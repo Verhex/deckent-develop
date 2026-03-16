@@ -1,0 +1,17 @@
+export {
+  readTask,
+  claimTask,
+  writeTaskPlan,
+  acquireLock,
+  releaseLock,
+  releaseAllLocks,
+  checkLock,
+  createHeartbeat,
+  writeHeartbeat,
+  writeResult,
+  updateTaskStatus,
+  isWithinScope,
+  TaskClaimError,
+  LockError,
+  ScopeViolationError,
+} from './worker.js';
