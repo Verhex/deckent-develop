@@ -68,7 +68,7 @@ import {
   evaluateResult, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runSprint,
-  BrainError,
+  BrainError, buildWorkerPrompt, extractScopeFromDirective,
 } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -367,6 +367,85 @@ describe('createTask', () => {
   });
 });
 
+describe('extractScopeFromDirective', () => {
+  it('extracts src/ directory paths', () => {
+    const scope = extractScopeFromDirective('Create hello.ts in src/utils/ directory');
+    expect(scope.directories).toContain('src/utils/');
+  });
+
+  it('extracts tests/ directory paths', () => {
+    const scope = extractScopeFromDirective('Add test in tests/utils/ for hello');
+    expect(scope.directories).toContain('tests/utils/');
+  });
+
+  it('extracts .ts file paths to filesWrite', () => {
+    const scope = extractScopeFromDirective('Create src/utils/hello.ts file');
+    expect(scope.filesWrite).toContain('src/utils/hello.ts');
+  });
+
+  it('extracts .js file paths to filesWrite', () => {
+    const scope = extractScopeFromDirective('Edit dist/index.js');
+    expect(scope.filesWrite).toContain('dist/index.js');
+  });
+
+  it('returns empty scope for directives without paths', () => {
+    const scope = extractScopeFromDirective('Refactor the authentication module');
+    expect(scope.directories).toHaveLength(0);
+    expect(scope.filesWrite).toHaveLength(0);
+  });
+
+  it('deduplicates paths', () => {
+    const scope = extractScopeFromDirective('Create src/utils/hello.ts and test src/utils/hello.ts');
+    expect(scope.filesWrite.filter(f => f === 'src/utils/hello.ts')).toHaveLength(1);
+  });
+
+  it('always returns empty filesRead', () => {
+    const scope = extractScopeFromDirective('anything src/foo/bar.ts');
+    expect(scope.filesRead).toEqual([]);
+  });
+});
+
+describe('buildWorkerPrompt', () => {
+  it('includes .tasks/task-{id}.result instruction', () => {
+    const task = makeTask({ id: '001-001' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('.tasks/task-001-001.result');
+  });
+
+  it('includes task id and title', () => {
+    const task = makeTask({ id: '002-003', title: 'Build feature X' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('Task 002-003');
+    expect(prompt).toContain('Build feature X');
+  });
+
+  it('includes selfAssessment options', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('DONE');
+    expect(prompt).toContain('GO_WITH_TECH_DEBT');
+    expect(prompt).toContain('NO_GO');
+  });
+
+  it('shows scope directories when available', () => {
+    const task = makeTask({ scope: { directories: ['src/core/'], filesRead: [], filesWrite: [] } });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('Scope: src/core/');
+  });
+
+  it('shows "any" when no scope directories', () => {
+    const task = makeTask({ scope: { directories: [], filesRead: [], filesWrite: [] } });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('Scope: any');
+  });
+
+  it('strips single quotes from prompt', () => {
+    const task = makeTask({ title: "Task with 'quotes'" });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).not.toContain("'");
+  });
+});
+
 describe('planSprint', () => {
   const config = makeConfig();
   const recommendation = { size: 'full' as const, maxWorkers: 4, modelConstraint: null, reason: '' };
@@ -428,6 +507,21 @@ describe('planSprint', () => {
     }]);
     expect(() => planSprint(ROOT, config, makeContext('A'), recommendation)).toThrow(BrainError);
   });
+
+  it('strips "- " prefix from directive lines', () => {
+    const ctx = makeContext('- Build feature X\n- Test feature X');
+    const sprint = planSprint(ROOT, config, ctx, recommendation);
+    expect(sprint.tasks[0]?.title).toBe('Build feature X');
+    expect(sprint.tasks[1]?.title).toBe('Test feature X');
+  });
+
+  it('extracts scope from directive paths', () => {
+    const ctx = makeContext('Create src/utils/hello.ts in src/utils/');
+    const sprint = planSprint(ROOT, config, ctx, recommendation);
+    const task = sprint.tasks[0];
+    expect(task?.scope.directories).toContain('src/utils/');
+    expect(task?.scope.filesWrite).toContain('src/utils/hello.ts');
+  });
 });
 
 describe('spawnWorkers', () => {
@@ -457,6 +551,7 @@ describe('spawnWorkers', () => {
     const call = mockedSpawnWorker.mock.calls[0];
     expect(call?.[0]).toBe('001-001');
     expect(call?.[2]).toContain('001-001');
+    expect(call?.[2]).toContain('.tasks/task-001-001.result');
   });
 
   it('updates dashboard after spawning', () => {

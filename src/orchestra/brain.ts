@@ -262,6 +262,30 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
   };
 }
 
+// 4b. extractScopeFromDirective (pure)
+export function extractScopeFromDirective(line: string): TaskScope {
+  const directories: string[] = [];
+  const filesWrite: string[] = [];
+
+  // Match directory-like paths: src/..., tests/...
+  const dirMatches = line.match(/\b(src\/[\w/.-]*|tests\/[\w/.-]*)\//g);
+  if (dirMatches) {
+    for (const d of dirMatches) {
+      if (!directories.includes(d)) directories.push(d);
+    }
+  }
+
+  // Match file paths: anything ending in .ts or .js
+  const fileMatches = line.match(/\b[\w/.-]+\.(?:ts|js)\b/g);
+  if (fileMatches) {
+    for (const f of fileMatches) {
+      if (!filesWrite.includes(f)) filesWrite.push(f);
+    }
+  }
+
+  return { directories, filesRead: [], filesWrite };
+}
+
 // 5. planSprint
 export function planSprint(
   projectRoot: string,
@@ -312,10 +336,12 @@ export function planSprint(
   const directiveLines = context.directives
     .split('\n')
     .map(l => l.trim())
-    .filter(l => l && !l.startsWith('#'));
+    .filter(l => l && !l.startsWith('#'))
+    .map(l => l.replace(/^-\s+/, ''));
 
   for (const line of directiveLines) {
     if (tasks.length >= recommendation.maxWorkers) break;
+    const scope = extractScopeFromDirective(line);
     tasks.push(createTask({
       title: line,
       description: line,
@@ -323,7 +349,7 @@ export function planSprint(
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'Directive',
-      scope: { directories: [], filesRead: [], filesWrite: [] },
+      scope,
       dependencies: [],
       goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
       sprintId,
@@ -356,13 +382,45 @@ export function planSprint(
   };
 }
 
+// 5b. buildWorkerPrompt (pure)
+export function buildWorkerPrompt(task: Task): string {
+  const scopeStr = task.scope.directories.length > 0
+    ? task.scope.directories.join(', ')
+    : 'any';
+
+  return `You are a Deckent worker agent. Your task:
+
+Task ${task.id}: ${task.title}
+Description: ${task.description}
+Scope: ${scopeStr}
+
+Instructions:
+1. Complete the task described above
+2. Stay within the assigned scope
+3. When finished, create the result file at .tasks/task-${task.id}.result with this exact JSON format:
+
+{
+  "taskId": "${task.id}",
+  "filesChanged": ["list/of/files/you/created/or/modified"],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Brief summary of what was done"
+}
+
+selfAssessment must be one of: "DONE", "GO_WITH_TECH_DEBT", "NO_GO"
+The result file is REQUIRED — without it your work cannot be evaluated.`.replace(/'/g, '');
+}
+
 // 6. spawnWorkers
 export function spawnWorkers(projectRoot: string, sprint: Sprint, config: ResolvedConfig): void {
   ensureSession();
   startAuditor(projectRoot, { allowedTools: 'Read,Bash' });
 
   for (const task of sprint.tasks) {
-    const prompt = `Task ${task.id}: ${task.title}. ${task.description}`.replace(/'/g, '');
+    const prompt = buildWorkerPrompt(task);
     const model = task.model;
     const writeTargets = [...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
     const allowedTools = writeTargets.length > 0
