@@ -38,3 +38,9 @@ Test: `npm test`
 Lint: `npm run lint`
 Dev: `npm run dev`
 Coverage: `npm run test:coverage`
+
+## Communication
+
+- Respond in Turkish. Technical terms may remain in English.
+- Kod yorumları İngilizce kalabilir (açık kaynak uyumluluk).
+- Sprint raporları ve retrospektifler Türkçe yazılır.

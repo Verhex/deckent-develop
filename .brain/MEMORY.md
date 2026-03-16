@@ -8,3 +8,9 @@
 - `structuredClone` is available at runtime in Node 18+ but needs `@types/node` for compile-time types
 - Config validation should collect all errors (not fail-fast) for better developer experience
 - `memfs` not needed for config tests — `vi.mock('node:fs')` with `mockImplementation` is simpler and sufficient
+
+## Windows Symlink (2026-03-16)
+
+- Windows'ta `git config core.symlinks=false` → `ln -s` kopya oluşturur, gerçek symlink değil
+- AGENTS.md güncellendiğinde CLAUDE.md'yi `cp AGENTS.md CLAUDE.md` ile senkronize et
+- Linux/macOS'ta gerçek symlink çalışır, senkronizasyon gerekmez
