@@ -61,6 +61,7 @@ export const TMUX_WORKER_PREFIX = 'w-' as const;
 // ─── Tech Debt Escalation ────────────────────────────────────────────
 export const DEBT_HIGH_PRIORITY_SPRINTS = 2 as const;
 export const DEBT_CRITICAL_SPRINTS = 3 as const;
+export const DEBT_TABLE_HEADER = '| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |' as const;
 
 // ─── Defaults ────────────────────────────────────────────────────────
 export const DEFAULT_LANGUAGE = 'en' as const;

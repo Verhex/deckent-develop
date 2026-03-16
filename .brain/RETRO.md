@@ -1,20 +1,23 @@
-# Sprint Retrospective — Sprint 1 / Wave 2
+# Sprint Retrospective — Sprint 1 / Wave 3
 
 **Date:** 2026-03-16
 
 ## What Went Well
-- 3 modül paralel planlandı ve implement edildi — birbirine bağımlı değil
-- Cross-import yok: orchestra, monitor, agents birbirini import etmiyor
-- Coverage %90.89 — hedef olan %90'ın üzerinde
-- 128 test (80 yeni) tümü yeşil — Wave 1 testleri kırılmadı
-- Güvenlik: tüm shell komutları spawnSync ile argument array olarak geçiyor
-- Auditor resilient: readJsonSafe pattern tek bozuk dosyayı atlıyor
+- 17 fonksiyon + 7 internal helper tek session'da implement edildi
+- Coverage %93.61 (stmts) / %96.42 (funcs) — hedef %90'ın üzerinde
+- 83 yeni test, toplam 211 — Wave 1+2 testleri kırılmadı (0 regression)
+- Brain modülü tmux/auditor/worker'ı orkestre ediyor — döngüsel import yok
+- `runSprint` 8 phase'i doğru sırayla yürütüyor, hata recovery çalışıyor
+- Pure fonksiyonlar (evaluateResult, calculateMetrics, adjustSprintSize) test ile I/O yapmadığı doğrulandı
 
 ## What Could Improve
-- writeResult test'inde beklenen writeFileSync çağrı sayısı yanlış hesaplandı (3 yerine 2) — ilk denemede 1 test fail oldu
-- Barrel export index.ts dosyaları coverage'ı düşürüyor (%0 — sadece re-export)
+- `parseDebtTable` ilk implementasyonda `filter(c => c)` boş kolonları siliyordu → `slice(1,-1)` ile düzeltildi (1 test fail)
+- `waitForResults` timeout=0 ile döngü hiç çalışmıyordu → ilk geçiş döngü öncesine taşındı (1 test fail)
+- `escalateDebt` test'inde tümü resolved item olunca writeFileSync çağrılmıyordu → test düzeltildi (1 test fail)
+- İlk denemede 5 test fail, 3 düzeltme ile 83/83'e ulaşıldı
 
 ## Action Items for Next Wave
-- Wave 3 Brain modülü bu 3 modülü orkestre edecek — API surface'ı kontrol et
-- Integration test'ler için gerçek dosya sistemi (temp dir) kullanmayı değerlendir
-- Brain'in `releaseAllLocks` ve `updateTaskStatus` helper'larını kullanması bekleniyor
+- Wave 4 CLI modülü `runSprint` fonksiyonunu çağıracak — public API yüzeyini kontrol et
+- `checkUsage` stub'ı gerçek Claude CLI entegrasyonuyla değiştir (DEBT-002)
+- Integration test'lerde gerçek dosya sistemi (temp dir) kullanmayı değerlendir
+- DEBT.md'nin programatik formatı Wave 4+ için yeterli mi değerlendir
