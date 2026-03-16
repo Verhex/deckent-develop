@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-wave4] - 2026-03-16
+
+### Added
+
+- **CLI Module** (`src/cli/`): 17 komut, 16 komut dosyası, 3 helper — `deckent` CLI arayüzü
+- **Entry point** (`src/cli/index.ts`): Shebang + Commander program, 16 register fonksiyonu
+- **Init wizard** (`src/cli/commands/init.ts`): Interactive setup — plan seçimi, dil, proje adı, dizin yapısı oluşturma, .gitignore duplicate kontrolü
+- **Doctor** (`src/cli/commands/doctor.ts`): Node.js, git, tmux, Claude CLI sağlık kontrolü
+- **Terminal dashboard** (`src/cli/commands/status.ts`): Unicode box-drawing ile ASCII dashboard render
+- **Sprint commands**: `start` (runSprint + --auto-approve + --sandbox stub), `plan` (plan-only mode), `cleanup`, `retro`
+- **Agent commands**: `attach` (tmux), `spawn` (manual worker), `kill` (worker kill)
+- **Config commands**: `config` (show), `config set` (validate + write)
+- **Info commands**: `usage`, `history` (sprint log table)
+- **Stub commands**: `plugin install/list`, `upgrade`, `onboard` — "not yet implemented"
+- **Helpers**: `output.ts` (formatDashboard, formatDoctorResult, formatTable, formatProgressBar, formatSprintSummary), `process.ts` (EXIT_CODES, handleCliError, resolveProjectRoot), `prompt.ts` (promptText, promptSelect, promptConfirm)
+- **Runtime dependency**: `commander@^13.0.0` (tek runtime dependency)
+- **Test suite**: 86 new tests, total 297 (all passing)
+- **Coverage**: %92.91 overall; CLI commands %98.33, CLI entry %95.23, CLI helpers %89.47
+
+### Changed
+
+- `vitest.config.ts`: Removed `src/cli/**` from coverage exclude
+- `package.json`: Added `commander` as runtime dependency
+
 ## [0.1.0-wave3] - 2026-03-16
 
 ### Added

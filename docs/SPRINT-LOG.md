@@ -108,4 +108,49 @@
 
 ---
 
+## Sprint 1 / Wave 4 — CLI Module
+
+**Status:** COMPLETE
+**Date:** 2026-03-16
+**Duration:** Single session
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Files created | 22 (16 commands, 3 helpers, 1 entry point, 3 test) |
+| Files updated | 2 (package.json, vitest.config.ts) |
+| Tests | 86 new, 297 total (all passing) |
+| Coverage | %92.91 overall; CLI commands %98.33 |
+| Type errors | 0 |
+| Commands | 17 (init, start, plan, status, attach, spawn, kill, retro, cleanup, doctor, config, config set, usage, history, plugin install/list, upgrade, onboard) |
+| Runtime dependencies | 1 (commander@^13.0.0) |
+
+### Decisions Made
+
+- **ADR-010**: Tek runtime dependency (commander.js) — minimal footprint
+- **ADR-011**: node:readline/promises — ek bağımlılık yerine built-in
+- **ADR-012**: register\<Name\>(program) pattern — her komut kendi dosyasında
+
+### Tech Debt Accepted
+
+- DEBT-005: `--auto-approve` → `haiku_allowed` mapping — semantik yanlış ama fonksiyonel
+- DEBT-006: `deckent status` tek-seferlik okuma — canlı izleme Phase 3'te
+- DEBT-007: `--sandbox` stub — Docker container modu implement edilmedi
+- DEBT-008: Plugin/upgrade/onboard stub komutlar
+- DEBT-009: CLI mesajları hardcoded İngilizce — i18n sonra
+- DEBT-010: `deckent retro` sadece görüntüleme — yeniden hesaplama yapmaz
+- DEBT-011: `deckent plan` sonrası `deckent start` çakışma riski
+
+### Notes
+
+- CLI → core/orchestra/monitor/agents yönünde tek yönlü bağımlılık, döngüsel import yok
+- `commander` tek runtime dependency — chalk/inquirer/picocolors eklenmedi
+- `node:readline/promises` Node 18+ built-in — interaktif prompt için yeterli
+- Unicode box-drawing (╔═╗║╚═╝) terminal dashboard için yeterli, renk kütüphanesi gereksiz
+- `.gitignore` append'de duplicate kontrolü ile güvenli ekleme
+- Wave 1-3 mevcut 211 test kırılmadı (0 regression)
+
+---
+
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Section 19*

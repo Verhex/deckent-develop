@@ -33,3 +33,13 @@
 - `parseDebtTable`/`generateDebtTable` markdown tablo formatını korur — `slice(1,-1)` boş kolon sorununu çözer
 - Timeout sonrası eksik task → syntheticResult ile NO_GO olarak değerlendirilir
 - `sleepSync(Atomics.wait)` main thread bloklar — brain headless CLI olarak çalıştığı için şu an kabul edilebilir, ileride async geçiş gerekebilir
+
+## Wave 4 Learnings (Sprint 1, 2026-03-16)
+
+- CLI tek runtime dependency: `commander.js` — chalk/inquirer/picocolors eklenmez, minimal footprint
+- `node:readline/promises` Node 18+ built-in — interaktif prompt (promptText, promptSelect, promptConfirm) için yeterli
+- Her komut `register<Name>(program: Command): void` pattern'i ile kendi dosyasında kayıtlanır — bağımsız test, kolay ekleme
+- Unicode box-drawing (`╔═╗║╚═╝`) terminal dashboard için yeterli, renk kütüphanesi gereksiz
+- `.gitignore` append'de duplicate kontrolü önemli — `existing.includes(entry)` ile mevcut satır varsa atla
+- Commander `exitOverride()` + sync action'larda throw edilen hatalar Commander tarafından yakalanır — test'lerde `rejects.toThrow` yerine çıktı kontrolü kullan
+- `vi.clearAllMocks()` her `beforeEach`'te zorunlu — mock call history testler arası sızar, özellikle `writeFileSync.mock.calls` filtreleme yapan testlerde

@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+
+import { Command } from 'commander';
+import { DECKENT_VERSION } from '../core/constants.js';
+import { handleCliError } from './helpers/process.js';
+import { registerInit } from './commands/init.js';
+import { registerStart } from './commands/start.js';
+import { registerPlan } from './commands/plan.js';
+import { registerStatus } from './commands/status.js';
+import { registerAttach } from './commands/attach.js';
+import { registerSpawn } from './commands/spawn.js';
+import { registerKill } from './commands/kill.js';
+import { registerRetro } from './commands/retro.js';
+import { registerCleanup } from './commands/cleanup.js';
+import { registerDoctor } from './commands/doctor.js';
+import { registerConfig } from './commands/config.js';
+import { registerUsage } from './commands/usage.js';
+import { registerHistory } from './commands/history.js';
+import { registerPlugin } from './commands/plugin.js';
+import { registerUpgrade } from './commands/upgrade.js';
+import { registerOnboard } from './commands/onboard.js';
+
+const program = new Command()
+  .name('deckent')
+  .description('AI agent orchestration system — your AI development team, orchestrated.')
+  .version(DECKENT_VERSION);
+
+registerInit(program);
+registerStart(program);
+registerPlan(program);
+registerStatus(program);
+registerAttach(program);
+registerSpawn(program);
+registerKill(program);
+registerRetro(program);
+registerCleanup(program);
+registerDoctor(program);
+registerConfig(program);
+registerUsage(program);
+registerHistory(program);
+registerPlugin(program);
+registerUpgrade(program);
+registerOnboard(program);
+
+program.parseAsync(process.argv).catch((err: unknown) => {
+  handleCliError(err);
+});
