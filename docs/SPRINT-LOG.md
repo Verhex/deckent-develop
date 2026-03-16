@@ -37,15 +37,34 @@
 
 ## Sprint 1 / Wave 2 — tmux + Worker + Auditor
 
-**Status:** TODO
+**Status:** COMPLETE
+**Date:** 2026-03-16
+**Duration:** Single session
 
-### Planned
+### Results
 
-- tmux session manager (`src/orchestra/tmux.ts`)
-- Worker lifecycle (`src/agents/worker.ts`)
-- Auditor scan loop (`src/monitor/auditor.ts`)
-- Lock manager
-- Heartbeat system
+| Metric | Value |
+|--------|-------|
+| Files created | 9 (3 source, 3 barrel, 3 test) |
+| Files updated | 1 (src/index.ts) |
+| Tests | 80 new, 128 total (all passing) |
+| Coverage | 90.89% overall |
+| Type errors | 0 |
+| Public functions | 32 (10 tmux + 10 auditor + 12 worker) |
+| Error classes | 4 (TmuxError, TaskClaimError, LockError, ScopeViolationError) |
+
+### Decisions Made
+
+- **ADR-005**: Synchronous I/O preferred (async unnecessary for small files)
+- **ADR-006**: spawnSync security pattern (no shell interpretation)
+- **ADR-007**: SpawnOptions interface (allowedTools + autoApprove)
+
+### Notes
+
+- 3 modules implemented in parallel — no cross-imports between orchestra/monitor/agents
+- Auditor uses `readJsonSafe` pattern — single corrupt file doesn't break scan loop
+- Lock file naming: path separators → `__` (double underscore), no nested directories needed
+- `isWithinScope` uses trailing separator normalization for prefix overlap protection
 
 ---
 

@@ -1,19 +1,20 @@
-# Sprint Retrospective — Sprint 1 / Wave 1
+# Sprint Retrospective — Sprint 1 / Wave 2
 
 **Date:** 2026-03-16
 
 ## What Went Well
-- Clean type system established — 8 enums, 25+ interfaces covering all Blueprint domains
-- 48 tests passing with 91.87% coverage on first iteration
-- 3-layer config merge working correctly with deep nested overrides
-- All Blueprint references (sections 5-15) accurately reflected in types
+- 3 modül paralel planlandı ve implement edildi — birbirine bağımlı değil
+- Cross-import yok: orchestra, monitor, agents birbirini import etmiyor
+- Coverage %90.89 — hedef olan %90'ın üzerinde
+- 128 test (80 yeni) tümü yeşil — Wave 1 testleri kırılmadı
+- Güvenlik: tüm shell komutları spawnSync ile argument array olarak geçiyor
+- Auditor resilient: readJsonSafe pattern tek bozuk dosyayı atlıyor
 
 ## What Could Improve
-- `@types/node` was missing from initial plan — should be standard for Node.js TypeScript projects
-- `deepMerge` required type workaround — consider a simpler approach if TypeScript generics cause friction in future
-- `memfs` was planned but not needed — simpler `vi.mock` was sufficient
+- writeResult test'inde beklenen writeFileSync çağrı sayısı yanlış hesaplandı (3 yerine 2) — ilk denemede 1 test fail oldu
+- Barrel export index.ts dosyaları coverage'ı düşürüyor (%0 — sadece re-export)
 
 ## Action Items for Next Wave
-- Wave 2 should import all types from `src/core/index.ts` — verify barrel exports work as expected
-- tmux manager will need integration tests on Linux/macOS (not Windows)
-- Worker heartbeat system needs real file I/O — consider whether to mock or use temp directories
+- Wave 3 Brain modülü bu 3 modülü orkestre edecek — API surface'ı kontrol et
+- Integration test'ler için gerçek dosya sistemi (temp dir) kullanmayı değerlendir
+- Brain'in `releaseAllLocks` ve `updateTaskStatus` helper'larını kullanması bekleniyor

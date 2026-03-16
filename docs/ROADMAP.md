@@ -11,7 +11,7 @@ Build the orchestration runtime — Brain, Auditor, Workers, Sprint lifecycle.
 ### Sprint 1 — Wave Breakdown
 
 - [x] **Wave 1: Core Types & Config** — TypeScript types, constants, 3-layer config loader
-- [ ] **Wave 2: tmux + Worker + Auditor** — tmux manager, worker lifecycle, auditor scan loop
+- [x] **Wave 2: tmux + Worker + Auditor** — tmux manager, worker lifecycle, auditor scan loop
 - [ ] **Wave 3: Brain** — Sprint planning, GO/NO-GO evaluation, retrospective, memory updates
 - [ ] **Wave 4: CLI** — `deckent init`, `start`, `plan`, `status`, `doctor` commands
 - [ ] **Wave 5: Integration Tests** — Full sprint cycle end-to-end test
