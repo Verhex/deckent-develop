@@ -1,0 +1,27 @@
+node_modules/
+dist/
+coverage/
+
+# Deckent runtime
+.tasks/*.hb
+.tasks/*.signal
+.tasks/*.output
+.locks/
+.dashboard
+
+# Archives
+.brain/archive/
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

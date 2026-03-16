@@ -1,0 +1,1150 @@
+# DECKENT MASTER BLUEPRINT
+## AI Agent Orchestration System — Complete Implementation Reference
+### Version 1.0 — March 2026 — Verhex
+
+---
+
+# TABLE OF CONTENTS
+
+1. Product Identity & Vision
+2. Architecture Overview
+3. Native CLI & Installation
+4. Workspace Structure
+5. Agent System (Brain, Auditor, Worker)
+6. Memory Architecture (3-Tier)
+7. Sprint Lifecycle & Orchestration
+8. GO / NO-GO / Tech Debt Protocol
+9. Usage-Aware Planning
+10. Dynamic Terminal Management (tmux)
+11. Plugin & Skill System
+12. UI Roadmap (Terminal → Web → VSCode)
+13. Multi-Plan Compatibility
+14. i18n & Multi-Language
+15. Security & Permissions
+16. Self-Test & Reporting
+17. Repository Strategy
+18. File-by-File Reference
+19. Sprint 1 Implementation Plan
+20. Claude Code Integration Guide
+
+---
+
+# 1. PRODUCT IDENTITY & VISION
+
+**Name:** Deckent (Deck + Agent)
+**Domain:** deckent.agency
+**Tagline:** "Your AI development team, orchestrated."
+**Author:** Alperen @ Verhex
+
+**What Deckent Is:**
+A self-evolving AI agent orchestration system. You write directives in plain language. Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
+
+**What Deckent Is NOT:**
+- Not another ChatGPT wrapper
+- Not a simple task runner
+- Not limited to Claude (future: multi-provider)
+
+**Core Principles:**
+1. Native-first — installs like a CLI tool, runs like a system service
+2. Self-evolving — learns from mistakes, improves plans, adapts patterns
+3. Observable — every agent's action is visible in real-time
+4. Usage-aware — never exceeds plan limits, never leaves sprints incomplete
+5. Plan-compatible — works on Pro ($20), Max ($100-200), or API
+6. Open source — community-driven, extensible via plugins/skills
+
+**Inspiration Sources:**
+- OpenClaw: workspace structure, memory tiers, skill system, AGENTS.md pattern
+- Claude Cowork: agentic loop, plan→execute→verify, plugin architecture
+- Claude Code: CLAUDE.md, .claude/rules/, headless mode, Agent Teams
+
+---
+
+# 2. ARCHITECTURE OVERVIEW
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    YOU (Operator)                     │
+│              writes DIRECTIVES.md                    │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│                  DECKENT CLI                          │
+│          `deckent start` / `deckent plan`            │
+│    Native binary — npm install -g deckent            │
+└──────────┬───────────────────────────┬──────────────┘
+           │                           │
+┌──────────▼──────────┐  ┌────────────▼──────────────┐
+│       BRAIN          │  │        AUDITOR             │
+│  Plans, evaluates,   │  │  Monitors, detects,       │
+│  learns, adapts      │  │  reports, enforces         │
+│  Model: opus/sonnet  │  │  Model: sonnet             │
+└──────────┬──────────┘  └────────────┬──────────────┘
+           │                           │
+┌──────────▼──────────────────────────▼──────────────┐
+│              WORKER POOL (dynamic)                   │
+│  tmux panes — spawned/killed by Brain on demand     │
+│  Each worker: plan → code → test → doc → report     │
+│  Model: per-task (opus/sonnet/haiku)                │
+└─────────────────────────────────────────────────────┘
+           │
+┌──────────▼──────────────────────────────────────────┐
+│              MEMORY SYSTEM (.brain/)                  │
+│  Tier 1: MEMORY.md (always loaded, ~100 lines)      │
+│  Tier 2: sprint logs (per-sprint, auto-archived)    │
+│  Tier 3: deep knowledge (searchable archive)        │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+# 3. NATIVE CLI & INSTALLATION
+
+## 3.1 Installation
+
+```bash
+# Install globally
+npm install -g deckent
+
+# Initialize in a project
+cd my-project
+deckent init
+
+# Or onboard with wizard
+deckent onboard
+```
+
+## 3.2 CLI Commands
+
+```
+deckent init              Interactive setup wizard for new project
+deckent onboard           Full onboarding (global + project config)
+deckent start             Run full sprint lifecycle
+deckent plan              Brain plans next sprint (plan mode)
+deckent status            Show live dashboard
+deckent attach            Attach to tmux session (see all agents)
+deckent spawn <id>        Manually spawn a worker
+deckent kill <id>         Kill a specific worker
+deckent retro             Run sprint retrospective
+deckent cleanup           Archive sprint files, kill workers
+deckent doctor            Check system health (tmux, claude, git, node)
+deckent config             Show/edit configuration
+deckent config set <k> <v> Set config value
+deckent usage             Show current plan usage
+deckent history           Show sprint history & metrics
+deckent plugin install <n> Install a skill/plugin
+deckent plugin list       List installed plugins
+deckent upgrade           Self-update
+```
+
+## 3.3 Init Wizard Flow
+
+```
+$ deckent init
+
+  🎛️  Welcome to Deckent!
+  
+  ? Select your Claude plan:
+    ❯ Max 20x ($200/mo) — up to 8 workers, Opus for Brain
+      Max 5x ($100/mo) — up to 5 workers, Sonnet for Brain
+      Pro ($20/mo) — up to 3 workers, Sonnet only
+      API (pay-as-you-go) — up to 10 workers, any model
+  
+  ? Default language: 
+    ❯ English
+      Türkçe
+      (more via plugins)
+  
+  ? Project name: my-awesome-project
+  
+  ✓ Created AGENTS.md (+ CLAUDE.md symlink)
+  ✓ Created .deckent/config.json
+  ✓ Created .deckent/workspace/
+  ✓ Created .claude/rules/
+  ✓ Initialized .gitignore
+  
+  Next: Edit DIRECTIVES.md with your first goals, then run `deckent start`
+```
+
+## 3.4 System Requirements
+
+```
+Required:
+  Node.js ≥ 18 (22 recommended)
+  git
+  tmux (auto-installed on first run if missing)
+  Claude Code CLI (npm install -g @anthropic-ai/claude-code)
+  Claude subscription (Pro, Max, or API key)
+
+Supported OS:
+  macOS (Intel + Apple Silicon)
+  Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch)
+  Windows (via WSL2 — native Windows planned)
+```
+
+---
+
+# 4. WORKSPACE STRUCTURE
+
+## 4.1 Project-Level (in your repo)
+
+```
+my-project/
+├── AGENTS.md                          # Master agent instructions
+├── CLAUDE.md → AGENTS.md              # Symlink for Claude Code compat
+├── DIRECTIVES.md                      # Operator commands (YOU write this)
+│
+├── .deckent/                          # Deckent workspace
+│   ├── config.json                    # Runtime config (mode, models, limits)
+│   ├── workspace/                     # Agent workspace
+│   │   ├── IDENTITY.md               # Project identity card
+│   │   ├── TOOLS.md                  # Environment-specific tools/commands
+│   │   └── BOOT.md                   # Startup routine for agents
+│   ├── plugins/                       # Installed plugins
+│   │   └── <plugin>/SKILL.md
+│   └── i18n/                          # Language files
+│       ├── en.json
+│       └── tr.json
+│
+├── .brain/                            # Memory system (Brain + Auditor only)
+│   ├── MEMORY.md                      # Tier 1: always loaded (~100 lines)
+│   ├── DECISIONS.md                   # Architecture Decision Records
+│   ├── DEBT.md                        # Technical debt log
+│   ├── PATTERNS.md                    # Auditor findings
+│   ├── RETRO.md                       # Latest sprint retrospective
+│   ├── sprints/                       # Tier 2: per-sprint logs
+│   │   ├── sprint-001.md
+│   │   └── sprint-002.md
+│   └── archive/                       # Tier 3: deep knowledge
+│       └── memory-old.md
+│
+├── .contracts/                        # Inter-agent contracts
+│   └── api-surface.md
+│
+├── .tasks/                            # Ephemeral task files (auto-cleaned)
+│   ├── task-001.json                  # Task definition
+│   ├── task-001.plan                  # Worker's execution plan
+│   ├── task-001.hb                    # Heartbeat (overwritten)
+│   └── task-001.result                # Completion report
+│
+├── .locks/                            # File locks (runtime only)
+├── .dashboard                         # Live status (Auditor overwrites)
+│
+├── .claude/                           # Claude Code native config
+│   ├── settings.json                  # Claude Code settings
+│   └── rules/                         # Path-scoped rules
+│       ├── brain.md                   # Rules when acting as Brain
+│       ├── auditor.md                 # Rules when acting as Auditor
+│       ├── worker-default.md          # Default worker rules
+│       └── testing.md                 # Rules for test files
+│
+├── src/                               # Your actual source code
+├── tests/
+├── docs/
+└── package.json
+```
+
+## 4.2 Global Config (~/.deckent/)
+
+```
+~/.deckent/
+├── config.json                        # Global defaults (plan, language, etc.)
+├── credentials/                       # API keys (never in project)
+│   └── anthropic.json
+├── skills/                            # Global skills (shared across projects)
+│   └── <skill>/SKILL.md
+├── templates/                         # Project templates
+│   ├── typescript/
+│   └── python/
+└── history/                           # Global sprint history for analytics
+```
+
+## 4.3 AGENTS.md + CLAUDE.md Symlink
+
+This is the critical integration point. AGENTS.md is Deckent's master file. CLAUDE.md is a symlink to it, so Claude Code reads it natively.
+
+```bash
+# Created by `deckent init`
+ln -s AGENTS.md CLAUDE.md
+```
+
+AGENTS.md structure:
+
+```markdown
+# Project: {name}
+
+## Identity
+{from .deckent/workspace/IDENTITY.md}
+
+## Rules
+{core rules — max 50 lines}
+
+## Imports
+@DIRECTIVES.md
+@.brain/MEMORY.md
+@.contracts/api-surface.md
+
+## Agent Instructions
+When acting as Brain: @.claude/rules/brain.md
+When acting as Auditor: @.claude/rules/auditor.md  
+When acting as Worker: @.claude/rules/worker-default.md
+
+## Commands
+Build: {command}
+Test: {command}
+Lint: {command}
+```
+
+Key: AGENTS.md is SHORT (~80 lines). Uses @imports for detail. Claude Code follows @imports natively.
+
+---
+
+# 5. AGENT SYSTEM
+
+## 5.1 Brain
+
+**Role:** Orchestrator — plans, evaluates, learns
+**Model:** Opus (Max plans) or Sonnet (Pro plan)
+**Reads:** DIRECTIVES, MEMORY, RETRO, DEBT, PATTERNS, project state
+**Writes:** .tasks/, .contracts/, .brain/RETRO, .brain/MEMORY, .brain/DECISIONS
+
+**Lifecycle:**
+```
+1. Check usage limits → adjust sprint size
+2. Read all memory files (RETRO, MEMORY, DEBT, PATTERNS)
+3. Read DIRECTIVES.md (operator commands)
+4. Scan project state (git status, file tree)
+5. Plan sprint in plan mode → create .tasks/*.json
+6. Determine worker count and model per task
+7. Spawn workers via tmux
+8. Wait for results
+9. Evaluate each result → GO / NO-GO / TECH_DEBT
+10. Handle cross-dependencies
+11. Run retrospective → update MEMORY, RETRO, DECISIONS
+12. Trigger decay/compression if needed
+13. Signal sprint complete
+```
+
+**Brain evolves:** Each sprint's retro feeds the next sprint's plan. Brain reads its own past mistakes and adjusts.
+
+## 5.2 Auditor
+
+**Role:** Immune system — monitors, detects, reports
+**Model:** Sonnet (always)
+**Reads:** .tasks/*.hb, git diff, .locks/, .dashboard
+**Writes:** .dashboard, .brain/PATTERNS.md, alerts
+
+**Scan cycle (every 30s):**
+```
+1. Read all heartbeat files → agent status
+2. Run git diff --stat → who changed what
+3. Check boundaries → any agent outside scope?
+4. Check locks → stale locks? conflicts?
+5. Deadlock detection → circular waits?
+6. Usage monitoring → approaching limits?
+7. Write .dashboard (overwrite — never append)
+8. If pattern detected → append to PATTERNS.md
+9. If critical → write alert, notify operator
+```
+
+**Auditor teaches:** Patterns found by Auditor feed into Brain's next plan.
+
+## 5.3 Worker
+
+**Role:** Builder — plans, codes, tests, documents
+**Model:** Per-task (opus/sonnet/haiku) — Brain decides
+**Reads:** .tasks/task-XXX.json, .contracts/, AGENTS.md
+**Writes:** source code (within scope), .tasks/*.hb, *.plan, *.result
+
+**Worker lifecycle:**
+```
+1. CLAIM: Read task file, set status CLAIMED
+2. PLAN: Write detailed plan to .tasks/task-XXX.plan
+   - Which files to create/modify
+   - Execution order
+   - Test strategy
+   - Documentation plan
+3. CODE: Execute plan within assigned scope
+   - Check lock before every file write
+   - Update heartbeat on every action
+4. TEST: Run tests
+   - tsc --noEmit (typecheck)
+   - vitest run (unit tests)
+   - Capture coverage
+5. DOCUMENT: Update relevant docs
+6. REPORT: Write .tasks/task-XXX.result
+   - files_changed, lines_added/removed
+   - test results, coverage
+   - self_assessment: DONE | GO_WITH_TECH_DEBT | NO_GO
+   - notes for Brain
+```
+
+**Worker model switching:**
+Brain assigns model per task in the task JSON:
+```json
+{
+  "model": "sonnet",
+  "effort": "normal",
+  "reason": "Routine CRUD endpoint"
+}
+```
+Worker spawns with that model. No runtime switching — model is fixed for task lifetime.
+
+---
+
+# 6. MEMORY ARCHITECTURE (3-Tier)
+
+Inspired by OpenClaw's tiered memory.
+
+## Tier 1: Always Loaded (MEMORY.md)
+- Max 100 lines
+- Brain writes after every sprint
+- Loaded into every agent's context via @import in AGENTS.md
+- Contains: learned patterns, key conventions, critical rules
+- Decay: oldest entries archived after 3 sprints of non-use
+
+## Tier 2: Sprint Logs (.brain/sprints/)
+- One file per sprint: sprint-001.md, sprint-002.md
+- Contains: full results, metrics, decisions made
+- Brain reads last 2 sprints at planning time
+- Older sprints archived automatically
+
+## Tier 3: Deep Archive (.brain/archive/)
+- Compressed old memories, patterns, sprint logs
+- NOT loaded into context automatically
+- Brain can search when needed (grep/find)
+- Useful for long-term trend analysis
+
+## Decay Mechanism
+```
+Every sprint end:
+1. Count total lines in .brain/ (excluding archive/)
+2. If > 300 lines → compress:
+   a. MEMORY.md: archive entries unused for 3+ sprints
+   b. PATTERNS.md: remove resolved patterns
+   c. DEBT.md: remove resolved debts
+   d. Move old sprint logs to archive/
+3. Verify total < 300 lines
+```
+
+## Memory Files
+
+| File | Writer | Reader | Max Lines | Decay |
+|------|--------|--------|-----------|-------|
+| MEMORY.md | Brain | All | 100 | 3 sprints |
+| DECISIONS.md | Brain | Brain, Auditor | No limit | Never |
+| DEBT.md | Brain | Brain | No limit | On resolve |
+| PATTERNS.md | Auditor | Brain | 80 | 5 sprints |
+| RETRO.md | Brain | Brain | 60 | Overwritten |
+| sprints/*.md | Brain | Brain | 50 each | Auto-archive |
+
+---
+
+# 7. SPRINT LIFECYCLE
+
+```
+Phase 0: DIRECTIVE
+  You write/update DIRECTIVES.md
+
+Phase 1: PLAN (Brain, plan mode)
+  Brain reads: DIRECTIVES + RETRO + MEMORY + DEBT + PATTERNS
+  Brain checks: usage limits
+  Brain creates: .tasks/*.json + .contracts/*
+  Brain decides: worker count, model per task
+  Output: sprint plan ready
+
+Phase 2: SPAWN
+  Brain spawns workers via tmux (dynamic)
+  Brain starts Auditor
+  Each agent gets its own tmux pane/window
+
+Phase 3: EXECUTE (Workers, parallel)
+  Each worker: plan → code → test → doc → report
+  Auditor: continuous scan loop (30s)
+  Dashboard: live updates
+
+Phase 4: EVALUATE (Brain)
+  For each .result file:
+    DONE → worker freed
+    GO_WITH_TECH_DEBT → worker freed + DEBT.md updated
+    NO_GO → fix task created, same or cross-assigned worker
+
+Phase 5: FIX (if NO-GO exists)
+  Assigned workers fix critical issues
+  Cross-dependency rule: if A's NO-GO caused by B's output,
+    B gets priority fix task even if B was GO
+
+Phase 6: RETRO (Brain)
+  Write RETRO.md (overwrite)
+  Update MEMORY.md (append learnings)
+  Update DECISIONS.md (if new decisions)
+  Calculate metrics
+  
+Phase 7: DECAY
+  Compress if .brain/ > 300 lines
+  Archive old sprint logs
+  Clean .tasks/, .locks/
+
+Phase 8: TRANSITION
+  If DIRECTIVES.md has more goals → start Phase 1 again
+  If done → report final status
+  SPRINT NEVER LEFT INCOMPLETE
+```
+
+---
+
+# 8. GO / NO-GO / TECH DEBT PROTOCOL
+
+Every task gets a three-way evaluation:
+
+| Decision | Condition | Worker Status | Memory Effect |
+|----------|-----------|---------------|---------------|
+| ✅ DONE | All criteria met | Free → next sprint | None |
+| ⚠️ GO+DEBT | Core done, minor deferred | Free + debt logged | DEBT.md updated |
+| ❌ NO-GO | Critical issue | Locked → must fix | Fix task created |
+
+**Cross-Dependency Rule:**
+If Worker-A gets NO-GO because Worker-B's output is broken:
+→ Worker-B gets a PRIORITY FIX task
+→ B fixes before starting any new sprint task
+→ Even if B was marked GO or GO+DEBT
+
+**Tech Debt Escalation:**
+- New debt: NORMAL priority
+- 2 sprints unfixed: HIGH priority
+- 3+ sprints unfixed: CRITICAL — auto-included in next sprint
+
+---
+
+# 9. USAGE-AWARE PLANNING
+
+Brain MUST check usage before planning. Sprint must never be left incomplete.
+
+## Usage Check Flow
+
+```
+1. Brain queries current usage (claude -p "/status")
+2. Parse 5-hour window % and weekly quota %
+3. Apply thresholds from config:
+
+   Max 20x:  5hr > 80% → small sprint  |  weekly > 60% → reduce workers
+   Max 5x:   5hr > 70% → small sprint  |  weekly > 50% → sonnet only
+   Pro:       5hr > 60% → small sprint  |  weekly > 40% → minimal
+   API:       check balance             |  budget per sprint limit
+
+4. If limit hit during sprint:
+   a. Pause current tasks (status → PAUSED)
+   b. Save state to .tasks/*.paused
+   c. Wait for limit reset
+   d. Resume from saved state
+   e. Sprint is NEVER abandoned
+```
+
+## Model Budget Per Sprint
+
+Brain calculates estimated token usage:
+```
+Brain planning:     ~2000 tokens (opus = expensive)
+Per worker task:    ~5000 tokens (sonnet = affordable)  
+Auditor per scan:   ~500 tokens (sonnet, short)
+Evaluation:         ~1000 tokens per task
+Retrospective:      ~2000 tokens
+
+Example sprint (5 workers, sonnet):
+  Brain: 2000 + Workers: 25000 + Auditor: 5000 + Eval: 5000 + Retro: 2000
+  Total: ~39000 tokens
+  
+Max 20x budget: ~900 messages/5hr ≈ plenty
+Pro budget: ~45 messages/5hr ≈ tight, 3 workers max
+```
+
+---
+
+# 10. DYNAMIC TERMINAL MANAGEMENT (tmux)
+
+## How Workers Are Spawned
+
+Brain creates workers by programmatically creating tmux windows:
+
+```bash
+# New worker
+tmux new-window -t deckent -n "w-{task_id}" -c "{project_dir}"
+tmux send-keys -t "deckent:w-{task_id}" "claude --model {model} -p '{prompt}'" Enter
+
+# Kill worker when done
+tmux kill-window -t "deckent:w-{task_id}"
+
+# List active workers
+tmux list-windows -t deckent -F '#{window_name}' | grep "^w-"
+```
+
+## tmux Session Layout
+
+```
+deckent (tmux session)
+├── brain       (window 0) — Brain orchestrator
+├── auditor     (window 1) — Live monitoring
+├── w-task-001  (window 2) — Worker 1
+├── w-task-002  (window 3) — Worker 2
+├── w-task-003  (window 4) — Worker 3
+└── dashboard   (window N) — watch cat .dashboard
+```
+
+## Dynamic Scaling
+
+Brain decides worker count per sprint:
+- 3 tasks with no dependencies → 3 workers
+- 8 tasks with dependency chain → 5 workers (some sequential)
+- If new task emerges mid-sprint → spawn additional worker
+- If worker finishes early → kill pane, free resources
+
+## Agent Teams Integration (Future)
+
+When Claude Code Agent Teams stabilizes:
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_SPAWN_BACKEND": "tmux"
+  },
+  "teammateMode": "tmux"
+}
+```
+Brain becomes team lead, workers become teammates with native messaging.
+
+---
+
+# 11. PLUGIN & SKILL SYSTEM
+
+Inspired by OpenClaw skills + Cowork plugins.
+
+## Skill Structure
+
+```
+.deckent/plugins/{skill-name}/
+├── SKILL.md          # Instructions (markdown)
+├── config.json       # Skill config (optional)
+├── scripts/          # Helper scripts (optional)
+│   └── run.sh
+└── README.md         # Documentation
+```
+
+## SKILL.md Format
+
+```markdown
+---
+name: react-component
+description: Generate React components with TypeScript and Tailwind
+version: 1.0.0
+author: community
+triggers:
+  - "create component"
+  - "build UI"
+model: sonnet
+---
+
+# React Component Skill
+
+When asked to create a React component:
+1. Use functional components with TypeScript
+2. Use Tailwind CSS for styling
+3. Include prop types
+4. Write co-located test file
+5. Export from barrel file
+
+## Template
+...
+```
+
+## Built-in Skills (Ship with Deckent)
+
+```
+orchestrate    — Core orchestration (Brain, Auditor, Worker)
+test-runner    — Automated testing workflows
+doc-writer     — Documentation generation
+code-reviewer  — Code review and quality checks
+refactor       — Safe refactoring with test validation
+migrate        — Database/API migration planning
+```
+
+## Custom Skills
+
+Users create project-specific skills:
+```bash
+deckent plugin create my-skill
+# Creates template in .deckent/plugins/my-skill/
+```
+
+---
+
+# 12. UI ROADMAP
+
+## Phase 1: Terminal Dashboard (Sprint 1-3)
+
+```
+$ deckent status
+
+╔══════════════════════════════════════════════════════╗
+║  DECKENT ORCHESTRA — Sprint 3 — 15:42              ║
+╠══════════════════════════════════════════════════════╣
+║  BRAIN     ░░░░░░░░  IDLE     Next: evaluation     ║
+║  AUDITOR   ████████  SCAN     Last: 3s ago          ║
+║  w-001     ████░░░░  CODE     src/core/engine.ts    ║
+║  w-002     ██████░░  TEST     running vitest        ║
+║  w-003     ████████  DONE ✓   src/api/routes.ts     ║
+╠══════════════════════════════════════════════════════╣
+║  Progress: 1/3 done | 2 active | 0 blocked         ║
+║  Usage: 5hr 34% | Weekly 22% | Budget: OK           ║
+║  Alerts: 0                                          ║
+╚══════════════════════════════════════════════════════╝
+```
+
+## Phase 2: Web Dashboard (Sprint 4-6)
+
+- React + Vite + Tailwind
+- WebSocket from file watcher → real-time updates
+- Sprint history with charts (Recharts)
+- DIRECTIVES.md editor
+- Agent detail view (click agent → see its work)
+- Dark/light theme
+- Mobile responsive
+
+## Phase 3: VSCode Extension (Sprint 7-10)
+
+- Sidebar panel with live agent status
+- Command palette: `Deckent: Start Sprint`, `Deckent: Show Dashboard`
+- Status bar: sprint progress, usage meter
+- Terminal management from sidebar
+- Inline decorations showing which agent modified which file
+- Settings UI for config.json
+
+---
+
+# 13. MULTI-PLAN COMPATIBILITY
+
+```json
+// .deckent/config.json
+{
+  "mode": "max_plan",
+  
+  "modes": {
+    "max_plan": {
+      "max_workers": 8,
+      "brain_model": "opus",
+      "default_model": "sonnet",
+      "haiku_allowed": true,
+      "usage_thresholds": { "5hr": 0.8, "weekly": 0.6 }
+    },
+    "max5x_plan": {
+      "max_workers": 5,
+      "brain_model": "sonnet",
+      "default_model": "sonnet",
+      "haiku_allowed": true,
+      "usage_thresholds": { "5hr": 0.7, "weekly": 0.5 }
+    },
+    "pro_plan": {
+      "max_workers": 3,
+      "brain_model": "sonnet",
+      "default_model": "sonnet",
+      "haiku_allowed": true,
+      "usage_thresholds": { "5hr": 0.6, "weekly": 0.4 }
+    },
+    "api": {
+      "max_workers": 10,
+      "brain_model": "opus",
+      "default_model": "sonnet",
+      "haiku_allowed": true,
+      "budget_per_sprint": 5.00,
+      "requires": "ANTHROPIC_API_KEY"
+    }
+  }
+}
+```
+
+Config switch: `deckent config set mode pro_plan`
+
+---
+
+# 14. i18n & MULTI-LANGUAGE
+
+## System Messages
+
+```json
+// .deckent/i18n/en.json
+{
+  "cli.welcome": "Welcome to Deckent!",
+  "cli.plan_select": "Select your Claude plan:",
+  "sprint.starting": "Sprint {n} starting...",
+  "sprint.complete": "Sprint {n} complete!",
+  "brain.planning": "Brain is planning...",
+  "worker.spawned": "Worker {id} spawned (model: {model})",
+  "auditor.alert": "ALERT: {message}",
+  "usage.warning": "Usage at {pct}% — conserving resources"
+}
+
+// .deckent/i18n/tr.json
+{
+  "cli.welcome": "Deckent'e hoş geldiniz!",
+  "cli.plan_select": "Claude planınızı seçin:",
+  "sprint.starting": "Sprint {n} başlıyor...",
+  "sprint.complete": "Sprint {n} tamamlandı!",
+  "brain.planning": "Brain planlıyor...",
+  "worker.spawned": "Worker {id} başlatıldı (model: {model})",
+  "auditor.alert": "UYARI: {message}",
+  "usage.warning": "Kullanım %{pct} — kaynaklar korunuyor"
+}
+```
+
+Language set: `deckent config set language tr`
+
+Agent prompts remain in English (LLM performance). UI/CLI output follows user's language preference.
+
+---
+
+# 15. SECURITY & PERMISSIONS
+
+## Permission Model
+
+```
+Level 1: Operator (YOU)
+  - Full access to everything
+  - Writes DIRECTIVES.md, AGENTS.md
+  - Approves/rejects sprint plans
+  - Can kill any agent
+
+Level 2: Brain
+  - Read: all files
+  - Write: .tasks/, .contracts/, .brain/, .dashboard
+  - Execute: claude -p (spawn workers)
+  - tmux: create/kill windows
+  - git: commit, push (with operator approval)
+  - CANNOT: write AGENTS.md, DIRECTIVES.md, .deckent/config.json
+
+Level 3: Auditor
+  - Read: all files
+  - Write: .dashboard, .brain/PATTERNS.md, .tasks/ALERT
+  - Execute: git diff, git log (read-only git)
+  - CANNOT: write source code, create tasks, spawn workers
+
+Level 4: Worker
+  - Read: AGENTS.md, .contracts/, assigned task
+  - Write: source code WITHIN SCOPE ONLY
+  - Write: .tasks/{own-id}.hb, .tasks/{own-id}.result, .tasks/{own-id}.plan
+  - Execute: build, test, lint (project commands)
+  - CANNOT: write .brain/, .contracts/, other workers' files
+```
+
+## Claude Code --allowedTools Per Agent
+
+```bash
+# Brain
+--allowedTools "Read,Write,Bash(git *),Bash(claude *),Bash(tmux *),Bash(cat *),Bash(find *),Bash(ls *)"
+
+# Auditor  
+--allowedTools "Read,Write(.dashboard),Write(.brain/PATTERNS.md),Write(.tasks/ALERT),Bash(git diff *),Bash(git log *),Bash(cat *),Bash(ls *),Bash(wc *)"
+
+# Worker
+--allowedTools "Read,Write(src/{scope}/*),Write(tests/{scope}/*),Write(.tasks/{id}.*),Bash(npm *),Bash(npx *),Bash(git add *)"
+```
+
+## Dangerous Mode Control
+
+```
+deckent start                    # Normal — asks for permission
+deckent start --auto-approve     # Auto-approve all tool uses
+deckent start --sandbox          # Run in Docker container (safest)
+```
+
+---
+
+# 16. SELF-TEST & REPORTING
+
+## Test Layers
+
+```
+Layer 1: Worker Self-Test (per task)
+  - tsc --noEmit (typecheck)
+  - vitest run --reporter=json
+  - Results in .tasks/{id}.result
+
+Layer 2: Auditor Integration Test (per sprint)
+  - Full project build
+  - Full test suite
+  - Coverage check
+  - Lint check
+  - Results in .dashboard
+
+Layer 3: Brain Regression Test (sprint transition)
+  - Previous sprint's tests still pass?
+  - Coverage dropped?
+  - If regression → priority fix in next sprint
+```
+
+## Sprint Report (auto-generated)
+
+```markdown
+# Sprint {N} Report — {date}
+
+## Summary
+- Duration: {X}min (previous: {Y}min, {change}%)
+- Tasks: {done} DONE, {debt} GO+debt, {nogo} NO-GO
+- Workers: {n} active
+- NO-GO rate: {pct}% (previous: {prev}%, {change})
+
+## Metrics
+- Boundary violations: {n}
+- Cross-assignments: {n}
+- Test coverage: {before}% → {after}%
+- Tech debt: {new} new, {resolved} resolved, {total} open
+- Context budget: {used}/300 lines
+
+## Learnings
+{from RETRO.md}
+
+## Next Sprint
+{from Brain's evaluation}
+```
+
+---
+
+# 17. REPOSITORY STRATEGY
+
+## Dual Repo
+
+**Private repo (deckent-dev):**
+Everything. All development artifacts, prompts, .brain/ history.
+
+**Public repo (deckent):**
+Product code only. Clean, documented, installable.
+
+## .gitignore for Private Repo
+
+```
+node_modules/
+dist/
+.env
+.tasks/*.hb
+.tasks/*.signal
+.tasks/*.output
+.locks/
+.dashboard
+.brain/archive/
+```
+
+## .gitignore for Public Repo
+
+```
+node_modules/
+dist/
+.env
+.brain/
+.tasks/
+.locks/
+.dashboard
+.contracts/
+DIRECTIVES.md
+.deckent/config.json
+scripts/internal/
+docs/internal/
+```
+
+## Sync Strategy
+
+```bash
+# Development happens in private repo
+# When feature is ready:
+deckent publish  # Copies product code to public repo, strips dev artifacts
+```
+
+---
+
+# 18. FILE-BY-FILE REFERENCE
+
+Every file in the project, its purpose, who writes it, who reads it:
+
+| File | Purpose | Writer | Reader | Lifecycle |
+|------|---------|--------|--------|-----------|
+| AGENTS.md | Master instructions | deckent init + you | All agents | Permanent |
+| CLAUDE.md | Symlink → AGENTS.md | deckent init | Claude Code | Permanent |
+| DIRECTIVES.md | Your commands | You | Brain | Until you change |
+| .deckent/config.json | Runtime config | deckent init/config | All | Permanent |
+| .deckent/workspace/IDENTITY.md | Project identity | deckent init | Brain | Permanent |
+| .deckent/workspace/TOOLS.md | Environment tools | You | Workers | Permanent |
+| .deckent/workspace/BOOT.md | Startup routine | Brain | All | Updated per sprint |
+| .brain/MEMORY.md | Learned patterns | Brain | All (via @import) | Decay: 3 sprints |
+| .brain/DECISIONS.md | ADRs | Brain | Brain, Auditor | Permanent |
+| .brain/DEBT.md | Tech debt | Brain | Brain | Until resolved |
+| .brain/PATTERNS.md | Auditor findings | Auditor | Brain | Decay: 5 sprints |
+| .brain/RETRO.md | Last sprint retro | Brain | Brain | Overwritten |
+| .brain/sprints/*.md | Sprint logs | Brain | Brain | Auto-archived |
+| .contracts/*.md | API contracts | Brain | All | Until changed |
+| .tasks/task-*.json | Task definitions | Brain | Workers | Deleted after sprint |
+| .tasks/task-*.plan | Execution plans | Workers | Auditor | Deleted after sprint |
+| .tasks/task-*.hb | Heartbeats | Workers | Auditor | Overwritten, deleted |
+| .tasks/task-*.result | Results | Workers | Brain | Deleted after sprint |
+| .locks/*.lock | File locks | Workers | Workers, Auditor | Deleted on release |
+| .dashboard | Live status | Auditor | You, UI | Overwritten |
+| .claude/rules/*.md | Agent-specific rules | deckent init | Claude Code | Permanent |
+
+---
+
+# 19. SPRINT 1 IMPLEMENTATION PLAN
+
+## Goal: Working Orchestration Loop
+
+Get Brain → Workers → Auditor → Evaluate → Retro working end-to-end.
+
+## Tasks
+
+```
+Task 1: CLI Scaffold (sonnet, normal)
+  - bin/deckent.ts entry point with Commander.js
+  - init, start, plan, status, attach, spawn, kill commands
+  - Config loading from .deckent/config.json
+  - Scope: src/cli/
+
+Task 2: tmux Manager (sonnet, normal)
+  - ensureSession, spawnWorker, killWorker, listWorkers
+  - startAuditor, attach, destroy
+  - Scope: src/orchestra/tmux.ts
+
+Task 3: Brain Module (opus, high)
+  - planSprint: read context → generate tasks
+  - evaluate: read result → GO/NO-GO
+  - retrospective: write RETRO, update MEMORY
+  - usageCheck: parse /status output
+  - Scope: src/orchestra/brain.ts
+
+Task 4: Auditor Module (sonnet, normal)
+  - scanLoop: heartbeats, git diff, boundaries, deadlocks
+  - updateDashboard: write .dashboard
+  - detectPatterns: append PATTERNS.md
+  - Scope: src/monitor/auditor.ts
+
+Task 5: Worker Module (sonnet, normal)
+  - claimTask, plan, execute, test, document, report
+  - lockManager: acquire, release, check
+  - heartbeat: periodic .hb updates
+  - Scope: src/agents/worker.ts
+
+Task 6: Core Types & Config (sonnet, low)
+  - All TypeScript types from contracts
+  - Config loader with validation
+  - Scope: src/core/
+
+Task 7: Tests (sonnet, normal)
+  - Unit tests for each module
+  - Integration test: full sprint cycle
+  - Scope: tests/
+```
+
+## Dependencies
+
+```
+Task 6 (types) → no deps (start first)
+Task 2 (tmux) → depends on Task 6
+Task 5 (worker) → depends on Task 6
+Task 4 (auditor) → depends on Task 6
+Task 3 (brain) → depends on Task 2, 6
+Task 1 (cli) → depends on Task 2, 3, 4, 5
+Task 7 (tests) → depends on all
+```
+
+## Wave Plan
+
+```
+Wave 1: Task 6 (types)
+Wave 2: Task 2 + Task 4 + Task 5 (parallel)
+Wave 3: Task 3 (brain — needs tmux)
+Wave 4: Task 1 (cli — needs everything)
+Wave 5: Task 7 (tests)
+```
+
+---
+
+# 20. CLAUDE CODE INTEGRATION GUIDE
+
+## How Claude Code Sees Deckent
+
+When you open Claude Code in a Deckent project:
+
+1. Claude reads CLAUDE.md (which is symlink to AGENTS.md)
+2. AGENTS.md has @imports → Claude follows them:
+   - @DIRECTIVES.md
+   - @.brain/MEMORY.md
+   - @.contracts/api-surface.md
+3. .claude/rules/ files activate based on context:
+   - Editing src/core/ → worker-default.md rules apply
+   - Running orchestrator → brain.md rules apply
+4. Claude Code's auto-memory works alongside .brain/:
+   - Auto-memory: Claude's own corrections
+   - .brain/MEMORY.md: Brain's explicit learnings
+   - Both complement each other
+
+## Rules Files (.claude/rules/)
+
+```markdown
+<!-- .claude/rules/brain.md -->
+---
+paths: [".tasks/*", ".brain/*", ".contracts/*"]
+---
+# Brain Rules
+- Always read DIRECTIVES.md first
+- Always check usage before planning
+- Plan mode required before execution
+- Write sprint plan as task JSON files
+- Evaluate every result: DONE / GO+DEBT / NO-GO
+- Update MEMORY.md after every sprint
+```
+
+```markdown
+<!-- .claude/rules/auditor.md -->
+---
+paths: [".dashboard", ".brain/PATTERNS.md"]
+---
+# Auditor Rules
+- NEVER write source code
+- Scan heartbeats for staleness (>2min = alert)
+- Check git diff for boundary violations
+- Overwrite .dashboard on every scan
+- Append patterns to PATTERNS.md (not overwrite)
+```
+
+```markdown
+<!-- .claude/rules/worker-default.md -->
+---
+paths: ["src/**", "tests/**"]
+---
+# Worker Rules
+- Read your task file first
+- Write plan before writing code
+- Check .locks/ before writing any file
+- Update heartbeat on every file change
+- Run tests before marking done
+- Document changes
+- Stay within your assigned scope
+```
+
+## Starting a Sprint with Claude Code
+
+```bash
+# In your terminal
+cd my-project
+deckent start
+
+# This runs:
+# 1. deckent doctor (preflight)
+# 2. tmux new-session -s deckent
+# 3. claude -p "Brain prompt..." --model opus (plan sprint)
+# 4. For each task: tmux new-window + claude -p "Worker prompt..." --model sonnet
+# 5. Auditor loop starts
+# 6. You: tmux attach -t deckent (watch everything)
+```
+
+---
+
+# END OF BLUEPRINT
+
+This document is the single source of truth for Deckent's implementation.
+Open it in Claude Code and say: "Implement this."
+
+Deckent starts this weekend. Let's build.

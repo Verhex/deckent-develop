@@ -1,0 +1,10 @@
+# Learned Patterns
+
+## Wave 1 Learnings (Sprint 1, 2026-03-16)
+
+- `@types/node` is required as devDependency for Node.js type declarations (`node:fs`, `node:path`, `structuredClone`)
+- `tsconfig.json` needs `"types": ["node"]` for explicit type resolution with `"lib": ["ES2022"]`
+- `deepMerge` with strict TypeScript generics requires runtime casts — keep the public API clean, use `Record<string, unknown>` internally
+- `structuredClone` is available at runtime in Node 18+ but needs `@types/node` for compile-time types
+- Config validation should collect all errors (not fail-fast) for better developer experience
+- `memfs` not needed for config tests — `vi.mock('node:fs')` with `mockImplementation` is simpler and sufficient
