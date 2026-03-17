@@ -13,3 +13,4 @@
 | debt-004-003 | Tech debt from 004-003: Created 12 integration tests in tests/orchestra/runsprin | 004-003 | sprint-004 | NORMAL | 0 | true | sprint-004 | 2026-03-17T06:04:27.872Z |
 | debt-006-001 | Tech debt from 006-001: Rewrote CONTRIBUTING.md with comprehensive sections: dev | 006-001 | sprint-006 | NORMAL | 0 | true | sprint-006 | 2026-03-17T09:00:10.497Z |
 | debt-006-002 | Tech debt from 006-002: Created docs/API.md (1490 lines) with full programmatic | 006-002 | sprint-006 | NORMAL | 0 | true | sprint-006 | 2026-03-17T09:00:10.498Z |
+| debt-007-001 | Tech debt from 007-001: Created .github/workflows/ci.yml with push/PR triggers o | 007-001 | sprint-007 | NORMAL | 0 | true | sprint-007 | 2026-03-17T10:14:56.694Z |

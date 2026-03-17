@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import {
   DECKENT_DIR,
@@ -143,8 +146,16 @@ describe('Defaults', () => {
     expect(DEFAULT_LANGUAGE).toBe('en');
   });
 
-  it('DECKENT_VERSION === 0.1.0', () => {
-    expect(DECKENT_VERSION).toBe('0.1.0');
+  it('DECKENT_VERSION matches package.json version', () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pkgPath = join(__dirname, '..', '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
+    expect(DECKENT_VERSION).toBe(pkg.version);
+  });
+
+  it('DECKENT_VERSION is a valid semver string', () => {
+    expect(DECKENT_VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 });
 

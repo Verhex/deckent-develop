@@ -19,7 +19,13 @@
       "Bash(grep -r \"timeout\\\\|race\\\\|deadlock\\\\|stale\\\\|concurrent\" /home/alperen/deckent-dev/tests --include=*.ts)",
       "Bash(grep -l \"waitForResults\\\\|timeout\\\\|pending\" /home/alperen/deckent-dev/tests/**/*.test.ts)",
       "Bash(npx vitest:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find /home/alperen/deckent-dev/.brain -name *.md -type f)",
+      "mcp__deckent__deckent_doctor",
+      "mcp__deckent__deckent_set_directives",
+      "mcp__deckent__deckent_plan",
+      "mcp__deckent__deckent_start",
+      "mcp__deckent__deckent_history"
     ]
   }
 }

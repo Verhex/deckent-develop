@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ─── Path Constants ──────────────────────────────────────────────────
 export const DECKENT_DIR = '.deckent' as const;
@@ -66,5 +68,15 @@ export const DEBT_TABLE_HEADER = '| ID | Description | Task | Sprint | Priority 
 // ─── Defaults ────────────────────────────────────────────────────────
 export const DEFAULT_LANGUAGE = 'en' as const;
 export const DEFAULT_MODE = 'max_plan' as const;
-export const DECKENT_VERSION = '0.1.0' as const;
+export const DECKENT_VERSION: string = (() => {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pkgPath = join(__dirname, '..', '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 export const SUPPORTED_LANGUAGES = ['en', 'tr'] as const;

@@ -1,0 +1,30 @@
+{
+  "id": "007-003",
+  "title": "Enrich deckent history",
+  "description": "Enrich deckent history\n- Modify src/cli/commands/history.ts to show richer sprint history\n- Current 4 columns: Sprint, Tasks, Coverage, Duration\n- New 6 columns: Sprint, Tasks, Completed, No-Go Rate, Coverage, Duration\n- Parse Completed count from sprint log line matching Completed metric row\n- Parse No-Go count from sprint log line matching No-Go metric row\n- Parse Total Tasks for rate calculation\n- Calculate No-Go Rate as noGo/totalTasks formatted as percentage (e.g. 0%, 50%)\n- Format Duration from milliseconds to human-readable: under 60s show Ns, over 60s show Nm Ns\n- Update history tests in tests/cli/commands.test.ts\n- Dosya: src/cli/commands/history.ts, tests/cli/commands.test.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/history.ts",
+      "tests/cli/commands.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-007",
+  "createdAt": "2026-03-17T10:11:53.558Z",
+  "updatedAt": "2026-03-17T10:14:56.695Z"
+}

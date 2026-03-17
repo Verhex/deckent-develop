@@ -1,11 +1,13 @@
-# Sprint sprint-006 Retrospective
+# Sprint sprint-007 Retrospective
 
 ## Metrics
-- Tasks: 2 total, 2 done, 2 debt, 0 no-go
-- Coverage: 0.0%
+- Tasks: 4 total, 4 done, 1 debt, 0 no-go
+- Coverage: 72.4%
 - No-Go Rate: 0.0%
-- Duration: 366131ms
+- Duration: 183137ms
 
 ## Results
-- 006-001: CONTRIBUTING.md Oluştur -> GO_WITH_TECH_DEBT
-- 006-002: docs/API.md Oluştur -> GO_WITH_TECH_DEBT
+- 007-001: CI Pipeline -> GO_WITH_TECH_DEBT
+- 007-002: Dynamic DECKENT_VERSION -> DONE
+- 007-003: Enrich deckent history -> DONE
+- 007-004: deckent archive-debt CLI command -> DONE

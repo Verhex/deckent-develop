@@ -1,0 +1,13 @@
+{
+  "taskId": "007-003",
+  "filesChanged": [
+    "src/cli/commands/history.ts",
+    "tests/cli/commands.test.ts"
+  ],
+  "linesAdded": 120,
+  "linesRemoved": 18,
+  "testsPassed": true,
+  "coverage": 100,
+  "selfAssessment": "DONE",
+  "notes": "Enriched history command from 4 to 6 columns (Sprint, Tasks, Completed, No-Go Rate, Coverage, Duration). Parses metrics table format from sprint logs. Calculates No-Go Rate as percentage. Formats Duration from ms to human-readable (Ns or Nm Ns). Backward-compatible with legacy non-table log format. Exported parseSprintLog and formatDurationMs for direct unit testing. 100% coverage on history.ts. tsc --noEmit clean."
+}

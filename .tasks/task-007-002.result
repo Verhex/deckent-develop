@@ -1,0 +1,10 @@
+{
+  "taskId": "007-002",
+  "filesChanged": ["src/core/constants.ts", "tests/core/constants.test.ts"],
+  "linesAdded": 26,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "coverage": 96.82,
+  "selfAssessment": "DONE",
+  "notes": "Replaced hardcoded DECKENT_VERSION with dynamic reading from package.json using readFileSync + fileURLToPath(import.meta.url). Graceful fallback to '0.0.0' on error. Updated test to verify version matches package.json and added semver format validation. All 703 tests pass, no regressions."
+}

@@ -99,7 +99,7 @@ import { registerKill } from '../../src/cli/commands/kill.js';
 import { registerUsage } from '../../src/cli/commands/usage.js';
 import { registerRetro } from '../../src/cli/commands/retro.js';
 import { registerStatus } from '../../src/cli/commands/status.js';
-import { registerHistory } from '../../src/cli/commands/history.js';
+import { registerHistory, parseSprintLog, formatDurationMs } from '../../src/cli/commands/history.js';
 import { registerConfig } from '../../src/cli/commands/config.js';
 import { registerSpawn } from '../../src/cli/commands/spawn.js';
 import { registerCleanup } from '../../src/cli/commands/cleanup.js';
@@ -515,13 +515,26 @@ describe('history command', () => {
   beforeEach(() => { vi.clearAllMocks(); captureOutput(); });
   afterEach(() => restoreOutput());
 
-  it('shows sprint history table', async () => {
+  it('shows sprint history table with 6 columns', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md', 'sprint-002.md'] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readFileSync).mockReturnValue('# Sprint 1\nTasks: 3\nCoverage: 91%\nDuration: 120s');
+    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue(
+      '# sprint-001\n\n## Metrics\n| Metric | Value |\n|--------|-------|\n| Total Tasks | 3 |\n| Completed | 2 |\n| Tech Debt | 1 |\n| No-Go | 1 |\n| Coverage | 91.0% |\n| Duration | 5000ms |'
+    );
     await runCommand(registerHistory, ['history']);
-    expect(stdout()).toContain('Sprint');
-    expect(stdout()).toContain('Tasks');
+    const out = stdout();
+    expect(out).toContain('Sprint');
+    expect(out).toContain('Tasks');
+    expect(out).toContain('Completed');
+    expect(out).toContain('No-Go Rate');
+    expect(out).toContain('Coverage');
+    expect(out).toContain('Duration');
+    expect(out).toContain('sprint-001');
+    expect(out).toContain('3');
+    expect(out).toContain('2');
+    expect(out).toContain('33%');
+    expect(out).toContain('91.0%');
+    expect(out).toContain('5s');
   });
 
   it('prints message when no history dir', async () => {
@@ -548,9 +561,102 @@ describe('history command', () => {
   it('shows "Unknown" for sprint without title', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readFileSync).mockReturnValue('no title line\nTasks: 3');
+    vi.mocked(readFileSync).mockReturnValue('no title line\n| Total Tasks | 3 |\n| No-Go | 0 |');
     await runCommand(registerHistory, ['history']);
     expect(stdout()).toContain('Unknown');
+  });
+
+  it('formats duration from ms to human-readable', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue(
+      '# sprint-001\n| Metric | Value |\n|--------|-------|\n| Total Tasks | 2 |\n| Completed | 2 |\n| No-Go | 0 |\n| Coverage | 95.0% |\n| Duration | 366131ms |'
+    );
+    await runCommand(registerHistory, ['history']);
+    expect(stdout()).toContain('6m 6s');
+  });
+
+  it('calculates no-go rate as percentage', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue(
+      '# sprint-001\n| Metric | Value |\n|--------|-------|\n| Total Tasks | 4 |\n| Completed | 2 |\n| No-Go | 2 |\n| Coverage | 80.0% |\n| Duration | 30000ms |'
+    );
+    await runCommand(registerHistory, ['history']);
+    expect(stdout()).toContain('50%');
+  });
+
+  it('shows 0% no-go rate when no failures', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue(
+      '# sprint-001\n| Metric | Value |\n|--------|-------|\n| Total Tasks | 3 |\n| Completed | 3 |\n| No-Go | 0 |\n| Coverage | 95.0% |\n| Duration | 10000ms |'
+    );
+    await runCommand(registerHistory, ['history']);
+    expect(stdout()).toContain('0%');
+  });
+
+  it('falls back to non-table format for legacy logs', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue('# Sprint 1\nTasks: 5\nCoverage: 88%\nDuration: 45s');
+    await runCommand(registerHistory, ['history']);
+    const out = stdout();
+    expect(out).toContain('Sprint 1');
+    expect(out).toContain('5');
+    expect(out).toContain('88%');
+    expect(out).toContain('45s');
+  });
+});
+
+// ─── History Helpers (unit) ─────────────────────────────────────────
+
+describe('formatDurationMs', () => {
+  it('converts ms under 60s', () => {
+    expect(formatDurationMs('5000ms')).toBe('5s');
+  });
+
+  it('converts ms over 60s', () => {
+    expect(formatDurationMs('366131ms')).toBe('6m 6s');
+  });
+
+  it('returns 0s for 0ms', () => {
+    expect(formatDurationMs('0ms')).toBe('0s');
+  });
+
+  it('passes through non-ms values', () => {
+    expect(formatDurationMs('120s')).toBe('120s');
+    expect(formatDurationMs('-')).toBe('-');
+  });
+});
+
+describe('parseSprintLog', () => {
+  it('parses full table format', () => {
+    const content = '# sprint-005\n\n## Metrics\n| Metric | Value |\n|--------|-------|\n| Total Tasks | 4 |\n| Completed | 3 |\n| Tech Debt | 1 |\n| No-Go | 1 |\n| Coverage | 92.5% |\n| Duration | 120000ms |';
+    const r = parseSprintLog(content);
+    expect(r.sprint).toBe('sprint-005');
+    expect(r.tasks).toBe('4');
+    expect(r.completed).toBe('3');
+    expect(r.noGoRate).toBe('25%');
+    expect(r.coverage).toBe('92.5%');
+    expect(r.duration).toBe('2m 0s');
+  });
+
+  it('returns dashes for missing fields', () => {
+    const r = parseSprintLog('# Sprint 1\nNothing here');
+    expect(r.tasks).toBe('-');
+    expect(r.completed).toBe('-');
+    expect(r.noGoRate).toBe('-');
+    expect(r.coverage).toBe('-');
+    expect(r.duration).toBe('-');
+  });
+
+  it('handles zero total tasks', () => {
+    const content = '# sprint-001\n| Metric | Value |\n|--------|-------|\n| Total Tasks | 0 |\n| Completed | 0 |\n| No-Go | 0 |\n| Coverage | 0.0% |\n| Duration | 84ms |';
+    const r = parseSprintLog(content);
+    expect(r.tasks).toBe('0');
+    expect(r.noGoRate).toBe('0%');
+    expect(r.duration).toBe('0s');
   });
 });
 

@@ -1,34 +1,54 @@
-# DIRECTIVES — Sprint 8 (Documentation)
+# DIRECTIVES — Sprint 9 (CI, Version, History, Archive-Debt)
 
-## Hedef: Proje Dokümantasyonu
-Deckent'e katkıda bulunma rehberi ve API referans dokümanı oluştur.
+## Hedef: Build pipeline, dynamic version, enriched history, debt archival
 
-## Görev 1: CONTRIBUTING.md Oluştur
-- Proje kök dizininde CONTRIBUTING.md oluştur
-- İçerik: Geliştirme ortamı kurulumu (Node 18+, npm install, npm run build, npm test)
-- Kod stili kuralları: TypeScript strict, ESM, Node16 module resolution
-- Branch stratejisi ve commit mesajı formatı
-- Test yazma rehberi: vitest, mock pattern'leri, coverage hedefi (%95+)
-- PR süreci: testlerin geçmesi, tsc --noEmit clean, review
-- Proje yapısı: src/core, src/orchestra, src/agents, src/monitor, src/cli, src/mcp açıklamaları
-- Sprint katkısı: DIRECTIVES.md formatı, wave planı
-- Markdown formatında, İngilizce
-- Dosya: src/, tests/, package.json, tsconfig.json, vitest.config.ts referans al
+## Task 1: CI Pipeline
+- Create .github/workflows/ci.yml for continuous integration
+- Triggers: push to master, pull_request to master
+- Jobs: install deps (npm ci), run tests (npm test), build (npm run build), type check (tsc --noEmit)
+- Matrix strategy: Node 18.x and Node 20.x
+- Use actions/checkout@v4 and actions/setup-node@v4
+- Single workflow file, no changes to existing code
+- Kapsam: .github/workflows/ci.yml
 
-## Görev 2: docs/API.md Oluştur
-- docs/ dizini yoksa oluştur, docs/API.md yaz
-- İçerik: Deckent'in programatik API referansı
-- Core exports: types (Task, Sprint, DashboardState, DoctorResult, DebtItem, ResolvedConfig, PlanMode), constants, config (loadConfig, validatePartialConfig)
-- Orchestra exports: brain fonksiyonları (readContext, checkUsage, adjustSprintSize, planSprint, runSprint, evaluateResult, runDecay, cleanup), tmux fonksiyonları
-- Agent exports: worker fonksiyonları (readTask, claimTask, acquireLock, releaseLock, writeResult, updateTaskStatus, isWithinScope)
-- Monitor exports: auditor fonksiyonları (scanHeartbeats, checkBoundaryViolations, updateDashboard, detectPatterns)
-- MCP: server (createServer), 8 tool, 4 resource listesi
-- CLI: 17 komut listesi ve açıklamaları
-- Her fonksiyon için imza, parametre açıklaması ve kısa kullanım örneği
-- Markdown formatında, İngilizce
-- Dosya: src/index.ts, src/core/index.ts, src/orchestra/index.ts, src/agents/index.ts, src/monitor/index.ts, src/mcp/server.ts referans al
+## Task 2: Dynamic DECKENT_VERSION
+- In src/core/constants.ts line 69, replace hardcoded DECKENT_VERSION = '0.1.0' as const
+- Read version from package.json at module load time using readFileSync + JSON.parse
+- Resolve package.json path relative to the constants.ts file location (use fileURLToPath + import.meta.url)
+- Graceful fallback: if package.json missing or parse error, default to '0.0.0'
+- Keep the export name and type compatible
+- Update tests/core/constants.test.ts to verify version matches package.json
+- Dosya: src/core/constants.ts, tests/core/constants.test.ts
+
+## Task 3: Enrich deckent history
+- Modify src/cli/commands/history.ts to show richer sprint history
+- Current 4 columns: Sprint, Tasks, Coverage, Duration
+- New 6 columns: Sprint, Tasks, Completed, No-Go Rate, Coverage, Duration
+- Parse Completed count from sprint log line matching Completed metric row
+- Parse No-Go count from sprint log line matching No-Go metric row
+- Parse Total Tasks for rate calculation
+- Calculate No-Go Rate as noGo/totalTasks formatted as percentage (e.g. 0%, 50%)
+- Format Duration from milliseconds to human-readable: under 60s show Ns, over 60s show Nm Ns
+- Update history tests in tests/cli/commands.test.ts
+- Dosya: src/cli/commands/history.ts, tests/cli/commands.test.ts
+
+## Task 4: deckent archive-debt CLI command
+- Create new file src/cli/commands/archive-debt.ts
+- Command: deckent archive-debt
+- Read .brain/DEBT.md, parse the markdown debt table
+- Implement own debt table parser (do NOT import from brain.ts — those functions are private)
+- Use DEBT_TABLE_HEADER constant from src/core/constants.ts as table format reference
+- Split resolved (resolved column = true) from unresolved items
+- Write unresolved items back to .brain/DEBT.md with header and separator
+- Append resolved items to .brain/archive/DEBT-ARCHIVE.md (create dir and file if needed)
+- Print: Archived N resolved debt items. M items remaining.
+- If no resolved items: No resolved debt items to archive.
+- Register in src/cli/index.ts with import + registerArchiveDebt(program) call
+- Follow src/cli/commands/cleanup.ts as registration pattern
+- Create tests/cli/archive-debt.test.ts with mocked node:fs
+- Dosya: src/cli/commands/archive-debt.ts, src/cli/index.ts, tests/cli/archive-debt.test.ts
 
 ## Kalite Kuralları
-- Mevcut testler regresyona uğramamalı (669 test)
-- Yeni dosya oluştur, mevcut kodu DEĞİŞTİRME
+- Mevcut testler regresyona uğramamalı (702 test)
 - tsc --noEmit clean kalmalı
+- Her görev için testler yazılmalı

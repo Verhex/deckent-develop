@@ -1,0 +1,30 @@
+{
+  "id": "007-002",
+  "title": "Dynamic DECKENT_VERSION",
+  "description": "Dynamic DECKENT_VERSION\n- In src/core/constants.ts line 69, replace hardcoded DECKENT_VERSION = '0.1.0' as const\n- Read version from package.json at module load time using readFileSync + JSON.parse\n- Resolve package.json path relative to the constants.ts file location (use fileURLToPath + import.meta.url)\n- Graceful fallback: if package.json missing or parse error, default to '0.0.0'\n- Keep the export name and type compatible\n- Update tests/core/constants.test.ts to verify version matches package.json\n- Dosya: src/core/constants.ts, tests/core/constants.test.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/constants.ts",
+      "tests/core/constants.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-007",
+  "createdAt": "2026-03-17T10:11:53.558Z",
+  "updatedAt": "2026-03-17T10:14:56.695Z"
+}

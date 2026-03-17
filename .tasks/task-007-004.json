@@ -1,0 +1,35 @@
+{
+  "id": "007-004",
+  "title": "deckent archive-debt CLI command",
+  "description": "deckent archive-debt CLI command\n- Create new file src/cli/commands/archive-debt.ts\n- Command: deckent archive-debt\n- Read .brain/DEBT.md, parse the markdown debt table\n- Implement own debt table parser (do NOT import from brain.ts — those functions are private)\n- Use DEBT_TABLE_HEADER constant from src/core/constants.ts as table format reference\n- Split resolved (resolved column = true) from unresolved items\n- Write unresolved items back to .brain/DEBT.md with header and separator\n- Append resolved items to .brain/archive/DEBT-ARCHIVE.md (create dir and file if needed)\n- Print: Archived N resolved debt items. M items remaining.\n- If no resolved items: No resolved debt items to archive.\n- Register in src/cli/index.ts with import + registerArchiveDebt(program) call\n- Follow src/cli/commands/cleanup.ts as registration pattern\n- Create tests/cli/archive-debt.test.ts with mocked node:fs\n- Dosya: src/cli/commands/archive-debt.ts, src/cli/index.ts, tests/cli/archive-debt.test.ts\n\n## Kalite Kuralları\n- Mevcut testler regresyona uğramamalı (702 test)\n- tsc --noEmit clean kalmalı\n- Her görev için testler yazılmalı",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "src/core/",
+      "src/cli/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/archive-debt.ts",
+      "src/core/constants.ts",
+      "src/cli/index.ts",
+      "src/cli/commands/cleanup.ts",
+      "tests/cli/archive-debt.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-007",
+  "createdAt": "2026-03-17T10:11:53.558Z",
+  "updatedAt": "2026-03-17T10:14:56.695Z"
+}

@@ -1,0 +1,10 @@
+{
+  "taskId": "007-001",
+  "filesChanged": [".github/workflows/ci.yml"],
+  "linesAdded": 30,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Created .github/workflows/ci.yml with push/PR triggers on master, Node 18.x/20.x matrix, steps: npm ci, tsc --noEmit, npm test, npm run build. All 702 existing tests pass."
+}
