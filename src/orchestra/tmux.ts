@@ -115,13 +115,23 @@ export function listWorkers(): string[] {
   }
 }
 
+function windowExists(windowName: string): boolean {
+  const result = spawnSync('tmux', [
+    'list-windows', '-t', TMUX_SESSION_NAME, '-F', '#{window_name}',
+  ], { encoding: 'utf-8' });
+  if (result.status !== 0) return false;
+  return (result.stdout ?? '').split('\n').some(name => name.trim() === windowName);
+}
+
 export function startAuditor(projectDir: string, opts?: SpawnOptions): void {
-  run([
-    'new-window',
-    '-t', TMUX_SESSION_NAME,
-    '-n', TMUX_AUDITOR_WINDOW,
-    '-c', projectDir,
-  ]);
+  if (!windowExists(TMUX_AUDITOR_WINDOW)) {
+    run([
+      'new-window',
+      '-t', TMUX_SESSION_NAME,
+      '-n', TMUX_AUDITOR_WINDOW,
+      '-c', projectDir,
+    ]);
+  }
   const cmd = buildClaudeCommand('sonnet', 'auditor', opts);
   run([
     'send-keys',

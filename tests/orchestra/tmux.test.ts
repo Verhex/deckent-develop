@@ -215,24 +215,50 @@ describe('listWorkers', () => {
 });
 
 describe('startAuditor', () => {
-  it('creates auditor window with sonnet model', () => {
+  it('creates auditor window with sonnet model when not already running', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
     startAuditor('/project');
 
-    expect(mockedSpawnSync).toHaveBeenCalledTimes(2);
-    // new-window with name "auditor"
+    // 3 calls: list-windows (existence check) + new-window + send-keys
+    expect(mockedSpawnSync).toHaveBeenCalledTimes(3);
+    // list-windows check
     expect(mockedSpawnSync).toHaveBeenNthCalledWith(
       1, 'tmux',
+      ['list-windows', '-t', 'deckent', '-F', '#{window_name}'],
+      expect.objectContaining({ encoding: 'utf-8' }),
+    );
+    // new-window with name "auditor"
+    expect(mockedSpawnSync).toHaveBeenNthCalledWith(
+      2, 'tmux',
       ['new-window', '-t', 'deckent', '-n', 'auditor', '-c', '/project'],
       expect.objectContaining({ encoding: 'utf-8' }),
     );
     // send-keys with --model sonnet
-    const sendKeysArgs = mockedSpawnSync.mock.calls[1]![1] as string[];
+    const sendKeysArgs = mockedSpawnSync.mock.calls[2]![1] as string[];
     const cmdArg = sendKeysArgs.find((a) => a.includes('claude'));
     expect(cmdArg).toContain('--model sonnet');
+  });
+
+  it('skips new-window when auditor window already exists', () => {
+    // list-windows returns "auditor" in the output
+    mockedSpawnSync.mockImplementation((_cmd, args) => {
+      const argsArr = args as string[];
+      if (argsArr[0] === 'list-windows') {
+        return { status: 0, stdout: 'brain\nauditor\n', stderr: '', pid: 1, signal: null, output: [] } as never;
+      }
+      return { status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never;
+    });
+
+    startAuditor('/project');
+
+    // 2 calls only: list-windows (exists → skip new-window) + send-keys
+    expect(mockedSpawnSync).toHaveBeenCalledTimes(2);
+    // No new-window call
+    const allArgs = mockedSpawnSync.mock.calls.map(c => (c[1] as string[])[0]);
+    expect(allArgs).not.toContain('new-window');
   });
 
   it('passes allowedTools from opts', () => {
@@ -244,7 +270,8 @@ describe('startAuditor', () => {
       allowedTools: 'Read,Write(.dashboard),Bash(git diff *)',
     });
 
-    const sendKeysArgs = mockedSpawnSync.mock.calls[1]![1] as string[];
+    // send-keys is now the 3rd call (after list-windows + new-window)
+    const sendKeysArgs = mockedSpawnSync.mock.calls[2]![1] as string[];
     const cmdArg = sendKeysArgs.find((a) => a.includes('--allowedTools'));
     expect(cmdArg).toBeDefined();
   });

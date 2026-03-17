@@ -479,6 +479,7 @@ export function spawnWorkers(
   spawnOpts?: { autoApprove?: boolean },
 ): void {
   ensureSession();
+  // startAuditor is idempotent — skips new-window if auditor window already exists
   startAuditor(projectRoot, { allowedTools: 'Read,Bash' });
 
   for (const task of sprint.tasks) {

@@ -1,0 +1,24 @@
+{
+  "id": "005-001",
+  "title": "README.md Oluştur",
+  "description": "README.md Oluştur\n- Proje kök dizininde README.md oluştur\n- İçerik: Deckent nedir, kurulum, hızlı başlangıç, komutlar\n- Blueprint Bölüm 1'deki vizyon ve Bölüm 3'teki CLI komutlarını referans al\n- Markdown formatında, İngilizce\n\n## Kalite Kuralları\n- Mevcut testler regresyona uğramamalı\n- Yeni dosya oluştur, mevcut kodu değiştirme",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [],
+    "filesRead": [],
+    "filesWrite": []
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-005",
+  "createdAt": "2026-03-17T07:40:21.285Z",
+  "updatedAt": "2026-03-17T07:41:47.146Z"
+}
