@@ -1,0 +1,28 @@
+{
+  "id": "003-001",
+  "title": "waitForResults async polling (DEBT-004)",
+  "description": "waitForResults async polling (DEBT-004)\n- Dosya: src/orchestra/brain.ts\n- Sorun: waitForResults (satır 458) sleepSync (satır 101) kullanıyor, main thread bloklanıyor\n- Fix: async/await + setTimeout tabanlı polling'e geç\n  - sleepSync fonksiyonunu kaldır, yerine async sleep(ms) yaz\n  - waitForResults'ı async yap\n  - runSprint'teki çağrıları await ile güncelle\n  - Mevcut davranış korunsun: timeout, partial results, retry\n- Test: async polling, timeout, partial result senaryoları\n- Kapsam: src/orchestra/brain.ts",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/brain.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-003",
+  "createdAt": "2026-03-17T05:27:12.859Z",
+  "updatedAt": "2026-03-17T05:32:57.595Z"
+}

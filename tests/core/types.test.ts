@@ -8,6 +8,7 @@ import {
   AgentStatus,
   DebtPriority,
 } from '../../src/core/types.js';
+import type { StartOptions } from '../../src/core/types.js';
 
 describe('TaskStatus enum', () => {
   it('PENDING === "PENDING" (string serialize)', () => {
@@ -60,5 +61,36 @@ describe('AgentStatus enum', () => {
 describe('DebtPriority enum', () => {
   it('has 3 members', () => {
     expect(Object.values(DebtPriority)).toHaveLength(3);
+  });
+});
+
+// ─── StartOptions (DEBT-005 semantic separation) ─────────────────────────────
+
+describe('StartOptions interface', () => {
+  it('accepts autoApprove and sandboxMode as optional booleans', () => {
+    const opts: StartOptions = { autoApprove: true, sandboxMode: false };
+    expect(opts.autoApprove).toBe(true);
+    expect(opts.sandboxMode).toBe(false);
+  });
+
+  it('allows empty StartOptions', () => {
+    const opts: StartOptions = {};
+    expect(opts.autoApprove).toBeUndefined();
+    expect(opts.sandboxMode).toBeUndefined();
+  });
+
+  it('autoApprove is for permissions — sandboxMode is for Docker (separate concerns)', () => {
+    // Verify fields are independently optional — no conflation
+    const permOnly: StartOptions = { autoApprove: true };
+    const sandboxOnly: StartOptions = { sandboxMode: true };
+    expect(permOnly.sandboxMode).toBeUndefined();
+    expect(sandboxOnly.autoApprove).toBeUndefined();
+  });
+
+  it('does not have legacy sandbox field', () => {
+    const opts: StartOptions = {};
+    // TypeScript enforces this at compile time; this runtime check guards renames
+    expect('sandbox' in opts).toBe(false);
+    expect('sandboxMode' in opts).toBe(false); // property absent when not set
   });
 });

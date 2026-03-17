@@ -212,7 +212,7 @@ export function checkUsage(_config: ResolvedConfig): UsageMetrics {
     if (result.status !== 0 || !result.stdout) return SAFE_DEFAULT;
 
     const output = result.stdout;
-    const fiveHrMatch = output.match(/5[- ]?h(?:our(?:ly)?)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
+    const fiveHrMatch = output.match(/5[- ]?h(?:r|our(?:ly)?)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
       ?? output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*5[- ]?h/i);
     const weeklyMatch = output.match(/week(?:ly)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
       ?? output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*week/i);
@@ -307,6 +307,7 @@ export interface ParsedDirectiveTask {
   title: string;
   description: string;
   scope: TaskScope;
+  testTarget?: string;
 }
 
 // 4d. parseStructuredDirectives (pure)
@@ -320,7 +321,7 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
   const tasks: ParsedDirectiveTask[] = [];
   for (const block of blocks) {
     const lines = block.trim().split('\n');
-    // First non-empty line after heading becomes the title
+    // First non-empty line after heading becomes the title (strip leading "- " prefix)
     const titleLine = lines.find(l => l.trim()) ?? '';
     const title = titleLine.trim().replace(/^-\s+/, '');
     if (!title) continue;
@@ -339,7 +340,13 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       };
     }, { directories: [], filesRead: [], filesWrite: [] });
 
-    tasks.push({ title, description: block.trim(), scope });
+    // Extract test target from "- Test: ..." lines
+    const testLine = lines.find(l => /^[\s-]*Test:/i.test(l.trim()));
+    const testTarget = testLine
+      ? testLine.trim().replace(/^-\s+/, '').replace(/^Test:\s*/i, '').trim()
+      : undefined;
+
+    tasks.push({ title, description: block.trim(), scope, testTarget });
   }
   return tasks;
 }
@@ -939,8 +946,12 @@ export function cleanup(projectRoot: string, sprint: Sprint): void {
 }
 
 // ─── RunSprintOptions ─────────────────────────────────────────────
+// autoApprove → passed to tmux as --dangerously-skip-permissions
+// sandboxMode → Docker sandbox (not yet implemented; reserved for future)
+// NOTE: haikuAllowed lives in PlanModeConfig.haiku_allowed (model selection only)
 export interface RunSprintOptions {
   autoApprove?: boolean;
+  sandboxMode?: boolean;
 }
 
 // 17. runSprint — Master Orchestrator

@@ -1,0 +1,28 @@
+{
+  "id": "003-005",
+  "title": "Worker prompt zenginleştirme",
+  "description": "Worker prompt zenginleştirme\n- Dosya: src/orchestra/brain.ts (buildWorkerPrompt fonksiyonu)\n- Sorun: Worker prompt'u test yazma talimatı içermiyor, coverage 0 çıkıyor\n- Fix: buildWorkerPrompt'a ekle:\n  - \"Yazdığın her fonksiyon için test yaz (*.test.ts)\"\n  - \"npx vitest run çalıştır, sonucu .result dosyasına yaz\"\n  - \"Coverage hedefi: %80 minimum\"\n  - \"Test dosyası aynı dizinde, aynı isimle .test.ts uzantılı olsun\"\n  - \".tasks/task-{id}.result dosyasını MUTLAKA yaz (JSON format)\"\n- Test: buildWorkerPrompt çıktısında test talimatı varlığı kontrolü\n- Kapsam: src/orchestra/brain.ts",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/brain.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-003",
+  "createdAt": "2026-03-17T05:27:12.859Z",
+  "updatedAt": "2026-03-17T05:32:57.621Z"
+}

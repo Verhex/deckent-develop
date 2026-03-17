@@ -323,9 +323,12 @@ export interface SkillMeta {
 }
 
 // ─── CLI Types ──────────────────────────────────────────────────────
+// autoApprove: passed to tmux as --dangerously-skip-permissions (CLI/spawn only)
+// sandboxMode: Docker sandbox flag (not yet implemented)
+// haikuAllowed (PlanModeConfig): model selection constraint only — never used for permissions
 export interface StartOptions {
   autoApprove?: boolean;
-  sandbox?: boolean;
+  sandboxMode?: boolean;
 }
 
 export interface DoctorResult {

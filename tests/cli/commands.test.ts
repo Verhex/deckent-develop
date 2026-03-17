@@ -575,6 +575,16 @@ describe('spawn command', () => {
     await runCommand(registerSpawn, ['spawn', 'task-001']);
     expect(ensureSession).toHaveBeenCalled();
   });
+
+  it('spawn does not use haiku_allowed as autoApprove', async () => {
+    // haiku_allowed belongs to model config — autoApprove is always false for spawn command
+    vi.mocked(readTask).mockReturnValue(makeTask());
+    vi.mocked(ensureSession).mockImplementation(() => {});
+    vi.mocked(spawnWorker).mockImplementation(() => {});
+    await runCommand(registerSpawn, ['spawn', 'task-001']);
+    const spawnOpts = vi.mocked(spawnWorker).mock.calls[0]?.[4];
+    expect(spawnOpts?.autoApprove).toBe(false);
+  });
 });
 
 // ─── Cleanup Command ────────────────────────────────────────────────
@@ -678,9 +688,23 @@ describe('start command', () => {
     expect(optsArg?.autoApprove).toBe(true);
   });
 
-  it('handles --sandbox stub', async () => {
-    await runCommand(registerStart, ['start', '--sandbox']);
+  it('handles --sandbox-mode stub', async () => {
+    await runCommand(registerStart, ['start', '--sandbox-mode']);
     expect(stdout()).toContain('Sandbox mode not yet implemented');
+  });
+
+  it('passes sandboxMode=undefined to runSprint when not set', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
+    await runCommand(registerStart, ['start']);
+    const optsArg = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(optsArg?.autoApprove).toBe(false);
+    expect(optsArg?.sandboxMode).toBeFalsy();
+  });
+
+  it('does not call runSprint when --sandbox-mode given', async () => {
+    await runCommand(registerStart, ['start', '--sandbox-mode']);
+    expect(runSprint).not.toHaveBeenCalled();
   });
 
   it('handles BrainError', async () => {

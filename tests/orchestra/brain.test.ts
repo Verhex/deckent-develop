@@ -1379,3 +1379,34 @@ describe('spawnWorkers — autoApprove flag (DEBT-005)', () => {
     expect(opts?.autoApprove).toBe(false);
   });
 });
+
+describe('RunSprintOptions — sandboxMode separation (DEBT-005)', () => {
+  it('RunSprintOptions accepts sandboxMode without error', () => {
+    // Type check at runtime: both fields must be independently optional
+    const opts: import('../../src/orchestra/brain.js').RunSprintOptions = {
+      autoApprove: false,
+      sandboxMode: true,
+    };
+    expect(opts.autoApprove).toBe(false);
+    expect(opts.sandboxMode).toBe(true);
+  });
+
+  it('RunSprintOptions allows omitting sandboxMode', () => {
+    const opts: import('../../src/orchestra/brain.js').RunSprintOptions = { autoApprove: true };
+    expect(opts.sandboxMode).toBeUndefined();
+  });
+
+  it('haiku_allowed in config is not conflated with autoApprove in RunSprintOptions', () => {
+    // haiku_allowed is a model constraint; autoApprove is a permission flag — no relation
+    const configWithHaiku = makeConfig({
+      activeModeConfig: { ...makeConfig().activeModeConfig, haiku_allowed: true },
+    });
+    // adjustSprintSize uses haiku_allowed for modelConstraint only
+    const usage: UsageMetrics = { fiveHourPercent: 90, weeklyPercent: 90, measuredAt: '' };
+    const rec = adjustSprintSize(configWithHaiku, usage);
+    expect(rec.modelConstraint).toBe('haiku');
+    // autoApprove lives in RunSprintOptions — completely separate
+    const runOpts: import('../../src/orchestra/brain.js').RunSprintOptions = { autoApprove: false };
+    expect(runOpts.autoApprove).toBe(false);
+  });
+});

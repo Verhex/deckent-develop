@@ -1,0 +1,13 @@
+{
+  "taskId": "003-003",
+  "filesChanged": [
+    "src/orchestra/brain.ts",
+    "tests/orchestra/checkUsage-parsing.test.ts"
+  ],
+  "linesAdded": 305,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": 85,
+  "selfAssessment": "DONE",
+  "notes": "Fixed checkUsage regex to handle 'hr' shorthand (5hr:, 5-hr:, 5 hr:). Added 63 comprehensive parsing tests covering: spawnSync invocation contract, 5hr format variants (hr/h/hour/hourly/uppercase/decimal/reverse), weekly format variants, combined outputs, safe default fallbacks (50%/30% on failure), UsageMetrics shape, adjustSprintSize integration with real parsed values, and error resilience. All 591 tests pass, 0 regressions."
+}

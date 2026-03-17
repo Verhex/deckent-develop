@@ -1,0 +1,28 @@
+{
+  "id": "003-003",
+  "title": "checkUsage gerçek entegrasyon (DEBT-002)",
+  "description": "checkUsage gerçek entegrasyon (DEBT-002)\n- Dosya: src/orchestra/brain.ts\n- Sorun: checkUsage (satır 208) her zaman sıfır dönen stub\n- Fix: claude -p \"/usage\" veya \"claude usage\" CLI çıktısını parse et\n  - spawnSync('claude', ['-p', '/usage']) çalıştır\n  - Çıktıdan 5hr %, weekly %, mesaj sayısı ayrıştır\n  - Parse başarısız olursa → güvenli varsayılan dön (50%, 30%)\n  - adjustSprintSize fonksiyonu gerçek verilerle çalışsın\n- Test: mock spawnSync çıktısı ile parsing testleri, hata senaryoları\n- Kapsam: src/orchestra/brain.ts",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/brain.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-003",
+  "createdAt": "2026-03-17T05:27:12.859Z",
+  "updatedAt": "2026-03-17T05:32:57.608Z"
+}

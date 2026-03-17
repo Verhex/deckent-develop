@@ -1,0 +1,28 @@
+{
+  "id": "003-004",
+  "title": "Directive parsing iyileştirme (DEBT-003)",
+  "description": "Directive parsing iyileştirme (DEBT-003)\n- Dosya: src/orchestra/brain.ts\n- Sorun: parseDirectives satır bazlı basit parsing, scope çıkaramıyor\n- Fix: Daha yapılandırılmış parsing\n  - \"## Görev N:\" pattern'ini tanı → ayrı task'lara böl\n  - Her görev bloğundan scope, dosya, test hedefi çıkar\n  - \"- \" prefix strip + regex ile alan extraction\n  - Fallback: mevcut satır bazlı parsing korunsun\n- Test: yapılandırılmış directive parsing, fallback, edge case\n- Kapsam: src/orchestra/brain.ts",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/brain.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-003",
+  "createdAt": "2026-03-17T05:27:12.859Z",
+  "updatedAt": "2026-03-17T05:32:57.616Z"
+}

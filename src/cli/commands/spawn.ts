@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { loadConfig } from '../../core/config.js';
 import { readTask } from '../../agents/worker.js';
 import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
@@ -13,13 +12,13 @@ export function registerSpawn(program: Command): void {
       const root = resolveProjectRoot();
 
       try {
-        const config = await loadConfig(root);
         const task = readTask(root, taskId);
 
         ensureSession();
         const prompt = `You are a Worker agent. Read your task file (.tasks/task-${taskId}.json) and execute it.`;
         spawnWorker(taskId, task.model, prompt, root, {
-          autoApprove: config.activeModeConfig.haiku_allowed,
+          // autoApprove is a CLI permission flag — never derived from haiku_allowed (model config)
+          autoApprove: false,
         });
 
         print(`Worker spawned for task ${taskId} (model: ${task.model}).`);

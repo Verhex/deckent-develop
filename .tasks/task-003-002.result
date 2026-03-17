@@ -1,0 +1,18 @@
+{
+  "taskId": "003-002",
+  "filesChanged": [
+    "src/core/types.ts",
+    "src/cli/commands/start.ts",
+    "src/cli/commands/spawn.ts",
+    "src/orchestra/brain.ts",
+    "tests/core/types.test.ts",
+    "tests/cli/commands.test.ts",
+    "tests/orchestra/brain.test.ts"
+  ],
+  "linesAdded": 52,
+  "linesRemoved": 12,
+  "testsPassed": true,
+  "coverage": 85,
+  "selfAssessment": "DONE",
+  "notes": "DEBT-005 fixed: autoApprove and haikuAllowed semantics clearly separated. Key changes: (1) StartOptions.sandbox renamed to sandboxMode in types.ts with clarifying comments; (2) RunSprintOptions gained sandboxMode field; (3) start.ts uses StartOptions type and --sandbox-mode flag; (4) spawn.ts bug fixed — haiku_allowed was incorrectly used as autoApprove (now hardcoded false, loadConfig removed since unused); (5) brain.ts RunSprintOptions documented. All 591 tests pass, tsc --noEmit clean."
+}

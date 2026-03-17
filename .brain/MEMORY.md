@@ -52,3 +52,7 @@
 - Sorun: waitForResults (satır 458) sleepSync (satır 101) kullanıyor, main thread bloklanıyor: GO_WITH_TECH_DEBT
 - Fix: async/await + setTimeout tabanlı polling'e geç: GO_WITH_TECH_DEBT
 - sleepSync fonksiyonunu kaldır, yerine async sleep(ms) yaz: GO_WITH_TECH_DEBT
+## Sprint sprint-003 Learnings
+- haiku_allowed semantik düzeltme (DEBT-005): GO_WITH_TECH_DEBT
+- checkUsage gerçek entegrasyon (DEBT-002): GO_WITH_TECH_DEBT
+- Worker prompt zenginleştirme: GO_WITH_TECH_DEBT
