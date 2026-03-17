@@ -33,7 +33,11 @@
       "Bash(git commit:*)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(gh run:*)",
+      "Bash(npm install:*)",
+      "Bash(apt list:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

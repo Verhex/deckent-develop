@@ -14,7 +14,7 @@ import {
 } from "../components/ui/table";
 import { NewSprintModal } from "../components/NewSprintModal";
 import { useSSE } from "../hooks/useSSE";
-import { fetchJson, postJson } from "../lib/api";
+import { fetchJson, postJson, ApiError } from "../lib/api";
 import type { DashboardState, AgentInfo, Alert } from "../types";
 
 const PHASE_COLORS: Record<string, string> = {
@@ -48,6 +48,13 @@ const ALERT_ICON: Record<string, typeof Info> = {
   CRITICAL: XOctagon,
 };
 
+const STATUS_VARIANT: Record<string, "info" | "success" | "critical" | "secondary"> = {
+  EXECUTING: "info",
+  DONE: "success",
+  ERROR: "critical",
+  IDLE: "secondary",
+};
+
 function elapsed(startedAt?: string): string {
   if (!startedAt) return "-";
   const ms = Date.now() - new Date(startedAt).getTime();
@@ -58,26 +65,43 @@ function elapsed(startedAt?: string): string {
   return `${mins}m ${remSecs}s`;
 }
 
+function relativeTime(isoDate: string): string {
+  const ms = Date.now() - new Date(isoDate).getTime();
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ago`;
+}
+
 export default function DashboardPage() {
   const sseState = useSSE("/api/events");
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
+  const [noSprint, setNoSprint] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     if (!sseState) {
       fetchJson<DashboardState>("/api/status")
-        .then(setFallbackState)
-        .catch(() => {});
+        .then((data) => {
+          setFallbackState(data);
+          setNoSprint(false);
+        })
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 404) {
+            setNoSprint(true);
+          }
+        });
     }
   }, [sseState]);
 
   const state = sseState ?? fallbackState;
 
-  const handleKill = useCallback(async (workerId: number) => {
-    if (!confirm(`Kill worker ${workerId}?`)) return;
+  const handleKill = useCallback(async (agentId: string) => {
+    if (!confirm(`Kill worker ${agentId}?`)) return;
     try {
-      await postJson(`/api/kill/${workerId}`);
-      // Refresh fallback state if SSE is not active
+      await postJson(`/api/kill/${agentId}`);
       if (!sseState) {
         fetchJson<DashboardState>("/api/status")
           .then(setFallbackState)
@@ -90,12 +114,13 @@ export default function DashboardPage() {
 
   const agents = state?.agents ?? [];
   const alerts = state?.alerts ?? [];
-  const metrics = state?.metrics;
+  const progress = state?.progress;
 
-  const done = metrics?.completedTasks ?? 0;
-  const total = metrics?.totalTasks ?? 0;
-  const active = agents.filter((a) => a.status === "running").length;
-  const pending = total - done - active;
+  const done = progress?.done ?? 0;
+  const active = progress?.active ?? 0;
+  const blocked = progress?.blocked ?? 0;
+  const total = progress?.total ?? 0;
+  const pending = total - done - active - blocked;
 
   return (
     <div className="space-y-6">
@@ -114,13 +139,13 @@ export default function DashboardPage() {
             <Activity className="h-5 w-5 text-blue-400" />
             Sprint Status
           </CardTitle>
-          {state?.phase && (
+          {state?.sprint?.phase && (
             <Badge
               variant={
-                (PHASE_COLORS[state.phase] as "info" | "warning" | "critical" | "success" | "secondary") ?? "secondary"
+                (PHASE_COLORS[state.sprint.phase] as "info" | "warning" | "critical" | "success" | "secondary") ?? "secondary"
               }
             >
-              {state.phase}
+              {state.sprint.phase}
             </Badge>
           )}
         </CardHeader>
@@ -130,26 +155,26 @@ export default function DashboardPage() {
               <div>
                 <p className="text-zinc-400">Sprint ID</p>
                 <p className="font-mono text-zinc-100">
-                  {state.sprintId ?? "—"}
+                  {state.sprint.id ?? "—"}
                 </p>
               </div>
               <div>
                 <p className="text-zinc-400">Phase</p>
-                <p className="text-zinc-100">{state.phase}</p>
+                <p className="text-zinc-100">{state.sprint.phase}</p>
               </div>
               <div>
                 <p className="text-zinc-400">Status</p>
-                <p className="text-zinc-100">
-                  {state.sprintId ? "Active" : "Idle"}
-                </p>
+                <p className="text-zinc-100">{state.sprint.status}</p>
               </div>
               <div>
                 <p className="text-zinc-400">Updated</p>
                 <p className="text-zinc-100">
-                  {state.uptime ? `${Math.floor(state.uptime)}s ago` : "—"}
+                  {state.updatedAt ? relativeTime(state.updatedAt) : "—"}
                 </p>
               </div>
             </div>
+          ) : noSprint ? (
+            <p className="text-zinc-500">No active sprint. Run <code className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-300">deckent start</code> first.</p>
           ) : (
             <p className="text-zinc-500">No sprint data available.</p>
           )}
@@ -202,33 +227,25 @@ export default function DashboardPage() {
               </TableHeader>
               <TableBody>
                 {agents.map((agent: AgentInfo) => (
-                  <TableRow key={agent.workerId}>
+                  <TableRow key={agent.id}>
                     <TableCell className="font-mono">
-                      {agent.workerId}
+                      {agent.id}
                     </TableCell>
-                    <TableCell>{agent.taskId}</TableCell>
+                    <TableCell>{agent.taskId ?? "—"}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={
-                          agent.status === "running"
-                            ? "info"
-                            : agent.status === "done"
-                              ? "success"
-                              : agent.status === "error"
-                                ? "critical"
-                                : "secondary"
-                        }
+                        variant={STATUS_VARIANT[agent.status] ?? "secondary"}
                       >
                         {agent.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{elapsed(agent.startedAt)}</TableCell>
+                    <TableCell>{elapsed(agent.spawnedAt)}</TableCell>
                     <TableCell className="text-right">
-                      {agent.status === "running" && (
+                      {agent.status === "EXECUTING" && (
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleKill(agent.workerId)}
+                          onClick={() => handleKill(agent.id)}
                         >
                           <Skull className="mr-1 h-3 w-3" />
                           Kill

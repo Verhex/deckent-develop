@@ -38,7 +38,7 @@ export default function SettingsPage() {
   const [mode, setMode] = useState("max_plan");
   const [brainModel, setBrainModel] = useState("opus");
   const [defaultModel, setDefaultModel] = useState("sonnet");
-  const [maxWorkers, setMaxWorkers] = useState(2);
+  const [maxWorkers, setMaxWorkers] = useState(8);
   const [language, setLanguage] = useState("en");
 
   const [saving, setSaving] = useState(false);
@@ -146,6 +146,20 @@ export default function SettingsPage() {
                       if (modeConfig.brain_model) setBrainModel(modeConfig.brain_model);
                       if (modeConfig.default_model) setDefaultModel(modeConfig.default_model);
                       if (modeConfig.max_workers) setMaxWorkers(modeConfig.max_workers);
+                    } else {
+                      // Defaults per mode type
+                      const defaults: Record<string, { brain: string; model: string; workers: number }> = {
+                        max_plan: { brain: "opus", model: "opus", workers: 8 },
+                        max5x_plan: { brain: "opus", model: "sonnet", workers: 4 },
+                        pro_plan: { brain: "sonnet", model: "sonnet", workers: 4 },
+                        api: { brain: "haiku", model: "haiku", workers: 2 },
+                      };
+                      const d = defaults[newMode];
+                      if (d) {
+                        setBrainModel(d.brain);
+                        setDefaultModel(d.model);
+                        setMaxWorkers(d.workers);
+                      }
                     }
                   }}
                 >

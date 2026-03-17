@@ -1,41 +1,48 @@
 export interface AgentInfo {
-  workerId: number;
-  taskId: string;
-  status: "idle" | "running" | "done" | "error";
-  model?: string;
-  startedAt?: string;
+  id: string;
+  role: string;
+  status: string; // IDLE | EXECUTING | DONE | ERROR
+  model: string;
+  tmuxWindow: string;
+  taskId?: string;
+  currentAction?: string;
+  spawnedAt?: string;
 }
 
 export interface Alert {
-  level: "info" | "warn" | "error";
+  level: string; // INFO | WARNING | CRITICAL
   message: string;
+  source?: string;
   timestamp: string;
-}
-
-export interface SprintMetrics {
-  sprintId: string;
-  totalTasks: number;
-  completedTasks: number;
-  passedTasks: number;
-  failedTasks: number;
-  coverage: number;
-  duration?: number;
-}
-
-export interface DeckentConfig {
-  projectName?: string;
-  maxWorkers?: number;
-  model?: string;
-  autoApprove?: boolean;
-  brainDir?: string;
+  acknowledged?: boolean;
 }
 
 export interface DashboardState {
-  sprintId: string | null;
-  phase: string;
+  sprint: {
+    id: string;
+    number: number;
+    phase: string;
+    status: string;
+  };
   agents: AgentInfo[];
+  progress: {
+    done: number;
+    active: number;
+    blocked: number;
+    total: number;
+  };
+  usage: {
+    fiveHourPercent: number;
+    weeklyPercent: number;
+    measuredAt: string;
+  };
   alerts: Alert[];
-  metrics: SprintMetrics | null;
-  config: DeckentConfig;
-  uptime: number;
+  updatedAt: string;
+}
+
+export interface DeckentConfig {
+  mode?: string;
+  language?: string;
+  projectName?: string;
+  modes?: Record<string, { brain_model?: string; default_model?: string; max_workers?: number }>;
 }

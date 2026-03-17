@@ -11,7 +11,7 @@ import {
 
 export interface SprintChartEntry {
   sprintId: string;
-  testCount: number;
+  taskCount: number;
   coverage: number;
 }
 
@@ -21,7 +21,7 @@ interface SprintChartProps {
 
 function tooltipFormatter(value: number, name: string): [string, string] {
   if (name === "coverage") return [`${value}%`, "Coverage"];
-  return [String(value), "Tests"];
+  return [String(value), "Tasks"];
 }
 
 export function parseChartData(
@@ -29,10 +29,10 @@ export function parseChartData(
 ): SprintChartEntry[] {
   return history.map((h) => {
     const id = h.id ?? h.sprint ?? "unknown";
-    const testCount = parseInt(h.tasks ?? "0", 10) || 0;
+    const taskCount = parseInt(h.tasks ?? "0", 10) || 0;
     const coverageStr = (h.coverage ?? "0").replace("%", "");
     const coverage = parseFloat(coverageStr) || 0;
-    return { sprintId: id, testCount, coverage };
+    return { sprintId: id, taskCount, coverage };
   });
 }
 
@@ -55,7 +55,7 @@ export default function SprintChart({ data }: SprintChartProps) {
           itemStyle={{ color: "#e4e4e7" }}
         />
         <Legend />
-        <Line yAxisId="left" type="monotone" dataKey="testCount" stroke="#60a5fa" name="Tests" dot />
+        <Line yAxisId="left" type="monotone" dataKey="taskCount" stroke="#60a5fa" name="Tasks" dot />
         <Line yAxisId="right" type="monotone" dataKey="coverage" stroke="#4ade80" name="Coverage %" dot />
       </LineChart>
     </ResponsiveContainer>

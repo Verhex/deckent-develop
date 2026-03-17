@@ -1183,5 +1183,15 @@ export async function runSprint(
   sprint.status = SprintStatus.COMPLETE;
   sprint.phase = SprintPhase.COMPLETE;
   sprint.completedAt = now();
+
+  updateDashboard(projectRoot, {
+    sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+    agents: [],
+    progress: { done: sprint.tasks.length, active: 0, blocked: 0, total: sprint.tasks.length },
+    usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
+    alerts: [],
+    updatedAt: now(),
+  });
+
   return sprint;
 }

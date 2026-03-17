@@ -2,6 +2,7 @@ import { useApi } from "../hooks/useApi";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import DebtTable, { parseDebtMarkdown } from "../components/DebtTable";
+import SimpleMarkdown from "../components/SimpleMarkdown";
 
 export default function MemoryPage() {
   const { data: memoryData, loading: memLoading, error: memError } = useApi<{ content: string }>("/api/memory");
@@ -26,9 +27,9 @@ export default function MemoryPage() {
               {memLoading && <p className="text-zinc-400">Loading memory…</p>}
               {memError && <p className="text-red-400">Error: {memError}</p>}
               {memoryData && (
-                <pre className="max-h-[600px] overflow-auto rounded-md bg-zinc-950 p-4 text-sm text-zinc-300 whitespace-pre-wrap border border-zinc-800">
-                  {memoryData.content}
-                </pre>
+                <div className="rounded-md bg-zinc-950 p-4 border border-zinc-800">
+                  <SimpleMarkdown content={memoryData.content} />
+                </div>
               )}
               {!memLoading && !memError && !memoryData && (
                 <p className="text-zinc-500">No memory content found.</p>

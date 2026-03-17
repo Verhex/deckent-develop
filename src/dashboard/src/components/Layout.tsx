@@ -4,6 +4,9 @@ import { LayoutDashboard, Settings, History, Brain, Menu } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
+import { Badge } from "./ui/badge";
+import { useSSE } from "../hooks/useSSE";
+import type { DashboardState } from "../types";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -38,15 +41,23 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ onNavigate, sseState }: { onNavigate?: () => void; sseState: DashboardState | null }) {
   return (
     <>
-      <div className="mb-8 px-3">
+      <div className="mb-4 px-3">
         <h1 className="text-lg font-bold text-zinc-100 tracking-tight">
           deckent
         </h1>
         <p className="text-xs text-zinc-500">agent orchestration</p>
       </div>
+      {sseState?.sprint && (
+        <div className="mb-4 px-3 flex items-center gap-2">
+          <span className="text-xs font-mono text-zinc-400">{sseState.sprint.id}</span>
+          <Badge variant="info" className="text-[10px] px-1.5 py-0">
+            {sseState.sprint.phase}
+          </Badge>
+        </div>
+      )}
       <NavLinks onNavigate={onNavigate} />
     </>
   );
@@ -54,18 +65,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const sseState = useSSE("/api/events");
 
   return (
     <div className="flex h-screen bg-zinc-950">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex w-[240px] flex-col border-r border-zinc-800 bg-zinc-900 p-4">
-        <SidebarContent />
+        <SidebarContent sseState={sseState} />
       </aside>
 
       {/* Mobile sidebar */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-[240px] p-4">
-          <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          <SidebarContent onNavigate={() => setMobileOpen(false)} sseState={sseState} />
         </SheetContent>
       </Sheet>
 
