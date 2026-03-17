@@ -8,3 +8,4 @@ export {
   validatePartialConfig,
   ConfigValidationError,
 } from './config.js';
+export { analyzeProject } from './analyzer.js';

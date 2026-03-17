@@ -65,11 +65,16 @@ vi.mock('../../src/agents/worker.js', () => ({
   releaseAllLocks: vi.fn(),
 }));
 
+vi.mock('../../src/core/analyzer.js', () => ({
+  analyzeProject: vi.fn(),
+}));
+
 import { createServer } from '../../src/mcp/server.js';
 import { loadConfig } from '../../src/core/config.js';
 import {
   readContext, checkUsage, adjustSprintSize, planSprint, runSprint,
 } from '../../src/orchestra/brain.js';
+import { analyzeProject } from '../../src/core/analyzer.js';
 
 // Helper: call a tool on the server's underlying Server instance
 async function callTool(toolName: string, args: Record<string, unknown> = {}): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
@@ -412,6 +417,45 @@ describe('MCP Tools', () => {
       const parsed = JSON.parse(result.content[0]!.text);
 
       expect(parsed.content).toBeNull();
+    });
+  });
+
+  describe('deckent_analyze_project', () => {
+    it('returns project analysis JSON', async () => {
+      const { registerAnalyzeTool } = await import('../../src/mcp/tools/analyze.js');
+      const mock = createMockServer();
+      registerAnalyzeTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(analyzeProject).mockReturnValue({
+        framework: 'next',
+        language: 'typescript',
+        testFramework: 'vitest',
+        buildTool: 'tsc',
+        ci: 'github-actions',
+        fileCount: 120,
+        authorCount: 3,
+        size: 'medium',
+        methodology: 'sprint',
+      });
+
+      const result = await mock.tools.get('deckent_analyze_project')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.framework).toBe('next');
+      expect(parsed.language).toBe('typescript');
+      expect(parsed.methodology).toBe('sprint');
+      expect(parsed.fileCount).toBe(120);
+    });
+
+    it('has readOnlyHint annotation', async () => {
+      const { registerAnalyzeTool } = await import('../../src/mcp/tools/analyze.js');
+      const mock = createMockServer();
+      registerAnalyzeTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const tool = mock.tools.get('deckent_analyze_project');
+      expect(tool).toBeDefined();
+      const config = tool!.config as { annotations?: { readOnlyHint?: boolean } };
+      expect(config.annotations?.readOnlyHint).toBe(true);
     });
   });
 

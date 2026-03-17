@@ -6,7 +6,20 @@
       "Bash(node:*)",
       "mcp__plugin_context7_context7__resolve-library-id",
       "mcp__plugin_context7_context7__query-docs",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(find /home/alperen/deckent-dev -name *blueprint* -o -name *BLUEPRINT*)",
+      "Bash(wc -l /home/alperen/deckent-dev/src/**/*.ts)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|BUG\\\\|HACK\" /home/alperen/deckent-dev/src --include=*.ts)",
+      "Bash(while read:*)",
+      "Bash(do echo:*)",
+      "Read(//home/alperen/deckent-dev/**)",
+      "Bash(done)",
+      "Bash(grep -r \"timeout\\\\|race\\\\|deadlock\\\\|stale\\\\|concurrent\" /home/alperen/deckent-dev/tests --include=*.ts)",
+      "Bash(grep -l \"waitForResults\\\\|timeout\\\\|pending\" /home/alperen/deckent-dev/tests/**/*.test.ts)",
+      "Bash(npx vitest:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

@@ -7,6 +7,7 @@ import { registerStatusTool } from './status.js';
 import { registerDoctorTool } from './doctor.js';
 import { registerRetroTool } from './retro.js';
 import { registerHistoryTool } from './history.js';
+import { registerAnalyzeTool } from './analyze.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -17,4 +18,5 @@ export function registerTools(server: McpServer): void {
   registerDoctorTool(server);
   registerRetroTool(server);
   registerHistoryTool(server);
+  registerAnalyzeTool(server);
 }

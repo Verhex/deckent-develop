@@ -349,3 +349,24 @@ export interface DoctorResult {
     required: boolean;
   }[];
 }
+
+// ─── Project Analysis ──────────────────────────────────────────────
+export type DetectedFramework = 'react' | 'next' | 'express' | 'nest' | 'vue' | 'angular' | 'svelte' | 'unknown';
+export type DetectedLanguage = 'typescript' | 'javascript' | 'python' | 'rust' | 'mixed' | 'unknown';
+export type DetectedTestFramework = 'vitest' | 'jest' | 'mocha' | 'pytest' | 'unknown';
+export type DetectedBuildTool = 'tsc' | 'vite' | 'webpack' | 'esbuild' | 'turbo' | 'unknown';
+export type DetectedCI = 'github-actions' | 'gitlab-ci' | 'circleci' | 'unknown';
+export type ProjectSize = 'small' | 'medium' | 'large';
+export type MethodologyRecommendation = 'micro-sprint' | 'sprint' | 'agile' | 'hybrid';
+
+export interface ProjectAnalysis {
+  framework: DetectedFramework;
+  language: DetectedLanguage;
+  testFramework: DetectedTestFramework;
+  buildTool: DetectedBuildTool;
+  ci: DetectedCI;
+  fileCount: number;
+  authorCount: number;
+  size: ProjectSize;
+  methodology: MethodologyRecommendation;
+}
