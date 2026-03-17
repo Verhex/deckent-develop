@@ -722,6 +722,21 @@ export function escalateDebt(projectRoot: string): void {
   }
 }
 
+// 11b. resolveDebt
+export function resolveDebt(projectRoot: string, debtId: string, resolvedInSprintId: string): boolean {
+  const debtPath = join(projectRoot, BRAIN_DIR, DEBT_FILE);
+  const content = readFileSafe(debtPath);
+  if (!content) return false;
+  const items = parseDebtTable(content);
+  const item = items.find(d => d.id === debtId);
+  if (!item || item.resolved) return false;
+  item.resolved = true;
+  item.resolvedInSprintId = resolvedInSprintId;
+  mkdirSync(join(projectRoot, BRAIN_DIR), { recursive: true });
+  writeFileSync(debtPath, generateDebtTable(items), 'utf-8');
+  return true;
+}
+
 // 12. writeRetrospective
 export function writeRetrospective(
   projectRoot: string,
@@ -805,6 +820,7 @@ export function calculateMetrics(
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
   results: TaskResult[],
+  debt?: DebtItem[],
 ): SprintMetrics {
   let completedTasks = 0;
   let techDebtTasks = 0;
@@ -834,8 +850,8 @@ export function calculateMetrics(
     coveragePercent,
     noGoRate,
     newDebtCount: techDebtTasks,
-    resolvedDebtCount: 0,
-    totalOpenDebt: 0,
+    resolvedDebtCount: debt ? debt.filter(d => d.resolved && d.resolvedInSprintId === sprint.id).length : 0,
+    totalOpenDebt: debt ? debt.filter(d => !d.resolved).length : 0,
     boundaryViolations: 0,
     crossAssignments: 0,
     contextLinesUsed: 0,
@@ -1018,6 +1034,13 @@ export async function runSprint(
         const evaluation = evaluateResult(result, task);
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
+        // Resolve debt for completed tasks
+        if (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT) {
+          if (task.isPriorityFix && task.fixForTaskId) {
+            resolveDebt(projectRoot, `debt-${task.fixForTaskId}`, sprint.id);
+          }
+          resolveDebt(projectRoot, `debt-${task.id}`, sprint.id);
+        }
       } else {
         const syntheticResult: TaskResult = {
           taskId: task.id,
@@ -1061,6 +1084,10 @@ export async function runSprint(
         if (fixResult) {
           const fixEval = evaluateResult(fixResult, fixTask);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
+          // Resolve debt for completed fix tasks
+          if (fixEval === TaskEvaluation.DONE && fixTask.fixForTaskId) {
+            resolveDebt(projectRoot, `debt-${fixTask.fixForTaskId}`, sprint.id);
+          }
         }
       }
     }
@@ -1071,7 +1098,8 @@ export async function runSprint(
   try {
     sprint.status = SprintStatus.RETROSPECTIVE;
     sprint.phase = SprintPhase.RETRO;
-    metrics = calculateMetrics(sprint, evaluations, results);
+    const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
+    metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
     sprint.metrics = metrics;
     writeRetrospective(projectRoot, sprint, evaluations, metrics);
     writeSprintLog(projectRoot, sprint, metrics);
