@@ -1,35 +1,90 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import http from 'node:http';
 
-// ─── Mocks ──────────────────────────────────────────────────────────
+// ─── Mocks ──────────────────────────────────────────────────────
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
   watch: vi.fn(() => ({ close: vi.fn() })),
 }));
 
-import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
-import { createHttpServer, type HttpApi } from '../../src/api/server.js';
+vi.mock('../../src/cli/commands/doctor.js', () => ({
+  runDoctorChecks: vi.fn(() => ({
+    ok: true,
+    checks: [{ name: 'Node', passed: true, message: 'v18.0.0', required: true }],
+  })),
+}));
+
+vi.mock('../../src/orchestra/tmux.js', () => ({
+  killWorker: vi.fn(),
+}));
+
+vi.mock('../../src/core/config.js', () => ({
+  loadConfig: vi.fn(async () => ({
+    activeModeConfig: { brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, max_workers: 4 },
+  })),
+}));
+
+vi.mock('../../src/orchestra/brain.js', () => ({
+  runSprint: vi.fn(async () => ({ id: 'sprint-001', status: 'COMPLETE' })),
+  readContext: vi.fn(() => ({ debt: [], patterns: [], memory: '' })),
+  checkUsage: vi.fn(() => ({ fiveHourPercent: 10, weeklyPercent: 5 })),
+  adjustSprintSize: vi.fn(() => ({ maxWorkers: 4 })),
+  planSprint: vi.fn(() => ({
+    id: 'sprint-001',
+    number: 1,
+    tasks: [{ id: '001-001', title: 'Test task' }],
+  })),
+}));
+
+import { readFileSync, existsSync, readdirSync, writeFileSync, watch } from 'node:fs';
+import { createHttpServer, parseBody, _resetActiveJob, type HttpApi } from '../../src/api/server.js';
 import { watchDashboard } from '../../src/api/watcher.js';
+import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
+import { killWorker } from '../../src/orchestra/tmux.js';
+import { runSprint } from '../../src/orchestra/brain.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
 const mockReaddirSync = vi.mocked(readdirSync);
+const mockWriteFileSync = vi.mocked(writeFileSync);
+const mockRunDoctorChecks = vi.mocked(runDoctorChecks);
+const mockKillWorker = vi.mocked(killWorker);
+const mockRunSprint = vi.mocked(runSprint);
 
-// ─── Helpers ────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────
 const PROJECT_ROOT = '/tmp/test-project';
 
-function request(api: HttpApi, path: string, method = 'GET'): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
+function request(
+  api: HttpApi,
+  path: string,
+  method = 'GET',
+  body?: unknown,
+): Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     const addr = api.server.address();
     if (!addr || typeof addr === 'string') return reject(new Error('No address'));
-    const req = http.request({ hostname: '127.0.0.1', port: addr.port, path, method }, (res) => {
-      let body = '';
-      res.on('data', (chunk) => { body += chunk; });
-      res.on('end', () => resolve({ status: res.statusCode!, body, headers: res.headers }));
-    });
+    const payload = body !== undefined ? JSON.stringify(body) : undefined;
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port: addr.port,
+        path,
+        method,
+        headers: payload
+          ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+          : undefined,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode!, body: data, headers: res.headers }));
+      },
+    );
     req.on('error', reject);
+    if (payload) req.write(payload);
     req.end();
   });
 }
@@ -60,13 +115,13 @@ const sprintMd = `# sprint-001
 - 001-002: Add tests (DONE)
 `;
 
-// ─── Tests ──────────────────────────────────────────────────────────
+// ─── Tests ──────────────────────────────────────────────────────
 describe('createHttpServer', () => {
   let api: HttpApi;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: dashboard file does not exist (no watcher setup)
+    _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
   });
 
@@ -75,18 +130,19 @@ describe('createHttpServer', () => {
   });
 
   it('starts and listens on given port', async () => {
-    api = createHttpServer(PROJECT_ROOT, 0); // port 0 = random
+    api = createHttpServer(PROJECT_ROOT, 0);
     await new Promise<void>((r) => api.server.once('listening', r));
     const addr = api.server.address();
     expect(addr).not.toBeNull();
     expect(typeof addr).toBe('object');
   });
 
+  // ─── Existing GET endpoints ─────────────────────────────────
+
   describe('GET /api/status', () => {
     it('returns 404 when dashboard file missing', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
-      // existsSync for dashPath returns false (already default)
       const res = await request(api, '/api/status');
       expect(res.status).toBe(404);
       expect(JSON.parse(res.body)).toEqual({ error: 'No active sprint' });
@@ -201,23 +257,357 @@ describe('createHttpServer', () => {
     });
   });
 
-  describe('error handling', () => {
-    it('returns 405 for non-GET methods', async () => {
+  // ─── New GET endpoints ──────────────────────────────────────
+
+  describe('GET /api/config', () => {
+    it('returns 404 when config missing', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const res = await request(api, '/api/status', 'POST');
+      const res = await request(api, '/api/config');
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Config not found' });
+    });
+
+    it('returns config JSON when file exists', async () => {
+      const configData = { mode: 'max_plan', max_workers: 4 };
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('config.json')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue(JSON.stringify(configData));
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/config');
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body)).toEqual(configData);
+    });
+  });
+
+  describe('GET /api/doctor', () => {
+    it('returns doctor checks', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/doctor');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.ok).toBe(true);
+      expect(body.checks).toHaveLength(1);
+      expect(body.checks[0].name).toBe('Node');
+      expect(mockRunDoctorChecks).toHaveBeenCalledWith(PROJECT_ROOT);
+    });
+  });
+
+  describe('GET /api/memory', () => {
+    it('returns 404 when memory file missing', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/memory');
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Memory file not found' });
+    });
+
+    it('returns memory content when file exists', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('MEMORY.md')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue('# Memory\n- Item 1');
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/memory');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.content).toBe('# Memory\n- Item 1');
+    });
+  });
+
+  describe('GET /api/debt', () => {
+    it('returns 404 when debt file missing', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/debt');
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Debt file not found' });
+    });
+
+    it('returns debt content when file exists', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('DEBT.md')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue('# Tech Debt\n| ID | Desc |');
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/debt');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.content).toBe('# Tech Debt\n| ID | Desc |');
+    });
+  });
+
+  // ─── CORS Preflight ─────────────────────────────────────────
+
+  describe('OPTIONS (CORS preflight)', () => {
+    it('returns 200 with CORS headers', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status', 'OPTIONS');
+      expect(res.status).toBe(200);
+      expect(res.headers['access-control-allow-origin']).toBe('*');
+      expect(res.headers['access-control-allow-methods']).toBe('GET, POST, OPTIONS');
+      expect(res.headers['access-control-allow-headers']).toBe('Content-Type');
+    });
+  });
+
+  // ─── POST endpoints ────────────────────────────────────────
+
+  describe('POST /api/start', () => {
+    it('returns 202 and starts sprint', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/start', 'POST', { autoApprove: true });
+      expect(res.status).toBe(202);
+      const body = JSON.parse(res.body);
+      expect(body.status).toBe('started');
+      expect(body.jobId).toMatch(/^job-/);
+    });
+
+    it('returns 409 when sprint already running', async () => {
+      // Make runSprint hang so the job stays in 'running' state
+      mockRunSprint.mockImplementation(() => new Promise(() => {}) as never);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res1 = await request(api, '/api/start', 'POST', {});
+      expect(res1.status).toBe(202);
+
+      const res2 = await request(api, '/api/start', 'POST', {});
+      expect(res2.status).toBe(409);
+      expect(JSON.parse(res2.body)).toEqual({ error: 'Sprint already running' });
+    });
+  });
+
+  describe('POST /api/plan', () => {
+    it('returns plan JSON', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/plan', 'POST', { directive: 'build dashboard' });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.id).toBe('sprint-001');
+      expect(body.tasks).toHaveLength(1);
+    });
+  });
+
+  describe('POST /api/kill/:workerId', () => {
+    it('kills worker and returns success', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/kill/001-001', 'POST', {});
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body)).toEqual({ success: true });
+      expect(mockKillWorker).toHaveBeenCalledWith('001-001');
+    });
+
+    it('returns 500 when kill fails', async () => {
+      mockKillWorker.mockImplementation(() => { throw new Error('tmux error'); });
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/kill/bad-id', 'POST', {});
+      expect(res.status).toBe(500);
+      expect(JSON.parse(res.body)).toEqual({ error: 'tmux error' });
+    });
+  });
+
+  describe('POST /api/set-directives', () => {
+    it('writes directives and returns task count', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const content = '# Sprint\n## Task 1\nDo thing\n## Task 2\nDo other thing';
+      const res = await request(api, '/api/set-directives', 'POST', { content });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.taskCount).toBe(2);
+      expect(mockWriteFileSync).toHaveBeenCalled();
+    });
+
+    it('returns 400 when content is missing', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/set-directives', 'POST', {});
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Missing content field' });
+    });
+  });
+
+  describe('POST /api/config', () => {
+    it('merges and writes config', async () => {
+      const existingConfig = { mode: 'max_plan', max_workers: 2 };
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('config.json')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue(JSON.stringify(existingConfig));
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/config', 'POST', { max_workers: 4 });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.mode).toBe('max_plan');
+      expect(body.max_workers).toBe(4);
+      expect(mockWriteFileSync).toHaveBeenCalled();
+    });
+
+    it('creates config from scratch when none exists', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/config', 'POST', { mode: 'balanced' });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.mode).toBe('balanced');
+    });
+  });
+
+  // ─── GET /api/job/:jobId ────────────────────────────────────
+
+  describe('GET /api/job/:jobId', () => {
+    it('returns 404 when no active job', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/job/nonexistent');
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Job not found' });
+    });
+
+    it('returns job status after start', async () => {
+      // Make runSprint hang so the job stays in 'running' state
+      mockRunSprint.mockImplementation(() => new Promise(() => {}) as never);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const startRes = await request(api, '/api/start', 'POST', {});
+      const { jobId } = JSON.parse(startRes.body) as { jobId: string };
+
+      const res = await request(api, `/api/job/${jobId}`);
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.id).toBe(jobId);
+      expect(body.status).toBe('running');
+    });
+
+    it('returns completed job after sprint finishes', async () => {
+      mockRunSprint.mockResolvedValue({ id: 'sprint-001', status: 'COMPLETE' } as never);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const startRes = await request(api, '/api/start', 'POST', {});
+      const { jobId } = JSON.parse(startRes.body) as { jobId: string };
+
+      // Wait for the background promise to resolve
+      await new Promise((r) => setTimeout(r, 50));
+
+      const res = await request(api, `/api/job/${jobId}`);
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.status).toBe('completed');
+      expect(body.result).toEqual({ id: 'sprint-001', status: 'COMPLETE' });
+    });
+
+    it('returns failed job when sprint errors', async () => {
+      mockRunSprint.mockRejectedValue(new Error('Spawn failed'));
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const startRes = await request(api, '/api/start', 'POST', {});
+      const { jobId } = JSON.parse(startRes.body) as { jobId: string };
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const res = await request(api, `/api/job/${jobId}`);
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.status).toBe('failed');
+      expect(body.error).toBe('Spawn failed');
+    });
+  });
+
+  // ─── Error handling ─────────────────────────────────────────
+
+  describe('error handling', () => {
+    it('returns 405 for unsupported methods', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status', 'PUT');
       expect(res.status).toBe(405);
       expect(JSON.parse(res.body)).toEqual({ error: 'Method not allowed' });
     });
 
-    it('returns 404 for unknown routes', async () => {
+    it('returns 404 for unknown GET routes', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/unknown');
       expect(res.status).toBe(404);
       expect(JSON.parse(res.body)).toEqual({ error: 'Not found' });
+    });
+
+    it('returns 404 for unknown POST routes', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/unknown', 'POST', {});
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Not found' });
+    });
+
+    it('returns 400 for invalid JSON POST body', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const addr = api.server.address() as { port: number };
+      const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const req = http.request(
+          { hostname: '127.0.0.1', port: addr.port, path: '/api/config', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': 12 } },
+          (r) => {
+            let data = '';
+            r.on('data', (c) => { data += c; });
+            r.on('end', () => resolve({ status: r.statusCode!, body: data }));
+          },
+        );
+        req.on('error', reject);
+        req.write('not valid!!!');
+        req.end();
+      });
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Invalid JSON body' });
     });
   });
 
@@ -236,8 +626,131 @@ describe('createHttpServer', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe('static file serving', () => {
+    const STATIC_DIR = '/tmp/test-static';
+
+    it('serves static files with correct MIME type', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.endsWith('style.css')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue(Buffer.from('body { color: red; }'));
+
+      api = createHttpServer(PROJECT_ROOT, 0, STATIC_DIR);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/style.css');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('text/css');
+      expect(res.body).toBe('body { color: red; }');
+    });
+
+    it('serves index.html for root path', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.endsWith('index.html')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue(Buffer.from('<html></html>'));
+
+      api = createHttpServer(PROJECT_ROOT, 0, STATIC_DIR);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('text/html');
+    });
+
+    it('falls back to index.html for SPA routes', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.endsWith('index.html')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue(Buffer.from('<html>SPA</html>'));
+
+      api = createHttpServer(PROJECT_ROOT, 0, STATIC_DIR);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/settings');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('text/html');
+      expect(res.body).toBe('<html>SPA</html>');
+    });
+
+    it('returns 404 when no static dir and unknown route', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/nonexistent');
+      expect(res.status).toBe(404);
+    });
+
+    it('API routes take priority over static files', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('sprints')) return true;
+        return false;
+      });
+      mockReaddirSync.mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+
+      api = createHttpServer(PROJECT_ROOT, 0, STATIC_DIR);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/history');
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body)).toEqual([]);
+    });
+
+    it('returns 404 when static dir set but no index.html fallback', async () => {
+      mockExistsSync.mockReturnValue(false);
+
+      api = createHttpServer(PROJECT_ROOT, 0, STATIC_DIR);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/nonexistent');
+      expect(res.status).toBe(404);
+    });
+  });
 });
 
+// ─── parseBody unit tests ────────────────────────────────────────
+describe('parseBody', () => {
+  it('parses valid JSON body', async () => {
+    const { Readable } = await import('node:stream');
+    const req = new Readable({
+      read() {
+        this.push(JSON.stringify({ foo: 'bar' }));
+        this.push(null);
+      },
+    }) as unknown as http.IncomingMessage;
+
+    const result = await parseBody(req);
+    expect(result).toEqual({ foo: 'bar' });
+  });
+
+  it('returns empty object for empty body', async () => {
+    const { Readable } = await import('node:stream');
+    const req = new Readable({
+      read() { this.push(null); },
+    }) as unknown as http.IncomingMessage;
+
+    const result = await parseBody(req);
+    expect(result).toEqual({});
+  });
+
+  it('rejects on invalid JSON', async () => {
+    const { Readable } = await import('node:stream');
+    const req = new Readable({
+      read() {
+        this.push('not json{{{');
+        this.push(null);
+      },
+    }) as unknown as http.IncomingMessage;
+
+    await expect(parseBody(req)).rejects.toThrow('Invalid JSON body');
+  });
+});
+
+// ─── watchDashboard tests ────────────────────────────────────────
 describe('watchDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -261,11 +774,9 @@ describe('watchDashboard', () => {
 
     expect(fileCallback).toBeDefined();
 
-    // Trigger file change
     fileCallback!();
     expect(onChange).not.toHaveBeenCalled();
 
-    // Advance past debounce
     vi.advanceTimersByTime(500);
     expect(onChange).toHaveBeenCalledTimes(1);
 
@@ -284,14 +795,12 @@ describe('watchDashboard', () => {
     const onChange = vi.fn();
     const w = watchDashboard('/tmp/test/.dashboard', onChange);
 
-    // Rapid changes
     fileCallback!();
     vi.advanceTimersByTime(200);
     fileCallback!();
     vi.advanceTimersByTime(200);
     fileCallback!();
 
-    // Only 500ms after the LAST change
     vi.advanceTimersByTime(500);
     expect(onChange).toHaveBeenCalledTimes(1);
 

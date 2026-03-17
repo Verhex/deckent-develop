@@ -29,7 +29,11 @@
       "Bash(git push:*)",
       "Bash(find /home/alperen/deckent-dev/.deckent -type f -name *.json)",
       "Bash(grep -r \"express\\\\|ws\\\\|chokidar\\\\|port\\\\|listen\\\\|http\\\\|https\" /home/alperen/deckent-dev/package.json /home/alperen/deckent-dev/src --include=*.ts --include=*.json)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(npx vite:*)"
     ]
   }
 }

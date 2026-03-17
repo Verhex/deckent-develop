@@ -1,0 +1,18 @@
+{
+  "taskId": "010-003",
+  "filesChanged": [
+    "src/dashboard/src/components/ui/tabs.tsx",
+    "src/dashboard/src/components/SprintChart.tsx",
+    "src/dashboard/src/components/DebtTable.tsx",
+    "src/dashboard/src/pages/HistoryPage.tsx",
+    "src/dashboard/src/pages/MemoryPage.tsx",
+    "tests/dashboard/pages.test.ts",
+    "tests/dashboard/components.test.ts"
+  ],
+  "linesAdded": 467,
+  "linesRemoved": 14,
+  "testsPassed": true,
+  "coverage": 95,
+  "selfAssessment": "DONE",
+  "notes": "Implemented HistoryPage (sprint history table + Recharts trend chart), MemoryPage (Memory/Debt tabs), SprintChart (LineChart with dual Y axes), DebtTable (markdown parser + priority badges), and tabs.tsx shadcn component. 58 new tests across 2 test files, all 1017 tests pass."
+}

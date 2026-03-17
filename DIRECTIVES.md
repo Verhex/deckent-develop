@@ -1,68 +1,74 @@
-# DIRECTIVES — Sprint 10 (Coverage, Refactor, API, Dashboard)
+# DIRECTIVES — Sprint 11B (Web Dashboard Pages)
 
-## Hedef: Branch coverage to 90%+, sprint ID extraction, HTTP API with SSE, terminal dashboard
+## Hedef: Dashboard, settings, history, memory pages with full UI
 
-## Task 1: Branch coverage >= 90%
-- Current branch coverage: 89.72%. Target: >= 90%
-- Low-coverage branches to target:
-  - src/mcp/tools/status.ts (75% branch): add test for JSON parse error path (catch block line 33-40)
-  - src/mcp/resources/debt.ts (57.89% branch): add tests for parseDebtTable edge cases (lines 13-18, 21, 44)
-  - src/mcp/tools/init.ts (70% branch): add tests for existing file detection paths (lines 27-28, 109-112)
-  - src/mcp/tools/start.ts (60% branch): add test for BrainError catch path
-  - src/mcp/tools/directives.ts (66.66% branch): add test for empty content edge case
-  - src/mcp/tools/retro.ts (75% branch): add test for missing retro path
-  - src/core/constants.ts (66.66% branch): add test for package.json read failure fallback
-  - src/core/utils.ts (80% branch): add tests for edge cases
-  - src/cli/commands/analyze.ts (33.33% stmt): add tests for formatAnalysisResult and action handler
-- Create NEW test files only, do NOT modify existing test files
-- Dosya: tests/mcp/branch-coverage.test.ts, tests/cli/analyze-coverage.test.ts, tests/core/branch-coverage.test.ts
-- Kapsam: tests/mcp/, tests/cli/, tests/core/
+## Task 1: Dashboard Ana Sayfa
+- Replace src/dashboard/src/pages/DashboardPage.tsx placeholder with full implementation
+- Sprint status card: sprint ID, phase badge (color-coded), status, updated time
+- Worker table: columns (ID, Task, Status, Elapsed) with Kill button per row
+  - Kill button: POST /api/kill/:workerId, confirm dialog, refresh on success
+- Progress section: visual progress bar with segments (done=green, active=blue, pending=gray)
+  - Text: "3/5 done, 1 active, 1 pending"
+- Alert section: list of alerts with level badges (INFO=blue, WARNING=amber, CRITICAL=red)
+- "Yeni Sprint" button → opens NewSprintModal
+- NewSprintModal: textarea for directive content → POST /api/set-directives → show task count → POST /api/plan → show plan → Confirm button → POST /api/start
+- SSE integration: useSSE('/api/events') for real-time DashboardState updates
+- Fallback: if no SSE data, fetch GET /api/status on mount
+- Dark theme: bg-zinc-950, cards bg-zinc-900, text zinc-100
+- Create needed shadcn components: dialog.tsx, table.tsx, badge.tsx, textarea.tsx, progress.tsx
+- Dosya: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/components/ui/dialog.tsx, src/dashboard/src/components/ui/table.tsx, src/dashboard/src/components/ui/badge.tsx, src/dashboard/src/components/ui/textarea.tsx, src/dashboard/src/components/ui/progress.tsx
+- Kapsam: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/
 
-## Task 2: Extract getNextSprintId() utility
-- In src/orchestra/brain.ts planSprint() lines 344-357, the sprint numbering logic is inline
-- Extract to a new exported function: getNextSprintId(projectRoot: string): string
-- Place in src/core/utils.ts (shared utility pattern, like countBrainLines)
-- Function should: scan .brain/sprints/ directory, find max sprint-NNN.md number, return sprint-{max+1 padded to 3 digits}
-- If no sprints dir or empty, return sprint-001
-- Update planSprint() to call getNextSprintId() instead of inline logic
-- Add tests to verify: empty dir → sprint-001, existing sprints → correct increment, non-sequential files handled
-- Dosya: src/core/utils.ts, src/orchestra/brain.ts, tests/core/utils-sprint-id.test.ts, tests/orchestra/brain.test.ts
+## Task 2: Ayarlar Sayfasi
+- Replace src/dashboard/src/pages/SettingsPage.tsx placeholder with full implementation
+- Config section: fetch GET /api/config on mount
+  - Mode dropdown: max_plan, max5x_plan, pro_plan, api
+  - Brain Model dropdown: opus, sonnet, haiku
+  - Default Model dropdown: opus, sonnet, haiku
+  - Max Workers number input
+  - Language dropdown: en, tr
+- Save button: POST /api/config with changed values, show success/error feedback
+- Doctor section: fetch GET /api/doctor, display checklist with pass/fail icons (CheckCircle/XCircle from lucide-react)
+- Refresh Doctor button
+- Dark theme consistent with DashboardPage
+- Create needed shadcn components: select.tsx, input.tsx, label.tsx, separator.tsx
+- Dosya: src/dashboard/src/pages/SettingsPage.tsx, src/dashboard/src/components/ui/select.tsx, src/dashboard/src/components/ui/input.tsx, src/dashboard/src/components/ui/label.tsx, src/dashboard/src/components/ui/separator.tsx
+- Kapsam: src/dashboard/src/pages/SettingsPage.tsx, src/dashboard/src/components/ui/
 
-## Task 3: HTTP API with SSE + deckent serve command
-- Create src/api/server.ts with createHttpServer(projectRoot: string, port?: number)
-- Use only node:http (NO express, NO ws package — zero new dependencies)
-- Endpoints:
-  - GET /api/status → reads .deckent/.dashboard JSON file, returns it with Content-Type application/json
-  - GET /api/sprint → reads latest sprint log from .brain/sprints/, returns JSON with id, metrics, tasks
-  - GET /api/history → reads all sprint logs, returns JSON array
-  - GET /api/events → SSE stream (Content-Type text/event-stream), watches .dashboard file with fs.watch, pushes data: {json} on change
-- Create src/api/watcher.ts with watchDashboard(filePath: string, onChange: callback)
-  - Uses node:fs watch (NOT chokidar — zero deps)
-  - Debounce: 500ms to avoid rapid fire
-- Create src/cli/commands/serve.ts with registerServe(program: Command)
-  - Command: deckent serve [--port 3100]
-  - Starts HTTP server, prints listening URL, handles SIGINT/SIGTERM gracefully (server.close())
-- Register in src/cli/index.ts: import registerServe, call registerServe(program)
-- Create tests with mocked node:http and node:fs
-- Dosya: src/api/server.ts, src/api/watcher.ts, src/cli/commands/serve.ts, src/cli/index.ts, tests/api/server.test.ts, tests/cli/serve.test.ts
+## Task 3: Sprint Gecmisi + Bellek + Borc Sayfasi
+- Replace src/dashboard/src/pages/HistoryPage.tsx placeholder with full implementation
+- Sprint history table: fetch GET /api/history, columns (Sprint ID, Tasks, Completed, No-Go Rate, Coverage, Duration)
+- Trend chart with Recharts: ResponsiveContainer + LineChart
+  - X axis: sprint ID
+  - Left Y axis: test count (Line, blue)
+  - Right Y axis: coverage % (Line, green)
+  - Tooltip with custom formatter
+  - CartesianGrid, Legend
+- Replace src/dashboard/src/pages/MemoryPage.tsx placeholder with full implementation
+- Memory tab: fetch GET /api/memory, render markdown content in scrollable code block (pre + whitespace-pre-wrap)
+- Debt tab: fetch GET /api/debt, parse markdown table rows, render as styled HTML table with priority badges
+- Use Tabs component to switch: History | Memory | Debt
+- Create needed shadcn components: tabs.tsx
+- Dosya: src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/components/SprintChart.tsx, src/dashboard/src/components/DebtTable.tsx, src/dashboard/src/components/ui/tabs.tsx
+- Kapsam: src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/components/
 
-## Task 4: deckent dashboard (terminal TUI)
-- Create src/cli/commands/dashboard.ts with registerDashboard(program: Command)
-- Command: deckent dashboard [--interval 2000]
-- Reads .deckent/.dashboard JSON file directly (no dependency on HTTP server)
-- Box-drawing UI with Unicode characters (established project pattern):
-  - Sprint info box: ID, phase, status (╔═══╗ style)
-  - Worker table: ID, task title, status, elapsed time
-  - Progress bar: completed/active/pending/total with visual bar
-  - Alerts section: level, message, timestamp (if any)
-- Auto-refresh with setInterval (default 2000ms), clear screen between renders
-- Handle SIGINT/SIGTERM for clean exit (clearInterval + process.exit)
-- If .dashboard file not found, print "No active sprint. Run deckent start first."
-- Register in src/cli/index.ts: import registerDashboard, call registerDashboard(program)
-- Dosya: src/cli/commands/dashboard.ts, src/cli/index.ts, tests/cli/dashboard.test.ts
+## Task 4: Layout + Router + Navigation + UX
+- Create src/dashboard/src/components/Layout.tsx
+  - Sidebar (left, 240px): deckent logo/text at top, nav links below
+  - Nav links: Dashboard (/), Settings (/settings), History (/history), Memory (/memory)
+  - Active link: bg-zinc-800 with left border accent (blue)
+  - Collapsible: hamburger icon on mobile (<768px), Sheet component slides in
+  - Sidebar: bg-zinc-900 border-r border-zinc-800
+  - Main content area: flex-1 overflow-auto p-6 bg-zinc-950
+- Update src/dashboard/src/App.tsx: wrap Routes in <Layout>, remove lazy placeholders, use direct imports
+- Create src/dashboard/src/components/ThemeProvider.tsx: sets dark class on html, provides theme context
+- Update src/dashboard/src/index.css: add dark theme variables, base styles (body bg-zinc-950 text-zinc-100), scrollbar styling
+- Create sheet.tsx and scroll-area.tsx shadcn components for mobile sidebar
+- Responsive design: sidebar hidden on mobile, toggleable via Sheet
+- Dosya: src/dashboard/src/components/Layout.tsx, src/dashboard/src/App.tsx, src/dashboard/src/components/ThemeProvider.tsx, src/dashboard/src/index.css, src/dashboard/src/components/ui/sheet.tsx, src/dashboard/src/components/ui/scroll-area.tsx
+- Kapsam: src/dashboard/src/components/, src/dashboard/src/App.tsx, src/dashboard/src/index.css
 
 ## Kalite Kuralları
-- Mevcut testler regresyona uğramamalı (720 test)
-- tsc --noEmit clean kalmalı
-- Her görev için testler yazılmalı
-- SIFIR yeni runtime dependency eklenecek
+- Main project tsc --noEmit + vitest run MUST still pass
+- SIFIR değişiklik ana proje kaynak dosyalarında
+- Dashboard build: cd src/dashboard && npm run build

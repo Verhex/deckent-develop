@@ -1,13 +1,13 @@
-# Sprint sprint-008 Retrospective
+# Sprint sprint-010 Retrospective
 
 ## Metrics
 - Tasks: 4 total, 4 done, 0 debt, 0 no-go
-- Coverage: 95.4%
+- Coverage: 97.5%
 - No-Go Rate: 0.0%
-- Duration: 422684ms
+- Duration: 293397ms
 
 ## Results
-- 008-001: Branch coverage >= 90% -> DONE
-- 008-002: Extract getNextSprintId() utility -> DONE
-- 008-003: HTTP API with SSE + deckent serve command -> DONE
-- 008-004: deckent dashboard (terminal TUI) -> DONE
+- 010-001: Dashboard Ana Sayfa -> DONE
+- 010-002: Ayarlar Sayfasi -> DONE
+- 010-003: Sprint Gecmisi + Bellek + Borc Sayfasi -> DONE
+- 010-004: Layout + Router + Navigation + UX -> DONE

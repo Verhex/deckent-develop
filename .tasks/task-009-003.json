@@ -1,0 +1,41 @@
+{
+  "id": "009-003",
+  "title": "Dashboard Scaffold — Vite + React + Tailwind + shadcn",
+  "description": "Dashboard Scaffold — Vite + React + Tailwind + shadcn\n- Create src/dashboard/ sub-project from scratch\n- src/dashboard/package.json:\n  - name: \"deckent-dashboard\", private: true, type: \"module\"\n  - dependencies: react@^19, react-dom@^19, react-router-dom@^7, recharts@^2, lucide-react, class-variance-authority, clsx, tailwind-merge\n  - devDependencies: @types/react, @types/react-dom, typescript, vite@^6, @vitejs/plugin-react, tailwindcss@^4, @tailwindcss/vite\n  - scripts: dev (\"vite\"), build (\"tsc -b && vite build\"), preview (\"vite preview\")\n- src/dashboard/vite.config.ts: @vitejs/plugin-react + @tailwindcss/vite plugins, server.port 5173, server.proxy /api → http://localhost:3100\n- src/dashboard/tsconfig.json: target ES2022, module ESNext, moduleResolution bundler, jsx react-jsx, lib [ES2022, DOM, DOM.Iterable], strict, paths @/* → src/*\n- src/dashboard/tsconfig.node.json: for vite.config.ts (module NodeNext, include vite.config.ts)\n- src/dashboard/index.html: standard Vite entry with <div id=\"root\"> and <script type=\"module\" src=\"/src/main.tsx\">\n- src/dashboard/src/main.tsx: createRoot + <App />\n- src/dashboard/src/App.tsx: BrowserRouter + Routes with lazy-loaded page placeholders for /, /settings, /history, /memory\n- src/dashboard/src/index.css: @import \"tailwindcss\", dark theme CSS variables (@theme block with zinc palette)\n- src/dashboard/src/lib/utils.ts: export cn() function (clsx + tailwind-merge)\n- src/dashboard/src/lib/api.ts: fetchJson(url), postJson(url, body) typed wrappers with error handling\n- src/dashboard/src/hooks/useSSE.ts: custom hook connecting to /api/events, returns DashboardState | null, auto-reconnect on error (3s delay)\n- src/dashboard/src/hooks/useApi.ts: generic useFetch<T>(url) hook with loading/error/data states + refetch()\n- src/dashboard/src/types/index.ts: DashboardState, AgentInfo, Alert, SprintMetrics, DeckentConfig type mirrors (subset of core/types.ts, standalone — NO import from main project)\n- src/dashboard/src/components/ui/button.tsx: shadcn Button component (variant: default, destructive, outline, ghost)\n- src/dashboard/src/components/ui/card.tsx: shadcn Card, CardHeader, CardTitle, CardContent, CardDescription\n- Placeholder pages: src/dashboard/src/pages/DashboardPage.tsx, SettingsPage.tsx, HistoryPage.tsx, MemoryPage.tsx — each exports default function with minimal content\n- Run: cd src/dashboard && npm install\n- Dosya: src/dashboard/package.json, src/dashboard/vite.config.ts, src/dashboard/tsconfig.json, src/dashboard/tsconfig.node.json, src/dashboard/index.html, src/dashboard/src/main.tsx, src/dashboard/src/App.tsx, src/dashboard/src/index.css, src/dashboard/src/lib/utils.ts, src/dashboard/src/lib/api.ts, src/dashboard/src/hooks/useSSE.ts, src/dashboard/src/hooks/useApi.ts, src/dashboard/src/types/index.ts, src/dashboard/src/components/ui/button.tsx, src/dashboard/src/components/ui/card.tsx, src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/pages/SettingsPage.tsx, src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx\n- Kapsam: src/dashboard/",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/dashboard/",
+      "src/dashboard/src/",
+      "src/dashboard/src/lib/",
+      "src/dashboard/src/hooks/",
+      "src/dashboard/src/types/",
+      "src/dashboard/src/components/ui/",
+      "src/dashboard/src/pages/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/dashboard/vite.config.ts",
+      "vite.config.ts",
+      "src/dashboard/src/lib/utils.ts",
+      "src/dashboard/src/lib/api.ts",
+      "src/dashboard/src/hooks/useSSE.ts",
+      "src/dashboard/src/hooks/useApi.ts",
+      "src/dashboard/src/types/index.ts",
+      "core/types.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-009",
+  "createdAt": "2026-03-17T11:18:06.114Z",
+  "updatedAt": "2026-03-17T11:25:29.624Z"
+}

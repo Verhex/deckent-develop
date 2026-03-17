@@ -1,0 +1,36 @@
+{
+  "id": "009-004",
+  "title": "CLI \"deckent web\" Command",
+  "description": "CLI \"deckent web\" Command\n- Create src/cli/commands/web.ts with registerWeb(program: Command)\n- Command: deckent web [--port 3100] [--dev]\n  - --port: API server port (default 3100)\n  - --dev: prints instruction \"Run 'cd src/dashboard && npm run dev' for Vite dev server on port 5173\"\n  - Without --dev: serves built dashboard from src/dashboard/dist/ as static files\n    - Any request NOT starting with /api/ → try static file from dist, fallback to index.html (SPA routing)\n    - MIME type map: .html → text/html, .js → application/javascript, .css → text/css, .svg → image/svg+xml, .json → application/json\n  - Starts API server via createHttpServer(), prints \"Deckent Web Dashboard on http://localhost:{port}\"\n  - SIGINT/SIGTERM → graceful shutdown\n- Modify createHttpServer() signature: add optional staticDir parameter for static file serving\n- Register in src/cli/index.ts: import registerWeb, call registerWeb(program)\n- Create tests/cli/web.test.ts with mocked fs/http\n- Dosya: src/cli/commands/web.ts, src/api/server.ts, src/cli/index.ts, tests/cli/web.test.ts\n- Kapsam: src/cli/commands/, src/cli/index.ts, tests/cli/, src/api/server.ts\n\n## Kalite Kuralları\n- Mevcut testler regresyona uğramamalı (799 test)\n- tsc --noEmit clean kalmalı (src/dashboard excluded)\n- Her görev için testler yazılmalı\n- SIFIR yeni runtime dependency (ana package.json'a eklenmez)\n- Dashboard dependencies SADECE src/dashboard/package.json'da",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "src/dashboard/dist/",
+      "src/cli/",
+      "tests/cli/",
+      "src/api/",
+      "src/dashboard/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/web.ts",
+      "src/cli/index.ts",
+      "tests/cli/web.test.ts",
+      "src/api/server.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-009",
+  "createdAt": "2026-03-17T11:18:06.114Z",
+  "updatedAt": "2026-03-17T11:25:29.624Z"
+}

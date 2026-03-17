@@ -1,0 +1,19 @@
+{
+  "taskId": "010-001",
+  "filesChanged": [
+    "src/dashboard/src/pages/DashboardPage.tsx",
+    "src/dashboard/src/components/NewSprintModal.tsx",
+    "src/dashboard/src/components/ui/badge.tsx",
+    "src/dashboard/src/components/ui/dialog.tsx",
+    "src/dashboard/src/components/ui/table.tsx",
+    "src/dashboard/src/components/ui/textarea.tsx",
+    "src/dashboard/src/components/ui/progress.tsx",
+    "tests/dashboard/dashboard-page.test.ts"
+  ],
+  "linesAdded": 587,
+  "linesRemoved": 17,
+  "testsPassed": true,
+  "coverage": 100,
+  "selfAssessment": "DONE",
+  "notes": "Full DashboardPage implementation: Sprint status card with phase badges, worker table with Kill button (POST /api/kill/:workerId + confirm), segmented progress bar (done/active/pending), alert section with level badges (INFO/WARNING/CRITICAL), Yeni Sprint button with NewSprintModal (multi-step: directives→plan→confirm→start), SSE integration via useSSE with GET /api/status fallback, dark theme. Created 5 shadcn UI components (badge, dialog, table, textarea, progress). 26 tests, all 1043 suite tests pass, tsc clean."
+}

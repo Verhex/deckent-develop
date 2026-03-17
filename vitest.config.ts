@@ -15,6 +15,7 @@ export default defineConfig({
         'src/cli/index.ts',
         'src/mcp/tools/index.ts',
         'src/mcp/resources/index.ts',
+        'src/dashboard/**',
       ],
     },
   },

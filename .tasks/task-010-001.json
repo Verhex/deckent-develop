@@ -1,0 +1,28 @@
+{
+  "id": "010-001",
+  "title": "Dashboard Ana Sayfa",
+  "description": "Dashboard Ana Sayfa\n- Replace src/dashboard/src/pages/DashboardPage.tsx placeholder with full implementation\n- Sprint status card: sprint ID, phase badge (color-coded), status, updated time\n- Worker table: columns (ID, Task, Status, Elapsed) with Kill button per row\n  - Kill button: POST /api/kill/:workerId, confirm dialog, refresh on success\n- Progress section: visual progress bar with segments (done=green, active=blue, pending=gray)\n  - Text: \"3/5 done, 1 active, 1 pending\"\n- Alert section: list of alerts with level badges (INFO=blue, WARNING=amber, CRITICAL=red)\n- \"Yeni Sprint\" button → opens NewSprintModal\n- NewSprintModal: textarea for directive content → POST /api/set-directives → show task count → POST /api/plan → show plan → Confirm button → POST /api/start\n- SSE integration: useSSE('/api/events') for real-time DashboardState updates\n- Fallback: if no SSE data, fetch GET /api/status on mount\n- Dark theme: bg-zinc-950, cards bg-zinc-900, text zinc-100\n- Create needed shadcn components: dialog.tsx, table.tsx, badge.tsx, textarea.tsx, progress.tsx\n- Dosya: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/components/ui/dialog.tsx, src/dashboard/src/components/ui/table.tsx, src/dashboard/src/components/ui/badge.tsx, src/dashboard/src/components/ui/textarea.tsx, src/dashboard/src/components/ui/progress.tsx\n- Kapsam: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/dashboard/src/pages/",
+      "src/dashboard/src/components/",
+      "src/dashboard/src/components/ui/"
+    ],
+    "filesRead": [],
+    "filesWrite": []
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-010",
+  "createdAt": "2026-03-17T11:26:42.041Z",
+  "updatedAt": "2026-03-17T11:31:35.436Z"
+}

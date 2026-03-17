@@ -1,0 +1,16 @@
+{
+  "taskId": "009-004",
+  "filesChanged": [
+    "src/cli/commands/web.ts",
+    "src/cli/index.ts",
+    "src/api/server.ts",
+    "tests/cli/web.test.ts",
+    "tests/api/server.test.ts"
+  ],
+  "linesAdded": 338,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "coverage": 90.9,
+  "selfAssessment": "DONE",
+  "notes": "Created `deckent web` CLI command with --port and --dev options. In production mode, passes staticDir to createHttpServer for SPA static file serving. In --dev mode, prints Vite dev server instruction and passes undefined staticDir. Added staticDir parameter to createHttpServer signature with static file serving + SPA fallback (MIME type mapping, index.html fallback). Registered registerWeb in CLI index. 16 new tests for web command + 6 new tests for static file serving in server. All 880 tests pass, tsc clean."
+}

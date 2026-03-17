@@ -26,3 +26,7 @@ Thumbs.db
 *.swp
 *.swo
 .deckent/
+
+# Dashboard sub-project
+src/dashboard/node_modules
+src/dashboard/dist

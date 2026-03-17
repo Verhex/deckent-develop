@@ -1,0 +1,20 @@
+{
+  "taskId": "010-004",
+  "filesChanged": [
+    "src/dashboard/src/components/Layout.tsx",
+    "src/dashboard/src/components/ThemeProvider.tsx",
+    "src/dashboard/src/components/ui/sheet.tsx",
+    "src/dashboard/src/components/ui/scroll-area.tsx",
+    "src/dashboard/src/App.tsx",
+    "src/dashboard/src/index.css",
+    "src/dashboard/tsconfig.node.json",
+    "tests/dashboard/layout.test.ts",
+    "tests/dashboard/scaffold.test.ts"
+  ],
+  "linesAdded": 665,
+  "linesRemoved": 35,
+  "testsPassed": true,
+  "coverage": 100,
+  "selfAssessment": "DONE",
+  "notes": "Created Layout with 240px sidebar (desktop) + Sheet-based mobile drawer, ThemeProvider (dark/light context), Sheet/ScrollArea UI components, updated App.tsx to use direct imports with Layout wrapper and ThemeProvider, enhanced index.css with scrollbar styling and dark color-scheme. Updated scaffold test to match new App.tsx structure. All 1017 tests pass, main tsc --noEmit clean, dashboard build succeeds."
+}

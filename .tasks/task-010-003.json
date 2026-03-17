@@ -1,0 +1,28 @@
+{
+  "id": "010-003",
+  "title": "Sprint Gecmisi + Bellek + Borc Sayfasi",
+  "description": "Sprint Gecmisi + Bellek + Borc Sayfasi\n- Replace src/dashboard/src/pages/HistoryPage.tsx placeholder with full implementation\n- Sprint history table: fetch GET /api/history, columns (Sprint ID, Tasks, Completed, No-Go Rate, Coverage, Duration)\n- Trend chart with Recharts: ResponsiveContainer + LineChart\n  - X axis: sprint ID\n  - Left Y axis: test count (Line, blue)\n  - Right Y axis: coverage % (Line, green)\n  - Tooltip with custom formatter\n  - CartesianGrid, Legend\n- Replace src/dashboard/src/pages/MemoryPage.tsx placeholder with full implementation\n- Memory tab: fetch GET /api/memory, render markdown content in scrollable code block (pre + whitespace-pre-wrap)\n- Debt tab: fetch GET /api/debt, parse markdown table rows, render as styled HTML table with priority badges\n- Use Tabs component to switch: History | Memory | Debt\n- Create needed shadcn components: tabs.tsx\n- Dosya: src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/components/SprintChart.tsx, src/dashboard/src/components/DebtTable.tsx, src/dashboard/src/components/ui/tabs.tsx\n- Kapsam: src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/components/",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/dashboard/src/pages/",
+      "src/dashboard/src/components/",
+      "src/dashboard/src/components/ui/"
+    ],
+    "filesRead": [],
+    "filesWrite": []
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-010",
+  "createdAt": "2026-03-17T11:26:42.041Z",
+  "updatedAt": "2026-03-17T11:31:35.437Z"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "009-001",
+  "title": "tsconfig + vitest Isolation",
+  "description": "tsconfig + vitest Isolation\n- Add \"src/dashboard\" to exclude array in tsconfig.json (line 25): [\"node_modules\", \"dist\", \"tests\", \"src/dashboard\"]\n- Add \"src/dashboard/**\" to vitest.config.ts coverage.exclude array\n- Add \"src/dashboard/node_modules\" and \"src/dashboard/dist\" to .gitignore\n- Create tests/config/isolation.test.ts: verify tsconfig exclude contains \"src/dashboard\"\n- Verify: tsc --noEmit still clean, vitest run still passes (799 tests)\n- Dosya: tsconfig.json, vitest.config.ts, .gitignore, tests/config/isolation.test.ts\n- Kapsam: tsconfig.json, vitest.config.ts, .gitignore, tests/config/",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/dashboard/",
+      "tests/config/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "vitest.config.ts",
+      "tests/config/isolation.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-009",
+  "createdAt": "2026-03-17T11:18:06.114Z",
+  "updatedAt": "2026-03-17T11:25:29.623Z"
+}
