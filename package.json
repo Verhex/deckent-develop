@@ -4,7 +4,8 @@
   "description": "AI agent orchestration system — your AI development team, orchestrated.",
   "type": "module",
   "bin": {
-    "deckent": "./dist/cli/index.js"
+    "deckent": "./dist/cli/index.js",
+    "deckent-mcp": "./dist/mcp/server.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,6 +36,7 @@
   "license": "MIT",
   "homepage": "https://deckent.agency",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "commander": "^13.0.0"
   },
   "engines": {

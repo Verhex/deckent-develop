@@ -13,6 +13,8 @@ export default defineConfig({
         'src/monitor/index.ts',
         'src/orchestra/index.ts',
         'src/cli/index.ts',
+        'src/mcp/tools/index.ts',
+        'src/mcp/resources/index.ts',
       ],
     },
   },

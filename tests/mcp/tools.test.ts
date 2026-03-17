@@ -1,0 +1,451 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
+import type { Sprint, Task, ResolvedConfig } from '../../src/core/types.js';
+
+// ─── Mocks ──────────────────────────────────────────────────────────
+
+vi.mock('node:fs', () => ({
+  readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  readdirSync: vi.fn(),
+  unlinkSync: vi.fn(),
+}));
+
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(),
+}));
+
+vi.mock('../../src/core/config.js', () => ({
+  loadConfig: vi.fn(),
+}));
+
+vi.mock('../../src/core/utils.js', () => ({
+  countBrainLines: vi.fn().mockReturnValue(100),
+}));
+
+vi.mock('../../src/orchestra/brain.js', () => ({
+  runSprint: vi.fn(),
+  readContext: vi.fn(),
+  checkUsage: vi.fn(),
+  adjustSprintSize: vi.fn(),
+  planSprint: vi.fn(),
+  BrainError: class BrainError extends Error {
+    phase?: string;
+    constructor(msg: string, phase?: string) {
+      super(msg);
+      this.name = 'BrainError';
+      this.phase = phase;
+    }
+  },
+}));
+
+vi.mock('../../src/orchestra/tmux.js', () => ({
+  isSessionActive: vi.fn(),
+  ensureSession: vi.fn(),
+  spawnWorker: vi.fn(),
+  killWorker: vi.fn(),
+  listWorkers: vi.fn(),
+  startAuditor: vi.fn(),
+  attach: vi.fn(),
+  destroy: vi.fn(),
+  sendKeys: vi.fn(),
+}));
+
+vi.mock('../../src/monitor/auditor.js', () => ({
+  updateDashboard: vi.fn(),
+  detectDeadlocks: vi.fn(),
+}));
+
+vi.mock('../../src/agents/worker.js', () => ({
+  updateTaskStatus: vi.fn(),
+  releaseAllLocks: vi.fn(),
+}));
+
+import { createServer } from '../../src/mcp/server.js';
+import { loadConfig } from '../../src/core/config.js';
+import {
+  readContext, checkUsage, adjustSprintSize, planSprint, runSprint,
+} from '../../src/orchestra/brain.js';
+
+// Helper: call a tool on the server's underlying Server instance
+async function callTool(toolName: string, args: Record<string, unknown> = {}): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  const server = createServer();
+  // Access the internal Server to call tool directly
+  const internalServer = (server as unknown as { _server: { _registeredTools: Map<string, { handler: (args: Record<string, unknown>) => Promise<unknown> }> } })._server;
+
+  // Alternative: Use the McpServer's tool registry
+  // We'll use the low-level approach: re-import the tool registrations and test handlers directly
+  // Since McpServer doesn't expose a direct callTool, we test via tool handler functions
+
+  // Instead, let's test by importing and calling the tool registration functions directly
+  // Each tool's handler is testable via its register function that takes a server
+
+  // For this test, we'll use a mock McpServer that captures tool registrations
+  return { content: [{ type: 'text', text: '{}' }] };
+}
+
+// ─── Test via mock server pattern ────────────────────────────────────
+
+type ToolHandler = (args: Record<string, unknown>, ctx?: unknown) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }>;
+
+interface MockServer {
+  tools: Map<string, { config: unknown; handler: ToolHandler }>;
+  resources: Map<string, { config: unknown; handler: (uri: URL, vars?: unknown) => Promise<unknown> }>;
+  registerTool: (name: string, config: unknown, handler: ToolHandler) => void;
+  registerResource: (name: string, uri: string, config: unknown, handler: (uri: URL, vars?: unknown) => Promise<unknown>) => void;
+}
+
+function createMockServer(): MockServer {
+  const tools = new Map<string, { config: unknown; handler: ToolHandler }>();
+  const resources = new Map<string, { config: unknown; handler: (uri: URL, vars?: unknown) => Promise<unknown> }>();
+
+  return {
+    tools,
+    resources,
+    registerTool(name: string, config: unknown, handler: ToolHandler) {
+      tools.set(name, { config, handler });
+    },
+    registerResource(name: string, _uri: string, config: unknown, handler: (uri: URL, vars?: unknown) => Promise<unknown>) {
+      resources.set(name, { config, handler });
+    },
+  };
+}
+
+// ─── Tool Tests ──────────────────────────────────────────────────────
+
+describe('MCP Tools', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('deckent_init', () => {
+    it('creates project structure', async () => {
+      const { registerInitTool } = await import('../../src/mcp/tools/init.js');
+      const mock = createMockServer();
+      registerInitTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const tool = mock.tools.get('deckent_init');
+      expect(tool).toBeDefined();
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const result = await tool!.handler({ projectName: 'test-project', mode: 'max_plan', language: 'en' });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.projectName).toBe('test-project');
+      expect(parsed.mode).toBe('max_plan');
+      expect(vi.mocked(mkdirSync)).toHaveBeenCalled();
+      expect(vi.mocked(writeFileSync)).toHaveBeenCalled();
+    });
+
+    it('registers MCP in .claude/settings.json', async () => {
+      const { registerInitTool } = await import('../../src/mcp/tools/init.js');
+      const mock = createMockServer();
+      registerInitTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      await mock.tools.get('deckent_init')!.handler({ projectName: 'test', mode: 'pro_plan', language: 'tr' });
+
+      const settingsWriteCalls = vi.mocked(writeFileSync).mock.calls.filter(
+        (c) => String(c[0]).includes('settings.json'),
+      );
+      expect(settingsWriteCalls.length).toBeGreaterThan(0);
+
+      const settingsContent = JSON.parse(String(settingsWriteCalls[0]![1]));
+      expect(settingsContent.mcpServers.deckent.command).toBe('deckent-mcp');
+    });
+  });
+
+  describe('deckent_set_directives', () => {
+    it('writes DIRECTIVES.md and counts tasks', async () => {
+      const { registerSetDirectivesTool } = await import('../../src/mcp/tools/directives.js');
+      const mock = createMockServer();
+      registerSetDirectivesTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const content = '# Sprint 7\n\n## Görev 1: Auth API\nDetails\n\n## Görev 2: Frontend\nDetails\n';
+      const result = await mock.tools.get('deckent_set_directives')!.handler({ content });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.taskCount).toBe(2);
+      expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
+        expect.stringContaining('DIRECTIVES.md'),
+        content,
+        'utf-8',
+      );
+    });
+
+    it('counts Task N: headers too', async () => {
+      const { registerSetDirectivesTool } = await import('../../src/mcp/tools/directives.js');
+      const mock = createMockServer();
+      registerSetDirectivesTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const content = '## Task 1: A\n## Task 2: B\n## Task 3: C\n';
+      const result = await mock.tools.get('deckent_set_directives')!.handler({ content });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.taskCount).toBe(3);
+    });
+  });
+
+  describe('deckent_plan', () => {
+    it('returns planned sprint with tasks', async () => {
+      const { registerPlanTool } = await import('../../src/mcp/tools/plan.js');
+      const mock = createMockServer();
+      registerPlanTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const mockTask: Task = {
+        id: '7-001',
+        title: 'Auth API',
+        description: 'Implement auth',
+        model: 'sonnet',
+        effort: 'normal',
+        priority: 'HIGH',
+        reason: 'directive',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        dependencies: [],
+        goNogo: { testsPass: true, coverageMin: 90 },
+        status: TaskStatus.PENDING,
+      };
+
+      const mockSprint: Sprint = {
+        id: 'sprint-007',
+        number: 7,
+        status: SprintStatus.PLANNING,
+        phase: SprintPhase.PLAN,
+        tasks: [mockTask],
+        workers: [],
+      };
+
+      vi.mocked(loadConfig).mockResolvedValue({
+        mode: 'max_plan',
+        activeModeConfig: {
+          max_workers: 8,
+          brain_model: 'opus',
+          default_model: 'sonnet',
+          haiku_allowed: true,
+          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+        },
+        modes: {} as ResolvedConfig['modes'],
+        language: 'en',
+        projectName: 'test',
+        projectRoot: '/tmp/test',
+        version: '0.1.0',
+      });
+
+      vi.mocked(readContext).mockReturnValue({
+        directives: '## Task 1: Auth',
+        memory: '',
+        retro: '',
+        debt: [],
+        patterns: '',
+        decisions: '',
+        existingTasks: [],
+        projectState: { gitStatus: '', fileTree: [] },
+      });
+
+      vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
+      vi.mocked(adjustSprintSize).mockReturnValue({
+        size: 'full',
+        maxWorkers: 8,
+        modelConstraint: null,
+        reason: 'Usage OK',
+      });
+      vi.mocked(planSprint).mockReturnValue(mockSprint);
+
+      const result = await mock.tools.get('deckent_plan')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.sprintId).toBe('sprint-007');
+      expect(parsed.tasks).toHaveLength(1);
+      expect(parsed.tasks[0].title).toBe('Auth API');
+      expect(parsed.recommendation.size).toBe('full');
+    });
+  });
+
+  describe('deckent_start', () => {
+    it('runs sprint and returns result', async () => {
+      const { registerStartTool } = await import('../../src/mcp/tools/start.js');
+      const mock = createMockServer();
+      registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const completedSprint: Sprint = {
+        id: 'sprint-007',
+        number: 7,
+        status: SprintStatus.COMPLETE,
+        phase: SprintPhase.COMPLETE,
+        tasks: [],
+        workers: [],
+        startedAt: '2026-03-17T10:00:00Z',
+        completedAt: '2026-03-17T10:05:00Z',
+      };
+
+      vi.mocked(loadConfig).mockResolvedValue({
+        mode: 'max_plan',
+        activeModeConfig: {
+          max_workers: 8,
+          brain_model: 'opus',
+          default_model: 'sonnet',
+          haiku_allowed: true,
+          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+        },
+        modes: {} as ResolvedConfig['modes'],
+        language: 'en',
+        projectName: 'test',
+        projectRoot: '/tmp/test',
+        version: '0.1.0',
+      });
+
+      vi.mocked(runSprint).mockResolvedValue(completedSprint);
+
+      const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.sprint.id).toBe('sprint-007');
+      expect(parsed.sprint.status).toBe('COMPLETE');
+    });
+
+    it('returns error on failure', async () => {
+      const { registerStartTool } = await import('../../src/mcp/tools/start.js');
+      const mock = createMockServer();
+      registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(loadConfig).mockRejectedValue(new Error('config not found'));
+
+      const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.success).toBe(false);
+      expect(parsed.error).toContain('config not found');
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('deckent_status', () => {
+    it('returns dashboard state when active', async () => {
+      const { registerStatusTool } = await import('../../src/mcp/tools/status.js');
+      const mock = createMockServer();
+      registerStatusTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const dashState = { sprint: { id: 'sprint-007' }, agents: [], progress: { done: 1, total: 3 } };
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify(dashState));
+
+      const result = await mock.tools.get('deckent_status')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.sprint.id).toBe('sprint-007');
+    });
+
+    it('returns inactive when no dashboard', async () => {
+      const { registerStatusTool } = await import('../../src/mcp/tools/status.js');
+      const mock = createMockServer();
+      registerStatusTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const result = await mock.tools.get('deckent_status')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.active).toBe(false);
+    });
+  });
+
+  describe('deckent_doctor', () => {
+    it('returns doctor checks', async () => {
+      const { registerDoctorTool } = await import('../../src/mcp/tools/doctor.js');
+      const mock = createMockServer();
+      registerDoctorTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      // Mock spawnSync for doctor checks (Node, git, tmux, claude)
+      vi.mocked(spawnSync).mockReturnValue({
+        status: 0,
+        stdout: 'v20.0.0',
+        stderr: '',
+        pid: 1,
+        output: [],
+        signal: null,
+      });
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('# Learned Patterns\n');
+      vi.mocked(readdirSync).mockReturnValue([]);
+
+      const result = await mock.tools.get('deckent_doctor')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed).toHaveProperty('ok');
+      expect(parsed).toHaveProperty('checks');
+      expect(Array.isArray(parsed.checks)).toBe(true);
+    });
+  });
+
+  describe('deckent_retro', () => {
+    it('returns retro content when file exists', async () => {
+      const { registerRetroTool } = await import('../../src/mcp/tools/retro.js');
+      const mock = createMockServer();
+      registerRetroTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('# Retrospective\n- Learned X');
+
+      const result = await mock.tools.get('deckent_retro')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.content).toContain('Retrospective');
+    });
+
+    it('returns null when no retro file', async () => {
+      const { registerRetroTool } = await import('../../src/mcp/tools/retro.js');
+      const mock = createMockServer();
+      registerRetroTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const result = await mock.tools.get('deckent_retro')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.content).toBeNull();
+    });
+  });
+
+  describe('deckent_history', () => {
+    it('returns sprint logs', async () => {
+      const { registerHistoryTool } = await import('../../src/mcp/tools/history.js');
+      const mock = createMockServer();
+      registerHistoryTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readdirSync).mockReturnValue(
+        ['sprint-005.md', 'sprint-006.md', 'sprint-007.md'] as unknown as ReturnType<typeof readdirSync>,
+      );
+      vi.mocked(readFileSync).mockReturnValue('# Sprint 007\nTasks: 3/3');
+
+      const result = await mock.tools.get('deckent_history')!.handler({ last: 2 });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.sprints).toHaveLength(2);
+      expect(parsed.sprints[0].id).toBe('sprint-006');
+      expect(parsed.sprints[1].id).toBe('sprint-007');
+    });
+
+    it('returns empty array when no sprints dir', async () => {
+      const { registerHistoryTool } = await import('../../src/mcp/tools/history.js');
+      const mock = createMockServer();
+      registerHistoryTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const result = await mock.tools.get('deckent_history')!.handler({ last: 5 });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.sprints).toHaveLength(0);
+    });
+  });
+});
