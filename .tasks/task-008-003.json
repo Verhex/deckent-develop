@@ -1,0 +1,37 @@
+{
+  "id": "008-003",
+  "title": "HTTP API with SSE + deckent serve command",
+  "description": "HTTP API with SSE + deckent serve command\n- Create src/api/server.ts with createHttpServer(projectRoot: string, port?: number)\n- Use only node:http (NO express, NO ws package — zero new dependencies)\n- Endpoints:\n  - GET /api/status → reads .deckent/.dashboard JSON file, returns it with Content-Type application/json\n  - GET /api/sprint → reads latest sprint log from .brain/sprints/, returns JSON with id, metrics, tasks\n  - GET /api/history → reads all sprint logs, returns JSON array\n  - GET /api/events → SSE stream (Content-Type text/event-stream), watches .dashboard file with fs.watch, pushes data: {json} on change\n- Create src/api/watcher.ts with watchDashboard(filePath: string, onChange: callback)\n  - Uses node:fs watch (NOT chokidar — zero deps)\n  - Debounce: 500ms to avoid rapid fire\n- Create src/cli/commands/serve.ts with registerServe(program: Command)\n  - Command: deckent serve [--port 3100]\n  - Starts HTTP server, prints listening URL, handles SIGINT/SIGTERM gracefully (server.close())\n- Register in src/cli/index.ts: import registerServe, call registerServe(program)\n- Create tests with mocked node:http and node:fs\n- Dosya: src/api/server.ts, src/api/watcher.ts, src/cli/commands/serve.ts, src/cli/index.ts, tests/api/server.test.ts, tests/cli/serve.test.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/api/",
+      "src/cli/commands/",
+      "src/cli/",
+      "tests/api/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/api/server.ts",
+      "src/api/watcher.ts",
+      "src/cli/commands/serve.ts",
+      "src/cli/index.ts",
+      "tests/api/server.test.ts",
+      "tests/cli/serve.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-008",
+  "createdAt": "2026-03-17T10:38:51.811Z",
+  "updatedAt": "2026-03-17T10:45:54.494Z"
+}

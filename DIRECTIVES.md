@@ -1,54 +1,68 @@
-# DIRECTIVES — Sprint 9 (CI, Version, History, Archive-Debt)
+# DIRECTIVES — Sprint 10 (Coverage, Refactor, API, Dashboard)
 
-## Hedef: Build pipeline, dynamic version, enriched history, debt archival
+## Hedef: Branch coverage to 90%+, sprint ID extraction, HTTP API with SSE, terminal dashboard
 
-## Task 1: CI Pipeline
-- Create .github/workflows/ci.yml for continuous integration
-- Triggers: push to master, pull_request to master
-- Jobs: install deps (npm ci), run tests (npm test), build (npm run build), type check (tsc --noEmit)
-- Matrix strategy: Node 18.x and Node 20.x
-- Use actions/checkout@v4 and actions/setup-node@v4
-- Single workflow file, no changes to existing code
-- Kapsam: .github/workflows/ci.yml
+## Task 1: Branch coverage >= 90%
+- Current branch coverage: 89.72%. Target: >= 90%
+- Low-coverage branches to target:
+  - src/mcp/tools/status.ts (75% branch): add test for JSON parse error path (catch block line 33-40)
+  - src/mcp/resources/debt.ts (57.89% branch): add tests for parseDebtTable edge cases (lines 13-18, 21, 44)
+  - src/mcp/tools/init.ts (70% branch): add tests for existing file detection paths (lines 27-28, 109-112)
+  - src/mcp/tools/start.ts (60% branch): add test for BrainError catch path
+  - src/mcp/tools/directives.ts (66.66% branch): add test for empty content edge case
+  - src/mcp/tools/retro.ts (75% branch): add test for missing retro path
+  - src/core/constants.ts (66.66% branch): add test for package.json read failure fallback
+  - src/core/utils.ts (80% branch): add tests for edge cases
+  - src/cli/commands/analyze.ts (33.33% stmt): add tests for formatAnalysisResult and action handler
+- Create NEW test files only, do NOT modify existing test files
+- Dosya: tests/mcp/branch-coverage.test.ts, tests/cli/analyze-coverage.test.ts, tests/core/branch-coverage.test.ts
+- Kapsam: tests/mcp/, tests/cli/, tests/core/
 
-## Task 2: Dynamic DECKENT_VERSION
-- In src/core/constants.ts line 69, replace hardcoded DECKENT_VERSION = '0.1.0' as const
-- Read version from package.json at module load time using readFileSync + JSON.parse
-- Resolve package.json path relative to the constants.ts file location (use fileURLToPath + import.meta.url)
-- Graceful fallback: if package.json missing or parse error, default to '0.0.0'
-- Keep the export name and type compatible
-- Update tests/core/constants.test.ts to verify version matches package.json
-- Dosya: src/core/constants.ts, tests/core/constants.test.ts
+## Task 2: Extract getNextSprintId() utility
+- In src/orchestra/brain.ts planSprint() lines 344-357, the sprint numbering logic is inline
+- Extract to a new exported function: getNextSprintId(projectRoot: string): string
+- Place in src/core/utils.ts (shared utility pattern, like countBrainLines)
+- Function should: scan .brain/sprints/ directory, find max sprint-NNN.md number, return sprint-{max+1 padded to 3 digits}
+- If no sprints dir or empty, return sprint-001
+- Update planSprint() to call getNextSprintId() instead of inline logic
+- Add tests to verify: empty dir → sprint-001, existing sprints → correct increment, non-sequential files handled
+- Dosya: src/core/utils.ts, src/orchestra/brain.ts, tests/core/utils-sprint-id.test.ts, tests/orchestra/brain.test.ts
 
-## Task 3: Enrich deckent history
-- Modify src/cli/commands/history.ts to show richer sprint history
-- Current 4 columns: Sprint, Tasks, Coverage, Duration
-- New 6 columns: Sprint, Tasks, Completed, No-Go Rate, Coverage, Duration
-- Parse Completed count from sprint log line matching Completed metric row
-- Parse No-Go count from sprint log line matching No-Go metric row
-- Parse Total Tasks for rate calculation
-- Calculate No-Go Rate as noGo/totalTasks formatted as percentage (e.g. 0%, 50%)
-- Format Duration from milliseconds to human-readable: under 60s show Ns, over 60s show Nm Ns
-- Update history tests in tests/cli/commands.test.ts
-- Dosya: src/cli/commands/history.ts, tests/cli/commands.test.ts
+## Task 3: HTTP API with SSE + deckent serve command
+- Create src/api/server.ts with createHttpServer(projectRoot: string, port?: number)
+- Use only node:http (NO express, NO ws package — zero new dependencies)
+- Endpoints:
+  - GET /api/status → reads .deckent/.dashboard JSON file, returns it with Content-Type application/json
+  - GET /api/sprint → reads latest sprint log from .brain/sprints/, returns JSON with id, metrics, tasks
+  - GET /api/history → reads all sprint logs, returns JSON array
+  - GET /api/events → SSE stream (Content-Type text/event-stream), watches .dashboard file with fs.watch, pushes data: {json} on change
+- Create src/api/watcher.ts with watchDashboard(filePath: string, onChange: callback)
+  - Uses node:fs watch (NOT chokidar — zero deps)
+  - Debounce: 500ms to avoid rapid fire
+- Create src/cli/commands/serve.ts with registerServe(program: Command)
+  - Command: deckent serve [--port 3100]
+  - Starts HTTP server, prints listening URL, handles SIGINT/SIGTERM gracefully (server.close())
+- Register in src/cli/index.ts: import registerServe, call registerServe(program)
+- Create tests with mocked node:http and node:fs
+- Dosya: src/api/server.ts, src/api/watcher.ts, src/cli/commands/serve.ts, src/cli/index.ts, tests/api/server.test.ts, tests/cli/serve.test.ts
 
-## Task 4: deckent archive-debt CLI command
-- Create new file src/cli/commands/archive-debt.ts
-- Command: deckent archive-debt
-- Read .brain/DEBT.md, parse the markdown debt table
-- Implement own debt table parser (do NOT import from brain.ts — those functions are private)
-- Use DEBT_TABLE_HEADER constant from src/core/constants.ts as table format reference
-- Split resolved (resolved column = true) from unresolved items
-- Write unresolved items back to .brain/DEBT.md with header and separator
-- Append resolved items to .brain/archive/DEBT-ARCHIVE.md (create dir and file if needed)
-- Print: Archived N resolved debt items. M items remaining.
-- If no resolved items: No resolved debt items to archive.
-- Register in src/cli/index.ts with import + registerArchiveDebt(program) call
-- Follow src/cli/commands/cleanup.ts as registration pattern
-- Create tests/cli/archive-debt.test.ts with mocked node:fs
-- Dosya: src/cli/commands/archive-debt.ts, src/cli/index.ts, tests/cli/archive-debt.test.ts
+## Task 4: deckent dashboard (terminal TUI)
+- Create src/cli/commands/dashboard.ts with registerDashboard(program: Command)
+- Command: deckent dashboard [--interval 2000]
+- Reads .deckent/.dashboard JSON file directly (no dependency on HTTP server)
+- Box-drawing UI with Unicode characters (established project pattern):
+  - Sprint info box: ID, phase, status (╔═══╗ style)
+  - Worker table: ID, task title, status, elapsed time
+  - Progress bar: completed/active/pending/total with visual bar
+  - Alerts section: level, message, timestamp (if any)
+- Auto-refresh with setInterval (default 2000ms), clear screen between renders
+- Handle SIGINT/SIGTERM for clean exit (clearInterval + process.exit)
+- If .dashboard file not found, print "No active sprint. Run deckent start first."
+- Register in src/cli/index.ts: import registerDashboard, call registerDashboard(program)
+- Dosya: src/cli/commands/dashboard.ts, src/cli/index.ts, tests/cli/dashboard.test.ts
 
 ## Kalite Kuralları
-- Mevcut testler regresyona uğramamalı (702 test)
+- Mevcut testler regresyona uğramamalı (720 test)
 - tsc --noEmit clean kalmalı
 - Her görev için testler yazılmalı
+- SIFIR yeni runtime dependency eklenecek

@@ -36,6 +36,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
+  getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
 }));
 
 vi.mock('../../src/agents/worker.js', () => ({
@@ -47,7 +48,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlink
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers, startAuditor } from '../../src/orchestra/tmux.js';
 import { updateDashboard, detectDeadlocks } from '../../src/monitor/auditor.js';
-import { countBrainLines } from '../../src/core/utils.js';
+import { countBrainLines, getNextSprintId } from '../../src/core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../../src/agents/worker.js';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
@@ -56,6 +57,7 @@ const mockedExistsSync = vi.mocked(existsSync);
 const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedUnlinkSync = vi.mocked(unlinkSync);
+const mockedGetNextSprintId = vi.mocked(getNextSprintId);
 const mockedSpawnSync = vi.mocked(spawnSync);
 const mockedEnsureSession = vi.mocked(ensureSession);
 const mockedSpawnWorker = vi.mocked(spawnWorker);
@@ -532,11 +534,7 @@ describe('planSprint', () => {
   }
 
   it('auto-increments sprint number from sprints dir', () => {
-    mockedExistsSync.mockImplementation((p: unknown) => String(p).includes('sprints'));
-    mockedReaddirSync.mockImplementation((p: unknown) => {
-      if (String(p).includes('sprints')) return ['sprint-001.md', 'sprint-002.md'] as never;
-      return [] as never;
-    });
+    mockedGetNextSprintId.mockReturnValue('sprint-003');
 
     const sprint = planSprint(ROOT, config, makeContext(), recommendation);
     expect(sprint.number).toBe(3);

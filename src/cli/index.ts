@@ -21,6 +21,8 @@ import { registerUpgrade } from './commands/upgrade.js';
 import { registerOnboard } from './commands/onboard.js';
 import { registerAnalyze } from './commands/analyze.js';
 import { registerArchiveDebt } from './commands/archive-debt.js';
+import { registerDashboard } from './commands/dashboard.js';
+import { registerServe } from './commands/serve.js';
 
 const program = new Command()
   .name('deckent')
@@ -45,6 +47,8 @@ registerUpgrade(program);
 registerOnboard(program);
 registerAnalyze(program);
 registerArchiveDebt(program);
+registerDashboard(program);
+registerServe(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   handleCliError(err);

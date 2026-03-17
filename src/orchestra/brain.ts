@@ -23,7 +23,7 @@ import {
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { countBrainLines } from '../core/utils.js';
+import { countBrainLines, getNextSprintId } from '../core/utils.js';
 
 // ─── Wave 2 — tmux ────────────────────────────────────────────────
 import { ensureSession, spawnWorker, killWorker, listWorkers, startAuditor } from './tmux.js';
@@ -342,19 +342,7 @@ export function planSprint(
   recommendation: SprintSizeRecommendation,
 ): Sprint {
   // Determine sprint number
-  const sprintsDir = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
-  let maxNumber = 0;
-  if (existsSync(sprintsDir)) {
-    for (const file of readdirSync(sprintsDir)) {
-      const match = file.match(/^sprint-(\d+)\.md$/);
-      if (match?.[1]) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNumber) maxNumber = num;
-      }
-    }
-  }
-  const sprintNumber = maxNumber + 1;
-  const sprintId = `sprint-${String(sprintNumber).padStart(3, '0')}`;
+  const sprintId = getNextSprintId(projectRoot);
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
 
   const tasks: Task[] = [];
@@ -427,7 +415,7 @@ export function planSprint(
 
   return {
     id: sprintId,
-    number: sprintNumber,
+    number: parseInt(sprintId.replace('sprint-', ''), 10),
     status: SprintStatus.PLANNING,
     phase: SprintPhase.PLAN,
     tasks,

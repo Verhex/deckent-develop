@@ -25,3 +25,23 @@ export function countBrainLines(projectRoot: string): number {
   }
   return total;
 }
+
+/**
+ * Scan .brain/sprints/ directory, find max sprint-NNN.md number,
+ * return sprint-{max+1} padded to 3 digits.
+ * If no sprints dir or empty, return "sprint-001".
+ */
+export function getNextSprintId(projectRoot: string): string {
+  const sprintsDir = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+  let maxNumber = 0;
+  if (existsSync(sprintsDir)) {
+    for (const file of readdirSync(sprintsDir)) {
+      const match = file.match(/^sprint-(\d+)\.md$/);
+      if (match?.[1]) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNumber) maxNumber = num;
+      }
+    }
+  }
+  return `sprint-${String(maxNumber + 1).padStart(3, '0')}`;
+}

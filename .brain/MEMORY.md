@@ -60,3 +60,4 @@
 - docs/API.md Oluştur: GO_WITH_TECH_DEBT
 ## Sprint sprint-007 Learnings
 - CI Pipeline: GO_WITH_TECH_DEBT
+## Sprint sprint-008 Learnings

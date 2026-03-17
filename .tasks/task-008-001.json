@@ -1,0 +1,45 @@
+{
+  "id": "008-001",
+  "title": "Branch coverage >= 90%",
+  "description": "Branch coverage >= 90%\n- Current branch coverage: 89.72%. Target: >= 90%\n- Low-coverage branches to target:\n  - src/mcp/tools/status.ts (75% branch): add test for JSON parse error path (catch block line 33-40)\n  - src/mcp/resources/debt.ts (57.89% branch): add tests for parseDebtTable edge cases (lines 13-18, 21, 44)\n  - src/mcp/tools/init.ts (70% branch): add tests for existing file detection paths (lines 27-28, 109-112)\n  - src/mcp/tools/start.ts (60% branch): add test for BrainError catch path\n  - src/mcp/tools/directives.ts (66.66% branch): add test for empty content edge case\n  - src/mcp/tools/retro.ts (75% branch): add test for missing retro path\n  - src/core/constants.ts (66.66% branch): add test for package.json read failure fallback\n  - src/core/utils.ts (80% branch): add tests for edge cases\n  - src/cli/commands/analyze.ts (33.33% stmt): add tests for formatAnalysisResult and action handler\n- Create NEW test files only, do NOT modify existing test files\n- Dosya: tests/mcp/branch-coverage.test.ts, tests/cli/analyze-coverage.test.ts, tests/core/branch-coverage.test.ts\n- Kapsam: tests/mcp/, tests/cli/, tests/core/",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/mcp/tools/",
+      "src/mcp/resources/",
+      "src/core/",
+      "src/cli/commands/",
+      "tests/mcp/",
+      "tests/cli/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/mcp/tools/status.ts",
+      "src/mcp/resources/debt.ts",
+      "src/mcp/tools/init.ts",
+      "src/mcp/tools/start.ts",
+      "src/mcp/tools/directives.ts",
+      "src/mcp/tools/retro.ts",
+      "src/core/constants.ts",
+      "src/core/utils.ts",
+      "src/cli/commands/analyze.ts",
+      "tests/mcp/branch-coverage.test.ts",
+      "tests/cli/analyze-coverage.test.ts",
+      "tests/core/branch-coverage.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-008",
+  "createdAt": "2026-03-17T10:38:51.811Z",
+  "updatedAt": "2026-03-17T10:45:54.493Z"
+}

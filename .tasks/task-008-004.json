@@ -1,0 +1,32 @@
+{
+  "id": "008-004",
+  "title": "deckent dashboard (terminal TUI)",
+  "description": "deckent dashboard (terminal TUI)\n- Create src/cli/commands/dashboard.ts with registerDashboard(program: Command)\n- Command: deckent dashboard [--interval 2000]\n- Reads .deckent/.dashboard JSON file directly (no dependency on HTTP server)\n- Box-drawing UI with Unicode characters (established project pattern):\n  - Sprint info box: ID, phase, status (╔═══╗ style)\n  - Worker table: ID, task title, status, elapsed time\n  - Progress bar: completed/active/pending/total with visual bar\n  - Alerts section: level, message, timestamp (if any)\n- Auto-refresh with setInterval (default 2000ms), clear screen between renders\n- Handle SIGINT/SIGTERM for clean exit (clearInterval + process.exit)\n- If .dashboard file not found, print \"No active sprint. Run deckent start first.\"\n- Register in src/cli/index.ts: import registerDashboard, call registerDashboard(program)\n- Dosya: src/cli/commands/dashboard.ts, src/cli/index.ts, tests/cli/dashboard.test.ts\n\n## Kalite Kuralları\n- Mevcut testler regresyona uğramamalı (720 test)\n- tsc --noEmit clean kalmalı\n- Her görev için testler yazılmalı\n- SIFIR yeni runtime dependency eklenecek",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "src/cli/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/dashboard.ts",
+      "src/cli/index.ts",
+      "tests/cli/dashboard.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-008",
+  "createdAt": "2026-03-17T10:38:51.811Z",
+  "updatedAt": "2026-03-17T10:45:54.495Z"
+}

@@ -25,7 +25,11 @@
       "mcp__deckent__deckent_set_directives",
       "mcp__deckent__deckent_plan",
       "mcp__deckent__deckent_start",
-      "mcp__deckent__deckent_history"
+      "mcp__deckent__deckent_history",
+      "Bash(git push:*)",
+      "Bash(find /home/alperen/deckent-dev/.deckent -type f -name *.json)",
+      "Bash(grep -r \"express\\\\|ws\\\\|chokidar\\\\|port\\\\|listen\\\\|http\\\\|https\" /home/alperen/deckent-dev/package.json /home/alperen/deckent-dev/src --include=*.ts --include=*.json)",
+      "Bash(git add:*)"
     ]
   }
 }

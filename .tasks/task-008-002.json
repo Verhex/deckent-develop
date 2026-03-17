@@ -1,0 +1,34 @@
+{
+  "id": "008-002",
+  "title": "Extract getNextSprintId() utility",
+  "description": "Extract getNextSprintId() utility\n- In src/orchestra/brain.ts planSprint() lines 344-357, the sprint numbering logic is inline\n- Extract to a new exported function: getNextSprintId(projectRoot: string): string\n- Place in src/core/utils.ts (shared utility pattern, like countBrainLines)\n- Function should: scan .brain/sprints/ directory, find max sprint-NNN.md number, return sprint-{max+1 padded to 3 digits}\n- If no sprints dir or empty, return sprint-001\n- Update planSprint() to call getNextSprintId() instead of inline logic\n- Add tests to verify: empty dir → sprint-001, existing sprints → correct increment, non-sequential files handled\n- Dosya: src/core/utils.ts, src/orchestra/brain.ts, tests/core/utils-sprint-id.test.ts, tests/orchestra/brain.test.ts",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/core/",
+      "tests/core/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/brain.ts",
+      "src/core/utils.ts",
+      "tests/core/utils-sprint-id.test.ts",
+      "tests/orchestra/brain.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-008",
+  "createdAt": "2026-03-17T10:38:51.811Z",
+  "updatedAt": "2026-03-17T10:45:54.494Z"
+}
