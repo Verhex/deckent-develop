@@ -1,6 +1,6 @@
 # DECKENT MASTER BLUEPRINT
 ## AI Agent Orchestration System — Complete Implementation Reference
-### Version 1.0 — March 2026 — Verhex
+### Version 2.0 — March 2026 — Verhex
 
 ---
 
@@ -24,8 +24,12 @@
 16. Self-Test & Reporting
 17. Repository Strategy
 18. File-by-File Reference
-19. Sprint 1 Implementation Plan
+19. Implementation History
 20. Claude Code Integration Guide
+21. MCP Server Architecture
+22. User Flows
+23. Strategic Roadmap
+24. Sprint History
 
 ---
 
@@ -37,25 +41,37 @@
 **Author:** Alperen @ Verhex
 
 **What Deckent Is:**
-A self-evolving AI agent orchestration system. You write directives in plain language. Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
+An agent-agnostic AI orchestration system. You describe goals in natural language — through Claude Code conversation or DIRECTIVES.md. Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
 
 **What Deckent Is NOT:**
 - Not another ChatGPT wrapper
 - Not a simple task runner
-- Not limited to Claude (future: multi-provider)
+- Not limited to Claude (future: multi-provider via provider abstraction layer)
 
 **Core Principles:**
-1. Native-first — installs like a CLI tool, runs like a system service
+1. Native-first — installs like a CLI tool, integrates via MCP into Claude Code
 2. Self-evolving — learns from mistakes, improves plans, adapts patterns
 3. Observable — every agent's action is visible in real-time
 4. Usage-aware — never exceeds plan limits, never leaves sprints incomplete
 5. Plan-compatible — works on Pro ($20), Max ($100-200), or API
-6. Open source — community-driven, extensible via plugins/skills
+6. Zero-friction — natural language in, orchestrated sprint out
+7. Open source — community-driven, extensible via plugins/skills
+
+**USP (Unique Selling Point):**
+Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints, evaluates results with GO/NO-GO protocol, tracks tech debt, runs retrospectives, and feeds learnings into the next sprint. Every sprint makes the system smarter.
+
+**Phased Roadmap:**
+| Phase | Focus | Target Audience | Sprint Range |
+|-------|-------|-----------------|--------------|
+| 1 | Claude native (CLI + MCP) | Solo developers | Sprint 1-8 |
+| 2 | Provider abstraction layer | Early adopters | Sprint 9-12 |
+| 3 | Multi-provider (OpenAI, Gemini) | Small teams | Sprint 13+ |
+| 4 | Platform (Web UI, VSCode, API) | Enterprise | Sprint 20+ |
 
 **Inspiration Sources:**
 - OpenClaw: workspace structure, memory tiers, skill system, AGENTS.md pattern
 - Claude Cowork: agentic loop, plan→execute→verify, plugin architecture
-- Claude Code: CLAUDE.md, .claude/rules/, headless mode, Agent Teams
+- Claude Code: CLAUDE.md, .claude/rules/, headless mode, MCP, Agent Teams
 
 ---
 
@@ -63,14 +79,24 @@ A self-evolving AI agent orchestration system. You write directives in plain lan
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    YOU (Operator)                     │
-│              writes DIRECTIVES.md                    │
+│               YOU (Natural Language)                  │
+│     Claude Code conversation / DIRECTIVES.md         │
+└──────────┬──────────────────────────┬───────────────┘
+           │                          │
+┌──────────▼──────────┐  ┌───────────▼───────────────┐
+│    CLAUDE CODE       │  │      DECKENT CLI           │
+│  (MCP client)        │  │  `deckent start/plan`      │
+└──────────┬──────────┘  └───────────┬───────────────┘
+           │                          │
+┌──────────▼──────────────────────────▼──────────────┐
+│              DECKENT MCP SERVER (stdio)              │
+│  8 Tools + 4 Resources + 2 Prompts                  │
+│  deckent_init | set_directives | plan | start | ... │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
-│                  DECKENT CLI                          │
-│          `deckent start` / `deckent plan`            │
-│    Native binary — npm install -g deckent            │
+│                 CORE ENGINE                           │
+│    brain.ts | auditor.ts | worker.ts | tmux.ts      │
 └──────────┬───────────────────────────┬──────────────┘
            │                           │
 ┌──────────▼──────────┐  ┌────────────▼──────────────┐
@@ -82,7 +108,7 @@ A self-evolving AI agent orchestration system. You write directives in plain lan
            │                           │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              WORKER POOL (dynamic)                   │
-│  tmux panes — spawned/killed by Brain on demand     │
+│  tmux windows — spawned/killed by Brain on demand   │
 │  Each worker: plan → code → test → doc → report     │
 │  Model: per-task (opus/sonnet/haiku)                │
 └─────────────────────────────────────────────────────┘
@@ -93,6 +119,13 @@ A self-evolving AI agent orchestration system. You write directives in plain lan
 │  Tier 2: sprint logs (per-sprint, auto-archived)    │
 │  Tier 3: deep knowledge (searchable archive)        │
 └─────────────────────────────────────────────────────┘
+```
+
+**Auth Chain:**
+```
+Claude Code → MCP stdio (local process, no extra auth)
+  → Core Engine → tmux → claude -p (inherits Claude Code session auth)
+  → API mode: ANTHROPIC_API_KEY env variable
 ```
 
 ---
@@ -134,6 +167,7 @@ deckent history           Show sprint history & metrics
 deckent plugin install <n> Install a skill/plugin
 deckent plugin list       List installed plugins
 deckent upgrade           Self-update
+deckent mcp               Start MCP server (stdio transport for Claude Code)
 ```
 
 ## 3.3 Init Wizard Flow
@@ -237,8 +271,29 @@ my-project/
 │       ├── worker-default.md          # Default worker rules
 │       └── testing.md                 # Rules for test files
 │
-├── src/                               # Your actual source code
-├── tests/
+├── src/                               # Deckent source code
+│   ├── core/                         # Types, config, constants, utils
+│   ├── orchestra/                    # Brain + tmux orchestration
+│   ├── agents/                       # Worker lifecycle
+│   ├── monitor/                      # Auditor monitoring
+│   ├── cli/                          # CLI commands (commander.js)
+│   └── mcp/                          # MCP server integration
+│       ├── server.ts                 # Entry point (McpServer + stdio)
+│       ├── tools/                    # 8 tool handlers
+│       │   ├── init.ts              # deckent_init
+│       │   ├── directives.ts        # deckent_set_directives
+│       │   ├── plan.ts              # deckent_plan
+│       │   ├── start.ts             # deckent_start
+│       │   ├── status.ts            # deckent_status
+│       │   ├── doctor.ts            # deckent_doctor
+│       │   ├── retro.ts             # deckent_retro
+│       │   └── history.ts           # deckent_history
+│       └── resources/                # 4 resource handlers
+│           ├── dashboard.ts          # deckent://dashboard
+│           ├── directives.ts         # deckent://directives
+│           ├── memory.ts             # deckent://memory
+│           └── debt.ts               # deckent://debt
+├── tests/                             # Unit + integration tests
 ├── docs/
 └── package.json
 ```
@@ -984,80 +1039,45 @@ Every file in the project, its purpose, who writes it, who reads it:
 | .locks/*.lock | File locks | Workers | Workers, Auditor | Deleted on release |
 | .dashboard | Live status | Auditor | You, UI | Overwritten |
 | .claude/rules/*.md | Agent-specific rules | deckent init | Claude Code | Permanent |
+| .claude/settings.json | MCP server registration | deckent init | Claude Code | Permanent |
+| src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (8) | Developer | MCP server | Permanent |
+| src/mcp/resources/*.ts | MCP resource handlers (4) | Developer | MCP server | Permanent |
+| tests/mcp/*.test.ts | MCP unit tests (24) | Developer | Test runner | Permanent |
 
 ---
 
-# 19. SPRINT 1 IMPLEMENTATION PLAN
+# 19. IMPLEMENTATION HISTORY
 
-## Goal: Working Orchestration Loop
+## Sprint 1: Core Engine (March 2026)
 
-Get Brain → Workers → Auditor → Evaluate → Retro working end-to-end.
+Wave-based implementation, 5 waves, all modules built and tested:
+- Wave 1: Core types, config, constants (src/core/)
+- Wave 2: tmux manager, auditor, worker (parallel)
+- Wave 3: Brain orchestrator (src/orchestra/brain.ts)
+- Wave 4: CLI scaffold (16 commands via commander.js)
+- Wave 5: Unit + integration tests
 
-## Tasks
+## Sprint 2-5: Lifecycle Hardening
 
-```
-Task 1: CLI Scaffold (sonnet, normal)
-  - bin/deckent.ts entry point with Commander.js
-  - init, start, plan, status, attach, spawn, kill commands
-  - Config loading from .deckent/config.json
-  - Scope: src/cli/
+- Sprint 2: Async migration (sleepSync → async sleep)
+- Sprint 3: Semantic fixes (haiku_allowed, checkUsage regex)
+- Sprint 4: Debt resolution lifecycle (resolveDebt, stale cleanup)
+- Sprint 5: Decay, doctor, start, dashboard, coverage (644 tests, 94.83%)
 
-Task 2: tmux Manager (sonnet, normal)
-  - ensureSession, spawnWorker, killWorker, listWorkers
-  - startAuditor, attach, destroy
-  - Scope: src/orchestra/tmux.ts
+## Sprint 6: First Dogfooding
 
-Task 3: Brain Module (opus, high)
-  - planSprint: read context → generate tasks
-  - evaluate: read result → GO/NO-GO
-  - retrospective: write RETRO, update MEMORY
-  - usageCheck: parse /status output
-  - Scope: src/orchestra/brain.ts
+Deckent ran itself for the first time:
+- Generated README.md via deckent start
+- Duration: 86 seconds, 1 task DONE
+- Proved end-to-end orchestration loop works
 
-Task 4: Auditor Module (sonnet, normal)
-  - scanLoop: heartbeats, git diff, boundaries, deadlocks
-  - updateDashboard: write .dashboard
-  - detectPatterns: append PATTERNS.md
-  - Scope: src/monitor/auditor.ts
+## Sprint 7: MCP Server Integration
 
-Task 5: Worker Module (sonnet, normal)
-  - claimTask, plan, execute, test, document, report
-  - lockManager: acquire, release, check
-  - heartbeat: periodic .hb updates
-  - Scope: src/agents/worker.ts
-
-Task 6: Core Types & Config (sonnet, low)
-  - All TypeScript types from contracts
-  - Config loader with validation
-  - Scope: src/core/
-
-Task 7: Tests (sonnet, normal)
-  - Unit tests for each module
-  - Integration test: full sprint cycle
-  - Scope: tests/
-```
-
-## Dependencies
-
-```
-Task 6 (types) → no deps (start first)
-Task 2 (tmux) → depends on Task 6
-Task 5 (worker) → depends on Task 6
-Task 4 (auditor) → depends on Task 6
-Task 3 (brain) → depends on Task 2, 6
-Task 1 (cli) → depends on Task 2, 3, 4, 5
-Task 7 (tests) → depends on all
-```
-
-## Wave Plan
-
-```
-Wave 1: Task 6 (types)
-Wave 2: Task 2 + Task 4 + Task 5 (parallel)
-Wave 3: Task 3 (brain — needs tmux)
-Wave 4: Task 1 (cli — needs everything)
-Wave 5: Task 7 (tests)
-```
+- 8 MCP tools + 4 resources (stdio transport)
+- Zero-friction Claude Code integration
+- Auto-registration in .claude/settings.json
+- 24 new tests, 669 total, 0 regression
 
 ---
 
@@ -1142,9 +1162,201 @@ deckent start
 
 ---
 
+# 21. MCP SERVER ARCHITECTURE
+
+## Overview
+
+Deckent integrates into Claude Code via the Model Context Protocol (MCP). The MCP server runs as a local stdio process — no extra authentication needed. Claude Code calls Deckent tools naturally through conversation.
+
+## Installation
+
+```bash
+# Option 1: Via deckent init (auto-registers)
+deckent init
+
+# Option 2: Manual registration
+claude mcp add deckent -- npx deckent mcp
+```
+
+Both methods register in `.claude/settings.json`:
+```json
+{
+  "mcpServers": {
+    "deckent": {
+      "command": "deckent-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+## Tools (8)
+
+### Lifecycle Tools
+
+| Tool | Input | Maps To | Purpose |
+|------|-------|---------|---------|
+| `deckent_init` | projectName, mode?, language? | init.ts scaffold | Initialize Deckent in a project |
+| `deckent_set_directives` | content: string | writes DIRECTIVES.md | Set sprint goals (Claude formats natural language into ## Gorev/Task blocks) |
+| `deckent_plan` | dryRun?: boolean | readContext → planSprint | Plan sprint, return task list without executing |
+| `deckent_start` | autoApprove?: boolean | runSprint() | Run full sprint lifecycle (may take minutes) |
+
+### Information Tools
+
+| Tool | Input | Maps To | Purpose |
+|------|-------|---------|---------|
+| `deckent_status` | none | reads .dashboard | Get current sprint dashboard |
+| `deckent_doctor` | none | runDoctorChecks() | System health check |
+| `deckent_retro` | none | reads RETRO.md | Latest sprint retrospective |
+| `deckent_history` | last?: number | reads .brain/sprints/ | Sprint history logs |
+
+## Resources (4)
+
+| URI | Content | MIME Type |
+|-----|---------|-----------|
+| `deckent://dashboard` | Live sprint status (JSON) | application/json |
+| `deckent://directives` | Current DIRECTIVES.md | text/markdown |
+| `deckent://memory` | Learned patterns (.brain/MEMORY.md) | text/markdown |
+| `deckent://debt` | Tech debt items (parsed table → JSON) | application/json |
+
+## Auth Chain
+
+```
+Claude Code (Pro/Max/API login)
+  → MCP stdio (local process, zero extra auth)
+    → Core Engine (brain.ts, auditor.ts, worker.ts)
+      → tmux → claude -p (inherits Claude Code session)
+  → API mode: ANTHROPIC_API_KEY env variable
+```
+
+## Key Design Decision: deckent_set_directives
+
+The biggest UX pain point was manually writing DIRECTIVES.md in the correct `## Gorev N:` format. The `deckent_set_directives` tool solves this:
+
+1. User says "Add JWT authentication with login/register" in natural language
+2. Claude formats this into structured `## Gorev N:` blocks
+3. Tool writes the formatted content to DIRECTIVES.md
+4. Brain's `parseStructuredDirectives()` reads it unchanged
+
+The MCP tool is a writer; Claude is the formatter. Core engine parsing stays untouched.
+
+---
+
+# 22. USER FLOWS
+
+## Flow 1: First Setup (MCP User)
+
+```
+User:    "Set up Deckent for this project"
+Claude:  → calls deckent_doctor (health check)
+         → calls deckent_init(projectName: "my-app", mode: "max_plan")
+         → "Created .deckent/, .brain/, .tasks/. Registered MCP server.
+            Edit DIRECTIVES.md or tell me your goals."
+```
+
+## Flow 2: First Sprint
+
+```
+User:    "Add JWT auth with login/register, protected routes, and profile page"
+Claude:  → calls deckent_set_directives(content: "## Gorev 1: Auth API\n...")
+         → calls deckent_plan()
+         → "4 tasks planned: Auth API (sonnet), Middleware (sonnet)..."
+User:    "Start it"
+Claude:  → calls deckent_start()
+         → Sprint runs, user waits
+User:    "How's it going?"
+Claude:  → reads deckent://dashboard
+         → "2/4 done, w-002 in testing, w-003 coding..."
+```
+
+## Flow 3: Ongoing Usage
+
+```
+User:    "What did we learn last sprint?"
+Claude:  → reads deckent://memory + calls deckent_history()
+         → Shows learnings and metrics
+
+User:    "Tech debt status?"
+Claude:  → reads deckent://debt
+         → "3 open items, 1 HIGH priority (2 sprints unfixed)"
+
+User:    "Add dark mode support"
+Claude:  → deckent_set_directives → deckent_plan → [user approves] → deckent_start
+```
+
+**The user NEVER needs to:**
+- Open or edit DIRECTIVES.md manually
+- Type terminal commands
+- Know agile/sprint terminology
+- Understand .tasks/ or .brain/ internals
+
+---
+
+# 23. STRATEGIC ROADMAP
+
+## Phase 1: Claude Native Stable (Sprint 1-8)
+
+**Goal:** Rock-solid Claude-native orchestration with MCP integration.
+
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| 1 | Core engine (brain, auditor, worker, tmux, CLI) | Done |
+| 2 | Async migration, lifecycle hardening | Done |
+| 3 | Semantic fixes, usage parsing | Done |
+| 4 | Debt resolution lifecycle | Done |
+| 5 | Decay, doctor, dashboard, coverage | Done |
+| 6 | First dogfooding (self-run) | Done |
+| 7 | MCP server (8 tools, 4 resources) | Done |
+| 8 | MCP polish, error handling, edge cases | Planned |
+
+**Exit criteria:** 700+ tests, 95%+ coverage, stable MCP integration, real projects using Deckent.
+
+## Phase 2: Provider Abstraction (Sprint 9-12)
+
+**Goal:** Decouple from Claude-specific APIs, enable future multi-provider support.
+
+- Abstract `claude -p` into a provider interface
+- Provider: Claude (native), OpenAI (future), local LLM (future)
+- Config: `provider: "claude" | "openai" | "ollama"`
+- tmux spawning stays — provider only affects model invocation
+
+## Phase 3: Multi-Provider (Sprint 13+)
+
+**Goal:** Run workers on different providers simultaneously.
+
+- Brain on Opus (Claude), workers on GPT-4o (OpenAI) — mix and match
+- Provider-specific tool mapping (allowedTools → function_calling)
+- Cost optimization: expensive tasks on powerful models, simple on cheap
+
+## Phase 4: Platform Expansion (Sprint 20+)
+
+**Goal:** Beyond CLI — web dashboard, VSCode extension, team features.
+
+- Web dashboard (React + WebSocket)
+- VSCode extension (sidebar, status bar, inline decorations)
+- Team mode: shared sprints, role-based access
+- Cloud mode: remote orchestration (no local tmux)
+
+---
+
+# 24. SPRINT HISTORY
+
+| Sprint | Tests | Coverage | Highlights |
+|--------|-------|----------|------------|
+| 1 | 432 | 89% | Core engine: types, config, brain, auditor, worker, tmux, CLI |
+| 2 | 480 | 91% | sleepSync → async sleep migration |
+| 3 | 540 | 92% | haiku_allowed semantic fix, checkUsage regex |
+| 4 | 617 | 93% | resolveDebt lifecycle, stale debt cleanup |
+| 5 | 644 | 94.83% | Decay, doctor, start --dry-run, status --watch, barrel excludes |
+| 6 | 645 | 95% | First dogfooding: README.md generated in 86s, 1 task DONE |
+| 7 | 669 | 95% | MCP server: 8 tools, 4 resources, auto-registration, 24 new tests |
+
+**First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
+
+---
+
 # END OF BLUEPRINT
 
 This document is the single source of truth for Deckent's implementation.
-Open it in Claude Code and say: "Implement this."
-
-Deckent starts this weekend. Let's build.
+Use the MCP tools: "Set up Deckent" or "Plan a sprint for [goals]".
+Or open it in Claude Code and say: "Implement this."
