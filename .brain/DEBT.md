@@ -9,3 +9,5 @@
 | debt-003-002 | Tech debt from 003-002: DEBT-005 fixed: autoApprove and haikuAllowed semantics c | 003-002 | sprint-003 | NORMAL | 1 | true | sprint-004 | 2026-03-17T05:32:57.604Z |
 | debt-003-003 | Tech debt from 003-003: Fixed checkUsage regex to handle 'hr' shorthand (5hr:, 5 | 003-003 | sprint-003 | NORMAL | 1 | true | sprint-004 | 2026-03-17T05:32:57.613Z |
 | debt-003-005 | Tech debt from 003-005: buildWorkerPrompt (src/orchestra/brain.ts:449-482) alrea | 003-005 | sprint-003 | NORMAL | 1 | true | sprint-004 | 2026-03-17T05:32:57.640Z |
+| debt-004-002 | Tech debt from 004-002: calculateMetrics debt parameter tests already exist in t | 004-002 | sprint-004 | NORMAL | 0 | true | sprint-004 | 2026-03-17T06:04:27.855Z |
+| debt-004-003 | Tech debt from 004-003: Created 12 integration tests in tests/orchestra/runsprin | 004-003 | sprint-004 | NORMAL | 0 | true | sprint-004 | 2026-03-17T06:04:27.872Z |

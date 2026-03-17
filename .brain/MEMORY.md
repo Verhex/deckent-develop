@@ -56,3 +56,6 @@
 - haiku_allowed semantik düzeltme (DEBT-005): GO_WITH_TECH_DEBT
 - checkUsage gerçek entegrasyon (DEBT-002): GO_WITH_TECH_DEBT
 - Worker prompt zenginleştirme: GO_WITH_TECH_DEBT
+## Sprint sprint-004 Learnings
+- calculateMetrics debt parametresi doğrulama: GO_WITH_TECH_DEBT
+- runSprint debt resolution entegrasyon: GO_WITH_TECH_DEBT

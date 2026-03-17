@@ -1,0 +1,10 @@
+{
+  "taskId": "004-002",
+  "filesChanged": ["tests/orchestra/debt-resolution.test.ts"],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 80,
+  "selfAssessment": "DONE",
+  "notes": "calculateMetrics debt parameter tests already exist in tests/orchestra/debt-resolution.test.ts (lines 181-221). Tests verify: (1) resolvedDebtCount counts only debts resolved in current sprint (resolved=true AND resolvedInSprintId===sprint.id), (2) totalOpenDebt counts all debts where resolved=false, (3) backward compat when debt param omitted returns 0 for both fields. All 605 tests pass with no regressions. The calculateMetrics function in src/orchestra/brain.ts correctly implements the logic at lines 853-854."
+}

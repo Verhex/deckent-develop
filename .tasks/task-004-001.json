@@ -1,0 +1,29 @@
+{
+  "id": "004-001",
+  "title": "resolveDebt fonksiyon doğrulama",
+  "description": "resolveDebt fonksiyon doğrulama\n- Dosya: src/orchestra/brain.ts\n- Sorun: resolveDebt() fonksiyonunun DEBT.md'yi doğru güncellediğini doğrula\n- Test: resolveDebt çağrıldığında resolved=true ve resolvedInSprintId yazıldığını kontrol et\n- Kapsam: src/orchestra/brain.ts, tests/orchestra/",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/brain.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-004",
+  "createdAt": "2026-03-17T05:55:48.650Z",
+  "updatedAt": "2026-03-17T06:04:27.843Z"
+}
