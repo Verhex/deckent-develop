@@ -44,18 +44,13 @@
 - Commander `exitOverride()` + sync action'larda throw edilen hatalar Commander tarafından yakalanır — test'lerde `rejects.toThrow` yerine çıktı kontrolü kullan
 - `vi.clearAllMocks()` her `beforeEach`'te zorunlu — mock call history testler arası sızar, özellikle `writeFileSync.mock.calls` filtreleme yapan testlerde
 
-## Sprint sprint-001 Learnings
-## Sprint sprint-002 Learnings
-- Coverage hedefi: değişen her dosyada minimum %80.: GO_WITH_TECH_DEBT
-- ---: GO_WITH_TECH_DEBT
-- Dosya: src/orchestra/brain.ts: GO_WITH_TECH_DEBT
-- Sorun: waitForResults (satır 458) sleepSync (satır 101) kullanıyor, main thread bloklanıyor: GO_WITH_TECH_DEBT
-- Fix: async/await + setTimeout tabanlı polling'e geç: GO_WITH_TECH_DEBT
-- sleepSync fonksiyonunu kaldır, yerine async sleep(ms) yaz: GO_WITH_TECH_DEBT
-## Sprint sprint-003 Learnings
-- haiku_allowed semantik düzeltme (DEBT-005): GO_WITH_TECH_DEBT
-- checkUsage gerçek entegrasyon (DEBT-002): GO_WITH_TECH_DEBT
-- Worker prompt zenginleştirme: GO_WITH_TECH_DEBT
-## Sprint sprint-004 Learnings
-- calculateMetrics debt parametresi doğrulama: GO_WITH_TECH_DEBT
-- runSprint debt resolution entegrasyon: GO_WITH_TECH_DEBT
+## Sprint 1-5 Özet
+- sleepSync → async sleep geçişi tamamlandı (Sprint 2)
+- haiku_allowed semantik düzeltme, checkUsage regex fix (Sprint 3)
+- resolveDebt lifecycle doğrulandı (Sprint 4)
+- `countBrainLines` → `src/core/utils.ts` (shared utility, brain.ts ve doctor.ts import eder)
+- `runDecay` force option: `force=true` → bütçe altında bile decay çalışır, `DecayResult` döndürür
+- Doctor `runDoctorChecks` export: start.ts pre-flight'ta kullanır, `ok` sadece `required` check'lere bakar
+- Start `--dry-run`: `planSprint()` çağrılır, task listesi gösterilir, spawn yok
+- Status `--watch`: `setInterval(2000)` ile ekran temizle + tekrar render, `--json` raw JSON çıktı
+- Barrel `index.ts` dosyaları vitest coverage exclude'da — sadece re-export, coverage'ı düşürüyor

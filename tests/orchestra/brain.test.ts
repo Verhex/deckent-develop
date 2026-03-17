@@ -34,6 +34,10 @@ vi.mock('../../src/monitor/auditor.js', () => ({
   detectDeadlocks: vi.fn().mockReturnValue([]),
 }));
 
+vi.mock('../../src/core/utils.js', () => ({
+  countBrainLines: vi.fn().mockReturnValue(100),
+}));
+
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn().mockImplementation((_root: string, _id: string, _status: string) => ({})),
   releaseAllLocks: vi.fn().mockReturnValue(0),
@@ -43,6 +47,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlink
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers, startAuditor } from '../../src/orchestra/tmux.js';
 import { updateDashboard, detectDeadlocks } from '../../src/monitor/auditor.js';
+import { countBrainLines } from '../../src/core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../../src/agents/worker.js';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
@@ -59,6 +64,7 @@ const mockedListWorkers = vi.mocked(listWorkers);
 const mockedStartAuditor = vi.mocked(startAuditor);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 const mockedDetectDeadlocks = vi.mocked(detectDeadlocks);
+const mockedCountBrainLines = vi.mocked(countBrainLines);
 const mockedUpdateTaskStatus = vi.mocked(updateTaskStatus);
 const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
 
@@ -67,7 +73,7 @@ import {
   planSprint, spawnWorkers, waitForResults,
   evaluateResult, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
-  calculateMetrics, decay, cleanup, runSprint,
+  calculateMetrics, decay, cleanup, runSprint, runDecay,
   BrainError, buildWorkerPrompt, extractScopeFromDirective, parseStructuredDirectives,
 } from '../../src/orchestra/brain.js';
 
@@ -1408,5 +1414,88 @@ describe('RunSprintOptions — sandboxMode separation (DEBT-005)', () => {
     // autoApprove lives in RunSprintOptions — completely separate
     const runOpts: import('../../src/orchestra/brain.js').RunSprintOptions = { autoApprove: false };
     expect(runOpts.autoApprove).toBe(false);
+  });
+});
+
+// ─── runDecay ──────────────────────────────────────────────────────
+
+describe('runDecay', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+    mockedWriteFileSync.mockImplementation(() => {});
+    mockedListWorkers.mockReturnValue([]);
+    mockedCountBrainLines.mockReturnValue(100);
+  });
+
+  it('skips decay when force=false and under budget', () => {
+    mockedCountBrainLines.mockReturnValue(200);
+    const result = runDecay(ROOT, 'sprint-005', { force: false });
+    expect(result.linesBefore).toBe(200);
+    expect(result.linesAfter).toBe(200);
+    expect(result.archivedSprints).toEqual([]);
+    expect(result.removedDebtCount).toBe(0);
+    expect(result.removedPatternCount).toBe(0);
+  });
+
+  it('runs decay when force=true even under budget', () => {
+    mockedCountBrainLines.mockReturnValue(100);
+    mockedReadFileSync.mockImplementation((p) => {
+      const path = String(p);
+      if (path.includes('PATTERNS')) return JSON.stringify([
+        { pattern: 'stale', resolved: true, occurrences: 1, firstDetectedInSprint: 's-1', lastDetectedInSprint: 's-1' },
+        { pattern: 'active', resolved: false, occurrences: 2, firstDetectedInSprint: 's-1', lastDetectedInSprint: 's-2' },
+      ]);
+      if (path.includes('DEBT')) return '| ID | Desc | Task | Sprint | Priority | Open | Resolved | Fixed | Created |\n|---|---|---|---|---|---|---|---|---|\n| d-1 | old | t-1 | s-1 | NORMAL | 1 | true | s-2 | 2026 |';
+      return '';
+    });
+    mockedReaddirSync.mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+
+    const result = runDecay(ROOT, 'sprint-005', { force: true });
+    expect(result.removedPatternCount).toBe(1);
+    expect(result.removedDebtCount).toBe(1);
+  });
+
+  it('runs decay when over budget without force', () => {
+    mockedCountBrainLines.mockReturnValue(350);
+    mockedReadFileSync.mockReturnValue('');
+    mockedReaddirSync.mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+
+    const result = runDecay(ROOT, 'sprint-005');
+    expect(result.linesBefore).toBe(350);
+  });
+
+  it('archives old sprint logs (keeps last 2)', () => {
+    mockedCountBrainLines.mockReturnValue(100);
+    mockedReadFileSync.mockImplementation((p) => {
+      if (String(p).includes('PATTERNS')) return '[]';
+      if (String(p).includes('DEBT')) return '';
+      return '# Sprint log content';
+    });
+
+    // sprints dir
+    mockedReaddirSync.mockImplementation((p) => {
+      if (String(p).includes('sprints')) return ['sprint-001.md', 'sprint-002.md', 'sprint-003.md'] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+
+    const result = runDecay(ROOT, 'sprint-005', { force: true });
+    expect(result.archivedSprints).toEqual(['sprint-001.md']);
+  });
+
+  it('returns correct DecayResult structure', () => {
+    mockedCountBrainLines.mockReturnValueOnce(100).mockReturnValue(80);
+    mockedReadFileSync.mockReturnValue('[]');
+    mockedReaddirSync.mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+
+    const result = runDecay(ROOT, 'sprint-005', { force: true });
+    expect(result).toHaveProperty('linesBefore');
+    expect(result).toHaveProperty('linesAfter');
+    expect(result).toHaveProperty('archivedSprints');
+    expect(result).toHaveProperty('removedDebtCount');
+    expect(result).toHaveProperty('removedPatternCount');
+    expect(result.linesBefore).toBe(100);
+    expect(result.linesAfter).toBe(80);
   });
 });

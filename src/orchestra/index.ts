@@ -17,7 +17,7 @@ export {
   planSprint, spawnWorkers, waitForResults,
   evaluateResult, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
-  calculateMetrics, decay, cleanup, runSprint,
+  calculateMetrics, decay, cleanup, runSprint, runDecay,
   BrainError,
 } from './brain.js';
-export type { BrainContext, ProjectState, SprintSizeRecommendation, CreateTaskParams } from './brain.js';
+export type { BrainContext, ProjectState, SprintSizeRecommendation, CreateTaskParams, RunDecayOptions } from './brain.js';

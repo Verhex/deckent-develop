@@ -37,6 +37,10 @@ vi.mock('../../src/core/config.js', () => ({
   },
 }));
 
+vi.mock('../../src/core/utils.js', () => ({
+  countBrainLines: vi.fn().mockReturnValue(100),
+}));
+
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
@@ -44,6 +48,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   cleanup: vi.fn(),
+  runDecay: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
     constructor(msg: string, phase?: string) {
@@ -80,8 +85,9 @@ vi.mock('../../src/agents/worker.js', () => ({
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
+import { countBrainLines } from '../../src/core/utils.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../src/core/config.js';
-import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, BrainError } from '../../src/orchestra/brain.js';
+import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, runDecay, BrainError } from '../../src/orchestra/brain.js';
 import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, TmuxError } from '../../src/orchestra/tmux.js';
 import { readTask } from '../../src/agents/worker.js';
 
@@ -193,6 +199,11 @@ describe('doctor command', () => {
     vi.clearAllMocks();
     captureOutput();
     process.exitCode = undefined;
+    // Default mocks for project-level checks
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('# Content\nSome data');
+    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(countBrainLines).mockReturnValue(100);
   });
   afterEach(() => {
     restoreOutput();
@@ -208,17 +219,16 @@ describe('doctor command', () => {
     });
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('\u2713');
-    expect(stdout()).toContain('4/4 checks passed');
+    expect(stdout()).toContain('10/10 checks passed');
   });
 
-  it('reports failing checks', async () => {
+  it('reports failing required check', async () => {
     vi.mocked(spawnSync).mockImplementation((cmd) => {
       if (cmd === 'tmux') return { status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
       return { status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('\u2717');
-    expect(stdout()).toContain('3/4 checks passed');
     expect(process.exitCode).toBe(1);
   });
 
@@ -247,10 +257,49 @@ describe('doctor command', () => {
     expect(stdout()).toContain('v2.44.0');
   });
 
-  it('sets ok=false when any check fails', async () => {
+  it('sets ok=false when required check fails', async () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
     await runCommand(registerDoctor, ['doctor']);
     expect(process.exitCode).toBe(1);
+  });
+
+  it('reports workspace missing', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    await runCommand(registerDoctor, ['doctor']);
+    expect(stdout()).toContain('.deckent/ missing');
+  });
+
+  it('reports brain budget over limit', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(countBrainLines).mockReturnValue(350);
+    await runCommand(registerDoctor, ['doctor']);
+    expect(stdout()).toContain('350/300');
+    expect(stdout()).toContain('OVER BUDGET');
+  });
+
+  it('reports critical debt', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).includes('DEBT')) {
+        return '| ID | Desc |\n|---|---|\n| d-1 | fix | task-1 | s-1 | CRITICAL | 3 | false | - | 2026 |';
+      }
+      return '# Content\nSome data';
+    });
+    await runCommand(registerDoctor, ['doctor']);
+    expect(stdout()).toContain('CRITICAL debt');
+  });
+
+  it('reports stale locks', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(readdirSync).mockReturnValue(['test.lock'] as unknown as ReturnType<typeof readdirSync>);
+    const staleTime = new Date(Date.now() - 400_000).toISOString();
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).includes('.lock')) return JSON.stringify({ acquiredAt: staleTime });
+      return '# Content\nSome data';
+    });
+    await runCommand(registerDoctor, ['doctor']);
+    expect(stdout()).toContain('stale lock');
   });
 });
 
@@ -422,6 +471,41 @@ describe('status command', () => {
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
     await runCommand(registerStatus, ['status']);
     expect(stdout()).toContain('\u2554');
+  });
+
+  it('--json outputs parseable JSON', async () => {
+    const state: DashboardState = {
+      sprint: { id: 's-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
+      agents: [],
+      progress: { done: 0, active: 0, blocked: 0, total: 0 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' },
+      alerts: [],
+      updatedAt: '2026-03-16T00:00:00Z',
+    };
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
+    await runCommand(registerStatus, ['status', '--json']);
+    const parsed = JSON.parse(stdout());
+    expect(parsed.sprint.id).toBe('s-001');
+  });
+
+  it('--watch sets up interval', async () => {
+    const state: DashboardState = {
+      sprint: { id: 's-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
+      agents: [],
+      progress: { done: 0, active: 0, blocked: 0, total: 0 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' },
+      alerts: [],
+      updatedAt: '2026-03-16T00:00:00Z',
+    };
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
+    const setIntervalSpy = vi.spyOn(global, 'setInterval');
+    const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    await runCommand(registerStatus, ['status', '--watch']);
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
+    setIntervalSpy.mockRestore();
+    onSpy.mockRestore();
   });
 });
 
@@ -657,6 +741,30 @@ describe('cleanup command', () => {
     expect(stderr()).toContain('cleanup failed');
     expect(process.exitCode).toBe(1);
   });
+
+  it('--decay flag runs runDecay with force', async () => {
+    vi.mocked(runDecay).mockReturnValue({
+      linesBefore: 350, linesAfter: 200,
+      archivedSprints: ['sprint-001.md'], removedDebtCount: 2, removedPatternCount: 1,
+    });
+    await runCommand(registerCleanup, ['cleanup', '--decay']);
+    expect(runDecay).toHaveBeenCalledWith(expect.any(String), 'sprint-cleanup', { force: true });
+    expect(stdout()).toContain('350');
+    expect(stdout()).toContain('200');
+    expect(stdout()).toContain('sprint-001.md');
+    expect(stdout()).toContain('2 debt');
+  });
+
+  it('--decay with no archived sprints', async () => {
+    vi.mocked(runDecay).mockReturnValue({
+      linesBefore: 100, linesAfter: 100,
+      archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0,
+    });
+    await runCommand(registerCleanup, ['cleanup', '--decay']);
+    expect(stdout()).toContain('100');
+    expect(stdout()).not.toContain('Archived');
+    expect(stdout()).not.toContain('Removed');
+  });
 });
 
 // ─── Start Command ──────────────────────────────────────────────────
@@ -666,6 +774,17 @@ describe('start command', () => {
     vi.clearAllMocks();
     captureOutput();
     process.exitCode = undefined;
+    // Doctor pre-flight: make all tool checks pass
+    vi.mocked(spawnSync).mockImplementation((cmd) => {
+      const outputs: Record<string, string> = {
+        node: 'v22.0.0', git: 'git version 2.44.0', tmux: 'tmux 3.4', claude: '1.0.0',
+      };
+      return { status: 0, stdout: outputs[cmd as string] ?? '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('# Content');
+    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(countBrainLines).mockReturnValue(100);
   });
   afterEach(() => {
     restoreOutput();
@@ -722,6 +841,42 @@ describe('start command', () => {
     await runCommand(registerStart, ['start']);
     expect(stderr()).toContain('unknown');
     expect(process.exitCode).toBe(1);
+  });
+
+  it('pre-flight failure prevents runSprint', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    await runCommand(registerStart, ['start']);
+    expect(runSprint).not.toHaveBeenCalled();
+    expect(stderr()).toContain('Pre-flight failed');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('--force skips pre-flight', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
+    await runCommand(registerStart, ['start', '--force']);
+    expect(runSprint).toHaveBeenCalled();
+  });
+
+  it('--dry-run plans but does not spawn', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(readContext).mockReturnValue({
+      directives: '', memory: '', retro: '', debt: [],
+      patterns: '', decisions: '', existingTasks: [],
+      projectState: { gitStatus: '', fileTree: [] },
+    });
+    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
+    vi.mocked(adjustSprintSize).mockReturnValue({
+      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
+    });
+    vi.mocked(planSprint).mockReturnValue(makeSprint({
+      tasks: [makeTask({ id: 'task-001', title: 'Test task' })],
+    }));
+    await runCommand(registerStart, ['start', '--dry-run']);
+    expect(runSprint).not.toHaveBeenCalled();
+    expect(stdout()).toContain('Dry-run complete');
+    expect(stdout()).toContain('task-001');
   });
 });
 

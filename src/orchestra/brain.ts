@@ -10,7 +10,7 @@ import { TaskStatus, TaskEvaluation, SprintPhase, SprintStatus, DebtPriority, Ag
 import type {
   Task, TaskResult, TaskScope, GoNoGoCriteria, Sprint, SprintMetrics,
   DebtItem, ModelType, TaskEffort, TaskPriority,
-  UsageMetrics, AgentInfo, ResolvedConfig, PatternEntry,
+  UsageMetrics, AgentInfo, ResolvedConfig, PatternEntry, DecayResult,
 } from '../core/types.js';
 import {
   BRAIN_DIR, TASKS_DIR, LOCKS_DIR, DIRECTIVES_FILE,
@@ -21,6 +21,9 @@ import {
   DEBT_HIGH_PRIORITY_SPRINTS, DEBT_CRITICAL_SPRINTS,
   DEBT_TABLE_HEADER,
 } from '../core/constants.js';
+
+// ─── Core — utils ─────────────────────────────────────────────────
+import { countBrainLines } from '../core/utils.js';
 
 // ─── Wave 2 — tmux ────────────────────────────────────────────────
 import { ensureSession, spawnWorker, killWorker, listWorkers, startAuditor } from './tmux.js';
@@ -141,26 +144,6 @@ function generateDebtTable(items: DebtItem[]): string {
     `| ${d.id} | ${d.description} | ${d.originTaskId} | ${d.originSprintId} | ${d.priority} | ${d.sprintsOpen} | ${d.resolved} | ${d.resolvedInSprintId ?? '-'} | ${d.createdAt} |`,
   );
   return [DEBT_TABLE_HEADER, separator, ...rows].join('\n');
-}
-
-function countBrainLines(projectRoot: string): number {
-  const brainPath = join(projectRoot, BRAIN_DIR);
-  if (!existsSync(brainPath)) return 0;
-
-  let total = 0;
-  const entries = readdirSync(brainPath);
-  for (const entry of entries) {
-    if (entry === ARCHIVE_DIR || entry === SPRINTS_DIR) continue;
-    try { total += readFileSync(join(brainPath, entry), 'utf-8').split('\n').length; } catch { /* dir */ }
-  }
-
-  const sprintsPath = join(brainPath, SPRINTS_DIR);
-  if (existsSync(sprintsPath)) {
-    for (const file of readdirSync(sprintsPath)) {
-      try { total += readFileSync(join(sprintsPath, file), 'utf-8').split('\n').length; } catch { /* skip */ }
-    }
-  }
-  return total;
 }
 
 function getSprintNumber(sprintId: string): number {
@@ -927,6 +910,98 @@ export function decay(projectRoot: string, currentSprintId: string): void {
       writeFileSync(join(brainPath, MEMORY_FILE), memLines.slice(memLines.length - 50).join('\n'), 'utf-8');
     }
   }
+}
+
+// 15b. runDecay — public wrapper with force option
+export interface RunDecayOptions {
+  force?: boolean;
+}
+
+export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayOptions): DecayResult {
+  const linesBefore = countBrainLines(projectRoot);
+  const brainPath = join(projectRoot, BRAIN_DIR);
+
+  // Track what we'll remove
+  let removedDebtCount = 0;
+  let removedPatternCount = 0;
+  const archivedSprints: string[] = [];
+
+  const shouldRun = opts?.force || linesBefore > BRAIN_TOTAL_LINE_BUDGET;
+  if (!shouldRun) {
+    return { linesBefore, linesAfter: linesBefore, archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0 };
+  }
+
+  // 1. Remove resolved patterns
+  const patternsPath = join(brainPath, PATTERNS_FILE);
+  if (existsSync(patternsPath)) {
+    const patterns = readJsonSafe<PatternEntry[]>(patternsPath);
+    if (patterns) {
+      const resolved = patterns.filter(p => p.resolved);
+      removedPatternCount = resolved.length;
+      const active = patterns.filter(p => !p.resolved);
+      writeFileSync(patternsPath, JSON.stringify(active, null, 2), 'utf-8');
+    }
+  }
+
+  // 2. Remove resolved debt
+  const debtPath = join(brainPath, DEBT_FILE);
+  const debtContent = readFileSafe(debtPath);
+  if (debtContent) {
+    const items = parseDebtTable(debtContent);
+    const resolved = items.filter(d => d.resolved);
+    removedDebtCount = resolved.length;
+    const openItems = items.filter(d => !d.resolved);
+    writeFileSync(debtPath, generateDebtTable(openItems), 'utf-8');
+  }
+
+  // 3. Archive old sprint logs (keep last 2)
+  const sprintsPath = join(brainPath, SPRINTS_DIR);
+  if (existsSync(sprintsPath)) {
+    const archivePath = join(brainPath, ARCHIVE_DIR);
+    const sprintFiles = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).sort();
+    const toArchive = sprintFiles.slice(0, Math.max(0, sprintFiles.length - 2));
+    if (toArchive.length > 0) {
+      mkdirSync(archivePath, { recursive: true });
+      for (const file of toArchive) {
+        const content = readFileSync(join(sprintsPath, file), 'utf-8');
+        writeFileSync(join(archivePath, file), content, 'utf-8');
+        unlinkSync(join(sprintsPath, file));
+        archivedSprints.push(file);
+      }
+    }
+  }
+
+  // 4. Memory archive — trim old sections
+  const memoryPath = join(brainPath, MEMORY_FILE);
+  if (existsSync(memoryPath) && countBrainLines(projectRoot) > BRAIN_TOTAL_LINE_BUDGET) {
+    const content = readFileSafe(memoryPath);
+    const currentNum = getSprintNumber(sprintId);
+    const lines = content.split('\n');
+    const kept: string[] = [];
+    let currentSectionOld = false;
+
+    for (const line of lines) {
+      const sectionMatch = line.match(/^## Sprint sprint-(\d+)/);
+      if (sectionMatch?.[1]) {
+        const sectionNum = parseInt(sectionMatch[1], 10);
+        currentSectionOld = (currentNum - sectionNum) >= MEMORY_DECAY_SPRINTS;
+      }
+      if (!currentSectionOld) kept.push(line);
+    }
+    writeFileSync(memoryPath, kept.join('\n'), 'utf-8');
+  }
+
+  // 5. Last resort — truncate MEMORY.md to 50 lines
+  if (countBrainLines(projectRoot) > BRAIN_TOTAL_LINE_BUDGET) {
+    const memContent = readFileSafe(join(brainPath, MEMORY_FILE));
+    const memLines = memContent.split('\n');
+    if (memLines.length > 50) {
+      writeFileSync(join(brainPath, MEMORY_FILE), memLines.slice(memLines.length - 50).join('\n'), 'utf-8');
+    }
+  }
+
+  const linesAfter = countBrainLines(projectRoot);
+  return { linesBefore, linesAfter, archivedSprints, removedDebtCount, removedPatternCount };
 }
 
 // 16. cleanup

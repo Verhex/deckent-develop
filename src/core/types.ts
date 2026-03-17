@@ -322,6 +322,15 @@ export interface SkillMeta {
   model: ModelType;
 }
 
+// ─── Decay Result ──────────────────────────────────────────────
+export interface DecayResult {
+  linesBefore: number;
+  linesAfter: number;
+  archivedSprints: string[];
+  removedDebtCount: number;
+  removedPatternCount: number;
+}
+
 // ─── CLI Types ──────────────────────────────────────────────────────
 // autoApprove: passed to tmux as --dangerously-skip-permissions (CLI/spawn only)
 // sandboxMode: Docker sandbox flag (not yet implemented)

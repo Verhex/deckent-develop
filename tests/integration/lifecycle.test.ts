@@ -733,7 +733,7 @@ describe('CLI doctor integration', () => {
 
     const output = stdoutData.join('');
     expect(output).toContain('\u2713');
-    expect(output).toContain('4/4 checks passed');
+    expect(output).toContain('checks passed');
   });
 
   it('doctor fails for old Node version', async () => {

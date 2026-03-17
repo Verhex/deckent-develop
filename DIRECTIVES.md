@@ -1,29 +1,20 @@
-# DIRECTIVES — Sprint 4: Debt Resolution Doğrulama
-# Deckent'in debt resolution lifecycle'ının doğru çalıştığını doğrula.
+# DIRECTIVES — Sprint 5 Tamamlandı
+# Deckent Sprint 5: Decay, Doctor, Start, Dashboard, Coverage, Integration
 # Operatör: Alperen @ Verhex
 # Tarih: 2026-03-17
 
-## Hedef
-Debt resolution lifecycle'ın doğru çalıştığını doğrula.
-Mevcut 605 testi bozmadan yeni testler yaz.
-Coverage hedefi: değişen her dosyada minimum %80.
+## Durum: TAMAMLANDI
 
----
+Sprint 5 hedefleri başarıyla tamamlandı:
+- 617 → 644 test (+27 yeni), 0 regression
+- Coverage: %94.83 overall (hedef %90+)
+- Decay mekanizması: runDecay() + cleanup --decay
+- Doctor: 10 check (4 required + 6 optional)
+- Start: pre-flight doctor, --dry-run, --force
+- Status: --watch (2s interval), --json
+- Full sprint cycle entegrasyon testi
 
-## Görev 1: resolveDebt fonksiyon doğrulama
-- Dosya: src/orchestra/brain.ts
-- Sorun: resolveDebt() fonksiyonunun DEBT.md'yi doğru güncellediğini doğrula
-- Test: resolveDebt çağrıldığında resolved=true ve resolvedInSprintId yazıldığını kontrol et
-- Kapsam: src/orchestra/brain.ts, tests/orchestra/
-
-## Görev 2: calculateMetrics debt parametresi doğrulama
-- Dosya: src/orchestra/brain.ts
-- Sorun: calculateMetrics'in debt parametresiyle resolvedDebtCount ve totalOpenDebt hesapladığını doğrula
-- Test: calculateMetrics'e debt array verildiğinde doğru metriklerin döndüğünü kontrol et
-- Kapsam: src/orchestra/brain.ts, tests/orchestra/
-
-## Görev 3: runSprint debt resolution entegrasyon
-- Dosya: src/orchestra/brain.ts
-- Sorun: DONE evaluation sonrası debt'in resolve edildiğini end-to-end doğrula
-- Test: runSprint Phase 4'te DONE/GO_WITH_TECH_DEBT evaluation sonrası resolveDebt çağrıldığını kontrol et
-- Kapsam: src/orchestra/brain.ts, tests/orchestra/
+## Sonraki Sprint icin Notlar
+- Web dashboard (Blueprint Phase 2)
+- Plugin/skill sistemi (Blueprint 11)
+- Agent Teams entegrasyonu (Blueprint 10)
