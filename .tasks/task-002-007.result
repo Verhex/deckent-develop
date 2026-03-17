@@ -1,0 +1,15 @@
+{
+  "taskId": "002-007",
+  "filesChanged": [
+    "src/orchestra/brain.ts",
+    "src/cli/commands/start.ts",
+    "tests/orchestra/brain.test.ts",
+    "tests/cli/commands.test.ts"
+  ],
+  "linesAdded": 12,
+  "linesRemoved": 8,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Replaced sleepSync (Atomics.wait) with async sleep(ms) using setTimeout. Made waitForResults and runSprint async. Updated all callers (start.ts) and all tests to use await. All 384 tests pass."
+}

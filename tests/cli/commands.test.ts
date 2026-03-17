@@ -452,6 +452,22 @@ describe('history command', () => {
     await runCommand(registerHistory, ['history']);
     expect(stdout()).toContain('No sprint history');
   });
+
+  it('shows "-" for missing tasks/coverage/duration fields', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue('# Sprint 1\nNo structured fields here');
+    await runCommand(registerHistory, ['history']);
+    expect(stdout()).toContain('-');
+  });
+
+  it('shows "Unknown" for sprint without title', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue('no title line\nTasks: 3');
+    await runCommand(registerHistory, ['history']);
+    expect(stdout()).toContain('Unknown');
+  });
 });
 
 // ─── Config Command ─────────────────────────────────────────────────
@@ -602,6 +618,35 @@ describe('cleanup command', () => {
     await runCommand(registerCleanup, ['cleanup']);
     expect(stdout()).toContain('0 tasks');
   });
+
+  it('skips malformed task JSON files', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['task-bad.json'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue('not-valid-json{{');
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    await runCommand(registerCleanup, ['cleanup']);
+    expect(stdout()).toContain('0 tasks');
+  });
+
+  it('handles destroy() throwing silently', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => { throw new Error('no session'); });
+    await runCommand(registerCleanup, ['cleanup']);
+    expect(stdout()).toContain('Cleanup complete');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('handles cleanup() throwing', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(cleanup).mockImplementation(() => { throw new Error('cleanup failed'); });
+    await runCommand(registerCleanup, ['cleanup']);
+    expect(stderr()).toContain('cleanup failed');
+    expect(process.exitCode).toBe(1);
+  });
 });
 
 // ─── Start Command ──────────────────────────────────────────────────
@@ -619,19 +664,18 @@ describe('start command', () => {
 
   it('runs sprint and shows summary', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(runSprint).mockReturnValue(makeSprint());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
     await runCommand(registerStart, ['start']);
     expect(runSprint).toHaveBeenCalled();
     expect(stdout()).toContain('Sprint 1');
   });
 
   it('handles --auto-approve', async () => {
-    const config = makeConfig({ activeModeConfig: { ...makeConfig().activeModeConfig, haiku_allowed: false } });
-    vi.mocked(loadConfig).mockResolvedValue(config);
-    vi.mocked(runSprint).mockReturnValue(makeSprint());
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
     await runCommand(registerStart, ['start', '--auto-approve']);
-    const callArg = vi.mocked(runSprint).mock.calls[0]?.[1];
-    expect(callArg?.activeModeConfig.haiku_allowed).toBe(true);
+    const optsArg = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(optsArg?.autoApprove).toBe(true);
   });
 
   it('handles --sandbox stub', async () => {
@@ -641,7 +685,7 @@ describe('start command', () => {
 
   it('handles BrainError', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(runSprint).mockImplementation(() => { throw new BrainError('fail', 'PLAN'); });
+    vi.mocked(runSprint).mockRejectedValue(new BrainError('fail', 'PLAN'));
     await runCommand(registerStart, ['start']);
     expect(stderr()).toContain('Sprint failed');
     expect(stderr()).toContain('PLAN');
@@ -650,7 +694,7 @@ describe('start command', () => {
 
   it('handles generic error', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(runSprint).mockImplementation(() => { throw new Error('unknown'); });
+    vi.mocked(runSprint).mockRejectedValue(new Error('unknown'));
     await runCommand(registerStart, ['start']);
     expect(stderr()).toContain('unknown');
     expect(process.exitCode).toBe(1);

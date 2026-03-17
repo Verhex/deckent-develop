@@ -43,3 +43,12 @@
 - `.gitignore` append'de duplicate kontrolü önemli — `existing.includes(entry)` ile mevcut satır varsa atla
 - Commander `exitOverride()` + sync action'larda throw edilen hatalar Commander tarafından yakalanır — test'lerde `rejects.toThrow` yerine çıktı kontrolü kullan
 - `vi.clearAllMocks()` her `beforeEach`'te zorunlu — mock call history testler arası sızar, özellikle `writeFileSync.mock.calls` filtreleme yapan testlerde
+
+## Sprint sprint-001 Learnings
+## Sprint sprint-002 Learnings
+- Coverage hedefi: değişen her dosyada minimum %80.: GO_WITH_TECH_DEBT
+- ---: GO_WITH_TECH_DEBT
+- Dosya: src/orchestra/brain.ts: GO_WITH_TECH_DEBT
+- Sorun: waitForResults (satır 458) sleepSync (satır 101) kullanıyor, main thread bloklanıyor: GO_WITH_TECH_DEBT
+- Fix: async/await + setTimeout tabanlı polling'e geç: GO_WITH_TECH_DEBT
+- sleepSync fonksiyonunu kaldır, yerine async sleep(ms) yaz: GO_WITH_TECH_DEBT

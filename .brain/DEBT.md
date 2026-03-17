@@ -1,15 +1,8 @@
-# Technical Debt Log
-
-| ID | Description | Origin | Priority | Sprints Open |
-|----|-------------|--------|----------|--------------|
-| DEBT-001 | `deckent init` must auto-detect OS for CLAUDE.md symlink vs copy | Wave 1 setup | NORMAL | 0 |
-| DEBT-002 | `checkUsage` stub (sıfır döner) — gerçek Claude CLI `/status` entegrasyonu gerekli | Wave 3 brain | NORMAL | 0 |
-| DEBT-003 | Directive parsing satır bazlı — ileride Claude API ile akıllı parsing yapılacak | Wave 3 brain | NORMAL | 0 |
-| DEBT-004 | `waitForResults` sleepSync main thread bloklar — uzun polling async'e geçirilmeli | Wave 3 brain | NORMAL | 0 |
-| DEBT-005 | `--auto-approve` → `haiku_allowed` mapping — semantik yanlış ama fonksiyonel. Brain API'sine `opts?: StartOptions` eklenmeli | Wave 4 CLI | NORMAL | 0 |
-| DEBT-006 | `deckent status` tek-seferlik okuma — canlı izleme (watch mode) Phase 3 TUI'da | Wave 4 CLI | NORMAL | 0 |
-| DEBT-007 | `--sandbox` stub — Docker container modu implement edilmedi | Wave 4 CLI | NORMAL | 0 |
-| DEBT-008 | Plugin/upgrade/onboard stub komutlar — "not yet implemented" mesajı döner | Wave 4 CLI | NORMAL | 0 |
-| DEBT-009 | CLI mesajları hardcoded İngilizce — i18n sistemi sonra eklenecek | Wave 4 CLI | NORMAL | 0 |
-| DEBT-010 | `deckent retro` sadece `.brain/RETRO.md` görüntüler — yeniden hesaplama yapmaz | Wave 4 CLI | NORMAL | 0 |
-| DEBT-011 | `deckent plan` sonrası `deckent start` mevcut .tasks/ üzerine yazar — "devam et mi?" sorulmalı | Wave 4 CLI | NORMAL | 0 |
+| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
+|----|-------------|------|--------|----------|------|----------|----------|---------|
+| debt-002-003 | Tech debt from 002-003: Coverage improved from 84.94% to 88.05% branch coverage | 002-003 | sprint-002 | NORMAL | 1 | false | - | 2026-03-17T05:00:12.658Z |
+| debt-002-004 | Tech debt from 002-004: Task was created from a '---' separator line in DIRECTIV | 002-004 | sprint-002 | NORMAL | 1 | false | - | 2026-03-17T05:00:12.659Z |
+| debt-002-005 | Tech debt from 002-005: Enhanced buildWorkerPrompt to include: test writing inst | 002-005 | sprint-002 | NORMAL | 1 | false | - | 2026-03-17T05:00:12.659Z |
+| debt-002-006 | Tech debt from 002-006: Replaced sleepSync (Atomics.wait blocking) with async sl | 002-006 | sprint-002 | NORMAL | 1 | false | - | 2026-03-17T05:00:12.659Z |
+| debt-002-007 | Tech debt from 002-007: Replaced sleepSync (Atomics.wait) with async sleep(ms) u | 002-007 | sprint-002 | NORMAL | 1 | false | - | 2026-03-17T05:00:12.659Z |
+| debt-002-008 | Tech debt from 002-008: Replaced sleepSync (Atomics.wait blocking) with async sl | 002-008 | sprint-002 | NORMAL | 1 | false | - | 2026-03-17T05:00:12.659Z |

@@ -12,6 +12,16 @@ import { EXIT_CODES, handleCliError, resolveProjectRoot } from '../../src/cli/he
 import { AgentStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { DashboardState, DoctorResult, Sprint, AgentInfo } from '../../src/core/types.js';
 
+vi.mock('node:readline/promises', () => ({
+  createInterface: vi.fn(() => ({
+    question: vi.fn(),
+    close: vi.fn(),
+  })),
+}));
+
+import { createInterface } from 'node:readline/promises';
+import { promptText, promptSelect, promptConfirm } from '../../src/cli/helpers/prompt.js';
+
 // ─── Output Tests ───────────────────────────────────────────────────
 
 describe('print', () => {
@@ -81,6 +91,12 @@ describe('formatTable', () => {
     const result = formatTable(['X'], []);
     const lines = result.split('\n');
     expect(lines.length).toBe(2); // header + sep
+  });
+
+  it('handles rows with fewer cells than headers (uses empty string)', () => {
+    // triggers `r[i] ?? ''` and `c ?? ''` fallback branches
+    const result = formatTable(['A', 'B', 'C'], [['1'] as string[]]);
+    expect(result).toContain('A');
   });
 });
 
@@ -260,5 +276,236 @@ describe('handleCliError', () => {
 describe('resolveProjectRoot', () => {
   it('returns current working directory', () => {
     expect(resolveProjectRoot()).toBe(process.cwd());
+  });
+});
+
+// ─── Dashboard Edge Cases ────────────────────────────────────────────
+
+describe('formatDashboard edge cases', () => {
+  it('shows --:-- when updatedAt is undefined', () => {
+    const state = makeDashboard({ updatedAt: undefined });
+    const result = formatDashboard(state);
+    expect(result).toContain('--:--');
+  });
+
+  it('uses phaseLabel when agent has no currentAction', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w-001', role: 'worker', status: AgentStatus.CODING,
+        model: 'sonnet', tmuxWindow: 'w-001', currentAction: undefined,
+      } as AgentInfo],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('Next:');
+  });
+
+  it('shows DONE progress bar for DONE agent', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w-001', role: 'worker', status: AgentStatus.DONE,
+        model: 'sonnet', tmuxWindow: 'w-001', currentAction: 'finished',
+      } as AgentInfo],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('DONE');
+  });
+
+  it('shows IDLE progress bar for IDLE agent', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w-001', role: 'worker', status: AgentStatus.IDLE,
+        model: 'sonnet', tmuxWindow: 'w-001', currentAction: 'waiting',
+      } as AgentInfo],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('IDLE');
+  });
+
+  it('slices content when agent line exceeds column width', () => {
+    // triggers padRight str.length >= len branch
+    const state = makeDashboard({
+      agents: [{
+        id: 'very-long-agent-id-xyz', role: 'worker', status: AgentStatus.CODING,
+        model: 'sonnet', tmuxWindow: 'w-001',
+        currentAction: 'a'.repeat(60),
+      } as AgentInfo],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('║');
+  });
+
+  it('falls back to unknown status tag', () => {
+    // triggers statusTag map[status] ?? fallback branch
+    const state = makeDashboard({
+      agents: [{
+        id: 'w-001', role: 'worker', status: 'UNKNOWN_STATUS' as AgentStatus,
+        model: 'sonnet', tmuxWindow: 'w-001', currentAction: 'test',
+      } as AgentInfo],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('UNKN');
+  });
+});
+
+// ─── Prompt Helper Tests ─────────────────────────────────────────────
+
+describe('promptText', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns trimmed answer when provided', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue('  myAnswer  '),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptText('Enter name');
+    expect(result).toBe('myAnswer');
+  });
+
+  it('returns default when answer is empty', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue(''),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptText('Enter name', 'defaultVal');
+    expect(result).toBe('defaultVal');
+  });
+
+  it('returns empty string when empty and no default', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue(''),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptText('Enter name');
+    expect(result).toBe('');
+  });
+
+  it('appends default suffix to question', async () => {
+    const mockQuestion = vi.fn().mockResolvedValue('answer');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    await promptText('Enter name', 'myDefault');
+    expect(mockQuestion).toHaveBeenCalledWith(expect.stringContaining('myDefault'));
+  });
+});
+
+describe('promptSelect', () => {
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    stdoutSpy.mockRestore();
+  });
+
+  it('returns selected value for valid input', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue('2'),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptSelect('Pick one', [
+      { label: 'Option A', value: 'a' as const },
+      { label: 'Option B', value: 'b' as const },
+    ]);
+    expect(result).toBe('b');
+  });
+
+  it('retries on invalid input then accepts valid', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('5')   // out of range
+      .mockResolvedValueOnce('0')   // out of range (idx = -1)
+      .mockResolvedValueOnce('1');  // valid
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptSelect('Pick one', [
+      { label: 'Option A', value: 'a' as const },
+    ]);
+    expect(result).toBe('a');
+    expect(mockQuestion).toHaveBeenCalledTimes(3);
+  });
+
+  it('prints options list', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue('1'),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    await promptSelect('Pick one', [{ label: 'Alpha', value: 'alpha' as const }]);
+    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+    expect(output).toContain('Alpha');
+  });
+});
+
+describe('promptConfirm', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns true for "y"', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue('y'),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptConfirm('Continue?');
+    expect(result).toBe(true);
+  });
+
+  it('returns true for "yes" (case insensitive)', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue('YES'),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptConfirm('Continue?');
+    expect(result).toBe(true);
+  });
+
+  it('returns false for "n"', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue('n'),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptConfirm('Continue?');
+    expect(result).toBe(false);
+  });
+
+  it('returns default true for empty answer', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue(''),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptConfirm('Continue?', true);
+    expect(result).toBe(true);
+  });
+
+  it('returns default false for empty answer', async () => {
+    vi.mocked(createInterface).mockReturnValue({
+      question: vi.fn().mockResolvedValue(''),
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    const result = await promptConfirm('Continue?', false);
+    expect(result).toBe(false);
+  });
+
+  it('shows Y/n hint when default is true', async () => {
+    const mockQuestion = vi.fn().mockResolvedValue('y');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    await promptConfirm('Continue?', true);
+    expect(mockQuestion).toHaveBeenCalledWith(expect.stringContaining('Y/n'));
+  });
+
+  it('shows y/N hint when default is false', async () => {
+    const mockQuestion = vi.fn().mockResolvedValue('n');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    await promptConfirm('Continue?', false);
+    expect(mockQuestion).toHaveBeenCalledWith(expect.stringContaining('y/N'));
   });
 });

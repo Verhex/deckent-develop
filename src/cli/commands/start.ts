@@ -20,13 +20,7 @@ export function registerStart(program: Command): void {
         }
 
         const config = await loadConfig(root);
-
-        // DEBT-005: --auto-approve maps to haiku_allowed
-        if (opts.autoApprove) {
-          config.activeModeConfig = { ...config.activeModeConfig, haiku_allowed: true };
-        }
-
-        const sprint = runSprint(root, config);
+        const sprint = await runSprint(root, config, { autoApprove: opts.autoApprove ?? false });
         print(formatSprintSummary(sprint));
       } catch (error) {
         if (error instanceof BrainError) {

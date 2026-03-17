@@ -68,7 +68,7 @@ import {
   evaluateResult, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runSprint,
-  BrainError, buildWorkerPrompt, extractScopeFromDirective,
+  BrainError, buildWorkerPrompt, extractScopeFromDirective, parseStructuredDirectives,
 } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -267,15 +267,52 @@ describe('readContext', () => {
 });
 
 describe('checkUsage', () => {
-  it('returns zeroed usage metrics', () => {
+  it('returns safe default when spawnSync fails', () => {
+    // vi.fn() mock returns undefined → catch → safe defaults
     const usage = checkUsage(makeConfig());
-    expect(usage.fiveHourPercent).toBe(0);
-    expect(usage.weeklyPercent).toBe(0);
+    expect(usage.fiveHourPercent).toBe(50);
+    expect(usage.weeklyPercent).toBe(30);
   });
 
   it('returns valid ISO timestamp', () => {
     const usage = checkUsage(makeConfig());
     expect(usage.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('returns safe default when status is non-zero', () => {
+    mockedSpawnSync.mockReturnValueOnce({ status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    const usage = checkUsage(makeConfig());
+    expect(usage.fiveHourPercent).toBe(50);
+    expect(usage.weeklyPercent).toBe(30);
+  });
+
+  it('returns safe default when stdout is empty', () => {
+    mockedSpawnSync.mockReturnValueOnce({ status: 0, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
+    const usage = checkUsage(makeConfig());
+    expect(usage.fiveHourPercent).toBe(50);
+    expect(usage.weeklyPercent).toBe(30);
+  });
+
+  it('parses 5hr and weekly percentages from output', () => {
+    mockedSpawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: '5h: 42.5%\nweekly: 18.0%',
+      stderr: '', pid: 0, output: [], signal: null,
+    } as ReturnType<typeof spawnSync>);
+    const usage = checkUsage(makeConfig());
+    expect(usage.fiveHourPercent).toBeCloseTo(42.5);
+    expect(usage.weeklyPercent).toBeCloseTo(18.0);
+  });
+
+  it('falls back to safe defaults for unmatched fields', () => {
+    mockedSpawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: 'some output without usage numbers',
+      stderr: '', pid: 0, output: [], signal: null,
+    } as ReturnType<typeof spawnSync>);
+    const usage = checkUsage(makeConfig());
+    expect(usage.fiveHourPercent).toBe(50);
+    expect(usage.weeklyPercent).toBe(30);
   });
 });
 
@@ -444,6 +481,37 @@ describe('buildWorkerPrompt', () => {
     const prompt = buildWorkerPrompt(task);
     expect(prompt).not.toContain("'");
   });
+
+  it('includes test writing instruction for every function', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('*.test.ts');
+  });
+
+  it('includes vitest run instruction', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('npx vitest run');
+  });
+
+  it('includes coverage goal of 80%', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('80%');
+  });
+
+  it('includes test file placement instruction (same directory, .test.ts)', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('.test.ts extension');
+  });
+
+  it('marks result file as REQUIRED', () => {
+    const task = makeTask({ id: '003-007' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('REQUIRED');
+    expect(prompt).toContain('.tasks/task-003-007.result');
+  });
 });
 
 describe('planSprint', () => {
@@ -561,32 +629,32 @@ describe('spawnWorkers', () => {
 });
 
 describe('waitForResults', () => {
-  it('returns immediately when all results exist', () => {
+  it('returns immediately when all results exist', async () => {
     const sprint = makeSprint();
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
 
-    const results = waitForResults(ROOT, sprint, 1000);
+    const results = await waitForResults(ROOT, sprint, 1000);
     expect(results).toHaveLength(1);
     expect(results[0]?.taskId).toBe('001-001');
   });
 
-  it('returns empty array when no results and timeout=0', () => {
+  it('returns empty array when no results and timeout=0', async () => {
     const sprint = makeSprint();
-    const results = waitForResults(ROOT, sprint, 0);
+    const results = await waitForResults(ROOT, sprint, 0);
     expect(results).toEqual([]);
   });
 
-  it('handles corrupt result files gracefully', () => {
+  it('handles corrupt result files gracefully', async () => {
     const sprint = makeSprint();
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue('NOT JSON');
 
-    const results = waitForResults(ROOT, sprint, 0);
+    const results = await waitForResults(ROOT, sprint, 0);
     expect(results).toEqual([]);
   });
 
-  it('collects results for multiple tasks', () => {
+  it('collects results for multiple tasks', async () => {
     const task2 = makeTask({ id: '001-002' });
     const sprint = makeSprint({ tasks: [makeTask(), task2] });
 
@@ -598,11 +666,11 @@ describe('waitForResults', () => {
       return '';
     });
 
-    const results = waitForResults(ROOT, sprint, 1000);
+    const results = await waitForResults(ROOT, sprint, 1000);
     expect(results).toHaveLength(2);
   });
 
-  it('returns partial results on timeout', () => {
+  it('returns partial results on timeout', async () => {
     const task2 = makeTask({ id: '001-002' });
     const sprint = makeSprint({ tasks: [makeTask(), task2] });
 
@@ -614,18 +682,45 @@ describe('waitForResults', () => {
       throw new Error('not found');
     });
 
-    const results = waitForResults(ROOT, sprint, 0);
+    const results = await waitForResults(ROOT, sprint, 0);
     expect(results).toHaveLength(1);
     expect(results[0]?.taskId).toBe('001-001');
   });
 
-  it('does not include duplicates', () => {
+  it('does not include duplicates', async () => {
     const sprint = makeSprint();
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
 
-    const results = waitForResults(ROOT, sprint, 1000);
+    const results = await waitForResults(ROOT, sprint, 1000);
     expect(results).toHaveLength(1);
+  });
+
+  it('polls until result appears (async behavior)', async () => {
+    vi.useFakeTimers();
+    const sprint = makeSprint();
+    let callCount = 0;
+    // First existsSync call returns false, subsequent return true
+    mockedExistsSync.mockImplementation(() => {
+      callCount++;
+      return callCount > 1;
+    });
+    mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
+
+    const promise = waitForResults(ROOT, sprint, 30_000);
+    // Advance past the first poll interval
+    await vi.advanceTimersByTimeAsync(15_001);
+    vi.useRealTimers();
+    const results = await promise;
+    expect(results).toHaveLength(1);
+    expect(results[0]?.taskId).toBe('001-001');
+  });
+
+  it('returns Promise (is async)', () => {
+    const sprint = makeSprint();
+    const returnValue = waitForResults(ROOT, sprint, 0);
+    expect(returnValue).toBeInstanceOf(Promise);
+    return returnValue; // let vitest await it
   });
 });
 
@@ -1105,7 +1200,7 @@ describe('runSprint', () => {
     mockedReaddirSync.mockReturnValue([] as never);
   }
 
-  it('returns a sprint with COMPLETE status', () => {
+  it('returns a sprint with COMPLETE status', async () => {
     setupFullSprint();
     // Supply a directive so planSprint creates at least one task
     mockedReadFileSync.mockImplementation((path: unknown) => {
@@ -1116,19 +1211,19 @@ describe('runSprint', () => {
       return '';
     });
 
-    const sprint = runSprint(ROOT, config);
+    const sprint = await runSprint(ROOT, config);
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
     expect(sprint.phase).toBe(SprintPhase.COMPLETE);
   });
 
-  it('sets startedAt and completedAt', () => {
+  it('sets startedAt and completedAt', async () => {
     setupFullSprint();
-    const sprint = runSprint(ROOT, config);
+    const sprint = await runSprint(ROOT, config);
     expect(sprint.startedAt).toBeDefined();
     expect(sprint.completedAt).toBeDefined();
   });
 
-  it('throws BrainError on PLAN phase failure', () => {
+  it('throws BrainError on PLAN phase failure', async () => {
     mockedReadFileSync.mockImplementation(() => { throw new Error('disk fail'); });
     mockedSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'err', pid: 1, signal: null, output: [] } as never);
 
@@ -1138,21 +1233,21 @@ describe('runSprint', () => {
     }]);
     mockedReadFileSync.mockReturnValue('Build X'); // DIRECTIVES content
 
-    expect(() => runSprint(ROOT, config)).toThrow(BrainError);
+    await expect(runSprint(ROOT, config)).rejects.toThrow(BrainError);
   });
 
-  it('handles EVALUATE phase with partial results', () => {
+  it('handles EVALUATE phase with partial results', async () => {
     setupFullSprint();
     // No results for the task (simulating timeout)
     mockedExistsSync.mockImplementation((path: unknown) => {
       return !String(path).includes('.result');
     });
 
-    const sprint = runSprint(ROOT, config);
+    const sprint = await runSprint(ROOT, config);
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
   });
 
-  it('skips FIX phase when all tasks are DONE', () => {
+  it('skips FIX phase when all tasks are DONE', async () => {
     setupFullSprint();
     mockedReadFileSync.mockImplementation((path: unknown) => {
       const p = String(path);
@@ -1161,11 +1256,11 @@ describe('runSprint', () => {
       return '';
     });
 
-    const sprint = runSprint(ROOT, config);
+    const sprint = await runSprint(ROOT, config);
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
   });
 
-  it('recovers from RETRO/DECAY errors', () => {
+  it('recovers from RETRO/DECAY errors', async () => {
     setupFullSprint();
     // Make writeFileSync throw only for RETRO
     let callCount = 0;
@@ -1174,8 +1269,113 @@ describe('runSprint', () => {
       if (callCount > 5) throw new Error('write fail');
     });
 
-    const sprint = runSprint(ROOT, config);
+    const sprint = await runSprint(ROOT, config);
     // Should still complete despite RETRO errors
     expect(sprint.status).toBe(SprintStatus.COMPLETE);
+  });
+
+  it('passes autoApprove opts to spawnWorkers', async () => {
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('DIRECTIVES')) return 'Build X';
+      if (p.includes('.result')) return JSON.stringify(makeResult());
+      return '';
+    });
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([] as never);
+    mockedSpawnSync.mockReturnValue(spawnOk);
+
+    await runSprint(ROOT, config, { autoApprove: true });
+    // spawnWorker should have been called with autoApprove: true
+    const calls = mockedSpawnWorker.mock.calls;
+    if (calls.length > 0) {
+      const opts = calls[0]?.[4] as { autoApprove?: boolean } | undefined;
+      expect(opts?.autoApprove).toBe(true);
+    }
+  });
+});
+
+describe('parseStructuredDirectives', () => {
+  it('returns empty array when no structured sections', () => {
+    const result = parseStructuredDirectives('Task A\nTask B\n');
+    expect(result).toEqual([]);
+  });
+
+  it('parses Görev sections into tasks', () => {
+    const content = [
+      '# Header',
+      '## Görev 1: Fix auth',
+      '- Fix the authentication module',
+      '- Kapsam: src/auth/auth.ts',
+      '',
+      '## Görev 2: Add tests',
+      '- Write integration tests',
+      '- Kapsam: tests/auth/',
+    ].join('\n');
+
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0]?.title).toContain('Fix');
+    expect(tasks[1]?.title).toContain('Add tests');
+  });
+
+  it('extracts scope from Kapsam lines', () => {
+    const content = [
+      '## Görev 1: Fix brain',
+      '- Fix the brain module',
+      '- Kapsam: src/orchestra/brain.ts',
+    ].join('\n');
+
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0]?.scope.filesWrite).toContain('src/orchestra/brain.ts');
+  });
+
+  it('extracts directory scope from matching lines', () => {
+    const content = [
+      '## Görev 1: Add utils',
+      '- Add utilities',
+      '- Kapsam: src/utils/',
+    ].join('\n');
+
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0]?.scope.directories).toContain('src/utils/');
+  });
+
+  it('falls back gracefully when sections have no valid title', () => {
+    const content = '## Görev 1: \n\n## Görev 2: Build X\n- Do it';
+    const tasks = parseStructuredDirectives(content);
+    // sections with empty title are skipped
+    const withTitle = tasks.filter(t => t.title.length > 0);
+    expect(withTitle).toHaveLength(1);
+  });
+});
+
+describe('spawnWorkers — autoApprove flag (DEBT-005)', () => {
+  const config = makeConfig();
+  const sprint = makeSprint();
+
+  it('passes autoApprove: false by default (not haiku_allowed)', () => {
+    const haikuConfig = makeConfig({
+      activeModeConfig: { ...makeConfig().activeModeConfig, haiku_allowed: true },
+    });
+    spawnWorkers(ROOT, sprint, haikuConfig);
+    const call = mockedSpawnWorker.mock.calls[0];
+    const opts = call?.[4] as { autoApprove?: boolean } | undefined;
+    // haiku_allowed should NOT propagate to autoApprove
+    expect(opts?.autoApprove).toBe(false);
+  });
+
+  it('passes autoApprove: true when spawnOpts.autoApprove is true', () => {
+    spawnWorkers(ROOT, sprint, config, { autoApprove: true });
+    const call = mockedSpawnWorker.mock.calls[0];
+    const opts = call?.[4] as { autoApprove?: boolean } | undefined;
+    expect(opts?.autoApprove).toBe(true);
+  });
+
+  it('passes autoApprove: false when spawnOpts.autoApprove is false', () => {
+    spawnWorkers(ROOT, sprint, config, { autoApprove: false });
+    const call = mockedSpawnWorker.mock.calls[0];
+    const opts = call?.[4] as { autoApprove?: boolean } | undefined;
+    expect(opts?.autoApprove).toBe(false);
   });
 });

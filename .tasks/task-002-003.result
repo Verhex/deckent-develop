@@ -1,0 +1,14 @@
+{
+  "taskId": "002-003",
+  "filesChanged": [
+    "tests/cli/helpers.test.ts",
+    "tests/cli/commands.test.ts",
+    "tests/orchestra/brain.test.ts"
+  ],
+  "linesAdded": 185,
+  "linesRemoved": 8,
+  "testsPassed": true,
+  "coverage": 88,
+  "selfAssessment": "DONE",
+  "notes": "Coverage improved from 84.94% to 88.05% branch coverage overall. Key improvements: prompt.ts 71%→100%, cleanup.ts branch 62%→100%, history.ts branch 69%→100%, output.ts branch 77%→95%. Added 37 new tests: promptText/promptSelect/promptConfirm full coverage, formatDashboard edge cases (updatedAt undefined, long agent ID, unknown status), formatTable with sparse rows, cleanup error paths (malformed JSON, destroy throws, cleanup throws), history parseSprintLog fallback fields. Also fixed two broken tests: checkUsage test updated to match new real-integration behavior (safe defaults 50/30 not 0/0), start --auto-approve test updated to check autoApprove opts instead of haiku_allowed. Test count: 356→393."
+}

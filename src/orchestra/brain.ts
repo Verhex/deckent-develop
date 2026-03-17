@@ -98,8 +98,8 @@ function readJsonSafe<T>(filePath: string): T | null {
   }
 }
 
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function now(): string {
@@ -204,9 +204,25 @@ export function readContext(projectRoot: string): BrainContext {
   return { directives, memory, retro, debt, patterns, decisions, existingTasks, projectState: { gitStatus, fileTree } };
 }
 
-// 2. checkUsage (stub)
+// 2. checkUsage — real integration
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
-  return { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() };
+  const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
+  try {
+    const result = spawnSync('claude', ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000 });
+    if (result.status !== 0 || !result.stdout) return SAFE_DEFAULT;
+
+    const output = result.stdout;
+    const fiveHrMatch = output.match(/5[- ]?h(?:our(?:ly)?)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
+      ?? output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*5[- ]?h/i);
+    const weeklyMatch = output.match(/week(?:ly)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
+      ?? output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*week/i);
+
+    const fiveHourPercent = fiveHrMatch?.[1] ? parseFloat(fiveHrMatch[1]) : SAFE_DEFAULT.fiveHourPercent;
+    const weeklyPercent = weeklyMatch?.[1] ? parseFloat(weeklyMatch[1]) : SAFE_DEFAULT.weeklyPercent;
+    return { fiveHourPercent, weeklyPercent, measuredAt: now() };
+  } catch {
+    return SAFE_DEFAULT;
+  }
 }
 
 // 3. adjustSprintSize (pure)
@@ -286,6 +302,48 @@ export function extractScopeFromDirective(line: string): TaskScope {
   return { directories, filesRead: [], filesWrite };
 }
 
+// 4c. ParsedDirectiveTask
+export interface ParsedDirectiveTask {
+  title: string;
+  description: string;
+  scope: TaskScope;
+}
+
+// 4d. parseStructuredDirectives (pure)
+export function parseStructuredDirectives(content: string): ParsedDirectiveTask[] {
+  // Split on "## Görev N:" or "## Task N:" pattern
+  const blockSplit = content.split(/^##\s+(?:Görev|Task)\s+\d+[^:]*:/m);
+  const blocks = blockSplit.slice(1); // skip content before first heading
+
+  if (blocks.length === 0) return []; // no structured sections → fallback
+
+  const tasks: ParsedDirectiveTask[] = [];
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    // First non-empty line after heading becomes the title
+    const titleLine = lines.find(l => l.trim()) ?? '';
+    const title = titleLine.trim().replace(/^-\s+/, '');
+    if (!title) continue;
+
+    // Collect all scope-related lines (Dosya:, Kapsam:, file paths)
+    const scopeLines = lines.filter(l =>
+      l.includes('Dosya:') || l.includes('Kapsam:') || l.includes('- Kapsam') ||
+      /\bsrc\/|tests\//.test(l),
+    );
+    const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
+      const extracted = extractScopeFromDirective(scopeLine);
+      return {
+        directories: [...acc.directories, ...extracted.directories.filter(d => !acc.directories.includes(d))],
+        filesRead: [],
+        filesWrite: [...acc.filesWrite, ...extracted.filesWrite.filter(f => !acc.filesWrite.includes(f))],
+      };
+    }, { directories: [], filesRead: [], filesWrite: [] });
+
+    tasks.push({ title, description: block.trim(), scope });
+  }
+  return tasks;
+}
+
 // 5. planSprint
 export function planSprint(
   projectRoot: string,
@@ -332,24 +390,29 @@ export function planSprint(
     }, seq++));
   }
 
-  // Directive lines → tasks
-  const directiveLines = context.directives
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('#'))
-    .map(l => l.replace(/^-\s+/, ''));
+  // Directive → tasks: try structured first, fall back to line-based
+  const structuredTasks = parseStructuredDirectives(context.directives);
+  const directiveSources: Array<{ title: string; description: string; scope: TaskScope }> =
+    structuredTasks.length > 0
+      ? structuredTasks
+      : context.directives
+          .split('\n')
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#'))
+          .map(l => l.replace(/^-\s+/, ''))
+          .filter(Boolean)
+          .map(line => ({ title: line, description: line, scope: extractScopeFromDirective(line) }));
 
-  for (const line of directiveLines) {
+  for (const src of directiveSources) {
     if (tasks.length >= recommendation.maxWorkers) break;
-    const scope = extractScopeFromDirective(line);
     tasks.push(createTask({
-      title: line,
-      description: line,
+      title: src.title,
+      description: src.description,
       model: defaultModel,
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'Directive',
-      scope,
+      scope: src.scope,
       dependencies: [],
       goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
       sprintId,
@@ -397,7 +460,11 @@ Scope: ${scopeStr}
 Instructions:
 1. Complete the task described above
 2. Stay within the assigned scope
-3. When finished, create the result file at .tasks/task-${task.id}.result with this exact JSON format:
+3. Write tests for every function you write (*.test.ts)
+4. Place test files in the same directory as the source file, with the same name and .test.ts extension
+5. Run: npx vitest run — then write the test results to the .result file
+6. Coverage goal: minimum 80%
+7. When finished, create the result file at .tasks/task-${task.id}.result — this file is REQUIRED (JSON format):
 
 {
   "taskId": "${task.id}",
@@ -411,11 +478,16 @@ Instructions:
 }
 
 selfAssessment must be one of: "DONE", "GO_WITH_TECH_DEBT", "NO_GO"
-The result file is REQUIRED — without it your work cannot be evaluated.`.replace(/'/g, '');
+The result file at .tasks/task-${task.id}.result is REQUIRED — without it your work cannot be evaluated.`.replace(/'/g, '');
 }
 
 // 6. spawnWorkers
-export function spawnWorkers(projectRoot: string, sprint: Sprint, config: ResolvedConfig): void {
+export function spawnWorkers(
+  projectRoot: string,
+  sprint: Sprint,
+  _config: ResolvedConfig,
+  spawnOpts?: { autoApprove?: boolean },
+): void {
   ensureSession();
   startAuditor(projectRoot, { allowedTools: 'Read,Bash' });
 
@@ -429,7 +501,7 @@ export function spawnWorkers(projectRoot: string, sprint: Sprint, config: Resolv
 
     spawnWorker(task.id, model, prompt, projectRoot, {
       allowedTools,
-      autoApprove: config.activeModeConfig.haiku_allowed,
+      autoApprove: spawnOpts?.autoApprove ?? false,
     });
   }
 
@@ -455,7 +527,7 @@ export function spawnWorkers(projectRoot: string, sprint: Sprint, config: Resolv
 }
 
 // 7. waitForResults
-export function waitForResults(projectRoot: string, sprint: Sprint, timeoutMs?: number): TaskResult[] {
+export async function waitForResults(projectRoot: string, sprint: Sprint, timeoutMs?: number): Promise<TaskResult[]> {
   const timeout = timeoutMs ?? 30 * 60 * 1000;
   const pollInterval = 15_000;
   const startTime = Date.now();
@@ -483,7 +555,8 @@ export function waitForResults(projectRoot: string, sprint: Sprint, timeoutMs?: 
 
   // Poll loop
   while (Date.now() - startTime < timeout) {
-    sleepSync(pollInterval);
+    const remaining = timeout - (Date.now() - startTime);
+    await sleep(Math.min(pollInterval, remaining));
     collectResults();
     if (collected.size === taskIds.size) break;
   }
@@ -865,8 +938,17 @@ export function cleanup(projectRoot: string, sprint: Sprint): void {
   }
 }
 
+// ─── RunSprintOptions ─────────────────────────────────────────────
+export interface RunSprintOptions {
+  autoApprove?: boolean;
+}
+
 // 17. runSprint — Master Orchestrator
-export function runSprint(projectRoot: string, config: ResolvedConfig): Sprint {
+export async function runSprint(
+  projectRoot: string,
+  config: ResolvedConfig,
+  opts?: RunSprintOptions,
+): Promise<Sprint> {
   let sprint: Sprint;
   let evaluations = new Map<string, TaskEvaluation>();
   let results: TaskResult[] = [];
@@ -891,7 +973,7 @@ export function runSprint(projectRoot: string, config: ResolvedConfig): Sprint {
   while (spawnAttempts < 2) {
     try {
       sprint.phase = SprintPhase.SPAWN;
-      spawnWorkers(projectRoot, sprint, config);
+      spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove });
       sprint.status = SprintStatus.ACTIVE;
       break;
     } catch (err) {
@@ -910,7 +992,7 @@ export function runSprint(projectRoot: string, config: ResolvedConfig): Sprint {
   // Phase 3: EXECUTE
   try {
     sprint.phase = SprintPhase.EXECUTE;
-    results = waitForResults(projectRoot, sprint);
+    results = await waitForResults(projectRoot, sprint);
   } catch { /* use empty results */ }
 
   // Phase 4: EVALUATE
@@ -961,8 +1043,8 @@ export function runSprint(projectRoot: string, config: ResolvedConfig): Sprint {
 
     if (fixTasks.length > 0) {
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
-      spawnWorkers(projectRoot, fixSprint, config);
-      const fixResults = waitForResults(projectRoot, fixSprint, 10 * 60 * 1000);
+      spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove });
+      const fixResults = await waitForResults(projectRoot, fixSprint, 10 * 60 * 1000);
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
