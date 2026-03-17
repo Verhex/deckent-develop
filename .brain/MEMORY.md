@@ -55,3 +55,6 @@
 - Status `--watch`: `setInterval(2000)` ile ekran temizle + tekrar render, `--json` raw JSON çıktı
 - Barrel `index.ts` dosyaları vitest coverage exclude'da — sadece re-export, coverage'ı düşürüyor
 ## Sprint sprint-005 Learnings
+## Sprint sprint-006 Learnings
+- CONTRIBUTING.md Oluştur: GO_WITH_TECH_DEBT
+- docs/API.md Oluştur: GO_WITH_TECH_DEBT

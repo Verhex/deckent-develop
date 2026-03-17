@@ -1,0 +1,10 @@
+{
+  "taskId": "006-001",
+  "filesChanged": ["CONTRIBUTING.md"],
+  "linesAdded": 247,
+  "linesRemoved": 77,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Rewrote CONTRIBUTING.md with comprehensive sections: dev setup, project structure (all 6 modules), TypeScript/ESM code standards, vitest testing guide with mock patterns, branch strategy, commit format, PR checklist, and sprint contribution guide (DIRECTIVES.md format, wave plan, task result files). No source code changed; all 669 tests pass."
+}

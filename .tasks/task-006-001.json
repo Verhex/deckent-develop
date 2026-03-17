@@ -1,0 +1,26 @@
+{
+  "id": "006-001",
+  "title": "CONTRIBUTING.md Oluştur",
+  "description": "CONTRIBUTING.md Oluştur\n- Proje kök dizininde CONTRIBUTING.md oluştur\n- İçerik: Geliştirme ortamı kurulumu (Node 18+, npm install, npm run build, npm test)\n- Kod stili kuralları: TypeScript strict, ESM, Node16 module resolution\n- Branch stratejisi ve commit mesajı formatı\n- Test yazma rehberi: vitest, mock pattern'leri, coverage hedefi (%95+)\n- PR süreci: testlerin geçmesi, tsc --noEmit clean, review\n- Proje yapısı: src/core, src/orchestra, src/agents, src/monitor, src/cli, src/mcp açıklamaları\n- Sprint katkısı: DIRECTIVES.md formatı, wave planı\n- Markdown formatında, İngilizce\n- Dosya: src/, tests/, package.json, tsconfig.json, vitest.config.ts referans al",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [],
+    "filesRead": [],
+    "filesWrite": [
+      "vitest.config.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-006",
+  "createdAt": "2026-03-17T08:54:04.366Z",
+  "updatedAt": "2026-03-17T09:00:10.497Z"
+}

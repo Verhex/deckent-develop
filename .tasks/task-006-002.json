@@ -1,0 +1,37 @@
+{
+  "id": "006-002",
+  "title": "docs/API.md Oluştur",
+  "description": "docs/API.md Oluştur\n- docs/ dizini yoksa oluştur, docs/API.md yaz\n- İçerik: Deckent'in programatik API referansı\n- Core exports: types (Task, Sprint, DashboardState, DoctorResult, DebtItem, ResolvedConfig, PlanMode), constants, config (loadConfig, validatePartialConfig)\n- Orchestra exports: brain fonksiyonları (readContext, checkUsage, adjustSprintSize, planSprint, runSprint, evaluateResult, runDecay, cleanup), tmux fonksiyonları\n- Agent exports: worker fonksiyonları (readTask, claimTask, acquireLock, releaseLock, writeResult, updateTaskStatus, isWithinScope)\n- Monitor exports: auditor fonksiyonları (scanHeartbeats, checkBoundaryViolations, updateDashboard, detectPatterns)\n- MCP: server (createServer), 8 tool, 4 resource listesi\n- CLI: 17 komut listesi ve açıklamaları\n- Her fonksiyon için imza, parametre açıklaması ve kısa kullanım örneği\n- Markdown formatında, İngilizce\n- Dosya: src/index.ts, src/core/index.ts, src/orchestra/index.ts, src/agents/index.ts, src/monitor/index.ts, src/mcp/server.ts referans al\n\n## Kalite Kuralları\n- Mevcut testler regresyona uğramamalı (669 test)\n- Yeni dosya oluştur, mevcut kodu DEĞİŞTİRME\n- tsc --noEmit clean kalmalı",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/orchestra/",
+      "src/agents/",
+      "src/monitor/",
+      "src/mcp/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/index.ts",
+      "src/core/index.ts",
+      "src/orchestra/index.ts",
+      "src/agents/index.ts",
+      "src/monitor/index.ts",
+      "src/mcp/server.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-006",
+  "createdAt": "2026-03-17T08:54:04.366Z",
+  "updatedAt": "2026-03-17T09:00:10.497Z"
+}
