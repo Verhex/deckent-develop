@@ -82,7 +82,8 @@ export function buildPlanPrompt(
   return `Sen bir yazılım proje orkestratörüsün. Verilen directive'leri analiz et ve yapılandırılmış görev planı oluştur.
 
 KURALLAR:
-- Maksimum ${recommendation.maxWorkers} görev oluştur
+- Directive'deki TÜM görevleri task JSON olarak planla — görev sayısını sınırlama
+- max_workers (${recommendation.maxWorkers}) sadece eş zamanlı çalışma limitidir, görev sayısını etkilemez
 - Her görev bağımsız çalışabilmeli (paralel execution)
 - Bağımlılık varsa dependencies array'inde belirt
 - Her görev için scope (directories + filesWrite) belirle

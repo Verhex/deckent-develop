@@ -4,8 +4,11 @@ import {
   getDefaultModes,
   loadConfig,
   validatePartialConfig,
+  validateConfig,
+  resolveEffectiveWorkers,
   ConfigValidationError,
 } from '../../src/core/config.js';
+import type { SystemProfile } from '../../src/core/types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
 
 // Mock fs modules
@@ -221,11 +224,24 @@ describe('validatePartialConfig', () => {
     ).toThrow(ConfigValidationError);
   });
 
-  it('rejects max_workers=100', () => {
+  it('accepts max_workers=100 (warn only, not error)', () => {
     expect(() =>
       validatePartialConfig({
         modes: {
           max_plan: { ...getDefaultModes().max_plan, max_workers: 100 },
+          max5x_plan: getDefaultModes().max5x_plan,
+          pro_plan: getDefaultModes().pro_plan,
+          api: getDefaultModes().api,
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects max_workers=101 (exceeds 100 limit)', () => {
+    expect(() =>
+      validatePartialConfig({
+        modes: {
+          max_plan: { ...getDefaultModes().max_plan, max_workers: 101 },
           max5x_plan: getDefaultModes().max5x_plan,
           pro_plan: getDefaultModes().pro_plan,
           api: getDefaultModes().api,
@@ -261,5 +277,130 @@ describe('validatePartialConfig', () => {
         },
       }),
     ).toThrow(ConfigValidationError);
+  });
+
+  it('accepts max_workers="auto"', () => {
+    expect(() =>
+      validatePartialConfig({
+        modes: {
+          max_plan: { ...getDefaultModes().max_plan, max_workers: 'auto' },
+          max5x_plan: getDefaultModes().max5x_plan,
+          pro_plan: getDefaultModes().pro_plan,
+          api: getDefaultModes().api,
+        },
+      }),
+    ).not.toThrow();
+  });
+});
+
+// ─── Helper: build a minimal ResolvedConfig ──────────────────────────
+function makeResolvedConfig(maxWorkers: number | 'auto') {
+  const modes = getDefaultModes();
+  const activeModeConfig = { ...modes.max_plan, max_workers: maxWorkers };
+  return {
+    mode: 'max_plan' as const,
+    activeModeConfig,
+    modes: { ...modes, max_plan: activeModeConfig },
+    language: 'en',
+    projectName: 'test',
+    projectRoot: '/test',
+    version: '0.0.0',
+  };
+}
+
+function makeSystemProfile(freeMemMB: number, cpuCores: number): SystemProfile {
+  return {
+    cpuCores,
+    totalMemMB: freeMemMB * 2,
+    freeMemMB,
+    recommendedMaxWorkers: Math.max(1, Math.min(Math.floor(freeMemMB / 400), cpuCores - 1, 30)),
+  };
+}
+
+describe('resolveEffectiveWorkers', () => {
+  it('returns configured number when max_workers is numeric', () => {
+    const config = makeResolvedConfig(6);
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(6);
+  });
+
+  it('auto mode + 16GB RAM + 8 cores → ~7 workers', () => {
+    const config = makeResolvedConfig('auto');
+    // recommendedMaxWorkers = max(1, min(floor(16384/400), 8-1, 30)) = min(40, 7, 30) = 7
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(7);
+  });
+
+  it('auto mode + low RAM (1600MB) + 8 cores → 4 workers', () => {
+    const config = makeResolvedConfig('auto');
+    // recommendedMaxWorkers = max(1, min(floor(1600/400), 7, 30)) = min(4, 7, 30) = 4
+    const profile = makeSystemProfile(1600, 8);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(4);
+  });
+
+  it('auto mode + very low RAM (400MB) + 4 cores → 1 worker', () => {
+    const config = makeResolvedConfig('auto');
+    // recommendedMaxWorkers = max(1, min(1, 3, 30)) = 1
+    const profile = makeSystemProfile(400, 4);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(1);
+  });
+
+  it('auto mode respects planLimit when provided', () => {
+    const config = makeResolvedConfig('auto');
+    // recommendedMaxWorkers = 7, planLimit = 3 → min(7, 3) = 3
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile, 3)).toBe(3);
+  });
+
+  it('auto mode planLimit higher than recommended → use recommended', () => {
+    const config = makeResolvedConfig('auto');
+    // recommendedMaxWorkers = 7, planLimit = 20 → min(7, 20) = 7
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile, 20)).toBe(7);
+  });
+
+  it('numeric mode ignores systemProfile', () => {
+    const config = makeResolvedConfig(50);
+    const profile = makeSystemProfile(400, 2); // very low resources
+    expect(resolveEffectiveWorkers(config, profile)).toBe(50);
+  });
+
+  it('numeric mode ignores planLimit', () => {
+    const config = makeResolvedConfig(10);
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile, 2)).toBe(10);
+  });
+});
+
+describe('validateConfig — max_workers warnings', () => {
+  it('max_workers=50 returns warning (not error)', () => {
+    const config = getDefaultConfig();
+    config.modes.max_plan.max_workers = 50;
+    const warnings = validateConfig(config);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain('50');
+    expect(warnings[0]).toContain('>=20');
+  });
+
+  it('max_workers=19 returns no warning', () => {
+    const config = getDefaultConfig();
+    config.modes.max_plan.max_workers = 19;
+    const warnings = validateConfig(config);
+    const maxWorkerWarnings = warnings.filter(w => w.includes('max_workers'));
+    expect(maxWorkerWarnings).toHaveLength(0);
+  });
+
+  it('max_workers=101 throws ConfigValidationError', () => {
+    const config = getDefaultConfig();
+    config.modes.max_plan.max_workers = 101;
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+  });
+
+  it('max_workers="auto" returns no warning', () => {
+    const config = getDefaultConfig();
+    config.modes.max_plan.max_workers = 'auto';
+    const warnings = validateConfig(config);
+    const autoWarnings = warnings.filter(w => w.includes('max_workers'));
+    expect(autoWarnings).toHaveLength(0);
   });
 });

@@ -73,9 +73,17 @@ describe('buildPlanPrompt', () => {
     expect(prompt).toContain('my-app');
   });
 
-  it('includes maxWorkers constraint', () => {
+  it('includes maxWorkers as concurrent execution limit (not task count cap)', () => {
     const prompt = buildPlanPrompt(makeContext(), makeRecommendation({ maxWorkers: 3 }), 'test');
+    // maxWorkers value is in the prompt as execution limit, not task cap
     expect(prompt).toContain('3');
+    // The prompt must NOT tell AI to limit task count to maxWorkers
+    expect(prompt).not.toMatch(/Maksimum\s+\d+\s+görev oluştur/);
+  });
+
+  it('instructs AI to plan ALL directive tasks without count limit', () => {
+    const prompt = buildPlanPrompt(makeContext(), makeRecommendation({ maxWorkers: 5 }), 'test');
+    expect(prompt).toContain('TÜM görevleri');
   });
 
   it('includes JSON format instruction', () => {

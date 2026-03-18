@@ -11,7 +11,7 @@ import type {
   Task, TaskResult, TaskScope, GoNoGoCriteria, Sprint, SprintMetrics,
   DebtItem, ModelType, TaskEffort, TaskPriority,
   UsageMetrics, AgentInfo, ResolvedConfig, PatternEntry, DecayResult,
-  BrainContext, SprintSizeRecommendation,
+  BrainContext, SprintSizeRecommendation, SystemProfile,
   BrainPlanningMode, PlannerResult, PlannerTask,
 } from '../core/types.js';
 export type { BrainContext, ProjectState, SprintSizeRecommendation } from '../core/types.js';
@@ -27,6 +27,12 @@ import {
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { countBrainLines, getNextSprintId, parseDebtTable, generateDebtTable, updateLastSprintId } from '../core/utils.js';
+
+// ─── Core — config ────────────────────────────────────────────────
+import { resolveEffectiveWorkers } from '../core/config.js';
+
+// ─── Core — system profile ────────────────────────────────────────
+import { getSystemProfile } from '../core/system-profile.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner } from './planner.js';
@@ -156,10 +162,13 @@ export function checkUsage(_config: ResolvedConfig): UsageMetrics {
 }
 
 // 3. adjustSprintSize (pure)
-export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics): SprintSizeRecommendation {
+export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics, systemProfile?: SystemProfile): SprintSizeRecommendation {
   const thresholds = config.activeModeConfig.usage_thresholds;
   const fiveHrExceeded = usage.fiveHourPercent / 100 >= thresholds['5hr'];
   const weeklyExceeded = usage.weeklyPercent / 100 >= thresholds.weekly;
+
+  // Resolve numeric max_workers (handles 'auto')
+  const baseMaxWorkers = resolveMaxWorkersNumeric(config, systemProfile);
 
   if (fiveHrExceeded && weeklyExceeded) {
     return {
@@ -172,17 +181,27 @@ export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics): S
   if (fiveHrExceeded || weeklyExceeded) {
     return {
       size: 'reduced',
-      maxWorkers: Math.max(1, Math.floor(config.activeModeConfig.max_workers / 2)),
+      maxWorkers: Math.max(1, Math.floor(baseMaxWorkers / 2)),
       modelConstraint: 'sonnet',
       reason: `${fiveHrExceeded ? '5hr' : 'Weekly'} usage threshold exceeded`,
     };
   }
   return {
     size: 'full',
-    maxWorkers: config.activeModeConfig.max_workers,
+    maxWorkers: baseMaxWorkers,
     modelConstraint: null,
     reason: 'No usage constraints',
   };
+}
+
+// Helper: resolve max_workers to a number, handling 'auto'
+function resolveMaxWorkersNumeric(config: ResolvedConfig, systemProfile?: SystemProfile): number {
+  const maxWorkers = config.activeModeConfig.max_workers;
+  if (maxWorkers === 'auto') {
+    const profile = systemProfile ?? getSystemProfile();
+    return profile.recommendedMaxWorkers;
+  }
+  return maxWorkers;
 }
 
 // 4. createTask (pure)
@@ -239,6 +258,56 @@ export function inferModelFromDirective(title: string, description: string, scop
   if (score >= 4) return 'opus';
   if (score <= -1) return 'haiku';
   return 'sonnet';
+}
+
+// 4c2. resolveTaskModel — layered model selection (top-level selector)
+// Layer order (highest priority first):
+//   1. Plan access filter: pro_plan → no opus; haiku_allowed=false → no haiku
+//   2. Usage pressure: 80%+ → downgrade opus to sonnet
+//   3. Task type filter: docs/test-only scope → max sonnet
+//   4. Score system: inferModelFromDirective as base
+export function resolveTaskModel(
+  title: string,
+  description: string,
+  scope: TaskScope,
+  config: ResolvedConfig,
+  usage: UsageMetrics,
+): ModelType {
+  // Layer 4: base model from score system
+  let model: ModelType = inferModelFromDirective(title, description, scope);
+
+  // Layer 3: task type filter — docs or test-only → cap at sonnet
+  const isDocScope = scope.directories.length > 0 && scope.directories.every(d =>
+    d === 'docs' || d.startsWith('docs/') ||
+    d === 'tmp-test' || d.startsWith('tmp-test/') ||
+    d === 'scripts' || d.startsWith('scripts/'),
+  );
+  const isTestOnly = scope.filesWrite.length > 0 &&
+    scope.filesWrite.every(f => f.includes('.test.') || f.includes('.spec.'));
+
+  if (isDocScope || isTestOnly) {
+    if (model === 'opus') model = 'sonnet';
+  }
+
+  // Layer 2: usage pressure — 80%+ → downgrade opus to sonnet
+  const usageHigh = usage.fiveHourPercent >= 80 || usage.weeklyPercent >= 80;
+  if (usageHigh && model === 'opus') {
+    model = 'sonnet';
+  }
+
+  // Layer 1: plan access filter (highest priority)
+  const mode = config.mode;
+  const isProPlan = mode === 'pro_plan';
+  if (isProPlan && model === 'opus') {
+    model = 'sonnet';
+  }
+
+  const haikuAllowed = config.activeModeConfig.haiku_allowed;
+  if (!haikuAllowed && model === 'haiku') {
+    model = 'sonnet';
+  }
+
+  return model;
 }
 
 // 4c1. calculateModelScore — score-based heuristic for model selection
@@ -368,13 +437,14 @@ export function planSprint(
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
-  options?: { mode?: BrainPlanningMode; asDraft?: boolean },
+  options?: { mode?: BrainPlanningMode; asDraft?: boolean; usage?: UsageMetrics },
 ): Sprint {
   // Determine sprint number
   const sprintId = getNextSprintId(projectRoot);
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
   const planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
+  const usageForModel: UsageMetrics = options?.usage ?? { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() };
 
   const tasks: Task[] = [];
   let seq = 1;
@@ -440,14 +510,15 @@ export function planSprint(
             .map(line => ({ title: line, description: line, scope: extractScopeFromDirective(line) }));
 
     for (const src of directiveSources) {
-      const inferredModel = inferModelFromDirective(src.title, src.description, src.scope);
+      const resolvedModel = recommendation.modelConstraint ??
+        resolveTaskModel(src.title, src.description, src.scope, config, usageForModel);
       tasks.push(createTask({
         title: src.title,
         description: src.description,
-        model: recommendation.modelConstraint ?? inferredModel,
+        model: resolvedModel,
         effort: 'normal',
         priority: 'NORMAL',
-        reason: `Directive (model: ${inferredModel} — inferred from scope/complexity)`,
+        reason: `Directive (model: ${resolvedModel} — resolved from scope/complexity/plan/usage)`,
         scope: src.scope,
         dependencies: [],
         goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
@@ -566,7 +637,8 @@ export function spawnWorkers(
 ): Task[] {
   ensureSession();
 
-  const maxWorkers = config.activeModeConfig.max_workers;
+  const systemProfile = getSystemProfile();
+  const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
   const activeTasks = sprint.tasks.slice(0, maxWorkers);
   const queuedTasks = sprint.tasks.slice(maxWorkers);
 
@@ -679,11 +751,23 @@ export async function waitForResults(
 
 // 8. evaluateResult (pure)
 
-/** Returns true if all scope directories are under docs/ (doc-only task) */
+/** Source code directory prefixes — anything outside these is treated as a doc task */
+const SOURCE_CODE_PREFIXES = ['src/', 'src\\', 'tests/', 'tests\\', 'lib/', 'lib\\'];
+
+function isSourceCodeDir(dir: string): boolean {
+  const normalized = dir === 'src' || dir === 'tests' || dir === 'lib';
+  return normalized || SOURCE_CODE_PREFIXES.some(p => dir.startsWith(p));
+}
+
+/**
+ * Returns true if the task is doc-only (no source code directories).
+ * Source code scopes: src/, tests/, lib/ — everything else is a doc task.
+ * Mixed scope (e.g. docs/ + src/) → false (normal evaluation applies).
+ */
 export function isDocTask(task: Task): boolean {
   const dirs = task.scope?.directories ?? [];
   if (dirs.length === 0) return false;
-  return dirs.every(d => d === 'docs' || d.startsWith('docs/') || d.startsWith('docs\\'));
+  return dirs.every(d => !isSourceCodeDir(d));
 }
 
 export function evaluateResult(result: TaskResult, task: Task): TaskEvaluation {
@@ -1244,6 +1328,9 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
 export interface RunSprintOptions {
   autoApprove?: boolean;
   sandboxMode?: boolean;
+  testMode?: boolean;
+  skipCleanup?: boolean;
+  timeoutMs?: number;
 }
 
 // 17. runSprint — Master Orchestrator
@@ -1419,69 +1506,84 @@ export async function runSprint(
     } catch { /* dashboard write failed — continue */ }
   }
 
-  // Phase 6: RETRO
-  try {
-    sprint.status = SprintStatus.RETROSPECTIVE;
-    sprint.phase = SprintPhase.RETRO;
-    const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
-    metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
-    sprint.metrics = metrics;
-    writeRetrospective(projectRoot, sprint, evaluations, metrics);
-    writeSprintLog(projectRoot, sprint, metrics, evaluations);
-    try { updateProjectDocs(projectRoot, { sprint, evaluations, metrics }); } catch { /* non-critical */ }
-  } catch (err) {
+  // Phase 6: RETRO (skipped in testMode)
+  if (!opts?.testMode) {
     try {
-      updateDashboard(projectRoot, {
-        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
-        agents: [],
-        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
-        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
-        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
-        updatedAt: new Date().toISOString(),
-      });
-    } catch { /* dashboard write failed — continue */ }
+      sprint.status = SprintStatus.RETROSPECTIVE;
+      sprint.phase = SprintPhase.RETRO;
+      const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
+      metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
+      sprint.metrics = metrics;
+      writeRetrospective(projectRoot, sprint, evaluations, metrics);
+      writeSprintLog(projectRoot, sprint, metrics, evaluations);
+      try { updateProjectDocs(projectRoot, { sprint, evaluations, metrics }); } catch { /* non-critical */ }
+    } catch (err) {
+      try {
+        updateDashboard(projectRoot, {
+          sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+          agents: [],
+          progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+          usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+          alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+          updatedAt: new Date().toISOString(),
+        });
+      } catch { /* dashboard write failed — continue */ }
+    }
+  } else {
+    // In testMode, still calculate metrics but skip writing retro/log/docs
+    try {
+      const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
+      metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
+      sprint.metrics = metrics;
+    } catch { /* metrics calculation failed in test mode — non-fatal */ }
   }
 
-  // Phase 7: DECAY
-  try {
-    sprint.phase = SprintPhase.DECAY;
-    runDecay(projectRoot, sprint.id);
-  } catch (err) {
+  // Phase 7: DECAY (skipped in testMode)
+  if (!opts?.testMode) {
     try {
-      updateDashboard(projectRoot, {
-        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
-        agents: [],
-        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
-        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
-        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
-        updatedAt: new Date().toISOString(),
-      });
-    } catch { /* dashboard write failed — continue */ }
+      sprint.phase = SprintPhase.DECAY;
+      runDecay(projectRoot, sprint.id);
+    } catch (err) {
+      try {
+        updateDashboard(projectRoot, {
+          sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+          agents: [],
+          progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+          usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+          alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+          updatedAt: new Date().toISOString(),
+        });
+      } catch { /* dashboard write failed — continue */ }
+    }
   }
 
-  // Phase 8: CLEANUP
+  // Phase 8: CLEANUP (skipped when skipCleanup is true)
   if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-  try {
-    cleanup(projectRoot, sprint);
-  } catch (err) {
+  if (!opts?.skipCleanup) {
     try {
-      updateDashboard(projectRoot, {
-        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
-        agents: [],
-        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
-        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
-        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
-        updatedAt: new Date().toISOString(),
-      });
-    } catch { /* dashboard write failed — continue */ }
+      cleanup(projectRoot, sprint);
+    } catch (err) {
+      try {
+        updateDashboard(projectRoot, {
+          sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+          agents: [],
+          progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+          usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+          alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+          updatedAt: new Date().toISOString(),
+        });
+      } catch { /* dashboard write failed — continue */ }
+    }
   }
 
   sprint.status = SprintStatus.COMPLETE;
   sprint.phase = SprintPhase.COMPLETE;
   sprint.completedAt = now();
 
-  // Persist sprint ID to config so getNextSprintId never regresses
-  updateLastSprintId(projectRoot, sprint.id);
+  // Persist sprint ID to config so getNextSprintId never regresses (skip in testMode)
+  if (!opts?.testMode) {
+    updateLastSprintId(projectRoot, sprint.id);
+  }
 
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },

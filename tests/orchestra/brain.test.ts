@@ -89,7 +89,7 @@ const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
 import {
   readContext, checkUsage, adjustSprintSize, createTask,
   planSprint, spawnWorkers, waitForResults,
-  evaluateResult, handleEvaluation, handleCrossDependencies,
+  evaluateResult, isDocTask, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runSprint, runDecay,
   BrainError, buildWorkerPrompt, extractScopeFromDirective, parseStructuredDirectives,
@@ -848,6 +848,58 @@ describe('waitForResults', () => {
   });
 });
 
+describe('isDocTask', () => {
+  it('returns true for docs/ scope', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: [] } }))).toBe(true);
+  });
+
+  it('returns true for docs/ subdirectory scope', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['docs/guides/'], filesRead: [], filesWrite: [] } }))).toBe(true);
+  });
+
+  it('returns true for tmp-test/ scope', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['tmp-test/'], filesRead: [], filesWrite: [] } }))).toBe(true);
+  });
+
+  it('returns true for scripts/ scope', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['scripts/'], filesRead: [], filesWrite: [] } }))).toBe(true);
+  });
+
+  it('returns true for root-level (./)', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['./'], filesRead: [], filesWrite: [] } }))).toBe(true);
+  });
+
+  it('returns false for src/ scope', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['src/'], filesRead: [], filesWrite: [] } }))).toBe(false);
+  });
+
+  it('returns false for tests/ scope', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['tests/'], filesRead: [], filesWrite: [] } }))).toBe(false);
+  });
+
+  it('returns false for lib/ scope', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['lib/'], filesRead: [], filesWrite: [] } }))).toBe(false);
+  });
+
+  it('returns false for mixed scope (docs/ + src/)', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['docs/', 'src/'], filesRead: [], filesWrite: [] } }))).toBe(false);
+  });
+
+  it('returns false for mixed scope (scripts/ + tests/)', () => {
+    expect(isDocTask(makeTask({ scope: { directories: ['scripts/', 'tests/'], filesRead: [], filesWrite: [] } }))).toBe(false);
+  });
+
+  it('returns false when directories is empty', () => {
+    expect(isDocTask(makeTask({ scope: { directories: [], filesRead: [], filesWrite: [] } }))).toBe(false);
+  });
+
+  it('returns false when scope is undefined', () => {
+    const task = makeTask();
+    (task as unknown as Record<string, unknown>).scope = undefined;
+    expect(isDocTask(task)).toBe(false);
+  });
+});
+
 describe('evaluateResult', () => {
   const task = makeTask();
 
@@ -875,6 +927,31 @@ describe('evaluateResult', () => {
     evaluateResult(makeResult(), task);
     expect(mockedReadFileSync).not.toHaveBeenCalled();
     expect(mockedWriteFileSync).not.toHaveBeenCalled();
+  });
+
+  it('doc task (docs/ scope) skips coverage check — low coverage returns DONE', () => {
+    const docTask = makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: [] } });
+    expect(evaluateResult(makeResult({ coverage: 0 }), docTask)).toBe(TaskEvaluation.DONE);
+  });
+
+  it('doc task (tmp-test/ scope) skips coverage check — returns DONE', () => {
+    const docTask = makeTask({ scope: { directories: ['tmp-test/'], filesRead: [], filesWrite: [] } });
+    expect(evaluateResult(makeResult({ coverage: 10 }), docTask)).toBe(TaskEvaluation.DONE);
+  });
+
+  it('doc task (scripts/ scope) skips coverage check — returns DONE', () => {
+    const docTask = makeTask({ scope: { directories: ['scripts/'], filesRead: [], filesWrite: [] } });
+    expect(evaluateResult(makeResult({ coverage: 50 }), docTask)).toBe(TaskEvaluation.DONE);
+  });
+
+  it('doc task still returns NO_GO when testsPassed=false', () => {
+    const docTask = makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: [] } });
+    expect(evaluateResult(makeResult({ testsPassed: false }), docTask)).toBe(TaskEvaluation.NO_GO);
+  });
+
+  it('mixed scope (docs/ + src/) uses normal coverage evaluation', () => {
+    const mixedTask = makeTask({ scope: { directories: ['docs/', 'src/'], filesRead: [], filesWrite: [] } });
+    expect(evaluateResult(makeResult({ coverage: 80 }), mixedTask)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 });
 

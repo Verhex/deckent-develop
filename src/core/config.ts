@@ -14,6 +14,7 @@ import type {
   PlanMode,
   PlanModeConfig,
   ResolvedConfig,
+  SystemProfile,
   UsageThresholds,
 } from './types.js';
 
@@ -98,8 +99,9 @@ export function deepMerge<T>(base: T, override: Partial<T>): T {
   return result;
 }
 
-export function validateConfig(config: DeckentConfig): void {
+export function validateConfig(config: DeckentConfig): string[] {
   const errors: string[] = [];
+  const maxWorkersWarnings: string[] = [];
 
   if (!VALID_MODES.includes(config.mode)) {
     errors.push(`Invalid mode "${config.mode}". Must be one of: ${VALID_MODES.join(', ')}`);
@@ -118,8 +120,13 @@ export function validateConfig(config: DeckentConfig): void {
 
     const prefix = `modes.${modeName}`;
 
-    if (typeof mc.max_workers !== 'number' || mc.max_workers < 1 || mc.max_workers > 20) {
-      errors.push(`${prefix}.max_workers must be a number between 1 and 20`);
+    if (mc.max_workers === 'auto') {
+      // 'auto' is valid — resolved at runtime
+    } else if (typeof mc.max_workers !== 'number' || mc.max_workers < 1 || mc.max_workers > 100) {
+      errors.push(`${prefix}.max_workers must be a number between 1 and 100, or 'auto'`);
+    } else if (mc.max_workers >= 20) {
+      // Warning only — collected separately, not as error
+      maxWorkersWarnings.push(`${prefix}.max_workers is ${mc.max_workers} (>=20) — high worker count may cause resource contention`);
     }
 
     if (!(VALID_MODELS as readonly string[]).includes(mc.brain_model)) {
@@ -159,6 +166,28 @@ export function validateConfig(config: DeckentConfig): void {
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }
+
+  return maxWorkersWarnings;
+}
+
+// ─── Worker Resolution ───────────────────────────────────────────────
+
+/**
+ * Resolves the effective number of workers to spawn.
+ * - 'auto': uses systemProfile.recommendedMaxWorkers, capped by an optional plan_limit
+ * - number: returns the configured value directly
+ */
+export function resolveEffectiveWorkers(
+  config: ResolvedConfig,
+  systemProfile: SystemProfile,
+  planLimit?: number,
+): number {
+  const maxWorkers = config.activeModeConfig.max_workers;
+  if (maxWorkers === 'auto') {
+    const recommended = systemProfile.recommendedMaxWorkers;
+    return planLimit !== undefined ? Math.min(recommended, planLimit) : recommended;
+  }
+  return maxWorkers;
 }
 
 // ─── File Reading ────────────────────────────────────────────────────

@@ -266,9 +266,17 @@ export interface UsageThresholds {
   weekly: number;
 }
 
+// ─── System Profile ─────────────────────────────────────────────────
+export interface SystemProfile {
+  cpuCores: number;
+  totalMemMB: number;
+  freeMemMB: number;
+  recommendedMaxWorkers: number;
+}
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
-  max_workers: number;
+  max_workers: number | 'auto';
   brain_model: ModelType;
   default_model: ModelType;
   haiku_allowed: boolean;
@@ -400,6 +408,17 @@ export interface DoctorResult {
     message: string;
     required: boolean;
   }[];
+}
+
+// ─── Subscription ───────────────────────────────────────────────────
+export type SubscriptionDetected = 'max' | 'pro' | 'unknown';
+export type DetectionMethod = 'opus_probe' | 'cli_missing' | 'timeout' | 'error';
+
+export interface SubscriptionProfile {
+  detected: SubscriptionDetected;
+  opusAvailable: boolean;
+  testedAt: string;
+  method: DetectionMethod;
 }
 
 // ─── Project Analysis ──────────────────────────────────────────────

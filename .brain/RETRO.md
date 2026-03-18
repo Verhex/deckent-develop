@@ -1,17 +1,17 @@
-# Sprint sprint-020 Retrospective
+# Sprint sprint-021 Retrospective
 
 ## Metrics
-- Tasks: 8 total, 8 done, 6 debt, 0 no-go
-- Coverage: 25.0%
+- Tasks: 8 total, 8 done, 1 debt, 0 no-go
+- Coverage: 96.4%
 - No-Go Rate: 0.0%
-- Duration: 113257ms
+- Duration: 630718ms
 
 ## Results
-- 020-001: Brain Modülü Fonksiyon Listesi -> DONE
-- 020-002: Auditor Modülü Fonksiyon Listesi -> DONE
-- 020-003: Worker Modülü Fonksiyon Listesi -> GO_WITH_TECH_DEBT
-- 020-004: Config Sistemi Analizi -> GO_WITH_TECH_DEBT
-- 020-005: tmux Modülü Analizi -> GO_WITH_TECH_DEBT
-- 020-006: Planner Modülü Analizi -> GO_WITH_TECH_DEBT
-- 020-007: MCP Tool Listesi ve Açıklamaları -> GO_WITH_TECH_DEBT
-- 020-008: MCP Resource Listesi ve Açıklamaları -> GO_WITH_TECH_DEBT
+- 021-001: planSprint Task Limit Fix (P0 — KRİTİK) -> DONE
+- 021-002: evaluateResult Doc Criteria Genişletme (P1) -> DONE
+- 021-003: system-profile.ts — Sistem Kaynak Taraması -> DONE
+- 021-004: subscription.ts — Claude Plan Tespiti -> GO_WITH_TECH_DEBT
+- 021-005: resolveTaskModel — Katmanlı Model Seçimi -> DONE
+- 021-006: max_workers auto + resolveEffectiveWorkers -> DONE
+- 021-007: deckent test CLI Komutu -> DONE
+- 021-008: deckent run CLI Komutu -> DONE

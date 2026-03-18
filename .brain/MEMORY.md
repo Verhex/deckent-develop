@@ -88,3 +88,5 @@
 - Planner Modülü Analizi: GO_WITH_TECH_DEBT
 - MCP Tool Listesi ve Açıklamaları: GO_WITH_TECH_DEBT
 - MCP Resource Listesi ve Açıklamaları: GO_WITH_TECH_DEBT
+## Sprint sprint-021 Learnings
+- subscription.ts — Claude Plan Tespiti: GO_WITH_TECH_DEBT
