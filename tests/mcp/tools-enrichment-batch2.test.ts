@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ROOT = join(__dirname, '..', '..');
 
 describe('MCP Enrichment Tools Batch 2', () => {
-  const toolsDir = '/home/alperen/deckent-dev/src/mcp/tools';
-  const enricherPath = '/home/alperen/deckent-dev/src/mcp/helpers/enrich.ts';
+  const toolsDir = join(ROOT, 'src/mcp/tools');
+  const enricherPath = join(ROOT, 'src/mcp/helpers/enrich.ts');
 
   describe('Tool imports verification', () => {
     it('doctor.ts should import enrichResponse', () => {
