@@ -25,6 +25,7 @@ import { registerDashboard } from './commands/dashboard.js';
 import { registerServe } from './commands/serve.js';
 import { registerWeb } from './commands/web.js';
 import { registerSync } from './commands/sync.js';
+import { registerWatch } from './commands/watch.js';
 
 const program = new Command()
   .name('deckent')
@@ -53,6 +54,7 @@ registerDashboard(program);
 registerServe(program);
 registerWeb(program);
 registerSync(program);
+registerWatch(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   handleCliError(err);

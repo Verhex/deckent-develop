@@ -4,6 +4,8 @@ import {
   runSprint, readContext, checkUsage, adjustSprintSize, planSprint,
   BrainError,
 } from '../../orchestra/brain.js';
+import { isSessionActive, setupWatchWindow } from '../../orchestra/tmux.js';
+import { TMUX_SESSION_NAME } from '../../core/constants.js';
 import { runDoctorChecks } from './doctor.js';
 import { print, printError, formatSprintSummary, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -13,6 +15,7 @@ interface StartCommandOpts {
   sandboxMode?: boolean;
   dryRun?: boolean;
   force?: boolean;
+  watch?: boolean;
 }
 
 export function registerStart(program: Command): void {
@@ -23,6 +26,7 @@ export function registerStart(program: Command): void {
     .option('--sandbox-mode', 'Run in sandbox mode (Docker)')
     .option('--dry-run', 'Plan sprint without spawning workers')
     .option('--force', 'Skip doctor pre-flight checks')
+    .option('--watch', 'Automatically open watch mode after sprint spawns workers')
     .action(async (opts: StartCommandOpts) => {
       const root = resolveProjectRoot();
 
@@ -48,6 +52,9 @@ export function registerStart(program: Command): void {
 
         // Dry-run mode: plan only, no spawn
         if (opts.dryRun) {
+          if (opts.watch) {
+            print('Note: --watch ignored in dry-run mode (no workers spawned).');
+          }
           const context = readContext(root);
           const usage = checkUsage(config);
           const recommendation = adjustSprintSize(config, usage);
@@ -66,6 +73,16 @@ export function registerStart(program: Command): void {
           print(`\nWorkers: ${sprint.tasks.length} | Brain model: ${config.activeModeConfig.brain_model}`);
           print('Dry-run complete. No workers spawned.');
           return;
+        }
+
+        // Set up watch window before runSprint blocks
+        if (opts.watch) {
+          if (isSessionActive()) {
+            setupWatchWindow(TMUX_SESSION_NAME, root);
+            print('Watch window created. Attach with: tmux attach -t deckent:watch');
+          } else {
+            print('Note: --watch requires an active tmux session. Skipping watch setup.');
+          }
         }
 
         const sprint = await runSprint(root, config, {

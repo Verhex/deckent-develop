@@ -3,7 +3,7 @@ import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
-  DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR,
+  DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR,
   PROJECT_CONFIG_PATH, MEMORY_FILE, DEBT_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
 import { watchDashboard } from './watcher.js';
@@ -11,6 +11,7 @@ import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
 import { killWorker } from '../orchestra/tmux.js';
 import { loadConfig } from '../core/config.js';
+import { readWorkerLog } from '../agents/worker.js';
 import {
   runSprint, readContext, checkUsage, adjustSprintSize, planSprint,
 } from '../orchestra/brain.js';
@@ -247,6 +248,24 @@ async function handleRequest(
         return;
       }
       sendJson(res, activeJob);
+      return;
+    }
+
+    // GET /api/worker/:taskId/log
+    if (url.startsWith('/api/worker/') && url.endsWith('/log')) {
+      const taskId = url.slice('/api/worker/'.length, -'/log'.length);
+      if (!taskId) {
+        sendError(res, 400, 'Missing taskId');
+        return;
+      }
+      const taskPath = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
+      const task = readJsonFile(taskPath);
+      if (!task) {
+        sendError(res, 404, 'Task not found');
+        return;
+      }
+      const log = readWorkerLog(projectRoot, taskId);
+      sendJson(res, { taskId, log, task });
       return;
     }
 

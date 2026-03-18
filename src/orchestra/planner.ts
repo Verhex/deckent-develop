@@ -85,9 +85,14 @@ KURALLAR:
 - Maksimum ${recommendation.maxWorkers} görev oluştur
 - Her görev bağımsız çalışabilmeli (paralel execution)
 - Bağımlılık varsa dependencies array'inde belirt
-- Model seçimi: karmaşık mimari → opus, rutin kod → sonnet, trivial → haiku
 - Her görev için scope (directories + filesWrite) belirle
 - Her görev için GO/NO-GO kriterleri yaz
+
+MODEL SEÇİM KRİTERLERİ (HER GÖREV İÇİN DOĞRU MODELİ SEÇ):
+- **opus**: Karmaşık mimari değişiklik, birden fazla modüle dokunan görevler, yeni pattern/abstraction oluşturan işler, cross-cutting concern'ler (yeni CLI+MCP+API birlikte), test + implementasyon birlikte gereken büyük feature'lar
+- **sonnet**: Standart CRUD işlemleri, tek dosya/modül değişikliği, mevcut pattern'i takip eden yeni dosya ekleme, template/config güncellemesi, dokümantasyon yazımı, basit API endpoint ekleme, UI component ekleme (mevcut pattern ile)
+- **haiku**: Sadece trivial işler — rename, typo fix, dosya kopyalama, .gitignore satırı ekleme, placeholder dosya oluşturma, tek satırlık config değişikliği
+- "reason" alanında model seçimini AÇIKLA (neden bu model, ne kadar karmaşık)
 
 CONTEXT:
 ${contextBlock}

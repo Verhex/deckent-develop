@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
   TMUX_WORKER_PREFIX,
+  TASKS_DIR,
 } from '../core/constants.js';
 
 // ─── SpawnOptions ───────────────────────────────────────────────────
@@ -92,6 +94,15 @@ export function spawnWorker(
     cmd,
     'Enter',
   ]);
+
+  // Capture worker output to a log file via pipe-pane
+  const logPath = join(projectDir, TASKS_DIR, `task-${taskId}.log`);
+  run([
+    'pipe-pane',
+    '-t', `${TMUX_SESSION_NAME}:${windowName}`,
+    '-o',
+    `cat >> ${logPath}`,
+  ]);
 }
 
 export function killWorker(taskId: string): void {
@@ -164,4 +175,70 @@ export function sendKeys(target: string, keys: string): void {
     keys,
     'Enter',
   ]);
+}
+
+export function setupWatchWindow(sessionName: string, projectRoot: string): void {
+  const watchWindow = 'watch';
+
+  // Check if watch window already exists
+  const hasWindow = spawnSync('tmux', [
+    'list-windows', '-t', sessionName, '-F', '#{window_name}',
+  ], { encoding: 'utf-8' });
+
+  if (!hasWindow.stdout?.includes(watchWindow)) {
+    spawnSync('tmux', [
+      'new-window', '-t', sessionName, '-n', watchWindow,
+      `watch -n 2 cat ${join(projectRoot, '.dashboard')}`,
+    ], { encoding: 'utf-8' });
+
+    spawnSync('tmux', [
+      'split-window', '-t', `${sessionName}:${watchWindow}`, '-h', '-p', '40',
+      `watch -n 3 "ls -la ${join(projectRoot, '.tasks')}/*.hb 2>/dev/null | tail -20"`,
+    ], { encoding: 'utf-8' });
+  }
+}
+
+export function createWatchLayout(projectRoot: string): void {
+  const watchWindow = 'watch';
+
+  // Check if watch window already exists
+  if (!windowExists(watchWindow)) {
+    // Create new window with dashboard watch
+    run([
+      'new-window', '-t', TMUX_SESSION_NAME, '-n', watchWindow,
+      `watch -n 2 cat ${join(projectRoot, '.dashboard')}`,
+    ]);
+
+    // Split right pane (40%) for worker heartbeat list
+    spawnSync('tmux', [
+      'split-window', '-t', `${TMUX_SESSION_NAME}:${watchWindow}`, '-h', '-p', '40',
+      `watch -n 3 "ls -la ${join(projectRoot, '.tasks')}/*.hb 2>/dev/null | tail -20"`,
+    ], { encoding: 'utf-8' });
+  }
+
+  // Select watch window and attach
+  spawnSync('tmux', ['select-window', '-t', `${TMUX_SESSION_NAME}:${watchWindow}`], {
+    encoding: 'utf-8',
+  });
+  spawnSync('tmux', ['attach-session', '-t', TMUX_SESSION_NAME], {
+    encoding: 'utf-8',
+    stdio: 'inherit',
+  });
+}
+
+export function attachToWorkerPane(taskId: string): void {
+  const windowName = workerWindowName(taskId);
+
+  // Check if worker window exists
+  if (!windowExists(windowName)) {
+    throw new TmuxError(`Worker window ${windowName} not found`);
+  }
+
+  spawnSync('tmux', ['select-window', '-t', `${TMUX_SESSION_NAME}:${windowName}`], {
+    encoding: 'utf-8',
+  });
+  spawnSync('tmux', ['attach-session', '-t', TMUX_SESSION_NAME], {
+    encoding: 'utf-8',
+    stdio: 'inherit',
+  });
 }

@@ -11,6 +11,7 @@ export {
   writeResult,
   updateTaskStatus,
   isWithinScope,
+  readWorkerLog,
   TaskClaimError,
   LockError,
   ScopeViolationError,

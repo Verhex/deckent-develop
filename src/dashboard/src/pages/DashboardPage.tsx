@@ -13,6 +13,8 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { NewSprintModal } from "../components/NewSprintModal";
+import { AgentDetail } from "../components/AgentDetail";
+import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSE } from "../hooks/useSSE";
 import { fetchJson, postJson, ApiError } from "../lib/api";
 import type { DashboardState, AgentInfo, Alert } from "../types";
@@ -80,6 +82,7 @@ export default function DashboardPage() {
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
   const [noSprint, setNoSprint] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sseState) {
@@ -228,7 +231,11 @@ export default function DashboardPage() {
               </TableHeader>
               <TableBody>
                 {agents.map((agent: AgentInfo) => (
-                  <TableRow key={agent.id}>
+                  <TableRow
+                    key={agent.id}
+                    className="cursor-pointer hover:bg-zinc-800/50"
+                    onClick={() => setSelectedAgent(agent.taskId ?? agent.id)}
+                  >
                     <TableCell className="font-mono">
                       {agent.id}
                     </TableCell>
@@ -304,6 +311,21 @@ export default function DashboardPage() {
 
       {/* New Sprint Modal */}
       <NewSprintModal open={modalOpen} onOpenChange={setModalOpen} />
+
+      {/* Agent Detail Sheet */}
+      <Sheet
+        open={selectedAgent !== null}
+        onOpenChange={(open) => { if (!open) setSelectedAgent(null); }}
+      >
+        <SheetContent side="right" className="w-[400px] sm:w-[500px]">
+          {selectedAgent && (
+            <AgentDetail
+              taskId={selectedAgent}
+              onClose={() => setSelectedAgent(null)}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

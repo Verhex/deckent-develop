@@ -27,6 +27,10 @@ vi.mock('../../src/core/config.js', () => ({
   })),
 }));
 
+vi.mock('../../src/agents/worker.js', () => ({
+  readWorkerLog: vi.fn(),
+}));
+
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(async () => ({ id: 'sprint-001', status: 'COMPLETE' })),
   readContext: vi.fn(() => ({ debt: [], patterns: [], memory: '' })),
@@ -44,6 +48,7 @@ import { createHttpServer, parseBody, _resetActiveJob, type HttpApi } from '../.
 import { watchDashboard } from '../../src/api/watcher.js';
 import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
 import { killWorker } from '../../src/orchestra/tmux.js';
+import { readWorkerLog } from '../../src/agents/worker.js';
 import { runSprint } from '../../src/orchestra/brain.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -52,6 +57,7 @@ const mockReaddirSync = vi.mocked(readdirSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockRunDoctorChecks = vi.mocked(runDoctorChecks);
 const mockKillWorker = vi.mocked(killWorker);
+const mockReadWorkerLog = vi.mocked(readWorkerLog);
 const mockRunSprint = vi.mocked(runSprint);
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -582,6 +588,62 @@ describe('createHttpServer', () => {
       const body = JSON.parse(res.body);
       expect(body.status).toBe('failed');
       expect(body.error).toBe('Spawn failed');
+    });
+  });
+
+  // ─── GET /api/worker/:taskId/log ────────────────────────────
+
+  describe('GET /api/worker/:taskId/log', () => {
+    it('returns task and log when both exist', async () => {
+      const taskData = { id: '001-001', title: 'Setup project', status: 'EXECUTING', model: 'sonnet' };
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('task-001-001.json')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue(JSON.stringify(taskData));
+      mockReadWorkerLog.mockReturnValue('Building project...\nTests passed.');
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/worker/001-001/log');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.taskId).toBe('001-001');
+      expect(body.log).toBe('Building project...\nTests passed.');
+      expect(body.task.title).toBe('Setup project');
+      expect(body.task.status).toBe('EXECUTING');
+    });
+
+    it('returns null log when no log file exists', async () => {
+      const taskData = { id: '001-002', title: 'Add tests', status: 'PENDING' };
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('task-001-002.json')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue(JSON.stringify(taskData));
+      mockReadWorkerLog.mockReturnValue(null);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/worker/001-002/log');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.taskId).toBe('001-002');
+      expect(body.log).toBeNull();
+      expect(body.task.title).toBe('Add tests');
+    });
+
+    it('returns 404 for nonexistent task', async () => {
+      mockExistsSync.mockReturnValue(false);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/worker/999-999/log');
+      expect(res.status).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Task not found' });
     });
   });
 

@@ -68,6 +68,7 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   spawnWorker: vi.fn(),
   killWorker: vi.fn(),
   destroy: vi.fn(),
+  setupWatchWindow: vi.fn(),
   TmuxError: class TmuxError extends Error {
     command?: string;
     constructor(msg: string, cmd?: string) {
@@ -90,7 +91,7 @@ import { createInterface } from 'node:readline/promises';
 import { countBrainLines, ensureDeckentImport } from '../../src/core/utils.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../src/core/config.js';
 import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, runDecay, BrainError, confirmDraftTasks } from '../../src/orchestra/brain.js';
-import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, TmuxError } from '../../src/orchestra/tmux.js';
+import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, setupWatchWindow, TmuxError } from '../../src/orchestra/tmux.js';
 import { readTask } from '../../src/agents/worker.js';
 
 // ─── Command Imports ────────────────────────────────────────────────
@@ -985,6 +986,44 @@ describe('start command', () => {
     expect(runSprint).not.toHaveBeenCalled();
     expect(stdout()).toContain('Dry-run complete');
     expect(stdout()).toContain('task-001');
+  });
+
+  it('--watch creates watch window before sprint when tmux session active', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
+    vi.mocked(isSessionActive).mockReturnValue(true);
+    await runCommand(registerStart, ['start', '--watch', '--force']);
+    expect(setupWatchWindow).toHaveBeenCalledWith('deckent', expect.any(String));
+    expect(stdout()).toContain('Watch window created');
+    expect(runSprint).toHaveBeenCalled();
+  });
+
+  it('--watch + --dry-run skips watch setup', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(readContext).mockReturnValue({
+      directives: '', memory: '', retro: '', debt: [],
+      patterns: '', decisions: '', existingTasks: [],
+      projectState: { gitStatus: '', fileTree: [] },
+    });
+    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
+    vi.mocked(adjustSprintSize).mockReturnValue({
+      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
+    });
+    vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [] }));
+    await runCommand(registerStart, ['start', '--dry-run', '--watch', '--force']);
+    expect(setupWatchWindow).not.toHaveBeenCalled();
+    expect(stdout()).toContain('--watch ignored in dry-run mode');
+    expect(stdout()).toContain('Dry-run complete');
+  });
+
+  it('--watch without active tmux session skips watch setup', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
+    vi.mocked(isSessionActive).mockReturnValue(false);
+    await runCommand(registerStart, ['start', '--watch', '--force']);
+    expect(setupWatchWindow).not.toHaveBeenCalled();
+    expect(stdout()).toContain('--watch requires an active tmux session');
+    expect(runSprint).toHaveBeenCalled();
   });
 });
 

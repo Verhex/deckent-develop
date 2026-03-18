@@ -12,6 +12,7 @@ import {
   writeResult,
   updateTaskStatus,
   isWithinScope,
+  readWorkerLog,
   TaskClaimError,
   LockError,
 } from '../../src/agents/worker.js';
@@ -474,6 +475,30 @@ describe('isWithinScope', () => {
 
   it('returns false for prefix overlap (src/core-extra/)', () => {
     expect(isWithinScope('src/core-extra/file.ts', scope)).toBe(false);
+  });
+});
+
+// ─── readWorkerLog ─────────────────────────────────────────────────
+
+describe('readWorkerLog', () => {
+  it('returns file content when log exists', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('worker output line 1\nworker output line 2\n' as never);
+
+    const result = readWorkerLog('/project', 'task-001');
+    expect(result).toBe('worker output line 1\nworker output line 2\n');
+    expect(mockedReadFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('task-task-001.log'),
+      'utf-8',
+    );
+  });
+
+  it('returns null when log file does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = readWorkerLog('/project', 'task-002');
+    expect(result).toBeNull();
+    expect(mockedReadFileSync).not.toHaveBeenCalled();
   });
 });
 

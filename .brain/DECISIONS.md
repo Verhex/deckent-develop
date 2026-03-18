@@ -71,3 +71,15 @@
 **Decision:** Her CLI komutu kendi dosyasında tanımlanır ve `register<Name>(program: Command): void` fonksiyonu export eder.
 **Context:** Tek dosyada tüm komutları tanımlamak bakım zorluğu yaratır. Ayrı dosyalar bağımsız test, kolay ekleme/çıkarma sağlar.
 **Consequence:** `src/cli/commands/` dizininde 16 dosya. Entry point (`index.ts`) 16 register çağrısı yapar. Yeni komut eklemek: dosya oluştur + index.ts'e import + register ekle.
+
+## ADR-013: DECKENT.md Adapter Pattern (Sprint 15)
+
+**Context:** CLAUDE.md'yi init sırasında overwrite etmek kullanıcı değişikliklerini kaybettiriyordu.
+
+**Decision:** DECKENT.md = tek gerçek kaynak. CLAUDE.md ve AGENTS.md adaptör dosyalar — sadece `@DECKENT.md` referansı enjekte edilir (ensureDeckentImport). Asla üzerine yazılmaz.
+
+**Consequences:**
+- Init idempotent ve güvenli
+- Kullanıcının CLAUDE.md özelleştirmeleri korunur
+- Gelecek provider'lar (Codex, Gemini) için adapter pattern genişletilebilir
+- `deckent sync` komutu adapter'ları yeniden senkronize eder

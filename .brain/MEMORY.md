@@ -54,3 +54,12 @@
 - Start `--dry-run`: `planSprint()` çağrılır, task listesi gösterilir, spawn yok
 - Status `--watch`: `setInterval(2000)` ile ekran temizle + tekrar render, `--json` raw JSON çıktı
 - Barrel `index.ts` dosyaları vitest coverage exclude'da — sadece re-export, coverage'ı düşürüyor
+
+## Sprint 15 Learnings (2026-03-18)
+
+- `ensureDeckentImport(filePath)` pattern: file missing → create, exists without ref → prepend, exists with ref → noop (idempotent)
+- Config merge: `Object.assign(existing, newConfig)` preserves custom fields during re-init
+- `.gitignore` selective tracking: `.deckent/plugins/*` ignored, `!.deckent/plugins/.gitkeep` exception
+- Rule templates: `writeIfNotExists` prevents overwrite, YAML frontmatter + rich rules (13/9/9)
+- MCP tool/resource addition: index.ts import+register, all test mocks must include new exports
+- Structured planner model inference: `inferModelFromDirective()` analyzes title+description+scope for model selection

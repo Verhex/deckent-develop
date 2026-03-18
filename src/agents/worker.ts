@@ -285,6 +285,12 @@ export function releaseAllLocks(
   return released;
 }
 
+export function readWorkerLog(projectRoot: string, taskId: string): string | null {
+  const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+  if (!existsSync(logPath)) return null;
+  return readFileSync(logPath, 'utf-8');
+}
+
 export function isWithinScope(filePath: string, scope: TaskScope): boolean {
   const normalizedFile = normalize(filePath).split(sep).join('/');
 

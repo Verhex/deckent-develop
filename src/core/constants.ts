@@ -52,7 +52,7 @@ export const MEMORY_DECAY_SPRINTS = 3 as const;
 export const PATTERN_DECAY_SPRINTS = 5 as const;
 
 // ─── Task File Extensions ────────────────────────────────────────────
-export const TASK_FILE_EXTENSIONS = ['.json', '.plan', '.hb', '.result', '.paused'] as const;
+export const TASK_FILE_EXTENSIONS = ['.json', '.plan', '.hb', '.result', '.paused', '.log'] as const;
 
 // ─── tmux ────────────────────────────────────────────────────────────
 export const TMUX_SESSION_NAME = 'deckent' as const;

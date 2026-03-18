@@ -231,7 +231,25 @@ export function extractScopeFromDirective(line: string): TaskScope {
   return { directories, filesRead: [], filesWrite };
 }
 
-// 4c. ParsedDirectiveTask
+// 4c. inferModelFromDirective — heuristic model selection for structured mode
+export function inferModelFromDirective(title: string, description: string, scope: TaskScope): ModelType {
+  const text = `${title}\n${description}`.toLowerCase();
+  const fileCount = scope.filesWrite.length + scope.directories.length;
+
+  // haiku: trivial tasks
+  const haikuPatterns = /\b(rename|typo|placeholder|copy|gitignore|gitkeep|config\s*değişikliği|tek\s*satır)\b/;
+  if (haikuPatterns.test(text) && fileCount <= 2) return 'haiku';
+
+  // opus: complex multi-module, new patterns, architecture
+  const opusPatterns = /\b(mimari|architect|cross.?cutting|yeni\s*pattern|birden\s*fazla\s*modül|multiple\s*module|refactor.*system|new\s*cli.*mcp|cli.*mcp.*api|brain.*worker|orchestrat)\b/;
+  if (opusPatterns.test(text)) return 'opus';
+  if (fileCount >= 6) return 'opus';
+
+  // sonnet: default for standard tasks
+  return 'sonnet';
+}
+
+// 4c2. ParsedDirectiveTask
 export interface ParsedDirectiveTask {
   title: string;
   description: string;
@@ -383,13 +401,14 @@ export function planSprint(
 
     for (const src of directiveSources) {
       if (tasks.length >= recommendation.maxWorkers) break;
+      const inferredModel = inferModelFromDirective(src.title, src.description, src.scope);
       tasks.push(createTask({
         title: src.title,
         description: src.description,
-        model: defaultModel,
+        model: recommendation.modelConstraint ?? inferredModel,
         effort: 'normal',
         priority: 'NORMAL',
-        reason: 'Directive',
+        reason: `Directive (model: ${inferredModel} — inferred from scope/complexity)`,
         scope: src.scope,
         dependencies: [],
         goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
@@ -979,10 +998,10 @@ export function cleanup(projectRoot: string, sprint: Sprint): void {
     }
   }
 
-  // Delete .hb files
+  // Delete .hb and .log files
   const tasksDir = join(projectRoot, TASKS_DIR);
   if (existsSync(tasksDir)) {
-    for (const file of readdirSync(tasksDir).filter(f => f.endsWith('.hb'))) {
+    for (const file of readdirSync(tasksDir).filter(f => f.endsWith('.hb') || f.endsWith('.log'))) {
       try { unlinkSync(join(tasksDir, file)); } catch { /* skip */ }
     }
   }

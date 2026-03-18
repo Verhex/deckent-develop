@@ -9,6 +9,8 @@ import {
   attach,
   destroy,
   sendKeys,
+  createWatchLayout,
+  attachToWorkerPane,
   TmuxError,
 } from '../../src/orchestra/tmux.js';
 
@@ -90,7 +92,7 @@ describe('spawnWorker', () => {
 
     spawnWorker('task-001', 'sonnet', 'build the feature', '/project');
 
-    expect(mockedSpawnSync).toHaveBeenCalledTimes(2);
+    expect(mockedSpawnSync).toHaveBeenCalledTimes(3);
     // new-window
     expect(mockedSpawnSync).toHaveBeenNthCalledWith(
       1, 'tmux',
@@ -150,6 +152,22 @@ describe('spawnWorker', () => {
     const args = sendKeysCall![1] as string[];
     const cmdArg = args.find((a) => a.includes('--dangerously-skip-permissions'));
     expect(cmdArg).toBeDefined();
+  });
+
+  it('calls pipe-pane to capture worker output to log file', () => {
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    spawnWorker('task-010', 'sonnet', 'do work', '/project');
+
+    // 3 calls: new-window + send-keys + pipe-pane
+    expect(mockedSpawnSync).toHaveBeenCalledTimes(3);
+    expect(mockedSpawnSync).toHaveBeenNthCalledWith(
+      3, 'tmux',
+      ['pipe-pane', '-t', 'deckent:w-task-010', '-o', 'cat >> /project/.tasks/task-task-010.log'],
+      expect.objectContaining({ encoding: 'utf-8' }),
+    );
   });
 
   it('uses only --model and -p when opts is undefined', () => {
@@ -346,5 +364,97 @@ describe('attach', () => {
       'tmux', ['attach', '-t', 'deckent'],
       expect.objectContaining({ stdio: 'inherit' }),
     );
+  });
+});
+
+describe('createWatchLayout', () => {
+  it('creates a watch window and splits it when window does not exist', () => {
+    mockedSpawnSync.mockImplementation((_cmd, args) => {
+      const argsArr = args as string[];
+      if (argsArr[0] === 'list-windows') {
+        return { status: 0, stdout: 'brain\nauditor\n', stderr: '', pid: 1, signal: null, output: [] } as never;
+      }
+      return { status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never;
+    });
+
+    createWatchLayout('/project');
+
+    // Calls: list-windows (windowExists) + new-window (run) + split-window + select-window + attach-session
+    const allCmds = mockedSpawnSync.mock.calls.map(c => (c[1] as string[])[0]);
+    expect(allCmds).toContain('list-windows');
+    expect(allCmds).toContain('new-window');
+    expect(allCmds).toContain('split-window');
+    expect(allCmds).toContain('select-window');
+    expect(allCmds).toContain('attach-session');
+  });
+
+  it('skips window creation when watch window already exists', () => {
+    mockedSpawnSync.mockImplementation((_cmd, args) => {
+      const argsArr = args as string[];
+      if (argsArr[0] === 'list-windows') {
+        return { status: 0, stdout: 'brain\nwatch\n', stderr: '', pid: 1, signal: null, output: [] } as never;
+      }
+      return { status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never;
+    });
+
+    createWatchLayout('/project');
+
+    const allCmds = mockedSpawnSync.mock.calls.map(c => (c[1] as string[])[0]);
+    expect(allCmds).not.toContain('new-window');
+    expect(allCmds).not.toContain('split-window');
+    expect(allCmds).toContain('select-window');
+    expect(allCmds).toContain('attach-session');
+  });
+
+  it('uses stdio inherit for attach-session', () => {
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    createWatchLayout('/project');
+
+    const attachCall = mockedSpawnSync.mock.calls.find(
+      c => (c[1] as string[])[0] === 'attach-session',
+    );
+    expect(attachCall).toBeDefined();
+    expect(attachCall![2]).toEqual(expect.objectContaining({ stdio: 'inherit' }));
+  });
+});
+
+describe('attachToWorkerPane', () => {
+  it('selects the correct worker window and attaches', () => {
+    mockedSpawnSync.mockImplementation((_cmd, args) => {
+      const argsArr = args as string[];
+      if (argsArr[0] === 'list-windows') {
+        return { status: 0, stdout: 'brain\nw-016-001\nauditor\n', stderr: '', pid: 1, signal: null, output: [] } as never;
+      }
+      return { status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never;
+    });
+
+    attachToWorkerPane('016-001');
+
+    const selectCall = mockedSpawnSync.mock.calls.find(
+      c => (c[1] as string[])[0] === 'select-window',
+    );
+    expect(selectCall).toBeDefined();
+    expect((selectCall![1] as string[])[2]).toBe('deckent:w-016-001');
+
+    const attachCall = mockedSpawnSync.mock.calls.find(
+      c => (c[1] as string[])[0] === 'attach-session',
+    );
+    expect(attachCall).toBeDefined();
+  });
+
+  it('throws TmuxError when worker window does not exist', () => {
+    mockedSpawnSync.mockImplementation((_cmd, args) => {
+      const argsArr = args as string[];
+      if (argsArr[0] === 'list-windows') {
+        return { status: 0, stdout: 'brain\nauditor\n', stderr: '', pid: 1, signal: null, output: [] } as never;
+      }
+      return { status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never;
+    });
+
+    expect(() => attachToWorkerPane('999-001')).toThrow(TmuxError);
+    expect(() => attachToWorkerPane('999-001')).toThrow('Worker window w-999-001 not found');
   });
 });

@@ -4,6 +4,7 @@ coverage/
 
 # Deckent runtime
 .tasks/*.hb
+.tasks/*.log
 .tasks/*.signal
 .tasks/*.output
 .locks/
