@@ -423,6 +423,29 @@ Deckent ilk kez kendini çalıştırdı:
 - `.brain/` dogfooding: sprint-015.md, ADR-013, MEMORY.md güncellendi
 - 987 test, %97.5 kapsam, 20 yeni test, 0 regresyon
 
+## Sprint 17: Güvenilirlik + Test Altyapısı + Dokümantasyon
+
+- MCP `deckent_start` arka plan görevleri: `child_process.fork()`, hemen `jobId` döndürür, MCP timeout yok
+- `.deckent/jobs/{jobId}.json` ile görev durumu takibi (RUNNING/COMPLETE/FAILED)
+- `deckent_status` aktif görev durumunu gösteriyor
+- `cleanup()` tüm görev dosya uzantılarını kapsıyor (.json, .plan, .hb, .result, .paused, .log), sprint prefix koruması, 24 saat eski dosya tespiti
+- Sprint ID güvenliği: `.deckent/config.json`'da `last_sprint_id`, yapılandırma ve dosya taramasının max değeri — asla geri atlamaz
+- Dashboard sıfırlama: PLAN fazında fresh DashboardState, sprint ID uyuşmazlığında auditor sıfırlama
+- React test altyapısı: `src/dashboard/vitest.config.ts` (happy-dom), AgentDetail + DashboardPage testleri
+- `test:dashboard` npm script'i
+- 1027 test, %97.5 kapsam, 40 yeni test, 0 regresyon
+
+## Sprint 18: Orkestrasyon Smoke Test — 10 Paralel Doküman Görevi
+
+- Sprint 10'dan bu yana ilk gerçek `runSprint` çalıştırması — uçtan uca orkestrasyon doğrulandı
+- 10 doküman görevi planlandı, 8'i çalıştırıldı (max_workers=8 görev sayısı limiti olarak yorumlandı — bug)
+- 8 doküman üretildi (~135 KB): GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
+- 8 sonnet worker paralel çalıştı, tümü 260 saniyede tamamlandı
+- 3 DONE, 5 GO_WITH_TECH_DEBT, 0 NO_GO
+- 6 bug keşfedildi: planner görev limiti, heartbeat zaman damgası, dashboard ilerleme gecikmesi, alert tekrar sorunu, doküman coverage kriterleri, DEBT.md test hatası
+- Gözlem raporu: docs/SPRINT-18-OBSERVATION.md
+- 1027 test (sadece doküman sprint'i — yeni test yok), %97.5 kapsam, 0 regresyon
+
 ---
 
 # 20. CLAUDE CODE ENTEGRASYON REHBERİ
@@ -576,7 +599,7 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Tamamlandı |
 | 16 | İzleme modu, worker logları, ajan detay, model çıkarımı | Tamamlandı |
 
-**Çıkış kriterleri:** 987+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama, DECKENT.md bağımsızlık.
+**Çıkış kriterleri:** 1027+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama, DECKENT.md bağımsızlık.
 
 ## Aşama 2: Sağlayıcı Soyutlama (Sprint 9-12)
 
@@ -617,12 +640,18 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 14 | 938 | %97.5 | Auditor canlı entegrasyon, .deckent sonlandırma |
 | 15 | 967 | %97.5 | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 kapatıldı, 10 araç 5 kaynak |
 | 16 | 987 | %97.5 | deckent watch, worker log yakalama, start --watch, ajan detay görünümü, model çıkarımı |
+| 17 | 1027 | %97.5 | MCP arka plan görevleri, cleanup düzeltme, sprint ID güvenliği, dashboard sıfırlama, React test altyapısı |
+| 18 | 1027 | %97.5 | Orkestrasyon smoke test: 8 doküman, S10'dan beri ilk gerçek runSprint, 6 bug keşfedildi |
 
 **İlk dogfooding sonucu (Sprint 6):** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Orkestrasyon döngüsü (planla → başlat → yürüt → değerlendir → retro → temizle) uçtan uca tamamlandı.
 
 **AI Planlama dönüm noktası (Sprint 12-13):** Brain, AI ile görev planlama yeteneği kazandı (Zod doğrulamalı). Başarısız olursa otomatik olarak yapısal ayrıştırmaya düşer. Auditor ayrı tmux sürecinden Brain içi tarama döngüsüne taşındı.
 
 **Bağımsızlık dönüm noktası (Sprint 15):** DECKENT.md tek gerçek kaynak oldu. CLAUDE.md ve AGENTS.md artık `ensureDeckentImport()` ile `@DECKENT.md` enjeksiyonu alan adaptörler — katkısal, asla yıkıcı değil. Deckent artık kendi `.deckent/` yapısıyla self-hosting yapıyor.
+
+**Güvenilirlik dönüm noktası (Sprint 17):** MCP `deckent_start` artık timeout olmuyor — sprint'i `child_process.fork()` ile arka plan görevi olarak çalıştırır. Sprint ID asla geri atlamaz (yapılandırma tabanlı güvenlik). Dashboard sprint'ler arasında temiz sıfırlanır. React test altyapısı bileşen testlerini mümkün kılar. Toplam 1027 test.
+
+**Orkestrasyon dönüm noktası (Sprint 18):** Sprint 10'dan bu yana ilk gerçek `runSprint`. 8 paralel sonnet worker 260 saniyede 8 doküman görevi tamamladı. Tam yaşam döngüsü (PLAN→SPAWN→EXECUTE→EVALUATE→RETRO→CLEANUP) uçtan uca çalıştı. 6 bug keşfedildi — planner görev kuyruğu, heartbeat zaman damgaları, dashboard ilerleme, alert tekrar sorunu, doküman değerlendirme kriterleri, borç tablosu testi.
 
 ---
 

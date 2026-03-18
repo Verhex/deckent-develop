@@ -57,7 +57,7 @@ npm run clean        # Remove dist/
 
 ```bash
 npm run lint    # Should exit with no errors
-npm test        # Should pass all tests (938+)
+npm test        # Should pass all tests (1027+)
 npm run build   # Should produce dist/ with no errors
 ```
 
@@ -92,12 +92,12 @@ deckent/
 │   │   ├── commands/       — One file per command (init, start, status, …)
 │   │   └── helpers/        — Shared CLI helpers (prompt, display)
 │   ├── api/                — HTTP API + SSE
-│   │   ├── server.ts       — 15 endpoints + SSE stream
+│   │   ├── server.ts       — 16 endpoints + SSE stream
 │   │   └── watcher.ts      — Dashboard file watcher
 │   ├── mcp/                — Model Context Protocol server
 │   │   ├── server.ts       — MCP server entry: createServer()
-│   │   ├── tools/          — 9 MCP tool handlers
-│   │   └── resources/      — 4 MCP resource handlers
+│   │   ├── tools/          — 10 MCP tool handlers
+│   │   └── resources/      — 5 MCP resource handlers
 │   └── dashboard/          — Web Dashboard (React+Vite+Tailwind, 4 pages)
 ├── tests/                  — Test files mirroring src/ structure
 │   ├── core/
@@ -123,9 +123,9 @@ deckent/
 | `src/orchestra` | Sprint planning (AI + structured), agent spawning, result evaluation, debt decay |
 | `src/agents` | Worker lifecycle: task claim, file lock, heartbeat, result write |
 | `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state |
-| `src/api` | HTTP API (15 endpoints + SSE), dashboard file watcher |
+| `src/api` | HTTP API (16 endpoints + SSE), dashboard file watcher |
 | `src/cli` | CLI commands (21 files), interactive prompts, display helpers |
-| `src/mcp` | MCP server with 9 tools and 4 resources for IDE/host integration |
+| `src/mcp` | MCP server with 10 tools and 5 resources for IDE/host integration |
 | `src/dashboard` | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui components |
 
 ---

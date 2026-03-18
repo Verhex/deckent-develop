@@ -63,3 +63,18 @@
 - Rule templates: `writeIfNotExists` prevents overwrite, YAML frontmatter + rich rules (13/9/9)
 - MCP tool/resource addition: index.ts import+register, all test mocks must include new exports
 - Structured planner model inference: `inferModelFromDirective()` analyzes title+description+scope for model selection
+
+## Sprint 16-17 Learnings (2026-03-18)
+
+- tmux pipe-pane log capture: `pipe-pane -t ... "cat >> logPath"` — simple, no extra dependencies
+- MCP background jobs: `child_process.fork()` prevents MCP timeout, job state in `.deckent/jobs/{jobId}.json`
+- cleanup() must cover ALL task file extensions (.json, .plan, .hb, .result, .paused, .log) — not just .hb/.log
+- Sprint ID safety: `last_sprint_id` in config + file scan, always use max — prevents regression on file deletion
+- Dashboard reset: fresh DashboardState on PLAN phase, sprint ID mismatch triggers reset in auditor
+- React test infra: separate vitest config for dashboard (happy-dom env), exclude from main config
+## Sprint sprint-018 Learnings
+- SECURITY.md — Güvenlik Modeli Detayı: GO_WITH_TECH_DEBT
+- MCP-GUIDE.md — MCP Kullanım Kılavuzu: GO_WITH_TECH_DEBT
+- MEMORY-SYSTEM.md — Bellek Mimarisi: GO_WITH_TECH_DEBT
+- SPRINT-LIFECYCLE.md — Sprint Yaşam Döngüsü: GO_WITH_TECH_DEBT
+- CONFIG-REFERENCE.md — Config Referans Kılavuzu: GO_WITH_TECH_DEBT

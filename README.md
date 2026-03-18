@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-987+ tests | 97.5% coverage | 16 sprints completed
+1027+ tests | 97.5% coverage | 18 sprints completed
 
 Deckent is a self-evolving AI agent orchestration system. Write directives in plain language — Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
 

@@ -243,4 +243,70 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 
 ---
 
+## Sprint 17 — Reliability + Test Infra + Docs
+
+**Status:** COMPLETE
+**Date:** 2026-03-18
+**Duration:** Single session
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Files created | 5 (job-runner fork, dashboard vitest config, test setup, 2 test files) |
+| Files updated | 8 (start.ts, status.ts, brain.ts, auditor.ts, utils.ts, config.json, types.ts, package.json) |
+| Tests | 40 new, 1027 total (all passing) |
+| Coverage | 97.5%+ |
+| Type errors | 0 |
+
+### Key Deliverables
+
+- MCP background jobs: deckent_start returns jobId immediately, sprint runs in fork()
+- cleanup() covers all task file extensions, sprint prefix guard, 24h stale detection
+- Sprint ID safety: last_sprint_id config + file scan, always max
+- Dashboard reset on PLAN phase, sprint ID mismatch check in auditor
+- React test infra: vitest happy-dom, AgentDetail + DashboardPage tests
+- Sprint 16 documentation sync across all files
+
+---
+
+## Sprint 18 — Orchestration Smoke Test (10 Parallel Doc Tasks)
+
+**Status:** COMPLETE (PARTIAL — 8/10 tasks)
+**Date:** 2026-03-18
+**Duration:** 260s (~4.3 minutes)
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Tasks planned | 8 (of 10 requested — max_workers limit) |
+| Tasks completed | 8 |
+| DONE | 3 |
+| GO_WITH_TECH_DEBT | 5 |
+| NO_GO | 0 |
+| Worker model | sonnet (all 8) |
+| Docs generated | 8 files (~135 KB) |
+| Tests | 1027 (0 new, 0 regressions) |
+| Coverage | 97.5% |
+| Bugs found | 6 |
+
+### Key Deliverables
+
+- First real `runSprint` execution since Sprint 10
+- 8 documentation files: GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
+- 2 docs not planned (BRAIN-GUIDE, DASHBOARD-GUIDE) — planner treated max_workers as task count limit
+- Observation report: [docs/SPRINT-18-OBSERVATION.md](SPRINT-18-OBSERVATION.md)
+
+### Bugs Discovered
+
+1. **P0** — Planner max_workers = task count limit (should be parallelism limit only)
+2. **P1** — Heartbeat timestamps wrong timezone (all workers marked stale)
+3. **P1** — Dashboard done counter not updated until EVALUATE phase
+4. **P2** — Alert dedup missing (42+ duplicate stale agent alerts)
+5. **P2** — Doc tasks get GO_WITH_TECH_DEBT due to coverage check (irrelevant for docs)
+6. **P3** — DEBT.md empty table breaks debt-002 test (pre-existing)
+
+---
+
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Section 19*

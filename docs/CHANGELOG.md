@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint18] - 2026-03-18
+
+### Added
+
+- **Orchestration smoke test**: First real `runSprint` execution since Sprint 10 — 10 parallel doc tasks planned, 8 executed
+- **8 documentation files** (~135 KB total): GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
+- **Sprint observation report**: `docs/SPRINT-18-OBSERVATION.md` — detailed phase-by-phase orchestration analysis
+- **6 bugs discovered**: planner max_workers task limit, heartbeat timestamp drift, dashboard progress lag, alert dedup missing, doc task coverage criteria, DEBT.md empty table test
+- **End-to-end validation**: PLAN → SPAWN → EXECUTE → EVALUATE → RETRO → CLEANUP completed in 260s with 8 parallel sonnet workers
+- **Test suite**: 1027 tests (0 new — doc-only sprint), 97.5% coverage, 0 regressions
+
+## [0.1.0-sprint17] - 2026-03-18
+
+### Added
+
+- **MCP background jobs**: `deckent_start` returns immediately with `jobId`, sprint runs in background via `child_process.fork()` — no MCP timeout
+- **`.deckent/jobs/{jobId}.json`**: Job state tracking (RUNNING/COMPLETE/FAILED)
+- **`deckent_status`** now includes active job state
+- **cleanup() fix**: Covers all task file extensions (.json, .plan, .hb, .result, .paused, .log), sprint prefix guard, stale file detection (24h)
+- **Sprint ID safety**: `last_sprint_id` in `.deckent/config.json`, max of config vs file scan — never regresses
+- **Dashboard reset**: Fresh `DashboardState` on PLAN phase, sprint ID mismatch triggers reset in auditor
+- **React test infra**: `src/dashboard/vitest.config.ts` (happy-dom), AgentDetail + DashboardPage tests
+- **`test:dashboard`** npm script: `vitest run --config src/dashboard/vitest.config.ts`
+- **Test suite**: 1027 tests (+40 new), 97.5% coverage, 0 regressions
+
 ## [0.1.0-sprint16] - 2026-03-18
 
 ### Added

@@ -1278,6 +1278,29 @@ Deckent ran itself for the first time:
 - `.brain/` dogfooding: sprint-015.md, ADR-013, MEMORY.md updated
 - 987 tests, 97.5% coverage, 20 new tests, 0 regressions
 
+## Sprint 17: Reliability + Test Infra + Docs
+
+- MCP `deckent_start` background jobs: `child_process.fork()`, returns `jobId` immediately, no MCP timeout
+- Job state tracking in `.deckent/jobs/{jobId}.json` (RUNNING/COMPLETE/FAILED)
+- `deckent_status` includes active job state
+- `cleanup()` covers all task file extensions (.json, .plan, .hb, .result, .paused, .log), sprint prefix guard, 24h stale detection
+- Sprint ID safety: `last_sprint_id` in `.deckent/config.json`, max of config vs file scan — never regresses
+- Dashboard reset: fresh `DashboardState` on PLAN phase, sprint ID mismatch triggers reset in auditor
+- React test infra: `src/dashboard/vitest.config.ts` (happy-dom), AgentDetail + DashboardPage tests
+- `test:dashboard` npm script for separate dashboard test runs
+- 1027 tests, 97.5% coverage, 40 new tests, 0 regressions
+
+## Sprint 18: Orchestration Smoke Test — 10 Parallel Doc Tasks
+
+- First real `runSprint` execution since Sprint 10 — end-to-end orchestration validated
+- 10 doc tasks planned, 8 executed (max_workers=8 treated as task count limit — bug)
+- 8 docs generated (~135 KB): GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
+- 8 sonnet workers ran in parallel, all completed in 260s
+- 3 DONE, 5 GO_WITH_TECH_DEBT, 0 NO_GO
+- 6 bugs discovered: planner task limit, heartbeat timestamp, dashboard progress lag, alert dedup, doc coverage criteria, DEBT.md test
+- Observation report: docs/SPRINT-18-OBSERVATION.md
+- 1027 tests (doc-only sprint — no new tests), 97.5% coverage, 0 regressions
+
 ---
 
 # 20. CLAUDE CODE INTEGRATION GUIDE
@@ -1528,7 +1551,7 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Done |
 | 16 | Watch mode, worker logs, agent detail, model inference | Done |
 
-**Exit criteria:** 987+ tests, 97%+ coverage, stable MCP integration, HTTP API, Web Dashboard, AI planning, DECKENT.md bağımsızlık.
+**Exit criteria:** 1027+ tests, 97%+ coverage, stable MCP integration, HTTP API, Web Dashboard, AI planning, DECKENT.md bağımsızlık.
 
 ## Phase 2: Self-Orchestration & Learning (Sprint 15+)
 
@@ -1579,12 +1602,18 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 14 | 938 | 97.5% | Auditor live integration, .deckent finalization |
 | 15 | 967 | 97.5% | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 closed, 10 tool 5 resource |
 | 16 | 987 | 97.5% | deckent watch, worker log capture, start --watch, agent detail view, model inference |
+| 17 | 1027 | 97.5% | MCP background jobs, cleanup fix, sprint ID safety, dashboard reset, React test infra |
+| 18 | 1027 | 97.5% | Orchestration smoke test: 8 docs, first real runSprint since S10, 6 bugs found |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
 **AI Planning milestone (Sprint 12-13):** Brain gained the ability to plan tasks using AI (Zod-validated) with automatic fallback to structured parsing. Auditor moved from separate tmux process to in-process scan loop within Brain.
 
 **Bağımsızlık milestone (Sprint 15):** DECKENT.md became the single source of truth. CLAUDE.md and AGENTS.md are now adapters that receive `@DECKENT.md` injection via `ensureDeckentImport()` -- additive, never destructive. Deckent now self-hosts with its own `.deckent/` structure.
+
+**Reliability milestone (Sprint 17):** MCP `deckent_start` no longer times out — runs sprint as background job via `child_process.fork()`. Sprint ID never regresses (config-based safety). Dashboard resets cleanly between sprints. React test infrastructure enables component testing. 1027 tests total.
+
+**Orchestration milestone (Sprint 18):** First real `runSprint` since Sprint 10. 8 parallel sonnet workers executed 8 doc tasks in 260s. Full lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→RETRO→CLEANUP) completed end-to-end. 6 bugs discovered — planner task queue, heartbeat timestamps, dashboard progress, alert dedup, doc evaluation criteria, debt table test.
 
 ---
 

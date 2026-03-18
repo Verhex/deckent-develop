@@ -1,146 +1,134 @@
-# DIRECTIVES — Sprint 17 (Reliability + Test Infra + Docs)
+# DIRECTIVES — Sprint 18 (Orchestration Smoke Test — 10 Parallel Doc Tasks)
 
-## Hedef: Sprint 16'da keşfedilen güvenilirlik sorunlarını düzelt, React test altyapısı kur, dokümantasyonu güncelle.
-
----
-
-## Görev 1: MCP deckent_start Background Job
-- Dosya: src/mcp/tools/start.ts, src/mcp/tools/status.ts, src/core/types.ts
-- Kapsam: src/mcp/tools/, src/core/
-
-### Problem
-MCP deckent_start çağrısı runSprint'i senkron çalıştırıyor. Sprint dakikalar sürebilir — MCP timeout'a düşüyor. Claude Code "tool call timed out" hatası alıyor.
-
-### Çözüm
-1. `deckent_start` hemen bir `jobId` döndürsün: `{ success: true, jobId: "sprint-017", status: "RUNNING" }`
-2. Sprint arka planda çalışsın — `runSprint` bir child process veya async task olarak başlasın
-3. `.deckent/jobs/{jobId}.json` dosyasına durum yazılsın: `{ status: "RUNNING"|"COMPLETE"|"FAILED", startedAt, completedAt?, error?, sprintResult? }`
-4. `deckent_status` mevcut job durumunu da döndürsün
-5. Basit yaklaşım: `child_process.fork()` ile ayrı process'te çalıştır, IPC ile sonuç al
-
-### Test
-- deckent_start hemen döner (timeout yok)
-- Job dosyası oluşturuluyor
-- deckent_status job durumunu gösteriyor
-- Job tamamlandığında sonuç dosyada
-- 6+ test
+## Hedef: Orkestrasyon smoke test — 10 paralel doküman görevi. Worker'lar repo'yu analiz edip MD dosyası yazar, kaynak kod değiştirilmez.
 
 ---
 
-## Görev 2: .tasks/ Cleanup Düzeltme
-- Dosya: src/orchestra/brain.ts
-- Kapsam: src/orchestra/
+## Görev 1: GLOSSARY.md — Deckent Terminoloji Sözlüğü
+- Dosya: docs/GLOSSARY.md (yeni)
+- Kapsam: docs/
 
-### Problem
-cleanup() fonksiyonu .hb ve .log dosyalarını temizliyor ama .json, .plan, .result, .paused dosyaları kalıyor. MCP üzerinden çalıştırıldığında cleanup çağrılmıyor çünkü runSprint'in COMPLETE fazına ulaşmadan process sonlanıyor.
-
-### Çözüm
-1. cleanup() fonksiyonunu genişlet: TASK_FILE_EXTENSIONS'taki TÜM uzantıları (.json, .plan, .hb, .result, .paused, .log) temizlesin
-2. Güvenlik: sadece sprint'e ait task dosyalarını sil (sprint ID prefix kontrolü)
-3. `deckent cleanup` CLI'da da aynı genişletilmiş temizlik çalışsın
-4. Stale task detection: 24 saatten eski .tasks/ dosyalarını da temizle
+### Açıklama
+Blueprint'teki (DECKENT-MASTER-BLUEPRINT.md) tüm teknik terimleri alfabetik sırayla listele. Her terim için kısa tanım ve ilk geçtiği Blueprint section numarası. Minimum 40 terim.
 
 ### Test
-- cleanup tüm task uzantılarını temizliyor
-- Sprint prefix koruması çalışıyor
-- Stale dosya tespiti çalışıyor
-- 5+ test
+- Manuel doğrulama — terimler alfabetik, Blueprint referansları doğru
 
 ---
 
-## Görev 3: Sprint ID Güvenliği — Config-Based
-- Dosya: src/core/utils.ts, src/core/types.ts, .deckent/config.json
-- Kapsam: src/core/
+## Görev 2: TROUBLESHOOTING.md — Sık Sorunlar ve Çözümleri
+- Dosya: docs/TROUBLESHOOTING.md (yeni)
+- Kapsam: docs/
 
-### Problem
-getNextSprintId() sadece .brain/sprints/ dizinindeki dosyalara bakıyor. Dosya silinirse veya eksikse sprint ID geri atlıyor (Sprint 16'da 011 oldu). Fragile.
-
-### Çözüm
-1. `.deckent/config.json`'a `last_sprint_id` alanı ekle
-2. getNextSprintId() önce config'den oku, dosya taramasını fallback olarak kullan
-3. Sprint tamamlandığında `last_sprint_id` güncelle (brain.ts runSprint sonunda)
-4. Her iki kaynaktan da max değeri al (config vs dosya taraması) — hiçbir zaman geri atlamaz
+### Açıklama
+En sık karşılaşılan sorunları ve çözümlerini dokümante et. `deckent doctor` çıktılarıyla eşleştir. Minimum 15 sorun-çözüm çifti. Kategoriler: kurulum, sprint çalıştırma, MCP, tmux, dashboard.
 
 ### Test
-- Config'den sprint ID okunuyor
-- Config yoksa dosya taraması fallback
-- Max değer seçiliyor (config > dosya veya tersi)
-- Sprint sonunda config güncelleniyor
-- 6+ test
+- Manuel doğrulama — doctor çıktılarıyla tutarlı
 
 ---
 
-## Görev 4: Dashboard State Reset
-- Dosya: src/orchestra/brain.ts, src/monitor/auditor.ts
-- Kapsam: src/orchestra/, src/monitor/
+## Görev 3: SECURITY.md — Güvenlik Modeli Detayı
+- Dosya: docs/SECURITY.md (yeni)
+- Kapsam: docs/
 
-### Problem
-Yeni sprint başladığında .dashboard dosyası eski sprint'in verilerini içeriyor. Web dashboard ve deckent status eski veriyi gösteriyor.
-
-### Çözüm
-1. runSprint'in PLAN fazında .dashboard'u sıfırla: fresh DashboardState yaz
-2. Fresh state: `{ sprint: { id, status: 'PLANNING' }, agents: [], progress: { done: 0, total: taskCount }, alerts: [], updatedAt }`
-3. Auditor scan loop başladığında da dashboard'un sprint ID'sini kontrol et — uyuşmuyorsa sıfırla
+### Açıklama
+Blueprint §15 güvenlik modelini detaylandır. 4 seviye permission sistemi, scope kuralları, lock mekanizması, auditor boundary detection. Threat model özetini dahil et.
 
 ### Test
-- PLAN fazında dashboard sıfırlanıyor
-- Fresh state doğru format
-- Sprint ID uyuşmazlığında reset
-- 4+ test
+- Manuel doğrulama — Blueprint §15 ile tutarlı
 
 ---
 
-## Görev 5: React Test Altyapısı
-- Dosya: src/dashboard/vitest.config.ts (yeni), src/dashboard/src/test/setup.ts (yeni), tests/dashboard/ (yeni dizin)
-- Kapsam: src/dashboard/, tests/dashboard/
+## Görev 4: MCP-GUIDE.md — MCP Kullanım Kılavuzu
+- Dosya: docs/MCP-GUIDE.md (yeni)
+- Kapsam: docs/
 
-### Problem
-Dashboard React bileşenlerinin testi yok. Sprint 16'da AgentDetail eklendi ama test yazılamadı — vitest happy-dom/jsdom setup'ı eksik.
-
-### Çözüm
-1. `src/dashboard/vitest.config.ts` oluştur: happy-dom environment, src/ alias
-2. `src/dashboard/src/test/setup.ts`: minimal setup (global fetch mock)
-3. `tests/dashboard/AgentDetail.test.tsx`: render, fetch mock, close button
-4. `tests/dashboard/DashboardPage.test.tsx`: temel render testi
-5. package.json'a `test:dashboard` script ekle: `vitest run --config src/dashboard/vitest.config.ts`
-6. Ana vitest.config.ts'ten dashboard testlerini exclude et (ayrı config)
+### Açıklama
+10 MCP tool ve 5 MCP resource'un kullanım kılavuzu. Her tool için: parametre listesi, örnek çağrı, beklenen çıktı. IDE entegrasyon adımları (VS Code, Cursor, Claude Code). Blueprint referansları.
 
 ### Test
-- AgentDetail render ediliyor
-- AgentDetail fetch mock çalışıyor
-- DashboardPage render ediliyor
-- 6+ test
+- Manuel doğrulama — tool/resource sayıları doğru
 
 ---
 
-## Görev 6: Sprint 16 Dokümantasyon Güncellemesi
-- Dosya: DECKENT-MASTER-BLUEPRINT.md, DECKENT-ANA-PLAN-TR.md, docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/API.md, docs/ARCHITECTURE.md, README.md
-- Kapsam: docs/, root
+## Görev 5: MEMORY-SYSTEM.md — Bellek Mimarisi
+- Dosya: docs/MEMORY-SYSTEM.md (yeni)
+- Kapsam: docs/
 
-### Problem
-Sprint 16 değişiklikleri dokümantasyona yansımamış. Blueprint, API.md, CHANGELOG hala Sprint 15'te.
-
-### Çözüm
-Her dosyada Sprint 16 güncellemeleri:
-- Blueprint: Section 3.2 (watch komutu, 25 CLI), Section 19 (Sprint 16 entry), Section 24 (tablo), Section 18 (worker log dosyaları)
-- API.md: Section 10 (yeni endpoint: GET /api/worker/:taskId/log), Section 12 (watch + start --watch)
-- CHANGELOG.md: [0.1.0-sprint16] entry
-- SPRINT-LOG.md: Sprint 16 log
-- README.md: 987 test, 16 sprint, watch komutu ekleme
-- ARCHITECTURE.md: watch mode, worker log flow
+### Açıklama
+3 katmanlı bellek mimarisi: MEMORY.md (kısa süreli), PATTERNS.md (uzun süreli), DECISIONS.md (kalıcı). Her dosyanın formatı, max satır limiti, decay kuralı, brain cleanup döngüsü. Blueprint referansları.
 
 ### Test
-- Manuel doğrulama — sayılar tutarlı (987 test, 26 CLI, 16 endpoint)
+- Manuel doğrulama — format ve limitler doğru
+
+---
+
+## Görev 6: SPRINT-LIFECYCLE.md — Sprint Yaşam Döngüsü
+- Dosya: docs/SPRINT-LIFECYCLE.md (yeni)
+- Kapsam: docs/
+
+### Açıklama
+8 fazlı sprint yaşam döngüsü: INIT → PLAN → SPAWN → EXECUTE → WAIT → EVALUATE → RETRO → COMPLETE. Her faz için: ne yapılır, hangi fonksiyon çağrılır (runSprint kod akışı), hangi dosyalar oluşur/güncellenir. Blueprint referansları.
+
+### Test
+- Manuel doğrulama — fazlar doğru sırada, kod referansları doğru
+
+---
+
+## Görev 7: CONFIG-REFERENCE.md — Config Referans Kılavuzu
+- Dosya: docs/CONFIG-REFERENCE.md (yeni)
+- Kapsam: docs/
+
+### Açıklama
+Tüm .deckent/config.json seçenekleri ve varsayılan değerleri. 4 plan modu (ai, structured, hybrid, auto) limitleri ve karşılaştırması. Örneklerle açıklama. Blueprint referansları.
+
+### Test
+- Manuel doğrulama — config seçenekleri ve plan modları doğru
+
+---
+
+## Görev 8: WORKER-GUIDE.md — Worker Davranış Kılavuzu
+- Dosya: docs/WORKER-GUIDE.md (yeni)
+- Kapsam: docs/
+
+### Açıklama
+Worker claim'den result'a kadar tüm akış: task okuma, plan yazma, heartbeat, lock yönetimi, scope kuralları, test çalıştırma, result yazma. Blueprint ve worker-default.md referansları.
+
+### Test
+- Manuel doğrulama — akış doğru, scope kuralları tutarlı
+
+---
+
+## Görev 9: BRAIN-GUIDE.md — Brain İç İşleyişi
+- Dosya: docs/BRAIN-GUIDE.md (yeni)
+- Kapsam: docs/
+
+### Açıklama
+Brain iç işleyişi: planlama modları (AI vs structured), task atama, model seçimi, GO/NO-GO değerlendirme, debt escalation, memory yönetimi, decay. Blueprint ve brain.md referansları.
+
+### Test
+- Manuel doğrulama — planlama modları ve değerlendirme kriterleri doğru
+
+---
+
+## Görev 10: DASHBOARD-GUIDE.md — Dashboard Kılavuzu
+- Dosya: docs/DASHBOARD-GUIDE.md (yeni)
+- Kapsam: docs/
+
+### Açıklama
+Terminal TUI dashboard (deckent status --watch), Web dashboard (React), HTTP API (15 endpoint listesi), SSE real-time stream. Kurulum ve kullanım adımları. Blueprint referansları.
+
+### Test
+- Manuel doğrulama — endpoint sayıları ve özellikler doğru
 
 ---
 
 ## Kalite Kuralları
 - tsc --noEmit MUST pass
-- npx vitest run MUST pass — hedef: 1020+ test (987 + ~33 yeni)
-- Coverage düşmemeli (%97+)
-- Mevcut 987 test 0 regresyon
-- MCP: 10 tool (değişiklik yok), 5 resource (değişiklik yok)
-- CLI: 26 komut (watch eklenmişti Sprint 16'da)
-- HTTP API: 15→16 endpoint (worker log eklendi Sprint 16'da)
-- getNextSprintId hiçbir zaman geri atlamamalı
-- Background job: fork() veya spawn(), ana process'i bloklamamalı
+- npx vitest run MUST pass — mevcut 1027 test kırılmamalı
+- Yeni dosya oluştur, mevcut kodu DEĞİŞTİRME
+- Her doküman Blueprint'e (DECKENT-MASTER-BLUEPRINT.md) referans vermeli
+- Sadece docs/ dizinine yazma izni — kaynak kod dokunulmaz
+- MCP: 10 tool, 5 resource (değişiklik yok)
+- CLI: 26 komut (değişiklik yok)

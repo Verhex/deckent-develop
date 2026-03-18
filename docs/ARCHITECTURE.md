@@ -21,7 +21,7 @@ YOU (Operator) → writes DIRECTIVES.md
  plan → code → test → doc → report
        │
  HTTP API + WEB DASHBOARD
- 15 endpoints + SSE, React+Vite+Tailwind
+ 16 endpoints + SSE, React+Vite+Tailwind
 ```
 
 ### Brain + Planner (Orchestrator)
@@ -83,7 +83,7 @@ Total `.brain/` budget: **300 lines** (excluding archive). Compressed at sprint 
 ---
 
 ### HTTP API & Web Dashboard
-- **HTTP API** (`src/api/server.ts`): 15 endpoints + SSE stream
+- **HTTP API** (`src/api/server.ts`): 16 endpoints + SSE stream
 - **Web Dashboard** (`src/dashboard/`): React + Vite + Tailwind, 4 pages (Dashboard, Settings, History, Memory)
 - `deckent web` launches both at localhost:3100
 - SSE endpoint watches `.dashboard` file for real-time updates
