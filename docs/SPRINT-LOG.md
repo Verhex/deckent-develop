@@ -153,6 +153,28 @@
 
 ---
 
+## Sprints 2-14 — Consolidated Summary
+
+Sprint 2-14 logs were not maintained in SPRINT-LOG.md during initial development.
+Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 19+24.
+
+| Sprint | Tests | Coverage | Highlights |
+|--------|-------|----------|------------|
+| 2 | 480 | 91% | Async migration (sleepSync → async sleep) |
+| 3 | 540 | 92% | checkUsage real impl, haiku_allowed semantic fix |
+| 4 | 617 | 93% | resolveDebt lifecycle, stale debt cleanup |
+| 5 | 644 | 94.83% | Decay, doctor, start --dry-run, status --watch |
+| 6 | 645 | 95% | First dogfooding: README.md generated in 86s |
+| 7 | 669 | 95% | MCP server: 8 tools, 4 resources, auto-registration |
+| 8 | 669 | 95% | CONTRIBUTING.md, API docs, MCP dogfooding |
+| 9 | 720 | 95% | Analyzer tool, CI pipeline, dynamic version |
+| 10 | 799 | 95% | HTTP API+SSE, terminal dashboard, sprint ID refactor |
+| 11 | 852 | 97% | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui |
+| 12-13 | 938 | 97.5% | Brain AI planning (planner.ts, Zod), Auditor in-process |
+| 14 | 938 | 97.5% | Auditor live scan loop, .deckent structure, worker heartbeat |
+
+---
+
 ## Sprint 15 — DECKENT.md Bağımsızlık + Self-Hosting
 
 **Status:** COMPLETE
