@@ -57,7 +57,7 @@ npm run clean        # Remove dist/
 
 ```bash
 npm run lint    # Should exit with no errors
-npm test        # Should pass all tests (1027+)
+npm test        # Should pass all tests (1422+)
 npm run build   # Should produce dist/ with no errors
 ```
 
@@ -119,13 +119,13 @@ deckent/
 
 | Module | Responsibility |
 |---|---|
-| `src/core` | Types, constants, config loading/validation, shared utilities, project analyzer |
-| `src/orchestra` | Sprint planning (AI + structured), agent spawning, result evaluation, debt decay |
+| `src/core` | Types, constants, config loading/validation, shared utilities, project analyzer, system profile, subscription detection |
+| `src/orchestra` | Sprint planning (AI + structured + auto fallback), agent spawning, result evaluation, debt decay, layered model selection |
 | `src/agents` | Worker lifecycle: task claim, file lock, heartbeat, result write |
-| `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state |
+| `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state, alert dedup |
 | `src/api` | HTTP API (16 endpoints + SSE), dashboard file watcher |
-| `src/cli` | CLI commands (21 files), interactive prompts, display helpers |
-| `src/mcp` | MCP server with 10 tools and 5 resources for IDE/host integration |
+| `src/cli` | CLI commands (28 commands), interactive prompts, display helpers, contextual hints, auto setup wizard |
+| `src/mcp` | MCP server with 10 tools (enriched responses) and 5 resources for IDE/host integration |
 | `src/dashboard` | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui components |
 
 ---

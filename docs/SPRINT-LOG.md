@@ -309,7 +309,119 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 
 ---
 
+## Sprint 19 — Motor Onarımı (6 Bug Fix)
+
+**Status:** COMPLETE
+**Date:** 2026-03-18
+**Duration:** 760s (~12.7 minutes)
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Tasks planned | 8 |
+| Tasks completed | 8 (6 DONE, 2 GO_WITH_TECH_DEBT) |
+| Tests | 1027→1123 (+96 new) |
+| Coverage | 97.5% |
+| Source lines added | +1555 |
+| Bugs fixed | 6 (from Sprint 18) |
+
+### Key Deliverables
+
+- Heartbeat timestamp fix: doğru UTC zaman damgası, 0 stale alert
+- Dashboard progress fix: done counter `.result` dosyaları ile güncelleniyor
+- Alert deduplication: tekrar eden uyarılar engellendi
+- inferModelFromDirective fix: opus aşırı atama düzeltildi
+- isDocTask(): doc scope'ları için coverage check atlanıyor
+- updateProjectDocs(): sprint sonrası otomatik doc güncelleme
+- Observation report: [docs/SPRINT-19-OBSERVATION.md](SPRINT-19-OBSERVATION.md)
+
+---
+
+## Sprint 20 — Fix Doğrulama Sprint'i
+
+**Status:** COMPLETE (PARTIAL — 8/14 tasks)
+**Date:** 2026-03-18
+**Duration:** 113s (~1.9 minutes)
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Tasks planned | 8 (of 14 requested — planner still limited) |
+| Tasks completed | 8 |
+| Tests | 1027 (validation sprint — no new tests) |
+| Fix validations | 3/6 confirmed PASSED |
+
+### Key Deliverables
+
+- Heartbeat timestamp: PASSED (0 stale alerts)
+- Dashboard progress: PASSED (Done: 8/8 correct)
+- Alert dedup: PASSED (0 duplicate alerts)
+- Task queue: FAILED (planner still limited by max_workers)
+- Doc task criteria: PARTIAL
+- Model inference: could not validate
+- Observation report: [docs/SPRINT-20-OBSERVATION.md](SPRINT-20-OBSERVATION.md)
+
+---
+
+## Sprint 21 — Parametrik Orkestrasyon
+
+**Status:** COMPLETE
+**Date:** 2026-03-18
+**Duration:** 631s (~10.5 minutes)
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Tasks planned | 8 |
+| Tasks completed | 8 (7 DONE, 1 GO_WITH_TECH_DEBT) |
+| Tests | 1123→1260 (+137 new) |
+| Coverage | 97.5% |
+| CLI commands | 26→28 (test, run) |
+
+### Key Deliverables
+
+- system-profile.ts: CPU, RAM, recommended workers tespiti
+- subscription.ts: Claude plan tespiti (max_20x/max_5x/pro/api/unknown)
+- resolveTaskModel(): katmanlı model seçimi (scope, complexity, plan, usage)
+- resolveEffectiveWorkers(): config "auto" ise otomatik worker sayısı
+- deckent test + deckent run CLI komutları
+- Planner task queue fix: tüm görevler planlanıyor, spawnWorkers parallelism sınırını uygular
+- DEBT.md decay bug tekrar oluştu (3. kez) — Sprint 22'de kalıcı fix
+- Observation report: [docs/SPRINT-21-OBSERVATION.md](SPRINT-21-OBSERVATION.md)
+
+---
+
+## Sprint 22 — Decay Fix + Auto Setup + MCP Enrichment
+
+**Status:** COMPLETE
+**Date:** 2026-03-18
+**Duration:** ~150s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Tasks planned | 8 (AI planner only returned 8 of 12) |
+| Tasks completed | 8 (6 DONE, 2 GO_WITH_TECH_DEBT) |
+| Tests | 1260→1392 (+132 new) |
+| New files | 5 (auto-setup.ts, enrich.ts, helpers/index.ts, hints.ts, messages.ts) |
+
+### Key Deliverables
+
+- shouldRemoveResolvedDebt() + parseSprintNumber(): DEBT-002 artık decay'de korunuyor
+- Auto Setup Wizard: generateSetupRecommendation() — subscription + sistem profili + proje boyutu
+- MCP Enrichment: enrichResponse() altyapısı, 10/10 tool'a _enriched meta eklenidi
+- CLI Hints: getContextualHints() faz bazlı öneriler, getMessage() lokalize mesajlar
+- doctor --profile: sistem profili gösterimi
+- AI planner hala 8/12 döndürüyor — Sprint 23'te post-validation fix
+
+---
+
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Section 19*
+
 ## Sprint 23 — sprint-023
 
 **Status:** RETROSPECTIVE

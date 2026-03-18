@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-1027+ tests | 97.5% coverage | 23 sprints completed
+1422+ tests | 97.5% coverage | 23 sprints completed
 
 Deckent is a self-evolving AI agent orchestration system. Write directives in plain language — Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
 
@@ -89,10 +89,12 @@ $ deckent init
 | `deckent upgrade` | Self-update Deckent |
 | `deckent sync` | Sync adapter files with DECKENT.md reference |
 | `deckent watch` | Live tmux split view: dashboard + worker panes |
+| `deckent test` | Run project tests (`npx vitest run`) |
+| `deckent run <cmd>` | Run arbitrary command in project context |
 
 ## MCP Integration
 
-Deckent integrates into Claude Code via 10 MCP tools + 5 resources. Register with:
+Deckent integrates into Claude Code via 10 MCP tools (enriched responses) + 5 resources. Register with:
 
 ```bash
 claude mcp add deckent -- npx deckent mcp

@@ -7,19 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0-sprint23] - 2026-03-18
 
+### Fixed
+
+- **AI planner post-validation fallback**: AI planner eksik görev döndürürse (`plannerResult.tasks.length < directiveTaskCount`) structured fallback'e düşüyor — ilk kez 12/12 görev planlandı
+- **CI hardcoded path fix**: `tools-enrichment-batch2.test.ts` absolute path → `__dirname` bazlı relative path
+
 ### Added
 
-- **AI Planner Post-Validation Fallback Fix (TAMAMLANDI)**: GO_WITH_TECH_DEBT
-- **Decay Fix Doğrulama**: DONE
-- **Auto Setup Wizard Doğrulama**: DONE
-- **MCP Enrichment Infrastructure Doğrulama**: GO_WITH_TECH_DEBT
-- **MCP Enrichment Tools Batch 1 Doğrulama**: DONE
-- **MCP Enrichment Tools Batch 2 Doğrulama**: DONE
-- **CLI Hints System Doğrulama**: DONE
-- **Doctor Profile Flag Doğrulama**: GO_WITH_TECH_DEBT
-- **Sprint 22 Test Coverage Doğrulama**: DONE
-- **AI Planner Fallback Fix Doğrulama**: DONE
-- **Tasks**: 12 total, 12 done, 4 tech debt, 0 no-go
+- 12 task (12 done, 4 tech debt, 0 no-go) — ilk 12-görevli sprint, task queue wave mekanizması doğrulandı
+- 11 doğrulama dokümanı (`tmp-test/`): Sprint 22 özelliklerinin kapsamlı validasyonu
+- +30 test (1392→1422), 55 test dosyası
+- Planning mode: `fallback` (AI yetersiz → structured fallback)
+
+## [0.1.0-sprint22] - 2026-03-18
+
+### Fixed
+
+- **runDecay DEBT.md resolved retention**: `shouldRemoveResolvedDebt()` + `parseSprintNumber()` — resolved entry'ler 3 sprint boyunca korunuyor (DEBT-002 artık decay'de silinmiyor)
+
+### Added
+
+- **Auto Setup Wizard** (`src/cli/auto-setup.ts`): `generateSetupRecommendation()` — subscription, sistem profili ve proje boyutuna göre otomatik yapılandırma önerisi
+- **MCP Enrichment** (10/10 tool): `enrichResponse()` altyapısı (`src/mcp/helpers/enrich.ts`) — tüm tool response'larına `_enriched: { summary, hints, timestamp }` ekleniyor
+- **CLI Hints System** (`src/cli/helpers/hints.ts`, `messages.ts`): `getContextualHints()` faz bazlı öneriler, `getMessage()` lokalize mesajlar (tr/en)
+- **doctor --profile**: Sistem profili gösterimi (CPU, RAM, recommended workers, subscription)
+- `SetupRecommendation` interface (`types.ts`)
+- +132 test (1260→1392), 0 regresyon
+
+## [0.1.0-sprint21] - 2026-03-18
+
+### Added
+
+- **System Profile** (`src/core/system-profile.ts`): `getSystemProfile()` — CPU, RAM, recommended workers tespiti
+- **Subscription Detection** (`src/core/subscription.ts`): `detectSubscription()` — Claude plan tespiti (max_20x/max_5x/pro/api/unknown)
+- **Layered Model Selection** (`src/orchestra/brain.ts`): `resolveTaskModel()` — scope, complexity, plan, usage'a göre katmanlı model seçimi (opus/sonnet/haiku)
+- **Auto Workers**: `resolveEffectiveWorkers()` — config "auto" ise sistem profiline göre worker sayısı
+- **deckent test** CLI: `npx vitest run` wrapper
+- **deckent run** CLI: Arbitrary komut çalıştırma
+- **Planner task queue fix**: `planSprint` artık max_workers'dan bağımsız tüm görevleri planlıyor (spawnWorkers parallelism sınırını uygular)
+- +137 test (1123→1260), 28 CLI komut, 0 regresyon
+
+## [0.1.0-sprint20] - 2026-03-18
+
+### Added
+
+- **Fix validation sprint**: Sprint 18'de keşfedilen 6 bug'ın 3'ü doğrulandı
+  - Heartbeat timestamp: PASSED (0 stale alert)
+  - Dashboard progress: PASSED (done counter doğru)
+  - Alert dedup: PASSED (0 duplicate alert)
+  - Task queue: FAILED (planner hala max_workers ile sınırlı — Sprint 21'de düzeltildi)
+  - Doc task criteria: PARTIAL
+  - Model inference: doğrulanamadı
+- 6 analiz dokümanı (`tmp-test/`): sistematik fix doğrulama
+- 8/14 görev planlandı ve çalıştırıldı (113s)
+- 1027 test (doğrulama sprint'i — yeni test yok), 0 regresyon
+
+## [0.1.0-sprint19] - 2026-03-18
+
+### Fixed
+
+- **Heartbeat timestamp**: Worker heartbeat'te doğru UTC zaman damgası — stale agent false positive düzeltildi
+- **Dashboard progress**: Done counter `.result` dosyaları oluşunca güncelleniyor (EVALUATE fazını beklemiyor)
+- **Alert deduplication**: Aynı alert aynı scan döngüsünde tekrarlanmıyor
+- **inferModelFromDirective**: Opus aşırı atama düzeltildi
+- **Doc task criteria**: `isDocTask()` — doc scope'ları için coverage check atlanıyor
+- **Auto doc update**: `updateProjectDocs()` — sprint sonrası doc dosyaları otomatik güncelleniyor
+
+### Added
+
+- Sprint 18'de keşfedilen 6 bug'ın tamamı ele alındı (6 DONE + 2 GO_WITH_TECH_DEBT)
+- +96 test (1027→1123), +1555 satır kaynak kodu, 0 regresyon
+
 ## [0.1.0-sprint18] - 2026-03-18
 
 ### Added

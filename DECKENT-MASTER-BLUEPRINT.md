@@ -1301,6 +1301,57 @@ Deckent ran itself for the first time:
 - Observation report: docs/SPRINT-18-OBSERVATION.md
 - 1027 tests (doc-only sprint — no new tests), 97.5% coverage, 0 regressions
 
+## Sprint 19: Motor Repair — 6 Bug Fixes
+
+- All 6 bugs from Sprint 18 addressed: heartbeat timestamp, dashboard progress, alert dedup, inferModelFromDirective, doc task criteria, auto doc update
+- 8/8 tasks completed (6 DONE, 2 GO_WITH_TECH_DEBT), 760s
+- `isDocTask()`: doc scopes skip coverage check
+- `updateProjectDocs()`: auto-updates docs after sprint
+- +96 tests (1027→1123), +1555 source lines, 0 regressions
+- Observation report: docs/SPRINT-19-OBSERVATION.md
+
+## Sprint 20: Fix Validation
+
+- Systematic validation of Sprint 19 fixes — 3/6 confirmed PASSED
+- Heartbeat timestamp: PASSED (0 stale alerts)
+- Dashboard progress: PASSED (done counter correct)
+- Alert dedup: PASSED (0 duplicate alerts)
+- Task queue: FAILED (planner still limited by max_workers — fixed in Sprint 21)
+- 8/14 tasks planned (planner bug still active), 113s
+- 1027 tests (validation sprint), 0 regressions
+- Observation report: docs/SPRINT-20-OBSERVATION.md
+
+## Sprint 21: Parametric Orchestration
+
+- `system-profile.ts`: CPU, RAM, recommended workers detection via `getSystemProfile()`
+- `subscription.ts`: Claude plan detection via `detectSubscription()` (max_20x/max_5x/pro/api/unknown)
+- `resolveTaskModel()`: layered model selection (scope → complexity → plan → usage)
+- `resolveEffectiveWorkers()`: auto worker count from system profile
+- `deckent test` + `deckent run` CLI commands (26→28 commands)
+- Planner task queue fix: `planSprint` plans ALL tasks, `spawnWorkers` enforces parallelism limit
+- DEBT.md decay bug recurred (3rd time) — resolved entries being removed
+- 8/8 tasks (7 DONE, 1 TECH_DEBT), +137 tests (1123→1260), 631s
+- Observation report: docs/SPRINT-21-OBSERVATION.md
+
+## Sprint 22: Decay Fix + Auto Setup + MCP Enrichment
+
+- `shouldRemoveResolvedDebt()` + `parseSprintNumber()`: resolved entries retained for 3 sprints (DEBT-002 preserved)
+- Auto Setup Wizard (`auto-setup.ts`): `generateSetupRecommendation()` — subscription + system profile + project size
+- MCP Enrichment (`enrich.ts`): `enrichResponse()` adds `_enriched: { summary, hints, timestamp }` to all 10 tools
+- CLI Hints (`hints.ts`, `messages.ts`): `getContextualHints()` phase-based suggestions, `getMessage()` localized (tr/en)
+- `doctor --profile`: system profile display (CPU, RAM, workers, subscription)
+- AI planner still returned 8/12 tasks — Sprint 23 post-validation fix needed
+- 8 tasks (6 DONE, 2 TECH_DEBT), +132 tests (1260→1392), ~150s
+
+## Sprint 23: AI Planner Post-Validation Fallback + 12-Task Validation
+
+- AI planner post-validation: if AI returns fewer tasks than `parseStructuredDirectives()` count → set `plannerResult = null`, fall back to structured mode
+- First time 12/12 tasks planned and completed — task queue wave mechanism validated (8 workers + 4 queued)
+- 11 validation docs in `tmp-test/` confirming Sprint 22 features
+- Planning mode: `fallback` (AI returned 8, directives had 12 → structured fallback produced 12)
+- 12 tasks (8 DONE, 4 TECH_DEBT, 0 NO_GO), 321s
+- +30 tests (1392→1422), 55 test files, 0 regressions
+
 ---
 
 # 20. CLAUDE CODE INTEGRATION GUIDE
@@ -1604,6 +1655,11 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 16 | 987 | 97.5% | deckent watch, worker log capture, start --watch, agent detail view, model inference |
 | 17 | 1027 | 97.5% | MCP background jobs, cleanup fix, sprint ID safety, dashboard reset, React test infra |
 | 18 | 1027 | 97.5% | Orchestration smoke test: 8 docs, first real runSprint since S10, 6 bugs found |
+| 19 | 1123 | 97.5% | Motor repair: 6 bug fixes (heartbeat, dashboard, alert dedup, model inference, doc criteria, auto doc) |
+| 20 | 1027 | 97.5% | Fix validation: 3/6 confirmed (heartbeat, dashboard, alert dedup), planner still broken |
+| 21 | 1260 | 97.5% | Parametric orchestration: system-profile, subscription, resolveTaskModel, auto workers, test+run CLI |
+| 22 | 1392 | 97.5% | Decay fix, auto setup wizard, MCP enrichment 10/10, CLI hints, doctor --profile |
+| 23 | 1422 | 97.5% | AI planner fallback fix, 12/12 tasks (first time), task queue waves validated |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1614,6 +1670,12 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 **Reliability milestone (Sprint 17):** MCP `deckent_start` no longer times out — runs sprint as background job via `child_process.fork()`. Sprint ID never regresses (config-based safety). Dashboard resets cleanly between sprints. React test infrastructure enables component testing. 1027 tests total.
 
 **Orchestration milestone (Sprint 18):** First real `runSprint` since Sprint 10. 8 parallel sonnet workers executed 8 doc tasks in 260s. Full lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→RETRO→CLEANUP) completed end-to-end. 6 bugs discovered — planner task queue, heartbeat timestamps, dashboard progress, alert dedup, doc evaluation criteria, debt table test.
+
+**Motor repair milestone (Sprint 19):** All 6 bugs from Sprint 18 fixed. +96 tests. `isDocTask()` and `updateProjectDocs()` added. Heartbeat, dashboard, and alert dedup all confirmed working in Sprint 20 validation.
+
+**Parametric orchestration milestone (Sprint 21):** System profile detection, subscription detection, layered model selection, auto workers. `deckent test` and `deckent run` CLI commands. Planner task queue finally fixed — all tasks planned regardless of max_workers. +137 tests.
+
+**Full orchestration milestone (Sprint 23):** AI planner post-validation fallback — if AI returns fewer tasks than directives specify, falls back to structured mode. First time 12/12 tasks planned and completed. Task queue wave mechanism (8 workers + 4 queued) validated end-to-end. 1422 tests total.
 
 ---
 

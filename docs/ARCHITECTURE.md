@@ -66,6 +66,37 @@ project/
 └── src/, tests/, docs/    # Source code
 ```
 
+### Key Source Modules
+
+```
+src/
+├── core/
+│   ├── types.ts           # Shared TypeScript interfaces and enums
+│   ├── constants.ts       # App-wide constants
+│   ├── config.ts          # 3-layer config loader
+│   ├── utils.ts           # Shared utilities (countBrainLines, shouldRemoveResolvedDebt, etc.)
+│   ├── analyzer.ts        # Project stack/size/methodology analysis
+│   ├── system-profile.ts  # CPU, RAM, recommended workers detection
+│   └── subscription.ts    # Claude plan detection (max_20x/max_5x/pro/api/unknown)
+├── orchestra/
+│   ├── brain.ts           # Sprint lifecycle, resolveTaskModel, planSprint (AI post-validation)
+│   ├── planner.ts         # AI task planning (Zod-validated)
+│   └── tmux.ts            # tmux session and window management
+├── cli/
+│   ├── auto-setup.ts      # Auto setup wizard (generateSetupRecommendation)
+│   ├── commands/          # 28 CLI commands (init, start, test, run, doctor --profile, ...)
+│   └── helpers/
+│       ├── hints.ts       # Phase-based contextual hints (tr/en)
+│       └── messages.ts    # Localized message system (tr/en)
+├── mcp/
+│   ├── tools/             # 10 MCP tool handlers (all enriched)
+│   ├── resources/         # 5 MCP resource handlers
+│   └── helpers/
+│       └── enrich.ts      # enrichResponse() — adds _enriched meta to all tool responses
+├── api/                   # HTTP API (16 endpoints + SSE)
+└── dashboard/             # Web Dashboard (React+Vite+Tailwind)
+```
+
 See Blueprint Section 4 for complete file-by-file reference.
 
 ---

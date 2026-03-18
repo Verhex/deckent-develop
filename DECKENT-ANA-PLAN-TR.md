@@ -446,6 +446,57 @@ Deckent ilk kez kendini çalıştırdı:
 - Gözlem raporu: docs/SPRINT-18-OBSERVATION.md
 - 1027 test (sadece doküman sprint'i — yeni test yok), %97.5 kapsam, 0 regresyon
 
+## Sprint 19: Motor Onarımı — 6 Bug Fix
+
+- Sprint 18'deki 6 bug'ın tamamı ele alındı: heartbeat zaman damgası, dashboard ilerleme, alert tekrar engelleme, inferModelFromDirective, doküman görev kriterleri, otomatik doküman güncelleme
+- 8/8 görev tamamlandı (6 DONE, 2 GO_WITH_TECH_DEBT), 760 saniye
+- `isDocTask()`: doküman scope'ları için coverage kontrolü atlanıyor
+- `updateProjectDocs()`: sprint sonrası dokümanlar otomatik güncelleniyor
+- +96 test (1027→1123), +1555 kaynak satırı, 0 regresyon
+- Gözlem raporu: docs/SPRINT-19-OBSERVATION.md
+
+## Sprint 20: Fix Doğrulama
+
+- Sprint 19 düzeltmelerinin sistematik doğrulaması — 3/6 GEÇTI
+- Heartbeat zaman damgası: GEÇTI (0 stale alert)
+- Dashboard ilerleme: GEÇTI (done sayacı doğru)
+- Alert tekrar engelleme: GEÇTI (0 tekrar alert)
+- Görev kuyruğu: BAŞARISIZ (planner hala max_workers ile sınırlı — Sprint 21'de düzeltildi)
+- 8/14 görev planlandı (planner bug'ı aktif), 113 saniye
+- 1027 test (doğrulama sprint'i), 0 regresyon
+- Gözlem raporu: docs/SPRINT-20-OBSERVATION.md
+
+## Sprint 21: Parametrik Orkestrasyon
+
+- `system-profile.ts`: CPU, RAM, önerilen worker sayısı tespiti (`getSystemProfile()`)
+- `subscription.ts`: Claude plan tespiti (`detectSubscription()`) — max_20x/max_5x/pro/api/unknown
+- `resolveTaskModel()`: katmanlı model seçimi (scope → karmaşıklık → plan → kullanım)
+- `resolveEffectiveWorkers()`: config "auto" ise sistem profilinden otomatik worker sayısı
+- `deckent test` + `deckent run` CLI komutları (26→28 komut)
+- Planner görev kuyruğu düzeltmesi: `planSprint` TÜM görevleri planlıyor, `spawnWorkers` parallelism sınırını uyguluyor
+- DEBT.md decay bug'ı tekrar oluştu (3. kez) — Sprint 22'de kalıcı fix
+- 8/8 görev (7 DONE, 1 TECH_DEBT), +137 test (1123→1260), 631 saniye
+- Gözlem raporu: docs/SPRINT-21-OBSERVATION.md
+
+## Sprint 22: Decay Fix + Auto Setup + MCP Enrichment
+
+- `shouldRemoveResolvedDebt()` + `parseSprintNumber()`: resolved entry'ler 3 sprint boyunca korunuyor (DEBT-002 artık korunuyor)
+- Auto Setup Wizard (`auto-setup.ts`): `generateSetupRecommendation()` — subscription + sistem profili + proje boyutu
+- MCP Enrichment (`enrich.ts`): `enrichResponse()` tüm 10 tool'a `_enriched: { summary, hints, timestamp }` ekliyor
+- CLI Hints (`hints.ts`, `messages.ts`): `getContextualHints()` faz bazlı öneriler, `getMessage()` lokalize mesajlar (tr/en)
+- `doctor --profile`: sistem profili gösterimi (CPU, RAM, worker, subscription)
+- AI planner hala 8/12 döndürüyor — Sprint 23'te post-validation fix
+- 8 görev (6 DONE, 2 TECH_DEBT), +132 test (1260→1392), ~150 saniye
+
+## Sprint 23: AI Planner Post-Validation Fallback + 12-Görev Doğrulama
+
+- AI planner post-validation: AI `parseStructuredDirectives()` sayısından az döndürürse → `plannerResult = null`, structured mod'a düşüyor
+- İlk kez 12/12 görev planlandı ve tamamlandı — görev kuyruğu dalga mekanizması doğrulandı (8 worker + 4 kuyruk)
+- 11 doğrulama dokümanı (`tmp-test/`): Sprint 22 özelliklerini onaylıyor
+- Planlama modu: `fallback` (AI 8 döndürdü, directive'de 12 vardı → structured fallback 12 oluşturdu)
+- 12 görev (8 DONE, 4 TECH_DEBT, 0 NO_GO), 321 saniye
+- +30 test (1392→1422), 55 test dosyası, 0 regresyon
+
 ---
 
 # 20. CLAUDE CODE ENTEGRASYON REHBERİ
@@ -642,6 +693,11 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 16 | 987 | %97.5 | deckent watch, worker log yakalama, start --watch, ajan detay görünümü, model çıkarımı |
 | 17 | 1027 | %97.5 | MCP arka plan görevleri, cleanup düzeltme, sprint ID güvenliği, dashboard sıfırlama, React test altyapısı |
 | 18 | 1027 | %97.5 | Orkestrasyon smoke test: 8 doküman, S10'dan beri ilk gerçek runSprint, 6 bug keşfedildi |
+| 19 | 1123 | %97.5 | Motor onarımı: 6 bug fix (heartbeat, dashboard, alert dedup, model çıkarımı, doküman kriterleri, otomatik doküman) |
+| 20 | 1027 | %97.5 | Fix doğrulama: 3/6 onaylandı (heartbeat, dashboard, alert dedup), planner hala kırık |
+| 21 | 1260 | %97.5 | Parametrik orkestrasyon: sistem profili, subscription, resolveTaskModel, auto workers, test+run CLI |
+| 22 | 1392 | %97.5 | Decay fix, auto setup wizard, MCP enrichment 10/10, CLI hints, doctor --profile |
+| 23 | 1422 | %97.5 | AI planner fallback fix, 12/12 görev (ilk kez), görev kuyruğu dalga mekanizması doğrulandı |
 
 **İlk dogfooding sonucu (Sprint 6):** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Orkestrasyon döngüsü (planla → başlat → yürüt → değerlendir → retro → temizle) uçtan uca tamamlandı.
 
@@ -652,6 +708,12 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 **Güvenilirlik dönüm noktası (Sprint 17):** MCP `deckent_start` artık timeout olmuyor — sprint'i `child_process.fork()` ile arka plan görevi olarak çalıştırır. Sprint ID asla geri atlamaz (yapılandırma tabanlı güvenlik). Dashboard sprint'ler arasında temiz sıfırlanır. React test altyapısı bileşen testlerini mümkün kılar. Toplam 1027 test.
 
 **Orkestrasyon dönüm noktası (Sprint 18):** Sprint 10'dan bu yana ilk gerçek `runSprint`. 8 paralel sonnet worker 260 saniyede 8 doküman görevi tamamladı. Tam yaşam döngüsü (PLAN→SPAWN→EXECUTE→EVALUATE→RETRO→CLEANUP) uçtan uca çalıştı. 6 bug keşfedildi — planner görev kuyruğu, heartbeat zaman damgaları, dashboard ilerleme, alert tekrar sorunu, doküman değerlendirme kriterleri, borç tablosu testi.
+
+**Motor onarımı dönüm noktası (Sprint 19):** Sprint 18'deki 6 bug'ın tamamı düzeltildi. +96 test. `isDocTask()` ve `updateProjectDocs()` eklendi. Heartbeat, dashboard ve alert dedup Sprint 20 doğrulamasında çalıştığı onaylandı.
+
+**Parametrik orkestrasyon dönüm noktası (Sprint 21):** Sistem profili tespiti, subscription tespiti, katmanlı model seçimi, otomatik worker sayısı. `deckent test` ve `deckent run` CLI komutları. Planner görev kuyruğu nihayet düzeltildi — tüm görevler max_workers'dan bağımsız planlanıyor. +137 test.
+
+**Tam orkestrasyon dönüm noktası (Sprint 23):** AI planner post-validation fallback — AI directive'deki görev sayısından az döndürürse structured mod'a düşüyor. İlk kez 12/12 görev planlandı ve tamamlandı. Görev kuyruğu dalga mekanizması (8 worker + 4 kuyruk) uçtan uca doğrulandı. Toplam 1422 test.
 
 ---
 
