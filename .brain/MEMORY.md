@@ -81,3 +81,10 @@
 ## Sprint sprint-019 Learnings
 - Alert Dedup — Auditor Tekrar Engelleme: GO_WITH_TECH_DEBT
 - Eksik Dokümanlar — BRAIN-GUIDE.md + DASHBOARD-GUIDE.md: GO_WITH_TECH_DEBT
+## Sprint sprint-020 Learnings
+- Worker Modülü Fonksiyon Listesi: GO_WITH_TECH_DEBT
+- Config Sistemi Analizi: GO_WITH_TECH_DEBT
+- tmux Modülü Analizi: GO_WITH_TECH_DEBT
+- Planner Modülü Analizi: GO_WITH_TECH_DEBT
+- MCP Tool Listesi ve Açıklamaları: GO_WITH_TECH_DEBT
+- MCP Resource Listesi ve Açıklamaları: GO_WITH_TECH_DEBT
