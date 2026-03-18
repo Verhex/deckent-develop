@@ -214,4 +214,33 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 
 ---
 
+## Sprint 16 — Watch Mode, Worker Logs, Agent Detail
+
+**Status:** COMPLETE
+**Date:** 2026-03-18
+**Duration:** Single session
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Files created | 4 (watch.ts, AgentDetail.tsx, watch.test.ts, job-runner.ts placeholder) |
+| Files updated | 10 (tmux.ts, worker.ts, brain.ts, start.ts, server.ts, DashboardPage.tsx, constants.ts, planner.ts, .gitignore, index.ts) |
+| Tests | 20 new, 987 total (all passing) |
+| Coverage | 97.5%+ |
+| Type errors | 0 |
+| CLI commands | 25->26 (watch) |
+| HTTP endpoints | 15->16 (worker log) |
+
+### Key Deliverables
+
+- deckent watch: tmux split view (dashboard left, worker list right)
+- Worker log capture: pipe-pane -> .tasks/task-{id}.log
+- start --watch: non-blocking watch window setup before sprint
+- GET /api/worker/:taskId/log: task + log API endpoint
+- AgentDetail component: Sheet panel with polling
+- inferModelFromDirective: structured planner model heuristic
+
+---
+
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Section 19*

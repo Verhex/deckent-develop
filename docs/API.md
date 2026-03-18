@@ -1653,6 +1653,7 @@ Creates an HTTP server with all API routes and optional static file serving. Ret
 | `GET /api/debt` | text/markdown | `.brain/DEBT.md` content |
 | `GET /api/job/:jobId` | Job status JSON | Active sprint job status (running/completed/failed) |
 | `GET /api/events` | SSE stream | Server-Sent Events — pushes dashboard updates on file change |
+| `GET /api/worker/:taskId/log` | Task JSON + log | Worker task JSON + terminal log output |
 
 #### POST Routes
 
@@ -1684,7 +1685,7 @@ Run via `deckent <command>` (globally installed) or `npx deckent <command>`.
 | Command | Description | Key Options |
 |---|---|---|
 | `init` | Initialize a new Deckent project (interactive wizard) | — |
-| `start` | Start a new sprint (full lifecycle) | `--auto-approve`, `--sandbox-mode`, `--dry-run`, `--force` |
+| `start` | Start a new sprint (full lifecycle) | `--auto-approve`, `--sandbox-mode`, `--dry-run`, `--force`, `--watch` |
 | `plan` | Plan a sprint without executing it | — |
 | `status` | Show the current sprint dashboard | `--watch` (auto-refresh 2s), `--json` |
 | `doctor` | Check system dependencies and health | — |
@@ -1708,6 +1709,7 @@ Run via `deckent <command>` (globally installed) or `npx deckent <command>`.
 | `serve` | Start HTTP API server (SSE) | `--port` |
 | `web` | Web dashboard + API server | `--port` |
 | `sync` | Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference | — |
+| `watch` | Live tmux split view: dashboard + worker panes | `--follow <taskId>` |
 
 ### Examples
 

@@ -5,6 +5,7 @@ import {
   checkBoundaryViolations,
   checkStaleLocks,
   detectDeadlocks,
+  resetDashboard,
   updateDashboard,
   detectPatterns,
   buildWorkerScopeMap,
@@ -623,6 +624,57 @@ describe('writeScanToDashboard', () => {
     expect(written).toHaveProperty('updatedAt');
     expect(written).toHaveProperty('auditorLastScan');
     expect(written).toHaveProperty('violations');
+  });
+});
+
+describe('resetDashboard', () => {
+  it('writes fresh state with correct sprint ID', () => {
+    resetDashboard('/project', 'sprint-005', 3);
+
+    expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
+    const callArgs = mockedWriteFileSync.mock.calls[0]!;
+    expect(String(callArgs[0])).toContain('.dashboard');
+    const written = JSON.parse(callArgs[1] as string);
+    expect(written.sprint.id).toBe('sprint-005');
+    expect(written.sprint.phase).toBe('PLAN');
+    expect(written.sprint.status).toBe('PLANNING');
+  });
+
+  it('sets progress to 0/total with correct task count', () => {
+    resetDashboard('/project', 'sprint-010', 7);
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.progress).toEqual({ done: 0, active: 0, blocked: 0, total: 7 });
+  });
+
+  it('clears old alerts (empty alerts array)', () => {
+    resetDashboard('/project', 'sprint-003', 2);
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.alerts).toEqual([]);
+  });
+
+  it('clears old agents (empty agents array)', () => {
+    resetDashboard('/project', 'sprint-003', 2);
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.agents).toEqual([]);
+  });
+
+  it('sets updatedAt to ISO timestamp', () => {
+    resetDashboard('/project', 'sprint-001', 1);
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('sets usage metrics to zero', () => {
+    resetDashboard('/project', 'sprint-001', 1);
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.usage.fiveHourPercent).toBe(0);
+    expect(written.usage.weeklyPercent).toBe(0);
+    expect(written.usage.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
 

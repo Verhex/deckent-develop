@@ -2,13 +2,14 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { runSprint, BrainError } from '../../orchestra/brain.js';
+import { writeJobState } from './job-runner.js';
 
 export function registerStartTool(server: McpServer): void {
   server.registerTool(
     'deckent_start',
     {
       title: 'Start Sprint',
-      description: 'Run a full sprint lifecycle (plan → spawn → execute → evaluate → retro → cleanup). This may take several minutes.',
+      description: 'Start a sprint in the background (plan → spawn → execute → evaluate → retro → cleanup). Returns immediately with a jobId. Use deckent_status to track progress.',
       inputSchema: z.object({
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker actions (--dangerously-skip-permissions)'),
       }),
@@ -18,23 +19,42 @@ export function registerStartTool(server: McpServer): void {
 
       try {
         const config = await loadConfig(root);
-        const sprint = await runSprint(root, config, { autoApprove });
+        const jobId = `sprint-${Date.now()}`;
+        const startedAt = new Date().toISOString();
+
+        writeJobState(root, { jobId, status: 'RUNNING', startedAt });
+
+        // Fire and forget — don't await. Sprint runs in background.
+        runSprint(root, config, { autoApprove }).then(sprint => {
+          writeJobState(root, {
+            jobId,
+            status: 'COMPLETE',
+            startedAt,
+            completedAt: new Date().toISOString(),
+            sprintId: sprint.id,
+          });
+        }).catch(err => {
+          const message = err instanceof BrainError
+            ? `Sprint failed at phase ${err.phase ?? 'unknown'}: ${err.message}`
+            : err instanceof Error ? err.message : String(err);
+
+          writeJobState(root, {
+            jobId,
+            status: 'FAILED',
+            startedAt,
+            completedAt: new Date().toISOString(),
+            error: message,
+          });
+        });
 
         return {
           content: [{
             type: 'text' as const,
             text: JSON.stringify({
               success: true,
-              sprint: {
-                id: sprint.id,
-                number: sprint.number,
-                status: sprint.status,
-                phase: sprint.phase,
-                taskCount: sprint.tasks.length,
-                metrics: sprint.metrics,
-                startedAt: sprint.startedAt,
-                completedAt: sprint.completedAt,
-              },
+              jobId,
+              status: 'RUNNING',
+              message: 'Sprint started in background. Use deckent_status to track progress.',
             }),
           }],
         };

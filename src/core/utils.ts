@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE } from './constants.js';
+import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, PROJECT_CONFIG_PATH } from './constants.js';
 import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
 
@@ -29,23 +29,60 @@ export function countBrainLines(projectRoot: string): number {
 }
 
 /**
- * Scan .brain/sprints/ directory, find max sprint-NNN.md number,
- * return sprint-{max+1} padded to 3 digits.
- * If no sprints dir or empty, return "sprint-001".
+ * Scan .brain/sprints/ directory AND .deckent/config.json last_sprint_id,
+ * take the max of both sources, return sprint-{max+1} padded to 3 digits.
+ * Never goes backward — config acts as a floor when sprint files are missing.
+ * If no sources available, returns "sprint-001".
  */
 export function getNextSprintId(projectRoot: string): string {
+  // Source 1: scan .brain/sprints/ (file-based)
   const sprintsDir = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
-  let maxNumber = 0;
+  let maxFromFiles = 0;
   if (existsSync(sprintsDir)) {
     for (const file of readdirSync(sprintsDir)) {
       const match = file.match(/^sprint-(\d+)\.md$/);
       if (match?.[1]) {
         const num = parseInt(match[1], 10);
-        if (num > maxNumber) maxNumber = num;
+        if (num > maxFromFiles) maxFromFiles = num;
       }
     }
   }
+
+  // Source 2: read last_sprint_id from .deckent/config.json
+  let maxFromConfig = 0;
+  const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
+  if (existsSync(configPath)) {
+    try {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+      const lastId = config.last_sprint_id;
+      if (typeof lastId === 'string') {
+        const m = lastId.match(/^sprint-(\d+)$/);
+        if (m?.[1]) maxFromConfig = parseInt(m[1], 10);
+      } else if (typeof lastId === 'number') {
+        maxFromConfig = lastId;
+      }
+    } catch { /* ignore malformed config */ }
+  }
+
+  // Take the max of both sources — never go backward
+  const maxNumber = Math.max(maxFromFiles, maxFromConfig);
   return `sprint-${String(maxNumber + 1).padStart(3, '0')}`;
+}
+
+/**
+ * Persist the latest sprint ID into .deckent/config.json so that
+ * getNextSprintId never regresses even if sprint log files are deleted.
+ */
+export function updateLastSprintId(projectRoot: string, sprintId: string): void {
+  const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
+  try {
+    let config: Record<string, unknown> = {};
+    if (existsSync(configPath)) {
+      config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    }
+    config.last_sprint_id = sprintId;
+    writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  } catch { /* ignore — non-critical */ }
 }
 
 export function parseDebtTable(content: string): DebtItem[] {

@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-967+ tests | 97.5% coverage | 15 sprints completed
+987+ tests | 97.5% coverage | 16 sprints completed
 
 Deckent is a self-evolving AI agent orchestration system. Write directives in plain language — Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
 
@@ -88,6 +88,7 @@ $ deckent init
 | `deckent web` | Web dashboard + API server (localhost:3100) |
 | `deckent upgrade` | Self-update Deckent |
 | `deckent sync` | Sync adapter files with DECKENT.md reference |
+| `deckent watch` | Live tmux split view: dashboard + worker panes |
 
 ## MCP Integration
 
@@ -115,7 +116,7 @@ React + Vite + Tailwind — 4 pages (Dashboard, Settings, History, Memory), SSE 
 deckent serve   # API only at localhost:3100
 ```
 
-15 endpoints + SSE: status, sprint, history, config, doctor, memory, debt, start, plan, kill, set-directives, events (SSE).
+16 endpoints + SSE: status, sprint, history, config, doctor, memory, debt, worker log, start, plan, kill, set-directives, events (SSE).
 
 ## Workspace Structure
 

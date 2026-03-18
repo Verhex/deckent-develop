@@ -1,257 +1,146 @@
-# DIRECTIVES — Sprint 16 (Watch Mode + Worker Logs + Agent Detail)
+# DIRECTIVES — Sprint 17 (Reliability + Test Infra + Docs)
 
-## Hedef: Sprint sırasında canlı izleme, worker log yakalama, web dashboard'da agent detay görünümü. Sprint 17'de self-run için dogfooding hazırlığı.
-
----
-
-## Görev 1: `deckent watch` CLI Komutu — Canlı tmux İzleme
-- Dosya: src/cli/commands/watch.ts (yeni), src/cli/index.ts, src/orchestra/tmux.ts
-- Kapsam: src/cli/, src/orchestra/
-
-### Problem
-Sprint başladığında kullanıcı `deckent attach` ile tmux'a bağlanıyor ama düzenli bir görünüm yok. Dashboard ve worker pane'leri karışık. Kullanıcı hangi worker'ın ne yaptığını rahat göremiyordu.
-
-### Çözüm
-
-1. **`deckent watch` komutu** — tmux session'ında düzenli split view oluştur:
-   - Sol panel (geniş, %60): `.dashboard` dosyasını `watch -n 2 cat .dashboard` ile izle
-   - Sağ panel (dar, %40): Worker'ların listesi, aktif worker'a attach
-   - Layout: `tmux split-window -h -p 40` ile yatay bölme
-   - `--follow <taskId>` flag: belirli bir worker'ın pane'ine attach ol
-
-2. **tmux.ts'e yeni fonksiyonlar ekle:**
-   ```typescript
-   export function createWatchLayout(sessionName: string): void {
-     // Yeni tmux window: "watch"
-     // Sol: dashboard izleme
-     // Sağ: worker list veya belirli worker
-   }
-   
-   export function attachToWorkerPane(sessionName: string, taskId: string): void {
-     // Belirli worker'ın tmux pane'ine attach
-   }
-   ```
-
-3. **Sprint aktif değilse** → hata mesajı: "No active sprint. Run `deckent start` first."
-   - `.dashboard` dosyasının varlığını kontrol et
-
-### Test
-- watch komutu tmux layout oluşturuyor
-- --follow flag belirli worker'a attach oluyor
-- Sprint aktif değilse hata veriyor
-- tmux yoksa graceful error
-- 6+ yeni test
+## Hedef: Sprint 16'da keşfedilen güvenilirlik sorunlarını düzelt, React test altyapısı kur, dokümantasyonu güncelle.
 
 ---
 
-## Görev 2: Worker Log Capture — tmux pipe-pane
-- Dosya: src/orchestra/tmux.ts, src/agents/worker.ts, src/orchestra/brain.ts
-- Kapsam: src/orchestra/, src/agents/
+## Görev 1: MCP deckent_start Background Job
+- Dosya: src/mcp/tools/start.ts, src/mcp/tools/status.ts, src/core/types.ts
+- Kapsam: src/mcp/tools/, src/core/
 
 ### Problem
-Worker'ların stdout/stderr çıktıları sadece tmux pane'inde görünüyor. Sprint bittiğinde kayboluyorlar. Debugging ve retro için log gerekiyor.
+MCP deckent_start çağrısı runSprint'i senkron çalıştırıyor. Sprint dakikalar sürebilir — MCP timeout'a düşüyor. Claude Code "tool call timed out" hatası alıyor.
 
 ### Çözüm
-
-1. **`spawnWorker` fonksiyonuna pipe-pane ekle:**
-   ```typescript
-   // tmux.ts spawnWorker'da, worker spawn edildikten sonra:
-   spawnSync('tmux', [
-     'pipe-pane', '-t', `${sessionName}:${windowName}`,
-     '-o', `cat >> ${logPath}`
-   ]);
-   ```
-   - `logPath = join(tasksDir, \`task-\${taskId}.log\`)`
-   - `-o` flag: sadece output (input değil)
-
-2. **Log dosyası yaşam döngüsü:**
-   - Oluşturma: `spawnWorker` sırasında (pipe-pane başladığında)
-   - Sprint sırasında: sürekli append
-   - Sprint sonrası: `cleanup` fonksiyonunda `.tasks/*.log` temizle (mevcut cleanup pattern'ini takip et)
-   - `.gitignore`'a `.tasks/*.log` ekle (zaten .tasks/*.hb pattern var, aynı yere)
-
-3. **Log okuma utility:**
-   ```typescript
-   // worker.ts veya yeni src/core/log-reader.ts
-   export function readWorkerLog(projectRoot: string, taskId: string): string | null {
-     const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
-     if (!existsSync(logPath)) return null;
-     return readFileSync(logPath, 'utf-8');
-   }
-   ```
-
-4. **brain.ts cleanup'a `.log` ekle:**
-   - Mevcut cleanup fonksiyonu `.hb`, `.signal`, `.output` dosyalarını temizliyor
-   - `.log` dosyalarını da temizle
+1. `deckent_start` hemen bir `jobId` döndürsün: `{ success: true, jobId: "sprint-017", status: "RUNNING" }`
+2. Sprint arka planda çalışsın — `runSprint` bir child process veya async task olarak başlasın
+3. `.deckent/jobs/{jobId}.json` dosyasına durum yazılsın: `{ status: "RUNNING"|"COMPLETE"|"FAILED", startedAt, completedAt?, error?, sprintResult? }`
+4. `deckent_status` mevcut job durumunu da döndürsün
+5. Basit yaklaşım: `child_process.fork()` ile ayrı process'te çalıştır, IPC ile sonuç al
 
 ### Test
-- spawnWorker pipe-pane çağırıyor
-- Log dosyası doğru path'te oluşuyor
-- readWorkerLog mevcut log'u okuyor
-- readWorkerLog log yoksa null dönüyor
-- cleanup .log dosyalarını temizliyor
-- .gitignore .tasks/*.log içeriyor
-- 8+ yeni test
+- deckent_start hemen döner (timeout yok)
+- Job dosyası oluşturuluyor
+- deckent_status job durumunu gösteriyor
+- Job tamamlandığında sonuç dosyada
+- 6+ test
 
 ---
 
-## Görev 3: `deckent start --watch` — Tek Komutla Başlat ve İzle
-- Dosya: src/cli/commands/start.ts, src/orchestra/brain.ts
-- Kapsam: src/cli/commands/, src/orchestra/
+## Görev 2: .tasks/ Cleanup Düzeltme
+- Dosya: src/orchestra/brain.ts
+- Kapsam: src/orchestra/
 
 ### Problem
-Kullanıcı önce `deckent start` sonra ayrı terminalde `deckent watch` yapıyor. Tek komutla hem sprint başlatıp hem izleme modu açılmalı.
+cleanup() fonksiyonu .hb ve .log dosyalarını temizliyor ama .json, .plan, .result, .paused dosyaları kalıyor. MCP üzerinden çalıştırıldığında cleanup çağrılmıyor çünkü runSprint'in COMPLETE fazına ulaşmadan process sonlanıyor.
 
 ### Çözüm
-
-1. **start.ts'e `--watch` flag ekle:**
-   ```typescript
-   .option('--watch', 'Automatically open watch mode after sprint starts')
-   ```
-
-2. **Davranış:**
-   - `deckent start --watch` → sprint başlar → SPAWN fazından sonra (worker'lar hazır olduğunda) otomatik olarak `createWatchLayout()` çağır → tmux attach
-   - Sprint EXECUTE fazında kullanıcı watch modunda izliyor
-   - Sprint bittiğinde tmux watch window kapanır, sonuç gösterilir
-
-3. **Brain'e hook point ekle:**
-   - `runSprint` fonksiyonunda SPAWN fazından sonra, EXECUTE'tan önce bir callback/event noktası ekle
-   - `onSpawned?: () => void` callback — start.ts'den geçirilir
-   - Bu callback `createWatchLayout()` çağırır
-
-4. **--watch + --dry-run kombinasyonu:** dry-run'da watch anlamsız, uyarı ver ve watch'ı atla
+1. cleanup() fonksiyonunu genişlet: TASK_FILE_EXTENSIONS'taki TÜM uzantıları (.json, .plan, .hb, .result, .paused, .log) temizlesin
+2. Güvenlik: sadece sprint'e ait task dosyalarını sil (sprint ID prefix kontrolü)
+3. `deckent cleanup` CLI'da da aynı genişletilmiş temizlik çalışsın
+4. Stale task detection: 24 saatten eski .tasks/ dosyalarını da temizle
 
 ### Test
-- --watch flag parse ediliyor
-- --watch ile start çağrıldığında createWatchLayout çağrılıyor
-- --dry-run + --watch kombinasyonunda watch atlanıyor
-- watch flag olmadan normal start davranışı korunuyor
-- 6+ yeni test
-
----
-
-## Görev 4: Web Dashboard Agent Detail View + Log API
-- Dosya: src/api/server.ts, src/api/routes/ (yeni?), src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/AgentDetail.tsx (yeni)
-- Kapsam: src/api/, src/dashboard/
-
-### Problem
-Web dashboard'da agent kartları var ama tıklanmıyor. Kullanıcı worker'ın ne yaptığını, task bilgisini ve log'unu göremiyordu.
-
-### Çözüm
-
-1. **Yeni API endpoint:**
-   ```typescript
-   // GET /api/worker/:taskId/log
-   // Response: { taskId, log: string | null, task: TaskJSON | null }
-   ```
-   - `readWorkerLog()` utility'sini kullan (Görev 2'den)
-   - Task JSON'u da oku ve döndür (`.tasks/task-{taskId}.json`)
-   - Log yoksa `null`, task yoksa `null`
-
-2. **Dashboard AgentDetail component:**
-   ```tsx
-   // src/dashboard/src/components/AgentDetail.tsx
-   // Props: { taskId: string, onClose: () => void }
-   // - Task bilgisi: title, status, model, scope
-   // - Log viewer: monospace, auto-scroll, max-height with overflow
-   // - Fetch: /api/worker/{taskId}/log (poll every 3s while open)
-   // - Close button
-   ```
-
-3. **DashboardPage entegrasyonu:**
-   - Agent kartına `onClick` ekle → `selectedAgent` state
-   - `selectedAgent` varsa → `<AgentDetail taskId={selectedAgent} onClose={...} />`
-   - Sheet/modal olarak göster (shadcn Sheet component zaten var)
-
-### Test
-- API endpoint log döndürüyor
-- API endpoint task yoksa 404
-- AgentDetail component render oluyor
-- Log polling çalışıyor
-- 6+ yeni test (API + component)
-
----
-
-## Görev 5: Dogfooding Hazırlığı — .brain/ State Düzenleme
-- Dosya: .brain/sprints/sprint-015.md (yeni), .brain/MEMORY.md, .brain/DECISIONS.md
-- Kapsam: .brain/
-
-### Problem
-Sprint 17'de `deckent start` ile self-run yapabilmek için .brain/ dosyalarının güncel ve tutarlı olması gerekiyor. Şu an Sprint 15 log'u yok, MEMORY.md güncel değil, ADR eksik.
-
-### Çözüm
-
-1. **`.brain/sprints/sprint-015.md`** oluştur (max 50 satır):
-   ```markdown
-   # Sprint 015 — Deckent Bağımsızlık + Self-Hosting
-   
-   **Date:** 2026-03-18
-   **Status:** COMPLETE
-   **Tasks:** 5 (all GO)
-   **Tests:** 938 → 967 (+29)
-   **Coverage:** 97.5%
-   
-   ## Results
-   - DECKENT.md single source of truth
-   - ensureDeckentImport() shared utility
-   - deckent sync CLI + MCP tool
-   - deckent://config MCP resource
-   - Self-hosting with .deckent/ in git
-   - DEBT-002 closed
-   - Blueprint-quality rule templates
-   
-   ## Learnings
-   - Additive injection pattern works well — ensureDeckentImport is reusable
-   - Config merge pattern (read-merge-write) prevents data loss
-   - writeIfNotExists for generated files, ensureDeckentImport for adapter files
-   - .gitignore management: track workspace, ignore runtime artifacts
-   ```
-
-2. **`.brain/MEMORY.md`** güncelle — Sprint 15 learnings ekle (max 100 satır):
-   - `ensureDeckentImport()` pattern: dosya yok → oluştur, var+ref yok → prepend, var+ref var → noop
-   - Config merge: `Object.assign(existing, new)` — mevcut alanlar korunur
-   - `.gitignore` selective tracking: `.deckent/plugins/*` ignore, `!.gitkeep` exception
-   - Rule template pattern: writeIfNotExists ile üzerine yazmama, frontmatter + zengin kurallar
-   - MCP tool/resource ekleme: index.ts'e import+register, test mock'a ekleme
-
-3. **`.brain/DECISIONS.md`** güncelle — ADR-013 ekle:
-   ```markdown
-   ## ADR-013: DECKENT.md Adapter Pattern (Sprint 15)
-   
-   **Context:** CLAUDE.md'yi init sırasında overwrite etmek kullanıcı değişikliklerini kaybettiriyordu.
-   
-   **Decision:** DECKENT.md = tek gerçek kaynak. CLAUDE.md ve AGENTS.md adaptör dosyalar — sadece `@DECKENT.md` referansı enjekte edilir (ensureDeckentImport). Asla üzerine yazılmaz.
-   
-   **Consequences:**
-   - Init idempotent ve güvenli
-   - Kullanıcının CLAUDE.md özelleştirmeleri korunur
-   - Gelecek provider'lar (Codex, Gemini) için adapter pattern genişletilebilir
-   - `deckent sync` komutu adapter'ları yeniden senkronize eder
-   ```
-
-4. **Sprint numarası doğrulaması:**
-   - `getNextSprintId()` → `sprint-016` dönmeli (sprint-015.md oluşturduktan sonra)
-   - Bu Sprint 17'de brain'in doğru sprint ID ataması için kritik
-
-### Test
-- sprint-015.md 50 satır altında
-- MEMORY.md 100 satır altında
-- DECISIONS.md ADR-013 içeriyor
-- getNextSprintId() → "sprint-016" (sprint-015.md oluşturulduktan sonra)
-- parseDebtTable DEBT.md'yi parse edebiliyor
+- cleanup tüm task uzantılarını temizliyor
+- Sprint prefix koruması çalışıyor
+- Stale dosya tespiti çalışıyor
 - 5+ test
+
+---
+
+## Görev 3: Sprint ID Güvenliği — Config-Based
+- Dosya: src/core/utils.ts, src/core/types.ts, .deckent/config.json
+- Kapsam: src/core/
+
+### Problem
+getNextSprintId() sadece .brain/sprints/ dizinindeki dosyalara bakıyor. Dosya silinirse veya eksikse sprint ID geri atlıyor (Sprint 16'da 011 oldu). Fragile.
+
+### Çözüm
+1. `.deckent/config.json`'a `last_sprint_id` alanı ekle
+2. getNextSprintId() önce config'den oku, dosya taramasını fallback olarak kullan
+3. Sprint tamamlandığında `last_sprint_id` güncelle (brain.ts runSprint sonunda)
+4. Her iki kaynaktan da max değeri al (config vs dosya taraması) — hiçbir zaman geri atlamaz
+
+### Test
+- Config'den sprint ID okunuyor
+- Config yoksa dosya taraması fallback
+- Max değer seçiliyor (config > dosya veya tersi)
+- Sprint sonunda config güncelleniyor
+- 6+ test
+
+---
+
+## Görev 4: Dashboard State Reset
+- Dosya: src/orchestra/brain.ts, src/monitor/auditor.ts
+- Kapsam: src/orchestra/, src/monitor/
+
+### Problem
+Yeni sprint başladığında .dashboard dosyası eski sprint'in verilerini içeriyor. Web dashboard ve deckent status eski veriyi gösteriyor.
+
+### Çözüm
+1. runSprint'in PLAN fazında .dashboard'u sıfırla: fresh DashboardState yaz
+2. Fresh state: `{ sprint: { id, status: 'PLANNING' }, agents: [], progress: { done: 0, total: taskCount }, alerts: [], updatedAt }`
+3. Auditor scan loop başladığında da dashboard'un sprint ID'sini kontrol et — uyuşmuyorsa sıfırla
+
+### Test
+- PLAN fazında dashboard sıfırlanıyor
+- Fresh state doğru format
+- Sprint ID uyuşmazlığında reset
+- 4+ test
+
+---
+
+## Görev 5: React Test Altyapısı
+- Dosya: src/dashboard/vitest.config.ts (yeni), src/dashboard/src/test/setup.ts (yeni), tests/dashboard/ (yeni dizin)
+- Kapsam: src/dashboard/, tests/dashboard/
+
+### Problem
+Dashboard React bileşenlerinin testi yok. Sprint 16'da AgentDetail eklendi ama test yazılamadı — vitest happy-dom/jsdom setup'ı eksik.
+
+### Çözüm
+1. `src/dashboard/vitest.config.ts` oluştur: happy-dom environment, src/ alias
+2. `src/dashboard/src/test/setup.ts`: minimal setup (global fetch mock)
+3. `tests/dashboard/AgentDetail.test.tsx`: render, fetch mock, close button
+4. `tests/dashboard/DashboardPage.test.tsx`: temel render testi
+5. package.json'a `test:dashboard` script ekle: `vitest run --config src/dashboard/vitest.config.ts`
+6. Ana vitest.config.ts'ten dashboard testlerini exclude et (ayrı config)
+
+### Test
+- AgentDetail render ediliyor
+- AgentDetail fetch mock çalışıyor
+- DashboardPage render ediliyor
+- 6+ test
+
+---
+
+## Görev 6: Sprint 16 Dokümantasyon Güncellemesi
+- Dosya: DECKENT-MASTER-BLUEPRINT.md, DECKENT-ANA-PLAN-TR.md, docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/API.md, docs/ARCHITECTURE.md, README.md
+- Kapsam: docs/, root
+
+### Problem
+Sprint 16 değişiklikleri dokümantasyona yansımamış. Blueprint, API.md, CHANGELOG hala Sprint 15'te.
+
+### Çözüm
+Her dosyada Sprint 16 güncellemeleri:
+- Blueprint: Section 3.2 (watch komutu, 25 CLI), Section 19 (Sprint 16 entry), Section 24 (tablo), Section 18 (worker log dosyaları)
+- API.md: Section 10 (yeni endpoint: GET /api/worker/:taskId/log), Section 12 (watch + start --watch)
+- CHANGELOG.md: [0.1.0-sprint16] entry
+- SPRINT-LOG.md: Sprint 16 log
+- README.md: 987 test, 16 sprint, watch komutu ekleme
+- ARCHITECTURE.md: watch mode, worker log flow
+
+### Test
+- Manuel doğrulama — sayılar tutarlı (987 test, 26 CLI, 16 endpoint)
 
 ---
 
 ## Kalite Kuralları
 - tsc --noEmit MUST pass
-- npx vitest run MUST pass — hedef: 998+ test (967 + ~31 yeni)
+- npx vitest run MUST pass — hedef: 1020+ test (987 + ~33 yeni)
 - Coverage düşmemeli (%97+)
-- Circular dependency yok
-- Brain→auditor tek yönlü import korunsun
-- Mevcut 967 test 0 regresyon
-- tmux fonksiyonları: spawnSync array pattern (shell injection koruması)
-- Web dashboard: mevcut shadcn/ui component'leri kullan (Sheet, Card, Badge, ScrollArea)
-- Log dosyaları .gitignore'da (.tasks/*.log)
-- MCP: 10 tool, 5 resource (değişiklik yok)
-- CLI: 25→26 komut (watch eklendi)
+- Mevcut 987 test 0 regresyon
+- MCP: 10 tool (değişiklik yok), 5 resource (değişiklik yok)
+- CLI: 26 komut (watch eklenmişti Sprint 16'da)
+- HTTP API: 15→16 endpoint (worker log eklendi Sprint 16'da)
+- getNextSprintId hiçbir zaman geri atlamamalı
+- Background job: fork() veya spawn(), ana process'i bloklamamalı

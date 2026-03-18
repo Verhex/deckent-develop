@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint16] - 2026-03-18
+
+### Added
+
+- **`deckent watch`** CLI command: Live tmux split view with dashboard and worker panes, `--follow <taskId>` flag
+- **Worker log capture**: tmux pipe-pane captures worker stdout to `.tasks/task-{id}.log`
+- **`deckent start --watch`**: Creates watch window before sprint runs (non-blocking)
+- **`readWorkerLog()`** (`src/agents/worker.ts`): Utility to read worker log files
+- **GET `/api/worker/:taskId/log`**: API endpoint returning task JSON + worker log content
+- **`AgentDetail`** component: React component with 3s polling, displayed in Sheet panel
+- **`inferModelFromDirective()`** (`src/orchestra/brain.ts`): Heuristic model selection for structured planner mode
+- **`setupWatchWindow()`** (`src/orchestra/tmux.ts`): Non-blocking watch layout creation
+- **.brain/ dogfooding**: sprint-015.md log, ADR-013, MEMORY.md Sprint 15 learnings
+- **Test suite**: 987 tests (+20 new), 97.5% coverage, 0 regressions
+
 ## [0.1.0-sprint15] - 2026-03-18
 
 ### Added

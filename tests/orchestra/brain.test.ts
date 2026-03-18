@@ -15,6 +15,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  statSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -29,6 +30,7 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 }));
 
 vi.mock('../../src/monitor/auditor.js', () => ({
+  resetDashboard: vi.fn(),
   updateDashboard: vi.fn(),
   detectDeadlocks: vi.fn().mockReturnValue([]),
   startScanLoop: vi.fn().mockReturnValue(setInterval(() => {}, 99999)),
@@ -53,10 +55,10 @@ vi.mock('../../src/orchestra/planner.js', () => ({
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
-import { updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../../src/monitor/auditor.js';
+import { resetDashboard, updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../../src/monitor/auditor.js';
 import { countBrainLines, getNextSprintId } from '../../src/core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../../src/agents/worker.js';
 import { callBrainPlanner } from '../../src/orchestra/planner.js';
@@ -68,12 +70,14 @@ const mockedExistsSync = vi.mocked(existsSync);
 const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedUnlinkSync = vi.mocked(unlinkSync);
+const mockedStatSync = vi.mocked(statSync);
 const mockedGetNextSprintId = vi.mocked(getNextSprintId);
 const mockedSpawnSync = vi.mocked(spawnSync);
 const mockedEnsureSession = vi.mocked(ensureSession);
 const mockedSpawnWorker = vi.mocked(spawnWorker);
 const mockedKillWorker = vi.mocked(killWorker);
 const mockedListWorkers = vi.mocked(listWorkers);
+const mockedResetDashboard = vi.mocked(resetDashboard);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 const mockedDetectDeadlocks = vi.mocked(detectDeadlocks);
 const mockedStartScanLoop = vi.mocked(startScanLoop);
@@ -89,7 +93,7 @@ import {
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runSprint, runDecay,
   BrainError, buildWorkerPrompt, extractScopeFromDirective, parseStructuredDirectives,
-  confirmDraftTasks,
+  confirmDraftTasks, isStaleTaskFile,
 } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -1273,14 +1277,22 @@ describe('cleanup', () => {
     expect(mockedReleaseAllLocks).toHaveBeenCalledWith(ROOT, 'w1');
   });
 
-  it('deletes .hb files', () => {
+  it('deletes ALL task extensions (.json, .plan, .hb, .result, .paused, .log)', () => {
     mockedExistsSync.mockReturnValue(true);
+    const taskFiles = [
+      'task-001.json', 'task-001.plan', 'task-001.hb',
+      'task-001.result', 'task-001.paused', 'task-001.log',
+    ];
     mockedReaddirSync.mockImplementation((p: unknown) => {
-      if (String(p).includes('.tasks')) return ['task-001.hb', 'task-001.json'] as never;
+      if (String(p).includes('.tasks')) return taskFiles as never;
       return [] as never;
     });
+    // statSync returns recent file so stale pass doesn't re-delete
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
     cleanup(ROOT, makeSprint());
-    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('.hb'));
+    for (const file of taskFiles) {
+      expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining(file));
+    }
   });
 
   it('deletes .lock files', () => {
@@ -1298,6 +1310,67 @@ describe('cleanup', () => {
     mockedListWorkers.mockReturnValue(['dead-worker']);
     mockedKillWorker.mockImplementation(() => { throw new Error('no window'); });
     expect(() => cleanup(ROOT, makeSprint())).not.toThrow();
+  });
+
+  it('handles stale files older than 24h', () => {
+    mockedExistsSync.mockReturnValue(true);
+    // First readdirSync call (main pass) returns empty, second (stale pass) returns stale file
+    let callCount = 0;
+    mockedReaddirSync.mockImplementation((p: unknown) => {
+      if (String(p).includes('.tasks')) {
+        callCount++;
+        // Both main and stale passes see the file
+        return ['task-old.json'] as never;
+      }
+      return [] as never;
+    });
+    // statSync returns a timestamp older than 24h
+    const oldTime = Date.now() - 86_400_000 - 1000;
+    mockedStatSync.mockReturnValue({ mtimeMs: oldTime } as never);
+    cleanup(ROOT, makeSprint());
+    // File should be deleted (at least once from main pass, possibly again from stale pass)
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-old.json'));
+  });
+
+  it('skips non-task files during cleanup', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockImplementation((p: unknown) => {
+      if (String(p).includes('.tasks')) return ['README.md', 'notes.txt', '.gitkeep'] as never;
+      return [] as never;
+    });
+    cleanup(ROOT, makeSprint());
+    // unlinkSync should NOT be called for non-task files (only for .locks dir which returns [])
+    const calls = mockedUnlinkSync.mock.calls.map(c => String(c[0]));
+    expect(calls.filter(c => c.includes('README.md'))).toHaveLength(0);
+    expect(calls.filter(c => c.includes('notes.txt'))).toHaveLength(0);
+    expect(calls.filter(c => c.includes('.gitkeep'))).toHaveLength(0);
+  });
+});
+
+describe('isStaleTaskFile', () => {
+  it('returns true for files older than maxAgeMs', () => {
+    const oldTime = Date.now() - 86_400_000 - 1000; // 24h + 1s ago
+    mockedStatSync.mockReturnValue({ mtimeMs: oldTime } as never);
+    expect(isStaleTaskFile('/project/.tasks/task-001.json')).toBe(true);
+  });
+
+  it('returns false for recent files', () => {
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
+    expect(isStaleTaskFile('/project/.tasks/task-001.json')).toBe(false);
+  });
+
+  it('returns false when statSync throws', () => {
+    mockedStatSync.mockImplementation(() => { throw new Error('ENOENT'); });
+    expect(isStaleTaskFile('/project/.tasks/nonexistent.json')).toBe(false);
+  });
+
+  it('uses custom maxAgeMs', () => {
+    const recentEnough = Date.now() - 5000; // 5 seconds ago
+    mockedStatSync.mockReturnValue({ mtimeMs: recentEnough } as never);
+    // With a 1-second max age, this is stale
+    expect(isStaleTaskFile('/project/.tasks/task-001.json', 1000)).toBe(true);
+    // With a 10-second max age, this is not stale
+    expect(isStaleTaskFile('/project/.tasks/task-001.json', 10_000)).toBe(false);
   });
 });
 
@@ -1769,5 +1842,48 @@ describe('runSprint scan loop integration (Sprint 14)', () => {
     const sprint = makeSprint();
     expect(() => spawnWorkers(ROOT, sprint, config)).not.toThrow();
     expect(mockedEnsureSession).toHaveBeenCalled();
+  });
+});
+
+// ─── Sprint 15: Dashboard reset on new sprint ─────────────────────
+describe('runSprint dashboard reset (Sprint 15)', () => {
+  const config = makeConfig();
+
+  function setupFullSprint() {
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('DIRECTIVES')) return 'Build X';
+      if (p.includes('task-') && p.endsWith('.result')) return JSON.stringify(makeResult());
+      if (p.includes('task-') && p.endsWith('.json')) return JSON.stringify(makeTask());
+      return '';
+    });
+    mockedSpawnSync.mockReturnValue(spawnOk);
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([] as never);
+  }
+
+  it('calls resetDashboard after PLAN and before SPAWN', async () => {
+    setupFullSprint();
+    await runSprint(ROOT, config);
+
+    expect(mockedResetDashboard).toHaveBeenCalledTimes(1);
+    expect(mockedResetDashboard).toHaveBeenCalledWith(
+      ROOT,
+      expect.stringContaining('sprint-'),
+      expect.any(Number),
+    );
+
+    // resetDashboard should be called before startScanLoop (which happens in SPAWN)
+    const resetOrder = mockedResetDashboard.mock.invocationCallOrder[0]!;
+    const scanOrder = mockedStartScanLoop.mock.invocationCallOrder[0]!;
+    expect(resetOrder).toBeLessThan(scanOrder);
+  });
+
+  it('continues sprint even if resetDashboard throws', async () => {
+    setupFullSprint();
+    mockedResetDashboard.mockImplementationOnce(() => { throw new Error('disk full'); });
+
+    const sprint = await runSprint(ROOT, config);
+    expect(sprint.status).toBe(SprintStatus.COMPLETE);
   });
 });

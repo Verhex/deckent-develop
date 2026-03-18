@@ -123,7 +123,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │
 ┌──────────▼──────────────────────────────────────────┐
 │          HTTP API + WEB DASHBOARD                    │
-│  src/api/server.ts — 15 endpoints + SSE             │
+│  src/api/server.ts — 16 endpoints + SSE             │
 │  src/dashboard/ — React+Vite+Tailwind (4 pages)     │
 │  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
@@ -182,6 +182,7 @@ deckent plugin list       List installed plugins
 deckent upgrade           Self-update
 deckent mcp               Start MCP server (stdio transport for Claude Code)
 deckent sync             Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference
+deckent watch            Live tmux split view: dashboard + worker panes
 ```
 
 **Plan command flags:**
@@ -305,7 +306,7 @@ my-project/
 │   ├── agents/                       # Worker lifecycle
 │   ├── monitor/                      # Auditor monitoring
 │   ├── api/                          # HTTP API + SSE
-│   │   ├── server.ts               # 15 endpoints + SSE stream
+│   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
 │   ├── cli/                          # CLI commands (commander.js, 21 files)
 │   ├── mcp/                          # MCP server integration
@@ -865,7 +866,7 @@ React + Vite + Tailwind, 4 pages, shadcn/ui components, SSE for real-time update
 - **History page:** Sprint history with charts (Recharts)
 - **Memory page:** Brain memory viewer
 - `deckent web` launches both HTTP API and web dashboard at localhost:3100
-- `deckent serve` launches HTTP API only (15 endpoints + SSE)
+- `deckent serve` launches HTTP API only (16 endpoints + SSE)
 - SSE endpoint: `GET /api/events` — file watcher on `.dashboard` pushes updates
 - Dark/light theme via ThemeProvider
 - Mobile responsive with hamburger menu
@@ -1149,13 +1150,14 @@ Every file in the project, its purpose, who writes it, who reads it:
 | .tasks/task-*.plan | Execution plans | Workers | Auditor | Deleted after sprint |
 | .tasks/task-*.hb | Heartbeats | Workers | Auditor | Overwritten, deleted |
 | .tasks/task-*.result | Results | Workers | Brain | Deleted after sprint |
+| .tasks/task-*.log | Worker terminal output | tmux pipe-pane | Brain, API, you | Deleted after sprint |
 | .locks/*.lock | File locks | Workers | Workers, Auditor | Deleted on release |
 | .dashboard | Live status | Auditor | You, UI | Overwritten |
 | .claude/rules/*.md | Agent-specific rules | deckent init | Claude Code | Permanent |
 | .claude/settings.json | MCP server registration | deckent init | Claude Code | Permanent |
 | src/orchestra/planner.ts | AI task planning (Zod) | Developer | Brain | Permanent |
 | src/core/analyzer.ts | Project stack/size analysis | Developer | MCP, CLI | Permanent |
-| src/api/server.ts | HTTP API (15 endpoints + SSE) | Developer | Web dashboard | Permanent |
+| src/api/server.ts | HTTP API (16 endpoints + SSE) | Developer | Web dashboard | Permanent |
 | src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
@@ -1217,7 +1219,7 @@ Deckent ran itself for the first time:
 
 ## Sprint 10: HTTP API & Terminal Dashboard
 
-- HTTP API server (`src/api/server.ts`): 15 endpoints + SSE stream
+- HTTP API server (`src/api/server.ts`): 16 endpoints + SSE stream
 - Terminal TUI dashboard (`deckent dashboard`)
 - Sprint ID refactor (consistent format across codebase)
 - `deckent serve` and `deckent web` CLI commands
@@ -1264,6 +1266,17 @@ Deckent ran itself for the first time:
 - Self-hosting: deckent-dev runs own `.deckent/` structure
 - DEBT-002 closed (checkUsage resolved in sprint-003)
 - 967 tests, 97.5% coverage, 29 new tests, 0 regressions
+
+## Sprint 16: Watch Mode, Worker Logs, Agent Detail
+
+- `deckent watch` CLI: live tmux split view (dashboard + worker panes), `--follow` flag
+- Worker log capture via tmux pipe-pane → `.tasks/task-{id}.log`
+- `deckent start --watch` flag: creates watch window before sprint runs
+- GET `/api/worker/:taskId/log` endpoint: task JSON + worker log content
+- AgentDetail React component with 3s polling, Sheet panel in DashboardPage
+- `inferModelFromDirective()` heuristic: opus/sonnet/haiku by scope+complexity
+- `.brain/` dogfooding: sprint-015.md, ADR-013, MEMORY.md updated
+- 987 tests, 97.5% coverage, 20 new tests, 0 regressions
 
 ---
 
@@ -1512,8 +1525,10 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 11 | Web Dashboard (React+Vite+Tailwind, 4 pages) | Done |
 | 12-13 | Brain AI planning, Auditor in-process, .deckent structure | Done |
 | 14 | Auditor live integration, .deckent finalization | Done |
+| 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Done |
+| 16 | Watch mode, worker logs, agent detail, model inference | Done |
 
-**Exit criteria:** 938+ tests, 97%+ coverage, stable MCP integration, HTTP API, Web Dashboard, AI planning.
+**Exit criteria:** 987+ tests, 97%+ coverage, stable MCP integration, HTTP API, Web Dashboard, AI planning, DECKENT.md bağımsızlık.
 
 ## Phase 2: Self-Orchestration & Learning (Sprint 15+)
 
@@ -1563,6 +1578,7 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 12-13 | 938 | 97.5% | Brain AI planning (planner.ts, Zod), Auditor in-process, .deckent structure |
 | 14 | 938 | 97.5% | Auditor live integration, .deckent finalization |
 | 15 | 967 | 97.5% | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 closed, 10 tool 5 resource |
+| 16 | 987 | 97.5% | deckent watch, worker log capture, start --watch, agent detail view, model inference |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 

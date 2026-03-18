@@ -70,11 +70,18 @@ vi.mock('../../src/core/analyzer.js', () => ({
   analyzeProject: vi.fn(),
 }));
 
+vi.mock('../../src/mcp/tools/job-runner.js', () => ({
+  writeJobState: vi.fn(),
+  readJobState: vi.fn(),
+  readLatestJobState: vi.fn(),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import {
   readContext, checkUsage, adjustSprintSize, planSprint, runSprint,
 } from '../../src/orchestra/brain.js';
 import { analyzeProject } from '../../src/core/analyzer.js';
+import { writeJobState, readLatestJobState } from '../../src/mcp/tools/job-runner.js';
 
 // ─── Test via mock server pattern ────────────────────────────────────
 
@@ -293,7 +300,47 @@ describe('MCP Tools', () => {
   });
 
   describe('deckent_start', () => {
-    it('runs sprint and returns result', async () => {
+    it('returns immediately with jobId and RUNNING status', async () => {
+      const { registerStartTool } = await import('../../src/mcp/tools/start.js');
+      const mock = createMockServer();
+      registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(loadConfig).mockResolvedValue({
+        mode: 'max_plan',
+        activeModeConfig: {
+          max_workers: 8,
+          brain_model: 'opus',
+          default_model: 'sonnet',
+          haiku_allowed: true,
+          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+        },
+        modes: {} as ResolvedConfig['modes'],
+        language: 'en',
+        projectName: 'test',
+        projectRoot: '/tmp/test',
+        version: '0.1.0',
+      });
+
+      // runSprint returns a promise that never resolves during the test
+      vi.mocked(runSprint).mockReturnValue(new Promise(() => {}));
+
+      const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.jobId).toMatch(/^sprint-\d+$/);
+      expect(parsed.status).toBe('RUNNING');
+      expect(parsed.message).toContain('background');
+      expect(result.isError).toBeUndefined();
+
+      // writeJobState should have been called with RUNNING
+      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ status: 'RUNNING' }),
+      );
+    });
+
+    it('writes COMPLETE job state when sprint finishes', async () => {
       const { registerStartTool } = await import('../../src/mcp/tools/start.js');
       const mock = createMockServer();
       registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
@@ -325,17 +372,62 @@ describe('MCP Tools', () => {
         version: '0.1.0',
       });
 
-      vi.mocked(runSprint).mockResolvedValue(completedSprint);
+      // Use a controllable promise
+      let resolveRun!: (sprint: Sprint) => void;
+      const runPromise = new Promise<Sprint>((resolve) => { resolveRun = resolve; });
+      vi.mocked(runSprint).mockReturnValue(runPromise);
 
-      const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
 
-      expect(parsed.success).toBe(true);
-      expect(parsed.sprint.id).toBe('sprint-007');
-      expect(parsed.sprint.status).toBe('COMPLETE');
+      // Resolve the sprint in the background
+      resolveRun(completedSprint);
+      // Allow microtask to process
+      await new Promise(r => setTimeout(r, 10));
+
+      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ status: 'COMPLETE', sprintId: 'sprint-007' }),
+      );
     });
 
-    it('returns error on failure', async () => {
+    it('writes FAILED job state when sprint errors', async () => {
+      const { registerStartTool } = await import('../../src/mcp/tools/start.js');
+      const mock = createMockServer();
+      registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(loadConfig).mockResolvedValue({
+        mode: 'max_plan',
+        activeModeConfig: {
+          max_workers: 8,
+          brain_model: 'opus',
+          default_model: 'sonnet',
+          haiku_allowed: true,
+          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+        },
+        modes: {} as ResolvedConfig['modes'],
+        language: 'en',
+        projectName: 'test',
+        projectRoot: '/tmp/test',
+        version: '0.1.0',
+      });
+
+      let rejectRun!: (err: Error) => void;
+      const runPromise = new Promise<Sprint>((_, reject) => { rejectRun = reject; });
+      vi.mocked(runSprint).mockReturnValue(runPromise);
+
+      await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
+
+      // Reject the sprint in the background
+      rejectRun(new Error('plan failed'));
+      await new Promise(r => setTimeout(r, 10));
+
+      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ status: 'FAILED', error: 'plan failed' }),
+      );
+    });
+
+    it('returns error when loadConfig fails', async () => {
       const { registerStartTool } = await import('../../src/mcp/tools/start.js');
       const mock = createMockServer();
       registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
@@ -360,11 +452,13 @@ describe('MCP Tools', () => {
       const dashState = { sprint: { id: 'sprint-007' }, agents: [], progress: { done: 1, total: 3 } };
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readFileSync).mockReturnValue(JSON.stringify(dashState));
+      vi.mocked(readLatestJobState).mockReturnValue(null);
 
       const result = await mock.tools.get('deckent_status')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
 
       expect(parsed.sprint.id).toBe('sprint-007');
+      expect(parsed.job).toBeNull();
     });
 
     it('returns inactive when no dashboard', async () => {
@@ -373,11 +467,33 @@ describe('MCP Tools', () => {
       registerStatusTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
       vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(readLatestJobState).mockReturnValue(null);
 
       const result = await mock.tools.get('deckent_status')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
 
       expect(parsed.active).toBe(false);
+      expect(parsed.job).toBeNull();
+    });
+
+    it('includes latest job state in response', async () => {
+      const { registerStatusTool } = await import('../../src/mcp/tools/status.js');
+      const mock = createMockServer();
+      registerStatusTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(readLatestJobState).mockReturnValue({
+        jobId: 'sprint-1234567890',
+        status: 'RUNNING',
+        startedAt: '2026-03-18T10:00:00Z',
+      });
+
+      const result = await mock.tools.get('deckent_status')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.job).toBeDefined();
+      expect(parsed.job.jobId).toBe('sprint-1234567890');
+      expect(parsed.job.status).toBe('RUNNING');
     });
   });
 

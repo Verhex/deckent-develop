@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, normalize } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { SprintPhase, SprintStatus } from '../core/types.js';
 import type {
   Heartbeat,
   LockInfo,
@@ -262,6 +263,23 @@ export function detectDeadlocks(tasks: Task[]): BoundaryViolation[] {
   }
 
   return violations;
+}
+
+export function resetDashboard(
+  projectRoot: string,
+  sprintId: string,
+  taskCount: number,
+): void {
+  const dashPath = join(projectRoot, DASHBOARD_FILE);
+  const freshState: DashboardState = {
+    sprint: { id: sprintId, number: 0, phase: SprintPhase.PLAN, status: SprintStatus.PLANNING },
+    agents: [],
+    progress: { done: 0, active: 0, blocked: 0, total: taskCount },
+    usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+    alerts: [],
+    updatedAt: new Date().toISOString(),
+  };
+  writeFileSync(dashPath, JSON.stringify(freshState, null, 2), 'utf-8');
 }
 
 export function updateDashboard(

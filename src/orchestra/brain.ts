@@ -1,5 +1,5 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -22,10 +22,11 @@ import {
   MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
   BRAIN_TOTAL_LINE_BUDGET, MEMORY_DECAY_SPRINTS,
   DEBT_HIGH_PRIORITY_SPRINTS, DEBT_CRITICAL_SPRINTS,
+  TASK_FILE_EXTENSIONS,
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { countBrainLines, getNextSprintId, parseDebtTable, generateDebtTable } from '../core/utils.js';
+import { countBrainLines, getNextSprintId, parseDebtTable, generateDebtTable, updateLastSprintId } from '../core/utils.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner } from './planner.js';
@@ -34,7 +35,7 @@ import { callBrainPlanner } from './planner.js';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from './tmux.js';
 
 // ─── Wave 2 — auditor ─────────────────────────────────────────────
-import { updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../monitor/auditor.js';
+import { resetDashboard, updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../monitor/auditor.js';
 
 // ─── Wave 2 — worker ──────────────────────────────────────────────
 import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
@@ -984,6 +985,19 @@ export function decay(projectRoot: string, currentSprintId: string): void {
 }
 
 // 16. cleanup
+/**
+ * Returns true if the file at `filePath` was last modified more than `maxAgeMs` ago.
+ * Used to detect stale task files left over from previous sprints.
+ */
+export function isStaleTaskFile(filePath: string, maxAgeMs: number = 86_400_000): boolean {
+  try {
+    const stat = statSync(filePath);
+    return Date.now() - stat.mtimeMs > maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
 export function cleanup(projectRoot: string, sprint: Sprint): void {
   // Kill all workers
   const workers = listWorkers();
@@ -998,11 +1012,23 @@ export function cleanup(projectRoot: string, sprint: Sprint): void {
     }
   }
 
-  // Delete .hb and .log files
+  // Delete all task files (.json, .plan, .hb, .result, .paused, .log)
   const tasksDir = join(projectRoot, TASKS_DIR);
   if (existsSync(tasksDir)) {
-    for (const file of readdirSync(tasksDir).filter(f => f.endsWith('.hb') || f.endsWith('.log'))) {
+    for (const file of readdirSync(tasksDir).filter(f => TASK_FILE_EXTENSIONS.some(ext => f.endsWith(ext)))) {
       try { unlinkSync(join(tasksDir, file)); } catch { /* skip */ }
+    }
+  }
+
+  // Clean stale task files (older than 24h) regardless of sprint
+  if (existsSync(tasksDir)) {
+    for (const file of readdirSync(tasksDir)) {
+      if (TASK_FILE_EXTENSIONS.some(ext => file.endsWith(ext))) {
+        const fullPath = join(tasksDir, file);
+        if (isStaleTaskFile(fullPath)) {
+          try { unlinkSync(fullPath); } catch { /* skip */ }
+        }
+      }
     }
   }
 
@@ -1049,6 +1075,11 @@ export async function runSprint(
       SprintPhase.PLAN,
     );
   }
+
+  // Reset dashboard for new sprint (clear stale data from previous sprint)
+  try {
+    resetDashboard(projectRoot, sprint.id, sprint.tasks.length);
+  } catch { /* dashboard reset failed — non-fatal */ }
 
   // Phase 2: SPAWN (1 retry)
   let spawnAttempts = 0;
@@ -1250,6 +1281,9 @@ export async function runSprint(
   sprint.status = SprintStatus.COMPLETE;
   sprint.phase = SprintPhase.COMPLETE;
   sprint.completedAt = now();
+
+  // Persist sprint ID to config so getNextSprintId never regresses
+  updateLastSprintId(projectRoot, sprint.id);
 
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },

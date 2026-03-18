@@ -123,7 +123,7 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
            │
 ┌──────────▼──────────────────────────────────────────┐
 │          HTTP API + WEB DASHBOARD                    │
-│  src/api/server.ts — 15 uç nokta + SSE             │
+│  src/api/server.ts — 16 uç nokta + SSE             │
 │  src/dashboard/ — React+Vite+Tailwind (4 sayfa)     │
 │  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
@@ -182,6 +182,7 @@ deckent plugin list       Kurulu eklentileri listele
 deckent upgrade           Kendini güncelle
 deckent mcp               MCP sunucuyu başlat (Claude Code için stdio transport)
 deckent sync             Adaptör dosyalarını DECKENT.md referansıyla senkronize et
+deckent watch            Canlı tmux bölünmüş görünüm: dashboard + worker panelleri
 ```
 
 ## 3.3 Sistem Gereksinimleri
@@ -244,7 +245,7 @@ my-project/
 │   ├── agents/                       # Worker yaşam döngüsü
 │   ├── monitor/                      # Auditor izleme
 │   ├── api/                          # HTTP API + SSE
-│   │   ├── server.ts               # 15 uç nokta + SSE akışı
+│   │   ├── server.ts               # 16 uç nokta + SSE akışı
 │   │   └── watcher.ts              # Dashboard dosya izleyici
 │   ├── cli/                          # CLI komutları (commander.js, 21 dosya)
 │   ├── mcp/                          # MCP sunucu entegrasyonu
@@ -269,7 +270,7 @@ my-project/
 - **`brain_planning` yapılandırması:** `'ai'` | `'structured'` | `'auto'` (varsayılan: auto). AI önce dener, başarısız olursa yapısal ayrıştırmaya düşer.
 - **Terminal Dashboard:** Tamamlandı (Sprint 10) — `deckent status` ve `deckent dashboard`
 - **Web Dashboard:** Tamamlandı (Sprint 11) — React+Vite+Tailwind, 4 sayfa, shadcn/ui, SSE
-- **HTTP API:** Tamamlandı (Sprint 10) — 15 uç nokta + SSE, `deckent serve` / `deckent web`
+- **HTTP API:** Tamamlandı (Sprint 10) — 16 uç nokta + SSE, `deckent serve` / `deckent web`
 - **Worker heartbeat:** `buildWorkerPrompt` artık `.tasks/task-{id}.hb` dosyası oluşturma talimatı içeriyor.
 - **DECKENT.md adaptör deseni** (Sprint 15): DECKENT.md tek gerçek kaynak. CLAUDE.md ve AGENTS.md artık symlink değil, `ensureDeckentImport()` ile `@DECKENT.md` enjekte ediliyor (katkısal, asla yıkıcı değil).
 - **`deckent sync` komutu** (Sprint 15): Adaptör dosyalarını (CLAUDE.md, AGENTS.md) DECKENT.md referansıyla senkronize eder.
@@ -295,12 +296,13 @@ Her dosya, amacı, yazarı ve okuyucusu:
 | .brain/sprints/*.md | Sprint logları | Brain | Brain | Otomatik arşiv |
 | .tasks/task-*.json | Görev tanımları | Brain | Worker'lar | Sprint sonrası silinir |
 | .tasks/task-*.result | Sonuçlar | Worker'lar | Brain | Sprint sonrası silinir |
+| .tasks/task-*.log | Worker terminal çıktısı | tmux pipe-pane | Brain, API, siz | Sprint sonrası silinir |
 | .dashboard | Canlı durum | Auditor | Siz, UI | Üzerine yazılır |
 | .claude/rules/*.md | Ajan kuralları | deckent init | Claude Code | Kalıcı |
 | .claude/settings.json | MCP sunucu kaydı | deckent init | Claude Code | Kalıcı |
 | src/orchestra/planner.ts | AI görev planlaması (Zod) | Geliştirici | Brain | Kalıcı |
 | src/core/analyzer.ts | Proje yığın/boyut analizi | Geliştirici | MCP, CLI | Kalıcı |
-| src/api/server.ts | HTTP API (15 uç nokta + SSE) | Geliştirici | Web dashboard | Kalıcı |
+| src/api/server.ts | HTTP API (16 uç nokta + SSE) | Geliştirici | Web dashboard | Kalıcı |
 | src/api/watcher.ts | Dashboard dosya izleyici | Geliştirici | API sunucu | Kalıcı |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Geliştirici | Tarayıcı | Kalıcı |
 | src/mcp/server.ts | MCP sunucu giriş noktası | Geliştirici | Claude Code | Kalıcı |
@@ -362,7 +364,7 @@ Deckent ilk kez kendini çalıştırdı:
 
 ## Sprint 10: HTTP API ve Terminal Dashboard
 
-- HTTP API sunucusu (`src/api/server.ts`): 15 uç nokta + SSE akışı
+- HTTP API sunucusu (`src/api/server.ts`): 16 uç nokta + SSE akışı
 - Terminal TUI dashboard (`deckent dashboard`)
 - Sprint ID refaktörü (kod tabanında tutarlı format)
 - `deckent serve` ve `deckent web` CLI komutları
@@ -409,6 +411,17 @@ Deckent ilk kez kendini çalıştırdı:
 - Self-hosting: deckent-dev kendi `.deckent/` yapısını çalıştırıyor
 - DEBT-002 kapatıldı (checkUsage sprint-003'te çözüldü)
 - 967 test, %97.5 kapsam, 29 yeni test, 0 regresyon
+
+## Sprint 16: İzleme Modu, Worker Logları, Ajan Detay
+
+- `deckent watch` CLI: canlı tmux bölünmüş görünüm, `--follow` flag
+- Worker log yakalama: tmux pipe-pane → `.tasks/task-{id}.log`
+- `deckent start --watch` flag: sprint öncesi izleme penceresi oluşturur
+- GET `/api/worker/:taskId/log` endpoint: görev JSON + worker log
+- AgentDetail React bileşeni: 3 saniye polling, Sheet paneli
+- `inferModelFromDirective()` sezgisel model seçimi: opus/sonnet/haiku
+- `.brain/` dogfooding: sprint-015.md, ADR-013, MEMORY.md güncellendi
+- 987 test, %97.5 kapsam, 20 yeni test, 0 regresyon
 
 ---
 
@@ -561,8 +574,9 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 12-13 | Brain AI planlaması, Auditor süreç-içi, .deckent yapısı | Tamamlandı |
 | 14 | Auditor canlı entegrasyon, .deckent sonlandırma | Tamamlandı |
 | 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Tamamlandı |
+| 16 | İzleme modu, worker logları, ajan detay, model çıkarımı | Tamamlandı |
 
-**Çıkış kriterleri:** 967+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama, DECKENT.md bağımsızlık.
+**Çıkış kriterleri:** 987+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama, DECKENT.md bağımsızlık.
 
 ## Aşama 2: Sağlayıcı Soyutlama (Sprint 9-12)
 
@@ -602,6 +616,7 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 12-13 | 938 | %97.5 | Brain AI planlaması (planner.ts, Zod), Auditor süreç-içi, .deckent yapısı |
 | 14 | 938 | %97.5 | Auditor canlı entegrasyon, .deckent sonlandırma |
 | 15 | 967 | %97.5 | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 kapatıldı, 10 araç 5 kaynak |
+| 16 | 987 | %97.5 | deckent watch, worker log yakalama, start --watch, ajan detay görünümü, model çıkarımı |
 
 **İlk dogfooding sonucu (Sprint 6):** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Orkestrasyon döngüsü (planla → başlat → yürüt → değerlendir → retro → temizle) uçtan uca tamamlandı.
 

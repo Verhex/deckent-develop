@@ -71,8 +71,15 @@ vi.mock('../../src/core/analyzer.js', () => ({
   analyzeProject: vi.fn(),
 }));
 
+vi.mock('../../src/mcp/tools/job-runner.js', () => ({
+  writeJobState: vi.fn(),
+  readJobState: vi.fn(),
+  readLatestJobState: vi.fn(),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import { runSprint, BrainError } from '../../src/orchestra/brain.js';
+import { writeJobState } from '../../src/mcp/tools/job-runner.js';
 
 // ─── Mock Server Pattern ────────────────────────────────────────────
 
@@ -283,9 +290,9 @@ describe('MCP Branch Coverage', () => {
     });
   });
 
-  // ─── start.ts: BrainError catch path ──────────────────────────────
-  describe('deckent_start — BrainError catch path', () => {
-    it('formats BrainError with phase info', async () => {
+  // ─── start.ts: background job error handling ───────────────────────
+  describe('deckent_start — background job error handling', () => {
+    it('writes FAILED job state with BrainError phase info', async () => {
       const { registerStartTool } = await import('../../src/mcp/tools/start.js');
       const mock = createMockServer();
       registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
@@ -301,18 +308,32 @@ describe('MCP Branch Coverage', () => {
       });
 
       const brainError = new (BrainError as unknown as new (msg: string, phase?: string) => Error & { phase?: string })('spawn failed', 'SPAWN');
-      vi.mocked(runSprint).mockRejectedValue(brainError);
+      let rejectRun!: (err: Error) => void;
+      const runPromise = new Promise<never>((_, reject) => { rejectRun = reject; });
+      vi.mocked(runSprint).mockReturnValue(runPromise);
 
       const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.success).toBe(false);
-      expect(parsed.error).toContain('Sprint failed at phase SPAWN');
-      expect(parsed.error).toContain('spawn failed');
-      expect(result.isError).toBe(true);
+      // Returns immediately with RUNNING
+      expect(parsed.success).toBe(true);
+      expect(parsed.status).toBe('RUNNING');
+
+      // Reject in background
+      rejectRun(brainError);
+      await new Promise(r => setTimeout(r, 10));
+
+      // writeJobState should have been called with FAILED and phase info
+      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          status: 'FAILED',
+          error: expect.stringContaining('Sprint failed at phase SPAWN'),
+        }),
+      );
     });
 
-    it('handles non-Error thrown values', async () => {
+    it('handles non-Error thrown values in loadConfig', async () => {
       const { registerStartTool } = await import('../../src/mcp/tools/start.js');
       const mock = createMockServer();
       registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
