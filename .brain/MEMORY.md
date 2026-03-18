@@ -78,3 +78,6 @@
 - MEMORY-SYSTEM.md — Bellek Mimarisi: GO_WITH_TECH_DEBT
 - SPRINT-LIFECYCLE.md — Sprint Yaşam Döngüsü: GO_WITH_TECH_DEBT
 - CONFIG-REFERENCE.md — Config Referans Kılavuzu: GO_WITH_TECH_DEBT
+## Sprint sprint-019 Learnings
+- Alert Dedup — Auditor Tekrar Engelleme: GO_WITH_TECH_DEBT
+- Eksik Dokümanlar — BRAIN-GUIDE.md + DASHBOARD-GUIDE.md: GO_WITH_TECH_DEBT

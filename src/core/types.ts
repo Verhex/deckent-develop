@@ -139,6 +139,7 @@ export interface Alert {
   source?: string;
   timestamp: string;
   acknowledged?: boolean;
+  count?: number;
 }
 
 export type BoundaryViolationType =

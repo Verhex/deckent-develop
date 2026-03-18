@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createAlert,
   scanHeartbeats,
+  scanResultFiles,
   checkBoundaryViolations,
   checkStaleLocks,
   detectDeadlocks,
@@ -12,6 +13,7 @@ import {
   runScanCycle,
   startScanLoop,
   writeScanToDashboard,
+  deduplicateAlerts,
 } from '../../src/monitor/auditor.js';
 import { AlertLevel, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
@@ -41,6 +43,7 @@ const mockedSpawnSync = vi.mocked(spawnSync);
 beforeEach(() => {
   vi.clearAllMocks();
   mockedExistsSync.mockReturnValue(false);
+  mockedReaddirSync.mockReturnValue([] as never);
 });
 
 describe('createAlert', () => {
@@ -127,6 +130,97 @@ describe('scanHeartbeats', () => {
 
     const result = scanHeartbeats('/project');
     expect(result.heartbeats).toHaveLength(1);
+  });
+
+  it('does not mark agent as stale when timestamp is malformed placeholder text (resilient)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+
+    const hb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: '<current ISO timestamp>', filesChangedCount: 0, sequence: 0,
+    };
+
+    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.heartbeats).toHaveLength(1);
+    expect(result.staleAgents).toHaveLength(0);
+    expect(result.alerts).toHaveLength(0);
+  });
+
+  it('does not mark agent as stale when timestamp is empty string', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+
+    const hb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: '', filesChangedCount: 0, sequence: 0,
+    };
+
+    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.staleAgents).toHaveLength(0);
+    expect(result.alerts).toHaveLength(0);
+  });
+
+  it('fresh UTC ISO timestamp (new Date().toISOString()) is NOT marked as stale', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+
+    const freshTimestamp = new Date().toISOString();
+    const hb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: freshTimestamp, filesChangedCount: 0, sequence: 0,
+    };
+
+    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.staleAgents).toHaveLength(0);
+    expect(result.alerts).toHaveLength(0);
+  });
+
+  it('timestamp 121 seconds old is marked as stale (>120s threshold)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+
+    const staleTimestamp = new Date(Date.now() - 121_000).toISOString();
+    const hb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: staleTimestamp, filesChangedCount: 0, sequence: 0,
+    };
+
+    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.staleAgents).toHaveLength(1);
+    expect(result.alerts).toHaveLength(1);
+    expect(result.alerts[0]!.level).toBe(AlertLevel.CRITICAL);
+  });
+
+  it('malformed timestamp: agent still appears in heartbeats list (tracked but not stale)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
+
+    const malformedHb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: 'not-a-date', filesChangedCount: 0, sequence: 0,
+    };
+    const freshHb: Heartbeat = {
+      workerId: 'w2', taskId: 'task-002', status: 'TESTING' as never,
+      currentAction: 'testing', timestamp: new Date().toISOString(), filesChangedCount: 1, sequence: 1,
+    };
+
+    mockedReadFileSync
+      .mockReturnValueOnce(JSON.stringify(malformedHb) as never)
+      .mockReturnValueOnce(JSON.stringify(freshHb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.heartbeats).toHaveLength(2);
+    expect(result.staleAgents).toHaveLength(0);
+    expect(result.alerts).toHaveLength(0);
   });
 });
 
@@ -675,6 +769,303 @@ describe('resetDashboard', () => {
     expect(written.usage.fiveHourPercent).toBe(0);
     expect(written.usage.weeklyPercent).toBe(0);
     expect(written.usage.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+describe('deduplicateAlerts', () => {
+  const ts = () => new Date().toISOString();
+
+  it('adds new alerts with count=1', () => {
+    const result = deduplicateAlerts([], [
+      { level: AlertLevel.WARNING, message: 'stale lock', source: 'w1', timestamp: ts() },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.count).toBe(1);
+    expect(result[0]!.message).toBe('stale lock');
+  });
+
+  it('does not add duplicate source+message — increments count instead', () => {
+    const existing = [
+      { level: AlertLevel.CRITICAL, message: 'Stale agent: w1', source: 'w1', timestamp: ts(), count: 1 },
+    ];
+    const incoming = [
+      { level: AlertLevel.CRITICAL, message: 'Stale agent: w1', source: 'w1', timestamp: ts() },
+    ];
+
+    const result = deduplicateAlerts(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.count).toBe(2);
+  });
+
+  it('allows same message with different source', () => {
+    const existing = [
+      { level: AlertLevel.WARNING, message: 'Stale agent detected', source: 'w1', timestamp: ts(), count: 1 },
+    ];
+    const incoming = [
+      { level: AlertLevel.WARNING, message: 'Stale agent detected', source: 'w2', timestamp: ts() },
+    ];
+
+    const result = deduplicateAlerts(existing, incoming);
+
+    expect(result).toHaveLength(2);
+    expect(result.find(a => a.source === 'w1')!.count).toBe(1);
+    expect(result.find(a => a.source === 'w2')!.count).toBe(1);
+  });
+
+  it('count increments correctly across multiple duplicates', () => {
+    let result = deduplicateAlerts([], [
+      { level: AlertLevel.CRITICAL, message: 'stale', source: 'w1', timestamp: ts() },
+    ]);
+    result = deduplicateAlerts(result, [
+      { level: AlertLevel.CRITICAL, message: 'stale', source: 'w1', timestamp: ts() },
+    ]);
+    result = deduplicateAlerts(result, [
+      { level: AlertLevel.CRITICAL, message: 'stale', source: 'w1', timestamp: ts() },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.count).toBe(3);
+  });
+
+  it('caps result at 50 (removes oldest when over limit)', () => {
+    const existing = Array.from({ length: 50 }, (_, i) => ({
+      level: AlertLevel.INFO,
+      message: `alert-${i}`,
+      source: 'sys',
+      timestamp: ts(),
+      count: 1,
+    }));
+
+    const result = deduplicateAlerts(existing, [
+      { level: AlertLevel.WARNING, message: 'new-alert', source: 'sys', timestamp: ts() },
+    ]);
+
+    expect(result).toHaveLength(50);
+    // newest alert should be present
+    expect(result.find(a => a.message === 'new-alert')).toBeDefined();
+    // oldest should be gone
+    expect(result.find(a => a.message === 'alert-0')).toBeUndefined();
+  });
+
+  it('returns empty array when both inputs are empty', () => {
+    expect(deduplicateAlerts([], [])).toEqual([]);
+  });
+
+  it('handles undefined source correctly (deduplicates by message only)', () => {
+    const existing = [
+      { level: AlertLevel.INFO, message: 'generic', timestamp: ts(), count: 1 },
+    ];
+    const incoming = [
+      { level: AlertLevel.INFO, message: 'generic', timestamp: ts() },
+    ];
+
+    const result = deduplicateAlerts(existing, incoming);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.count).toBe(2);
+  });
+
+  it('writeScanToDashboard uses deduplication — repeated alerts do not stack', () => {
+    const alert = { level: 'CRITICAL' as never, message: 'Stale agent: w1', source: 'w1', timestamp: ts(), count: 1 };
+    const existingDash: DashboardState = {
+      sprint: { id: 's1', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
+      agents: [],
+      progress: { done: 0, active: 0, blocked: 0, total: 0 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: ts() },
+      alerts: [alert],
+      updatedAt: ts(),
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
+
+    writeScanToDashboard('/project', { id: 's1', number: 1, phase: 'EXECUTE', status: 'ACTIVE' }, {
+      heartbeats: [],
+      violations: [],
+      alerts: [{ level: 'CRITICAL' as never, message: 'Stale agent: w1', source: 'w1', timestamp: ts() }],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    // Should still be 1 alert, not 2
+    expect(written.alerts).toHaveLength(1);
+    expect(written.alerts[0].count).toBe(2);
+  });
+});
+
+describe('scanResultFiles', () => {
+  it('returns zero when tasks dir does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = scanResultFiles('/project');
+
+    expect(result.resultCount).toBe(0);
+    expect(result.doneTaskIds.size).toBe(0);
+  });
+
+  it('counts result files correctly', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([
+      'task-001.result', 'task-002.result', 'task-001.json', 'task-001.hb',
+    ] as never);
+
+    const result = scanResultFiles('/project');
+
+    expect(result.resultCount).toBe(2);
+    expect(result.doneTaskIds.size).toBe(2);
+  });
+
+  it('extracts task IDs from result filenames', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([
+      'task-019-001.result', 'task-019-002.result',
+    ] as never);
+
+    const result = scanResultFiles('/project');
+
+    expect(result.doneTaskIds.has('019-001')).toBe(true);
+    expect(result.doneTaskIds.has('019-002')).toBe(true);
+  });
+
+  it('ignores non-result files', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([
+      'task-001.json', 'task-001.hb', 'task-001.plan', 'task-001.log',
+    ] as never);
+
+    const result = scanResultFiles('/project');
+
+    expect(result.resultCount).toBe(0);
+    expect(result.doneTaskIds.size).toBe(0);
+  });
+
+  it('returns empty set when no files in dir', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([] as never);
+
+    const result = scanResultFiles('/project');
+
+    expect(result.resultCount).toBe(0);
+    expect(result.doneTaskIds.size).toBe(0);
+  });
+});
+
+describe('writeScanToDashboard — result file progress', () => {
+  const sprintInfo = { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' };
+
+  it('sets progress.done from .result file count', () => {
+    mockedExistsSync
+      .mockReturnValueOnce(false)  // dashPath does not exist
+      .mockReturnValueOnce(true);  // tasksDir exists for scanResultFiles
+    mockedReaddirSync.mockReturnValue(['task-001.result', 'task-002.result'] as never);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.progress.done).toBe(2);
+  });
+
+  it('sets progress.active to heartbeats without matching result', () => {
+    mockedExistsSync
+      .mockReturnValueOnce(false)  // dashPath
+      .mockReturnValueOnce(true);  // tasksDir
+    mockedReaddirSync.mockReturnValue(['task-001.result'] as never);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [
+        { workerId: 'w-001', taskId: '001', status: 'CODING' as never, currentAction: 'working', timestamp: new Date().toISOString(), filesChangedCount: 1, sequence: 1 },
+        { workerId: 'w-002', taskId: '002', status: 'CODING' as never, currentAction: 'working', timestamp: new Date().toISOString(), filesChangedCount: 1, sequence: 1 },
+      ],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    // task-001 has result (done), task-002 does not (active)
+    expect(written.progress.active).toBe(1);
+  });
+
+  it('sets progress.done=0 and active=heartbeat count when no result files', () => {
+    mockedExistsSync
+      .mockReturnValueOnce(false)  // dashPath
+      .mockReturnValueOnce(true);  // tasksDir
+    mockedReaddirSync.mockReturnValue(['task-001.json', 'task-001.hb'] as never);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [
+        { workerId: 'w-001', taskId: '001', status: 'CODING' as never, currentAction: 'working', timestamp: new Date().toISOString(), filesChangedCount: 0, sequence: 0 },
+      ],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.progress.done).toBe(0);
+    expect(written.progress.active).toBe(1);
+  });
+
+  it('marks agent status as DONE when task has .result file', () => {
+    const existingDash: DashboardState = {
+      sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
+      agents: [{ id: 'w-001', role: 'worker', status: 'EXECUTING' as never, model: 'sonnet', tmuxWindow: 'w-001', taskId: '001' }] as never,
+      progress: { done: 0, active: 1, blocked: 0, total: 2 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+      alerts: [],
+      updatedAt: new Date().toISOString(),
+    };
+    mockedExistsSync
+      .mockReturnValueOnce(true)   // dashPath exists
+      .mockReturnValueOnce(true);  // tasksDir exists
+    mockedReadFileSync.mockReturnValueOnce(JSON.stringify(existingDash) as never);
+    mockedReaddirSync.mockReturnValue(['task-001.result'] as never);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.agents[0].status).toBe('DONE');
+  });
+
+  it('preserves progress.total and progress.blocked from existing dashboard', () => {
+    const existingDash: DashboardState = {
+      sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
+      agents: [],
+      progress: { done: 1, active: 2, blocked: 1, total: 8 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+      alerts: [],
+      updatedAt: new Date().toISOString(),
+    };
+    mockedExistsSync
+      .mockReturnValueOnce(true)   // dashPath exists
+      .mockReturnValueOnce(true);  // tasksDir exists
+    mockedReadFileSync.mockReturnValueOnce(JSON.stringify(existingDash) as never);
+    mockedReaddirSync.mockReturnValue([
+      'task-001.result', 'task-002.result', 'task-003.result',
+    ] as never);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.progress.done).toBe(3);
+    expect(written.progress.total).toBe(8);
+    expect(written.progress.blocked).toBe(1);
   });
 });
 

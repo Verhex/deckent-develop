@@ -232,22 +232,63 @@ export function extractScopeFromDirective(line: string): TaskScope {
   return { directories, filesRead: [], filesWrite };
 }
 
-// 4c. inferModelFromDirective — heuristic model selection for structured mode
+// 4c. inferModelFromDirective — score-based model selection for structured mode
 export function inferModelFromDirective(title: string, description: string, scope: TaskScope): ModelType {
-  const text = `${title}\n${description}`.toLowerCase();
-  const fileCount = scope.filesWrite.length + scope.directories.length;
+  const score = calculateModelScore(title, description, scope);
 
-  // haiku: trivial tasks
-  const haikuPatterns = /\b(rename|typo|placeholder|copy|gitignore|gitkeep|config\s*değişikliği|tek\s*satır)\b/;
-  if (haikuPatterns.test(text) && fileCount <= 2) return 'haiku';
-
-  // opus: complex multi-module, new patterns, architecture
-  const opusPatterns = /\b(mimari|architect|cross.?cutting|yeni\s*pattern|birden\s*fazla\s*modül|multiple\s*module|refactor.*system|new\s*cli.*mcp|cli.*mcp.*api|brain.*worker|orchestrat)\b/;
-  if (opusPatterns.test(text)) return 'opus';
-  if (fileCount >= 6) return 'opus';
-
-  // sonnet: default for standard tasks
+  if (score >= 4) return 'opus';
+  if (score <= -1) return 'haiku';
   return 'sonnet';
+}
+
+// 4c1. calculateModelScore — score-based heuristic for model selection
+export function calculateModelScore(title: string, description: string, scope: TaskScope): number {
+  const text = `${title}\n${description}`.toLowerCase();
+  let score = 0;
+
+  // ─── Cross-module scope: +3 (2+ directories)
+  if (scope.directories.length >= 2) {
+    score += 3;
+  }
+
+  // ─── Architectural keywords: +2
+  const architectPatterns = /\b(mimari|architect|refactor|redesign|migrate|breaking|cross.?cutting|orchestrat)\b/;
+  if (architectPatterns.test(text)) {
+    score += 2;
+  }
+
+  // ─── File count: filesWrite.length
+  const fileWriteCount = scope.filesWrite.length;
+  if (fileWriteCount > 15) {
+    score += 3;
+  } else if (fileWriteCount > 10) {
+    score += 2;
+  } else if (fileWriteCount > 5) {
+    score += 1;
+  }
+
+  // ─── docs/ or config scope: -2 (all directories are docs or config)
+  const isAllDocOrConfig = scope.directories.every(d =>
+    d === 'docs' || d.startsWith('docs/') ||
+    d === 'config' || d.startsWith('config/')
+  );
+  if (isAllDocOrConfig) {
+    score -= 2;
+  }
+
+  // ─── Single directory scope: -1
+  if (scope.directories.length === 1) {
+    score -= 1;
+  }
+
+  // ─── Test-only task: -1
+  const isTestOnly = /\btest\b|\b(unit|integration|e2e)\b/i.test(text) &&
+    scope.filesWrite.every(f => f.includes('.test.') || f.includes('.spec.'));
+  if (isTestOnly) {
+    score -= 1;
+  }
+
+  return score;
 }
 
 // 4c2. ParsedDirectiveTask
@@ -343,7 +384,6 @@ export function planSprint(
   // CRITICAL debt → priority fix tasks
   const criticalDebt = context.debt.filter(d => d.priority === DebtPriority.CRITICAL && !d.resolved);
   for (const debt of criticalDebt) {
-    if (tasks.length >= recommendation.maxWorkers) break;
     tasks.push(createTask({
       title: `Fix debt: ${debt.description}`,
       description: `Priority fix for critical debt item ${debt.id}`,
@@ -373,7 +413,6 @@ export function planSprint(
     if (plannerResult) {
       usedMode = 'ai';
       for (const pt of plannerResult.tasks) {
-        if (tasks.length >= recommendation.maxWorkers) break;
         tasks.push(createTask(
           plannerTaskToParams(pt, sprintId, defaultModel, initialStatus),
           seq++,
@@ -401,7 +440,6 @@ export function planSprint(
             .map(line => ({ title: line, description: line, scope: extractScopeFromDirective(line) }));
 
     for (const src of directiveSources) {
-      if (tasks.length >= recommendation.maxWorkers) break;
       const inferredModel = inferModelFromDirective(src.title, src.description, src.scope);
       tasks.push(createTask({
         title: src.title,
@@ -488,16 +526,19 @@ Instructions:
   "taskId": "${task.id}",
   "status": "EXECUTING",
   "currentAction": "Starting task",
-  "timestamp": "<current ISO timestamp>",
+  "timestamp": "<use new Date().toISOString() — UTC ISO 8601, e.g. 2026-01-01T00:00:00.000Z>",
   "filesChangedCount": 0,
   "sequence": 0
 }
+
+IMPORTANT: The timestamp field MUST be a valid UTC ISO 8601 string produced by new Date().toISOString(). Never use locale date strings, relative times, or placeholder text.
 
 Update this file periodically as you work:
 - Change status to CODING, TESTING, DOCUMENTING as appropriate
 - Update currentAction with what you're doing
 - Increment sequence on each update
 - Update filesChangedCount as you modify files
+- Always refresh the timestamp using new Date().toISOString() on each update
 
 8. When finished, create the result file at .tasks/task-${task.id}.result — this file is REQUIRED (JSON format):
 
@@ -516,16 +557,20 @@ selfAssessment must be one of: "DONE", "GO_WITH_TECH_DEBT", "NO_GO"
 The result file at .tasks/task-${task.id}.result is REQUIRED — without it your work cannot be evaluated.`;
 }
 
-// 6. spawnWorkers
+// 6. spawnWorkers — spawns initial batch (up to max_workers), returns queued tasks
 export function spawnWorkers(
   projectRoot: string,
   sprint: Sprint,
-  _config: ResolvedConfig,
+  config: ResolvedConfig,
   spawnOpts?: { autoApprove?: boolean },
-): void {
+): Task[] {
   ensureSession();
 
-  for (const task of sprint.tasks) {
+  const maxWorkers = config.activeModeConfig.max_workers;
+  const activeTasks = sprint.tasks.slice(0, maxWorkers);
+  const queuedTasks = sprint.tasks.slice(maxWorkers);
+
+  for (const task of activeTasks) {
     const prompt = buildWorkerPrompt(task);
     const model = task.model;
     const writeTargets = [...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
@@ -539,7 +584,7 @@ export function spawnWorkers(
     });
   }
 
-  const agents: AgentInfo[] = sprint.tasks.map(task => ({
+  const agents: AgentInfo[] = activeTasks.map(task => ({
     id: `w-${task.id}`,
     role: 'worker' as const,
     status: AgentStatus.EXECUTING,
@@ -553,23 +598,33 @@ export function spawnWorkers(
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
     agents,
-    progress: { done: 0, active: sprint.tasks.length, blocked: 0, total: sprint.tasks.length },
+    progress: { done: 0, active: activeTasks.length, blocked: 0, total: sprint.tasks.length },
     usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
     alerts: [],
     updatedAt: now(),
   });
+
+  return queuedTasks;
 }
 
-// 7. waitForResults
-export async function waitForResults(projectRoot: string, sprint: Sprint, timeoutMs?: number): Promise<TaskResult[]> {
+// 7. waitForResults — with queue support
+export async function waitForResults(
+  projectRoot: string,
+  sprint: Sprint,
+  timeoutMs?: number,
+  queue?: Task[],
+  spawnOpts?: { autoApprove?: boolean },
+): Promise<TaskResult[]> {
   const timeout = timeoutMs ?? 30 * 60 * 1000;
   const pollInterval = 15_000;
   const startTime = Date.now();
   const results: TaskResult[] = [];
   const taskIds = new Set(sprint.tasks.map(t => t.id));
   const collected = new Set<string>();
+  const remainingQueue: Task[] = queue ? [...queue] : [];
 
-  const collectResults = () => {
+  const collectResults = (): string[] => {
+    const newlyCollected: string[] = [];
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
       const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
@@ -578,31 +633,66 @@ export async function waitForResults(projectRoot: string, sprint: Sprint, timeou
         if (result) {
           results.push(result);
           collected.add(taskId);
+          newlyCollected.push(taskId);
         }
       }
+    }
+    return newlyCollected;
+  };
+
+  const processQueue = (completedTaskIds: string[]): void => {
+    for (const taskId of completedTaskIds) {
+      if (remainingQueue.length === 0) break;
+      // Kill the completed worker's tmux window
+      try { killWorker(taskId); } catch { /* ignore */ }
+      // Spawn next queued task
+      const nextTask = remainingQueue.shift()!;
+      const prompt = buildWorkerPrompt(nextTask);
+      const writeTargets = [...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
+      const allowedTools = writeTargets.length > 0
+        ? `Read,Write(${writeTargets.join(',')}),Bash`
+        : 'Read,Write,Bash';
+      try {
+        spawnWorker(nextTask.id, nextTask.model, prompt, projectRoot, {
+          allowedTools,
+          autoApprove: spawnOpts?.autoApprove ?? false,
+        });
+      } catch { /* ignore spawn errors — task will timeout */ }
     }
   };
 
   // First pass — check immediately
-  collectResults();
+  const initiallyCollected = collectResults();
+  processQueue(initiallyCollected);
   if (collected.size === taskIds.size) return results;
 
   // Poll loop
   while (Date.now() - startTime < timeout) {
     const remaining = timeout - (Date.now() - startTime);
     await sleep(Math.min(pollInterval, remaining));
-    collectResults();
+    const newlyCollected = collectResults();
+    processQueue(newlyCollected);
     if (collected.size === taskIds.size) break;
   }
   return results;
 }
 
 // 8. evaluateResult (pure)
-export function evaluateResult(result: TaskResult, _task: Task): TaskEvaluation {
+
+/** Returns true if all scope directories are under docs/ (doc-only task) */
+export function isDocTask(task: Task): boolean {
+  const dirs = task.scope?.directories ?? [];
+  if (dirs.length === 0) return false;
+  return dirs.every(d => d === 'docs' || d.startsWith('docs/') || d.startsWith('docs\\'));
+}
+
+export function evaluateResult(result: TaskResult, task: Task): TaskEvaluation {
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
   if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;
   // selfAssessment === 'DONE' — verify
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
+  // Doc tasks: skip coverage threshold — testsPassed is sufficient
+  if (isDocTask(task)) return TaskEvaluation.DONE;
   if (result.coverage < 90) return TaskEvaluation.GO_WITH_TECH_DEBT;
   return TaskEvaluation.DONE;
 }
@@ -1041,6 +1131,112 @@ export function cleanup(projectRoot: string, sprint: Sprint): void {
   }
 }
 
+// 16b. SprintResult — combined result for updateProjectDocs
+export interface SprintResult {
+  sprint: Sprint;
+  evaluations: Map<string, TaskEvaluation>;
+  metrics: SprintMetrics;
+}
+
+// 16c. updateProjectDocs — auto-update project docs after sprint completion
+export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult): void {
+  const { sprint, evaluations, metrics } = sprintResult;
+  const date = new Date().toISOString().slice(0, 10);
+  const sprintNum = sprint.number;
+
+  // 1. Update CHANGELOG.md
+  try {
+    const changelogPath = join(projectRoot, 'docs', 'CHANGELOG.md');
+    const existing = existsSync(changelogPath)
+      ? readFileSafe(changelogPath)
+      : '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
+
+    const highlights: string[] = [];
+    for (const task of sprint.tasks) {
+      const ev = evaluations.get(task.id);
+      if (ev === TaskEvaluation.DONE || ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
+        highlights.push(`- **${task.title}**: ${ev}`);
+      }
+    }
+    if (highlights.length === 0) highlights.push('- No completed tasks');
+
+    const newEntry = [
+      `## [0.1.0-sprint${String(sprintNum).padStart(2, '0')}] - ${date}`,
+      '',
+      '### Added',
+      '',
+      ...highlights.slice(0, 10),
+      `- **Tasks**: ${metrics.totalTasks} total, ${metrics.completedTasks} done, ${metrics.techDebtTasks} tech debt, ${metrics.noGoTasks} no-go`,
+      '',
+    ].join('\n');
+
+    // Insert after the header (before first ## [)
+    const headerEndIdx = existing.indexOf('\n## ');
+    const insertAt = headerEndIdx >= 0 ? headerEndIdx + 1 : existing.length;
+    const updated = existing.slice(0, insertAt) + newEntry + existing.slice(insertAt);
+    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
+    writeFileSync(changelogPath, updated, 'utf-8');
+  } catch { /* non-critical */ }
+
+  // 2. Update docs/SPRINT-LOG.md
+  try {
+    const sprintLogPath = join(projectRoot, 'docs', 'SPRINT-LOG.md');
+    const existing = existsSync(sprintLogPath)
+      ? readFileSafe(sprintLogPath)
+      : '# Sprint Log\n\n---\n\n';
+
+    const taskLines: string[] = [];
+    for (const task of sprint.tasks) {
+      const ev = evaluations.get(task.id) ?? task.status;
+      taskLines.push(`- ${task.id}: ${task.title} (${ev})`);
+    }
+
+    const newSection = [
+      `## Sprint ${sprintNum} — ${sprint.id}`,
+      '',
+      `**Status:** ${sprint.status}`,
+      `**Date:** ${date}`,
+      `**Duration:** ${Math.round(metrics.durationMs / 1000)}s`,
+      '',
+      '### Results',
+      '',
+      '| Metric | Value |',
+      '|--------|-------|',
+      `| Total Tasks | ${metrics.totalTasks} |`,
+      `| Completed | ${metrics.completedTasks} |`,
+      `| Tech Debt | ${metrics.techDebtTasks} |`,
+      `| No-Go | ${metrics.noGoTasks} |`,
+      `| Coverage | ${metrics.coveragePercent.toFixed(1)}% |`,
+      `| Duration | ${metrics.durationMs}ms |`,
+      '',
+      '### Tasks',
+      '',
+      ...taskLines,
+      '',
+      '---',
+      '',
+    ].join('\n');
+
+    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
+    writeFileSync(sprintLogPath, existing + newSection, 'utf-8');
+  } catch { /* non-critical */ }
+
+  // 3. Update README.md
+  try {
+    const readmePath = join(projectRoot, 'README.md');
+    if (!existsSync(readmePath)) return;
+    let content = readFileSafe(readmePath);
+
+    // Update sprint count: "N sprints completed"
+    content = content.replace(
+      /\d+\s+sprints?\s+completed/g,
+      `${sprintNum} sprints completed`,
+    );
+
+    writeFileSync(readmePath, content, 'utf-8');
+  } catch { /* non-critical */ }
+}
+
 // ─── RunSprintOptions ─────────────────────────────────────────────
 // autoApprove → passed to tmux as --dangerously-skip-permissions
 // sandboxMode → Docker sandbox (not yet implemented; reserved for future)
@@ -1061,6 +1257,7 @@ export async function runSprint(
   let results: TaskResult[] = [];
   let metrics: SprintMetrics | undefined;
   let scanInterval: ReturnType<typeof setInterval> | null = null;
+  let taskQueue: Task[] = [];
 
   // Phase 1: PLAN
   try {
@@ -1086,7 +1283,7 @@ export async function runSprint(
   while (spawnAttempts < 2) {
     try {
       sprint.phase = SprintPhase.SPAWN;
-      spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove });
+      taskQueue = spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove });
       sprint.status = SprintStatus.ACTIVE;
       // Start auditor scan loop (in-process)
       try {
@@ -1114,7 +1311,7 @@ export async function runSprint(
   // Phase 3: EXECUTE
   try {
     sprint.phase = SprintPhase.EXECUTE;
-    results = await waitForResults(projectRoot, sprint);
+    results = await waitForResults(projectRoot, sprint, undefined, taskQueue, { autoApprove: opts?.autoApprove });
   } catch (err) {
     try {
       updateDashboard(projectRoot, {
@@ -1231,6 +1428,7 @@ export async function runSprint(
     sprint.metrics = metrics;
     writeRetrospective(projectRoot, sprint, evaluations, metrics);
     writeSprintLog(projectRoot, sprint, metrics, evaluations);
+    try { updateProjectDocs(projectRoot, { sprint, evaluations, metrics }); } catch { /* non-critical */ }
   } catch (err) {
     try {
       updateDashboard(projectRoot, {

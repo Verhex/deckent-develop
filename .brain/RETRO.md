@@ -1,17 +1,17 @@
-# Sprint sprint-018 Retrospective
+# Sprint sprint-019 Retrospective
 
 ## Metrics
-- Tasks: 8 total, 8 done, 5 debt, 0 no-go
-- Coverage: 36.9%
+- Tasks: 8 total, 8 done, 2 debt, 0 no-go
+- Coverage: 73.1%
 - No-Go Rate: 0.0%
-- Duration: 259820ms
+- Duration: 759728ms
 
 ## Results
-- 018-001: GLOSSARY.md — Deckent Terminoloji Sözlüğü -> DONE
-- 018-002: TROUBLESHOOTING.md — Sık Sorunlar ve Çözümleri -> DONE
-- 018-003: SECURITY.md — Güvenlik Modeli Detayı -> GO_WITH_TECH_DEBT
-- 018-004: MCP-GUIDE.md — MCP Kullanım Kılavuzu -> GO_WITH_TECH_DEBT
-- 018-005: MEMORY-SYSTEM.md — Bellek Mimarisi -> GO_WITH_TECH_DEBT
-- 018-006: SPRINT-LIFECYCLE.md — Sprint Yaşam Döngüsü -> GO_WITH_TECH_DEBT
-- 018-007: CONFIG-REFERENCE.md — Config Referans Kılavuzu -> GO_WITH_TECH_DEBT
-- 018-008: WORKER-GUIDE.md — Worker Davranış Kılavuzu -> DONE
+- 019-001: Task Queue — Planner Task Sayısı vs Worker Limiti Ayrımı -> DONE
+- 019-002: Heartbeat Timestamp Fix -> DONE
+- 019-003: Dashboard Progress — Auditor .result Taraması -> DONE
+- 019-004: inferModelFromDirective Skor Tabanlı Sistem -> DONE
+- 019-005: Alert Dedup — Auditor Tekrar Engelleme -> GO_WITH_TECH_DEBT
+- 019-006: Auto Doc Update — Sprint Sonrası Dokümantasyon -> DONE
+- 019-007: Doc Task Criteria — evaluateResult Görev Tipine Duyarlı -> DONE
+- 019-008: Eksik Dokümanlar — BRAIN-GUIDE.md + DASHBOARD-GUIDE.md -> GO_WITH_TECH_DEBT

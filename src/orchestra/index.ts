@@ -15,7 +15,7 @@ export type { SpawnOptions } from './tmux.js';
 export {
   readContext, checkUsage, adjustSprintSize, createTask,
   planSprint, spawnWorkers, waitForResults,
-  evaluateResult, handleEvaluation, handleCrossDependencies,
+  evaluateResult, isDocTask, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runSprint, runDecay,
   BrainError, confirmDraftTasks,

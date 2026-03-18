@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, normalize } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { SprintPhase, SprintStatus } from '../core/types.js';
+import { AgentStatus, SprintPhase, SprintStatus } from '../core/types.js';
 import type {
   Heartbeat,
   LockInfo,
@@ -78,7 +78,9 @@ export function scanHeartbeats(projectRoot: string): {
 
     heartbeats.push(hb);
 
-    const elapsed = currentTime - new Date(hb.timestamp).getTime();
+    const parsedTime = new Date(hb.timestamp).getTime();
+    if (isNaN(parsedTime)) continue; // malformed timestamp — skip, do not mark as stale
+    const elapsed = currentTime - parsedTime;
     if (elapsed > HEARTBEAT_STALE_THRESHOLD_MS) {
       staleAgents.push({
         type: 'stale_heartbeat',
@@ -445,6 +447,60 @@ export function startScanLoop(
   }, interval);
 }
 
+export function scanResultFiles(projectRoot: string): {
+  resultCount: number;
+  doneTaskIds: Set<string>;
+} {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  const doneTaskIds = new Set<string>();
+
+  if (!existsSync(tasksDir)) {
+    return { resultCount: 0, doneTaskIds };
+  }
+
+  const files = readdirSync(tasksDir).filter(
+    (f) => f.startsWith('task-') && f.endsWith('.result'),
+  );
+
+  for (const file of files) {
+    // Extract task ID from filename: task-{id}.result
+    const taskId = file.replace(/^task-/, '').replace(/\.result$/, '');
+    doneTaskIds.add(taskId);
+  }
+
+  return { resultCount: files.length, doneTaskIds };
+}
+
+const ALERT_MAX = 50;
+
+/**
+ * Merges incoming alerts into existing ones with dedup by source+message.
+ * Duplicate alerts increment `count` rather than creating a new entry.
+ * Result is capped at ALERT_MAX (oldest alerts removed first).
+ */
+export function deduplicateAlerts(existing: Alert[], incoming: Alert[]): Alert[] {
+  const merged = [...existing];
+
+  for (const alert of incoming) {
+    const key = `${alert.source ?? ''}::${alert.message}`;
+    const idx = merged.findIndex(
+      (a) => `${a.source ?? ''}::${a.message}` === key,
+    );
+
+    if (idx !== -1) {
+      merged[idx] = {
+        ...merged[idx]!,
+        count: (merged[idx]!.count ?? 1) + 1,
+        timestamp: alert.timestamp,
+      };
+    } else {
+      merged.push({ ...alert, count: 1 });
+    }
+  }
+
+  return merged.slice(-ALERT_MAX);
+}
+
 export function writeScanToDashboard(
   projectRoot: string,
   sprintInfo: { id: string; number: number; phase: string; status: string },
@@ -458,14 +514,23 @@ export function writeScanToDashboard(
     }
   } catch { /* start fresh */ }
 
-  // Merge alerts (keep last 50)
-  const mergedAlerts = [
-    ...(existing?.alerts ?? []),
-    ...scanResult.alerts,
-  ].slice(-50);
+  // Merge alerts with deduplication
+  const mergedAlerts = deduplicateAlerts(existing?.alerts ?? [], scanResult.alerts);
 
-  // Update agent statuses from heartbeats
+  // Scan .result files to determine done task count
+  const { resultCount, doneTaskIds } = scanResultFiles(projectRoot);
+
+  // Active workers = heartbeats whose task does NOT yet have a .result file
+  const activeWorkerCount = scanResult.heartbeats.filter(
+    (hb) => !doneTaskIds.has(hb.taskId),
+  ).length;
+
+  // Update agent statuses from heartbeats and .result files
   const agents = (existing?.agents ?? []).map(agent => {
+    // If agent's task has a result file, mark as DONE
+    if (agent.taskId && doneTaskIds.has(agent.taskId)) {
+      return { ...agent, status: AgentStatus.DONE };
+    }
     const hb = scanResult.heartbeats.find(h => h.workerId === agent.id);
     if (hb) {
       return { ...agent, status: hb.status, currentAction: hb.currentAction, lastHeartbeat: hb.timestamp };
@@ -473,10 +538,16 @@ export function writeScanToDashboard(
     return agent;
   });
 
+  const existingProgress = existing?.progress ?? { done: 0, active: 0, blocked: 0, total: 0 };
+
   updateDashboard(projectRoot, {
     sprint: sprintInfo as DashboardState['sprint'],
     agents,
-    progress: existing?.progress ?? { done: 0, active: 0, blocked: 0, total: 0 },
+    progress: {
+      ...existingProgress,
+      done: resultCount,
+      active: activeWorkerCount,
+    },
     usage: existing?.usage ?? { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
     alerts: mergedAlerts,
     updatedAt: new Date().toISOString(),
