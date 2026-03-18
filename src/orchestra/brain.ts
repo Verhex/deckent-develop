@@ -13,6 +13,7 @@ import type {
   UsageMetrics, AgentInfo, ResolvedConfig, PatternEntry, DecayResult,
   BrainContext, SprintSizeRecommendation, SystemProfile,
   BrainPlanningMode, PlannerResult, PlannerTask,
+  SprintResult,
 } from '../core/types.js';
 export type { BrainContext, ProjectState, SprintSizeRecommendation } from '../core/types.js';
 import {
@@ -45,6 +46,12 @@ import { resetDashboard, updateDashboard, detectDeadlocks, startScanLoop, writeS
 
 // ─── Wave 2 — worker ──────────────────────────────────────────────
 import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
+
+// ─── Doc Updaters ─────────────────────────────────────────────────
+import { runAllUpdaters } from './doc-updaters/registry.js';
+import type { DocUpdateResult } from './doc-updaters/types.js';
+// Side-effect import: registers all updaters
+import './doc-updaters/index.js';
 
 // ═══ Types ═════════════════════════════════════════════════════════
 
@@ -1227,110 +1234,31 @@ export function cleanup(projectRoot: string, sprint: Sprint): void {
   }
 }
 
-// 16b. SprintResult — combined result for updateProjectDocs
-export interface SprintResult {
-  sprint: Sprint;
-  evaluations: Map<string, TaskEvaluation>;
-  metrics: SprintMetrics;
-}
+// 16b. SprintResult — re-exported from core/types
+export type { SprintResult } from '../core/types.js';
 
-// 16c. updateProjectDocs — auto-update project docs after sprint completion
-export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult): void {
-  const { sprint, evaluations, metrics } = sprintResult;
-  const date = new Date().toISOString().slice(0, 10);
-  const sprintNum = sprint.number;
-
-  // 1. Update CHANGELOG.md
-  try {
-    const changelogPath = join(projectRoot, 'docs', 'CHANGELOG.md');
-    const existing = existsSync(changelogPath)
-      ? readFileSafe(changelogPath)
-      : '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
-
-    const highlights: string[] = [];
-    for (const task of sprint.tasks) {
-      const ev = evaluations.get(task.id);
-      if (ev === TaskEvaluation.DONE || ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
-        highlights.push(`- **${task.title}**: ${ev}`);
-      }
-    }
-    if (highlights.length === 0) highlights.push('- No completed tasks');
-
-    const newEntry = [
-      `## [0.1.0-sprint${String(sprintNum).padStart(2, '0')}] - ${date}`,
-      '',
-      '### Added',
-      '',
-      ...highlights.slice(0, 10),
-      `- **Tasks**: ${metrics.totalTasks} total, ${metrics.completedTasks} done, ${metrics.techDebtTasks} tech debt, ${metrics.noGoTasks} no-go`,
-      '',
-    ].join('\n');
-
-    // Insert after the header (before first ## [)
-    const headerEndIdx = existing.indexOf('\n## ');
-    const insertAt = headerEndIdx >= 0 ? headerEndIdx + 1 : existing.length;
-    const updated = existing.slice(0, insertAt) + newEntry + existing.slice(insertAt);
-    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
-    writeFileSync(changelogPath, updated, 'utf-8');
-  } catch { /* non-critical */ }
-
-  // 2. Update docs/SPRINT-LOG.md
-  try {
-    const sprintLogPath = join(projectRoot, 'docs', 'SPRINT-LOG.md');
-    const existing = existsSync(sprintLogPath)
-      ? readFileSafe(sprintLogPath)
-      : '# Sprint Log\n\n---\n\n';
-
-    const taskLines: string[] = [];
-    for (const task of sprint.tasks) {
-      const ev = evaluations.get(task.id) ?? task.status;
-      taskLines.push(`- ${task.id}: ${task.title} (${ev})`);
-    }
-
-    const newSection = [
-      `## Sprint ${sprintNum} — ${sprint.id}`,
-      '',
-      `**Status:** ${sprint.status}`,
-      `**Date:** ${date}`,
-      `**Duration:** ${Math.round(metrics.durationMs / 1000)}s`,
-      '',
-      '### Results',
-      '',
-      '| Metric | Value |',
-      '|--------|-------|',
-      `| Total Tasks | ${metrics.totalTasks} |`,
-      `| Completed | ${metrics.completedTasks} |`,
-      `| Tech Debt | ${metrics.techDebtTasks} |`,
-      `| No-Go | ${metrics.noGoTasks} |`,
-      `| Coverage | ${metrics.coveragePercent.toFixed(1)}% |`,
-      `| Duration | ${metrics.durationMs}ms |`,
-      '',
-      '### Tasks',
-      '',
-      ...taskLines,
-      '',
-      '---',
-      '',
-    ].join('\n');
-
-    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
-    writeFileSync(sprintLogPath, existing + newSection, 'utf-8');
-  } catch { /* non-critical */ }
-
-  // 3. Update README.md
-  try {
-    const readmePath = join(projectRoot, 'README.md');
-    if (!existsSync(readmePath)) return;
-    let content = readFileSafe(readmePath);
-
-    // Update sprint count: "N sprints completed"
-    content = content.replace(
-      /\d+\s+sprints?\s+completed/g,
-      `${sprintNum} sprints completed`,
-    );
-
-    writeFileSync(readmePath, content, 'utf-8');
-  } catch { /* non-critical */ }
+// 16c. updateProjectDocs — registry-based auto-update after sprint completion
+export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult): DocUpdateResult[] {
+  const isInternalProject = existsSync(join(projectRoot, 'DECKENT-MASTER-BLUEPRINT.md'));
+  const config: ResolvedConfig = {
+    mode: 'max_plan',
+    activeModeConfig: {
+      max_workers: 8,
+      brain_model: 'opus',
+      default_model: 'opus',
+      haiku_allowed: true,
+      usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+      brain_planning: 'auto',
+    },
+    modes: {} as ResolvedConfig['modes'],
+    language: 'en',
+    projectName: isInternalProject ? 'deckent' : 'deckent-project',
+    projectRoot,
+    version: '0.0.0',
+    auto_docs: { tier1: true, tier2: true, tier3: false },
+  };
+  const ctx = { projectRoot, sprintResult, config, isInternalProject };
+  return runAllUpdaters(ctx);
 }
 
 // ─── RunSprintOptions ─────────────────────────────────────────────

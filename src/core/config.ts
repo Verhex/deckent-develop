@@ -10,6 +10,7 @@ import {
   SUPPORTED_LANGUAGES,
 } from './constants.js';
 import type {
+  AutoDocsConfig,
   DeckentConfig,
   PlanMode,
   PlanModeConfig,
@@ -17,6 +18,13 @@ import type {
   SystemProfile,
   UsageThresholds,
 } from './types.js';
+
+// ─── Default Auto Docs Config ───────────────────────────────────────
+export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
+  tier1: true,
+  tier2: false,
+  tier3: false,
+};
 
 // ─── Default Mode Definitions (Blueprint 13) ────────────────────────
 
@@ -260,6 +268,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     projectName: config.projectName ?? 'deckent-project',
     projectRoot: root,
     version: config.version ?? DECKENT_VERSION,
+    auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
   };
 }
 

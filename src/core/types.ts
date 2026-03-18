@@ -211,6 +211,13 @@ export interface SprintMetrics {
   contextLinesUsed: number;
 }
 
+// ─── Sprint Result ─────────────────────────────────────────────────
+export interface SprintResult {
+  sprint: Sprint;
+  evaluations: Map<string, TaskEvaluation>;
+  metrics: SprintMetrics;
+}
+
 // ─── Tech Debt (Blueprint 8) ────────────────────────────────────────
 export enum DebtPriority {
   NORMAL = 'NORMAL',
@@ -296,6 +303,7 @@ export interface DeckentConfig {
   language?: string;
   projectName?: string;
   version?: string;
+  auto_docs?: AutoDocsConfig;
 }
 
 export interface ResolvedConfig {
@@ -306,6 +314,7 @@ export interface ResolvedConfig {
   projectName: string;
   projectRoot: string;
   version: string;
+  auto_docs?: AutoDocsConfig;
 }
 
 // ─── Dashboard (Blueprint 12) ───────────────────────────────────────
@@ -429,6 +438,13 @@ export interface SetupRecommendation {
   defaultModel: ModelType;
   planning: BrainPlanningMode;
   reasons: string[];
+}
+
+// ─── Auto Docs Config ─────────────────────────────────────────────
+export interface AutoDocsConfig {
+  tier1: boolean;  // CHANGELOG, SPRINT-LOG
+  tier2: boolean;  // README counts, CONTRIBUTING, HEALTH-CHECK
+  tier3: boolean;  // BLUEPRINT, ARCHITECTURE
 }
 
 // ─── Project Analysis ──────────────────────────────────────────────
