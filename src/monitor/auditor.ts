@@ -350,15 +350,17 @@ export function buildWorkerScopeMap(
   return scopeMap;
 }
 
-export function runScanCycle(
-  projectRoot: string,
-  currentSprintId: string,
-): {
+export interface ScanResult {
   heartbeats: Heartbeat[];
   violations: BoundaryViolation[];
   alerts: Alert[];
   locks: LockInfo[];
-} {
+}
+
+export function runScanCycle(
+  projectRoot: string,
+  currentSprintId: string,
+): ScanResult {
   try {
     const hbResult = scanHeartbeats(projectRoot);
     const workerScopes = buildWorkerScopeMap(projectRoot);
@@ -410,13 +412,57 @@ export function startScanLoop(
   projectRoot: string,
   currentSprintId: string,
   intervalMs?: number,
+  onScanComplete?: (result: ScanResult) => void,
 ): ReturnType<typeof setInterval> {
   const interval = intervalMs ?? AUDITOR_SCAN_INTERVAL_MS;
   return setInterval(() => {
     try {
-      runScanCycle(projectRoot, currentSprintId);
+      const result = runScanCycle(projectRoot, currentSprintId);
+      if (onScanComplete) {
+        try { onScanComplete(result); } catch { /* callback must not kill loop */ }
+      }
     } catch {
       // Scan loop must not die
     }
   }, interval);
+}
+
+export function writeScanToDashboard(
+  projectRoot: string,
+  sprintInfo: { id: string; number: number; phase: string; status: string },
+  scanResult: ScanResult,
+): void {
+  const dashPath = join(projectRoot, DASHBOARD_FILE);
+  let existing: DashboardState | null = null;
+  try {
+    if (existsSync(dashPath)) {
+      existing = JSON.parse(readFileSync(dashPath, 'utf-8')) as DashboardState;
+    }
+  } catch { /* start fresh */ }
+
+  // Merge alerts (keep last 50)
+  const mergedAlerts = [
+    ...(existing?.alerts ?? []),
+    ...scanResult.alerts,
+  ].slice(-50);
+
+  // Update agent statuses from heartbeats
+  const agents = (existing?.agents ?? []).map(agent => {
+    const hb = scanResult.heartbeats.find(h => h.workerId === agent.id);
+    if (hb) {
+      return { ...agent, status: hb.status, currentAction: hb.currentAction, lastHeartbeat: hb.timestamp };
+    }
+    return agent;
+  });
+
+  updateDashboard(projectRoot, {
+    sprint: sprintInfo as DashboardState['sprint'],
+    agents,
+    progress: existing?.progress ?? { done: 0, active: 0, blocked: 0, total: 0 },
+    usage: existing?.usage ?? { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+    alerts: mergedAlerts,
+    updatedAt: new Date().toISOString(),
+    auditorLastScan: new Date().toISOString(),
+    violations: scanResult.violations.length,
+  });
 }

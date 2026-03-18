@@ -221,6 +221,7 @@ export default function DashboardPage() {
                   <TableHead>ID</TableHead>
                   <TableHead>Task</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Last HB</TableHead>
                   <TableHead>Elapsed</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
@@ -239,6 +240,7 @@ export default function DashboardPage() {
                         {agent.status}
                       </Badge>
                     </TableCell>
+                    <TableCell>{agent.lastHeartbeat ? relativeTime(agent.lastHeartbeat) : "—"}</TableCell>
                     <TableCell>{elapsed(agent.spawnedAt)}</TableCell>
                     <TableCell className="text-right">
                       {agent.status === "EXECUTING" && (
@@ -263,8 +265,11 @@ export default function DashboardPage() {
       {/* Alerts Section */}
       {alerts.length > 0 && (
         <Card className="border-zinc-800 bg-zinc-900">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-zinc-100">Alerts</CardTitle>
+            {(state?.violations ?? 0) > 0 && (
+              <Badge variant="critical">{state!.violations} violations</Badge>
+            )}
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">

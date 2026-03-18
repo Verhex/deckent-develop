@@ -7,6 +7,7 @@ export interface AgentInfo {
   taskId?: string;
   currentAction?: string;
   spawnedAt?: string;
+  lastHeartbeat?: string;
 }
 
 export interface Alert {
@@ -38,6 +39,8 @@ export interface DashboardState {
   };
   alerts: Alert[];
   updatedAt: string;
+  auditorLastScan?: string;
+  violations?: number;
 }
 
 export interface DeckentConfig {

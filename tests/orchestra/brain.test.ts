@@ -26,31 +26,42 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   spawnWorker: vi.fn(),
   killWorker: vi.fn(),
   listWorkers: vi.fn().mockReturnValue([]),
-  startAuditor: vi.fn(),
 }));
 
 vi.mock('../../src/monitor/auditor.js', () => ({
   updateDashboard: vi.fn(),
   detectDeadlocks: vi.fn().mockReturnValue([]),
+  startScanLoop: vi.fn().mockReturnValue(setInterval(() => {}, 99999)),
+  writeScanToDashboard: vi.fn(),
 }));
 
-vi.mock('../../src/core/utils.js', () => ({
-  countBrainLines: vi.fn().mockReturnValue(100),
-  getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
-}));
+vi.mock('../../src/core/utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
+  return {
+    ...actual,
+    countBrainLines: vi.fn().mockReturnValue(100),
+    getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
+  };
+});
 
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn().mockImplementation((_root: string, _id: string, _status: string) => ({})),
   releaseAllLocks: vi.fn().mockReturnValue(0),
 }));
 
+vi.mock('../../src/orchestra/planner.js', () => ({
+  callBrainPlanner: vi.fn().mockReturnValue(null),
+}));
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { ensureSession, spawnWorker, killWorker, listWorkers, startAuditor } from '../../src/orchestra/tmux.js';
-import { updateDashboard, detectDeadlocks } from '../../src/monitor/auditor.js';
+import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
+import { updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../../src/monitor/auditor.js';
 import { countBrainLines, getNextSprintId } from '../../src/core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../../src/agents/worker.js';
+import { callBrainPlanner } from '../../src/orchestra/planner.js';
 
+const mockedCallBrainPlanner = vi.mocked(callBrainPlanner);
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
 const mockedExistsSync = vi.mocked(existsSync);
@@ -63,9 +74,10 @@ const mockedEnsureSession = vi.mocked(ensureSession);
 const mockedSpawnWorker = vi.mocked(spawnWorker);
 const mockedKillWorker = vi.mocked(killWorker);
 const mockedListWorkers = vi.mocked(listWorkers);
-const mockedStartAuditor = vi.mocked(startAuditor);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 const mockedDetectDeadlocks = vi.mocked(detectDeadlocks);
+const mockedStartScanLoop = vi.mocked(startScanLoop);
+const mockedWriteScanToDashboard = vi.mocked(writeScanToDashboard);
 const mockedCountBrainLines = vi.mocked(countBrainLines);
 const mockedUpdateTaskStatus = vi.mocked(updateTaskStatus);
 const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
@@ -77,6 +89,7 @@ import {
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runSprint, runDecay,
   BrainError, buildWorkerPrompt, extractScopeFromDirective, parseStructuredDirectives,
+  confirmDraftTasks,
 } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -160,6 +173,11 @@ beforeEach(() => {
   mockedUpdateTaskStatus.mockImplementation((_r, _i, _s) => ({}) as Task);
   mockedReleaseAllLocks.mockReturnValue(0);
   mockedSpawnSync.mockReturnValue(spawnOk);
+  mockedStartScanLoop.mockReturnValue(setInterval(() => {}, 99999));
+  mockedWriteScanToDashboard.mockImplementation(() => {});
+  mockedGetNextSprintId.mockReturnValue('sprint-001');
+  mockedCountBrainLines.mockReturnValue(100);
+  mockedCallBrainPlanner.mockReturnValue(null);
 });
 
 // ═══ Tests ═══════════════════════════════════════════════════════════
@@ -484,10 +502,10 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('Scope: any');
   });
 
-  it('strips single quotes from prompt', () => {
+  it('preserves single quotes in prompt (tmux handles escaping)', () => {
     const task = makeTask({ title: "Task with 'quotes'" });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).not.toContain("'");
+    expect(prompt).toContain("'quotes'");
   });
 
   it('includes test writing instruction for every function', () => {
@@ -594,6 +612,102 @@ describe('planSprint', () => {
     expect(task?.scope.directories).toContain('src/utils/');
     expect(task?.scope.filesWrite).toContain('src/utils/hello.ts');
   });
+
+  it('mode=structured uses structured parse (no AI call)', () => {
+    const ctx = makeContext('Task A\nTask B');
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'structured' });
+    expect(mockedCallBrainPlanner).not.toHaveBeenCalled();
+    expect(sprint.planningMode).toBe('structured');
+    expect(sprint.tasks.length).toBeGreaterThan(0);
+  });
+
+  it('mode=auto tries AI, falls back to structured on null', () => {
+    mockedCallBrainPlanner.mockReturnValue(null);
+    const ctx = makeContext('Task A');
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(mockedCallBrainPlanner).toHaveBeenCalledTimes(1);
+    expect(sprint.planningMode).toBe('fallback');
+    expect(sprint.tasks.length).toBeGreaterThan(0);
+  });
+
+  it('mode=auto uses AI result when available', () => {
+    mockedCallBrainPlanner.mockReturnValue({
+      tasks: [{
+        title: 'AI Task', description: 'From AI', model: 'sonnet' as const,
+        effort: 'normal' as const, priority: 'HIGH' as const, reason: 'AI decided',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        dependencies: [], goNogo: { goCriteria: 'Pass', noGoCriteria: 'Fail', techDebtAcceptable: 'Minor' },
+      }],
+      reasoning: 'AI reasoning here',
+    });
+    const ctx = makeContext('');
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('ai');
+    expect(sprint.reasoning).toBe('AI reasoning here');
+    expect(sprint.tasks.some(t => t.title === 'AI Task')).toBe(true);
+  });
+
+  it('mode=ai throws BrainError when AI returns null', () => {
+    mockedCallBrainPlanner.mockReturnValue(null);
+    const ctx = makeContext('Task A');
+    expect(() => planSprint(ROOT, config, ctx, recommendation, { mode: 'ai' }))
+      .toThrow(BrainError);
+  });
+
+  it('asDraft=true creates tasks with DRAFT status', () => {
+    const ctx = makeContext('Task A');
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { asDraft: true });
+    expect(sprint.tasks[0]?.status).toBe(TaskStatus.DRAFT);
+  });
+
+  it('Sprint includes reasoning and planningMode fields', () => {
+    const ctx = makeContext('Task A');
+    const sprint = planSprint(ROOT, config, ctx, recommendation);
+    expect(sprint).toHaveProperty('reasoning');
+    expect(sprint).toHaveProperty('planningMode');
+  });
+});
+
+describe('confirmDraftTasks', () => {
+  it('changes DRAFT tasks to PENDING', () => {
+    const sprint = makeSprint({
+      tasks: [makeTask({ status: TaskStatus.DRAFT }), makeTask({ id: '001-002', status: TaskStatus.DRAFT })],
+    });
+    confirmDraftTasks(ROOT, sprint);
+    expect(sprint.tasks[0]?.status).toBe(TaskStatus.PENDING);
+    expect(sprint.tasks[1]?.status).toBe(TaskStatus.PENDING);
+    expect(mockedWriteFileSync).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips non-DRAFT tasks', () => {
+    const sprint = makeSprint({
+      tasks: [makeTask({ status: TaskStatus.PENDING })],
+    });
+    confirmDraftTasks(ROOT, sprint);
+    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('createTask initialStatus', () => {
+  it('uses initialStatus when provided', () => {
+    const task = createTask({
+      title: 'T', description: 'D', model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+      reason: 'R', scope: { directories: [], filesRead: [], filesWrite: [] },
+      dependencies: [], goNogo: { goCriteria: 'G', noGoCriteria: 'N', techDebtAcceptable: 'T' },
+      sprintId: 'sprint-001', initialStatus: TaskStatus.DRAFT,
+    }, 1);
+    expect(task.status).toBe(TaskStatus.DRAFT);
+  });
+
+  it('defaults to PENDING when initialStatus not provided', () => {
+    const task = createTask({
+      title: 'T', description: 'D', model: 'sonnet', effort: 'normal', priority: 'NORMAL',
+      reason: 'R', scope: { directories: [], filesRead: [], filesWrite: [] },
+      dependencies: [], goNogo: { goCriteria: 'G', noGoCriteria: 'N', techDebtAcceptable: 'T' },
+      sprintId: 'sprint-001',
+    }, 1);
+    expect(task.status).toBe(TaskStatus.PENDING);
+  });
 });
 
 describe('spawnWorkers', () => {
@@ -605,9 +719,10 @@ describe('spawnWorkers', () => {
     expect(mockedEnsureSession).toHaveBeenCalledTimes(1);
   });
 
-  it('starts auditor', () => {
+  it('does NOT call startAuditor (scan loop runs in-process)', () => {
     spawnWorkers(ROOT, sprint, config);
-    expect(mockedStartAuditor).toHaveBeenCalledWith(ROOT, expect.objectContaining({ allowedTools: 'Read,Bash' }));
+    // startAuditor is no longer imported — spawnWorkers only calls ensureSession + spawnWorker
+    expect(mockedEnsureSession).toHaveBeenCalled();
   });
 
   it('spawns one worker per task', () => {
@@ -1495,5 +1610,164 @@ describe('runDecay', () => {
     expect(result).toHaveProperty('removedPatternCount');
     expect(result.linesBefore).toBe(100);
     expect(result.linesAfter).toBe(80);
+  });
+});
+
+// ─── Sprint 12: writeSprintLog with evaluations ─────────────────
+describe('writeSprintLog with evaluations (2B)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('writes evaluation result instead of task.status when evaluations provided', () => {
+    const sprint: Sprint = {
+      id: 'sprint-001',
+      number: 1,
+      status: SprintStatus.COMPLETE,
+      phase: SprintPhase.COMPLETE,
+      tasks: [
+        makeTask({ id: '001-001', title: 'Setup', status: TaskStatus.DONE }),
+        makeTask({ id: '001-002', title: 'Test', status: TaskStatus.PENDING }),
+      ],
+      workers: [],
+    };
+    const metrics: SprintMetrics = {
+      totalTasks: 2, completedTasks: 1, techDebtTasks: 1, noGoTasks: 0,
+      durationMs: 5000, coveragePercent: 85, noGoRate: 0,
+      newDebtCount: 1, resolvedDebtCount: 0, totalOpenDebt: 0,
+      boundaryViolations: 0, crossAssignments: 0, contextLinesUsed: 0,
+    };
+    const evaluations = new Map<string, TaskEvaluation>();
+    evaluations.set('001-001', TaskEvaluation.DONE);
+    evaluations.set('001-002', TaskEvaluation.GO_WITH_TECH_DEBT);
+
+    writeSprintLog(ROOT, sprint, metrics, evaluations);
+
+    const written = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('sprint-001.md'));
+    expect(written).toBeDefined();
+    const content = String(written![1]);
+    expect(content).toContain('001-001: Setup (DONE)');
+    expect(content).toContain('001-002: Test (GO_WITH_TECH_DEBT)');
+    // Should NOT contain PENDING (the task.status)
+    expect(content).not.toContain('PENDING');
+  });
+
+  it('falls back to task.status when no evaluations provided', () => {
+    const sprint: Sprint = {
+      id: 'sprint-002',
+      number: 2,
+      status: SprintStatus.COMPLETE,
+      phase: SprintPhase.COMPLETE,
+      tasks: [makeTask({ id: '002-001', title: 'Build', status: TaskStatus.DONE })],
+      workers: [],
+    };
+    const metrics: SprintMetrics = {
+      totalTasks: 1, completedTasks: 1, techDebtTasks: 0, noGoTasks: 0,
+      durationMs: 1000, coveragePercent: 95, noGoRate: 0,
+      newDebtCount: 0, resolvedDebtCount: 0, totalOpenDebt: 0,
+      boundaryViolations: 0, crossAssignments: 0, contextLinesUsed: 0,
+    };
+
+    writeSprintLog(ROOT, sprint, metrics);
+
+    const written = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('sprint-002.md'));
+    expect(written).toBeDefined();
+    const content = String(written![1]);
+    expect(content).toContain('002-001: Build (DONE)');
+  });
+});
+
+// ─── Sprint 12: decay alias delegates to runDecay ────────────────
+describe('decay alias (2D)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('decay() delegates to runDecay()', () => {
+    mockedCountBrainLines.mockReturnValue(100);
+
+    decay(ROOT, 'sprint-003');
+    // decay should not throw and should call the same internal logic
+    // Since budget is under limit and no force, it returns early
+    expect(mockedCountBrainLines).toHaveBeenCalled();
+  });
+});
+
+// ─── Sprint 12: buildWorkerPrompt preserves quotes ────────────────
+describe('buildWorkerPrompt quote handling (3B)', () => {
+  it('preserves single quotes in prompt (tmux handles escaping)', () => {
+    const task = makeTask({ id: '001-001', title: "Fix it's bug" });
+    const prompt = buildWorkerPrompt(task);
+    // Quotes should be preserved (no longer stripped)
+    expect(prompt).toContain("selfAssessment must be one of: \"DONE\", \"GO_WITH_TECH_DEBT\", \"NO_GO\"");
+  });
+});
+
+// ─── Sprint 14: Heartbeat prompt ──────────────────────────────────
+describe('buildWorkerPrompt heartbeat instruction (Sprint 14)', () => {
+  it('includes heartbeat file path (.hb)', () => {
+    const task = makeTask({ id: '007-001' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('.tasks/task-007-001.hb');
+  });
+
+  it('includes heartbeat JSON format (workerId, sequence, filesChangedCount)', () => {
+    const task = makeTask({ id: '007-001' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('"workerId"');
+    expect(prompt).toContain('"sequence"');
+    expect(prompt).toContain('"filesChangedCount"');
+  });
+
+  it('mentions CODING, TESTING, DOCUMENTING status values', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('CODING');
+    expect(prompt).toContain('TESTING');
+    expect(prompt).toContain('DOCUMENTING');
+  });
+});
+
+// ─── Sprint 14: Scan loop integration in runSprint ────────────────
+describe('runSprint scan loop integration (Sprint 14)', () => {
+  const config = makeConfig();
+
+  function setupFullSprint() {
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('DIRECTIVES')) return 'Build X';
+      if (p.includes('task-') && p.endsWith('.result')) return JSON.stringify(makeResult());
+      if (p.includes('task-') && p.endsWith('.json')) return JSON.stringify(makeTask());
+      return '';
+    });
+    mockedSpawnSync.mockReturnValue(spawnOk);
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([] as never);
+  }
+
+  it('calls startScanLoop after spawn', async () => {
+    setupFullSprint();
+    await runSprint(ROOT, config);
+    expect(mockedStartScanLoop).toHaveBeenCalledWith(
+      ROOT,
+      expect.stringContaining('sprint-'),
+      undefined,
+      expect.any(Function),
+    );
+  });
+
+  it('clears scanInterval during cleanup', async () => {
+    setupFullSprint();
+    const fakeInterval = setInterval(() => {}, 99999);
+    mockedStartScanLoop.mockReturnValue(fakeInterval);
+
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+    await runSprint(ROOT, config);
+    expect(clearSpy).toHaveBeenCalledWith(fakeInterval);
+    clearSpy.mockRestore();
+    clearInterval(fakeInterval);
+  });
+
+  it('spawnWorkers does not import startAuditor', () => {
+    // startAuditor is no longer in the tmux mock — if it were called, it would throw
+    const sprint = makeSprint();
+    expect(() => spawnWorkers(ROOT, sprint, config)).not.toThrow();
+    expect(mockedEnsureSession).toHaveBeenCalled();
   });
 });

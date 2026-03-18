@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getNextSprintId } from '../../src/core/utils.js';
+import { getNextSprintId, parseDebtTable, generateDebtTable } from '../../src/core/utils.js';
+import { DebtPriority } from '../../src/core/types.js';
+import type { DebtItem } from '../../src/core/types.js';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -99,5 +101,56 @@ describe('getNextSprintId', () => {
       'notes.txt',
     ] as any);
     expect(getNextSprintId('/project')).toBe('sprint-001');
+  });
+});
+
+// ─── Sprint 12: parseDebtTable + generateDebtTable round-trip ─────
+describe('parseDebtTable / generateDebtTable round-trip (3A)', () => {
+  const sampleItems: DebtItem[] = [
+    {
+      id: 'debt-001',
+      description: 'Missing tests for auth',
+      originTaskId: '001-001',
+      originSprintId: 'sprint-001',
+      priority: DebtPriority.NORMAL,
+      sprintsOpen: 1,
+      resolved: false,
+      createdAt: '2026-03-17T00:00:00Z',
+    },
+    {
+      id: 'debt-002',
+      description: 'Refactor config loader',
+      originTaskId: '001-002',
+      originSprintId: 'sprint-001',
+      priority: DebtPriority.HIGH,
+      sprintsOpen: 3,
+      resolved: true,
+      resolvedInSprintId: 'sprint-003',
+      createdAt: '2026-03-16T00:00:00Z',
+    },
+  ];
+
+  it('generates and parses debt table round-trip', () => {
+    const table = generateDebtTable(sampleItems);
+    const parsed = parseDebtTable(table);
+
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0]!.id).toBe('debt-001');
+    expect(parsed[0]!.priority).toBe(DebtPriority.NORMAL);
+    expect(parsed[0]!.resolved).toBe(false);
+    expect(parsed[0]!.resolvedInSprintId).toBeUndefined();
+    expect(parsed[1]!.id).toBe('debt-002');
+    expect(parsed[1]!.resolved).toBe(true);
+    expect(parsed[1]!.resolvedInSprintId).toBe('sprint-003');
+    expect(parsed[1]!.sprintsOpen).toBe(3);
+  });
+
+  it('returns empty array for content with no table', () => {
+    expect(parseDebtTable('# No table here')).toEqual([]);
+  });
+
+  it('skips rows with fewer than 9 columns', () => {
+    const table = '| ID | Description |\n|---|---|\n| debt-x | short |';
+    expect(parseDebtTable(table)).toEqual([]);
   });
 });

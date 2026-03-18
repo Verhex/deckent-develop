@@ -4,14 +4,17 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
-import { TaskStatus, TaskEvaluation, SprintPhase, SprintStatus, DebtPriority, AgentStatus } from '../core/types.js';
+import { TaskStatus, TaskEvaluation, SprintPhase, SprintStatus, DebtPriority, AgentStatus, AlertLevel } from '../core/types.js';
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
   Task, TaskResult, TaskScope, GoNoGoCriteria, Sprint, SprintMetrics,
   DebtItem, ModelType, TaskEffort, TaskPriority,
   UsageMetrics, AgentInfo, ResolvedConfig, PatternEntry, DecayResult,
+  BrainContext, SprintSizeRecommendation,
+  BrainPlanningMode, PlannerResult, PlannerTask,
 } from '../core/types.js';
+export type { BrainContext, ProjectState, SprintSizeRecommendation } from '../core/types.js';
 import {
   BRAIN_DIR, TASKS_DIR, LOCKS_DIR, DIRECTIVES_FILE,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE,
@@ -19,45 +22,24 @@ import {
   MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
   BRAIN_TOTAL_LINE_BUDGET, MEMORY_DECAY_SPRINTS,
   DEBT_HIGH_PRIORITY_SPRINTS, DEBT_CRITICAL_SPRINTS,
-  DEBT_TABLE_HEADER,
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { countBrainLines, getNextSprintId } from '../core/utils.js';
+import { countBrainLines, getNextSprintId, parseDebtTable, generateDebtTable } from '../core/utils.js';
+
+// ─── Planner ─────────────────────────────────────────────────────
+import { callBrainPlanner } from './planner.js';
 
 // ─── Wave 2 — tmux ────────────────────────────────────────────────
-import { ensureSession, spawnWorker, killWorker, listWorkers, startAuditor } from './tmux.js';
+import { ensureSession, spawnWorker, killWorker, listWorkers } from './tmux.js';
 
 // ─── Wave 2 — auditor ─────────────────────────────────────────────
-import { updateDashboard, detectDeadlocks } from '../monitor/auditor.js';
+import { updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../monitor/auditor.js';
 
 // ─── Wave 2 — worker ──────────────────────────────────────────────
 import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
 
 // ═══ Types ═════════════════════════════════════════════════════════
-
-export interface BrainContext {
-  directives: string;
-  memory: string;
-  retro: string;
-  debt: DebtItem[];
-  patterns: string;
-  decisions: string;
-  existingTasks: Task[];
-  projectState: ProjectState;
-}
-
-export interface ProjectState {
-  gitStatus: string;
-  fileTree: string[];
-}
-
-export interface SprintSizeRecommendation {
-  size: 'full' | 'reduced' | 'minimal';
-  maxWorkers: number;
-  modelConstraint: ModelType | null;
-  reason: string;
-}
 
 export interface CreateTaskParams {
   title: string;
@@ -72,6 +54,7 @@ export interface CreateTaskParams {
   sprintId: string;
   isPriorityFix?: boolean;
   fixForTaskId?: string;
+  initialStatus?: import('../core/types.js').TaskStatus;
 }
 
 export class BrainError extends Error {
@@ -107,43 +90,6 @@ function sleep(ms: number): Promise<void> {
 
 function now(): string {
   return new Date().toISOString();
-}
-
-function parseDebtTable(content: string): DebtItem[] {
-  const lines = content.split('\n');
-  const items: DebtItem[] = [];
-  let headerFound = false;
-
-  for (const line of lines) {
-    if (line.includes('| ID |')) { headerFound = true; continue; }
-    if (!headerFound) continue;
-    if (line.startsWith('|---') || line.startsWith('| ---')) continue;
-    if (!line.startsWith('|')) continue;
-
-    const cols = line.split('|').slice(1, -1).map(c => c.trim());
-    if (cols.length < 9) continue;
-
-    items.push({
-      id: cols[0]!,
-      description: cols[1]!,
-      originTaskId: cols[2]!,
-      originSprintId: cols[3]!,
-      priority: cols[4] as DebtPriority,
-      sprintsOpen: parseInt(cols[5]!, 10) || 0,
-      resolved: cols[6] === 'true',
-      resolvedInSprintId: cols[7] === '-' ? undefined : cols[7],
-      createdAt: cols[8]!,
-    });
-  }
-  return items;
-}
-
-function generateDebtTable(items: DebtItem[]): string {
-  const separator = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
-  const rows = items.map(d =>
-    `| ${d.id} | ${d.description} | ${d.originTaskId} | ${d.originSprintId} | ${d.priority} | ${d.sprintsOpen} | ${d.resolved} | ${d.resolvedInSprintId ?? '-'} | ${d.createdAt} |`,
-  );
-  return [DEBT_TABLE_HEADER, separator, ...rows].join('\n');
 }
 
 function getSprintNumber(sprintId: string): number {
@@ -253,7 +199,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     scope: params.scope,
     dependencies: params.dependencies,
     goNogo: params.goNogo,
-    status: TaskStatus.PENDING,
+    status: params.initialStatus ?? TaskStatus.PENDING,
     sprintId: params.sprintId,
     isPriorityFix: params.isPriorityFix,
     fixForTaskId: params.fixForTaskId,
@@ -334,19 +280,46 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
   return tasks;
 }
 
+// 4e. plannerTaskToParams (pure)
+function plannerTaskToParams(
+  pt: PlannerTask,
+  sprintId: string,
+  modelOverride: ModelType,
+  initialStatus?: import('../core/types.js').TaskStatus,
+): CreateTaskParams {
+  return {
+    title: pt.title,
+    description: pt.description,
+    model: pt.model ?? modelOverride,
+    effort: pt.effort,
+    priority: pt.priority,
+    reason: pt.reason,
+    scope: pt.scope,
+    dependencies: pt.dependencies,
+    goNogo: pt.goNogo,
+    sprintId,
+    initialStatus,
+  };
+}
+
 // 5. planSprint
 export function planSprint(
   projectRoot: string,
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
+  options?: { mode?: BrainPlanningMode; asDraft?: boolean },
 ): Sprint {
   // Determine sprint number
   const sprintId = getNextSprintId(projectRoot);
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
+  const planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
+  const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
 
   const tasks: Task[] = [];
   let seq = 1;
+  let plannerResult: PlannerResult | null = null;
+  let usedMode: string = 'structured';
 
   // CRITICAL debt → priority fix tasks
   const criticalDebt = context.debt.filter(d => d.priority === DebtPriority.CRITICAL && !d.resolved);
@@ -365,36 +338,65 @@ export function planSprint(
       sprintId,
       isPriorityFix: true,
       fixForTaskId: debt.originTaskId,
+      initialStatus,
     }, seq++));
   }
 
-  // Directive → tasks: try structured first, fall back to line-based
-  const structuredTasks = parseStructuredDirectives(context.directives);
-  const directiveSources: Array<{ title: string; description: string; scope: TaskScope }> =
-    structuredTasks.length > 0
-      ? structuredTasks
-      : context.directives
-          .split('\n')
-          .map(l => l.trim())
-          .filter(l => l && !l.startsWith('#'))
-          .map(l => l.replace(/^-\s+/, ''))
-          .filter(Boolean)
-          .map(line => ({ title: line, description: line, scope: extractScopeFromDirective(line) }));
+  // AI planner attempt
+  if (planMode === 'ai' || planMode === 'auto') {
+    plannerResult = callBrainPlanner(
+      context,
+      recommendation,
+      config.activeModeConfig.brain_model,
+      config.projectName,
+    );
 
-  for (const src of directiveSources) {
-    if (tasks.length >= recommendation.maxWorkers) break;
-    tasks.push(createTask({
-      title: src.title,
-      description: src.description,
-      model: defaultModel,
-      effort: 'normal',
-      priority: 'NORMAL',
-      reason: 'Directive',
-      scope: src.scope,
-      dependencies: [],
-      goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
-      sprintId,
-    }, seq++));
+    if (plannerResult) {
+      usedMode = 'ai';
+      for (const pt of plannerResult.tasks) {
+        if (tasks.length >= recommendation.maxWorkers) break;
+        tasks.push(createTask(
+          plannerTaskToParams(pt, sprintId, defaultModel, initialStatus),
+          seq++,
+        ));
+      }
+    } else if (planMode === 'ai') {
+      throw new BrainError('AI planner failed', SprintPhase.PLAN);
+    } else {
+      usedMode = 'fallback';
+    }
+  }
+
+  // Structured fallback (mode === 'structured' || AI fail + auto)
+  if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
+    const structuredTasks = parseStructuredDirectives(context.directives);
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope }> =
+      structuredTasks.length > 0
+        ? structuredTasks
+        : context.directives
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l && !l.startsWith('#'))
+            .map(l => l.replace(/^-\s+/, ''))
+            .filter(Boolean)
+            .map(line => ({ title: line, description: line, scope: extractScopeFromDirective(line) }));
+
+    for (const src of directiveSources) {
+      if (tasks.length >= recommendation.maxWorkers) break;
+      tasks.push(createTask({
+        title: src.title,
+        description: src.description,
+        model: defaultModel,
+        effort: 'normal',
+        priority: 'NORMAL',
+        reason: 'Directive',
+        scope: src.scope,
+        dependencies: [],
+        goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
+        sprintId,
+        initialStatus,
+      }, seq++));
+    }
   }
 
   // Deadlock check
@@ -420,7 +422,24 @@ export function planSprint(
     phase: SprintPhase.PLAN,
     tasks,
     workers: tasks.map(t => `w-${t.id}`),
+    reasoning: plannerResult?.reasoning,
+    planningMode: usedMode,
   };
+}
+
+// 5a. confirmDraftTasks — DRAFT → PENDING
+export function confirmDraftTasks(projectRoot: string, sprint: Sprint): void {
+  const tasksPath = join(projectRoot, TASKS_DIR);
+  for (const task of sprint.tasks) {
+    if (task.status === TaskStatus.DRAFT) {
+      task.status = TaskStatus.PENDING;
+      writeFileSync(
+        join(tasksPath, `task-${task.id}.json`),
+        JSON.stringify(task, null, 2),
+        'utf-8',
+      );
+    }
+  }
 }
 
 // 5b. buildWorkerPrompt (pure)
@@ -442,7 +461,25 @@ Instructions:
 4. Place test files in the same directory as the source file, with the same name and .test.ts extension
 5. Run: npx vitest run — then write the test results to the .result file
 6. Coverage goal: minimum 80%
-7. When finished, create the result file at .tasks/task-${task.id}.result — this file is REQUIRED (JSON format):
+7. Create a heartbeat file at .tasks/task-${task.id}.hb BEFORE starting work (JSON format):
+
+{
+  "workerId": "w-${task.id}",
+  "taskId": "${task.id}",
+  "status": "EXECUTING",
+  "currentAction": "Starting task",
+  "timestamp": "<current ISO timestamp>",
+  "filesChangedCount": 0,
+  "sequence": 0
+}
+
+Update this file periodically as you work:
+- Change status to CODING, TESTING, DOCUMENTING as appropriate
+- Update currentAction with what you're doing
+- Increment sequence on each update
+- Update filesChangedCount as you modify files
+
+8. When finished, create the result file at .tasks/task-${task.id}.result — this file is REQUIRED (JSON format):
 
 {
   "taskId": "${task.id}",
@@ -456,7 +493,7 @@ Instructions:
 }
 
 selfAssessment must be one of: "DONE", "GO_WITH_TECH_DEBT", "NO_GO"
-The result file at .tasks/task-${task.id}.result is REQUIRED — without it your work cannot be evaluated.`.replace(/'/g, '');
+The result file at .tasks/task-${task.id}.result is REQUIRED — without it your work cannot be evaluated.`;
 }
 
 // 6. spawnWorkers
@@ -467,8 +504,6 @@ export function spawnWorkers(
   spawnOpts?: { autoApprove?: boolean },
 ): void {
   ensureSession();
-  // startAuditor is idempotent — skips new-window if auditor window already exists
-  startAuditor(projectRoot, { allowedTools: 'Read,Bash' });
 
   for (const task of sprint.tasks) {
     const prompt = buildWorkerPrompt(task);
@@ -760,7 +795,7 @@ export function writeRetrospective(
 }
 
 // 13. writeSprintLog
-export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: SprintMetrics): void {
+export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: SprintMetrics, evaluations?: Map<string, TaskEvaluation>): void {
   const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
   mkdirSync(sprintsPath, { recursive: true });
 
@@ -778,7 +813,9 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
     '## Tasks',
   ];
   for (const task of sprint.tasks) {
-    lines.push(`- ${task.id}: ${task.title} (${task.status})`);
+    const evalResult = evaluations?.get(task.id);
+    const statusStr = evalResult ?? task.status;
+    lines.push(`- ${task.id}: ${task.title} (${statusStr})`);
   }
   writeFileSync(
     join(sprintsPath, `${sprint.id}.md`),
@@ -830,78 +867,7 @@ export function calculateMetrics(
   };
 }
 
-// 15. decay
-export function decay(projectRoot: string, currentSprintId: string): void {
-  if (countBrainLines(projectRoot) <= BRAIN_TOTAL_LINE_BUDGET) return;
-
-  const brainPath = join(projectRoot, BRAIN_DIR);
-  const archivePath = join(brainPath, ARCHIVE_DIR);
-
-  // 1. Remove resolved patterns
-  const patternsPath = join(brainPath, PATTERNS_FILE);
-  if (existsSync(patternsPath)) {
-    const patterns = readJsonSafe<PatternEntry[]>(patternsPath);
-    if (patterns) {
-      const active = patterns.filter(p => !p.resolved);
-      writeFileSync(patternsPath, JSON.stringify(active, null, 2), 'utf-8');
-    }
-  }
-
-  // 2. Remove resolved debt
-  const debtPath = join(brainPath, DEBT_FILE);
-  const debtContent = readFileSafe(debtPath);
-  if (debtContent) {
-    const items = parseDebtTable(debtContent);
-    const openItems = items.filter(d => !d.resolved);
-    writeFileSync(debtPath, generateDebtTable(openItems), 'utf-8');
-  }
-
-  // 3. Archive old sprint logs (keep last 2)
-  const sprintsPath = join(brainPath, SPRINTS_DIR);
-  if (existsSync(sprintsPath)) {
-    const sprintFiles = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).sort();
-    const toArchive = sprintFiles.slice(0, Math.max(0, sprintFiles.length - 2));
-    if (toArchive.length > 0) {
-      mkdirSync(archivePath, { recursive: true });
-      for (const file of toArchive) {
-        const content = readFileSync(join(sprintsPath, file), 'utf-8');
-        writeFileSync(join(archivePath, file), content, 'utf-8');
-        unlinkSync(join(sprintsPath, file));
-      }
-    }
-  }
-
-  // 4. Memory archive — trim old sections
-  const memoryPath = join(brainPath, MEMORY_FILE);
-  if (existsSync(memoryPath) && countBrainLines(projectRoot) > BRAIN_TOTAL_LINE_BUDGET) {
-    const content = readFileSafe(memoryPath);
-    const currentNum = getSprintNumber(currentSprintId);
-    const lines = content.split('\n');
-    const kept: string[] = [];
-    let currentSectionOld = false;
-
-    for (const line of lines) {
-      const sectionMatch = line.match(/^## Sprint sprint-(\d+)/);
-      if (sectionMatch?.[1]) {
-        const sectionNum = parseInt(sectionMatch[1], 10);
-        currentSectionOld = (currentNum - sectionNum) >= MEMORY_DECAY_SPRINTS;
-      }
-      if (!currentSectionOld) kept.push(line);
-    }
-    writeFileSync(memoryPath, kept.join('\n'), 'utf-8');
-  }
-
-  // 5. Last resort — truncate MEMORY.md to 50 lines
-  if (countBrainLines(projectRoot) > BRAIN_TOTAL_LINE_BUDGET) {
-    const memContent = readFileSafe(join(brainPath, MEMORY_FILE));
-    const memLines = memContent.split('\n');
-    if (memLines.length > 50) {
-      writeFileSync(join(brainPath, MEMORY_FILE), memLines.slice(memLines.length - 50).join('\n'), 'utf-8');
-    }
-  }
-}
-
-// 15b. runDecay — public wrapper with force option
+// 15. runDecay — public wrapper with force option
 export interface RunDecayOptions {
   force?: boolean;
 }
@@ -993,6 +959,11 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   return { linesBefore, linesAfter, archivedSprints, removedDebtCount, removedPatternCount };
 }
 
+// 15b. decay — backward-compatible alias for runDecay
+export function decay(projectRoot: string, currentSprintId: string): void {
+  runDecay(projectRoot, currentSprintId);
+}
+
 // 16. cleanup
 export function cleanup(projectRoot: string, sprint: Sprint): void {
   // Kill all workers
@@ -1044,6 +1015,7 @@ export async function runSprint(
   let evaluations = new Map<string, TaskEvaluation>();
   let results: TaskResult[] = [];
   let metrics: SprintMetrics | undefined;
+  let scanInterval: ReturnType<typeof setInterval> | null = null;
 
   // Phase 1: PLAN
   try {
@@ -1066,11 +1038,20 @@ export async function runSprint(
       sprint.phase = SprintPhase.SPAWN;
       spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove });
       sprint.status = SprintStatus.ACTIVE;
+      // Start auditor scan loop (in-process)
+      try {
+        scanInterval = startScanLoop(projectRoot, sprint.id, undefined, (scanResult) => {
+          writeScanToDashboard(projectRoot, {
+            id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status,
+          }, scanResult);
+        });
+      } catch { /* scan loop start failed — non-fatal */ }
       break;
     } catch (err) {
       spawnAttempts++;
       if (spawnAttempts >= 2) {
         // Cleanup and throw
+        if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
         try { cleanup(projectRoot, sprint); } catch { /* best effort */ }
         throw new BrainError(
           `Spawn phase failed after retry: ${err instanceof Error ? err.message : String(err)}`,
@@ -1084,7 +1065,18 @@ export async function runSprint(
   try {
     sprint.phase = SprintPhase.EXECUTE;
     results = await waitForResults(projectRoot, sprint);
-  } catch { /* use empty results */ }
+  } catch (err) {
+    try {
+      updateDashboard(projectRoot, {
+        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch { /* dashboard write failed — continue */ }
+  }
 
   // Phase 4: EVALUATE
   try {
@@ -1121,7 +1113,18 @@ export async function runSprint(
         evaluations.set(task.id, TaskEvaluation.NO_GO);
       }
     }
-  } catch { /* skip to retro */ }
+  } catch (err) {
+    try {
+      updateDashboard(projectRoot, {
+        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch { /* dashboard write failed — continue */ }
+  }
 
   // Phase 5: FIX
   try {
@@ -1156,7 +1159,18 @@ export async function runSprint(
       }
     }
     escalateDebt(projectRoot);
-  } catch { /* skip to retro */ }
+  } catch (err) {
+    try {
+      updateDashboard(projectRoot, {
+        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch { /* dashboard write failed — continue */ }
+  }
 
   // Phase 6: RETRO
   try {
@@ -1166,19 +1180,53 @@ export async function runSprint(
     metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
     sprint.metrics = metrics;
     writeRetrospective(projectRoot, sprint, evaluations, metrics);
-    writeSprintLog(projectRoot, sprint, metrics);
-  } catch { /* skip to decay */ }
+    writeSprintLog(projectRoot, sprint, metrics, evaluations);
+  } catch (err) {
+    try {
+      updateDashboard(projectRoot, {
+        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch { /* dashboard write failed — continue */ }
+  }
 
   // Phase 7: DECAY
   try {
     sprint.phase = SprintPhase.DECAY;
-    decay(projectRoot, sprint.id);
-  } catch { /* skip to cleanup */ }
+    runDecay(projectRoot, sprint.id);
+  } catch (err) {
+    try {
+      updateDashboard(projectRoot, {
+        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch { /* dashboard write failed — continue */ }
+  }
 
   // Phase 8: CLEANUP
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
   try {
     cleanup(projectRoot, sprint);
-  } catch { /* best effort */ }
+  } catch (err) {
+    try {
+      updateDashboard(projectRoot, {
+        sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+        usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+        alerts: [{ level: AlertLevel.WARNING, message: `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date().toISOString() }],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch { /* dashboard write failed — continue */ }
+  }
 
   sprint.status = SprintStatus.COMPLETE;
   sprint.phase = SprintPhase.COMPLETE;

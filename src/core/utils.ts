@@ -1,6 +1,8 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR } from './constants.js';
+import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER } from './constants.js';
+import type { DebtItem } from './types.js';
+import { DebtPriority } from './types.js';
 
 /**
  * Count total lines in .brain/ directory (excluding archive/).
@@ -44,4 +46,41 @@ export function getNextSprintId(projectRoot: string): string {
     }
   }
   return `sprint-${String(maxNumber + 1).padStart(3, '0')}`;
+}
+
+export function parseDebtTable(content: string): DebtItem[] {
+  const lines = content.split('\n');
+  const items: DebtItem[] = [];
+  let headerFound = false;
+
+  for (const line of lines) {
+    if (line.includes('| ID |')) { headerFound = true; continue; }
+    if (!headerFound) continue;
+    if (line.startsWith('|---') || line.startsWith('| ---')) continue;
+    if (!line.startsWith('|')) continue;
+
+    const cols = line.split('|').slice(1, -1).map(c => c.trim());
+    if (cols.length < 9) continue;
+
+    items.push({
+      id: cols[0]!,
+      description: cols[1]!,
+      originTaskId: cols[2]!,
+      originSprintId: cols[3]!,
+      priority: cols[4] as DebtPriority,
+      sprintsOpen: parseInt(cols[5]!, 10) || 0,
+      resolved: cols[6] === 'true',
+      resolvedInSprintId: cols[7] === '-' ? undefined : cols[7],
+      createdAt: cols[8]!,
+    });
+  }
+  return items;
+}
+
+export function generateDebtTable(items: DebtItem[]): string {
+  const separator = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
+  const rows = items.map(d =>
+    `| ${d.id} | ${d.description} | ${d.originTaskId} | ${d.originSprintId} | ${d.priority} | ${d.sprintsOpen} | ${d.resolved} | ${d.resolvedInSprintId ?? '-'} | ${d.createdAt} |`,
+  );
+  return [DEBT_TABLE_HEADER, separator, ...rows].join('\n');
 }

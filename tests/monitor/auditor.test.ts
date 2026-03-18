@@ -10,6 +10,7 @@ import {
   buildWorkerScopeMap,
   runScanCycle,
   startScanLoop,
+  writeScanToDashboard,
 } from '../../src/monitor/auditor.js';
 import { AlertLevel, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
@@ -420,6 +421,208 @@ describe('startScanLoop', () => {
 
     clearInterval(handle);
     vi.useRealTimers();
+  });
+});
+
+describe('startScanLoop with callback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('invokes onScanComplete callback after scan', () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedSpawnSync.mockReturnValue({
+      status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    const callback = vi.fn();
+    const handle = startScanLoop('/project', 'sprint-1', 100, callback);
+
+    vi.advanceTimersByTime(100);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(expect.objectContaining({
+      heartbeats: expect.any(Array),
+      violations: expect.any(Array),
+      alerts: expect.any(Array),
+      locks: expect.any(Array),
+    }));
+
+    clearInterval(handle);
+    vi.useRealTimers();
+  });
+
+  it('swallows callback errors — loop continues', () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedSpawnSync.mockReturnValue({
+      status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    const callback = vi.fn().mockImplementation(() => { throw new Error('callback boom'); });
+    const handle = startScanLoop('/project', 'sprint-1', 50, callback);
+
+    vi.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
+    // Should have been called twice despite first error
+    expect(callback).toHaveBeenCalledTimes(2);
+
+    clearInterval(handle);
+    vi.useRealTimers();
+  });
+});
+
+describe('writeScanToDashboard', () => {
+  const sprintInfo = { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' };
+
+  it('writes dashboard JSON with merged alerts', () => {
+    const existingDash: DashboardState = {
+      sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
+      agents: [],
+      progress: { done: 0, active: 1, blocked: 0, total: 2 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+      alerts: [{ level: 'INFO' as never, message: 'existing', timestamp: new Date().toISOString() }],
+      updatedAt: new Date().toISOString(),
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: [{ level: 'WARNING' as never, message: 'new alert', timestamp: new Date().toISOString() }],
+      locks: [],
+    });
+
+    expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.alerts).toHaveLength(2);
+  });
+
+  it('updates agent statuses from heartbeats', () => {
+    const existingDash: DashboardState = {
+      sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
+      agents: [{ id: 'w-001', role: 'worker', status: 'EXECUTING', model: 'sonnet', tmuxWindow: 'w-001' }] as never,
+      progress: { done: 0, active: 1, blocked: 0, total: 1 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+      alerts: [],
+      updatedAt: new Date().toISOString(),
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
+
+    const hbTimestamp = new Date().toISOString();
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [{ workerId: 'w-001', taskId: '001', status: 'CODING' as never, currentAction: 'writing tests', timestamp: hbTimestamp, filesChangedCount: 3, sequence: 5 }],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.agents[0].lastHeartbeat).toBe(hbTimestamp);
+    expect(written.agents[0].currentAction).toBe('writing tests');
+  });
+
+  it('handles no existing dashboard (fresh start)', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.alerts).toEqual([]);
+    expect(written.agents).toEqual([]);
+  });
+
+  it('limits alerts to 50', () => {
+    const existingAlerts = Array.from({ length: 48 }, (_, i) => ({
+      level: 'INFO' as never,
+      message: `alert-${i}`,
+      timestamp: new Date().toISOString(),
+    }));
+    const existingDash: DashboardState = {
+      sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
+      agents: [],
+      progress: { done: 0, active: 0, blocked: 0, total: 0 },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+      alerts: existingAlerts as never,
+      updatedAt: new Date().toISOString(),
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
+
+    const newAlerts = Array.from({ length: 5 }, (_, i) => ({
+      level: 'WARNING' as never,
+      message: `new-${i}`,
+      timestamp: new Date().toISOString(),
+    }));
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: newAlerts as never,
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.alerts.length).toBeLessThanOrEqual(50);
+  });
+
+  it('includes auditorLastScan in output', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.auditorLastScan).toBeDefined();
+    expect(written.auditorLastScan).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('includes violations count', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [
+        { type: 'stale_heartbeat', agentId: 'w1', detail: 'stale', timestamp: new Date().toISOString() },
+        { type: 'file_outside_scope', agentId: 'w2', detail: 'bad', timestamp: new Date().toISOString() },
+      ],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written.violations).toBe(2);
+  });
+
+  it('dashboard JSON contains all DashboardState fields', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    writeScanToDashboard('/project', sprintInfo, {
+      heartbeats: [],
+      violations: [],
+      alerts: [],
+      locks: [],
+    });
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
+    expect(written).toHaveProperty('sprint');
+    expect(written).toHaveProperty('agents');
+    expect(written).toHaveProperty('progress');
+    expect(written).toHaveProperty('usage');
+    expect(written).toHaveProperty('alerts');
+    expect(written).toHaveProperty('updatedAt');
+    expect(written).toHaveProperty('auditorLastScan');
+    expect(written).toHaveProperty('violations');
   });
 });
 

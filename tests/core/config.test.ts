@@ -160,6 +160,39 @@ describe('loadConfig', () => {
   });
 });
 
+describe('brain_planning config', () => {
+  it('default modes have brain_planning === "auto"', () => {
+    const modes = getDefaultModes();
+    for (const mode of Object.values(modes)) {
+      expect(mode.brain_planning).toBe('auto');
+    }
+  });
+
+  it('accepts valid brain_planning values', () => {
+    for (const value of ['ai', 'structured', 'auto'] as const) {
+      expect(() => validatePartialConfig({
+        modes: {
+          max_plan: { ...getDefaultModes().max_plan, brain_planning: value },
+          max5x_plan: getDefaultModes().max5x_plan,
+          pro_plan: getDefaultModes().pro_plan,
+          api: getDefaultModes().api,
+        },
+      })).not.toThrow();
+    }
+  });
+
+  it('rejects invalid brain_planning value', () => {
+    expect(() => validatePartialConfig({
+      modes: {
+        max_plan: { ...getDefaultModes().max_plan, brain_planning: 'invalid' as 'auto' },
+        max5x_plan: getDefaultModes().max5x_plan,
+        pro_plan: getDefaultModes().pro_plan,
+        api: getDefaultModes().api,
+      },
+    })).toThrow(ConfigValidationError);
+  });
+});
+
 describe('validatePartialConfig', () => {
   it('accepts { mode: "pro_plan" }', () => {
     expect(() => validatePartialConfig({ mode: 'pro_plan' })).not.toThrow();

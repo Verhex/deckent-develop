@@ -58,6 +58,14 @@ function SidebarContent({ onNavigate, sseState }: { onNavigate?: () => void; sse
           </Badge>
         </div>
       )}
+      <div className="mb-4 px-3 flex items-center gap-2">
+        <span className="text-xs text-zinc-400">Auditor:</span>
+        {sseState?.auditorLastScan ? (
+          <Badge variant="success" className="text-[10px]">Active</Badge>
+        ) : (
+          <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
+        )}
+      </div>
       <NavLinks onNavigate={onNavigate} />
     </>
   );

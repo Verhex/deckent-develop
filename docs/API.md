@@ -18,12 +18,15 @@ import { scanHeartbeats } from 'deckent/monitor';
 1. [Core — Types](#1-core--types)
 2. [Core — Constants](#2-core--constants)
 3. [Core — Config](#3-core--config)
-4. [Orchestra — Brain](#4-orchestra--brain)
-5. [Orchestra — Tmux](#5-orchestra--tmux)
-6. [Agents — Worker](#6-agents--worker)
-7. [Monitor — Auditor](#7-monitor--auditor)
-8. [MCP Server](#8-mcp-server)
-9. [CLI Commands](#9-cli-commands)
+4. [Core — Analyzer](#4-core--analyzer)
+5. [Orchestra — Brain](#5-orchestra--brain)
+6. [Orchestra — Planner](#6-orchestra--planner)
+7. [Orchestra — Tmux](#7-orchestra--tmux)
+8. [Agents — Worker](#8-agents--worker)
+9. [Monitor — Auditor](#9-monitor--auditor)
+10. [MCP Server](#10-mcp-server)
+11. [HTTP API](#11-http-api)
+12. [CLI Commands](#12-cli-commands)
 
 ---
 
@@ -187,15 +190,17 @@ interface TaskPlan {
 
 ```ts
 interface Sprint {
-  id:          string;          // Format: "sprint-{number}"
-  number:      number;
-  status:      SprintStatus;
-  phase:       SprintPhase;
-  tasks:       Task[];
-  workers:     string[];        // Worker IDs
-  metrics?:    SprintMetrics;
-  startedAt?:  string;          // ISO 8601
-  completedAt?: string;         // ISO 8601
+  id:            string;          // Format: "sprint-{number}"
+  number:        number;
+  status:        SprintStatus;
+  phase:         SprintPhase;
+  tasks:         Task[];
+  workers:       string[];        // Worker IDs
+  metrics?:      SprintMetrics;
+  reasoning?:    string;          // AI planner reasoning (when brain_planning = 'ai')
+  planningMode?: BrainPlanningMode;  // Which planning mode was used
+  startedAt?:    string;          // ISO 8601
+  completedAt?:  string;          // ISO 8601
 }
 ```
 
@@ -300,11 +305,13 @@ interface DashboardState {
     phase:  SprintPhase;
     status: SprintStatus;
   };
-  agents:   AgentInfo[];
-  progress: { done: number; active: number; blocked: number; total: number };
-  usage:    UsageMetrics;
-  alerts:   Alert[];
-  updatedAt: string;
+  agents:           AgentInfo[];
+  progress:         { done: number; active: number; blocked: number; total: number };
+  usage:            UsageMetrics;
+  alerts:           Alert[];
+  auditorLastScan?: string;    // ISO 8601 — when last scan cycle completed
+  violations?:      number;    // Total boundary violation count
+  updatedAt:        string;
 }
 ```
 
@@ -329,6 +336,14 @@ interface LockInfo {
 }
 ```
 
+#### `BrainPlanningMode`
+
+```ts
+type BrainPlanningMode = 'ai' | 'structured' | 'auto';
+```
+
+Brain planning strategy: `'ai'` uses AI planner with Zod validation, `'structured'` parses DIRECTIVES.md `## Task N:` blocks, `'auto'` (default) tries AI first then falls back to structured.
+
 #### `PlanModeConfig`
 
 ```ts
@@ -340,6 +355,7 @@ interface PlanModeConfig {
   usage_thresholds: { '5hr': number; weekly: number };  // 0.0–1.0
   budget_per_sprint?: number;  // USD, api mode only
   requires?:        string;    // Env var name, api mode only
+  brain_planning?:  BrainPlanningMode;  // Default: 'auto'
 }
 ```
 
@@ -571,7 +587,48 @@ Thrown when config validation fails. The `errors` array contains one entry per v
 
 ---
 
-## 4. Orchestra — Brain
+## 4. Core — Analyzer
+
+**Source:** `src/core/analyzer.ts`
+**Exports:** `src/core/index.ts`
+
+### `analyzeProject`
+
+```ts
+function analyzeProject(root: string): ProjectAnalysis
+```
+
+Analyzes a project directory and returns detected stack, size classification, and methodology recommendation.
+
+**Returns:** `ProjectAnalysis`:
+```ts
+interface ProjectAnalysis {
+  framework:      string | null;   // 'react' | 'next' | 'express' | 'nestjs' | 'vue' | 'angular' | 'svelte' | null
+  language:       string;          // 'typescript' | 'javascript' | 'python' | 'rust' | 'mixed'
+  testFramework:  string | null;   // 'vitest' | 'jest' | 'mocha' | 'pytest' | null
+  buildTool:      string | null;   // 'tsc' | 'vite' | 'webpack' | 'esbuild' | 'turbo' | null
+  ci:             string | null;   // 'github-actions' | 'gitlab-ci' | 'circleci' | null
+  size:           ProjectSize;
+  methodology:    MethodologyRecommendation;
+}
+
+interface ProjectSize {
+  files:          number;
+  lines:          number;
+  classification: 'small' | 'medium' | 'large' | 'enterprise';
+}
+
+interface MethodologyRecommendation {
+  maxWorkers:     number;
+  defaultModel:   ModelType;
+  brainModel:     ModelType;
+  reasoning:      string;
+}
+```
+
+---
+
+## 5. Orchestra — Brain
 
 **Source:** `src/orchestra/brain.ts`
 **Exports:** `src/orchestra/index.ts`
@@ -677,12 +734,41 @@ function planSprint(
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
+  options?: { mode?: BrainPlanningMode; asDraft?: boolean },
 ): Sprint
 ```
 
 Reads `DIRECTIVES.md`, creates `Task` objects, and writes `.tasks/task-{id}.json` files. Handles CRITICAL debt priority fixes by prepending fix tasks.
 
+**Parameters:**
+- `options.mode` — Planning mode override (`'ai'`, `'structured'`, `'auto'`). Default from config.
+- `options.asDraft` — If `true`, tasks are created in `DRAFT` status (requires `confirmDraftTasks` before spawning).
+
 **Returns:** A `Sprint` in `PLANNING` status with all tasks populated.
+
+---
+
+### `confirmDraftTasks`
+
+```ts
+function confirmDraftTasks(projectRoot: string, sprint: Sprint): void
+```
+
+Transitions all DRAFT tasks in a sprint to PENDING status. Called after operator confirms the sprint plan when `asDraft: true` was used.
+
+---
+
+### `resolveDebt`
+
+```ts
+function resolveDebt(
+  projectRoot: string,
+  debtId: string,
+  resolvedInSprintId: string,
+): boolean
+```
+
+Marks a debt item as resolved. Returns `true` if the debt was found and updated, `false` otherwise.
 
 ---
 
@@ -803,7 +889,9 @@ function spawnWorkers(
 ): void
 ```
 
-Ensures the tmux session exists, starts the auditor window, and creates one tmux window per task. Each window runs `claude` with the generated worker prompt.
+Ensures the tmux session exists and creates one tmux window per task. Each window runs `claude` with the generated worker prompt.
+
+**Note:** As of Sprint 14, `spawnWorkers` no longer calls `startAuditor()`. The auditor scan loop runs in-process within `runSprint`. The worker prompt (via `buildWorkerPrompt`) includes instructions for creating and updating `.tasks/task-{id}.hb` heartbeat files.
 
 ---
 
@@ -894,7 +982,76 @@ Thrown when a sprint phase fails unrecoverably. The `phase` field identifies whi
 
 ---
 
-## 5. Orchestra — Tmux
+## 6. Orchestra — Planner
+
+**Source:** `src/orchestra/planner.ts`
+**Exports:** `src/orchestra/index.ts`
+
+Planner imports ONLY from `core/` (types, constants) — never from brain.ts (ADR-008).
+
+### `buildPlanPrompt`
+
+```ts
+function buildPlanPrompt(
+  context: BrainContext,
+  recommendation: SprintSizeRecommendation,
+  projectName: string,
+): string
+```
+
+Constructs the AI prompt sent to the LLM for task planning. Includes context from directives, memory, debt, patterns, and the sprint size recommendation.
+
+---
+
+### `parsePlannerResponse`
+
+```ts
+function parsePlannerResponse(raw: string): PlannerResult | null
+```
+
+Parses and validates a raw AI response string into a `PlannerResult` using Zod schemas. Returns `null` if the response is invalid or cannot be parsed.
+
+**Type `PlannerResult`:**
+```ts
+interface PlannerResult {
+  tasks: PlannerTask[];
+  reasoning: string;
+}
+
+interface PlannerTask {
+  title:       string;
+  description: string;
+  model:       ModelType;
+  effort:      TaskEffort;
+  priority:    TaskPriority;
+  reason:      string;
+  scope:       TaskScope;
+  dependencies: string[];
+  goNogo:      GoNoGoCriteria;
+}
+```
+
+---
+
+### `callBrainPlanner`
+
+```ts
+function callBrainPlanner(
+  context: BrainContext,
+  recommendation: SprintSizeRecommendation,
+  model: ModelType,
+  projectName: string,
+): PlannerResult | null
+```
+
+Spawns `claude` CLI with the plan prompt, parses the response, and returns a validated `PlannerResult`. Returns `null` on any failure (timeout, invalid response, etc.).
+
+**Parameters:**
+- `model` — Which model to use for planning (typically `opus` or `sonnet`).
+
+---
+
+## 7. Orchestra — Tmux
 
 **Source:** `src/orchestra/tmux.ts`
 **Exports:** `src/orchestra/index.ts`
@@ -1026,7 +1183,7 @@ class TmuxError extends Error {
 
 ---
 
-## 6. Agents — Worker
+## 8. Agents — Worker
 
 **Source:** `src/agents/worker.ts`
 **Exports:** `src/agents/index.ts`
@@ -1221,7 +1378,7 @@ class ScopeViolationError extends Error {
 
 ---
 
-## 7. Monitor — Auditor
+## 9. Monitor — Auditor
 
 **Source:** `src/monitor/auditor.ts`
 **Exports:** `src/monitor/index.ts`
@@ -1351,15 +1508,31 @@ function startScanLoop(
   projectRoot: string,
   currentSprintId: string,
   intervalMs?: number,
+  onScanComplete?: (result: ScanResult) => void,
 ): ReturnType<typeof setInterval>
 ```
 
-Starts an interval that calls `runScanCycle` repeatedly. Never throws.
+Starts an interval that calls `runScanCycle` repeatedly. Never throws. Called by Brain in Phase 2.5 of `runSprint`.
 
 **Parameters:**
 - `intervalMs` — Default: `AUDITOR_SCAN_INTERVAL_MS` (30,000 ms).
+- `onScanComplete` — Optional callback invoked after each scan cycle. Errors in the callback do not kill the loop.
 
-**Returns:** The interval handle. Call `clearInterval` to stop.
+**Returns:** The interval handle. Call `clearInterval` to stop (Brain does this in Phase 3.5).
+
+---
+
+### `writeScanToDashboard`
+
+```ts
+function writeScanToDashboard(
+  projectRoot: string,
+  sprintInfo: { id: string; number: number; phase: SprintPhase; status: SprintStatus },
+  scanResult: ScanResult,
+): void
+```
+
+Merges scan results into the existing dashboard state. Reads the current `.dashboard` file, merges new alerts (keeps last 50), updates agent statuses from heartbeats, and overwrites. Used as the `onScanComplete` callback in `startScanLoop`.
 
 ---
 
@@ -1373,7 +1546,7 @@ Factory function for `Alert` objects. Stamps the current ISO timestamp automatic
 
 ---
 
-## 8. MCP Server
+## 10. MCP Server
 
 **Source:** `src/mcp/server.ts`
 
@@ -1383,7 +1556,7 @@ Factory function for `Alert` objects. Stamps the current ISO timestamp automatic
 function createServer(): McpServer
 ```
 
-Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 8 tools and 4 resources.
+Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 9 tools and 4 resources.
 
 **Example:**
 ```ts
@@ -1396,7 +1569,7 @@ await server.connect(new StdioServerTransport());
 
 ---
 
-### Tools (8)
+### Tools (9)
 
 | Tool name | Description |
 |---|---|
@@ -1408,6 +1581,15 @@ await server.connect(new StdioServerTransport());
 | `deckent_doctor` | Run all health checks (Node, git, tmux, Claude CLI, workspace, budget) |
 | `deckent_retro` | Return the latest sprint retrospective (`RETRO.md`) |
 | `deckent_history` | Return recent sprint log summaries |
+| `deckent_analyze_project` | Analyze project stack, size, and methodology recommendation |
+
+#### `deckent_plan` Input Schema
+```ts
+{
+  dryRun?: boolean;  // default: false
+  mode?:   'ai' | 'structured' | 'auto';  // default: from config (brain_planning)
+}
+```
 
 #### `deckent_init` Input Schema
 ```ts
@@ -1438,7 +1620,62 @@ await server.connect(new StdioServerTransport());
 
 ---
 
-## 9. CLI Commands
+## 11. HTTP API
+
+**Source:** `src/api/server.ts`, `src/api/watcher.ts`
+
+### `createHttpServer`
+
+```ts
+function createHttpServer(
+  projectRoot: string,
+  port?: number,
+  staticDir?: string,
+): HttpApi
+```
+
+Creates an HTTP server with all API routes and optional static file serving. Returns `{ server, listen() }`.
+
+### Routes
+
+#### GET Routes
+
+| Route | Response | Description |
+|-------|----------|-------------|
+| `GET /api/status` | `DashboardState` JSON | Current dashboard state |
+| `GET /api/sprint` | Sprint log + metrics | Latest sprint with task details |
+| `GET /api/history` | Sprint log array | All sprint history entries |
+| `GET /api/config` | `DeckentConfig` JSON | Project configuration |
+| `GET /api/doctor` | `DoctorResult` JSON | System health check results |
+| `GET /api/memory` | text/markdown | `.brain/MEMORY.md` content |
+| `GET /api/debt` | text/markdown | `.brain/DEBT.md` content |
+| `GET /api/job/:jobId` | Job status JSON | Active sprint job status (running/completed/failed) |
+| `GET /api/events` | SSE stream | Server-Sent Events — pushes dashboard updates on file change |
+
+#### POST Routes
+
+| Route | Body | Description |
+|-------|------|-------------|
+| `POST /api/start` | `{ autoApprove? }` | Start a sprint (async, returns jobId) |
+| `POST /api/plan` | `{ mode? }` | Generate sprint plan |
+| `POST /api/kill/:workerId` | — | Kill a running worker |
+| `POST /api/set-directives` | `{ content }` | Update DIRECTIVES.md |
+| `POST /api/config` | Partial config | Merge-update project config |
+
+### `watchDashboard`
+
+```ts
+function watchDashboard(
+  filePath: string,
+  onChange: () => void,
+): DashboardWatcher
+```
+
+Watches the `.dashboard` file for changes and calls `onChange` with 500ms debounce. Returns `{ close(): void }`.
+
+---
+
+## 12. CLI Commands
 
 Run via `deckent <command>` (globally installed) or `npx deckent <command>`.
 
@@ -1463,6 +1700,11 @@ Run via `deckent <command>` (globally installed) or `npx deckent <command>`.
 | `plugin install <name>` | Install a plugin | — |
 | `plugin list` | List installed plugins | — |
 | `onboard` | Run the first-time onboarding wizard | — |
+| `analyze` | Analyze project stack, size, methodology | — |
+| `archive-debt` | Archive resolved technical debt | — |
+| `dashboard` | Terminal TUI dashboard (rich mode) | — |
+| `serve` | Start HTTP API server (SSE) | `--port` |
+| `web` | Web dashboard + API server | `--port` |
 
 ### Examples
 

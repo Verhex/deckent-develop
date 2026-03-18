@@ -196,7 +196,7 @@ describe('Config integration', () => {
     const config = await loadConfig(root);
     expect(config.activeModeConfig.max_workers).toBe(6);
     expect(config.activeModeConfig.brain_model).toBe('opus');
-    expect(config.activeModeConfig.default_model).toBe('sonnet');
+    expect(config.activeModeConfig.default_model).toBe('opus');
   });
 
   it('throws ConfigValidationError for invalid mode', async () => {

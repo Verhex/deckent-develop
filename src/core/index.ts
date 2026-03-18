@@ -1,6 +1,6 @@
 export * from './types.js';
 export * from './constants.js';
-export { countBrainLines } from './utils.js';
+export { countBrainLines, getNextSprintId, parseDebtTable, generateDebtTable } from './utils.js';
 export {
   loadConfig,
   getDefaultConfig,

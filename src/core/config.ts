@@ -21,21 +21,24 @@ import type {
 
 const VALID_MODES: readonly PlanMode[] = ['max_plan', 'max5x_plan', 'pro_plan', 'api'] as const;
 const VALID_MODELS = ['opus', 'sonnet', 'haiku'] as const;
+const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 
 export const DEFAULT_MODES: Record<PlanMode, PlanModeConfig> = {
   max_plan: {
     max_workers: 8,
     brain_model: 'opus',
-    default_model: 'sonnet',
+    default_model: 'opus',
     haiku_allowed: true,
     usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+    brain_planning: 'auto',
   },
   max5x_plan: {
     max_workers: 5,
     brain_model: 'sonnet',
-    default_model: 'sonnet',
+    default_model: 'opus',
     haiku_allowed: true,
     usage_thresholds: { '5hr': 0.7, weekly: 0.5 },
+    brain_planning: 'auto',
   },
   pro_plan: {
     max_workers: 3,
@@ -43,6 +46,7 @@ export const DEFAULT_MODES: Record<PlanMode, PlanModeConfig> = {
     default_model: 'sonnet',
     haiku_allowed: false,
     usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+    brain_planning: 'auto',
   },
   api: {
     max_workers: 10,
@@ -52,6 +56,7 @@ export const DEFAULT_MODES: Record<PlanMode, PlanModeConfig> = {
     usage_thresholds: { '5hr': 1.0, weekly: 1.0 },
     budget_per_sprint: 5.0,
     requires: 'ANTHROPIC_API_KEY',
+    brain_planning: 'auto',
   },
 };
 
@@ -137,6 +142,11 @@ export function validateConfig(config: DeckentConfig): void {
       if (typeof thresholds.weekly !== 'number' || thresholds.weekly < 0 || thresholds.weekly > 1) {
         errors.push(`${prefix}.usage_thresholds.weekly must be a number between 0 and 1`);
       }
+    }
+
+    if (mc.brain_planning !== undefined &&
+        !(VALID_BRAIN_PLANNING as readonly string[]).includes(mc.brain_planning)) {
+      errors.push(`${prefix}.brain_planning must be one of: ${VALID_BRAIN_PLANNING.join(', ')}`);
     }
 
     if (modeName === 'api' && mc.budget_per_sprint !== undefined) {

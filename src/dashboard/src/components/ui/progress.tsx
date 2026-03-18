@@ -17,6 +17,7 @@ function Progress({ segments, total, className, ...props }: ProgressProps) {
     <div
       className={cn("flex h-4 w-full overflow-hidden rounded-full bg-zinc-800", className)}
       role="progressbar"
+      aria-valuenow={segments.reduce((sum, s) => sum + s.value, 0)}
       aria-valuemin={0}
       aria-valuemax={total}
       {...props}

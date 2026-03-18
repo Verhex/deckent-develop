@@ -411,6 +411,34 @@ describe('createHttpServer', () => {
       expect(body.id).toBe('sprint-001');
       expect(body.tasks).toHaveLength(1);
     });
+
+    it('passes mode param to planSprint', async () => {
+      const { planSprint: mockPlanSprint } = await import('../../src/orchestra/brain.js');
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      await request(api, '/api/plan', 'POST', { mode: 'structured' });
+      expect(vi.mocked(mockPlanSprint)).toHaveBeenCalledWith(
+        expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+        expect.objectContaining({ mode: 'structured' }),
+      );
+    });
+
+    it('response includes reasoning when present', async () => {
+      const { planSprint: mockPlanSprint } = await import('../../src/orchestra/brain.js');
+      vi.mocked(mockPlanSprint).mockReturnValue({
+        id: 'sprint-001', number: 1, tasks: [{ id: '001-001', title: 'T' }],
+        reasoning: 'AI reasoning', planningMode: 'ai',
+      } as never);
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/plan', 'POST', {});
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.reasoning).toBe('AI reasoning');
+      expect(body.planningMode).toBe('ai');
+    });
   });
 
   describe('POST /api/kill/:workerId', () => {
@@ -708,6 +736,79 @@ describe('createHttpServer', () => {
 
       const res = await request(api, '/nonexistent');
       expect(res.status).toBe(404);
+    });
+
+    it('returns 403 for path traversal attempts', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(Buffer.from('secret'));
+
+      api = createHttpServer(PROJECT_ROOT, 0, STATIC_DIR);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/../../etc/passwd');
+      expect(res.status).toBe(403);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Forbidden' });
+    });
+  });
+
+  // ─── Zod Validation ─────────────────────────────────────────
+
+  describe('POST validation', () => {
+    it('returns 400 for /api/start with invalid body', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/start', 'POST', { autoApprove: 'not-a-boolean' });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for /api/plan with invalid body', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/plan', 'POST', { directive: 123 });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for /api/set-directives with empty content', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/set-directives', 'POST', { content: '' });
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Missing content field' });
+    });
+
+    it('returns 400 for /api/kill with invalid workerId chars', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/kill/../../../etc', 'POST', {});
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Invalid workerId' });
+    });
+
+    it('returns 400 for /api/config with non-object body', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const addr = api.server.address() as { port: number };
+      const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const payload = '"just-a-string"';
+        const req = http.request(
+          { hostname: '127.0.0.1', port: addr.port, path: '/api/config', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } },
+          (r) => {
+            let data = '';
+            r.on('data', (c) => { data += c; });
+            r.on('end', () => resolve({ status: r.statusCode!, body: data }));
+          },
+        );
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+      });
+      expect(res.status).toBe(400);
     });
   });
 });

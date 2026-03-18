@@ -1,6 +1,6 @@
 # DECKENT MASTER BLUEPRINT
 ## AI Agent Orchestration System — Complete Implementation Reference
-### Version 2.0 — March 2026 — Verhex
+### Version 2.1 — March 2026 — Verhex
 
 ---
 
@@ -85,25 +85,26 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────┐  ┌───────────▼───────────────┐
 │    CLAUDE CODE       │  │      DECKENT CLI           │
-│  (MCP client)        │  │  `deckent start/plan`      │
+│  (MCP client)        │  │  `deckent start/plan/web`  │
 └──────────┬──────────┘  └───────────┬───────────────┘
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  8 Tools + 4 Resources + 2 Prompts                  │
-│  deckent_init | set_directives | plan | start | ... │
+│  9 Tools + 4 Resources                              │
+│  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
 │                 CORE ENGINE                           │
-│    brain.ts | auditor.ts | worker.ts | tmux.ts      │
+│  brain.ts | planner.ts | auditor.ts | worker.ts     │
+│  analyzer.ts | tmux.ts | server.ts (HTTP API)       │
 └──────────┬───────────────────────────┬──────────────┘
            │                           │
 ┌──────────▼──────────┐  ┌────────────▼──────────────┐
-│       BRAIN          │  │        AUDITOR             │
-│  Plans, evaluates,   │  │  Monitors, detects,       │
-│  learns, adapts      │  │  reports, enforces         │
-│  Model: opus/sonnet  │  │  Model: sonnet             │
+│   BRAIN + PLANNER    │  │        AUDITOR             │
+│  Plans (AI/struct),  │  │  In-process scan loop      │
+│  evaluates, learns   │  │  within Brain's runSprint  │
+│  Model: opus/sonnet  │  │  (30s cycle, no tmux)      │
 └──────────┬──────────┘  └────────────┬──────────────┘
            │                           │
 ┌──────────▼──────────────────────────▼──────────────┐
@@ -118,6 +119,13 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 │  Tier 1: MEMORY.md (always loaded, ~100 lines)      │
 │  Tier 2: sprint logs (per-sprint, auto-archived)    │
 │  Tier 3: deep knowledge (searchable archive)        │
+└─────────────────────────────────────────────────────┘
+           │
+┌──────────▼──────────────────────────────────────────┐
+│          HTTP API + WEB DASHBOARD                    │
+│  src/api/server.ts — 15 endpoints + SSE             │
+│  src/dashboard/ — React+Vite+Tailwind (4 pages)     │
+│  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -164,11 +172,21 @@ deckent config             Show/edit configuration
 deckent config set <k> <v> Set config value
 deckent usage             Show current plan usage
 deckent history           Show sprint history & metrics
+deckent analyze           Analyze project stack, size, methodology
+deckent archive-debt      Archive resolved technical debt
+deckent dashboard         Terminal TUI dashboard (rich mode)
+deckent serve             Start HTTP API server (SSE)
+deckent web               Web dashboard + API server (localhost:3100)
 deckent plugin install <n> Install a skill/plugin
 deckent plugin list       List installed plugins
 deckent upgrade           Self-update
 deckent mcp               Start MCP server (stdio transport for Claude Code)
 ```
+
+**Plan command flags:**
+- `deckent plan --no-confirm` — Skip task confirmation prompt
+- `deckent plan --structured` — Force structured directive parsing
+- `deckent plan --mode <ai|structured|auto>` — Set planning mode
 
 ## 3.3 Init Wizard Flow
 
@@ -273,26 +291,41 @@ my-project/
 │
 ├── src/                               # Deckent source code
 │   ├── core/                         # Types, config, constants, utils
-│   ├── orchestra/                    # Brain + tmux orchestration
+│   │   ├── types.ts                 # All shared interfaces and enums
+│   │   ├── constants.ts             # App-wide constants
+│   │   ├── config.ts                # 3-layer config loader
+│   │   ├── utils.ts                 # Shared utilities
+│   │   └── analyzer.ts             # Project stack/size analysis
+│   ├── orchestra/                    # Brain + Planner + tmux orchestration
+│   │   ├── brain.ts                 # Sprint lifecycle orchestrator
+│   │   ├── planner.ts              # AI task planning (Zod-validated)
+│   │   └── tmux.ts                  # tmux session management
 │   ├── agents/                       # Worker lifecycle
 │   ├── monitor/                      # Auditor monitoring
-│   ├── cli/                          # CLI commands (commander.js)
-│   └── mcp/                          # MCP server integration
-│       ├── server.ts                 # Entry point (McpServer + stdio)
-│       ├── tools/                    # 8 tool handlers
-│       │   ├── init.ts              # deckent_init
-│       │   ├── directives.ts        # deckent_set_directives
-│       │   ├── plan.ts              # deckent_plan
-│       │   ├── start.ts             # deckent_start
-│       │   ├── status.ts            # deckent_status
-│       │   ├── doctor.ts            # deckent_doctor
-│       │   ├── retro.ts             # deckent_retro
-│       │   └── history.ts           # deckent_history
-│       └── resources/                # 4 resource handlers
-│           ├── dashboard.ts          # deckent://dashboard
-│           ├── directives.ts         # deckent://directives
-│           ├── memory.ts             # deckent://memory
-│           └── debt.ts               # deckent://debt
+│   ├── api/                          # HTTP API + SSE
+│   │   ├── server.ts               # 15 endpoints + SSE stream
+│   │   └── watcher.ts              # Dashboard file watcher
+│   ├── cli/                          # CLI commands (commander.js, 21 files)
+│   ├── mcp/                          # MCP server integration
+│   │   ├── server.ts                # Entry point (McpServer + stdio)
+│   │   ├── tools/                   # 9 tool handlers
+│   │   │   ├── init.ts             # deckent_init
+│   │   │   ├── directives.ts       # deckent_set_directives
+│   │   │   ├── plan.ts             # deckent_plan
+│   │   │   ├── start.ts            # deckent_start
+│   │   │   ├── status.ts           # deckent_status
+│   │   │   ├── doctor.ts           # deckent_doctor
+│   │   │   ├── retro.ts            # deckent_retro
+│   │   │   ├── history.ts          # deckent_history
+│   │   │   └── analyze.ts          # deckent_analyze_project
+│   │   └── resources/               # 4 resource handlers
+│   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
+│       └── src/
+│           ├── pages/               # 4 pages: Dashboard, Settings, History, Memory
+│           ├── components/          # Layout, DebtTable, SprintChart, 14 UI components
+│           ├── hooks/               # useSSE, custom hooks
+│           ├── lib/                 # Utilities
+│           └── types/               # Dashboard-specific types
 ├── tests/                             # Unit + integration tests
 ├── docs/
 └── package.json
@@ -355,12 +388,26 @@ Key: AGENTS.md is SHORT (~80 lines). Uses @imports for detail. Claude Code follo
 
 # 5. AGENT SYSTEM
 
-## 5.1 Brain
+## 5.1 Brain + Planner
 
 **Role:** Orchestrator — plans, evaluates, learns
 **Model:** Opus (Max plans) or Sonnet (Pro plan)
 **Reads:** DIRECTIVES, MEMORY, RETRO, DEBT, PATTERNS, project state
 **Writes:** .tasks/, .contracts/, .brain/RETRO, .brain/MEMORY, .brain/DECISIONS
+
+**Brain+Planner Separation (ADR-008):**
+- `brain.ts` — orchestrator, imports from all modules
+- `planner.ts` — AI task planning, imports ONLY from `core/` (types, constants)
+- Planner uses Zod schema validation for AI responses
+- Brain delegates planning to Planner when `brain_planning` is `'ai'` or `'auto'`
+
+**Planning Modes (`brain_planning` config):**
+- `'structured'` — parse DIRECTIVES.md via `parseStructuredDirectives()`
+- `'ai'` — call `callBrainPlanner()` (Zod-validated AI response)
+- `'auto'` (default) — AI first, structured fallback on failure
+
+**`buildWorkerPrompt` includes heartbeat instruction:**
+Workers are instructed to create `.tasks/task-{id}.hb` with JSON heartbeat (workerId, taskId, status, currentAction, timestamp, filesChangedCount, sequence) and update it periodically during execution.
 
 **Lifecycle:**
 ```
@@ -368,37 +415,45 @@ Key: AGENTS.md is SHORT (~80 lines). Uses @imports for detail. Claude Code follo
 2. Read all memory files (RETRO, MEMORY, DEBT, PATTERNS)
 3. Read DIRECTIVES.md (operator commands)
 4. Scan project state (git status, file tree)
-5. Plan sprint in plan mode → create .tasks/*.json
-6. Determine worker count and model per task
-7. Spawn workers via tmux
-8. Wait for results
-9. Evaluate each result → GO / NO-GO / TECH_DEBT
-10. Handle cross-dependencies
-11. Run retrospective → update MEMORY, RETRO, DECISIONS
-12. Trigger decay/compression if needed
-13. Signal sprint complete
+5. Plan sprint (AI or structured mode) → create .tasks/*.json
+6. Confirm DRAFT tasks → PENDING (if asDraft mode)
+7. Determine worker count and model per task
+8. Spawn workers via tmux
+9. Start auditor scan loop (in-process)
+10. Wait for results
+11. Stop auditor scan loop
+12. Evaluate each result → GO / NO-GO / TECH_DEBT
+13. Handle cross-dependencies
+14. Run retrospective → update MEMORY, RETRO, DECISIONS
+15. Trigger decay/compression if needed
+16. Signal sprint complete
 ```
 
 **Brain evolves:** Each sprint's retro feeds the next sprint's plan. Brain reads its own past mistakes and adjusts.
 
-## 5.2 Auditor
+## 5.2 Auditor (In-Process Scan Loop)
 
 **Role:** Immune system — monitors, detects, reports
-**Model:** Sonnet (always)
+**Model:** N/A (runs as code within Brain's process, not as separate LLM agent)
 **Reads:** .tasks/*.hb, git diff, .locks/, .dashboard
 **Writes:** .dashboard, .brain/PATTERNS.md, alerts
 
-**Scan cycle (every 30s):**
+**Critical change (Sprint 12-14):** Auditor no longer runs as a separate tmux window. Instead, Brain calls `startScanLoop()` in-process between SPAWN and EXECUTE phases. The scan loop runs every 30 seconds via `setInterval`. Brain calls `clearInterval` when the sprint completes.
+
+**`startAuditor()` in tmux.ts still exists** for future standalone auditor mode but is no longer called from `spawnWorkers()`.
+
+**`writeScanToDashboard()` merges scan results into the existing dashboard state** — reads current dashboard, merges alerts (keeps last 50), updates agent statuses from heartbeats, and overwrites.
+
+**Scan cycle (every 30s, in Brain process):**
 ```
 1. Read all heartbeat files → agent status
 2. Run git diff --stat → who changed what
 3. Check boundaries → any agent outside scope?
 4. Check locks → stale locks? conflicts?
 5. Deadlock detection → circular waits?
-6. Usage monitoring → approaching limits?
-7. Write .dashboard (overwrite — never append)
-8. If pattern detected → append to PATTERNS.md
-9. If critical → write alert, notify operator
+6. Merge scan results into dashboard via writeScanToDashboard()
+7. If pattern detected → append to PATTERNS.md
+8. If critical → create alert in dashboard
 ```
 
 **Auditor teaches:** Patterns found by Auditor feed into Brain's next plan.
@@ -413,20 +468,22 @@ Key: AGENTS.md is SHORT (~80 lines). Uses @imports for detail. Claude Code follo
 **Worker lifecycle:**
 ```
 1. CLAIM: Read task file, set status CLAIMED
-2. PLAN: Write detailed plan to .tasks/task-XXX.plan
+2. HEARTBEAT: Create .tasks/task-XXX.hb BEFORE starting work
+   - JSON: { workerId, taskId, status: "EXECUTING", currentAction, timestamp, filesChangedCount: 0, sequence: 0 }
+3. PLAN: Write detailed plan to .tasks/task-XXX.plan
    - Which files to create/modify
    - Execution order
    - Test strategy
    - Documentation plan
-3. CODE: Execute plan within assigned scope
+4. CODE: Execute plan within assigned scope
    - Check lock before every file write
-   - Update heartbeat on every action
-4. TEST: Run tests
+   - Update heartbeat periodically (status: CODING/TESTING/DOCUMENTING, increment sequence)
+5. TEST: Run tests
    - tsc --noEmit (typecheck)
    - vitest run (unit tests)
    - Capture coverage
-5. DOCUMENT: Update relevant docs
-6. REPORT: Write .tasks/task-XXX.result
+6. DOCUMENT: Update relevant docs
+7. REPORT: Write .tasks/task-XXX.result
    - files_changed, lines_added/removed
    - test results, coverage
    - self_assessment: DONE | GO_WITH_TECH_DEBT | NO_GO
@@ -509,13 +566,21 @@ Phase 1: PLAN (Brain, plan mode)
 
 Phase 2: SPAWN
   Brain spawns workers via tmux (dynamic)
-  Brain starts Auditor
-  Each agent gets its own tmux pane/window
+  Each worker gets its own tmux window
+
+Phase 2.5: AUDITOR START
+  const scanInterval = startScanLoop(projectRoot, sprint.id)
+  onScanComplete callback → writeScanToDashboard()
+  Scan runs every 30s within Brain's process
 
 Phase 3: EXECUTE (Workers, parallel)
   Each worker: plan → code → test → doc → report
-  Auditor: continuous scan loop (30s)
-  Dashboard: live updates
+  Auditor scan loop running in background (30s cycles)
+  Dashboard: live updates via scan results
+
+Phase 3.5: AUDITOR STOP
+  clearInterval(scanInterval)
+  Scan loop stopped before evaluation begins
 
 Phase 4: EVALUATE (Brain)
   For each .result file:
@@ -593,6 +658,25 @@ Brain MUST check usage before planning. Sprint must never be left incomplete.
    d. Resume from saved state
    e. Sprint is NEVER abandoned
 ```
+
+## BrainPlanningMode
+
+Brain supports three planning modes, configured via `brain_planning` in `PlanModeConfig`:
+
+| Mode | Strategy | Fallback |
+|------|----------|----------|
+| `'structured'` | `parseStructuredDirectives()` — parses `## Task N:` blocks | None |
+| `'ai'` | `callBrainPlanner()` — AI generates tasks, Zod-validated | Error if fails |
+| `'auto'` (default) | AI first → structured fallback on failure | Always succeeds |
+
+**Planner module** (`src/orchestra/planner.ts`):
+- `buildPlanPrompt(context, recommendation, projectName)` — constructs the AI prompt
+- `parsePlannerResponse(raw)` — validates JSON response with Zod schemas
+- `callBrainPlanner(context, recommendation, model, projectName)` — spawns `claude` CLI, returns `PlannerResult | null`
+- Imports ONLY from `core/` (types, constants) — no brain.ts imports (ADR-008)
+
+**DRAFT task support:**
+When `planSprint` is called with `{ asDraft: true }`, tasks are created in `DRAFT` status. `confirmDraftTasks()` transitions them to `PENDING` before spawning.
 
 ## Model Budget Per Sprint
 
@@ -733,7 +817,9 @@ deckent plugin create my-skill
 
 # 12. UI ROADMAP
 
-## Phase 1: Terminal Dashboard (Sprint 1-3)
+## Phase 1: Terminal Dashboard — DONE (Sprint 10)
+
+`deckent status` and `deckent dashboard` provide a Unicode box-drawing terminal dashboard with live agent status, progress bars, and usage meters.
 
 ```
 $ deckent status
@@ -753,17 +839,22 @@ $ deckent status
 ╚══════════════════════════════════════════════════════╝
 ```
 
-## Phase 2: Web Dashboard (Sprint 4-6)
+## Phase 2: Web Dashboard — DONE (Sprint 11)
 
-- React + Vite + Tailwind
-- WebSocket from file watcher → real-time updates
-- Sprint history with charts (Recharts)
-- DIRECTIVES.md editor
-- Agent detail view (click agent → see its work)
-- Dark/light theme
-- Mobile responsive
+React + Vite + Tailwind, 4 pages, shadcn/ui components, SSE for real-time updates.
 
-## Phase 3: VSCode Extension (Sprint 7-10)
+- **Dashboard page:** Live agent status, progress bars, alerts with badge colors, elapsed time, auditor status indicator
+- **Settings page:** Config viewer
+- **History page:** Sprint history with charts (Recharts)
+- **Memory page:** Brain memory viewer
+- `deckent web` launches both HTTP API and web dashboard at localhost:3100
+- `deckent serve` launches HTTP API only (15 endpoints + SSE)
+- SSE endpoint: `GET /api/events` — file watcher on `.dashboard` pushes updates
+- Dark/light theme via ThemeProvider
+- Mobile responsive with hamburger menu
+- Auditor status badge in sidebar: "Active" (green) / "Inactive" (gray)
+
+## Phase 3: VSCode Extension (Planned)
 
 - Sidebar panel with live agent status
 - Command palette: `Deckent: Start Sprint`, `Deckent: Show Dashboard`
@@ -811,7 +902,9 @@ $ deckent status
       "budget_per_sprint": 5.00,
       "requires": "ANTHROPIC_API_KEY"
     }
-  }
+  },
+
+  "brain_planning": "auto"
 }
 ```
 
@@ -852,6 +945,8 @@ Config switch: `deckent config set mode pro_plan`
 Language set: `deckent config set language tr`
 
 Agent prompts remain in English (LLM performance). UI/CLI output follows user's language preference.
+
+**Note:** i18n JSON files are created by `deckent init` in `.deckent/i18n/`. CLI integration for runtime message lookup is pending (messages are currently hardcoded in English/Turkish).
 
 ---
 
@@ -1040,10 +1135,18 @@ Every file in the project, its purpose, who writes it, who reads it:
 | .dashboard | Live status | Auditor | You, UI | Overwritten |
 | .claude/rules/*.md | Agent-specific rules | deckent init | Claude Code | Permanent |
 | .claude/settings.json | MCP server registration | deckent init | Claude Code | Permanent |
+| src/orchestra/planner.ts | AI task planning (Zod) | Developer | Brain | Permanent |
+| src/core/analyzer.ts | Project stack/size analysis | Developer | MCP, CLI | Permanent |
+| src/api/server.ts | HTTP API (15 endpoints + SSE) | Developer | Web dashboard | Permanent |
+| src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
+| src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
-| src/mcp/tools/*.ts | MCP tool handlers (8) | Developer | MCP server | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (9) | Developer | MCP server | Permanent |
 | src/mcp/resources/*.ts | MCP resource handlers (4) | Developer | MCP server | Permanent |
-| tests/mcp/*.test.ts | MCP unit tests (24) | Developer | Test runner | Permanent |
+| .deckent/workspace/TOOLS.md | Environment tools/commands | deckent init | Workers | Permanent |
+| .deckent/workspace/BOOT.md | Agent boot sequence | deckent init | All agents | Permanent |
+| .deckent/plugins/ | Installed plugins directory | deckent init | Plugin system | Permanent |
+| .deckent/i18n/*.json | i18n message templates | deckent init | CLI | Permanent |
 
 ---
 
@@ -1078,6 +1181,58 @@ Deckent ran itself for the first time:
 - Zero-friction Claude Code integration
 - Auto-registration in .claude/settings.json
 - 24 new tests, 669 total, 0 regression
+
+## Sprint 8: Documentation & MCP Dogfooding
+
+- CONTRIBUTING.md, full API reference (docs/API.md)
+- MCP dogfooding: used Deckent's own MCP tools to develop
+- 669 tests, 95% coverage
+
+## Sprint 9: Analyzer & CI Pipeline
+
+- 9th MCP tool: `deckent_analyze_project` (project stack/size/methodology detection)
+- CI pipeline with GitHub Actions
+- Dynamic version from package.json
+- `deckent archive-debt` command
+- Enriched sprint history
+- 720 tests, 95% coverage
+
+## Sprint 10: HTTP API & Terminal Dashboard
+
+- HTTP API server (`src/api/server.ts`): 15 endpoints + SSE stream
+- Terminal TUI dashboard (`deckent dashboard`)
+- Sprint ID refactor (consistent format across codebase)
+- `deckent serve` and `deckent web` CLI commands
+- 799 tests, 95% coverage
+
+## Sprint 11: Web Dashboard
+
+- React + Vite + Tailwind web dashboard (`src/dashboard/`)
+- 4 pages: Dashboard, Settings, History, Memory
+- shadcn/ui component library (14 UI components)
+- SSE real-time updates via file watcher
+- SprintChart with Recharts, DebtTable, NewSprintModal
+- Dark/light theme, mobile responsive
+- 852 tests, 97% coverage
+
+## Sprint 12-13: Brain AI Planning & Auditor In-Process
+
+- Planner module (`src/orchestra/planner.ts`): AI task planning with Zod validation
+- `BrainPlanningMode`: 'ai' | 'structured' | 'auto' config
+- DRAFT task status + `confirmDraftTasks()`
+- Auditor moved from tmux to in-process scan loop within Brain's `runSprint`
+- `writeScanToDashboard()` merges scan results into dashboard
+- `buildWorkerPrompt` now includes heartbeat file creation instructions
+- `.deckent/` structure additions: TOOLS.md, BOOT.md, plugins/, i18n/
+- 938 tests, 97.5% coverage
+
+## Sprint 14: Auditor Live Integration (in progress)
+
+- Auditor real scan loop runs between SPAWN and EXECUTE phases
+- `startScanLoop` / `clearInterval` lifecycle in `runSprint`
+- Worker heartbeat prompt instructions finalized
+- `.deckent/` structure finalization
+- 938 tests, 97.5% coverage
 
 ---
 
@@ -1190,7 +1345,7 @@ Both methods register in `.claude/settings.json`:
 }
 ```
 
-## Tools (8)
+## Tools (9)
 
 ### Lifecycle Tools
 
@@ -1198,7 +1353,7 @@ Both methods register in `.claude/settings.json`:
 |------|-------|---------|---------|
 | `deckent_init` | projectName, mode?, language? | init.ts scaffold | Initialize Deckent in a project |
 | `deckent_set_directives` | content: string | writes DIRECTIVES.md | Set sprint goals (Claude formats natural language into ## Gorev/Task blocks) |
-| `deckent_plan` | dryRun?: boolean | readContext → planSprint | Plan sprint, return task list without executing |
+| `deckent_plan` | dryRun?, mode?: 'ai'\|'structured'\|'auto' | readContext → planSprint | Plan sprint, return task list without executing |
 | `deckent_start` | autoApprove?: boolean | runSprint() | Run full sprint lifecycle (may take minutes) |
 
 ### Information Tools
@@ -1209,6 +1364,12 @@ Both methods register in `.claude/settings.json`:
 | `deckent_doctor` | none | runDoctorChecks() | System health check |
 | `deckent_retro` | none | reads RETRO.md | Latest sprint retrospective |
 | `deckent_history` | last?: number | reads .brain/sprints/ | Sprint history logs |
+
+### Analysis Tools
+
+| Tool | Input | Maps To | Purpose |
+|------|-------|---------|---------|
+| `deckent_analyze_project` | none | analyzeProject() | Analyze project stack, size, methodology recommendation |
 
 ## Resources (4)
 
@@ -1307,32 +1468,39 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 5 | Decay, doctor, dashboard, coverage | Done |
 | 6 | First dogfooding (self-run) | Done |
 | 7 | MCP server (8 tools, 4 resources) | Done |
-| 8 | MCP polish, error handling, edge cases | Planned |
+| 8 | Documentation, API docs, MCP dogfooding | Done |
+| 9 | Analyzer tool, CI, dynamic version, archive-debt | Done |
+| 10 | HTTP API+SSE, terminal dashboard, sprint ID refactor | Done |
+| 11 | Web Dashboard (React+Vite+Tailwind, 4 pages) | Done |
+| 12-13 | Brain AI planning, Auditor in-process, .deckent structure | Done |
+| 14 | Auditor live integration, .deckent finalization | Done |
 
-**Exit criteria:** 700+ tests, 95%+ coverage, stable MCP integration, real projects using Deckent.
+**Exit criteria:** 938+ tests, 97%+ coverage, stable MCP integration, HTTP API, Web Dashboard, AI planning.
 
-## Phase 2: Provider Abstraction (Sprint 9-12)
+## Phase 2: Self-Orchestration & Learning (Sprint 15+)
 
-**Goal:** Decouple from Claude-specific APIs, enable future multi-provider support.
+**Goal:** Continued dogfooding, plugin system, advanced learning.
 
-- Abstract `claude -p` into a provider interface
-- Provider: Claude (native), OpenAI (future), local LLM (future)
-- Config: `provider: "claude" | "openai" | "ollama"`
-- tmux spawning stays — provider only affects model invocation
+- Run 5+ consecutive sprints on Deckent's own codebase — Done
+- Brain learns from its own retros and improves plans — Done
+- Auditor catches real boundary violations — Done
+- Tech debt escalation triggers automatically — Done
+- Memory decay keeps `.brain/` under 300 lines — Done
+- Plugin system: first community skill template — Planned
 
-## Phase 3: Multi-Provider (Sprint 13+)
+## Phase 3: Multi-Provider (Sprint 20+)
 
 **Goal:** Run workers on different providers simultaneously.
 
+- Abstract `claude -p` into a provider interface
 - Brain on Opus (Claude), workers on GPT-4o (OpenAI) — mix and match
 - Provider-specific tool mapping (allowedTools → function_calling)
 - Cost optimization: expensive tasks on powerful models, simple on cheap
 
-## Phase 4: Platform Expansion (Sprint 20+)
+## Phase 4: Platform Expansion (Sprint 25+)
 
-**Goal:** Beyond CLI — web dashboard, VSCode extension, team features.
+**Goal:** Beyond CLI — VSCode extension, team features.
 
-- Web dashboard (React + WebSocket)
 - VSCode extension (sidebar, status bar, inline decorations)
 - Team mode: shared sprints, role-based access
 - Cloud mode: remote orchestration (no local tmux)
@@ -1350,8 +1518,16 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 5 | 644 | 94.83% | Decay, doctor, start --dry-run, status --watch, barrel excludes |
 | 6 | 645 | 95% | First dogfooding: README.md generated in 86s, 1 task DONE |
 | 7 | 669 | 95% | MCP server: 8 tools, 4 resources, auto-registration, 24 new tests |
+| 8 | 669 | 95% | CONTRIBUTING.md, API docs, MCP dogfooding |
+| 9 | 720 | 95% | analyze_project tool, CI pipeline, dynamic version, archive-debt |
+| 10 | 799 | 95% | HTTP API+SSE, terminal dashboard, sprint ID refactor |
+| 11 | 852 | 97% | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui |
+| 12-13 | 938 | 97.5% | Brain AI planning (planner.ts, Zod), Auditor in-process, .deckent structure |
+| 14 | 938 | 97.5% | Auditor live integration, .deckent finalization |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
+
+**AI Planning milestone (Sprint 12-13):** Brain gained the ability to plan tasks using AI (Zod-validated) with automatic fallback to structured parsing. Auditor moved from separate tmux process to in-process scan loop within Brain.
 
 ---
 

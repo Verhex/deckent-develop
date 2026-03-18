@@ -46,7 +46,8 @@ function buildClaudeCommand(
   prompt: string,
   opts?: SpawnOptions,
 ): string {
-  let cmd = `claude -p '${prompt}' --model ${model}`;
+  const safePrompt = prompt.replace(/'/g, "'\\''");
+  let cmd = `claude -p '${safePrompt}' --model ${model}`;
   if (opts?.allowedTools) {
     cmd += ` --allowedTools '${opts.allowedTools}'`;
   }

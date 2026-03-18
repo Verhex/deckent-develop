@@ -57,7 +57,7 @@ npm run clean        # Remove dist/
 
 ```bash
 npm run lint    # Should exit with no errors
-npm test        # Should pass all tests (669+)
+npm test        # Should pass all tests (938+)
 npm run build   # Should produce dist/ with no errors
 ```
 
@@ -74,9 +74,11 @@ deckent/
 │   │   ├── constants.ts    — App-wide constants (DEFAULT_MODE, file paths)
 │   │   ├── config.ts       — 3-layer config loader and validator
 │   │   ├── utils.ts        — Shared utility functions (countBrainLines, etc.)
+│   │   ├── analyzer.ts     — Project stack/size/methodology analysis
 │   │   └── index.ts        — Barrel: re-exports core public API
 │   ├── orchestra/          — Sprint orchestration and tmux management
 │   │   ├── brain.ts        — Sprint lifecycle: plan → run → evaluate → decay
+│   │   ├── planner.ts      — AI task planning (Zod-validated, imports only core/)
 │   │   ├── tmux.ts         — tmux session and window management
 │   │   └── index.ts        — Barrel
 │   ├── agents/             — Agent worker lifecycle
@@ -89,10 +91,14 @@ deckent/
 │   │   ├── index.ts        — CLI entry: registers all commands
 │   │   ├── commands/       — One file per command (init, start, status, …)
 │   │   └── helpers/        — Shared CLI helpers (prompt, display)
-│   └── mcp/                — Model Context Protocol server
-│       ├── server.ts       — MCP server entry: createServer()
-│       ├── tools/          — 8 MCP tool handlers
-│       └── resources/      — 4 MCP resource handlers
+│   ├── api/                — HTTP API + SSE
+│   │   ├── server.ts       — 15 endpoints + SSE stream
+│   │   └── watcher.ts      — Dashboard file watcher
+│   ├── mcp/                — Model Context Protocol server
+│   │   ├── server.ts       — MCP server entry: createServer()
+│   │   ├── tools/          — 9 MCP tool handlers
+│   │   └── resources/      — 4 MCP resource handlers
+│   └── dashboard/          — Web Dashboard (React+Vite+Tailwind, 4 pages)
 ├── tests/                  — Test files mirroring src/ structure
 │   ├── core/
 │   ├── orchestra/
@@ -113,12 +119,14 @@ deckent/
 
 | Module | Responsibility |
 |---|---|
-| `src/core` | Types, constants, config loading/validation, shared utilities |
-| `src/orchestra` | Sprint planning, agent spawning, result evaluation, debt decay |
+| `src/core` | Types, constants, config loading/validation, shared utilities, project analyzer |
+| `src/orchestra` | Sprint planning (AI + structured), agent spawning, result evaluation, debt decay |
 | `src/agents` | Worker lifecycle: task claim, file lock, heartbeat, result write |
-| `src/monitor` | Heartbeat scanning, scope boundary enforcement, dashboard state |
-| `src/cli` | CLI commands (17 total), interactive prompts, display helpers |
-| `src/mcp` | MCP server with 8 tools and 4 resources for IDE/host integration |
+| `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state |
+| `src/api` | HTTP API (15 endpoints + SSE), dashboard file watcher |
+| `src/cli` | CLI commands (21 files), interactive prompts, display helpers |
+| `src/mcp` | MCP server with 9 tools and 4 resources for IDE/host integration |
+| `src/dashboard` | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui components |
 
 ---
 

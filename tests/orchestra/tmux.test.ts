@@ -316,6 +316,24 @@ describe('sendKeys', () => {
   });
 });
 
+describe('buildClaudeCommand quote escaping (3B)', () => {
+  it('escapes single quotes in prompt', () => {
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    spawnWorker('task-quote', 'sonnet', "it's a test", '/project');
+
+    const sendKeysCall = mockedSpawnSync.mock.calls[1];
+    const args = sendKeysCall![1] as string[];
+    const cmdArg = args.find((a) => a.includes('claude'));
+    expect(cmdArg).toBeDefined();
+    // Single quote should be escaped as '\''
+    expect(cmdArg).toContain("'\\''");
+    expect(cmdArg).not.toContain("it's a test");
+  });
+});
+
 describe('attach', () => {
   it('uses stdio inherit for blocking attach', () => {
     mockedSpawnSync.mockReturnValue({

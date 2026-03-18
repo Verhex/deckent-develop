@@ -19,8 +19,12 @@ describe('TaskStatus enum', () => {
     expect(TaskStatus.DOCUMENTING).toBe('DOCUMENTING');
   });
 
-  it('has 8 members', () => {
-    expect(Object.values(TaskStatus)).toHaveLength(8);
+  it('has 9 members', () => {
+    expect(Object.values(TaskStatus)).toHaveLength(9);
+  });
+
+  it('DRAFT === "DRAFT"', () => {
+    expect(TaskStatus.DRAFT).toBe('DRAFT');
   });
 });
 

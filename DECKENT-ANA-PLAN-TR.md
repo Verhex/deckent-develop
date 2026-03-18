@@ -1,6 +1,6 @@
 # DECKENT ANA PLAN
 ## Yapay Zeka Ajan Orkestrasyon Sistemi — Tam Uygulama Referansı
-### Versiyon 2.0 — Mart 2026 — Verhex
+### Versiyon 2.1 — Mart 2026 — Verhex
 
 ---
 
@@ -85,25 +85,26 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
            │                          │
 ┌──────────▼──────────┐  ┌───────────▼───────────────┐
 │    CLAUDE CODE       │  │      DECKENT CLI           │
-│  (MCP istemci)       │  │  `deckent start/plan`      │
+│  (MCP istemci)       │  │  `deckent start/plan/web`  │
 └──────────┬──────────┘  └───────────┬───────────────┘
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SUNUCU (stdio)              │
-│  8 Araç + 4 Kaynak + 2 Şablon                      │
-│  deckent_init | set_directives | plan | start | ... │
+│  9 Araç + 4 Kaynak                                  │
+│  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
 │                 ÇEKİRDEK MOTOR                       │
-│    brain.ts | auditor.ts | worker.ts | tmux.ts      │
+│  brain.ts | planner.ts | auditor.ts | worker.ts     │
+│  analyzer.ts | tmux.ts | server.ts (HTTP API)       │
 └──────────┬───────────────────────────┬──────────────┘
            │                           │
 ┌──────────▼──────────┐  ┌────────────▼──────────────┐
-│       BRAIN          │  │        AUDITOR             │
-│  Planlar, değerlendir│  │  İzler, tespit eder,      │
-│  öğrenir, uyum sağlar│  │  raporlar, uygular         │
-│  Model: opus/sonnet  │  │  Model: sonnet             │
+│  BRAIN + PLANNER     │  │        AUDITOR             │
+│  Planlar (AI/yapısal)│  │  Brain içinde tarama döng. │
+│  değerlendir, öğren  │  │  runSprint içinde (30sn)   │
+│  Model: opus/sonnet  │  │  (tmux yok)                │
 └──────────┬──────────┘  └────────────┬──────────────┘
            │                           │
 ┌──────────▼──────────────────────────▼──────────────┐
@@ -118,6 +119,13 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
 │  Katman 1: MEMORY.md (her zaman yüklü, ~100 satır) │
 │  Katman 2: sprint logları (sprint başına, otomatik)  │
 │  Katman 3: derin bilgi (aranabilir arşiv)           │
+└─────────────────────────────────────────────────────┘
+           │
+┌──────────▼──────────────────────────────────────────┐
+│          HTTP API + WEB DASHBOARD                    │
+│  src/api/server.ts — 15 uç nokta + SSE             │
+│  src/dashboard/ — React+Vite+Tailwind (4 sayfa)     │
+│  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -164,6 +172,11 @@ deckent config            Yapılandırmayı göster/düzenle
 deckent config set <k> <v> Yapılandırma değeri ayarla
 deckent usage             Mevcut plan kullanımını göster
 deckent history           Sprint geçmişini ve metrikleri göster
+deckent analyze           Proje yığın/boyut/metodoloji analizi
+deckent archive-debt      Çözülmüş teknik borcu arşivle
+deckent dashboard         Terminal TUI dashboard (zengin mod)
+deckent serve             HTTP API sunucusu (SSE)
+deckent web               Web dashboard + API sunucusu (localhost:3100)
 deckent plugin install <n> Yetenek/eklenti kur
 deckent plugin list       Kurulu eklentileri listele
 deckent upgrade           Kendini güncelle
@@ -221,14 +234,23 @@ my-project/
 │
 ├── src/                               # Deckent kaynak kodu
 │   ├── core/                         # Tipler, yapılandırma, sabitler, yardımcılar
-│   ├── orchestra/                    # Brain + tmux orkestrasyon
+│   │   └── analyzer.ts             # Proje yığın/boyut analizi
+│   ├── orchestra/                    # Brain + Planner + tmux orkestrasyon
+│   │   ├── brain.ts                 # Sprint yaşam döngüsü orkestratörü
+│   │   ├── planner.ts              # AI görev planlaması (Zod doğrulamalı)
+│   │   └── tmux.ts                  # tmux oturum yönetimi
 │   ├── agents/                       # Worker yaşam döngüsü
 │   ├── monitor/                      # Auditor izleme
-│   ├── cli/                          # CLI komutları (commander.js)
-│   └── mcp/                          # MCP sunucu entegrasyonu
-│       ├── server.ts                 # Giriş noktası (McpServer + stdio)
-│       ├── tools/                    # 8 araç işleyicisi
-│       └── resources/                # 4 kaynak işleyicisi
+│   ├── api/                          # HTTP API + SSE
+│   │   ├── server.ts               # 15 uç nokta + SSE akışı
+│   │   └── watcher.ts              # Dashboard dosya izleyici
+│   ├── cli/                          # CLI komutları (commander.js, 21 dosya)
+│   ├── mcp/                          # MCP sunucu entegrasyonu
+│   │   ├── server.ts                # Giriş noktası (McpServer + stdio)
+│   │   ├── tools/                   # 9 araç işleyicisi
+│   │   └── resources/               # 4 kaynak işleyicisi
+│   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
+│       └── src/                     # 4 sayfa, 14 UI bileşeni, SSE
 ├── tests/                             # Birim + entegrasyon testleri
 └── package.json
 ```
@@ -238,6 +260,15 @@ my-project/
 # 5-17. AJAN SİSTEMİ VE ÇEKİRDEK MODÜLLER
 
 > Bölüm 5-17 İngilizce Blueprint ile aynıdır. Teknik referans için DECKENT-MASTER-BLUEPRINT.md'ye bakınız.
+
+**Önemli v2.1 Değişiklikleri:**
+- **Auditor artık tmux'ta ayrı çalışmıyor.** Brain'in `runSprint` fonksiyonu içinde `startScanLoop()` ile süreç-içi çalışıyor (Faz 2.5). Sprint bittiğinde `clearInterval` ile durduruluyor (Faz 3.5).
+- **Planner modülü eklendi** (`src/orchestra/planner.ts`): AI ile görev planlaması, Zod doğrulaması. Sadece `core/` modülünden import eder (ADR-008).
+- **`brain_planning` yapılandırması:** `'ai'` | `'structured'` | `'auto'` (varsayılan: auto). AI önce dener, başarısız olursa yapısal ayrıştırmaya düşer.
+- **Terminal Dashboard:** Tamamlandı (Sprint 10) — `deckent status` ve `deckent dashboard`
+- **Web Dashboard:** Tamamlandı (Sprint 11) — React+Vite+Tailwind, 4 sayfa, shadcn/ui, SSE
+- **HTTP API:** Tamamlandı (Sprint 10) — 15 uç nokta + SSE, `deckent serve` / `deckent web`
+- **Worker heartbeat:** `buildWorkerPrompt` artık `.tasks/task-{id}.hb` dosyası oluşturma talimatı içeriyor.
 
 ---
 
@@ -262,9 +293,18 @@ Her dosya, amacı, yazarı ve okuyucusu:
 | .dashboard | Canlı durum | Auditor | Siz, UI | Üzerine yazılır |
 | .claude/rules/*.md | Ajan kuralları | deckent init | Claude Code | Kalıcı |
 | .claude/settings.json | MCP sunucu kaydı | deckent init | Claude Code | Kalıcı |
+| src/orchestra/planner.ts | AI görev planlaması (Zod) | Geliştirici | Brain | Kalıcı |
+| src/core/analyzer.ts | Proje yığın/boyut analizi | Geliştirici | MCP, CLI | Kalıcı |
+| src/api/server.ts | HTTP API (15 uç nokta + SSE) | Geliştirici | Web dashboard | Kalıcı |
+| src/api/watcher.ts | Dashboard dosya izleyici | Geliştirici | API sunucu | Kalıcı |
+| src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Geliştirici | Tarayıcı | Kalıcı |
 | src/mcp/server.ts | MCP sunucu giriş noktası | Geliştirici | Claude Code | Kalıcı |
-| src/mcp/tools/*.ts | MCP araç işleyicileri (8) | Geliştirici | MCP sunucu | Kalıcı |
+| src/mcp/tools/*.ts | MCP araç işleyicileri (9) | Geliştirici | MCP sunucu | Kalıcı |
 | src/mcp/resources/*.ts | MCP kaynak işleyicileri (4) | Geliştirici | MCP sunucu | Kalıcı |
+| .deckent/workspace/TOOLS.md | Ortam araçları/komutları | deckent init | Worker'lar | Kalıcı |
+| .deckent/workspace/BOOT.md | Ajan başlatma sırası | deckent init | Tüm ajanlar | Kalıcı |
+| .deckent/plugins/ | Kurulu eklentiler dizini | deckent init | Eklenti sistemi | Kalıcı |
+| .deckent/i18n/*.json | i18n mesaj şablonları | deckent init | CLI | Kalıcı |
 
 ---
 
@@ -299,6 +339,58 @@ Deckent ilk kez kendini çalıştırdı:
 - Sıfır-sürtünme Claude Code entegrasyonu
 - .claude/settings.json'a otomatik kayıt
 - 24 yeni test, toplam 669, 0 regresyon
+
+## Sprint 8: Dokümantasyon ve MCP Dogfooding
+
+- CONTRIBUTING.md, tam API referansı (docs/API.md)
+- MCP dogfooding: Deckent'in kendi MCP araçlarıyla geliştirme
+- 669 test, %95 kapsam
+
+## Sprint 9: Analiz Aracı ve CI Pipeline
+
+- 9. MCP aracı: `deckent_analyze_project` (proje yığın/boyut/metodoloji tespiti)
+- GitHub Actions ile CI pipeline
+- package.json'dan dinamik versiyon
+- `deckent archive-debt` komutu
+- Zenginleştirilmiş sprint geçmişi
+- 720 test, %95 kapsam
+
+## Sprint 10: HTTP API ve Terminal Dashboard
+
+- HTTP API sunucusu (`src/api/server.ts`): 15 uç nokta + SSE akışı
+- Terminal TUI dashboard (`deckent dashboard`)
+- Sprint ID refaktörü (kod tabanında tutarlı format)
+- `deckent serve` ve `deckent web` CLI komutları
+- 799 test, %95 kapsam
+
+## Sprint 11: Web Dashboard
+
+- React + Vite + Tailwind web dashboard (`src/dashboard/`)
+- 4 sayfa: Dashboard, Ayarlar, Geçmiş, Bellek
+- shadcn/ui bileşen kütüphanesi (14 UI bileşeni)
+- SSE ile gerçek zamanlı güncellemeler
+- SprintChart (Recharts), DebtTable, NewSprintModal
+- Karanlık/aydınlık tema, mobil uyumlu
+- 852 test, %97 kapsam
+
+## Sprint 12-13: Brain AI Planlaması ve Auditor Süreç-İçi
+
+- Planner modülü (`src/orchestra/planner.ts`): Zod doğrulamalı AI görev planlaması
+- `BrainPlanningMode`: 'ai' | 'structured' | 'auto' yapılandırması
+- DRAFT görev durumu + `confirmDraftTasks()`
+- Auditor tmux'tan süreç-içi tarama döngüsüne taşındı
+- `writeScanToDashboard()` tarama sonuçlarını dashboard'a birleştir
+- `buildWorkerPrompt` artık heartbeat dosyası oluşturma talimatı içeriyor
+- `.deckent/` yapı eklemeleri: TOOLS.md, BOOT.md, plugins/, i18n/
+- 938 test, %97.5 kapsam
+
+## Sprint 14: Auditor Canlı Entegrasyon (devam ediyor)
+
+- Auditor gerçek tarama döngüsü SPAWN ve EXECUTE fazları arasında çalışıyor
+- `startScanLoop` / `clearInterval` yaşam döngüsü `runSprint` içinde
+- Worker heartbeat prompt talimatları tamamlandı
+- `.deckent/` yapı sonlandırması
+- 938 test, %97.5 kapsam
 
 ---
 
@@ -339,7 +431,7 @@ deckent init
 claude mcp add deckent -- npx deckent mcp
 ```
 
-## Araçlar (8)
+## Araçlar (9)
 
 ### Yaşam Döngüsü Araçları
 
@@ -358,6 +450,7 @@ claude mcp add deckent -- npx deckent mcp
 | `deckent_doctor` | yok | runDoctorChecks() | Sistem sağlık kontrolü |
 | `deckent_retro` | yok | RETRO.md okur | Son sprint retrospektifi |
 | `deckent_history` | last?: number | .brain/sprints/ okur | Sprint geçmişi logları |
+| `deckent_analyze_project` | yok | analyzeProject() | Proje yığın/boyut/metodoloji analizi |
 
 ## Kaynaklar (4)
 
@@ -441,9 +534,14 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 5 | Zayıflama, doctor, dashboard, kapsam | Tamamlandı |
 | 6 | İlk dogfooding (kendini çalıştırma) | Tamamlandı |
 | 7 | MCP sunucu (8 araç, 4 kaynak) | Tamamlandı |
-| 8 | MCP cilalama, hata yönetimi, uç durumlar | Planlandı |
+| 8 | Dokümantasyon, API docs, MCP dogfooding | Tamamlandı |
+| 9 | Analiz aracı, CI, dinamik versiyon, archive-debt | Tamamlandı |
+| 10 | HTTP API+SSE, terminal dashboard, sprint ID refaktör | Tamamlandı |
+| 11 | Web Dashboard (React+Vite+Tailwind, 4 sayfa) | Tamamlandı |
+| 12-13 | Brain AI planlaması, Auditor süreç-içi, .deckent yapısı | Tamamlandı |
+| 14 | Auditor canlı entegrasyon, .deckent sonlandırma | Tamamlandı |
 
-**Çıkış kriterleri:** 700+ test, %95+ kapsam, kararlı MCP entegrasyonu.
+**Çıkış kriterleri:** 938+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama.
 
 ## Aşama 2: Sağlayıcı Soyutlama (Sprint 9-12)
 
@@ -476,8 +574,16 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 5 | 644 | %94.83 | Zayıflama, doctor, start --dry-run, status --watch |
 | 6 | 645 | %95 | İlk dogfooding: README.md 86 saniyede oluşturuldu, 1 görev TAMAMLANDI |
 | 7 | 669 | %95 | MCP sunucu: 8 araç, 4 kaynak, otomatik kayıt, 24 yeni test |
+| 8 | 669 | %95 | CONTRIBUTING.md, API docs, MCP dogfooding |
+| 9 | 720 | %95 | analyze_project aracı, CI pipeline, dinamik versiyon, archive-debt |
+| 10 | 799 | %95 | HTTP API+SSE, terminal dashboard, sprint ID refaktör |
+| 11 | 852 | %97 | Web Dashboard: React+Vite+Tailwind, 4 sayfa, shadcn/ui |
+| 12-13 | 938 | %97.5 | Brain AI planlaması (planner.ts, Zod), Auditor süreç-içi, .deckent yapısı |
+| 14 | 938 | %97.5 | Auditor canlı entegrasyon, .deckent sonlandırma |
 
 **İlk dogfooding sonucu (Sprint 6):** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Orkestrasyon döngüsü (planla → başlat → yürüt → değerlendir → retro → temizle) uçtan uca tamamlandı.
+
+**AI Planlama dönüm noktası (Sprint 12-13):** Brain, AI ile görev planlama yeteneği kazandı (Zod doğrulamalı). Başarısız olursa otomatik olarak yapısal ayrıştırmaya düşer. Auditor ayrı tmux sürecinden Brain içi tarama döngüsüne taşındı.
 
 ---
 

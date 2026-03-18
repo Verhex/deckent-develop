@@ -4,7 +4,7 @@
 
 ---
 
-## Phase 1: Core Engine (March 2026)
+## Phase 1: Core Engine (March 2026) — COMPLETE
 
 Build the orchestration runtime — Brain, Auditor, Workers, Sprint lifecycle.
 
@@ -14,38 +14,38 @@ Build the orchestration runtime — Brain, Auditor, Workers, Sprint lifecycle.
 - [x] **Wave 2: tmux + Worker + Auditor** — tmux manager, worker lifecycle, auditor scan loop
 - [x] **Wave 3: Brain** — Sprint planning, GO/NO-GO evaluation, retrospective, memory updates
 - [x] **Wave 4: CLI** — `deckent init`, `start`, `plan`, `status`, `doctor` + 12 more commands
-- [ ] **Wave 5: Integration Tests** — Full sprint cycle end-to-end test
+- [x] **Wave 5: Integration Tests** — Full sprint cycle end-to-end test
 
 ### Deliverables
-- [ ] `deckent start` runs a full sprint (plan → execute → evaluate → retro)
-- [ ] `deckent status` shows live terminal dashboard
-- [ ] `deckent doctor` verifies system health
-- [ ] Memory system operational (MEMORY.md, DECISIONS.md, RETRO.md decay)
-- [ ] Usage-aware planning respects plan limits
+- [x] `deckent start` runs a full sprint (plan → execute → evaluate → retro)
+- [x] `deckent status` shows live terminal dashboard
+- [x] `deckent doctor` verifies system health
+- [x] Memory system operational (MEMORY.md, DECISIONS.md, RETRO.md decay)
+- [x] Usage-aware planning respects plan limits
 
 ---
 
-## Phase 2: Self-Orchestration / Dogfooding (April 2026)
+## Phase 2: Self-Orchestration / Dogfooding (March-April 2026) — MOSTLY COMPLETE
 
 Use Deckent to build Deckent. Validate the sprint loop on real development work.
 
-- [ ] Run 5+ consecutive sprints on Deckent's own codebase
-- [ ] Brain learns from its own retros and improves plans
-- [ ] Auditor catches real boundary violations and pattern regressions
-- [ ] Tech debt escalation triggers automatically (2 sprint → HIGH, 3 sprint → CRITICAL)
-- [ ] Memory decay keeps `.brain/` under 300 lines
+- [x] Run 5+ consecutive sprints on Deckent's own codebase (14 sprints completed)
+- [x] Brain learns from its own retros and improves plans
+- [x] Auditor catches real boundary violations and pattern regressions
+- [x] Tech debt escalation triggers automatically (2 sprint → HIGH, 3 sprint → CRITICAL)
+- [x] Memory decay keeps `.brain/` under 300 lines
 - [ ] Plugin system: first community skill template
 
 ---
 
-## Phase 3: UI — Terminal + Web Dashboard (April–May 2026)
+## Phase 3: UI — Terminal + Web Dashboard (March 2026) — MOSTLY COMPLETE
 
-- [ ] Terminal dashboard: rich TUI with live agent status, progress bars, usage meters
-- [ ] Web dashboard: React + Vite + Tailwind, WebSocket file watcher → real-time
-- [ ] Sprint history with charts (Recharts)
+- [x] Terminal dashboard: rich TUI with live agent status, progress bars, usage meters (Sprint 10)
+- [x] Web dashboard: React + Vite + Tailwind, SSE file watcher → real-time (Sprint 11)
+- [x] Sprint history with charts (Recharts)
 - [ ] DIRECTIVES.md editor in web UI
 - [ ] Agent detail view (click → see work in progress)
-- [ ] Dark/light theme, mobile responsive
+- [x] Dark/light theme, mobile responsive
 
 ---
 

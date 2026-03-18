@@ -2,6 +2,8 @@
 
 **Your AI development team, orchestrated.**
 
+938+ tests | 97.5% coverage | 14 sprints completed
+
 Deckent is a self-evolving AI agent orchestration system. Write directives in plain language — Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
 
 ## What Deckent Is
@@ -79,7 +81,40 @@ $ deckent init
 | `deckent history` | Show sprint history and metrics |
 | `deckent plugin install <name>` | Install a skill/plugin |
 | `deckent plugin list` | List installed plugins |
+| `deckent analyze` | Analyze project stack, size, methodology |
+| `deckent archive-debt` | Archive resolved technical debt |
+| `deckent dashboard` | Terminal TUI dashboard (rich mode) |
+| `deckent serve` | Start HTTP API server (SSE) |
+| `deckent web` | Web dashboard + API server (localhost:3100) |
 | `deckent upgrade` | Self-update Deckent |
+
+## MCP Integration
+
+Deckent integrates into Claude Code via 9 MCP tools + 4 resources. Register with:
+
+```bash
+claude mcp add deckent -- npx deckent mcp
+```
+
+Or let `deckent init` auto-register it.
+
+## Web Dashboard
+
+Launch the web dashboard:
+
+```bash
+deckent web     # Opens at localhost:3100
+```
+
+React + Vite + Tailwind — 4 pages (Dashboard, Settings, History, Memory), SSE real-time updates, dark/light theme.
+
+## HTTP API
+
+```bash
+deckent serve   # API only at localhost:3100
+```
+
+15 endpoints + SSE: status, sprint, history, config, doctor, memory, debt, start, plan, kill, set-directives, events (SSE).
 
 ## Workspace Structure
 
@@ -92,7 +127,12 @@ my-project/
 ├── DIRECTIVES.md       # Your goals — edit this before each sprint
 └── .deckent/
     ├── config.json     # Runtime config (mode, models, limits)
-    └── workspace/      # Agent workspace (tasks, logs, memory)
+    ├── workspace/
+    │   ├── IDENTITY.md # Project identity card
+    │   ├── TOOLS.md    # Environment tools/commands
+    │   └── BOOT.md     # Agent boot sequence
+    ├── plugins/        # Installed plugins
+    └── i18n/           # Language files (en.json, tr.json)
 ```
 
 ## How a Sprint Works

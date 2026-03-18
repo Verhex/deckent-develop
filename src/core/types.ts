@@ -5,6 +5,7 @@ export type TaskPriority = 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW';
 
 // ─── Task System ─────────────────────────────────────────────────────
 export enum TaskStatus {
+  DRAFT = 'DRAFT',
   PENDING = 'PENDING',
   CLAIMED = 'CLAIMED',
   EXECUTING = 'EXECUTING',
@@ -122,6 +123,7 @@ export interface AgentInfo {
   taskId?: string;
   currentAction?: string;
   spawnedAt?: string;
+  lastHeartbeat?: string;
 }
 
 // ─── Alerts & Monitoring ────────────────────────────────────────────
@@ -188,6 +190,8 @@ export interface Sprint {
   metrics?: SprintMetrics;
   startedAt?: string;
   completedAt?: string;
+  reasoning?: string;
+  planningMode?: string;
 }
 
 export interface SprintMetrics {
@@ -270,7 +274,10 @@ export interface PlanModeConfig {
   usage_thresholds: UsageThresholds;
   budget_per_sprint?: number;
   requires?: string;
+  brain_planning?: BrainPlanningMode;
 }
+
+export type BrainPlanningMode = 'ai' | 'structured' | 'auto';
 
 export type PlanMode = 'max_plan' | 'max5x_plan' | 'pro_plan' | 'api';
 
@@ -310,6 +317,8 @@ export interface DashboardState {
   usage: UsageMetrics;
   alerts: Alert[];
   updatedAt: string;
+  auditorLastScan?: string;
+  violations?: number;
 }
 
 // ─── Plugin System (Blueprint 11) ───────────────────────────────────
@@ -329,6 +338,48 @@ export interface DecayResult {
   archivedSprints: string[];
   removedDebtCount: number;
   removedPatternCount: number;
+}
+
+// ─── Brain Context ──────────────────────────────────────────────────
+export interface BrainContext {
+  directives: string;
+  memory: string;
+  retro: string;
+  debt: DebtItem[];
+  patterns: string;
+  decisions: string;
+  existingTasks: Task[];
+  projectState: ProjectState;
+}
+
+export interface ProjectState {
+  gitStatus: string;
+  fileTree: string[];
+}
+
+export interface SprintSizeRecommendation {
+  size: 'full' | 'reduced' | 'minimal';
+  maxWorkers: number;
+  modelConstraint: ModelType | null;
+  reason: string;
+}
+
+// ─── AI Planner ─────────────────────────────────────────────────────
+export interface PlannerTask {
+  title: string;
+  description: string;
+  model: ModelType;
+  effort: TaskEffort;
+  priority: TaskPriority;
+  reason: string;
+  scope: TaskScope;
+  dependencies: string[];
+  goNogo: GoNoGoCriteria;
+}
+
+export interface PlannerResult {
+  tasks: PlannerTask[];
+  reasoning: string;
 }
 
 // ─── CLI Types ──────────────────────────────────────────────────────

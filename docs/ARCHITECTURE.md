@@ -9,33 +9,42 @@
 ```
 YOU (Operator) → writes DIRECTIVES.md
        │
-   DECKENT CLI → `deckent start`
+   DECKENT CLI → `deckent start` / `deckent web`
        │
    ┌───┴───────────────┐
    │                    │
- BRAIN              AUDITOR
- Plans, evaluates,  Monitors, detects,
- learns, adapts     reports, enforces
+ BRAIN + PLANNER    AUDITOR (in-process)
+ Plans (AI/struct), 30s scan loop within
+ evaluates, learns  Brain's runSprint
    │
  WORKER POOL (dynamic, via tmux)
  plan → code → test → doc → report
+       │
+ HTTP API + WEB DASHBOARD
+ 15 endpoints + SSE, React+Vite+Tailwind
 ```
 
-### Brain (Orchestrator)
+### Brain + Planner (Orchestrator)
 - Model: opus (Max) or sonnet (Pro)
 - Reads: DIRECTIVES, MEMORY, RETRO, DEBT, PATTERNS, project state
 - Writes: `.tasks/`, `.contracts/`, `.brain/RETRO`, `.brain/MEMORY`, `.brain/DECISIONS`
-- Lifecycle: check usage → read memory → plan sprint → spawn workers → evaluate → retro → decay
+- **Planner** (`planner.ts`): AI task planning with Zod validation, imports only from `core/` (ADR-008)
+- **Planning modes**: `'ai'` | `'structured'` | `'auto'` (default) via `brain_planning` config
+- Lifecycle: check usage → read memory → plan sprint → spawn workers → start auditor scan → wait → stop scan → evaluate → retro → decay
 
-### Auditor (Immune System)
-- Model: sonnet (always)
-- 30-second scan cycle: heartbeats → git diff → boundaries → locks → deadlocks → usage
+### Auditor (In-Process Scan Loop)
+- Runs within Brain's `runSprint` process (not as separate tmux window)
+- `startScanLoop()` called between SPAWN and EXECUTE phases
+- `clearInterval()` called after EXECUTE completes
+- 30-second scan cycle: heartbeats → git diff → boundaries → locks → deadlocks
+- `writeScanToDashboard()` merges scan results into `.dashboard`
 - Writes: `.dashboard`, `.brain/PATTERNS.md`, alerts
 
 ### Worker (Builder)
 - Model: per-task (opus/sonnet/haiku) — Brain decides
-- Lifecycle: CLAIM → PLAN → CODE → TEST → DOCUMENT → REPORT
+- Lifecycle: CLAIM → HEARTBEAT → PLAN → CODE → TEST → DOCUMENT → REPORT
 - Scoped: can only write files within assigned directories
+- Heartbeat: creates and updates `.tasks/task-{id}.hb` periodically
 
 ---
 
@@ -72,21 +81,32 @@ Total `.brain/` budget: **300 lines** (excluding archive). Compressed at sprint 
 
 ---
 
+### HTTP API & Web Dashboard
+- **HTTP API** (`src/api/server.ts`): 15 endpoints + SSE stream
+- **Web Dashboard** (`src/dashboard/`): React + Vite + Tailwind, 4 pages (Dashboard, Settings, History, Memory)
+- `deckent web` launches both at localhost:3100
+- SSE endpoint watches `.dashboard` file for real-time updates
+- Dashboard shows agent status, progress, alerts, auditor status, sprint history
+
+---
+
 ## Sprint Lifecycle
 
 ```
-DIRECTIVE → PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → TRANSITION
+DIRECTIVE → PLAN → SPAWN → AUDITOR START → EXECUTE → AUDITOR STOP → EVALUATE → FIX → RETRO → DECAY → TRANSITION
 ```
 
 1. **DIRECTIVE** — Operator writes/updates DIRECTIVES.md
-2. **PLAN** — Brain reads context, checks usage, creates task JSONs
-3. **SPAWN** — Brain spawns workers + auditor via tmux
-4. **EXECUTE** — Workers code in parallel, auditor scans every 30s
-5. **EVALUATE** — Brain grades each result: DONE / GO+DEBT / NO-GO
-6. **FIX** — NO-GO tasks get priority fixes (cross-dependency aware)
-7. **RETRO** — Brain updates MEMORY, RETRO, DECISIONS
-8. **DECAY** — Compress if over 300 lines, archive old logs
-9. **TRANSITION** — More directives? Loop. Done? Report.
+2. **PLAN** — Brain reads context, checks usage, creates task JSONs (AI or structured mode)
+3. **SPAWN** — Brain spawns workers via tmux
+4. **AUDITOR START** (Phase 2.5) — `startScanLoop()` begins in-process scan
+5. **EXECUTE** — Workers code in parallel, auditor scans every 30s in background
+6. **AUDITOR STOP** (Phase 3.5) — `clearInterval()` stops scan loop
+7. **EVALUATE** — Brain grades each result: DONE / GO+DEBT / NO-GO
+8. **FIX** — NO-GO tasks get priority fixes (cross-dependency aware)
+9. **RETRO** — Brain updates MEMORY, RETRO, DECISIONS
+10. **DECAY** — Compress if over 300 lines, archive old logs
+11. **TRANSITION** — More directives? Loop. Done? Report.
 
 **Sprints are never left incomplete.** If usage limits hit, tasks pause and resume.
 

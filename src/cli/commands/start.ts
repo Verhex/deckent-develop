@@ -57,6 +57,12 @@ export function registerStart(program: Command): void {
           const headers = ['ID', 'Title', 'Model', 'Priority'];
           const rows = sprint.tasks.map(t => [t.id, t.title, t.model, t.priority]);
           print(formatTable(headers, rows));
+          if (sprint.reasoning) {
+            print(`\nReasoning: ${sprint.reasoning}`);
+          }
+          if (sprint.planningMode) {
+            print(`Planning mode: ${sprint.planningMode}`);
+          }
           print(`\nWorkers: ${sprint.tasks.length} | Brain model: ${config.activeModeConfig.brain_model}`);
           print('Dry-run complete. No workers spawned.');
           return;

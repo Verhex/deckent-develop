@@ -5,6 +5,124 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint12-13] - 2026-03-18
+
+### Added
+
+- **Brain AI Planning** (`src/orchestra/planner.ts`): AI task planning with Zod schema validation, 3 planning modes (ai/structured/auto)
+- **BrainPlanningMode**: `'ai' | 'structured' | 'auto'` config field in PlanModeConfig
+- **DRAFT task status**: `confirmDraftTasks()` transitions DRAFT → PENDING before spawning
+- **Auditor in-process**: `startScanLoop()` runs within Brain's `runSprint` (Phase 2.5), not as separate tmux window
+- **`writeScanToDashboard()`**: Merges scan results into dashboard state (alerts, agent statuses)
+- **Worker heartbeat prompt**: `buildWorkerPrompt` includes .hb file creation/update instructions
+- **.deckent/ structure**: TOOLS.md, BOOT.md, plugins/, i18n/ created by init
+- **Test suite**: 938 tests, 97.5% coverage
+
+## [0.1.0-sprint11] - 2026-03-18
+
+### Added
+
+- **Web Dashboard** (`src/dashboard/`): React+Vite+Tailwind, shadcn/ui components
+- **4 pages**: DashboardPage, SettingsPage, HistoryPage, MemoryPage
+- **14 UI components**: button, card, tabs, select, input, label, separator, sheet, scroll-area, badge, table, textarea, dialog, progress
+- **6 main components**: Layout, DebtTable, ThemeProvider, NewSprintModal, SprintChart, SimpleMarkdown
+- **SSE integration**: `useSSE` hook, real-time dashboard updates
+- **`deckent web`**: Launches HTTP API + web dashboard at localhost:3100
+- **Dark/light theme**, mobile responsive with hamburger menu
+- **Test suite**: 852 tests, 97% coverage
+
+## [0.1.0-sprint10] - 2026-03-17
+
+### Added
+
+- **HTTP API** (`src/api/server.ts`): 15 endpoints + SSE stream
+- **Routes**: GET status/sprint/history/config/doctor/memory/debt/job/events, POST start/plan/kill/set-directives/config
+- **Dashboard watcher** (`src/api/watcher.ts`): File watcher with debounce for SSE
+- **Terminal dashboard** (`deckent dashboard`): Rich TUI with Unicode box-drawing
+- **`deckent serve`**: HTTP API server standalone
+- **Sprint ID refactor**: Consistent format across codebase
+- **Test suite**: 799 tests, 95% coverage
+
+## [0.1.0-sprint9] - 2026-03-17
+
+### Added
+
+- **Analyzer** (`src/core/analyzer.ts`): Project stack, size, methodology detection
+- **9th MCP tool**: `deckent_analyze_project` — analyzes project and returns recommendations
+- **CI pipeline**: GitHub Actions workflow
+- **Dynamic version**: Reads from package.json at runtime
+- **`deckent archive-debt`**: Archive resolved technical debt
+- **Enriched sprint history**: Metrics in sprint log display
+- **Test suite**: 720 tests, 95% coverage
+
+## [0.1.0-sprint8] - 2026-03-17
+
+### Added
+
+- **CONTRIBUTING.md**: Full contributing guide (setup, standards, testing, PR process)
+- **docs/API.md**: Complete programmatic API reference (1491 lines)
+- **docs/ARCHITECTURE.md**: Condensed architecture overview
+- **docs/ROADMAP.md**: Phase-based roadmap
+- **MCP dogfooding**: Used Deckent's own MCP tools during development
+- **Test suite**: 669 tests, 95% coverage
+
+## [0.1.0-sprint7] - 2026-03-17
+
+### Added
+
+- **MCP Server** (`src/mcp/`): 8 tools + 4 resources, stdio transport
+- **Zero-friction integration**: Auto-registration in .claude/settings.json
+- **Test suite**: 669 tests, 95% coverage, 24 new MCP tests
+
+## [0.1.0-sprint6] - 2026-03-16
+
+### Added
+
+- **First dogfooding**: Deckent ran `deckent start` on itself
+- Generated README.md in 86 seconds with 1 worker
+- End-to-end orchestration loop proven
+- **Test suite**: 645 tests, 95% coverage
+
+## [0.1.0-sprint5] - 2026-03-16
+
+### Added
+
+- **Memory decay**: Auto-compress .brain/ when >300 lines
+- **Doctor checks**: `runDoctorChecks()` for pre-flight validation
+- **`deckent start --dry-run`**: Plan tasks without spawning workers
+- **`deckent status --watch`**: Auto-refresh every 2 seconds
+- **Barrel excludes**: index.ts files excluded from coverage
+- **Test suite**: 644 tests, 94.83% coverage
+
+## [0.1.0-sprint4] - 2026-03-16
+
+### Added
+
+- **Debt resolution lifecycle**: `resolveDebt()`, stale debt cleanup
+- **Test suite**: 617 tests, 93% coverage
+
+## [0.1.0-sprint3] - 2026-03-16
+
+### Fixed
+
+- **haiku_allowed**: Semantic fix (true = haiku is allowed as downgrade option)
+- **checkUsage regex**: Fixed usage percentage parsing
+
+### Added
+
+- **Test suite**: 540 tests, 92% coverage
+
+## [0.1.0-sprint2] - 2026-03-16
+
+### Changed
+
+- **Async migration**: `sleepSync(Atomics.wait)` → `async sleep(setTimeout)`
+- Brain now fully async throughout sprint lifecycle
+
+### Added
+
+- **Test suite**: 480 tests, 91% coverage
+
 ## [0.1.0-wave4] - 2026-03-16
 
 ### Added

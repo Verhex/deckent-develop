@@ -362,11 +362,11 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
     expect(prompt).toContain('src/core/');
   });
 
-  it('does not contain raw single-quotes (tmux-safe)', () => {
+  it('preserves single quotes in prompt (tmux handles escaping)', () => {
     const task = makeTask('001-001');
     task.title = "Task with it's apostrophe";
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).not.toContain("'");
+    expect(prompt).toContain("it's");
   });
 });
 

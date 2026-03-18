@@ -69,29 +69,11 @@ vi.mock('../../src/core/analyzer.js', () => ({
   analyzeProject: vi.fn(),
 }));
 
-import { createServer } from '../../src/mcp/server.js';
 import { loadConfig } from '../../src/core/config.js';
 import {
   readContext, checkUsage, adjustSprintSize, planSprint, runSprint,
 } from '../../src/orchestra/brain.js';
 import { analyzeProject } from '../../src/core/analyzer.js';
-
-// Helper: call a tool on the server's underlying Server instance
-async function callTool(toolName: string, args: Record<string, unknown> = {}): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
-  const server = createServer();
-  // Access the internal Server to call tool directly
-  const internalServer = (server as unknown as { _server: { _registeredTools: Map<string, { handler: (args: Record<string, unknown>) => Promise<unknown> }> } })._server;
-
-  // Alternative: Use the McpServer's tool registry
-  // We'll use the low-level approach: re-import the tool registrations and test handlers directly
-  // Since McpServer doesn't expose a direct callTool, we test via tool handler functions
-
-  // Instead, let's test by importing and calling the tool registration functions directly
-  // Each tool's handler is testable via its register function that takes a server
-
-  // For this test, we'll use a mock McpServer that captures tool registrations
-  return { content: [{ type: 'text', text: '{}' }] };
-}
 
 // ─── Test via mock server pattern ────────────────────────────────────
 
@@ -271,6 +253,41 @@ describe('MCP Tools', () => {
       expect(parsed.tasks).toHaveLength(1);
       expect(parsed.tasks[0].title).toBe('Auth API');
       expect(parsed.recommendation.size).toBe('full');
+    });
+
+    it('passes mode input to planSprint', async () => {
+      const { registerPlanTool } = await import('../../src/mcp/tools/plan.js');
+      const mock = createMockServer();
+      registerPlanTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(loadConfig).mockResolvedValue({
+        mode: 'max_plan',
+        activeModeConfig: {
+          max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
+          haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+        },
+        modes: {} as ResolvedConfig['modes'],
+        language: 'en', projectName: 'test', projectRoot: '/tmp/test', version: '0.1.0',
+      });
+      vi.mocked(readContext).mockReturnValue({
+        directives: '', memory: '', retro: '', debt: [], patterns: '', decisions: '',
+        existingTasks: [], projectState: { gitStatus: '', fileTree: [] },
+      });
+      vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 } as never);
+      vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+      vi.mocked(planSprint).mockReturnValue({
+        id: 'sprint-001', number: 1, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
+        tasks: [], workers: [], reasoning: 'Test reasoning', planningMode: 'structured',
+      });
+
+      const result = await mock.tools.get('deckent_plan')!.handler({ mode: 'structured' });
+      expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
+        expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+        expect.objectContaining({ mode: 'structured' }),
+      );
+      const parsed = JSON.parse(result.content[0]!.text);
+      expect(parsed.reasoning).toBe('Test reasoning');
+      expect(parsed.planningMode).toBe('structured');
     });
   });
 

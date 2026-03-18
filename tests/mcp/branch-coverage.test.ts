@@ -20,9 +20,13 @@ vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/core/utils.js', () => ({
-  countBrainLines: vi.fn().mockReturnValue(100),
-}));
+vi.mock('../../src/core/utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
+  return {
+    ...actual,
+    countBrainLines: vi.fn().mockReturnValue(100),
+  };
+});
 
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
@@ -125,12 +129,12 @@ describe('MCP Branch Coverage', () => {
 
   // ─── debt.ts: parseDebtTable edge cases ───────────────────────────
   describe('deckent://debt — parseDebtTable edge cases', () => {
-    it('handles rows with missing columns (defaults to empty strings)', async () => {
+    it('skips rows with fewer than 9 columns', async () => {
       const { registerDebtResource } = await import('../../src/mcp/resources/debt.js');
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
-      // Row with fewer columns than expected
+      // Row with fewer columns than expected — shared parseDebtTable skips it
       const debtMd = `# Tech Debt
 | ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
 |---|---|---|---|---|---|---|---|---|
@@ -144,14 +148,10 @@ describe('MCP Branch Coverage', () => {
       const result = await handler(new URL('deckent://debt'));
       const items = JSON.parse(result.contents[0]!.text);
 
-      expect(items).toHaveLength(1);
-      expect(items[0].id).toBe('debt-001');
-      expect(items[0].originTaskId).toBe('');
-      expect(items[0].originSprintId).toBe('');
-      expect(items[0].resolvedInSprintId).toBeUndefined();
+      expect(items).toHaveLength(0);
     });
 
-    it('handles empty resolvedInSprintId (cols[7] is empty string)', async () => {
+    it('handles dash resolvedInSprintId (cols[7] is "-")', async () => {
       const { registerDebtResource } = await import('../../src/mcp/resources/debt.js');
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
@@ -159,7 +159,7 @@ describe('MCP Branch Coverage', () => {
       const debtMd = `# Tech Debt
 | ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
 |---|---|---|---|---|---|---|---|---|
-| debt-001 | Some issue | 7-001 | sprint-007 | NORMAL | 1 | false |  | 2026-03-17 |
+| debt-001 | Some issue | 7-001 | sprint-007 | NORMAL | 1 | false | - | 2026-03-17 |
 `;
 
       vi.mocked(existsSync).mockReturnValue(true);
@@ -187,7 +187,7 @@ describe('MCP Branch Coverage', () => {
       expect(items).toHaveLength(0);
     });
 
-    it('filters out rows with empty IDs', async () => {
+    it('includes rows with empty IDs (shared parseDebtTable does not filter)', async () => {
       const { registerDebtResource } = await import('../../src/mcp/resources/debt.js');
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
@@ -196,7 +196,7 @@ describe('MCP Branch Coverage', () => {
 | ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
 |---|---|---|---|---|---|---|---|---|
 |  |  |  |  |  |  |  |  |  |
-| debt-001 | Real item | 7-001 | sprint-007 | HIGH | 1 | false |  | 2026-03-17 |
+| debt-001 | Real item | 7-001 | sprint-007 | HIGH | 1 | false | - | 2026-03-17 |
 `;
 
       vi.mocked(existsSync).mockReturnValue(true);
@@ -206,9 +206,9 @@ describe('MCP Branch Coverage', () => {
       const result = await handler(new URL('deckent://debt'));
       const items = JSON.parse(result.contents[0]!.text);
 
-      // Only the non-empty ID row should be included
-      expect(items).toHaveLength(1);
-      expect(items[0].id).toBe('debt-001');
+      // Shared parseDebtTable includes all rows with 9+ columns
+      expect(items).toHaveLength(2);
+      expect(items[1].id).toBe('debt-001');
     });
   });
 

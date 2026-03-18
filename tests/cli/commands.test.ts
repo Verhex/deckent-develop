@@ -49,6 +49,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   planSprint: vi.fn(),
   cleanup: vi.fn(),
   runDecay: vi.fn(),
+  confirmDraftTasks: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
     constructor(msg: string, phase?: string) {
@@ -87,7 +88,7 @@ import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { countBrainLines } from '../../src/core/utils.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../src/core/config.js';
-import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, runDecay, BrainError } from '../../src/orchestra/brain.js';
+import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, runDecay, BrainError, confirmDraftTasks } from '../../src/orchestra/brain.js';
 import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, TmuxError } from '../../src/orchestra/tmux.js';
 import { readTask } from '../../src/agents/worker.js';
 
@@ -1064,6 +1065,67 @@ describe('plan command', () => {
     expect(stdout()).toContain('task-002');
     expect(stdout()).toContain('2 tasks');
   });
+
+  it('--structured passes mode=structured to planSprint', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(readContext).mockReturnValue({
+      directives: '', memory: '', retro: '', debt: [],
+      patterns: '', decisions: '', existingTasks: [],
+      projectState: { gitStatus: '', fileTree: [] },
+    });
+    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
+    vi.mocked(adjustSprintSize).mockReturnValue({
+      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
+    });
+    vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [makeTask()] }));
+    await runCommand(registerPlan, ['plan', '--structured']);
+    expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ mode: 'structured' }),
+    );
+  });
+
+  it('--no-confirm skips approval flow', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(readContext).mockReturnValue({
+      directives: '', memory: '', retro: '', debt: [],
+      patterns: '', decisions: '', existingTasks: [],
+      projectState: { gitStatus: '', fileTree: [] },
+    });
+    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
+    vi.mocked(adjustSprintSize).mockReturnValue({
+      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
+    });
+    vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [makeTask()] }));
+    await runCommand(registerPlan, ['plan', '--no-confirm']);
+    expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ asDraft: false }),
+    );
+    // No approval prompt, no confirmDraftTasks call
+    expect(vi.mocked(confirmDraftTasks)).not.toHaveBeenCalled();
+  });
+
+  it('shows reasoning when present', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(readContext).mockReturnValue({
+      directives: '', memory: '', retro: '', debt: [],
+      patterns: '', decisions: '', existingTasks: [],
+      projectState: { gitStatus: '', fileTree: [] },
+    });
+    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
+    vi.mocked(adjustSprintSize).mockReturnValue({
+      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
+    });
+    vi.mocked(planSprint).mockReturnValue(makeSprint({
+      tasks: [makeTask()],
+      reasoning: 'AI planned this',
+      planningMode: 'ai',
+    }));
+    await runCommand(registerPlan, ['plan', '--no-confirm']);
+    expect(stdout()).toContain('AI planned this');
+    expect(stdout()).toContain('Planning mode: ai');
+  });
 });
 
 // ─── Stub Commands ──────────────────────────────────────────────────
@@ -1269,5 +1331,126 @@ describe('init command', () => {
     await runCommand(registerInit, ['init']);
     expect(stdout()).toContain('DIRECTIVES.md');
     expect(stdout()).toContain('deckent start');
+  });
+
+  it('creates plugins directory', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const mkdirCalls = vi.mocked(mkdirSync).mock.calls.map(c => String(c[0]));
+    expect(mkdirCalls.some(c => c.includes('plugins'))).toBe(true);
+  });
+
+  it('creates i18n directory', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const mkdirCalls = vi.mocked(mkdirSync).mock.calls.map(c => String(c[0]));
+    expect(mkdirCalls.some(c => c.includes('i18n'))).toBe(true);
+  });
+
+  it('creates TOOLS.md in workspace', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const writeCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('TOOLS.md'),
+    );
+    expect(writeCalls.length).toBeGreaterThan(0);
+  });
+
+  it('creates BOOT.md in workspace', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const writeCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('BOOT.md'),
+    );
+    expect(writeCalls.length).toBeGreaterThan(0);
+  });
+
+  it('creates en.json in i18n', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const writeCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('en.json'),
+    );
+    expect(writeCalls.length).toBeGreaterThan(0);
+    const content = JSON.parse(String(writeCalls[0]?.[1]));
+    expect(content).toHaveProperty('sprint_started');
+  });
+
+  it('creates tr.json in i18n', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const writeCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('tr.json'),
+    );
+    expect(writeCalls.length).toBeGreaterThan(0);
+    const content = JSON.parse(String(writeCalls[0]?.[1]));
+    expect(content).toHaveProperty('sprint_started');
+    expect(content.sprint_started).toContain('baslatildi');
   });
 });

@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import {
+  BRAIN_PLAN_TIMEOUT_MS,
+  BRAIN_PLAN_MAX_CONTEXT_LINES,
   DECKENT_DIR,
   PROJECT_CONFIG_PATH,
   GLOBAL_DECKENT_DIR,
@@ -172,6 +174,16 @@ describe('tmux constants', () => {
     expect(TMUX_BRAIN_WINDOW.length).toBeGreaterThan(0);
     expect(TMUX_AUDITOR_WINDOW.length).toBeGreaterThan(0);
     expect(TMUX_DASHBOARD_WINDOW.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Brain AI planner constants', () => {
+  it('BRAIN_PLAN_TIMEOUT_MS === 60_000', () => {
+    expect(BRAIN_PLAN_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it('BRAIN_PLAN_MAX_CONTEXT_LINES === 200', () => {
+    expect(BRAIN_PLAN_MAX_CONTEXT_LINES).toBe(200);
   });
 });
 

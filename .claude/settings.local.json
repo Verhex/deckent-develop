@@ -37,7 +37,20 @@
       "Bash(gh run:*)",
       "Bash(npm install:*)",
       "Bash(apt list:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(find /home/alperen/deckent-dev -maxdepth 2 -type f -name *BLUEPRINT* -o -name *blueprint*)",
+      "Bash(grep -n \"exec\\\\|shell\\\\|spawn\\\\|fork\" /home/alperen/deckent-dev/src/cli/commands/*.ts /home/alperen/deckent-dev/src/mcp/tools/*.ts)",
+      "Bash(grep -C3 \"const.*=.*\\\\`\" /home/alperen/deckent-dev/src/orchestra/tmux.ts)",
+      "Bash(grep:*)",
+      "Bash(wc -l /home/alperen/deckent-dev/tests/**/*.test.ts)",
+      "Bash(python3 -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\(f''''Tests: {d[numTotalTests]}, Passed: {d[numPassedTests]}, Failed: {d[numFailedTests]}''''\\)\")",
+      "Bash(node -e \"require\\(''zod''\\)\")",
+      "Bash(npx tsx:*)",
+      "Bash(git:*)",
+      "Bash(find /home/alperen/deckent-dev -name *BLUEPRINT* -o -name *ANA-PLAN*)",
+      "Bash(wc -l /home/alperen/deckent-dev/.brain/*.md)",
+      "Bash(wc -l /home/alperen/deckent-dev/.brain/sprints/*.md)"
     ]
-  }
+  },
+  "outputStyle": "default"
 }

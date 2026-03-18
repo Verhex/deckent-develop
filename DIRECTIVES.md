@@ -1,74 +1,198 @@
-# DIRECTIVES — Sprint 11B (Web Dashboard Pages)
+# DIRECTIVES — Sprint 14 (Auditor Canlı Entegrasyon + .deckent Yapı Tamamlama)
 
-## Hedef: Dashboard, settings, history, memory pages with full UI
+## Hedef: Auditor sprint sırasında gerçek scan cycle çalıştırır. .deckent/ yapısı Blueprint'e tam uyumlu olur.
 
-## Task 1: Dashboard Ana Sayfa
-- Replace src/dashboard/src/pages/DashboardPage.tsx placeholder with full implementation
-- Sprint status card: sprint ID, phase badge (color-coded), status, updated time
-- Worker table: columns (ID, Task, Status, Elapsed) with Kill button per row
-  - Kill button: POST /api/kill/:workerId, confirm dialog, refresh on success
-- Progress section: visual progress bar with segments (done=green, active=blue, pending=gray)
-  - Text: "3/5 done, 1 active, 1 pending"
-- Alert section: list of alerts with level badges (INFO=blue, WARNING=amber, CRITICAL=red)
-- "Yeni Sprint" button → opens NewSprintModal
-- NewSprintModal: textarea for directive content → POST /api/set-directives → show task count → POST /api/plan → show plan → Confirm button → POST /api/start
-- SSE integration: useSSE('/api/events') for real-time DashboardState updates
-- Fallback: if no SSE data, fetch GET /api/status on mount
-- Dark theme: bg-zinc-950, cards bg-zinc-900, text zinc-100
-- Create needed shadcn components: dialog.tsx, table.tsx, badge.tsx, textarea.tsx, progress.tsx
-- Dosya: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/components/ui/dialog.tsx, src/dashboard/src/components/ui/table.tsx, src/dashboard/src/components/ui/badge.tsx, src/dashboard/src/components/ui/textarea.tsx, src/dashboard/src/components/ui/progress.tsx
-- Kapsam: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/
+---
 
-## Task 2: Ayarlar Sayfasi
-- Replace src/dashboard/src/pages/SettingsPage.tsx placeholder with full implementation
-- Config section: fetch GET /api/config on mount
-  - Mode dropdown: max_plan, max5x_plan, pro_plan, api
-  - Brain Model dropdown: opus, sonnet, haiku
-  - Default Model dropdown: opus, sonnet, haiku
-  - Max Workers number input
-  - Language dropdown: en, tr
-- Save button: POST /api/config with changed values, show success/error feedback
-- Doctor section: fetch GET /api/doctor, display checklist with pass/fail icons (CheckCircle/XCircle from lucide-react)
-- Refresh Doctor button
-- Dark theme consistent with DashboardPage
-- Create needed shadcn components: select.tsx, input.tsx, label.tsx, separator.tsx
-- Dosya: src/dashboard/src/pages/SettingsPage.tsx, src/dashboard/src/components/ui/select.tsx, src/dashboard/src/components/ui/input.tsx, src/dashboard/src/components/ui/label.tsx, src/dashboard/src/components/ui/separator.tsx
-- Kapsam: src/dashboard/src/pages/SettingsPage.tsx, src/dashboard/src/components/ui/
+## Görev 1: Auditor Gerçek Scan Loop Entegrasyonu
+- Dosya: src/orchestra/brain.ts, src/monitor/auditor.ts, src/orchestra/tmux.ts
+- Kapsam: src/orchestra/, src/monitor/
 
-## Task 3: Sprint Gecmisi + Bellek + Borc Sayfasi
-- Replace src/dashboard/src/pages/HistoryPage.tsx placeholder with full implementation
-- Sprint history table: fetch GET /api/history, columns (Sprint ID, Tasks, Completed, No-Go Rate, Coverage, Duration)
-- Trend chart with Recharts: ResponsiveContainer + LineChart
-  - X axis: sprint ID
-  - Left Y axis: test count (Line, blue)
-  - Right Y axis: coverage % (Line, green)
-  - Tooltip with custom formatter
-  - CartesianGrid, Legend
-- Replace src/dashboard/src/pages/MemoryPage.tsx placeholder with full implementation
-- Memory tab: fetch GET /api/memory, render markdown content in scrollable code block (pre + whitespace-pre-wrap)
-- Debt tab: fetch GET /api/debt, parse markdown table rows, render as styled HTML table with priority badges
-- Use Tabs component to switch: History | Memory | Debt
-- Create needed shadcn components: tabs.tsx
-- Dosya: src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/components/SprintChart.tsx, src/dashboard/src/components/DebtTable.tsx, src/dashboard/src/components/ui/tabs.tsx
-- Kapsam: src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/components/
+### Problem
+startAuditor() tmux'ta `claude -p 'auditor'` çalıştırıyor — bu anlamsız. Auditor'ın gerçek scan cycle'ı (`runScanCycle` + `startScanLoop`) Brain process'i içinden çalışmalı, ayrı tmux penceresinde değil.
 
-## Task 4: Layout + Router + Navigation + UX
-- Create src/dashboard/src/components/Layout.tsx
-  - Sidebar (left, 240px): deckent logo/text at top, nav links below
-  - Nav links: Dashboard (/), Settings (/settings), History (/history), Memory (/memory)
-  - Active link: bg-zinc-800 with left border accent (blue)
-  - Collapsible: hamburger icon on mobile (<768px), Sheet component slides in
-  - Sidebar: bg-zinc-900 border-r border-zinc-800
-  - Main content area: flex-1 overflow-auto p-6 bg-zinc-950
-- Update src/dashboard/src/App.tsx: wrap Routes in <Layout>, remove lazy placeholders, use direct imports
-- Create src/dashboard/src/components/ThemeProvider.tsx: sets dark class on html, provides theme context
-- Update src/dashboard/src/index.css: add dark theme variables, base styles (body bg-zinc-950 text-zinc-100), scrollbar styling
-- Create sheet.tsx and scroll-area.tsx shadcn components for mobile sidebar
-- Responsive design: sidebar hidden on mobile, toggleable via Sheet
-- Dosya: src/dashboard/src/components/Layout.tsx, src/dashboard/src/App.tsx, src/dashboard/src/components/ThemeProvider.tsx, src/dashboard/src/index.css, src/dashboard/src/components/ui/sheet.tsx, src/dashboard/src/components/ui/scroll-area.tsx
-- Kapsam: src/dashboard/src/components/, src/dashboard/src/App.tsx, src/dashboard/src/index.css
+### Çözüm: Brain İçinde Auditor Loop
+- `runSprint` fonksiyonunda Phase 2 (SPAWN) ile Phase 3 (EXECUTE) arasında auditor scan loop başlat:
+  ```
+  Phase 2: SPAWN
+    spawnWorkers(...)
+  
+  Phase 2.5: AUDITOR START
+    const scanInterval = startScanLoop(projectRoot, sprint.id)
+  
+  Phase 3: EXECUTE
+    results = await waitForResults(...)
+  
+  Phase 3.5: AUDITOR STOP
+    clearInterval(scanInterval)
+  ```
+- `startScanLoop` her 30 saniyede `runScanCycle` çağırır → heartbeat'leri okur → stale detection → boundary violations → dashboard günceller
+- Sprint bittiğinde `clearInterval` ile durdur
+
+### runScanCycle → Dashboard Entegrasyonu
+- Her scan cycle'da mevcut dashboard state'i oku, alerts'i merge et, üzerine yaz
+- Scan sonuçlarını dashboard'a yansıt:
+  ```typescript
+  const scanResult = runScanCycle(projectRoot, sprintId);
+  // Mevcut dashboard'u oku
+  const currentDash = readDashboardJson(projectRoot);
+  // Alerts'i merge et (yeni scan alerts + mevcut alerts)
+  const mergedAlerts = [...(currentDash?.alerts ?? []), ...scanResult.alerts];
+  // Dashboard güncelle
+  updateDashboard(projectRoot, { ...currentDash, alerts: mergedAlerts, updatedAt: now() });
+  ```
+
+### startAuditor tmux kaldır
+- `spawnWorkers` içindeki `startAuditor()` çağrısını kaldır
+- tmux'ta ayrı auditor penceresi artık gerekmiyor — Brain kendi process'inde çalıştırıyor
+- `startAuditor` fonksiyonu tmux.ts'de kalsın (gelecekte bağımsız auditor modu için) ama spawnWorkers'dan çağrılmasın
+
+### Auditor Dashboard Write Fonksiyonu
+- Yeni fonksiyon: `writeScanToDashboard(projectRoot: string, sprint: Sprint, scanResult: ScanResult): void`
+- Mevcut agent bilgilerini koru, sadece alerts ve violations güncelle
+- Agent status'ları heartbeat'lerden oku ve dashboard'a yansıt
+
+### Test
+- runSprint sırasında scanLoop başlıyor ve duruyor (interval mock)
+- Scan cycle stale heartbeat algılıyor → alert oluşuyor → dashboard'a yazılıyor
+- Scan cycle boundary violation algılıyor → pattern kaydediliyor
+- startAuditor artık spawnWorkers'dan çağrılmıyor
+- Sprint sonrası interval temizleniyor (clearInterval)
+- 8+ yeni test
+
+---
+
+## Görev 2: Worker Heartbeat Yazma — Prompt Talimatı
+- Dosya: src/orchestra/brain.ts (buildWorkerPrompt)
+- Kapsam: src/orchestra/brain.ts
+
+### Problem
+Worker prompt'unda heartbeat yazma talimatı yok. Worker'lar .result dosyası yazıyor ama .hb dosyası yazmıyor. Auditor scan heartbeat okumaya çalışıyor ama dosya yok → boş sonuç.
+
+### Çözüm
+buildWorkerPrompt'a heartbeat talimatı ekle:
+```
+8. Create a heartbeat file at .tasks/task-{task.id}.hb BEFORE starting work (JSON format):
+{
+  "workerId": "w-{task.id}",
+  "taskId": "{task.id}",
+  "status": "EXECUTING",
+  "currentAction": "Starting task",
+  "timestamp": "{ISO timestamp}",
+  "filesChangedCount": 0,
+  "sequence": 0
+}
+Update this file periodically as you work:
+- Change status to CODING, TESTING, DOCUMENTING as appropriate
+- Update currentAction with what you're doing
+- Increment sequence on each update
+- Update filesChangedCount as you modify files
+```
+
+### Test
+- buildWorkerPrompt çıktısında ".hb" ve "heartbeat" geçiyor
+- Heartbeat JSON format talimatı prompt'ta var
+- 3+ yeni test
+
+---
+
+## Görev 3: .deckent/ Yapı Tamamlama
+- Dosya: src/cli/commands/init.ts, src/mcp/tools/init.ts, .deckent/workspace/
+- Kapsam: src/cli/, src/mcp/, .deckent/
+
+### Problem
+`deckent init` çalıştığında .deckent/ altında sadece config.json ve workspace/IDENTITY.md oluşuyor. Blueprint'teki tam yapı eksik.
+
+### Init'te Oluşturulacak Dosyalar
+
+#### .deckent/workspace/TOOLS.md
+```markdown
+# Environment Tools
+Build: {package.json scripts.build veya "tsc"}
+Test: {package.json scripts.test veya "npx vitest run"}
+Lint: {package.json scripts.lint veya "tsc --noEmit"}
+Dev: {package.json scripts.dev veya "tsc --watch"}
+```
+Init sırasında package.json varsa scripts'ten oku, yoksa default'ları yaz.
+
+#### .deckent/workspace/BOOT.md
+```markdown
+# Agent Boot Sequence
+1. Read AGENTS.md (follows @imports)
+2. Read assigned task from .tasks/
+3. Check .locks/ before file operations
+4. Write heartbeat to .tasks/task-{id}.hb
+5. Execute task within assigned scope
+6. Run tests
+7. Write result to .tasks/task-{id}.result
+```
+
+#### .deckent/plugins/ dizini
+Boş dizin oluştur — gelecek plugin sistemi için.
+
+#### .deckent/i18n/en.json + tr.json
+Temel mesaj şablonları:
+```json
+{
+  "cli.welcome": "Welcome to Deckent!",
+  "sprint.starting": "Sprint {n} starting...",
+  "sprint.complete": "Sprint {n} complete!",
+  "brain.planning": "Brain is planning...",
+  "worker.spawned": "Worker {id} spawned (model: {model})"
+}
+```
+
+### src/cli/commands/init.ts güncelle
+- TOOLS.md: package.json oku → scripts'ten build/test/lint çıkar → yaz
+- BOOT.md: sabit şablon yaz
+- plugins/ dizini oluştur
+- i18n/ dizini + en.json + tr.json yaz
+- Mevcut dosyalar varsa üzerine yazma (writeIfNotExists pattern koru)
+
+### src/mcp/tools/init.ts güncelle
+- Aynı dosyaları oluştur (CLI ile tutarlı)
+
+### Deckent'in kendi .deckent/ yapısını güncelle
+- .deckent/workspace/TOOLS.md oluştur (deckent'in kendi araçları)
+- .deckent/workspace/BOOT.md oluştur
+- .deckent/plugins/ dizini oluştur
+- .deckent/i18n/ dizini + en.json + tr.json oluştur
+
+### Test
+- init sonrası tüm dosyaların varlığını doğrula
+- TOOLS.md package.json'dan scripts okuyor
+- i18n dosyaları valid JSON
+- Mevcut dosya varsa üzerine yazmıyor
+- 6+ yeni test
+
+---
+
+## Görev 4: Dashboard SSE + Auditor Canlı Gösterge
+- Dosya: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/Layout.tsx
+- Kapsam: src/dashboard/
+
+### Problem
+Auditor artık dashboard'a canlı yazıyor ama frontend bunu tam göstermiyor.
+
+### Çözüm
+- DashboardPage: Alert listesini scan cycle'dan gelen canlı alertlerle güncelle (zaten SSE var)
+- Agent status kartlarına "Last heartbeat: Xs ago" göstergesi ekle
+- Auditor scan durumunu layout sidebar'a ekle: "Auditor: Active (last scan: 3s ago)" veya "Auditor: Inactive"
+- Yeni: Violations badge — boundary violation sayısı
+- Layout sidebar'da SSE fallback: SSE yoksa "Auditor: Unknown" göster
+
+### Test
+- Dashboard component render testleri (mevcut test pattern'i ile)
+- Alert rendering doğru badge renkleri
+- 4+ yeni test
+
+---
 
 ## Kalite Kuralları
-- Main project tsc --noEmit + vitest run MUST still pass
-- SIFIR değişiklik ana proje kaynak dosyalarında
-- Dashboard build: cd src/dashboard && npm run build
+- tsc --noEmit MUST pass
+- npx vitest run MUST pass — hedef: 940+ test (917 + ~23 yeni)
+- Coverage düşmemeli
+- Circular dependency yok
+- Brain→auditor tek yönlü import korunsun
+- Auditor scan loop resilient: hata olsa bile loop devam etmeli (mevcut try/catch korunsun)
+- .deckent/ yapısı Blueprint Bölüm 4 ile uyumlu olmalı

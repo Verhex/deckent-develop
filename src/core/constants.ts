@@ -80,3 +80,7 @@ export const DECKENT_VERSION: string = (() => {
   }
 })();
 export const SUPPORTED_LANGUAGES = ['en', 'tr'] as const;
+
+// ─── Brain AI Planner ───────────────────────────────────────────────
+export const BRAIN_PLAN_TIMEOUT_MS = 60_000 as const;
+export const BRAIN_PLAN_MAX_CONTEXT_LINES = 200 as const;

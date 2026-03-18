@@ -20,9 +20,13 @@ vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn(),
 }));
 
-vi.mock('../../src/core/utils.js', () => ({
-  countBrainLines: vi.fn().mockReturnValue(100),
-}));
+vi.mock('../../src/core/utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
+  return {
+    ...actual,
+    countBrainLines: vi.fn().mockReturnValue(100),
+  };
+});
 
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
