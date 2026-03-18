@@ -59,7 +59,17 @@
       "Bash(node -e \":*)",
       "Bash(find /home/alperen/deckent-dev/src/dashboard -name *.test.tsx -o -name *.test.ts)",
       "Bash(find /home/alperen/deckent-dev/tests/mcp -name *.test.ts)",
-      "Bash(find /home/alperen/deckent-dev -name *BLUEPRINT* -o -name *blueprint*)"
+      "Bash(find /home/alperen/deckent-dev -name *BLUEPRINT* -o -name *blueprint*)",
+      "Bash(grep \"registerTool\\(\" src/mcp/tools/*.ts)",
+      "Bash(grep \"registerTool\\(\" src/mcp/tools/*.ts -A 2)",
+      "Bash(tmux list-sessions:*)",
+      "Bash(find /home/alperen/deckent-dev -maxdepth 1 -name LICENSE* -o -name license*)",
+      "Bash(wc:*)",
+      "Bash(find /home/alperen/deckent-dev/src -name \"*.ts\" -exec wc -l {} +)",
+      "Bash(tmux ls:*)",
+      "Bash(tmux list-windows:*)",
+      "Bash(python3:*)",
+      "Bash(tsc --noEmit)"
     ]
   },
   "outputStyle": "default"
