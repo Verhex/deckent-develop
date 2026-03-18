@@ -370,9 +370,9 @@ describe('createHttpServer', () => {
 
       const res = await request(api, '/api/status', 'OPTIONS');
       expect(res.status).toBe(200);
-      expect(res.headers['access-control-allow-origin']).toBe('*');
+      expect(res.headers['access-control-allow-origin']).toMatch(/^http:\/\/(localhost|127\.0\.0\.1)/);
       expect(res.headers['access-control-allow-methods']).toBe('GET, POST, OPTIONS');
-      expect(res.headers['access-control-allow-headers']).toBe('Content-Type');
+      expect(res.headers['access-control-allow-headers']).toBe('Content-Type, Authorization');
     });
   });
 

@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { writeFileSync, unlinkSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import type { ModelType } from '../core/types.js';
 import {
   TMUX_SESSION_NAME,
@@ -43,19 +45,40 @@ function workerWindowName(taskId: string): string {
   return `${TMUX_WORKER_PREFIX}${taskId}`;
 }
 
+/**
+ * Write prompt to a temp file and pass via stdin redirection.
+ * This eliminates shell injection risk — no prompt content is ever
+ * interpreted by the shell.
+ */
+function writePromptFile(projectRoot: string, prompt: string): string {
+  const tmpDir = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const id = randomBytes(8).toString('hex');
+  const promptPath = join(tmpDir, `.prompt-${id}.txt`);
+  writeFileSync(promptPath, prompt, 'utf-8');
+  return promptPath;
+}
+
+/** Exported for testing */
+export function cleanupPromptFile(promptPath: string): void {
+  try { unlinkSync(promptPath); } catch { /* already deleted */ }
+}
+
 function buildClaudeCommand(
   model: ModelType,
-  prompt: string,
+  promptFilePath: string,
   opts?: SpawnOptions,
 ): string {
-  const safePrompt = prompt.replace(/'/g, "'\\''");
-  let cmd = `claude -p '${safePrompt}' --model ${model}`;
+  // Use stdin redirection from file — no shell metacharacter risk
+  let cmd = `claude -p - --model ${model}`;
   if (opts?.allowedTools) {
+    // allowedTools is a controlled string (never user input)
     cmd += ` --allowedTools '${opts.allowedTools}'`;
   }
   if (opts?.autoApprove) {
     cmd += ' --dangerously-skip-permissions';
   }
+  cmd += ` < ${promptFilePath}`;
   return cmd;
 }
 
@@ -87,7 +110,8 @@ export function spawnWorker(
     '-n', windowName,
     '-c', projectDir,
   ]);
-  const cmd = buildClaudeCommand(model, prompt, opts);
+  const promptPath = writePromptFile(projectDir, prompt);
+  const cmd = buildClaudeCommand(model, promptPath, opts);
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${windowName}`,
@@ -144,7 +168,8 @@ export function startAuditor(projectDir: string, opts?: SpawnOptions): void {
       '-c', projectDir,
     ]);
   }
-  const cmd = buildClaudeCommand('sonnet', 'auditor', opts);
+  const promptPath = writePromptFile(projectDir, 'auditor');
+  const cmd = buildClaudeCommand('sonnet', promptPath, opts);
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${TMUX_AUDITOR_WINDOW}`,

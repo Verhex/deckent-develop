@@ -26,6 +26,9 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
+  openSync: vi.fn(() => 42),
+  closeSync: vi.fn(),
+  constants: { O_WRONLY: 1, O_CREAT: 64, O_EXCL: 128 },
 }));
 
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';

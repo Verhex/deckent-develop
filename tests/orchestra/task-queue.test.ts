@@ -46,6 +46,13 @@ vi.mock('node:child_process', () => ({
   }),
 }));
 
+vi.mock('../../src/orchestra/result-watcher.js', () => ({
+  createResultWatcher: vi.fn(() => ({
+    waitForChange: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(),
+  })),
+}));
+
 vi.mock('node:readline/promises', () => ({
   createInterface: vi.fn(() => ({
     question: vi.fn().mockResolvedValue('y'),

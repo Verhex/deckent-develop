@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, openSync, closeSync, constants as fsConstants } from 'node:fs';
 import { join, normalize, sep } from 'node:path';
 import type {
   Task,
@@ -159,7 +159,26 @@ export function acquireLock(
     taskId,
   };
 
-  writeFileSync(lockPath, JSON.stringify(lockInfo, null, 2), 'utf-8');
+  // Atomic lock creation — O_EXCL ensures only one process can create
+  const data = JSON.stringify(lockInfo, null, 2);
+  try {
+    const fd = openSync(lockPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL);
+    writeFileSync(fd, data, 'utf-8');
+    closeSync(fd);
+  } catch (err: unknown) {
+    // EEXIST = another worker created the lock between our check and create
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
+      // Re-read to get the actual owner
+      try {
+        const actual = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
+        throw new LockError(`File ${filePath} is locked by ${actual.ownerWorkerId}`, filePath);
+      } catch (innerErr) {
+        if (innerErr instanceof LockError) throw innerErr;
+        throw new LockError(`File ${filePath} is locked by another worker`, filePath);
+      }
+    }
+    throw err;
+  }
   return lockInfo;
 }
 

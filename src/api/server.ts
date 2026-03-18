@@ -1,6 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR,
@@ -25,6 +26,24 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 const DEFAULT_PORT = 3100;
+const LOCALHOST_ONLY = '127.0.0.1';
+
+// ─── Auth ───────────────────────────────────────────────────────
+
+/** Generate a cryptographically random API token */
+export function generateApiToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
+/** Check bearer token from Authorization header */
+function checkAuth(req: IncomingMessage, token: string | null): boolean {
+  // If no token configured, auth is disabled (backward-compatible)
+  if (!token) return true;
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return false;
+  const [scheme, value] = authHeader.split(' ', 2);
+  return scheme === 'Bearer' && value === token;
+}
 
 // ─── Zod Schemas for POST validation ────────────────────────────
 const StartSchema = z.object({ autoApprove: z.boolean().optional() });
@@ -57,7 +76,7 @@ function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   const body = JSON.stringify(data);
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': `http://localhost:${DEFAULT_PORT}`,
   });
   res.end(body);
 }
@@ -176,19 +195,32 @@ async function handleRequest(
   sseClients: Set<ServerResponse>,
   staticDir?: string,
   initWatcher?: () => void,
+  apiToken?: string | null,
 ): Promise<void> {
   const url = req.url ?? '/';
   const method = req.method ?? 'GET';
+  const origin = req.headers['origin'] ?? `http://localhost:${DEFAULT_PORT}`;
+  const allowedOrigin = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')
+    ? origin
+    : `http://localhost:${DEFAULT_PORT}`;
 
   // CORS preflight
   if (method === 'OPTIONS') {
     res.writeHead(200, {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     });
     res.end();
     return;
+  }
+
+  // Auth check for API routes (POST and mutating endpoints)
+  if (url.startsWith('/api/') && method === 'POST') {
+    if (!checkAuth(req, apiToken ?? null)) {
+      sendError(res, 401, 'Unauthorized — provide Authorization: Bearer <token>');
+      return;
+    }
   }
 
   // ─── GET routes ────────────────────────────────────────────
@@ -274,7 +306,7 @@ async function handleRequest(
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowedOrigin,
       });
       res.write('\n');
       sseClients.add(res);
@@ -457,10 +489,41 @@ export interface HttpApi {
   close(): Promise<void>;
 }
 
-export function createHttpServer(projectRoot: string, port?: number, staticDir?: string): HttpApi {
-  const listenPort = port ?? DEFAULT_PORT;
-  const dashPath = join(projectRoot, DASHBOARD_FILE);
+export interface HttpServerOptions {
+  port?: number;
+  staticDir?: string;
+  /** Bearer token for POST endpoints. If omitted, auth is disabled. */
+  apiToken?: string;
+  /** Bind address. Defaults to 127.0.0.1 (localhost-only). */
+  host?: string;
+}
 
+export function createHttpServer(projectRoot: string, port?: number, staticDir?: string, apiToken?: string): HttpApi;
+export function createHttpServer(projectRoot: string, opts?: HttpServerOptions): HttpApi;
+export function createHttpServer(
+  projectRoot: string,
+  portOrOpts?: number | HttpServerOptions,
+  staticDir?: string,
+  apiToken?: string,
+): HttpApi {
+  let listenPort: number;
+  let resolvedStaticDir: string | undefined;
+  let resolvedToken: string | undefined;
+  let host: string;
+
+  if (typeof portOrOpts === 'object' && portOrOpts !== null) {
+    listenPort = portOrOpts.port ?? DEFAULT_PORT;
+    resolvedStaticDir = portOrOpts.staticDir;
+    resolvedToken = portOrOpts.apiToken;
+    host = portOrOpts.host ?? LOCALHOST_ONLY;
+  } else {
+    listenPort = portOrOpts ?? DEFAULT_PORT;
+    resolvedStaticDir = staticDir;
+    resolvedToken = apiToken;
+    host = LOCALHOST_ONLY;
+  }
+
+  const dashPath = join(projectRoot, DASHBOARD_FILE);
   const sseClients = new Set<ServerResponse>();
 
   // Watch dashboard file for SSE — lazy start
@@ -488,12 +551,12 @@ export function createHttpServer(projectRoot: string, port?: number, staticDir?:
   }
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-    handleRequest(req, res, projectRoot, dashPath, sseClients, staticDir, initWatcher).catch((err: unknown) => {
+    handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, resolvedToken).catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });
   });
 
-  server.listen(listenPort);
+  server.listen(listenPort, host);
 
   return {
     server,
