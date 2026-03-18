@@ -1,0 +1,8 @@
+{
+  "sprint_started": "Sprint {id} baslatildi, {count} gorev",
+  "sprint_complete": "Sprint {id} tamamlandi",
+  "task_done": "Gorev {id}: TAMAMLANDI",
+  "task_nogo": "Gorev {id}: BASARISIZ",
+  "plan_approved": "Plan onaylandi",
+  "plan_rejected": "Plan reddedildi"
+}

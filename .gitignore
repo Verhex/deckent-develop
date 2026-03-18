@@ -25,7 +25,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-.deckent/
+# .deckent/ is tracked (config, workspace, i18n); plugins content is ignored
+.deckent/plugins/*
+!.deckent/plugins/.gitkeep
 
 # Dashboard sub-project
 src/dashboard/node_modules

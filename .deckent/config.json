@@ -1,0 +1,13 @@
+{
+  "mode": "max_plan",
+  "language": "tr",
+  "projectName": "deckent",
+  "brain_planning": "auto",
+  "modes": {
+    "max_plan": {
+      "brain_model": "opus",
+      "default_model": "opus",
+      "max_workers": 8
+    }
+  }
+}

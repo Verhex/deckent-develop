@@ -1556,7 +1556,7 @@ Factory function for `Alert` objects. Stamps the current ISO timestamp automatic
 function createServer(): McpServer
 ```
 
-Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 9 tools and 4 resources.
+Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 10 tools and 5 resources.
 
 **Example:**
 ```ts
@@ -1569,7 +1569,7 @@ await server.connect(new StdioServerTransport());
 
 ---
 
-### Tools (9)
+### Tools (10)
 
 | Tool name | Description |
 |---|---|
@@ -1582,6 +1582,7 @@ await server.connect(new StdioServerTransport());
 | `deckent_retro` | Return the latest sprint retrospective (`RETRO.md`) |
 | `deckent_history` | Return recent sprint log summaries |
 | `deckent_analyze_project` | Analyze project stack, size, and methodology recommendation |
+| `deckent_sync` | Sync adapter files (CLAUDE.md, AGENTS.md) with @DECKENT.md reference |
 
 #### `deckent_plan` Input Schema
 ```ts
@@ -1609,7 +1610,7 @@ await server.connect(new StdioServerTransport());
 
 ---
 
-### Resources (4)
+### Resources (5)
 
 | Resource URI | Description |
 |---|---|
@@ -1617,6 +1618,7 @@ await server.connect(new StdioServerTransport());
 | `deckent://directives` | Current contents of `DIRECTIVES.md` |
 | `deckent://memory` | Current contents of `.brain/MEMORY.md` |
 | `deckent://debt` | Current contents of `.brain/DEBT.md` |
+| `deckent://config` | Current project config (`.deckent/config.json`) |
 
 ---
 
@@ -1705,6 +1707,7 @@ Run via `deckent <command>` (globally installed) or `npx deckent <command>`.
 | `dashboard` | Terminal TUI dashboard (rich mode) | — |
 | `serve` | Start HTTP API server (SSE) | `--port` |
 | `web` | Web dashboard + API server | `--port` |
+| `sync` | Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference | — |
 
 ### Examples
 

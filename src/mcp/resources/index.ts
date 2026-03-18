@@ -3,10 +3,12 @@ import { registerDashboardResource } from './dashboard.js';
 import { registerDirectivesResource } from './directives.js';
 import { registerMemoryResource } from './memory.js';
 import { registerDebtResource } from './debt.js';
+import { registerConfigResource } from './config.js';
 
 export function registerResources(server: McpServer): void {
   registerDashboardResource(server);
   registerDirectivesResource(server);
   registerMemoryResource(server);
   registerDebtResource(server);
+  registerConfigResource(server);
 }

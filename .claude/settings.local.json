@@ -49,7 +49,17 @@
       "Bash(git:*)",
       "Bash(find /home/alperen/deckent-dev -name *BLUEPRINT* -o -name *ANA-PLAN*)",
       "Bash(wc -l /home/alperen/deckent-dev/.brain/*.md)",
-      "Bash(wc -l /home/alperen/deckent-dev/.brain/sprints/*.md)"
+      "Bash(wc -l /home/alperen/deckent-dev/.brain/sprints/*.md)",
+      "Bash(sudo apt-get:*)",
+      "Bash(conda install:*)",
+      "Bash(pip install:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(npm --version)",
+      "Bash(npm ci:*)",
+      "Bash(node -e \":*)",
+      "Bash(find /home/alperen/deckent-dev/src/dashboard -name *.test.tsx -o -name *.test.ts)",
+      "Bash(find /home/alperen/deckent-dev/tests/mcp -name *.test.ts)",
+      "Bash(find /home/alperen/deckent-dev -name *BLUEPRINT* -o -name *blueprint*)"
     ]
   },
   "outputStyle": "default"

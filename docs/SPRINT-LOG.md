@@ -153,4 +153,43 @@
 
 ---
 
+## Sprint 15 — DECKENT.md Bağımsızlık + Self-Hosting
+
+**Status:** COMPLETE
+**Date:** 2026-03-18
+**Duration:** Single session
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Files created | 8 (3 source: sync.ts CLI+MCP, config.ts resource; 3 test; 2 workspace) |
+| Files updated | 12 (constants, utils, init CLI+MCP, index CLI+MCP+resources, .gitignore, CLAUDE.md, config.json, DEBT.md) |
+| Tests | 29 new, 967 total (all passing) |
+| Coverage | 97.5%+ |
+| Type errors | 0 |
+| MCP tools | 9→10 (deckent_sync) |
+| MCP resources | 4→5 (deckent://config) |
+
+### Wave Execution
+
+| Wave | Tasks | Description |
+|------|-------|-------------|
+| A | Görev 1 | DECKENT.md foundation: constant, ensureDeckentImport, init refactor |
+| B | Görev 2+4+5 (parallel) | Rule templates, DEBT-002 close, sync CLI+MCP+resource |
+| C | Görev 3 | Self-hosting: .deckent/ files, .gitignore, CLAUDE.md injection |
+
+### Key Deliverables
+
+- DECKENT.md = single source of truth; CLAUDE.md/AGENTS.md = adapters
+- ensureDeckentImport() shared utility (CLI + MCP + sync use same function)
+- Config merge pattern: existing fields preserved, new fields added
+- .deckent/ tracked in git (removed from .gitignore)
+- Blueprint-quality rule templates with frontmatter
+- deckent sync CLI + deckent_sync MCP tool
+- deckent://config MCP resource
+- DEBT-002 formalized as resolved
+
+---
+
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Section 19*

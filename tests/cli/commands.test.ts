@@ -39,6 +39,7 @@ vi.mock('../../src/core/config.js', () => ({
 
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
+  ensureDeckentImport: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -86,7 +87,7 @@ vi.mock('../../src/agents/worker.js', () => ({
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
-import { countBrainLines } from '../../src/core/utils.js';
+import { countBrainLines, ensureDeckentImport } from '../../src/core/utils.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../src/core/config.js';
 import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, runDecay, BrainError, confirmDraftTasks } from '../../src/orchestra/brain.js';
 import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, TmuxError } from '../../src/orchestra/tmux.js';
@@ -1452,5 +1453,220 @@ describe('init command', () => {
     const content = JSON.parse(String(writeCalls[0]?.[1]));
     expect(content).toHaveProperty('sprint_started');
     expect(content.sprint_started).toContain('baslatildi');
+  });
+
+  it('creates DECKENT.md with full template', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('my-project');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const deckentCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).endsWith('DECKENT.md'),
+    );
+    expect(deckentCalls.length).toBeGreaterThan(0);
+    const content = String(deckentCalls[0]?.[1]);
+    expect(content).toContain('my-project');
+    expect(content).toContain('@.deckent/workspace/IDENTITY.md');
+    expect(content).toContain('@DIRECTIVES.md');
+    expect(content).toContain('@.brain/MEMORY.md');
+    expect(content).toContain('@.claude/rules/brain.md');
+    expect(content).toContain('@.deckent/workspace/BOOT.md');
+  });
+
+  it('calls ensureDeckentImport for CLAUDE.md (not destructive write)', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'));
+  });
+
+  it('calls ensureDeckentImport for AGENTS.md', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
+  });
+
+  it('does not overwrite CLAUDE.md with writeFileSync', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    // CLAUDE.md should NOT be written by writeFileSync directly
+    // (it should be handled by ensureDeckentImport instead)
+    const claudeDirectWrites = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).endsWith('CLAUDE.md'),
+    );
+    expect(claudeDirectWrites.length).toBe(0);
+  });
+
+  it('merges config when existing config.json present', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockImplementation((p) => {
+      if (String(p).includes('config.json')) return true;
+      return false;
+    });
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).includes('config.json')) {
+        return JSON.stringify({ mode: 'pro_plan', customField: 'keep-me' });
+      }
+      return '';
+    });
+
+    await runCommand(registerInit, ['init']);
+
+    const configCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('config.json'),
+    );
+    expect(configCalls.length).toBeGreaterThan(0);
+    const config = JSON.parse(String(configCalls[0]?.[1]));
+    expect(config.customField).toBe('keep-me');
+    expect(config.mode).toBe('max_plan'); // updated
+  });
+
+  it('does not add .deckent/ to .gitignore', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockImplementation((p) => {
+      if (String(p).includes('.gitignore')) return true;
+      return false;
+    });
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).includes('.gitignore')) return 'node_modules/\n';
+      return '';
+    });
+
+    await runCommand(registerInit, ['init']);
+
+    const gitignoreCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('.gitignore'),
+    );
+    if (gitignoreCalls.length > 0) {
+      const content = String(gitignoreCalls[0]?.[1]);
+      expect(content).not.toContain('.deckent/');
+    }
+  });
+
+  it('brain.md template has frontmatter and 13 rules', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const brainCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('brain.md'),
+    );
+    expect(brainCalls.length).toBeGreaterThan(0);
+    const content = String(brainCalls[0]?.[1]);
+    expect(content).toContain('paths:');
+    expect(content).toContain('.tasks/*');
+    expect(content).toContain('Sprint is NEVER left incomplete');
+  });
+
+  it('auditor.md template has frontmatter and rules', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const auditorCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('auditor.md'),
+    );
+    expect(auditorCalls.length).toBeGreaterThan(0);
+    const content = String(auditorCalls[0]?.[1]);
+    expect(content).toContain('paths:');
+    expect(content).toContain('.dashboard');
+    expect(content).toContain('NEVER write source code');
+  });
+
+  it('worker-default.md template has heartbeat and result rules', async () => {
+    const mockQuestion = vi.fn()
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('1')
+      .mockResolvedValueOnce('proj');
+    vi.mocked(createInterface).mockReturnValue({
+      question: mockQuestion,
+      close: vi.fn(),
+    } as unknown as ReturnType<typeof createInterface>);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue('');
+
+    await runCommand(registerInit, ['init']);
+
+    const workerCalls = vi.mocked(writeFileSync).mock.calls.filter(
+      c => String(c[0]).includes('worker-default.md'),
+    );
+    expect(workerCalls.length).toBeGreaterThan(0);
+    const content = String(workerCalls[0]?.[1]);
+    expect(content).toContain('paths:');
+    expect(content).toContain('heartbeat');
+    expect(content).toContain('result file');
   });
 });

@@ -1,6 +1,6 @@
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER } from './constants.js';
+import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE } from './constants.js';
 import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
 
@@ -83,4 +83,22 @@ export function generateDebtTable(items: DebtItem[]): string {
     `| ${d.id} | ${d.description} | ${d.originTaskId} | ${d.originSprintId} | ${d.priority} | ${d.sprintsOpen} | ${d.resolved} | ${d.resolvedInSprintId ?? '-'} | ${d.createdAt} |`,
   );
   return [DEBT_TABLE_HEADER, separator, ...rows].join('\n');
+}
+
+/**
+ * Ensure a file contains `@DECKENT.md` reference.
+ * - File doesn't exist → create with `@DECKENT.md\n`
+ * - File exists without reference → prepend `@DECKENT.md\n\n` to existing content
+ * - File exists with reference → no-op (idempotent)
+ */
+export function ensureDeckentImport(filePath: string): void {
+  const ref = `@${DECKENT_FILE}`;
+  if (existsSync(filePath)) {
+    const content = readFileSync(filePath, 'utf-8');
+    if (!content.includes(ref)) {
+      writeFileSync(filePath, `${ref}\n\n${content}`);
+    }
+  } else {
+    writeFileSync(filePath, `${ref}\n`);
+  }
 }

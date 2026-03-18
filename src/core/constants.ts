@@ -33,6 +33,7 @@ export const ARCHIVE_DIR = 'archive' as const;
 export const AGENTS_FILE = 'AGENTS.md' as const;
 export const CLAUDE_FILE = 'CLAUDE.md' as const;
 export const DIRECTIVES_FILE = 'DIRECTIVES.md' as const;
+export const DECKENT_FILE = 'DECKENT.md' as const;
 
 // ─── Timing ──────────────────────────────────────────────────────────
 export const AUDITOR_SCAN_INTERVAL_MS = 30_000 as const;

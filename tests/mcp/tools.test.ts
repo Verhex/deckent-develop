@@ -25,6 +25,7 @@ vi.mock('../../src/core/config.js', () => ({
 
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
+  ensureDeckentImport: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -507,6 +508,38 @@ describe('MCP Tools', () => {
       const parsed = JSON.parse(result.content[0]!.text);
 
       expect(parsed.sprints).toHaveLength(0);
+    });
+  });
+
+  describe('deckent_sync', () => {
+    it('syncs CLAUDE.md and AGENTS.md when DECKENT.md exists', async () => {
+      const { registerSyncTool } = await import('../../src/mcp/tools/sync.js');
+      const mock = createMockServer();
+      registerSyncTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(true);
+
+      const result = await mock.tools.get('deckent_sync')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.synced).toContain('CLAUDE.md');
+      expect(parsed.synced).toContain('AGENTS.md');
+    });
+
+    it('returns error when DECKENT.md is missing', async () => {
+      const { registerSyncTool } = await import('../../src/mcp/tools/sync.js');
+      const mock = createMockServer();
+      registerSyncTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const result = await mock.tools.get('deckent_sync')!.handler({});
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(parsed.success).toBe(false);
+      expect(parsed.error).toContain('DECKENT.md not found');
+      expect(result.isError).toBe(true);
     });
   });
 });

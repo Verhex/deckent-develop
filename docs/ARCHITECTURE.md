@@ -52,8 +52,9 @@ YOU (Operator) → writes DIRECTIVES.md
 
 ```
 project/
-├── AGENTS.md              # Master instructions (max ~80 lines)
-├── CLAUDE.md → AGENTS.md  # Symlink for Claude Code
+├── AGENTS.md              # @DECKENT.md adapter
+├── CLAUDE.md              # @DECKENT.md adapter for Claude Code
+├── DECKENT.md             # Single source of truth (agent config)
 ├── DIRECTIVES.md          # Operator commands
 ├── .deckent/              # Runtime config, workspace, plugins, i18n
 ├── .brain/                # Memory system (3 tiers)

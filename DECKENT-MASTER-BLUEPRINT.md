@@ -181,6 +181,7 @@ deckent plugin install <n> Install a skill/plugin
 deckent plugin list       List installed plugins
 deckent upgrade           Self-update
 deckent mcp               Start MCP server (stdio transport for Claude Code)
+deckent sync             Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference
 ```
 
 **Plan command flags:**
@@ -208,7 +209,7 @@ $ deckent init
   
   ? Project name: my-awesome-project
   
-  ✓ Created AGENTS.md (+ CLAUDE.md symlink)
+  ✓ Created DECKENT.md + AGENTS.md + CLAUDE.md (@DECKENT.md adapter)
   ✓ Created .deckent/config.json
   ✓ Created .deckent/workspace/
   ✓ Created .claude/rules/
@@ -241,8 +242,9 @@ Supported OS:
 
 ```
 my-project/
-├── AGENTS.md                          # Master agent instructions
-├── CLAUDE.md → AGENTS.md              # Symlink for Claude Code compat
+├── DECKENT.md                         # Single source of truth (agent config)
+├── AGENTS.md                          # @DECKENT.md adapter
+├── CLAUDE.md                          # @DECKENT.md adapter for Claude Code
 ├── DIRECTIVES.md                      # Operator commands (YOU write this)
 │
 ├── .deckent/                          # Deckent workspace
@@ -346,43 +348,58 @@ my-project/
 └── history/                           # Global sprint history for analytics
 ```
 
-## 4.3 AGENTS.md + CLAUDE.md Symlink
+## 4.3 DECKENT.md + Adapter Pattern
 
-This is the critical integration point. AGENTS.md is Deckent's master file. CLAUDE.md is a symlink to it, so Claude Code reads it natively.
+DECKENT.md is the single source of truth for agent configuration. CLAUDE.md and AGENTS.md are adapters that reference it via `@DECKENT.md` injection.
 
 ```bash
 # Created by `deckent init`
-ln -s AGENTS.md CLAUDE.md
+# DECKENT.md is generated (writeIfNotExists)
+# CLAUDE.md and AGENTS.md get @DECKENT.md prepended (ensureDeckentImport)
 ```
 
-AGENTS.md structure:
+DECKENT.md structure:
 
 ```markdown
-# Project: {name}
+# {projectName} — Deckent Orchestrated
 
 ## Identity
-{from .deckent/workspace/IDENTITY.md}
+@.deckent/workspace/IDENTITY.md
 
 ## Rules
-{core rules — max 50 lines}
+- Brain is the ONLY orchestrator — workers never plan
+- Workers stay within assigned scope (directories + filesWrite)
+- Auditor never writes source code
+- Sprint is NEVER left incomplete
+- Memory budget: 300 lines max in .brain/
 
-## Imports
+## Context
 @DIRECTIVES.md
 @.brain/MEMORY.md
 @.contracts/api-surface.md
 
-## Agent Instructions
+## Agent Roles
 When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md  
+When acting as Auditor: @.claude/rules/auditor.md
 When acting as Worker: @.claude/rules/worker-default.md
 
-## Commands
-Build: {command}
-Test: {command}
-Lint: {command}
+## Environment
+Build: tsc
+Test: npx vitest run
+Lint: tsc --noEmit
+
+## Boot
+@.deckent/workspace/BOOT.md
 ```
 
-Key: AGENTS.md is SHORT (~80 lines). Uses @imports for detail. Claude Code follows @imports natively.
+**Adapter injection pattern -- `ensureDeckentImport(filePath)`:**
+- File doesn't exist -> create with `@DECKENT.md\n`
+- File exists without `@DECKENT.md` -> prepend to existing content
+- File exists with `@DECKENT.md` -> no-op (idempotent)
+
+**Critical principle:** Deckent never deletes or resets user files. It only adds its own reference. Additive, not destructive.
+
+`deckent sync` regenerates adapters on demand. Future: `deckent sync --provider codex` for CODEX.md adapters.
 
 ---
 
@@ -1113,8 +1130,9 @@ Every file in the project, its purpose, who writes it, who reads it:
 
 | File | Purpose | Writer | Reader | Lifecycle |
 |------|---------|--------|--------|-----------|
-| AGENTS.md | Master instructions | deckent init + you | All agents | Permanent |
-| CLAUDE.md | Symlink → AGENTS.md | deckent init | Claude Code | Permanent |
+| AGENTS.md | @DECKENT.md adapter | deckent init (ensureDeckentImport) | All agents | Permanent |
+| CLAUDE.md | @DECKENT.md adapter | ensureDeckentImport() | Claude Code | Permanent |
+| DECKENT.md | Single source of truth (agent config) | deckent init (writeIfNotExists) | All agents via @import | Permanent |
 | DIRECTIVES.md | Your commands | You | Brain | Until you change |
 | .deckent/config.json | Runtime config | deckent init/config | All | Permanent |
 | .deckent/workspace/IDENTITY.md | Project identity | deckent init | Brain | Permanent |
@@ -1141,8 +1159,8 @@ Every file in the project, its purpose, who writes it, who reads it:
 | src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
-| src/mcp/tools/*.ts | MCP tool handlers (9) | Developer | MCP server | Permanent |
-| src/mcp/resources/*.ts | MCP resource handlers (4) | Developer | MCP server | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (10) | Developer | MCP server | Permanent |
+| src/mcp/resources/*.ts | MCP resource handlers (5) | Developer | MCP server | Permanent |
 | .deckent/workspace/TOOLS.md | Environment tools/commands | deckent init | Workers | Permanent |
 | .deckent/workspace/BOOT.md | Agent boot sequence | deckent init | All agents | Permanent |
 | .deckent/plugins/ | Installed plugins directory | deckent init | Plugin system | Permanent |
@@ -1234,6 +1252,19 @@ Deckent ran itself for the first time:
 - `.deckent/` structure finalization
 - 938 tests, 97.5% coverage
 
+## Sprint 15: Deckent Bağımsızlık + Self-Hosting
+
+- DECKENT.md as single source of truth (replaces AGENTS.md+CLAUDE.md symlink pattern)
+- `ensureDeckentImport()` shared utility (`src/core/utils.ts`): additive, never destructive
+- Init no longer overwrites CLAUDE.md — uses `ensureDeckentImport()` instead
+- Config merge pattern: existing `.deckent/config.json` preserved, new fields added
+- Blueprint-quality rule templates: brain.md (13 rules), auditor.md (9 rules), worker-default.md (9 rules) with frontmatter
+- `deckent sync` CLI command + `deckent_sync` MCP tool (10th tool)
+- `deckent://config` MCP resource (5th resource)
+- Self-hosting: deckent-dev runs own `.deckent/` structure
+- DEBT-002 closed (checkUsage resolved in sprint-003)
+- 967 tests, 97.5% coverage, 29 new tests, 0 regressions
+
 ---
 
 # 20. CLAUDE CODE INTEGRATION GUIDE
@@ -1242,8 +1273,8 @@ Deckent ran itself for the first time:
 
 When you open Claude Code in a Deckent project:
 
-1. Claude reads CLAUDE.md (which is symlink to AGENTS.md)
-2. AGENTS.md has @imports → Claude follows them:
+1. Claude reads CLAUDE.md (which contains `@DECKENT.md` reference)
+2. DECKENT.md has @imports → Claude follows them:
    - @DIRECTIVES.md
    - @.brain/MEMORY.md
    - @.contracts/api-surface.md
@@ -1345,7 +1376,7 @@ Both methods register in `.claude/settings.json`:
 }
 ```
 
-## Tools (9)
+## Tools (10)
 
 ### Lifecycle Tools
 
@@ -1371,7 +1402,13 @@ Both methods register in `.claude/settings.json`:
 |------|-------|---------|---------|
 | `deckent_analyze_project` | none | analyzeProject() | Analyze project stack, size, methodology recommendation |
 
-## Resources (4)
+### Sync Tools
+
+| Tool | Input | Maps To | Purpose |
+|------|-------|---------|---------|
+| `deckent_sync` | none | ensureDeckentImport() | Sync CLAUDE.md + AGENTS.md with @DECKENT.md reference |
+
+## Resources (5)
 
 | URI | Content | MIME Type |
 |-----|---------|-----------|
@@ -1379,6 +1416,7 @@ Both methods register in `.claude/settings.json`:
 | `deckent://directives` | Current DIRECTIVES.md | text/markdown |
 | `deckent://memory` | Learned patterns (.brain/MEMORY.md) | text/markdown |
 | `deckent://debt` | Tech debt items (parsed table → JSON) | application/json |
+| `deckent://config` | Project config (.deckent/config.json) | application/json |
 
 ## Auth Chain
 
@@ -1524,10 +1562,13 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 11 | 852 | 97% | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui |
 | 12-13 | 938 | 97.5% | Brain AI planning (planner.ts, Zod), Auditor in-process, .deckent structure |
 | 14 | 938 | 97.5% | Auditor live integration, .deckent finalization |
+| 15 | 967 | 97.5% | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 closed, 10 tool 5 resource |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
 **AI Planning milestone (Sprint 12-13):** Brain gained the ability to plan tasks using AI (Zod-validated) with automatic fallback to structured parsing. Auditor moved from separate tmux process to in-process scan loop within Brain.
+
+**Bağımsızlık milestone (Sprint 15):** DECKENT.md became the single source of truth. CLAUDE.md and AGENTS.md are now adapters that receive `@DECKENT.md` injection via `ensureDeckentImport()` -- additive, never destructive. Deckent now self-hosts with its own `.deckent/` structure.
 
 ---
 

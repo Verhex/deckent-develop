@@ -25,6 +25,7 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   return {
     ...actual,
     countBrainLines: vi.fn().mockReturnValue(100),
+    ensureDeckentImport: vi.fn(),
   };
 });
 

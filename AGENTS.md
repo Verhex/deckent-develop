@@ -1,3 +1,5 @@
+@DECKENT.md
+
 # Project: deckent
 
 ## Rules

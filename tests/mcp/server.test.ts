@@ -20,6 +20,7 @@ vi.mock('../../src/core/config.js', () => ({
 
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
+  ensureDeckentImport: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint15] - 2026-03-18
+
+### Added
+
+- **DECKENT.md** — Single source of truth for agent configuration (replaces AGENTS.md+CLAUDE.md symlink pattern)
+- **`ensureDeckentImport()`** (`src/core/utils.ts`): Shared utility for additive @DECKENT.md injection — never overwrites existing content
+- **`DECKENT_FILE` constant** (`src/core/constants.ts`)
+- **Init additive injection**: `deckent init` no longer overwrites CLAUDE.md — uses `ensureDeckentImport()` instead
+- **Config merge**: Existing `.deckent/config.json` fields preserved during re-init
+- **Blueprint-quality rule templates**: brain.md (13 rules + frontmatter), auditor.md (9 rules), worker-default.md (9 rules)
+- **`deckent sync`** CLI command: Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference
+- **`deckent_sync`** MCP tool (10th tool): Same functionality via MCP
+- **`deckent://config`** MCP resource (5th resource): Read project configuration via MCP
+- **Self-hosting**: deckent-dev now runs its own `.deckent/` structure (config, workspace, i18n, plugins)
+- **DEBT-002 closed**: checkUsage was resolved in sprint-003, debt entry formalized
+- **Test suite**: 967 tests (+29 new), 97.5% coverage, 0 regressions
+
 ## [0.1.0-sprint12-13] - 2026-03-18
 
 ### Added

@@ -90,7 +90,7 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SUNUCU (stdio)              │
-│  9 Araç + 4 Kaynak                                  │
+│  10 Araç + 5 Kaynak                                 │
 │  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -181,6 +181,7 @@ deckent plugin install <n> Yetenek/eklenti kur
 deckent plugin list       Kurulu eklentileri listele
 deckent upgrade           Kendini güncelle
 deckent mcp               MCP sunucuyu başlat (Claude Code için stdio transport)
+deckent sync             Adaptör dosyalarını DECKENT.md referansıyla senkronize et
 ```
 
 ## 3.3 Sistem Gereksinimleri
@@ -207,8 +208,9 @@ Desteklenen İşletim Sistemleri:
 
 ```
 my-project/
-├── AGENTS.md                          # Ana ajan talimatları
-├── CLAUDE.md → AGENTS.md              # Claude Code uyumluluğu için symlink
+├── AGENTS.md                          # @DECKENT.md adaptörü
+├── CLAUDE.md                          # @DECKENT.md adaptörü (Claude Code için)
+├── DECKENT.md                         # Tek gerçek kaynak (ajan yapılandırması)
 ├── DIRECTIVES.md                      # Operatör komutları (SİZ yazarsınız)
 │
 ├── .deckent/                          # Deckent çalışma alanı
@@ -247,8 +249,8 @@ my-project/
 │   ├── cli/                          # CLI komutları (commander.js, 21 dosya)
 │   ├── mcp/                          # MCP sunucu entegrasyonu
 │   │   ├── server.ts                # Giriş noktası (McpServer + stdio)
-│   │   ├── tools/                   # 9 araç işleyicisi
-│   │   └── resources/               # 4 kaynak işleyicisi
+│   │   ├── tools/                   # 10 araç işleyicisi
+│   │   └── resources/               # 5 kaynak işleyicisi
 │   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
 │       └── src/                     # 4 sayfa, 14 UI bileşeni, SSE
 ├── tests/                             # Birim + entegrasyon testleri
@@ -269,6 +271,8 @@ my-project/
 - **Web Dashboard:** Tamamlandı (Sprint 11) — React+Vite+Tailwind, 4 sayfa, shadcn/ui, SSE
 - **HTTP API:** Tamamlandı (Sprint 10) — 15 uç nokta + SSE, `deckent serve` / `deckent web`
 - **Worker heartbeat:** `buildWorkerPrompt` artık `.tasks/task-{id}.hb` dosyası oluşturma talimatı içeriyor.
+- **DECKENT.md adaptör deseni** (Sprint 15): DECKENT.md tek gerçek kaynak. CLAUDE.md ve AGENTS.md artık symlink değil, `ensureDeckentImport()` ile `@DECKENT.md` enjekte ediliyor (katkısal, asla yıkıcı değil).
+- **`deckent sync` komutu** (Sprint 15): Adaptör dosyalarını (CLAUDE.md, AGENTS.md) DECKENT.md referansıyla senkronize eder.
 
 ---
 
@@ -278,8 +282,9 @@ Her dosya, amacı, yazarı ve okuyucusu:
 
 | Dosya | Amaç | Yazan | Okuyan | Yaşam Döngüsü |
 |-------|------|-------|--------|----------------|
-| AGENTS.md | Ana talimatlar | deckent init + siz | Tüm ajanlar | Kalıcı |
-| CLAUDE.md | Symlink → AGENTS.md | deckent init | Claude Code | Kalıcı |
+| AGENTS.md | @DECKENT.md adaptörü | deckent init (ensureDeckentImport) | Tüm ajanlar | Kalıcı |
+| CLAUDE.md | @DECKENT.md adaptörü | ensureDeckentImport() | Claude Code | Kalıcı |
+| DECKENT.md | Tek gerçek kaynak (ajan yapılandırması) | deckent init (writeIfNotExists) | Tüm ajanlar (@import ile) | Kalıcı |
 | DIRECTIVES.md | Komutlarınız | Siz / MCP | Brain | Siz değiştirene kadar |
 | .deckent/config.json | Çalışma zamanı yapılandırması | deckent init/config | Hepsi | Kalıcı |
 | .brain/MEMORY.md | Öğrenilen kalıplar | Brain | Hepsi (@import) | Zayıflama: 3 sprint |
@@ -299,8 +304,8 @@ Her dosya, amacı, yazarı ve okuyucusu:
 | src/api/watcher.ts | Dashboard dosya izleyici | Geliştirici | API sunucu | Kalıcı |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Geliştirici | Tarayıcı | Kalıcı |
 | src/mcp/server.ts | MCP sunucu giriş noktası | Geliştirici | Claude Code | Kalıcı |
-| src/mcp/tools/*.ts | MCP araç işleyicileri (9) | Geliştirici | MCP sunucu | Kalıcı |
-| src/mcp/resources/*.ts | MCP kaynak işleyicileri (4) | Geliştirici | MCP sunucu | Kalıcı |
+| src/mcp/tools/*.ts | MCP araç işleyicileri (10) | Geliştirici | MCP sunucu | Kalıcı |
+| src/mcp/resources/*.ts | MCP kaynak işleyicileri (5) | Geliştirici | MCP sunucu | Kalıcı |
 | .deckent/workspace/TOOLS.md | Ortam araçları/komutları | deckent init | Worker'lar | Kalıcı |
 | .deckent/workspace/BOOT.md | Ajan başlatma sırası | deckent init | Tüm ajanlar | Kalıcı |
 | .deckent/plugins/ | Kurulu eklentiler dizini | deckent init | Eklenti sistemi | Kalıcı |
@@ -392,14 +397,27 @@ Deckent ilk kez kendini çalıştırdı:
 - `.deckent/` yapı sonlandırması
 - 938 test, %97.5 kapsam
 
+## Sprint 15: Deckent Bağımsızlık + Self-Hosting
+
+- DECKENT.md tek gerçek kaynak olarak belirlendi (AGENTS.md+CLAUDE.md symlink deseninin yerini aldı)
+- `ensureDeckentImport()` paylaşımlı yardımcı (`src/core/utils.ts`): katkısal, asla yıkıcı değil
+- Init artık CLAUDE.md'yi üzerine yazmıyor — `ensureDeckentImport()` kullanıyor
+- Yapılandırma birleştirme: mevcut `.deckent/config.json` alanları korunuyor
+- Blueprint kalitesinde kural şablonları: brain.md (13 kural), auditor.md (9 kural), worker-default.md (9 kural) frontmatter ile
+- `deckent sync` CLI komutu + `deckent_sync` MCP aracı (10. araç)
+- `deckent://config` MCP kaynağı (5. kaynak)
+- Self-hosting: deckent-dev kendi `.deckent/` yapısını çalıştırıyor
+- DEBT-002 kapatıldı (checkUsage sprint-003'te çözüldü)
+- 967 test, %97.5 kapsam, 29 yeni test, 0 regresyon
+
 ---
 
 # 20. CLAUDE CODE ENTEGRASYON REHBERİ
 
 Claude Code bir Deckent projesini şöyle görür:
 
-1. Claude, CLAUDE.md'yi okur (AGENTS.md'ye symlink)
-2. AGENTS.md'de @import'lar var → Claude bunları takip eder
+1. Claude, CLAUDE.md'yi okur (@DECKENT.md referansını takip eder)
+2. DECKENT.md'de @import'lar var → Claude bunları takip eder
 3. .claude/rules/ dosyaları bağlama göre etkinleşir
 4. MCP sunucu kaydı sayesinde deckent araçları doğal dille çağrılabilir
 
@@ -431,7 +449,7 @@ deckent init
 claude mcp add deckent -- npx deckent mcp
 ```
 
-## Araçlar (9)
+## Araçlar (10)
 
 ### Yaşam Döngüsü Araçları
 
@@ -451,8 +469,9 @@ claude mcp add deckent -- npx deckent mcp
 | `deckent_retro` | yok | RETRO.md okur | Son sprint retrospektifi |
 | `deckent_history` | last?: number | .brain/sprints/ okur | Sprint geçmişi logları |
 | `deckent_analyze_project` | yok | analyzeProject() | Proje yığın/boyut/metodoloji analizi |
+| `deckent_sync` | yok | ensureDeckentImport() | CLAUDE.md + AGENTS.md'yi @DECKENT.md ile senkronize et |
 
-## Kaynaklar (4)
+## Kaynaklar (5)
 
 | URI | İçerik | MIME Tipi |
 |-----|--------|-----------|
@@ -460,6 +479,7 @@ claude mcp add deckent -- npx deckent mcp
 | `deckent://directives` | Mevcut DIRECTIVES.md | text/markdown |
 | `deckent://memory` | Öğrenilen kalıplar (.brain/MEMORY.md) | text/markdown |
 | `deckent://debt` | Teknik borç kalemleri (tablo → JSON) | application/json |
+| `deckent://config` | Proje yapılandırması (.deckent/config.json) | application/json |
 
 ## Kritik Tasarım Kararı: deckent_set_directives
 
@@ -540,8 +560,9 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 11 | Web Dashboard (React+Vite+Tailwind, 4 sayfa) | Tamamlandı |
 | 12-13 | Brain AI planlaması, Auditor süreç-içi, .deckent yapısı | Tamamlandı |
 | 14 | Auditor canlı entegrasyon, .deckent sonlandırma | Tamamlandı |
+| 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Tamamlandı |
 
-**Çıkış kriterleri:** 938+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama.
+**Çıkış kriterleri:** 967+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama, DECKENT.md bağımsızlık.
 
 ## Aşama 2: Sağlayıcı Soyutlama (Sprint 9-12)
 
@@ -580,10 +601,13 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 11 | 852 | %97 | Web Dashboard: React+Vite+Tailwind, 4 sayfa, shadcn/ui |
 | 12-13 | 938 | %97.5 | Brain AI planlaması (planner.ts, Zod), Auditor süreç-içi, .deckent yapısı |
 | 14 | 938 | %97.5 | Auditor canlı entegrasyon, .deckent sonlandırma |
+| 15 | 967 | %97.5 | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 kapatıldı, 10 araç 5 kaynak |
 
 **İlk dogfooding sonucu (Sprint 6):** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Orkestrasyon döngüsü (planla → başlat → yürüt → değerlendir → retro → temizle) uçtan uca tamamlandı.
 
 **AI Planlama dönüm noktası (Sprint 12-13):** Brain, AI ile görev planlama yeteneği kazandı (Zod doğrulamalı). Başarısız olursa otomatik olarak yapısal ayrıştırmaya düşer. Auditor ayrı tmux sürecinden Brain içi tarama döngüsüne taşındı.
+
+**Bağımsızlık dönüm noktası (Sprint 15):** DECKENT.md tek gerçek kaynak oldu. CLAUDE.md ve AGENTS.md artık `ensureDeckentImport()` ile `@DECKENT.md` enjeksiyonu alan adaptörler — katkısal, asla yıkıcı değil. Deckent artık kendi `.deckent/` yapısıyla self-hosting yapıyor.
 
 ---
 

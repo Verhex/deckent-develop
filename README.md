@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-938+ tests | 97.5% coverage | 14 sprints completed
+967+ tests | 97.5% coverage | 15 sprints completed
 
 Deckent is a self-evolving AI agent orchestration system. Write directives in plain language — Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
 
@@ -87,10 +87,11 @@ $ deckent init
 | `deckent serve` | Start HTTP API server (SSE) |
 | `deckent web` | Web dashboard + API server (localhost:3100) |
 | `deckent upgrade` | Self-update Deckent |
+| `deckent sync` | Sync adapter files with DECKENT.md reference |
 
 ## MCP Integration
 
-Deckent integrates into Claude Code via 9 MCP tools + 4 resources. Register with:
+Deckent integrates into Claude Code via 10 MCP tools + 5 resources. Register with:
 
 ```bash
 claude mcp add deckent -- npx deckent mcp
@@ -122,8 +123,9 @@ After `deckent init`, your project will contain:
 
 ```
 my-project/
-├── AGENTS.md           # Master agent instructions
-├── CLAUDE.md           # Symlink to AGENTS.md (Claude Code compatibility)
+├── AGENTS.md           # @DECKENT.md adapter
+├── CLAUDE.md           # @DECKENT.md adapter (Claude Code compatibility)
+├── DECKENT.md          # Single source of truth (agent config)
 ├── DIRECTIVES.md       # Your goals — edit this before each sprint
 └── .deckent/
     ├── config.json     # Runtime config (mode, models, limits)

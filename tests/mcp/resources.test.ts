@@ -25,6 +25,7 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   return {
     ...actual,
     countBrainLines: vi.fn().mockReturnValue(100),
+    ensureDeckentImport: vi.fn(),
   };
 });
 
@@ -218,6 +219,55 @@ describe('MCP Resources', () => {
 
       const items = JSON.parse(result.contents[0]!.text);
       expect(items).toHaveLength(0);
+    });
+  });
+
+  describe('deckent://config', () => {
+    it('returns config JSON when file exists', async () => {
+      const { registerConfigResource } = await import('../../src/mcp/resources/config.js');
+      const mock = createMockServer();
+      registerConfigResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const configContent = JSON.stringify({ mode: 'max_plan', language: 'tr', projectName: 'test' });
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(configContent);
+
+      const handler = mock.resources.get('config')!.handler;
+      const result = await handler(new URL('deckent://config'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.mode).toBe('max_plan');
+      expect(parsed.projectName).toBe('test');
+      expect(result.contents[0]!.mimeType).toBe('application/json');
+    });
+
+    it('returns error when config file is missing', async () => {
+      const { registerConfigResource } = await import('../../src/mcp/resources/config.js');
+      const mock = createMockServer();
+      registerConfigResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const handler = mock.resources.get('config')!.handler;
+      const result = await handler(new URL('deckent://config'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.error).toContain('Config not found');
+    });
+
+    it('returns error when config is invalid JSON', async () => {
+      const { registerConfigResource } = await import('../../src/mcp/resources/config.js');
+      const mock = createMockServer();
+      registerConfigResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('not valid json{{{');
+
+      const handler = mock.resources.get('config')!.handler;
+      const result = await handler(new URL('deckent://config'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.error).toContain('Cannot parse config');
     });
   });
 });

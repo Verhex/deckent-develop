@@ -1,0 +1,8 @@
+{
+  "sprint_started": "Sprint {id} started with {count} tasks",
+  "sprint_complete": "Sprint {id} complete",
+  "task_done": "Task {id}: DONE",
+  "task_nogo": "Task {id}: NO_GO",
+  "plan_approved": "Plan approved",
+  "plan_rejected": "Plan rejected"
+}

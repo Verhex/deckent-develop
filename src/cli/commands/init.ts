@@ -15,12 +15,14 @@ import {
   DIRECTIVES_FILE,
   AGENTS_FILE,
   CLAUDE_FILE,
+  DECKENT_FILE,
   MEMORY_FILE,
   DECISIONS_FILE,
   DEBT_FILE,
   PATTERNS_FILE,
   RETRO_FILE,
 } from '../../core/constants.js';
+import { ensureDeckentImport } from '../../core/utils.js';
 import { promptText, promptSelect } from '../helpers/prompt.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -101,54 +103,91 @@ export function registerInit(program: Command): void {
         ensureDir(join(root, PLUGINS_DIR));
         ensureDir(join(root, I18N_DIR));
 
-        // 5. Config
-        const config = {
-          mode,
-          language,
-          projectName,
-        };
-        writeFileSync(
-          join(root, DECKENT_DIR, 'config.json'),
-          JSON.stringify(config, null, 2) + '\n',
-        );
+        // 5. Config (merge — preserve existing fields)
+        const configPath = join(root, DECKENT_DIR, 'config.json');
+        const newConfig: Record<string, unknown> = { mode, language, projectName };
+        if (existsSync(configPath)) {
+          try {
+            const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+            Object.assign(existing, newConfig);
+            writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
+          } catch {
+            writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
+          }
+        } else {
+          writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
+        }
 
-        // 6. Agent files
-        const agentsContent = `# ${projectName}\n\n## Rules\n\n@DIRECTIVES.md\n@.brain/MEMORY.md\n`;
-        writeIfNotExists(join(root, AGENTS_FILE), agentsContent);
-        writeFileSync(join(root, CLAUDE_FILE), agentsContent);
+        // 6. DECKENT.md (single source of truth — writeIfNotExists)
+        const deckentContent = `# ${projectName} — Deckent Orchestrated
 
-        // 7. Claude rules
+## Identity
+@.deckent/workspace/IDENTITY.md
+
+## Rules
+- Brain is the ONLY orchestrator — workers never plan
+- Workers stay within assigned scope (directories + filesWrite)
+- Auditor never writes source code
+- Sprint is NEVER left incomplete
+- Memory budget: 300 lines max in .brain/
+
+## Context
+@DIRECTIVES.md
+@.brain/MEMORY.md
+@.contracts/api-surface.md
+
+## Agent Roles
+When acting as Brain: @.claude/rules/brain.md
+When acting as Auditor: @.claude/rules/auditor.md
+When acting as Worker: @.claude/rules/worker-default.md
+
+## Environment
+Build: tsc
+Test: npx vitest run
+Lint: tsc --noEmit
+
+## Boot
+@.deckent/workspace/BOOT.md
+`;
+        writeIfNotExists(join(root, DECKENT_FILE), deckentContent);
+
+        // 7. Agent files — additive injection, never overwrite
+        writeIfNotExists(join(root, AGENTS_FILE), `@${DECKENT_FILE}\n`);
+        ensureDeckentImport(join(root, AGENTS_FILE));
+        ensureDeckentImport(join(root, CLAUDE_FILE));
+
+        // 8. Claude rules (blueprint-quality templates with frontmatter)
         writeIfNotExists(
           join(root, CLAUDE_RULES_DIR, 'brain.md'),
-          '# Brain Rules\n- Read DIRECTIVES.md first\n- Plan before executing\n',
+          `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 100 lines)\n- Write RETRO.md (overwrite, max 60 lines)\n- Trigger decay if .brain/ exceeds 300 lines\n- Sprint is NEVER left incomplete\n`,
         );
         writeIfNotExists(
           join(root, CLAUDE_RULES_DIR, 'auditor.md'),
-          '# Auditor Rules\n- Never write source code\n- Scan every 30 seconds\n',
+          `---\npaths: [".dashboard", ".brain/PATTERNS.md"]\n---\n# Auditor Rules\n- NEVER write source code\n- Scan every 30 seconds\n- Read all heartbeat files → detect stale agents (>2min = alert)\n- Run git diff --stat → detect boundary violations\n- Check .locks/ → detect stale locks (>5min)\n- Detect circular dependencies / deadlocks\n- Overwrite .dashboard on every scan (never append)\n- Append new patterns to PATTERNS.md (never overwrite)\n- Write alerts for critical issues\n`,
         );
         writeIfNotExists(
           join(root, CLAUDE_RULES_DIR, 'worker-default.md'),
-          '# Worker Rules\n- Read your task file first\n- Stay within assigned scope\n',
+          `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run tests before marking done (npx vitest run)\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`,
         );
 
-        // 8. DIRECTIVES.md
+        // 9. DIRECTIVES.md
         writeIfNotExists(
           join(root, DIRECTIVES_FILE),
           `# Directives\n\nDescribe your project goals and architecture here.\nBrain reads this before every sprint.\n`,
         );
 
-        // 9. Brain files
+        // 10. Brain files
         writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
         writeIfNotExists(join(root, BRAIN_DIR, DECISIONS_FILE), '# Architecture Decisions\n');
         writeIfNotExists(join(root, BRAIN_DIR, DEBT_FILE), '# Tech Debt\n');
         writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
         writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
 
-        // 9b. Workspace: TOOLS.md + BOOT.md
+        // 10b. Workspace: TOOLS.md + BOOT.md
         writeIfNotExists(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));
         writeIfNotExists(join(root, WORKSPACE_DIR, 'BOOT.md'), `# Boot Sequence\n\n1. Brain reads DIRECTIVES.md\n2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS)\n3. Brain plans sprint\n4. Workers spawned, auditor scan loop starts\n5. Workers execute tasks, write heartbeats\n6. Brain waits for results, evaluates\n7. Sprint complete\n`);
 
-        // 9c. i18n
+        // 10c. i18n
         const enMessages = {
           sprint_started: 'Sprint {id} started with {count} tasks',
           sprint_complete: 'Sprint {id} complete',
@@ -168,9 +207,8 @@ export function registerInit(program: Command): void {
         writeIfNotExists(join(root, I18N_DIR, 'en.json'), JSON.stringify(enMessages, null, 2) + '\n');
         writeIfNotExists(join(root, I18N_DIR, 'tr.json'), JSON.stringify(trMessages, null, 2) + '\n');
 
-        // 10. .gitignore
+        // 11. .gitignore (no longer adds .deckent/ — it should be tracked)
         appendToGitignore(root, [
-          DECKENT_DIR + '/',
           TASKS_DIR + '/',
           LOCKS_DIR + '/',
           DASHBOARD_FILE,
