@@ -26,7 +26,7 @@ import {
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { countBrainLines, getNextSprintId, parseDebtTable, generateDebtTable, updateLastSprintId } from '../core/utils.js';
+import { countBrainLines, getNextSprintId, parseDebtTable, generateDebtTable, updateLastSprintId, shouldRemoveResolvedDebt } from '../core/utils.js';
 
 // ─── Core — config ────────────────────────────────────────────────
 import { resolveEffectiveWorkers } from '../core/config.js';
@@ -481,12 +481,24 @@ export function planSprint(
     );
 
     if (plannerResult) {
-      usedMode = 'ai';
-      for (const pt of plannerResult.tasks) {
-        tasks.push(createTask(
-          plannerTaskToParams(pt, sprintId, defaultModel, initialStatus),
-          seq++,
-        ));
+      // POST-VALIDATION: AI planner tüm görevleri planlıyor mu?
+      const directiveTaskCount = parseStructuredDirectives(context.directives).length;
+      if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length < directiveTaskCount) {
+        // AI yetersiz — structured fallback'e düş
+        console.error(
+          `[Brain] AI planner returned ${plannerResult.tasks.length} tasks, ` +
+          `but directives contain ${directiveTaskCount}. Falling back to structured mode.`,
+        );
+        plannerResult = null;
+        usedMode = 'fallback';
+      } else {
+        usedMode = 'ai';
+        for (const pt of plannerResult.tasks) {
+          tasks.push(createTask(
+            plannerTaskToParams(pt, sprintId, defaultModel, initialStatus),
+            seq++,
+          ));
+        }
       }
     } else if (planMode === 'ai') {
       throw new BrainError('AI planner failed', SprintPhase.PLAN);
@@ -1092,15 +1104,15 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
     }
   }
 
-  // 2. Remove resolved debt
+  // 2. Remove resolved debt (with retention window — keep entries resolved < 3 sprints ago)
   const debtPath = join(brainPath, DEBT_FILE);
   const debtContent = readFileSafe(debtPath);
   if (debtContent) {
     const items = parseDebtTable(debtContent);
-    const resolved = items.filter(d => d.resolved);
-    removedDebtCount = resolved.length;
-    const openItems = items.filter(d => !d.resolved);
-    writeFileSync(debtPath, generateDebtTable(openItems), 'utf-8');
+    const toRemove = items.filter(d => shouldRemoveResolvedDebt(d, sprintId, 3));
+    removedDebtCount = toRemove.length;
+    const keptItems = items.filter(d => !shouldRemoveResolvedDebt(d, sprintId, 3));
+    writeFileSync(debtPath, generateDebtTable(keptItems), 'utf-8');
   }
 
   // 3. Archive old sprint logs (keep last 2)

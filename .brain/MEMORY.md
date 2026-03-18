@@ -1,10 +1,3 @@
-# Learned Patterns
-
-## Wave 1 Learnings (Sprint 1, 2026-03-16)
-
-- `@types/node` is required as devDependency for Node.js type declarations (`node:fs`, `node:path`, `structuredClone`)
-- `tsconfig.json` needs `"types": ["node"]` for explicit type resolution with `"lib": ["ES2022"]`
-- `deepMerge` with strict TypeScript generics requires runtime casts — keep the public API clean, use `Record<string, unknown>` internally
 - `structuredClone` is available at runtime in Node 18+ but needs `@types/node` for compile-time types
 - Config validation should collect all errors (not fail-fast) for better developer experience
 - `memfs` not needed for config tests — `vi.mock('node:fs')` with `mockImplementation` is simpler and sufficient
@@ -90,3 +83,18 @@
 - MCP Resource Listesi ve Açıklamaları: GO_WITH_TECH_DEBT
 ## Sprint sprint-021 Learnings
 - subscription.ts — Claude Plan Tespiti: GO_WITH_TECH_DEBT
+## Sprint sprint-022 Learnings
+- MCP Enrichment — doctor + init + retro + history + sync + analyze: GO_WITH_TECH_DEBT
+- doctor --profile Flag: GO_WITH_TECH_DEBT
+- Planner Fix Verification: GO_WITH_TECH_DEBT
+## Sprint sprint-023 Learnings
+- MCP Enrichment Tools Batch 1 Doğrulama: GO_WITH_TECH_DEBT
+- Doctor Profile Flag Doğrulama: GO_WITH_TECH_DEBT
+## Sprint sprint-023 Learnings
+- MCP Enrichment Tools Batch 1 Doğrulama: GO_WITH_TECH_DEBT
+- MCP Enrichment Tools Batch 2 Doğrulama: GO_WITH_TECH_DEBT
+## Sprint sprint-023 Learnings
+- AI Planner Post-Validation Fallback Fix (TAMAMLANDI): GO_WITH_TECH_DEBT
+- MCP Enrichment Infrastructure Doğrulama: GO_WITH_TECH_DEBT
+- Doctor Profile Flag Doğrulama: GO_WITH_TECH_DEBT
+- Sprint History Karşılaştırma: GO_WITH_TECH_DEBT

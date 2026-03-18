@@ -3,6 +3,35 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { readContext, checkUsage, adjustSprintSize, planSprint } from '../../orchestra/brain.js';
 import type { BrainPlanningMode } from '../../core/types.js';
+import { enrichResponse } from '../helpers/enrich.js';
+
+function computeWaveBreakdown(taskCount: number, maxWorkers: number): Record<string, number> {
+  const waves: Record<string, number> = {};
+  let remaining = taskCount;
+  let wave = 1;
+  while (remaining > 0) {
+    const inWave = Math.min(remaining, maxWorkers);
+    waves[`wave${wave}`] = inWave;
+    remaining -= inWave;
+    wave++;
+  }
+  return waves;
+}
+
+function computeModelDistribution(tasks: Array<{ model: string }>): Record<string, number> {
+  const dist: Record<string, number> = { opus: 0, sonnet: 0, haiku: 0 };
+  for (const t of tasks) {
+    const m = t.model ?? 'sonnet';
+    dist[m] = (dist[m] ?? 0) + 1;
+  }
+  return dist;
+}
+
+function computeRiskAssessment(taskCount: number): string {
+  if (taskCount <= 3) return 'low';
+  if (taskCount <= 8) return 'medium';
+  return 'high';
+}
 
 export function registerPlanTool(server: McpServer): void {
   server.registerTool(
@@ -32,21 +61,30 @@ export function registerPlanTool(server: McpServer): void {
         priority: t.priority,
       }));
 
+      const waveBreakdown = computeWaveBreakdown(tasks.length, recommendation.maxWorkers);
+      const modelDistribution = computeModelDistribution(tasks);
+      const riskAssessment = computeRiskAssessment(tasks.length);
+
+      const baseResponse = {
+        sprintId: sprint.id,
+        sprintNumber: sprint.number,
+        tasks,
+        recommendation: {
+          size: recommendation.size,
+          maxWorkers: recommendation.maxWorkers,
+          reason: recommendation.reason,
+        },
+        reasoning: sprint.reasoning,
+        planningMode: sprint.planningMode,
+        waveBreakdown,
+        modelDistribution,
+        riskAssessment,
+      };
+
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify({
-            sprintId: sprint.id,
-            sprintNumber: sprint.number,
-            tasks,
-            recommendation: {
-              size: recommendation.size,
-              maxWorkers: recommendation.maxWorkers,
-              reason: recommendation.reason,
-            },
-            reasoning: sprint.reasoning,
-            planningMode: sprint.planningMode,
-          }),
+          text: JSON.stringify(enrichResponse('plan', baseResponse)),
         }],
       };
     },

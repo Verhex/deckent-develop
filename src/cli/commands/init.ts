@@ -2,6 +2,10 @@ import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { PlanMode } from '../../core/types.js';
+import { generateSetupRecommendation } from '../auto-setup.js';
+import { getSystemProfile } from '../../core/system-profile.js';
+import { detectSubscription } from '../../core/subscription.js';
+import { analyzeProject } from '../../core/analyzer.js';
 import {
   DECKENT_DIR,
   BRAIN_DIR,
@@ -70,27 +74,57 @@ export function registerInit(program: Command): void {
   program
     .command('init')
     .description('Initialize a new Deckent project')
-    .action(async () => {
+    .option('--auto', 'Auto-detect system, subscription, and project to generate recommendations')
+    .option('--manual', 'Skip auto-detection, use interactive prompts only')
+    .action(async (options: { auto?: boolean; manual?: boolean }) => {
       const root = resolveProjectRoot();
 
       try {
-        // 1. Plan selection
-        const mode = await promptSelect<PlanMode>('Select your Claude plan:', [
-          { label: 'Max ($200/mo) — 8 workers, Opus brain', value: 'max_plan' },
-          { label: 'Max 5x ($100/mo) — 5 workers, Sonnet brain', value: 'max5x_plan' },
-          { label: 'Pro ($20/mo) — 3 workers, Sonnet only', value: 'pro_plan' },
-          { label: 'API (pay-as-you-go) — 10 workers, any model', value: 'api' },
-        ]);
+        let mode: PlanMode;
+        let language: string;
+        let projectName: string;
 
-        // 2. Language
-        const language = await promptSelect('Select language:', [
-          { label: 'English', value: 'en' },
-          { label: 'Türkçe', value: 'tr' },
-        ]);
-
-        // 3. Project name
         const dirName = root.split(/[\\/]/).pop() ?? 'my-project';
-        const projectName = await promptText('Project name', dirName);
+
+        if (options.auto && !options.manual) {
+          // Auto-detect mode
+          print('Auto-detecting system, subscription, and project...');
+          const systemProfile = getSystemProfile();
+          const subscription = detectSubscription();
+          const analysis = analyzeProject(root);
+
+          const recommendation = generateSetupRecommendation(
+            systemProfile,
+            subscription.detected,
+            analysis,
+          );
+
+          print('');
+          print('Recommendation:');
+          for (const reason of recommendation.reasons) {
+            print(`  • ${reason}`);
+          }
+          print('');
+
+          mode = recommendation.mode;
+          language = 'en';
+          projectName = dirName;
+        } else {
+          // Interactive mode (default or --manual)
+          mode = await promptSelect<PlanMode>('Select your Claude plan:', [
+            { label: 'Max ($200/mo) — 8 workers, Opus brain', value: 'max_plan' },
+            { label: 'Max 5x ($100/mo) — 5 workers, Sonnet brain', value: 'max5x_plan' },
+            { label: 'Pro ($20/mo) — 3 workers, Sonnet only', value: 'pro_plan' },
+            { label: 'API (pay-as-you-go) — 10 workers, any model', value: 'api' },
+          ]);
+
+          language = await promptSelect('Select language:', [
+            { label: 'English', value: 'en' },
+            { label: 'Türkçe', value: 'tr' },
+          ]);
+
+          projectName = await promptText('Project name', dirName);
+        }
 
         // 4. Create directories
         ensureDir(join(root, DECKENT_DIR));

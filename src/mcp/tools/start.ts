@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { runSprint, BrainError } from '../../orchestra/brain.js';
 import { writeJobState } from './job-runner.js';
+import { enrichResponse } from '../helpers/enrich.js';
 
 export function registerStartTool(server: McpServer): void {
   server.registerTool(
@@ -47,15 +48,20 @@ export function registerStartTool(server: McpServer): void {
           });
         });
 
+        const startResponse = enrichResponse('start', {
+          success: true,
+          jobId,
+          status: 'RUNNING',
+          message: 'Sprint started in background. Use deckent_status to track progress.',
+          activeWorkers: 0,
+          queuedTasks: 0,
+          estimatedDuration: '~10-30 minutes',
+        });
+
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({
-              success: true,
-              jobId,
-              status: 'RUNNING',
-              message: 'Sprint started in background. Use deckent_status to track progress.',
-            }),
+            text: JSON.stringify(startResponse),
           }],
         };
       } catch (error) {

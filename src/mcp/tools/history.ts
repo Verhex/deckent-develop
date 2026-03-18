@@ -3,6 +3,25 @@ import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
+import { enrichResponse } from '../helpers/enrich.js';
+
+function detectTrend(sprints: Array<{ id: string; content: string }>): string {
+  if (sprints.length < 2) return 'insufficient_data';
+  const taskCounts = sprints.map((s) => {
+    const match = s.content.match(/(\d+)\/(\d+)\s*(tasks?|görev)/i);
+    if (match) return { done: parseInt(match[1]!, 10), total: parseInt(match[2]!, 10) };
+    return null;
+  }).filter(Boolean) as Array<{ done: number; total: number }>;
+
+  if (taskCounts.length < 2) return 'insufficient_data';
+  const last = taskCounts[taskCounts.length - 1]!;
+  const prev = taskCounts[taskCounts.length - 2]!;
+  const lastRate = last.total > 0 ? last.done / last.total : 0;
+  const prevRate = prev.total > 0 ? prev.done / prev.total : 0;
+  if (lastRate > prevRate) return 'improving';
+  if (lastRate < prevRate) return 'declining';
+  return 'stable';
+}
 
 export function registerHistoryTool(server: McpServer): void {
   server.registerTool(
@@ -20,7 +39,7 @@ export function registerHistoryTool(server: McpServer): void {
 
       if (!existsSync(sprintsDir)) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ sprints: [] }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(enrichResponse('history', { sprints: [], trend: 'insufficient_data' })) }],
         };
       }
 
@@ -34,8 +53,11 @@ export function registerHistoryTool(server: McpServer): void {
         content: readFileSync(join(sprintsDir, f), 'utf-8'),
       }));
 
+      const trend = detectTrend(sprints);
+      const enriched = enrichResponse('history', { sprints, trend });
+
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ sprints }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
       };
     },
   );

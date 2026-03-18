@@ -671,6 +671,120 @@ describe('planSprint', () => {
     expect(sprint).toHaveProperty('reasoning');
     expect(sprint).toHaveProperty('planningMode');
   });
+
+  // ─── AI Post-Validation Fallback Tests ─────────────────────────────
+  const structuredDirective12 = Array.from({ length: 12 }, (_, i) =>
+    `## Görev ${i + 1}: Task ${i + 1}\n- Dosya: src/file${i}.ts\n- Kapsam: src/\n\nDescription ${i + 1}`
+  ).join('\n\n');
+
+  function makeAiResult(count: number) {
+    return {
+      tasks: Array.from({ length: count }, (_, i) => ({
+        title: `AI Task ${i + 1}`, description: `From AI ${i + 1}`, model: 'sonnet' as const,
+        effort: 'normal' as const, priority: 'NORMAL' as const, reason: 'AI decided',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        dependencies: [], goNogo: { goCriteria: 'Pass', noGoCriteria: 'Fail', techDebtAcceptable: 'Minor' },
+      })),
+      reasoning: 'AI reasoning',
+    };
+  }
+
+  it('mode=auto falls back when AI returns fewer tasks than directives (8 vs 12)', () => {
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(8));
+    const ctx = makeContext(structuredDirective12);
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('fallback');
+    expect(sprint.tasks.length).toBe(12);
+  });
+
+  it('mode=auto accepts AI result when task count matches directives (12 vs 12)', () => {
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(12));
+    const ctx = makeContext(structuredDirective12);
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('ai');
+    expect(sprint.tasks.length).toBe(12);
+  });
+
+  it('mode=auto falls back when AI returns fewer tasks (5 vs 10)', () => {
+    const directive10 = Array.from({ length: 10 }, (_, i) =>
+      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
+    ).join('\n\n');
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(5));
+    const ctx = makeContext(directive10);
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('fallback');
+    expect(sprint.tasks.length).toBe(10);
+  });
+
+  it('mode=auto accepts AI result when directives have no structured tasks', () => {
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(3));
+    const ctx = makeContext('Some plain text directive without structured format');
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('ai');
+    expect(sprint.tasks.length).toBe(3);
+  });
+
+  it('mode=ai does NOT fall back even when AI returns fewer tasks', () => {
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(8));
+    const ctx = makeContext(structuredDirective12);
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'ai' });
+    expect(sprint.planningMode).toBe('ai');
+    expect(sprint.tasks.length).toBe(8);
+  });
+
+  it('fallback sets planningMode to "fallback"', () => {
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(3));
+    const directive5 = Array.from({ length: 5 }, (_, i) =>
+      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
+    ).join('\n\n');
+    const ctx = makeContext(directive5);
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('fallback');
+  });
+
+  it('CRITICAL debt tasks are preserved alongside fallback tasks', () => {
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(2));
+    const directive4 = Array.from({ length: 4 }, (_, i) =>
+      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
+    ).join('\n\n');
+    const ctx = makeContext(directive4);
+    ctx.debt = [{
+      id: 'debt-1', description: 'critical debt', originTaskId: 't-1', originSprintId: 's-1',
+      priority: DebtPriority.CRITICAL, sprintsOpen: 3, resolved: false, createdAt: '',
+    }];
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('fallback');
+    expect(sprint.tasks.some(t => t.isPriorityFix)).toBe(true);
+    // 1 debt + 4 structured = 5
+    expect(sprint.tasks.length).toBe(5);
+  });
+
+  it('logs error message on fallback', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockedCallBrainPlanner.mockReturnValue(makeAiResult(8));
+    const ctx = makeContext(structuredDirective12);
+    planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('AI planner returned 8 tasks'),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('AI null + auto still falls back to structured (existing behavior)', () => {
+    mockedCallBrainPlanner.mockReturnValue(null);
+    const ctx = makeContext(structuredDirective12);
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    expect(sprint.planningMode).toBe('fallback');
+    expect(sprint.tasks.length).toBe(12);
+  });
+
+  it('mode=structured ignores AI entirely and plans all structured tasks', () => {
+    const ctx = makeContext(structuredDirective12);
+    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'structured' });
+    expect(mockedCallBrainPlanner).not.toHaveBeenCalled();
+    expect(sprint.planningMode).toBe('structured');
+    expect(sprint.tasks.length).toBe(12);
+  });
 });
 
 describe('confirmDraftTasks', () => {

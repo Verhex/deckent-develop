@@ -421,6 +421,16 @@ export interface SubscriptionProfile {
   method: DetectionMethod;
 }
 
+// ─── Setup Recommendation ──────────────────────────────────────────
+export interface SetupRecommendation {
+  mode: PlanMode;
+  maxWorkers: number;
+  brainModel: ModelType;
+  defaultModel: ModelType;
+  planning: BrainPlanningMode;
+  reasons: string[];
+}
+
 // ─── Project Analysis ──────────────────────────────────────────────
 export type DetectedFramework = 'react' | 'next' | 'express' | 'nest' | 'vue' | 'angular' | 'svelte' | 'unknown';
 export type DetectedLanguage = 'typescript' | 'javascript' | 'python' | 'rust' | 'mixed' | 'unknown';

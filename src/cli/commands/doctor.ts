@@ -2,12 +2,14 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
-import type { DoctorResult } from '../../core/types.js';
+import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import {
   DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, LOCK_STALE_THRESHOLD_MS, DEBT_TABLE_HEADER,
 } from '../../core/constants.js';
 import { countBrainLines } from '../../core/utils.js';
+import { getSystemProfile } from '../../core/system-profile.js';
+import { detectSubscription } from '../../core/subscription.js';
 import { print, formatDoctorResult } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
@@ -169,6 +171,33 @@ function checkStaleLocks(root: string): DoctorCheck {
   }
 }
 
+export function formatSystemProfile(profile: SystemProfile, subscription?: string): string {
+  const totalGB = (profile.totalMemMB / 1024).toFixed(1);
+  const freeGB = (profile.freeMemMB / 1024).toFixed(1);
+  const inner = 54;
+  const top = `\u2554${'═'.repeat(inner)}\u2557`;
+  const bot = `\u255A${'═'.repeat(inner)}\u255D`;
+  const row = (content: string): string => {
+    const padded = content.length >= inner - 2
+      ? content.slice(0, inner - 2)
+      : content + ' '.repeat(inner - 2 - content.length);
+    return `\u2551 ${padded} \u2551`;
+  };
+
+  const lines = [
+    top,
+    row('System Profile'),
+    row(`CPU: ${profile.cpuCores} cores  RAM: ${totalGB} GB (${freeGB} GB free)  Workers: ${profile.recommendedMaxWorkers}`),
+  ];
+
+  if (subscription !== undefined) {
+    lines.push(row(`Subscription: ${subscription}`));
+  }
+
+  lines.push(bot);
+  return lines.join('\n');
+}
+
 export function runDoctorChecks(root: string): DoctorResult {
   const checks: DoctorCheck[] = [
     checkNode(), checkGit(), checkTmux(), checkClaude(),
@@ -185,7 +214,8 @@ export function registerDoctor(program: Command): void {
   program
     .command('doctor')
     .description('Check system dependencies and health')
-    .action(() => {
+    .option('--profile', 'Show system profile information')
+    .action((opts: { profile?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -194,6 +224,15 @@ export function registerDoctor(program: Command): void {
       }
       const result = runDoctorChecks(root);
       print(formatDoctorResult(result));
+
+      if (opts.profile) {
+        const profile = getSystemProfile();
+        const sub = detectSubscription();
+        const subLabel = sub.detected === 'unknown' ? 'unknown' : sub.detected;
+        print('');
+        print(formatSystemProfile(profile, subLabel));
+      }
+
       if (!result.ok) {
         process.exitCode = 1;
       }

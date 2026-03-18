@@ -10,6 +10,7 @@ import {
   PATTERNS_FILE, RETRO_FILE,
 } from '../../core/constants.js';
 import { ensureDeckentImport } from '../../core/utils.js';
+import { enrichResponse } from '../helpers/enrich.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -203,10 +204,18 @@ Lint: tsc --noEmit
         created.push('.claude/settings.json');
       }
 
+      const nextSteps = [
+        '`deckent plan` — plan your first sprint',
+        '`deckent start` — start the sprint',
+        '`deckent status` — monitor progress',
+      ];
+
+      const enriched = enrichResponse('init', { success: true, created, mode, language, projectName, nextSteps }, { lang: language });
+
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify({ success: true, created, mode, language, projectName }),
+          text: JSON.stringify(enriched),
         }],
       };
     },

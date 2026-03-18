@@ -85,6 +85,35 @@ export function updateLastSprintId(projectRoot: string, sprintId: string): void 
   } catch { /* ignore — non-critical */ }
 }
 
+/**
+ * Parse a sprint ID string like "sprint-021" and return the numeric part (21).
+ * Returns 0 if the format is unrecognised.
+ */
+export function parseSprintNumber(sprintId: string): number {
+  const match = sprintId.match(/sprint-(\d+)/);
+  return match?.[1] ? parseInt(match[1], 10) : 0;
+}
+
+/**
+ * Decide whether a DEBT.md entry should be removed during decay.
+ *
+ * Rules:
+ * - open entry (resolved === false)         → keep (return false)
+ * - resolved, resolvedInSprintId undefined  → remove (legacy, return true)
+ * - resolved, sprint diff >= retentionSprints → remove (return true)
+ * - resolved, sprint diff < retentionSprints  → keep (return false)
+ */
+export function shouldRemoveResolvedDebt(
+  entry: DebtItem,
+  currentSprintId: string,
+  retentionSprints = 3,
+): boolean {
+  if (!entry.resolved) return false;                         // open → keep
+  if (entry.resolvedInSprintId === undefined) return true;  // legacy → remove
+  const diff = parseSprintNumber(currentSprintId) - parseSprintNumber(entry.resolvedInSprintId);
+  return diff >= retentionSprints;                          // old enough → remove
+}
+
 export function parseDebtTable(content: string): DebtItem[] {
   const lines = content.split('\n');
   const items: DebtItem[] = [];

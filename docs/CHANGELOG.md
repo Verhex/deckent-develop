@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint23] - 2026-03-18
+
+### Added
+
+- **AI Planner Post-Validation Fallback Fix (TAMAMLANDI)**: GO_WITH_TECH_DEBT
+- **Decay Fix Doğrulama**: DONE
+- **Auto Setup Wizard Doğrulama**: DONE
+- **MCP Enrichment Infrastructure Doğrulama**: GO_WITH_TECH_DEBT
+- **MCP Enrichment Tools Batch 1 Doğrulama**: DONE
+- **MCP Enrichment Tools Batch 2 Doğrulama**: DONE
+- **CLI Hints System Doğrulama**: DONE
+- **Doctor Profile Flag Doğrulama**: GO_WITH_TECH_DEBT
+- **Sprint 22 Test Coverage Doğrulama**: DONE
+- **AI Planner Fallback Fix Doğrulama**: DONE
+- **Tasks**: 12 total, 12 done, 4 tech debt, 0 no-go
 ## [0.1.0-sprint18] - 2026-03-18
 
 ### Added

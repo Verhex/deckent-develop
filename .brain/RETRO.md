@@ -1,17 +1,21 @@
-# Sprint sprint-021 Retrospective
+# Sprint sprint-023 Retrospective
 
 ## Metrics
-- Tasks: 8 total, 8 done, 1 debt, 0 no-go
-- Coverage: 96.4%
+- Tasks: 12 total, 12 done, 4 debt, 0 no-go
+- Coverage: 80.0%
 - No-Go Rate: 0.0%
-- Duration: 630718ms
+- Duration: 320657ms
 
 ## Results
-- 021-001: planSprint Task Limit Fix (P0 — KRİTİK) -> DONE
-- 021-002: evaluateResult Doc Criteria Genişletme (P1) -> DONE
-- 021-003: system-profile.ts — Sistem Kaynak Taraması -> DONE
-- 021-004: subscription.ts — Claude Plan Tespiti -> GO_WITH_TECH_DEBT
-- 021-005: resolveTaskModel — Katmanlı Model Seçimi -> DONE
-- 021-006: max_workers auto + resolveEffectiveWorkers -> DONE
-- 021-007: deckent test CLI Komutu -> DONE
-- 021-008: deckent run CLI Komutu -> DONE
+- 023-001: AI Planner Post-Validation Fallback Fix (TAMAMLANDI) -> GO_WITH_TECH_DEBT
+- 023-002: Decay Fix Doğrulama -> DONE
+- 023-003: Auto Setup Wizard Doğrulama -> DONE
+- 023-004: MCP Enrichment Infrastructure Doğrulama -> GO_WITH_TECH_DEBT
+- 023-005: MCP Enrichment Tools Batch 1 Doğrulama -> DONE
+- 023-006: MCP Enrichment Tools Batch 2 Doğrulama -> DONE
+- 023-007: CLI Hints System Doğrulama -> DONE
+- 023-008: Doctor Profile Flag Doğrulama -> GO_WITH_TECH_DEBT
+- 023-009: Sprint 22 Test Coverage Doğrulama -> DONE
+- 023-010: AI Planner Fallback Fix Doğrulama -> DONE
+- 023-011: Task Queue Wave Doğrulama -> DONE
+- 023-012: Sprint History Karşılaştırma -> GO_WITH_TECH_DEBT

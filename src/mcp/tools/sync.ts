@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { DECKENT_FILE, CLAUDE_FILE, AGENTS_FILE } from '../../core/constants.js';
 import { ensureDeckentImport } from '../../core/utils.js';
+import { enrichResponse } from '../helpers/enrich.js';
 
 export function registerSyncTool(server: McpServer): void {
   server.registerTool(
@@ -28,8 +29,11 @@ export function registerSyncTool(server: McpServer): void {
       ensureDeckentImport(join(root, AGENTS_FILE));
       synced.push(AGENTS_FILE);
 
+      const changeCount = synced.length;
+      const enriched = enrichResponse('sync', { success: true, synced, changeCount });
+
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ success: true, synced }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
       };
     },
   );
