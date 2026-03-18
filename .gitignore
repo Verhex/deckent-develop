@@ -25,7 +25,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-.deckent/
+# Deckent workspace — track workspace/, ignore runtime
+.deckent/config.json
 
 # Dashboard sub-project
 src/dashboard/node_modules
