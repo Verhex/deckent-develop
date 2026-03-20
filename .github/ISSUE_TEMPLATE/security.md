@@ -9,6 +9,7 @@ assignees: ''
 <!--
 IMPORTANT: Please do NOT include any sensitive details (credentials, tokens, etc.) in this public issue.
 For critical vulnerabilities, consider responsible disclosure via email first (see note below).
+Do NOT include exploit code or step-by-step attack instructions in public issues.
 -->
 
 ## Vulnerability Type
@@ -29,10 +30,10 @@ For critical vulnerabilities, consider responsible disclosure via email first (s
 **CVSS Score (if known):** <!-- e.g. 7.5 -->
 
 **Severity Level:**
-- [ ] Critical
-- [ ] High
-- [ ] Medium
-- [ ] Low
+- [ ] Critical (CVSS 9.0-10.0)
+- [ ] High (CVSS 7.0-8.9)
+- [ ] Medium (CVSS 4.0-6.9)
+- [ ] Low (CVSS 0.1-3.9)
 
 **Justification:**
 <!-- Explain your severity rating briefly -->
@@ -53,22 +54,30 @@ For critical vulnerabilities, consider responsible disclosure via email first (s
 <!-- Describe what an attacker could achieve by exploiting this vulnerability -->
 
 **Affected component(s):**
-<!-- e.g. src/api/server.ts, MCP server, CLI -->
+<!-- e.g. src/api/server.ts, src/orchestra/brain.ts, src/agents/worker.ts, MCP server, CLI -->
 
 **Attack vector:** <!-- Local / Network / Adjacent -->
 **Authentication required:** <!-- Yes / No -->
 **User interaction required:** <!-- Yes / No -->
+**Privileges required:** <!-- None / Low / High -->
 
 ## Proposed Fix (Optional)
 
 <!-- If you have a suggested fix or mitigation, describe it here -->
 
-## Responsible Disclosure Note
+## Timeline & Patches
 
-We appreciate responsible disclosure. If this vulnerability is critical (CVSS >= 7.0 or severity High/Critical), please consider:
+- Patches will be documented in the CHANGELOG upon release.
+- Security advisories will be published via GitHub Security Advisories (GHSA).
+- We aim to release fixes within 30 days of confirmed vulnerabilities.
+
+## Responsible Disclosure Policy
+
+We appreciate responsible disclosure. If this vulnerability is critical (CVSS ≥ 7.0 or severity High/Critical), please consider:
 
 1. **Email first** — contact the maintainer directly before publishing details publicly, allowing time to patch before disclosure.
 2. **Allow reasonable time** — we aim to respond within 72 hours and release a patch within 30 days.
-3. **Coordinated disclosure** — we'll credit you in the security advisory and CHANGELOG when the fix is released.
+3. **Coordinated disclosure** — we'll credit you in the security advisory (GHSA) and CHANGELOG when the fix is released.
+4. **No exploit code** — do NOT include exploit code or step-by-step attack instructions in public issues.
 
 Thank you for helping keep Deckent secure.

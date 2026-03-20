@@ -63,7 +63,7 @@ export type { SprintComparison } from './sprint-reporter.js';
 export type { SprintResult } from '../core/types.js';
 
 // ─── Internal imports from sub-modules (used by orchestrator) ─────
-import { resolveTaskModel } from './model-selector.js';
+import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
 import { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay } from './debt-manager.js';
 import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs } from './sprint-reporter.js';
@@ -314,9 +314,13 @@ export function planSprint(
             .filter(Boolean)
             .map(line => ({ title: line, description: line, scope: extractScopeFromDirective(line) }));
 
+    // Parse and deduplicate patterns from context for model selection
+    const patternsRaw = typeof context.patterns === 'string' ? context.patterns : '';
+    const parsedPatterns = deduplicatePatterns(parsePatterns(patternsRaw));
+
     for (const src of directiveSources) {
       const resolvedModel = recommendation.modelConstraint ??
-        resolveTaskModel(src.title, src.description, src.scope, config, usageForModel);
+        resolveTaskModel(src.title, src.description, src.scope, config, usageForModel, parsedPatterns);
       tasks.push(createTask({
         title: src.title,
         description: src.description,

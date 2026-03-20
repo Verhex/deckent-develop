@@ -232,4 +232,133 @@ describe('resolveTaskModel with patterns', () => {
     const withoutPatterns = resolveTaskModel('Add util', 'Simple', scope, config, usage);
     expect(withPatterns).toBe(withoutPatterns);
   });
+
+  it('resolved patterns do not trigger model upgrade', () => {
+    const config = makeConfig();
+    const usage = makeUsage();
+    const scope = makeScope(['src/orchestra/']);
+    const patterns = [makePattern('file_outside_scope', 10, true)];
+    const result = resolveTaskModel('Refactor orchestra', 'Orchestra refactor', scope, config, usage, patterns);
+    expect(result).not.toBe('opus');
+  });
+
+  it('multiple mixed patterns — only unresolved boundary violations count', () => {
+    const config = makeConfig();
+    const usage = makeUsage();
+    const scope = makeScope(['src/core/']);
+    const patterns: PatternEntry[] = [
+      makePattern('file_outside_scope', 5, true),  // resolved — no effect
+      makePattern('stale_heartbeat', 100, false),   // not a trigger — no effect
+    ];
+    const result = resolveTaskModel('Add util', 'Simple', scope, config, usage, patterns);
+    expect(result).toBe('sonnet');
+  });
+});
+
+// ─── parsePatterns + deduplicatePatterns pipeline ──────────────────
+
+describe('parsePatterns + deduplicatePatterns pipeline', () => {
+  it('pipeline: raw JSON string → parsed → deduplicated', () => {
+    const raw: PatternEntry[] = [
+      makePattern('file_outside_scope', 3),
+      makePattern('file_outside_scope', 7),
+      makePattern('stale_heartbeat', 2),
+    ];
+    const parsed = parsePatterns(JSON.stringify(raw));
+    const deduped = deduplicatePatterns(parsed);
+    expect(deduped).toHaveLength(2);
+    const fos = deduped.find(p => p.pattern === 'file_outside_scope');
+    expect(fos?.occurrences).toBe(7);
+  });
+
+  it('pipeline: empty string → no patterns → no model upgrade', () => {
+    const parsed = parsePatterns('');
+    const deduped = deduplicatePatterns(parsed);
+    expect(deduped).toHaveLength(0);
+    const scope = makeScope(['src/core/']);
+    const config = makeConfig();
+    const usage = makeUsage();
+    const result = resolveTaskModel('Add util', 'Simple', scope, config, usage, deduped);
+    expect(result).toBe('sonnet');
+  });
+
+  it('pipeline: JSON with duplicates triggers model upgrade after deduplication', () => {
+    const raw: PatternEntry[] = [
+      makePattern('file_outside_scope', 1),
+      makePattern('file_outside_scope', 3),
+    ];
+    const deduped = deduplicatePatterns(parsePatterns(JSON.stringify(raw)));
+    expect(deduped[0]?.occurrences).toBe(3);
+    const scope = makeScope(['src/orchestra/']);
+    const config = makeConfig();
+    const usage = makeUsage();
+    const result = resolveTaskModel('Refactor module', 'Complex refactor', scope, config, usage, deduped);
+    expect(result).toBe('opus');
+  });
+
+  it('pipeline: malformed JSON → empty array → no upgrade', () => {
+    const parsed = parsePatterns('{broken json');
+    const deduped = deduplicatePatterns(parsed);
+    expect(deduped).toHaveLength(0);
+    const suggestion = suggestModelFromPatterns(makeScope(['src/core/']), deduped);
+    expect(suggestion).toBeNull();
+  });
+
+  it('pipeline: non-array JSON → empty array', () => {
+    const parsed = parsePatterns('{"pattern": "file_outside_scope", "occurrences": 5}');
+    expect(deduplicatePatterns(parsed)).toHaveLength(0);
+  });
+
+  it('deduplicatePatterns preserves resolved flag of highest-occurrence entry', () => {
+    const patterns: PatternEntry[] = [
+      makePattern('circular_dependency', 5, true),
+      makePattern('circular_dependency', 2, false),
+    ];
+    const result = deduplicatePatterns(patterns);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.occurrences).toBe(5);
+    expect(result[0]?.resolved).toBe(true);
+  });
+});
+
+// ─── suggestModelFromPatterns edge cases ───────────────────────────
+
+describe('suggestModelFromPatterns — additional edge cases', () => {
+  it('returns null for empty scope directories', () => {
+    const scope = makeScope([]);
+    const patterns = [makePattern('file_outside_scope', 5)];
+    expect(suggestModelFromPatterns(scope, patterns)).toBeNull();
+  });
+
+  it('returns opus for bare "src" directory (without trailing slash)', () => {
+    const scope = makeScope(['src']);
+    const patterns = [makePattern('circular_dependency', 1)];
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('opus');
+  });
+
+  it('returns opus for bare "tests" directory', () => {
+    const scope = makeScope(['tests']);
+    const patterns = [makePattern('file_outside_scope', 3)];
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('opus');
+  });
+
+  it('mixed scope: one src dir triggers upgrade even with other non-src dirs', () => {
+    const scope = makeScope(['docs/', 'src/core/']);
+    const patterns = [makePattern('file_outside_scope', 2)];
+    expect(suggestModelFromPatterns(scope, patterns)).toBe('opus');
+  });
+
+  it('file_outside_scope with exactly 1 occurrence does not trigger upgrade', () => {
+    const scope = makeScope(['src/core/']);
+    const patterns = [makePattern('file_outside_scope', 1)];
+    expect(suggestModelFromPatterns(scope, patterns)).toBeNull();
+  });
+
+  it('returns null when all patterns have zero occurrences', () => {
+    const scope = makeScope(['src/core/']);
+    const patterns: PatternEntry[] = [
+      { pattern: 'file_outside_scope', occurrences: 0, firstDetectedInSprint: 'sprint-001', lastDetectedInSprint: 'sprint-001', resolved: false },
+    ];
+    expect(suggestModelFromPatterns(scope, patterns)).toBeNull();
+  });
 });

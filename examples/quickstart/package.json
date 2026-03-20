@@ -1,0 +1,21 @@
+{
+  "name": "deckent-quickstart",
+  "version": "1.0.0",
+  "description": "Quickstart example for Deckent orchestration",
+  "type": "module",
+  "scripts": {
+    "deckent:plan": "deckent plan",
+    "deckent:start": "deckent start",
+    "deckent:status": "deckent status",
+    "deckent:doctor": "deckent doctor"
+  },
+  "keywords": ["deckent", "ai", "orchestration"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "deckent": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

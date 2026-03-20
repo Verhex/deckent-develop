@@ -26,17 +26,6 @@
 - Sprint ID safety: `last_sprint_id` in config + file scan, always use max — prevents regression on file deletion
 - Dashboard reset: fresh DashboardState on PLAN phase, sprint ID mismatch triggers reset in auditor
 - React test infra: separate vitest config for dashboard (happy-dom env), exclude from main config
-## Sprint sprint-023 Learnings
-- MCP Enrichment Tools Batch 1 Doğrulama: GO_WITH_TECH_DEBT
-- Doctor Profile Flag Doğrulama: GO_WITH_TECH_DEBT
-## Sprint sprint-023 Learnings
-- MCP Enrichment Tools Batch 1 Doğrulama: GO_WITH_TECH_DEBT
-- MCP Enrichment Tools Batch 2 Doğrulama: GO_WITH_TECH_DEBT
-## Sprint sprint-023 Learnings
-- AI Planner Post-Validation Fallback Fix (TAMAMLANDI): GO_WITH_TECH_DEBT
-- MCP Enrichment Infrastructure Doğrulama: GO_WITH_TECH_DEBT
-- Doctor Profile Flag Doğrulama: GO_WITH_TECH_DEBT
-- Sprint History Karşılaştırma: GO_WITH_TECH_DEBT
 ## Sprint sprint-025 Learnings
 - package.json files Field Düzeltme: GO_WITH_TECH_DEBT
 - CODEOWNERS Dosyası: GO_WITH_TECH_DEBT
@@ -48,3 +37,14 @@
 - debt-manager.ts readJsonSafe Import Migration: GO_WITH_TECH_DEBT
 - auditor.ts readJsonSafe Import Migration: GO_WITH_TECH_DEBT
 - debt-manager.test.ts — Dedicated Test Suite: GO_WITH_TECH_DEBT
+## Sprint sprint-026 Learnings
+- readJsonSafe Import Migration Tamamlama: GO_WITH_TECH_DEBT
+- package.json files + keywords Tamamlama: GO_WITH_TECH_DEBT
+- task-builder.test.ts Test Tamamlama: GO_WITH_TECH_DEBT
+- core/config.ts Edge Case Test Tamamlama: GO_WITH_TECH_DEBT
+- auditor.ts Edge Case Test Tamamlama: GO_WITH_TECH_DEBT
+- tmux.ts + api/server.ts Edge Case Test Tamamlama: GO_WITH_TECH_DEBT
+- Brain Pattern Learning Tamamlama: GO_WITH_TECH_DEBT
+- Global Config + Config Export/Import Tamamlama: GO_WITH_TECH_DEBT
+- FAQ Dokümanı (NO_GO Fix): GO_WITH_TECH_DEBT
+- Integration Test — init→plan→status E2E (NO_GO Fix): GO_WITH_TECH_DEBT

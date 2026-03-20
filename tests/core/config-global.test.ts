@@ -194,6 +194,173 @@ describe('saveGlobalConfig', () => {
   });
 });
 
+// ── loadGlobalConfig — additional edge cases ────────────────────────────────
+
+describe('loadGlobalConfig — edge cases', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('returns empty object when config file contains {}', async () => {
+    const cfgPath = join(tempDir, 'config.json');
+    writeCfg(cfgPath, {});
+    const result = await loadGlobalConfig(cfgPath);
+    expect(result).toEqual({});
+  });
+
+  it('reads config with all supported top-level fields', async () => {
+    const cfgPath = join(tempDir, 'config.json');
+    writeCfg(cfgPath, {
+      mode: 'pro_plan',
+      language: 'tr',
+      projectName: 'full-config-project',
+      version: '2.0.0',
+    });
+    const result = await loadGlobalConfig(cfgPath) as Partial<DeckentConfig>;
+    expect(result?.mode).toBe('pro_plan');
+    expect(result?.language).toBe('tr');
+    expect(result?.projectName).toBe('full-config-project');
+    expect(result?.version).toBe('2.0.0');
+  });
+});
+
+// ── saveGlobalConfig — additional edge cases ────────────────────────────────
+
+describe('saveGlobalConfig — edge cases', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('succeeds when directory already exists', async () => {
+    const cfgPath = join(tempDir, 'config.json');
+    await expect(saveGlobalConfig({ language: 'en' }, cfgPath)).resolves.not.toThrow();
+  });
+
+  it('saves and reloads an empty config object', async () => {
+    const cfgPath = join(tempDir, 'config.json');
+    await saveGlobalConfig({}, cfgPath);
+    const loaded = await loadGlobalConfig(cfgPath);
+    expect(loaded).toEqual({});
+  });
+
+  it('preserves nested modes in the written file', async () => {
+    const cfgPath = join(tempDir, 'config.json');
+    const cfg: Partial<DeckentConfig> = {
+      mode: 'pro_plan',
+      modes: {
+        pro_plan: {
+          max_workers: 5,
+          brain_model: 'sonnet',
+          default_model: 'sonnet',
+          haiku_allowed: false,
+          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+          brain_planning: 'auto',
+        },
+      } as DeckentConfig['modes'],
+    };
+    await saveGlobalConfig(cfg, cfgPath);
+    const loaded = await loadGlobalConfig(cfgPath) as Partial<DeckentConfig>;
+    expect(loaded?.modes?.pro_plan?.max_workers).toBe(5);
+  });
+});
+
+// ── mergeConfigs — additional edge cases ────────────────────────────────────
+
+describe('mergeConfigs — edge cases', () => {
+  it('both configs are empty objects (not null) — returns defaults', () => {
+    const result = mergeConfigs({}, {});
+    expect(result.mode).toBe('max_plan');
+    expect(result.language).toBe('en');
+    expect(result.activeModeConfig).toBeDefined();
+  });
+
+  it('global empty object + project with language — applies language', () => {
+    const result = mergeConfigs({}, { language: 'tr' });
+    expect(result.language).toBe('tr');
+  });
+
+  it('deep merges nested mode config from global', () => {
+    const global: Partial<DeckentConfig> = {
+      modes: {
+        pro_plan: {
+          max_workers: 7,
+          brain_model: 'sonnet',
+          default_model: 'sonnet',
+          haiku_allowed: false,
+          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+          brain_planning: 'auto',
+        },
+      } as DeckentConfig['modes'],
+    };
+    const result = mergeConfigs(global, { mode: 'pro_plan' });
+    expect(result.modes.pro_plan.max_workers).toBe(7);
+  });
+
+  it('project config can override a nested mode field from global', () => {
+    const global: Partial<DeckentConfig> = {
+      modes: {
+        pro_plan: {
+          max_workers: 3,
+          brain_model: 'sonnet',
+          default_model: 'sonnet',
+          haiku_allowed: false,
+          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+          brain_planning: 'auto',
+        },
+      } as DeckentConfig['modes'],
+    };
+    const project: Partial<DeckentConfig> = {
+      modes: {
+        pro_plan: {
+          max_workers: 5,
+          brain_model: 'sonnet',
+          default_model: 'sonnet',
+          haiku_allowed: false,
+          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+          brain_planning: 'auto',
+        },
+      } as DeckentConfig['modes'],
+    };
+    const result = mergeConfigs(global, project);
+    expect(result.modes.pro_plan.max_workers).toBe(5);
+  });
+
+  it('projectRoot is always a resolved string path', () => {
+    const result = mergeConfigs(null, null);
+    expect(typeof result.projectRoot).toBe('string');
+    expect(result.projectRoot.startsWith('/')).toBe(true);
+  });
+
+  it('auto_docs defaults are present when not provided', () => {
+    const result = mergeConfigs(null, null);
+    expect(result.auto_docs).toBeDefined();
+    expect(result.auto_docs?.tier1).toBe(true);
+  });
+
+  it('version defaults to DECKENT_VERSION when not provided', () => {
+    const result = mergeConfigs(null, null);
+    expect(result.version).toBeDefined();
+    expect(typeof result.version).toBe('string');
+  });
+
+  it('projectName defaults to "deckent-project" when not provided', () => {
+    const result = mergeConfigs(null, null);
+    expect(result.projectName).toBe('deckent-project');
+  });
+});
+
 // ── loadConfig global+project merge ─────────────────────────────────────────
 
 describe('loadConfig — global + project merge', () => {

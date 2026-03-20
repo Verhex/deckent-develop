@@ -1,7 +1,19 @@
 # GitHub Sponsors & Funding Configuration
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
 
+# GitHub Sponsors usernames
 github: []
+
+# Custom funding links
+# Example: You can add links to any funding platform.
+# Supported platforms: Patreon, OpenCollective, Ko-fi, Buy Me A Coffee, Tidelift, Liberapay
+#
+# Alternative sponsorship methods (uncomment to enable):
+# patreon: deckent
+# open_collective: deckent
+# ko_fi: deckent
+# tidelift: npm/deckent
+# liberapay: deckent
 
 custom:
   - https://verhex.net

@@ -759,6 +759,51 @@ describe('compareWithPreviousSprint', () => {
     expect(cmp.completedTasksDelta).toBe(0);
     expect(cmp.techDebtTasksDelta).toBe(0);
   });
+
+  it('returns 0 durationChangePct when both durations are equal and nonzero', () => {
+    const current = makeMetrics({ durationMs: 3600000 });
+    const previous = makeMetrics({ durationMs: 3600000 });
+    const cmp = compareWithPreviousSprint(current, previous);
+    expect(cmp.durationChangePct).toBe(0);
+  });
+
+  it('handles negative completedTasksDelta when fewer tasks completed', () => {
+    const current = makeMetrics({ completedTasks: 3 });
+    const previous = makeMetrics({ completedTasks: 8 });
+    const cmp = compareWithPreviousSprint(current, previous);
+    expect(cmp.completedTasksDelta).toBe(-5);
+  });
+
+  it('handles negative techDebtTasksDelta when less debt', () => {
+    const current = makeMetrics({ techDebtTasks: 0 });
+    const previous = makeMetrics({ techDebtTasks: 4 });
+    const cmp = compareWithPreviousSprint(current, previous);
+    expect(cmp.techDebtTasksDelta).toBe(-4);
+  });
+
+  it('handles negative testCountDelta when fewer total tasks', () => {
+    const current = makeMetrics({ totalTasks: 3 });
+    const previous = makeMetrics({ totalTasks: 10 });
+    const cmp = compareWithPreviousSprint(current, previous);
+    expect(cmp.testCountDelta).toBe(-7);
+  });
+
+  it('handles large positive durationChangePct (10x slower)', () => {
+    const current = makeMetrics({ durationMs: 36000000 });
+    const previous = makeMetrics({ durationMs: 3600000 });
+    const cmp = compareWithPreviousSprint(current, previous);
+    expect(cmp.durationChangePct).toBeCloseTo(900, 5);
+  });
+
+  it('returns structured object with all required comparison fields', () => {
+    const cmp = compareWithPreviousSprint(makeMetrics(), makeMetrics());
+    expect(cmp).toHaveProperty('durationChangePct');
+    expect(cmp).toHaveProperty('noGoRateChange');
+    expect(cmp).toHaveProperty('testCountDelta');
+    expect(cmp).toHaveProperty('coverageDelta');
+    expect(cmp).toHaveProperty('completedTasksDelta');
+    expect(cmp).toHaveProperty('techDebtTasksDelta');
+  });
 });
 
 // ─── readPreviousSprintMetrics ────────────────────────────────────────
@@ -832,6 +877,37 @@ describe('readPreviousSprintMetrics', () => {
     writeFileSync(join(sprintsDir, 'sprint-001.md'), 'no metrics here', 'utf-8');
     const result = readPreviousSprintMetrics(tmpDir, 'sprint-002');
     expect(result).toBeNull();
+  });
+
+  it('returns null for sprint log with only the header row and no data', () => {
+    const sprintsDir = join(tmpDir, '.brain', 'sprints');
+    mkdirSync(sprintsDir, { recursive: true });
+    writeFileSync(join(sprintsDir, 'sprint-001.md'), '| Metric | Value |\n|--------|-------|', 'utf-8');
+    const result = readPreviousSprintMetrics(tmpDir, 'sprint-002');
+    expect(result).toBeNull();
+  });
+
+  it('excludes current sprint even when it sorts last alphabetically', () => {
+    const sprintsDir = join(tmpDir, '.brain', 'sprints');
+    mkdirSync(sprintsDir, { recursive: true });
+    writeSprintLog(tmpDir, makeSprint({ id: 'sprint-001' }), makeMetrics({ totalTasks: 3 }));
+    writeSprintLog(tmpDir, makeSprint({ id: 'sprint-003' }), makeMetrics({ totalTasks: 9 }));
+    // Current is sprint-003; previous should be sprint-001
+    const result = readPreviousSprintMetrics(tmpDir, 'sprint-003');
+    expect(result).not.toBeNull();
+    expect(result!.totalTasks).toBe(3);
+  });
+
+  it('correctly derives noGoRate from parsed noGoTasks and totalTasks', () => {
+    const sprintsDir = join(tmpDir, '.brain', 'sprints');
+    mkdirSync(sprintsDir, { recursive: true });
+    const sprint001 = makeSprint({ id: 'sprint-001' });
+    // 2 no-go out of 4 total → noGoRate should be 50%
+    const metrics001 = makeMetrics({ totalTasks: 4, noGoTasks: 2 });
+    writeSprintLog(tmpDir, sprint001, metrics001);
+    const result = readPreviousSprintMetrics(tmpDir, 'sprint-002');
+    expect(result).not.toBeNull();
+    expect(result!.noGoRate).toBeCloseTo(50, 5);
   });
 });
 

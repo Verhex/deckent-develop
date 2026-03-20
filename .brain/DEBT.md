@@ -1,11 +1,5 @@
 | ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
 |----|-------------|------|--------|----------|------|----------|----------|---------|
-| debt-023-005 | Tech debt from 023-005: All 4 MCP tools (directives, plan, start, status) confir | 023-005 | sprint-023 | NORMAL | 0 | true | sprint-023 | 2026-03-18T16:21:14.372Z |
-| debt-023-006 | Tech debt from 023-006: Sprint 22 Görev 5 (MCP Enrichment Batch 2) doğrulandı. 6 | 023-006 | sprint-023 | NORMAL | 0 | true | sprint-023 | 2026-03-18T16:21:14.373Z |
-| debt-023-001 | Tech debt from 023-001: AI Planner Post-Validation Fallback Fix tamamlandı. brai | 023-001 | sprint-023 | NORMAL | 0 | true | sprint-023 | 2026-03-18T17:02:05.306Z |
-| debt-023-004 | Tech debt from 023-004: Sprint 22 Görev 3 (MCP Enrichment Infrastructure) fully | 023-004 | sprint-023 | NORMAL | 0 | true | sprint-023 | 2026-03-18T17:02:05.307Z |
-| debt-023-008 | Tech debt from 023-008: Doctor --profile doğrulaması tamamlandı. CLI doctor.ts s | 023-008 | sprint-023 | NORMAL | 0 | true | sprint-023 | 2026-03-18T17:02:05.309Z |
-| debt-023-012 | Tech debt from 023-012: Created comprehensive Sprint 18-23 comparison report ana | 023-012 | sprint-023 | NORMAL | 0 | true | sprint-023 | 2026-03-18T17:02:05.310Z |
 | debt-025-003 | Tech debt from 025-003: Removed 'bin' from files array (bin/ dir doesn't exist), | 025-003 | sprint-025 | NORMAL | 0 | true | sprint-025 | 2026-03-20T00:18:58.371Z |
 | debt-025-004 | Tech debt from 025-004: Created .github/CODEOWNERS with ownership rules for all | 025-004 | sprint-025 | NORMAL | 0 | true | sprint-025 | 2026-03-20T00:18:58.373Z |
 | debt-025-005 | Tech debt from 025-005: Created .github/dependabot.yml with npm ecosystem, weekl | 025-005 | sprint-025 | NORMAL | 0 | true | sprint-025 | 2026-03-20T00:18:58.373Z |
@@ -38,3 +32,19 @@
 | debt-025-056 | Tech debt from 025-056: Added SprintComparison interface to types.ts, compareWit | 025-056 | sprint-025 | NORMAL | 0 | true | sprint-025 | 2026-03-20T00:18:58.398Z |
 | debt-025-062 | Tech debt from 025-062: Added getLanguage(configLanguage?: string): string to sr | 025-062 | sprint-025 | NORMAL | 0 | true | sprint-025 | 2026-03-20T00:18:58.400Z |
 | debt-025-065 | Tech debt from 025-065: Created docs/PLUGIN-GUIDE.md — comprehensive plugin deve | 025-065 | sprint-025 | NORMAL | 0 | true | sprint-025 | 2026-03-20T00:18:58.402Z |
+| debt-026-001 | Tech debt from 026-001: Removed local readFileSafe/readJsonSafe definitions from | 026-001 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.757Z |
+| debt-026-002 | Tech debt from 026-002: Successfully completed package.json cleanup task: (1) Re | 026-002 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.759Z |
+| debt-026-008 | Tech debt from 026-008: Added 27 comprehensive edge case tests to task-builder.t | 026-008 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.761Z |
+| debt-026-014 | Tech debt from 026-014: Successfully added comprehensive edge case tests for cor | 026-014 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.763Z |
+| debt-026-015 | Tech debt from 026-015: Verified comprehensive edge case test coverage for audit | 026-015 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.764Z |
+| debt-026-017 | Tech debt from 026-017: Both test files already fully implement the required edg | 026-017 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.765Z |
+| debt-026-020 | Tech debt from 026-020: Fixed Brain Pattern Learning: (1) Added parsePatterns+de | 026-020 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.766Z |
+| debt-026-021 | Tech debt from 026-021: Added 20 new edge case tests: config-global.test.ts grew | 026-021 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.767Z |
+| debt-026-024 | Tech debt from 026-024: FAQ documentation created with comprehensive answers to | 026-024 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.771Z |
+| debt-026-026 | Tech debt from 026-026: E2E integration test for init→plan→status flow completed | 026-026 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.771Z |
+| debt-026-028 | Tech debt from 026-028: Created comprehensive integration test for MCP flow (ini | 026-028 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.773Z |
+| debt-026-029 | Tech debt from 026-029: Created comprehensive plugin lifecycle integration test | 026-029 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.773Z |
+| debt-026-031 | Tech debt from 026-031: Created comprehensive security integration tests (16 tes | 026-031 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.774Z |
+| debt-026-032 | Tech debt from 026-032: Created Dockerfile (node:22-slim, tmux+git, npm install, | 026-032 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.776Z |
+| debt-026-033 | Tech debt from 026-033: Successfully updated CONTRIBUTING.md with Plugin System | 026-033 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.777Z |
+| debt-026-035 | Tech debt from 026-035: Removed entire tmp-test/ directory which contained Sprin | 026-035 | sprint-026 | NORMAL | 0 | true | sprint-026 | 2026-03-20T18:19:31.778Z |

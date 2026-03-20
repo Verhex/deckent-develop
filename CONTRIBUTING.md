@@ -14,6 +14,9 @@ Thank you for your interest in contributing to Deckent — the AI agent orchestr
 6. [Commit Messages](#commit-messages)
 7. [Pull Request Process](#pull-request-process)
 8. [Sprint Contribution](#sprint-contribution)
+9. [Plugin System Development](#plugin-system-development)
+10. [Internationalization (i18n) Contributing](#internationalization-i18n-contributing)
+11. [MCP Tool and Resource Development](#mcp-tool-and-resource-development)
 
 ---
 
@@ -57,7 +60,7 @@ npm run clean        # Remove dist/
 
 ```bash
 npm run lint    # Should exit with no errors
-npm test        # Should pass all tests (1422+)
+npm test        # Should pass all tests (3150+)
 npm run build   # Should produce dist/ with no errors
 ```
 
@@ -430,6 +433,394 @@ Every task produces a result file at `.tasks/task-XXX-YYY.result`:
 - `"DONE"` — task complete, all quality rules met
 - `"GO_WITH_TECH_DEBT"` — task complete, known debt logged
 - `"NO_GO"` — task blocked or failing; explain in `notes`
+
+---
+
+## Plugin System Development
+
+Plugins extend Deckent's capabilities through a versioned plugin system. All plugins run in isolated worker contexts with scoped file access.
+
+### Plugin structure
+
+Each plugin is stored in `.deckent/plugins/{pluginName}/`:
+
+```
+.deckent/plugins/my-plugin/
+├── plugin.json          — Plugin metadata (name, version, description, exports)
+├── src/
+│   ├── index.ts         — Plugin entry point (exports IPlugin interface)
+│   └── *.ts             — Plugin implementation modules
+├── tests/
+│   └── *.test.ts        — Plugin tests (vitest)
+└── README.md            — Plugin documentation
+```
+
+### Plugin metadata (plugin.json)
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "description": "Brief description of what the plugin does",
+  "exports": {
+    "hooks": ["onTaskStart", "onTaskComplete"],
+    "commands": ["my-command"],
+    "patterns": ["CustomPattern"]
+  },
+  "permissions": {
+    "directories": ["logs", "data"],
+    "filesRead": ["config.json"],
+    "filesWrite": ["state.json"]
+  }
+}
+```
+
+### Plugin interface
+
+All plugins must implement the `IPlugin` interface from `src/core/types.ts`:
+
+```typescript
+export interface IPlugin {
+  name: string;
+  version: string;
+  hooks?: {
+    onTaskStart?: (task: Task) => Promise<void>;
+    onTaskComplete?: (result: TaskResult) => Promise<void>;
+    onSprintStart?: (directives: string) => Promise<void>;
+    onSprintComplete?: (retro: string) => Promise<void>;
+  };
+  commands?: Record<string, (args: unknown[]) => Promise<unknown>>;
+  validate?: () => Promise<boolean>;
+}
+```
+
+### Plugin development checklist
+
+- [ ] Plugin implements `IPlugin` interface correctly
+- [ ] `plugin.json` declares accurate permissions and hooks
+- [ ] All permissions in `plugin.json` are actually used by the plugin
+- [ ] Plugin is isolated — does not import from non-core modules
+- [ ] All plugin functions have ≥ 80% test coverage
+- [ ] Plugin has a `validate()` method that checks prerequisites
+- [ ] Plugin handles errors gracefully (no unhandled rejections)
+- [ ] Plugin cleanup: `onSprintComplete` should clean up temporary files
+- [ ] `README.md` documents plugin purpose, installation, and usage
+- [ ] Version follows [Semantic Versioning](https://semver.org/)
+
+### Plugin testing
+
+Plugins are tested in isolation using mock core services:
+
+```typescript
+// .deckent/plugins/my-plugin/tests/index.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MyPlugin } from '../src/index.js';
+
+describe('MyPlugin', () => {
+  let plugin: MyPlugin;
+
+  beforeEach(() => {
+    plugin = new MyPlugin();
+  });
+
+  it('validates successfully with correct config', async () => {
+    const valid = await plugin.validate();
+    expect(valid).toBe(true);
+  });
+
+  it('calls onTaskStart hook when task begins', async () => {
+    const task = { id: '001-001', title: 'Test Task' };
+    await plugin.hooks?.onTaskStart?.(task);
+    expect(/* assertions */);
+  });
+});
+```
+
+### Plugin registration
+
+Plugins are discovered and loaded from `.deckent/plugins/` by the Brain on startup. To register a new plugin:
+
+1. Create the plugin directory structure
+2. Implement `IPlugin` interface
+3. Declare permissions and hooks in `plugin.json`
+4. Test the plugin with `npm test`
+5. The plugin is automatically available on next Brain restart
+
+---
+
+## Internationalization (i18n) Contributing
+
+Deckent supports multiple languages through a runtime i18n system. Currently supported: **English (en)**, **Turkish (tr)**.
+
+### Adding a new language
+
+1. **Create language directory**:
+
+   ```bash
+   mkdir -p src/i18n/{languageCode}
+   ```
+
+   Use [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) language codes (e.g., `de` for German, `fr` for French).
+
+2. **Create message files** — mirror the structure of `src/i18n/en/`:
+
+   ```
+   src/i18n/de/
+   ├── index.ts         — Barrel re-export
+   ├── cli.ts           — CLI messages
+   ├── errors.ts        — Error messages
+   ├── hints.ts         — Contextual hints
+   └── messages.ts      — General UI messages
+   ```
+
+3. **Implement message exports** — each file exports a Messages object:
+
+   ```typescript
+   // src/i18n/de/cli.ts
+   export const cliMessages = {
+     initStart: 'Deckent wird initialisiert...',
+     initComplete: 'Initialisierung abgeschlossen',
+     planStart: 'Planen Sie den Sprint...',
+     // ... all keys matching src/i18n/en/cli.ts
+   };
+   ```
+
+4. **Update i18n loader** — add the language to `src/core/i18n.ts`:
+
+   ```typescript
+   const languages = {
+     en: () => import('../i18n/en/index.js'),
+     tr: () => import('../i18n/tr/index.js'),
+     de: () => import('../i18n/de/index.js'),  // Add new language
+   };
+   ```
+
+5. **Test coverage** — ensure all keys are present in the new language:
+
+   ```typescript
+   // tests/i18n/de.test.ts
+   import { describe, it, expect } from 'vitest';
+   import { loadMessages } from '../../src/core/i18n.js';
+   import * as enMessages from '../../src/i18n/en/index.js';
+
+   describe('German (de) i18n completeness', () => {
+     it('has all keys from English', async () => {
+       const deMessages = await loadMessages('de');
+       const enKeys = Object.keys(enMessages);
+       deKeys.forEach(key => {
+         expect(deMessages).toHaveProperty(key);
+       });
+     });
+   });
+   ```
+
+6. **Update DIRECTIVES.md** — note the new language support in the sprint summary
+
+### i18n conventions
+
+- **Key naming**: Use camelCase, descriptive names (e.g., `taskStartedMessage`, not `msg1`)
+- **Consistent terminology**: Keep translated terms consistent across all files
+  - If "Sprint" = "Sprint" in German, use it everywhere
+  - Maintain a glossary comment at the top of each file
+- **Pluralization**: Use message templates for plural forms:
+
+  ```typescript
+  tasksCompleted: (count: number) => `${count} Aufgabe${count !== 1 ? 'n' : ''} abgeschlossen`,
+  ```
+
+- **Formatting**: Follow the structure of existing language files exactly
+- **Do not translate**: variable names, file paths, code snippets, command names
+
+### Available languages
+
+| Code | Language | Status | Maintainer |
+|---|---|---|---|
+| `en` | English | Complete | @team |
+| `tr` | Turkish | Complete | @team |
+| `de` | German | Needs contributor | — |
+| `fr` | French | Needs contributor | — |
+
+---
+
+## MCP Tool and Resource Development
+
+Deckent exposes its API to IDE hosts (Claude, Cursor, etc.) through the Model Context Protocol (MCP). Tools and resources are the primary extension points for IDE integration.
+
+### MCP architecture
+
+```
+src/mcp/
+├── server.ts          — MCP server entry point
+├── tools/             — Tool implementations (10 tools)
+│   ├── directives.ts
+│   ├── plan.ts
+│   ├── start.ts
+│   ├── status.ts
+│   ├── doctor.ts
+│   ├── init.ts
+│   ├── retro.ts
+│   ├── history.ts
+│   ├── sync.ts
+│   └── analyze.ts
+├── resources/         — Resource implementations (5 resources)
+│   ├── directives.ts
+│   ├── brain-memory.ts
+│   ├── debt.ts
+│   ├── decisions.ts
+│   └── patterns.ts
+└── helpers/
+    └── enrich.ts      — Response enrichment utilities
+```
+
+### Adding a new MCP tool
+
+1. **Create tool file** in `src/mcp/tools/{toolName}.ts`:
+
+   ```typescript
+   import { Tool } from '@anthropic-ai/sdk/resources/messages.js';
+   import { enrichResponse } from '../helpers/enrich.js';
+   import type { EnrichedResponse } from '../../core/types.js';
+
+   export const myTool: Tool = {
+     type: 'function',
+     function: {
+       name: 'my_tool',
+       description: 'What this tool does',
+       inputSchema: {
+         type: 'object' as const,
+         properties: {
+           param1: { type: 'string', description: 'Parameter description' },
+         },
+         required: ['param1'],
+       },
+     },
+   };
+
+   export async function handleMyTool(params: { param1: string }): Promise<EnrichedResponse> {
+     // Implementation
+     const result = { /* tool output */ };
+     return enrichResponse(result, 'my_tool');
+   }
+   ```
+
+2. **Register tool** in `src/mcp/server.ts`:
+
+   ```typescript
+   import { myTool, handleMyTool } from './tools/my-tool.js';
+
+   // In createServer():
+   server.setRequestHandler(ListToolsRequestSchema, async () => ({
+     tools: [
+       // ... existing tools
+       myTool,
+     ],
+   }));
+
+   server.setRequestHandler(CallToolRequestSchema, async (request) => {
+     // ... existing handlers
+     if (request.params.name === 'my_tool') {
+       const result = await handleMyTool(request.params.arguments as { param1: string });
+       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+     }
+   }));
+   ```
+
+3. **Update index** — export tool from `src/mcp/tools/index.ts` (if barrel exists)
+
+4. **Write tests** in `tests/mcp/tools/my-tool.test.ts`:
+
+   ```typescript
+   import { describe, it, expect, vi, beforeEach } from 'vitest';
+   import { handleMyTool } from '../../../src/mcp/tools/my-tool.js';
+
+   describe('handleMyTool', () => {
+     it('returns enriched response', async () => {
+       const result = await handleMyTool({ param1: 'test' });
+       expect(result._enriched).toBeDefined();
+       expect(result._enriched.toolName).toBe('my_tool');
+     });
+   });
+   ```
+
+### Adding a new MCP resource
+
+1. **Create resource file** in `src/mcp/resources/{resourceName}.ts`:
+
+   ```typescript
+   import { Resource } from '@anthropic-ai/sdk/resources/messages.js';
+   import { readFile } from 'node:fs/promises';
+   import { join } from 'node:path';
+
+   export const myResource: Resource = {
+     type: 'resource',
+     uri: 'deckent://my-resource',
+     name: 'My Resource',
+     description: 'What this resource exposes',
+     mimeType: 'application/json',
+   };
+
+   export async function readMyResource(): Promise<string> {
+     const filePath = join(process.cwd(), '.brain', 'my-resource.md');
+     try {
+       return await readFile(filePath, 'utf-8');
+     } catch {
+       return 'Resource not found';
+     }
+   }
+   ```
+
+2. **Register resource** in `src/mcp/server.ts`:
+
+   ```typescript
+   import { myResource, readMyResource } from './resources/my-resource.js';
+
+   // In createServer():
+   server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+     resources: [
+       // ... existing resources
+       myResource,
+     ],
+   }));
+
+   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+     if (request.params.uri === 'deckent://my-resource') {
+       const content = await readMyResource();
+       return { contents: [{ uri: request.params.uri, mimeType: 'text/markdown', text: content }] };
+     }
+   }));
+   ```
+
+3. **Write tests** in `tests/mcp/resources/my-resource.test.ts`
+
+### Response enrichment
+
+All tool responses are enriched with metadata via `enrichResponse()`:
+
+```typescript
+import { enrichResponse } from '../helpers/enrich.js';
+
+const response = { data: 'tool result' };
+const enriched = enrichResponse(response, 'my_tool'); // Adds _enriched field
+```
+
+The `_enriched` field contains:
+- `toolName`: Name of the tool
+- `timestamp`: ISO 8601 timestamp
+- `version`: Deckent version
+- `locale`: Current language (en/tr)
+
+### Tool/resource checklist
+
+- [ ] Tool/resource implements MCP interface correctly
+- [ ] Tool has ≥ 80% test coverage
+- [ ] Response includes proper error messages (no stack traces)
+- [ ] Long-running tools support `--dry-run` or preview mode
+- [ ] Tool description is clear and concise
+- [ ] Input schema is complete and validated
+- [ ] Tool is registered in `src/mcp/server.ts`
+- [ ] All new test mocks include the new tool/resource in exports
+- [ ] Documentation mentions the new tool/resource in [docs/API.md](docs/API.md)
+- [ ] Response is enriched with `enrichResponse()` if it's a tool
 
 ---
 

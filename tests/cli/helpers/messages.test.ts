@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getMessage, getLanguage } from '../../../src/cli/helpers/messages.js';
 
-// Actual keys in messages.ts (104-line version)
+// All keys defined in messages.ts
 const KNOWN_KEYS = [
   'hint.COMPLETE',
   'hint.EXECUTE',
@@ -14,6 +14,35 @@ const KNOWN_KEYS = [
   'status.tasks_running',
   'status.sprint_active',
   'status.no_sprint',
+  'status.no_active_sprint',
+  'status.dashboard_read_failed',
+  'start.sandbox_not_implemented',
+  'start.use_force',
+  'start.watch_ignored_dry_run',
+  'start.sprint_planned',
+  'start.reasoning',
+  'start.planning_mode',
+  'start.workers_info',
+  'start.dry_run_complete',
+  'start.watch_window_created',
+  'start.watch_no_tmux',
+  'plan.sprint_planned',
+  'plan.reasoning',
+  'plan.planning_mode',
+  'plan.note_sprint_size',
+  'plan.approved',
+  'plan.rejected',
+  'cleanup.decay_complete',
+  'cleanup.archived_sprints',
+  'cleanup.removed_items',
+  'cleanup.complete',
+  'doctor.checks_passed',
+  'init.auto_detecting',
+  'init.recommendation',
+  'init.initialized',
+  'init.next_steps',
+  'init.next_step_directives',
+  'init.next_step_start',
 ] as const;
 
 // ─── getMessage ───────────────────────────────────────────────────────────────
@@ -245,6 +274,244 @@ describe('Language completeness', () => {
     expect(getMessage('kill.worker_killed', 'tr')).toContain('durduruldu');
     expect(getMessage('kill.worker_not_found', 'en')).toContain('not found');
     expect(getMessage('kill.worker_not_found', 'tr')).toContain('bulunamadı');
+  });
+});
+
+// ─── start command messages ───────────────────────────────────────────────────
+
+describe('start command messages', () => {
+  it('start.sandbox_not_implemented returns English text', () => {
+    expect(getMessage('start.sandbox_not_implemented', 'en')).toContain('Sandbox');
+  });
+
+  it('start.sandbox_not_implemented returns Turkish text', () => {
+    expect(getMessage('start.sandbox_not_implemented', 'tr')).toContain('Sandbox');
+  });
+
+  it('start.use_force has --force mention in both languages', () => {
+    expect(getMessage('start.use_force', 'en')).toContain('--force');
+    expect(getMessage('start.use_force', 'tr')).toContain('--force');
+  });
+
+  it('start.watch_ignored_dry_run mentions dry-run mode', () => {
+    expect(getMessage('start.watch_ignored_dry_run', 'en')).toContain('dry-run');
+    expect(getMessage('start.watch_ignored_dry_run', 'tr')).toContain('Dry-run');
+  });
+
+  it('start.sprint_planned interpolates number, id, count', () => {
+    const result = getMessage('start.sprint_planned', 'en', { number: '5', id: 'sprint-005', count: '10' });
+    expect(result).toContain('sprint-005');
+    expect(result).toContain('10');
+  });
+
+  it('start.reasoning interpolates reasoning', () => {
+    expect(getMessage('start.reasoning', 'en', { reasoning: 'test reason' })).toContain('test reason');
+  });
+
+  it('start.planning_mode interpolates mode in both languages', () => {
+    expect(getMessage('start.planning_mode', 'en', { mode: 'ai' })).toContain('ai');
+    expect(getMessage('start.planning_mode', 'tr', { mode: 'ai' })).toContain('ai');
+  });
+
+  it('start.workers_info interpolates count and model', () => {
+    const result = getMessage('start.workers_info', 'en', { count: '4', model: 'opus' });
+    expect(result).toContain('4');
+    expect(result).toContain('opus');
+  });
+
+  it('start.dry_run_complete mentions Dry-run in both languages', () => {
+    expect(getMessage('start.dry_run_complete', 'en')).toContain('Dry-run');
+    expect(getMessage('start.dry_run_complete', 'tr')).toContain('Dry-run');
+  });
+
+  it('start.watch_window_created mentions tmux', () => {
+    expect(getMessage('start.watch_window_created', 'en')).toContain('tmux');
+  });
+
+  it('start.watch_no_tmux mentions tmux in both languages', () => {
+    expect(getMessage('start.watch_no_tmux', 'en')).toContain('tmux');
+    expect(getMessage('start.watch_no_tmux', 'tr')).toContain('tmux');
+  });
+});
+
+// ─── plan command messages ────────────────────────────────────────────────────
+
+describe('plan command messages', () => {
+  it('plan.sprint_planned interpolates number, id, count', () => {
+    const result = getMessage('plan.sprint_planned', 'en', { number: '3', id: 'sprint-003', count: '7' });
+    expect(result).toContain('sprint-003');
+    expect(result).toContain('7');
+  });
+
+  it('plan.sprint_planned Turkish version', () => {
+    const result = getMessage('plan.sprint_planned', 'tr', { number: '3', id: 'sprint-003', count: '7' });
+    expect(result).toContain('sprint-003');
+  });
+
+  it('plan.reasoning interpolates reasoning', () => {
+    expect(getMessage('plan.reasoning', 'en', { reasoning: 'because X' })).toContain('because X');
+  });
+
+  it('plan.planning_mode interpolates mode', () => {
+    expect(getMessage('plan.planning_mode', 'en', { mode: 'structured' })).toContain('structured');
+  });
+
+  it('plan.note_sprint_size interpolates size and reason', () => {
+    const result = getMessage('plan.note_sprint_size', 'en', { size: 'large', reason: 'many tasks' });
+    expect(result).toContain('large');
+    expect(result).toContain('many tasks');
+  });
+
+  it('plan.approved returns approval message in both langs', () => {
+    expect(getMessage('plan.approved', 'en')).toContain('approved');
+    expect(getMessage('plan.approved', 'tr')).toContain('onaylandı');
+  });
+
+  it('plan.rejected returns rejection message in both langs', () => {
+    expect(getMessage('plan.rejected', 'en')).toContain('rejected');
+    expect(getMessage('plan.rejected', 'tr')).toContain('reddedildi');
+  });
+});
+
+// ─── cleanup command messages ─────────────────────────────────────────────────
+
+describe('cleanup command messages', () => {
+  it('cleanup.decay_complete interpolates before and after', () => {
+    const result = getMessage('cleanup.decay_complete', 'en', { before: '100', after: '80' });
+    expect(result).toContain('100');
+    expect(result).toContain('80');
+  });
+
+  it('cleanup.decay_complete Turkish version', () => {
+    const result = getMessage('cleanup.decay_complete', 'tr', { before: '100', after: '80' });
+    expect(result).toContain('100');
+    expect(result).toContain('80');
+  });
+
+  it('cleanup.archived_sprints interpolates sprints list', () => {
+    const result = getMessage('cleanup.archived_sprints', 'en', { sprints: 'sprint-001, sprint-002' });
+    expect(result).toContain('sprint-001');
+  });
+
+  it('cleanup.removed_items interpolates debt and patterns', () => {
+    const result = getMessage('cleanup.removed_items', 'en', { debt: '3', patterns: '5' });
+    expect(result).toContain('3');
+    expect(result).toContain('5');
+  });
+
+  it('cleanup.complete interpolates count', () => {
+    const result = getMessage('cleanup.complete', 'en', { count: '12' });
+    expect(result).toContain('12');
+    expect(result).toContain('Cleanup complete');
+  });
+});
+
+// ─── doctor command messages ──────────────────────────────────────────────────
+
+describe('doctor command messages', () => {
+  it('doctor.checks_passed interpolates passed and total', () => {
+    const result = getMessage('doctor.checks_passed', 'en', { passed: '5', total: '6' });
+    expect(result).toContain('5');
+    expect(result).toContain('6');
+  });
+
+  it('doctor.checks_passed Turkish version', () => {
+    const result = getMessage('doctor.checks_passed', 'tr', { passed: '4', total: '5' });
+    expect(result).toContain('kontrol');
+  });
+});
+
+// ─── status extended messages ─────────────────────────────────────────────────
+
+describe('status extended messages', () => {
+  it('status.no_active_sprint has proper English text', () => {
+    expect(getMessage('status.no_active_sprint', 'en')).toContain('No active sprint');
+  });
+
+  it('status.no_active_sprint has proper Turkish text', () => {
+    expect(getMessage('status.no_active_sprint', 'tr')).toContain('Aktif sprint yok');
+  });
+
+  it('status.dashboard_read_failed English mentions Failed', () => {
+    expect(getMessage('status.dashboard_read_failed', 'en')).toContain('Failed');
+  });
+
+  it('status.dashboard_read_failed Turkish mentions okunamadı', () => {
+    expect(getMessage('status.dashboard_read_failed', 'tr')).toContain('okunamadı');
+  });
+});
+
+// ─── init command messages ────────────────────────────────────────────────────
+
+describe('init command messages', () => {
+  it('init.auto_detecting English mentions Auto-detecting', () => {
+    expect(getMessage('init.auto_detecting', 'en')).toContain('Auto-detecting');
+  });
+
+  it('init.auto_detecting Turkish mentions algılanıyor', () => {
+    expect(getMessage('init.auto_detecting', 'tr')).toContain('algılanıyor');
+  });
+
+  it('init.recommendation English mentions Recommendation', () => {
+    expect(getMessage('init.recommendation', 'en')).toContain('Recommendation');
+  });
+
+  it('init.recommendation Turkish mentions Öneri', () => {
+    expect(getMessage('init.recommendation', 'tr')).toContain('Öneri');
+  });
+
+  it('init.initialized interpolates name, mode, language', () => {
+    const result = getMessage('init.initialized', 'en', { name: 'myproject', mode: 'max_plan', language: 'en' });
+    expect(result).toContain('myproject');
+    expect(result).toContain('max_plan');
+  });
+
+  it('init.next_steps returns next steps in both languages', () => {
+    expect(getMessage('init.next_steps', 'en')).toContain('Next steps');
+    expect(getMessage('init.next_steps', 'tr')).toContain('adımlar');
+  });
+
+  it('init.next_step_directives mentions DIRECTIVES.md in both langs', () => {
+    expect(getMessage('init.next_step_directives', 'en')).toContain('DIRECTIVES.md');
+    expect(getMessage('init.next_step_directives', 'tr')).toContain('DIRECTIVES.md');
+  });
+
+  it('init.next_step_start mentions deckent start in both langs', () => {
+    expect(getMessage('init.next_step_start', 'en')).toContain('deckent start');
+    expect(getMessage('init.next_step_start', 'tr')).toContain('deckent start');
+  });
+});
+
+// ─── getLanguage empty string edge cases ─────────────────────────────────────
+
+describe('getLanguage empty string config', () => {
+  const origLang = process.env['LANG'];
+  const origLcAll = process.env['LC_ALL'];
+
+  beforeEach(() => {
+    delete process.env['LANG'];
+    delete process.env['LC_ALL'];
+  });
+
+  afterEach(() => {
+    if (origLang !== undefined) process.env['LANG'] = origLang;
+    else delete process.env['LANG'];
+    if (origLcAll !== undefined) process.env['LC_ALL'] = origLcAll;
+    else delete process.env['LC_ALL'];
+  });
+
+  it('empty string config falls through to LC_ALL env', () => {
+    process.env['LC_ALL'] = 'tr_TR.UTF-8';
+    expect(getLanguage('')).toBe('tr');
+  });
+
+  it('empty string config falls through to LANG env', () => {
+    process.env['LANG'] = 'tr_TR.UTF-8';
+    expect(getLanguage('')).toBe('tr');
+  });
+
+  it('empty string config falls back to en with no env', () => {
+    expect(getLanguage('')).toBe('en');
   });
 });
 

@@ -17,3 +17,13 @@ updates:
         update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "ci/cd"

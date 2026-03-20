@@ -111,6 +111,34 @@ describe('config export/import commands', () => {
       vi.mocked(readFileSync).mockReturnValue('not-valid-json');
       expect(() => exportConfig('/mock/root/.deckent/config.json')).toThrow();
     });
+
+    it('handles empty JSON object {}', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('{}');
+      expect(() => exportConfig('/mock/root/.deckent/config.json')).not.toThrow();
+      expect(print).toHaveBeenCalledWith('{}');
+    });
+
+    it('strips multiline block comments spanning multiple lines', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(
+        '/*\n * Multi-line\n * block comment\n */\n{"mode":"max_plan"}',
+      );
+      exportConfig('/mock/root/.deckent/config.json');
+      const output = vi.mocked(print).mock.calls[0]?.[0] as string;
+      expect(output).not.toContain('Multi-line');
+      expect(output).not.toContain('block comment');
+      expect(output).toContain('"mode"');
+    });
+
+    it('handles config with nested objects', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('{"modes":{"pro_plan":{"max_workers":3}}}');
+      expect(() => exportConfig('/mock/root/.deckent/config.json')).not.toThrow();
+      const output = vi.mocked(print).mock.calls[0]?.[0] as string;
+      expect(output).toContain('modes');
+      expect(output).toContain('max_workers');
+    });
   });
 
   // ── importConfig unit tests ──────────────────────────────────────
@@ -184,6 +212,57 @@ describe('config export/import commands', () => {
         throw new ConfigValidationError(['Invalid mode']);
       });
       expect(() => importConfig('/import.json', '/config.json')).toThrow(ConfigValidationError);
+    });
+
+    it('imports an empty JSON object without error', () => {
+      vi.mocked(existsSync).mockImplementation((p: unknown) => p === '/import.json');
+      vi.mocked(readFileSync).mockReturnValue('{}');
+      vi.mocked(validatePartialConfig).mockImplementation(() => {});
+      expect(() => importConfig('/import.json', '/config.json')).not.toThrow();
+      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const written = JSON.parse(String(writeCall![1]));
+      expect(written).toEqual({});
+    });
+
+    it('preserves extra fields in existing config during merge', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+        if (String(p).includes('import')) return '{"language":"tr"}';
+        return '{"mode":"max_plan","customField":"preserved","projectName":"myapp"}';
+      });
+      vi.mocked(validatePartialConfig).mockImplementation(() => {});
+      importConfig('/import.json', '/config.json');
+      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const written = JSON.parse(String(writeCall![1]));
+      expect(written.customField).toBe('preserved');
+      expect(written.projectName).toBe('myapp');
+      expect(written.language).toBe('tr');
+    });
+
+    it('import data with numeric value is preserved', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+        if (String(p).includes('import')) return '{"max_workers":5}';
+        return '{}';
+      });
+      vi.mocked(validatePartialConfig).mockImplementation(() => {});
+      importConfig('/import.json', '/config.json');
+      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const written = JSON.parse(String(writeCall![1]));
+      expect(written.max_workers).toBe(5);
+    });
+
+    it('import data overrides existing config field of same name', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+        if (String(p).includes('import')) return '{"mode":"pro_plan"}';
+        return '{"mode":"max_plan"}';
+      });
+      vi.mocked(validatePartialConfig).mockImplementation(() => {});
+      importConfig('/import.json', '/config.json');
+      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const written = JSON.parse(String(writeCall![1]));
+      expect(written.mode).toBe('pro_plan');
     });
   });
 

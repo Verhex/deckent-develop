@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint26] - 2026-03-20
+
+### Added
+
+- **readJsonSafe Import Migration Tamamlama**: GO_WITH_TECH_DEBT
+- **package.json files + keywords Tamamlama**: GO_WITH_TECH_DEBT
+- **CODEOWNERS İyileştirme**: DONE
+- **dependabot.yml İyileştirme**: DONE
+- **Release Workflow İyileştirme**: DONE
+- **Security Template + FUNDING.yml İyileştirme**: DONE
+- **debt-manager.test.ts Test Tamamlama**: DONE
+- **task-builder.test.ts Test Tamamlama**: GO_WITH_TECH_DEBT
+- **CLI init.test.ts Test Tamamlama**: DONE
+- **CLI archive-debt.test.ts Test Tamamlama**: DONE
+- **Tasks**: 35 total, 35 done, 16 tech debt, 0 no-go
 ## [0.1.0-sprint25] - 2026-03-20
 
 ### Added
