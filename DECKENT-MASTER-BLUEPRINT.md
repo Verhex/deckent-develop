@@ -129,10 +129,36 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 └─────────────────────────────────────────────────────┘
 ```
 
+**Provider Abstraction Layer (Planned — Sprint 27):**
+```
+┌─────────────────────────────────────────────────────────┐
+│              PROVIDER ADAPTER INTERFACE                    │
+│  spawn(opts) | checkUsage() | isAvailable()               │
+│  supportedModels[] | name                                  │
+├─────────────┬─────────────┬─────────────┬────────────────┤
+│  Claude     │  Codex      │  Gemini     │  (future)      │
+│  Adapter    │  Adapter    │  Adapter    │                │
+│  claude -p  │  codex -p   │  gemini ... │                │
+└──────┬──────┴──────┬──────┴──────┬──────┴────────────────┘
+       │             │             │
+┌──────▼──────────────▼──────────────▼──────────────────────┐
+│              SPAWN BACKEND FACTORY                         │
+│  TmuxBackend | SubprocessBackend | SandboxBackend         │
+│  (auto-detect: tmux available → tmux, else → subprocess)  │
+└───────────────────────────────────────────────────────────┘
+```
+
+Brain becomes provider-agnostic. `spawnWorkers()` calls `SpawnBackendFactory.create()` instead of importing tmux directly. This enables:
+- **tmux-free operation** via SubprocessBackend (Windows without WSL2)
+- **Multi-provider** mixing: Claude Brain + OpenAI workers
+- **Sandbox mode** via isolated subprocess with scope enforcement
+
 **Auth Chain:**
 ```
 Claude Code → MCP stdio (local process, no extra auth)
-  → Core Engine → tmux → claude -p (inherits Claude Code session auth)
+  → Core Engine → Provider Adapter → Spawn Backend → worker process
+  → Claude mode: inherits Claude Code session auth
+  → Codex mode: OPENAI_API_KEY env variable
   → API mode: ANTHROPIC_API_KEY env variable
 ```
 
@@ -1352,6 +1378,44 @@ Deckent ran itself for the first time:
 - 12 tasks (8 DONE, 4 TECH_DEBT, 0 NO_GO), 321s
 - +30 tests (1392→1422), 55 test files, 0 regressions
 
+## Sprint 24 (Mega Sprint): Plugin v2 + i18n + OSS Infrastructure
+
+- Plugin v2 system: install (local/git), create (scaffold), remove, enable/disable, hooks (before/afterSprint, before/afterTask)
+- i18n runtime: getMessage() with tr/en support, CLI hints, contextual messages
+- +1449 tests in a single sprint (1701→3150) — largest test increase ever
+- OSS infrastructure: CONTRIBUTING.md, LICENSE, CI pipeline, issue templates
+- 3150 tests, 97.5% coverage
+
+## Sprint 25-26: Tech Debt Cleanup + OSS Polish
+
+- readJsonSafe import migration across brain.ts, debt-manager.ts, auditor.ts
+- package.json files field, keywords, CODEOWNERS, dependabot.yml, FUNDING.yml
+- GitHub Actions release workflow (basic)
+- Dedicated test suites: debt-manager, task-builder, core/config, auditor, tmux, api/server
+- Integration test: init→plan→status E2E
+- FAQ document
+- +292 tests (3150→3442), 136 test files, 0 regressions
+
+## Sprint 27-29: Global Launch Preparation (Planned)
+
+Full directives available at:
+- `docs/directives/sprint-027.md` — Technical gap closure (30 tasks)
+- `docs/directives/sprint-028.md` — npm publish preparation (30 tasks)
+- `docs/directives/sprint-029.md` — Real-world testing + beta publish (30 tasks)
+
+Key deliverables across all three sprints:
+- Provider abstraction layer (Claude, Codex, future providers)
+- Subprocess spawn backend (tmux-free operation)
+- Zero-config mode (`deckent start "description"`)
+- Rollback mechanism (git safety points)
+- Usage tracking (model-based token/call counting)
+- npm publish pipeline + 0.1.0-beta.1 release
+- English documentation overhaul
+- Interactive onboard wizard
+- E2E smoke tests across 4 project types
+- Performance benchmarks (10/50/100 task sprints)
+- Launch preparation (Product Hunt, Hacker News, Discord)
+
 ---
 
 # 20. CLAUDE CODE INTEGRATION GUIDE
@@ -1576,11 +1640,61 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 - Know agile/sprint terminology
 - Understand .tasks/ or .brain/ internals
 
+## Flow 4: Zero-Config Mode (Planned — Sprint 27)
+
+```
+# No DIRECTIVES.md needed — single line of natural language
+$ deckent start "Add user authentication with JWT and Google OAuth"
+
+# Deckent automatically:
+# 1. Creates temporary DIRECTIVES.md with structured tasks
+# 2. AI planner decomposes into 3-5 subtasks:
+#    - Auth API endpoints (sonnet)
+#    - Google OAuth integration (opus)
+#    - Login page UI (sonnet)
+#    - Tests + documentation (haiku)
+# 3. Plans sprint with model assignment
+# 4. Creates git safety point (rollback branch)
+# 5. Spawns workers, runs sprint
+# 6. On completion: cleans temporary DIRECTIVES
+
+# Quick fix mode:
+$ deckent start "Fix the TypeScript errors in src/api/"
+# → Single-task sprint, targeted scope
+
+# Review mode (future):
+$ deckent review
+# → Analyzes current PR, suggests improvements
+```
+
+**Zero-config enables:**
+- First-time users start in <30 seconds
+- No need to learn DIRECTIVES.md format
+- AI handles task decomposition automatically
+- Rollback safety on full failure
+
+## Flow 5: Provider-Agnostic Usage (Planned — Sprint 29+)
+
+```
+# Auto-detect available CLI tools
+$ deckent doctor --profile
+  Provider: Claude CLI (claude v2.1.32) ✓
+  Provider: OpenAI Codex CLI (codex v1.0) ✓
+  Recommended: Claude for Brain, Codex for workers (cost optimization)
+
+# Mix providers
+$ deckent config set brain_provider claude
+$ deckent config set worker_provider codex
+$ deckent start "Build REST API for user management"
+# → Brain plans with Claude Opus
+# → Workers execute with OpenAI GPT-4.1
+```
+
 ---
 
 # 23. STRATEGIC ROADMAP
 
-## Phase 1: Claude Native Stable (Sprint 1-8)
+## Phase 1: Claude Native Stable (Sprint 1-16) — COMPLETE
 
 **Goal:** Rock-solid Claude-native orchestration with MCP integration.
 
@@ -1602,35 +1716,103 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Done |
 | 16 | Watch mode, worker logs, agent detail, model inference | Done |
 
-**Exit criteria:** 1027+ tests, 97%+ coverage, stable MCP integration, HTTP API, Web Dashboard, AI planning, DECKENT.md bağımsızlık.
+**Exit criteria:** 1027+ tests, 97%+ coverage, stable MCP integration, HTTP API, Web Dashboard, AI planning, DECKENT.md bağımsızlık. ✅ ALL MET.
 
-## Phase 2: Self-Orchestration & Learning (Sprint 15+)
+## Phase 2: Self-Orchestration & Learning (Sprint 17-26) — COMPLETE
 
 **Goal:** Continued dogfooding, plugin system, advanced learning.
 
-- Run 5+ consecutive sprints on Deckent's own codebase — Done
-- Brain learns from its own retros and improves plans — Done
-- Auditor catches real boundary violations — Done
-- Tech debt escalation triggers automatically — Done
-- Memory decay keeps `.brain/` under 300 lines — Done
-- Plugin system: first community skill template — Planned
+- Run 5+ consecutive sprints on Deckent's own codebase — ✅ Done (18 consecutive sprints)
+- Brain learns from its own retros and improves plans — ✅ Done
+- Auditor catches real boundary violations — ✅ Done
+- Tech debt escalation triggers automatically — ✅ Done
+- Memory decay keeps `.brain/` under 300 lines — ✅ Done
+- Plugin system v2 (install/create/remove/hooks) — ✅ Done (Sprint 24)
+- i18n runtime — ✅ Done (Sprint 24)
+- OSS infrastructure (CONTRIBUTING, LICENSE, CI) — ✅ Done (Sprint 24-26)
+- 3442 tests, 136 test files — ✅ Done
 
-## Phase 3: Multi-Provider (Sprint 20+)
+## Phase 3: Global Launch Preparation (Sprint 27-29) — IN PROGRESS
 
-**Goal:** Run workers on different providers simultaneously.
+**Goal:** Technical gap closure → npm publish → real-world testing → beta launch.
 
-- Abstract `claude -p` into a provider interface
+### Sprint 27: Technical Gap Closure (30 tasks)
+Full directive: `docs/directives/sprint-027.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Provider Abstraction | 5 | ProviderAdapter interface, ClaudeAdapter, ProviderRegistry, brain.ts integration |
+| Subprocess Spawn | 2 | SubprocessSpawnBackend (tmux-free), SpawnBackendFactory |
+| Coverage Validation | 2 | parseCoverageFromVitest, brain evaluateResult integration |
+| Usage Tracking | 3 | UsageTracker, brain integration, `deckent usage` real implementation |
+| Zero-Config Mode | 2 | `deckent start "description"`, AI planner single-line decomposition |
+| Rollback | 2 | Git safety point, brain integration, auto-rollback on full NO_GO |
+| Worker IPC | 2 | MessageChannel (process.send), brain dual-mode (IPC + file fallback) |
+| Sandbox Mode | 2 | SandboxSpawnBackend, `--sandbox-mode` real implementation |
+| Global Config | 3 | ~/.deckent/, CLI --global, credentials management |
+| Validation & Testing | 4 | Task retry, deadlock detection, pattern learning, integration tests |
+| Doc Updater | 1 | Sprint metrics in README |
+| Config Validation | 2 | Enhanced validation, provider-aware config |
+
+### Sprint 28: npm Publish Preparation (30 tasks)
+Full directive: `docs/directives/sprint-028.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Build & Publish Pipeline | 4 | package.json, build verify, npm pack, publish script |
+| English Documentation | 6 | README overhaul (3 sections), QUICKSTART, API docs, CONFIG-REFERENCE |
+| Interactive Onboarding | 3 | TUI wizard framework, `deckent onboard`, `deckent upgrade` |
+| Error UX | 4 | Error registry, CLI handler, doctor improvements, i18n errors |
+| OSS Files | 4 | LICENSE, issue templates, PR template, SECURITY.md |
+| npm Compatibility | 3 | npx support, init post-publish, --version enhancement |
+| Launch Content | 2 | Landing page content, CONTRIBUTING.md update |
+| Automation | 3 | CHANGELOG updater, telemetry opt-in, release checklist |
+| Integration Test | 1 | npm install simulation E2E |
+
+### Sprint 29: Real-World Testing + Beta Publish (30 tasks)
+Full directive: `docs/directives/sprint-029.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Cross-Project Testing | 4 | React/Next.js, Python/FastAPI, Rust CLI, Monorepo scenarios |
+| E2E Smoke Tests | 4 | Full flow, zero-config, MCP chain, error scenarios |
+| npm Beta Publish | 2 | 0.1.0-beta.1, GitHub Actions release workflow |
+| CI Improvements | 1 | Matrix (Node 18/20/22), coverage, PR comments |
+| Performance Benchmarks | 3 | 10-task, 50-task, 100-task stress tests |
+| Launch Preparation | 4 | GIF demo script, Product Hunt doc, HN post draft, Discord setup |
+| Notifications | 2 | Webhook provider, brain integration |
+| Platform Compat | 2 | Cross-platform tests, doctor post-publish checks |
+| Provider Expansion | 2 | Auto-detect providers, Codex CLI adapter (basic) |
+| Templates | 2 | Template gallery, `deckent init --template` |
+| Regression | 2 | Sprint 027-028 regression suite, beta launch checklist |
+
+**Exit criteria:** `npm install -g deckent@beta` works. `deckent init && deckent start "hello"` completes in <60s. 3+ project types tested. Performance benchmarks baselined. Launch docs ready.
+
+## Phase 4: Multi-Provider & Ecosystem (Sprint 30+) — PLANNED
+
+**Goal:** Run workers on different providers simultaneously. VSCode extension. Community ecosystem.
+
+- Provider adapters: OpenAI Codex CLI, Gemini CLI, local models (Ollama)
 - Brain on Opus (Claude), workers on GPT-4o (OpenAI) — mix and match
 - Provider-specific tool mapping (allowedTools → function_calling)
 - Cost optimization: expensive tasks on powerful models, simple on cheap
-
-## Phase 4: Platform Expansion (Sprint 25+)
-
-**Goal:** Beyond CLI — VSCode extension, team features.
-
-- VSCode extension (sidebar, status bar, inline decorations)
+- VSCode extension (sidebar, status bar, sprint management)
+- GitHub App (issue → sprint → PR automation)
 - Team mode: shared sprints, role-based access
-- Cloud mode: remote orchestration (no local tmux)
+- Plugin marketplace (community plugins)
+- Cloud dashboard (deckent.agency remote monitoring)
+- Claude Code Agent Teams integration (native spawn backend)
+
+## Phase 5: Platform & Enterprise (Sprint 40+) — VISION
+
+**Goal:** Deckent as a platform for AI-driven development.
+
+- Enterprise features: SSO, audit log, compliance, RBAC
+- Deckent Hub: community templates, plugins, DIRECTIVES examples
+- CI/CD integration: auto `deckent plan --dry-run` on PR
+- Cloud orchestration: remote tmux-free workers
+- Multi-project orchestration: cross-repo sprints
+- Native Windows support (no WSL2 required)
 
 ---
 
@@ -1660,6 +1842,11 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 | 21 | 1260 | 97.5% | Parametric orchestration: system-profile, subscription, resolveTaskModel, auto workers, test+run CLI |
 | 22 | 1392 | 97.5% | Decay fix, auto setup wizard, MCP enrichment 10/10, CLI hints, doctor --profile |
 | 23 | 1422 | 97.5% | AI planner fallback fix, 12/12 tasks (first time), task queue waves validated |
+| 24 (Mega) | 3150 | 97.5% | Plugin v2, i18n runtime, +1449 tests, OSS infra (CONTRIBUTING, LICENSE, CI) |
+| 25-26 | 3442 | 97.5% | Tech debt cleanup, readJsonSafe migration, integration tests, OSS files |
+| 27 | — | Planned | Teknik boşluk kapatma: provider abstraction, subprocess spawn, zero-config, rollback, usage tracking, sandbox, IPC |
+| 28 | — | Planned | npm publish hazırlık: publish pipeline, İngilizce README, onboard wizard, error UX, upgrade/usage implement |
+| 29 | — | Planned | Gerçek dünya testi + beta: E2E smoke tests, cross-platform, npm 0.1.0-beta.1, performance benchmark, launch prep |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1676,6 +1863,10 @@ Claude:  → deckent_set_directives → deckent_plan → [user approves] → dec
 **Parametric orchestration milestone (Sprint 21):** System profile detection, subscription detection, layered model selection, auto workers. `deckent test` and `deckent run` CLI commands. Planner task queue finally fixed — all tasks planned regardless of max_workers. +137 tests.
 
 **Full orchestration milestone (Sprint 23):** AI planner post-validation fallback — if AI returns fewer tasks than directives specify, falls back to structured mode. First time 12/12 tasks planned and completed. Task queue wave mechanism (8 workers + 4 queued) validated end-to-end. 1422 tests total.
+
+**Mega sprint milestone (Sprint 24):** Plugin v2 system (install/create/remove/hooks), i18n runtime, +1449 tests in a single sprint. OSS infrastructure: CONTRIBUTING.md, LICENSE, CI pipeline. Test count jumped from 1701 to 3150.
+
+**OSS readiness milestone (Sprint 25-26):** Tech debt cleanup sprint. readJsonSafe import migration completed across brain.ts, debt-manager.ts, auditor.ts. Integration tests added. OSS files polished. 3442 tests total.
 
 ---
 
