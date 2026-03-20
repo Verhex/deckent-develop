@@ -5,6 +5,28 @@ import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
 
 /**
+ * Read a file safely, returning empty string on any error.
+ */
+export function readFileSafe(filePath: string): string {
+  try {
+    return readFileSync(filePath, 'utf-8');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Parse a JSON file safely, returning null on any error.
+ */
+export function readJsonSafe<T>(filePath: string): T | null {
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Count total lines in .brain/ directory (excluding archive/).
  * Used by brain decay and doctor health checks.
  */
@@ -167,4 +189,69 @@ export function ensureDeckentImport(filePath: string): void {
   } else {
     writeFileSync(filePath, `${ref}\n`);
   }
+}
+
+// ─── i18n Date/Time Localization ─────────────────────────────────────────────
+
+const DATE_LOCALES: Record<string, string> = {
+  en: 'en-US',
+  tr: 'tr-TR',
+};
+
+/**
+ * Format a Date or ISO string according to the given language.
+ * Supported lang values: 'en' (default), 'tr'
+ */
+export function formatDate(date: Date | string, lang: string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const locale = DATE_LOCALES[lang] ?? DATE_LOCALES['en']!;
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+const DURATION_UNITS: Array<{ ms: number; en: string; tr: string }> = [
+  { ms: 86_400_000, en: 'day', tr: 'gün' },
+  { ms: 3_600_000, en: 'hour', tr: 'saat' },
+  { ms: 60_000, en: 'minute', tr: 'dakika' },
+  { ms: 1_000, en: 'second', tr: 'saniye' },
+];
+
+/**
+ * Format a duration in milliseconds into a human-readable string.
+ * e.g. formatDuration(300000, 'en') → "5 minutes"
+ *      formatDuration(300000, 'tr') → "5 dakika"
+ */
+export function formatDuration(ms: number, lang: string): string {
+  if (ms < 0) ms = 0;
+  const isTr = lang === 'tr';
+
+  for (const unit of DURATION_UNITS) {
+    const value = Math.floor(ms / unit.ms);
+    if (value >= 1) {
+      if (isTr) {
+        return `${value} ${unit.tr}`;
+      }
+      return value === 1 ? `1 ${unit.en}` : `${value} ${unit.en}s`;
+    }
+  }
+  return isTr ? '0 saniye' : '0 seconds';
+}
+
+/**
+ * Format the time elapsed since `date` as a relative string.
+ * e.g. formatRelativeTime(pastDate, 'en') → "3 seconds ago"
+ *      formatRelativeTime(pastDate, 'tr') → "3 saniye önce"
+ * For future dates: "in 3 seconds" / "3 saniye sonra"
+ */
+export function formatRelativeTime(date: Date, lang: string): string {
+  const diffMs = Date.now() - date.getTime();
+  const isFuture = diffMs < 0;
+  const absDiff = Math.abs(diffMs);
+  const isTr = lang === 'tr';
+
+  const duration = formatDuration(absDiff, lang);
+
+  if (isTr) {
+    return isFuture ? `${duration} sonra` : `${duration} önce`;
+  }
+  return isFuture ? `in ${duration}` : `${duration} ago`;
 }

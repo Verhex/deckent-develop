@@ -3,6 +3,8 @@ import { readTask } from '../../agents/worker.js';
 import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { loadConfig } from '../../core/config.js';
+import { getMessage } from '../helpers/messages.js';
 
 export function registerSpawn(program: Command): void {
   program
@@ -13,6 +15,8 @@ export function registerSpawn(program: Command): void {
 
       try {
         const task = readTask(root, taskId);
+        const config = await loadConfig(root).catch(() => ({ language: 'en' }));
+        const lang = config.language ?? 'en';
 
         ensureSession();
         const prompt = `You are a Worker agent. Read your task file (.tasks/task-${taskId}.json) and execute it.`;
@@ -21,7 +25,7 @@ export function registerSpawn(program: Command): void {
           autoApprove: false,
         });
 
-        print(`Worker spawned for task ${taskId} (model: ${task.model}).`);
+        print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));
       } catch (error) {
         printError(error);
         process.exitCode = 1;

@@ -165,3 +165,97 @@ describe('cleanup command (isolated)', () => {
     expect(process.exitCode).toBeUndefined();
   });
 });
+
+// ─── i18n integration ─────────────────────────────────────────────────
+
+describe('cleanup i18n integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+  });
+
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it('uses en language by default when config missing', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('Cleanup complete'))).toBe(true);
+  });
+
+  it('reads language from config and uses tr output when language=tr', async () => {
+    vi.mocked(existsSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return true;
+      return false;
+    });
+    vi.mocked(readFileSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return JSON.stringify({ language: 'tr' });
+      return '';
+    });
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    // Turkish: 'Temizlik tamamlandı. {count} görevin artifaktları silindi.'
+    expect(calls.some(c => String(c).includes('Temizlik tamamlandı'))).toBe(true);
+  });
+
+  it('decay complete uses tr language when config language=tr', async () => {
+    vi.mocked(existsSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return true;
+      return false;
+    });
+    vi.mocked(readFileSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return JSON.stringify({ language: 'tr' });
+      return '';
+    });
+    vi.mocked(runDecay).mockReturnValue({
+      linesBefore: 300, linesAfter: 200,
+      archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0,
+    });
+    await runCommand(['cleanup', '--decay']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    // Turkish: 'Decay tamamlandı: {before} → {after} satır'
+    expect(calls.some(c => String(c).includes('Decay tamamlandı'))).toBe(true);
+  });
+
+  it('falls back to en when config has malformed JSON', async () => {
+    vi.mocked(existsSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return true;
+      return false;
+    });
+    vi.mocked(readFileSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return 'INVALID JSON';
+      return '';
+    });
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('Cleanup complete'))).toBe(true);
+  });
+
+  it('archived_sprints message uses tr language when language=tr', async () => {
+    vi.mocked(existsSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return true;
+      return false;
+    });
+    vi.mocked(readFileSync).mockImplementation((p: string) => {
+      if (String(p).includes('config.json')) return JSON.stringify({ language: 'tr' });
+      return '';
+    });
+    vi.mocked(runDecay).mockReturnValue({
+      linesBefore: 300, linesAfter: 200,
+      archivedSprints: ['sprint-001.md'],
+      removedDebtCount: 0, removedPatternCount: 0,
+    });
+    await runCommand(['cleanup', '--decay']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    // Turkish: 'Arşivlendi: {sprints}'
+    expect(calls.some(c => String(c).includes('Arşivlendi'))).toBe(true);
+  });
+});

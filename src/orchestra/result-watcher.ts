@@ -46,26 +46,16 @@ export function createResultWatcher(projectRoot: string, fallbackMs = 5_000): Re
     waitForChange(): Promise<void> {
       if (closed) return Promise.resolve();
       return new Promise<void>((resolve) => {
-        if (fsWatcher) {
-          // fs.watch mode — resolve when a .result file event fires
-          pendingResolve = resolve;
-          // Safety fallback in case watch misses events
-          const timer = setTimeout(() => {
-            if (pendingResolve === resolve) {
-              pendingResolve = null;
-              resolve();
-            }
-          }, fallbackMs);
-          // Store cleanup reference
-          const origResolve = resolve;
-          pendingResolve = () => {
-            clearTimeout(timer);
-            origResolve();
-          };
-        } else {
-          // No watcher — pure timer fallback
-          setTimeout(resolve, fallbackMs);
-        }
+        let settled = false;
+        const settle = () => {
+          if (settled) return;
+          settled = true;
+          pendingResolve = null;
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(settle, fallbackMs);
+        pendingResolve = settle;
       });
     },
     close(): void {

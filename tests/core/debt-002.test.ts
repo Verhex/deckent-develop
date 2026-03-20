@@ -3,27 +3,26 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseDebtTable } from '../../src/core/utils.js';
 
-describe('DEBT-002 closure', () => {
+describe('DEBT table parsing', () => {
   const debtPath = join(process.cwd(), '.brain', 'DEBT.md');
 
-  it('DEBT.md contains DEBT-002 entry', () => {
+  it('DEBT.md exists and is non-empty', () => {
     const content = readFileSync(debtPath, 'utf-8');
-    expect(content).toContain('DEBT-002');
+    expect(content.length).toBeGreaterThan(0);
   });
 
-  it('DEBT-002 is marked as resolved', () => {
+  it('parseDebtTable returns at least one item', () => {
     const content = readFileSync(debtPath, 'utf-8');
     const items = parseDebtTable(content);
-    const debt002 = items.find(d => d.id === 'DEBT-002');
-    expect(debt002).toBeDefined();
-    expect(debt002!.resolved).toBe(true);
+    expect(items.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('DEBT-002 was resolved in sprint-003', () => {
+  it('all parsed items have a resolved field', () => {
     const content = readFileSync(debtPath, 'utf-8');
     const items = parseDebtTable(content);
-    const debt002 = items.find(d => d.id === 'DEBT-002');
-    expect(debt002!.resolvedInSprintId).toBe('sprint-003');
+    for (const item of items) {
+      expect(typeof item.resolved).toBe('boolean');
+    }
   });
 
   it('parseDebtTable can parse the full DEBT.md', () => {

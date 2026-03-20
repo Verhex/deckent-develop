@@ -3,7 +3,7 @@
   "language": "tr",
   "projectName": "deckent",
   "brain_planning": "auto",
-  "last_sprint_id": "sprint-023",
+  "last_sprint_id": "sprint-025",
   "modes": {
     "max_plan": {
       "brain_model": "opus",

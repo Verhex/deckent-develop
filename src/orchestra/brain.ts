@@ -53,12 +53,13 @@ import { releaseAllLocks } from '../agents/worker.js';
 import { createResultWatcher } from './result-watcher.js';
 
 // ─── Sub-modules (re-export for backward compatibility) ───────────
-export { calculateModelScore, inferModelFromDirective, resolveTaskModel } from './model-selector.js';
-export { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
+export { calculateModelScore, inferModelFromDirective, resolveTaskModel, parsePatterns, deduplicatePatterns, suggestModelFromPatterns } from './model-selector.js';
+export { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams, resolveWorkerEffort } from './task-builder.js';
 export type { CreateTaskParams, ParsedDirectiveTask } from './task-builder.js';
 export { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay, decay } from './debt-manager.js';
 export type { RunDecayOptions } from './debt-manager.js';
-export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs } from './sprint-reporter.js';
+export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics } from './sprint-reporter.js';
+export type { SprintComparison } from './sprint-reporter.js';
 export type { SprintResult } from '../core/types.js';
 
 // ─── Internal imports from sub-modules (used by orchestrator) ─────
@@ -777,4 +778,194 @@ export async function runSprint(
   });
 
   return sprint;
+}
+
+
+// ═══ Pause / Resume ════════════════════════════════════════════════
+
+export interface PauseState {
+  sprintId: string;
+  pausedAt: string;
+  pausedTaskIds: string[];
+  reason: string;
+}
+
+const PAUSE_STATE_FILE = '.deckent/pause-state.json';
+
+/**
+ * pauseSprint -- transitions active/pending tasks to PAUSED status,
+ * writes a .paused marker file for each task, saves pause state,
+ * and updates the dashboard with PAUSED sprint status.
+ */
+export function pauseSprint(
+  projectRoot: string,
+  sprint: Sprint,
+  reason: string = 'Manual pause',
+): PauseState {
+  const tasksPath = join(projectRoot, TASKS_DIR);
+  const pausedTaskIds: string[] = [];
+
+  for (const task of sprint.tasks) {
+    if (
+      task.status === TaskStatus.PENDING ||
+      task.status === TaskStatus.CLAIMED ||
+      task.status === TaskStatus.EXECUTING ||
+      task.status === TaskStatus.TESTING ||
+      task.status === TaskStatus.DOCUMENTING
+    ) {
+      const prevStatus = task.status;
+      task.status = TaskStatus.PAUSED;
+
+      // Write updated task JSON
+      try {
+        writeFileSync(
+          join(tasksPath, `task-${task.id}.json`),
+          JSON.stringify(task, null, 2),
+          'utf-8',
+        );
+      } catch { /* skip */ }
+
+      // Write .paused marker with previous status for resume
+      try {
+        writeFileSync(
+          join(tasksPath, `task-${task.id}.paused`),
+          JSON.stringify({ taskId: task.id, previousStatus: prevStatus, pausedAt: now() }, null, 2),
+          'utf-8',
+        );
+      } catch { /* skip */ }
+
+      pausedTaskIds.push(task.id);
+    }
+  }
+
+  sprint.status = SprintStatus.PAUSED;
+
+  const pauseState: PauseState = {
+    sprintId: sprint.id,
+    pausedAt: now(),
+    pausedTaskIds,
+    reason,
+  };
+
+  // Persist pause state
+  try {
+    const deckentDir = join(projectRoot, '.deckent');
+    mkdirSync(deckentDir, { recursive: true });
+    writeFileSync(
+      join(projectRoot, PAUSE_STATE_FILE),
+      JSON.stringify(pauseState, null, 2),
+      'utf-8',
+    );
+  } catch { /* non-fatal */ }
+
+  // Update dashboard to reflect PAUSED status
+  try {
+    updateDashboard(projectRoot, {
+      sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: SprintStatus.PAUSED },
+      agents: [],
+      progress: {
+        done: sprint.tasks.filter(t => t.status === TaskStatus.DONE).length,
+        active: 0,
+        blocked: pausedTaskIds.length,
+        total: sprint.tasks.length,
+      },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
+      alerts: [{ level: AlertLevel.WARNING, message: `Sprint paused: ${reason}`, timestamp: now() }],
+      updatedAt: now(),
+    });
+  } catch { /* dashboard update failed -- non-fatal */ }
+
+  return pauseState;
+}
+
+/**
+ * resumeSprint -- transitions PAUSED tasks back to PENDING,
+ * removes .paused marker files, clears the pause state, and
+ * restores the dashboard to ACTIVE status.
+ */
+export function resumeSprint(
+  projectRoot: string,
+  sprint: Sprint,
+): PauseState | null {
+  const tasksPath = join(projectRoot, TASKS_DIR);
+
+  // Load saved pause state (if available)
+  const pauseState = readJsonSafe<PauseState>(join(projectRoot, PAUSE_STATE_FILE));
+
+  const resumedTaskIds: string[] = [];
+
+  for (const task of sprint.tasks) {
+    if (task.status === TaskStatus.PAUSED) {
+      task.status = TaskStatus.PENDING;
+
+      // Write updated task JSON
+      try {
+        writeFileSync(
+          join(tasksPath, `task-${task.id}.json`),
+          JSON.stringify(task, null, 2),
+          'utf-8',
+        );
+      } catch { /* skip */ }
+
+      // Remove .paused marker
+      const pausedMarker = join(tasksPath, `task-${task.id}.paused`);
+      if (existsSync(pausedMarker)) {
+        try { unlinkSync(pausedMarker); } catch { /* skip */ }
+      }
+
+      resumedTaskIds.push(task.id);
+    }
+  }
+
+  sprint.status = SprintStatus.ACTIVE;
+
+  // Remove pause state file
+  const pauseStatePath = join(projectRoot, PAUSE_STATE_FILE);
+  if (existsSync(pauseStatePath)) {
+    try { unlinkSync(pauseStatePath); } catch { /* skip */ }
+  }
+
+  // Update dashboard to reflect ACTIVE status
+  try {
+    updateDashboard(projectRoot, {
+      sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: SprintStatus.ACTIVE },
+      agents: [],
+      progress: {
+        done: sprint.tasks.filter(t => t.status === TaskStatus.DONE).length,
+        active: resumedTaskIds.length,
+        blocked: 0,
+        total: sprint.tasks.length,
+      },
+      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
+      alerts: [],
+      updatedAt: now(),
+    });
+  } catch { /* dashboard update failed -- non-fatal */ }
+
+  return pauseState;
+}
+
+/**
+ * checkAndAutoPause -- checks usage thresholds and auto-pauses the sprint
+ * if either the 5hr or weekly limit is exceeded.
+ * Returns true if the sprint was paused, false otherwise.
+ */
+export function checkAndAutoPause(
+  projectRoot: string,
+  sprint: Sprint,
+  config: ResolvedConfig,
+): boolean {
+  const usage = checkUsage(config);
+  const thresholds = config.activeModeConfig.usage_thresholds;
+  const fiveHrExceeded = usage.fiveHourPercent / 100 >= thresholds['5hr'];
+  const weeklyExceeded = usage.weeklyPercent / 100 >= thresholds.weekly;
+
+  if (fiveHrExceeded || weeklyExceeded) {
+    const reason = fiveHrExceeded
+      ? `5hr usage limit exceeded (${usage.fiveHourPercent.toFixed(1)}%)`
+      : `Weekly usage limit exceeded (${usage.weeklyPercent.toFixed(1)}%)`;
+    pauseSprint(projectRoot, sprint, reason);
+    return true;
+  }
+  return false;
 }

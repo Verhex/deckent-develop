@@ -5,6 +5,7 @@ import type { BrainPlanningMode } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
 
 export function registerPlan(program: Command): void {
   program
@@ -17,6 +18,7 @@ export function registerPlan(program: Command): void {
 
       try {
         const config = await loadConfig(root);
+        const lang = config.language;
         const context = readContext(root);
         const usage = checkUsage(config);
         const recommendation = adjustSprintSize(config, usage);
@@ -29,20 +31,27 @@ export function registerPlan(program: Command): void {
           asDraft,
         });
 
-        print(`Sprint ${sprint.number} (${sprint.id}) planned with ${sprint.tasks.length} tasks:\n`);
+        print(getMessage('plan.sprint_planned', lang, {
+          number: String(sprint.number),
+          id: sprint.id,
+          count: String(sprint.tasks.length),
+        }));
         const headers = ['ID', 'Title', 'Model', 'Priority'];
         const rows = sprint.tasks.map((t) => [t.id, t.title, t.model, t.priority]);
         print(formatTable(headers, rows));
 
         if (sprint.reasoning) {
-          print(`\nReasoning: ${sprint.reasoning}`);
+          print(getMessage('plan.reasoning', lang, { reasoning: sprint.reasoning }));
         }
         if (sprint.planningMode) {
-          print(`Planning mode: ${sprint.planningMode}`);
+          print(getMessage('plan.planning_mode', lang, { mode: sprint.planningMode }));
         }
 
         if (recommendation.size !== 'full') {
-          print(`\nNote: Sprint size ${recommendation.size} — ${recommendation.reason}`);
+          print(getMessage('plan.note_sprint_size', lang, {
+            size: recommendation.size,
+            reason: recommendation.reason,
+          }));
         }
 
         // Approval flow for DRAFT tasks
@@ -50,9 +59,9 @@ export function registerPlan(program: Command): void {
           const confirmed = await promptConfirm('Approve this plan?');
           if (confirmed) {
             confirmDraftTasks(root, sprint);
-            print('Plan approved.');
+            print(getMessage('plan.approved', lang));
           } else {
-            print('Plan rejected.');
+            print(getMessage('plan.rejected', lang));
           }
         }
       } catch (error) {

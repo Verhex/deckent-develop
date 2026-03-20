@@ -6,18 +6,33 @@ import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import {
   DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, LOCK_STALE_THRESHOLD_MS, DEBT_TABLE_HEADER,
+  PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { countBrainLines } from '../../core/utils.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { print, formatDoctorResult } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
 
 interface DoctorCheck {
   name: string;
   passed: boolean;
   message: string;
   required: boolean;
+}
+
+function readLanguage(root: string): string {
+  try {
+    const configPath = join(root, PROJECT_CONFIG_PATH);
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { language?: string };
+      return config.language ?? 'en';
+    }
+  } catch {
+    // fallback
+  }
+  return 'en';
 }
 
 function checkNode(): DoctorCheck {
@@ -222,8 +237,16 @@ export function registerDoctor(program: Command): void {
       } catch {
         root = process.cwd();
       }
+      const lang = readLanguage(root);
       const result = runDoctorChecks(root);
       print(formatDoctorResult(result));
+
+      const passed = result.checks.filter(c => c.passed).length;
+      const total = result.checks.length;
+      print(getMessage('doctor.checks_passed', lang, {
+        passed: String(passed),
+        total: String(total),
+      }));
 
       if (opts.profile) {
         const profile = getSystemProfile();

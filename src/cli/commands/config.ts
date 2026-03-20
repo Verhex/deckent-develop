@@ -7,6 +7,63 @@ import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
+/**
+ * Strip JSON comments (block and line) from a string.
+ */
+function stripJsonComments(text: string): string {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
+/**
+ * Export a config file's content. Strips comments and validates JSON.
+ * If outputFile is given, writes to that file; otherwise prints to stdout.
+ */
+export function exportConfig(configPath: string, outputFile?: string): void {
+  if (!existsSync(configPath)) {
+    throw new Error('Config file not found: ' + configPath);
+  }
+  const raw = readFileSync(configPath, 'utf-8');
+  const stripped = stripJsonComments(raw);
+  // Validate that it's valid JSON
+  JSON.parse(stripped);
+  if (outputFile) {
+    writeFileSync(outputFile, stripped);
+  } else {
+    print(stripped);
+  }
+}
+
+/**
+ * Import config from a JSON file, merging over existing config.
+ */
+export function importConfig(importPath: string, configPath: string): void {
+  if (!existsSync(importPath)) {
+    throw new Error('Import file not found: ' + importPath);
+  }
+  const raw = readFileSync(importPath, 'utf-8');
+  let importData: Record<string, unknown>;
+  try {
+    importData = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    throw new Error('Invalid JSON in import file: ' + importPath);
+  }
+  validatePartialConfig(importData);
+
+  let existing: Record<string, unknown> = {};
+  if (existsSync(configPath)) {
+    try {
+      existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    } catch {
+      // Malformed existing config — start fresh
+    }
+  }
+
+  const merged = { ...existing, ...importData };
+  writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
+}
+
 export function registerConfig(program: Command): void {
   const cmd = program
     .command('config')
@@ -48,6 +105,42 @@ export function registerConfig(program: Command): void {
         validatePartialConfig(existing);
         writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
         print(`Set ${key} = ${JSON.stringify(parsed)}`);
+      } catch (error) {
+        if (error instanceof ConfigValidationError) {
+          printError(new Error(`Invalid config: ${error.errors.join(', ')}`));
+        } else {
+          printError(error);
+        }
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('export [file]')
+    .description('Export config to stdout or a file')
+    .action((file?: string) => {
+      const root = resolveProjectRoot();
+      const configPath = join(root, PROJECT_CONFIG_PATH);
+      try {
+        exportConfig(configPath, file);
+        if (file) {
+          print(`Config exported to ${file}`);
+        }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('import <file>')
+    .description('Import config from a JSON file')
+    .action((file: string) => {
+      const root = resolveProjectRoot();
+      const configPath = join(root, PROJECT_CONFIG_PATH);
+      try {
+        importConfig(file, configPath);
+        print(`Config imported from ${file}`);
       } catch (error) {
         if (error instanceof ConfigValidationError) {
           printError(new Error(`Invalid config: ${error.errors.join(', ')}`));

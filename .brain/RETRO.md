@@ -1,21 +1,60 @@
-# Sprint sprint-023 Retrospective
+# Sprint sprint-025 Retrospective
 
 ## Metrics
-- Tasks: 12 total, 12 done, 4 debt, 0 no-go
-- Coverage: 80.0%
-- No-Go Rate: 0.0%
-- Duration: 320657ms
+- Tasks: 97 total, 62 done, 32 debt, 35 no-go
+- Coverage: 60.5%
+- No-Go Rate: 36.1%
+- Duration: 2617576ms
 
 ## Results
-- 023-001: AI Planner Post-Validation Fallback Fix (TAMAMLANDI) -> GO_WITH_TECH_DEBT
-- 023-002: Decay Fix Doğrulama -> DONE
-- 023-003: Auto Setup Wizard Doğrulama -> DONE
-- 023-004: MCP Enrichment Infrastructure Doğrulama -> GO_WITH_TECH_DEBT
-- 023-005: MCP Enrichment Tools Batch 1 Doğrulama -> DONE
-- 023-006: MCP Enrichment Tools Batch 2 Doğrulama -> DONE
-- 023-007: CLI Hints System Doğrulama -> DONE
-- 023-008: Doctor Profile Flag Doğrulama -> GO_WITH_TECH_DEBT
-- 023-009: Sprint 22 Test Coverage Doğrulama -> DONE
-- 023-010: AI Planner Fallback Fix Doğrulama -> DONE
-- 023-011: Task Queue Wave Doğrulama -> DONE
-- 023-012: Sprint History Karşılaştırma -> GO_WITH_TECH_DEBT
+- 025-001: readJsonSafe/readFileSafe Shared Utility -> DONE
+- 025-002: result-watcher pendingResolve Timer Fix -> DONE
+- 025-003: package.json files Field Düzeltme -> GO_WITH_TECH_DEBT
+- 025-004: CODEOWNERS Dosyası -> GO_WITH_TECH_DEBT
+- 025-005: dependabot.yml -> GO_WITH_TECH_DEBT
+- 025-006: GitHub Actions Release Workflow -> GO_WITH_TECH_DEBT
+- 025-007: Security Issue Template -> GO_WITH_TECH_DEBT
+- 025-008: FUNDING.yml -> GO_WITH_TECH_DEBT
+- 025-009: brain.ts readJsonSafe Import Migration -> GO_WITH_TECH_DEBT
+- 025-010: debt-manager.ts readJsonSafe Import Migration -> GO_WITH_TECH_DEBT
+- 025-011: auditor.ts readJsonSafe Import Migration -> GO_WITH_TECH_DEBT
+- 025-012: sprint-reporter.ts readJsonSafe Import Migration -> DONE
+- 025-013: debt-manager.test.ts — Dedicated Test Suite -> GO_WITH_TECH_DEBT
+- 025-014: sprint-reporter.test.ts — Dedicated Test Suite -> DONE
+- 025-015: result-watcher.test.ts — Test Suite -> DONE
+- 025-016: task-builder.test.ts — Isolated Test Suite -> GO_WITH_TECH_DEBT
+- 025-017: CLI doctor.test.ts -> DONE
+- 025-018: CLI init.test.ts -> GO_WITH_TECH_DEBT
+- 025-019: CLI start.test.ts -> DONE
+- 025-020: CLI onboard.test.ts -> DONE
+- 025-021: CLI upgrade.test.ts -> DONE
+- 025-022: CLI usage.test.ts -> DONE
+- 025-023: CLI analyze.test.ts -> DONE
+- 025-024: CLI archive-debt.test.ts Expansion -> GO_WITH_TECH_DEBT
+- 025-025: MCP Tool init.test.ts -> GO_WITH_TECH_DEBT
+- 025-026: MCP Tool doctor.test.ts -> GO_WITH_TECH_DEBT
+- 025-027: MCP Tool plan.test.ts -> GO_WITH_TECH_DEBT
+- 025-028: MCP Tool start.test.ts -> DONE
+- 025-029: MCP Tool status+history Tests -> GO_WITH_TECH_DEBT
+- 025-030: MCP Tool retro+sync+analyze+directives Tests -> GO_WITH_TECH_DEBT
+- 025-031: MCP Resources Test Suite -> GO_WITH_TECH_DEBT
+- 025-032: api/watcher.test.ts -> DONE
+- 025-033: core/types.ts Edge Case Tests -> DONE
+- 025-034: core/config.ts Edge Case Tests -> GO_WITH_TECH_DEBT
+- 025-035: auditor.ts Edge Case Tests -> GO_WITH_TECH_DEBT
+- 025-036: worker.ts Edge Case Tests -> GO_WITH_TECH_DEBT
+- 025-037: planner.ts Edge Case Tests -> DONE
+- 025-038: tmux.ts Edge Case Tests -> GO_WITH_TECH_DEBT
+- 025-039: api/server.ts Edge Case Tests -> GO_WITH_TECH_DEBT
+- 025-040: CLI output.ts + prompt.ts Tests -> DONE
+- 025-041: Plugin Install Implementation -> DONE
+- 025-042: Plugin Create Command -> DONE
+- 025-043: Plugin Remove Implementation -> DONE
+- 025-044: Plugin Enable/Disable Toggle -> DONE
+- 025-045: Built-in Skill Templates -> DONE
+- 025-046: Plugin Hook System -> DONE
+- 025-047: Plugin Manifest v2 -> DONE
+- 025-048: Plugin System Integration Tests -> GO_WITH_TECH_DEBT
+- 025-049: Sprint Pause/Resume Mechanism -> GO_WITH_TECH_DEBT
+- 025-050: Task Retry Mechanism -> DONE
+- 025-051: Worker Progress Percentage -> DONE

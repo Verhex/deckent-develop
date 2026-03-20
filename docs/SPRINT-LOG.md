@@ -455,3 +455,121 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 023-012: Sprint History Karşılaştırma (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 25 — sprint-025
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-20
+**Duration:** 2618s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 97 |
+| Completed | 62 |
+| Tech Debt | 32 |
+| No-Go | 35 |
+| Coverage | 60.5% |
+| Duration | 2617576ms |
+
+### Tasks
+
+- 025-001: readJsonSafe/readFileSafe Shared Utility (DONE)
+- 025-002: result-watcher pendingResolve Timer Fix (DONE)
+- 025-003: package.json files Field Düzeltme (GO_WITH_TECH_DEBT)
+- 025-004: CODEOWNERS Dosyası (GO_WITH_TECH_DEBT)
+- 025-005: dependabot.yml (GO_WITH_TECH_DEBT)
+- 025-006: GitHub Actions Release Workflow (GO_WITH_TECH_DEBT)
+- 025-007: Security Issue Template (GO_WITH_TECH_DEBT)
+- 025-008: FUNDING.yml (GO_WITH_TECH_DEBT)
+- 025-009: brain.ts readJsonSafe Import Migration (GO_WITH_TECH_DEBT)
+- 025-010: debt-manager.ts readJsonSafe Import Migration (GO_WITH_TECH_DEBT)
+- 025-011: auditor.ts readJsonSafe Import Migration (GO_WITH_TECH_DEBT)
+- 025-012: sprint-reporter.ts readJsonSafe Import Migration (DONE)
+- 025-013: debt-manager.test.ts — Dedicated Test Suite (GO_WITH_TECH_DEBT)
+- 025-014: sprint-reporter.test.ts — Dedicated Test Suite (DONE)
+- 025-015: result-watcher.test.ts — Test Suite (DONE)
+- 025-016: task-builder.test.ts — Isolated Test Suite (GO_WITH_TECH_DEBT)
+- 025-017: CLI doctor.test.ts (DONE)
+- 025-018: CLI init.test.ts (GO_WITH_TECH_DEBT)
+- 025-019: CLI start.test.ts (DONE)
+- 025-020: CLI onboard.test.ts (DONE)
+- 025-021: CLI upgrade.test.ts (DONE)
+- 025-022: CLI usage.test.ts (DONE)
+- 025-023: CLI analyze.test.ts (DONE)
+- 025-024: CLI archive-debt.test.ts Expansion (GO_WITH_TECH_DEBT)
+- 025-025: MCP Tool init.test.ts (GO_WITH_TECH_DEBT)
+- 025-026: MCP Tool doctor.test.ts (GO_WITH_TECH_DEBT)
+- 025-027: MCP Tool plan.test.ts (GO_WITH_TECH_DEBT)
+- 025-028: MCP Tool start.test.ts (DONE)
+- 025-029: MCP Tool status+history Tests (GO_WITH_TECH_DEBT)
+- 025-030: MCP Tool retro+sync+analyze+directives Tests (GO_WITH_TECH_DEBT)
+- 025-031: MCP Resources Test Suite (GO_WITH_TECH_DEBT)
+- 025-032: api/watcher.test.ts (DONE)
+- 025-033: core/types.ts Edge Case Tests (DONE)
+- 025-034: core/config.ts Edge Case Tests (GO_WITH_TECH_DEBT)
+- 025-035: auditor.ts Edge Case Tests (GO_WITH_TECH_DEBT)
+- 025-036: worker.ts Edge Case Tests (GO_WITH_TECH_DEBT)
+- 025-037: planner.ts Edge Case Tests (DONE)
+- 025-038: tmux.ts Edge Case Tests (GO_WITH_TECH_DEBT)
+- 025-039: api/server.ts Edge Case Tests (GO_WITH_TECH_DEBT)
+- 025-040: CLI output.ts + prompt.ts Tests (DONE)
+- 025-041: Plugin Install Implementation (DONE)
+- 025-042: Plugin Create Command (DONE)
+- 025-043: Plugin Remove Implementation (DONE)
+- 025-044: Plugin Enable/Disable Toggle (DONE)
+- 025-045: Built-in Skill Templates (DONE)
+- 025-046: Plugin Hook System (DONE)
+- 025-047: Plugin Manifest v2 (DONE)
+- 025-048: Plugin System Integration Tests (GO_WITH_TECH_DEBT)
+- 025-049: Sprint Pause/Resume Mechanism (GO_WITH_TECH_DEBT)
+- 025-050: Task Retry Mechanism (DONE)
+- 025-051: Worker Progress Percentage (DONE)
+- 025-052: Sprint Time Estimation (DONE)
+- 025-053: Brain Pattern Learning (GO_WITH_TECH_DEBT)
+- 025-054: Global Config Support (GO_WITH_TECH_DEBT)
+- 025-055: Config Export/Import CLI (GO_WITH_TECH_DEBT)
+- 025-056: Sprint Comparison Metrics (GO_WITH_TECH_DEBT)
+- 025-057: i18n Key Inventory (DONE)
+- 025-058: i18n Integration — start, plan, status (NO_GO)
+- 025-059: i18n Integration — doctor, init, cleanup (NO_GO)
+- 025-060: i18n Integration — spawn, kill, attach (DONE)
+- 025-061: i18n JSON Files Expansion (DONE)
+- 025-062: i18n Language Auto-Detection (GO_WITH_TECH_DEBT)
+- 025-063: i18n Date/Time Localization (DONE)
+- 025-064: i18n Test Coverage (NO_GO)
+- 025-065: Plugin Development Guide (GO_WITH_TECH_DEBT)
+- 025-066: ARCHITECTURE.md Genişletme (NO_GO)
+- 025-067: API Integration Examples (NO_GO)
+- 025-068: Quick Start Tutorial (NO_GO)
+- 025-069: Migration/Upgrade Guide (NO_GO)
+- 025-070: Performance Tuning Guide (NO_GO)
+- 025-071: FAQ Dokümanı (NO_GO)
+- 025-072: CONTRIBUTING.md Güncellemesi (NO_GO)
+- 025-073: npm Publish Verification Script (NO_GO)
+- 025-074: README Badges (NO_GO)
+- 025-075: Automated Changelog Script (NO_GO)
+- 025-076: Version Bump Script (NO_GO)
+- 025-077: Example Project Skeleton (NO_GO)
+- 025-078: Dockerfile (NO_GO)
+- 025-079: Pre-commit Hooks Setup (NO_GO)
+- 025-080: npm Publish GitHub Action (NO_GO)
+- 025-081: readContext Paralel I/O (NO_GO)
+- 025-082: Config Caching (NO_GO)
+- 025-083: CLI Lazy Command Loading (NO_GO)
+- 025-084: Lock Contention Optimization (NO_GO)
+- 025-085: Benchmark Suite (NO_GO)
+- 025-086: Error Message Consistency Audit (NO_GO)
+- 025-087: Dead Code Elimination (NO_GO)
+- 025-088: Unused Dependency Cleanup (NO_GO)
+- 025-089: E2E Integration Test — init → plan → status (NO_GO)
+- 025-090: E2E Integration Test — Full Sprint Mock (NO_GO)
+- 025-091: MCP Integration Test (NO_GO)
+- 025-092: CLI Integration Test (NO_GO)
+- 025-093: Plugin Lifecycle Integration Test (NO_GO)
+- 025-094: Doc Updater Registry Integration Test (NO_GO)
+- 025-095: Config Layer Integration Test (NO_GO)
+- 025-096: Security Integration Test (NO_GO)
+- 025-097: tmp-test Cleanup + Blueprint Sync (NO_GO)
+
+---

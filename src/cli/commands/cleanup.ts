@@ -3,11 +3,25 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
 import { SprintStatus, SprintPhase } from '../../core/types.js';
-import { TASKS_DIR } from '../../core/constants.js';
+import { TASKS_DIR, PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { cleanup, runDecay } from '../../orchestra/brain.js';
 import { destroy } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
+
+function readLanguage(root: string): string {
+  try {
+    const configPath = join(root, PROJECT_CONFIG_PATH);
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { language?: string };
+      return config.language ?? 'en';
+    }
+  } catch {
+    // fallback
+  }
+  return 'en';
+}
 
 export function registerCleanup(program: Command): void {
   program
@@ -16,17 +30,26 @@ export function registerCleanup(program: Command): void {
     .option('--decay', 'Force run memory decay (compress .brain/ files)')
     .action((opts: { decay?: boolean }) => {
       const root = resolveProjectRoot();
+      const lang = readLanguage(root);
       const tasksDir = join(root, TASKS_DIR);
 
       try {
         if (opts.decay) {
           const result = runDecay(root, 'sprint-cleanup', { force: true });
-          print(`Decay complete: ${result.linesBefore} → ${result.linesAfter} lines`);
+          print(getMessage('cleanup.decay_complete', lang, {
+            before: String(result.linesBefore),
+            after: String(result.linesAfter),
+          }));
           if (result.archivedSprints.length > 0) {
-            print(`Archived: ${result.archivedSprints.join(', ')}`);
+            print(getMessage('cleanup.archived_sprints', lang, {
+              sprints: result.archivedSprints.join(', '),
+            }));
           }
           if (result.removedDebtCount > 0 || result.removedPatternCount > 0) {
-            print(`Removed: ${result.removedDebtCount} debt, ${result.removedPatternCount} patterns`);
+            print(getMessage('cleanup.removed_items', lang, {
+              debt: String(result.removedDebtCount),
+              patterns: String(result.removedPatternCount),
+            }));
           }
           return;
         }
@@ -63,7 +86,7 @@ export function registerCleanup(program: Command): void {
           // session may not exist
         }
 
-        print(`Cleanup complete. Removed artifacts for ${tasks.length} tasks.`);
+        print(getMessage('cleanup.complete', lang, { count: String(tasks.length) }));
       } catch (error) {
         printError(error);
         process.exitCode = 1;

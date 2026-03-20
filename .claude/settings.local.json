@@ -69,7 +69,12 @@
       "Bash(tmux ls:*)",
       "Bash(tmux list-windows:*)",
       "Bash(python3:*)",
-      "Bash(tsc --noEmit)"
+      "Bash(tsc --noEmit)",
+      "mcp__deckent__deckent_status",
+      "mcp__deckent__deckent_retro",
+      "Bash(find . -name *.test.ts -newer .brain/RETRO.md -not -path */node_modules/*)",
+      "Bash(find . -name *.ts -newer .brain/RETRO.md -not -path */node_modules/* -not -path */dist/* -not -name *.test.ts -not -name *.bench.ts)",
+      "Bash(find . -name *.test.ts -not -path */node_modules/* -not -path */dist/*)"
     ]
   },
   "outputStyle": "default"

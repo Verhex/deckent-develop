@@ -30,6 +30,7 @@ import { ensureDeckentImport } from '../../core/utils.js';
 import { promptText, promptSelect } from '../helpers/prompt.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -88,7 +89,7 @@ export function registerInit(program: Command): void {
 
         if (options.auto && !options.manual) {
           // Auto-detect mode
-          print('Auto-detecting system, subscription, and project...');
+          print(getMessage('init.auto_detecting', 'en'));
           const systemProfile = getSystemProfile();
           const subscription = detectSubscription();
           const analysis = analyzeProject(root);
@@ -100,7 +101,7 @@ export function registerInit(program: Command): void {
           );
 
           print('');
-          print('Recommendation:');
+          print(getMessage('init.recommendation', 'en'));
           for (const reason of recommendation.reasons) {
             print(`  • ${reason}`);
           }
@@ -249,11 +250,11 @@ Lint: tsc --noEmit
           BRAIN_DIR + '/archive/',
         ]);
 
-        print(`\nDeckent initialized for "${projectName}" (${mode}, ${language}).`);
+        print('\n' + getMessage('init.initialized', language, { name: projectName, mode, language }));
         print('');
-        print('Next steps:');
-        print('  1. Edit DIRECTIVES.md with your project goals');
-        print('  2. Run `deckent start` to begin your first sprint');
+        print(getMessage('init.next_steps', language));
+        print(getMessage('init.next_step_directives', language));
+        print(getMessage('init.next_step_start', language));
       } catch (error) {
         printError(error);
         process.exitCode = 1;

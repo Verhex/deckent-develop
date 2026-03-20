@@ -25,7 +25,7 @@ vi.mock('node:readline/promises', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
-  loadConfig: vi.fn(),
+  loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
   validatePartialConfig: vi.fn(),
   ConfigValidationError: class ConfigValidationError extends Error {
     errors: string[];
@@ -81,6 +81,15 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 
 vi.mock('../../src/agents/worker.js', () => ({
   readTask: vi.fn(),
+}));
+
+vi.mock('../../src/core/plugin.js', () => ({
+  loadPlugin: vi.fn(),
+  scanPlugins: vi.fn().mockReturnValue([]),
+  createPlugin: vi.fn(),
+  PluginError: class PluginError extends Error {
+    constructor(msg: string) { super(msg); this.name = 'PluginError'; }
+  },
 }));
 
 // ─── Static Imports (after mocks) ──────────────────────────────────
@@ -1179,9 +1188,9 @@ describe('stub commands', () => {
     expect(stdout()).toContain('not yet implemented');
   });
 
-  it('plugin list shows not implemented', async () => {
+  it('plugin list shows no plugins message', async () => {
     await runCommand(registerPlugin, ['plugin', 'list']);
-    expect(stdout()).toContain('not yet implemented');
+    expect(stdout()).toContain('No plugins');
   });
 
   it('upgrade shows not implemented', async () => {

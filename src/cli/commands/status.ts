@@ -5,6 +5,7 @@ import type { DashboardState } from '../../core/types.js';
 import { DASHBOARD_FILE } from '../../core/constants.js';
 import { print, printError, formatDashboard } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -20,6 +21,22 @@ function readDashboard(dashPath: string): DashboardState | null {
   }
 }
 
+/**
+ * Reads the language setting from the project config synchronously.
+ * Falls back to 'en' if the config is missing or unreadable.
+ */
+export function getLangFromRoot(root: string): string {
+  try {
+    const configPath = join(root, '.deckent', 'config.json');
+    if (!existsSync(configPath)) return 'en';
+    const raw = readFileSync(configPath, 'utf-8');
+    const cfg = JSON.parse(raw) as { language?: string };
+    return cfg.language === 'tr' ? 'tr' : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
 export function registerStatus(program: Command): void {
   program
     .command('status')
@@ -29,9 +46,10 @@ export function registerStatus(program: Command): void {
     .action((opts: StatusOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
+      const lang = getLangFromRoot(root);
 
       if (!existsSync(dashPath)) {
-        print('No active sprint. Run `deckent start` first.');
+        print(getMessage('status.no_active_sprint', lang));
         return;
       }
 
@@ -64,7 +82,7 @@ export function registerStatus(program: Command): void {
           print(formatDashboard(state));
         }
       } catch (error) {
-        printError(new Error('Failed to read dashboard file.'));
+        printError(new Error(getMessage('status.dashboard_read_failed', lang)));
         process.exitCode = 1;
       }
     });

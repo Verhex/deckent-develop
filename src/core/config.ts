@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
   PROJECT_CONFIG_PATH,
   GLOBAL_CONFIG_PATH,
@@ -275,4 +275,67 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
 export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
   const merged = deepMerge(createDefaultConfig(), partial);
   validateConfig(merged);
+}
+
+// ─── Global Config ───────────────────────────────────────────────────
+
+/**
+ * Load a global config file (partial DeckentConfig).
+ * Returns null when the file does not exist.
+ * Throws on malformed JSON.
+ */
+export async function loadGlobalConfig(
+  configPath?: string,
+): Promise<Partial<DeckentConfig> | null> {
+  const cfgPath = configPath ?? GLOBAL_CONFIG_PATH;
+  return readJsonFile<Partial<DeckentConfig>>(cfgPath);
+}
+
+/**
+ * Save a partial config to the global config path.
+ * Creates parent directories if needed.
+ */
+export async function saveGlobalConfig(
+  config: Partial<DeckentConfig>,
+  configPath?: string,
+): Promise<void> {
+  const cfgPath = configPath ?? GLOBAL_CONFIG_PATH;
+  const dir = dirname(cfgPath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await writeFile(cfgPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+}
+
+/**
+ * Merge global + project partial configs over defaults into a ResolvedConfig.
+ * Both parameters may be null.
+ */
+export function mergeConfigs(
+  globalConfig: Partial<DeckentConfig> | null,
+  projectConfig: Partial<DeckentConfig> | null,
+): ResolvedConfig {
+  let config = createDefaultConfig();
+
+  if (globalConfig) {
+    config = deepMerge(config, globalConfig);
+  }
+  if (projectConfig) {
+    config = deepMerge(config, projectConfig);
+  }
+
+  validateConfig(config);
+
+  const activeModeConfig = config.modes[config.mode];
+
+  return {
+    mode: config.mode,
+    activeModeConfig,
+    modes: config.modes,
+    language: config.language ?? DEFAULT_LANGUAGE,
+    projectName: config.projectName ?? 'deckent-project',
+    projectRoot: resolve(process.cwd()),
+    version: config.version ?? DECKENT_VERSION,
+    auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
+  };
 }

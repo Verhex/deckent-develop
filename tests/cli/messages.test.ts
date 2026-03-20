@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { getMessage } from '../../src/cli/helpers/messages.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { getMessage, getLanguage } from '../../src/cli/helpers/messages.js';
 
 describe('getMessage', () => {
   it('returns English hint for known key', () => {
@@ -66,5 +66,67 @@ describe('getMessage', () => {
   it('unknown lang falls back to English', () => {
     const msg = getMessage('hint.COMPLETE', 'de');
     expect(msg).toContain('Sprint complete');
+  });
+});
+
+describe('getLanguage', () => {
+  let origLang: string | undefined;
+  let origLcAll: string | undefined;
+
+  beforeEach(() => {
+    origLang = process.env['LANG'];
+    origLcAll = process.env['LC_ALL'];
+  });
+
+  afterEach(() => {
+    if (origLang === undefined) delete process.env['LANG'];
+    else process.env['LANG'] = origLang;
+    if (origLcAll === undefined) delete process.env['LC_ALL'];
+    else process.env['LC_ALL'] = origLcAll;
+  });
+
+  it('returns configLanguage when a supported language is provided', () => {
+    expect(getLanguage('tr')).toBe('tr');
+    expect(getLanguage('en')).toBe('en');
+  });
+
+  it('normalizes locale-style configLanguage (tr_TR → tr)', () => {
+    expect(getLanguage('tr_TR')).toBe('tr');
+  });
+
+  it('falls back to LANG env var when configLanguage not provided', () => {
+    delete process.env['LC_ALL'];
+    process.env['LANG'] = 'tr_TR.UTF-8';
+    expect(getLanguage()).toBe('tr');
+  });
+
+  it('prefers LC_ALL over LANG env var', () => {
+    process.env['LC_ALL'] = 'tr_TR.UTF-8';
+    process.env['LANG'] = 'en_US.UTF-8';
+    expect(getLanguage()).toBe('tr');
+  });
+
+  it('returns en when LANG is an unsupported language', () => {
+    delete process.env['LC_ALL'];
+    process.env['LANG'] = 'de_DE.UTF-8';
+    expect(getLanguage()).toBe('en');
+  });
+
+  it('returns en when no config and no env var set', () => {
+    delete process.env['LC_ALL'];
+    delete process.env['LANG'];
+    expect(getLanguage()).toBe('en');
+  });
+
+  it('falls back to LANG env when configLanguage is unsupported', () => {
+    delete process.env['LC_ALL'];
+    process.env['LANG'] = 'tr_TR.UTF-8';
+    expect(getLanguage('de')).toBe('tr');
+  });
+
+  it('handles en_US LANG → returns en', () => {
+    delete process.env['LC_ALL'];
+    process.env['LANG'] = 'en_US.UTF-8';
+    expect(getLanguage()).toBe('en');
   });
 });

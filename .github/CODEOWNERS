@@ -1,0 +1,36 @@
+# CODEOWNERS — Deckent Repository Ownership
+# Format: <pattern> <owner> [<owner> ...]
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @verhex/deckent-core
+
+# Brain/Orchestration — core orchestrator, planner, task builder, debt manager
+src/orchestra/ @verhex/deckent-core
+
+# Core modules — types, config, utils, plugin system
+src/core/ @verhex/deckent-core
+
+# MCP integration — tools, resources, server
+src/mcp/ @verhex/deckent-core
+
+# CLI commands and helpers
+src/cli/ @verhex/deckent-core
+
+# Agent workers
+src/agents/ @verhex/deckent-core
+
+# Monitoring and auditing
+src/monitor/ @verhex/deckent-core
+
+# HTTP API
+src/api/ @verhex/deckent-core
+
+# Documentation
+docs/ @verhex/deckent-core
+
+# CI/CD and GitHub configuration
+.github/ @verhex/deckent-core
+
+# Tests
+tests/ @verhex/deckent-core

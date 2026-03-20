@@ -9,6 +9,7 @@ import { TMUX_SESSION_NAME } from '../../core/constants.js';
 import { runDoctorChecks } from './doctor.js';
 import { print, printError, formatSprintSummary, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
 
 interface StartCommandOpts {
   autoApprove?: boolean;
@@ -31,8 +32,11 @@ export function registerStart(program: Command): void {
       const root = resolveProjectRoot();
 
       try {
+        const config = await loadConfig(root);
+        const lang = config.language;
+
         if (opts.sandboxMode) {
-          print('Sandbox mode not yet implemented. Running normally.');
+          print(getMessage('start.sandbox_not_implemented', lang));
           return;
         }
 
@@ -42,36 +46,41 @@ export function registerStart(program: Command): void {
           const requiredFailed = doctorResult.checks.filter(c => c.required && !c.passed);
           if (requiredFailed.length > 0) {
             printError(new Error(`Pre-flight failed: ${requiredFailed.map(c => `${c.name}: ${c.message}`).join('; ')}`));
-            print('Use --force to skip pre-flight checks.');
+            print(getMessage('start.use_force', lang));
             process.exitCode = 1;
             return;
           }
         }
 
-        const config = await loadConfig(root);
-
         // Dry-run mode: plan only, no spawn
         if (opts.dryRun) {
           if (opts.watch) {
-            print('Note: --watch ignored in dry-run mode (no workers spawned).');
+            print(getMessage('start.watch_ignored_dry_run', lang));
           }
           const context = readContext(root);
           const usage = checkUsage(config);
           const recommendation = adjustSprintSize(config, usage);
           const sprint = planSprint(root, config, context, recommendation);
 
-          print(`Sprint ${sprint.number} (${sprint.id}) planned — ${sprint.tasks.length} tasks:\n`);
+          print(getMessage('start.sprint_planned', lang, {
+            number: String(sprint.number),
+            id: sprint.id,
+            count: String(sprint.tasks.length),
+          }));
           const headers = ['ID', 'Title', 'Model', 'Priority'];
           const rows = sprint.tasks.map(t => [t.id, t.title, t.model, t.priority]);
           print(formatTable(headers, rows));
           if (sprint.reasoning) {
-            print(`\nReasoning: ${sprint.reasoning}`);
+            print(getMessage('start.reasoning', lang, { reasoning: sprint.reasoning }));
           }
           if (sprint.planningMode) {
-            print(`Planning mode: ${sprint.planningMode}`);
+            print(getMessage('start.planning_mode', lang, { mode: sprint.planningMode }));
           }
-          print(`\nWorkers: ${sprint.tasks.length} | Brain model: ${config.activeModeConfig.brain_model}`);
-          print('Dry-run complete. No workers spawned.');
+          print(getMessage('start.workers_info', lang, {
+            count: String(sprint.tasks.length),
+            model: config.activeModeConfig.brain_model,
+          }));
+          print(getMessage('start.dry_run_complete', lang));
           return;
         }
 
@@ -79,9 +88,9 @@ export function registerStart(program: Command): void {
         if (opts.watch) {
           if (isSessionActive()) {
             setupWatchWindow(TMUX_SESSION_NAME, root);
-            print('Watch window created. Attach with: tmux attach -t deckent:watch');
+            print(getMessage('start.watch_window_created', lang));
           } else {
-            print('Note: --watch requires an active tmux session. Skipping watch setup.');
+            print(getMessage('start.watch_no_tmux', lang));
           }
         }
 

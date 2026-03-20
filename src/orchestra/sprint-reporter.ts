@@ -1,6 +1,6 @@
 // ─── Sprint Reporting ──────────────────────────────────────────────
 // Extracted from brain.ts — retrospective, sprint log, metrics, doc updates
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
@@ -64,6 +64,20 @@ export function writeRetrospective(
   for (const task of sprint.tasks) {
     retroLines.push(`- ${task.id}: ${task.title} -> ${evaluations.get(task.id) ?? 'UNKNOWN'}`);
   }
+
+  // Add comparison section if previous sprint exists
+  const previousMetrics = readPreviousSprintMetrics(projectRoot, sprint.id);
+  if (previousMetrics) {
+    const cmp = compareWithPreviousSprint(metrics, previousMetrics);
+    retroLines.push('', '## Comparison with Previous Sprint');
+    const durationSign = cmp.durationChangePct >= 0 ? '+' : '';
+    retroLines.push(`- Duration: ${durationSign}${cmp.durationChangePct.toFixed(1)}%`);
+    const noGoSign = cmp.noGoRateChange >= 0 ? '+' : '';
+    retroLines.push(`- No-Go Rate: ${noGoSign}${cmp.noGoRateChange.toFixed(1)}pp`);
+    const covSign = cmp.coverageDelta >= 0 ? '+' : '';
+    retroLines.push(`- Coverage: ${covSign}${cmp.coverageDelta.toFixed(1)}pp`);
+  }
+
   writeFileSync(
     join(brainPath, RETRO_FILE),
     retroLines.slice(0, RETRO_MAX_LINES).join('\n'),
@@ -184,4 +198,90 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
   };
   const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
   return runAllUpdaters(ctx);
+}
+
+// ═══ Sprint Comparison ═══════════════════════════════════════════
+
+export interface SprintComparison {
+  durationChangePct: number;
+  noGoRateChange: number;
+  testCountDelta: number;
+  coverageDelta: number;
+  completedTasksDelta: number;
+  techDebtTasksDelta: number;
+}
+
+/** Compare current metrics against a previous sprint's metrics. */
+export function compareWithPreviousSprint(current: SprintMetrics, previous: SprintMetrics): SprintComparison {
+  const durationChangePct = previous.durationMs > 0
+    ? ((current.durationMs - previous.durationMs) / previous.durationMs) * 100
+    : 0;
+  return {
+    durationChangePct,
+    noGoRateChange: current.noGoRate - previous.noGoRate,
+    testCountDelta: current.totalTasks - previous.totalTasks,
+    coverageDelta: current.coveragePercent - previous.coveragePercent,
+    completedTasksDelta: current.completedTasks - previous.completedTasks,
+    techDebtTasksDelta: current.techDebtTasks - previous.techDebtTasks,
+  };
+}
+
+/** Read metrics from a previous sprint log file by parsing the markdown table. */
+export function readPreviousSprintMetrics(projectRoot: string, currentSprintId: string): SprintMetrics | null {
+  const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+  if (!existsSync(sprintsPath)) return null;
+
+  const files = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).sort();
+  // Filter out the current sprint and pick the latest previous
+  const previousFiles = files.filter(f => !f.includes(currentSprintId));
+  if (previousFiles.length === 0) return null;
+
+  const latestFile = previousFiles[previousFiles.length - 1]!;
+  const content = readFileSafe(join(sprintsPath, latestFile));
+  return parseSprintLogMetrics(content);
+}
+
+/** Parse metrics from a sprint log markdown table. */
+function parseSprintLogMetrics(content: string): SprintMetrics | null {
+  const lines = content.split('\n');
+  const metricsMap = new Map<string, string>();
+
+  for (const line of lines) {
+    if (!line.startsWith('|') || line.startsWith('|---') || line.startsWith('| Metric')) continue;
+    const cols = line.split('|').map(c => c.trim()).filter(c => c);
+    if (cols.length >= 2) {
+      metricsMap.set(cols[0]!, cols[1]!);
+    }
+  }
+
+  if (metricsMap.size === 0) return null;
+
+  const totalTasks = parseInt(metricsMap.get('Total Tasks') ?? '0', 10);
+  const completedTasks = parseInt(metricsMap.get('Completed') ?? '0', 10);
+  const techDebtTasks = parseInt(metricsMap.get('Tech Debt') ?? '0', 10);
+  const noGoTasks = parseInt(metricsMap.get('No-Go') ?? '0', 10);
+  const coverageStr = metricsMap.get('Coverage') ?? '0';
+  const coveragePercent = parseFloat(coverageStr.replace('%', ''));
+  const durationStr = metricsMap.get('Duration') ?? '0';
+  const durationMs = parseInt(durationStr.replace('ms', ''), 10);
+
+  if (isNaN(totalTasks) && isNaN(completedTasks)) return null;
+
+  const noGoRate = totalTasks > 0 ? (noGoTasks / totalTasks) * 100 : 0;
+
+  return {
+    totalTasks,
+    completedTasks,
+    techDebtTasks,
+    noGoTasks,
+    durationMs: isNaN(durationMs) ? 0 : durationMs,
+    coveragePercent: isNaN(coveragePercent) ? 0 : coveragePercent,
+    noGoRate,
+    newDebtCount: 0,
+    resolvedDebtCount: 0,
+    totalOpenDebt: 0,
+    boundaryViolations: 0,
+    crossAssignments: 0,
+    contextLinesUsed: 0,
+  };
 }

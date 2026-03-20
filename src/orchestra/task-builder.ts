@@ -5,6 +5,7 @@ import type {
   PlannerTask,
 } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
+import { calculateModelScore } from './model-selector.js';
 
 // ═══ Types ═════════════════════════════════════════════════════════
 
@@ -147,17 +148,30 @@ export function plannerTaskToParams(
   };
 }
 
+// 5a. resolveWorkerEffort — determine worker effort level based on task complexity
+export function resolveWorkerEffort(task: Task): 'max' | 'high' | 'medium' | 'low' {
+  const score = calculateModelScore(task.title, task.description, task.scope);
+  if (score >= 6) return 'max';
+  if (score >= 1) return 'high';
+  if (score >= -1) return 'medium';
+  return 'low';
+}
+
 // 5b. buildWorkerPrompt (pure)
 export function buildWorkerPrompt(task: Task): string {
   const scopeStr = task.scope.directories.length > 0
     ? task.scope.directories.join(', ')
     : 'any';
+  const effort = resolveWorkerEffort(task);
 
   return `You are a Deckent worker agent. Your task:
 
 Task ${task.id}: ${task.title}
 Description: ${task.description}
+Model: ${task.model}
 Scope: ${scopeStr}
+
+Worker effort: --effort ${effort}
 
 Instructions:
 1. Complete the task described above

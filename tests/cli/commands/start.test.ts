@@ -1,0 +1,384 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Command } from 'commander';
+
+// ─── Mocks ───────────────────────────────────────────────────────────
+
+vi.mock('../../../src/core/config.js', () => ({
+  loadConfig: vi.fn(),
+}));
+
+vi.mock('../../../src/orchestra/brain.js', () => ({
+  runSprint: vi.fn(),
+  readContext: vi.fn(),
+  checkUsage: vi.fn(),
+  adjustSprintSize: vi.fn(),
+  planSprint: vi.fn(),
+  BrainError: class BrainError extends Error {
+    phase?: string;
+    constructor(message: string, phase?: string) {
+      super(message);
+      this.name = 'BrainError';
+      this.phase = phase;
+    }
+  },
+}));
+
+vi.mock('../../../src/orchestra/tmux.js', () => ({
+  isSessionActive: vi.fn(),
+  setupWatchWindow: vi.fn(),
+}));
+
+vi.mock('../../../src/core/constants.js', () => ({
+  TMUX_SESSION_NAME: 'deckent',
+}));
+
+vi.mock('../../../src/cli/commands/doctor.js', () => ({
+  runDoctorChecks: vi.fn(),
+}));
+
+vi.mock('../../../src/cli/helpers/output.js', () => ({
+  print: vi.fn(),
+  printError: vi.fn(),
+  formatSprintSummary: vi.fn().mockReturnValue('Sprint summary'),
+  formatTable: vi.fn().mockReturnValue('Task table'),
+}));
+
+vi.mock('../../../src/cli/helpers/process.js', () => ({
+  resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
+}));
+
+import { loadConfig } from '../../../src/core/config.js';
+import {
+  runSprint, readContext, checkUsage, adjustSprintSize, planSprint, BrainError,
+} from '../../../src/orchestra/brain.js';
+import { isSessionActive, setupWatchWindow } from '../../../src/orchestra/tmux.js';
+import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
+import { print, printError, formatSprintSummary } from '../../../src/cli/helpers/output.js';
+import { registerStart } from '../../../src/cli/commands/start.js';
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function makeConfig(overrides = {}) {
+  return {
+    activeModeConfig: { brain_model: 'opus', max_workers: 3 },
+    brain_planning: 'auto',
+    language: 'en',
+    ...overrides,
+  };
+}
+
+function makeSprint(overrides = {}) {
+  return {
+    id: 'sprint-001',
+    number: 1,
+    tasks: [
+      { id: '001-001', title: 'Task One', model: 'sonnet', priority: 'NORMAL' },
+    ],
+    reasoning: 'Test reasoning',
+    planningMode: 'structured',
+    ...overrides,
+  };
+}
+
+function makeDoctorResult(allPass = true) {
+  return {
+    checks: [
+      { name: 'tmux', required: true, passed: allPass, message: allPass ? 'ok' : 'tmux not found' },
+      { name: 'claude', required: true, passed: allPass, message: allPass ? 'ok' : 'claude not found' },
+    ],
+  };
+}
+
+async function runCommand(args: string[]): Promise<void> {
+  const program = new Command();
+  program.exitOverride();
+  registerStart(program);
+  try {
+    await program.parseAsync(['node', 'test', ...args]);
+  } catch {
+    // Commander exitOverride
+  }
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────
+
+describe('start command (isolated)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+
+    // Default mocks
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig() as any);
+    vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(true) as any);
+    vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
+    vi.mocked(checkUsage).mockReturnValue({ allowed: true, used: 0, limit: 100 } as any);
+    vi.mocked(adjustSprintSize).mockReturnValue({ maxWorkers: 3 } as any);
+    vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
+    vi.mocked(runSprint).mockResolvedValue(makeSprint() as any);
+    vi.mocked(isSessionActive).mockReturnValue(true);
+    vi.mocked(setupWatchWindow).mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  // ─── Command Registration ─────────────────────────────────────────
+
+  describe('registerStart', () => {
+    it('registers the start command', () => {
+      const program = new Command();
+      registerStart(program);
+      const cmd = program.commands.find(c => c.name() === 'start');
+      expect(cmd).toBeDefined();
+    });
+
+    it('registers --dry-run flag', () => {
+      const program = new Command();
+      registerStart(program);
+      const cmd = program.commands.find(c => c.name() === 'start');
+      const option = cmd?.options.find(o => o.long === '--dry-run');
+      expect(option).toBeDefined();
+    });
+
+    it('registers --watch flag', () => {
+      const program = new Command();
+      registerStart(program);
+      const cmd = program.commands.find(c => c.name() === 'start');
+      const option = cmd?.options.find(o => o.long === '--watch');
+      expect(option).toBeDefined();
+    });
+
+    it('registers --auto-approve flag', () => {
+      const program = new Command();
+      registerStart(program);
+      const cmd = program.commands.find(c => c.name() === 'start');
+      const option = cmd?.options.find(o => o.long === '--auto-approve');
+      expect(option).toBeDefined();
+    });
+
+    it('registers --force flag', () => {
+      const program = new Command();
+      registerStart(program);
+      const cmd = program.commands.find(c => c.name() === 'start');
+      const option = cmd?.options.find(o => o.long === '--force');
+      expect(option).toBeDefined();
+    });
+
+    it('registers --sandbox-mode flag', () => {
+      const program = new Command();
+      registerStart(program);
+      const cmd = program.commands.find(c => c.name() === 'start');
+      const option = cmd?.options.find(o => o.long === '--sandbox-mode');
+      expect(option).toBeDefined();
+    });
+  });
+
+  // ─── Pre-flight ───────────────────────────────────────────────────
+
+  describe('pre-flight doctor checks', () => {
+    it('runs doctor checks before starting sprint', async () => {
+      await runCommand(['start']);
+      expect(runDoctorChecks).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('aborts and sets exit code 1 when required doctor check fails', async () => {
+      vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(false) as any);
+
+      await runCommand(['start']);
+
+      expect(printError).toHaveBeenCalled();
+      expect(runSprint).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('skips doctor checks when --force is provided', async () => {
+      await runCommand(['start', '--force']);
+
+      expect(runDoctorChecks).not.toHaveBeenCalled();
+      expect(runSprint).toHaveBeenCalled();
+    });
+
+    it('prints --force hint after pre-flight failure', async () => {
+      vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(false) as any);
+
+      await runCommand(['start']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('--force'));
+    });
+  });
+
+  // ─── Dry-run Mode ────────────────────────────────────────────────
+
+  describe('--dry-run mode', () => {
+    it('calls planSprint in dry-run mode', async () => {
+      await runCommand(['start', '--dry-run']);
+
+      expect(planSprint).toHaveBeenCalled();
+    });
+
+    it('does not call runSprint in dry-run mode', async () => {
+      await runCommand(['start', '--dry-run']);
+
+      expect(runSprint).not.toHaveBeenCalled();
+    });
+
+    it('prints task list in dry-run mode', async () => {
+      await runCommand(['start', '--dry-run']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('sprint-001'));
+    });
+
+    it('prints dry-run complete message', async () => {
+      await runCommand(['start', '--dry-run']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('Dry-run complete'));
+    });
+
+    it('ignores --watch flag in dry-run mode and prints a note', async () => {
+      await runCommand(['start', '--dry-run', '--watch']);
+
+      expect(setupWatchWindow).not.toHaveBeenCalled();
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('--watch ignored'));
+    });
+
+    it('passes readContext, checkUsage, adjustSprintSize to planSprint', async () => {
+      await runCommand(['start', '--dry-run']);
+
+      expect(readContext).toHaveBeenCalledWith('/mock/root');
+      expect(checkUsage).toHaveBeenCalled();
+      expect(adjustSprintSize).toHaveBeenCalled();
+    });
+
+    it('prints sprint reasoning when present', async () => {
+      await runCommand(['start', '--dry-run']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('Test reasoning'));
+    });
+
+    it('prints planning mode when present', async () => {
+      await runCommand(['start', '--dry-run']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('structured'));
+    });
+  });
+
+  // ─── Watch Mode ───────────────────────────────────────────────────
+
+  describe('--watch mode', () => {
+    it('calls setupWatchWindow when tmux session is active', async () => {
+      vi.mocked(isSessionActive).mockReturnValue(true);
+
+      await runCommand(['start', '--watch']);
+
+      expect(setupWatchWindow).toHaveBeenCalledWith('deckent', '/mock/root');
+    });
+
+    it('prints watch window instructions when tmux session is active', async () => {
+      vi.mocked(isSessionActive).mockReturnValue(true);
+
+      await runCommand(['start', '--watch']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('Watch window created'));
+    });
+
+    it('skips watch setup when no active tmux session', async () => {
+      vi.mocked(isSessionActive).mockReturnValue(false);
+
+      await runCommand(['start', '--watch']);
+
+      expect(setupWatchWindow).not.toHaveBeenCalled();
+    });
+
+    it('prints note when tmux session is not active', async () => {
+      vi.mocked(isSessionActive).mockReturnValue(false);
+
+      await runCommand(['start', '--watch']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('--watch requires'));
+    });
+  });
+
+  // ─── Auto-approve Mode ────────────────────────────────────────────
+
+  describe('--auto-approve mode', () => {
+    it('passes autoApprove: true to runSprint when --auto-approve is set', async () => {
+      await runCommand(['start', '--auto-approve']);
+
+      expect(runSprint).toHaveBeenCalledWith(
+        '/mock/root',
+        expect.anything(),
+        expect.objectContaining({ autoApprove: true }),
+      );
+    });
+
+    it('passes autoApprove: false to runSprint by default', async () => {
+      await runCommand(['start']);
+
+      expect(runSprint).toHaveBeenCalledWith(
+        '/mock/root',
+        expect.anything(),
+        expect.objectContaining({ autoApprove: false }),
+      );
+    });
+  });
+
+  // ─── Error Handling ───────────────────────────────────────────────
+
+  describe('error handling', () => {
+    it('handles BrainError and includes phase in message', async () => {
+      const BrainErrorClass = (await import('../../../src/orchestra/brain.js')).BrainError as any;
+      const err = new BrainErrorClass('Sprint planning failed', 'PLAN');
+      vi.mocked(runSprint).mockRejectedValue(err);
+
+      await runCommand(['start']);
+
+      expect(printError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('PLAN') }),
+      );
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('handles generic error and sets exit code 1', async () => {
+      vi.mocked(runSprint).mockRejectedValue(new Error('Unexpected failure'));
+
+      await runCommand(['start']);
+
+      expect(printError).toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('handles missing DIRECTIVES via BrainError', async () => {
+      const BrainErrorClass = (await import('../../../src/orchestra/brain.js')).BrainError as any;
+      vi.mocked(runSprint).mockRejectedValue(new BrainErrorClass('DIRECTIVES.md not found'));
+
+      await runCommand(['start']);
+
+      expect(printError).toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('handles sandbox-mode and returns early with print', async () => {
+      await runCommand(['start', '--sandbox-mode']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('Sandbox mode'));
+      expect(runSprint).not.toHaveBeenCalled();
+    });
+
+    it('prints formatted sprint summary on successful run', async () => {
+      await runCommand(['start']);
+
+      expect(formatSprintSummary).toHaveBeenCalled();
+      expect(print).toHaveBeenCalledWith('Sprint summary');
+    });
+
+    it('handles loadConfig failure gracefully', async () => {
+      vi.mocked(loadConfig).mockRejectedValue(new Error('Config not found'));
+
+      await runCommand(['start']);
+
+      expect(printError).toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+    });
+  });
+});

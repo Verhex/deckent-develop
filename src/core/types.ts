@@ -112,6 +112,7 @@ export interface Heartbeat {
   timestamp: string;
   filesChangedCount: number;
   sequence: number;
+  progress: number;
 }
 
 export interface AgentInfo {

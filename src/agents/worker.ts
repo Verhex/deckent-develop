@@ -75,6 +75,21 @@ function ensureDir(dirPath: string): void {
   }
 }
 
+// ─── Progress Calculation ───────────────────────────────────────────
+
+export function calculateProgress(heartbeat: { status: AgentStatus | string; filesChangedCount?: number }): number {
+  const status = heartbeat.status as string;
+  const filesChanged = heartbeat.filesChangedCount ?? 0;
+  switch (status) {
+    case 'EXECUTING': return 10;
+    case 'CODING': return 30 + Math.min(filesChanged, 5) * 6;
+    case 'TESTING': return 70;
+    case 'DOCUMENTING': return 85;
+    case 'DONE': return 100;
+    default: return 0;
+  }
+}
+
 // ─── Public API ─────────────────────────────────────────────────────
 
 export function readTask(projectRoot: string, taskId: string): Task {
@@ -229,7 +244,9 @@ export function createHeartbeat(
   action: string,
   file?: string,
   sequence?: number,
+  filesChangedCount?: number,
 ): Heartbeat {
+  const count = filesChangedCount ?? 0;
   return {
     workerId,
     taskId,
@@ -237,8 +254,9 @@ export function createHeartbeat(
     currentAction: action,
     currentFile: file,
     timestamp: now(),
-    filesChangedCount: 0,
+    filesChangedCount: count,
     sequence: sequence ?? 0,
+    progress: calculateProgress({ status, filesChangedCount: count }),
   };
 }
 
