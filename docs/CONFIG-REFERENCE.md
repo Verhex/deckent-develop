@@ -1,6 +1,6 @@
-# CONFIG-REFERENCE — Deckent Configuration Reference
+# Configuration Reference
 
-> Blueprint Reference: §13 Multi-Plan Compatibility, §9 Usage-Aware Planning, §5.1 Brain+Planner
+Complete reference for all Deckent configuration options.
 
 ---
 
@@ -13,54 +13,41 @@
 5. [PlanModeConfig Fields](#5-planmodeconfig-fields)
 6. [Brain Planning Modes](#6-brain-planning-modes)
 7. [Usage Thresholds](#7-usage-thresholds)
-8. [Complete Example Configs](#8-complete-example-configs)
-9. [CLI Config Commands](#9-cli-config-commands)
-10. [Validation Rules](#10-validation-rules)
+8. [Global vs Project Config](#8-global-vs-project-config)
+9. [Example Configs](#9-example-configs)
+10. [CLI Config Commands](#10-cli-config-commands)
+11. [Validation Rules](#11-validation-rules)
 
 ---
 
 ## 1. Config File Locations
 
-Deckent uses a **two-layer configuration system**:
+Deckent uses a two-layer configuration system:
 
 | Layer | Path | Scope |
 |-------|------|-------|
 | Global | `~/.deckent/config.json` | All projects on this machine |
 | Project | `.deckent/config.json` | This project only |
 
-Project config **overrides** global config using a deep merge. Fields not specified in project config inherit from global config. Fields not specified in either inherit from built-in defaults.
-
-```
-Built-in Defaults
-     ↓ deepMerge
-~/.deckent/config.json (global)
-     ↓ deepMerge
-.deckent/config.json (project)
-     ↓
-ResolvedConfig (runtime)
-```
-
-> Source: `src/core/config.ts` — `loadConfig()`
+Project config overrides global config using a deep merge. Fields not specified in the project config inherit from the global config. Fields not specified in either inherit from built-in defaults.
 
 ---
 
 ## 2. Config Loading Order
 
-```typescript
-// Pseudo-code of loadConfig()
-let config = createDefaultConfig();           // Built-in defaults
-
-const globalConfig = readJson('~/.deckent/config.json');
-if (globalConfig) config = deepMerge(config, globalConfig);
-
-const projectConfig = readJson('.deckent/config.json');
-if (projectConfig) config = deepMerge(config, projectConfig);
-
-validateConfig(config);   // Throws ConfigValidationError if invalid
-return resolvedConfig;    // Ready for runtime use
+```
+Built-in Defaults
+     |  (deep merge)
+~/.deckent/config.json  (global)
+     |  (deep merge)
+.deckent/config.json  (project)
+     |
+ResolvedConfig  (runtime)
 ```
 
-The `deepMerge` function recursively merges plain objects — nested mode configs (e.g., `modes.max_plan.max_workers`) can be overridden individually without replacing the entire mode block.
+The deep merge function recursively merges plain objects. Nested mode configs (for example, `modes.max_plan.max_workers`) can be overridden individually without replacing the entire mode block.
+
+Source: `src/core/config.ts` -- `loadConfig()`
 
 ---
 
@@ -70,13 +57,13 @@ These fields sit at the root of `.deckent/config.json`:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | `PlanMode` | `"max_plan"` | Active plan mode — determines model limits and worker count |
-| `modes` | `Record<PlanMode, PlanModeConfig>` | (see §4) | Per-mode configuration blocks |
-| `language` | `"en" \| "tr"` | `"en"` | CLI output language |
-| `projectName` | `string` | `"deckent-project"` | Project name shown in dashboard and logs |
-| `version` | `string` | (from `package.json`) | Deckent version — usually not set manually |
-| `brain_planning` | `BrainPlanningMode` | `"auto"` | **Deprecated top-level position** — use `modes.<mode>.brain_planning` instead |
-| `last_sprint_id` | `string` | — | Last sprint ID, managed by Brain — do not edit manually |
+| `mode` | `PlanMode` | `"max_plan"` | Active plan mode. Determines model limits and worker count. |
+| `modes` | `Record<PlanMode, PlanModeConfig>` | (see section 4) | Per-mode configuration blocks. |
+| `language` | `"en"` or `"tr"` | `"en"` | CLI output language. |
+| `projectName` | `string` | `"deckent-project"` | Project name shown in dashboard and logs. |
+| `version` | `string` | (from package.json) | Deckent version. Usually not set manually. |
+| `brain_planning` | `BrainPlanningMode` | `"auto"` | Planning mode. Can also be set per-mode. |
+| `last_sprint_id` | `string` | -- | Last sprint ID. Managed by Brain. Do not edit manually. |
 
 ### Minimal Valid Config
 
@@ -94,94 +81,44 @@ When only top-level fields are specified, all `modes.*` values fall back to buil
 
 ## 4. Plan Modes
 
-Deckent ships with **4 built-in plan modes**, each tuned for a different Claude subscription tier. Blueprint §13.
+Deckent ships with four built-in plan modes, each tuned for a different Claude subscription tier.
 
-### 4.1 Comparison Table
+### Comparison Table
 
 | Field | `max_plan` | `max5x_plan` | `pro_plan` | `api` |
 |-------|-----------|-------------|-----------|-------|
-| **Subscription** | Claude Max 20x ($200/mo) | Claude Max 5x ($100/mo) | Claude Pro ($20/mo) | API key (pay-as-you-go) |
-| `max_workers` | **8** | **5** | **3** | **10** |
+| **Subscription** | Max 20x ($200/mo) | Max 5x ($100/mo) | Pro ($20/mo) | API key (pay-as-you-go) |
+| `max_workers` | 8 | 5 | 3 | 10 |
 | `brain_model` | `opus` | `sonnet` | `sonnet` | `opus` |
 | `default_model` | `opus` | `opus` | `sonnet` | `sonnet` |
 | `haiku_allowed` | `true` | `true` | `false` | `true` |
-| `5hr` threshold | `0.8` (80%) | `0.7` (70%) | `0.6` (60%) | `1.0` (100%) |
-| `weekly` threshold | `0.6` (60%) | `0.5` (50%) | `0.4` (40%) | `1.0` (100%) |
-| `budget_per_sprint` | — | — | — | `$5.00` |
-| `requires` env var | — | — | — | `ANTHROPIC_API_KEY` |
+| `5hr` threshold | 0.8 (80%) | 0.7 (70%) | 0.6 (60%) | 1.0 (100%) |
+| `weekly` threshold | 0.6 (60%) | 0.5 (50%) | 0.4 (40%) | 1.0 (100%) |
+| `budget_per_sprint` | -- | -- | -- | $5.00 |
+| `requires` env var | -- | -- | -- | `ANTHROPIC_API_KEY` |
 | `brain_planning` | `"auto"` | `"auto"` | `"auto"` | `"auto"` |
 
-### 4.2 `max_plan` — Claude Max 20x
+### max_plan -- Claude Max 20x
 
-```json
-"max_plan": {
-  "max_workers": 8,
-  "brain_model": "opus",
-  "default_model": "opus",
-  "haiku_allowed": true,
-  "usage_thresholds": { "5hr": 0.8, "weekly": 0.6 },
-  "brain_planning": "auto"
-}
-```
+Full parallelism with up to 8 workers. Brain uses Opus for highest-quality planning. Workers default to Opus. Brain can downgrade individual tasks to Sonnet or Haiku.
 
-**When to use:** You have the Claude Max $200/month plan. Full parallelism with up to 8 workers. Brain uses Opus for highest-quality planning. Workers default to Opus — Brain can downgrade individual tasks to Sonnet or Haiku.
+Limits: Sprint planning pauses when 5-hour usage exceeds 80% or weekly usage exceeds 60%.
 
-**Limits:** Sprint planning pauses when 5-hour usage exceeds 80% or weekly usage exceeds 60%.
+### max5x_plan -- Claude Max 5x
 
-### 4.3 `max5x_plan` — Claude Max 5x
+Good parallelism at 5 workers. Brain uses Sonnet to conserve budget. Workers can still use Opus for complex tasks.
 
-```json
-"max5x_plan": {
-  "max_workers": 5,
-  "brain_model": "sonnet",
-  "default_model": "opus",
-  "haiku_allowed": true,
-  "usage_thresholds": { "5hr": 0.7, "weekly": 0.5 },
-  "brain_planning": "auto"
-}
-```
+Limits: Sprint planning pauses at 70% 5-hour usage or 50% weekly usage.
 
-**When to use:** You have the Claude Max $100/month plan. Good parallelism at 5 workers. Brain uses Sonnet to conserve budget; workers can still use Opus for complex tasks.
+### pro_plan -- Claude Pro
 
-**Limits:** Sprint planning pauses at 70% 5-hour usage or 50% weekly usage.
+Conservative mode with 3 workers maximum. Haiku is disabled because Pro plan usage limits are tight. Everything runs on Sonnet.
 
-### 4.4 `pro_plan` — Claude Pro
+Limits: Sprint planning pauses at 60% 5-hour usage or 40% weekly usage.
 
-```json
-"pro_plan": {
-  "max_workers": 3,
-  "brain_model": "sonnet",
-  "default_model": "sonnet",
-  "haiku_allowed": false,
-  "usage_thresholds": { "5hr": 0.6, "weekly": 0.4 },
-  "brain_planning": "auto"
-}
-```
+### api -- API Key Mode
 
-**When to use:** You have the Claude Pro $20/month plan. Conservative mode — 3 workers maximum. Haiku is disabled because Pro plan usage limits are tight. Everything runs on Sonnet.
-
-**Limits:** Sprint planning pauses at 60% 5-hour usage or 40% weekly usage. Most conservative thresholds.
-
-### 4.5 `api` — API Key Mode
-
-```json
-"api": {
-  "max_workers": 10,
-  "brain_model": "opus",
-  "default_model": "sonnet",
-  "haiku_allowed": true,
-  "usage_thresholds": { "5hr": 1.0, "weekly": 1.0 },
-  "budget_per_sprint": 5.0,
-  "requires": "ANTHROPIC_API_KEY",
-  "brain_planning": "auto"
-}
-```
-
-**When to use:** You use the Anthropic API with a key. Highest parallelism (10 workers). No usage percentage limits — instead uses `budget_per_sprint` as a dollar cap per sprint. Requires `ANTHROPIC_API_KEY` environment variable.
-
-**Limits:** Budget-based, not usage-percentage-based. `budget_per_sprint: 5.0` means $5.00 maximum per sprint. Thresholds are `1.0` (100%) because percentage limits don't apply.
-
-**Requirement:** `ANTHROPIC_API_KEY` must be set in the environment. Deckent will throw a `ConfigValidationError` at startup if the key is missing.
+Highest parallelism at 10 workers. No usage percentage limits. Uses `budget_per_sprint` as a dollar cap instead. Requires `ANTHROPIC_API_KEY` environment variable.
 
 ---
 
@@ -191,94 +128,70 @@ Each mode block (`modes.<modeName>`) supports these fields:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `max_workers` | `number` (1–20) | Yes | Maximum parallel workers for this mode |
-| `brain_model` | `"opus" \| "sonnet" \| "haiku"` | Yes | Model used by Brain for planning and evaluation |
-| `default_model` | `"opus" \| "sonnet" \| "haiku"` | Yes | Default model assigned to workers when Brain doesn't specify |
-| `haiku_allowed` | `boolean` | Yes | Whether Brain can assign `haiku` model to workers |
-| `usage_thresholds` | `UsageThresholds` | Yes | When to reduce/pause sprint due to usage |
-| `usage_thresholds["5hr"]` | `number` (0–1) | Yes | 5-hour rolling window threshold (fraction, e.g. `0.8` = 80%) |
-| `usage_thresholds.weekly` | `number` (0–1) | Yes | Weekly quota threshold (fraction, e.g. `0.6` = 60%) |
-| `budget_per_sprint` | `number > 0` | No (API mode only) | Max USD budget per sprint |
-| `requires` | `string` | No | Required environment variable name (e.g. `"ANTHROPIC_API_KEY"`) |
-| `brain_planning` | `BrainPlanningMode` | No | Planning mode override for this specific plan mode |
+| `max_workers` | number (1-20) | Yes | Maximum parallel workers for this mode. |
+| `brain_model` | `"opus"`, `"sonnet"`, or `"haiku"` | Yes | Model used by Brain for planning and evaluation. |
+| `default_model` | `"opus"`, `"sonnet"`, or `"haiku"` | Yes | Default model assigned to workers. |
+| `haiku_allowed` | boolean | Yes | Whether Brain can assign `haiku` to workers. |
+| `usage_thresholds` | object | Yes | When to reduce or pause the sprint. |
+| `usage_thresholds["5hr"]` | number (0-1) | Yes | 5-hour rolling window threshold. |
+| `usage_thresholds.weekly` | number (0-1) | Yes | Weekly quota threshold. |
+| `budget_per_sprint` | number > 0 | No (API mode only) | Maximum USD budget per sprint. |
+| `requires` | string | No | Required environment variable name. |
+| `brain_planning` | `BrainPlanningMode` | No | Planning mode override for this mode. |
 
 ### Field Details
 
-**`max_workers`**
-Controls how many tmux worker windows Brain can spawn in parallel. Brain may spawn fewer if there are fewer tasks or if dependencies constrain parallelism. Valid range: 1–20.
+**max_workers** -- Controls how many worker windows Brain can spawn in parallel. Brain may spawn fewer if there are fewer tasks or if dependencies constrain parallelism.
 
-**`brain_model`**
-The model Brain uses for:
-- Sprint planning (calling `callBrainPlanner()`)
-- Evaluating task results (GO/NO-GO decisions)
-- Writing retrospectives and memory updates
+**brain_model** -- The model Brain uses for sprint planning, result evaluation, retrospectives, and memory updates.
 
-**`default_model`**
-Fallback model for worker tasks when Brain's planner doesn't specify a different model. Brain can override per-task in the task JSON's `model` field.
+**default_model** -- Fallback model for worker tasks when Brain's planner does not specify a different model. Brain can override per-task.
 
-**`haiku_allowed`**
-When `false`, Brain's planner will never assign `haiku` to any worker task, even for trivial work. Use `false` for Pro plan to avoid burning rate limits on haiku calls.
+**haiku_allowed** -- When `false`, Brain will never assign `haiku` to any worker task. Set to `false` for Pro plan to conserve rate limits.
 
-**`budget_per_sprint`**
-Only meaningful for `api` mode. Brain tracks estimated token cost and pauses sprint execution if the budget would be exceeded. Value is in USD.
+**budget_per_sprint** -- Only meaningful for `api` mode. Brain tracks estimated token cost and pauses execution if the budget would be exceeded. Value is in USD.
 
 ---
 
 ## 6. Brain Planning Modes
 
-`brain_planning` controls **how Brain generates task plans** from DIRECTIVES.md. Blueprint §9, §5.1.
+The `brain_planning` field controls how Brain generates task plans from DIRECTIVES.md.
 
-> Note: The DIRECTIVES may reference "hybrid" as a mode — this maps to `"auto"` in the codebase. The three implemented modes are `ai`, `structured`, and `auto`.
-
-### 6.1 Mode Comparison
+### Mode Comparison
 
 | Mode | Strategy | Fallback | Best For |
 |------|----------|----------|----------|
-| `"structured"` | Parse `## Task N:` blocks in DIRECTIVES.md | None | Deterministic, predictable plans |
-| `"ai"` | AI generates tasks (Zod-validated JSON) | Fails if AI fails | Maximum flexibility |
-| `"auto"` **(default)** | AI first → structured fallback on failure | Always succeeds | Production use |
+| `"structured"` | Parse `## Task N:` blocks | None | Deterministic, predictable plans |
+| `"ai"` | AI generates tasks (Zod-validated) | Fails if AI fails | Maximum flexibility |
+| `"auto"` (default) | AI first, structured fallback | Always succeeds | Production use |
 
-### 6.2 `"structured"` — Directive Block Parser
+### structured -- Directive Block Parser
 
-```
-brain_planning: "structured"
-```
+Brain calls `parseStructuredDirectives()` to extract tasks from DIRECTIVES.md. Tasks must use `## Task N:` section headers.
 
-Brain calls `parseStructuredDirectives()` to extract tasks from DIRECTIVES.md. Tasks are defined with `## Task N:` or `## Görev N:` section headers.
-
-- **Deterministic** — same DIRECTIVES always produces same tasks
-- **No AI call** for planning — faster and uses zero tokens
-- **Requires** well-formatted DIRECTIVES.md with structured task blocks
+- Deterministic: same directives always produce the same tasks
+- No AI call for planning: faster and uses zero tokens
+- Requires well-formatted DIRECTIVES.md
 - Fails if DIRECTIVES.md has no parseable task blocks
 
-### 6.3 `"ai"` — AI Planner
+### ai -- AI Planner
 
-```
-brain_planning: "ai"
-```
+Brain spawns `claude -p <prompt>` with the full context (directives, memory, retro, debt, patterns). The response is validated against a Zod schema.
 
-Brain calls `callBrainPlanner()`, which spawns `claude -p <prompt>` with the full context (DIRECTIVES, MEMORY, RETRO, DEBT, PATTERNS). The response is validated against a Zod schema — tasks must match the `PlannerTask` structure.
+- Flexible: AI can interpret ambiguous directives, infer scope, and select models
+- Zod-validated: invalid AI responses are rejected
+- Uses tokens for planning (typically around 2000 tokens with Opus)
+- Fails hard if the AI response is invalid
 
-- **Flexible** — AI can interpret ambiguous directives, infer scope, select models
-- **Zod-validated** — invalid AI responses are rejected (returns `null`)
-- **Uses tokens** for planning (typically ~2000 tokens with Opus)
-- Fails hard if AI response is invalid or the `claude` CLI is unavailable
+### auto -- Hybrid (Recommended)
 
-### 6.4 `"auto"` — Hybrid (Recommended)
+Brain tries AI first. If AI planning succeeds, the AI plan is used. If AI fails for any reason, Brain falls back to structured mode.
 
-```
-brain_planning: "auto"
-```
+- Resilient: never fails due to AI issues alone
+- Best of both worlds: prefers AI quality, guarantees a plan
+- Default for all built-in plan modes
 
-Brain tries AI first. If AI planning succeeds (valid Zod response), the AI plan is used. If AI fails for any reason (timeout, invalid JSON, CLI error), Brain falls back to `structured` mode.
-
-- **Resilient** — never fails due to AI issues alone
-- **Best of both worlds** — prefers AI quality, guarantees a plan
-- **Default** for all built-in plan modes
-
-### 6.5 Setting Per-Mode vs. Global
-
-You can set `brain_planning` per mode or override it globally:
+### Setting Per-Mode vs Global
 
 ```json
 {
@@ -294,13 +207,13 @@ You can set `brain_planning` per mode or override it globally:
 }
 ```
 
-This means `max_plan` uses AI planning (more tokens, higher quality), while `pro_plan` uses structured parsing (zero tokens, conserves budget).
+This gives `max_plan` AI planning (higher quality) while `pro_plan` uses structured parsing (zero token cost).
 
 ---
 
 ## 7. Usage Thresholds
 
-Usage thresholds control when Brain reduces sprint size or pauses execution. Blueprint §9.
+Usage thresholds control when Brain reduces sprint size or pauses execution.
 
 ```json
 "usage_thresholds": {
@@ -311,28 +224,24 @@ Usage thresholds control when Brain reduces sprint size or pauses execution. Blu
 
 | Threshold | Key | Meaning |
 |-----------|-----|---------|
-| 5-hour rolling window | `"5hr"` | Fraction of 5-hour message quota used (0.0–1.0) |
-| Weekly quota | `"weekly"` | Fraction of weekly message quota used (0.0–1.0) |
+| 5-hour rolling window | `"5hr"` | Fraction of 5-hour message quota used (0.0 to 1.0) |
+| Weekly quota | `"weekly"` | Fraction of weekly message quota used (0.0 to 1.0) |
 
 ### Behavior When Thresholds Are Exceeded
 
-```
 Before sprint planning:
-  5hr > threshold → reduce sprint size (fewer workers, smaller tasks)
-  weekly > threshold → minimal sprint (1-2 workers only)
+- `5hr` exceeded: sprint size is reduced (fewer workers, smaller tasks)
+- `weekly` exceeded: minimal sprint (1-2 workers only)
 
 During sprint execution:
-  Limit hit mid-sprint:
-    1. Pause active tasks (status → PAUSED, .tasks/*.paused created)
-    2. Wait for limit reset
-    3. Resume from saved state
-    4. Sprint is NEVER abandoned — always runs to completion
-```
+- If a limit is hit mid-sprint, active tasks are paused
+- The sprint waits for the limit to reset, then resumes
+- Sprints are never abandoned
 
-### Usage Check Per Mode
+### Threshold Summary by Mode
 
-| Mode | 5hr pause trigger | Weekly pause trigger |
-|------|------------------|---------------------|
+| Mode | 5hr Pause Trigger | Weekly Pause Trigger |
+|------|-------------------|---------------------|
 | `max_plan` | > 80% | > 60% |
 | `max5x_plan` | > 70% | > 50% |
 | `pro_plan` | > 60% | > 40% |
@@ -340,9 +249,46 @@ During sprint execution:
 
 ---
 
-## 8. Complete Example Configs
+## 8. Global vs Project Config
 
-### 8.1 Minimal Project Config (Max 20x user)
+### Global Config
+
+Located at `~/.deckent/config.json`. Applies to all projects on this machine. Use it for settings that rarely change, like your preferred plan mode and language.
+
+```json
+{
+  "mode": "max_plan",
+  "language": "en"
+}
+```
+
+### Project Config
+
+Located at `.deckent/config.json`. Applies to this project only. Use it for project-specific settings like worker count or planning mode.
+
+```json
+{
+  "projectName": "my-api",
+  "modes": {
+    "max_plan": {
+      "max_workers": 4,
+      "brain_planning": "structured"
+    }
+  }
+}
+```
+
+### Merge Behavior
+
+Project config always takes priority. If the global config sets `language: "en"` and the project config sets `language: "tr"`, the resolved config uses `"tr"`.
+
+Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` in the project config only overrides that field; all other `max_plan` fields keep their global or default values.
+
+---
+
+## 9. Example Configs
+
+### Minimal (Max 20x User)
 
 ```json
 {
@@ -352,9 +298,7 @@ During sprint execution:
 }
 ```
 
-All `modes.*` values fall back to built-in defaults.
-
-### 8.2 Custom Worker Limits
+### Custom Worker Limits
 
 ```json
 {
@@ -373,9 +317,7 @@ All `modes.*` values fall back to built-in defaults.
 }
 ```
 
-Reduces workers to 4 (from default 8) and lowers thresholds slightly for a more conservative sprint.
-
-### 8.3 API Mode Config
+### API Mode
 
 ```json
 {
@@ -397,15 +339,13 @@ Reduces workers to 4 (from default 8) and lowers thresholds slightly for a more 
 }
 ```
 
-API mode with reduced budget ($3/sprint instead of $5) and 6 workers instead of 10.
-
-### 8.4 Pro Plan with Turkish Language
+### Pro Plan (Conservative)
 
 ```json
 {
   "mode": "pro_plan",
-  "language": "tr",
-  "projectName": "benim-projem",
+  "language": "en",
+  "projectName": "my-project",
   "modes": {
     "pro_plan": {
       "max_workers": 3,
@@ -419,9 +359,7 @@ API mode with reduced budget ($3/sprint instead of $5) and 6 workers instead of 
 }
 ```
 
-Pro plan with Turkish UI, conservative thresholds (50%/35%), and structured planning to save tokens.
-
-### 8.5 Multi-Mode Config (switch between modes without re-editing)
+### Multi-Mode (Switch Without Re-Editing)
 
 ```json
 {
@@ -467,59 +405,67 @@ Pro plan with Turkish UI, conservative thresholds (50%/35%), and structured plan
 }
 ```
 
-All 4 modes pre-configured — switch the active mode with `deckent config set mode pro_plan`.
+Switch modes with: `deckent config set mode pro_plan`
 
 ---
 
-## 9. CLI Config Commands
+## 10. CLI Config Commands
 
-### Show current resolved config
+### Show Resolved Config
 
 ```bash
 deckent config
 ```
 
-Outputs the fully resolved `ResolvedConfig` as JSON — includes merged values from global + project config plus runtime fields (`projectRoot`, `version`, `activeModeConfig`).
+Outputs the fully resolved config as JSON, including merged values from global + project config and runtime fields.
 
-### Set a top-level config value
+### Set a Value
 
 ```bash
 deckent config set mode pro_plan
-deckent config set language tr
+deckent config set language en
 deckent config set projectName my-new-name
 ```
 
-Values are written to `.deckent/config.json`. The value is parsed as JSON first (for booleans/numbers), then as a string.
+Values are written to `.deckent/config.json`. The value is parsed as JSON first (for booleans and numbers), then as a string.
 
-### Switch plan mode
+### Switch Plan Mode
 
 ```bash
-deckent config set mode max_plan      # Claude Max 20x
-deckent config set mode max5x_plan    # Claude Max 5x
-deckent config set mode pro_plan      # Claude Pro
-deckent config set mode api           # API key mode
+deckent config set mode max_plan
+deckent config set mode max5x_plan
+deckent config set mode pro_plan
+deckent config set mode api
 ```
 
 The mode switch takes effect on the next `deckent start` or `deckent plan`.
 
-### Set brain planning mode
+### Set Brain Planning Mode
 
 ```bash
 deckent config set brain_planning auto
 ```
 
-> Note: this sets `brain_planning` at the top level. To set it per-mode, edit `.deckent/config.json` directly under `modes.<modeName>.brain_planning`.
+To set brain_planning per-mode, edit `.deckent/config.json` directly under `modes.<modeName>.brain_planning`.
+
+### Global Config
+
+```bash
+deckent config --global           # Show global config
+deckent config set --global mode max_plan   # Set a global value
+deckent config export --global    # Export global config
+```
 
 ---
 
-## 10. Validation Rules
+## 11. Validation Rules
 
 Deckent validates the config on every load. A `ConfigValidationError` is thrown with all validation failures listed.
 
 | Field | Constraint |
 |-------|-----------|
 | `mode` | Must be one of: `max_plan`, `max5x_plan`, `pro_plan`, `api` |
-| `language` | Must be one of: `en`, `tr` (if specified) |
+| `language` | Must be one of: `en`, `tr` |
 | `modes.<name>.max_workers` | Number between 1 and 20 (inclusive) |
 | `modes.<name>.brain_model` | One of: `opus`, `sonnet`, `haiku` |
 | `modes.<name>.default_model` | One of: `opus`, `sonnet`, `haiku` |
@@ -528,9 +474,9 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 | `modes.<name>.usage_thresholds.weekly` | Number between 0.0 and 1.0 |
 | `modes.<name>.budget_per_sprint` | Positive number (API mode only) |
 | `modes.<name>.brain_planning` | One of: `ai`, `structured`, `auto` |
-| API mode + `ANTHROPIC_API_KEY` | Environment variable must be set when `mode` is `"api"` |
+| API mode + `ANTHROPIC_API_KEY` | Environment variable must be set when mode is `"api"` |
 
-### Example validation error output
+### Example Validation Error
 
 ```
 ConfigValidationError: Config validation failed:
@@ -539,16 +485,11 @@ ConfigValidationError: Config validation failed:
   - modes.api.usage_thresholds.5hr must be a number between 0 and 1
 ```
 
-> Source: `src/core/config.ts` — `validateConfig()`, `ConfigValidationError`
-
 ---
 
 ## Related Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — System architecture overview
-- [BRAIN-GUIDE.md](BRAIN-GUIDE.md) — Brain planning internals
-- [SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md) — Sprint phases and flow
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Common config issues
-- Blueprint §9: Usage-Aware Planning
-- Blueprint §13: Multi-Plan Compatibility
-- Blueprint §15: Security & Permissions
+- [ARCHITECTURE.md](ARCHITECTURE.md) -- System architecture overview
+- [BRAIN-GUIDE.md](BRAIN-GUIDE.md) -- Brain planning internals
+- [SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md) -- Sprint phases and flow
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) -- Common config issues

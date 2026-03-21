@@ -230,7 +230,7 @@ describe('doctor command', () => {
       return { status: 0, stdout: outputs[cmd as string] ?? '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
-    expect(stdout()).toContain('\u2713');
+    expect(stdout()).toContain('[PASS]');
     expect(stdout()).toContain('10/10 checks passed');
   });
 
@@ -240,7 +240,7 @@ describe('doctor command', () => {
       return { status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
-    expect(stdout()).toContain('\u2717');
+    expect(stdout()).toContain('[FAIL]');
     expect(process.exitCode).toBe(1);
   });
 
@@ -1194,16 +1194,14 @@ describe('stub commands', () => {
     expect(stdout()).toContain('No plugins');
   });
 
-  it('upgrade shows not implemented', async () => {
+  it('upgrade shows current version', async () => {
     await runCommand(registerUpgrade, ['upgrade']);
-    expect(stdout()).toContain('not yet implemented');
-    expect(stdout()).toContain('npm update');
+    expect(stdout()).toContain('Current version');
   });
 
-  it('onboard shows not implemented', async () => {
+  it('onboard shows welcome message', async () => {
     await runCommand(registerOnboard, ['onboard']);
-    expect(stdout()).toContain('not yet implemented');
-    expect(stdout()).toContain('deckent init');
+    expect(stdout()).toContain('Welcome');
   });
 });
 

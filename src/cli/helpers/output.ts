@@ -107,17 +107,28 @@ export function formatDashboard(state: DashboardState): string {
 // ─── Doctor ─────────────────────────────────────────────────────────
 
 export function formatDoctorResult(result: DoctorResult): string {
+  const green = '\x1b[32m';
+  const yellow = '\x1b[33m';
+  const red = '\x1b[31m';
+  const reset = '\x1b[0m';
+
   const lines = result.checks.map((c) => {
-    const icon = c.passed ? '\u2713' : '\u2717';
-    return `  ${icon} ${padRight(c.name, 12)}${c.message}`;
+    if (c.passed) {
+      return `  ${green}[PASS]${reset} ${padRight(c.name, 14)}${c.message}`;
+    }
+    if (c.required) {
+      return `  ${red}[FAIL]${reset} ${padRight(c.name, 14)}${c.message}`;
+    }
+    return `  ${yellow}[WARN]${reset} ${padRight(c.name, 14)}${c.message}`;
   });
 
   const passed = result.checks.filter((c) => c.passed).length;
   const total = result.checks.length;
   const failed = total - passed;
+  const summaryColor = failed > 0 ? red : green;
   const summary = failed > 0
-    ? `Result: ${passed}/${total} checks passed (${failed} failed)`
-    : `Result: ${passed}/${total} checks passed`;
+    ? `${summaryColor}Result: ${passed}/${total} checks passed (${failed} failed)${reset}`
+    : `${summaryColor}Result: ${passed}/${total} checks passed${reset}`;
 
   return [...lines, '', `  ${summary}`].join('\n');
 }

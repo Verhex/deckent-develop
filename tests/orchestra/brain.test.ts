@@ -2651,7 +2651,7 @@ describe('updateProjectDocs', () => {
     expect(written).toContain('sprint19');
     expect(written).toContain('### Added');
     expect(written).toContain('Feature Alpha');
-    expect(written).toContain('DONE');
+    expect(written).toContain('total');
   });
 
   it('writes new CHANGELOG if file does not exist', () => {
@@ -2737,8 +2737,8 @@ describe('updateProjectDocs', () => {
     const changelogCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('CHANGELOG'));
     expect(changelogCall).toBeDefined();
     const written = String(changelogCall![1]);
-    expect(written).toContain('GO_WITH_TECH_DEBT');
-    expect(written).not.toContain('Feature Beta: NO_GO'); // NO_GO not in highlights
+    expect(written).toContain('tech debt');
+    expect(written).not.toContain('Feature Beta'); // NO_GO tasks not in changelog
   });
 
   it('uses fallback text when no tasks are DONE or DEBT', () => {

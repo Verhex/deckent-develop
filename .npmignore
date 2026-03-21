@@ -1,0 +1,46 @@
+# Brain / orchestration state
+.brain/
+.tasks/
+.locks/
+.dashboard
+
+# Deckent workspace
+.deckent/
+
+# Source (dist/ is published instead)
+src/
+tests/
+
+# Git
+.git/
+
+# Node
+node_modules/
+
+# Test files
+*.test.ts
+*.test.js
+test-*.log
+tmp-test/
+
+# Claude / AI config
+.claude/
+CLAUDE.md
+DECKENT.md
+DIRECTIVES.md
+
+# Development files
+kararlanacakplan.md
+docs/directives/
+.contracts/
+tsconfig.json
+vitest.config.ts
+vitest.dashboard.config.ts
+.github/
+
+# Scripts (shell scripts not needed in package)
+scripts/
+
+# Misc
+*.tgz
+.tmp-script-tests/

@@ -99,5 +99,15 @@
   "history.no_history": "No sprint history found.",
   "history.sprint_entry": "Sprint {id}: {tasks} tasks, {date}",
   "archive_debt.nothing_to_archive": "No resolved debt items to archive.",
-  "archive_debt.archived": "Archived {count} resolved debt items. {remaining} items remaining."
+  "archive_debt.archived": "Archived {count} resolved debt items. {remaining} items remaining.",
+  "error.tmux_not_found": "tmux not found. Install: brew install tmux (macOS) / sudo apt install tmux (Linux). Or use spawn_backend: \"subprocess\" in config.",
+  "error.claude_not_found": "Claude CLI not found. Install: npm install -g @anthropic-ai/claude-code",
+  "error.no_directives": "DIRECTIVES.md not found. Create it with sprint goals, or run: deckent init",
+  "error.config_invalid": "Configuration is invalid. Run: deckent doctor to diagnose",
+  "error.scope_violation": "Worker exceeded assigned scope. Check task scope boundaries.",
+  "error.lock_conflict": "Another worker holds the lock. Wait or run: deckent cleanup",
+  "error.usage_exceeded": "Usage threshold reached. Sprint has been auto-paused.",
+  "error.build_failed": "Build failed. Run: tsc --noEmit to check for errors.",
+  "error.git_not_found": "git not found. Install git to use deckent.",
+  "error.node_version_low": "Node.js version too low. Upgrade to >=18."
 }

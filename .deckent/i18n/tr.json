@@ -114,5 +114,15 @@
   "history.sprint_entry": "Sprint {id}: {tasks} görev, {date}",
 
   "archive_debt.nothing_to_archive": "Arşivlenecek çözülmüş borç kalemi yok.",
-  "archive_debt.archived": "{count} çözülmüş borç kalemi arşivlendi. {remaining} kalem kaldı."
+  "archive_debt.archived": "{count} çözülmüş borç kalemi arşivlendi. {remaining} kalem kaldı.",
+  "error.tmux_not_found": "tmux bulunamadi. Kurulum: brew install tmux (macOS) / sudo apt install tmux (Linux). Veya config'de spawn_backend: \"subprocess\" kullanin.",
+  "error.claude_not_found": "Claude CLI bulunamadi. Kurulum: npm install -g @anthropic-ai/claude-code",
+  "error.no_directives": "DIRECTIVES.md bulunamadi. Sprint hedeflerinizi yazin veya calistirin: deckent init",
+  "error.config_invalid": "Yapilandirma gecersiz. Tani icin calistirin: deckent doctor",
+  "error.scope_violation": "Worker atanan kapsami asti. Gorev kapsam sinirlarini kontrol edin.",
+  "error.lock_conflict": "Baska bir worker kilidi tutuyor. Bekleyin veya calistirin: deckent cleanup",
+  "error.usage_exceeded": "Kullanim esigi asildi. Sprint otomatik olarak duraklatildi.",
+  "error.build_failed": "Derleme basarisiz. Hatalari kontrol icin calistirin: tsc --noEmit",
+  "error.git_not_found": "git bulunamadi. deckent kullanmak icin git kurun.",
+  "error.node_version_low": "Node.js surumu cok dusuk. >=18 surumune yukselin."
 }

@@ -1612,19 +1612,48 @@ await server.connect(new StdioServerTransport());
 
 ### Resources (5)
 
-| Resource URI | Description |
-|---|---|
-| `deckent://dashboard` | Current `DashboardState` JSON |
-| `deckent://directives` | Current contents of `DIRECTIVES.md` |
-| `deckent://memory` | Current contents of `.brain/MEMORY.md` |
-| `deckent://debt` | Current contents of `.brain/DEBT.md` |
-| `deckent://config` | Current project config (`.deckent/config.json`) |
+Resources provide read-only context that MCP hosts can inject into the AI's context window.
+
+| Resource URI | MIME Type | Description |
+|---|---|---|
+| `deckent://dashboard` | application/json | Current `DashboardState` with sprint progress, agents, alerts |
+| `deckent://directives` | text/markdown | Current contents of `DIRECTIVES.md` |
+| `deckent://memory` | text/markdown | Current contents of `.brain/MEMORY.md` (learned patterns) |
+| `deckent://debt` | text/markdown | Current contents of `.brain/DEBT.md` (technical debt items) |
+| `deckent://config` | application/json | Current project config from `.deckent/config.json` |
+
+### MCP Registration
+
+Register the Deckent MCP server with Claude Code:
+
+```bash
+claude mcp add deckent -- npx deckent mcp
+```
+
+Or let `deckent init` handle registration automatically. The MCP server is registered in `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "deckent": {
+      "command": "deckent-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+### Authentication
+
+No authentication is required for the MCP server or the HTTP API when running locally. Both are intended for local development use only.
 
 ---
 
 ## 11. HTTP API
 
 **Source:** `src/api/server.ts`, `src/api/watcher.ts`
+
+Start the server with `deckent serve` (API only) or `deckent web` (API + web dashboard). Default port: 3100. No authentication required for local use.
 
 ### `createHttpServer`
 
@@ -1638,7 +1667,7 @@ function createHttpServer(
 
 Creates an HTTP server with all API routes and optional static file serving. Returns `{ server, listen() }`.
 
-### Routes
+### Routes (16 Endpoints + SSE)
 
 #### GET Routes
 
@@ -1652,7 +1681,7 @@ Creates an HTTP server with all API routes and optional static file serving. Ret
 | `GET /api/memory` | text/markdown | `.brain/MEMORY.md` content |
 | `GET /api/debt` | text/markdown | `.brain/DEBT.md` content |
 | `GET /api/job/:jobId` | Job status JSON | Active sprint job status (running/completed/failed) |
-| `GET /api/events` | SSE stream | Server-Sent Events — pushes dashboard updates on file change |
+| `GET /api/events` | SSE stream | Server-Sent Events, pushes dashboard updates on file change |
 | `GET /api/worker/:taskId/log` | Task JSON + log | Worker task JSON + terminal log output |
 
 #### POST Routes
@@ -1661,9 +1690,80 @@ Creates an HTTP server with all API routes and optional static file serving. Ret
 |-------|------|-------------|
 | `POST /api/start` | `{ autoApprove? }` | Start a sprint (async, returns jobId) |
 | `POST /api/plan` | `{ mode? }` | Generate sprint plan |
-| `POST /api/kill/:workerId` | — | Kill a running worker |
+| `POST /api/kill/:workerId` | -- | Kill a running worker |
 | `POST /api/set-directives` | `{ content }` | Update DIRECTIVES.md |
 | `POST /api/config` | Partial config | Merge-update project config |
+
+#### Curl Examples
+
+```bash
+# Get current dashboard status
+curl http://localhost:3100/api/status
+
+# Get system health
+curl http://localhost:3100/api/doctor
+
+# Get project config
+curl http://localhost:3100/api/config
+
+# Get sprint history
+curl http://localhost:3100/api/history
+
+# Get brain memory
+curl http://localhost:3100/api/memory
+
+# Get technical debt
+curl http://localhost:3100/api/debt
+
+# Get latest sprint details
+curl http://localhost:3100/api/sprint
+
+# Get worker log for a specific task
+curl http://localhost:3100/api/worker/001-001/log
+
+# Check job status
+curl http://localhost:3100/api/job/sprint-1710768000000
+
+# Start a sprint
+curl -X POST http://localhost:3100/api/start \
+  -H "Content-Type: application/json" \
+  -d '{"autoApprove": true}'
+
+# Plan without executing
+curl -X POST http://localhost:3100/api/plan \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "ai"}'
+
+# Kill a worker
+curl -X POST http://localhost:3100/api/kill/001-002
+
+# Set directives
+curl -X POST http://localhost:3100/api/set-directives \
+  -H "Content-Type: application/json" \
+  -d '{"content": "# DIRECTIVES\n\n## Task 1: Fix bug\n- Fix the login bug"}'
+
+# Update config
+curl -X POST http://localhost:3100/api/config \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "pro_plan"}'
+
+# Subscribe to SSE events
+curl -N http://localhost:3100/api/events
+```
+
+#### SSE Stream Format
+
+The `/api/events` endpoint returns Server-Sent Events. Each event is a JSON-encoded `DashboardState` object:
+
+```
+event: dashboard
+data: {"sprint":{"id":"sprint-1","number":1,"phase":"EXECUTE","status":"ACTIVE"},...}
+
+event: dashboard
+data: {"sprint":{"id":"sprint-1","number":1,"phase":"EVALUATE","status":"EVALUATING"},...}
+```
+
+Events are pushed whenever the `.dashboard` file changes (500ms debounce).
 
 ### `watchDashboard`
 

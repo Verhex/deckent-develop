@@ -111,6 +111,6 @@ describe('changelogUpdater', () => {
     changelogUpdater.run(ctx);
 
     const written = String(mockedWriteFileSync.mock.calls[0][1]);
-    expect(written).toContain('GO_WITH_TECH_DEBT');
+    expect(written).toContain('tech debt');
   });
 });

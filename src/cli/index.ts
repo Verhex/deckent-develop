@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { DECKENT_VERSION } from '../core/constants.js';
 import { handleCliError } from './helpers/process.js';
+import { buildVersionString, buildVersionJson } from './version-info.js';
 import { registerInit } from './commands/init.js';
 import { registerStart } from './commands/start.js';
 import { registerPlan } from './commands/plan.js';
@@ -32,7 +33,12 @@ import { registerTestRun } from './commands/test-run.js';
 const program = new Command()
   .name('deckent')
   .description('AI agent orchestration system — your AI development team, orchestrated.')
-  .version(DECKENT_VERSION);
+  .version(buildVersionString(DECKENT_VERSION), '-V, --version', 'output the version number with environment info')
+  .option('--version-json', 'output version info as JSON')
+  .on('option:version-json', () => {
+    console.log(JSON.stringify(buildVersionJson(DECKENT_VERSION), null, 2));
+    process.exit(0);
+  });
 
 registerInit(program);
 registerStart(program);

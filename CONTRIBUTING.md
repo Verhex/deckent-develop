@@ -1,22 +1,37 @@
 # Contributing to Deckent
 
-Thank you for your interest in contributing to Deckent — the AI agent orchestration system. This guide covers everything you need to get started.
+Thank you for your interest in contributing to Deckent -- the AI agent orchestration CLI. This guide covers everything you need to get started, from development setup to submitting pull requests.
 
 ---
 
 ## Table of Contents
 
-1. [Development Setup](#development-setup)
-2. [Project Structure](#project-structure)
-3. [Code Standards](#code-standards)
-4. [Testing Guide](#testing-guide)
-5. [Branch Strategy](#branch-strategy)
-6. [Commit Messages](#commit-messages)
-7. [Pull Request Process](#pull-request-process)
-8. [Sprint Contribution](#sprint-contribution)
-9. [Plugin System Development](#plugin-system-development)
-10. [Internationalization (i18n) Contributing](#internationalization-i18n-contributing)
-11. [MCP Tool and Resource Development](#mcp-tool-and-resource-development)
+1. [Getting Started](#getting-started)
+2. [Development Setup](#development-setup)
+3. [Project Structure](#project-structure)
+4. [Code Standards](#code-standards)
+5. [Testing Guide](#testing-guide)
+6. [How to Add a CLI Command](#how-to-add-a-cli-command)
+7. [Branch Strategy](#branch-strategy)
+8. [Commit Messages](#commit-messages)
+9. [Pull Request Process](#pull-request-process)
+10. [Sprint Contribution](#sprint-contribution)
+11. [Plugin System Development](#plugin-system-development)
+12. [Internationalization (i18n) Contributing](#internationalization-i18n-contributing)
+13. [MCP Tool and Resource Development](#mcp-tool-and-resource-development)
+
+---
+
+## Getting Started
+
+1. Fork the repository on GitHub
+2. Clone your fork locally
+3. Install dependencies and verify the setup
+4. Create a feature branch
+5. Make your changes with tests
+6. Open a pull request
+
+If you are not sure where to start, look for issues labeled `good first issue` or `help wanted` on GitHub.
 
 ---
 
@@ -71,52 +86,52 @@ npm run build   # Should produce dist/ with no errors
 ```
 deckent/
 ├── src/
-│   ├── index.ts            — Top-level barrel: re-exports all public API
-│   ├── core/               — Foundational types, constants, config, utils
-│   │   ├── types.ts        — All shared TypeScript interfaces and enums
-│   │   ├── constants.ts    — App-wide constants (DEFAULT_MODE, file paths)
-│   │   ├── config.ts       — 3-layer config loader and validator
-│   │   ├── utils.ts        — Shared utility functions (countBrainLines, etc.)
-│   │   ├── analyzer.ts     — Project stack/size/methodology analysis
-│   │   └── index.ts        — Barrel: re-exports core public API
-│   ├── providers/          — Provider adapters (Claude, subprocess, sandbox)
-│   ├── orchestra/          — Sprint orchestration and tmux management
-│   │   ├── brain.ts        — Sprint lifecycle: plan → run → evaluate → decay
-│   │   ├── planner.ts      — AI task planning (Zod-validated, imports only core/)
-│   │   ├── tmux.ts         — tmux session and window management
-│   │   └── index.ts        — Barrel
-│   ├── agents/             — Agent worker lifecycle
-│   │   ├── worker.ts       — Task claiming, locking, result writing
-│   │   └── index.ts        — Barrel
-│   ├── monitor/            — Observability and audit
-│   │   ├── auditor.ts      — Heartbeat scanning, boundary checks, dashboard
-│   │   └── index.ts        — Barrel
-│   ├── cli/                — Commander.js CLI entry point
-│   │   ├── index.ts        — CLI entry: registers all commands
-│   │   ├── commands/       — One file per command (init, start, status, …)
-│   │   └── helpers/        — Shared CLI helpers (prompt, display)
-│   ├── api/                — HTTP API + SSE
-│   │   ├── server.ts       — 16 endpoints + SSE stream
-│   │   └── watcher.ts      — Dashboard file watcher
-│   ├── mcp/                — Model Context Protocol server
-│   │   ├── server.ts       — MCP server entry: createServer()
-│   │   ├── tools/          — 10 MCP tool handlers
-│   │   └── resources/      — 5 MCP resource handlers
-│   └── dashboard/          — Web Dashboard (React+Vite+Tailwind, 4 pages)
-├── tests/                  — Test files mirroring src/ structure
+│   ├── index.ts            --Top-level barrel: re-exports all public API
+│   ├── core/               --Foundational types, constants, config, utils
+│   │   ├── types.ts        --All shared TypeScript interfaces and enums
+│   │   ├── constants.ts    --App-wide constants (DEFAULT_MODE, file paths)
+│   │   ├── config.ts       --3-layer config loader and validator
+│   │   ├── utils.ts        --Shared utility functions (countBrainLines, etc.)
+│   │   ├── analyzer.ts     --Project stack/size/methodology analysis
+│   │   └── index.ts        --Barrel: re-exports core public API
+│   ├── providers/          --Provider adapters (Claude, subprocess, sandbox)
+│   ├── orchestra/          --Sprint orchestration and tmux management
+│   │   ├── brain.ts        --Sprint lifecycle: plan → run → evaluate → decay
+│   │   ├── planner.ts      --AI task planning (Zod-validated, imports only core/)
+│   │   ├── tmux.ts         --tmux session and window management
+│   │   └── index.ts        --Barrel
+│   ├── agents/             --Agent worker lifecycle
+│   │   ├── worker.ts       --Task claiming, locking, result writing
+│   │   └── index.ts        --Barrel
+│   ├── monitor/            --Observability and audit
+│   │   ├── auditor.ts      --Heartbeat scanning, boundary checks, dashboard
+│   │   └── index.ts        --Barrel
+│   ├── cli/                --Commander.js CLI entry point
+│   │   ├── index.ts        --CLI entry: registers all commands
+│   │   ├── commands/       --One file per command (init, start, status, …)
+│   │   └── helpers/        --Shared CLI helpers (prompt, display)
+│   ├── api/                --HTTP API + SSE
+│   │   ├── server.ts       --16 endpoints + SSE stream
+│   │   └── watcher.ts      --Dashboard file watcher
+│   ├── mcp/                --Model Context Protocol server
+│   │   ├── server.ts       --MCP server entry: createServer()
+│   │   ├── tools/          --10 MCP tool handlers
+│   │   └── resources/      --5 MCP resource handlers
+│   └── dashboard/          --Web Dashboard (React+Vite+Tailwind, 4 pages)
+├── tests/                  --Test files mirroring src/ structure
 │   ├── core/
 │   ├── orchestra/
 │   ├── agents/
 │   ├── monitor/
 │   ├── cli/
 │   ├── mcp/
-│   └── integration/        — End-to-end integration tests
-├── docs/                   — API reference and architecture docs
-├── package.json            — Dependencies, scripts, engine constraints
-├── tsconfig.json           — TypeScript compiler config (strict, Node16, ESM)
-├── vitest.config.ts        — Test runner config (coverage, include patterns)
-├── DIRECTIVES.md           — Active sprint directives (read before contributing)
-└── DECKENT-MASTER-BLUEPRINT.md  — Full architecture reference
+│   └── integration/        --End-to-end integration tests
+├── docs/                   --API reference and architecture docs
+├── package.json            --Dependencies, scripts, engine constraints
+├── tsconfig.json           --TypeScript compiler config (strict, Node16, ESM)
+├── vitest.config.ts        --Test runner config (coverage, include patterns)
+├── DIRECTIVES.md           --Active sprint directives (read before contributing)
+└── DECKENT-MASTER-BLUEPRINT.md  --Full architecture reference
 ```
 
 ### Module responsibilities
@@ -155,11 +170,11 @@ The project uses **strict TypeScript** with `module: "Node16"` and `moduleResolu
 ```
 
 Rules enforced:
-- No `any` — use explicit types or `unknown` with narrowing
-- No implicit returns — all code paths must return a value
-- No unused locals or parameters — remove or prefix with `_`
-- No unchecked indexed access — guard array/object access with bounds checks
-- No fallthrough in switch — every case must `break` or `return`
+- No `any` --use explicit types or `unknown` with narrowing
+- No implicit returns --all code paths must return a value
+- No unused locals or parameters --remove or prefix with `_`
+- No unchecked indexed access --guard array/object access with bounds checks
+- No fallthrough in switch --every case must `break` or `return`
 
 ### ESM modules
 
@@ -172,7 +187,7 @@ The project uses native ESM (`"type": "module"` in `package.json`). Always:
 // Correct
 import { loadConfig } from './config.js';
 
-// Wrong — will fail with Node16 module resolution
+// Wrong --will fail with Node16 module resolution
 import { loadConfig } from './config';
 ```
 
@@ -185,11 +200,11 @@ import { join } from 'node:path';
 
 ### General conventions
 
-- **Pure functions** where possible — avoid side effects, prefer returning values
+- **Pure functions** where possible --avoid side effects, prefer returning values
 - **Collect errors** rather than fail-fast in validators (better developer experience)
-- **No shell injection** — use `spawnSync('cmd', [...args])` with array args, never string concatenation
-- **Minimal dependencies** — check if a Node built-in suffices before adding a package
-- Barrel `index.ts` files are re-export only — no logic in barrels
+- **No shell injection** --use `spawnSync('cmd', [...args])` with array args, never string concatenation
+- **Minimal dependencies** --check if a Node built-in suffices before adding a package
+- Barrel `index.ts` files are re-export only --no logic in barrels
 
 ---
 
@@ -200,8 +215,8 @@ import { join } from 'node:path';
 Tests use **[vitest](https://vitest.dev/)** with v8 coverage provider.
 
 ```
-tests/                 — All test files live here, mirroring src/
-vitest.config.ts       — Config: include pattern, coverage exclude list
+tests/                 --All test files live here, mirroring src/
+vitest.config.ts       --Config: include pattern, coverage exclude list
 ```
 
 ### Running tests
@@ -267,7 +282,7 @@ const mockedExistsSync = vi.mocked(existsSync);
 const mockedReadFile = vi.mocked(readFile);
 
 beforeEach(() => {
-  vi.clearAllMocks();  // REQUIRED — call history bleeds between tests
+  vi.clearAllMocks();  // REQUIRED --call history bleeds between tests
 });
 ```
 
@@ -287,19 +302,70 @@ const mockedSpawnSync = vi.mocked(spawnSync);
 - One `describe` block per exported function
 - Name `it` descriptions as behaviour: `'returns X when Y'`, `'throws when Z'`
 - Test happy path, error path, and edge cases separately
-- Do not assert on implementation details — test the public contract
+- Do not assert on implementation details --test the public contract
+
+---
+
+## How to Add a CLI Command
+
+Deckent uses Commander.js for CLI commands. Each command lives in its own file under `src/cli/commands/`.
+
+### 1. Create the command file
+
+```typescript
+// src/cli/commands/my-command.ts
+import { Command } from 'commander';
+
+export function registerMyCommand(program: Command): void {
+  program
+    .command('my-command')
+    .description('Brief description of what this command does')
+    .option('--flag', 'Description of the flag')
+    .action(async (opts) => {
+      // Command implementation
+      console.log('Running my-command');
+    });
+}
+```
+
+### 2. Register in the CLI entry point
+
+```typescript
+// src/cli/index.ts
+import { registerMyCommand } from './commands/my-command.js';
+
+// Inside the setup function:
+registerMyCommand(program);
+```
+
+### 3. Write tests
+
+```typescript
+// tests/cli/commands/my-command.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+describe('my-command', () => {
+  it('executes successfully', async () => {
+    // Test the command handler function directly
+  });
+});
+```
+
+### 4. Update documentation
+
+Add the command to the CLI commands table in `README.md` and add usage examples if relevant.
 
 ---
 
 ## Branch Strategy
 
 ```
-main              — stable, releasable code; protected
-feature/<name>    — new features
-fix/<name>        — bug fixes
-docs/<name>       — documentation-only changes
-refactor/<name>   — internal refactors with no behaviour change
-test/<name>       — test-only additions
+main              --stable, releasable code; protected
+feature/<name>    --new features
+fix/<name>        --bug fixes
+docs/<name>       --documentation-only changes
+refactor/<name>   --internal refactors with no behaviour change
+test/<name>       --test-only additions
 ```
 
 - Always branch from `main`
@@ -341,7 +407,7 @@ chore: upgrade vitest to v3
 ```
 
 - Keep the description under 72 characters
-- Use imperative mood: "add", "fix", "remove" — not "added", "fixes"
+- Use imperative mood: "add", "fix", "remove" --not "added", "fixes"
 - Include `[task-XXX]` when the commit is part of a tracked sprint task
 
 ---
@@ -349,7 +415,7 @@ chore: upgrade vitest to v3
 ## Pull Request Process
 
 1. **Create a branch** from `main` with the appropriate prefix
-2. **Make your changes** — keep PRs focused on a single concern
+2. **Make your changes** --keep PRs focused on a single concern
 3. **Write tests** for all new code; do not reduce coverage
 4. **Run the full check suite** before opening the PR:
 
@@ -364,7 +430,7 @@ chore: upgrade vitest to v3
    - A clear title matching the commit format
    - A description of what changed and why
    - References to related sprint tasks or issues
-6. **Respond to review comments** — address or discuss every comment
+6. **Respond to review comments** --address or discuss every comment
 7. **Squash and merge** once approved
 
 ### PR checklist
@@ -385,26 +451,26 @@ Deckent is developed in sprints. Each sprint has an active `DIRECTIVES.md` that 
 ### DIRECTIVES.md format
 
 ```markdown
-# DIRECTIVES — Sprint N (Sprint Name)
+# DIRECTIVES --Sprint N (Sprint Name)
 
-## Hedef: <Sprint Goal>
+## Goal: <Sprint Goal>
 One-paragraph description of the sprint's objective.
 
-## Görev 1: <Task Name>
+## Task 1: <Task Name>
 - Bullet list of requirements for this task
 - Each bullet is a specific deliverable
 
-## Görev 2: <Task Name>
+## Task 2: <Task Name>
 - ...
 
-## Kalite Kuralları
+## Quality Rules
 - Quality rules that apply to ALL tasks in this sprint
 - e.g., "existing tests must not regress", "tsc --noEmit clean"
 ```
 
 ### Wave plan
 
-Large sprints are broken into **waves** — logical groups of tasks that can be parallelised. A wave completes when all its tasks have a `.result` file in `.tasks/`.
+Large sprints are broken into **waves** --logical groups of tasks that can be parallelised. A wave completes when all its tasks have a `.result` file in `.tasks/`.
 
 ```
 Wave 1: Foundation tasks (types, config, constants)
@@ -431,9 +497,9 @@ Every task produces a result file at `.tasks/task-XXX-YYY.result`:
 ```
 
 `selfAssessment` values:
-- `"DONE"` — task complete, all quality rules met
-- `"GO_WITH_TECH_DEBT"` — task complete, known debt logged
-- `"NO_GO"` — task blocked or failing; explain in `notes`
+- `"DONE"` --task complete, all quality rules met
+- `"GO_WITH_TECH_DEBT"` --task complete, known debt logged
+- `"NO_GO"` --task blocked or failing; explain in `notes`
 
 ---
 
@@ -447,13 +513,13 @@ Each plugin is stored in `.deckent/plugins/{pluginName}/`:
 
 ```
 .deckent/plugins/my-plugin/
-├── plugin.json          — Plugin metadata (name, version, description, exports)
+├── plugin.json          --Plugin metadata (name, version, description, exports)
 ├── src/
-│   ├── index.ts         — Plugin entry point (exports IPlugin interface)
-│   └── *.ts             — Plugin implementation modules
+│   ├── index.ts         --Plugin entry point (exports IPlugin interface)
+│   └── *.ts             --Plugin implementation modules
 ├── tests/
-│   └── *.test.ts        — Plugin tests (vitest)
-└── README.md            — Plugin documentation
+│   └── *.test.ts        --Plugin tests (vitest)
+└── README.md            --Plugin documentation
 ```
 
 ### Plugin metadata (plugin.json)
@@ -500,7 +566,7 @@ export interface IPlugin {
 - [ ] Plugin implements `IPlugin` interface correctly
 - [ ] `plugin.json` declares accurate permissions and hooks
 - [ ] All permissions in `plugin.json` are actually used by the plugin
-- [ ] Plugin is isolated — does not import from non-core modules
+- [ ] Plugin is isolated --does not import from non-core modules
 - [ ] All plugin functions have ≥ 80% test coverage
 - [ ] Plugin has a `validate()` method that checks prerequisites
 - [ ] Plugin handles errors gracefully (no unhandled rejections)
@@ -563,18 +629,18 @@ Deckent supports multiple languages through a runtime i18n system. Currently sup
 
    Use [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) language codes (e.g., `de` for German, `fr` for French).
 
-2. **Create message files** — mirror the structure of `src/i18n/en/`:
+2. **Create message files** --mirror the structure of `src/i18n/en/`:
 
    ```
    src/i18n/de/
-   ├── index.ts         — Barrel re-export
-   ├── cli.ts           — CLI messages
-   ├── errors.ts        — Error messages
-   ├── hints.ts         — Contextual hints
-   └── messages.ts      — General UI messages
+   ├── index.ts         --Barrel re-export
+   ├── cli.ts           --CLI messages
+   ├── errors.ts        --Error messages
+   ├── hints.ts         --Contextual hints
+   └── messages.ts      --General UI messages
    ```
 
-3. **Implement message exports** — each file exports a Messages object:
+3. **Implement message exports** --each file exports a Messages object:
 
    ```typescript
    // src/i18n/de/cli.ts
@@ -586,7 +652,7 @@ Deckent supports multiple languages through a runtime i18n system. Currently sup
    };
    ```
 
-4. **Update i18n loader** — add the language to `src/core/i18n.ts`:
+4. **Update i18n loader** --add the language to `src/core/i18n.ts`:
 
    ```typescript
    const languages = {
@@ -596,7 +662,7 @@ Deckent supports multiple languages through a runtime i18n system. Currently sup
    };
    ```
 
-5. **Test coverage** — ensure all keys are present in the new language:
+5. **Test coverage** --ensure all keys are present in the new language:
 
    ```typescript
    // tests/i18n/de.test.ts
@@ -615,7 +681,7 @@ Deckent supports multiple languages through a runtime i18n system. Currently sup
    });
    ```
 
-6. **Update DIRECTIVES.md** — note the new language support in the sprint summary
+6. **Update DIRECTIVES.md** --note the new language support in the sprint summary
 
 ### i18n conventions
 
@@ -638,8 +704,8 @@ Deckent supports multiple languages through a runtime i18n system. Currently sup
 |---|---|---|---|
 | `en` | English | Complete | @team |
 | `tr` | Turkish | Complete | @team |
-| `de` | German | Needs contributor | — |
-| `fr` | French | Needs contributor | — |
+| `de` | German | Needs contributor | --|
+| `fr` | French | Needs contributor | --|
 
 ---
 
@@ -651,8 +717,8 @@ Deckent exposes its API to IDE hosts (Claude, Cursor, etc.) through the Model Co
 
 ```
 src/mcp/
-├── server.ts          — MCP server entry point
-├── tools/             — Tool implementations (10 tools)
+├── server.ts          --MCP server entry point
+├── tools/             --Tool implementations (10 tools)
 │   ├── directives.ts
 │   ├── plan.ts
 │   ├── start.ts
@@ -663,14 +729,14 @@ src/mcp/
 │   ├── history.ts
 │   ├── sync.ts
 │   └── analyze.ts
-├── resources/         — Resource implementations (5 resources)
+├── resources/         --Resource implementations (5 resources)
 │   ├── directives.ts
 │   ├── brain-memory.ts
 │   ├── debt.ts
 │   ├── decisions.ts
 │   └── patterns.ts
 └── helpers/
-    └── enrich.ts      — Response enrichment utilities
+    └── enrich.ts      --Response enrichment utilities
 ```
 
 ### Adding a new MCP tool
@@ -726,7 +792,7 @@ src/mcp/
    }));
    ```
 
-3. **Update index** — export tool from `src/mcp/tools/index.ts` (if barrel exists)
+3. **Update index** --export tool from `src/mcp/tools/index.ts` (if barrel exists)
 
 4. **Write tests** in `tests/mcp/tools/my-tool.test.ts`:
 
@@ -827,6 +893,7 @@ The `_enriched` field contains:
 
 ## Questions?
 
-- Open an issue on GitHub
-- Read the [Blueprint](DECKENT-MASTER-BLUEPRINT.md) for full architecture details
-- Check [docs/API.md](docs/API.md) for the programmatic API reference
+- Open an issue on [GitHub](https://github.com/VerhexIO/deckent/issues)
+- Read the [Architecture docs](docs/ARCHITECTURE.md) for system design details
+- Check [docs/API.md](docs/API.md) for the full API reference
+- Visit [deckent.agency](https://deckent.agency) for more information

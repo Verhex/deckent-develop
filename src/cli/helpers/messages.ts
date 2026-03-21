@@ -198,6 +198,48 @@ const MESSAGES: MessageMap = {
     en: '  2. Run `deckent start` to begin your first sprint',
     tr: '  2. İlk sprint\'i başlatmak için `deckent start` çalıştırın',
   },
+
+  // ─── error codes (structured) ─────────────────────────────────────
+  'error.tmux_not_found': {
+    en: 'tmux not found. Install: brew install tmux (macOS) / sudo apt install tmux (Linux). Or use spawn_backend: "subprocess" in config.',
+    tr: 'tmux bulunamadi. Kurulum: brew install tmux (macOS) / sudo apt install tmux (Linux). Veya config\'de spawn_backend: "subprocess" kullanin.',
+  },
+  'error.claude_not_found': {
+    en: 'Claude CLI not found. Install: npm install -g @anthropic-ai/claude-code',
+    tr: 'Claude CLI bulunamadi. Kurulum: npm install -g @anthropic-ai/claude-code',
+  },
+  'error.no_directives': {
+    en: 'DIRECTIVES.md not found. Create it with sprint goals, or run: deckent init',
+    tr: 'DIRECTIVES.md bulunamadi. Sprint hedeflerinizi yazin veya calistirin: deckent init',
+  },
+  'error.config_invalid': {
+    en: 'Configuration is invalid. Run: deckent doctor to diagnose',
+    tr: 'Yapilandirma gecersiz. Tani icin calistirin: deckent doctor',
+  },
+  'error.scope_violation': {
+    en: 'Worker exceeded assigned scope. Check task scope boundaries.',
+    tr: 'Worker atanan kapsami asti. Gorev kapsam sinirlarini kontrol edin.',
+  },
+  'error.lock_conflict': {
+    en: 'Another worker holds the lock. Wait or run: deckent cleanup',
+    tr: 'Baska bir worker kilidi tutuyor. Bekleyin veya calistirin: deckent cleanup',
+  },
+  'error.usage_exceeded': {
+    en: 'Usage threshold reached. Sprint has been auto-paused.',
+    tr: 'Kullanim esigi asildi. Sprint otomatik olarak duraklatildi.',
+  },
+  'error.build_failed': {
+    en: 'Build failed. Run: tsc --noEmit to check for errors.',
+    tr: 'Derleme basarisiz. Hatalari kontrol icin calistirin: tsc --noEmit',
+  },
+  'error.git_not_found': {
+    en: 'git not found. Install git to use deckent.',
+    tr: 'git bulunamadi. deckent kullanmak icin git kurun.',
+  },
+  'error.node_version_low': {
+    en: 'Node.js version too low. Upgrade to >=18.',
+    tr: 'Node.js surumu cok dusuk. >=18 surumune yukselin.',
+  },
 };
 
 /**

@@ -732,7 +732,7 @@ describe('CLI doctor integration', () => {
     try { await program.parseAsync(['node', 'test', 'doctor']); } catch { /* commander exit */ }
 
     const output = stdoutData.join('');
-    expect(output).toContain('\u2713');
+    expect(output).toContain('[PASS]');
     expect(output).toContain('checks passed');
   });
 

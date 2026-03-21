@@ -454,7 +454,7 @@ describe('error handling', () => {
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Node.js');
     expect(check!.passed).toBe(false);
-    expect(check!.message).toBe('not found');
+    expect(check!.message).toContain('not found');
   });
 
   it('claude not found — check returns passed=false', () => {
@@ -465,7 +465,7 @@ describe('error handling', () => {
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Claude CLI');
     expect(check!.passed).toBe(false);
-    expect(check!.message).toBe('not found');
+    expect(check!.message).toContain('not found');
   });
 
   it('workspace missing — check returns passed=false with hint message', () => {

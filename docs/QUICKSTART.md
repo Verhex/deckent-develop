@@ -1,4 +1,4 @@
-# Deckent — Quick Start Tutorial
+# Quickstart Guide
 
 > Get from zero to your first AI-driven sprint in 5 minutes.
 
@@ -6,51 +6,67 @@
 
 ## Table of Contents
 
-1. [Installation](#1-installation)
-2. [First Project — `deckent init`](#2-first-project--deckent-init)
-3. [First Sprint — Write DIRECTIVES.md → `deckent start`](#3-first-sprint--write-directivesmd--deckent-start)
-4. [See Results — `deckent status` & `deckent history`](#4-see-results--deckent-status--deckent-history)
-5. [MCP Integration — Using with Claude Code](#5-mcp-integration--using-with-claude-code)
-6. [Frequently Asked Questions](#6-frequently-asked-questions)
+1. [Prerequisites](#1-prerequisites)
+2. [Installation](#2-installation)
+3. [First Project Setup](#3-first-project-setup)
+4. [Writing Directives](#4-writing-directives)
+5. [Running a Sprint](#5-running-a-sprint)
+6. [Understanding Results](#6-understanding-results)
+7. [Next Steps](#7-next-steps)
 
 ---
 
-## 1. Installation
+## 1. Prerequisites
 
-### Prerequisites
-
-| Requirement | Minimum Version | Check |
-|-------------|-----------------|-------|
-| Node.js | ≥ 18 | `node --version` |
+| Requirement | Minimum Version | How to Check |
+|-------------|-----------------|--------------|
+| Node.js | >= 18 | `node --version` |
 | git | any | `git --version` |
-| tmux | any | `tmux -V` |
-| Claude CLI | any | `claude --version` |
+| Claude Code CLI | any | `claude --version` |
+| tmux | any (optional) | `tmux -V` |
 
-> **tmux** is required because Deckent spawns worker agents in isolated tmux windows. Install via `brew install tmux` (macOS) or `apt install tmux` (Ubuntu/Debian).
+**tmux** is the default backend for spawning workers. If tmux is not available, Deckent falls back to the subprocess backend automatically.
 
-### Install Deckent
+Install tmux if needed:
+
+```bash
+# macOS
+brew install tmux
+
+# Ubuntu/Debian
+sudo apt install tmux
+
+# Fedora
+sudo dnf install tmux
+```
+
+You also need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key.
+
+---
+
+## 2. Installation
+
+Install Deckent globally:
 
 ```bash
 npm install -g deckent
 ```
 
-Verify:
+Verify the installation:
 
 ```bash
 deckent --version
-# 0.x.x
 ```
 
-If you see `command not found`, add npm's global bin to your PATH:
+If you see `command not found`, add the npm global bin to your PATH:
 
 ```bash
 export PATH="$(npm bin -g):$PATH"
-# Add this line to ~/.bashrc or ~/.zshrc permanently
 ```
 
-### Health Check
+Add that line to `~/.bashrc` or `~/.zshrc` to make it permanent.
 
-Before initialising a project, run the doctor to confirm all prerequisites are met:
+Run the health check to confirm all dependencies are available:
 
 ```bash
 deckent doctor
@@ -59,95 +75,92 @@ deckent doctor
 Expected output:
 
 ```
-✓ node_version   v20.11.0 (>=18 required)
-✓ git            git 2.43.0
-✓ tmux           tmux 3.3a
-✓ claude_cli     claude 1.2.3
-✗ workspace      .deckent/ not found — run deckent init
+  node_version   v20.11.0 (>=18 required)     [pass]
+  git            git 2.43.0                    [pass]
+  tmux           tmux 3.3a                     [pass]
+  claude_cli     claude 1.2.3                  [pass]
+  workspace      .deckent/ not found           [fail]
 ```
 
-The `workspace` check will fail until you initialise the project — that is normal at this stage.
+The `workspace` check will fail until you initialize a project. That is expected at this stage.
 
 ---
 
-## 2. First Project — `deckent init`
+## 3. First Project Setup
 
-Navigate to your project directory and run:
+Navigate to your project directory and run the init wizard:
 
 ```bash
 cd my-project
 deckent init
 ```
 
-The interactive wizard will ask:
+The wizard will prompt you for:
 
-- **Project name** — e.g. `my-project`
-- **Plan mode** — your Claude subscription tier:
-  - `max_plan` — Claude Max (recommended, up to 5 parallel workers)
-  - `max5x_plan` — Claude Max 5x (up to 10 workers)
-  - `pro_plan` — Claude Pro (up to 2 workers)
-  - `api` — Claude API key (custom limits)
-- **Language** — `en` (English) or `tr` (Turkish) for agent prompts
+- **Project name** -- for example, `my-project`
+- **Plan mode** -- your Claude subscription tier:
+  - `Max 20x ($200/mo)` -- up to 8 parallel workers, Opus for Brain
+  - `Max 5x ($100/mo)` -- up to 5 workers, Sonnet for Brain
+  - `Pro ($20/mo)` -- up to 3 workers, Sonnet only
+  - `API (pay-as-you-go)` -- up to 10 workers, any model
+- **Language** -- `en` (English) or `tr` (Turkish)
 
-Deckent creates the following structure:
+After initialization, your project will contain:
 
 ```
 my-project/
-├── DECKENT.md             ← Single source of truth for agent config
-├── DIRECTIVES.md          ← You write sprint goals here (created empty)
-├── CLAUDE.md              ← Claude Code adapter (@DECKENT.md reference)
-├── AGENTS.md              ← Generic agent adapter
-├── .deckent/
-│   ├── config.json        ← Project config (mode, language, sprint ID)
-│   └── workspace/
-├── .brain/
-│   ├── MEMORY.md          ← Learned patterns (auto-updated)
-│   ├── DEBT.md            ← Tech debt log
-│   └── sprints/           ← Per-sprint logs
-├── .tasks/                ← Task JSON files (written by Brain)
-├── .locks/                ← File locks (managed by workers)
-└── .claude/
-    ├── settings.json      ← MCP server registration (auto-created)
-    └── rules/             ← Agent rule files
+  DECKENT.md             # Single source of truth for agent config
+  DIRECTIVES.md          # Your sprint goals (edit this before each sprint)
+  CLAUDE.md              # Claude Code adapter
+  AGENTS.md              # Generic agent adapter
+  .deckent/
+    config.json          # Runtime config (mode, language, sprint ID)
+    workspace/
+  .brain/
+    MEMORY.md            # Learned patterns (auto-updated)
+    DEBT.md              # Technical debt log
+    sprints/             # Per-sprint logs
+  .tasks/                # Task JSON files (written by Brain)
+  .locks/                # File locks (managed by workers)
+  .claude/
+    settings.json        # MCP server registration (auto-created)
+    rules/               # Agent rule files
 ```
 
 Verify the setup:
 
 ```bash
 deckent doctor
-# All checks should now pass
 ```
+
+All checks should pass now.
 
 ---
 
-## 3. First Sprint — Write DIRECTIVES.md → `deckent start`
+## 4. Writing Directives
 
-### Step 1 — Write Your Sprint Goals
-
-Open `DIRECTIVES.md` and describe what you want to build. Use the `## Task N:` format:
+Open `DIRECTIVES.md` and describe what you want to build. Use the `## Task N:` format so Brain can parse your goals into individual tasks:
 
 ```markdown
-# DIRECTIVES — Sprint 1
+# DIRECTIVES -- Sprint 1
 
 ## Task 1: User Authentication
-- File: src/auth/index.ts (yeni)
-- Scope: src/auth/
+- Files: src/auth/index.ts (new), tests/auth/auth.test.ts (new)
+- Scope: src/auth/, tests/auth/
 
 ### Description
 Implement JWT-based login and registration endpoints.
-- POST /auth/login → returns access token
-- POST /auth/register → creates user, returns token
+- POST /auth/login returns an access token
+- POST /auth/register creates a user and returns a token
 - Add bcrypt password hashing
 - Write tests for both endpoints
 
-### Test
+### Tests
 - All auth tests pass
 - 90%+ coverage on src/auth/
 
----
-
 ## Task 2: User Profile Page
-- File: src/pages/profile.tsx (yeni)
+- Files: src/pages/profile.tsx (new)
 - Scope: src/pages/, src/components/
 
 ### Description
@@ -156,20 +169,26 @@ Create a user profile page showing name, email, and avatar.
 - Display in a responsive card layout
 - Add loading and error states
 
-### Test
+### Tests
 - Component renders correctly
 - API integration test passes
 ```
 
-**Tips for writing good directives:**
-- Be specific about what files should be created or modified
-- Define the scope (which directories workers can touch)
-- Include test requirements — workers run tests before marking a task done
+**Tips for effective directives:**
+
+- Be specific about which files to create or modify
+- Define the scope so workers know their boundaries
+- Include test requirements -- workers run tests before marking done
 - Each `## Task N:` block becomes one parallel worker agent
+- Use higher priority and the `opus` model for complex tasks
 
-### Step 2 — Preview the Plan (Optional)
+---
 
-See what Brain will plan without running it:
+## 5. Running a Sprint
+
+### Preview the Plan (Optional)
+
+See what Brain will create without running anything:
 
 ```bash
 deckent plan
@@ -178,7 +197,7 @@ deckent plan
 Output:
 
 ```
-Sprint 001 — 2 tasks planned
+Sprint 001 -- 2 tasks planned
 
   ID        TITLE                    MODEL    PRIORITY   EFFORT
   001-001   User Authentication      sonnet   HIGH       normal
@@ -188,7 +207,7 @@ Max workers: 5 (max_plan)
 Planning mode: ai
 ```
 
-### Step 3 — Start the Sprint
+### Start the Sprint
 
 ```bash
 deckent start
@@ -201,48 +220,48 @@ Brain will:
 3. Spawn one Claude worker per task in separate tmux windows
 4. Start the auditor scan loop (health checks every 30 seconds)
 5. Wait for all workers to complete
-6. Evaluate each result (GO / NO_GO / GO_WITH_TECH_DEBT)
-7. Write retrospective to `.brain/RETRO.md` and update `.brain/MEMORY.md`
+6. Evaluate each result (GO / NO-GO / GO_WITH_TECH_DEBT)
+7. Write a retrospective and update memory
 
-> Workers run in **tmux windows** — you can attach to any window to watch a worker live:
-> ```bash
-> tmux ls                       # List all sessions
-> tmux attach -t deckent-001    # Attach to sprint session
-> # Press Ctrl+B, then window number to switch between workers
-> ```
+Workers run in tmux windows. Attach to watch a worker live:
 
-#### Dry Run
+```bash
+tmux attach -t deckent
+# Press Ctrl+B, then a window number to switch workers
+```
 
-To preview what will happen without spawning workers:
+### Dry Run
+
+Preview without spawning workers:
 
 ```bash
 deckent start --dry-run
 ```
 
-#### Auto-Approve Mode
+### Auto-Approve Mode
 
-Workers occasionally need permission to run tools. To skip all permission prompts:
+Skip all worker permission prompts:
 
 ```bash
 deckent start --auto-approve
 ```
 
-> Use `--auto-approve` only in trusted environments. Workers are scoped to their assigned directories, but auto-approve removes the permission confirmation step.
+Use `--auto-approve` only in trusted environments. Workers are scoped to assigned directories, but auto-approve removes confirmation prompts.
 
 ---
 
-## 4. See Results — `deckent status` & `deckent history`
+## 6. Understanding Results
 
-### Live Sprint Status
+### Live Status
 
 ```bash
 deckent status
 ```
 
-Example output during an active sprint:
+Example output during a sprint:
 
 ```
-Sprint sprint-001 — EXECUTE phase
+Sprint sprint-001 -- EXECUTE phase
 
   TASK        STATUS      MODEL    LAST HEARTBEAT
   001-001     EXECUTING   sonnet   5s ago
@@ -253,19 +272,13 @@ Progress: 1/2 done  |  0 failed  |  1 running
 No alerts.
 ```
 
-#### Watch Mode
-
-Refresh status automatically every 2 seconds:
+Auto-refresh every 2 seconds:
 
 ```bash
 deckent status --watch
 ```
 
-Press `Ctrl+C` to stop.
-
-#### JSON Output
-
-For scripting or piping:
+JSON output for scripting:
 
 ```bash
 deckent status --json
@@ -273,254 +286,74 @@ deckent status --json
 
 ### Sprint History
 
-View completed sprint logs:
-
 ```bash
 deckent history
-# Shows last 5 sprints by default
-
-deckent history --last 10
-# Show last 10 sprints
 ```
 
 ### Retrospective
 
-Read what Brain learned from the last sprint:
+Brain writes what it learned after each sprint:
 
 ```bash
 deckent retro
 ```
 
-### Tech Debt Log
+### Task Results
+
+Each completed task produces a `.result` file:
+
+```bash
+cat .tasks/task-001-001.result
+```
+
+```json
+{
+  "taskId": "001-001",
+  "filesChanged": ["src/auth/index.ts", "tests/auth/auth.test.ts"],
+  "linesAdded": 120,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 97.5,
+  "selfAssessment": "DONE",
+  "notes": "Implemented JWT auth with bcrypt hashing"
+}
+```
+
+Evaluation values:
+
+- **DONE** -- Task complete, all criteria met
+- **GO_WITH_TECH_DEBT** -- Task complete with known debt (logged in `.brain/DEBT.md`)
+- **NO_GO** -- Task failed; Brain logs the failure and it can be retried next sprint
+
+### Technical Debt
+
+Brain tracks technical debt automatically:
 
 ```bash
 cat .brain/DEBT.md
 ```
 
-Brain automatically logs technical debt items discovered during sprint evaluation.
+### What Brain Learned
 
----
-
-## 5. MCP Integration — Using with Claude Code
-
-Deckent integrates with Claude Code (and other MCP-compatible IDEs) via the Model Context Protocol. When you ran `deckent init`, it automatically registered the MCP server in `.claude/settings.json`.
-
-### Verify MCP Registration
-
-In Claude Code's terminal:
-
-```
-/mcp
-```
-
-You should see `deckent` listed with 10 tools available.
-
-### Starting a Sprint via Claude Code
-
-Instead of editing `DIRECTIVES.md` manually, you can describe your goals in natural language and let Claude structure them:
-
-```
-You: I want to add a shopping cart feature with product listing, cart management, and checkout flow
-
-Claude: I'll set up the directives for you.
-[calls deckent_set_directives with structured task blocks]
-
-Sprint plan:
-- Task 1: Product Listing API (sonnet, HIGH)
-- Task 2: Cart State Management (sonnet, HIGH)
-- Task 3: Checkout Flow UI (haiku, NORMAL)
-
-Shall I start the sprint?
-
-You: Yes, go ahead
-
-Claude: [calls deckent_start]
-Sprint started! Job ID: sprint-1710768000000
-I'll monitor progress for you.
-[calls deckent_status periodically]
-```
-
-### Available MCP Tools
-
-| Tool | What it does |
-|------|-------------|
-| `deckent_init` | Initialise project structure |
-| `deckent_set_directives` | Write sprint goals to DIRECTIVES.md |
-| `deckent_plan` | Preview the sprint plan (dry-run) |
-| `deckent_start` | Start a sprint in the background |
-| `deckent_status` | Get current sprint status |
-| `deckent_doctor` | Run health checks |
-| `deckent_retro` | Read last retrospective |
-| `deckent_history` | View sprint history |
-| `deckent_analyze_project` | Analyse project stack and get recommendations |
-| `deckent_sync` | Sync CLAUDE.md / AGENTS.md adapter files |
-
-### MCP Resources (Context Window)
-
-These resources can be injected into Claude's context automatically:
-
-| Resource URI | Contents |
-|--------------|---------|
-| `deckent://dashboard` | Live sprint dashboard (JSON) |
-| `deckent://directives` | Current DIRECTIVES.md |
-| `deckent://memory` | Learned patterns from past sprints |
-| `deckent://debt` | Tech debt items |
-| `deckent://config` | Project configuration |
-
-### Manual MCP Registration
-
-If you skipped `deckent init` or need to register manually:
+Brain stores learnings that persist across sprints:
 
 ```bash
-# Create .claude/settings.json
-mkdir -p .claude
-cat > .claude/settings.json << 'EOF'
-{
-  "mcpServers": {
-    "deckent": {
-      "command": "deckent-mcp",
-      "args": []
-    }
-  }
-}
-EOF
-```
-
-Restart Claude Code after saving.
-
----
-
-## 6. Frequently Asked Questions
-
-### Q: How many tasks can run in parallel?
-
-Depends on your Claude plan mode:
-
-| Mode | Max Workers |
-|------|-------------|
-| `api` | 2 (configurable) |
-| `pro_plan` | 2 |
-| `max_plan` | 5 |
-| `max5x_plan` | 10 |
-
-Brain respects these limits and queues tasks when the limit is reached. With 12 tasks and 8 max workers, the first 8 start immediately and the remaining 4 queue up.
-
----
-
-### Q: What models do workers use?
-
-Brain assigns a model to each task based on complexity:
-
-| Model | When assigned |
-|-------|---------------|
-| `opus` | Critical, complex architectural tasks |
-| `sonnet` | Standard implementation tasks |
-| `haiku` | Simple, well-defined tasks (docs, formatting, small fixes) |
-
-You can override in DIRECTIVES.md:
-
-```markdown
-## Task 1: Complex Algorithm
-- Model: opus
+cat .brain/MEMORY.md
 ```
 
 ---
 
-### Q: A worker seems stuck. What do I do?
+## 7. Next Steps
 
-1. Check the status: `deckent status`
-2. Attach to the tmux window to see what the worker is doing: `tmux attach`
-3. If the worker is stale (no heartbeat for >2 minutes), the auditor will alert automatically
-4. To kill a specific task: `deckent kill <taskId>`
-5. To clean up all task artifacts: `deckent cleanup`
-
----
-
-### Q: Can I pause and resume a sprint?
-
-Yes. Workers write `.tasks/task-NNN.paused` files when paused:
-
-```bash
-# Pause a specific worker task
-deckent kill 001-001
-
-# To resume, re-start the sprint — Brain reads existing task status
-deckent start
-```
+- **[CONFIG-REFERENCE.md](CONFIG-REFERENCE.md)** -- All configuration options in detail
+- **[API.md](API.md)** -- Full TypeScript API and HTTP API reference
+- **[MCP-GUIDE.md](MCP-GUIDE.md)** -- Using Deckent inside Claude Code via MCP
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** -- How Brain, Workers, and Auditor work together
+- **[SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md)** -- The full PLAN, SPAWN, EXECUTE, EVALUATE, RETRO, DECAY cycle
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** -- Solutions for common issues
+- **[PLUGIN-GUIDE.md](PLUGIN-GUIDE.md)** -- How to extend Deckent with plugins
+- **[GLOSSARY.md](GLOSSARY.md)** -- Terminology reference
 
 ---
 
-### Q: Where does Brain store what it learns?
-
-In `.brain/MEMORY.md` (max 300 lines). After each sprint, Brain appends learnings — things like "avoid mocking the database in these tests" or "use async sleep instead of sleepSync". This context is loaded at the start of every future sprint.
-
----
-
-### Q: How do I change the planning mode?
-
-Edit `.deckent/config.json`:
-
-```json
-{
-  "brain_planning": "ai"
-}
-```
-
-| Value | Behaviour |
-|-------|-----------|
-| `"ai"` | Claude plans tasks (recommended) |
-| `"structured"` | Rule-based planning from DIRECTIVES.md structure |
-| `"auto"` | AI first, falls back to structured if AI underdelivers |
-
-Or via CLI:
-
-```bash
-deckent config set brain_planning ai
-```
-
----
-
-### Q: What if a task fails (NO_GO)?
-
-Brain evaluates each result. If a worker marks a task `NO_GO`:
-
-1. Brain logs the failure in `.brain/DEBT.md`
-2. The sprint completes (never left incomplete)
-3. The retrospective notes the failure
-4. In the next sprint, you can fix it by including the task in `DIRECTIVES.md` again
-
----
-
-### Q: How do I see what changed during a sprint?
-
-```bash
-# Git diff since sprint started
-git diff HEAD~1
-
-# Specific task result files
-cat .tasks/task-001-001.result
-
-# Full retrospective
-deckent retro
-```
-
----
-
-### Q: Can multiple people use Deckent on the same repo?
-
-Yes — each developer runs their own sprint on their own branch. `.tasks/`, `.locks/`, and `.dashboard` files are gitignored by default. Brain uses file locks to prevent write conflicts within a single sprint.
-
----
-
-## Next Steps
-
-- **[MCP-GUIDE.md](MCP-GUIDE.md)** — Full MCP tool reference with all parameters and example responses
-- **[CONFIG-REFERENCE.md](CONFIG-REFERENCE.md)** — All configuration options in detail
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — How Brain, Workers, and Auditor fit together
-- **[SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md)** — The full PLAN → SPAWN → EXECUTE → EVALUATE → RETRO cycle
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — Solutions for common issues
-- **[GLOSSARY.md](GLOSSARY.md)** — Terminology reference
-
----
-
-*Deckent — AI Agent Orchestration CLI | Node.js ≥18 | TypeScript ESM*
+*Deckent -- AI Agent Orchestration CLI | Node.js >=18 | TypeScript ESM | MIT License*

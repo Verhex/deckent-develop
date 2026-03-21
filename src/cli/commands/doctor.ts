@@ -14,6 +14,7 @@ import { detectSubscription } from '../../core/subscription.js';
 import { print, formatDoctorResult } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import { ErrorRegistry } from '../../core/errors.js';
 
 interface DoctorCheck {
   name: string;
@@ -38,13 +39,23 @@ function readLanguage(root: string): string {
 function checkNode(): DoctorCheck {
   const result = spawnSync('node', ['--version'], { encoding: 'utf-8' });
   if (result.status !== 0) {
-    return { name: 'Node.js', passed: false, message: 'not found', required: true };
+    const entry = ErrorRegistry.get('DECKENT_E010');
+    return { name: 'Node.js', passed: false, message: `not found — ${entry?.suggestion ?? 'Install Node.js >=18'}`, required: true };
   }
   const version = result.stdout.trim();
   const major = parseInt(version.replace('v', '').split('.')[0] ?? '0', 10);
+  if (major < 18) {
+    const entry = ErrorRegistry.get('DECKENT_E010');
+    return {
+      name: 'Node.js',
+      passed: false,
+      message: `${version} found but >=18 required — ${entry?.suggestion ?? 'Upgrade Node.js'}`,
+      required: true,
+    };
+  }
   return {
     name: 'Node.js',
-    passed: major >= 18,
+    passed: true,
     message: `${version} (>=18 required)`,
     required: true,
   };
@@ -53,7 +64,8 @@ function checkNode(): DoctorCheck {
 function checkGit(): DoctorCheck {
   const result = spawnSync('git', ['--version'], { encoding: 'utf-8' });
   if (result.status !== 0) {
-    return { name: 'git', passed: false, message: 'not found', required: true };
+    const entry = ErrorRegistry.get('DECKENT_E009');
+    return { name: 'git', passed: false, message: `not found — ${entry?.suggestion ?? 'Install git'}. Needed for: rollback, safety points, branch management`, required: true };
   }
   const match = result.stdout.trim().match(/(\d+\.\d+\.\d+)/);
   return {
@@ -67,7 +79,8 @@ function checkGit(): DoctorCheck {
 function checkTmux(): DoctorCheck {
   const result = spawnSync('tmux', ['-V'], { encoding: 'utf-8' });
   if (result.status !== 0) {
-    return { name: 'tmux', passed: false, message: 'not found', required: true };
+    const entry = ErrorRegistry.get('DECKENT_E001');
+    return { name: 'tmux', passed: false, message: `not found — ${entry?.suggestion ?? 'Install tmux'}`, required: true };
   }
   return {
     name: 'tmux',
@@ -80,7 +93,8 @@ function checkTmux(): DoctorCheck {
 function checkClaude(): DoctorCheck {
   const result = spawnSync('claude', ['--version'], { encoding: 'utf-8' });
   if (result.status !== 0) {
-    return { name: 'Claude CLI', passed: false, message: 'not found', required: true };
+    const entry = ErrorRegistry.get('DECKENT_E002');
+    return { name: 'Claude CLI', passed: false, message: `not found — ${entry?.suggestion ?? 'Install Claude CLI'}`, required: true };
   }
   return {
     name: 'Claude CLI',
@@ -116,15 +130,16 @@ function checkBrainDir(root: string): DoctorCheck {
 function checkDirectives(root: string): DoctorCheck {
   const path = join(root, DIRECTIVES_FILE);
   if (!existsSync(path)) {
-    return { name: 'Directives', passed: false, message: 'DIRECTIVES.md missing', required: false };
+    const entry = ErrorRegistry.get('DECKENT_E003');
+    return { name: 'Directives', passed: false, message: `DIRECTIVES.md missing — ${entry?.suggestion ?? 'Create DIRECTIVES.md or run deckent init'}`, required: false };
   }
   try {
     const content = readFileSync(path, 'utf-8').trim();
     if (content.length === 0) {
-      return { name: 'Directives', passed: false, message: 'DIRECTIVES.md is empty', required: false };
+      return { name: 'Directives', passed: false, message: 'DIRECTIVES.md is empty — add sprint goals with ## Task sections', required: false };
     }
   } catch {
-    return { name: 'Directives', passed: false, message: 'Cannot read DIRECTIVES.md', required: false };
+    return { name: 'Directives', passed: false, message: 'Cannot read DIRECTIVES.md — check file permissions', required: false };
   }
   return { name: 'Directives', passed: true, message: 'DIRECTIVES.md found', required: false };
 }

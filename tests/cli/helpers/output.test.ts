@@ -294,7 +294,7 @@ describe('formatDashboard', () => {
 describe('formatDoctorResult', () => {
   it('shows checkmark for passed checks', () => {
     const result = formatDoctorResult(makeDoctorResult());
-    expect(result).toContain('✓');
+    expect(result).toContain('[PASS]');
   });
 
   it('shows cross for failed checks', () => {
@@ -304,7 +304,7 @@ describe('formatDoctorResult', () => {
         { name: 'tmux', passed: false, message: 'not found', required: true },
       ],
     }));
-    expect(result).toContain('✗');
+    expect(result).toContain('[FAIL]');
   });
 
   it('shows pass count in summary', () => {

@@ -206,7 +206,7 @@ describe('doctor --profile flag', () => {
     await runCommand(['doctor', '--profile']);
     const out = stdout();
     // Doctor output contains check icons
-    expect(out).toContain('✓');
+    expect(out).toContain('[PASS]');
   });
 
   it('without --profile: normal doctor output is unchanged', async () => {

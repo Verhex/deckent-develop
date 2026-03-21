@@ -188,7 +188,7 @@ describe('formatDoctorResult', () => {
       ],
     };
     const output = formatDoctorResult(result);
-    expect(output).toContain('\u2713');
+    expect(output).toContain('[PASS]');
     expect(output).toContain('Node.js');
     expect(output).toContain('1/1 checks passed');
   });
@@ -201,7 +201,7 @@ describe('formatDoctorResult', () => {
       ],
     };
     const output = formatDoctorResult(result);
-    expect(output).toContain('\u2717');
+    expect(output).toContain('[FAIL]');
     expect(output).toContain('1 failed');
   });
 
