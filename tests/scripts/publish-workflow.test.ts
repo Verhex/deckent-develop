@@ -39,7 +39,7 @@ describe('.github/workflows/publish.yml', () => {
   });
 
   it('should have test step', () => {
-    expect(workflowContent).toContain('npm test');
+    expect(workflowContent).toContain('vitest run');
   });
 
   it('should have publish step with provenance', () => {

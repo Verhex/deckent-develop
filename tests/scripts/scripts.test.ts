@@ -113,8 +113,10 @@ describe('OSS Scripts', () => {
 
     it('should show release date in changelog', () => {
       const result = runScript('changelog.sh', ['--dry-run']);
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      expect(result.output).toContain(today);
+      // Use local date (matching shell's `date +%Y-%m-%d`) not UTC
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      expect(result.output).toContain(localDate);
     });
 
     it('should parse conventional commits if present', () => {
