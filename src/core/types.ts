@@ -1,3 +1,5 @@
+import type { DecisionEngineConfig, LearningConfig, CollaborationConfig } from './decision-config.js';
+
 // ─── Models ──────────────────────────────────────────────────────────
 export type ModelType = 'opus' | 'sonnet' | 'haiku';
 export type TaskEffort = 'low' | 'normal' | 'high';
@@ -343,6 +345,12 @@ export interface DeckentConfig {
   spawn_backend?: 'tmux' | 'subprocess' | 'auto';
   /** Skill system configuration */
   skills?: SkillConfig;
+  /** Decision engine configuration */
+  decision_engine?: DecisionEngineConfig;
+  /** Learning system configuration */
+  learning?: LearningConfig;
+  /** Collaboration configuration */
+  collaboration?: CollaborationConfig;
 }
 
 export interface ResolvedConfig {
