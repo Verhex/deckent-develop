@@ -242,4 +242,19 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 ---
 
-*Updated every sprint. Next audit: Sprint 32.*
+### Sprint 32 Features (UX Polish)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Progress Bar | WORKING | Live rendering with ETA, worker table, queue |
+| Rich Summary | WORKING | Categorized changes, agent performance, recommendations |
+| Notifications | WORKING | Terminal bell, webhook, Discord, Slack |
+| Interactive Review | WORKING | deckent review — approve/reject/retry, --auto |
+| Agent/Skill Visibility | WORKING | Dashboard, status, retro, history, MCP |
+| Theme System | WORKING | 6 colors, NO_COLOR/FORCE_COLOR support |
+| Output Modes | WORKING | quiet/normal/verbose global flags |
+| Progress Persistence | WORKING | Save/load for reconnect |
+
+---
+
+*Updated every sprint. Next audit: Sprint 33.*

@@ -5,19 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-sprint32] - 2026-03-21
+## [0.1.0-sprint32] — 2026-03-22 (UX Polish)
 
 ### Added
-
-- Opus Override Test
-- Opus Override Test 2
+- **Progress System**: Live progress bar, ETA calculator (weighted average), worker status tracker, queue display, terminal width adaptation
+- **Rich Sprint Summary**: Categorized file changes, agent performance table, recommendation engine (max 5), sprint comparison with delta
+- **Notification System**: Terminal bell, webhook (POST+retry), Discord embeds (color-coded), Slack Block Kit
+- **Interactive Review**: `deckent review` command — approve/reject/retry per task, --auto mode, review reports
+- **Selective Retry**: Queue failed tasks for next sprint, generate retry directives
+- **Theme System**: Consistent colors (success/error/warning/info/muted/accent), NO_COLOR/FORCE_COLOR support
+- **Output Modes**: --quiet (errors only), --verbose (debug), --normal (default)
+- **Progress Persistence**: Save/load progress state for reconnect
 
 ### Changed
-
-- Auto Model Test (completed with tech debt)
-
-
-_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+- Dashboard: skills column added, agent visibility improved
+- Status command: agent/skill assignment sections, --verbose flag
+- Retro command: rich format default, --raw for original, --compare for delta
+- History command: --agent and --skill filters
+- MCP status: agentAssignments + skillAssignments in response
+- types.ts: notifications config on DeckentConfig
 
 ## [0.1.0-sprint31] — 2026-03-22 (Brain Decision Engine)
 

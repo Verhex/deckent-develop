@@ -1929,6 +1929,7 @@ Full directive: `docs/directives/sprint-034.md`
 | 29 | 5300 | 97.5% | Agent Pool Core: 8 built-in agents, selector algorithm, Brain integration, multi-agent pipeline, shared context, CLI commands |
 | 30 | 5700 | 97.5% | Skill System: 10 built-in skills, stack detection, prompt injection, skill selector, registry, CLI commands |
 | 31 | 6400 | 97.5% | Brain Decision Engine: 6-step pipeline, learning loop, parallel pipeline, shared memory, conflict resolver, adaptive agent (prompt A/B, versioning, rollback) |
+| 32 | 6900 | 97.5% | UX: progress bar, rich summary, notifications (terminal/webhook/Discord/Slack), interactive review, agent/skill visibility, theme, output modes |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1961,6 +1962,8 @@ Full directive: `docs/directives/sprint-034.md`
 **Skill System milestone (Sprint 30):** Dynamic skill system operational. 10 built-in skills covering TypeScript, React, Python, APIs, databases, testing, documentation, security, performance, and DevOps. Stack detection auto-identifies project technology and caches results. Skills selected per task via multi-factor scoring (stack match, keyword match, agent expertise). SKILL.md content injected into worker prompts (1500 char/skill, 4000 total cap). Skill registry foundation for future marketplace. 55 files changed, +8038 lines, 435 new tests.
 
 **Brain Decision Engine milestone (Sprint 31):** Full 6-step decision pipeline operational: TaskAnalyzer infers type and complexity, DecisionOrchestrator chains agent selection -> skill selection -> model resolution -> effort -> scope computation. Learning loop records agent+skill+model evaluations and scores historical combinations for future sprint optimization. Multi-agent collaboration: parallel pipelines with topological wave execution, shared memory for inter-worker communication, conflict detection and resolution. Adaptive agent system: prompt effectiveness analysis, A/B testing (min 4 samples), versioning (max 10), auto-rollback for underperforming prompts. 51 files changed, +10,438 lines, 572 new tests.
+
+**UX milestone (Sprint 32):** End-user experience polished. Live progress bar with ETA during sprint execution. Rich sprint summary with categorized file changes, agent performance table, and smart recommendations. Notification system supports terminal bell, webhooks, Discord embeds, and Slack Block Kit. Interactive post-sprint review: approve, reject, or retry individual tasks. Agent and skill visibility across dashboard, status, retro, history, and MCP. Theme system with NO_COLOR support. Output modes: quiet, normal, verbose. 59 files changed, +9481 lines, 539 new tests.
 
 ---
 

@@ -368,6 +368,16 @@ Deckent, 6 adimli karar motoru ile gorev atamasini otomatiklestirir:
 - **Geri alma:** Basarisiz prompt'lari otomatik geri al (<%50 basari, 3 kullanim sonrasi)
 - **Metrikler:** Performans panosu (trend, en iyi/en kotu surum)
 
+### UX Sistemi (Sprint 32)
+
+- **Ilerleme cubugu (Progress bar):** Canli ilerleme cubugu, ETA hesaplayici (agirlikli ortalama), worker durum tablosu, kuyruk gorunumu, terminal genisligine uyum
+- **Bildirimler:** Terminal zili, webhook (POST+retry), Discord embeds (renk kodlu), Slack Block Kit, event filtreleme
+- **Sprint ozeti:** Kategorize dosya degisiklikleri (kaynak/test/config/docs), agent performans tablosu, akilli oneriler (maksimum 5), onceki sprint ile karsilastirma
+- **Interaktif inceleme:** `deckent review` komutu — gorev bazinda onayla/reddet/yeniden dene, --auto modu, inceleme raporlari
+- **Tema:** NO_COLOR/FORCE_COLOR destegi, 6 renk (success/error/warning/info/muted/accent)
+- **Cikti modlari:** --quiet (sadece hatalar), --verbose (debug), --normal (varsayilan)
+- **Ilerleme kaliciligi:** Baglanti kopmasinda durum kaydet/yukle
+
 ### Worker — Görev Yürütücü
 **Dosya:** `src/agents/worker.ts` (350 satır, 14 export)
 
@@ -839,6 +849,7 @@ Sprint 28 (npm publish): 4.100+ test (+491) — error registry, TUI wizard, onbo
 Sprint 29 (Agent Pool): 5.300+ test (+314) — agent havuzu, 8 yerlesik agent, agent selector, multi-agent pipeline, shared context
 Sprint 30 (Skill System): 5.700+ test (+435) — skill sistemi, 10 yerlesik skill, stack detection, prompt enjeksiyonu, skill selector, registry, CLI komutlari
 Sprint 31 (Brain Decision Engine): 6.272+ test (+572) — karar motoru, ogrenme dongusu, paralel pipeline, paylasimli bellek, catisma cozumleme, adaptive agent
+Sprint 32 (UX Polish): 6.811+ test (+539) — ilerleme cubugu, ETA, bildirimler (terminal/webhook/Discord/Slack), interaktif inceleme, tema, cikti modlari
 ```
 
 ### Konfigürasyon Modları

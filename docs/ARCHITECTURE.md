@@ -261,6 +261,40 @@ src/
 | `src/agents/prompt-rollback.ts` | ~80 | Auto-rollback bad prompts |
 | `src/agents/prompt-metrics.ts` | ~80 | Performance dashboard |
 
+### cli/helpers/ — UX System (Sprint 32)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/cli/helpers/progress.ts` | ~120 | Live progress bar with worker table |
+| `src/cli/helpers/eta-calculator.ts` | ~80 | Weighted rolling average ETA |
+| `src/cli/helpers/worker-status.ts` | ~100 | Heartbeat polling → progress entries |
+| `src/cli/helpers/queue-display.ts` | ~60 | Pending tasks + wave display |
+| `src/cli/helpers/terminal-utils.ts` | ~80 | Width, truncation, table fitting |
+| `src/cli/helpers/sprint-summary.ts` | ~120 | Rich results/changes/tests sections |
+| `src/cli/helpers/change-categorizer.ts` | ~80 | File categorization (source/test/config/docs) |
+| `src/cli/helpers/agent-performance.ts` | ~80 | Per-agent stats with underperformer detection |
+| `src/cli/helpers/recommendations.ts` | ~100 | Smart recommendations engine (max 5) |
+| `src/cli/helpers/sprint-comparison.ts` | ~80 | Sprint delta with previous |
+| `src/cli/helpers/theme.ts` | ~60 | Color system (NO_COLOR support) |
+| `src/cli/helpers/output-mode.ts` | ~50 | quiet/normal/verbose modes |
+| `src/cli/helpers/progress-persistence.ts` | ~60 | Progress state save/load |
+
+### core/ — Notification System (Sprint 32)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/notifications.ts` | ~100 | NotificationDispatcher with event filtering |
+| `src/core/notification-providers/webhook.ts` | ~80 | HTTP POST with retry |
+| `src/core/notification-providers/discord.ts` | ~80 | Discord embeds |
+| `src/core/notification-providers/slack.ts` | ~80 | Slack Block Kit |
+| `src/core/notification-config.ts` | ~60 | Config validation + defaults |
+
+### cli/ — Review System (Sprint 32)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/cli/commands/review.ts` | ~100 | Interactive post-sprint review |
+| `src/cli/helpers/review-actions.ts` | ~80 | Approve/reject/retry per task |
+| `src/cli/helpers/selective-retry.ts` | ~80 | Queue for retry + generate directives |
+| `src/cli/helpers/review-summary.ts` | ~80 | Review counts + report |
+
 ---
 
 ## 3. Module Responsibilities & Boundaries

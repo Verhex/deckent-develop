@@ -812,25 +812,17 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 ---
 ## Sprint 32 — sprint-032
 
-**Status:** RETROSPECTIVE
-**Date:** 2026-03-21
-**Duration:** 34s
+**Status:** COMPLETE
+**Date:** 2026-03-22
+**Theme:** UX Polish
 
-### Results
-
-| Metric | Value |
-|--------|-------|
-| Total Tasks | 3 |
-| Completed | 3 |
-| Tech Debt | 1 |
-| No-Go | 0 |
-| Coverage | 66.7% |
-| Duration | 34291ms |
-
-### Tasks
-
-- 032-001: Opus Override Test (DONE)
-- 032-002: Opus Override Test 2 (DONE)
-- 032-003: Auto Model Test (GO_WITH_TECH_DEBT)
+**Key Deliverables:**
+- Progress: live bar, ETA calculator, worker status, queue display, terminal utils
+- Rich summary: categorized changes, agent performance, recommendations, comparison
+- Notifications: terminal bell, webhook, Discord, Slack with event filtering
+- Interactive review: approve/reject/retry, --auto mode, review reports
+- Agent/skill visibility: dashboard, status, retro, history, MCP enrichment
+- CLI polish: theme (NO_COLOR), output modes (quiet/verbose), progress persistence
+- 59 files changed, +9481 lines, 539 new tests, 27 new modules
 
 ---
