@@ -730,8 +730,16 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 029-004: Sprint 27 Feature Summary (GO_WITH_TECH_DEBT)
 
 **Key Deliverables:**
-- Continued subprocess backend verification in tmux-free environment
-- No-tmux mode validation: workers spawn and complete without tmux dependency
+- Agent type system: AgentDefinition, AgentPool, AgentSelectionResult
+- Agent pool manager: load/save/validate/stats/temp agents
+- Agent selector: keyword+scope scoring, threshold, tie-break
+- 8 built-in agents with PROMPT.md (security, test, doc, review, refactor, bug, api, perf)
+- Shared context for inter-agent communication
+- Multi-agent pipeline (sequential execution)
+- CLI: deckent agent list/create/enable/disable
+- Brain integration: auto agent selection in planSprint
+- Dashboard: agent column visibility
+- 47 files changed, +7030 lines, 314 new tests
 
 ---
 ## Sprint 30 — sprint-030
@@ -764,5 +772,53 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - Rollback mechanism debt fixed: verification reports for rollback + Worker IPC
 - Tmux-free sprint completed successfully: 4 workers via subprocess backend
 - Sprint 27 feature summary and provider abstraction analysis finalized
+
+---
+## Sprint 31 — sprint-031
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-21
+**Duration:** 126s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 33.3% |
+| Duration | 126331ms |
+
+### Tasks
+
+- 031-001: Fix debt: Tech debt from 027-003: Verification report written to tmp-test/rollback-verify. (DONE)
+- 031-002: Opus Model Verification (GO_WITH_TECH_DEBT)
+- 031-003: Config Verification (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 32 — sprint-032
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-21
+**Duration:** 34s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 66.7% |
+| Duration | 34291ms |
+
+### Tasks
+
+- 032-001: Opus Override Test (DONE)
+- 032-002: Opus Override Test 2 (DONE)
+- 032-003: Auto Model Test (GO_WITH_TECH_DEBT)
 
 ---

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint32] - 2026-03-21
+
+### Added
+
+- Opus Override Test
+- Opus Override Test 2
+
+### Changed
+
+- Auto Model Test (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
+## [0.1.0-sprint31] - 2026-03-21
+
+### Added
+
+- **Fix debt: Tech debt from 027-003: Verification report written to tmp-test/rollback-verify.**: DONE
+- **Opus Model Verification**: GO_WITH_TECH_DEBT
+- **Config Verification**: GO_WITH_TECH_DEBT
+- **Tasks**: 3 total, 3 done, 2 tech debt, 0 no-go
 ## [0.1.0-sprint30] - 2026-03-21
 
 ### Added
@@ -16,15 +38,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
 - **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
 - **Tasks**: 6 total, 6 done, 4 tech debt, 0 no-go
-## [0.1.0-sprint29] - 2026-03-21
+## [0.1.0-sprint29] — 2026-03-22 (Agent Pool Core)
 
 ### Added
+- **Agent Type System**: AgentDefinition interface, AgentPool, AgentSelectionResult types
+- **Agent Pool Manager**: Load, save, validate, stats tracking, temp agent lifecycle
+- **Agent Selector**: Keyword+scope scoring algorithm, threshold filtering, tie-break by success rate
+- **8 Built-in Agents**: security-auditor (opus), test-writer (sonnet), doc-writer (sonnet), code-reviewer (opus, read-only), refactorer (sonnet), bug-fixer (opus, 1.5x effort), api-builder (sonnet), performance-analyzer (opus)
+- **Shared Context**: Inter-agent communication via .tasks/shared-context.json (atomic writes)
+- **Multi-Agent Pipeline**: Sequential agent execution with shared context propagation
+- **CLI Commands**: `deckent agent list`, `deckent agent create`, `deckent agent enable/disable`
+- **Agent Documentation**: docs/AGENTS.md with 8 sections
 
-- **Subprocess Backend Verification**: GO_WITH_TECH_DEBT
-- **No-Tmux Verification**: GO_WITH_TECH_DEBT
-- **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
-- **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
-- **Tasks**: 4 total, 4 done, 4 tech debt, 0 no-go
+### Changed
+- brain.ts planSprint: auto-selects specialized agent per task based on keywords and scope
+- task-builder.ts buildWorkerPrompt: injects agent PROMPT.md before task content (2000 char limit)
+- worker.ts: agent ID included in heartbeat and result files
+- sprint-reporter.ts: agent performance table in RETRO.md
+- Dashboard: agent column with color coding (cyan=specialized, dim=generic)
+- types.ts: assignedAgent on Task, agentId on TaskResult/Heartbeat/AgentInfo
 ## [0.1.0-sprint28] — 2026-03-21 (npm Publish Prep)
 
 ### Added

@@ -191,4 +191,20 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 ---
 
+### Sprint 29 Features (Agent Pool Core)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Agent Type System | WORKING | AgentDefinition, AgentPool, AgentSelectionResult types |
+| Agent Pool Manager | WORKING | Load from .deckent/agents/, validate, stats tracking |
+| Agent Selector | WORKING | Keyword+scope scoring, threshold >= 3, tie-break by successRate |
+| Built-in Agents | WORKING | 8 agents: security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer |
+| Shared Context | WORKING | Inter-agent communication via atomic JSON file |
+| Multi-Agent Pipeline | WORKING | Sequential agent execution with abort-on-failure |
+| Agent CLI | WORKING | deckent agent list/create/enable/disable |
+| Brain Integration | WORKING | planSprint auto-selects agent, injects PROMPT.md |
+| Dashboard Visibility | WORKING | Agent column in worker status (cyan/dim) |
+
+---
+
 *Updated every sprint. Next audit: Sprint 31.*

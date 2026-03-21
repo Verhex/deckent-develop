@@ -322,6 +322,16 @@ Brain, sistemin **tek karar vericisidir**. ADR-008'e göre yalnızca Brain, tmux
 
 **Hata Yönetimi:** `BrainError(message, phase)` — hangi fazda hata olduğunu izler.
 
+### Agent Havuzu (Sprint 29)
+
+Deckent, gorevlere otomatik olarak uzmanlasmis agent atayabilir:
+
+- **8 yerlesik agent:** security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer
+- **Brain entegrasyonu:** planSprint sirasinda her gorev icin keyword+scope bazli otomatik agent secimi
+- **Multi-agent pipeline:** Sirali agent calistirma, shared context ile ajanlar arasi iletisim
+- **CLI:** `deckent agent list`, `deckent agent create`, `deckent agent enable/disable`
+- **Dashboard:** Agent kolonu (cyan=uzman, dim=genel)
+
 ### Worker — Görev Yürütücü
 **Dosya:** `src/agents/worker.ts` (350 satır, 14 export)
 
@@ -790,6 +800,7 @@ Sprint 23-24 (Mega): 3.150 test (+1.748)
 Sprint 25-26: 3.442 test (+292)
 Sprint 27-30: 3.609 test (+167) — provider abstraction, subprocess backend, usage tracker, rollback, worker IPC, zero-config
 Sprint 28 (npm publish): 4.100+ test (+491) — error registry, TUI wizard, onboard/upgrade real, telemetry, publish pipeline
+Sprint 29 (Agent Pool): 5.300+ test (+314) — agent havuzu, 8 yerlesik agent, agent selector, multi-agent pipeline, shared context
 ```
 
 ### Konfigürasyon Modları

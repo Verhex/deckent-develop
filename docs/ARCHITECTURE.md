@@ -202,6 +202,16 @@ src/
 | `scripts/pack-test.ts` | ~90 | npm pack dry-run validation (excluded/required files, size) |
 | `scripts/publish.ts` | ~120 | Full publish pipeline (build, test, pack, version bump, tag, publish) |
 
+### agents/ — Agent Pool System (Sprint 29)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/agent-types.ts` | ~100 | AgentDefinition, AgentPool, AgentSelectionResult types |
+| `src/core/agent-pool.ts` | ~200 | AgentPoolManager — load, save, validate, stats, temp agents |
+| `src/core/agent-selector.ts` | ~150 | selectAgent algorithm, extractKeywords, suggestNewAgent |
+| `src/agents/shared-context.ts` | ~80 | SharedContext — inter-agent communication (atomic JSON) |
+| `src/orchestra/multi-agent.ts` | ~100 | MultiAgentPipeline — sequential agent execution |
+| `src/cli/commands/agent.ts` | ~120 | CLI: agent list/create/enable/disable |
+
 ---
 
 ## 3. Module Responsibilities & Boundaries
