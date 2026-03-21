@@ -121,7 +121,11 @@ export function resolveTaskModel(
   config: ResolvedConfig,
   usage: UsageMetrics,
   patterns?: PatternEntry[],
+  forceModel?: ModelType,
 ): ModelType {
+  // Layer 0: user override from DIRECTIVES.md — bypasses all auto-selection
+  if (forceModel) return forceModel;
+
   // Layer 4: base model from score system
   let model: ModelType = inferModelFromDirective(title, description, scope);
 

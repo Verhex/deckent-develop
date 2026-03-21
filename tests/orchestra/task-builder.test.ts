@@ -419,3 +419,86 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('DONE');
   });
 });
+
+// ─── forceModel / forceEffort (DIRECTIVES.md user override) ─────────────
+
+describe('parseStructuredDirectives — forceModel/forceEffort', () => {
+  it('parses "Model: opus" into forceModel', () => {
+    const content = '## Task 1: Security Audit\n- Model: opus\n- Scope: src/auth/\n\n### Description\nAudit auth.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceModel).toBe('opus');
+  });
+
+  it('parses "Model: haiku" into forceModel', () => {
+    const content = '## Task 1: Quick Fix\nModel: haiku\n\n### Description\nFix typo.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceModel).toBe('haiku');
+  });
+
+  it('returns undefined forceModel when no Model line', () => {
+    const content = '## Task 1: Normal Task\n\n### Description\nDo something.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceModel).toBeUndefined();
+  });
+
+  it('ignores invalid model values', () => {
+    const content = '## Task 1: Bad Model\nModel: gpt4\n\n### Description\nTest.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceModel).toBeUndefined();
+  });
+
+  it('parses "Effort: high" into forceEffort', () => {
+    const content = '## Task 1: Complex Task\nEffort: high\n\n### Description\nHard work.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceEffort).toBe('high');
+  });
+
+  it('returns undefined forceEffort when no Effort line', () => {
+    const content = '## Task 1: Normal\n\n### Description\nSimple.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceEffort).toBeUndefined();
+  });
+
+  it('parses both Model and Effort together', () => {
+    const content = '## Task 1: Full Override\nModel: opus\nEffort: high\n- Scope: src/\n\n### Description\nBig task.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceModel).toBe('opus');
+    expect(tasks[0].forceEffort).toBe('high');
+  });
+
+  it('case-insensitive Model parsing', () => {
+    const content = '## Task 1: Case Test\n- model: OPUS\n\n### Description\nTest.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].forceModel).toBe('opus');
+  });
+});
+
+describe('resolveWorkerEffort — forceEffort override', () => {
+  it('returns forceEffort when set', () => {
+    const task = makeTask({ forceEffort: 'high' });
+    expect(resolveWorkerEffort(task)).toBe('high');
+  });
+
+  it('returns score-based effort when forceEffort not set', () => {
+    const task = makeTask({ forceEffort: undefined });
+    const effort = resolveWorkerEffort(task);
+    expect(['max', 'high', 'medium', 'low']).toContain(effort);
+  });
+});
+
+describe('createTask — forceModel/forceEffort passthrough', () => {
+  it('passes forceModel to task', () => {
+    const task = createTask(makeBaseParams({ forceModel: 'opus' }), 1);
+    expect(task.forceModel).toBe('opus');
+  });
+
+  it('passes forceEffort to task', () => {
+    const task = createTask(makeBaseParams({ forceEffort: 'high' }), 1);
+    expect(task.forceEffort).toBe('high');
+  });
+
+  it('forceModel undefined when not provided', () => {
+    const task = createTask(makeBaseParams(), 1);
+    expect(task.forceModel).toBeUndefined();
+  });
+});

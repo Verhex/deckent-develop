@@ -371,7 +371,7 @@ export function planSprint(
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
     const structuredTasks = parseStructuredDirectives(context.directives);
-    const directiveSources: Array<{ title: string; description: string; scope: TaskScope }> =
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort }> =
       structuredTasks.length > 0
         ? structuredTasks
         : context.directives
@@ -388,19 +388,24 @@ export function planSprint(
 
     for (const src of directiveSources) {
       const resolvedModel = recommendation.modelConstraint ??
-        resolveTaskModel(src.title, src.description, src.scope, config, usageForModel, parsedPatterns);
+        resolveTaskModel(src.title, src.description, src.scope, config, usageForModel, parsedPatterns, src.forceModel);
+      const resolvedEffort = src.forceEffort ?? 'normal';
       tasks.push(createTask({
         title: src.title,
         description: src.description,
         model: resolvedModel,
-        effort: 'normal',
+        effort: resolvedEffort,
         priority: 'NORMAL',
-        reason: `Directive (model: ${resolvedModel} — resolved from scope/complexity/plan/usage)`,
+        reason: src.forceModel
+          ? `Directive (model: ${resolvedModel} — user override)`
+          : `Directive (model: ${resolvedModel} — resolved from scope/complexity/plan/usage)`,
         scope: src.scope,
         dependencies: [],
         goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
         sprintId,
         initialStatus,
+        forceModel: src.forceModel,
+        forceEffort: src.forceEffort,
       }, seq++));
     }
   }

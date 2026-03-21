@@ -23,6 +23,8 @@ export interface CreateTaskParams {
   isPriorityFix?: boolean;
   fixForTaskId?: string;
   initialStatus?: TaskStatus;
+  forceModel?: ModelType;
+  forceEffort?: TaskEffort;
 }
 
 export interface ParsedDirectiveTask {
@@ -30,6 +32,8 @@ export interface ParsedDirectiveTask {
   description: string;
   scope: TaskScope;
   testTarget?: string;
+  forceModel?: ModelType;
+  forceEffort?: TaskEffort;
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
@@ -57,6 +61,8 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     sprintId: params.sprintId,
     isPriorityFix: params.isPriorityFix,
     fixForTaskId: params.fixForTaskId,
+    forceModel: params.forceModel,
+    forceEffort: params.forceEffort,
     createdAt: now(),
   };
 }
@@ -121,7 +127,23 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       ? testLine.trim().replace(/^-\s+/, '').replace(/^Test:\s*/i, '').trim()
       : undefined;
 
-    tasks.push({ title, description: block.trim(), scope, testTarget });
+    // Extract optional Model: override (e.g., "Model: opus")
+    const modelLine = lines.find(l => /^[\s-]*Model:\s*/i.test(l.trim()));
+    const forceModel = modelLine
+      ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase() as ModelType
+      : undefined;
+    const validModels: string[] = ['opus', 'sonnet', 'haiku'];
+    const parsedForceModel = forceModel && validModels.includes(forceModel) ? forceModel : undefined;
+
+    // Extract optional Effort: override (e.g., "Effort: max")
+    const effortLine = lines.find(l => /^[\s-]*Effort:\s*/i.test(l.trim()));
+    const forceEffort = effortLine
+      ? effortLine.trim().replace(/^-\s+/, '').replace(/^Effort:\s*/i, '').trim().toLowerCase() as TaskEffort
+      : undefined;
+    const validEfforts: string[] = ['low', 'normal', 'high'];
+    const parsedForceEffort = forceEffort && validEfforts.includes(forceEffort) ? forceEffort : undefined;
+
+    tasks.push({ title, description: block.trim(), scope, testTarget, forceModel: parsedForceModel, forceEffort: parsedForceEffort });
   }
   return tasks;
 }
@@ -150,6 +172,7 @@ export function plannerTaskToParams(
 
 // 5a. resolveWorkerEffort — determine worker effort level based on task complexity
 export function resolveWorkerEffort(task: Task): 'max' | 'high' | 'medium' | 'low' {
+  if (task.forceEffort) return task.forceEffort as 'max' | 'high' | 'medium' | 'low';
   const score = calculateModelScore(task.title, task.description, task.scope);
   if (score >= 6) return 'max';
   if (score >= 1) return 'high';

@@ -55,6 +55,10 @@ export interface Task {
   assignedWorker?: string;
   isPriorityFix?: boolean;
   fixForTaskId?: string;
+  /** User-specified model override from DIRECTIVES.md (bypasses all auto-selection layers) */
+  forceModel?: ModelType;
+  /** User-specified effort override from DIRECTIVES.md */
+  forceEffort?: TaskEffort;
   createdAt?: string;
   updatedAt?: string;
 }

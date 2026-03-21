@@ -217,3 +217,37 @@ describe('resolveTaskModel', () => {
     expect(result).toBe('sonnet');
   });
 });
+
+// ─── forceModel user override ───────────────────────────────────────
+
+describe('resolveTaskModel — forceModel override', () => {
+  const config = makeConfig();
+  const usage = makeUsage();
+
+  it('returns forceModel=opus directly, bypassing all layers', () => {
+    // tmp-test scope would normally downgrade to sonnet
+    const scope = makeScope(['tmp-test/']);
+    const result = resolveTaskModel('Doc task', 'Write docs', scope, config, usage, undefined, 'opus');
+    expect(result).toBe('opus');
+  });
+
+  it('returns forceModel=haiku even when haiku_allowed=false', () => {
+    const scope = makeScope(['src/']);
+    const result = resolveTaskModel('Simple fix', 'Fix typo', scope, config, usage, undefined, 'haiku');
+    expect(result).toBe('haiku');
+  });
+
+  it('returns forceModel=sonnet without score calculation', () => {
+    // High-complexity task would normally get opus
+    const scope = makeScope(['src/', 'tests/', 'docs/'], Array.from({ length: 20 }, (_, i) => `f${i}.ts`));
+    const result = resolveTaskModel('Architect redesign', 'Major refactor', scope, config, usage, undefined, 'sonnet');
+    expect(result).toBe('sonnet');
+  });
+
+  it('undefined forceModel uses normal auto-selection', () => {
+    const scope = makeScope(['src/', 'tests/']);
+    const result = resolveTaskModel('Big architect redesign task', 'Cross-cutting refactor', scope, config, usage, undefined, undefined);
+    // Should be opus (high score from keywords + multi-dir)
+    expect(result).toBe('opus');
+  });
+});
