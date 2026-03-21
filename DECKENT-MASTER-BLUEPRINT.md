@@ -1788,7 +1788,87 @@ Full directive: `docs/directives/sprint-029.md`
 
 **Exit criteria:** `npm install -g deckent@beta` works. `deckent init && deckent start "hello"` completes in <60s. 3+ project types tested. Performance benchmarks baselined. Launch docs ready.
 
-## Phase 4: Multi-Provider & Ecosystem (Sprint 30+) — PLANNED
+## Phase 4: Agent/Skill Intelligence (Sprint 29-33) — PLANNED
+
+**Goal:** Dynamic agent pool, composable skills, intelligent Brain decisions, polished UX.
+
+Full architecture: `docs/AGENT-SKILL-ARCHITECTURE.md`
+
+### Sprint 29: Agent Pool Core + Brain Integration (30 tasks)
+Full directive: `docs/directives/sprint-029.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Agent Types & Pool | 3 | AgentDefinition type, AgentPool class, agent selector algorithm |
+| Built-in Agents | 8 | security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer |
+| Brain Integration | 3 | planSprint agent selection, prompt injection, worker agent context |
+| Agent Lifecycle | 3 | Stats tracking, pattern learning, temp agent creation |
+| CLI Commands | 3 | deckent agent list/create/enable/disable |
+| Multi-Agent | 2 | Shared context file, sequential pipeline |
+| Testing & Docs | 3 | Integration tests, agent documentation |
+
+### Sprint 30: Skill System + Stack Detection (30 tasks)
+Full directive: `docs/directives/sprint-030.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Skill Types & Pool | 2 | SkillDefinition type, SkillPool class |
+| Stack Detection | 2 | detectProjectStack, cache system |
+| Skill Selection | 2 | Selector algorithm, composition resolver |
+| Built-in Skills | 10 | typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer |
+| Brain Integration | 2 | planSprint skill selection, model-selector skill preference |
+| Prompt Injection | 1 | buildWorkerPrompt with skill SKILL.md content |
+| CLI Commands | 3 | deckent skill list/create/install |
+| Marketplace | 1 | Local skill registry foundation |
+| Testing & Docs | 4 | Integration tests, stack detection E2E, skill docs |
+| Config | 1 | Skill configuration in DeckentConfig |
+
+### Sprint 31: Brain Decision Engine + Learning Loop (30 tasks)
+Full directive: `docs/directives/sprint-031.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Decision Engine | 7 | TaskAnalyzer, DecisionOrchestrator, 6-step flow, logging, replay |
+| Learning Loop | 5 | Pattern recorder/reader, combination scorer, decay, migration |
+| Multi-Agent Collab | 5 | Parallel pipeline, shared memory, conflict resolver, result merger, handoff |
+| Adaptive Agent | 5 | Prompt self-improvement, A/B testing, versioning, rollback, metrics |
+| Context Enrichment | 4 | Stack/agent/skill/history context for Brain |
+| Config | 2 | Decision + learning configuration |
+| Integration Tests | 2 | Decision engine E2E, collaboration E2E |
+
+### Sprint 32: UX — Progress, Summary, Notifications (30 tasks)
+Full directive: `docs/directives/sprint-032.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Progress System | 5 | Real-time renderer, ETA calculator, worker status, queue display |
+| Sprint Summary | 5 | Rich formatter, change categorizer, agent performance, recommendations |
+| Notifications | 5 | Terminal bell, webhook, Discord, Slack, config |
+| Agent/Skill Visibility | 5 | Dashboard, status, retro, history, MCP enrichment |
+| Interactive Review | 4 | Post-sprint review, task approval/rejection, selective retry |
+| CLI Polish | 3 | Color themes, output modes, progress persistence |
+| Integration Tests | 3 | E2E tests for progress, notifications, review |
+
+### Sprint 33: Integration Testing + Marketplace + Analytics (30 tasks)
+Full directive: `docs/directives/sprint-033.md`
+
+| Focus Area | Tasks | Key Deliverables |
+|------------|-------|------------------|
+| Integration Tests | 5 | Full agent+skill sprint, 3 project types, error scenarios |
+| Skill Marketplace | 5 | Remote registry, search/publish commands, ratings, dependency resolution |
+| Adaptive Agent Advanced | 5 | Cross-sprint analysis, drift detection, auto-retire, evolution log |
+| Analytics Dashboard | 5 | Web page, usage graphs, success charts, agent comparison |
+| Performance | 5 | Selection cache, loading cache, token counter, lazy loading, batch stats |
+| Security & Config | 3 | Marketplace auth, skill sandboxing, permission escalation prevention |
+| Documentation | 2 | Full system docs, release preparation |
+
+**Exit criteria:** 8 built-in agents working. 10 built-in skills working. Stack detection auto-selects skills. Brain 6-step decision engine functional. Learning loop improves selections across sprints. Progress bar + rich summary in CLI. Notification webhooks working. Skill marketplace foundation ready.
+
+### Sprint 34: Real-World Testing + Beta Publish (30 tasks)
+Full directive: `docs/directives/sprint-034.md`
+(Moved from original Sprint 29 plan)
+
+## Phase 5: Multi-Provider & Ecosystem (Sprint 35+) — PLANNED
 
 **Goal:** Run workers on different providers simultaneously. VSCode extension. Community ecosystem.
 
@@ -1799,11 +1879,11 @@ Full directive: `docs/directives/sprint-029.md`
 - VSCode extension (sidebar, status bar, sprint management)
 - GitHub App (issue → sprint → PR automation)
 - Team mode: shared sprints, role-based access
-- Plugin marketplace (community plugins)
+- Skill marketplace (community skills + agents)
 - Cloud dashboard (deckent.agency remote monitoring)
 - Claude Code Agent Teams integration (native spawn backend)
 
-## Phase 5: Platform & Enterprise (Sprint 40+) — VISION
+## Phase 6: Platform & Enterprise (Sprint 45+) — VISION
 
 **Goal:** Deckent as a platform for AI-driven development.
 

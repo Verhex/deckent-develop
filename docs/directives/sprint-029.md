@@ -1,470 +1,519 @@
-# DIRECTIVES — Sprint 029 (Gercek Dunya Testi + Beta Publish)
+# DIRECTIVES — Sprint 029 (Agent Pool Core + Brain Integration)
 
-## Hedef: Deckent'i farkli proje tiplerinde test et, E2E smoke test suite olustur, npm beta yayinla, GitHub Release workflow tamamla, performance benchmark, lansman hazirligi. 30 gorev — tumu opus model, effort high/max.
-
----
-
-## Gorev 1: Test Senaryosu — React/Next.js Projesi
-- Dosya: tests/e2e/scenarios/react-nextjs.test.ts (yeni)
-- Kapsam: tests/e2e/
-
-### Aciklama
-Deckent'i bir React/Next.js projesinde test et (mock ortam). Senaryo: 1) Bos Next.js proje yapisi olustur (package.json, tsconfig, pages/), 2) deckent init calistir, 3) DIRECTIVES yaz: "Add login page with form validation", 4) planSprint calistir, 5) Planner dogru scope ve model atamasi yapiyor mu kontrol, 6) analyzeProject dogru framework tespit ediyor mu kontrol. 15+ test.
-
-### Test
-- Next.js projesi tespit ediliyor (framework: next)
-- Planner src/pages/ veya src/app/ scope atiyor
-- Model atamasi mantikli (sonnet icin UI task)
-- 15+ test
+## Goal: Implement the dynamic agent pool system. Agents are specialized worker personas with custom prompts, tool constraints, and model preferences. Brain selects the best agent for each task. 30 tasks — all opus model, effort high.
 
 ---
 
-## Gorev 2: Test Senaryosu — Python/FastAPI Projesi
-- Dosya: tests/e2e/scenarios/python-fastapi.test.ts (yeni)
-- Kapsam: tests/e2e/
+## Task 1: AgentDefinition Type
+- Model: opus
+- Effort: high
+- Files: src/core/agent-types.ts (new), tests/core/agent-types.test.ts (new)
+- Scope: src/core/, tests/core/
 
-### Aciklama
-Deckent'i bir Python/FastAPI projesinde test et (mock ortam). Senaryo: 1) Python proje yapisi olustur (requirements.txt, main.py, pyproject.toml), 2) deckent init calistir, 3) DIRECTIVES yaz: "Add user CRUD API endpoints", 4) planSprint calistir, 5) analyzeProject dogru language/framework tespit ediyor mu, 6) Worker prompt'unda Python-spesifik komutlar var mi (pytest, pip). 15+ test.
+### Description
+Define AgentDefinition interface: id, name, description, systemPrompt, expertise[], allowedTools[], deniedTools[], preferredModel, effortMultiplier, triggerKeywords[], triggerScopes[], triggerFilePatterns[], persistent (boolean), source ('builtin'|'user'|'learned'), stats ({totalUses, successRate, avgCoverage, lastUsedInSprint}). Also define AgentPool type as Map<string, AgentDefinition>. Export AgentSelectionResult type: {agent: AgentDefinition | null, score: number, reason: string}. 15+ tests for type validation.
 
-### Test
-- Python projesi tespit ediliyor (language: python)
-- FastAPI framework tespit ediliyor
-- Build/test komutlari Python-uyumlu
-- 15+ test
-
----
-
-## Gorev 3: Test Senaryosu — Rust CLI Projesi
-- Dosya: tests/e2e/scenarios/rust-cli.test.ts (yeni)
-- Kapsam: tests/e2e/
-
-### Aciklama
-Deckent'i bir Rust CLI projesinde test et (mock ortam). Senaryo: 1) Rust proje yapisi olustur (Cargo.toml, src/main.rs), 2) deckent init calistir, 3) DIRECTIVES yaz: "Add argument parsing with clap", 4) planSprint calistir, 5) analyzeProject dogru language tespit ediyor mu, 6) Build komutlari Rust-uyumlu mu (cargo build, cargo test). 15+ test.
-
-### Test
-- Rust projesi tespit ediliyor (language: rust)
-- Build tool: cargo tespit ediliyor
-- Worker prompt'unda cargo komutlari var
-- 15+ test
+### Tests
+- AgentDefinition fields validated
+- AgentPool map operations
+- AgentSelectionResult structure
+- 15+ tests
 
 ---
 
-## Gorev 4: Test Senaryosu — Monorepo (Turborepo)
-- Dosya: tests/e2e/scenarios/monorepo.test.ts (yeni)
-- Kapsam: tests/e2e/
+## Task 2: AgentPool Class — Load & Save
+- Model: opus
+- Effort: high
+- Files: src/core/agent-pool.ts (new), tests/core/agent-pool.test.ts (new)
+- Scope: src/core/, tests/core/
 
-### Aciklama
-Deckent'i bir Turborepo monorepo'da test et (mock ortam). Senaryo: 1) Monorepo yapisi olustur (turbo.json, packages/, apps/), 2) deckent init calistir, 3) DIRECTIVES yaz: "Add shared UI component library", 4) planSprint calistir, 5) Scope atamasi dogru mu (packages/ui/), 6) Worker izolasyonu monorepo'da calisiyor mu. 10+ test.
+### Description
+AgentPool class: loadAgents(projectRoot) reads .deckent/agents/*/agent.json, saveAgent(agent), removeAgent(id), getAgent(id), listAgents(), listEnabled(). Support persistent agents (.deckent/agents/) and temp agents (.tasks/agents/). Create/delete temp agents per sprint lifecycle. 15+ tests.
 
-### Test
-- Turborepo tespit ediliyor (build tool: turbo)
-- Scope monorepo alt dizinine atanabiliyor
-- Coklu paket yapisi destekleniyor
-- 10+ test
-
----
-
-## Gorev 5: E2E Smoke Test — Tam Akis
-- Dosya: tests/e2e/smoke/full-flow.test.ts (yeni)
-- Kapsam: tests/e2e/
-
-### Aciklama
-npm install -g → init → start → status → complete tam akis testi. Adimlar: 1) Gecici dizinde proje olustur, 2) deckent init --auto calistir, 3) DIRECTIVES.md yaz (basit 2 gorevli), 4) planSprint calistir (structured mode), 5) Mock worker result yaz, 6) evaluateResult calistir, 7) writeRetrospective calistir, 8) cleanup calistir, 9) Tum dosyalar dogru durumda mi kontrol. 20+ test.
-
-### Test
-- init → plan → evaluate → retro → cleanup akisi calisiyor
-- Task dosyalari olusturuluyor ve temizleniyor
-- RETRO.md yaziliyor
-- Sprint log olusturuluyor
-- Dashboard dogru guncelleniyor
-- 20+ test
+### Tests
+- loadAgents reads agent.json files
+- saveAgent writes correctly
+- removeAgent deletes directory
+- Persistent vs temp agent separation
+- 15+ tests
 
 ---
 
-## Gorev 6: E2E Smoke Test — Zero-Config Akis
-- Dosya: tests/e2e/smoke/zero-config.test.ts (yeni)
-- Kapsam: tests/e2e/
+## Task 3: Agent Selector Algorithm
+- Model: opus
+- Effort: high
+- Files: src/core/agent-selector.ts (new), tests/core/agent-selector.test.ts (new)
+- Scope: src/core/, tests/core/
 
-### Aciklama
-`deckent start "description"` zero-config akis testi. Adimlar: 1) Gecici proje, 2) deckent init, 3) `start "Add health check endpoint"` cagir, 4) Gecici DIRECTIVES olusturuldu mu, 5) Plan yapildi mi, 6) Sprint tamamlandi mi, 7) Gecici DIRECTIVES temizlendi mi. 10+ test.
+### Description
+selectAgent(task, pool) algorithm: 1) Extract keywords from task title+description, 2) Score each agent: +2 per keyword match, +3 per scope overlap, +1 per file pattern match, 3) Threshold score >= 3 to select, 4) Tie-break by successRate, 5) Return AgentSelectionResult with best agent or null (generic worker). Also extractKeywords(text): string[] utility. 20+ tests.
 
-### Test
-- Tek satirlik girdi calisiyor
-- DIRECTIVES otomatik olusturuluyor
-- Sprint akisi tamamlaniyor
-- Temizlik yapiliyor
-- 10+ test
-
----
-
-## Gorev 7: E2E Smoke Test — MCP Akis
-- Dosya: tests/e2e/smoke/mcp-flow.test.ts (yeni)
-- Kapsam: tests/e2e/
-
-### Aciklama
-MCP tool zinciri testi. Adimlar: 1) deckent_init cagir, 2) deckent_set_directives cagir, 3) deckent_plan cagir, 4) Plan sonucunu dogrula, 5) deckent_status cagir, 6) deckent_doctor cagir, 7) deckent_history cagir, 8) deckent_retro cagir. Tum tool'lar zincir halinde calisiyor mu? 15+ test.
-
-### Test
-- init → set_directives → plan zinciri calisiyor
-- Her tool dogru response donduruyor
-- Enrichment metadata mevcut
-- 15+ test
+### Tests
+- Keyword extraction from title+description
+- Score calculation correct
+- Threshold filtering
+- Tie-break by success rate
+- Returns null when no match
+- 20+ tests
 
 ---
 
-## Gorev 8: E2E Smoke Test — Error Scenarios
-- Dosya: tests/e2e/smoke/error-scenarios.test.ts (yeni)
-- Kapsam: tests/e2e/
+## Task 4: Built-in Agent — security-auditor
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/security-auditor/agent.json (new), .deckent/agents/security-auditor/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-Hata senaryolari testi. Senaryolar: 1) DIRECTIVES.md olmadan start → anlamli hata, 2) Gecersiz config ile init → validation hatasi, 3) Zaten aktif sprint varken start → conflict hatasi, 4) Olmayan task'a spawn → not found, 5) Scope disina yazma → violation, 6) tmux yokken start → subprocess fallback veya hata. 15+ test.
+### Description
+Security auditor agent definition. triggerKeywords: [security, auth, jwt, csrf, xss, injection, encryption, vulnerability, oauth, password, token, session]. triggerScopes: [src/auth/, src/middleware/, src/security/]. preferredModel: opus. allowedTools: [Read, Grep, Bash, Write]. PROMPT.md: security-focused system prompt with OWASP checklist, threat modeling, secure coding practices. 5+ tests.
 
-### Test
-- Her hata senaryosu anlamli mesaj donduruyor
-- Cozum onerisi mevcut
-- Sistem crash etmiyor
-- 15+ test
-
----
-
-## Gorev 9: npm Publish Beta — 0.1.0-beta.1
-- Dosya: scripts/publish-beta.ts (yeni), package.json
-- Kapsam: scripts/
-
-### Aciklama
-npm'e beta surum yayinlama scripti. Adimlar: 1) Surum: 0.1.0-beta.1 ayarla, 2) tsc build, 3) vitest run, 4) npm pack kontrol, 5) npm publish --tag beta (--dry-run default), 6) Basarili ise git tag v0.1.0-beta.1, 7) npm info deckent ile dogrula. Script --for-real flag'i olmadan gercek publish yapmaz. 10+ test.
-
-### Test
-- Beta surum numarasi dogru
-- Build basarili
-- --dry-run default
-- --for-real ile gercek publish tetikleniyor
-- 10+ test
+### Tests
+- agent.json valid
+- PROMPT.md exists and has content
+- Trigger keywords correct
+- 5+ tests
 
 ---
 
-## Gorev 10: GitHub Actions — Release Workflow
-- Dosya: .github/workflows/release.yml (yeni veya guncelle)
-- Kapsam: .github/workflows/
+## Task 5: Built-in Agent — test-writer
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/test-writer/agent.json (new), .deckent/agents/test-writer/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-GitHub Actions release workflow. Tetikleyici: git tag v* push. Adimlar: 1) Checkout, 2) Node.js 22 setup, 3) npm ci, 4) tsc build, 5) vitest run, 6) npm pack, 7) npm publish (NPM_TOKEN secret), 8) GitHub Release olustur (changelog'dan notes). Beta tag'leri (v*-beta*) --tag beta ile publish. 10+ test.
+### Description
+Test writer agent. triggerKeywords: [test, coverage, spec, vitest, jest, unit, integration, e2e, mock, assert, fixture]. triggerScopes: [tests/]. preferredModel: sonnet. PROMPT.md: testing expert prompt with coverage targets, mock patterns, assertion best practices. 5+ tests.
 
-### Test
-- Workflow YAML gecerli
-- Tag tetikleyici dogru
-- Beta tag ayri isleniyor
-- 10+ test
-
----
-
-## Gorev 11: GitHub Actions — CI Workflow Iyilestirme
-- Dosya: .github/workflows/ci.yml (yeni veya guncelle)
-- Kapsam: .github/workflows/
-
-### Aciklama
-Her PR ve push icin CI workflow. Adimlar: 1) Matrix: Node 18, 20, 22, 2) npm ci, 3) tsc --noEmit, 4) vitest run --reporter=json, 5) Coverage raporu (opsiyonel), 6) npm pack --dry-run kontrol. Basarisiz olursa PR'a yorum. 10+ test.
-
-### Test
-- Matrix dogru Node surumlerini kapsıyor
-- Tum adimlar sirayla calisiyor
-- Basarisizlik durumu dogru raporlaniyor
-- 10+ test
+### Tests
+- agent.json valid
+- PROMPT.md content
+- 5+ tests
 
 ---
 
-## Gorev 12: Performance Benchmark — 10 Gorev
-- Dosya: tests/benchmark/sprint-10-tasks.bench.ts (yeni)
-- Kapsam: tests/benchmark/
+## Task 6: Built-in Agent — doc-writer
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/doc-writer/agent.json (new), .deckent/agents/doc-writer/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-10 gorevli sprint icin performance benchmark. Olcumler: 1) planSprint suresi (ms), 2) Task JSON yazma suresi, 3) evaluateResult suresi (per task), 4) writeRetrospective suresi, 5) cleanup suresi, 6) Toplam bellek kullanimi (peak RSS). Mock worker result'lar ile. Baseline olarak kaydet. 5+ test.
+### Description
+Documentation writer agent. triggerKeywords: [docs, readme, changelog, guide, tutorial, jsdoc, tsdoc, documentation, api-docs]. triggerScopes: [docs/]. preferredModel: sonnet. allowedTools: [Read, Write]. PROMPT.md: documentation standards, Keep a Changelog format, JSDoc conventions. 5+ tests.
 
-### Test
-- planSprint <2s
-- evaluateResult <100ms per task
-- Toplam akis <5s
-- Bellek <200MB
-- 5+ test
-
----
-
-## Gorev 13: Performance Benchmark — 50 Gorev
-- Dosya: tests/benchmark/sprint-50-tasks.bench.ts (yeni)
-- Kapsam: tests/benchmark/
-
-### Aciklama
-50 gorevli sprint icin performance benchmark. Ayni olcumler + ek: 1) Task queue wave performansi (8 worker ile 50 task), 2) Auditor scan suresi (50 heartbeat dosyasi), 3) Dashboard guncelleme suresi. Olcekleme sorunlari tespit et. 5+ test.
-
-### Test
-- planSprint <5s (50 task)
-- Auditor scan <500ms
-- Dashboard guncelleme <100ms
-- 5+ test
+### Tests
+- agent.json valid
+- PROMPT.md content
+- 5+ tests
 
 ---
 
-## Gorev 14: Performance Benchmark — 100 Gorev Stres Testi
-- Dosya: tests/benchmark/sprint-100-tasks.bench.ts (yeni)
-- Kapsam: tests/benchmark/
+## Task 7: Built-in Agent — code-reviewer
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/code-reviewer/agent.json (new), .deckent/agents/code-reviewer/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-100 gorevli sprint stres testi. Ek kontroller: 1) Dosya sistemi limitleri (100 task + 100 hb + 100 result = 300 dosya), 2) Lock contention (10+ worker ayni anda), 3) Dashboard boyutu (100 agent entry), 4) Memory decay 100 sprint sonrasi. Darbogazlari tespit et ve raporla. 5+ test.
+### Description
+Code reviewer agent. triggerKeywords: [review, refactor, quality, lint, cleanup, code-review, pr-review]. triggerScopes: [src/]. preferredModel: opus. allowedTools: [Read, Grep]. deniedTools: [Write]. PROMPT.md: code review checklist, severity levels (CRITICAL/HIGH/MEDIUM/LOW), focus on correctness + security + quality. 5+ tests.
 
-### Test
-- 100 task dosyasi olusturuluyor ve temizleniyor
-- Lock contention yonetilebiliyor
-- Dashboard boyutu makul (<100KB)
-- 5+ test
-
----
-
-## Gorev 15: README GIF Demo Script
-- Dosya: scripts/record-demo.sh (yeni), docs/demo-script.md (yeni)
-- Kapsam: scripts/, docs/
-
-### Aciklama
-README icin GIF demo kayit scripti. Arac: asciinema + agg (veya vhs). Senaryo: 1) deckent init (1s), 2) DIRECTIVES goster (1s), 3) deckent start --dry-run (2s), 4) deckent status --watch (3s), 5) Sprint tamamlandi mesaji (1s). Toplam ~10s. docs/demo-script.md'de kayit adimlari dokumante. 3+ test.
-
-### Test
-- Script dosyasi calistirilabilir
-- Senaryo adimlari dokumante
-- 3+ test
+### Tests
+- agent.json valid
+- deniedTools set
+- 5+ tests
 
 ---
 
-## Gorev 16: Product Hunt Hazirlık Dokumani
-- Dosya: docs/launch/product-hunt.md (yeni)
-- Kapsam: docs/launch/
+## Task 8: Built-in Agent — refactorer
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/refactorer/agent.json (new), .deckent/agents/refactorer/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-Product Hunt lansman hazirlik dokumani. Icerik: 1) Tagline (60 karakter), 2) Description (260 karakter), 3) Detayli aciklama (5 paragraf), 4) 5 adet key feature, 5) Maker comment taslagi, 6) FAQ (5 soru), 7) Screenshot/GIF listesi, 8) Lansman gunu checklist. 3+ test.
+### Description
+Refactoring specialist. triggerKeywords: [refactor, rename, extract, split, merge, reorganize, modularize, decouple, simplify]. preferredModel: sonnet. PROMPT.md: refactoring patterns (extract method/class, move function, inline), preserve behavior, test before+after. 5+ tests.
 
-### Test
-- Tum bolumler mevcut
-- Karakter limitleri uygun
-- Ingilizce
-- 3+ test
-
----
-
-## Gorev 17: Hacker News Post Taslagi
-- Dosya: docs/launch/hackernews-post.md (yeni)
-- Kapsam: docs/launch/
-
-### Aciklama
-Hacker News "Show HN" post taslagi. Format: 1) Baslik: "Show HN: Deckent — Open-source AI agent orchestrator with sprint lifecycle", 2) Post body: problem, solution, how it works, key differentiators, links, 3) Beklenen sorular ve cevaplar (10 soru), 4) Timing onerileri (gun/saat). 3+ test.
-
-### Test
-- Post taslagi mevcut
-- Q&A bolumleri hazir
-- Ingilizce
-- 3+ test
+### Tests
+- agent.json valid
+- 5+ tests
 
 ---
 
-## Gorev 18: Discord Community Setup Dokumani
-- Dosya: docs/launch/discord-setup.md (yeni)
-- Kapsam: docs/launch/
+## Task 9: Built-in Agent — bug-fixer
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/bug-fixer/agent.json (new), .deckent/agents/bug-fixer/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-Discord topluluk yapilandirma dokumani. Kanallar: #general, #getting-started, #bug-reports, #feature-requests, #showcase, #plugins, #dev-chat. Roller: maintainer, contributor, user. Bot entegrasyonu: GitHub webhook (yeni release bildirimi). Hosgeldin mesaji taslagi. Community guidelines. 3+ test.
+### Description
+Bug fixer agent. triggerKeywords: [fix, bug, error, crash, regression, broken, issue, defect, patch, hotfix]. preferredModel: opus. effortMultiplier: 1.5. PROMPT.md: root cause analysis first, minimal fix, regression test, bisect methodology. 5+ tests.
 
-### Test
-- Kanal listesi mevcut
-- Roller tanimli
-- Guidelines mevcut
-- 3+ test
-
----
-
-## Gorev 19: Sprint Bildirimi — Webhook Altyapisi
-- Dosya: src/core/notifications.ts (yeni), tests/core/notifications.test.ts (yeni)
-- Kapsam: src/core/, tests/core/
-
-### Aciklama
-Sprint olaylari icin bildirim altyapisi. NotificationProvider interface: send(event, payload). WebhookProvider: HTTP POST ile webhook URL'ye gonder. Event tipleri: SPRINT_STARTED, SPRINT_COMPLETED, TASK_NO_GO, USAGE_WARNING. Config: notifications.webhook_url. Opsiyonel, config'de yoksa devre disi. 10+ test.
-
-### Test
-- WebhookProvider HTTP POST gonderiyor
-- Event tipleri dogru
-- Config yoksa sessizce geciyor
-- Hata durumunda non-fatal
-- 10+ test
+### Tests
+- agent.json valid
+- effortMultiplier correct
+- 5+ tests
 
 ---
 
-## Gorev 20: Sprint Bildirimi — Brain Entegrasyonu
-- Dosya: src/orchestra/brain.ts, tests/orchestra/brain-notifications.test.ts (yeni)
-- Kapsam: src/orchestra/, tests/orchestra/
+## Task 10: Built-in Agent — api-builder
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/api-builder/agent.json (new), .deckent/agents/api-builder/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-Brain sprint lifecycle'ina bildirim entegrasyonu. PLAN fazinda SPRINT_STARTED, COMPLETE'de SPRINT_COMPLETED, NO_GO'da TASK_NO_GO, auto-pause'da USAGE_WARNING. Bildirim gondermezse sprint devam eder (non-blocking, non-fatal). 10+ test.
+### Description
+API builder agent. triggerKeywords: [api, endpoint, route, controller, rest, graphql, middleware, request, response, handler]. triggerScopes: [src/api/, src/routes/]. preferredModel: sonnet. PROMPT.md: REST conventions, error handling, validation, authentication middleware. 5+ tests.
 
-### Test
-- SPRINT_STARTED bildirimi gonderiliyor
-- SPRINT_COMPLETED bildirimi gonderiliyor
-- Bildirim hatasi sprint'i durdurmaz
-- 10+ test
-
----
-
-## Gorev 21: Multi-Platform Test Matrix
-- Dosya: tests/e2e/platform/cross-platform.test.ts (yeni)
-- Kapsam: tests/e2e/
-
-### Aciklama
-Cross-platform uyumluluk testleri. Kontroller: 1) Path separator (/ vs \) dogru isleniyor mu, 2) Home dizin tespiti (macOS/Linux/Windows), 3) tmux availability check platform bazli, 4) Subprocess spawn platform farkliliklari, 5) Dosya izinleri (chmod 0600 Windows'da calismaz). 10+ test.
-
-### Test
-- Path separator dogru isleniyor
-- Home dizin her platformda tespit ediliyor
-- Platform-spesifik kodlar korunakli
-- 10+ test
+### Tests
+- agent.json valid
+- 5+ tests
 
 ---
 
-## Gorev 22: deckent doctor — Publish Sonrasi Kontroller
-- Dosya: src/cli/commands/doctor.ts, tests/cli/doctor-publish.test.ts (yeni)
-- Kapsam: src/cli/, tests/cli/
+## Task 11: Built-in Agent — performance-analyzer
+- Model: opus
+- Effort: high
+- Files: .deckent/agents/performance-analyzer/agent.json (new), .deckent/agents/performance-analyzer/PROMPT.md (new)
+- Scope: .deckent/agents/
 
-### Aciklama
-npm install sonrasi doctor check'leri genislet. Yeni kontroller: 1) deckent surum kontrolu (guncel mi?), 2) Global config dizini var mi, 3) MCP kaydi dogru mu, 4) Permission kontrolleri (.deckent/ yazilabilir mi). Her kontrol cozum onerisi icermeli. 10+ test.
+### Description
+Performance analyzer agent. triggerKeywords: [performance, optimize, speed, memory, profiling, benchmark, latency, cache, bottleneck, slow]. preferredModel: opus. PROMPT.md: profiling methodology, Big-O analysis, memory leak detection, caching strategies. 5+ tests.
 
-### Test
-- Surum kontrolu calisiyor
-- MCP kaydi dogrulaniyor
-- Permission kontrolu dogru
-- 10+ test
-
----
-
-## Gorev 23: Provider Registry — Otomatik Tespit
-- Dosya: src/core/provider.ts, tests/core/provider-detect.test.ts (yeni)
-- Kapsam: src/core/, tests/core/
-
-### Aciklama
-ProviderRegistry'ye otomatik tespit ekle. detectAvailableProviders(): PATH'te claude, codex, gemini CLI'larini ara, bulunanlardan adapter olustur. resolveProvider(config): config'deki provider veya en iyi mevcut provider'i sec. init sirasinda tespit et ve config'e yaz. 10+ test.
-
-### Test
-- Claude CLI bulununca ClaudeAdapter seciliyor
-- Hicbir CLI bulunamazsa hata
-- Config'deki tercih oncelikli
-- 10+ test
+### Tests
+- agent.json valid
+- 5+ tests
 
 ---
 
-## Gorev 24: Codex CLI Adapter (Temel)
-- Dosya: src/providers/codex.ts (yeni), tests/providers/codex.test.ts (yeni)
-- Kapsam: src/providers/, tests/providers/
+## Task 12: Agent Validation — Manifest Checker
+- Model: opus
+- Effort: high
+- Files: src/core/agent-pool.ts (extend), tests/core/agent-pool.test.ts (extend)
+- Scope: src/core/, tests/core/
 
-### Aciklama
-OpenAI Codex CLI icin temel adapter. CodexAdapter implements ProviderAdapter. spawn: `codex -p {prompt}` komutu. checkUsage: API rate limit kontrolu. isAvailable: codex --version. supportedModels: ['gpt-4.1', 'o3', 'o4-mini']. Bu adapter tam fonksiyonel degil, temel yapi + TODO'lar. 10+ test.
+### Description
+validateAgentDefinition(agent): validates required fields, model enum, triggerKeywords non-empty, effortMultiplier range (0.1-3.0), source enum. Returns {valid: boolean, errors: string[]}. Integrate into loadAgents — skip invalid agents with warning. 10+ tests.
 
-### Test
-- CodexAdapter dogru komut olusturuyor
-- isAvailable kontrol calisiyor
-- supportedModels dogru
-- 10+ test
-
----
-
-## Gorev 25: Template Gallery — Temel Yapi
-- Dosya: src/cli/helpers/templates.ts (yeni), tests/cli/templates.test.ts (yeni)
-- Kapsam: src/cli/, tests/cli/
-
-### Aciklama
-`deckent init --template <name>` icin sablon sistemi. Template interface: name, description, directives (ornek DIRECTIVES.md), config (onerilen config). Built-in sablonlar: typescript-api, react-app, python-api. listTemplates(), getTemplate(name), applyTemplate(projectRoot, template). 10+ test.
-
-### Test
-- 3 built-in sablon mevcut
-- listTemplates dogru listeliyor
-- applyTemplate dosyalari olusturuyor
-- Olmayan sablon hata veriyor
-- 10+ test
+### Tests
+- Valid agent passes
+- Missing required field fails
+- Invalid model fails
+- effortMultiplier out of range fails
+- 10+ tests
 
 ---
 
-## Gorev 26: deckent init --template Entegrasyonu
-- Dosya: src/cli/commands/init.ts, tests/cli/init-template.test.ts (yeni)
-- Kapsam: src/cli/, tests/cli/
+## Task 13: brain.ts — Agent Selection in planSprint
+- Model: opus
+- Effort: high
+- Files: src/orchestra/brain.ts, tests/orchestra/brain-agent.test.ts (new)
+- Scope: src/orchestra/, tests/orchestra/
 
-### Aciklama
-init komutuna --template flag ekle. `deckent init --template react-app` calisti^gildiginda: 1) Normal init adimlari, 2) Template'in onerilen config'ini uygula, 3) Ornek DIRECTIVES.md'yi yaz, 4) Template-spesifik .claude/rules/ olustur. --list-templates ile mevcut sablonlari listele. 10+ test.
+### Description
+Integrate agent selection into planSprint. After tasks are created: 1) loadAgents from pool, 2) For each task: selectAgent(task, pool), 3) Set task.assignedAgent = agent.id or 'generic', 4) If agent.preferredModel && !task.forceModel: use agent model preference, 5) Apply agent effortMultiplier. Add assignedAgent field to Task type. 15+ tests.
 
-### Test
-- --template flag calisiyor
-- Template config uygulandigi
-- DIRECTIVES.md sablondan olusturuluyor
-- --list-templates listeliyor
-- 10+ test
-
----
-
-## Gorev 27: README Badges — Dinamik
-- Dosya: scripts/update-badges.ts (yeni)
-- Kapsam: scripts/
-
-### Aciklama
-README.md icin dinamik badge'ler olusturan script. Badge'ler: npm version, tests passing, license (MIT), Node >=18, PRs welcome. shields.io formati. Script her release'de calistirilir ve README'deki badge bolumunu gunceller. 5+ test.
-
-### Test
-- Badge URL'leri gecerli shields.io formati
-- README'deki badge bolumleri guncelleniyor
-- 5+ test
+### Tests
+- Agent selected for matching task
+- Generic worker for non-matching
+- Agent model preference applied
+- forceModel overrides agent preference
+- 15+ tests
 
 ---
 
-## Gorev 28: docs/TROUBLESHOOTING.md Ingilizce Guncelleme
-- Dosya: docs/TROUBLESHOOTING.md
-- Kapsam: docs/
+## Task 14: task-builder.ts — Agent Prompt Injection
+- Model: opus
+- Effort: high
+- Files: src/orchestra/task-builder.ts, tests/orchestra/task-builder.test.ts (extend)
+- Scope: src/orchestra/, tests/orchestra/
 
-### Aciklama
-Troubleshooting dokumani Ingilizce guncellemesi. Senaryolar: 1) tmux not found, 2) Claude CLI not found, 3) Sprint hangs, 4) Worker scope violation, 5) High usage warning, 6) Dashboard not updating, 7) MCP connection failed, 8) Config validation error. Her senaryo: problem, cause, solution, prevention. 5+ test.
+### Description
+Extend buildWorkerPrompt to inject agent PROMPT.md before task content. New signature: buildWorkerPrompt(task, agentPrompt?). If agentPrompt provided, prepend "=== Agent: {name} ===" section. Agent prompt truncated at 2000 tokens to prevent context overflow. 10+ tests.
 
-### Test
-- Tum senaryolar Ingilizce
-- Her senaryo cozum iceriyor
-- 5+ test
-
----
-
-## Gorev 29: Regression Test Suite — Sprint 027-028 Ozellikleri
-- Dosya: tests/regression/sprint-027-028.test.ts (yeni)
-- Kapsam: tests/regression/
-
-### Aciklama
-Sprint 027 ve 028'de eklenen tum ozelliklerin regresyon testi. Kontroller: 1) Provider abstraction calisiyor, 2) Subprocess backend calisiyor, 3) Usage tracking kayit yapiyor, 4) Zero-config mode calisiyor, 5) Rollback mekanizmasi calisiyor, 6) npm publish pipeline calisiyor, 7) Error registry dogru mesajlar donduruyor. 20+ test.
-
-### Test
-- Tum Sprint 027 ozellikleri calisiyor
-- Tum Sprint 028 ozellikleri calisiyor
-- Mevcut 3442+ test gecmeye devam ediyor
-- 20+ test
+### Tests
+- Agent prompt prepended
+- No agent prompt = current behavior
+- Truncation at limit
+- 10+ tests
 
 ---
 
-## Gorev 30: Beta Launch Checklist Dogrulama
-- Dosya: docs/launch/beta-launch-checklist.md (yeni)
-- Kapsam: docs/launch/
+## Task 15: worker.ts — Agent Context Awareness
+- Model: opus
+- Effort: high
+- Files: src/agents/worker.ts, tests/agents/worker.test.ts (extend)
+- Scope: src/agents/, tests/agents/
 
-### Aciklama
-Beta lansman oncesi son kontrol listesi ve dogrulama. Adimlar: 1) npm install -g deckent@beta calisiyor, 2) deckent init yeni projede calisiyor, 3) deckent doctor tum kontroller geciyor, 4) deckent start basit gorev tamamliyor, 5) deckent web dashboard calisiyor, 6) MCP entegrasyonu calisiyor, 7) README anlasilir, 8) QUICKSTART izlenebilir, 9) Error mesajlari yardimci, 10) Rollback calisiyor. Her adim icin PASS/FAIL durumu. 3+ test.
+### Description
+Worker reads agent context from task.assignedAgent. If agent has allowedTools/deniedTools, enforce in scope check. Add agent ID to heartbeat for dashboard visibility. Worker result includes agentId field. 10+ tests.
 
-### Test
-- Checklist tum adimlari kapsıyor
-- Ingilizce
-- Her adim dogrulanabilir
-- 3+ test
+### Tests
+- Agent ID in heartbeat
+- Agent ID in result
+- Tool enforcement from agent definition
+- 10+ tests
 
 ---
 
-## Kalite Kurallari
+## Task 16: Agent Stats Tracking
+- Model: opus
+- Effort: high
+- Files: src/core/agent-pool.ts (extend), tests/core/agent-pool.test.ts (extend)
+- Scope: src/core/, tests/core/
+
+### Description
+After sprint evaluation: updateAgentStats(agentId, evaluation). Track totalUses++, recalculate successRate (DONE count / total), update avgCoverage, set lastUsedInSprint. Save to agent.json. Brain reads stats during planning for tie-breaking. 10+ tests.
+
+### Tests
+- Stats updated after DONE
+- Stats updated after NO_GO
+- successRate calculation correct
+- 10+ tests
+
+---
+
+## Task 17: Agent Pattern Learning
+- Model: opus
+- Effort: high
+- Files: src/monitor/auditor.ts (extend), tests/monitor/auditor-agent.test.ts (new)
+- Scope: src/monitor/, tests/monitor/
+
+### Description
+Extend detectPatterns to record agent performance patterns. New pattern fields: agentId, skillIds[], evaluation. After sprint: record which agent+task type combinations succeeded/failed. Brain reads these in planSprint for better selection. 10+ tests.
+
+### Tests
+- Agent pattern recorded
+- Failed agent pattern recorded
+- Pattern influences future selection
+- 10+ tests
+
+---
+
+## Task 18: Temp Agent Creation
+- Model: opus
+- Effort: high
+- Files: src/core/agent-pool.ts (extend), tests/core/agent-pool.test.ts (extend)
+- Scope: src/core/, tests/core/
+
+### Description
+createTempAgent(sprintId, definition): creates agent in .tasks/agents/{sprintId}-{id}/. Temp agents exist only for one sprint. cleanup() in brain.ts removes temp agent dirs. Brain can create temp agents when AI planner suggests specialized approach for unusual task. 10+ tests.
+
+### Tests
+- Temp agent created in .tasks/agents/
+- Temp agent removed on cleanup
+- Temp agent available during sprint
+- 10+ tests
+
+---
+
+## Task 19: CLI — deckent agent list
+- Model: opus
+- Effort: high
+- Files: src/cli/commands/agent.ts (new), tests/cli/commands/agent.test.ts (new)
+- Scope: src/cli/, tests/cli/
+
+### Description
+New CLI command: deckent agent list. Shows all agents in pool with: name, type (builtin/user/learned), status (enabled/disabled), stats (uses, success rate), preferred model. Table format. --json flag. 10+ tests.
+
+### Tests
+- Lists all agents
+- Shows stats
+- --json output
+- 10+ tests
+
+---
+
+## Task 20: CLI — deckent agent create
+- Model: opus
+- Effort: high
+- Files: src/cli/commands/agent.ts (extend), tests/cli/commands/agent.test.ts (extend)
+- Scope: src/cli/, tests/cli/
+
+### Description
+deckent agent create <name>. Interactive wizard: name, description, trigger keywords, preferred model, allowed/denied tools. Creates .deckent/agents/{name}/agent.json + PROMPT.md template. Validates name uniqueness. 10+ tests.
+
+### Tests
+- Creates agent directory
+- agent.json valid
+- PROMPT.md template created
+- Duplicate name rejected
+- 10+ tests
+
+---
+
+## Task 21: CLI — deckent agent enable/disable
+- Model: opus
+- Effort: high
+- Files: src/cli/commands/agent.ts (extend), tests/cli/commands/agent.test.ts (extend)
+- Scope: src/cli/, tests/cli/
+
+### Description
+deckent agent enable <name> and deckent agent disable <name>. Sets enabled field in agent.json. Disabled agents skipped in selectAgent. 5+ tests.
+
+### Tests
+- Enable sets enabled=true
+- Disable sets enabled=false
+- Disabled agent not selected
+- 5+ tests
+
+---
+
+## Task 22: Dashboard Agent Visibility
+- Model: opus
+- Effort: high
+- Files: src/cli/helpers/output.ts, tests/cli/helpers/output.test.ts (extend)
+- Scope: src/cli/, tests/cli/
+
+### Description
+Update formatDashboard to show agent assignment per worker. Agent column: "security-auditor" or "generic". Color-coded: specialized agents green, generic gray. 5+ tests.
+
+### Tests
+- Agent column in dashboard
+- Color coding
+- 5+ tests
+
+---
+
+## Task 23: Agent Inter-Communication — Shared Context
+- Model: opus
+- Effort: high
+- Files: src/agents/shared-context.ts (new), tests/agents/shared-context.test.ts (new)
+- Scope: src/agents/, tests/agents/
+
+### Description
+SharedContext class: agents share findings via .tasks/shared-context.json. write(agentId, key, value), read(key), readAll(). Used when code-reviewer finds issues that bug-fixer should address. Thread-safe (atomic read/write with temp file). 10+ tests.
+
+### Tests
+- Write and read back
+- Multiple agents write
+- Atomic operation (no corruption)
+- readAll returns all entries
+- 10+ tests
+
+---
+
+## Task 24: Multi-Agent Task — Sequential Pipeline
+- Model: opus
+- Effort: high
+- Files: src/orchestra/multi-agent.ts (new), tests/orchestra/multi-agent.test.ts (new)
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+MultiAgentPipeline: run multiple agents on same task sequentially. Pipeline definition: [{agent: 'code-reviewer', phase: 'review'}, {agent: 'test-writer', phase: 'test'}]. Each agent's output becomes next agent's input via SharedContext. Brain decides when to use pipeline vs single agent. 15+ tests.
+
+### Tests
+- Pipeline runs agents sequentially
+- Output passed between agents
+- Pipeline aborts on NO_GO
+- 15+ tests
+
+---
+
+## Task 25: types.ts — Agent Type Extensions
+- Model: opus
+- Effort: high
+- Files: src/core/types.ts, tests/core/types.test.ts (extend)
+- Scope: src/core/, tests/core/
+
+### Description
+Add to types.ts: assignedAgent field on Task, agentId field on TaskResult, agentId field on Heartbeat. Add MultiAgentPipelineStep type. Update AgentRole union to include custom agent IDs. 5+ tests.
+
+### Tests
+- New fields compile
+- Type assertions pass
+- 5+ tests
+
+---
+
+## Task 26: sprint-reporter.ts — Agent Performance Report
+- Model: opus
+- Effort: high
+- Files: src/orchestra/sprint-reporter.ts (extend), tests/orchestra/sprint-reporter.test.ts (extend)
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+Extend writeRetrospective to include agent performance section. Per-agent: tasks assigned, done/debt/no-go counts, avg coverage. Write to RETRO.md. Compare agent performance across sprints. 10+ tests.
+
+### Tests
+- Agent section in RETRO.md
+- Per-agent metrics correct
+- Comparison data included
+- 10+ tests
+
+---
+
+## Task 27: Agent Discovery — Auto-Suggest
+- Model: opus
+- Effort: high
+- Files: src/core/agent-selector.ts (extend), tests/core/agent-selector.test.ts (extend)
+- Scope: src/core/, tests/core/
+
+### Description
+suggestNewAgent(tasks, pool): analyze task patterns that don't match any existing agent. If 3+ tasks in same domain have no agent match, suggest creating new agent. Returns suggestion with name, keywords, model. Brain can auto-create temp agent from suggestion. 10+ tests.
+
+### Tests
+- Suggestion generated for unmatched patterns
+- No suggestion when agents cover all tasks
+- Temp agent created from suggestion
+- 10+ tests
+
+---
+
+## Task 28: Integration Test — Agent Selection E2E
+- Model: opus
+- Effort: high
+- Files: tests/integration/agent-selection.test.ts (new)
+- Scope: tests/integration/
+
+### Description
+End-to-end test: 1) Load agent pool, 2) Create tasks with security/test/doc keywords, 3) Run selectAgent for each, 4) Verify correct agent selected, 5) Verify prompt injection, 6) Verify stats updated after evaluation. 15+ tests.
+
+### Tests
+- Security task → security-auditor
+- Test task → test-writer
+- Doc task → doc-writer
+- Generic task → null (generic worker)
+- 15+ tests
+
+---
+
+## Task 29: Integration Test — Multi-Agent Pipeline E2E
+- Model: opus
+- Effort: high
+- Files: tests/integration/multi-agent-pipeline.test.ts (new)
+- Scope: tests/integration/
+
+### Description
+End-to-end multi-agent pipeline test: 1) Define pipeline [code-reviewer, test-writer], 2) Run pipeline on mock task, 3) Verify shared context passed between agents, 4) Verify final result combines both agents' work. 10+ tests.
+
+### Tests
+- Pipeline executes sequentially
+- Shared context populated
+- Final result correct
+- 10+ tests
+
+---
+
+## Task 30: Agent Documentation
+- Model: opus
+- Effort: high
+- Files: docs/AGENTS.md (new), tests/docs/agents.test.ts (new)
+- Scope: docs/, tests/docs/
+
+### Description
+Comprehensive agent system documentation. Sections: 1) What are agents, 2) Built-in agents (8 descriptions), 3) Creating custom agents (deckent agent create), 4) Agent selection algorithm, 5) Multi-agent pipelines, 6) Agent stats and learning, 7) Temp agents, 8) Configuration. 5+ tests.
+
+### Tests
+- Doc exists
+- All sections present
+- English
+- 5+ tests
+
+---
+
+## Quality Rules
 - tsc --noEmit MUST pass
-- npx vitest run MUST pass — mevcut testler + Sprint 027-028 testleri 0 regresyon
-- Tum gorevler opus model, effort high
-- Her gorev bagimsiz, paralel calisabilir (max 8 worker)
-- Beta publish sadece --for-real flag'i ile gerceklesir
-- Tum lansman dokumanlari INGILIZCE
-- Performance benchmark baseline kaydi zorunlu
-- E2E testler en az 3 farkli proje tipini kapsamali
+- All new tests MUST pass
+- Existing tests 0 regression
+- All tasks opus model, effort high
+- Each task independent where possible
+- All documentation English
