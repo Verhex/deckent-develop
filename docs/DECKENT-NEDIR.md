@@ -378,6 +378,14 @@ Deckent, 6 adimli karar motoru ile gorev atamasini otomatiklestirir:
 - **Cikti modlari:** --quiet (sadece hatalar), --verbose (debug), --normal (varsayilan)
 - **Ilerleme kaliciligi:** Baglanti kopmasinda durum kaydet/yukle
 
+### Marketplace ve Entegrasyon (Sprint 33)
+
+- **Skill Marketplace:** Skill arama, yayinlama, puanlama, bagimlillik cozumleme (topolojik siralama), uzak registry istemcisi
+- **Adaptive Agent Ileri:** Sprint arasi analiz (basari/coverage trendleri), uzmanlik kaymasi tespiti (skor 0-1), otomatik emeklilik (<%30 basari), prompt evrim logu, agent soy agaci
+- **Analytics:** Kullanim grafikleri, basari kartlari, agent karsilastirma, skill isi haritasi verileri
+- **Performans:** Agent cache (LRU 100 girdi), skill cache (500KB), token sayaci (kelime/0.75 tahmini), lazy loader, toplu istatistik
+- **Guvenlik:** Skill sandbox (suphe tespiti + karantina), izin korumasi (agent kendi kendini degistirme ve yetki yukseltme engeli)
+
 ### Worker — Görev Yürütücü
 **Dosya:** `src/agents/worker.ts` (350 satır, 14 export)
 
@@ -850,6 +858,7 @@ Sprint 29 (Agent Pool): 5.300+ test (+314) — agent havuzu, 8 yerlesik agent, a
 Sprint 30 (Skill System): 5.700+ test (+435) — skill sistemi, 10 yerlesik skill, stack detection, prompt enjeksiyonu, skill selector, registry, CLI komutlari
 Sprint 31 (Brain Decision Engine): 6.272+ test (+572) — karar motoru, ogrenme dongusu, paralel pipeline, paylasimli bellek, catisma cozumleme, adaptive agent
 Sprint 32 (UX Polish): 6.811+ test (+539) — ilerleme cubugu, ETA, bildirimler (terminal/webhook/Discord/Slack), interaktif inceleme, tema, cikti modlari
+Sprint 33 (Integration + Marketplace + Analytics): 7.370+ test (+559) — entegrasyon testleri (3 proje tipi), skill marketplace, adaptive agent ileri (kayma/emeklilik/soy agaci), analytics verisi, performans onbellekleme, guvenlik (sandbox/izin korumasi)
 ```
 
 ### Konfigürasyon Modları

@@ -32,8 +32,13 @@ jobs:
       - name: Type check (lint)
         run: npm run lint
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests (staged to avoid OOM)
+        run: |
+          npx vitest run tests/core/ tests/agents/
+          npx vitest run tests/orchestra/
+          npx vitest run tests/cli/
+          npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
+        timeout-minutes: 15
 
       - name: Build
         run: npm run build

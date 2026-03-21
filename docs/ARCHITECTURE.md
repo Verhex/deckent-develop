@@ -295,6 +295,34 @@ src/
 | `src/cli/helpers/selective-retry.ts` | ~80 | Queue for retry + generate directives |
 | `src/cli/helpers/review-summary.ts` | ~80 | Review counts + report |
 
+### marketplace/ — Skill Marketplace (Sprint 33)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/marketplace/registry-client.ts` | ~120 | Remote registry search/detail/publish |
+| `src/core/marketplace/rating-system.ts` | ~100 | Local + remote ratings (0-5 stars) |
+| `src/core/marketplace/dependency-resolver.ts` | ~100 | Topological dependency resolution |
+| `src/core/marketplace/marketplace-auth.ts` | ~80 | Token storage (0600 permissions) |
+| `src/core/marketplace/skill-sandbox.ts` | ~100 | Safety validation + quarantine |
+
+### agents/ — Adaptive Agent Advanced (Sprint 33)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/agents/cross-sprint-analyzer.ts` | ~100 | Multi-sprint trends and suggestions |
+| `src/agents/specialization-drift.ts` | ~80 | Drift detection (score 0-1) |
+| `src/agents/agent-retirement.ts` | ~100 | Retire/reinstate underperformers |
+| `src/agents/prompt-evolution.ts` | ~80 | Evolution timeline log |
+| `src/agents/agent-genealogy.ts` | ~80 | Parent-child agent tracking |
+| `src/agents/permission-guard.ts` | ~80 | Escalation prevention |
+
+### Performance (Sprint 33)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/agent-cache.ts` | ~100 | LRU agent selection cache |
+| `src/core/skill-cache.ts` | ~100 | SKILL.md content cache (500KB) |
+| `src/core/token-counter.ts` | ~80 | Prompt token estimation |
+| `src/core/lazy-loader.ts` | ~80 | Deferred loading proxy |
+| `src/orchestra/batch-stats.ts` | ~80 | Batched stat updates |
+
 ---
 
 ## 3. Module Responsibilities & Boundaries

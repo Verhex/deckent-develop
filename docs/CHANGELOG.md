@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint33] — 2026-03-22 (Integration + Marketplace + Analytics)
+
+### Added
+- **Integration Tests**: Full agent+skill E2E, TypeScript/React project, Python/FastAPI project, monorepo, error recovery
+- **Skill Marketplace**: Registry client (search/detail/publish), CLI search+publish, rating system, dependency resolver, marketplace auth
+- **Adaptive Agent Advanced**: Cross-sprint analyzer, specialization drift detector, agent retirement, prompt evolution log, agent genealogy
+- **Analytics Data**: Sprint analytics, usage graphs, success charts, agent comparison, skill heatmap data
+- **Performance**: Agent selection cache (LRU 100), skill loading cache (500KB), token counter, lazy loader, batch stats
+- **Security**: Skill sandbox (quarantine suspicious skills), permission guard (block agent self-modification)
+- **Documentation**: AGENT-GUIDE.md, MARKETPLACE-GUIDE.md
+
+### Changed
+- package.json: +4 keywords (agents, skills, marketplace, analytics)
+
 ## [0.1.0-sprint32] — 2026-03-22 (UX Polish)
 
 ### Added

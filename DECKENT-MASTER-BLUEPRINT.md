@@ -1930,6 +1930,7 @@ Full directive: `docs/directives/sprint-034.md`
 | 30 | 5700 | 97.5% | Skill System: 10 built-in skills, stack detection, prompt injection, skill selector, registry, CLI commands |
 | 31 | 6400 | 97.5% | Brain Decision Engine: 6-step pipeline, learning loop, parallel pipeline, shared memory, conflict resolver, adaptive agent (prompt A/B, versioning, rollback) |
 | 32 | 6900 | 97.5% | UX: progress bar, rich summary, notifications (terminal/webhook/Discord/Slack), interactive review, agent/skill visibility, theme, output modes |
+| 33 | 7500 | 97.5% | Integration tests (3 project types), skill marketplace, adaptive agent advanced (drift/retirement/genealogy), analytics data, performance caching, security (sandbox/permission guard) |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1964,6 +1965,8 @@ Full directive: `docs/directives/sprint-034.md`
 **Brain Decision Engine milestone (Sprint 31):** Full 6-step decision pipeline operational: TaskAnalyzer infers type and complexity, DecisionOrchestrator chains agent selection -> skill selection -> model resolution -> effort -> scope computation. Learning loop records agent+skill+model evaluations and scores historical combinations for future sprint optimization. Multi-agent collaboration: parallel pipelines with topological wave execution, shared memory for inter-worker communication, conflict detection and resolution. Adaptive agent system: prompt effectiveness analysis, A/B testing (min 4 samples), versioning (max 10), auto-rollback for underperforming prompts. 51 files changed, +10,438 lines, 572 new tests.
 
 **UX milestone (Sprint 32):** End-user experience polished. Live progress bar with ETA during sprint execution. Rich sprint summary with categorized file changes, agent performance table, and smart recommendations. Notification system supports terminal bell, webhooks, Discord embeds, and Slack Block Kit. Interactive post-sprint review: approve, reject, or retry individual tasks. Agent and skill visibility across dashboard, status, retro, history, and MCP. Theme system with NO_COLOR support. Output modes: quiet, normal, verbose. 59 files changed, +9481 lines, 539 new tests.
+
+**Integration + Marketplace milestone (Sprint 33):** Comprehensive integration tests cover full sprint E2E with agents+skills across TypeScript/React, Python/FastAPI, and monorepo projects. Skill marketplace foundation: remote registry client, CLI search/publish, rating system, dependency resolution with topological sort. Adaptive agent advanced: cross-sprint analysis, specialization drift detection, auto-retirement for underperformers, prompt evolution logging, agent genealogy. Analytics data modules for dashboard. Performance: LRU agent cache, 500KB skill cache, token counter, lazy loader, batch stats. Security: skill sandbox with quarantine, permission guard blocking agent self-modification. 56 files, +12,063 lines, 559 new tests.
 
 ---
 

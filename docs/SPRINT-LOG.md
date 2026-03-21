@@ -826,3 +826,20 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 59 files changed, +9481 lines, 539 new tests, 27 new modules
 
 ---
+## Sprint 33 — sprint-033
+
+**Status:** COMPLETE
+**Date:** 2026-03-22
+**Theme:** Integration + Marketplace + Analytics
+
+**Key Deliverables:**
+- Integration tests: full E2E, TypeScript/React, Python/FastAPI, monorepo, error recovery
+- Marketplace: registry client, CLI search/publish, ratings, dependency resolver, auth
+- Adaptive: cross-sprint analyzer, drift detection, retirement, evolution log, genealogy
+- Analytics: sprint data, usage graphs, success charts, agent comparison, skill heatmap
+- Performance: agent cache (LRU), skill cache (500KB), token counter, lazy loader, batch stats
+- Security: skill sandbox + quarantine, permission guard (escalation prevention)
+- Docs: AGENT-GUIDE.md, MARKETPLACE-GUIDE.md
+- 56 files changed, +12,063 lines, 559 new tests
+
+---

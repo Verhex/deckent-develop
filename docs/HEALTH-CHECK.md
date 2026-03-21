@@ -257,4 +257,20 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 ---
 
-*Updated every sprint. Next audit: Sprint 33.*
+### Sprint 33 Features (Integration + Marketplace + Analytics)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Full Sprint E2E | WORKING | 6-task sprint with agents+skills, 3 project types |
+| Skill Marketplace | WORKING | Registry client, search/publish CLI, ratings, deps |
+| Cross-Sprint Analysis | WORKING | Success/coverage trends, best/worst task types |
+| Agent Retirement | WORKING | Auto-retire <30% success, move to .retired/ |
+| Analytics Data | WORKING | Sprint data, graphs, charts, comparison, heatmap |
+| Agent Cache | WORKING | LRU 100 entries, TTL, per-agent invalidation |
+| Token Counter | WORKING | Prompt size estimation (words/0.75) |
+| Skill Sandbox | WORKING | Suspicious pattern detection, quarantine |
+| Permission Guard | WORKING | Block agent self-modification and escalation |
+
+---
+
+*Updated every sprint. Next audit: Sprint 34.*
