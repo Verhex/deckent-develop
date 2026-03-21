@@ -1,4 +1,5 @@
 import type { DecisionEngineConfig, LearningConfig, CollaborationConfig } from './decision-config.js';
+import type { NotificationConfig } from './notifications.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 export type ModelType = 'opus' | 'sonnet' | 'haiku';
@@ -351,6 +352,8 @@ export interface DeckentConfig {
   learning?: LearningConfig;
   /** Collaboration configuration */
   collaboration?: CollaborationConfig;
+  /** Notification configuration */
+  notifications?: NotificationConfig;
 }
 
 export interface ResolvedConfig {

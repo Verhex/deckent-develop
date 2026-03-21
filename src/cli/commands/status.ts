@@ -1,15 +1,16 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import type { DashboardState } from '../../core/types.js';
-import { DASHBOARD_FILE } from '../../core/constants.js';
-import { print, printError, formatDashboard } from '../helpers/output.js';
+import type { DashboardState, Task } from '../../core/types.js';
+import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
+import { print, printError, formatDashboard, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 
 interface StatusOpts {
   watch?: boolean;
   json?: boolean;
+  verbose?: boolean;
 }
 
 function readDashboard(dashPath: string): DashboardState | null {
@@ -37,12 +38,92 @@ export function getLangFromRoot(root: string): string {
   }
 }
 
+export function loadTaskFiles(root: string): Task[] {
+  const tasksDir = join(root, TASKS_DIR);
+  if (!existsSync(tasksDir)) return [];
+  const files = readdirSync(tasksDir).filter(
+    (f) => f.startsWith('task-') && f.endsWith('.json'),
+  );
+  const tasks: Task[] = [];
+  for (const f of files) {
+    try {
+      const data = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as Task;
+      tasks.push(data);
+    } catch {
+      // Skip malformed task files
+    }
+  }
+  return tasks;
+}
+
+export function formatAgentAssignments(tasks: Task[], verbose: boolean): string {
+  const lines: string[] = [];
+  lines.push('\n--- Agent Assignments ---');
+  const agentMap = new Map<string, string[]>();
+  for (const t of tasks) {
+    const agent = t.assignedAgent ?? 'generic';
+    if (!agentMap.has(agent)) agentMap.set(agent, []);
+    agentMap.get(agent)!.push(t.id);
+  }
+  if (agentMap.size === 0) {
+    lines.push('No agent assignments found.');
+    return lines.join('\n');
+  }
+  if (verbose) {
+    const headers = ['Agent', 'Tasks', 'Count'];
+    const rows = Array.from(agentMap.entries()).map(([agent, taskIds]) => [
+      agent,
+      taskIds.join(', '),
+      String(taskIds.length),
+    ]);
+    lines.push(formatTable(headers, rows));
+  } else {
+    for (const [agent, taskIds] of agentMap) {
+      lines.push(`  ${agent}: ${taskIds.length} task(s)`);
+    }
+  }
+  return lines.join('\n');
+}
+
+export function formatSkillAssignments(tasks: Task[], verbose: boolean): string {
+  const lines: string[] = [];
+  lines.push('\n--- Skill Assignments ---');
+  const skillMap = new Map<string, string[]>();
+  for (const t of tasks) {
+    if (t.assignedSkills && t.assignedSkills.length > 0) {
+      for (const skill of t.assignedSkills) {
+        if (!skillMap.has(skill)) skillMap.set(skill, []);
+        skillMap.get(skill)!.push(t.id);
+      }
+    }
+  }
+  if (skillMap.size === 0) {
+    lines.push('No skill assignments found.');
+    return lines.join('\n');
+  }
+  if (verbose) {
+    const headers = ['Skill', 'Tasks', 'Count'];
+    const rows = Array.from(skillMap.entries()).map(([skill, taskIds]) => [
+      skill,
+      taskIds.join(', '),
+      String(taskIds.length),
+    ]);
+    lines.push(formatTable(headers, rows));
+  } else {
+    for (const [skill, taskIds] of skillMap) {
+      lines.push(`  ${skill}: ${taskIds.length} task(s)`);
+    }
+  }
+  return lines.join('\n');
+}
+
 export function registerStatus(program: Command): void {
   program
     .command('status')
     .description('Show the current sprint dashboard')
     .option('--watch', 'Auto-refresh every 2 seconds')
     .option('--json', 'Output raw JSON instead of formatted dashboard')
+    .option('--verbose', 'Show detailed agent and skill assignment info')
     .action((opts: StatusOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
@@ -80,6 +161,13 @@ export function registerStatus(program: Command): void {
           print(JSON.stringify(state, null, 2));
         } else {
           print(formatDashboard(state));
+        }
+
+        // Show agent and skill assignments
+        const tasks = loadTaskFiles(root);
+        if (tasks.length > 0) {
+          print(formatAgentAssignments(tasks, !!opts.verbose));
+          print(formatSkillAssignments(tasks, !!opts.verbose));
         }
       } catch (error) {
         printError(new Error(getMessage('status.dashboard_read_failed', lang)));

@@ -12,6 +12,8 @@ interface SprintRecord {
   noGoRate: string;
   coverage: string;
   duration: string;
+  agents: string;
+  skills: string;
 }
 
 export function formatDurationMs(raw: string): string {
@@ -23,6 +25,33 @@ export function formatDurationMs(raw: string): string {
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return `${min}m ${sec}s`;
+}
+
+export function parseAgentSkillInfo(content: string): { agents: string[]; skills: string[] } {
+  const agents: string[] = [];
+  const skills: string[] = [];
+
+  // Parse agent mentions: Agent: <name> or Agents: <list>
+  const agentMatch = content.match(/Agents?:\s*(.+)/i);
+  if (agentMatch) {
+    const raw = agentMatch[1]!.trim();
+    for (const part of raw.split(/[,;]+/)) {
+      const trimmed = part.trim().replace(/\|.*/, '').trim();
+      if (trimmed && trimmed !== '-') agents.push(trimmed);
+    }
+  }
+
+  // Parse skill mentions: Skill: <name> or Skills: <list>
+  const skillMatch = content.match(/Skills?:\s*(.+)/i);
+  if (skillMatch) {
+    const raw = skillMatch[1]!.trim();
+    for (const part of raw.split(/[,;]+/)) {
+      const trimmed = part.trim().replace(/\|.*/, '').trim();
+      if (trimmed && trimmed !== '-') skills.push(trimmed);
+    }
+  }
+
+  return { agents, skills };
 }
 
 export function parseSprintLog(content: string): SprintRecord {
@@ -51,6 +80,8 @@ export function parseSprintLog(content: string): SprintRecord {
 
   const rawDuration = durationMatch?.[1] ?? fallbackDuration?.[1] ?? '-';
 
+  const { agents, skills } = parseAgentSkillInfo(content);
+
   return {
     sprint: titleMatch?.[1] ?? 'Unknown',
     tasks: totalMatch ? String(totalTasks) : (fallbackTasks?.[1] ?? '-'),
@@ -58,14 +89,48 @@ export function parseSprintLog(content: string): SprintRecord {
     noGoRate,
     coverage: coverageMatch?.[1] ?? fallbackCoverage?.[1] ?? '-',
     duration: formatDurationMs(rawDuration),
+    agents: agents.length > 0 ? agents.join(', ') : '-',
+    skills: skills.length > 0 ? skills.join(', ') : '-',
   };
+}
+
+interface HistoryOpts {
+  agent?: string;
+  skill?: string;
+}
+
+function loadLearningData(root: string, sprintId: string): { agents: string[]; skills: string[] } {
+  try {
+    const learningDir = join(root, BRAIN_DIR, 'learning');
+    if (!existsSync(learningDir)) return { agents: [], skills: [] };
+
+    const agents: string[] = [];
+    const skills: string[] = [];
+
+    const learningFile = join(learningDir, `${sprintId}.json`);
+    if (existsSync(learningFile)) {
+      const raw = readFileSync(learningFile, 'utf-8');
+      const data = JSON.parse(raw) as {
+        agents?: string[];
+        skills?: string[];
+      };
+      if (Array.isArray(data.agents)) agents.push(...data.agents);
+      if (Array.isArray(data.skills)) skills.push(...data.skills);
+    }
+
+    return { agents, skills };
+  } catch {
+    return { agents: [], skills: [] };
+  }
 }
 
 export function registerHistory(program: Command): void {
   program
     .command('history')
     .description('Show sprint history')
-    .action(() => {
+    .option('--agent <name>', 'Filter by agent name')
+    .option('--skill <name>', 'Filter by skill name')
+    .action((opts: HistoryOpts) => {
       const root = resolveProjectRoot();
       const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
 
@@ -83,13 +148,49 @@ export function registerHistory(program: Command): void {
         return;
       }
 
-      const records: SprintRecord[] = files.map((f) => {
+      const needsEnrichment = !!(opts.agent || opts.skill);
+
+      let records: SprintRecord[] = files.map((f) => {
         const content = readFileSync(join(sprintsDir, f), 'utf-8');
-        return parseSprintLog(content);
+        const record = parseSprintLog(content);
+
+        // Enrich from learning data only when filtering by agent/skill
+        if (needsEnrichment) {
+          const sprintId = f.replace('.md', '');
+          const learning = loadLearningData(root, sprintId);
+          if (learning.agents.length > 0 && record.agents === '-') {
+            record.agents = learning.agents.join(', ');
+          }
+          if (learning.skills.length > 0 && record.skills === '-') {
+            record.skills = learning.skills.join(', ');
+          }
+        }
+
+        return record;
       });
 
-      const headers = ['Sprint', 'Tasks', 'Completed', 'No-Go Rate', 'Coverage', 'Duration'];
-      const rows = records.map((r) => [r.sprint, r.tasks, r.completed, r.noGoRate, r.coverage, r.duration]);
+      // Apply filters
+      if (opts.agent) {
+        const agentName = opts.agent.toLowerCase();
+        records = records.filter(
+          (r) => r.agents.toLowerCase().includes(agentName),
+        );
+      }
+
+      if (opts.skill) {
+        const skillName = opts.skill.toLowerCase();
+        records = records.filter(
+          (r) => r.skills.toLowerCase().includes(skillName),
+        );
+      }
+
+      if (records.length === 0) {
+        print('No matching sprint history found.');
+        return;
+      }
+
+      const headers = ['Sprint', 'Tasks', 'Completed', 'No-Go Rate', 'Coverage', 'Duration', 'Agents', 'Skills'];
+      const rows = records.map((r) => [r.sprint, r.tasks, r.completed, r.noGoRate, r.coverage, r.duration, r.agents, r.skills]);
       print(formatTable(headers, rows));
     });
 }

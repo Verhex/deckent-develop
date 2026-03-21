@@ -1,4 +1,4 @@
-import type { DashboardState, DoctorResult, Sprint } from '../../core/types.js';
+import type { DashboardState, DoctorResult, Sprint, AgentInfo } from '../../core/types.js';
 import { AgentStatus, SprintPhase } from '../../core/types.js';
 
 // ─── Basic Output ───────────────────────────────────────────────────
@@ -41,6 +41,18 @@ function padRight(str: string, len: number): string {
   return str.length >= len ? str.slice(0, len) : str + ' '.repeat(len - str.length);
 }
 
+/** Visible length excluding ANSI escape codes. */
+function visibleLength(str: string): number {
+  return str.replace(/\x1b\[[0-9;]*m/g, '').length;
+}
+
+/** Pad string accounting for ANSI escape codes. */
+function padRightAnsi(str: string, len: number): string {
+  const visible = visibleLength(str);
+  if (visible >= len) return str;
+  return str + ' '.repeat(len - visible);
+}
+
 function statusTag(status: AgentStatus): string {
   const map: Record<string, string> = {
     [AgentStatus.IDLE]: 'IDLE',
@@ -69,6 +81,13 @@ export function formatAgentLabel(assignedAgent?: string): string {
   return `\x1b[36m${assignedAgent}\x1b[0m`;
 }
 
+export function formatSkillsLabel(assignedSkills?: string[]): string {
+  if (!assignedSkills || assignedSkills.length === 0) {
+    return '\x1b[2mnone\x1b[0m';
+  }
+  return `\x1b[33m${assignedSkills.join(', ')}\x1b[0m`;
+}
+
 export function formatDashboard(state: DashboardState): string {
   const W = 72;
   const inner = W - 2;
@@ -77,7 +96,7 @@ export function formatDashboard(state: DashboardState): string {
   const mid = `\u2560${'═'.repeat(inner)}\u2563`;
   const bot = `\u255A${'═'.repeat(inner)}\u255D`;
   const row = (content: string): string =>
-    `\u2551  ${padRight(content, inner - 2)}\u2551`;
+    `\u2551  ${padRightAnsi(content, inner - 2)}\u2551`;
 
   const time = state.updatedAt
     ? new Date(state.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -89,8 +108,9 @@ export function formatDashboard(state: DashboardState): string {
     const bar = `[${formatProgressBar(a.status === AgentStatus.DONE ? 100 : a.status === AgentStatus.IDLE ? 0 : 50)}]`;
     const tag = statusTag(a.status);
     const agentTag = formatAgentLabel(a.assignedAgent);
+    const skillsTag = formatSkillsLabel((a as AgentInfo & { assignedSkills?: string[] }).assignedSkills);
     const action = a.currentAction ?? `Next: ${phaseLabel(state.sprint.phase)}`;
-    return row(`${padRight(a.id.toUpperCase(), 10)}${bar}  ${padRight(tag, 6)}${padRight(agentTag, 22)}${action}`);
+    return row(`${padRight(a.id.toUpperCase(), 10)}${bar}  ${padRight(tag, 6)}${padRightAnsi(agentTag, 14)}${padRightAnsi(skillsTag, 12)}${action}`);
   });
 
   const p = state.progress;

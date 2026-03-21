@@ -31,6 +31,7 @@ import { registerRun } from './commands/run.js';
 import { registerTestRun } from './commands/test-run.js';
 import { registerAgent } from './commands/agent.js';
 import { registerSkill } from './commands/skill.js';
+import { registerReview } from './commands/review.js';
 
 const program = new Command()
   .name('deckent')
@@ -69,6 +70,7 @@ registerRun(program);
 registerTestRun(program);
 registerAgent(program);
 registerSkill(program);
+registerReview(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   handleCliError(err);

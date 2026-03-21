@@ -1,14 +1,14 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { DASHBOARD_FILE } from '../../core/constants.js';
+import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
 import { readLatestJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 
 function buildProgressBar(done: number, total: number, width = 10): string {
-  if (total <= 0) return '░'.repeat(width);
+  if (total <= 0) return '\u2591'.repeat(width);
   const filled = Math.round((done / total) * width);
-  return '█'.repeat(filled) + '░'.repeat(width - filled);
+  return '\u2588'.repeat(filled) + '\u2591'.repeat(width - filled);
 }
 
 function computeEta(done: number, total: number, startedAt?: string): string {
@@ -19,6 +19,59 @@ function computeEta(done: number, total: number, startedAt?: string): string {
   const mins = Math.round(remaining / 60000);
   if (mins <= 0) return 'finishing soon';
   return `~${mins} minute${mins === 1 ? '' : 's'}`;
+}
+
+interface TaskData {
+  id?: string;
+  assignedAgent?: string;
+  assignedSkills?: string[];
+}
+
+function loadAgentSkillAssignments(root: string): {
+  agentAssignments: Record<string, string[]>;
+  skillAssignments: Record<string, string[]>;
+} {
+  const agentAssignments: Record<string, string[]> = {};
+  const skillAssignments: Record<string, string[]> = {};
+
+  try {
+    const tasksDir = join(root, TASKS_DIR);
+    if (!existsSync(tasksDir)) return { agentAssignments, skillAssignments };
+
+    const entries = readdirSync(tasksDir);
+    const files = (Array.isArray(entries) ? entries : []).filter(
+      (f) => typeof f === 'string' && f.startsWith('task-') && f.endsWith('.json'),
+    );
+
+    for (const f of files) {
+      try {
+        const data = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as TaskData;
+        const taskId = data.id ?? f.replace('.json', '');
+
+        if (data.assignedAgent) {
+          if (!agentAssignments[data.assignedAgent]) {
+            agentAssignments[data.assignedAgent] = [];
+          }
+          agentAssignments[data.assignedAgent]!.push(taskId);
+        }
+
+        if (data.assignedSkills && Array.isArray(data.assignedSkills)) {
+          for (const skill of data.assignedSkills) {
+            if (!skillAssignments[skill]) {
+              skillAssignments[skill] = [];
+            }
+            skillAssignments[skill]!.push(taskId);
+          }
+        }
+      } catch {
+        // Skip malformed task files
+      }
+    }
+  } catch {
+    // If reading tasks dir fails, just return empty assignments
+  }
+
+  return { agentAssignments, skillAssignments };
 }
 
 export function registerStatusTool(server: McpServer): void {
@@ -58,6 +111,8 @@ export function registerStatusTool(server: McpServer): void {
         const workerSummary = `${agents?.length ?? 0} active`;
         const alertSummary = `${alerts?.length ?? 0} alert${(alerts?.length ?? 0) === 1 ? '' : 's'}`;
 
+        const { agentAssignments, skillAssignments } = loadAgentSkillAssignments(root);
+
         const enrichedState = enrichResponse('status', {
           ...state,
           job: latestJob,
@@ -65,6 +120,8 @@ export function registerStatusTool(server: McpServer): void {
           eta,
           workerSummary,
           alertSummary,
+          agentAssignments,
+          skillAssignments,
         });
 
         return {
