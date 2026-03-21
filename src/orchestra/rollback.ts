@@ -1,0 +1,290 @@
+// ═══ Rollback — Git Safety Point Management ══════════════════════════
+// Provides automatic git safety before sprint starts.
+// createSafetyPoint: create a backup branch before sprint
+// rollback: restore to backup branch on failure
+// isCleanWorkingTree: detect uncommitted changes
+
+import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { BRAIN_DIR, DEBT_FILE } from '../core/constants.js';
+
+// ─── Types ────────────────────────────────────────────────────────
+
+export interface SafetyPoint {
+  /** Unique ID (sprintId) */
+  id: string;
+  /** Git branch name created for backup */
+  branchName: string;
+  /** SHA of HEAD at the time the safety point was created */
+  commitSha: string;
+  /** ISO timestamp */
+  createdAt: string;
+  /** Whether the working tree was clean at creation time */
+  wasClean: boolean;
+}
+
+export interface RollbackResult {
+  success: boolean;
+  message: string;
+}
+
+export type RollbackPolicy = 'auto' | 'ask' | 'never';
+
+// ─── Helpers ──────────────────────────────────────────────────────
+
+function git(args: string[], cwd: string): { stdout: string; stderr: string; status: number | null } {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf-8' });
+  return {
+    stdout: (result.stdout ?? '').trim(),
+    stderr: (result.stderr ?? '').trim(),
+    status: result.status ?? 1,
+  };
+}
+
+// ─── isCleanWorkingTree ────────────────────────────────────────────
+
+/**
+ * Returns true if there are no uncommitted changes (staged or unstaged).
+ * Untracked files are NOT considered dirty.
+ */
+export function isCleanWorkingTree(projectRoot: string): boolean {
+  const result = git(['status', '--porcelain', '--untracked-files=no'], projectRoot);
+  if (result.status !== 0) {
+    // If git command fails, assume dirty to be safe
+    return false;
+  }
+  return result.stdout.length === 0;
+}
+
+/**
+ * Returns a list of uncommitted changed files (tracked, not committed).
+ */
+export function getDirtyFiles(projectRoot: string): string[] {
+  const result = spawnSync('git', ['status', '--porcelain', '--untracked-files=no'], {
+    cwd: projectRoot,
+    encoding: 'utf-8',
+  });
+  if ((result.status ?? 1) !== 0) return [];
+  const raw = result.stdout ?? '';
+  if (!raw.trim()) return [];
+  return raw
+    .split('\n')
+    .filter(line => line.length >= 3)
+    .map(line => line.slice(3).trim())
+    .filter(Boolean);
+}
+
+// ─── getCurrentCommitSha ──────────────────────────────────────────
+
+export function getCurrentCommitSha(projectRoot: string): string {
+  const result = git(['rev-parse', 'HEAD'], projectRoot);
+  if (result.status !== 0) return '';
+  return result.stdout;
+}
+
+// ─── getCurrentBranch ─────────────────────────────────────────────
+
+export function getCurrentBranch(projectRoot: string): string {
+  const result = git(['rev-parse', '--abbrev-ref', 'HEAD'], projectRoot);
+  if (result.status !== 0) return 'HEAD';
+  return result.stdout;
+}
+
+// ─── createSafetyPoint ───────────────────────────────────────────
+
+/**
+ * Creates a git backup branch `deckent-backup-{sprintId}` at current HEAD.
+ * If the working tree is dirty, stashes changes first.
+ *
+ * @returns SafetyPoint metadata
+ */
+export function createSafetyPoint(projectRoot: string, sprintId: string): SafetyPoint {
+  const branchName = `deckent-backup-${sprintId}`;
+  const wasClean = isCleanWorkingTree(projectRoot);
+
+  // If dirty, stash to get a clean SHA reference
+  if (!wasClean) {
+    const stashResult = git(['stash', 'push', '-m', `deckent-safety-${sprintId}`], projectRoot);
+    if (stashResult.status !== 0) {
+      throw new Error(`Failed to stash changes before creating safety point: ${stashResult.stderr}`);
+    }
+  }
+
+  const commitSha = getCurrentCommitSha(projectRoot);
+  if (!commitSha) {
+    throw new Error('Failed to get current commit SHA — is this a git repository?');
+  }
+
+  // Create the backup branch pointing to current HEAD
+  const branchResult = git(['branch', branchName], projectRoot);
+  if (branchResult.status !== 0) {
+    // Branch may already exist — try to force update
+    const forceResult = git(['branch', '-f', branchName], projectRoot);
+    if (forceResult.status !== 0) {
+      throw new Error(`Failed to create safety branch "${branchName}": ${branchResult.stderr}`);
+    }
+  }
+
+  // If we stashed, pop the stash to restore working tree state
+  if (!wasClean) {
+    const popResult = git(['stash', 'pop'], projectRoot);
+    if (popResult.status !== 0) {
+      // Non-fatal: working tree was stashed but couldn't pop — log warning
+      console.warn(`[rollback] Warning: could not pop stash after safety point creation: ${popResult.stderr}`);
+    }
+  }
+
+  return {
+    id: sprintId,
+    branchName,
+    commitSha,
+    createdAt: new Date().toISOString(),
+    wasClean,
+  };
+}
+
+// ─── rollback ─────────────────────────────────────────────────────
+
+/**
+ * Rolls back to the safety point branch using `git reset --hard`.
+ * WARNING: This will discard all uncommitted changes.
+ *
+ * @param projectRoot - absolute path to the git repository root
+ * @param safetyPoint - the SafetyPoint returned by createSafetyPoint
+ */
+export function rollback(projectRoot: string, safetyPoint: SafetyPoint): RollbackResult {
+  const { branchName, commitSha } = safetyPoint;
+
+  // Verify the branch exists
+  const checkResult = git(['rev-parse', '--verify', branchName], projectRoot);
+  if (checkResult.status !== 0) {
+    return {
+      success: false,
+      message: `Safety branch "${branchName}" not found — cannot rollback`,
+    };
+  }
+
+  // Get the SHA that the safety branch points to
+  const safetyResult = git(['rev-parse', branchName], projectRoot);
+  if (safetyResult.status !== 0) {
+    return {
+      success: false,
+      message: `Failed to resolve safety branch SHA: ${safetyResult.stderr}`,
+    };
+  }
+
+  const safetySha = safetyResult.stdout;
+
+  // Hard reset to the safety point SHA
+  const resetResult = git(['reset', '--hard', safetySha], projectRoot);
+  if (resetResult.status !== 0) {
+    return {
+      success: false,
+      message: `git reset --hard failed: ${resetResult.stderr}`,
+    };
+  }
+
+  return {
+    success: true,
+    message: `Rolled back to safety point "${branchName}" (${commitSha.slice(0, 8)})`,
+  };
+}
+
+// ─── deleteSafetyPoint ────────────────────────────────────────────
+
+/**
+ * Removes the backup branch after a successful sprint (cleanup).
+ */
+export function deleteSafetyPoint(projectRoot: string, safetyPoint: SafetyPoint): boolean {
+  const result = git(['branch', '-D', safetyPoint.branchName], projectRoot);
+  return result.status === 0;
+}
+
+// ─── safetyBranchExists ───────────────────────────────────────────
+
+export function safetyBranchExists(projectRoot: string, sprintId: string): boolean {
+  const branchName = `deckent-backup-${sprintId}`;
+  const result = git(['rev-parse', '--verify', branchName], projectRoot);
+  return result.status === 0;
+}
+
+// ─── getRollbackPolicy ────────────────────────────────────────────
+
+/**
+ * Determines the rollback policy based on task evaluation outcomes.
+ * - All NO_GO  → auto-offer rollback
+ * - Some NO_GO → ask user
+ * - All DONE   → no rollback needed
+ */
+export function getRollbackPolicy(
+  evaluations: Array<'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'>
+): RollbackPolicy {
+  if (evaluations.length === 0) return 'never';
+  const noGoCount = evaluations.filter(e => e === 'NO_GO').length;
+  if (noGoCount === evaluations.length) return 'auto';
+  if (noGoCount > 0) return 'ask';
+  return 'never';
+}
+
+// ─── recordRollbackInDebt ─────────────────────────────────────────
+
+/**
+ * Records a rollback event as a debt entry in DEBT.md.
+ */
+export function recordRollbackInDebt(
+  projectRoot: string,
+  sprintId: string,
+  result: RollbackResult,
+): void {
+  const brainPath = join(projectRoot, BRAIN_DIR);
+  try {
+    if (!existsSync(brainPath)) mkdirSync(brainPath, { recursive: true });
+  } catch { /* ignore */ }
+
+  const debtPath = join(brainPath, DEBT_FILE);
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const status = result.success ? 'SUCCESS' : 'FAILED';
+  const entry = `| rollback-${sprintId} | Sprint ${sprintId} rollback ${status}: ${result.message} | ${sprintId} | ${timestamp} | NORMAL | 0 | false |\n`;
+
+  try {
+    if (!existsSync(debtPath)) {
+      const header = '| id | description | originSprintId | createdAt | priority | sprintsOpen | resolved |\n|---|---|---|---|---|---|---|\n';
+      writeFileSync(debtPath, header + entry, 'utf-8');
+    } else {
+      appendFileSync(debtPath, entry, 'utf-8');
+    }
+  } catch { /* non-fatal */ }
+}
+
+// ─── saveSafetyPoint / loadSafetyPoint ────────────────────────────
+
+const SAFETY_POINT_FILE = '.deckent/safety-point.json';
+
+/**
+ * Persist a safety point to disk so it survives process restarts.
+ */
+export function saveSafetyPoint(projectRoot: string, safetyPoint: SafetyPoint): void {
+  const deckentDir = join(projectRoot, '.deckent');
+  try {
+    if (!existsSync(deckentDir)) mkdirSync(deckentDir, { recursive: true });
+    writeFileSync(
+      join(projectRoot, SAFETY_POINT_FILE),
+      JSON.stringify(safetyPoint, null, 2),
+      'utf-8',
+    );
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * Load a previously persisted safety point from disk.
+ */
+export function loadSafetyPoint(projectRoot: string): SafetyPoint | null {
+  const path = join(projectRoot, SAFETY_POINT_FILE);
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8')) as SafetyPoint;
+  } catch {
+    return null;
+  }
+}

@@ -332,7 +332,7 @@ export async function createPlugin(name: string, pluginsDir: string): Promise<Pl
     'version: 0.1.0',
     'description: ""',
     'triggers: []',
-    'model: sonnet',
+    'model: opus',
     '---',
     '',
     `# ${name}`,

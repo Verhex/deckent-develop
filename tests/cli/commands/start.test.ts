@@ -47,6 +47,11 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
+vi.mock('../../../src/cli/commands/quick-start.js', () => ({
+  prepareZeroConfig: vi.fn(),
+  cleanupZeroConfig: vi.fn(),
+}));
+
 import { loadConfig } from '../../../src/core/config.js';
 import {
   runSprint, readContext, checkUsage, adjustSprintSize, planSprint, BrainError,
@@ -54,6 +59,7 @@ import {
 import { isSessionActive, setupWatchWindow } from '../../../src/orchestra/tmux.js';
 import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
 import { print, printError, formatSprintSummary } from '../../../src/cli/helpers/output.js';
+import { prepareZeroConfig, cleanupZeroConfig } from '../../../src/cli/commands/quick-start.js';
 import { registerStart } from '../../../src/cli/commands/start.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -117,6 +123,12 @@ describe('start command (isolated)', () => {
     vi.mocked(runSprint).mockResolvedValue(makeSprint() as any);
     vi.mocked(isSessionActive).mockReturnValue(true);
     vi.mocked(setupWatchWindow).mockImplementation(() => {});
+    vi.mocked(prepareZeroConfig).mockReturnValue({
+      createdTemp: true,
+      alreadyExisted: false,
+      directivesPath: '/mock/root/DIRECTIVES.md',
+    });
+    vi.mocked(cleanupZeroConfig).mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -379,6 +391,108 @@ describe('start command (isolated)', () => {
 
       expect(printError).toHaveBeenCalled();
       expect(process.exitCode).toBe(1);
+    });
+  });
+
+  // ─── Zero-Config Mode ─────────────────────────────────────────────
+
+  describe('zero-config mode (positional description argument)', () => {
+    it('calls prepareZeroConfig when description argument is provided', async () => {
+      await runCommand(['start', 'Add login page with Google OAuth']);
+
+      expect(prepareZeroConfig).toHaveBeenCalledWith('/mock/root', 'Add login page with Google OAuth');
+    });
+
+    it('does NOT call prepareZeroConfig when no description is provided', async () => {
+      await runCommand(['start']);
+
+      expect(prepareZeroConfig).not.toHaveBeenCalled();
+    });
+
+    it('calls cleanupZeroConfig after a successful sprint when description was provided', async () => {
+      await runCommand(['start', 'Add login page with Google OAuth']);
+
+      expect(cleanupZeroConfig).toHaveBeenCalled();
+    });
+
+    it('calls cleanupZeroConfig on sprint error when description was provided', async () => {
+      vi.mocked(runSprint).mockRejectedValue(new Error('Sprint failed'));
+
+      await runCommand(['start', 'Add login page with Google OAuth']);
+
+      expect(cleanupZeroConfig).toHaveBeenCalled();
+    });
+
+    it('does NOT call cleanupZeroConfig when alreadyExisted is true', async () => {
+      vi.mocked(prepareZeroConfig).mockReturnValue({
+        createdTemp: false,
+        alreadyExisted: true,
+        directivesPath: '/mock/root/DIRECTIVES.md',
+      });
+
+      await runCommand(['start', 'Add login page']);
+
+      expect(cleanupZeroConfig).not.toHaveBeenCalled();
+    });
+
+    it('prints warning when DIRECTIVES.md already exists', async () => {
+      vi.mocked(prepareZeroConfig).mockReturnValue({
+        createdTemp: false,
+        alreadyExisted: true,
+        directivesPath: '/mock/root/DIRECTIVES.md',
+      });
+
+      await runCommand(['start', 'Add login page']);
+
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('already exists'));
+    });
+
+    it('prints zero-config created message when DIRECTIVES was created', async () => {
+      vi.mocked(prepareZeroConfig).mockReturnValue({
+        createdTemp: true,
+        alreadyExisted: false,
+        directivesPath: '/mock/root/DIRECTIVES.md',
+      });
+
+      await runCommand(['start', 'Add login page with Google OAuth']);
+
+      expect(print).toHaveBeenCalledWith(
+        expect.stringContaining('Add login page with Google OAuth'),
+      );
+    });
+
+    it('still runs sprint when description provided and DIRECTIVES already existed', async () => {
+      vi.mocked(prepareZeroConfig).mockReturnValue({
+        createdTemp: false,
+        alreadyExisted: true,
+        directivesPath: '/mock/root/DIRECTIVES.md',
+      });
+
+      await runCommand(['start', 'Add login page']);
+
+      expect(runSprint).toHaveBeenCalled();
+    });
+
+    it('runs sprint normally when no description provided (backward-compatible)', async () => {
+      await runCommand(['start']);
+
+      expect(runSprint).toHaveBeenCalled();
+      expect(prepareZeroConfig).not.toHaveBeenCalled();
+    });
+
+    it('cleans up on pre-flight failure when description was provided', async () => {
+      vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(false) as any);
+
+      await runCommand(['start', 'Add login page']);
+
+      expect(cleanupZeroConfig).toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('cleans up on sandbox-mode when description was provided', async () => {
+      await runCommand(['start', 'Add login page', '--sandbox-mode']);
+
+      expect(cleanupZeroConfig).toHaveBeenCalled();
     });
   });
 });

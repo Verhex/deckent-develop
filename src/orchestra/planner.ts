@@ -40,10 +40,19 @@ export function buildPlanPrompt(
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
   projectName: string,
+  zeroConfigDescription?: string,
 ): string {
   const sections: string[] = [];
 
   sections.push(`Project: ${projectName}`);
+
+  if (zeroConfigDescription) {
+    sections.push(
+      `ZERO-CONFIG MODE:\nKullanıcı tek satır doğal dil ile sprint başlattı: "${zeroConfigDescription}"\n` +
+      `Bu açıklamayı 3-5 bağımsız göreve böl. Her görev kendi başına tamamlanabilmeli.\n` +
+      `Örnek: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`,
+    );
+  }
 
   if (context.directives) {
     sections.push(`DIRECTIVES:\n${context.directives}`);
@@ -153,4 +162,118 @@ export function callBrainPlanner(
 
   if (result.status !== 0 || !result.stdout) return null;
   return parsePlannerResponse(result.stdout);
+}
+
+// ─── Zero-Config AI Planner ───────────────────────────────────────
+
+const ZERO_CONFIG_MIN_TASKS = 3;
+const ZERO_CONFIG_MAX_TASKS = 5;
+
+/**
+ * Build a prompt specifically for splitting a single natural-language description
+ * into 3–5 structured tasks that the AI planner can assign to workers.
+ */
+export function buildZeroConfigPlanPrompt(
+  description: string,
+  projectName: string,
+  fileTree: string[] = [],
+): string {
+  const treeSection = fileTree.length > 0
+    ? `\nFILE TREE (first ${Math.min(fileTree.length, 50)}):\n${fileTree.slice(0, 50).join('\n')}`
+    : '';
+
+  return `Sen bir yazılım proje orkestratörüsün. Kullanıcı tek satır doğal dil ile bir özellik talep etti.
+Bu talebi ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} bağımsız, paralel çalışabilir göreve böl.
+
+PROJE: ${projectName}
+KULLANICI TALEBİ: "${description}"${treeSection}
+
+GÖREV BÖLME KURALLARI:
+- Her görev bağımsız çalışabilmeli (paralel execution mümkün olmalı)
+- Bağımlılık varsa dependencies array'inde belirt (örn. UI, backend API'ye bağlıysa)
+- Toplam ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} görev oluştur (ne az ne fazla)
+- Her görev için scope (directories + filesWrite) belirle
+- Her görev için GO/NO-GO kriterleri yaz
+- Son görev MUTLAKA entegrasyon/test görevi olsun
+
+ÖRNEK BÖLME:
+"Add login page with Google OAuth" →
+1. Auth API endpoints (backend, POST /auth/login, /auth/google-callback)
+2. Google OAuth integration (oauth2 client setup, token exchange)
+3. Login page UI (React component, form, redirect logic)
+4. Integration tests (E2E auth flow, token validation tests)
+
+MODEL SEÇİM KRİTERLERİ:
+- **opus**: Karmaşık mimari, çoklu modül, yeni pattern/abstraction
+- **sonnet**: Standart implementasyon, tek modül, mevcut pattern takip
+- **haiku**: Sadece trivial işler — rename, typo fix, placeholder oluşturma
+
+ÇIKTI FORMAT (SADECE JSON, başka bir şey yazma):
+{
+  "tasks": [
+    {
+      "title": "...",
+      "description": "...",
+      "model": "sonnet|opus|haiku",
+      "effort": "low|normal|high",
+      "priority": "CRITICAL|HIGH|NORMAL|LOW",
+      "reason": "Neden bu model/effort",
+      "scope": { "directories": [...], "filesRead": [...], "filesWrite": [...] },
+      "dependencies": [],
+      "goNogo": { "goCriteria": "...", "noGoCriteria": "...", "techDebtAcceptable": "..." }
+    }
+  ],
+  "reasoning": "Neden bu şekilde böldün"
+}`;
+}
+
+/**
+ * Call the AI planner with a zero-config (single natural-language) description.
+ * The AI splits the description into 3–5 structured tasks.
+ *
+ * Falls back to null if the AI call fails; callers should fall back to
+ * structured (single-task) mode in that case.
+ */
+export function callZeroConfigPlanner(
+  description: string,
+  model: ModelType,
+  projectName: string,
+  fileTree: string[] = [],
+): PlannerResult | null {
+  const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree);
+  const result = spawnSync('claude', ['-p', prompt, '--model', model, '--output-format', 'json'], {
+    encoding: 'utf-8',
+    timeout: BRAIN_PLAN_TIMEOUT_MS,
+  });
+
+  if (result.status !== 0 || !result.stdout) return null;
+  return parsePlannerResponse(result.stdout);
+}
+
+/**
+ * Build a minimal structured fallback plan from a zero-config description.
+ * Used when the AI planner is unavailable or returns an invalid response.
+ * Produces a single task that wraps the full description.
+ */
+export function buildZeroConfigFallbackPlan(description: string): PlannerResult {
+  return {
+    tasks: [
+      {
+        title: description.slice(0, 80),
+        description,
+        model: 'sonnet',
+        effort: 'normal',
+        priority: 'NORMAL',
+        reason: 'Zero-config fallback: single task wrapping the full description',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        dependencies: [],
+        goNogo: {
+          goCriteria: 'Feature implemented and tests pass',
+          noGoCriteria: 'Build fails or tests do not pass',
+          techDebtAcceptable: 'Minor style issues acceptable',
+        },
+      },
+    ],
+    reasoning: `Zero-config fallback plan for: ${description}`,
+  };
 }

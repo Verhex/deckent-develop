@@ -78,6 +78,18 @@ const MESSAGES: MessageMap = {
     en: 'Note: --watch requires an active tmux session. Skipping watch setup.',
     tr: 'Not: --watch aktif bir tmux oturumu gerektirir. Watch kurulumu atlandı.',
   },
+  'start.zero_config_created': {
+    en: 'Zero-config mode: created temporary DIRECTIVES.md for "{description}"',
+    tr: 'Sıfır-yapılandırma modu: "{description}" için geçici DIRECTIVES.md oluşturuldu',
+  },
+  'start.zero_config_directives_exist': {
+    en: 'Warning: DIRECTIVES.md already exists. Using existing file (ignoring description argument).',
+    tr: 'Uyarı: DIRECTIVES.md zaten mevcut. Mevcut dosya kullanılıyor (açıklama argümanı görmezden geliniyor).',
+  },
+  'start.zero_config_cleanup': {
+    en: 'Zero-config mode: cleaned up temporary DIRECTIVES.md',
+    tr: 'Sıfır-yapılandırma modu: geçici DIRECTIVES.md temizlendi',
+  },
 
   // ─── plan command ───────────────────────────────────────────────────
   'plan.sprint_planned': {

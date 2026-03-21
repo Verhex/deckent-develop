@@ -6,7 +6,17 @@ import { Command } from 'commander';
 vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
+  formatTable: vi.fn(() => 'Model | Calls | Tokens\n------'),
 }));
+
+vi.mock('../../../src/core/usage-tracker.js', () => {
+  const tracker = {
+    getTotalUsage: vi.fn(() => ({ totalCalls: 0, totalTokens: 0, sprintCount: 0, modelBreakdown: [] })),
+    listSprints: vi.fn(() => []),
+    getSprintUsage: vi.fn(() => ({ sprintId: '', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [] })),
+  };
+  return { UsageTracker: vi.fn(() => tracker) };
+});
 
 import { print } from '../../../src/cli/helpers/output.js';
 import { registerUsage } from '../../../src/cli/commands/usage.js';
@@ -56,14 +66,15 @@ describe('usage command (isolated)', () => {
     expect(print).toHaveBeenCalled();
   });
 
-  it('prints not yet available message', async () => {
+  it('prints usage-related message', async () => {
     await runCommand(['usage']);
     const printCalls = vi.mocked(print).mock.calls;
-    const hasNotAvailable = printCalls.some(c =>
-      c[0].toLowerCase().includes('not yet available') ||
-      c[0].toLowerCase().includes('usage')
+    const hasUsageMsg = printCalls.some(c =>
+      c[0].toLowerCase().includes('usage') ||
+      c[0].toLowerCase().includes('no usage') ||
+      c[0].toLowerCase().includes('sprint')
     );
-    expect(hasNotAvailable).toBe(true);
+    expect(hasUsageMsg).toBe(true);
   });
 
   it('prints metrics implementation message', async () => {

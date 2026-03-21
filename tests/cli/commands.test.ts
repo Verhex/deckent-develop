@@ -390,14 +390,15 @@ describe('usage command', () => {
   beforeEach(() => { vi.clearAllMocks(); captureOutput(); });
   afterEach(() => restoreOutput());
 
-  it('prints stub message', async () => {
+  it('prints usage output', async () => {
     await runCommand(registerUsage, ['usage']);
-    expect(stdout()).toContain('not yet available');
+    expect(stdout().length).toBeGreaterThan(0);
   });
 
-  it('mentions telemetry', async () => {
+  it('mentions usage or sprint in output', async () => {
     await runCommand(registerUsage, ['usage']);
-    expect(stdout()).toContain('telemetry');
+    const out = stdout().toLowerCase();
+    expect(out.includes('usage') || out.includes('sprint') || out.includes('no usage')).toBe(true);
   });
 });
 

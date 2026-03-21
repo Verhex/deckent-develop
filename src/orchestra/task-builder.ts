@@ -87,8 +87,8 @@ export function extractScopeFromDirective(line: string): TaskScope {
 
 // 4d. parseStructuredDirectives (pure)
 export function parseStructuredDirectives(content: string): ParsedDirectiveTask[] {
-  // Split on "## Görev N:" or "## Task N:" pattern
-  const blockSplit = content.split(/^##\s+(?:Görev|Task)\s+\d+[^:]*:/m);
+  // Split on "## Görev N:" / "## Gorev N:" / "## Task N:" pattern
+  const blockSplit = content.split(/^##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:/m);
   const blocks = blockSplit.slice(1); // skip content before first heading
 
   if (blocks.length === 0) return []; // no structured sections → fallback

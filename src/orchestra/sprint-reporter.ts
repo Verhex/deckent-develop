@@ -13,6 +13,7 @@ import {
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
+import type { UsageTracker } from '../core/usage-tracker.js';
 // Side-effect import: registers all updaters
 import './doc-updaters/index.js';
 
@@ -47,6 +48,7 @@ export function writeRetrospective(
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
   metrics: SprintMetrics,
+  usageTracker?: UsageTracker,
 ): void {
   const brainPath = join(projectRoot, BRAIN_DIR);
   mkdirSync(brainPath, { recursive: true });
@@ -76,6 +78,19 @@ export function writeRetrospective(
     retroLines.push(`- No-Go Rate: ${noGoSign}${cmp.noGoRateChange.toFixed(1)}pp`);
     const covSign = cmp.coverageDelta >= 0 ? '+' : '';
     retroLines.push(`- Coverage: ${covSign}${cmp.coverageDelta.toFixed(1)}pp`);
+  }
+
+  // Add usage summary if tracker provided
+  if (usageTracker) {
+    try {
+      const sprintUsage = usageTracker.getSprintUsage(sprint.id);
+      retroLines.push('', '## Usage');
+      retroLines.push(`- Total Calls: ${sprintUsage.totalCalls}`);
+      retroLines.push(`- Total Tokens (est): ${sprintUsage.totalTokens}`);
+      for (const mb of sprintUsage.modelBreakdown) {
+        retroLines.push(`  - ${mb.model}: ${mb.calls} calls, ${mb.tokens} tokens`);
+      }
+    } catch { /* non-fatal — usage data may not be available */ }
   }
 
   writeFileSync(

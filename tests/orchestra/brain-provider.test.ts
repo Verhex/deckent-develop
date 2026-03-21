@@ -1,0 +1,576 @@
+/**
+ * tests/orchestra/brain-provider.test.ts — Brain Provider Integration Tests
+ *
+ * Tests the ProviderAdapter and SpawnBackend integration in brain.ts:
+ * - spawnWorkers uses provided SpawnBackend
+ * - spawnWorkers falls back to tmux when no backend provided
+ * - waitForResults uses SpawnBackend in processQueue
+ * - cleanup uses SpawnBackend list/kill methods
+ * - cleanup removes .tasks/.prompt-* hidden tmpfiles
+ * - checkUsageWithProvider delegates to ProviderAdapter
+ * - getDefaultProvider returns registered provider or null
+ * - RunSprintOptions accepts spawnBackend and provider
+ * - runSprint creates SpawnBackend via factory when none provided
+ * - runSprint uses provider for usage check when available
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { TaskStatus, SprintPhase, SprintStatus, AgentStatus } from '../../src/core/types.js';
+import type { Task, Sprint, ResolvedConfig, UsageMetrics } from '../../src/core/types.js';
+import type { SpawnBackend, SpawnBackendOptions } from '../../src/core/spawn-backend.js';
+import type { ProviderAdapter, ProviderSpawnOptions } from '../../src/core/provider.js';
+import type { ModelType } from '../../src/core/types.js';
+
+// ─── Mocks ──────────────────────────────────────────────────────────
+
+vi.mock('node:fs', () => ({
+  readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  readdirSync: vi.fn(),
+  unlinkSync: vi.fn(),
+  statSync: vi.fn(),
+}));
+
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(),
+}));
+
+vi.mock('../../src/orchestra/tmux.js', () => ({
+  ensureSession: vi.fn(),
+  spawnWorker: vi.fn(),
+  killWorker: vi.fn(),
+  listWorkers: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock('../../src/monitor/auditor.js', () => ({
+  resetDashboard: vi.fn(),
+  updateDashboard: vi.fn(),
+  detectDeadlocks: vi.fn().mockReturnValue([]),
+  startScanLoop: vi.fn().mockReturnValue(setInterval(() => {}, 99999)),
+  writeScanToDashboard: vi.fn(),
+}));
+
+vi.mock('../../src/core/utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
+  return {
+    ...actual,
+    countBrainLines: vi.fn().mockReturnValue(100),
+    getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
+    updateLastSprintId: vi.fn(),
+  };
+});
+
+vi.mock('../../src/agents/worker.js', () => ({
+  updateTaskStatus: vi.fn(),
+  releaseAllLocks: vi.fn().mockReturnValue(0),
+}));
+
+vi.mock('../../src/orchestra/planner.js', () => ({
+  callBrainPlanner: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('../../src/core/spawn-backend.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/spawn-backend.js')>();
+  return {
+    ...actual,
+    SpawnBackendFactory: {
+      create: vi.fn().mockReturnValue({
+        name: 'tmux',
+        spawn: vi.fn(),
+        kill: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        isAvailable: vi.fn().mockResolvedValue(true),
+      }),
+      isTmuxAvailable: vi.fn().mockReturnValue(true),
+      createAsync: vi.fn(),
+    },
+  };
+});
+
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    providerRegistry: {
+      getDefault: vi.fn().mockImplementation(() => { throw new Error('No providers registered'); }),
+      registerProvider: vi.fn(),
+      getProvider: vi.fn(),
+      listProviders: vi.fn().mockReturnValue([]),
+      hasProvider: vi.fn().mockReturnValue(false),
+      unregisterProvider: vi.fn().mockReturnValue(false),
+      clear: vi.fn(),
+      setDefault: vi.fn(),
+      size: 0,
+    },
+  };
+});
+
+vi.mock('../../src/core/usage-tracker.js', () => ({
+  UsageTracker: vi.fn().mockImplementation(() => ({
+    recordCall: vi.fn(),
+    getSprintUsage: vi.fn().mockReturnValue({ totalCalls: 0, totalTokens: 0, modelBreakdown: {} }),
+    getTotalUsage: vi.fn().mockReturnValue({ totalCalls: 0, totalTokens: 0, modelBreakdown: {} }),
+  })),
+}));
+
+vi.mock('../../src/orchestra/result-watcher.js', () => ({
+  createResultWatcher: vi.fn().mockReturnValue({
+    waitForChange: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(),
+  }),
+}));
+
+vi.mock('../../src/agents/worker-ipc.js', () => ({
+  ChannelRegistry: vi.fn().mockImplementation(() => ({
+    register: vi.fn(),
+    remove: vi.fn(),
+    get: vi.fn().mockReturnValue(null),
+    has: vi.fn().mockReturnValue(false),
+    clear: vi.fn(),
+    size: 0,
+  })),
+}));
+
+// Sub-module mocks
+vi.mock('../../src/orchestra/model-selector.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/model-selector.js')>();
+  return { ...actual };
+});
+
+vi.mock('../../src/orchestra/debt-manager.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/debt-manager.js')>();
+  return {
+    ...actual,
+    handleEvaluation: vi.fn(),
+    handleCrossDependencies: vi.fn(),
+    escalateDebt: vi.fn(),
+    resolveDebt: vi.fn(),
+    runDecay: vi.fn(),
+  };
+});
+
+vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
+  writeRetrospective: vi.fn(),
+  writeSprintLog: vi.fn(),
+  calculateMetrics: vi.fn().mockReturnValue({
+    sprintId: 'sprint-001',
+    totalTasks: 0,
+    doneTasks: 0,
+    techDebtTasks: 0,
+    noGoTasks: 0,
+    successRate: 1,
+  }),
+  updateProjectDocs: vi.fn(),
+  compareWithPreviousSprint: vi.fn(),
+  readPreviousSprintMetrics: vi.fn(),
+  trimMemoryWithHeader: vi.fn(),
+}));
+
+vi.mock('../../src/orchestra/coverage-validator.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/coverage-validator.js')>();
+  return { ...actual };
+});
+
+// ─── Imports after mocks ──────────────────────────────────────────
+
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
+import { updateDashboard, detectDeadlocks } from '../../src/monitor/auditor.js';
+import { getNextSprintId } from '../../src/core/utils.js';
+import { providerRegistry } from '../../src/core/provider.js';
+
+import {
+  spawnWorkers,
+  waitForResults,
+  cleanup,
+  checkUsageWithProvider,
+  getDefaultProvider,
+  checkUsage,
+  SpawnBackendFactory,
+} from '../../src/orchestra/brain.js';
+
+// ─── Helpers ─────────────────────────────────────────────────────
+
+const ROOT = '/project';
+
+function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
+  return {
+    mode: 'max_plan',
+    activeModeConfig: {
+      max_workers: 4,
+      brain_model: 'opus',
+      default_model: 'sonnet',
+      haiku_allowed: false,
+      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
+    },
+    modes: {} as never,
+    language: 'en',
+    projectName: 'test',
+    projectRoot: ROOT,
+    version: '0.1.0',
+    ...overrides,
+  };
+}
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: '001-001',
+    title: 'Test task',
+    description: 'A test task',
+    model: 'sonnet',
+    effort: 'normal',
+    priority: 'NORMAL',
+    reason: 'test',
+    scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: 'minor' },
+    status: TaskStatus.PENDING,
+    sprintId: 'sprint-001',
+    createdAt: '2026-03-16T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
+  return {
+    id: 'sprint-001',
+    number: 1,
+    status: SprintStatus.ACTIVE,
+    phase: SprintPhase.EXECUTE,
+    tasks: [makeTask()],
+    workers: ['w-001-001'],
+    startedAt: '2026-03-16T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeMockBackend(): SpawnBackend & {
+  spawn: ReturnType<typeof vi.fn>;
+  kill: ReturnType<typeof vi.fn>;
+  list: ReturnType<typeof vi.fn>;
+  isAvailable: ReturnType<typeof vi.fn>;
+} {
+  return {
+    name: 'mock-backend',
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    list: vi.fn().mockReturnValue([]),
+    isAvailable: vi.fn().mockResolvedValue(true),
+  };
+}
+
+function makeMockProvider(usageOverride?: Partial<UsageMetrics>): ProviderAdapter {
+  const usage: UsageMetrics = {
+    fiveHourPercent: 25,
+    weeklyPercent: 15,
+    measuredAt: new Date().toISOString(),
+    ...usageOverride,
+  };
+  return {
+    name: 'mock-provider',
+    supportedModels: ['opus', 'sonnet', 'haiku'] as const,
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue(usage),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('claude -p -'),
+  };
+}
+
+const spawnOk = { status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(existsSync).mockReturnValue(false);
+  vi.mocked(readdirSync).mockReturnValue([] as never);
+  vi.mocked(listWorkers).mockReturnValue([]);
+  vi.mocked(detectDeadlocks).mockReturnValue([]);
+  vi.mocked(spawnSync).mockReturnValue(spawnOk);
+  vi.mocked(getNextSprintId).mockReturnValue('sprint-001');
+  vi.mocked(providerRegistry.getDefault).mockImplementation(() => {
+    throw new Error('No providers registered');
+  });
+});
+
+// ═══ Tests ═══════════════════════════════════════════════════════════
+
+describe('checkUsageWithProvider', () => {
+  it('delegates to provider.checkUsage()', async () => {
+    const provider = makeMockProvider({ fiveHourPercent: 42, weeklyPercent: 18 });
+    const result = await checkUsageWithProvider(provider);
+    expect(provider.checkUsage).toHaveBeenCalledOnce();
+    expect(result.fiveHourPercent).toBe(42);
+    expect(result.weeklyPercent).toBe(18);
+  });
+
+  it('returns provider usage metrics', async () => {
+    const provider = makeMockProvider({ fiveHourPercent: 75, weeklyPercent: 60 });
+    const result = await checkUsageWithProvider(provider);
+    expect(result).toMatchObject({ fiveHourPercent: 75, weeklyPercent: 60 });
+    expect(result.measuredAt).toBeDefined();
+  });
+
+  it('propagates provider errors', async () => {
+    const provider = makeMockProvider();
+    vi.mocked(provider.checkUsage).mockRejectedValue(new Error('Provider unavailable'));
+    await expect(checkUsageWithProvider(provider)).rejects.toThrow('Provider unavailable');
+  });
+});
+
+describe('getDefaultProvider', () => {
+  it('returns null when no provider is registered', () => {
+    vi.mocked(providerRegistry.getDefault).mockImplementation(() => {
+      throw new Error('No providers registered');
+    });
+    const result = getDefaultProvider();
+    expect(result).toBeNull();
+  });
+
+  it('returns the default registered provider', () => {
+    const mockProvider = makeMockProvider();
+    vi.mocked(providerRegistry.getDefault).mockReturnValue(mockProvider);
+    const result = getDefaultProvider();
+    expect(result).toBe(mockProvider);
+  });
+
+  it('handles any error from providerRegistry gracefully', () => {
+    vi.mocked(providerRegistry.getDefault).mockImplementation(() => {
+      throw new TypeError('Unexpected error');
+    });
+    expect(() => getDefaultProvider()).not.toThrow();
+    expect(getDefaultProvider()).toBeNull();
+  });
+});
+
+describe('spawnWorkers with SpawnBackend', () => {
+  it('uses provided spawnBackend.spawn() for each task', () => {
+    const backend = makeMockBackend();
+    const sprint = makeSprint();
+    const config = makeConfig();
+
+    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+
+    expect(backend.spawn).toHaveBeenCalledOnce();
+    expect(backend.spawn).toHaveBeenCalledWith(
+      '001-001',
+      'sonnet',
+      expect.any(String),
+      expect.objectContaining({ projectDir: ROOT }),
+    );
+  });
+
+  it('does NOT call ensureSession when spawnBackend is provided', () => {
+    const backend = makeMockBackend();
+    const sprint = makeSprint();
+    const config = makeConfig();
+
+    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+
+    expect(ensureSession).not.toHaveBeenCalled();
+  });
+
+  it('does NOT call spawnWorker (tmux) when spawnBackend is provided', () => {
+    const backend = makeMockBackend();
+    const sprint = makeSprint();
+    const config = makeConfig();
+
+    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+
+    expect(spawnWorker).not.toHaveBeenCalled();
+  });
+
+  it('uses legacy tmux path when no spawnBackend provided', () => {
+    const sprint = makeSprint();
+    const config = makeConfig();
+
+    spawnWorkers(ROOT, sprint, config);
+
+    expect(ensureSession).toHaveBeenCalledOnce();
+    expect(spawnWorker).toHaveBeenCalledOnce();
+  });
+
+  it('passes autoApprove to spawnBackend', () => {
+    const backend = makeMockBackend();
+    const sprint = makeSprint();
+    const config = makeConfig();
+
+    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend, autoApprove: true });
+
+    expect(backend.spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ autoApprove: true }),
+    );
+  });
+
+  it('passes allowedTools derived from task scope', () => {
+    const backend = makeMockBackend();
+    const task = makeTask({ scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/foo.ts'] } });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+
+    expect(backend.spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ allowedTools: expect.stringContaining('src/') }),
+    );
+  });
+
+  it('handles multiple tasks up to maxWorkers', () => {
+    const backend = makeMockBackend();
+    const tasks = [
+      makeTask({ id: '001-001' }),
+      makeTask({ id: '001-002' }),
+      makeTask({ id: '001-003' }),
+    ];
+    const sprint = makeSprint({ tasks });
+    const config = makeConfig({ activeModeConfig: { max_workers: 2, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, usage_thresholds: { '5hr': 0.8, weekly: 0.9 } } });
+
+    const queued = spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+
+    expect(backend.spawn).toHaveBeenCalledTimes(2);
+    expect(queued).toHaveLength(1);
+  });
+});
+
+describe('cleanup with SpawnBackend', () => {
+  it('uses spawnBackend.list() instead of listWorkers()', () => {
+    const backend = makeMockBackend();
+    vi.mocked(backend.list).mockReturnValue(['001-001', '001-002']);
+    const sprint = makeSprint();
+
+    cleanup(ROOT, sprint, backend);
+
+    expect(backend.list).toHaveBeenCalledOnce();
+    expect(listWorkers).not.toHaveBeenCalled();
+  });
+
+  it('calls spawnBackend.kill() for each active worker', () => {
+    const backend = makeMockBackend();
+    vi.mocked(backend.list).mockReturnValue(['001-001', '001-002']);
+    const sprint = makeSprint();
+
+    cleanup(ROOT, sprint, backend);
+
+    expect(backend.kill).toHaveBeenCalledTimes(2);
+    expect(backend.kill).toHaveBeenCalledWith('001-001');
+    expect(backend.kill).toHaveBeenCalledWith('001-002');
+  });
+
+  it('does NOT call killWorker (tmux) when spawnBackend is provided', () => {
+    const backend = makeMockBackend();
+    vi.mocked(backend.list).mockReturnValue(['001-001']);
+    const sprint = makeSprint();
+
+    cleanup(ROOT, sprint, backend);
+
+    expect(killWorker).not.toHaveBeenCalled();
+  });
+
+  it('uses legacy tmux killWorker when no backend provided', () => {
+    vi.mocked(listWorkers).mockReturnValue(['001-001']);
+    const sprint = makeSprint();
+
+    cleanup(ROOT, sprint);
+
+    expect(listWorkers).toHaveBeenCalledOnce();
+    expect(killWorker).toHaveBeenCalledWith('001-001');
+  });
+
+  it('removes .tasks/.prompt-* hidden tmpfiles', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-001-001.json',
+      '.prompt-abc123',
+      '.prompt-def456',
+      'task-001-001.hb',
+    ] as never);
+    const sprint = makeSprint();
+
+    cleanup(ROOT, sprint);
+
+    // Should unlink both .prompt-* files
+    expect(unlinkSync).toHaveBeenCalledWith(expect.stringContaining('.prompt-abc123'));
+    expect(unlinkSync).toHaveBeenCalledWith(expect.stringContaining('.prompt-def456'));
+  });
+
+  it('does not remove non-prompt hidden files', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      '.gitkeep',
+      '.dashboard',
+      '.prompt-xyz',
+    ] as never);
+    const sprint = makeSprint();
+
+    cleanup(ROOT, sprint);
+
+    // Only .prompt-xyz should be removed, not .gitkeep or .dashboard
+    const unlinkedPaths = vi.mocked(unlinkSync).mock.calls.map(c => c[0] as string);
+    const removedPrompt = unlinkedPaths.filter(p => p.includes('.prompt-'));
+    const removedOthers = unlinkedPaths.filter(p => p.includes('.gitkeep') || p.includes('.dashboard'));
+
+    expect(removedPrompt).toHaveLength(1);
+    expect(removedOthers).toHaveLength(0);
+  });
+
+  it('handles cleanup errors gracefully (does not throw)', () => {
+    const backend = makeMockBackend();
+    vi.mocked(backend.list).mockReturnValue(['001-001']);
+    vi.mocked(backend.kill).mockImplementation(() => { throw new Error('kill failed'); });
+    const sprint = makeSprint();
+
+    expect(() => cleanup(ROOT, sprint, backend)).not.toThrow();
+  });
+});
+
+describe('SpawnBackendFactory re-export', () => {
+  it('SpawnBackendFactory.create is callable and accessible from brain module', () => {
+    // SpawnBackendFactory is re-exported from brain.ts for external callers
+    expect(typeof SpawnBackendFactory.create).toBe('function');
+  });
+
+  it('spawnWorkers with spawnBackend does not call SpawnBackendFactory.create', () => {
+    const backend = makeMockBackend();
+    const sprint = makeSprint();
+    const config = makeConfig();
+
+    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+
+    // Factory should NOT be called — backend was provided directly
+    expect(SpawnBackendFactory.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('checkUsage (existing sync implementation)', () => {
+  it('returns safe defaults when spawnSync fails', () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: 'error', pid: 1, signal: null, output: [] } as never);
+    const config = makeConfig();
+    const result = checkUsage(config);
+    expect(result.fiveHourPercent).toBe(50);
+    expect(result.weeklyPercent).toBe(30);
+  });
+
+  it('parses 5hr percentage from claude output', () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: '5hr: 65.3% used\nweekly: 40.0% used',
+      stderr: '',
+      pid: 1,
+      signal: null,
+      output: [],
+    } as never);
+    const config = makeConfig();
+    const result = checkUsage(config);
+    expect(result.fiveHourPercent).toBe(65.3);
+    expect(result.weeklyPercent).toBe(40.0);
+  });
+});

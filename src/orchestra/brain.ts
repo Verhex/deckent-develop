@@ -37,6 +37,20 @@ import { resolveEffectiveWorkers } from '../core/config.js';
 // ─── Core — system profile ────────────────────────────────────────
 import { getSystemProfile } from '../core/system-profile.js';
 
+// ─── Core — usage tracker ─────────────────────────────────────────
+import { UsageTracker } from '../core/usage-tracker.js';
+export type { SprintUsage, TotalUsage, ModelBreakdown } from '../core/usage-tracker.js';
+
+// ─── Core — provider abstraction ──────────────────────────────────
+import type { ProviderAdapter } from '../core/provider.js';
+export type { ProviderAdapter } from '../core/provider.js';
+import { providerRegistry } from '../core/provider.js';
+
+// ─── Core — spawn backend abstraction ────────────────────────────
+import type { SpawnBackend } from '../core/spawn-backend.js';
+export type { SpawnBackend } from '../core/spawn-backend.js';
+export { SpawnBackendFactory } from '../core/spawn-backend.js';
+
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner } from './planner.js';
 
@@ -52,6 +66,18 @@ import { releaseAllLocks } from '../agents/worker.js';
 // ─── Result watcher (fs.watch-based, replaces pure polling) ──────
 import { createResultWatcher } from './result-watcher.js';
 
+// ─── Worker IPC ───────────────────────────────────────────────────
+import { ChannelRegistry } from '../agents/worker-ipc.js';
+import type { WorkerChannel } from '../agents/worker-ipc.js';
+
+// ─── Rollback ─────────────────────────────────────────────────────
+import {
+  createSafetyPoint, rollback, getRollbackPolicy, recordRollbackInDebt,
+  saveSafetyPoint, deleteSafetyPoint,
+} from './rollback.js';
+export type { SafetyPoint, RollbackResult, RollbackPolicy } from './rollback.js';
+export { createSafetyPoint, rollback, getRollbackPolicy, recordRollbackInDebt, isCleanWorkingTree, safetyBranchExists } from './rollback.js';
+
 // ─── Sub-modules (re-export for backward compatibility) ───────────
 export { calculateModelScore, inferModelFromDirective, resolveTaskModel, parsePatterns, deduplicatePatterns, suggestModelFromPatterns } from './model-selector.js';
 export { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams, resolveWorkerEffort } from './task-builder.js';
@@ -61,12 +87,15 @@ export type { RunDecayOptions } from './debt-manager.js';
 export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics } from './sprint-reporter.js';
 export type { SprintComparison } from './sprint-reporter.js';
 export type { SprintResult } from '../core/types.js';
+export { parseCoverageFromVitest, validateCoverage, validateWorkerCoverage, isDocOnlyTask } from './coverage-validator.js';
+export type { CoverageResult, CoverageWarningLevel, ParsedVitestOutput, VitestCoverageSummary, VitestCoverageData } from './coverage-validator.js';
 
 // ─── Internal imports from sub-modules (used by orchestrator) ─────
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
 import { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay } from './debt-manager.js';
 import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs } from './sprint-reporter.js';
+import { validateWorkerCoverage } from './coverage-validator.js';
 
 // ═══ Types ═════════════════════════════════════════════════════════
 
@@ -77,6 +106,30 @@ export class BrainError extends Error {
     this.name = 'BrainError';
     this.phase = phase;
   }
+}
+
+// ═══ IPC Channel Registry ══════════════════════════════════════════
+
+/**
+ * Module-level registry that maps taskId → WorkerChannel.
+ * Populated when workers are spawned via child_process.fork (subprocess backend).
+ * tmux-based workers do not populate this registry — they use file-based heartbeats.
+ */
+const _channelRegistry = new ChannelRegistry();
+
+/** Returns the module-level ChannelRegistry (used by Brain and tests). */
+export function getChannelRegistry(): ChannelRegistry {
+  return _channelRegistry;
+}
+
+/** Register a WorkerChannel for a given taskId. */
+export function registerWorkerChannel(taskId: string, channel: WorkerChannel): void {
+  _channelRegistry.register(taskId, channel);
+}
+
+/** Unregister and close the WorkerChannel for a given taskId. */
+export function unregisterWorkerChannel(taskId: string): void {
+  _channelRegistry.remove(taskId);
 }
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
@@ -173,7 +226,7 @@ export function readContext(projectRoot: string): BrainContext {
   return { directives, memory, retro, debt, patterns, decisions, existingTasks, projectState: { gitStatus, fileTree } };
 }
 
-// 2. checkUsage — real integration
+// 2. checkUsage — real integration (synchronous, direct claude CLI)
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
   const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
   try {
@@ -191,6 +244,20 @@ export function checkUsage(_config: ResolvedConfig): UsageMetrics {
     return { fiveHourPercent, weeklyPercent, measuredAt: now() };
   } catch {
     return SAFE_DEFAULT;
+  }
+}
+
+// 2a. checkUsageWithProvider — async, delegates to ProviderAdapter
+export async function checkUsageWithProvider(provider: ProviderAdapter): Promise<UsageMetrics> {
+  return provider.checkUsage();
+}
+
+// 2b. getDefaultProvider — returns the default registered provider, or null
+export function getDefaultProvider(): ProviderAdapter | null {
+  try {
+    return providerRegistry.getDefault();
+  } catch {
+    return null;
   }
 }
 
@@ -385,9 +452,15 @@ export function spawnWorkers(
   projectRoot: string,
   sprint: Sprint,
   config: ResolvedConfig,
-  spawnOpts?: { autoApprove?: boolean },
+  spawnOpts?: { autoApprove?: boolean; usageTracker?: UsageTracker; spawnBackend?: SpawnBackend },
 ): Task[] {
-  ensureSession();
+  // Use provided SpawnBackend, or fall back to direct tmux calls (backward compat)
+  const backend = spawnOpts?.spawnBackend;
+
+  if (!backend) {
+    // Legacy path: direct tmux session management
+    ensureSession();
+  }
 
   const systemProfile = getSystemProfile();
   const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
@@ -402,10 +475,25 @@ export function spawnWorkers(
       ? `Read,Write(${writeTargets.join(',')}),Bash`
       : 'Read,Write,Bash';
 
-    spawnWorker(task.id, model, prompt, projectRoot, {
-      allowedTools,
-      autoApprove: spawnOpts?.autoApprove ?? false,
-    });
+    if (backend) {
+      // SpawnBackend abstraction path
+      backend.spawn(task.id, model, prompt, {
+        allowedTools,
+        autoApprove: spawnOpts?.autoApprove ?? false,
+        projectDir: projectRoot,
+      });
+    } else {
+      // Legacy direct tmux path
+      spawnWorker(task.id, model, prompt, projectRoot, {
+        allowedTools,
+        autoApprove: spawnOpts?.autoApprove ?? false,
+      });
+    }
+
+    // Record spawn call in usage tracker
+    if (spawnOpts?.usageTracker) {
+      spawnOpts.usageTracker.recordCall(model, 5_000, task.id, sprint.id);
+    }
   }
 
   const agents: AgentInfo[] = activeTasks.map(task => ({
@@ -437,7 +525,7 @@ export async function waitForResults(
   sprint: Sprint,
   timeoutMs?: number,
   queue?: Task[],
-  spawnOpts?: { autoApprove?: boolean },
+  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
 ): Promise<TaskResult[]> {
   const timeout = timeoutMs ?? 30 * 60 * 1000;
   const WATCH_FALLBACK_MS = 5_000;
@@ -464,10 +552,16 @@ export async function waitForResults(
     return newlyCollected;
   };
 
+  const queueBackend = spawnOpts?.spawnBackend;
+
   const processQueue = (completedTaskIds: string[]): void => {
     for (const taskId of completedTaskIds) {
       if (remainingQueue.length === 0) break;
-      try { killWorker(taskId); } catch { /* ignore */ }
+      // Kill completed worker (clean up slot)
+      try {
+        if (queueBackend) queueBackend.kill(taskId);
+        else killWorker(taskId);
+      } catch { /* ignore */ }
       const nextTask = remainingQueue.shift()!;
       const prompt = buildWorkerPrompt(nextTask);
       const writeTargets = [...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
@@ -475,10 +569,18 @@ export async function waitForResults(
         ? `Read,Write(${writeTargets.join(',')}),Bash`
         : 'Read,Write,Bash';
       try {
-        spawnWorker(nextTask.id, nextTask.model, prompt, projectRoot, {
-          allowedTools,
-          autoApprove: spawnOpts?.autoApprove ?? false,
-        });
+        if (queueBackend) {
+          queueBackend.spawn(nextTask.id, nextTask.model, prompt, {
+            allowedTools,
+            autoApprove: spawnOpts?.autoApprove ?? false,
+            projectDir: projectRoot,
+          });
+        } else {
+          spawnWorker(nextTask.id, nextTask.model, prompt, projectRoot, {
+            allowedTools,
+            autoApprove: spawnOpts?.autoApprove ?? false,
+          });
+        }
       } catch { /* ignore spawn errors — task will timeout */ }
     }
   };
@@ -487,11 +589,45 @@ export async function waitForResults(
   processQueue(initiallyCollected);
   if (collected.size === taskIds.size) return results;
 
+  // ── IPC dual-mode: register HEARTBEAT listeners for any channels in registry ──
+  // When a worker is spawned via subprocess (fork), its channel is registered.
+  // We listen for HEARTBEAT messages here as a liveness signal; the result is
+  // still read from the .result file (file-based authority for results).
+  // For tmux-based workers there is no channel → file-based polling only.
+  const ipcWakeup = { resolve: (_: void) => {}, pending: false };
+  let ipcWakeupPromise: Promise<void> | null = null;
+
+  const setupIpcListeners = (): void => {
+    for (const taskId of taskIds) {
+      if (collected.has(taskId)) continue;
+      const channel = _channelRegistry.get(taskId);
+      if (!channel) continue;
+
+      channel.onMessage('HEARTBEAT', () => {
+        // A heartbeat means the worker is alive — trigger a result check
+        if (ipcWakeup.pending) {
+          ipcWakeup.pending = false;
+          ipcWakeup.resolve();
+        }
+      });
+    }
+  };
+
+  const makeIpcWakeupPromise = (): Promise<void> => {
+    ipcWakeup.pending = true;
+    return new Promise<void>(resolve => { ipcWakeup.resolve = resolve; });
+  };
+
+  setupIpcListeners();
+
   // Use fs.watch with fallback polling (5s instead of 15s)
+  // IPC heartbeats can also wake the loop early.
   const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS);
   try {
     while (Date.now() - startTime < timeout) {
-      await watcher.waitForChange();
+      ipcWakeupPromise = makeIpcWakeupPromise();
+      // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
+      await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
       const newlyCollected = collectResults();
       processQueue(newlyCollected);
       if (collected.size === taskIds.size) break;
@@ -514,11 +650,24 @@ export function isDocTask(task: Task): boolean {
   return dirs.every(d => !isSourceCodeDir(d));
 }
 
-export function evaluateResult(result: TaskResult, task: Task): TaskEvaluation {
+export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string): TaskEvaluation {
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
   if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
   if (isDocTask(task)) return TaskEvaluation.DONE;
+
+  // Coverage validation: if vitest JSON output provided, validate reported vs actual
+  if (vitestJsonOutput !== undefined) {
+    const coverageCheck = validateWorkerCoverage({
+      reportedCoverage: result.coverage,
+      vitestJsonOutput,
+      taskScope: { directories: task.scope?.directories ?? [] },
+    });
+    if (coverageCheck && coverageCheck.level === 'WARNING') {
+      return TaskEvaluation.GO_WITH_TECH_DEBT;
+    }
+  }
+
   if (result.coverage < 90) return TaskEvaluation.GO_WITH_TECH_DEBT;
   return TaskEvaluation.DONE;
 }
@@ -534,10 +683,14 @@ export function isStaleTaskFile(filePath: string, maxAgeMs: number = 86_400_000)
   }
 }
 
-export function cleanup(projectRoot: string, sprint: Sprint): void {
-  const workers = listWorkers();
+export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: SpawnBackend): void {
+  // Kill all active workers via backend or direct tmux calls
+  const workers = spawnBackend ? spawnBackend.list() : listWorkers();
   for (const taskId of workers) {
-    try { killWorker(taskId); } catch { /* already dead */ }
+    try {
+      if (spawnBackend) spawnBackend.kill(taskId);
+      else killWorker(taskId);
+    } catch { /* already dead */ }
   }
 
   for (const task of sprint.tasks) {
@@ -564,6 +717,15 @@ export function cleanup(projectRoot: string, sprint: Sprint): void {
     }
   }
 
+  // Clean up leftover .tasks/.prompt-* hidden tmpfiles from buildClaudeCommand
+  if (existsSync(tasksDir)) {
+    for (const file of readdirSync(tasksDir)) {
+      if (file.startsWith('.prompt-')) {
+        try { unlinkSync(join(tasksDir, file)); } catch { /* skip */ }
+      }
+    }
+  }
+
   const locksDir = join(projectRoot, LOCKS_DIR);
   if (existsSync(locksDir)) {
     for (const file of readdirSync(locksDir).filter(f => f.endsWith('.lock'))) {
@@ -579,6 +741,17 @@ export interface RunSprintOptions {
   testMode?: boolean;
   skipCleanup?: boolean;
   timeoutMs?: number;
+  /** Optional SpawnBackend override — defaults to SpawnBackendFactory.create() */
+  spawnBackend?: SpawnBackend;
+  /** Optional ProviderAdapter override — used for usage checking */
+  provider?: ProviderAdapter;
+  /**
+   * Enable git rollback safety mechanism.
+   * When true (default): creates a safety branch before PLAN phase and
+   * offers rollback when all tasks result in NO_GO.
+   * When false: disables rollback entirely.
+   */
+  rollback?: boolean;
 }
 
 // 17. runSprint — Master Orchestrator
@@ -593,14 +766,38 @@ export async function runSprint(
   let metrics: SprintMetrics | undefined;
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let taskQueue: Task[] = [];
+  const usageTracker = new UsageTracker(projectRoot);
+
+  // Use provided SpawnBackend, or undefined (legacy tmux path preserved for backward compat)
+  // To use factory-created backend, pass: opts.spawnBackend = SpawnBackendFactory.create({...})
+  const spawnBackend: SpawnBackend | undefined = opts?.spawnBackend;
+
+  // Resolve provider for usage checks (use provided override or registry default)
+  const activeProvider: ProviderAdapter | null = opts?.provider ?? getDefaultProvider();
+
+  // Rollback enabled by default (unless explicitly disabled via opts.rollback === false)
+  const rollbackEnabled = opts?.rollback !== false;
+  let safetyPoint: import('./rollback.js').SafetyPoint | null = null;
 
   // Phase 1: PLAN
   try {
     const context = readContext(projectRoot);
-    const usage = checkUsage(config);
+    // Use provider-based async usage check when a provider is available
+    const usage = activeProvider
+      ? await checkUsageWithProvider(activeProvider)
+      : checkUsage(config);
     const recommendation = adjustSprintSize(config, usage);
     sprint = planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
+
+    // Create git safety point after planning (we now have sprint.id) but before workers spawn.
+    // This records the pre-execution state so we can roll back if all tasks fail.
+    if (rollbackEnabled) {
+      try {
+        safetyPoint = createSafetyPoint(projectRoot, sprint.id);
+        saveSafetyPoint(projectRoot, safetyPoint);
+      } catch { /* safety point creation failure is non-fatal — continue without rollback */ }
+    }
   } catch (err) {
     throw new BrainError(
       `Plan phase failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -618,7 +815,7 @@ export async function runSprint(
   while (spawnAttempts < 2) {
     try {
       sprint.phase = SprintPhase.SPAWN;
-      taskQueue = spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove });
+      taskQueue = spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
       sprint.status = SprintStatus.ACTIVE;
       try {
         scanInterval = startScanLoop(projectRoot, sprint.id, undefined, (scanResult) => {
@@ -644,7 +841,7 @@ export async function runSprint(
   // Phase 3: EXECUTE
   try {
     sprint.phase = SprintPhase.EXECUTE;
-    results = await waitForResults(projectRoot, sprint, undefined, taskQueue, { autoApprove: opts?.autoApprove });
+    results = await waitForResults(projectRoot, sprint, undefined, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend });
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -661,6 +858,8 @@ export async function runSprint(
         const evaluation = evaluateResult(result, task);
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
+        // Record evaluation call in usage tracker
+        usageTracker.recordCall(task.model, 2_000, task.id, sprint.id);
         if (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT) {
           if (task.isPriorityFix && task.fixForTaskId) {
             resolveDebt(projectRoot, `debt-${task.fixForTaskId}`, sprint.id);
@@ -681,10 +880,34 @@ export async function runSprint(
         };
         handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
         evaluations.set(task.id, TaskEvaluation.NO_GO);
+        // Record evaluation call for timeout tasks too
+        usageTracker.recordCall(task.model, 1_000, task.id, sprint.id);
       }
     }
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Rollback check: if rollback is enabled and all tasks are NO_GO, trigger rollback
+  if (rollbackEnabled && safetyPoint && evaluations.size > 0) {
+    try {
+      const evalValues = [...evaluations.values()].map(e => e as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO');
+      const policy = getRollbackPolicy(evalValues);
+      if (policy === 'auto') {
+        // All tasks NO_GO — automatically rollback
+        const rollbackResult = rollback(projectRoot, safetyPoint);
+        recordRollbackInDebt(projectRoot, sprint.id, rollbackResult);
+        sprint.rolledBack = true;
+        sprint.rollbackResult = rollbackResult.message;
+      }
+      // 'ask' policy (partial failure): record in debt but don't auto-rollback
+      // The CLI layer can check sprint.rolledBack and offer the option interactively
+    } catch { /* rollback failure is non-fatal */ }
+  }
+
+  // After successful sprint (no rollback or partial success): clean up safety branch
+  if (rollbackEnabled && safetyPoint && !sprint.rolledBack) {
+    try { deleteSafetyPoint(projectRoot, safetyPoint); } catch { /* non-fatal */ }
   }
 
   // Phase 5: FIX
@@ -704,8 +927,8 @@ export async function runSprint(
 
     if (fixTasks.length > 0) {
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
-      spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove });
-      const fixResults = await waitForResults(projectRoot, fixSprint, 10 * 60 * 1000);
+      spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
+      const fixResults = await waitForResults(projectRoot, fixSprint, 10 * 60 * 1000, undefined, { spawnBackend });
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
@@ -730,7 +953,7 @@ export async function runSprint(
       const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
       metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
       sprint.metrics = metrics;
-      writeRetrospective(projectRoot, sprint, evaluations, metrics);
+      writeRetrospective(projectRoot, sprint, evaluations, metrics, usageTracker);
       writeSprintLog(projectRoot, sprint, metrics, evaluations);
       try { updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, config); } catch { /* non-critical */ }
     } catch (err) {
@@ -758,7 +981,7 @@ export async function runSprint(
   if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
   if (!opts?.skipCleanup) {
     try {
-      cleanup(projectRoot, sprint);
+      cleanup(projectRoot, sprint, spawnBackend);
     } catch (err) {
       safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -767,6 +990,16 @@ export async function runSprint(
   sprint.status = SprintStatus.COMPLETE;
   sprint.phase = SprintPhase.COMPLETE;
   sprint.completedAt = now();
+
+  // Sprint usage report
+  try {
+    const sprintUsage = usageTracker.getSprintUsage(sprint.id);
+    sprint.usageReport = {
+      totalCalls: sprintUsage.totalCalls,
+      totalTokens: sprintUsage.totalTokens,
+      modelBreakdown: sprintUsage.modelBreakdown,
+    };
+  } catch { /* non-fatal */ }
 
   if (!opts?.testMode) {
     updateLastSprintId(projectRoot, sprint.id);
@@ -839,6 +1072,16 @@ export function pauseSprint(
       } catch { /* skip */ }
 
       pausedTaskIds.push(task.id);
+
+      // Send PAUSE via IPC if a channel is registered for this task (subprocess backend)
+      // For tmux backend (no IPC channel), kill the worker to stop execution.
+      const channel = _channelRegistry.get(task.id);
+      if (channel) {
+        try { channel.pause(); } catch { /* non-fatal — file-based paused marker written above */ }
+      } else {
+        // No IPC channel → tmux backend worker — kill the session to stop execution
+        try { killWorker(task.id); } catch { /* non-fatal */ }
+      }
     }
   }
 
@@ -918,6 +1161,13 @@ export function resumeSprint(
       }
 
       resumedTaskIds.push(task.id);
+
+      // Send RESUME via IPC if a channel is registered for this task (subprocess backend).
+      // Tmux workers were killed on pause and must be re-spawned by the caller.
+      const channel = _channelRegistry.get(task.id);
+      if (channel) {
+        try { channel.resume(); } catch { /* non-fatal */ }
+      }
     }
   }
 
@@ -969,6 +1219,39 @@ export function checkAndAutoPause(
       ? `5hr usage limit exceeded (${usage.fiveHourPercent.toFixed(1)}%)`
       : `Weekly usage limit exceeded (${usage.weeklyPercent.toFixed(1)}%)`;
     pauseSprint(projectRoot, sprint, reason);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * checkAndAutoResume -- checks usage thresholds and auto-resumes the sprint
+ * if usage has dropped below the resume threshold (80% of the pause threshold).
+ * This hysteresis prevents rapid pause/resume oscillation.
+ * Returns true if the sprint was resumed, false otherwise.
+ */
+export function checkAndAutoResume(
+  projectRoot: string,
+  sprint: Sprint,
+  config: ResolvedConfig,
+): boolean {
+  // Only auto-resume a PAUSED sprint
+  if (sprint.status !== SprintStatus.PAUSED) {
+    return false;
+  }
+
+  const usage = checkUsage(config);
+  const thresholds = config.activeModeConfig.usage_thresholds;
+
+  // Resume threshold: usage must drop to 80% of the pause threshold (hysteresis)
+  const resumeThreshold5hr = thresholds['5hr'] * 0.8;
+  const resumeThresholdWeekly = thresholds.weekly * 0.8;
+
+  const fiveHrSafe = usage.fiveHourPercent / 100 < resumeThreshold5hr;
+  const weeklySafe = usage.weeklyPercent / 100 < resumeThresholdWeekly;
+
+  if (fiveHrSafe && weeklySafe) {
+    resumeSprint(projectRoot, sprint);
     return true;
   }
   return false;
