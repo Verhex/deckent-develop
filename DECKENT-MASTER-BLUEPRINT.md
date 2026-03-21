@@ -1927,7 +1927,7 @@ Full directive: `docs/directives/sprint-034.md`
 | 27 | 3609 | 97.5% | Technical gap closure: provider abstraction, subprocess backend, usage tracker, coverage validator, rollback, worker IPC, sandbox, global config, zero-config, credentials. 13 new modules, +14,737 lines |
 | 28 | 4100 | 97.5% | npm publish prep: error registry, TUI wizard, onboard/upgrade real, English docs, publish pipeline, .npmignore, telemetry, SECURITY.md |
 | 29 | 5300 | 97.5% | Agent Pool Core: 8 built-in agents, selector algorithm, Brain integration, multi-agent pipeline, shared context, CLI commands |
-| 30 | 3609 | 97.5% | Subprocess backend REAL test — tmux-free sprint verified, 4 workers via child_process.spawn |
+| 30 | 5700 | 97.5% | Skill System: 10 built-in skills, stack detection, prompt injection, skill selector, registry, CLI commands |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1956,6 +1956,8 @@ Full directive: `docs/directives/sprint-034.md`
 **Agent Pool milestone (Sprint 29):** Dynamic agent pool system operational. 8 built-in agents (security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer) with custom PROMPT.md files. Brain auto-selects best agent per task via keyword+scope scoring. Agent prompt injected into worker context. Multi-agent pipeline enables sequential agent execution with shared context. CLI commands for agent management. 47 files changed, +7030 lines, 314 new tests.
 
 **Subprocess backend milestone (Sprint 30):** First tmux-free sprint completed successfully. brain.ts reads config.spawn_backend and creates backend via SpawnBackendFactory.create(). With spawn_backend: "subprocess", workers spawn as direct child_process without tmux. Verified: `tmux ls` returns "no server running", 4 claude processes running with no TTY (? in ps output). tmux is now fully optional.
+
+**Skill System milestone (Sprint 30):** Dynamic skill system operational. 10 built-in skills covering TypeScript, React, Python, APIs, databases, testing, documentation, security, performance, and DevOps. Stack detection auto-identifies project technology and caches results. Skills selected per task via multi-factor scoring (stack match, keyword match, agent expertise). SKILL.md content injected into worker prompts (1500 char/skill, 4000 total cap). Skill registry foundation for future marketplace. 55 files changed, +8038 lines, 435 new tests.
 
 ---
 

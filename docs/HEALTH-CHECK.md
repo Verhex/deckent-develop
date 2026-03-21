@@ -207,4 +207,21 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 ---
 
+### Sprint 30 Features (Skill System)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Skill Type System | WORKING | SkillDefinition, ProjectStack, SkillCategory types |
+| Skill Pool Manager | WORKING | Load from .deckent/skills/, validate, stats |
+| Stack Detector | WORKING | Auto-detect TS/React/Python/Rust/Go/Docker, cached |
+| Skill Selector | WORKING | Multi-factor scoring, max 3 skills, composition check |
+| Skill Registry | WORKING | Local index, search, popular ranking |
+| Built-in Skills | WORKING | 10 skills with SKILL.md prompts |
+| Skill CLI | WORKING | deckent skill list/create/install |
+| Brain Skill Integration | WORKING | planSprint async, stack detect + skill select |
+| Prompt Injection | WORKING | SKILL.md in worker prompt (1500/skill, 4000 total) |
+| Skill Config | WORKING | enabled, maxPerTask, autoDetectStack, preferredSkills |
+
+---
+
 *Updated every sprint. Next audit: Sprint 31.*

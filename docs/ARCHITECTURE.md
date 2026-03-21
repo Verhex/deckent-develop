@@ -212,6 +212,16 @@ src/
 | `src/orchestra/multi-agent.ts` | ~100 | MultiAgentPipeline — sequential agent execution |
 | `src/cli/commands/agent.ts` | ~120 | CLI: agent list/create/enable/disable |
 
+### skills/ — Skill System (Sprint 30)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/skill-types.ts` | ~120 | SkillDefinition, ProjectStack, SkillSelectionResult types |
+| `src/core/skill-pool.ts` | ~200 | SkillPoolManager — load, save, validate, stats |
+| `src/core/stack-detector.ts` | ~150 | detectProjectStack with cache + staleness check |
+| `src/core/skill-selector.ts` | ~150 | selectSkills algorithm, resolveComposition |
+| `src/core/skill-registry.ts` | ~100 | SkillRegistry — local index, search, popular |
+| `src/cli/commands/skill.ts` | ~130 | CLI: skill list/create/install |
+
 ---
 
 ## 3. Module Responsibilities & Boundaries

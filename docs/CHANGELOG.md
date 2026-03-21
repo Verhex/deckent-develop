@@ -38,6 +38,26 @@ _Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
 - **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
 - **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
 - **Tasks**: 6 total, 6 done, 4 tech debt, 0 no-go
+## [0.1.0-sprint30] — 2026-03-22 (Skill System)
+
+### Added
+- **Skill Type System**: SkillDefinition, ProjectStack, SkillSelectionResult, SkillCategory types
+- **Skill Pool Manager**: Load, save, validate, stats tracking from .deckent/skills/
+- **Stack Detector**: Auto-detect project technology (TypeScript/React/Python/Rust/Go/Docker) with cache
+- **Skill Selector**: Multi-factor scoring (stack+keyword+agent), composition resolver, max 3 skills
+- **Skill Registry**: Local skill index foundation for future marketplace
+- **10 Built-in Skills**: typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer
+- **CLI Commands**: `deckent skill list`, `deckent skill create`, `deckent skill install`
+- **Skill Documentation**: docs/SKILLS.md
+
+### Changed
+- brain.ts planSprint (now async): auto-detects project stack, selects skills per task
+- task-builder.ts buildWorkerPrompt: injects SKILL.md content (1500 char/skill, 4000 total cap)
+- model-selector.ts: Layer 4d skill model preference (highest among skills wins)
+- sprint-reporter.ts: skill performance table in RETRO.md
+- config.ts: skills config (enabled, maxPerTask, autoDetectStack, preferredSkills)
+- types.ts: assignedSkills on Task, skillIds on TaskResult, SkillConfig on DeckentConfig
+
 ## [0.1.0-sprint29] — 2026-03-22 (Agent Pool Core)
 
 ### Added

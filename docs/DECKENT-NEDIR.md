@@ -332,6 +332,15 @@ Deckent, gorevlere otomatik olarak uzmanlasmis agent atayabilir:
 - **CLI:** `deckent agent list`, `deckent agent create`, `deckent agent enable/disable`
 - **Dashboard:** Agent kolonu (cyan=uzman, dim=genel)
 
+### Skill Sistemi (Sprint 30)
+
+Deckent, proje teknolojisine gore dinamik skill secimi yapar:
+
+- **10 yerlesik skill:** typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer
+- **Stack detection:** Proje teknolojisini otomatik tespit (TypeScript, React, Python, Rust, Go, Docker) ve sonuclari cache'ler
+- **Brain entegrasyonu:** Her gorev icin uygun skill secimi ve SKILL.md prompt enjeksiyonu (1500 karakter/skill, 4000 toplam limit)
+- **CLI:** `deckent skill list`, `deckent skill create`, `deckent skill install`
+
 ### Worker — Görev Yürütücü
 **Dosya:** `src/agents/worker.ts` (350 satır, 14 export)
 
@@ -801,6 +810,7 @@ Sprint 25-26: 3.442 test (+292)
 Sprint 27-30: 3.609 test (+167) — provider abstraction, subprocess backend, usage tracker, rollback, worker IPC, zero-config
 Sprint 28 (npm publish): 4.100+ test (+491) — error registry, TUI wizard, onboard/upgrade real, telemetry, publish pipeline
 Sprint 29 (Agent Pool): 5.300+ test (+314) — agent havuzu, 8 yerlesik agent, agent selector, multi-agent pipeline, shared context
+Sprint 30 (Skill System): 5.700+ test (+435) — skill sistemi, 10 yerlesik skill, stack detection, prompt enjeksiyonu, skill selector, registry, CLI komutlari
 ```
 
 ### Konfigürasyon Modları

@@ -769,9 +769,17 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 030-006: Sprint 27 Feature Summary (GO_WITH_TECH_DEBT)
 
 **Key Deliverables:**
-- Rollback mechanism debt fixed: verification reports for rollback + Worker IPC
-- Tmux-free sprint completed successfully: 4 workers via subprocess backend
-- Sprint 27 feature summary and provider abstraction analysis finalized
+- Skill type system: SkillDefinition, ProjectStack, SkillSelectionResult
+- Skill pool manager: load/save/validate/stats from .deckent/skills/
+- Stack detector: TypeScript/React/Python/Rust/Go/Docker with cache
+- Skill selector: multi-factor scoring, composition resolver
+- Skill registry: local index foundation
+- 10 built-in skills with SKILL.md prompts
+- CLI: deckent skill list/create/install
+- Brain: stack detection + skill selection in planSprint (async)
+- Prompt injection: SKILL.md content in worker prompts
+- Model selector Layer 4d: skill model preference
+- 55 files changed, +8038 lines, 435 new tests
 
 ---
 ## Sprint 31 — sprint-031
