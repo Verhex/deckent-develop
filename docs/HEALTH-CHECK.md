@@ -224,4 +224,22 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 ---
 
-*Updated every sprint. Next audit: Sprint 31.*
+### Sprint 31 Features (Brain Decision Engine)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Decision Engine | WORKING | 6-step pipeline, DecisionOrchestrator |
+| Task Analyzer | WORKING | Type inference, complexity scoring |
+| Decision Logging | WORKING | Persist to .tasks/decisions/, replay support |
+| Learning Loop | WORKING | Record/query/score agent+skill+model combinations |
+| Learning Decay | WORKING | Prune old data, compact to summary |
+| Parallel Pipeline | WORKING | Topological sort into execution waves |
+| Shared Memory | WORKING | Inter-worker key-value with TTL |
+| Conflict Resolver | WORKING | Detect overlaps, 3 resolution strategies |
+| Handoff Protocol | WORKING | Artifact handoffs between tasks |
+| Adaptive Agent | WORKING | Prompt analysis, A/B test, versioning, rollback |
+| Brain Context | WORKING | Stack/agent/skill/history enrichment |
+
+---
+
+*Updated every sprint. Next audit: Sprint 32.*

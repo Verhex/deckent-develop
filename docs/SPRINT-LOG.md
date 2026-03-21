@@ -784,26 +784,30 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 ---
 ## Sprint 31 — sprint-031
 
-**Status:** RETROSPECTIVE
-**Date:** 2026-03-21
-**Duration:** 126s
+**Status:** COMPLETE
+**Date:** 2026-03-22
+**Duration:** Brain Decision Engine + Learning Loop + Multi-Agent Collaboration + Adaptive Agent
 
 ### Results
 
 | Metric | Value |
 |--------|-------|
-| Total Tasks | 3 |
-| Completed | 3 |
-| Tech Debt | 2 |
-| No-Go | 0 |
-| Coverage | 33.3% |
-| Duration | 126331ms |
+| Files Changed | 51 |
+| Lines Added | +10,438 |
+| New Tests | 572 |
+| New Source Modules | 24 |
 
-### Tasks
-
-- 031-001: Fix debt: Tech debt from 027-003: Verification report written to tmp-test/rollback-verify. (DONE)
-- 031-002: Opus Model Verification (GO_WITH_TECH_DEBT)
-- 031-003: Config Verification (GO_WITH_TECH_DEBT)
+**Key Deliverables:**
+- Decision engine: 6-step pipeline (TaskAnalyzer -> Agent -> Skill -> Model -> Effort -> Scope)
+- Decision logger + replay: persist and re-run decisions for debugging
+- Learning loop: pattern recorder/reader, combination scorer, decay, migration
+- Multi-agent: parallel pipeline (topological waves), shared memory (TTL), conflict resolver
+- Result merger: deduplicate files, weighted coverage, overlap detection
+- Handoff protocol: artifact handoffs between dependent tasks
+- Adaptive agent: prompt effectiveness analysis, A/B testing, versioning, rollback, metrics
+- Brain context: stack/agent/skill/history enrichment
+- Config: DecisionEngineConfig, LearningConfig, CollaborationConfig
+- 51 files changed, +10,438 lines, 572 new tests
 
 ---
 ## Sprint 32 — sprint-032

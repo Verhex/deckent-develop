@@ -222,6 +222,45 @@ src/
 | `src/core/skill-registry.ts` | ~100 | SkillRegistry — local index, search, popular |
 | `src/cli/commands/skill.ts` | ~130 | CLI: skill list/create/install |
 
+### orchestra/ — Decision Engine (Sprint 31)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/decision-types.ts` | ~80 | TaskAnalysis, DecisionResult, DecisionLogEntry, DecisionContext |
+| `src/core/decision-config.ts` | ~100 | DecisionEngineConfig, LearningConfig, CollaborationConfig |
+| `src/orchestra/task-analyzer.ts` | ~120 | TaskAnalyzer — type inference, complexity, keywords |
+| `src/orchestra/decision-engine.ts` | ~150 | DecisionOrchestrator — 6-step pipeline |
+| `src/orchestra/decision-steps/` | ~100 | Agent step (type-boosted), Scope step (merge + security) |
+| `src/orchestra/decision-logger.ts` | ~80 | Persist/read decision logs |
+| `src/orchestra/decision-replay.ts` | ~80 | Replay decisions, diff comparison |
+
+### orchestra/ — Learning Loop (Sprint 31)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/orchestra/pattern-recorder.ts` | ~80 | Record LearningEntry per sprint |
+| `src/orchestra/pattern-reader.ts` | ~100 | Query patterns, success/fail combinations |
+| `src/orchestra/combination-scorer.ts` | ~80 | Score historical combos |
+| `src/orchestra/learning-decay.ts` | ~70 | Prune old data, compact summary |
+| `src/orchestra/learning-migration.ts` | ~80 | PATTERNS.md -> learning format |
+
+### orchestra/ — Collaboration (Sprint 31)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/orchestra/parallel-pipeline.ts` | ~100 | Topological sort into waves |
+| `src/orchestra/shared-memory.ts` | ~100 | Key-value with TTL |
+| `src/orchestra/conflict-resolver.ts` | ~100 | Detect/resolve file conflicts |
+| `src/orchestra/result-merger.ts` | ~80 | Merge worker results |
+| `src/orchestra/handoff-protocol.ts` | ~80 | Artifact handoffs |
+| `src/orchestra/brain-context.ts` | ~150 | Stack/agent/skill/history enrichment |
+
+### agents/ — Adaptive Agent (Sprint 31)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/agents/adaptive-agent.ts` | ~100 | Prompt effectiveness analysis |
+| `src/agents/prompt-ab-test.ts` | ~120 | A/B testing framework |
+| `src/agents/prompt-version.ts` | ~120 | Prompt versioning (max 10) |
+| `src/agents/prompt-rollback.ts` | ~80 | Auto-rollback bad prompts |
+| `src/agents/prompt-metrics.ts` | ~80 | Performance dashboard |
+
 ---
 
 ## 3. Module Responsibilities & Boundaries

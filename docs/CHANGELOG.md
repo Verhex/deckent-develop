@@ -19,14 +19,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
 
-## [0.1.0-sprint31] - 2026-03-21
+## [0.1.0-sprint31] — 2026-03-22 (Brain Decision Engine)
 
 ### Added
+- **Decision Engine**: 6-step pipeline (analyze -> agent -> skill -> model -> effort -> scope)
+- **Task Analyzer**: Infers task type (code/test/doc/security/refactor/devops/config), complexity scoring
+- **Decision Logger**: Persist decisions to .tasks/decisions/ for debugging and replay
+- **Decision Replay**: Re-run decisions with same inputs, diff comparison
+- **Learning Loop**: PatternRecorder/PatternReader — record agent+skill+model evaluations per sprint
+- **Combination Scorer**: Score historical combos (success*2 - fail*3 - recency penalty)
+- **Learning Decay**: Remove old learning data, compact to summary
+- **Learning Migration**: Convert PATTERNS.md to learning format, export/import
+- **Parallel Pipeline**: Topological sort into dependency-aware execution waves
+- **Shared Memory**: Key-value inter-worker communication with TTL
+- **Conflict Resolver**: Detect same-file-write/scope-overlap, resolution strategies
+- **Result Merger**: Combine worker results (deduplicate, weighted coverage)
+- **Handoff Protocol**: Artifact handoffs between dependent tasks
+- **Adaptive Agent**: Prompt effectiveness analysis, improvement suggestions
+- **Prompt A/B Testing**: Compare prompt variants (min 4 samples, 50/50 split)
+- **Prompt Versioning**: Max 10 versions with activate/prune
+- **Prompt Rollback**: Auto-rollback bad prompts (<50% success after 3 uses)
+- **Prompt Metrics**: Performance dashboard (trend, best/worst version)
+- **Brain Context**: Stack/agent/skill/history enrichment for planning
+- **Decision Config**: DecisionEngineConfig, LearningConfig, CollaborationConfig
 
-- **Fix debt: Tech debt from 027-003: Verification report written to tmp-test/rollback-verify.**: DONE
-- **Opus Model Verification**: GO_WITH_TECH_DEBT
-- **Config Verification**: GO_WITH_TECH_DEBT
-- **Tasks**: 3 total, 3 done, 2 tech debt, 0 no-go
+### Changed
+- types.ts: decision_engine, learning, collaboration config fields on DeckentConfig
 ## [0.1.0-sprint30] - 2026-03-21
 
 ### Added

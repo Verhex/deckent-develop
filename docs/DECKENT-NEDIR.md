@@ -1,6 +1,6 @@
 # DECKENT TAM DURUM ANALİZİ
 
-> Son güncelleme: 2026-03-21 | Kaynak: Codebase tam tarama | 638 .ts dosya, ~85.990 satır kod, 4.100+ test
+> Son güncelleme: 2026-03-22 | Kaynak: Codebase tam tarama | 689 .ts dosya, ~96.428 satır kod, 6.272+ test
 
 ---
 
@@ -25,7 +25,7 @@ Deckent, **Claude Code CLI üzerine kurulu bir AI ajan orkestrasyon sistemidir**
 **Teknoloji:**
 - Dil: TypeScript (ESM)
 - Runtime: Node.js >=18
-- Test: Vitest (4.100+ test, 214 test dosyası)
+- Test: Vitest (6.272+ test, 265 test dosyası)
 - Build: tsc
 - Bagimsizlik: Claude CLI, git (tmux opsiyonel — subprocess backend ile calismadan kaldirilabilir)
 
@@ -340,6 +340,33 @@ Deckent, proje teknolojisine gore dinamik skill secimi yapar:
 - **Stack detection:** Proje teknolojisini otomatik tespit (TypeScript, React, Python, Rust, Go, Docker) ve sonuclari cache'ler
 - **Brain entegrasyonu:** Her gorev icin uygun skill secimi ve SKILL.md prompt enjeksiyonu (1500 karakter/skill, 4000 toplam limit)
 - **CLI:** `deckent skill list`, `deckent skill create`, `deckent skill install`
+
+### Karar Motoru (Sprint 31)
+
+Deckent, 6 adimli karar motoru ile gorev atamasini otomatiklestirir:
+
+- **Decision Engine:** 6 adimli pipeline (analiz -> agent -> skill -> model -> effort -> scope)
+- **Task Analyzer:** Gorev tipi cikarimi (code/test/doc/security/refactor/devops/config), karmasiklik puanlamasi
+- **Decision Logger:** Kararlari .tasks/decisions/ dizinine kaydet, replay ile yeniden calistir
+- **Ogrenme dongusu:** Sprint sonrasi agent+skill+model kombinasyonlarini kaydet, basarili kombinasyonlari puanla (success*2 - fail*3 - recency penalty)
+- **Learning Decay:** Eski ogrenme verilerini temizle, ozete sıkıstır
+- **Learning Migration:** PATTERNS.md'yi ogrenme formatina donustur
+
+### Multi-Agent Isbirligi (Sprint 31)
+
+- **Paralel pipeline:** Topological sort ile bagimlilik-duyarli yurutme dalgalari
+- **Paylasimli bellek:** Worker'lar arasi key-value iletisim, TTL destekli
+- **Catisma cozumleme:** Ayni dosyaya yazma/scope cakismasi tespiti, 3 cozum stratejisi
+- **Result merger:** Worker sonuclarini birlestir (dosya tekillestime, agirlikli coverage)
+- **Handoff protokolu:** Bagimli gorevler arasi artifact aktarimi
+
+### Adaptive Agent (Sprint 31)
+
+- **Prompt etkinlik analizi:** Prompt basari oranini olc, iyilestirme onerileri sun
+- **A/B testi:** Prompt varyantlarini karsilastir (minimum 4 ornek, 50/50 dagilim)
+- **Surumleme:** Maksimum 10 surum, aktif surum secimi, budama
+- **Geri alma:** Basarisiz prompt'lari otomatik geri al (<%50 basari, 3 kullanim sonrasi)
+- **Metrikler:** Performans panosu (trend, en iyi/en kotu surum)
 
 ### Worker — Görev Yürütücü
 **Dosya:** `src/agents/worker.ts` (350 satır, 14 export)
@@ -761,10 +788,10 @@ Son iki sprint'te çeşitli item'lar `GO_WITH_TECH_DEBT` olarak kapatıldı:
 
 | Metrik | Değer |
 |--------|-------|
-| Toplam .ts dosya | 638 |
-| Toplam kaynak kodu | ~79.571 satır |
-| Test sayisi | 4.100+ (tumu geciyor) |
-| Test dosyasi | 214 |
+| Toplam .ts dosya | 689 |
+| Toplam kaynak kodu | ~96.428 satır |
+| Test sayisi | 6.272+ (tumu geciyor) |
+| Test dosyasi | 265 |
 | Test süresi | ~38s |
 
 ### Kritik Modül Boyutları
@@ -811,6 +838,7 @@ Sprint 27-30: 3.609 test (+167) — provider abstraction, subprocess backend, us
 Sprint 28 (npm publish): 4.100+ test (+491) — error registry, TUI wizard, onboard/upgrade real, telemetry, publish pipeline
 Sprint 29 (Agent Pool): 5.300+ test (+314) — agent havuzu, 8 yerlesik agent, agent selector, multi-agent pipeline, shared context
 Sprint 30 (Skill System): 5.700+ test (+435) — skill sistemi, 10 yerlesik skill, stack detection, prompt enjeksiyonu, skill selector, registry, CLI komutlari
+Sprint 31 (Brain Decision Engine): 6.272+ test (+572) — karar motoru, ogrenme dongusu, paralel pipeline, paylasimli bellek, catisma cozumleme, adaptive agent
 ```
 
 ### Konfigürasyon Modları
@@ -824,4 +852,4 @@ Sprint 30 (Skill System): 5.700+ test (+435) — skill sistemi, 10 yerlesik skil
 
 ---
 
-*Bu dokuman, deckent code base'inin tam taramasiyla olusturulmustur. Kaynak: 700+ TypeScript dosyasi, ~85.990 satir kod, 4.100+ test.*
+*Bu dokuman, deckent code base'inin tam taramasiyla olusturulmustur. Kaynak: 700+ TypeScript dosyasi, ~96.428 satir kod, 6.272+ test.*
