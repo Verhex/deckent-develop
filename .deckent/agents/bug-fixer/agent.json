@@ -1,0 +1,17 @@
+{
+  "id": "bug-fixer",
+  "name": "Bug Fixer",
+  "description": "Root cause analysis and minimal fix specialist. Regression testing, bisect methodology, no band-aid patches.",
+  "expertise": ["debugging", "root-cause-analysis", "regression-testing", "error-handling"],
+  "allowedTools": ["Read", "Grep", "Bash", "Write"],
+  "deniedTools": [],
+  "preferredModel": "opus",
+  "effortMultiplier": 1.5,
+  "triggerKeywords": ["fix", "bug", "error", "crash", "regression", "broken", "issue", "defect", "patch", "hotfix"],
+  "triggerScopes": ["src/", "tests/"],
+  "triggerFilePatterns": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

@@ -181,13 +181,18 @@ export function resolveWorkerEffort(task: Task): 'max' | 'high' | 'medium' | 'lo
 }
 
 // 5b. buildWorkerPrompt (pure)
-export function buildWorkerPrompt(task: Task): string {
+export function buildWorkerPrompt(task: Task, agentPrompt?: string): string {
   const scopeStr = task.scope.directories.length > 0
     ? task.scope.directories.join(', ')
     : 'any';
   const effort = resolveWorkerEffort(task);
 
-  return `You are a Deckent worker agent. Your task:
+  // Agent context block: prepended when a specialized agent is assigned
+  const agentBlock = agentPrompt
+    ? `=== Agent: ${task.assignedAgent ?? 'generic'} ===\n${agentPrompt.slice(0, 2000)}\n\n=== Task ===\n`
+    : '';
+
+  return `${agentBlock}You are a Deckent worker agent. Your task:
 
 Task ${task.id}: ${task.title}
 Description: ${task.description}

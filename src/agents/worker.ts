@@ -245,6 +245,7 @@ export function createHeartbeat(
   file?: string,
   sequence?: number,
   filesChangedCount?: number,
+  agentId?: string,
 ): Heartbeat {
   const count = filesChangedCount ?? 0;
   return {
@@ -257,6 +258,7 @@ export function createHeartbeat(
     filesChangedCount: count,
     sequence: sequence ?? 0,
     progress: calculateProgress({ status, filesChangedCount: count }),
+    agentId,
   };
 }
 

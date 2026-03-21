@@ -62,8 +62,15 @@ function phaseLabel(phase: SprintPhase): string {
   return phase.toLowerCase();
 }
 
+export function formatAgentLabel(assignedAgent?: string): string {
+  if (!assignedAgent || assignedAgent === 'generic') {
+    return '\x1b[2mgeneric\x1b[0m';
+  }
+  return `\x1b[36m${assignedAgent}\x1b[0m`;
+}
+
 export function formatDashboard(state: DashboardState): string {
-  const W = 56;
+  const W = 72;
   const inner = W - 2;
 
   const top = `\u2554${'═'.repeat(inner)}\u2557`;
@@ -81,8 +88,9 @@ export function formatDashboard(state: DashboardState): string {
   const agentLines = state.agents.map((a) => {
     const bar = `[${formatProgressBar(a.status === AgentStatus.DONE ? 100 : a.status === AgentStatus.IDLE ? 0 : 50)}]`;
     const tag = statusTag(a.status);
+    const agentTag = formatAgentLabel(a.assignedAgent);
     const action = a.currentAction ?? `Next: ${phaseLabel(state.sprint.phase)}`;
-    return row(`${padRight(a.id.toUpperCase(), 10)}${bar}  ${padRight(tag, 9)}${action}`);
+    return row(`${padRight(a.id.toUpperCase(), 10)}${bar}  ${padRight(tag, 6)}${padRight(agentTag, 22)}${action}`);
   });
 
   const p = state.progress;

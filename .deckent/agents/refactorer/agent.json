@@ -1,0 +1,17 @@
+{
+  "id": "refactorer",
+  "name": "Refactorer",
+  "description": "Code refactoring specialist. Extract, rename, split, merge, and reorganize code while preserving behavior.",
+  "expertise": ["refactoring", "design-patterns", "modularization", "code-organization"],
+  "allowedTools": ["Read", "Grep", "Bash", "Write"],
+  "deniedTools": [],
+  "preferredModel": "sonnet",
+  "effortMultiplier": 1.0,
+  "triggerKeywords": ["refactor", "rename", "extract", "split", "merge", "reorganize", "modularize", "decouple", "simplify"],
+  "triggerScopes": ["src/"],
+  "triggerFilePatterns": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

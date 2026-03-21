@@ -1,0 +1,17 @@
+{
+  "id": "security-auditor",
+  "name": "Security Auditor",
+  "description": "Security-focused code analysis. OWASP compliance, vulnerability detection, threat modeling.",
+  "expertise": ["security", "authentication", "encryption", "vulnerability-assessment"],
+  "allowedTools": ["Read", "Grep", "Bash", "Write"],
+  "deniedTools": [],
+  "preferredModel": "opus",
+  "effortMultiplier": 1.2,
+  "triggerKeywords": ["security", "auth", "jwt", "csrf", "xss", "injection", "encryption", "vulnerability", "oauth", "password", "token", "session"],
+  "triggerScopes": ["src/auth/", "src/middleware/", "src/security/"],
+  "triggerFilePatterns": ["*.guard.ts", "*.auth.ts", "*.security.ts"],
+  "persistent": true,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "test-writer",
+  "name": "Test Writer",
+  "description": "Testing expert for unit, integration, and e2e tests. Vitest patterns, coverage targets, mock strategies.",
+  "expertise": ["unit-testing", "integration-testing", "e2e-testing", "mocking", "coverage"],
+  "allowedTools": ["Read", "Grep", "Bash", "Write"],
+  "deniedTools": [],
+  "preferredModel": "sonnet",
+  "effortMultiplier": 1.0,
+  "triggerKeywords": ["test", "coverage", "spec", "vitest", "jest", "unit", "integration", "e2e", "mock", "assert", "fixture"],
+  "triggerScopes": ["tests/"],
+  "triggerFilePatterns": ["*.test.ts", "*.spec.ts", "*.test.tsx"],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

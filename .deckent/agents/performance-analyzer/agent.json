@@ -1,0 +1,17 @@
+{
+  "id": "performance-analyzer",
+  "name": "Performance Analyzer",
+  "description": "Performance profiling and optimization specialist. Big-O analysis, memory leaks, caching strategies, benchmarking.",
+  "expertise": ["performance", "profiling", "optimization", "memory-management", "caching"],
+  "allowedTools": ["Read", "Grep", "Bash", "Write"],
+  "deniedTools": [],
+  "preferredModel": "opus",
+  "effortMultiplier": 1.3,
+  "triggerKeywords": ["performance", "optimize", "speed", "memory", "profiling", "benchmark", "latency", "cache", "bottleneck", "slow"],
+  "triggerScopes": ["src/"],
+  "triggerFilePatterns": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

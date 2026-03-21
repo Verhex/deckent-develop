@@ -59,6 +59,8 @@ export interface Task {
   forceModel?: ModelType;
   /** User-specified effort override from DIRECTIVES.md */
   forceEffort?: TaskEffort;
+  /** Assigned agent ID (from agent pool) or 'generic' */
+  assignedAgent?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -74,6 +76,8 @@ export interface TaskResult {
   coverage: number;
   selfAssessment: SelfAssessment;
   notes: string;
+  /** Agent ID that produced this result */
+  agentId?: string;
   completedAt?: string;
   durationMs?: number;
 }
@@ -117,6 +121,8 @@ export interface Heartbeat {
   filesChangedCount: number;
   sequence: number;
   progress: number;
+  /** Agent ID for this heartbeat */
+  agentId?: string;
 }
 
 export interface AgentInfo {
@@ -129,6 +135,8 @@ export interface AgentInfo {
   currentAction?: string;
   spawnedAt?: string;
   lastHeartbeat?: string;
+  /** Assigned agent persona (from agent pool) or 'generic' */
+  assignedAgent?: string;
 }
 
 // ─── Alerts & Monitoring ────────────────────────────────────────────

@@ -502,3 +502,86 @@ describe('createTask — forceModel/forceEffort passthrough', () => {
     expect(task.forceModel).toBeUndefined();
   });
 });
+
+// ─── buildWorkerPrompt — agentPrompt injection ──────────────────────────────
+
+describe('buildWorkerPrompt — agentPrompt parameter', () => {
+  it('includes agent block when agentPrompt is provided', () => {
+    const task = makeTask({ assignedAgent: 'security-auditor' });
+    const prompt = buildWorkerPrompt(task, 'You are a security specialist.');
+    expect(prompt).toContain('=== Agent: security-auditor ===');
+    expect(prompt).toContain('You are a security specialist.');
+    expect(prompt).toContain('=== Task ===');
+  });
+
+  it('does not include agent block when agentPrompt is undefined', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).not.toContain('=== Agent:');
+    expect(prompt).not.toContain('=== Task ===');
+  });
+
+  it('does not include agent block when agentPrompt is empty string', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task, '');
+    expect(prompt).not.toContain('=== Agent:');
+  });
+
+  it('truncates agentPrompt to 2000 chars', () => {
+    const longPrompt = 'X'.repeat(3000);
+    const task = makeTask({ assignedAgent: 'test-agent' });
+    const prompt = buildWorkerPrompt(task, longPrompt);
+    // The agentPrompt portion (between header line and "=== Task ===" line)
+    // should contain at most 2000 X's
+    const agentSection = prompt.split('=== Task ===')[0]!;
+    const xCount = (agentSection.match(/X/g) || []).length;
+    expect(xCount).toBeLessThanOrEqual(2000);
+  });
+
+  it('uses "generic" for assignedAgent when not set', () => {
+    const task = makeTask({ assignedAgent: undefined });
+    const prompt = buildWorkerPrompt(task, 'some prompt');
+    expect(prompt).toContain('=== Agent: generic ===');
+  });
+
+  it('includes both agent block and standard prompt content', () => {
+    const task = makeTask({ id: '029-005', title: 'Special Task', assignedAgent: 'my-agent' });
+    const prompt = buildWorkerPrompt(task, 'Agent instructions here');
+    // Agent block present
+    expect(prompt).toContain('Agent instructions here');
+    // Standard prompt content also present
+    expect(prompt).toContain('029-005');
+    expect(prompt).toContain('Special Task');
+    expect(prompt).toContain('You are a Deckent worker agent');
+  });
+
+  it('agent block comes before task content', () => {
+    const task = makeTask({ assignedAgent: 'first-agent' });
+    const prompt = buildWorkerPrompt(task, 'First content');
+    const agentIdx = prompt.indexOf('=== Agent:');
+    const workerIdx = prompt.indexOf('You are a Deckent worker agent');
+    expect(agentIdx).toBeLessThan(workerIdx);
+  });
+
+  it('standard prompt unchanged when agentPrompt is not provided', () => {
+    const task = makeTask({ id: '029-010' });
+    const withoutAgent = buildWorkerPrompt(task);
+    const withEmptyAgent = buildWorkerPrompt(task, '');
+    // Both should produce same output (no agent block)
+    expect(withoutAgent).toBe(withEmptyAgent);
+  });
+
+  it('handles agentPrompt with special characters', () => {
+    const task = makeTask({ assignedAgent: 'regex-agent' });
+    const prompt = buildWorkerPrompt(task, 'Use pattern: /[a-z]+/g and $1 replacement');
+    expect(prompt).toContain('Use pattern: /[a-z]+/g and $1 replacement');
+  });
+
+  it('handles agentPrompt with newlines', () => {
+    const task = makeTask({ assignedAgent: 'multiline-agent' });
+    const agentPrompt = 'Line 1\nLine 2\nLine 3';
+    const prompt = buildWorkerPrompt(task, agentPrompt);
+    expect(prompt).toContain('Line 1');
+    expect(prompt).toContain('Line 3');
+  });
+});

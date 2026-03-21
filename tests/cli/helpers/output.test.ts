@@ -7,6 +7,7 @@ import {
   formatDashboard,
   formatDoctorResult,
   formatSprintSummary,
+  formatAgentLabel,
 } from '../../../src/cli/helpers/output.js';
 import { AgentStatus, SprintPhase, SprintStatus } from '../../../src/core/types.js';
 import type { DashboardState, DoctorResult, Sprint, AgentRole } from '../../../src/core/types.js';
@@ -409,5 +410,119 @@ describe('formatSprintSummary', () => {
     });
     const result = formatSprintSummary(sprint);
     expect(result).toContain('66s');
+  });
+});
+
+// ─── formatAgentLabel ───────────────────────────────────────────────
+
+describe('formatAgentLabel', () => {
+  it('returns dim "generic" for undefined agent', () => {
+    const label = formatAgentLabel(undefined);
+    expect(label).toContain('generic');
+    expect(label).toContain('\x1b[2m'); // dim ANSI code
+  });
+
+  it('returns dim "generic" for explicit generic value', () => {
+    const label = formatAgentLabel('generic');
+    expect(label).toContain('generic');
+    expect(label).toContain('\x1b[2m');
+  });
+
+  it('returns cyan-highlighted label for specialized agent', () => {
+    const label = formatAgentLabel('security-auditor');
+    expect(label).toContain('security-auditor');
+    expect(label).toContain('\x1b[36m'); // cyan ANSI code
+  });
+
+  it('returns cyan-highlighted label for test-writer agent', () => {
+    const label = formatAgentLabel('test-writer');
+    expect(label).toContain('test-writer');
+    expect(label).toContain('\x1b[36m');
+  });
+
+  it('includes ANSI reset code', () => {
+    const label = formatAgentLabel('any-agent');
+    expect(label).toContain('\x1b[0m');
+  });
+});
+
+// ─── formatDashboard agent column ───────────────────────────────────
+
+describe('formatDashboard agent column', () => {
+  it('shows agent label for worker with assignedAgent', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w1',
+        role: 'worker' as AgentRole,
+        status: AgentStatus.CODING,
+        model: 'sonnet',
+        tmuxWindow: 'w1',
+        assignedAgent: 'security-auditor',
+        currentAction: 'scanning',
+      }],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('security-auditor');
+  });
+
+  it('shows generic label for worker without assignedAgent', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w2',
+        role: 'worker' as AgentRole,
+        status: AgentStatus.CODING,
+        model: 'sonnet',
+        tmuxWindow: 'w2',
+        currentAction: 'writing code',
+      }],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('generic');
+  });
+
+  it('shows generic label for worker with explicit generic agent', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w3',
+        role: 'worker' as AgentRole,
+        status: AgentStatus.IDLE,
+        model: 'haiku',
+        tmuxWindow: 'w3',
+        assignedAgent: 'generic',
+      }],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('generic');
+  });
+
+  it('uses cyan ANSI for specialized agent', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w4',
+        role: 'worker' as AgentRole,
+        status: AgentStatus.TESTING,
+        model: 'opus',
+        tmuxWindow: 'w4',
+        assignedAgent: 'test-writer',
+        currentAction: 'running tests',
+      }],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('\x1b[36m'); // cyan
+  });
+
+  it('uses dim ANSI for generic agent', () => {
+    const state = makeDashboard({
+      agents: [{
+        id: 'w5',
+        role: 'worker' as AgentRole,
+        status: AgentStatus.IDLE,
+        model: 'sonnet',
+        tmuxWindow: 'w5',
+        assignedAgent: 'generic',
+      }],
+    });
+    const result = formatDashboard(state);
+    expect(result).toContain('\x1b[2m'); // dim
   });
 });

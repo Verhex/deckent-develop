@@ -1,0 +1,17 @@
+{
+  "id": "doc-writer",
+  "name": "Doc Writer",
+  "description": "Documentation specialist. README structure, changelogs, JSDoc/TSDoc, guides, and API documentation.",
+  "expertise": ["documentation", "technical-writing", "jsdoc", "readme", "changelog"],
+  "allowedTools": ["Read", "Write"],
+  "deniedTools": ["Bash"],
+  "preferredModel": "sonnet",
+  "effortMultiplier": 0.8,
+  "triggerKeywords": ["docs", "readme", "changelog", "guide", "tutorial", "jsdoc", "tsdoc", "documentation", "api-docs"],
+  "triggerScopes": ["docs/"],
+  "triggerFilePatterns": ["*.md", "*.mdx", "CHANGELOG*", "README*"],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

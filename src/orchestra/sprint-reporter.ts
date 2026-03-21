@@ -42,6 +42,80 @@ export function trimMemoryWithHeader(lines: string[], maxLines: number): string 
 
 // ═══ Exported Functions ════════════════════════════════════════════
 
+// ═══ Agent Performance ════════════════════════════════════════════
+
+export interface AgentPerformanceRow {
+  agent: string;
+  tasks: number;
+  done: number;
+  debt: number;
+  noGo: number;
+  avgCoverage: number;
+}
+
+/**
+ * Build agent performance data from sprint tasks, evaluations, and results.
+ * agentMap: Map<taskId, agentId> — if not provided, uses task.assignedAgent.
+ */
+export function buildAgentPerformance(
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  results: TaskResult[],
+  agentMap?: Map<string, string>,
+): AgentPerformanceRow[] {
+  const agentData = new Map<string, { tasks: number; done: number; debt: number; noGo: number; coverageSum: number; coverageCount: number }>();
+
+  for (const task of sprint.tasks) {
+    const agentId = agentMap?.get(task.id) ?? task.assignedAgent ?? 'generic';
+    if (!agentData.has(agentId)) {
+      agentData.set(agentId, { tasks: 0, done: 0, debt: 0, noGo: 0, coverageSum: 0, coverageCount: 0 });
+    }
+    const data = agentData.get(agentId)!;
+    data.tasks += 1;
+
+    const ev = evaluations.get(task.id);
+    if (ev === TaskEvaluation.DONE) data.done += 1;
+    else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) data.debt += 1;
+    else if (ev === TaskEvaluation.NO_GO) data.noGo += 1;
+
+    const result = results.find(r => r.taskId === task.id);
+    if (result && typeof result.coverage === 'number') {
+      data.coverageSum += result.coverage;
+      data.coverageCount += 1;
+    }
+  }
+
+  const rows: AgentPerformanceRow[] = [];
+  for (const [agent, data] of agentData) {
+    rows.push({
+      agent,
+      tasks: data.tasks,
+      done: data.done,
+      debt: data.debt,
+      noGo: data.noGo,
+      avgCoverage: data.coverageCount > 0 ? Math.round(data.coverageSum / data.coverageCount) : 0,
+    });
+  }
+  return rows.sort((a, b) => b.tasks - a.tasks);
+}
+
+/**
+ * Format agent performance as a markdown table.
+ */
+export function formatAgentPerformanceTable(rows: AgentPerformanceRow[]): string[] {
+  if (rows.length === 0) return [];
+  const lines: string[] = [
+    '',
+    '## Agent Performance',
+    '| Agent | Tasks | Done | Debt | NoGo | Avg Coverage |',
+    '|-------|-------|------|------|------|-------------|',
+  ];
+  for (const row of rows) {
+    lines.push(`| ${row.agent} | ${row.tasks} | ${row.done} | ${row.debt} | ${row.noGo} | ${row.avgCoverage}% |`);
+  }
+  return lines;
+}
+
 // 12. writeRetrospective
 export function writeRetrospective(
   projectRoot: string,
@@ -49,6 +123,7 @@ export function writeRetrospective(
   evaluations: Map<string, TaskEvaluation>,
   metrics: SprintMetrics,
   usageTracker?: UsageTracker,
+  agentMap?: Map<string, string>,
 ): void {
   const brainPath = join(projectRoot, BRAIN_DIR);
   mkdirSync(brainPath, { recursive: true });
@@ -92,6 +167,16 @@ export function writeRetrospective(
       }
     } catch { /* non-fatal — usage data may not be available */ }
   }
+
+  // Add agent performance section
+  try {
+    // Use calculateMetrics results array — we need TaskResult[] but don't have it here.
+    // Build from evaluations + sprint tasks instead.
+    const perfRows = buildAgentPerformance(sprint, evaluations, [], agentMap);
+    if (perfRows.length > 0) {
+      retroLines.push(...formatAgentPerformanceTable(perfRows));
+    }
+  } catch { /* non-fatal */ }
 
   writeFileSync(
     join(brainPath, RETRO_FILE),

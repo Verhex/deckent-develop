@@ -1,0 +1,17 @@
+{
+  "id": "code-reviewer",
+  "name": "Code Reviewer",
+  "description": "Systematic code review agent. Quality analysis, correctness checks, security review, and improvement suggestions.",
+  "expertise": ["code-review", "quality-analysis", "best-practices", "design-patterns"],
+  "allowedTools": ["Read", "Grep"],
+  "deniedTools": ["Write"],
+  "preferredModel": "opus",
+  "effortMultiplier": 1.0,
+  "triggerKeywords": ["review", "refactor", "quality", "lint", "cleanup", "code-review", "pr-review"],
+  "triggerScopes": ["src/"],
+  "triggerFilePatterns": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

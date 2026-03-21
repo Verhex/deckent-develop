@@ -71,6 +71,10 @@ import { createResultWatcher } from './result-watcher.js';
 import { ChannelRegistry } from '../agents/worker-ipc.js';
 import type { WorkerChannel } from '../agents/worker-ipc.js';
 
+// ─── Agent Pool & Selection ──────────────────────────────────────
+import { AgentPoolManager } from '../core/agent-pool.js';
+import { selectAgent } from '../core/agent-selector.js';
+
 // ─── Rollback ─────────────────────────────────────────────────────
 import {
   createSafetyPoint, rollback, getRollbackPolicy, recordRollbackInDebt,
@@ -85,8 +89,8 @@ export { createTask, extractScopeFromDirective, parseStructuredDirectives, build
 export type { CreateTaskParams, ParsedDirectiveTask } from './task-builder.js';
 export { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay, decay } from './debt-manager.js';
 export type { RunDecayOptions } from './debt-manager.js';
-export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics } from './sprint-reporter.js';
-export type { SprintComparison } from './sprint-reporter.js';
+export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics, buildAgentPerformance, formatAgentPerformanceTable } from './sprint-reporter.js';
+export type { SprintComparison, AgentPerformanceRow } from './sprint-reporter.js';
 export type { SprintResult } from '../core/types.js';
 export { parseCoverageFromVitest, validateCoverage, validateWorkerCoverage, isDocOnlyTask } from './coverage-validator.js';
 export type { CoverageResult, CoverageWarningLevel, ParsedVitestOutput, VitestCoverageSummary, VitestCoverageData } from './coverage-validator.js';
@@ -418,6 +422,23 @@ export function planSprint(
       SprintPhase.PLAN,
     );
   }
+
+  // Agent selection (non-fatal — if pool fails, continue with generic workers)
+  try {
+    const agentPool = new AgentPoolManager(projectRoot);
+    const pool = agentPool.loadAgents();
+    for (const task of tasks) {
+      if (!task.forceModel) {
+        const result = selectAgent(task, pool);
+        task.assignedAgent = result.agent?.id ?? 'generic';
+        if (result.agent?.preferredModel && !task.forceModel) {
+          task.model = result.agent.preferredModel;
+        }
+      } else {
+        task.assignedAgent = 'generic';
+      }
+    }
+  } catch { /* agent pool failure is non-fatal */ }
 
   // Write task files
   const tasksPath = join(projectRoot, TASKS_DIR);

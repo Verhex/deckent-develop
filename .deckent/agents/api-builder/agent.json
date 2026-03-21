@@ -1,0 +1,17 @@
+{
+  "id": "api-builder",
+  "name": "API Builder",
+  "description": "REST API development specialist. Endpoint design, HTTP conventions, validation, error responses, OpenAPI.",
+  "expertise": ["rest-api", "http", "validation", "error-handling", "openapi"],
+  "allowedTools": ["Read", "Grep", "Bash", "Write"],
+  "deniedTools": [],
+  "preferredModel": "sonnet",
+  "effortMultiplier": 1.0,
+  "triggerKeywords": ["api", "endpoint", "route", "controller", "rest", "graphql", "middleware", "request", "response", "handler"],
+  "triggerScopes": ["src/api/", "src/routes/"],
+  "triggerFilePatterns": ["*.route.ts", "*.controller.ts", "*.handler.ts", "*.middleware.ts"],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}
