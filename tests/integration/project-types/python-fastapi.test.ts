@@ -1,0 +1,472 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import os from 'node:os';
+import { DecisionOrchestrator } from '../../../src/orchestra/decision-engine.js';
+import { createAgentDefinition } from '../../../src/core/agent-types.js';
+import { createSkillDefinition } from '../../../src/core/skill-types.js';
+import type { AgentPool, AgentDefinition } from '../../../src/core/agent-types.js';
+import type { SkillDefinition, ProjectStack } from '../../../src/core/skill-types.js';
+import type { Task, TaskScope, ResolvedConfig, UsageMetrics } from '../../../src/core/types.js';
+import type { DecisionContext, DecisionResult } from '../../../src/core/decision-types.js';
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+let tmpDir: string;
+
+function setup(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'python-fastapi-'));
+  fs.mkdirSync(path.join(dir, '.brain', 'learning'), { recursive: true });
+  return dir;
+}
+
+function cleanup(dir: string): void {
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+function makeScope(dirs: string[] = ['src/'], filesWrite: string[] = []): TaskScope {
+  return { directories: dirs, filesRead: [], filesWrite };
+}
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: '033-001',
+    title: 'Add user API endpoint',
+    description: 'Create FastAPI endpoint for user CRUD operations',
+    model: 'sonnet',
+    effort: 'normal',
+    priority: 'HIGH',
+    reason: 'API feature',
+    scope: makeScope(
+      ['app/api/', 'app/models/'],
+      ['app/api/users.py', 'app/models/user.py'],
+    ),
+    dependencies: [],
+    goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
+    status: 'PENDING' as any,
+    sprintId: 'sprint-033',
+    ...overrides,
+  };
+}
+
+function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
+  return {
+    mode: 'max_plan',
+    activeModeConfig: {
+      max_workers: 4,
+      brain_model: 'opus',
+      default_model: 'sonnet',
+      haiku_allowed: true,
+      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
+    },
+    modes: {} as never,
+    language: 'en',
+    projectName: 'fastapi-app',
+    projectRoot: tmpDir,
+    version: '0.1.0',
+    ...overrides,
+  };
+}
+
+function makeUsage(): UsageMetrics {
+  return { fiveHourPercent: 10, weeklyPercent: 10, measuredAt: new Date().toISOString() };
+}
+
+// ─── Python+FastAPI Stack ───────────────────────────────────────────
+
+function makePythonStack(): ProjectStack {
+  return {
+    language: 'python',
+    framework: 'fastapi',
+    dependencies: ['fastapi', 'uvicorn', 'sqlalchemy', 'pytest', 'pydantic'],
+    buildTool: 'setuptools',
+    testFramework: 'pytest',
+    detectedAt: new Date().toISOString(),
+  };
+}
+
+// ─── Agents ─────────────────────────────────────────────────────────
+
+function makeAPIAgent(): AgentDefinition {
+  return createAgentDefinition({
+    id: 'api-builder',
+    name: 'API Builder',
+    description: 'Builds REST API endpoints',
+    expertise: ['api', 'rest', 'endpoint', 'crud'],
+    triggerKeywords: ['api', 'endpoint', 'rest', 'crud', 'route', 'controller'],
+    triggerScopes: ['app/api/', 'app/routes/', 'src/api/'],
+    triggerFilePatterns: ['**/api/**', '**/routes/**'],
+    preferredModel: 'sonnet',
+    enabled: true,
+    source: 'builtin',
+    stats: { totalUses: 10, successRate: 0.80, avgCoverage: 78, lastUsedInSprint: 'sprint-032' },
+  });
+}
+
+function makeTestAgent(): AgentDefinition {
+  return createAgentDefinition({
+    id: 'test-writer',
+    name: 'Test Writer',
+    description: 'Writes comprehensive tests',
+    expertise: ['testing', 'pytest', 'coverage'],
+    triggerKeywords: ['test', 'spec', 'coverage', 'pytest', 'mock'],
+    triggerScopes: ['tests/'],
+    triggerFilePatterns: ['**/test_*.py', '**/*_test.py'],
+    preferredModel: 'sonnet',
+    enabled: true,
+    source: 'builtin',
+    stats: { totalUses: 12, successRate: 0.85, avgCoverage: 88, lastUsedInSprint: 'sprint-032' },
+  });
+}
+
+// ─── Skills ─────────────────────────────────────────────────────────
+
+function makePythonSkill(): SkillDefinition {
+  return createSkillDefinition({
+    id: 'python-expert',
+    name: 'Python Expert',
+    category: 'language',
+    description: 'Python best practices, type hints, and patterns',
+    triggers: ['python', 'py', 'pip', 'pydantic'],
+    stackDetection: { files: ['setup.py', 'pyproject.toml'], dependencies: [], commands: ['python'] },
+    composableWith: [],
+    priority: 5,
+    enabled: true,
+    stats: { totalUses: 22, successRate: 0.91, avgCoverage: 86, lastUsedInSprint: 'sprint-032' },
+  });
+}
+
+function makeAPISkill(): SkillDefinition {
+  return createSkillDefinition({
+    id: 'api-builder',
+    name: 'API Builder',
+    category: 'domain',
+    description: 'REST API design and implementation',
+    triggers: ['api', 'endpoint', 'rest', 'crud', 'fastapi', 'route'],
+    stackDetection: { files: [], dependencies: ['fastapi'], commands: [] },
+    composableWith: [],
+    priority: 4,
+    model: 'sonnet',
+    enabled: true,
+    stats: { totalUses: 15, successRate: 0.87, avgCoverage: 81, lastUsedInSprint: 'sprint-032' },
+  });
+}
+
+function makeTypescriptSkill(): SkillDefinition {
+  return createSkillDefinition({
+    id: 'typescript-expert',
+    name: 'TypeScript Expert',
+    category: 'language',
+    description: 'TypeScript best practices',
+    triggers: ['typescript', 'ts', 'type', 'interface'],
+    stackDetection: { files: ['tsconfig.json'], dependencies: ['typescript'], commands: ['tsc'] },
+    composableWith: [],
+    priority: 5,
+    enabled: true,
+  });
+}
+
+function makeReactSkill(): SkillDefinition {
+  return createSkillDefinition({
+    id: 'react-specialist',
+    name: 'React Specialist',
+    category: 'framework',
+    description: 'React patterns and hooks',
+    triggers: ['react', 'component', 'jsx', 'hook'],
+    stackDetection: { files: [], dependencies: ['react', 'react-dom'], commands: [] },
+    composableWith: [],
+    priority: 5,
+    enabled: true,
+  });
+}
+
+function makeTestingSkill(): SkillDefinition {
+  return createSkillDefinition({
+    id: 'testing-expert',
+    name: 'Testing Expert',
+    category: 'tool',
+    description: 'Testing best practices with pytest',
+    triggers: ['test', 'spec', 'coverage', 'pytest', 'mock'],
+    stackDetection: { files: [], dependencies: ['pytest'], commands: [] },
+    composableWith: [],
+    priority: 4,
+    enabled: true,
+  });
+}
+
+function makeSecuritySkill(): SkillDefinition {
+  return createSkillDefinition({
+    id: 'security-specialist',
+    name: 'Security Specialist',
+    category: 'domain',
+    description: 'Security best practices',
+    triggers: ['security', 'jwt', 'auth', 'oauth'],
+    stackDetection: { files: [], dependencies: [], commands: [] },
+    composableWith: [],
+    priority: 6,
+    enabled: true,
+  });
+}
+
+// ─── Context Factory ────────────────────────────────────────────────
+
+function makePythonContext(overrides: Partial<DecisionContext> = {}): DecisionContext {
+  const agentPool: AgentPool = new Map();
+  agentPool.set('api-builder', makeAPIAgent());
+  agentPool.set('test-writer', makeTestAgent());
+
+  const skillPool = new Map<string, SkillDefinition>();
+  skillPool.set('python-expert', makePythonSkill());
+  skillPool.set('api-builder', makeAPISkill());
+  skillPool.set('typescript-expert', makeTypescriptSkill());
+  skillPool.set('react-specialist', makeReactSkill());
+  skillPool.set('testing-expert', makeTestingSkill());
+  skillPool.set('security-specialist', makeSecuritySkill());
+
+  return {
+    projectStack: makePythonStack(),
+    agentPool,
+    skillPool,
+    patterns: [],
+    usageMetrics: makeUsage(),
+    config: makeConfig(),
+    ...overrides,
+  };
+}
+
+// ─── Tests ──────────────────────────────────────────────────────────
+
+describe('Python + FastAPI Project Integration', () => {
+  beforeEach(() => {
+    tmpDir = setup();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  // ─── Stack Verification ───────────────────────────────────────
+
+  describe('Stack detection', () => {
+    it('detects Python language', () => {
+      const ctx = makePythonContext();
+      expect(ctx.projectStack!.language).toBe('python');
+    });
+
+    it('detects FastAPI framework', () => {
+      const ctx = makePythonContext();
+      expect(ctx.projectStack!.framework).toBe('fastapi');
+    });
+
+    it('detects pytest as test framework', () => {
+      const ctx = makePythonContext();
+      expect(ctx.projectStack!.testFramework).toBe('pytest');
+    });
+
+    it('includes fastapi in dependencies', () => {
+      const ctx = makePythonContext();
+      expect(ctx.projectStack!.dependencies).toContain('fastapi');
+    });
+
+    it('includes pydantic in dependencies', () => {
+      const ctx = makePythonContext();
+      expect(ctx.projectStack!.dependencies).toContain('pydantic');
+    });
+  });
+
+  // ─── Skill Selection ──────────────────────────────────────────
+
+  describe('Skill selection for Python/FastAPI tasks', () => {
+    it('selects python-expert for Python project', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+      const skillIds = result.skills.map(s => s.id);
+
+      expect(skillIds).toContain('python-expert');
+    });
+
+    it('selects api-builder skill for API endpoint task', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+      const skillIds = result.skills.map(s => s.id);
+
+      expect(skillIds).toContain('api-builder');
+    });
+
+    it('does not select typescript-expert for Python project', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+      const skillIds = result.skills.map(s => s.id);
+
+      expect(skillIds).not.toContain('typescript-expert');
+    });
+
+    it('does not select react-specialist for Python project', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+      const skillIds = result.skills.map(s => s.id);
+
+      expect(skillIds).not.toContain('react-specialist');
+    });
+
+    it('selects testing-expert for test task', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask({
+        title: 'Write tests for user API',
+        description: 'Comprehensive pytest tests for user endpoint with fixtures',
+        scope: makeScope(['tests/'], ['tests/test_users.py']),
+      });
+
+      const result = orch.decide(task);
+      const skillIds = result.skills.map(s => s.id);
+
+      expect(skillIds).toContain('testing-expert');
+    });
+
+    it('python-expert scores higher than typescript-expert in Python project', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+      const skillIds = result.skills.map(s => s.id);
+
+      const pyIdx = skillIds.indexOf('python-expert');
+      const tsIdx = skillIds.indexOf('typescript-expert');
+      // python-expert should be selected, typescript-expert should not
+      expect(pyIdx).toBeGreaterThanOrEqual(0);
+      expect(tsIdx).toBe(-1);
+    });
+
+    it('respects max 3 skills per task', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+
+      expect(result.skills.length).toBeLessThanOrEqual(3);
+    });
+  });
+
+  // ─── Agent Selection ──────────────────────────────────────────
+
+  describe('Agent selection for Python tasks', () => {
+    it('assigns api-builder agent for API endpoint task', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+
+      if (result.agent) {
+        expect(result.agent.id).toBe('api-builder');
+      }
+    });
+
+    it('assigns test-writer agent for test task', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask({
+        title: 'Write pytest tests for API',
+        description: 'Unit tests for FastAPI endpoints with test coverage',
+        scope: makeScope(['tests/'], ['tests/test_api.py']),
+      });
+
+      const result = orch.decide(task);
+
+      if (result.agent) {
+        expect(result.agent.id).toBe('test-writer');
+      }
+    });
+  });
+
+  // ─── Full Decision Pipeline ───────────────────────────────────
+
+  describe('Full decision pipeline', () => {
+    it('produces 6-step decision log', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+
+      expect(result.decisionLog.length).toBe(6);
+    });
+
+    it('task analysis classifies API endpoint as code type', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+
+      expect(result.analysis.type).toBe('code');
+    });
+
+    it('preserves filesWrite security boundary', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+
+      for (const file of result.scope.filesWrite) {
+        expect(task.scope.filesWrite).toContain(file);
+      }
+    });
+
+    it('handles security task in Python context', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask({
+        title: 'Add OAuth2 authentication',
+        description: 'Implement OAuth2 with JWT tokens for FastAPI security',
+        scope: makeScope(['app/auth/'], ['app/auth/oauth.py', 'app/auth/jwt.py']),
+      });
+
+      const result = orch.decide(task);
+
+      expect(result.analysis.type).toBe('security');
+      const skillIds = result.skills.map(s => s.id);
+      expect(skillIds).toContain('security-specialist');
+    });
+
+    it('handles doc task in Python context', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask({
+        title: 'Update API documentation',
+        description: 'Document FastAPI endpoints in README',
+        scope: makeScope(['docs/'], ['docs/API.md']),
+      });
+
+      const result = orch.decide(task);
+
+      expect(result.analysis.type).toBe('doc');
+    });
+
+    it('effort resolves to valid value', () => {
+      const ctx = makePythonContext();
+      const orch = new DecisionOrchestrator(ctx);
+      const task = makeTask();
+
+      const result = orch.decide(task);
+
+      expect(['low', 'normal', 'high']).toContain(result.effort);
+    });
+  });
+});

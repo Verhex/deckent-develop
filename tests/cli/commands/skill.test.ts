@@ -12,6 +12,8 @@ vi.mock('node:fs', () => ({
   cpSync: vi.fn(),
   rmSync: vi.fn(),
   statSync: vi.fn(),
+  unlinkSync: vi.fn(),
+  chmodSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -26,6 +28,27 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
+}));
+
+vi.mock('../../../src/core/marketplace/registry-client.js', () => ({
+  RegistryClient: vi.fn(() => ({
+    searchSkills: vi.fn().mockResolvedValue({ skills: [], total: 0, page: 1, pages: 0 }),
+    getSkillDetail: vi.fn().mockResolvedValue({}),
+    publishSkill: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+  })),
+  RegistryNetworkError: class extends Error { name = 'RegistryNetworkError'; },
+  RegistryRateLimitError: class extends Error { name = 'RegistryRateLimitError'; },
+}));
+
+vi.mock('../../../src/core/marketplace/marketplace-auth.js', () => ({
+  MarketplaceAuth: vi.fn(() => ({
+    getToken: vi.fn().mockReturnValue(null),
+    login: vi.fn(),
+    logout: vi.fn(),
+    isAuthenticated: vi.fn().mockReturnValue(false),
+    validateToken: vi.fn().mockReturnValue(true),
+  })),
+  MarketplaceAuthError: class extends Error { name = 'MarketplaceAuthError'; },
 }));
 
 vi.mock('../../../src/core/skill-types.js', () => ({

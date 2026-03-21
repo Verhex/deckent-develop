@@ -31,7 +31,11 @@
     "agent",
     "orchestration",
     "claude",
-    "cli"
+    "cli",
+    "agents",
+    "skills",
+    "marketplace",
+    "analytics"
   ],
   "author": "Alperen @ Verhex",
   "license": "MIT",
