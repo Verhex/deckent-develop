@@ -1,0 +1,15 @@
+{
+  "id": "database-migration",
+  "name": "Database Migration",
+  "version": "0.1.0",
+  "description": "Migration safety, schema design, query optimization, transaction management",
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": ["database", "migration", "schema", "query", "model", "relation", "index", "seed"],
+  "stackDetection": { "files": [], "dependencies": ["prisma", "typeorm", "knex", "drizzle", "sequelize"], "commands": [] },
+  "composableWith": ["typescript-expert", "python-expert", "testing-expert", "api-builder", "security-specialist", "performance-optimizer"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

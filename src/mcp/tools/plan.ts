@@ -50,7 +50,7 @@ export function registerPlanTool(server: McpServer): void {
       const context = readContext(root);
       const usage = checkUsage(config);
       const recommendation = adjustSprintSize(config, usage);
-      const sprint = planSprint(root, config, context, recommendation, {
+      const sprint = await planSprint(root, config, context, recommendation, {
         mode: input.mode as BrainPlanningMode | undefined,
       });
 

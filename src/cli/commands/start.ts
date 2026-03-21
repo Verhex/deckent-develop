@@ -85,7 +85,7 @@ export function registerStart(program: Command): void {
           const context = readContext(root);
           const usage = checkUsage(config);
           const recommendation = adjustSprintSize(config, usage);
-          const sprint = planSprint(root, config, context, recommendation);
+          const sprint = await planSprint(root, config, context, recommendation);
 
           print(getMessage('start.sprint_planned', lang, {
             number: String(sprint.number),

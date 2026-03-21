@@ -116,6 +116,69 @@ export function formatAgentPerformanceTable(rows: AgentPerformanceRow[]): string
   return lines;
 }
 
+// ═══ Skill Performance ════════════════════════════════════════════
+
+export interface SkillPerformanceRow {
+  skill: string;
+  tasks: number;
+  done: number;
+  debt: number;
+  noGo: number;
+}
+
+/**
+ * Build skill performance data from sprint tasks, evaluations, and a skillMap.
+ * skillMap: Map<taskId, skillId[]> — maps tasks to the skills used.
+ */
+export function buildSkillPerformance(
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  skillMap?: Map<string, string[]>,
+): SkillPerformanceRow[] {
+  if (!skillMap || skillMap.size === 0) return [];
+
+  const skillData = new Map<string, { tasks: number; done: number; debt: number; noGo: number }>();
+
+  for (const task of sprint.tasks) {
+    const skillIds = skillMap.get(task.id) ?? task.assignedSkills ?? [];
+    for (const skillId of skillIds) {
+      if (!skillData.has(skillId)) {
+        skillData.set(skillId, { tasks: 0, done: 0, debt: 0, noGo: 0 });
+      }
+      const data = skillData.get(skillId)!;
+      data.tasks += 1;
+
+      const ev = evaluations.get(task.id);
+      if (ev === TaskEvaluation.DONE) data.done += 1;
+      else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) data.debt += 1;
+      else if (ev === TaskEvaluation.NO_GO) data.noGo += 1;
+    }
+  }
+
+  const rows: SkillPerformanceRow[] = [];
+  for (const [skill, data] of skillData) {
+    rows.push({ skill, tasks: data.tasks, done: data.done, debt: data.debt, noGo: data.noGo });
+  }
+  return rows.sort((a, b) => b.tasks - a.tasks);
+}
+
+/**
+ * Format skill performance as a markdown table.
+ */
+export function formatSkillPerformanceTable(rows: SkillPerformanceRow[]): string[] {
+  if (rows.length === 0) return [];
+  const lines: string[] = [
+    '',
+    '## Skill Performance',
+    '| Skill | Tasks | Done | Debt | NoGo |',
+    '|-------|-------|------|------|------|',
+  ];
+  for (const row of rows) {
+    lines.push(`| ${row.skill} | ${row.tasks} | ${row.done} | ${row.debt} | ${row.noGo} |`);
+  }
+  return lines;
+}
+
 // 12. writeRetrospective
 export function writeRetrospective(
   projectRoot: string,
@@ -124,6 +187,7 @@ export function writeRetrospective(
   metrics: SprintMetrics,
   usageTracker?: UsageTracker,
   agentMap?: Map<string, string>,
+  skillMap?: Map<string, string[]>,
 ): void {
   const brainPath = join(projectRoot, BRAIN_DIR);
   mkdirSync(brainPath, { recursive: true });
@@ -175,6 +239,14 @@ export function writeRetrospective(
     const perfRows = buildAgentPerformance(sprint, evaluations, [], agentMap);
     if (perfRows.length > 0) {
       retroLines.push(...formatAgentPerformanceTable(perfRows));
+    }
+  } catch { /* non-fatal */ }
+
+  // Add skill performance section
+  try {
+    const skillRows = buildSkillPerformance(sprint, evaluations, skillMap);
+    if (skillRows.length > 0) {
+      retroLines.push(...formatSkillPerformanceTable(skillRows));
     }
   } catch { /* non-fatal */ }
 

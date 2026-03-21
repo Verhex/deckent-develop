@@ -1,0 +1,15 @@
+{
+  "id": "documentation-writer",
+  "name": "Documentation Writer",
+  "version": "0.1.0",
+  "description": "Technical writing, README structure, changelogs, JSDoc/TSDoc, API documentation",
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": ["docs", "readme", "changelog", "guide", "tutorial", "jsdoc", "api-docs"],
+  "stackDetection": { "files": ["docs/", "README.md"], "dependencies": [], "commands": [] },
+  "composableWith": ["typescript-expert", "python-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

@@ -61,6 +61,8 @@ export interface Task {
   forceEffort?: TaskEffort;
   /** Assigned agent ID (from agent pool) or 'generic' */
   assignedAgent?: string;
+  /** Assigned skill IDs (from skill pool) */
+  assignedSkills?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -78,6 +80,8 @@ export interface TaskResult {
   notes: string;
   /** Agent ID that produced this result */
   agentId?: string;
+  /** Skill IDs used during this task execution */
+  skillIds?: string[];
   completedAt?: string;
   durationMs?: number;
 }
@@ -321,6 +325,13 @@ export type BrainPlanningMode = 'ai' | 'structured' | 'auto';
 
 export type PlanMode = 'max_plan' | 'max5x_plan' | 'pro_plan' | 'api';
 
+export interface SkillConfig {
+  enabled: boolean;
+  maxPerTask: number;         // default 3
+  autoDetectStack: boolean;   // default true
+  preferredSkills: string[];
+}
+
 export interface DeckentConfig {
   mode: PlanMode;
   modes: Record<PlanMode, PlanModeConfig>;
@@ -330,6 +341,8 @@ export interface DeckentConfig {
   auto_docs?: AutoDocsConfig;
   /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'tmux' | 'subprocess' | 'auto';
+  /** Skill system configuration */
+  skills?: SkillConfig;
 }
 
 export interface ResolvedConfig {
@@ -343,6 +356,8 @@ export interface ResolvedConfig {
   auto_docs?: AutoDocsConfig;
   /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'tmux' | 'subprocess' | 'auto';
+  /** Skill system configuration */
+  skills?: SkillConfig;
 }
 
 // ─── Dashboard (Blueprint 12) ───────────────────────────────────────

@@ -1,0 +1,15 @@
+{
+  "id": "security-specialist",
+  "name": "Security Specialist",
+  "version": "0.1.0",
+  "description": "OWASP Top 10, authentication, input validation, secret management, vulnerability prevention",
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": ["security", "auth", "jwt", "encryption", "vulnerability", "owasp", "csrf", "xss", "sql-injection"],
+  "stackDetection": { "files": [], "dependencies": [], "commands": [] },
+  "composableWith": ["typescript-expert", "python-expert", "api-builder", "devops-engineer"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

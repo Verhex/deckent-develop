@@ -1,0 +1,15 @@
+{
+  "id": "api-builder",
+  "name": "API Builder",
+  "version": "0.1.0",
+  "description": "RESTful API design, validation, error handling, OpenAPI, versioning",
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": ["api", "endpoint", "route", "rest", "graphql", "middleware", "cors", "validation"],
+  "stackDetection": { "files": [], "dependencies": ["express", "fastify", "koa", "hono"], "commands": [] },
+  "composableWith": ["typescript-expert", "testing-expert", "security-specialist", "database-migration", "documentation-writer"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

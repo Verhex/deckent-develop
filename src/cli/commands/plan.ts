@@ -26,7 +26,7 @@ export function registerPlan(program: Command): void {
         const planMode: BrainPlanningMode | undefined = opts.structured ? 'structured' : undefined;
         const asDraft = opts.confirm !== false;
 
-        const sprint = planSprint(root, config, context, recommendation, {
+        const sprint = await planSprint(root, config, context, recommendation, {
           mode: planMode,
           asDraft,
         });

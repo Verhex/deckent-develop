@@ -1,0 +1,15 @@
+{
+  "id": "python-expert",
+  "name": "Python Expert",
+  "version": "0.1.0",
+  "description": "Python best practices, type hints, async patterns, testing, modern tooling",
+  "entrypoint": "SKILL.md",
+  "category": "language",
+  "triggers": ["python", "pip", "django", "flask", "fastapi", "pytest", "async"],
+  "stackDetection": { "files": ["setup.py", "pyproject.toml", "requirements.txt"], "dependencies": [], "commands": [] },
+  "composableWith": ["testing-expert", "api-builder", "database-migration", "security-specialist", "documentation-writer", "devops-engineer"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+}

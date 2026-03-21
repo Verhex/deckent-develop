@@ -411,7 +411,7 @@ async function handleRequest(
         const context = readContext(projectRoot);
         const usage = checkUsage(config);
         const recommendation = adjustSprintSize(config, usage);
-        const plan = planSprint(projectRoot, config, context, recommendation, {
+        const plan = await planSprint(projectRoot, config, context, recommendation, {
           mode: b.mode,
         });
         sendJson(res, plan);

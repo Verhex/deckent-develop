@@ -122,6 +122,7 @@ export function resolveTaskModel(
   usage: UsageMetrics,
   patterns?: PatternEntry[],
   forceModel?: ModelType,
+  skillModels?: ModelType[],
 ): ModelType {
   // Layer 0: user override from DIRECTIVES.md — bypasses all auto-selection
   if (forceModel) return forceModel;
@@ -135,6 +136,13 @@ export function resolveTaskModel(
     if (suggestion === 'opus') {
       model = 'opus';
     }
+  }
+
+  // Layer 4d: skill model preference (highest model among skills wins)
+  if (skillModels && skillModels.length > 0) {
+    const modelRank: Record<string, number> = { haiku: 0, sonnet: 1, opus: 2 };
+    const highest = skillModels.reduce<ModelType>((best, m) => (modelRank[m] ?? 0) > (modelRank[best] ?? 0) ? m : best, model);
+    if ((modelRank[highest] ?? 0) > (modelRank[model] ?? 0)) model = highest;
   }
 
   // Layer 3: task type filter — docs or test-only → cap at sonnet

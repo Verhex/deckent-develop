@@ -181,7 +181,11 @@ export function resolveWorkerEffort(task: Task): 'max' | 'high' | 'medium' | 'lo
 }
 
 // 5b. buildWorkerPrompt (pure)
-export function buildWorkerPrompt(task: Task, agentPrompt?: string): string {
+export function buildWorkerPrompt(
+  task: Task,
+  agentPrompt?: string,
+  skillPrompts?: Array<{ name: string; content: string }>,
+): string {
   const scopeStr = task.scope.directories.length > 0
     ? task.scope.directories.join(', ')
     : 'any';
@@ -192,7 +196,27 @@ export function buildWorkerPrompt(task: Task, agentPrompt?: string): string {
     ? `=== Agent: ${task.assignedAgent ?? 'generic'} ===\n${agentPrompt.slice(0, 2000)}\n\n=== Task ===\n`
     : '';
 
-  return `${agentBlock}You are a Deckent worker agent. Your task:
+  // Skill context block: appended after agent block when skills are assigned
+  const SKILL_SECTION_MAX = 4000;
+  const SKILL_DEFAULT_MAX = 1500;
+  let skillBlock = '';
+  if (skillPrompts && skillPrompts.length > 0) {
+    const parts: string[] = ['=== Skills ==='];
+    let totalLen = parts[0]!.length;
+    for (const sp of skillPrompts) {
+      const maxChars = SKILL_DEFAULT_MAX;
+      const truncated = sp.content.slice(0, maxChars);
+      const entry = `--- ${sp.name} ---\n${truncated}`;
+      if (totalLen + entry.length + 1 > SKILL_SECTION_MAX) break;
+      parts.push(entry);
+      totalLen += entry.length + 1;
+    }
+    if (parts.length > 1) {
+      skillBlock = parts.join('\n') + '\n\n';
+    }
+  }
+
+  return `${agentBlock}${skillBlock}You are a Deckent worker agent. Your task:
 
 Task ${task.id}: ${task.title}
 Description: ${task.description}

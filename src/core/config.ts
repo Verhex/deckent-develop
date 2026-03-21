@@ -171,6 +171,38 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Skills config validation ───────────────────────────────────────
+  if (config.skills !== undefined) {
+    const skills = config.skills;
+    if (typeof skills !== 'object' || skills === null || Array.isArray(skills)) {
+      errors.push('skills must be an object');
+    } else {
+      if (skills.enabled !== undefined && typeof skills.enabled !== 'boolean') {
+        errors.push('skills.enabled must be a boolean');
+      }
+      if (skills.maxPerTask !== undefined) {
+        if (typeof skills.maxPerTask !== 'number' || skills.maxPerTask < 1 || skills.maxPerTask > 10) {
+          errors.push('skills.maxPerTask must be a number between 1 and 10');
+        }
+      }
+      if (skills.autoDetectStack !== undefined && typeof skills.autoDetectStack !== 'boolean') {
+        errors.push('skills.autoDetectStack must be a boolean');
+      }
+      if (skills.preferredSkills !== undefined) {
+        if (!Array.isArray(skills.preferredSkills)) {
+          errors.push('skills.preferredSkills must be an array of strings');
+        } else {
+          for (const item of skills.preferredSkills) {
+            if (typeof item !== 'string') {
+              errors.push('skills.preferredSkills must be an array of strings');
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }
@@ -270,6 +302,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     version: config.version ?? DECKENT_VERSION,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     spawn_backend: config.spawn_backend,
+    skills: config.skills,
   };
 }
 
@@ -338,5 +371,6 @@ export function mergeConfigs(
     projectRoot: resolve(process.cwd()),
     version: config.version ?? DECKENT_VERSION,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
+    skills: config.skills,
   };
 }

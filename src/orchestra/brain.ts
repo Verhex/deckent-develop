@@ -89,8 +89,8 @@ export { createTask, extractScopeFromDirective, parseStructuredDirectives, build
 export type { CreateTaskParams, ParsedDirectiveTask } from './task-builder.js';
 export { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay, decay } from './debt-manager.js';
 export type { RunDecayOptions } from './debt-manager.js';
-export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics, buildAgentPerformance, formatAgentPerformanceTable } from './sprint-reporter.js';
-export type { SprintComparison, AgentPerformanceRow } from './sprint-reporter.js';
+export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics, buildAgentPerformance, formatAgentPerformanceTable, buildSkillPerformance, formatSkillPerformanceTable } from './sprint-reporter.js';
+export type { SprintComparison, AgentPerformanceRow, SkillPerformanceRow } from './sprint-reporter.js';
 export type { SprintResult } from '../core/types.js';
 export { parseCoverageFromVitest, validateCoverage, validateWorkerCoverage, isDocOnlyTask } from './coverage-validator.js';
 export type { CoverageResult, CoverageWarningLevel, ParsedVitestOutput, VitestCoverageSummary, VitestCoverageData } from './coverage-validator.js';
@@ -300,13 +300,13 @@ export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics, sy
 }
 
 // 5. planSprint
-export function planSprint(
+export async function planSprint(
   projectRoot: string,
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
   options?: { mode?: BrainPlanningMode; asDraft?: boolean; usage?: UsageMetrics },
-): Sprint {
+): Promise<Sprint> {
   const sprintId = getNextSprintId(projectRoot);
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
   const planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
@@ -439,6 +439,29 @@ export function planSprint(
       }
     }
   } catch { /* agent pool failure is non-fatal */ }
+
+  // Skill selection (non-fatal — if skill modules fail, continue without skills)
+  try {
+    const { detectProjectStack } = await import('../core/stack-detector.js');
+    const { SkillPoolManager } = await import('../core/skill-pool.js');
+    const { selectSkills } = await import('../core/skill-selector.js');
+
+    const projectStack = detectProjectStack(projectRoot);
+    const skillPool = new SkillPoolManager(projectRoot);
+    const skills = skillPool.loadSkills();
+
+    if (skills.size > 0) {
+      for (const task of tasks) {
+        const agentInfo = task.assignedAgent && task.assignedAgent !== 'generic'
+          ? { id: task.assignedAgent, expertise: [] as string[] }
+          : undefined;
+        const result = selectSkills(task, projectStack, skills, agentInfo);
+        if (result.skills.length > 0) {
+          task.assignedSkills = result.skills.map(s => s.id);
+        }
+      }
+    }
+  } catch { /* skill selection failure is non-fatal */ }
 
   // Write task files
   const tasksPath = join(projectRoot, TASKS_DIR);
@@ -817,7 +840,7 @@ export async function runSprint(
       ? await checkUsageWithProvider(activeProvider)
       : checkUsage(config);
     const recommendation = adjustSprintSize(config, usage);
-    sprint = planSprint(projectRoot, config, context, recommendation);
+    sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
 
     // Create git safety point after planning (we now have sprint.id) but before workers spawn.
