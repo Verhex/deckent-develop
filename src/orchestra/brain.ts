@@ -49,7 +49,8 @@ import { providerRegistry } from '../core/provider.js';
 // ─── Core — spawn backend abstraction ────────────────────────────
 import type { SpawnBackend } from '../core/spawn-backend.js';
 export type { SpawnBackend } from '../core/spawn-backend.js';
-export { SpawnBackendFactory } from '../core/spawn-backend.js';
+import { SpawnBackendFactory } from '../core/spawn-backend.js';
+export { SpawnBackendFactory };
 
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner } from './planner.js';
@@ -768,9 +769,12 @@ export async function runSprint(
   let taskQueue: Task[] = [];
   const usageTracker = new UsageTracker(projectRoot);
 
-  // Use provided SpawnBackend, or undefined (legacy tmux path preserved for backward compat)
-  // To use factory-created backend, pass: opts.spawnBackend = SpawnBackendFactory.create({...})
-  const spawnBackend: SpawnBackend | undefined = opts?.spawnBackend;
+  // Use provided SpawnBackend, or create one from config.spawn_backend via SpawnBackendFactory.
+  // Falls back to legacy direct-tmux path only when spawn_backend is not set and no backend provided.
+  const spawnBackend: SpawnBackend | undefined = opts?.spawnBackend
+    ?? (config.spawn_backend
+      ? SpawnBackendFactory.create({ backend: config.spawn_backend, projectDir: projectRoot })
+      : undefined);
 
   // Resolve provider for usage checks (use provided override or registry default)
   const activeProvider: ProviderAdapter | null = opts?.provider ?? getDefaultProvider();

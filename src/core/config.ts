@@ -269,6 +269,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     projectRoot: root,
     version: config.version ?? DECKENT_VERSION,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
+    spawn_backend: config.spawn_backend,
   };
 }
 

@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import type { ModelType } from './types.js';
 import type { ProviderSpawnOptions } from './provider.js';
+import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from '../orchestra/tmux.js';
+import { SubprocessSpawnBackend } from '../providers/subprocess.js';
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
@@ -88,24 +90,20 @@ export class TmuxBackend implements SpawnBackend {
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
-    // Lazy import to avoid circular deps and allow mocking in tests
-    const tmux = this._getTmux();
     const dir = opts?.projectDir ?? this.projectDir;
-    tmux.ensureSession();
-    tmux.spawnWorker(taskId, model, prompt, dir, {
+    ensureSession();
+    tmuxSpawnWorker(taskId, model, prompt, dir, {
       allowedTools: opts?.allowedTools,
       autoApprove: opts?.autoApprove,
     });
   }
 
   kill(taskId: string): void {
-    const tmux = this._getTmux();
-    tmux.killWorker(taskId);
+    tmuxKillWorker(taskId);
   }
 
   list(): string[] {
-    const tmux = this._getTmux();
-    return tmux.listWorkers();
+    return tmuxListWorkers();
   }
 
   async isAvailable(): Promise<boolean> {
@@ -114,16 +112,6 @@ export class TmuxBackend implements SpawnBackend {
       timeout: 5_000,
     });
     return result.status === 0;
-  }
-
-  /**
-   * Indirection for testability — allows tests to inject a mock tmux module.
-   * @internal
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected _getTmux(): any {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('../orchestra/tmux.js');
   }
 }
 
@@ -140,19 +128,15 @@ export class SubprocessBackend implements SpawnBackend {
 
   private readonly projectDir: string;
   private readonly timeoutMs: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _backend: any = null;
+  private _backend: SubprocessSpawnBackend | null = null;
 
   constructor(projectDir: string, opts?: { timeoutMs?: number }) {
     this.projectDir = projectDir;
     this.timeoutMs = opts?.timeoutMs ?? 0;
   }
 
-  private getBackend() {
+  private getBackend(): SubprocessSpawnBackend {
     if (!this._backend) {
-      // Lazy import for testability
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { SubprocessSpawnBackend } = require('../providers/subprocess.js');
       this._backend = new SubprocessSpawnBackend(this.projectDir, {
         defaultTimeoutMs: this.timeoutMs,
       });

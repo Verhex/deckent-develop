@@ -316,6 +316,8 @@ export interface DeckentConfig {
   projectName?: string;
   version?: string;
   auto_docs?: AutoDocsConfig;
+  /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
+  spawn_backend?: 'tmux' | 'subprocess' | 'auto';
 }
 
 export interface ResolvedConfig {
@@ -327,6 +329,8 @@ export interface ResolvedConfig {
   projectRoot: string;
   version: string;
   auto_docs?: AutoDocsConfig;
+  /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
+  spawn_backend?: 'tmux' | 'subprocess' | 'auto';
 }
 
 // ─── Dashboard (Blueprint 12) ───────────────────────────────────────

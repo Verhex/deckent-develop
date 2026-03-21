@@ -16,53 +16,41 @@ vi.mock('node:child_process', () => ({
 import { spawnSync } from 'node:child_process';
 const mockSpawnSync = vi.mocked(spawnSync);
 
-// ─── Mock tmux module ─────────────────────────────────────────────────────────
+// ─── Mock tmux module (direct import used by TmuxBackend) ────────────────────
 
-const mockTmux = {
+vi.mock('../../src/orchestra/tmux.js', () => ({
   ensureSession: vi.fn(),
   spawnWorker: vi.fn(),
   killWorker: vi.fn(),
   listWorkers: vi.fn().mockReturnValue([]),
   isSessionActive: vi.fn().mockReturnValue(true),
+}));
+
+import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
+const mockTmux = {
+  ensureSession: vi.mocked(ensureSession),
+  spawnWorker: vi.mocked(spawnWorker),
+  killWorker: vi.mocked(killWorker),
+  listWorkers: vi.mocked(listWorkers),
 };
 
-// ─── Mock subprocess provider ─────────────────────────────────────────────────
+// ─── Mock subprocess provider (direct import used by SubprocessBackend) ──────
 
-const mockSubprocessInstance = {
-  spawn: vi.fn(),
-  kill: vi.fn(),
-  listWorkers: vi.fn().mockReturnValue([]),
-  checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
-  isAvailable: vi.fn().mockResolvedValue(true),
-};
+vi.mock('../../src/providers/subprocess.js', () => {
+  const mockInstance = {
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+  };
+  return {
+    SubprocessSpawnBackend: vi.fn().mockImplementation(() => mockInstance),
+    _mockInstance: mockInstance,
+  };
+});
 
-const MockSubprocessSpawnBackend = vi.fn().mockImplementation(() => mockSubprocessInstance);
-
-// ─── TmuxBackend subclass for testing ────────────────────────────────────────
-
-class TestableTmuxBackend extends TmuxBackend {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected override _getTmux(): any {
-    return mockTmux;
-  }
-}
-
-// ─── SubprocessBackend subclass for testing ───────────────────────────────────
-
-class TestableSubprocessBackend extends SubprocessBackend {
-  // Override getBackend to return mock
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _testBackend: any = null;
-
-  setTestBackend(b: typeof mockSubprocessInstance) {
-    this._testBackend = b;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected getBackendForTest(): any {
-    return this._testBackend ?? mockSubprocessInstance;
-  }
-}
+import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,7 +66,7 @@ function tmuxMissing() {
 
 describe('SpawnBackend interface', () => {
   it('should define required methods on TmuxBackend', () => {
-    const backend = new TestableTmuxBackend('/proj');
+    const backend = new TmuxBackend('/proj');
     expect(typeof backend.name).toBe('string');
     expect(typeof backend.spawn).toBe('function');
     expect(typeof backend.kill).toBe('function');
@@ -99,11 +87,11 @@ describe('SpawnBackend interface', () => {
 // ─── TmuxBackend ─────────────────────────────────────────────────────────────
 
 describe('TmuxBackend', () => {
-  let backend: TestableTmuxBackend;
+  let backend: TmuxBackend;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    backend = new TestableTmuxBackend('/project/root');
+    backend = new TmuxBackend('/project/root');
     mockTmux.listWorkers.mockReturnValue([]);
   });
 
@@ -203,7 +191,7 @@ describe('SubprocessBackend', () => {
   });
 
   it('same SpawnBackend interface as TmuxBackend', () => {
-    const b1: SpawnBackend = new TestableTmuxBackend('/proj');
+    const b1: SpawnBackend = new TmuxBackend('/proj');
     const b2: SpawnBackend = new SubprocessBackend('/proj');
     // Both satisfy the interface
     expect(typeof b1.spawn).toBe(typeof b2.spawn);
@@ -346,7 +334,7 @@ describe('SpawnBackendFactory', () => {
 describe('SpawnBackend swappability', () => {
   it('can store different backends behind the same interface', () => {
     const backends: SpawnBackend[] = [
-      new TestableTmuxBackend('/proj'),
+      new TmuxBackend('/proj'),
       new SubprocessBackend('/proj'),
     ];
     expect(backends.map((b) => b.name)).toEqual(['tmux', 'subprocess']);
