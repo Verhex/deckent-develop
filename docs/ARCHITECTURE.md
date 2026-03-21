@@ -1,6 +1,6 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** Sprint 25 | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** Sprint 30 | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
 > For the primary system specification, see [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md).
@@ -48,10 +48,10 @@ Deckent is an **AI agent orchestration CLI** that manages multiple Claude Code a
 │  brain.ts           │  scan     │  auditor.ts           │
 │  planner.ts         │  results  │  30-second scan loop  │
 └─────────┬───────────┘           └───────────────────────┘
-          │ spawns via tmux
+          │ spawns via SpawnBackend (tmux or subprocess)
           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  WORKER POOL  (dynamic, via tmux windows)                           │
+│  WORKER POOL  (dynamic, via tmux or subprocess)                      │
 │  Each worker: Claude Code with scoped --allowedTools                │
 │  Lifecycle: CLAIM → PLAN → CODE → TEST → DOCUMENT → REPORT         │
 └─────────────────────────────────────────────────────────────────────┘
@@ -163,6 +163,24 @@ src/
     └── ...                  ← React + Vite + Tailwind (4 pages)
 ```
 
+### providers/ — Provider Adapters (Sprint 27)
+
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/provider.ts` | ~200 | ProviderAdapter interface, ProviderRegistry singleton, error types |
+| `src/core/spawn-backend.ts` | ~265 | SpawnBackend interface, TmuxBackend, SubprocessBackend, SpawnBackendFactory |
+| `src/providers/claude.ts` | ~180 | ClaudeAdapter — wraps tmux.ts behind ProviderAdapter |
+| `src/providers/subprocess.ts` | ~250 | SubprocessSpawnBackend — child_process based worker spawning |
+| `src/providers/sandbox.ts` | ~170 | SandboxSpawnBackend — isolated subprocess with memory/fs limits |
+| `src/core/usage-tracker.ts` | ~165 | UsageTracker — sprint-based token/call counting |
+| `src/core/credentials.ts` | ~210 | CredentialManager — secure key storage (~/.deckent/credentials/) |
+| `src/core/global-config.ts` | ~100 | Global config utilities (ensureGlobalDir, readGlobalConfig, writeGlobalConfig) |
+| `src/orchestra/coverage-validator.ts` | ~310 | Coverage parsing (vitest JSON) and validation |
+| `src/orchestra/rollback.ts` | ~290 | Git safety points, rollback mechanism, dirty tree detection |
+| `src/agents/worker-ipc.ts` | ~350 | WorkerChannel, ChannelRegistry — process.send IPC for subprocess workers |
+| `src/cli/commands/quick-start.ts` | ~85 | Zero-config mode — single-line natural language sprint start |
+| `src/orchestra/doc-updaters/metrics-updater.ts` | ~80 | Sprint metrics README updater |
+
 ---
 
 ## 3. Module Responsibilities & Boundaries
@@ -238,7 +256,7 @@ Workers are the **builder agents** — they read a task, implement it, run tests
 PENDING → CLAIMED → EXECUTING → TESTING → DOCUMENTING → DONE / NO_GO
 ```
 
-Workers are spawned as separate `tmux` windows running `claude -p` with scoped `--allowedTools`. They never import from `brain.ts` or `auditor.ts`. All data exchange is through the filesystem:
+Workers are spawned as separate `tmux` windows running `claude -p` with scoped `--allowedTools`, or as child processes via the subprocess backend (Sprint 27). The subprocess backend (`SubprocessSpawnBackend`) provides an alternative to tmux, enabling support for environments where tmux is unavailable (e.g., Windows without WSL2). `SpawnBackendFactory` selects the appropriate backend based on configuration and environment detection. Workers never import from `brain.ts` or `auditor.ts`. All data exchange is through the filesystem:
 - **Input:** `.tasks/task-{id}.json`
 - **Plan:** `.tasks/task-{id}.plan`
 - **Heartbeat:** `.tasks/task-{id}.hb` (updated periodically)
@@ -421,8 +439,9 @@ brain.ts: runSprint()
         │     output: .tasks/task-{sprint}-{N}.json (one per task)
         │
         ├─► spawnWorkers()
-        │     tmux.ts: new-window per task
-        │     each window: claude -p --allowedTools "..."
+        │     SpawnBackendFactory selects tmux or subprocess backend
+        │     tmux: new-window per task | subprocess: child_process.spawn per task
+        │     each worker: claude -p --allowedTools "..."
         │
         ├─► startScanLoop()  ◄─────────────────────────────────┐
         │     auditor.ts: setInterval(30s)                     │
@@ -464,7 +483,7 @@ brain.ts: runSprint()
 ### 5.2 Worker Task Flow
 
 ```
-Brain spawns worker via tmux new-window
+Brain spawns worker via SpawnBackend (tmux new-window or subprocess)
         │
         ▼
 worker reads .tasks/task-{id}.json

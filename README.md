@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-1422+ tests | 97.5% coverage | 26 sprints completed
+3609+ tests | 97.5% coverage | 30 sprints completed
 
 Deckent is a self-evolving AI agent orchestration system. Write directives in plain language — Deckent plans, assigns, monitors, and completes development work using multiple AI agents running in parallel. The system learns from every sprint and improves over time.
 
@@ -10,13 +10,13 @@ Deckent is a self-evolving AI agent orchestration system. Write directives in pl
 
 - **Brain** — plans tasks, evaluates results, learns from patterns
 - **Auditor** — monitors agents, detects issues, enforces quality
-- **Workers** — execute tasks in parallel tmux panes, each running a full plan→code→test→report cycle
+- **Workers** — execute tasks in parallel (tmux or subprocess), each running a full plan→code→test→report cycle
 
 ## Requirements
 
 - Node.js >= 18
 - git
-- tmux
+- tmux *(optional — subprocess backend available for environments without tmux)*
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
 - Claude subscription (Pro, Max 5x/20x, or API key)
 
@@ -69,7 +69,7 @@ $ deckent init
 | `deckent start` | Run the full sprint lifecycle |
 | `deckent plan` | Brain plans the next sprint (plan mode only) |
 | `deckent status` | Show live dashboard |
-| `deckent attach` | Attach to the tmux session to see all agents |
+| `deckent attach` | Attach to the tmux session (tmux mode only) |
 | `deckent spawn <id>` | Manually spawn a worker |
 | `deckent kill <id>` | Kill a specific worker |
 | `deckent retro` | Run sprint retrospective |
@@ -144,7 +144,7 @@ my-project/
 
 1. **You** write goals in `DIRECTIVES.md`
 2. **Brain** reads directives, creates tasks, assigns workers
-3. **Workers** execute tasks in parallel tmux panes
+3. **Workers** execute tasks in parallel (via tmux or subprocess backend)
 4. **Auditor** monitors progress and enforces quality
 5. **Brain** evaluates results — GO, NO-GO, or GO_WITH_TECH_DEBT
 6. Results and learnings are stored in `.brain/` for the next sprint

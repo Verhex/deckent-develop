@@ -1,6 +1,6 @@
 # DECKENT TAM DURUM ANALİZİ
 
-> Son güncelleme: 2026-03-20 | Kaynak: Codebase tam tarama | 625 .ts dosya, ~64.834 satır kod, 3.442 test
+> Son güncelleme: 2026-03-21 | Kaynak: Codebase tam tarama | 638 .ts dosya, ~79.571 satır kod, 3.609 test
 
 ---
 
@@ -11,8 +11,8 @@ Deckent, **Claude Code CLI üzerine kurulu bir AI ajan orkestrasyon sistemidir**
 **Ne yapar:**
 - Bir yazılım projesinde yapılması gereken işleri (DIRECTIVES.md) okur
 - Bu işleri görevlere (task) böler ve her birine uygun model atar (opus/sonnet/haiku)
-- tmux oturumları üzerinden paralel worker'lar spawn eder
-- Her worker bağımsız bir Claude CLI instance'ıdır
+- tmux oturumları veya subprocess backend uzerinden paralel worker'lar spawn eder (tmux artik opsiyonel)
+- Her worker bagimsiz bir Claude CLI instance'idir
 - Auditor sürekli izler: sınır ihlali, kilitlenme, stale agent tespiti
 - Sprint sonunda değerlendirme, retrospektif ve bellek yönetimi yapar
 
@@ -25,9 +25,9 @@ Deckent, **Claude Code CLI üzerine kurulu bir AI ajan orkestrasyon sistemidir**
 **Teknoloji:**
 - Dil: TypeScript (ESM)
 - Runtime: Node.js >=18
-- Test: Vitest (3.442 test, 136 test dosyası)
+- Test: Vitest (3.609 test, 149 test dosyası)
 - Build: tsc
-- Bağımlılık: Claude CLI, tmux, git
+- Bagimsizlik: Claude CLI, git (tmux opsiyonel — subprocess backend ile calismadan kaldirilabilir)
 
 ---
 
@@ -690,14 +690,18 @@ HTTP API **yalnızca 127.0.0.1'e** bağlanır — dış ağdan erişilemez. CORS
 
 | Özellik | Durum | Açıklama |
 |---------|-------|----------|
-| **Sandbox Mode** | Flag var, uygulama yok | `start --sandbox-mode` tanımlı ama "not yet available" mesajı veriyor |
-| **Usage Tracking** | Yok | Model/token sayısı, maliyet takibi henüz implemente edilmemiş |
-| **Remote Plugin Install** | Kısıtlı | Git URL desteği var ama npm registry desteği yok |
-| **Multi-Project** | Yok | Tek proje dizininde çalışır, cross-project orkestrasyon yok |
-| **API Key Doğrulaması** | Kısıtlı | API mode'da ANTHROPIC_API_KEY kontrolü var ama detaylı doğrulama yok |
-| **Worker İletişimi** | Dosya tabanlı | Worker'lar birbirleriyle doğrudan iletişim kuramaz, yalnızca dosya sistemi üzerinden |
-| **Test Coverage Raporlama** | Kısıtlı | Worker self-assessment'ta coverage bildirir ama doğrulama yok |
-| **Rollback** | Yok | Başarısız sprint'i geri alma mekanizması yok (git revert manuel) |
+| **Sandbox Mode** | Temel uygulama var | `start --sandbox-mode` SandboxSpawnBackend kullanir: bellek limiti, scope zorlama, ag kisitlamasi |
+| **Usage Tracking** | Tam | UsageTracker: model/token/call sayimi, sprint bazli ve kumulatif raporlama (.deckent/usage/) |
+| **Remote Plugin Install** | Kisitli | Git URL destegi var ama npm registry destegi yok |
+| **Multi-Project** | Yok | Tek proje dizininde calisir, cross-project orkestrasyon yok |
+| **API Key Dogrulamasi** | Tam | Credentials yonetimi: ~/.deckent/credentials/ ile guvenli key saklama (0600 izin) |
+| **Worker Iletisimi** | IPC + dosya | Worker IPC: process.send tabanli MessageChannel (subprocess backend). Dosya tabanli heartbeat fallback olarak korunuyor |
+| **Test Coverage Raporlama** | Tam | CoverageValidator: vitest JSON ciktisi parse, %5 esik ile dogrulama, evaluateResult entegrasyonu |
+| **Rollback** | Tam | Git safety point (branch) sprint oncesi, basarisiz sprint'te otomatik rollback teklifi |
+| **Subprocess Backend** | Tam | tmux olmadan child_process.spawn ile worker calistirma. SpawnBackendFactory: config.spawn_backend'e gore secim |
+| **Zero-Config Mode** | Tam | `deckent start "aciklama"` ile tek satirda sprint baslat, gecici DIRECTIVES.md olusturulur |
+| **Provider Abstraction** | Tam | ProviderAdapter + ProviderRegistry: Brain'i spawn mekanizmasindan bagimsizlastirir |
+| **Global Config** | Tam | ~/.deckent/config.json: global ayarlar, proje config ile merge (proje oncelikli) |
 
 ### Bilinen Teknik Borçlar (Sprint 025-026)
 
@@ -716,10 +720,10 @@ Son iki sprint'te çeşitli item'lar `GO_WITH_TECH_DEBT` olarak kapatıldı:
 
 | Metrik | Değer |
 |--------|-------|
-| Toplam .ts dosya | 625 |
-| Toplam kaynak kodu | ~64.834 satır |
-| Test sayısı | 3.442 (tümü geçiyor) |
-| Test dosyası | 136 |
+| Toplam .ts dosya | 638 |
+| Toplam kaynak kodu | ~79.571 satır |
+| Test sayısı | 3.609 (tumu geciyor) |
+| Test dosyası | 149 |
 | Test süresi | ~38s |
 
 ### Kritik Modül Boyutları
@@ -762,6 +766,7 @@ Sprint 20: 1.260 test (+137)
 Sprint 21-22: 1.402 test (+142)
 Sprint 23-24 (Mega): 3.150 test (+1.748)
 Sprint 25-26: 3.442 test (+292)
+Sprint 27-30: 3.609 test (+167) — provider abstraction, subprocess backend, usage tracker, rollback, worker IPC, zero-config
 ```
 
 ### Konfigürasyon Modları
@@ -775,4 +780,4 @@ Sprint 25-26: 3.442 test (+292)
 
 ---
 
-*Bu doküman, deckent code base'inin tam taramasıyla oluşturulmuştur. Kaynak: 625 TypeScript dosyası, 3 paralel analiz ajanı.*
+*Bu dokuman, deckent code base'inin tam taramasiyla olusturulmustur. Kaynak: 638 TypeScript dosyasi, 3 paralel analiz ajani.*

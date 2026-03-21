@@ -1844,9 +1844,10 @@ Full directive: `docs/directives/sprint-029.md`
 | 23 | 1422 | 97.5% | AI planner fallback fix, 12/12 tasks (first time), task queue waves validated |
 | 24 (Mega) | 3150 | 97.5% | Plugin v2, i18n runtime, +1449 tests, OSS infra (CONTRIBUTING, LICENSE, CI) |
 | 25-26 | 3442 | 97.5% | Tech debt cleanup, readJsonSafe migration, integration tests, OSS files |
-| 27 | — | Planned | Teknik boşluk kapatma: provider abstraction, subprocess spawn, zero-config, rollback, usage tracking, sandbox, IPC |
-| 28 | — | Planned | npm publish hazırlık: publish pipeline, İngilizce README, onboard wizard, error UX, upgrade/usage implement |
-| 29 | — | Planned | Gerçek dünya testi + beta: E2E smoke tests, cross-platform, npm 0.1.0-beta.1, performance benchmark, launch prep |
+| 27 | 3609 | 97.5% | Technical gap closure: provider abstraction, subprocess backend, usage tracker, coverage validator, rollback, worker IPC, sandbox, global config, zero-config, credentials. 13 new modules, +14,737 lines |
+| 28 | 3609 | 97.5% | Subprocess backend verification sprint (tmux mode — pre-fix) |
+| 29 | 3609 | 97.5% | Subprocess backend verification sprint (tmux mode — pre-fix, rebuild needed) |
+| 30 | 3609 | 97.5% | Subprocess backend REAL test — tmux-free sprint verified, 4 workers via child_process.spawn |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1867,6 +1868,10 @@ Full directive: `docs/directives/sprint-029.md`
 **Mega sprint milestone (Sprint 24):** Plugin v2 system (install/create/remove/hooks), i18n runtime, +1449 tests in a single sprint. OSS infrastructure: CONTRIBUTING.md, LICENSE, CI pipeline. Test count jumped from 1701 to 3150.
 
 **OSS readiness milestone (Sprint 25-26):** Tech debt cleanup sprint. readJsonSafe import migration completed across brain.ts, debt-manager.ts, auditor.ts. Integration tests added. OSS files polished. 3442 tests total.
+
+**Technical gap closure milestone (Sprint 27):** 30 tasks completed in a single sprint. Provider abstraction (ProviderAdapter interface + ProviderRegistry) decouples Brain from specific spawn mechanisms. SpawnBackendFactory selects TmuxBackend or SubprocessBackend based on config.spawn_backend. Usage tracking via UsageTracker stores per-sprint metrics. Coverage validation parses vitest JSON output. Git rollback creates safety branches before each sprint. Worker IPC enables process.send-based communication for subprocess workers. Zero-config mode allows `deckent start "description"` without writing DIRECTIVES.md. 13 new modules, 167 new tests (3442→3609), +14,737 lines of code.
+
+**Subprocess backend milestone (Sprint 30):** First tmux-free sprint completed successfully. brain.ts reads config.spawn_backend and creates backend via SpawnBackendFactory.create(). With spawn_backend: "subprocess", workers spawn as direct child_process without tmux. Verified: `tmux ls` returns "no server running", 4 claude processes running with no TTY (? in ps output). tmux is now fully optional.
 
 ---
 

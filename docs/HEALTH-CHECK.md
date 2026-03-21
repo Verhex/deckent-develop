@@ -1,7 +1,7 @@
-# Deckent Health Check — Post-Sprint 23
+# Deckent Health Check — Post-Sprint 30
 
-*Last audit: 2026-03-18 (Sprint 23 complete)*
-*Next audit: Sprint 24 completion*
+*Last audit: 2026-03-21 (Sprint 30 complete)*
+*Next audit: Sprint 31 completion*
 
 ---
 
@@ -23,8 +23,8 @@
 
 | Status | Count | Commands |
 |--------|-------|----------|
-| WORKING | 24 | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run |
-| STUB | 4 | usage (placeholder), plugin install/list (not implemented), upgrade (placeholder), onboard (placeholder) |
+| WORKING | 25 | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, usage |
+| STUB | 3 | plugin install/list (not implemented), upgrade (placeholder), onboard (placeholder) |
 
 ### Section 5: Agent System
 
@@ -33,7 +33,7 @@
 | Brain planSprint | WORKING | AI + structured + auto mode, post-validation fallback (Sprint 23 fix) |
 | Brain runSprint | WORKING | 8-phase lifecycle, 12/12 tasks in Sprint 23 (321s, 8+4 queue) |
 | Auditor scanLoop | WORKING | Heartbeat check fixed (Sprint 19), alert dedup working |
-| Worker spawn | WORKING | tmux new-window + send-keys + pipe-pane log capture |
+| Worker spawn | WORKING | SpawnBackendFactory — tmux (default) or subprocess backend. Config: spawn_backend: "subprocess" |
 | Worker .result | WORKING | 12 workers wrote .result files in Sprint 23 |
 | Task queue | WORKING | First validated in Sprint 23: 8 worker + 4 queued, wave mechanism |
 | End-to-end chain | WORKING | Sprint 23: 12/12 tasks completed, 0 NO-GO, 321s |
@@ -88,7 +88,7 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 - No end-to-end flow tests
 
 ### Section 23: Roadmap — Phase 1 MET
-- 1422 tests > 987 target
+- 3609 tests > 987 target
 - 97.5% coverage > 97% target
 - MCP stable, HTTP API, Web Dashboard, AI planning, task queue validated
 
@@ -98,14 +98,14 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 | Metric | Value | Source |
 |--------|-------|--------|
-| Tests | 1422 | `npx vitest run` |
-| Test files | 55 | `npx vitest run` |
+| Tests | 3609 | `npx vitest run` |
+| Test files | 174 | `npx vitest run` |
 | Coverage | 97.5% | `npx vitest run --coverage` |
 | CLI commands | 28 | src/cli/commands/ |
 | MCP tools | 10 (enriched) | src/mcp/tools/ |
 | MCP resources | 5 | src/mcp/resources/ |
 | HTTP endpoints | 16 | src/api/server.ts |
-| Sprints | 23 | .brain/sprints/ |
+| Sprints | 30 | .brain/sprints/ |
 | .brain/ budget | ~180 / 300 lines | countBrainLines() |
 
 ---
@@ -136,7 +136,7 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 |------|--------|----------|
 | Plugin system | Stub (not implemented) | LOW |
 | i18n runtime | Partial (CLI hints + MCP enrichment only) | LOW |
-| Usage command | Placeholder | LOW |
+| Usage command | WORKING | -- |
 | Upgrade command | Placeholder | LOW |
 | Onboard command | Placeholder | LOW |
 | Self-evolving loop | Manual, not automatic | MEDIUM |
@@ -156,4 +156,22 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 ---
 
-*Updated every sprint. Next audit: Sprint 24.*
+### Sprint 27 Features (Technical Gap Closure)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Provider Abstraction | WORKING | ProviderAdapter interface + ProviderRegistry + ClaudeAdapter |
+| SpawnBackend Abstraction | WORKING | TmuxBackend + SubprocessBackend + SpawnBackendFactory, config-driven |
+| Subprocess Backend | VERIFIED | Sprint 30: tmux-free sprint completed successfully, 4 workers via child_process |
+| Usage Tracking | WORKING | UsageTracker class, sprint-based JSON storage, model breakdown |
+| Coverage Validation | WORKING | parseCoverageFromVitest, validateCoverage, doc-task skip |
+| Rollback Mechanism | WORKING | createSafetyPoint, rollback, getRollbackPolicy, DEBT.md recording |
+| Worker IPC | WORKING | WorkerChannel + ChannelRegistry, HEARTBEAT/PAUSE/RESUME/KILL messages |
+| Zero-Config Mode | WORKING | Single-line start: `deckent start "Add login page"` |
+| Sandbox Mode | PARTIAL | SandboxSpawnBackend exists, --sandbox-mode flag, needs Docker integration |
+| Global Config | WORKING | ~/.deckent/config.json, ensureGlobalDir, merge with project config |
+| Credentials Management | WORKING | ~/.deckent/credentials/, file permissions 0600, storeCredential/getCredential |
+
+---
+
+*Updated every sprint. Next audit: Sprint 31.*

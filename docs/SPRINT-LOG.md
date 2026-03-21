@@ -629,3 +629,131 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 026-035: tmp-test Cleanup (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 27 — sprint-027
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-21
+**Duration:** 126s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | 25.0% |
+| Duration | 125894ms |
+
+### Tasks
+
+- 027-001: Subprocess Backend Verification (GO_WITH_TECH_DEBT)
+- 027-002: Provider Abstraction Verification (DONE)
+- 027-003: Rollback Mechanism Verification (GO_WITH_TECH_DEBT)
+- 027-004: Worker IPC Verification (GO_WITH_TECH_DEBT)
+
+**Key Deliverables:**
+- Provider abstraction: ProviderAdapter + ProviderRegistry + ClaudeAdapter
+- SpawnBackend: TmuxBackend + SubprocessBackend + SpawnBackendFactory
+- Usage tracking: UsageTracker with sprint-based JSON storage
+- Coverage validation: vitest JSON parsing + threshold checks
+- Rollback: Git safety points + auto-rollback policy
+- Worker IPC: WorkerChannel + ChannelRegistry (HEARTBEAT/PAUSE/RESUME/KILL)
+- Zero-config: single-line `deckent start "description"` mode
+- Sandbox foundation: SandboxSpawnBackend with memory/fs limits
+- Global config: ~/.deckent/ directory + merge with project
+- Credentials: secure key storage with 0600 permissions
+- 13 new modules, 167 new tests (3442 → 3609), +14,737 lines
+
+---
+## Sprint 28 — sprint-028
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-21
+**Duration:** 193s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | 25.0% |
+| Duration | 192915ms |
+
+### Tasks
+
+- 028-001: Subprocess Backend Verification (DONE)
+- 028-002: No-Tmux Verification (GO_WITH_TECH_DEBT)
+- 028-003: Provider Abstraction Analysis (GO_WITH_TECH_DEBT)
+- 028-004: Sprint 27 Feature Summary (GO_WITH_TECH_DEBT)
+
+**Key Deliverables:**
+- Subprocess backend verification: child_process.spawn workers confirmed functional
+- Provider abstraction analysis: ClaudeAdapter + SpawnBackendFactory integration validated
+
+---
+## Sprint 29 — sprint-029
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-21
+**Duration:** 127s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 126519ms |
+
+### Tasks
+
+- 029-001: Subprocess Backend Verification (GO_WITH_TECH_DEBT)
+- 029-002: No-Tmux Verification (GO_WITH_TECH_DEBT)
+- 029-003: Provider Abstraction Analysis (GO_WITH_TECH_DEBT)
+- 029-004: Sprint 27 Feature Summary (GO_WITH_TECH_DEBT)
+
+**Key Deliverables:**
+- Continued subprocess backend verification in tmux-free environment
+- No-tmux mode validation: workers spawn and complete without tmux dependency
+
+---
+## Sprint 30 — sprint-030
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-21
+**Duration:** 235s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 33.3% |
+| Duration | 234552ms |
+
+### Tasks
+
+- 030-001: Fix debt: Tech debt from 027-003: Verification report written to tmp-test/rollback-verify. (DONE)
+- 030-002: Fix debt: Tech debt from 027-004: Comprehensive verification report written to tmp-test/ip (DONE)
+- 030-003: Subprocess Backend Verification (GO_WITH_TECH_DEBT)
+- 030-004: No-Tmux Verification (GO_WITH_TECH_DEBT)
+- 030-005: Provider Abstraction Analysis (GO_WITH_TECH_DEBT)
+- 030-006: Sprint 27 Feature Summary (GO_WITH_TECH_DEBT)
+
+**Key Deliverables:**
+- Rollback mechanism debt fixed: verification reports for rollback + Worker IPC
+- Tmux-free sprint completed successfully: 4 workers via subprocess backend
+- Sprint 27 feature summary and provider abstraction analysis finalized
+
+---

@@ -60,7 +60,7 @@ npm run clean        # Remove dist/
 
 ```bash
 npm run lint    # Should exit with no errors
-npm test        # Should pass all tests (3150+)
+npm test        # Should pass all tests (3609+)
 npm run build   # Should produce dist/ with no errors
 ```
 
@@ -79,6 +79,7 @@ deckent/
 │   │   ├── utils.ts        — Shared utility functions (countBrainLines, etc.)
 │   │   ├── analyzer.ts     — Project stack/size/methodology analysis
 │   │   └── index.ts        — Barrel: re-exports core public API
+│   ├── providers/          — Provider adapters (Claude, subprocess, sandbox)
 │   ├── orchestra/          — Sprint orchestration and tmux management
 │   │   ├── brain.ts        — Sprint lifecycle: plan → run → evaluate → decay
 │   │   ├── planner.ts      — AI task planning (Zod-validated, imports only core/)

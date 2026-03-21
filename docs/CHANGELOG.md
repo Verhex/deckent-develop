@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint30] - 2026-03-21
+
+### Added
+
+- **Fix debt: Tech debt from 027-003: Verification report written to tmp-test/rollback-verify.**: DONE
+- **Fix debt: Tech debt from 027-004: Comprehensive verification report written to tmp-test/ip**: DONE
+- **Subprocess Backend Verification**: GO_WITH_TECH_DEBT
+- **No-Tmux Verification**: GO_WITH_TECH_DEBT
+- **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
+- **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
+- **Tasks**: 6 total, 6 done, 4 tech debt, 0 no-go
+## [0.1.0-sprint29] - 2026-03-21
+
+### Added
+
+- **Subprocess Backend Verification**: GO_WITH_TECH_DEBT
+- **No-Tmux Verification**: GO_WITH_TECH_DEBT
+- **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
+- **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
+- **Tasks**: 4 total, 4 done, 4 tech debt, 0 no-go
+## [0.1.0-sprint28] - 2026-03-21
+
+### Added
+
+- **Subprocess Backend Verification**: DONE
+- **No-Tmux Verification**: GO_WITH_TECH_DEBT
+- **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
+- **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
+- **Tasks**: 4 total, 4 done, 3 tech debt, 0 no-go
+## [0.1.0-sprint27] — 2026-03-21 (Technical Gap Closure)
+
+### Added
+- **Provider Abstraction**: ProviderAdapter interface, ProviderRegistry singleton, ClaudeAdapter
+- **SpawnBackend Abstraction**: TmuxBackend, SubprocessBackend, SpawnBackendFactory (config-driven)
+- **Subprocess Backend**: Workers via child_process.spawn — tmux no longer required
+- **Usage Tracking**: UsageTracker class with sprint-based JSON storage in .deckent/usage/
+- **Coverage Validation**: parseCoverageFromVitest, validateCoverage with 5% threshold
+- **Rollback Mechanism**: Git safety points (deckent-backup-{sprintId}), auto-rollback on all NO_GO
+- **Worker IPC**: WorkerChannel + ChannelRegistry for process.send-based communication
+- **Zero-Config Mode**: `deckent start "description"` — single-line natural language sprint
+- **Sandbox Foundation**: SandboxSpawnBackend with memory limits and scope enforcement
+- **Global Config**: ~/.deckent/config.json with project merge (project takes priority)
+- **Credentials Management**: Secure key storage in ~/.deckent/credentials/ (0600 permissions)
+- 13 new source modules, 167 new tests (3442 → 3609)
+
+### Changed
+- brain.ts reads config.spawn_backend and uses SpawnBackendFactory.create()
+- evaluateResult integrates coverage validation (doc tasks skip)
+- spawnWorkers supports SpawnBackend abstraction (backward compatible)
+- tmux is now optional — subprocess backend available for non-tmux environments
+
+### Fixed
+- brain-ipc.test.ts task ID mismatch in channel registration
+- brain-usage.test.ts OOM — removed heavy runSprint integration, kept unit tests
+- ESM require() → direct import in spawn-backend.ts (TmuxBackend + SubprocessBackend)
 ## [0.1.0-sprint26] - 2026-03-20
 
 ### Added
