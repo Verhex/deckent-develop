@@ -23,8 +23,8 @@
 
 | Status | Count | Commands |
 |--------|-------|----------|
-| WORKING | 25 | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, usage |
-| STUB | 3 | plugin install/list (not implemented), upgrade (placeholder), onboard (placeholder) |
+| WORKING | 27 | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, usage, onboard, upgrade |
+| STUB | 1 | plugin install (not implemented) |
 
 ### Section 5: Agent System
 
@@ -98,8 +98,8 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 | Metric | Value | Source |
 |--------|-------|--------|
-| Tests | 3609 | `npx vitest run` |
-| Test files | 174 | `npx vitest run` |
+| Tests | 4100+ | `npx vitest run` |
+| Test files | 214 | `npx vitest run` |
 | Coverage | 97.5% | `npx vitest run --coverage` |
 | CLI commands | 28 | src/cli/commands/ |
 | MCP tools | 10 (enriched) | src/mcp/tools/ |
@@ -137,8 +137,8 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 | Plugin system | Stub (not implemented) | LOW |
 | i18n runtime | Partial (CLI hints + MCP enrichment only) | LOW |
 | Usage command | WORKING | -- |
-| Upgrade command | Placeholder | LOW |
-| Onboard command | Placeholder | LOW |
+| Upgrade command | WORKING | -- |
+| Onboard command | WORKING | -- |
 | Self-evolving loop | Manual, not automatic | MEDIUM |
 
 ---
@@ -171,6 +171,23 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 | Sandbox Mode | PARTIAL | SandboxSpawnBackend exists, --sandbox-mode flag, needs Docker integration |
 | Global Config | WORKING | ~/.deckent/config.json, ensureGlobalDir, merge with project config |
 | Credentials Management | WORKING | ~/.deckent/credentials/, file permissions 0600, storeCredential/getCredential |
+
+---
+
+### Sprint 28 Features (npm Publish Prep)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Error Registry | WORKING | DeckentError + ErrorRegistry, 10 error codes, i18n support |
+| Error Handler | WORKING | Centralized CLI error handling, colored output, suggestions |
+| TUI Wizard | WORKING | WizardStep interface, select/input/confirm, non-interactive mode |
+| Onboard Wizard | WORKING | Interactive setup: Claude detection, system profile, config |
+| Upgrade Command | WORKING | npm view version check, --check flag, npm install -g |
+| Telemetry | WORKING | Opt-in TelemetryCollector, PII sanitization, default disabled |
+| Publish Pipeline | WORKING | prepublish, build-verify, pack-test, publish scripts |
+| .npmignore | WORKING | Excludes sensitive files from npm package |
+| Enhanced --version | WORKING | System info + --version-json flag |
+| Doctor UX | IMPROVED | Platform-specific install suggestions, [PASS]/[FAIL]/[WARN] colors |
 
 ---
 

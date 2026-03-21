@@ -1845,7 +1845,7 @@ Full directive: `docs/directives/sprint-029.md`
 | 24 (Mega) | 3150 | 97.5% | Plugin v2, i18n runtime, +1449 tests, OSS infra (CONTRIBUTING, LICENSE, CI) |
 | 25-26 | 3442 | 97.5% | Tech debt cleanup, readJsonSafe migration, integration tests, OSS files |
 | 27 | 3609 | 97.5% | Technical gap closure: provider abstraction, subprocess backend, usage tracker, coverage validator, rollback, worker IPC, sandbox, global config, zero-config, credentials. 13 new modules, +14,737 lines |
-| 28 | 3609 | 97.5% | Subprocess backend verification sprint (tmux mode — pre-fix) |
+| 28 | 4100 | 97.5% | npm publish prep: error registry, TUI wizard, onboard/upgrade real, English docs, publish pipeline, .npmignore, telemetry, SECURITY.md |
 | 29 | 3609 | 97.5% | Subprocess backend verification sprint (tmux mode — pre-fix, rebuild needed) |
 | 30 | 3609 | 97.5% | Subprocess backend REAL test — tmux-free sprint verified, 4 workers via child_process.spawn |
 
@@ -1870,6 +1870,8 @@ Full directive: `docs/directives/sprint-029.md`
 **OSS readiness milestone (Sprint 25-26):** Tech debt cleanup sprint. readJsonSafe import migration completed across brain.ts, debt-manager.ts, auditor.ts. Integration tests added. OSS files polished. 3442 tests total.
 
 **Technical gap closure milestone (Sprint 27):** 30 tasks completed in a single sprint. Provider abstraction (ProviderAdapter interface + ProviderRegistry) decouples Brain from specific spawn mechanisms. SpawnBackendFactory selects TmuxBackend or SubprocessBackend based on config.spawn_backend. Usage tracking via UsageTracker stores per-sprint metrics. Coverage validation parses vitest JSON output. Git rollback creates safety branches before each sprint. Worker IPC enables process.send-based communication for subprocess workers. Zero-config mode allows `deckent start "description"` without writing DIRECTIVES.md. 13 new modules, 167 new tests (3442→3609), +14,737 lines of code.
+
+**npm publish readiness milestone (Sprint 28):** Package fully prepared for npm publish. Error UX overhauled with DeckentError + ErrorRegistry (10 codes with platform-specific suggestions). Interactive onboard wizard replaces stub. Upgrade command real. TUI wizard framework for CLI interactions. Telemetry opt-in infrastructure (no data sent). Publish pipeline: prepublish validation, build verification, pack test, npm publish with --dry-run default. README.md rewritten in English with badges, comparison table, architecture diagram. SECURITY.md, RELEASE-CHECKLIST.md added. .npmignore excludes sensitive files. 66 files changed, +6419 lines, 40 new test files.
 
 **Subprocess backend milestone (Sprint 30):** First tmux-free sprint completed successfully. brain.ts reads config.spawn_backend and creates backend via SpawnBackendFactory.create(). With spawn_backend: "subprocess", workers spawn as direct child_process without tmux. Verified: `tmux ls` returns "no server running", 4 claude processes running with no TTY (? in ps output). tmux is now fully optional.
 

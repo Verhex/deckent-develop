@@ -181,6 +181,27 @@ src/
 | `src/cli/commands/quick-start.ts` | ~85 | Zero-config mode — single-line natural language sprint start |
 | `src/orchestra/doc-updaters/metrics-updater.ts` | ~80 | Sprint metrics README updater |
 
+### core/ — Error & Telemetry (Sprint 28)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/core/errors.ts` | ~120 | DeckentError class, ErrorRegistry with 10 error codes and suggestions |
+| `src/core/telemetry.ts` | ~80 | TelemetryCollector — opt-in event recording with PII sanitization |
+
+### cli/helpers/ — Wizard & Error Handler (Sprint 28)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `src/cli/helpers/wizard.ts` | ~100 | TUI wizard framework — select/input/confirm steps, non-interactive mode |
+| `src/cli/helpers/error-handler.ts` | ~60 | Centralized CLI error handling with colored output |
+| `src/cli/version-info.ts` | ~50 | Enhanced --version with system info + --version-json |
+
+### scripts/ — Publish Pipeline (Sprint 28)
+| File | Lines | Responsibility |
+|------|-------|---------------|
+| `scripts/prepublish.ts` | ~80 | Pre-publish validation (package.json, dist/, size) |
+| `scripts/build-verify.ts` | ~100 | Build verification (tsc, shebang, dist files, circular deps) |
+| `scripts/pack-test.ts` | ~90 | npm pack dry-run validation (excluded/required files, size) |
+| `scripts/publish.ts` | ~120 | Full publish pipeline (build, test, pack, version bump, tag, publish) |
+
 ---
 
 ## 3. Module Responsibilities & Boundaries

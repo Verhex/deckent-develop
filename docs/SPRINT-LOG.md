@@ -692,8 +692,17 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 028-004: Sprint 27 Feature Summary (GO_WITH_TECH_DEBT)
 
 **Key Deliverables:**
-- Subprocess backend verification: child_process.spawn workers confirmed functional
-- Provider abstraction analysis: ClaudeAdapter + SpawnBackendFactory integration validated
+- Error UX: DeckentError + ErrorRegistry (10 codes), error-handler.ts, doctor enhanced messages
+- Interactive onboard wizard: Claude detection, system profile, config recommendation
+- Upgrade command: real npm update with version check
+- TUI wizard framework: select/input/confirm steps, non-interactive mode
+- Telemetry opt-in infrastructure (no data sent yet)
+- Publish pipeline: prepublish, build-verify, pack-test, publish scripts
+- .npmignore for clean npm package
+- README.md complete English rewrite
+- 5 docs English polish (QUICKSTART, API, CONFIG-REFERENCE, CONTRIBUTING, docs)
+- 3 new docs (SECURITY.md, RELEASE-CHECKLIST.md, landing-page-content.md)
+- 66 files changed, +6419 lines, 40 new test files
 
 ---
 ## Sprint 29 — sprint-029

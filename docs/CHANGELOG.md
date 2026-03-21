@@ -25,15 +25,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
 - **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
 - **Tasks**: 4 total, 4 done, 4 tech debt, 0 no-go
-## [0.1.0-sprint28] - 2026-03-21
+## [0.1.0-sprint28] — 2026-03-21 (npm Publish Prep)
 
 ### Added
+- **Error Registry**: DeckentError class + ErrorRegistry with 10 error codes and fix suggestions
+- **Telemetry Infrastructure**: TelemetryCollector (opt-in, PII sanitization, GDPR-ready)
+- **TUI Wizard Framework**: WizardStep interface (select/input/confirm) for interactive CLI
+- **Error Handler**: Centralized CLI error handling with colored output and suggestions
+- **Version Info**: Enhanced `--version` with Node.js, OS, tmux, claude status + `--version-json`
+- **Publish Scripts**: prepublish.ts, build-verify.ts, pack-test.ts, publish.ts
+- **.npmignore**: Excludes .brain/, .tasks/, .locks/, tests/, src/ from npm package
+- **SECURITY.md**: Security policy with vulnerability reporting process
+- **RELEASE-CHECKLIST.md**: 11-step release checklist
+- **Landing Page Content**: Marketing content for deckent.agency
 
-- **Subprocess Backend Verification**: DONE
-- **No-Tmux Verification**: GO_WITH_TECH_DEBT
-- **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
-- **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
-- **Tasks**: 4 total, 4 done, 3 tech debt, 0 no-go
+### Changed
+- **onboard command**: Stub replaced with interactive wizard (Claude detection, system profile, config recommendation)
+- **upgrade command**: Stub replaced with real npm update (version check, --check flag)
+- **README.md**: Complete English rewrite with badges, comparison table, architecture diagram
+- **CONTRIBUTING.md**: English update with dev guides (add CLI command, add MCP tool)
+- **docs/QUICKSTART.md, API.md, CONFIG-REFERENCE.md**: English polish with curl examples
+- **doctor.ts**: Enhanced error messages with platform-specific install suggestions
+- **Changelog updater**: Keep a Changelog format (Added/Changed/Fixed categories)
+- **Doctor output**: Traffic light format [PASS]/[FAIL]/[WARN] with colors
+
+### Fixed
+- brain.test.ts changelog format expectations updated for Keep a Changelog
+- Doctor test expectations updated for [PASS]/[FAIL] format
+- Onboard test updated for real implementation output
+
 ## [0.1.0-sprint27] — 2026-03-21 (Technical Gap Closure)
 
 ### Added

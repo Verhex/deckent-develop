@@ -1,6 +1,6 @@
 # DECKENT TAM DURUM ANALİZİ
 
-> Son güncelleme: 2026-03-21 | Kaynak: Codebase tam tarama | 638 .ts dosya, ~79.571 satır kod, 3.609 test
+> Son güncelleme: 2026-03-21 | Kaynak: Codebase tam tarama | 638 .ts dosya, ~85.990 satır kod, 4.100+ test
 
 ---
 
@@ -25,7 +25,7 @@ Deckent, **Claude Code CLI üzerine kurulu bir AI ajan orkestrasyon sistemidir**
 **Teknoloji:**
 - Dil: TypeScript (ESM)
 - Runtime: Node.js >=18
-- Test: Vitest (3.609 test, 149 test dosyası)
+- Test: Vitest (4.100+ test, 214 test dosyası)
 - Build: tsc
 - Bagimsizlik: Claude CLI, git (tmux opsiyonel — subprocess backend ile calismadan kaldirilabilir)
 
@@ -144,13 +144,19 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 | `deckent plugin create <name>` | src/cli/commands/plugin.ts | — | Tam | Plugin scaffold oluştur (manifest.json, SKILL.md, README.md) |
 | `deckent plugin install <name>` | src/cli/commands/plugin.ts | — | **Stub** | Henüz uygulanmadı |
 
-### Stub Komutlar (3 komut)
+### Stub Komutlar (1 komut)
 
 | Komut | Dosya | Durum | Mesaj |
 |-------|-------|-------|-------|
-| `deckent usage` | src/cli/commands/usage.ts | **Stub** | "Usage tracking not yet available" |
-| `deckent upgrade` | src/cli/commands/upgrade.ts | **Stub** | "Use: npm update -g deckent" |
-| `deckent onboard` | src/cli/commands/onboard.ts | **Stub** | "Use: deckent init" |
+| `deckent plugin install` | src/cli/commands/plugin.ts | **Stub** | Henuz uygulanmadi |
+
+### Yeni Tam Uygulamalar (Sprint 28)
+
+| Komut | Dosya | Durum | Aciklama |
+|-------|-------|-------|----------|
+| `deckent onboard` | src/cli/commands/onboard.ts | **Tam** | Interaktif wizard: Claude tespit, sistem profil, config onerisi |
+| `deckent upgrade` | src/cli/commands/upgrade.ts | **Tam** | npm view ile versiyon kontrolu, --check flag, npm install -g |
+| `deckent usage` | src/cli/commands/usage.ts | **Tam** | UsageTracker'dan veri okuma, --json, --sprint filtre |
 
 ---
 
@@ -677,14 +683,19 @@ HTTP API **yalnızca 127.0.0.1'e** bağlanır — dış ağdan erişilemez. CORS
 
 ## 13. YAPILAMAYAN / EKSİK OLANLAR
 
-### Stub Komutlar (Henüz Uygulanmamış)
+### Stub Komutlar (Henuz Uygulanmamis)
 
-| Özellik | Dosya | Durum | Alternatif |
+| Ozellik | Dosya | Durum | Alternatif |
 |---------|-------|-------|------------|
-| `deckent usage` | src/cli/commands/usage.ts | Stub | Sprint telemetry henüz yok |
-| `deckent upgrade` | src/cli/commands/upgrade.ts | Stub | `npm update -g deckent` |
-| `deckent onboard` | src/cli/commands/onboard.ts | Stub | `deckent init` kullanın |
 | `deckent plugin install` | src/cli/commands/plugin.ts | Stub | Manuel kurulum |
+
+### Sprint 28 ile Tam Uygulama Gecen Komutlar
+
+| Ozellik | Dosya | Durum | Aciklama |
+|---------|-------|-------|----------|
+| `deckent onboard` | src/cli/commands/onboard.ts | Tam | Interaktif wizard: Claude tespit, sistem profil, config onerisi |
+| `deckent upgrade` | src/cli/commands/upgrade.ts | Tam | npm view ile versiyon kontrolu, --check flag |
+| `deckent usage` | src/cli/commands/usage.ts | Tam | UsageTracker entegrasyonu, --json, --sprint filtre |
 
 ### Eksik / Kısıtlı Özellikler
 
@@ -703,7 +714,18 @@ HTTP API **yalnızca 127.0.0.1'e** bağlanır — dış ağdan erişilemez. CORS
 | **Provider Abstraction** | Tam | ProviderAdapter + ProviderRegistry: Brain'i spawn mekanizmasindan bagimsizlastirir |
 | **Global Config** | Tam | ~/.deckent/config.json: global ayarlar, proje config ile merge (proje oncelikli) |
 
-### Bilinen Teknik Borçlar (Sprint 025-026)
+### Sprint 28 Yeni Ozellikler (npm Publish Prep)
+
+| Ozellik | Durum | Aciklama |
+|---------|-------|----------|
+| **npm Publish Pipeline** | Tam | .npmignore, prepublish validation, build-verify, pack-test, publish scripts |
+| **Error UX** | Tam | DeckentError + ErrorRegistry, 10 hata kodu, platform bazli cozum onerileri |
+| **Interactive Onboard Wizard** | Tam | Claude tespit, sistem profil, config onerisi |
+| **Telemetry Altyapisi** | Tam | Opt-in TelemetryCollector, PII temizleme, varsayilan kapali |
+| **TUI Wizard Framework** | Tam | WizardStep: select/input/confirm, non-interactive mode destegi |
+| **Enhanced --version** | Tam | Node.js, OS, tmux, claude durum bilgisi + --version-json |
+
+### Bilinen Teknik Borclar (Sprint 025-026)
 
 Son iki sprint'te çeşitli item'lar `GO_WITH_TECH_DEBT` olarak kapatıldı:
 - package.json `files` field düzeltmesi
@@ -722,8 +744,8 @@ Son iki sprint'te çeşitli item'lar `GO_WITH_TECH_DEBT` olarak kapatıldı:
 |--------|-------|
 | Toplam .ts dosya | 638 |
 | Toplam kaynak kodu | ~79.571 satır |
-| Test sayısı | 3.609 (tumu geciyor) |
-| Test dosyası | 149 |
+| Test sayisi | 4.100+ (tumu geciyor) |
+| Test dosyasi | 214 |
 | Test süresi | ~38s |
 
 ### Kritik Modül Boyutları
@@ -748,7 +770,7 @@ Son iki sprint'te çeşitli item'lar `GO_WITH_TECH_DEBT` olarak kapatıldı:
 
 | Arayüz | Adet |
 |--------|------|
-| CLI komutları | 25 (21 tam, 4 stub) |
+| CLI komutlari | 28 (27 tam, 1 stub) |
 | MCP tool'ları | 10 |
 | MCP resource'ları | 5 |
 | HTTP GET endpoint'leri | 11 |
@@ -767,6 +789,7 @@ Sprint 21-22: 1.402 test (+142)
 Sprint 23-24 (Mega): 3.150 test (+1.748)
 Sprint 25-26: 3.442 test (+292)
 Sprint 27-30: 3.609 test (+167) — provider abstraction, subprocess backend, usage tracker, rollback, worker IPC, zero-config
+Sprint 28 (npm publish): 4.100+ test (+491) — error registry, TUI wizard, onboard/upgrade real, telemetry, publish pipeline
 ```
 
 ### Konfigürasyon Modları
@@ -780,4 +803,4 @@ Sprint 27-30: 3.609 test (+167) — provider abstraction, subprocess backend, us
 
 ---
 
-*Bu dokuman, deckent code base'inin tam taramasiyla olusturulmustur. Kaynak: 638 TypeScript dosyasi, 3 paralel analiz ajani.*
+*Bu dokuman, deckent code base'inin tam taramasiyla olusturulmustur. Kaynak: 700+ TypeScript dosyasi, ~85.990 satir kod, 4.100+ test.*
