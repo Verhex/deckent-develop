@@ -48,14 +48,48 @@
 - Global Config + Config Export/Import Tamamlama: GO_WITH_TECH_DEBT
 - FAQ Dokümanı (NO_GO Fix): GO_WITH_TECH_DEBT
 - Integration Test — init→plan→status E2E (NO_GO Fix): GO_WITH_TECH_DEBT
-## Sprint sprint-033 Learnings
-- EventEmitter MaxListeners Fix: GO_WITH_TECH_DEBT
-- Onboard Test Timeout Fix: GO_WITH_TECH_DEBT
-- README Badge Update: GO_WITH_TECH_DEBT
-- File Extension Constant Usage: GO_WITH_TECH_DEBT
-- Sprint Observation Docs Archive: GO_WITH_TECH_DEBT
-- CI Coverage Gate: GO_WITH_TECH_DEBT
-- readJsonSafe Migration: NO_GO
-- Error Handling Unification: NO_GO
-- Silent Catch Logging: NO_GO
-- parseBody Type Safety: GO_WITH_TECH_DEBT
+## Sprint 035 Learnings (Beta Cleanup Wave 1+2)
+- readJsonSafe Migration: 13 inline JSON.parse → readJsonSafe(), readJsonSafeAsync() eklendi
+- Error Handling Unification: 11 generic throw → DeckentError + ErrorRegistry (E039-E053)
+- Silent Catch Logging: debugLog() helper, DECKENT_DEBUG env gate, 8 catch block güncellendi
+- parseBody Type Safety: 5 Zod schema (Start/Plan/Directives/Config/Kill), parseBodyWithSchema()
+- Utility Extraction: readFileIfExists, listFilesWithExtension, safeMapGet → utils.ts
+- EventEmitter: dedicated _ipcEmitter + setMaxListeners(0), process EventEmitter kullanımı bitti
+- tmux worker crash recovery: agent-based subprocess fallback çalışıyor
+
+## Sprint 036 Learnings (Beta Cleanup Wave 3+4)
+- brain.ts God Object Split: 1312→58 satır, sprint-controller.ts + result-evaluator.ts + usage-manager.ts
+- Re-export pattern: brain.ts pure re-export layer, backward compat korundu
+- Task 1-3 paralel extraction stratejisi: yeni dosya oluştur, brain.ts'ye dokunma, slim-down ayrı task
+- spawn-backend.ts: core/ → orchestra/ taşındı (layer violation fix)
+- types.ts Split: 524 satır → task-types, config-types, monitoring-types, sprint-types + barrel
+- Non-null assertion: 48 `!` → guard clause, `.at()`, `?? fallback` (29 dosya)
+- Type cast: enum literal kullanımı (`TaskStatus.DONE` vs `'DONE' as TaskStatus`), type guard'lar
+- Barrel cleanup: orchestra/index.ts 30+ → 22 public API, @internal JSDoc
+- Auditor queue: shift() O(n) → descending sort + pop() O(1)
+- PromptAnalytics: prompt-metrics + prompt-ab-test → unified class, stub re-export
+## Sprint 037 Learnings (Beta Cleanup Wave 5+6)
+- Security: timingSafeEqual (SHA-256 hash), redactSensitive (API key/Bearer/URL password masking)
+- Agent Pool: LRU eviction (max 50 temp, 5 sprint age), batch read (N+1 → single readdirSync)
+- Skill Sandbox AST: TypeScript compiler API second-pass (eval, Function, child_process detection)
+- DIRECTIVES Zod Schema: DirectiveSchema + DirectiveTaskSchema validation before task creation
+- Plugin System: full install (npm/git/local + rollback), runtime hooks (beforeSprint/afterTask/afterSprint)
+- Memory Budget: 300→600, decay 3→5 sprints, RETRO 60→100, sprint log 50→80
+- PROJECT-IDENTITY.md: permanent project memory, never decayed, updated every sprint
+- finalizeSprint(): post-sprint actions regardless of execution mode + `deckent finalize` CLI
+- Config mode aliases: performance/balanced/economic/unlimited → canonical mode names
+
+## Sprint 038 Learnings (Multi-Provider Infrastructure)
+- ModelType Extended: ClaudeModel | OpenAIModel | GeminiModel (8 models, 3 providers)
+- ProviderName = 'claude' | 'codex' | 'gemini', PROVIDER_MODEL_MAP for validation
+- Model Equivalence: tier-based (premium/standard/economy), economy gemini → standard fallback
+- Provider Capabilities: ProviderCapability interface (streaming, vision, cost, context tokens)
+- Codex/Gemini Adapters: ProviderAdapter interface, spawn/kill/checkUsage/buildCommand
+- Multi-Provider Config: brain_provider, worker_provider, fallback_provider, env var overrides
+- Provider-Aware Model Selector: resolveTaskModel + provider param, tier→equivalent mapping
+- spawnWorkers Routing: task.provider field, mixed sprint (Claude tmux + Codex/Gemini subprocess)
+- Provider Fallback Chain: resolveProviderWithFallback, single retry, no infinite loops
+- Decoupling: planner/tmux/subprocess all accept ProviderAdapter, backward compat via default
+- CLI Entrypoint: buildProgram() + entry.ts, no side-effects on import
+- bootstrapProviders(): single startup point, detect + register + set default
+- Platform: describe.skipIf(isWindows) for tmux/scripts tests, cross-platform helpers
