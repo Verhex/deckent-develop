@@ -186,61 +186,61 @@ describe('planSprint — no max_workers cap on task count', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('creates 5 tasks when max_workers=3 and 5 directives provided', () => {
+  it('creates 5 tasks when max_workers=3 and 5 directives provided', async () => {
     const context = makeBrainContext(
       '- Task one\n- Task two\n- Task three\n- Task four\n- Task five',
     );
     const config = makeConfig(root, 3);
     const recommendation = { size: 'full' as const, maxWorkers: 3, modelConstraint: null, reason: '' };
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     expect(sprint.tasks.length).toBe(5);
   });
 
-  it('creates 10 tasks when max_workers=8 and 10 directives provided', () => {
+  it('creates 10 tasks when max_workers=8 and 10 directives provided', async () => {
     const lines = Array.from({ length: 10 }, (_, i) => `- Directive task ${i + 1}`).join('\n');
     const context = makeBrainContext(lines);
     const config = makeConfig(root, 8);
     const recommendation = { size: 'full' as const, maxWorkers: 8, modelConstraint: null, reason: '' };
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     expect(sprint.tasks.length).toBe(10);
   });
 
-  it('writes all 10 task JSON files to .tasks/ when max_workers=8', () => {
+  it('writes all 10 task JSON files to .tasks/ when max_workers=8', async () => {
     const lines = Array.from({ length: 10 }, (_, i) => `- Task ${i + 1}`).join('\n');
     const context = makeBrainContext(lines);
     const config = makeConfig(root, 8);
     const recommendation = { size: 'full' as const, maxWorkers: 8, modelConstraint: null, reason: '' };
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     const taskFiles = readdirSync(join(root, TASKS_DIR)).filter(f => f.endsWith('.json'));
     expect(taskFiles.length).toBe(10);
     expect(sprint.tasks.length).toBe(10);
   });
 
-  it('creates tasks equal to directive count when max_workers < directive count', () => {
+  it('creates tasks equal to directive count when max_workers < directive count', async () => {
     const lines = Array.from({ length: 6 }, (_, i) => `- Task ${i + 1}`).join('\n');
     const context = makeBrainContext(lines);
     const config = makeConfig(root, 2);
     const recommendation = { size: 'full' as const, maxWorkers: 2, modelConstraint: null, reason: '' };
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     expect(sprint.tasks.length).toBe(6);
     expect(sprint.workers.length).toBe(6);
   });
 
-  it('creates tasks up to directive count regardless of very low max_workers', () => {
+  it('creates tasks up to directive count regardless of very low max_workers', async () => {
     const lines = Array.from({ length: 4 }, (_, i) => `- Task ${i + 1}`).join('\n');
     const context = makeBrainContext(lines);
     const config = makeConfig(root, 1);
     const recommendation = { size: 'full' as const, maxWorkers: 1, modelConstraint: null, reason: '' };
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     expect(sprint.tasks.length).toBe(4);
   });

@@ -52,6 +52,11 @@ export type { SpawnBackend } from '../core/spawn-backend.js';
 import { SpawnBackendFactory } from '../core/spawn-backend.js';
 export { SpawnBackendFactory };
 
+// ─── Core — skill system ─────────────────────────────────────────
+import { detectProjectStack } from '../core/stack-detector.js';
+import { SkillPoolManager } from '../core/skill-pool.js';
+import { selectSkills } from '../core/skill-selector.js';
+
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner } from './planner.js';
 
@@ -442,10 +447,6 @@ export async function planSprint(
 
   // Skill selection (non-fatal — if skill modules fail, continue without skills)
   try {
-    const { detectProjectStack } = await import('../core/stack-detector.js');
-    const { SkillPoolManager } = await import('../core/skill-pool.js');
-    const { selectSkills } = await import('../core/skill-selector.js');
-
     const projectStack = detectProjectStack(projectRoot);
     const skillPool = new SkillPoolManager(projectRoot);
     const skills = skillPool.loadSkills();

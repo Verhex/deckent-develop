@@ -120,7 +120,7 @@ describe('planSprint end-to-end integration', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('creates task files from structured DIRECTIVES.md', () => {
+  it('creates task files from structured DIRECTIVES.md', async () => {
     const root = join(tempDir, 'project-1');
     mkdirSync(root, { recursive: true });
 
@@ -152,7 +152,7 @@ Update project documentation.
     const context = makeContext(root);
     const recommendation = makeRecommendation();
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     // Verify sprint properties
     expect(sprint.tasks.length).toBe(2);
@@ -192,45 +192,45 @@ Update project documentation.
     }
   });
 
-  it('produces PENDING status tasks by default', () => {
+  it('produces PENDING status tasks by default', async () => {
     const root = join(tempDir, 'project-2');
     mkdirSync(root, { recursive: true });
 
     setupProject(root, `# DIRECTIVES\n\n## Görev 1: Task A\n- Kapsam: src/\n### Açıklama\nDo A\n### Test\n- pass\n`);
     const config = makeConfig(root);
     const context = makeContext(root);
-    const sprint = planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
 
     expect(sprint.tasks[0]!.status).toBe(TaskStatus.PENDING);
   });
 
-  it('produces DRAFT status tasks when asDraft=true', () => {
+  it('produces DRAFT status tasks when asDraft=true', async () => {
     const root = join(tempDir, 'project-3');
     mkdirSync(root, { recursive: true });
 
     setupProject(root, `# DIRECTIVES\n\n## Görev 1: Task B\n- Kapsam: src/\n### Açıklama\nDo B\n### Test\n- pass\n`);
     const config = makeConfig(root);
     const context = makeContext(root);
-    const sprint = planSprint(root, config, context, makeRecommendation(), { mode: 'structured', asDraft: true });
+    const sprint = await planSprint(root, config, context, makeRecommendation(), { mode: 'structured', asDraft: true });
 
     expect(sprint.tasks[0]!.status).toBe(TaskStatus.DRAFT);
   });
 
-  it('handles empty directives gracefully', () => {
+  it('handles empty directives gracefully', async () => {
     const root = join(tempDir, 'project-4');
     mkdirSync(root, { recursive: true });
 
     setupProject(root, '# DIRECTIVES\n\nNo structured tasks here.\n');
     const config = makeConfig(root);
     const context = makeContext(root);
-    const sprint = planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
 
     // Falls back to line-by-line parsing — should still produce some tasks
     expect(sprint.tasks.length).toBeGreaterThanOrEqual(0);
     expect(sprint.id).toMatch(/^sprint-\d+$/);
   });
 
-  it('uses modelConstraint from recommendation when provided', () => {
+  it('uses modelConstraint from recommendation when provided', async () => {
     const root = join(tempDir, 'project-5');
     mkdirSync(root, { recursive: true });
 
@@ -240,14 +240,14 @@ Update project documentation.
     const recommendation: SprintSizeRecommendation = {
       size: 'reduced', maxWorkers: 2, modelConstraint: 'haiku', reason: 'High usage',
     };
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     for (const task of sprint.tasks) {
       expect(task.model).toBe('haiku');
     }
   });
 
-  it('assigns sequential task IDs within sprint', () => {
+  it('assigns sequential task IDs within sprint', async () => {
     const root = join(tempDir, 'project-6');
     mkdirSync(root, { recursive: true });
 
@@ -277,7 +277,7 @@ Third task
     setupProject(root, directives);
     const config = makeConfig(root);
     const context = makeContext(root);
-    const sprint = planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
 
     expect(sprint.tasks.length).toBe(3);
     // IDs should be sequential within the sprint number
@@ -286,14 +286,14 @@ Third task
     expect(seqNums).toEqual([1, 2, 3]);
   });
 
-  it('includes workers array matching task IDs', () => {
+  it('includes workers array matching task IDs', async () => {
     const root = join(tempDir, 'project-7');
     mkdirSync(root, { recursive: true });
 
     setupProject(root, `# DIRECTIVES\n\n## Görev 1: Worker Task\n- Kapsam: src/\n### Açıklama\nTest workers\n### Test\n- pass\n`);
     const config = makeConfig(root);
     const context = makeContext(root);
-    const sprint = planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
 
     expect(sprint.workers.length).toBe(sprint.tasks.length);
     for (let i = 0; i < sprint.tasks.length; i++) {
@@ -301,14 +301,14 @@ Third task
     }
   });
 
-  it('sets planningMode to structured when mode=structured', () => {
+  it('sets planningMode to structured when mode=structured', async () => {
     const root = join(tempDir, 'project-8');
     mkdirSync(root, { recursive: true });
 
     setupProject(root, `# DIRECTIVES\n\n## Görev 1: Mode Test\n- Kapsam: src/\n### Açıklama\nTest mode\n### Test\n- pass\n`);
     const config = makeConfig(root);
     const context = makeContext(root);
-    const sprint = planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
 
     expect(sprint.planningMode).toBe('structured');
   });

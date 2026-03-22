@@ -252,50 +252,50 @@ describe('planSprint — creates ALL task JSONs regardless of max_workers', () =
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('creates 14 task JSONs when max_workers=8 and 14 structured directives', () => {
+  it('creates 14 task JSONs when max_workers=8 and 14 structured directives', async () => {
     const directives = makeStructuredDirectives(14);
     const context = makeBrainContext(directives);
     const config = makeConfig(root, 8);
     const recommendation = makeRecommendation(8);
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     expect(sprint.tasks.length).toBe(14);
     const taskFiles = readdirSync(join(root, TASKS_DIR)).filter(f => f.endsWith('.json'));
     expect(taskFiles.length).toBe(14);
   });
 
-  it('creates 20 task JSONs when max_workers=6 and 20 structured directives', () => {
+  it('creates 20 task JSONs when max_workers=6 and 20 structured directives', async () => {
     const directives = makeStructuredDirectives(20);
     const context = makeBrainContext(directives);
     const config = makeConfig(root, 6);
     const recommendation = makeRecommendation(6);
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     expect(sprint.tasks.length).toBe(20);
     const taskFiles = readdirSync(join(root, TASKS_DIR)).filter(f => f.endsWith('.json'));
     expect(taskFiles.length).toBe(20);
   });
 
-  it('sprint.workers length equals all task count (not max_workers)', () => {
+  it('sprint.workers length equals all task count (not max_workers)', async () => {
     const directives = makeStructuredDirectives(14);
     const context = makeBrainContext(directives);
     const config = makeConfig(root, 8);
     const recommendation = makeRecommendation(8);
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     expect(sprint.workers.length).toBe(14);
   });
 
-  it('each task JSON file is valid and contains required fields', () => {
+  it('each task JSON file is valid and contains required fields', async () => {
     const directives = makeStructuredDirectives(5);
     const context = makeBrainContext(directives);
     const config = makeConfig(root, 2);
     const recommendation = makeRecommendation(2);
 
-    planSprint(root, config, context, recommendation, { mode: 'structured' });
+    await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     const taskFiles = readdirSync(join(root, TASKS_DIR)).filter(f => f.endsWith('.json'));
     for (const file of taskFiles) {

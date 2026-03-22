@@ -230,6 +230,28 @@ describe('WorkerChannel', () => {
     const msg: IPCMessage = { type: 'KILL', taskId: 'task-001', timestamp: new Date().toISOString() };
     expect(() => proc._emit(msg)).not.toThrow();
   });
+
+  it('send() returns false when proc.send throws', () => {
+    const throwProc = makeMockProc();
+    (throwProc.send as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('send fail'); });
+    const ch = new WorkerChannel(throwProc, 'throw-task');
+    const result = ch.send('HEARTBEAT', { status: 'ok' });
+    expect(result).toBe(false);
+    ch.close();
+  });
+
+  it('close() uses removeListener fallback when off is unavailable', () => {
+    const noOffProc = makeMockProc();
+    const removeListenerSpy = vi.spyOn(noOffProc, 'removeListener');
+    // @ts-expect-error — intentionally removing off
+    noOffProc.off = undefined;
+
+    const ch = new WorkerChannel(noOffProc, 'no-off-task');
+    ch.close();
+
+    expect(removeListenerSpy).toHaveBeenCalledWith('message', expect.any(Function));
+    expect(ch.isClosed()).toBe(true);
+  });
 });
 
 // ─── ChannelRegistry ──────────────────────────────────────────────────────────
@@ -412,5 +434,85 @@ describe('WorkerSideChannel', () => {
     ch.close();
     // @ts-expect-error
     delete process.send;
+  });
+
+  it('send() returns false when process.send throws', () => {
+    const mockSend = vi.fn().mockImplementation(() => { throw new Error('IPC broken'); });
+    process.send = mockSend as unknown as typeof process.send;
+
+    const ch = new WorkerSideChannel('task-w-010');
+    const result = ch.send('HEARTBEAT', { status: 'EXECUTING' });
+    expect(result).toBe(false);
+
+    ch.close();
+    // @ts-expect-error
+    delete process.send;
+  });
+
+  it('send() returns true on successful process.send', () => {
+    const mockSend = vi.fn().mockReturnValue(true);
+    process.send = mockSend as unknown as typeof process.send;
+
+    const ch = new WorkerSideChannel('task-w-011');
+    const result = ch.send('HEARTBEAT', { status: 'CODING' });
+    expect(result).toBe(true);
+
+    ch.close();
+    // @ts-expect-error
+    delete process.send;
+  });
+
+  it('close() uses removeListener fallback when off is unavailable', () => {
+    const emitter = new EventEmitter();
+    const removeListenerSpy = vi.spyOn(emitter, 'removeListener');
+    // Remove off to force fallback path
+    // @ts-expect-error — intentionally removing off
+    emitter.off = undefined;
+
+    const ch = new WorkerSideChannel('task-w-012', emitter);
+    ch.close();
+
+    expect(removeListenerSpy).toHaveBeenCalledWith('message', expect.any(Function));
+    expect(ch.isClosed()).toBe(true);
+  });
+
+  it('handler errors are swallowed in WorkerSideChannel dispatch', () => {
+    const emitter = new EventEmitter();
+    const ch = new WorkerSideChannel('task-w-013', emitter);
+    ch.onMessage('KILL', () => { throw new Error('handler boom'); });
+
+    const msg: IPCMessage = { type: 'KILL', taskId: 'task-w-013', timestamp: new Date().toISOString() };
+    expect(() => emitter.emit('message', msg)).not.toThrow();
+    ch.close();
+  });
+
+  it('does not dispatch non-IPC shaped messages', () => {
+    const emitter = new EventEmitter();
+    const ch = new WorkerSideChannel('task-w-014', emitter);
+    const handler = vi.fn();
+    ch.onMessage('PAUSE', handler);
+
+    emitter.emit('message', { random: 'data' });
+    emitter.emit('message', null);
+    emitter.emit('message', 'string');
+
+    expect(handler).not.toHaveBeenCalled();
+    ch.close();
+  });
+
+  it('multiple handlers for same type all fire', () => {
+    const emitter = new EventEmitter();
+    const ch = new WorkerSideChannel('task-w-015', emitter);
+    const h1 = vi.fn();
+    const h2 = vi.fn();
+    ch.onMessage('RESUME', h1);
+    ch.onMessage('RESUME', h2);
+
+    const msg: IPCMessage = { type: 'RESUME', taskId: 'task-w-015', timestamp: new Date().toISOString() };
+    emitter.emit('message', msg);
+
+    expect(h1).toHaveBeenCalledOnce();
+    expect(h2).toHaveBeenCalledOnce();
+    ch.close();
   });
 });

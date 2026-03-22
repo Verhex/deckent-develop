@@ -149,7 +149,7 @@ describe('E2E Integration: init→plan→status flow', () => {
     expect(existsSync(join(root, DECKENT_DIR, 'config.json'))).toBe(true);
   });
 
-  it('creates task files from DIRECTIVES.md via planSprint', () => {
+  it('creates task files from DIRECTIVES.md via planSprint', async () => {
     const root = join(tempDir, 'proj-2');
     mkdirSync(root, { recursive: true });
     setupProject(root);
@@ -182,7 +182,7 @@ Test planning sprint.
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 4, modelConstraint: null, reason: 'Test' };
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     // Verify sprint created
     expect(sprint.id).toMatch(/^sprint-\d+$/);
@@ -208,7 +208,7 @@ Test planning sprint.
     }
   });
 
-  it('initializes dashboard after planSprint', () => {
+  it('initializes dashboard after planSprint', async () => {
     const root = join(tempDir, 'proj-3');
     mkdirSync(root, { recursive: true });
     setupProject(root);
@@ -229,7 +229,7 @@ Test dashboard initialization.
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 4, modelConstraint: null, reason: 'Test' };
 
-    const sprint = planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
 
     // Initialize dashboard using real resetDashboard function (not mocked)
     actualResetDashboard(root, sprint.id, sprint.tasks.length);
@@ -251,7 +251,7 @@ Test dashboard initialization.
     }
   });
 
-  it('handles multiple projects independently', () => {
+  it('handles multiple projects independently', async () => {
     const root1 = join(tempDir, 'proj-multi-1');
     const root2 = join(tempDir, 'proj-multi-2');
     mkdirSync(root1, { recursive: true });
@@ -281,8 +281,8 @@ Unique to this project.
     const context2 = readContext(root2);
     const recommendation = { size: 'full' as const, maxWorkers: 4, modelConstraint: null, reason: 'Test' };
 
-    const sprint1 = planSprint(root1, config1, context1, recommendation, { mode: 'structured' });
-    const sprint2 = planSprint(root2, config2, context2, recommendation, { mode: 'structured' });
+    const sprint1 = await planSprint(root1, config1, context1, recommendation, { mode: 'structured' });
+    const sprint2 = await planSprint(root2, config2, context2, recommendation, { mode: 'structured' });
 
     // Verify both have valid sprint IDs (each project starts at sprint-001)
     expect(sprint1.id).toMatch(/^sprint-\d+$/);
@@ -308,7 +308,7 @@ Unique to this project.
     }
   });
 
-  it('preserves config across init and plan steps', () => {
+  it('preserves config across init and plan steps', async () => {
     const root = join(tempDir, 'proj-preserve');
     mkdirSync(root, { recursive: true });
     setupProject(root);
@@ -333,7 +333,7 @@ Test config preservation.
 
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 4, modelConstraint: null, reason: 'Test' };
-    planSprint(root, originalConfig, context, recommendation, { mode: 'structured' });
+    await planSprint(root, originalConfig, context, recommendation, { mode: 'structured' });
 
     // Verify config persists
     const configPath = join(root, DECKENT_DIR, 'config.json');

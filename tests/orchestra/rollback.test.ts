@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import type { SpawnSyncReturns } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 
 import {
   isCleanWorkingTree,
@@ -12,11 +13,28 @@ import {
   deleteSafetyPoint,
   safetyBranchExists,
   getRollbackPolicy,
+  recordRollbackInDebt,
+  saveSafetyPoint,
+  loadSafetyPoint,
+  type SafetyPoint,
+  type RollbackResult,
 } from '../../src/orchestra/rollback.js';
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    appendFileSync: vi.fn(),
+    mkdirSync: vi.fn(),
+  };
+});
 
 const mockSpawnSync = vi.mocked(spawnSync);
 
@@ -126,6 +144,28 @@ describe('createSafetyPoint', () => {
     const point = createSafetyPoint('/repo', 'sprint-002');
     expect(point.wasClean).toBe(false);
     expect(point.commitSha).toBe('cafebabe');
+  });
+
+  it('warns but succeeds when stash pop fails after dirty tree', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // isCleanWorkingTree → dirty
+    mockSpawnSync.mockReturnValueOnce(makeResult(' M src/foo.ts'));
+    // git stash push
+    mockSpawnSync.mockReturnValueOnce(makeResult('Saved'));
+    // getCurrentCommitSha
+    mockSpawnSync.mockReturnValueOnce(makeResult('cafebabe'));
+    // git branch
+    mockSpawnSync.mockReturnValueOnce(makeResult(''));
+    // git stash pop fails
+    mockSpawnSync.mockReturnValueOnce(makeResult('', 'conflict', 1));
+
+    const point = createSafetyPoint('/repo', 'sprint-002b');
+    expect(point.wasClean).toBe(false);
+    expect(point.commitSha).toBe('cafebabe');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('could not pop stash'),
+    );
+    warnSpy.mockRestore();
   });
 
   it('throws when stash fails on dirty tree', () => {
@@ -291,5 +331,149 @@ describe('getRollbackPolicy', () => {
 
   it('returns "never" for single DONE', () => {
     expect(getRollbackPolicy(['DONE'])).toBe('never');
+  });
+});
+
+const mockExistsSync = vi.mocked(existsSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockWriteFileSync = vi.mocked(writeFileSync);
+const mockAppendFileSync = vi.mocked(appendFileSync);
+const mockMkdirSync = vi.mocked(mkdirSync);
+
+describe('recordRollbackInDebt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('creates DEBT.md with header when file does not exist', () => {
+    mockExistsSync.mockReturnValueOnce(true);   // brainPath exists
+    mockExistsSync.mockReturnValueOnce(false);  // debtPath does not exist
+
+    const result: RollbackResult = { success: true, message: 'Rolled back to abc' };
+    recordRollbackInDebt('/repo', 'sprint-050', result);
+
+    expect(mockWriteFileSync).toHaveBeenCalledOnce();
+    const written = mockWriteFileSync.mock.calls[0][1] as string;
+    expect(written).toContain('| id | description |');
+    expect(written).toContain('rollback-sprint-050');
+    expect(written).toContain('SUCCESS');
+  });
+
+  it('appends to existing DEBT.md', () => {
+    mockExistsSync.mockReturnValueOnce(true);  // brainPath exists
+    mockExistsSync.mockReturnValueOnce(true);  // debtPath exists
+
+    const result: RollbackResult = { success: false, message: 'Branch not found' };
+    recordRollbackInDebt('/repo', 'sprint-051', result);
+
+    expect(mockAppendFileSync).toHaveBeenCalledOnce();
+    const appended = mockAppendFileSync.mock.calls[0][1] as string;
+    expect(appended).toContain('rollback-sprint-051');
+    expect(appended).toContain('FAILED');
+    expect(appended).toContain('Branch not found');
+  });
+
+  it('creates .brain/ directory if it does not exist', () => {
+    mockExistsSync.mockReturnValueOnce(false);  // brainPath does not exist
+    mockExistsSync.mockReturnValueOnce(false);  // debtPath does not exist
+
+    const result: RollbackResult = { success: true, message: 'ok' };
+    recordRollbackInDebt('/repo', 'sprint-052', result);
+
+    expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining('.brain'), { recursive: true });
+  });
+
+  it('does not throw when fs operations fail', () => {
+    mockExistsSync.mockReturnValueOnce(true);
+    mockExistsSync.mockReturnValueOnce(true);
+    mockAppendFileSync.mockImplementationOnce(() => { throw new Error('disk full'); });
+
+    expect(() => {
+      recordRollbackInDebt('/repo', 'sprint-053', { success: true, message: 'ok' });
+    }).not.toThrow();
+  });
+});
+
+describe('saveSafetyPoint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const point: SafetyPoint = {
+    id: 'sprint-060',
+    branchName: 'deckent-backup-sprint-060',
+    commitSha: 'abc123',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    wasClean: true,
+  };
+
+  it('writes safety point JSON to .deckent/safety-point.json', () => {
+    mockExistsSync.mockReturnValueOnce(true); // .deckent dir exists
+
+    saveSafetyPoint('/repo', point);
+
+    expect(mockWriteFileSync).toHaveBeenCalledOnce();
+    const [path, content] = mockWriteFileSync.mock.calls[0];
+    expect(path).toContain('safety-point.json');
+    const parsed = JSON.parse(content as string);
+    expect(parsed.id).toBe('sprint-060');
+    expect(parsed.branchName).toBe('deckent-backup-sprint-060');
+    expect(parsed.commitSha).toBe('abc123');
+  });
+
+  it('creates .deckent directory if it does not exist', () => {
+    mockExistsSync.mockReturnValueOnce(false); // .deckent dir does not exist
+
+    saveSafetyPoint('/repo', point);
+
+    expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining('.deckent'), { recursive: true });
+  });
+
+  it('does not throw on write failure', () => {
+    mockExistsSync.mockReturnValueOnce(true);
+    mockWriteFileSync.mockImplementationOnce(() => { throw new Error('permission denied'); });
+
+    expect(() => saveSafetyPoint('/repo', point)).not.toThrow();
+  });
+});
+
+describe('loadSafetyPoint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns SafetyPoint when file exists and is valid JSON', () => {
+    const data: SafetyPoint = {
+      id: 'sprint-070',
+      branchName: 'deckent-backup-sprint-070',
+      commitSha: 'deadbeef',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      wasClean: false,
+    };
+    mockExistsSync.mockReturnValueOnce(true);
+    mockReadFileSync.mockReturnValueOnce(JSON.stringify(data));
+
+    const result = loadSafetyPoint('/repo');
+    expect(result).toEqual(data);
+  });
+
+  it('returns null when file does not exist', () => {
+    mockExistsSync.mockReturnValueOnce(false);
+
+    expect(loadSafetyPoint('/repo')).toBeNull();
+  });
+
+  it('returns null when file contains invalid JSON', () => {
+    mockExistsSync.mockReturnValueOnce(true);
+    mockReadFileSync.mockReturnValueOnce('not json at all');
+
+    expect(loadSafetyPoint('/repo')).toBeNull();
+  });
+
+  it('returns null when readFileSync throws', () => {
+    mockExistsSync.mockReturnValueOnce(true);
+    mockReadFileSync.mockImplementationOnce(() => { throw new Error('ENOENT'); });
+
+    expect(loadSafetyPoint('/repo')).toBeNull();
   });
 });

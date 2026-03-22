@@ -555,87 +555,87 @@ describe('planSprint', () => {
     };
   }
 
-  it('auto-increments sprint number from sprints dir', () => {
+  it('auto-increments sprint number from sprints dir', async () => {
     mockedGetNextSprintId.mockReturnValue('sprint-003');
 
-    const sprint = planSprint(ROOT, config, makeContext(), recommendation);
+    const sprint = await planSprint(ROOT, config, makeContext(), recommendation);
     expect(sprint.number).toBe(3);
     expect(sprint.id).toBe('sprint-003');
   });
 
-  it('writes task JSON files to .tasks/', () => {
-    const sprint = planSprint(ROOT, config, makeContext('Do X'), recommendation);
+  it('writes task JSON files to .tasks/', async () => {
+    const sprint = await planSprint(ROOT, config, makeContext('Do X'), recommendation);
     expect(sprint.tasks.length).toBeGreaterThan(0);
     expect(mockedWriteFileSync).toHaveBeenCalled();
     const writeCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('task-'));
     expect(writeCall).toBeDefined();
   });
 
-  it('creates .tasks/ directory', () => {
-    planSprint(ROOT, config, makeContext('Do X'), recommendation);
+  it('creates .tasks/ directory', async () => {
+    await planSprint(ROOT, config, makeContext('Do X'), recommendation);
     expect(mockedMkdirSync).toHaveBeenCalledWith(
       expect.stringContaining('.tasks'),
       expect.objectContaining({ recursive: true }),
     );
   });
 
-  it('creates priority fix tasks for CRITICAL debt', () => {
+  it('creates priority fix tasks for CRITICAL debt', async () => {
     const ctx = makeContext('');
     ctx.debt = [{
       id: 'debt-1', description: 'critical debt', originTaskId: 't-1', originSprintId: 's-1',
       priority: DebtPriority.CRITICAL, sprintsOpen: 3, resolved: false, createdAt: '',
     }];
-    const sprint = planSprint(ROOT, config, ctx, recommendation);
+    const sprint = await planSprint(ROOT, config, ctx, recommendation);
     expect(sprint.tasks.some(t => t.isPriorityFix)).toBe(true);
   });
 
-  it('plans all tasks regardless of maxWorkers (queue mechanism handles parallelism)', () => {
+  it('plans all tasks regardless of maxWorkers (queue mechanism handles parallelism)', async () => {
     const smallRec = { ...recommendation, maxWorkers: 1 };
-    const sprint = planSprint(ROOT, config, makeContext('A\nB\nC'), smallRec);
+    const sprint = await planSprint(ROOT, config, makeContext('A\nB\nC'), smallRec);
     // planSprint now plans ALL tasks — spawnWorkers enforces the active worker limit
     expect(sprint.tasks.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('throws BrainError on deadlock detection', () => {
+  it('throws BrainError on deadlock detection', async () => {
     mockedDetectDeadlocks.mockReturnValue([{
       type: 'circular_dependency', agentId: 'a,b', detail: 'cycle', timestamp: '',
     }]);
-    expect(() => planSprint(ROOT, config, makeContext('A'), recommendation)).toThrow(BrainError);
+    await expect(planSprint(ROOT, config, makeContext('A'), recommendation)).rejects.toThrow(BrainError);
   });
 
-  it('strips "- " prefix from directive lines', () => {
+  it('strips "- " prefix from directive lines', async () => {
     const ctx = makeContext('- Build feature X\n- Test feature X');
-    const sprint = planSprint(ROOT, config, ctx, recommendation);
+    const sprint = await planSprint(ROOT, config, ctx, recommendation);
     expect(sprint.tasks[0]?.title).toBe('Build feature X');
     expect(sprint.tasks[1]?.title).toBe('Test feature X');
   });
 
-  it('extracts scope from directive paths', () => {
+  it('extracts scope from directive paths', async () => {
     const ctx = makeContext('Create src/utils/hello.ts in src/utils/');
-    const sprint = planSprint(ROOT, config, ctx, recommendation);
+    const sprint = await planSprint(ROOT, config, ctx, recommendation);
     const task = sprint.tasks[0];
     expect(task?.scope.directories).toContain('src/utils/');
     expect(task?.scope.filesWrite).toContain('src/utils/hello.ts');
   });
 
-  it('mode=structured uses structured parse (no AI call)', () => {
+  it('mode=structured uses structured parse (no AI call)', async () => {
     const ctx = makeContext('Task A\nTask B');
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'structured' });
     expect(mockedCallBrainPlanner).not.toHaveBeenCalled();
     expect(sprint.planningMode).toBe('structured');
     expect(sprint.tasks.length).toBeGreaterThan(0);
   });
 
-  it('mode=auto tries AI, falls back to structured on null', () => {
+  it('mode=auto tries AI, falls back to structured on null', async () => {
     mockedCallBrainPlanner.mockReturnValue(null);
     const ctx = makeContext('Task A');
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(mockedCallBrainPlanner).toHaveBeenCalledTimes(1);
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.length).toBeGreaterThan(0);
   });
 
-  it('mode=auto uses AI result when available', () => {
+  it('mode=auto uses AI result when available', async () => {
     mockedCallBrainPlanner.mockReturnValue({
       tasks: [{
         title: 'AI Task', description: 'From AI', model: 'sonnet' as const,
@@ -646,28 +646,28 @@ describe('planSprint', () => {
       reasoning: 'AI reasoning here',
     });
     const ctx = makeContext('');
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('ai');
     expect(sprint.reasoning).toBe('AI reasoning here');
     expect(sprint.tasks.some(t => t.title === 'AI Task')).toBe(true);
   });
 
-  it('mode=ai throws BrainError when AI returns null', () => {
+  it('mode=ai throws BrainError when AI returns null', async () => {
     mockedCallBrainPlanner.mockReturnValue(null);
     const ctx = makeContext('Task A');
-    expect(() => planSprint(ROOT, config, ctx, recommendation, { mode: 'ai' }))
-      .toThrow(BrainError);
+    await expect(planSprint(ROOT, config, ctx, recommendation, { mode: 'ai' }))
+      .rejects.toThrow(BrainError);
   });
 
-  it('asDraft=true creates tasks with DRAFT status', () => {
+  it('asDraft=true creates tasks with DRAFT status', async () => {
     const ctx = makeContext('Task A');
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { asDraft: true });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { asDraft: true });
     expect(sprint.tasks[0]?.status).toBe(TaskStatus.DRAFT);
   });
 
-  it('Sprint includes reasoning and planningMode fields', () => {
+  it('Sprint includes reasoning and planningMode fields', async () => {
     const ctx = makeContext('Task A');
-    const sprint = planSprint(ROOT, config, ctx, recommendation);
+    const sprint = await planSprint(ROOT, config, ctx, recommendation);
     expect(sprint).toHaveProperty('reasoning');
     expect(sprint).toHaveProperty('planningMode');
   });
@@ -689,60 +689,60 @@ describe('planSprint', () => {
     };
   }
 
-  it('mode=auto falls back when AI returns fewer tasks than directives (8 vs 12)', () => {
+  it('mode=auto falls back when AI returns fewer tasks than directives (8 vs 12)', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(8));
     const ctx = makeContext(structuredDirective12);
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.length).toBe(12);
   });
 
-  it('mode=auto accepts AI result when task count matches directives (12 vs 12)', () => {
+  it('mode=auto accepts AI result when task count matches directives (12 vs 12)', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(12));
     const ctx = makeContext(structuredDirective12);
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('ai');
     expect(sprint.tasks.length).toBe(12);
   });
 
-  it('mode=auto falls back when AI returns fewer tasks (5 vs 10)', () => {
+  it('mode=auto falls back when AI returns fewer tasks (5 vs 10)', async () => {
     const directive10 = Array.from({ length: 10 }, (_, i) =>
       `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
     ).join('\n\n');
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(5));
     const ctx = makeContext(directive10);
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.length).toBe(10);
   });
 
-  it('mode=auto accepts AI result when directives have no structured tasks', () => {
+  it('mode=auto accepts AI result when directives have no structured tasks', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(3));
     const ctx = makeContext('Some plain text directive without structured format');
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('ai');
     expect(sprint.tasks.length).toBe(3);
   });
 
-  it('mode=ai does NOT fall back even when AI returns fewer tasks', () => {
+  it('mode=ai does NOT fall back even when AI returns fewer tasks', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(8));
     const ctx = makeContext(structuredDirective12);
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'ai' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'ai' });
     expect(sprint.planningMode).toBe('ai');
     expect(sprint.tasks.length).toBe(8);
   });
 
-  it('fallback sets planningMode to "fallback"', () => {
+  it('fallback sets planningMode to "fallback"', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(3));
     const directive5 = Array.from({ length: 5 }, (_, i) =>
       `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
     ).join('\n\n');
     const ctx = makeContext(directive5);
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('fallback');
   });
 
-  it('CRITICAL debt tasks are preserved alongside fallback tasks', () => {
+  it('CRITICAL debt tasks are preserved alongside fallback tasks', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(2));
     const directive4 = Array.from({ length: 4 }, (_, i) =>
       `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
@@ -752,35 +752,35 @@ describe('planSprint', () => {
       id: 'debt-1', description: 'critical debt', originTaskId: 't-1', originSprintId: 's-1',
       priority: DebtPriority.CRITICAL, sprintsOpen: 3, resolved: false, createdAt: '',
     }];
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.some(t => t.isPriorityFix)).toBe(true);
     // 1 debt + 4 structured = 5
     expect(sprint.tasks.length).toBe(5);
   });
 
-  it('logs error message on fallback', () => {
+  it('logs error message on fallback', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(8));
     const ctx = makeContext(structuredDirective12);
-    planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('AI planner returned 8 tasks'),
     );
     errorSpy.mockRestore();
   });
 
-  it('AI null + auto still falls back to structured (existing behavior)', () => {
+  it('AI null + auto still falls back to structured (existing behavior)', async () => {
     mockedCallBrainPlanner.mockReturnValue(null);
     const ctx = makeContext(structuredDirective12);
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.length).toBe(12);
   });
 
-  it('mode=structured ignores AI entirely and plans all structured tasks', () => {
+  it('mode=structured ignores AI entirely and plans all structured tasks', async () => {
     const ctx = makeContext(structuredDirective12);
-    const sprint = planSprint(ROOT, config, ctx, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'structured' });
     expect(mockedCallBrainPlanner).not.toHaveBeenCalled();
     expect(sprint.planningMode).toBe('structured');
     expect(sprint.tasks.length).toBe(12);

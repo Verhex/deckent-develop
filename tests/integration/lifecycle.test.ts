@@ -592,7 +592,7 @@ describe('Sprint mini-cycle integration', () => {
     expect(context.decisions).toContain('Architecture Decisions');
   });
 
-  it('planSprint creates task files on disk', () => {
+  it('planSprint creates task files on disk', async () => {
     vi.mocked(spawnSync).mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as ReturnType<typeof spawnSync>);
@@ -601,7 +601,7 @@ describe('Sprint mini-cycle integration', () => {
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 3, modelConstraint: null, reason: 'OK' };
 
-    const sprint = planSprint(root, config, context, recommendation);
+    const sprint = await planSprint(root, config, context, recommendation);
     expect(sprint.tasks.length).toBeGreaterThan(0);
 
     // Verify task files exist on disk
@@ -609,7 +609,7 @@ describe('Sprint mini-cycle integration', () => {
     expect(taskFiles.length).toBeGreaterThanOrEqual(sprint.tasks.length);
   });
 
-  it('planSprint auto-increments sprint number', () => {
+  it('planSprint auto-increments sprint number', async () => {
     // Write existing sprint logs
     writeFileSync(join(root, BRAIN_DIR, SPRINTS_DIR, 'sprint-001.md'), '# sprint-001\n');
     writeFileSync(join(root, BRAIN_DIR, SPRINTS_DIR, 'sprint-002.md'), '# sprint-002\n');
@@ -622,7 +622,7 @@ describe('Sprint mini-cycle integration', () => {
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 2, modelConstraint: null, reason: 'OK' };
 
-    const sprint = planSprint(root, config, context, recommendation);
+    const sprint = await planSprint(root, config, context, recommendation);
     expect(sprint.number).toBe(3);
     expect(sprint.id).toBe('sprint-003');
   });

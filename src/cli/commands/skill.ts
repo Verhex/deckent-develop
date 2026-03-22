@@ -6,6 +6,7 @@ import type { SkillDefinition } from '../../core/skill-types.js';
 import { createSkillDefinition } from '../../core/skill-types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { registerSkillMarketplace } from './skill-marketplace.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -285,4 +286,7 @@ export function registerSkill(program: Command): void {
         process.exitCode = 1;
       }
     });
+
+  // ─── marketplace subcommands (search, publish) ────────────────────
+  registerSkillMarketplace(skillCmd);
 }

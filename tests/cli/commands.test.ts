@@ -412,7 +412,8 @@ describe('retro command', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue('# Sprint 1 Retro\nGood stuff');
     await runCommand(registerRetro, ['retro']);
-    expect(stdout()).toContain('Sprint 1 Retro');
+    // Rich summary format is now the default (use --raw for original content)
+    expect(stdout()).toContain('Sprint Retrospective');
   });
 
   it('prints message when no retro file', async () => {

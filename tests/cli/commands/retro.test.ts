@@ -6,6 +6,7 @@ import { Command } from 'commander';
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
+  readdirSync: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -65,6 +66,15 @@ describe('retro command (isolated)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(content);
     await runCommand(['retro']);
+    // Now shows rich summary by default (use --raw for original content)
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('Sprint Retrospective'));
+  });
+
+  it('prints raw content with --raw flag', async () => {
+    const content = '## Sprint 001\n- Task completed\n- Results: DONE';
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(content);
+    await runCommand(['retro', '--raw']);
     expect(print).toHaveBeenCalledWith(content);
   });
 
