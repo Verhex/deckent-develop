@@ -25,17 +25,20 @@ Build the orchestration runtime — Brain, Auditor, Workers, Sprint lifecycle.
 
 ---
 
-## Phase 2: Self-Orchestration / Dogfooding (March-April 2026) — MOSTLY COMPLETE
+## Phase 2: Self-Orchestration / Dogfooding (March-April 2026) — COMPLETE
 
 Use Deckent to build Deckent. Validate the sprint loop on real development work.
 
-- [x] Run 5+ consecutive sprints on Deckent's own codebase (14 sprints completed)
+- [x] Run 5+ consecutive sprints on Deckent's own codebase (38 sprints completed)
 - [x] Brain learns from its own retros and improves plans
 - [x] Auditor catches real boundary violations and pattern regressions
 - [x] Tech debt escalation triggers automatically (2 sprint → HIGH, 3 sprint → CRITICAL)
 - [x] Memory decay keeps `.brain/` under 600 lines
 - [x] DECKENT.md as single source of truth (Sprint 15 — additive adapter pattern)
-- [ ] Plugin system: first community skill template
+- [x] Plugin system: full install + runtime hooks (Sprint 037)
+- [x] Security hardening: timing-safe auth, credential redaction (Sprint 037)
+- [x] Memory system fix: budget increase, PROJECT-IDENTITY.md, finalizeSprint (Sprint 037)
+- [x] Skill sandbox AST enhancement (Sprint 037)
 
 ---
 
@@ -47,6 +50,19 @@ Use Deckent to build Deckent. Validate the sprint loop on real development work.
 - [ ] DIRECTIVES.md editor in web UI
 - [ ] Agent detail view (click → see work in progress)
 - [x] Dark/light theme, mobile responsive
+
+---
+
+## Phase 3.5: Multi-Provider & Platform Support (March 2026) — COMPLETE
+
+Make Deckent provider-agnostic and cross-platform ready.
+
+- [x] Multi-provider support: Codex and Gemini adapters (Sprint 038)
+- [x] Provider-aware model selection across all planning and execution paths (Sprint 038)
+- [x] Platform decoupling: planner, tmux, subprocess made provider-agnostic (Sprint 038)
+- [x] CLI entrypoint side-effect fix (Sprint 038)
+- [x] Platform support matrix documented (Sprint 038)
+- [x] Cross-platform test infrastructure (Sprint 038)
 
 ---
 
@@ -72,4 +88,7 @@ Use Deckent to build Deckent. Validate the sprint loop on real development work.
 
 ---
 
+---
+
+*Current status: Sprint 038 completed — 8555+ tests passing*
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Sections 12, 19*

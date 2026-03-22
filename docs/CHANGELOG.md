@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-sprint38] — 2026-03-22 (Multi-Provider Infrastructure + Platform Decoupling)
+
+### Added
+- **ModelType Extended**: 8 model variants across 3 providers (Claude, Codex, Gemini)
+- **Codex Adapter**: OpenAI Codex provider adapter with usage tracking
+- **Gemini Adapter**: Google Gemini provider adapter with usage tracking
+- **Provider-Aware Model Selection**: model-selector.ts updated to route across all 3 providers
+- **spawnWorkers Routing**: Worker spawn routing based on provider/model assignment
+- **Planner Decoupling**: planner.ts decoupled from tmux/subprocess specifics
+- **tmux Decoupling**: tmux.ts platform abstraction layer
+- **Subprocess Decoupling**: subprocess backend abstraction improvements
+- **CLI Entrypoint Fix**: CLI entrypoint corrected for multi-provider environment
+- **Platform Support Matrix**: Documented macOS/Linux/WSL2 support matrix
+
+### Changed
+- ModelType enum extended with Codex and Gemini model variants
+- ProviderRegistry updated to support dynamic provider registration
+- spawnWorkers now routes tasks to provider-appropriate backends
+- Config supports per-provider API key and endpoint configuration
+
+_Tasks: 20 total, 20 done, 0 tech debt, 0 no-go — +476 tests (8073 → 8555)_
+
+## [0.1.0-sprint37] — 2026-03-22 (Beta Cleanup Wave 5+6: Security, Performance, Plugin, Memory System Fix)
+
+### Added
+- **Timing-Safe Auth**: Constant-time comparison for authentication tokens (prevents timing attacks)
+- **Credential Redaction**: Automatic redaction of secrets/keys from logs and error messages
+- **Skill Sandbox AST**: AST-based static analysis for skill sandboxing and permission enforcement
+- **Plugin Install + Hooks**: Plugin installation lifecycle with pre/post install hooks
+- **PROJECT-IDENTITY.md**: Project identity file generation during init
+- **finalizeSprint()**: Dedicated sprint finalization function extracted from brain.ts
+
+### Changed
+- Memory budget increased from 300 to 600 lines to accommodate richer sprint learnings
+- Plugin system hooks integrated into install/uninstall lifecycle
+
+_Tasks: 16 total, 16 done, 0 tech debt, 0 no-go — +258 tests (7815 → 8073)_
+
 ## [0.1.0-sprint33] - 2026-03-22
 
 ### Added

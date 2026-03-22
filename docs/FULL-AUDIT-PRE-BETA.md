@@ -1,3 +1,5 @@
+> **Note:** This audit was performed pre-Sprint 036. brain.ts has since been split into focused sub-modules. See ARCHITECTURE.md for current structure.
+
 # DECKENT PRE-BETA TAM KAPSAM DENETİM RAPORU
 
 **Tarih:** 2026-03-22
@@ -231,7 +233,7 @@ KATMAN 0 — CORE (Temel)
 
 KATMAN 1 — ORCHESTRATION
   src/orchestra/ (30 dosya)
-    ├── brain.ts (1312 satır, 29 import, 22 export) — Ana orkestratör
+    ├── brain.ts (58 satır, re-export only — split in Sprint 036 into sprint-controller.ts, result-evaluator.ts, usage-manager.ts; originally 1312 satır, 29 import, 22 export) — Ana orkestratör
     ├── planner.ts — AI/structured görev planlama
     ├── tmux.ts — Tmux session yönetimi
     ├── task-builder.ts — Task JSON üretimi
@@ -328,7 +330,7 @@ import { ensureSession, spawnWorker as tmuxSpawnWorker, ... } from '../orchestra
 10. Channel Management (3 fn): getChannelRegistry, registerWorkerChannel, unregisterWorkerChannel
 11. Cleanup (1 fn): cleanup
 
-**Değerlendirme:** ORTA RİSK — İyi organize edilmiş (22 fn / 1312 satır = ~60 satır/fn) ama 7 farklı alan tek dosyada.
+**Değerlendirme:** ORTA RİSK — İyi organize edilmiş (22 fn / 1312 satır = ~60 satır/fn) ama 7 farklı alan tek dosyada. **Sprint 036 notu:** Bu sorun giderildi — brain.ts 58 satıra indirildi; işlevler sprint-controller.ts, result-evaluator.ts ve usage-manager.ts alt modüllerine taşındı.
 
 **Öneri:** Bölünmesi önerilen yapı:
 - `sprint-controller.ts` — runSprint, pauseSprint, resumeSprint, cleanup

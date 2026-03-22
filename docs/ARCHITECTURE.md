@@ -1,6 +1,6 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** Sprint 30 | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** Sprint 038 | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
 > For the primary system specification, see [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md).
@@ -92,9 +92,13 @@ src/
 │   └── plugin-hooks.ts      ← Plugin hook execution (beforeSprint/afterSprint/etc.)
 │
 ├── orchestra/               ← Sprint orchestration
-│   ├── brain.ts             ← ONLY orchestration entry point — imports everything
+│   ├── brain.ts             ← Re-export layer (~58 lines) — sole orchestration entry point
+│   ├── sprint-controller.ts ← Sprint lifecycle (runSprint, pauseSprint, resumeSprint, cleanup)
+│   ├── result-evaluator.ts  ← Pure evaluation (evaluateResult, isDocTask, waitForResults)
+│   ├── usage-manager.ts     ← Usage/quota logic (checkUsage, adjustSprintSize)
 │   ├── planner.ts           ← AI task planning with Zod validation
 │   ├── tmux.ts              ← tmux session and window management
+│   ├── spawn-backend.ts     ← SpawnBackend interface, TmuxBackend, SubprocessBackend, factory
 │   ├── sprint-estimator.ts  ← Sprint duration and effort estimation
 │   └── task-retry.ts        ← NO_GO task retry and priority-fix logic
 │
@@ -163,15 +167,48 @@ src/
     └── ...                  ← React + Vite + Tailwind (4 pages)
 ```
 
-### providers/ — Provider Adapters (Sprint 27)
+### providers/ — Multi-Provider Architecture (Sprint 038)
+
+**Core Abstraction:**
+
+| Interface / Type | Description |
+|-----------------|-------------|
+| `ProviderAdapter` | Unified interface: `spawn()`, `kill()`, `listWorkers()`, `checkUsage()`, `isAvailable()`, `buildCommand()` |
+| `ProviderRegistry` | Singleton — `register()`, `get()`, `getDefault()`, `bootstrapProviders()` at startup |
+| `ProviderName` | `'claude' \| 'codex' \| 'gemini'` |
+| `ModelType` | `ClaudeModel \| OpenAIModel \| GeminiModel` — union across all providers |
+| `ProviderCapabilities` | `streaming`, `toolUse`, `vision`, `codeExecution`, `maxContextTokens`, `cost` |
+| `Task.provider` | Per-task provider assignment field |
+
+**Provider Adapters:**
 
 | File | Lines | Responsibility |
 |------|-------|---------------|
 | `src/core/provider.ts` | ~200 | ProviderAdapter interface, ProviderRegistry singleton, error types |
-| `src/core/spawn-backend.ts` | ~265 | SpawnBackend interface, TmuxBackend, SubprocessBackend, SpawnBackendFactory |
-| `src/providers/claude.ts` | ~180 | ClaudeAdapter — wraps tmux.ts behind ProviderAdapter |
+| `src/providers/claude.ts` | ~180 | ClaudeAdapter — tmux + subprocess backend, Claude Code models |
+| `src/providers/codex.ts` | ~180 | CodexAdapter — CLI subprocess, OpenAI Codex/GPT models |
+| `src/providers/gemini.ts` | ~180 | GeminiAdapter — API subprocess, Gemini models |
 | `src/providers/subprocess.ts` | ~250 | SubprocessSpawnBackend — child_process based worker spawning |
 | `src/providers/sandbox.ts` | ~170 | SandboxSpawnBackend — isolated subprocess with memory/fs limits |
+
+**Model Equivalence (tier-based cross-provider mapping):**
+
+| Tier | Claude | OpenAI | Gemini |
+|------|--------|--------|--------|
+| Premium | opus | o3 | gemini-2.5-pro |
+| Standard | sonnet | gpt-4.1 | gemini-2.0-flash |
+| Economy | haiku | gpt-4.1-mini | gemini-2.0-flash-lite |
+
+**Provider-aware model selection:** `resolveTaskModel(task, provider?)` maps task requirements to the best model for the target provider using tier equivalence.
+
+**Provider fallback chain:** primary provider → fallback provider → error. If a provider is unavailable (`isAvailable()` returns false), the system tries the next provider in the configured fallback chain before failing.
+
+**Mixed sprint support:** `spawnWorkers()` routes each task to its assigned provider — a single sprint can mix Claude (tmux), Codex (subprocess), and Gemini (subprocess) workers.
+
+### core/ & orchestra/ — Supporting Infrastructure (Sprint 27+)
+
+| File | Lines | Responsibility |
+|------|-------|---------------|
 | `src/core/usage-tracker.ts` | ~165 | UsageTracker — sprint-based token/call counting |
 | `src/core/credentials.ts` | ~210 | CredentialManager — secure key storage (~/.deckent/credentials/) |
 | `src/core/global-config.ts` | ~100 | Global config utilities (ensureGlobalDir, readGlobalConfig, writeGlobalConfig) |
@@ -256,10 +293,9 @@ src/
 | File | Lines | Responsibility |
 |------|-------|---------------|
 | `src/agents/adaptive-agent.ts` | ~100 | Prompt effectiveness analysis |
-| `src/agents/prompt-ab-test.ts` | ~120 | A/B testing framework |
+| `src/agents/prompt-analytics.ts` | ~200 | Unified PromptAnalytics — metrics + A/B testing (merged Sprint 036) |
 | `src/agents/prompt-version.ts` | ~120 | Prompt versioning (max 10) |
 | `src/agents/prompt-rollback.ts` | ~80 | Auto-rollback bad prompts |
-| `src/agents/prompt-metrics.ts` | ~80 | Performance dashboard |
 
 ### cli/helpers/ — UX System (Sprint 32)
 | File | Lines | Responsibility |
@@ -333,7 +369,7 @@ The `core/` module is the **only module that may be imported by all other module
 
 | File | Responsibility | Key Exports |
 |------|---------------|-------------|
-| `types.ts` | All shared TypeScript types, interfaces, and enums | `Task`, `TaskStatus`, `TaskResult`, `TaskScope`, `ModelType`, `DeckentConfig` |
+| `types.ts` | Barrel re-export from task-types, config-types, monitoring-types, sprint-types (split Sprint 036) | `Task`, `TaskStatus`, `TaskResult`, `TaskScope`, `ModelType`, `DeckentConfig` |
 | `constants.ts` | Runtime constants — never import from other modules | `AUDITOR_SCAN_INTERVAL_MS`, `HEARTBEAT_STALE_THRESHOLD_MS`, `BRAIN_TOTAL_LINE_BUDGET` |
 | `config.ts` | 3-layer config merge (global → project → env) | `loadConfig()`, `resolveConfig()`, `DEFAULT_MODES` |
 | `utils.ts` | Pure utility functions | `countBrainLines()`, `parseDebtTable()`, `generateDebtTable()`, `shouldRemoveResolvedDebt()` |
@@ -353,13 +389,16 @@ The orchestration layer coordinates the entire sprint lifecycle. `brain.ts` is t
 
 | File | Responsibility | Key Exports |
 |------|---------------|-------------|
-| `brain.ts` | Sprint lifecycle, task evaluation, memory updates, decay | `runSprint()`, `planSprint()`, `evaluateResult()`, `runDecay()`, `resolveTaskModel()` |
+| `brain.ts` | Re-export layer (~58 lines) — re-exports from sprint-controller, result-evaluator, usage-manager, model-selector, task-builder, debt-manager, sprint-reporter. Retains `readContext()`, `planSprint()`, `spawnWorkers()`, `confirmDraftTasks()`, IPC channel registry, `BrainError` class. | `runSprint()`, `planSprint()`, `evaluateResult()`, `runDecay()`, `resolveTaskModel()` |
+| `sprint-controller.ts` | Sprint lifecycle management | `runSprint()`, `pauseSprint()`, `resumeSprint()`, `cleanup()` |
+| `result-evaluator.ts` | Pure task evaluation (no side effects) | `evaluateResult()`, `isDocTask()`, `waitForResults()` |
+| `usage-manager.ts` | Usage/quota checking and sprint size adjustment | `checkUsage()`, `checkUsageWithProvider()`, `adjustSprintSize()` |
 | `planner.ts` | AI task planning with Zod schema validation | `planWithAI()`, `parseStructuredDirectives()`, `inferModelFromDirective()` |
 | `tmux.ts` | tmux session/window creation, worker spawning | `spawnWorker()`, `killWorker()`, `listWindows()`, `attachSession()` |
 | `sprint-estimator.ts` | Sprint duration and effort estimation | `estimateSprint()` |
 | `task-retry.ts` | NO_GO task retry and priority-fix scheduling | `scheduleRetry()`, `buildPriorityFix()` |
 
-**Key Design:** `brain.ts` is the **only** module in the system that imports from `tmux.ts`, `auditor.ts`, and `worker.ts`. This prevents circular dependencies and ensures the orchestration boundary is clear.
+**Key Design:** `brain.ts` is a **re-export layer** (~58 lines, down from 1,312 pre-Sprint 036). The actual logic lives in `sprint-controller.ts`, `result-evaluator.ts`, `usage-manager.ts`, and other orchestra sub-modules. `brain.ts` remains the **only** module that external code imports for orchestration, preserving backward compatibility. It re-exports all public API functions from its sub-modules.
 
 #### Brain Planning Modes
 
@@ -432,6 +471,8 @@ The Auditor observes the system state and enforces boundaries. It **never writes
 ### 3.5 `cli/` — Command-Line Interface Layer
 
 The CLI layer exposes Deckent's functionality to the operator via terminal commands. Each command is registered via the `register<Name>(program: Command): void` pattern (ADR-012).
+
+**CLI Entrypoint:** `src/cli/index.ts` exports `buildProgram()` which assembles all commands. `src/cli/entry.ts` calls `buildProgram().parseAsync(process.argv)` as the executable entry point.
 
 **Single runtime dependency:** `commander.js` (ADR-010). No chalk, inquirer, or picocolors.
 
@@ -903,7 +944,7 @@ Current ADRs (Sprint 25):
 ### Decay Cycle
 
 ```typescript
-// src/orchestra/brain.ts
+// src/orchestra/sprint-controller.ts (re-exported via brain.ts)
 function runDecay(projectRoot: string, sprintId: string, opts?: { force?: boolean }): DecayResult {
   if (!opts?.force && countBrainLines(projectRoot) <= BRAIN_TOTAL_LINE_BUDGET) {
     return earlyReturn(); // no-op if under budget
@@ -1181,7 +1222,7 @@ DIRECTIVE → PLAN → SPAWN → AUDIT_START → EXECUTE → AUDIT_STOP → EVAL
 |-------|-------|--------|--------|
 | **DIRECTIVE** | Operator | Write/update `DIRECTIVES.md` | Updated directives |
 | **PLAN** | Brain | Read context, check usage, create task JSONs | `.tasks/task-{id}.json` × N |
-| **SPAWN** | Brain | Spawn workers via tmux | N tmux windows |
+| **SPAWN** | Brain | Spawn workers via provider adapters (tmux/subprocess) | N workers across providers |
 | **AUDIT_START** | Brain | Start auditor scan loop (in-process) | Running scan interval |
 | **EXECUTE** | Workers | Code, test, document, report | `.tasks/task-{id}.result` × N |
 | **AUDIT_STOP** | Brain | Stop scan loop after all results collected | Cleared interval |
