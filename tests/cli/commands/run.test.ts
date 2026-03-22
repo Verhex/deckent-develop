@@ -116,7 +116,7 @@ describe('run command — buildRunTask', () => {
 describe('run command — createRunTaskId', () => {
   it('returns a string starting with run-', async () => {
     const { createRunTaskId } = await import('../../../src/cli/commands/run.js');
-    expect(createRunTaskId()).toMatch(/^run-\d+$/);
+    expect(createRunTaskId()).toMatch(/^run-\d+-\d+$/);
   });
 
   it('returns unique IDs on successive calls', async () => {

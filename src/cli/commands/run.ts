@@ -42,8 +42,9 @@ function readJsonSafe<T>(filePath: string): T | null {
   }
 }
 
+let _runTaskCounter = 0;
 export function createRunTaskId(): string {
-  return `run-${Date.now()}`;
+  return `run-${Date.now()}-${_runTaskCounter++}`;
 }
 
 export function buildRunTask(

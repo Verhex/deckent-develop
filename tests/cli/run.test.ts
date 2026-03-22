@@ -57,7 +57,7 @@ import {
 describe('createRunTaskId', () => {
   it('returns a string starting with run-', () => {
     const id = createRunTaskId();
-    expect(id).toMatch(/^run-\d+$/);
+    expect(id).toMatch(/^run-\d+-\d+$/);
   });
 
   it('returns unique-format ids on each call', () => {
