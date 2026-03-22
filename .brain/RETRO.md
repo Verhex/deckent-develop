@@ -1,44 +1,42 @@
-# Sprint sprint-026 Retrospective
+# Sprint sprint-033 Retrospective
 
 ## Metrics
-- Tasks: 35 total, 35 done, 16 debt, 0 no-go
-- Coverage: 71.6%
-- No-Go Rate: 0.0%
-- Duration: 1186027ms
+- Tasks: 17 total, 14 done, 7 debt, 3 no-go
+- Coverage: 62.1%
+- No-Go Rate: 17.6%
+- Duration: 2404980ms
 
 ## Results
-- 026-001: readJsonSafe Import Migration Tamamlama -> GO_WITH_TECH_DEBT
-- 026-002: package.json files + keywords Tamamlama -> GO_WITH_TECH_DEBT
-- 026-003: CODEOWNERS İyileştirme -> DONE
-- 026-004: dependabot.yml İyileştirme -> DONE
-- 026-005: Release Workflow İyileştirme -> DONE
-- 026-006: Security Template + FUNDING.yml İyileştirme -> DONE
-- 026-007: debt-manager.test.ts Test Tamamlama -> DONE
-- 026-008: task-builder.test.ts Test Tamamlama -> GO_WITH_TECH_DEBT
-- 026-009: CLI init.test.ts Test Tamamlama -> DONE
-- 026-010: CLI archive-debt.test.ts Test Tamamlama -> DONE
-- 026-011: MCP Tool init+doctor+plan Test Tamamlama -> DONE
-- 026-012: MCP Tool status+history+misc Test Tamamlama -> DONE
-- 026-013: MCP Resources Test Tamamlama -> DONE
-- 026-014: core/config.ts Edge Case Test Tamamlama -> GO_WITH_TECH_DEBT
-- 026-015: auditor.ts Edge Case Test Tamamlama -> GO_WITH_TECH_DEBT
-- 026-016: worker.ts Edge Case Test Tamamlama -> DONE
-- 026-017: tmux.ts + api/server.ts Edge Case Test Tamamlama -> GO_WITH_TECH_DEBT
-- 026-018: Plugin System Integration Test Tamamlama -> DONE
-- 026-019: Sprint Pause/Resume Tamamlama -> DONE
-- 026-020: Brain Pattern Learning Tamamlama -> GO_WITH_TECH_DEBT
-- 026-021: Global Config + Config Export/Import Tamamlama -> GO_WITH_TECH_DEBT
-- 026-022: Sprint Comparison + i18n Language Detection Tamamlama -> DONE
-- 026-023: Plugin Guide Tamamlama -> DONE
-- 026-024: FAQ Dokümanı (NO_GO Fix) -> GO_WITH_TECH_DEBT
-- 026-025: OSS Scripts (NO_GO Fix) -> DONE
-- 026-026: Integration Test — init→plan→status E2E (NO_GO Fix) -> GO_WITH_TECH_DEBT
-- 026-027: Integration Test — Full Sprint Mock (NO_GO Fix) -> DONE
-- 026-028: Integration Test — MCP Flow (NO_GO Fix) -> GO_WITH_TECH_DEBT
-- 026-029: Integration Test — Plugin Lifecycle (NO_GO Fix) -> GO_WITH_TECH_DEBT
-- 026-030: Integration Test — Config Layers (NO_GO Fix) -> DONE
-- 026-031: Integration Test — Security (NO_GO Fix) -> GO_WITH_TECH_DEBT
-- 026-032: Dockerfile + Example Project (NO_GO Fix) -> GO_WITH_TECH_DEBT
-- 026-033: CONTRIBUTING.md Güncellemesi (NO_GO Fix) -> GO_WITH_TECH_DEBT
-- 026-034: npm Publish GitHub Action (NO_GO Fix) -> DONE
-- 026-035: tmp-test Cleanup -> GO_WITH_TECH_DEBT
+- 033-001: EventEmitter MaxListeners Fix -> GO_WITH_TECH_DEBT
+- 033-002: CI Workflow Test Fix — publish -> DONE
+- 033-003: CI Workflow Test Fix — release -> DONE
+- 033-004: Onboard Test Timeout Fix -> GO_WITH_TECH_DEBT
+- 033-005: README Badge Update -> GO_WITH_TECH_DEBT
+- 033-006: CHANGELOG Version Format -> DONE
+- 033-007: File Extension Constant Usage -> GO_WITH_TECH_DEBT
+- 033-008: Sprint Observation Docs Archive -> GO_WITH_TECH_DEBT
+- 033-009: CI Coverage Gate -> GO_WITH_TECH_DEBT
+- 033-010: SECURITY.md Location -> DONE
+- 033-011: PR Template Deckent-Specific -> DONE
+- 033-012: FUNDING.yml Update -> DONE
+- 033-013: Utility Function Extraction -> DONE
+- 033-014: readJsonSafe Migration -> NO_GO
+- 033-015: Error Handling Unification -> NO_GO
+- 033-016: Silent Catch Logging -> NO_GO
+- 033-017: parseBody Type Safety -> GO_WITH_TECH_DEBT
+
+## Comparison with Previous Sprint
+- Duration: +6913.4%
+- No-Go Rate: +17.6pp
+- Coverage: -4.6pp
+
+## Usage
+- Total Calls: 24
+- Total Tokens (est): 66000
+  - sonnet: 19 calls, 52000 tokens
+  - opus: 5 calls, 14000 tokens
+
+## Agent Performance
+| Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
+|-------|-------|------|------|------|-------------|
+| generic | 17 | 7 | 7 | 3 | 0% |

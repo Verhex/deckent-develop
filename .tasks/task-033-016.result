@@ -1,0 +1,13 @@
+{
+  "taskId": "033-016",
+  "filesChanged": [
+    "src/core/utils.ts",
+    "tests/core/utils-debug-logging.test.ts"
+  ],
+  "linesAdded": 145,
+  "linesRemoved": 8,
+  "testsPassed": true,
+  "coverage": 95,
+  "selfAssessment": "DONE",
+  "notes": "Added debugLog(context, err) helper gated on DECKENT_DEBUG env var. All 8 silent catch blocks across 7 functions now log via process.stderr.write. 31 new tests in utils-debug-logging.test.ts. All 128 pre-existing utils tests still pass."
+}

@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import type { ModelType } from './types.js';
-import type { ProviderSpawnOptions } from './provider.js';
-import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from '../orchestra/tmux.js';
+import type { ModelType } from '../core/types.js';
+import type { ProviderSpawnOptions } from '../core/provider.js';
+import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from './tmux.js';
 import { SubprocessSpawnBackend } from '../providers/subprocess.js';
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────

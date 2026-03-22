@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import {
@@ -9,6 +9,7 @@ import {
   DECKENT_VERSION,
   SUPPORTED_LANGUAGES,
 } from './constants.js';
+import { readJsonSafeAsync } from './utils.js';
 import type {
   AutoDocsConfig,
   DeckentConfig,
@@ -89,6 +90,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 export function deepMerge<T>(base: T, override: Partial<T>): T {
   const result = structuredClone(base);
+  // safe: generic T is always a plain object type; Record view needed for dynamic key iteration
   const resultObj = result as Record<string, unknown>;
   const overrideObj = override as Record<string, unknown>;
 
@@ -233,17 +235,7 @@ export function resolveEffectiveWorkers(
 // ─── File Reading ────────────────────────────────────────────────────
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {
-  if (!existsSync(filePath)) {
-    return null;
-  }
-
-  try {
-    const content = await readFile(filePath, 'utf-8');
-    return JSON.parse(content) as T;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to read config file "${filePath}": ${message}`);
-  }
+  return readJsonSafeAsync<T>(filePath);
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -315,8 +307,7 @@ export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
 
 /**
  * Load a global config file (partial DeckentConfig).
- * Returns null when the file does not exist.
- * Throws on malformed JSON.
+ * Returns null when the file does not exist or contains malformed JSON.
  */
 export async function loadGlobalConfig(
   configPath?: string,

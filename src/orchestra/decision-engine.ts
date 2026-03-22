@@ -89,8 +89,8 @@ export class DecisionOrchestrator {
     // Step 4: Resolve model
     const t4Start = Date.now();
     const skillModels = skillResult.skills
-      .filter(s => s.model !== undefined)
-      .map(s => s.model!);
+      .map(s => s.model)
+      .filter((m): m is NonNullable<typeof m> => m !== undefined);
     const agentModel = agentResult.agent?.preferredModel;
     const allSkillModels = agentModel ? [agentModel, ...skillModels] : skillModels;
     const model = resolveTaskModel(

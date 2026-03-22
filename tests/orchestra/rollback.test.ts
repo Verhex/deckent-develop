@@ -180,7 +180,7 @@ describe('createSafetyPoint', () => {
     mockSpawnSync.mockReturnValueOnce(makeResult('', '', 128)); // SHA fails
 
     expect(() => createSafetyPoint('/repo', 'sprint-004')).toThrow(
-      'Failed to get current commit SHA'
+      'failed to get commit SHA'
     );
   });
 

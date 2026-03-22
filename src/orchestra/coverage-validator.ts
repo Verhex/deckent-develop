@@ -59,6 +59,7 @@ export function parseCoverageFromVitest(jsonOutput: string): ParsedVitestOutput 
     return null;
   }
 
+  // safe: parsed is confirmed non-null object by typeof check above
   const obj = parsed as Record<string, unknown>;
 
   // vitest --reporter=json --coverage format:
@@ -82,6 +83,7 @@ export function parseCoverageFromVitest(jsonOutput: string): ParsedVitestOutput 
 
   // Try vitest JSON reporter format
   if ('coverageMap' in obj && obj.coverageMap && typeof obj.coverageMap === 'object') {
+    // safe: coverageMap confirmed non-null object by typeof check on line above
     const coverageMap = obj.coverageMap as Record<string, unknown>;
     const summary = buildSummaryFromCoverageMap(coverageMap);
     if (summary) {
@@ -99,6 +101,7 @@ export function parseCoverageFromVitest(jsonOutput: string): ParsedVitestOutput 
 
   // Try coverage field
   if ('coverage' in obj && obj.coverage && typeof obj.coverage === 'object') {
+    // safe: coverage confirmed non-null object by typeof check on line above
     const coverage = obj.coverage as Record<string, unknown>;
     const summary = extractTotals(coverage);
     if (summary) {
@@ -119,6 +122,7 @@ export function parseCoverageFromVitest(jsonOutput: string): ParsedVitestOutput 
 
 function isCoverageData(v: unknown): v is VitestCoverageData {
   if (!v || typeof v !== 'object') return false;
+  // safe: v confirmed non-null object by typeof check above
   const obj = v as Record<string, unknown>;
   return typeof obj['pct'] === 'number' &&
     typeof obj['total'] === 'number' &&
@@ -127,26 +131,29 @@ function isCoverageData(v: unknown): v is VitestCoverageData {
 
 function extractTotals(obj: Record<string, unknown>): VitestCoverageSummary | null {
   // Direct format: { lines: { pct, total, covered }, ... }
+  // safe: isCoverageData() is a type guard that validates pct/total/covered are numbers
   if (isCoverageData(obj['lines']) && isCoverageData(obj['statements']) &&
       isCoverageData(obj['functions']) && isCoverageData(obj['branches'])) {
     return {
-      lines: obj['lines'] as VitestCoverageData,
-      statements: obj['statements'] as VitestCoverageData,
-      functions: obj['functions'] as VitestCoverageData,
-      branches: obj['branches'] as VitestCoverageData,
+      lines: obj['lines'],
+      statements: obj['statements'],
+      functions: obj['functions'],
+      branches: obj['branches'],
     };
   }
 
   // Nested under 'total'
   if (obj['total'] && typeof obj['total'] === 'object') {
+    // safe: confirmed non-null object by typeof check above
     const total = obj['total'] as Record<string, unknown>;
+    // safe: isCoverageData() is a type guard that validates pct/total/covered are numbers
     if (isCoverageData(total['lines']) && isCoverageData(total['statements']) &&
         isCoverageData(total['functions']) && isCoverageData(total['branches'])) {
       return {
-        lines: total['lines'] as VitestCoverageData,
-        statements: total['statements'] as VitestCoverageData,
-        functions: total['functions'] as VitestCoverageData,
-        branches: total['branches'] as VitestCoverageData,
+        lines: total['lines'],
+        statements: total['statements'],
+        functions: total['functions'],
+        branches: total['branches'],
       };
     }
   }
@@ -164,10 +171,13 @@ function buildSummaryFromCoverageMap(coverageMap: Record<string, unknown>): Vite
   let totalFunctions = 0, coveredFunctions = 0;
   let totalBranches = 0, coveredBranches = 0;
 
+  // safe: data confirmed non-null object by typeof check above
   for (const fileData of Object.values(data as Record<string, unknown>)) {
     if (!fileData || typeof fileData !== 'object') continue;
+    // safe: fileData confirmed non-null object by typeof check above
     const fd = fileData as Record<string, unknown>;
 
+    // safe: istanbul coverage format fields — optional, guarded by null checks below
     const s = fd['s'] as Record<string, number> | undefined;
     const f = fd['f'] as Record<string, number> | undefined;
     const b = fd['b'] as Record<string, number[]> | undefined;
@@ -200,6 +210,7 @@ function buildSummaryFromCoverageMap(coverageMap: Record<string, unknown>): Vite
       const lineNums = new Set<number>();
       const coveredLineNums = new Set<number>();
       for (const [key, loc] of Object.entries(statementMap)) {
+        // safe: istanbul statementMap entries have start.line structure; guarded by typeof check below
         const location = loc as Record<string, Record<string, number>> | undefined;
         const lineNum = location?.['start']?.['line'];
         if (typeof lineNum === 'number') {

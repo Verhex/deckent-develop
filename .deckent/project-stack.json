@@ -1,0 +1,16 @@
+{
+  "language": "typescript",
+  "framework": "unknown",
+  "dependencies": [
+    "@modelcontextprotocol/sdk",
+    "commander",
+    "zod",
+    "@types/node",
+    "@vitest/coverage-v8",
+    "typescript",
+    "vitest"
+  ],
+  "buildTool": "tsc",
+  "testFramework": "vitest",
+  "detectedAt": "2026-03-22T11:16:32.694Z"
+}

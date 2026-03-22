@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from './types.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -53,15 +54,9 @@ export class UsageTracker {
 
   private readSprintEntries(sprintId: string): UsageEntry[] {
     const filePath = this.sprintFilePath(sprintId);
-    if (!existsSync(filePath)) return [];
-    try {
-      const raw = readFileSync(filePath, 'utf-8');
-      const parsed = JSON.parse(raw) as unknown;
-      if (Array.isArray(parsed)) return parsed as UsageEntry[];
-      return [];
-    } catch {
-      return [];
-    }
+    const parsed = readJsonSafe<unknown>(filePath);
+    if (Array.isArray(parsed)) return parsed as UsageEntry[];
+    return [];
   }
 
   private writeSprintEntries(sprintId: string, entries: UsageEntry[]): void {

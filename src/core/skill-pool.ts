@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SkillDefinition, SkillCategory } from './skill-types.js';
 import { createDefaultSkillStats } from './skill-types.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -44,15 +45,13 @@ export class SkillPoolManager {
       if (!entry.isDirectory()) continue;
       const manifestPath = path.join(skillsDir, entry.name, MANIFEST_FILENAME);
       if (!fs.existsSync(manifestPath)) continue;
-      try {
-        const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
+      if (raw) {
         const validation = SkillPoolManager.validateSkillDefinition(raw);
         if (validation.valid) {
-          const skill = raw as SkillDefinition;
+          const skill = raw as unknown as SkillDefinition;
           pool.set(skill.id, skill);
         }
-      } catch {
-        // Skip invalid skill files silently
       }
     }
 

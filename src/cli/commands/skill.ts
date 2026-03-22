@@ -7,6 +7,7 @@ import { createSkillDefinition } from '../../core/skill-types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { registerSkillMarketplace } from './skill-marketplace.js';
+import { ErrorRegistry } from '../../core/errors.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ function isValidSkillName(name: string): boolean {
 export function loadSkillManifest(skillDir: string): SkillDefinition {
   const manifestPath = join(skillDir, 'manifest.json');
   if (!existsSync(manifestPath)) {
-    throw new Error(`Skill manifest not found: ${manifestPath}`);
+    throw ErrorRegistry.createError('DECKENT_E023', { message: `Skill manifest not found: ${manifestPath}` });
   }
   return JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillDefinition;
 }
@@ -149,14 +150,14 @@ export function registerSkill(program: Command): void {
         const root = resolveProjectRoot();
 
         if (!isValidSkillName(name)) {
-          throw new Error(
-            `Invalid skill name "${name}". Use alphanumeric characters and hyphens only.`,
-          );
+          throw ErrorRegistry.createError('DECKENT_E024', {
+            message: `Invalid skill name "${name}". Use alphanumeric characters and hyphens only.`,
+          });
         }
 
         const skillDir = join(getSkillsDir(root), name);
         if (existsSync(join(skillDir, 'manifest.json'))) {
-          throw new Error(`Skill "${name}" already exists.`);
+          throw ErrorRegistry.createError('DECKENT_E025', { message: `Skill "${name}" already exists.` });
         }
 
         const skill = createSkillDefinition({
@@ -207,25 +208,25 @@ export function registerSkill(program: Command): void {
           });
 
           if (cloneResult.status !== 0) {
-            throw new Error(`Git clone failed: ${cloneResult.stderr || 'unknown error'}`);
+            throw ErrorRegistry.createError('DECKENT_E026', { message: `Git clone failed: ${cloneResult.stderr || 'unknown error'}` });
           }
 
           const manifestPath = join(tmpDir, 'manifest.json');
           if (!existsSync(manifestPath)) {
             rmSync(tmpDir, { recursive: true, force: true });
-            throw new Error('Cloned repository does not contain manifest.json');
+            throw ErrorRegistry.createError('DECKENT_E027');
           }
 
           const manifestData = JSON.parse(readFileSync(manifestPath, 'utf-8'));
           if (!validateManifest(manifestData)) {
             rmSync(tmpDir, { recursive: true, force: true });
-            throw new Error('Invalid manifest.json: must contain id, name, and version');
+            throw ErrorRegistry.createError('DECKENT_E028');
           }
 
           const targetDir = join(skillsDir, manifestData.id);
           if (existsSync(targetDir) && !opts.force) {
             rmSync(tmpDir, { recursive: true, force: true });
-            throw new Error(`Skill "${manifestData.id}" already exists. Use --force to overwrite.`);
+            throw ErrorRegistry.createError('DECKENT_E025', { message: `Skill "${manifestData.id}" already exists. Use --force to overwrite.` });
           }
 
           if (existsSync(targetDir)) {
@@ -246,27 +247,27 @@ export function registerSkill(program: Command): void {
           // Install from local path
           const sourcePath = resolve(source);
           if (!existsSync(sourcePath)) {
-            throw new Error(`Source path not found: ${sourcePath}`);
+            throw ErrorRegistry.createError('DECKENT_E029', { message: `Source path not found: ${sourcePath}` });
           }
 
           const stat = statSync(sourcePath);
           if (!stat.isDirectory()) {
-            throw new Error(`Source must be a directory: ${sourcePath}`);
+            throw ErrorRegistry.createError('DECKENT_E030', { message: `Source must be a directory: ${sourcePath}` });
           }
 
           const manifestPath = join(sourcePath, 'manifest.json');
           if (!existsSync(manifestPath)) {
-            throw new Error('Source directory does not contain manifest.json');
+            throw ErrorRegistry.createError('DECKENT_E027', { message: 'Source directory does not contain manifest.json' });
           }
 
           const manifestData = JSON.parse(readFileSync(manifestPath, 'utf-8'));
           if (!validateManifest(manifestData)) {
-            throw new Error('Invalid manifest.json: must contain id, name, and version');
+            throw ErrorRegistry.createError('DECKENT_E028');
           }
 
           const targetDir = join(skillsDir, manifestData.id);
           if (existsSync(targetDir) && !opts.force) {
-            throw new Error(`Skill "${manifestData.id}" already exists. Use --force to overwrite.`);
+            throw ErrorRegistry.createError('DECKENT_E025', { message: `Skill "${manifestData.id}" already exists. Use --force to overwrite.` });
           }
 
           if (!existsSync(skillsDir)) {

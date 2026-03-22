@@ -120,7 +120,7 @@ function diffDecisionLogs(original: DecisionLogEntry[], replayed: DecisionLogEnt
     const repl = replayed[i];
 
     if (!orig) {
-      diffs.push(`Step ${i + 1}: new step added -- ${repl!.name}`);
+      diffs.push(`Step ${i + 1}: new step added -- ${repl?.name ?? 'unknown'}`);
       continue;
     }
     if (!repl) {

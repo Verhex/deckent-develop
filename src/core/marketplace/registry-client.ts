@@ -4,6 +4,7 @@
 import * as https from 'node:https';
 import * as http from 'node:http';
 import { URL } from 'node:url';
+import { ErrorRegistry } from '../errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ export class RegistryClient {
    */
   async getSkillDetail(name: string): Promise<SkillDetail> {
     if (!name || typeof name !== 'string') {
-      throw new Error('Skill name must be a non-empty string');
+      throw ErrorRegistry.createError('DECKENT_E039');
     }
     const safeName = encodeURIComponent(name);
     const url = `${this.baseUrl}/api/skills/${safeName}`;

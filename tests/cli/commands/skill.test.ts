@@ -483,7 +483,7 @@ describe('skill install — local path', () => {
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ invalid: true }));
     await runCommand(['skill', 'install', '/tmp/bad-manifest']);
     expect(printError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Invalid manifest.json') }),
+      expect.objectContaining({ message: expect.stringContaining('invalid manifest.json') }),
     );
     expect(process.exitCode).toBe(1);
   });
@@ -569,7 +569,7 @@ describe('skill install — git URL', () => {
     });
     await runCommand(['skill', 'install', 'https://github.com/user/no-manifest.git']);
     expect(printError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('manifest.json') }),
+      expect.objectContaining({ message: expect.stringContaining('missing manifest') }),
     );
     expect(rmSync).toHaveBeenCalled();
     expect(process.exitCode).toBe(1);

@@ -9,13 +9,14 @@ function detectTrend(sprints: Array<{ id: string; content: string }>): string {
   if (sprints.length < 2) return 'insufficient_data';
   const taskCounts = sprints.map((s) => {
     const match = s.content.match(/(\d+)\/(\d+)\s*(tasks?|görev)/i);
-    if (match) return { done: parseInt(match[1]!, 10), total: parseInt(match[2]!, 10) };
+    if (match) return { done: parseInt(match[1] ?? '0', 10), total: parseInt(match[2] ?? '0', 10) };
     return null;
   }).filter(Boolean) as Array<{ done: number; total: number }>;
 
   if (taskCounts.length < 2) return 'insufficient_data';
-  const last = taskCounts[taskCounts.length - 1]!;
-  const prev = taskCounts[taskCounts.length - 2]!;
+  const last = taskCounts.at(-1);
+  const prev = taskCounts.at(-2);
+  if (!last || !prev) return 'insufficient_data';
   const lastRate = last.total > 0 ? last.done / last.total : 0;
   const prevRate = prev.total > 0 ? prev.done / prev.total : 0;
   if (lastRate > prevRate) return 'improving';

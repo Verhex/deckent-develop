@@ -7,6 +7,7 @@ import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR,
   PROJECT_CONFIG_PATH, MEMORY_FILE, DEBT_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
+import { readJsonSafe } from '../core/utils.js';
 import { watchDashboard } from './watcher.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
@@ -103,12 +104,7 @@ export function parseBody(req: IncomingMessage): Promise<unknown> {
 }
 
 function readDashboardJson(dashPath: string): unknown | null {
-  if (!existsSync(dashPath)) return null;
-  try {
-    return JSON.parse(readFileSync(dashPath, 'utf-8')) as unknown;
-  } catch {
-    return null;
-  }
+  return readJsonSafe<unknown>(dashPath);
 }
 
 function getLatestSprintLog(projectRoot: string): { id: string; metrics: Record<string, string>; tasks: string[] } | null {
@@ -121,7 +117,8 @@ function getLatestSprintLog(projectRoot: string): { id: string; metrics: Record<
 
   if (files.length === 0) return null;
 
-  const latest = files[files.length - 1]!;
+  const latest = files.at(-1);
+  if (!latest) return null;
   const content = readFileSync(join(sprintsDir, latest), 'utf-8');
   const record = parseSprintLog(content);
 
@@ -163,12 +160,7 @@ function getAllSprintLogs(projectRoot: string): unknown[] {
 }
 
 function readJsonFile(filePath: string): unknown | null {
-  if (!existsSync(filePath)) return null;
-  try {
-    return JSON.parse(readFileSync(filePath, 'utf-8')) as unknown;
-  } catch {
-    return null;
-  }
+  return readJsonSafe<unknown>(filePath);
 }
 
 function readTextFile(filePath: string): string | null {
@@ -317,7 +309,7 @@ async function handleRequest(
 
     // Static file serving for dashboard
     if (staticDir && !url.startsWith('/api/')) {
-      const urlPath = url.split('?')[0]!;
+      const urlPath = url.split('?')[0] ?? '/';
       const resolved = resolve(staticDir, urlPath === '/' ? 'index.html' : urlPath.slice(1));
       if (!resolved.startsWith(resolve(staticDir))) {
         sendError(res, 403, 'Forbidden');
@@ -461,10 +453,7 @@ async function handleRequest(
       }
       const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
       try {
-        let existing: Record<string, unknown> = {};
-        if (existsSync(configPath)) {
-          existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
-        }
+        const existing: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
         const merged = { ...existing, ...parsed.data };
         writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf-8');
         sendJson(res, merged);

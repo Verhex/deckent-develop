@@ -1,34 +1,94 @@
+// ═══ orchestra/index.ts — Public API Barrel ════════════════════════
+//
+// PUBLIC API SURFACE
+// ──────────────────
+// This barrel exports ONLY the symbols consumed by cli/, mcp/, and api/.
+// Internal orchestra functions (marked @internal in their source files)
+// are NOT re-exported here; they are imported directly within orchestra/.
+//
+// Public functions (cli/ + mcp/ + api/ consumers):
+//   runSprint          — execute a full sprint (start.ts, test-run.ts, server.ts, mcp/start.ts)
+//   readContext        — read brain context (plan.ts, server.ts, mcp/plan.ts)
+//   checkUsage         — check claude usage quota (plan.ts, server.ts, mcp/plan.ts)
+//   adjustSprintSize   — adjust sprint size based on usage (plan.ts, server.ts, mcp/plan.ts)
+//   planSprint         — plan sprint tasks (plan.ts, server.ts, mcp/plan.ts)
+//   confirmDraftTasks  — prompt user to confirm draft tasks (plan.ts)
+//   buildWorkerPrompt  — build a worker's task prompt (run.ts)
+//   cleanup            — clean up task files and locks (cleanup.ts)
+//   runDecay           — run memory/debt decay (cleanup.ts)
+//   BrainError         — error class for orchestration failures
+//
+// Public tmux API (cli/ + api/ consumers):
+//   isSessionActive    — check if tmux session exists (attach.ts, start.ts, watch.ts)
+//   ensureSession      — create tmux session if needed (spawn.ts, run.ts)
+//   spawnWorker        — spawn a worker in a tmux window (spawn.ts, run.ts)
+//   killWorker         — kill a worker tmux window (kill.ts, server.ts)
+//   attach             — attach to tmux session (attach.ts)
+//   destroy            — destroy tmux session (cleanup.ts)
+//   setupWatchWindow   — set up watch window in session (start.ts)
+//   createWatchLayout  — create watch layout and attach (watch.ts)
+//   attachToWorkerPane — attach to a specific worker pane (watch.ts)
+//   TmuxError          — error class for tmux operations (attach.ts, kill.ts, watch.ts)
+//   SpawnOptions       — options for spawnWorker (run.ts, spawn.ts)
+//
+// Public doc-updater API (sprint-reporter.ts internal + external plugin authors):
+//   registerUpdater    — register a doc updater plugin
+//   runAllUpdaters     — run all registered doc updaters
+//   DocUpdater         — doc updater plugin interface
+//   DocUpdateContext   — context passed to doc updaters
+//   DocUpdateResult    — result returned by doc updaters
+//
+// ─────────────────────────────────────────────────────────────────────
+
+// ─── Tmux Backend (public: spawn/kill workers, session management) ──
 export {
   isSessionActive,
   ensureSession,
   spawnWorker,
   killWorker,
-  listWorkers,
-  startAuditor,
   attach,
   destroy,
-  sendKeys,
+  setupWatchWindow,
+  createWatchLayout,
+  attachToWorkerPane,
   TmuxError,
 } from './tmux.js';
 export type { SpawnOptions } from './tmux.js';
 
+// ─── Brain API (public: sprint lifecycle functions) ─────────────────
 export {
-  readContext, checkUsage, adjustSprintSize, createTask,
-  planSprint, spawnWorkers, waitForResults,
-  evaluateResult, isDocTask, handleEvaluation, handleCrossDependencies,
-  escalateDebt, writeRetrospective, writeSprintLog,
-  calculateMetrics, decay, cleanup, runSprint, runDecay,
-  BrainError, confirmDraftTasks, updateProjectDocs,
+  BrainError,
+  readContext,
+  checkUsage,
+  adjustSprintSize,
+  planSprint,
+  confirmDraftTasks,
+  buildWorkerPrompt,
+  cleanup,
+  runSprint,
+  runDecay,
 } from './brain.js';
-export type { BrainContext, ProjectState, SprintSizeRecommendation, PlannerResult, PlannerTask, BrainPlanningMode, SprintResult } from '../core/types.js';
+
+// ─── Key types for public consumers ─────────────────────────────────
+export type {
+  BrainContext,
+  ProjectState,
+  SprintSizeRecommendation,
+  PlannerResult,
+  PlannerTask,
+  BrainPlanningMode,
+  SprintResult,
+} from '../core/types.js';
 export type { CreateTaskParams, RunDecayOptions } from './brain.js';
+export type { RunSprintOptions } from './sprint-controller.js';
 
-export { buildPlanPrompt, parsePlannerResponse, callBrainPlanner } from './planner.js';
-
-// ─── Doc Updaters ─────────────────────────────────────────────────
-export { registerUpdater, getRegisteredUpdaters, clearUpdaters, runAllUpdaters } from './doc-updaters/index.js';
-export type { DocUpdater, DocUpdateContext, DocUpdateResult } from './doc-updaters/index.js';
-export { changelogUpdater } from './doc-updaters/changelog.js';
-export { sprintLogUpdater } from './doc-updaters/sprint-log.js';
-export { readmeMetricsUpdater } from './doc-updaters/readme-metrics.js';
-export { healthCheckUpdater } from './doc-updaters/health-check.js';
+// ─── Doc Updater plugin API (public: for external plugin authors) ────
+export {
+  registerUpdater,
+  runAllUpdaters,
+} from './doc-updaters/index.js';
+export type {
+  DocUpdater,
+  DocUpdateContext,
+  DocUpdateResult,
+} from './doc-updaters/index.js';

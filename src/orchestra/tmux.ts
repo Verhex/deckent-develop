@@ -134,6 +134,10 @@ export function killWorker(taskId: string): void {
   run(['kill-window', '-t', `${TMUX_SESSION_NAME}:${windowName}`]);
 }
 
+/**
+ * @internal Lists active worker windows in tmux. Used only within orchestra/.
+ * Not part of the public API surface.
+ */
 export function listWorkers(): string[] {
   try {
     const output = run([
@@ -159,6 +163,10 @@ function windowExists(windowName: string): boolean {
   return (result.stdout ?? '').split('\n').some(name => name.trim() === windowName);
 }
 
+/**
+ * @internal Used only within orchestra/ — spawns auditor in a tmux window.
+ * Not part of the public API surface.
+ */
 export function startAuditor(projectDir: string, opts?: SpawnOptions): void {
   if (!windowExists(TMUX_AUDITOR_WINDOW)) {
     run([
@@ -193,6 +201,10 @@ export function destroy(): void {
   }
 }
 
+/**
+ * @internal Sends keys to a tmux pane. Used only within orchestra/.
+ * Not part of the public API surface.
+ */
 export function sendKeys(target: string, keys: string): void {
   run([
     'send-keys',

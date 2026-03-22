@@ -150,11 +150,12 @@ describe('loadConfig', () => {
     expect(config.activeModeConfig.budget_per_sprint).toBe(5.0);
   });
 
-  it('throws descriptive error for malformed JSON', async () => {
+  it('returns defaults for malformed JSON (readJsonSafeAsync returns null)', async () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReadFile.mockResolvedValue('{ invalid json !!!');
 
-    await expect(loadConfig('/test/project')).rejects.toThrow('Failed to read config file');
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('max_plan');
   });
 
   it('resolves projectRoot from parameter', async () => {

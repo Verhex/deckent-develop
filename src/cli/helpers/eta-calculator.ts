@@ -45,7 +45,7 @@ export class ETACalculator {
 
   private weightedAverage(durations: number[]): number {
     if (durations.length === 0) return 0;
-    if (durations.length === 1) return durations[0]!;
+    if (durations.length === 1) return durations[0] ?? 0;
 
     // Last 3 tasks get 2x weight
     let weightedSum = 0;
@@ -53,7 +53,7 @@ export class ETACalculator {
     for (let i = 0; i < durations.length; i++) {
       const isRecent = i >= durations.length - 3;
       const weight = isRecent ? 2 : 1;
-      weightedSum += durations[i]! * weight;
+      weightedSum += (durations[i] ?? 0) * weight;
       totalWeight += weight;
     }
     return weightedSum / totalWeight;

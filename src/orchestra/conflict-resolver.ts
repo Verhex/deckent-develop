@@ -78,8 +78,9 @@ export class ConflictResolver {
     // Detect scope_overlap: pairs of workers sharing 2+ files
     for (let i = 0; i < results.length; i++) {
       for (let j = i + 1; j < results.length; j++) {
-        const a = results[i]!;
-        const b = results[j]!;
+        const a = results[i];
+        const b = results[j];
+        if (!a || !b) continue;
         const overlap = a.filesChanged.filter(f => b.filesChanged.includes(f));
         if (overlap.length >= 2) {
           conflicts.push({
@@ -129,7 +130,8 @@ export class ConflictResolver {
 
     const lines: string[] = [`Conflict Report (${conflicts.length} conflict${conflicts.length === 1 ? '' : 's'}):`];
     for (let i = 0; i < conflicts.length; i++) {
-      const c = conflicts[i]!;
+      const c = conflicts[i];
+      if (!c) continue;
       lines.push(`  ${i + 1}. [${c.type}] ${c.detail}`);
       lines.push(`     Files: ${c.files.join(', ')}`);
       lines.push(`     Workers: ${c.workers.join(', ')}`);

@@ -17,7 +17,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TaskStatus, SprintPhase, SprintStatus, AgentStatus } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig, UsageMetrics } from '../../src/core/types.js';
-import type { SpawnBackend, SpawnBackendOptions } from '../../src/core/spawn-backend.js';
+import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
 
@@ -71,8 +71,8 @@ vi.mock('../../src/orchestra/planner.js', () => ({
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../src/core/spawn-backend.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/core/spawn-backend.js')>();
+vi.mock('../../src/orchestra/spawn-backend.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/spawn-backend.js')>();
   return {
     ...actual,
     SpawnBackendFactory: {

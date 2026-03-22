@@ -2,6 +2,7 @@
 // Enables agents to share key-value data atomically via a JSON file.
 import { readFileSync, writeFileSync, renameSync, unlinkSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { ErrorRegistry } from '../core/errors.js';
 
 export interface SharedContextEntry {
   agentId: string;
@@ -22,10 +23,10 @@ export class SharedContext {
    */
   write(agentId: string, key: string, value: unknown): void {
     if (!key || typeof key !== 'string') {
-      throw new Error('SharedContext.write: key must be a non-empty string');
+      throw ErrorRegistry.createError('DECKENT_E062', { message: 'SharedContext.write: key must be a non-empty string' });
     }
     if (!agentId || typeof agentId !== 'string') {
-      throw new Error('SharedContext.write: agentId must be a non-empty string');
+      throw ErrorRegistry.createError('DECKENT_E063', { message: 'SharedContext.write: agentId must be a non-empty string' });
     }
 
     const data = this._readAll();

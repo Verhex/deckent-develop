@@ -31,6 +31,10 @@ vi.mock('../../src/agents/worker.js', () => ({
   readWorkerLog: vi.fn(),
 }));
 
+vi.mock('../../src/core/utils.js', () => ({
+  readJsonSafe: vi.fn(() => null),
+}));
+
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(async () => ({ id: 'sprint-001', status: 'COMPLETE' })),
   readContext: vi.fn(() => ({ debt: [], patterns: [], memory: '' })),
@@ -49,6 +53,7 @@ import { watchDashboard } from '../../src/api/watcher.js';
 import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
 import { killWorker } from '../../src/orchestra/tmux.js';
 import { readWorkerLog } from '../../src/agents/worker.js';
+import { readJsonSafe } from '../../src/core/utils.js';
 import { runSprint } from '../../src/orchestra/brain.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -59,6 +64,7 @@ const mockRunDoctorChecks = vi.mocked(runDoctorChecks);
 const mockKillWorker = vi.mocked(killWorker);
 const mockReadWorkerLog = vi.mocked(readWorkerLog);
 const mockRunSprint = vi.mocked(runSprint);
+const mockReadJsonSafe = vi.mocked(readJsonSafe);
 
 // ─── Helpers ────────────────────────────────────────────────────
 const PROJECT_ROOT = '/tmp/test-project';
@@ -129,6 +135,7 @@ describe('createHttpServer', () => {
     vi.clearAllMocks();
     _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
+    mockReadJsonSafe.mockReturnValue(null);
   });
 
   afterEach(async () => {
@@ -155,11 +162,7 @@ describe('createHttpServer', () => {
     });
 
     it('returns dashboard JSON when file exists', async () => {
-      mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.endsWith('.dashboard')) return true;
-        return false;
-      });
-      mockReadFileSync.mockReturnValue(dashboardJson);
+      mockReadJsonSafe.mockReturnValue(JSON.parse(dashboardJson));
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
@@ -277,11 +280,7 @@ describe('createHttpServer', () => {
 
     it('returns config JSON when file exists', async () => {
       const configData = { mode: 'max_plan', max_workers: 4 };
-      mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.includes('config.json')) return true;
-        return false;
-      });
-      mockReadFileSync.mockReturnValue(JSON.stringify(configData));
+      mockReadJsonSafe.mockReturnValue(configData);
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
@@ -496,11 +495,7 @@ describe('createHttpServer', () => {
   describe('POST /api/config', () => {
     it('merges and writes config', async () => {
       const existingConfig = { mode: 'max_plan', max_workers: 2 };
-      mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.includes('config.json')) return true;
-        return false;
-      });
-      mockReadFileSync.mockReturnValue(JSON.stringify(existingConfig));
+      mockReadJsonSafe.mockReturnValue(existingConfig);
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
@@ -596,11 +591,7 @@ describe('createHttpServer', () => {
   describe('GET /api/worker/:taskId/log', () => {
     it('returns task and log when both exist', async () => {
       const taskData = { id: '001-001', title: 'Setup project', status: 'EXECUTING', model: 'sonnet' };
-      mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.includes('task-001-001.json')) return true;
-        return false;
-      });
-      mockReadFileSync.mockReturnValue(JSON.stringify(taskData));
+      mockReadJsonSafe.mockReturnValue(taskData);
       mockReadWorkerLog.mockReturnValue('Building project...\nTests passed.');
 
       api = createHttpServer(PROJECT_ROOT, 0);
@@ -617,11 +608,7 @@ describe('createHttpServer', () => {
 
     it('returns null log when no log file exists', async () => {
       const taskData = { id: '001-002', title: 'Add tests', status: 'PENDING' };
-      mockExistsSync.mockImplementation((p) => {
-        if (typeof p === 'string' && p.includes('task-001-002.json')) return true;
-        return false;
-      });
-      mockReadFileSync.mockReturnValue(JSON.stringify(taskData));
+      mockReadJsonSafe.mockReturnValue(taskData);
       mockReadWorkerLog.mockReturnValue(null);
 
       api = createHttpServer(PROJECT_ROOT, 0);
@@ -636,7 +623,7 @@ describe('createHttpServer', () => {
     });
 
     it('returns 404 for nonexistent task', async () => {
-      mockExistsSync.mockReturnValue(false);
+      mockReadJsonSafe.mockReturnValue(null);
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));

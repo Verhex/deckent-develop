@@ -92,8 +92,8 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Test Step', () => {
-    it('should run npm test', () => {
-      expect(workflowContent).toMatch(/Run tests[\s\S]*?run: npm test/)
+    it('should run tests (staged vitest)', () => {
+      expect(workflowContent).toMatch(/Run tests[\s\S]*?npx vitest run/)
     })
   })
 

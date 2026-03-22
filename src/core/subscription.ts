@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { PROJECT_CONFIG_PATH } from './constants.js';
+import { readJsonSafeAsync } from './utils.js';
 import type {
   SubscriptionProfile,
   PlanMode,
@@ -23,6 +23,7 @@ export function checkModeCompatibility(
 ): string | null {
   if (profile.detected === 'unknown') return null;
 
+  // safe: widening PlanMode[] to string[] for .includes() with string argument — TypeScript limitation workaround
   const isMaxMode = (MAX_MODES as readonly string[]).includes(configMode);
   const isProMode = (PRO_MODES as readonly string[]).includes(configMode);
 
@@ -143,18 +144,8 @@ export async function saveSubscriptionToConfig(
   const root = resolve(projectRoot ?? process.cwd());
   const configPath = join(root, PROJECT_CONFIG_PATH);
 
-  let existing: Record<string, unknown> = {};
-
-  if (existsSync(configPath)) {
-    try {
-      const { readFile } = await import('node:fs/promises');
-      const raw = await readFile(configPath, 'utf-8');
-      existing = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      // If we can't read the existing config, start fresh
-      existing = {};
-    }
-  }
+  const existing: Record<string, unknown> =
+    (await readJsonSafeAsync<Record<string, unknown>>(configPath)) ?? {};
 
   existing['subscription'] = profile;
 

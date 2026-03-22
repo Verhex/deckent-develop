@@ -63,7 +63,8 @@ export function formatAgentAssignments(tasks: Task[], verbose: boolean): string 
   for (const t of tasks) {
     const agent = t.assignedAgent ?? 'generic';
     if (!agentMap.has(agent)) agentMap.set(agent, []);
-    agentMap.get(agent)!.push(t.id);
+    const agentTasks = agentMap.get(agent);
+    if (agentTasks) agentTasks.push(t.id); // narrowed: set() called above
   }
   if (agentMap.size === 0) {
     lines.push('No agent assignments found.');
@@ -93,7 +94,8 @@ export function formatSkillAssignments(tasks: Task[], verbose: boolean): string 
     if (t.assignedSkills && t.assignedSkills.length > 0) {
       for (const skill of t.assignedSkills) {
         if (!skillMap.has(skill)) skillMap.set(skill, []);
-        skillMap.get(skill)!.push(t.id);
+        const skillTasks = skillMap.get(skill);
+        if (skillTasks) skillTasks.push(t.id); // narrowed: set() called above
       }
     }
   }

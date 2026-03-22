@@ -1,0 +1,19 @@
+{
+  "taskId": "036-006",
+  "workerId": "worker-barrel-cleanup",
+  "filesChanged": [
+    "src/orchestra/index.ts",
+    "src/orchestra/tmux.ts",
+    "src/orchestra/planner.ts",
+    "src/orchestra/usage-manager.ts",
+    "src/orchestra/sprint-controller.ts",
+    "src/orchestra/result-evaluator.ts",
+    "tests/orchestra/barrel-exports.test.ts"
+  ],
+  "linesAdded": 162,
+  "linesRemoved": 76,
+  "testsPassed": true,
+  "coverage": 95,
+  "selfAssessment": "DONE",
+  "notes": "Barrel cleanup complete. orchestra/index.ts reduced from 76 lines to 91 lines but now exports only the 22 public runtime symbols used by cli/, mcp/, api/ consumers. Removed 30+ internal symbols from barrel: spawn backends (TmuxBackend, SubprocessBackend, SpawnBackendFactory), internal sprint functions (pauseSprint, resumeSprint, checkAndAutoPause, checkAndAutoResume, isStaleTaskFile), IPC registry (getChannelRegistry, registerWorkerChannel, unregisterWorkerChannel), planner internals (buildPlanPrompt, parsePlannerResponse, callBrainPlanner), DI variants (evaluateResultDI, waitForResultsDI), standalone usage variants, individual doc updater instances (changelogUpdater, sprintLogUpdater, etc.), and internal registry functions (getRegisteredUpdaters, clearUpdaters). All @internal JSDoc annotations added to source files. Public API comment block added at top of index.ts. 51 tests written verifying public accessibility + internal exclusion + surface count. tsc: 0 errors. vitest: 7782/7782 pass (332 test files)."
+}

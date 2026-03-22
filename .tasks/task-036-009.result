@@ -1,0 +1,24 @@
+{
+  "taskId": "036-009",
+  "title": "Auditor Pattern Queue Fix",
+  "self_assessment": "DONE",
+  "files_changed": [
+    "src/monitor/auditor.ts",
+    "tests/monitor/auditor-queue.test.ts"
+  ],
+  "lines_added": 55,
+  "lines_removed": 3,
+  "changes": {
+    "src/monitor/auditor.ts": "Replaced shift() O(n) with pop() O(1) in detectPatterns() truncation loop. Sort order changed from ascending to descending by occurrences so pop() removes lowest-occurrence patterns from the end.",
+    "tests/monitor/auditor-queue.test.ts": "New test file with 7 tests covering: retains highest-occurrence patterns, removes lowest first, fits within PATTERNS_MAX_LINES, never removes all entries, no truncation within limits, stable with equal occurrences, sorted descending after truncation."
+  },
+  "test_results": {
+    "command": "npx vitest run tests/monitor/",
+    "files": 6,
+    "tests": 143,
+    "passed": 143,
+    "failed": 0
+  },
+  "tsc_errors": 0,
+  "notes": "The fix is minimal and correct: sort descending by occurrences, pop() from the back instead of shift() from the front. Semantics are identical — lowest-occurrence patterns are evicted first. Performance improves from O(n) to O(1) per eviction."
+}

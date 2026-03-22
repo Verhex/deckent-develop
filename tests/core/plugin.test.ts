@@ -70,7 +70,7 @@ describe('loadPlugin', () => {
     loadPlugin('/root/plugins/foo');
     expect(fs.readFileSync).toHaveBeenCalledWith(
       expect.stringContaining('manifest.json'),
-      'utf8'
+      'utf-8'
     );
   });
 });

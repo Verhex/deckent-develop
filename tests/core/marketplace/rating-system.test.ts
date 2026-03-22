@@ -146,14 +146,14 @@ describe('RatingSystem', () => {
       const fs = createMockFS();
       const rs = new RatingSystem(dataDir, { fs });
 
-      expect(() => rs.submitRating('skill-a', 0)).toThrow('between 1 and 5');
+      expect(() => rs.submitRating('skill-a', 0)).toThrow('rating must be 1-5 integer');
     });
 
     it('throws for rating above 5', () => {
       const fs = createMockFS();
       const rs = new RatingSystem(dataDir, { fs });
 
-      expect(() => rs.submitRating('skill-a', 6)).toThrow('between 1 and 5');
+      expect(() => rs.submitRating('skill-a', 6)).toThrow('rating must be 1-5 integer');
     });
 
     it('throws for non-integer rating', () => {

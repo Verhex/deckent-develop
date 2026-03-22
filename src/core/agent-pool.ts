@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import { createDefaultStats } from './agent-types.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -51,15 +52,13 @@ export class AgentPoolManager {
       if (!entry.isDirectory()) continue;
       const agentFile = path.join(dir, entry.name, AGENT_FILENAME);
       if (!fs.existsSync(agentFile)) continue;
-      try {
-        const raw = JSON.parse(fs.readFileSync(agentFile, 'utf8'));
+      const raw = readJsonSafe<Record<string, unknown>>(agentFile);
+      if (raw) {
         const validation = AgentPoolManager.validateAgentDefinition(raw);
         if (validation.valid) {
-          const agent = raw as AgentDefinition;
+          const agent = raw as unknown as AgentDefinition;
           pool.set(agent.id, agent);
         }
-      } catch {
-        // Skip invalid agent files silently
       }
     }
   }

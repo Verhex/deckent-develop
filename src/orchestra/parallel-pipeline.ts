@@ -1,3 +1,4 @@
+import { ErrorRegistry } from '../core/errors.js';
 // ─── Parallel Pipeline Manager ─────────────────────────────────────────────
 // Topological sort of tasks into execution waves based on dependencies.
 // Wave 0: no deps, Wave 1: depends only on wave 0, etc.
@@ -63,7 +64,7 @@ export class ParallelPipelineManager {
       if (waveTaskIds.length === 0) {
         // Remaining tasks all have unresolved deps -> circular dependency
         const unresolved = [...inDegree.keys()].filter(id => !resolved.has(id));
-        throw new Error(`Circular dependency detected among tasks: ${unresolved.join(', ')}`);
+        throw ErrorRegistry.createError('DECKENT_E049', { message: `Circular dependency detected among tasks: ${unresolved.join(', ')}` });
       }
 
       // Sort for deterministic output

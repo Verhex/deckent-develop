@@ -117,7 +117,8 @@ export class DependencyResolver {
     for (const [name, versionList] of versions) {
       if (versionList.length === 0) continue;
       const sorted = [...versionList].sort(this._compareSemver.bind(this));
-      resolved.set(name, sorted[sorted.length - 1]!);
+      const highest = sorted.at(-1);
+      if (highest !== undefined) resolved.set(name, highest);
     }
     return resolved;
   }
@@ -136,7 +137,7 @@ export class DependencyResolver {
   private _getManifest(skillName: string): SkillManifestDeps | null {
     // Check registry lookup first (for testing / remote resolution)
     if (this.registryLookup.has(skillName)) {
-      return this.registryLookup.get(skillName)!;
+      return this.registryLookup.get(skillName) ?? null; // narrowed by has() above
     }
 
     // Check local skills directory
@@ -184,7 +185,8 @@ export class DependencyResolver {
 
     const deps = manifest.dependencies ?? {};
     for (const depName of Object.keys(deps)) {
-      graph.get(skillName)!.add(depName);
+      const edges = graph.get(skillName);
+      if (edges) edges.add(depName); // narrowed: graph.set(skillName, ...) called above
       this._buildGraph(depName, graph, versions, visited, [...ancestors, skillName]);
     }
   }
@@ -211,7 +213,8 @@ export class DependencyResolver {
 
     const result: string[] = [];
     while (queue.length > 0) {
-      const node = queue.shift()!;
+      const node = queue.shift(); // length > 0 guarantees defined
+      if (node === undefined) break;
       result.push(node);
       const deps = graph.get(node);
       if (deps) {

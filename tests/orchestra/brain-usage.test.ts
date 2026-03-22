@@ -36,7 +36,7 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   listWorkers: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock('../../src/core/spawn-backend.js', () => ({
+vi.mock('../../src/orchestra/spawn-backend.js', () => ({
   TmuxBackend: vi.fn(),
   SubprocessBackend: vi.fn(),
   SpawnBackendFactory: { create: vi.fn() },

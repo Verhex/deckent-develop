@@ -54,7 +54,8 @@ export function registerHook(hook: PluginHook, callback: HookCallback): void {
   if (!hookRegistry.has(hook)) {
     hookRegistry.set(hook, []);
   }
-  hookRegistry.get(hook)!.push(callback);
+  const callbacks = hookRegistry.get(hook);
+  if (callbacks) callbacks.push(callback); // narrowed: set() called above
 }
 
 /**

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import {
   GLOBAL_CONFIG_PATH,
   GLOBAL_CREDENTIALS_DIR,
@@ -6,6 +6,7 @@ import {
 } from './constants.js';
 import type { DeckentConfig } from './types.js';
 import { deepMerge } from './config.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Global Config Utilities ────────────────────────────────────────
 
@@ -32,14 +33,7 @@ export function readGlobalConfig(): Partial<DeckentConfig> | null {
     return null;
   }
 
-  const content = readFileSync(GLOBAL_CONFIG_PATH, 'utf-8');
-  try {
-    return JSON.parse(content) as Partial<DeckentConfig>;
-  } catch {
-    throw new Error(
-      `Malformed JSON in global config "${GLOBAL_CONFIG_PATH}". Please fix or delete the file.`,
-    );
-  }
+  return readJsonSafe<Partial<DeckentConfig>>(GLOBAL_CONFIG_PATH);
 }
 
 /**

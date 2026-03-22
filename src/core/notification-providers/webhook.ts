@@ -1,7 +1,8 @@
 // ─── Webhook Notification Provider ──────────────────────────────────
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { NotificationEvent, NotificationProvider } from '../notifications.js';
+import { readJsonSafe } from '../utils.js';
 
 export interface WebhookPayload {
   event: string;
@@ -62,7 +63,7 @@ export class WebhookNotificationProvider implements NotificationProvider {
     }
 
     this.writeLog({ url, event: event.type, status: 'error', timestamp: new Date().toISOString(), errorMessage: lastError?.message });
-    throw lastError!;
+    throw lastError ?? new Error('Webhook request failed after retries');
   }
 
   private writeLog(entry: WebhookLogEntry): void {
@@ -72,14 +73,7 @@ export class WebhookNotificationProvider implements NotificationProvider {
         mkdirSync(dir, { recursive: true });
       }
 
-      let entries: WebhookLogEntry[] = [];
-      if (existsSync(this.logPath)) {
-        try {
-          entries = JSON.parse(readFileSync(this.logPath, 'utf-8')) as WebhookLogEntry[];
-        } catch {
-          entries = [];
-        }
-      }
+      let entries: WebhookLogEntry[] = readJsonSafe<WebhookLogEntry[]>(this.logPath) ?? [];
 
       entries.push(entry);
 

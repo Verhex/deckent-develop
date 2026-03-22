@@ -83,7 +83,8 @@ export class WorkerChannel {
     if (!this.handlers.has(type)) {
       this.handlers.set(type, []);
     }
-    this.handlers.get(type)!.push(handler);
+    const handlers = this.handlers.get(type);
+    if (handlers) handlers.push(handler); // narrowed: set() called above
   }
 
   /**
@@ -274,7 +275,8 @@ export class WorkerSideChannel {
     if (!this.handlers.has(type)) {
       this.handlers.set(type, []);
     }
-    this.handlers.get(type)!.push(handler);
+    const handlers = this.handlers.get(type);
+    if (handlers) handlers.push(handler); // narrowed: set() called above
   }
 
   /**

@@ -83,11 +83,11 @@ describe('readGlobalConfig', () => {
     expect(result).toEqual(config);
   });
 
-  it('handles malformed JSON by throwing descriptive error', () => {
+  it('returns null for malformed JSON (readJsonSafe returns null)', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue('{ not valid json }');
 
-    expect(() => readGlobalConfig()).toThrow('Malformed JSON');
+    expect(readGlobalConfig()).toBeNull();
   });
 
   it('reads from GLOBAL_CONFIG_PATH', () => {

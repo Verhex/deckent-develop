@@ -11,7 +11,7 @@ import {
   TmuxBackend,
   SubprocessBackend,
   SpawnBackendError,
-} from '../../src/core/spawn-backend.js';
+} from '../../src/orchestra/spawn-backend.js';
 import type { ModelType, UsageMetrics } from '../../src/core/types.js';
 
 // ─── Mock ProviderAdapter factory ────────────────────────────────────

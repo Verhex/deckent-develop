@@ -40,6 +40,7 @@ vi.mock('../../src/core/config.js', () => ({
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
   ensureDeckentImport: vi.fn(),
+  readJsonSafe: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -97,7 +98,7 @@ vi.mock('../../src/core/plugin.js', () => ({
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
-import { countBrainLines, ensureDeckentImport } from '../../src/core/utils.js';
+import { countBrainLines, ensureDeckentImport, readJsonSafe } from '../../src/core/utils.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../src/core/config.js';
 import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, runDecay, BrainError, confirmDraftTasks } from '../../src/orchestra/brain.js';
 import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, setupWatchWindow, TmuxError } from '../../src/orchestra/tmux.js';
@@ -306,9 +307,11 @@ describe('doctor command', () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
     vi.mocked(readdirSync).mockReturnValue(['test.lock'] as unknown as ReturnType<typeof readdirSync>);
     const staleTime = new Date(Date.now() - 400_000).toISOString();
-    vi.mocked(readFileSync).mockImplementation((p) => {
-      if (String(p).includes('.lock')) return JSON.stringify({ acquiredAt: staleTime });
-      return '# Content\nSome data';
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      if (typeof p === 'string' && p.includes('.lock')) {
+        return JSON.stringify({ acquiredAt: staleTime }) as unknown as ReturnType<typeof readFileSync>;
+      }
+      return '# Content\nSome data' as unknown as ReturnType<typeof readFileSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('stale lock');
@@ -807,7 +810,7 @@ describe('cleanup command', () => {
   it('cleans up with tasks', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeTask()));
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeTask()) as unknown as ReturnType<typeof readFileSync>);
     vi.mocked(cleanup).mockImplementation(() => {});
     vi.mocked(destroy).mockImplementation(() => {});
     await runCommand(registerCleanup, ['cleanup']);
@@ -1599,11 +1602,11 @@ describe('init command', () => {
       if (String(p).includes('config.json')) return true;
       return false;
     });
-    vi.mocked(readFileSync).mockImplementation((p) => {
-      if (String(p).includes('config.json')) {
-        return JSON.stringify({ mode: 'pro_plan', customField: 'keep-me' });
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      if (typeof p === 'string' && p.includes('config.json')) {
+        return JSON.stringify({ mode: 'pro_plan', customField: 'keep-me' }) as unknown as ReturnType<typeof readFileSync>;
       }
-      return '';
+      return '' as unknown as ReturnType<typeof readFileSync>;
     });
 
     await runCommand(registerInit, ['init']);

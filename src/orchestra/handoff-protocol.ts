@@ -2,6 +2,7 @@
 // Manages artifact handoffs between dependent tasks.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { ErrorRegistry } from '../core/errors.js';
 
 export interface Handoff {
   id: string;
@@ -25,10 +26,10 @@ export class HandoffProtocol {
    */
   createHandoff(fromTaskId: string, toTaskId: string, artifacts: string[]): Handoff {
     if (!fromTaskId || !toTaskId) {
-      throw new Error('HandoffProtocol.createHandoff: fromTaskId and toTaskId are required');
+      throw ErrorRegistry.createError('DECKENT_E046', { message: 'HandoffProtocol.createHandoff: fromTaskId and toTaskId are required' });
     }
     if (!Array.isArray(artifacts) || artifacts.length === 0) {
-      throw new Error('HandoffProtocol.createHandoff: artifacts must be a non-empty array');
+      throw ErrorRegistry.createError('DECKENT_E047', { message: 'HandoffProtocol.createHandoff: artifacts must be a non-empty array' });
     }
 
     mkdirSync(this.handoffDir, { recursive: true });
@@ -89,7 +90,7 @@ export class HandoffProtocol {
   failHandoff(handoffId: string, reason: string): void {
     const handoff = this._readHandoff(handoffId);
     if (!handoff) {
-      throw new Error(`HandoffProtocol.failHandoff: handoff "${handoffId}" not found`);
+      throw ErrorRegistry.createError('DECKENT_E048', { message: `HandoffProtocol.failHandoff: handoff "${handoffId}" not found` });
     }
 
     handoff.status = 'failed';
@@ -108,6 +109,7 @@ export class HandoffProtocol {
       for (const file of files) {
         try {
           const content = readFileSync(join(this.handoffDir, file), 'utf-8');
+          // safe: handoff files written by _writeHandoff with Handoff shape; id checked below
           const parsed = JSON.parse(content) as Handoff;
           if (parsed && parsed.id) {
             handoffs.push(parsed);
@@ -129,6 +131,7 @@ export class HandoffProtocol {
     try {
       if (!existsSync(filePath)) return null;
       const content = readFileSync(filePath, 'utf-8');
+      // safe: handoff files written by _writeHandoff with Handoff shape
       return JSON.parse(content) as Handoff;
     } catch {
       return null;

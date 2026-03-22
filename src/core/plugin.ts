@@ -3,6 +3,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { ModelType } from './types.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,9 +41,11 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
   if (!raw || typeof raw !== 'object') {
     throw new PluginError(`Invalid manifest in ${pluginDir}: must be an object`);
   }
+  // safe: raw confirmed non-null object by typeof check above
   const obj = raw as Record<string, unknown>;
   const required = ['name', 'version', 'description', 'entrypoint'] as const;
   for (const field of required) {
+    // safe: typeof check on same line confirms string before .trim()
     if (typeof obj[field] !== 'string' || !(obj[field] as string).trim()) {
       throw new PluginError(`Invalid manifest in ${pluginDir}: missing or empty field "${field}"`);
     }
@@ -54,6 +57,7 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
       if (!Array.isArray(obj[field])) {
         throw new PluginError(`Invalid manifest in ${pluginDir}: "${field}" must be an array`);
       }
+      // safe: Array.isArray check above confirms obj[field] is an array
       for (const item of obj[field] as unknown[]) {
         if (typeof item !== 'string') {
           throw new PluginError(`Invalid manifest in ${pluginDir}: "${field}" must be an array of strings`);
@@ -67,6 +71,7 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
     if (typeof obj['hooks'] !== 'object' || Array.isArray(obj['hooks']) || obj['hooks'] === null) {
       throw new PluginError(`Invalid manifest in ${pluginDir}: "hooks" must be an object`);
     }
+    // safe: confirmed non-null, non-array object by typeof/Array.isArray/null checks above
     const hooks = obj['hooks'] as Record<string, unknown>;
     for (const hookKey of ['beforeSprint', 'afterSprint'] as const) {
       if (hooks[hookKey] !== undefined && typeof hooks[hookKey] !== 'string') {
@@ -77,6 +82,7 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
 
   // Validate model
   if (obj['model'] !== undefined) {
+    // safe: cast needed for includes() comparison; invalid values rejected by the throw below
     if (!VALID_MODELS.includes(obj['model'] as ModelType)) {
       throw new PluginError(
         `Invalid manifest in ${pluginDir}: "model" must be one of ${VALID_MODELS.join(', ')}`
@@ -84,6 +90,7 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
     }
   }
 
+  // safe: all fields validated as non-empty strings by the required field loop above
   const manifest: PluginManifest = {
     name: obj['name'] as string,
     version: obj['version'] as string,
@@ -92,6 +99,7 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
     enabled: obj['enabled'] === false ? false : true,
   };
 
+  // safe: all optional fields validated as arrays-of-strings/ModelType/object by the validation loops above
   if (obj['triggers'] !== undefined) manifest.triggers = obj['triggers'] as string[];
   if (obj['permissions'] !== undefined) manifest.permissions = obj['permissions'] as string[];
   if (obj['dependencies'] !== undefined) manifest.dependencies = obj['dependencies'] as string[];
@@ -116,11 +124,9 @@ export function loadPlugin(pluginDir: string): Plugin {
   if (!fs.existsSync(manifestPath)) {
     throw new PluginError(`No manifest.json found in ${pluginDir}`);
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  } catch (err) {
-    throw new PluginError(`Failed to parse manifest.json in ${pluginDir}: ${(err as Error).message}`);
+  const raw = readJsonSafe<unknown>(manifestPath);
+  if (raw === null) {
+    throw new PluginError(`Failed to parse manifest.json in ${pluginDir}`);
   }
   const manifest = validateManifest(raw, pluginDir);
   return { manifest, dir: pluginDir };
@@ -174,13 +180,8 @@ export function scanPlugins(projectRoot: string): Plugin[] {
 export function enablePlugin(pluginName: string, pluginsDir: string): boolean {
   const pluginDir = path.join(pluginsDir, pluginName);
   const manifestPath = path.join(pluginDir, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) {
-    return false;
-  }
-  let raw: Record<string, unknown>;
-  try {
-    raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
-  } catch {
+  const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
+  if (!raw) {
     return false;
   }
   raw['enabled'] = true;
@@ -195,13 +196,8 @@ export function enablePlugin(pluginName: string, pluginsDir: string): boolean {
 export function disablePlugin(pluginName: string, pluginsDir: string): boolean {
   const pluginDir = path.join(pluginsDir, pluginName);
   const manifestPath = path.join(pluginDir, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) {
-    return false;
-  }
-  let raw: Record<string, unknown>;
-  try {
-    raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
-  } catch {
+  const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
+  if (!raw) {
     return false;
   }
   raw['enabled'] = false;
@@ -284,16 +280,9 @@ export function removePlugin(pluginName: string, pluginsDir: string): boolean {
   }
   // Check if it's a system plugin by loading the manifest
   const manifestPath = path.join(pluginDir, 'manifest.json');
-  if (fs.existsSync(manifestPath)) {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    } catch {
-      raw = null;
-    }
-    if (raw && typeof raw === 'object' && (raw as Record<string, unknown>)['system'] === true) {
-      throw new PluginError(`Cannot remove system plugin "${pluginName}"`);
-    }
+  const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
+  if (raw && raw['system'] === true) {
+    throw new PluginError(`Cannot remove system plugin "${pluginName}"`);
   }
   fs.rmSync(pluginDir, { recursive: true, force: true });
   return true;

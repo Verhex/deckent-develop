@@ -186,9 +186,11 @@ export class SkillLoadingCache {
     }
 
     if (oldestKey !== null) {
-      const entry = this._cache.get(oldestKey)!;
-      this._totalBytes -= entry.sizeBytes;
-      this._cache.delete(oldestKey);
+      const entry = this._cache.get(oldestKey);
+      if (entry) {
+        this._totalBytes -= entry.sizeBytes;
+        this._cache.delete(oldestKey);
+      }
     }
   }
 }

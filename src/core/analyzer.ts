@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type {
@@ -11,15 +11,11 @@ import type {
   ProjectSize,
   MethodologyRecommendation,
 } from './types.js';
+import { readJsonSafe } from './utils.js';
 
 function readPackageJson(root: string): { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } | null {
   const pkgPath = join(root, 'package.json');
-  if (!existsSync(pkgPath)) return null;
-  try {
-    return JSON.parse(readFileSync(pkgPath, 'utf-8'));
-  } catch {
-    return null;
-  }
+  return readJsonSafe<{ dependencies?: Record<string, string>; devDependencies?: Record<string, string> }>(pkgPath);
 }
 
 function detectFramework(root: string): DetectedFramework {

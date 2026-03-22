@@ -1,0 +1,15 @@
+{
+  "taskId": "036-001",
+  "workerId": "w-036-001",
+  "filesChanged": [
+    "src/orchestra/sprint-controller.ts",
+    "tests/orchestra/sprint-controller.test.ts"
+  ],
+  "linesAdded": 1127,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 95,
+  "selfAssessment": "DONE",
+  "notes": "Extracted sprint-controller.ts from brain.ts with all 8 target functions (runSprint, pauseSprint, resumeSprint, checkAndAutoPause, checkAndAutoResume, cleanup, isStaleTaskFile, RunSprintOptions interface) plus supporting functions (readContext, checkUsage, adjustSprintSize, planSprint, spawnWorkers, waitForResults, evaluateResult, etc.) and types (BrainError, PauseState, IPC registry). Created 51 tests covering all extracted functions. tsc --noEmit passes cleanly. brain.ts was NOT modified.",
+  "completedAt": "2026-03-22T16:07:00.000Z"
+}

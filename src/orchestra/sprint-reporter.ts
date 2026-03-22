@@ -70,7 +70,8 @@ export function buildAgentPerformance(
     if (!agentData.has(agentId)) {
       agentData.set(agentId, { tasks: 0, done: 0, debt: 0, noGo: 0, coverageSum: 0, coverageCount: 0 });
     }
-    const data = agentData.get(agentId)!;
+    const data = agentData.get(agentId); // narrowed: set() called above
+    if (!data) continue;
     data.tasks += 1;
 
     const ev = evaluations.get(task.id);
@@ -145,7 +146,8 @@ export function buildSkillPerformance(
       if (!skillData.has(skillId)) {
         skillData.set(skillId, { tasks: 0, done: 0, debt: 0, noGo: 0 });
       }
-      const data = skillData.get(skillId)!;
+      const data = skillData.get(skillId); // narrowed: set() called above
+      if (!data) continue;
       data.tasks += 1;
 
       const ev = evaluations.get(task.id);
@@ -408,7 +410,8 @@ export function readPreviousSprintMetrics(projectRoot: string, currentSprintId: 
   const previousFiles = files.filter(f => !f.includes(currentSprintId));
   if (previousFiles.length === 0) return null;
 
-  const latestFile = previousFiles[previousFiles.length - 1]!;
+  const latestFile = previousFiles.at(-1);
+  if (!latestFile) return null;
   const content = readFileSafe(join(sprintsPath, latestFile));
   return parseSprintLogMetrics(content);
 }
@@ -421,8 +424,8 @@ function parseSprintLogMetrics(content: string): SprintMetrics | null {
   for (const line of lines) {
     if (!line.startsWith('|') || line.startsWith('|---') || line.startsWith('| Metric')) continue;
     const cols = line.split('|').map(c => c.trim()).filter(c => c);
-    if (cols.length >= 2) {
-      metricsMap.set(cols[0]!, cols[1]!);
+    if (cols.length >= 2 && cols[0] !== undefined && cols[1] !== undefined) {
+      metricsMap.set(cols[0], cols[1]);
     }
   }
 

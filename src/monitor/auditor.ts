@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, normalize } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { AgentStatus, SprintPhase, SprintStatus } from '../core/types.js';
+import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from '../core/types.js';
 import type {
   Heartbeat,
   LockInfo,
@@ -9,7 +9,6 @@ import type {
   TaskScope,
   BoundaryViolation,
   Alert,
-  AlertLevel,
   DashboardState,
   PatternEntry,
 } from '../core/types.js';
@@ -30,6 +29,7 @@ import {
 function readJsonSafe<T>(filePath: string): T | null {
   try {
     const content = readFileSync(filePath, 'utf-8');
+    // safe: generic T is caller-provided; JSON.parse returns unknown, cast defers validation to caller
     return JSON.parse(content) as T;
   } catch {
     return null;
@@ -90,7 +90,7 @@ export function scanHeartbeats(projectRoot: string): {
       });
       alerts.push(
         createAlert(
-          'CRITICAL' as AlertLevel,
+          AlertLevel.CRITICAL,
           `Stale agent detected: ${hb.workerId} (task: ${hb.taskId})`,
           hb.workerId,
         ),
@@ -197,7 +197,7 @@ export function checkStaleLocks(projectRoot: string): {
       });
       alerts.push(
         createAlert(
-          'WARNING' as AlertLevel,
+          AlertLevel.WARNING,
           `Stale lock: ${lock.filePath} by ${lock.ownerWorkerId}`,
           lock.ownerWorkerId,
         ),
@@ -226,7 +226,8 @@ export function detectDeadlocks(tasks: Task[]): BoundaryViolation[] {
 
     for (const dep of task.dependencies) {
       if (!adjList.has(dep)) adjList.set(dep, []);
-      adjList.get(dep)!.push(task.id);
+      const depList = adjList.get(dep);
+      if (depList) depList.push(task.id); // narrowed: set() called above
       inDegree.set(task.id, (inDegree.get(task.id) ?? 0) + 1);
       if (!inDegree.has(dep)) inDegree.set(dep, 0);
     }
@@ -239,7 +240,8 @@ export function detectDeadlocks(tasks: Task[]): BoundaryViolation[] {
 
   let processed = 0;
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const current = queue.shift(); // length > 0 guarantees defined
+    if (current === undefined) break;
     processed++;
     for (const neighbor of adjList.get(current) ?? []) {
       const newDegree = (inDegree.get(neighbor) ?? 1) - 1;
@@ -305,6 +307,7 @@ export function detectPatterns(
   let existingPatterns: PatternEntry[] = [];
   try {
     const content = readFileSync(patternsPath, 'utf-8');
+    // safe: PatternEntry[] shape validated by detectPatterns logic (occurrences, pattern, etc.)
     existingPatterns = JSON.parse(content) as PatternEntry[];
   } catch {
     existingPatterns = [];
@@ -336,13 +339,13 @@ export function detectPatterns(
   const serialized = JSON.stringify(existingPatterns, null, 2);
   const lineCount = serialized.split('\n').length;
   if (lineCount > PATTERNS_MAX_LINES) {
-    // Remove oldest unresolved patterns first
-    existingPatterns.sort((a, b) => a.occurrences - b.occurrences);
+    // Sort descending so lowest-occurrence patterns are at the end — pop() is O(1) vs shift() O(n)
+    existingPatterns.sort((a, b) => b.occurrences - a.occurrences);
     while (
       JSON.stringify(existingPatterns, null, 2).split('\n').length > PATTERNS_MAX_LINES &&
       existingPatterns.length > 1
     ) {
-      existingPatterns.shift();
+      existingPatterns.pop();
     }
   }
 
@@ -488,11 +491,14 @@ export function deduplicateAlerts(existing: Alert[], incoming: Alert[]): Alert[]
     );
 
     if (idx !== -1) {
-      merged[idx] = {
-        ...merged[idx]!,
-        count: (merged[idx]!.count ?? 1) + 1,
-        timestamp: alert.timestamp,
-      };
+      const existing = merged[idx];
+      if (existing) {
+        merged[idx] = {
+          ...existing,
+          count: (existing.count ?? 1) + 1,
+          timestamp: alert.timestamp,
+        };
+      }
     } else {
       merged.push({ ...alert, count: 1 });
     }
@@ -510,6 +516,7 @@ export function writeScanToDashboard(
   let existing: DashboardState | null = null;
   try {
     if (existsSync(dashPath)) {
+      // safe: dashboard file is always written by updateDashboard with DashboardState shape
       existing = JSON.parse(readFileSync(dashPath, 'utf-8')) as DashboardState;
     }
   } catch { /* start fresh */ }
@@ -541,6 +548,7 @@ export function writeScanToDashboard(
   const existingProgress = existing?.progress ?? { done: 0, active: 0, blocked: 0, total: 0 };
 
   updateDashboard(projectRoot, {
+    // safe: sprintInfo fields (id, number, phase, status) match DashboardState['sprint'] — caller provides correct shape
     sprint: sprintInfo as DashboardState['sprint'],
     agents,
     progress: {

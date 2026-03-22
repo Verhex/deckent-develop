@@ -1,8 +1,14 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, PROJECT_CONFIG_PATH } from './constants.js';
 import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
+
+/** Type guard: validates that a string is a valid DebtPriority enum value. */
+function isDebtPriority(value: string): value is DebtPriority {
+  return Object.values(DebtPriority).includes(value as DebtPriority);
+}
 
 /**
  * Read a file safely, returning empty string on any error.
@@ -20,7 +26,21 @@ export function readFileSafe(filePath: string): string {
  */
 export function readJsonSafe<T>(filePath: string): T | null {
   try {
+    // safe: generic T is caller-supplied; validation is deferred to caller; null returned on parse failure
     return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Async variant of readJsonSafe. Parse a JSON file safely, returning null on any error.
+ */
+export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> {
+  try {
+    const content = await readFile(filePath, 'utf-8');
+    // safe: generic T is caller-supplied; validation is deferred to caller; null returned on parse failure
+    return JSON.parse(content) as T;
   } catch {
     return null;
   }
@@ -73,17 +93,15 @@ export function getNextSprintId(projectRoot: string): string {
   // Source 2: read last_sprint_id from .deckent/config.json
   let maxFromConfig = 0;
   const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
-  if (existsSync(configPath)) {
-    try {
-      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
-      const lastId = config.last_sprint_id;
-      if (typeof lastId === 'string') {
-        const m = lastId.match(/^sprint-(\d+)$/);
-        if (m?.[1]) maxFromConfig = parseInt(m[1], 10);
-      } else if (typeof lastId === 'number') {
-        maxFromConfig = lastId;
-      }
-    } catch { /* ignore malformed config */ }
+  const config = readJsonSafe<Record<string, unknown>>(configPath);
+  if (config) {
+    const lastId = config.last_sprint_id;
+    if (typeof lastId === 'string') {
+      const m = lastId.match(/^sprint-(\d+)$/);
+      if (m?.[1]) maxFromConfig = parseInt(m[1], 10);
+    } else if (typeof lastId === 'number') {
+      maxFromConfig = lastId;
+    }
   }
 
   // Take the max of both sources — never go backward
@@ -98,10 +116,7 @@ export function getNextSprintId(projectRoot: string): string {
 export function updateLastSprintId(projectRoot: string, sprintId: string): void {
   const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
   try {
-    let config: Record<string, unknown> = {};
-    if (existsSync(configPath)) {
-      config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
-    }
+    const config: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
     config.last_sprint_id = sprintId;
     writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
   } catch { /* ignore — non-critical */ }
@@ -151,15 +166,15 @@ export function parseDebtTable(content: string): DebtItem[] {
     if (cols.length < 9) continue;
 
     items.push({
-      id: cols[0]!,
-      description: cols[1]!,
-      originTaskId: cols[2]!,
-      originSprintId: cols[3]!,
-      priority: cols[4] as DebtPriority,
-      sprintsOpen: parseInt(cols[5]!, 10) || 0,
+      id: cols[0] ?? '',
+      description: cols[1] ?? '',
+      originTaskId: cols[2] ?? '',
+      originSprintId: cols[3] ?? '',
+      priority: isDebtPriority(cols[4] ?? '') ? cols[4] as DebtPriority : DebtPriority.NORMAL,
+      sprintsOpen: parseInt(cols[5] ?? '0', 10) || 0,
       resolved: cols[6] === 'true',
       resolvedInSprintId: cols[7] === '-' ? undefined : cols[7],
-      createdAt: cols[8]!,
+      createdAt: cols[8] ?? '',
     });
   }
   return items;
@@ -204,7 +219,7 @@ const DATE_LOCALES: Record<string, string> = {
  */
 export function formatDate(date: Date | string, lang: string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  const locale = DATE_LOCALES[lang] ?? DATE_LOCALES['en']!;
+  const locale = DATE_LOCALES[lang] ?? DATE_LOCALES['en'] ?? 'en-US';
   return d.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 

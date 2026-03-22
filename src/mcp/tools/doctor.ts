@@ -34,6 +34,7 @@ export function registerDoctorTool(server: McpServer): void {
         };
       }
 
+      // safe: response.checks comes from runDoctorChecks() which returns DoctorResult with checks array
       const checks = response.checks as Array<{ ok: boolean; name?: string }> | undefined;
       const totalChecks = checks?.length ?? 0;
       const passedChecks = checks?.filter((c) => c.ok).length ?? 0;

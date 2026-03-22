@@ -3,12 +3,12 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
-  readFileSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { GLOBAL_CREDENTIALS_DIR } from './constants.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -96,15 +96,8 @@ export class CredentialManager {
     if (!provider || typeof provider !== 'string') return null;
 
     const filePath = this.credentialFilePath(provider);
-    if (!existsSync(filePath)) return null;
-
-    try {
-      const raw = readFileSync(filePath, 'utf-8');
-      const entry = JSON.parse(raw) as CredentialEntry;
-      return entry.key ?? null;
-    } catch {
-      return null;
-    }
+    const entry = readJsonSafe<CredentialEntry>(filePath);
+    return entry?.key ?? null;
   }
 
   /**
@@ -136,13 +129,8 @@ export class CredentialManager {
       return files
         .filter((f) => f.endsWith('.json'))
         .map((f) => {
-          try {
-            const raw = readFileSync(join(this.credentialsDir, f), 'utf-8');
-            const entry = JSON.parse(raw) as CredentialEntry;
-            return entry.provider ?? null;
-          } catch {
-            return null;
-          }
+          const entry = readJsonSafe<CredentialEntry>(join(this.credentialsDir, f));
+          return entry?.provider ?? null;
         })
         .filter((p): p is string => p !== null);
     } catch {
@@ -166,14 +154,7 @@ export class CredentialManager {
     if (!provider || typeof provider !== 'string') return null;
 
     const filePath = this.credentialFilePath(provider);
-    if (!existsSync(filePath)) return null;
-
-    try {
-      const raw = readFileSync(filePath, 'utf-8');
-      return JSON.parse(raw) as CredentialEntry;
-    } catch {
-      return null;
-    }
+    return readJsonSafe<CredentialEntry>(filePath);
   }
 
   /**

@@ -1,0 +1,16 @@
+{
+  "taskId": "036-003",
+  "workerId": "worker-036-003",
+  "filesChanged": [
+    "src/orchestra/usage-manager.ts",
+    "tests/orchestra/usage-manager.test.ts"
+  ],
+  "linesAdded": 303,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": -1,
+  "selfAssessment": "DONE",
+  "notes": "Extracted checkUsage, checkUsageWithProvider, getDefaultProvider, adjustSprintSize from brain.ts into src/orchestra/usage-manager.ts. Included internal helpers now() and resolveMaxWorkersNumeric. All necessary imports from core/types, core/provider, core/system-profile. 17 tests covering: CLI failure safe defaults, no-stdout safe defaults, regex parsing, spawnSync throw, alternative output format, provider delegation, provider error propagation, registry default, registry empty, full/reduced/minimal sprint sizes, haiku constraint, auto max_workers, explicit systemProfile, and maxWorkers floor(1). tsc --noEmit passes. brain.ts was NOT modified.",
+  "completedAt": "2026-03-22T16:01:17.000Z",
+  "durationMs": 45000
+}

@@ -2,6 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ProjectStack } from './skill-types.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -27,13 +28,9 @@ export function detectProjectStack(projectRoot: string): ProjectStack {
 
   // Try reading from cache first
   if (!isStackStale(projectRoot)) {
-    try {
-      const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-      if (cached && typeof cached === 'object' && cached.language) {
-        return cached as ProjectStack;
-      }
-    } catch {
-      // Cache read failed, detect fresh
+    const cached = readJsonSafe<ProjectStack>(cachePath);
+    if (cached && typeof cached === 'object' && cached.language) {
+      return cached;
     }
   }
 
@@ -113,12 +110,7 @@ function detectFresh(projectRoot: string): ProjectStack {
 
   // Read package.json
   const pkgPath = path.join(projectRoot, 'package.json');
-  let pkg: Record<string, unknown> = {};
-  try {
-    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  } catch {
-    // No package.json
-  }
+  const pkg: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(pkgPath) ?? {};
 
   const allDeps = {
     ...(pkg['dependencies'] as Record<string, string> | undefined) ?? {},

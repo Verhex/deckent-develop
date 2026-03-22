@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, openSync, closeSync, constants as fsConstants } from 'node:fs';
 import { join, normalize, sep } from 'node:path';
+import { TaskStatus } from '../core/types.js';
 import type {
   Task,
-  TaskStatus,
   TaskPlan,
   TaskResult,
   Heartbeat,
@@ -11,6 +11,7 @@ import type {
   AgentStatus,
 } from '../core/types.js';
 import { TASKS_DIR, LOCKS_DIR } from '../core/constants.js';
+import { ErrorRegistry } from '../core/errors.js';
 
 // ─── Error Classes ──────────────────────────────────────────────────
 
@@ -78,7 +79,8 @@ function ensureDir(dirPath: string): void {
 // ─── Progress Calculation ───────────────────────────────────────────
 
 export function calculateProgress(heartbeat: { status: AgentStatus | string; filesChangedCount?: number }): number {
-  const status = heartbeat.status as string;
+  // safe: status is AgentStatus | string — String() handles both enum values and plain strings
+  const status = String(heartbeat.status);
   const filesChanged = heartbeat.filesChangedCount ?? 0;
   switch (status) {
     case 'EXECUTING': return 10;
@@ -96,12 +98,13 @@ export function readTask(projectRoot: string, taskId: string): Task {
   const path = taskFilePath(projectRoot, taskId);
   try {
     const content = readFileSync(path, 'utf-8');
+    // safe: task files written by createTask/updateTaskStatus with Task shape; SyntaxError handled below
     return JSON.parse(content) as Task;
   } catch (err) {
     if (err instanceof SyntaxError) {
-      throw new Error(`Invalid JSON in task file: ${path}`);
+      throw ErrorRegistry.createError('DECKENT_E060', { message: `Invalid JSON in task file: ${path}` });
     }
-    throw new Error(`Task file not found: ${path}`);
+    throw ErrorRegistry.createError('DECKENT_E061', { message: `Task file not found: ${path}` });
   }
 }
 
@@ -124,7 +127,7 @@ export function claimTask(
     );
   }
 
-  task.status = 'CLAIMED' as TaskStatus;
+  task.status = TaskStatus.CLAIMED;
   task.assignedWorker = workerId;
   task.updatedAt = now();
 
@@ -152,6 +155,7 @@ export function acquireLock(
   // Check existing lock
   if (existsSync(lockPath)) {
     try {
+      // safe: lock files always written by acquireLock with LockInfo shape
       const existing = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
       if (existing.ownerWorkerId === workerId) {
         // Idempotent — same worker already holds the lock
@@ -182,9 +186,11 @@ export function acquireLock(
     closeSync(fd);
   } catch (err: unknown) {
     // EEXIST = another worker created the lock between our check and create
+    // safe: 'code' in err confirms property exists; NodeJS.ErrnoException extends Error with code
     if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
       // Re-read to get the actual owner
       try {
+        // safe: lock file written by acquireLock with LockInfo shape
         const actual = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
         throw new LockError(`File ${filePath} is locked by ${actual.ownerWorkerId}`, filePath);
       } catch (innerErr) {
@@ -207,6 +213,7 @@ export function releaseLock(
   if (!existsSync(lockPath)) return; // No-op if no lock
 
   try {
+    // safe: lock file written by acquireLock with LockInfo shape
     const existing = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
     if (existing.ownerWorkerId !== workerId) {
       throw new LockError(
@@ -231,6 +238,7 @@ export function checkLock(
   if (!existsSync(lockPath)) return null;
 
   try {
+    // safe: lock file written by acquireLock with LockInfo shape
     return JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
   } catch {
     return null;
@@ -276,8 +284,8 @@ export function writeResult(projectRoot: string, result: TaskResult): void {
   // Update task status based on self-assessment
   const newStatus: TaskStatus =
     result.selfAssessment === 'NO_GO'
-      ? ('NO_GO' as TaskStatus)
-      : ('DONE' as TaskStatus);
+      ? TaskStatus.NO_GO
+      : TaskStatus.DONE;
 
   updateTaskStatus(projectRoot, result.taskId, newStatus);
 }
@@ -311,6 +319,7 @@ export function releaseAllLocks(
   for (const file of files) {
     const lockPath = join(locksDir, file);
     try {
+      // safe: lock file written by acquireLock with LockInfo shape
       const lock = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
       if (lock.ownerWorkerId === workerId) {
         unlinkSync(lockPath);

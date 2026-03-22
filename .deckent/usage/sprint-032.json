@@ -1,0 +1,38 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "032-001",
+    "timestamp": "2026-03-21T21:04:09.811Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "032-002",
+    "timestamp": "2026-03-21T21:04:09.813Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "032-003",
+    "timestamp": "2026-03-21T21:04:09.815Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "032-001",
+    "timestamp": "2026-03-21T21:04:44.097Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "032-002",
+    "timestamp": "2026-03-21T21:04:44.097Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "032-003",
+    "timestamp": "2026-03-21T21:04:44.098Z"
+  }
+]

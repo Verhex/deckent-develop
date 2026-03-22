@@ -19,7 +19,7 @@ interface SprintRecord {
 export function formatDurationMs(raw: string): string {
   const msMatch = raw.match(/^(\d+)ms$/);
   if (!msMatch) return raw;
-  const totalMs = parseInt(msMatch[1]!, 10);
+  const totalMs = parseInt(msMatch[1] ?? '0', 10);
   const totalSec = Math.floor(totalMs / 1000);
   if (totalSec < 60) return `${totalSec}s`;
   const min = Math.floor(totalSec / 60);
@@ -34,7 +34,7 @@ export function parseAgentSkillInfo(content: string): { agents: string[]; skills
   // Parse agent mentions: Agent: <name> or Agents: <list>
   const agentMatch = content.match(/Agents?:\s*(.+)/i);
   if (agentMatch) {
-    const raw = agentMatch[1]!.trim();
+    const raw = (agentMatch[1] ?? '').trim();
     for (const part of raw.split(/[,;]+/)) {
       const trimmed = part.trim().replace(/\|.*/, '').trim();
       if (trimmed && trimmed !== '-') agents.push(trimmed);
@@ -44,7 +44,7 @@ export function parseAgentSkillInfo(content: string): { agents: string[]; skills
   // Parse skill mentions: Skill: <name> or Skills: <list>
   const skillMatch = content.match(/Skills?:\s*(.+)/i);
   if (skillMatch) {
-    const raw = skillMatch[1]!.trim();
+    const raw = (skillMatch[1] ?? '').trim();
     for (const part of raw.split(/[,;]+/)) {
       const trimmed = part.trim().replace(/\|.*/, '').trim();
       if (trimmed && trimmed !== '-') skills.push(trimmed);
@@ -67,9 +67,9 @@ export function parseSprintLog(content: string): SprintRecord {
   const fallbackCoverage = content.match(/Coverage:\s*(\S+)/i);
   const fallbackDuration = content.match(/Duration:\s*(\S+)/i);
 
-  const totalTasks = totalMatch ? parseInt(totalMatch[1]!, 10) : NaN;
-  const completed = completedMatch ? parseInt(completedMatch[1]!, 10) : NaN;
-  const noGo = noGoMatch ? parseInt(noGoMatch[1]!, 10) : NaN;
+  const totalTasks = totalMatch ? parseInt(totalMatch[1] ?? '0', 10) : NaN;
+  const completed = completedMatch ? parseInt(completedMatch[1] ?? '0', 10) : NaN;
+  const noGo = noGoMatch ? parseInt(noGoMatch[1] ?? '0', 10) : NaN;
 
   let noGoRate = '-';
   if (!isNaN(noGo) && !isNaN(totalTasks) && totalTasks > 0) {

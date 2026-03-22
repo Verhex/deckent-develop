@@ -36,6 +36,10 @@ const PlannerResultSchema = z.object({
 
 // ─── buildPlanPrompt ──────────────────────────────────────────────
 
+/**
+ * @internal Used only within orchestra/ — builds the AI planner prompt.
+ * Not part of the public API surface.
+ */
 export function buildPlanPrompt(
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
@@ -128,6 +132,10 @@ ${contextBlock}
 
 // ─── parsePlannerResponse ─────────────────────────────────────────
 
+/**
+ * @internal Used only within orchestra/ — parses the AI planner response JSON.
+ * Not part of the public API surface.
+ */
 export function parsePlannerResponse(raw: string): PlannerResult | null {
   try {
     // Strip code fences if present
@@ -148,6 +156,10 @@ export function parsePlannerResponse(raw: string): PlannerResult | null {
 
 // ─── callBrainPlanner ─────────────────────────────────────────────
 
+/**
+ * @internal Used only within orchestra/ — invokes the AI planner subprocess.
+ * Not part of the public API surface.
+ */
 export function callBrainPlanner(
   context: BrainContext,
   recommendation: SprintSizeRecommendation,

@@ -3,7 +3,7 @@
   "language": "tr",
   "projectName": "deckent",
   "brain_planning": "structured",
-  "last_sprint_id": "sprint-030",
+  "last_sprint_id": "sprint-033",
   "modes": {
     "max_plan": {
       "brain_model": "opus",
@@ -11,6 +11,5 @@
       "haiku_allowed": false,
       "max_workers": 4
     }
-  },
-  "spawn_backend": "subprocess"
+  }
 }

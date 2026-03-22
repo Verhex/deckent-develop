@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { ErrorRegistry } from '../../core/errors.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ function isValidAgentName(name: string): boolean {
 export function loadAgentConfig(agentDir: string): AgentConfig {
   const configPath = join(agentDir, 'agent.json');
   if (!existsSync(configPath)) {
-    throw new Error(`Agent config not found: ${configPath}`);
+    throw ErrorRegistry.createError('DECKENT_E031', { message: `Agent config not found: ${configPath}` });
   }
   return JSON.parse(readFileSync(configPath, 'utf-8')) as AgentConfig;
 }
@@ -150,14 +151,14 @@ export function registerAgent(program: Command): void {
         const root = resolveProjectRoot();
 
         if (!isValidAgentName(name)) {
-          throw new Error(
-            `Invalid agent name "${name}". Use alphanumeric characters and hyphens only.`,
-          );
+          throw ErrorRegistry.createError('DECKENT_E032', {
+            message: `Invalid agent name "${name}". Use alphanumeric characters and hyphens only.`,
+          });
         }
 
         const agentDir = join(getAgentsDir(root), name);
         if (existsSync(join(agentDir, 'agent.json'))) {
-          throw new Error(`Agent "${name}" already exists.`);
+          throw ErrorRegistry.createError('DECKENT_E033', { message: `Agent "${name}" already exists.` });
         }
 
         const agent = createDefaultAgent(name);

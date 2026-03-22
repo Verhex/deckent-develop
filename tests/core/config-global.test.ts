@@ -53,10 +53,11 @@ describe('loadGlobalConfig', () => {
     expect((result as Partial<DeckentConfig>).language).toBe('tr');
   });
 
-  it('throws on malformed JSON in global config', async () => {
+  it('returns null for malformed JSON in global config', async () => {
     const cfgPath = join(tempDir, 'config.json');
     writeFileSync(cfgPath, '{ invalid json }', 'utf-8');
-    await expect(loadGlobalConfig(cfgPath)).rejects.toThrow();
+    const result = await loadGlobalConfig(cfgPath);
+    expect(result).toBeNull();
   });
 
   it('returns null for a missing file path', async () => {

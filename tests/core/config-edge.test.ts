@@ -328,10 +328,11 @@ describe('loadConfig', () => {
     expect(config.mode).toBe('pro_plan');
   });
 
-  it('throws when the config file contains malformed JSON', async () => {
+  it('returns defaults when config file contains malformed JSON', async () => {
     const projectConfigPath = join(tmpDir, '.deckent', 'config.json');
     writeFileSync(projectConfigPath, '{ invalid json ===');
-    await expect(loadConfig(tmpDir)).rejects.toThrow(/Failed to read config file/);
+    const config = await loadConfig(tmpDir);
+    expect(config.mode).toBe('max_plan');
   });
 
   it('includes projectRoot in the resolved config', async () => {

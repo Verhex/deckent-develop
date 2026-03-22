@@ -32,10 +32,10 @@ export function parseRetroToRichSummary(content: string): RichSprintSummary {
 
   return {
     sprintId: sprintMatch?.[1] ?? 'unknown',
-    totalTasks: totalMatch ? parseInt(totalMatch[1]!, 10) : (fbTotal ? parseInt(fbTotal[1]!, 10) : 0),
-    completed: completedMatch ? parseInt(completedMatch[1]!, 10) : 0,
-    noGo: noGoMatch ? parseInt(noGoMatch[1]!, 10) : 0,
-    techDebt: debtMatch ? parseInt(debtMatch[1]!, 10) : 0,
+    totalTasks: totalMatch ? parseInt(totalMatch[1] ?? '0', 10) : (fbTotal ? parseInt(fbTotal[1] ?? '0', 10) : 0),
+    completed: completedMatch ? parseInt(completedMatch[1] ?? '0', 10) : 0,
+    noGo: noGoMatch ? parseInt(noGoMatch[1] ?? '0', 10) : 0,
+    techDebt: debtMatch ? parseInt(debtMatch[1] ?? '0', 10) : 0,
     coverage: coverageMatch?.[1] ?? fbCoverage?.[1] ?? '-',
     duration: durationMatch?.[1] ?? fbDuration?.[1] ?? '-',
     raw: content,
@@ -84,7 +84,9 @@ function loadPreviousRetro(root: string): string | null {
     .sort();
   if (files.length < 1) return null;
   // Return the last sprint log as previous
-  return readFileSync(join(sprintsDir, files[files.length - 1]!), 'utf-8');
+  const lastFile = files.at(-1);
+  if (!lastFile) return null;
+  return readFileSync(join(sprintsDir, lastFile), 'utf-8');
 }
 
 export function registerRetro(program: Command): void {

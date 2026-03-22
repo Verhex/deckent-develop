@@ -28,7 +28,7 @@ export async function promptSelect<T extends string>(
   try {
     print(`? ${question}`);
     for (let i = 0; i < options.length; i++) {
-      print(`  ${i + 1}) ${options[i]!.label}`);
+      print(`  ${i + 1}) ${options[i]?.label ?? ''}`);
     }
 
     // eslint-disable-next-line no-constant-condition
@@ -36,7 +36,7 @@ export async function promptSelect<T extends string>(
       const answer = await rl.question('> ');
       const idx = parseInt(answer.trim(), 10) - 1;
       if (idx >= 0 && idx < options.length) {
-        return options[idx]!.value;
+        return options[idx]?.value as T; // narrowed: idx range checked above
       }
       print(`Please enter a number between 1 and ${options.length}`);
     }

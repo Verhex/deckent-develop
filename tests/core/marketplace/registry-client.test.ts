@@ -268,7 +268,7 @@ describe('RegistryClient', () => {
         httpModule: mockHttp as unknown as typeof import('node:https'),
       });
 
-      await expect(client.getSkillDetail('')).rejects.toThrow('Skill name must be a non-empty string');
+      await expect(client.getSkillDetail('')).rejects.toThrow('skill name must be non-empty');
     });
 
     it('encodes skill name in URL', async () => {

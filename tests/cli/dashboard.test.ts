@@ -18,7 +18,12 @@ vi.mock('../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn(() => '/test-root'),
 }));
 
+vi.mock('../../src/core/utils.js', () => ({
+  readJsonSafe: vi.fn().mockReturnValue(null),
+}));
+
 import { readFileSync, existsSync } from 'node:fs';
+import { readJsonSafe } from '../../src/core/utils.js';
 import { renderDashboard, readDashboardFile, registerDashboard } from '../../src/cli/commands/dashboard.js';
 
 const mockExistsSync = vi.mocked(existsSync);

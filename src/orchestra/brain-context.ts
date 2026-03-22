@@ -230,8 +230,8 @@ function _loadSprintHistory(projectRoot: string, maxSprints: number): SprintHist
         // Parse model from metrics table
         // e.g., "| opus | 5 |"
         const modelMatch = line.match(/\| (opus|sonnet|haiku) \|/);
-        if (modelMatch) {
-          const model = modelMatch[1]!;
+        if (modelMatch?.[1]) {
+          const model = modelMatch[1];
           models[model] = (models[model] ?? 0) + 1;
         }
       }

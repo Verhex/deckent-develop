@@ -35,7 +35,7 @@ export function lazyLoad<T>(loader: LoaderFn<T>): LazyHandle<T> {
         cached = loader();
         loaded = true;
       }
-      return cached!;
+      return cached as T; // narrowed: loader() assigns cached before loaded=true
     },
     get isLoaded(): boolean {
       return loaded;
@@ -74,7 +74,9 @@ export class LazyMap<T> {
 
     let handle = this._handles.get(key);
     if (!handle) {
-      handle = lazyLoad(this._loaders.get(key)!);
+      const loader = this._loaders.get(key);
+      if (!loader) return undefined; // should not happen: has() checked above
+      handle = lazyLoad(loader);
       this._handles.set(key, handle);
     }
 

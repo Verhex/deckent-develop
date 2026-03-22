@@ -43,7 +43,8 @@ export class QueueDisplay {
 
     const lines: string[] = [];
     for (let i = 0; i < waves.length; i++) {
-      const wave = waves[i]!;
+      const wave = waves[i];
+      if (!wave) continue;
       const taskIds = wave.map((t) => t.id).join(', ');
       lines.push(`Wave ${i + 1}: [${taskIds}]`);
     }

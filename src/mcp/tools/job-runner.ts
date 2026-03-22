@@ -37,7 +37,7 @@ export function readLatestJobState(projectRoot: string): JobState | null {
       .sort()
       .reverse();
     if (jobFiles.length === 0) return null;
-    const jobId = jobFiles[0]!.replace('.json', '');
+    const jobId = (jobFiles[0] ?? '').replace('.json', '');
     return readJobState(projectRoot, jobId);
   } catch { return null; }
 }

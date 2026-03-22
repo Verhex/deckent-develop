@@ -48,3 +48,14 @@
 - Global Config + Config Export/Import Tamamlama: GO_WITH_TECH_DEBT
 - FAQ Dokümanı (NO_GO Fix): GO_WITH_TECH_DEBT
 - Integration Test — init→plan→status E2E (NO_GO Fix): GO_WITH_TECH_DEBT
+## Sprint sprint-033 Learnings
+- EventEmitter MaxListeners Fix: GO_WITH_TECH_DEBT
+- Onboard Test Timeout Fix: GO_WITH_TECH_DEBT
+- README Badge Update: GO_WITH_TECH_DEBT
+- File Extension Constant Usage: GO_WITH_TECH_DEBT
+- Sprint Observation Docs Archive: GO_WITH_TECH_DEBT
+- CI Coverage Gate: GO_WITH_TECH_DEBT
+- readJsonSafe Migration: NO_GO
+- Error Handling Unification: NO_GO
+- Silent Catch Logging: NO_GO
+- parseBody Type Safety: GO_WITH_TECH_DEBT

@@ -6,6 +6,7 @@ import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { ErrorRegistry } from '../../core/errors.js';
 
 /**
  * Strip JSON comments (block and line) from a string.
@@ -22,7 +23,7 @@ function stripJsonComments(text: string): string {
  */
 export function exportConfig(configPath: string, outputFile?: string): void {
   if (!existsSync(configPath)) {
-    throw new Error('Config file not found: ' + configPath);
+    throw ErrorRegistry.createError('DECKENT_E020', { message: 'Config file not found: ' + configPath });
   }
   const raw = readFileSync(configPath, 'utf-8');
   const stripped = stripJsonComments(raw);
@@ -40,14 +41,14 @@ export function exportConfig(configPath: string, outputFile?: string): void {
  */
 export function importConfig(importPath: string, configPath: string): void {
   if (!existsSync(importPath)) {
-    throw new Error('Import file not found: ' + importPath);
+    throw ErrorRegistry.createError('DECKENT_E021', { message: 'Import file not found: ' + importPath });
   }
   const raw = readFileSync(importPath, 'utf-8');
   let importData: Record<string, unknown>;
   try {
     importData = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    throw new Error('Invalid JSON in import file: ' + importPath);
+    throw ErrorRegistry.createError('DECKENT_E022', { message: 'Invalid JSON in import file: ' + importPath });
   }
   validatePartialConfig(importData);
 

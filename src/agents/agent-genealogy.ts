@@ -104,7 +104,8 @@ export class AgentGenealogy {
     const queue = [agentId];
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift(); // length > 0 guarantees defined
+      if (current === undefined) break;
       for (const [id, node] of Object.entries(nodes)) {
         if (node.parentId === current && !descendants.includes(id)) {
           descendants.push(id);
@@ -152,8 +153,9 @@ export class AgentGenealogy {
 
     while (current && nodes[current]?.parentId != null && !visited.has(current)) {
       visited.add(current);
-      const parentId = nodes[current]!.parentId!;
-      current = parentId;
+      const node = nodes[current];
+      if (!node?.parentId) break; // narrowed: parentId checked in while condition
+      current = node.parentId;
       chain.push(current);
     }
 

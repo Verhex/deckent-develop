@@ -2,6 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SkillDefinition } from './skill-types.js';
+import { readJsonSafe } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -116,14 +117,9 @@ export class SkillRegistry {
 
   private _readData(): RegistryData {
     const filePath = this._getFilePath();
-    try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.skills)) {
-        return parsed as RegistryData;
-      }
-    } catch {
-      // File doesn't exist or is invalid
+    const parsed = readJsonSafe<RegistryData>(filePath);
+    if (parsed && Array.isArray(parsed.skills)) {
+      return parsed;
     }
     return { skills: [], updatedAt: new Date().toISOString() };
   }

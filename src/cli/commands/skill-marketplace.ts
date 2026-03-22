@@ -8,6 +8,7 @@ import { RegistryClient } from '../../core/marketplace/registry-client.js';
 import { MarketplaceAuth } from '../../core/marketplace/marketplace-auth.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { ErrorRegistry } from '../../core/errors.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ export function registerSkillMarketplace(parentCmd: Command): void {
         // Find manifest.json in current skill directory
         const manifestPath = join(root, 'manifest.json');
         if (!existsSync(manifestPath)) {
-          throw new Error('manifest.json not found in current directory. Run from a skill directory.');
+          throw ErrorRegistry.createError('DECKENT_E034');
         }
 
         const manifestRaw = readFileSync(manifestPath, 'utf-8');
@@ -132,7 +133,7 @@ export function registerSkillMarketplace(parentCmd: Command): void {
         try {
           manifest = JSON.parse(manifestRaw);
         } catch {
-          throw new Error('Failed to parse manifest.json');
+          throw ErrorRegistry.createError('DECKENT_E035');
         }
 
         // Pre-publish validation
@@ -170,7 +171,7 @@ export function registerSkillMarketplace(parentCmd: Command): void {
         const auth = new MarketplaceAuth();
         const token = auth.getToken();
         if (!token) {
-          throw new Error('Not authenticated. Run `deckent config set --global marketplace_token <token>` first.');
+          throw ErrorRegistry.createError('DECKENT_E036');
         }
 
         // Publish

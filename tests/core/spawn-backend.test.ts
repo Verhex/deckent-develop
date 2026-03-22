@@ -4,8 +4,8 @@ import {
   SubprocessBackend,
   SpawnBackendFactory,
   SpawnBackendError,
-} from '../../src/core/spawn-backend.js';
-import type { SpawnBackend, SpawnBackendOptions } from '../../src/core/spawn-backend.js';
+} from '../../src/orchestra/spawn-backend.js';
+import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
 
 // ─── Mock child_process.spawnSync ────────────────────────────────────────────
 

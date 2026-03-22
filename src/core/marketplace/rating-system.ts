@@ -3,6 +3,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { ErrorRegistry } from '../errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ export class RatingSystem {
    */
   submitRating(skillId: string, rating: number, comment?: string): RatingSubmission {
     if (rating < 1 || rating > 5 || !Number.isInteger(rating)) {
-      throw new Error('Rating must be an integer between 1 and 5');
+      throw ErrorRegistry.createError('DECKENT_E053');
     }
 
     const submission: RatingSubmission = {

@@ -240,7 +240,7 @@ describe('skill marketplace commands', () => {
       await program.parseAsync(['node', 'test', 'publish']);
 
       expect(printError).toHaveBeenCalledWith(expect.objectContaining({
-        message: expect.stringContaining('Not authenticated'),
+        message: expect.stringContaining('not authenticated'),
       }));
     });
 
@@ -251,7 +251,7 @@ describe('skill marketplace commands', () => {
       await program.parseAsync(['node', 'test', 'publish']);
 
       expect(printError).toHaveBeenCalledWith(expect.objectContaining({
-        message: expect.stringContaining('manifest.json not found'),
+        message: expect.stringContaining('manifest not found'),
       }));
     });
   });

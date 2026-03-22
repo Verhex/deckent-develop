@@ -4,6 +4,7 @@ import { enrichResponse } from '../helpers/enrich.js';
 
 function generateConfigSuggestion(analysis: Record<string, unknown>): string[] {
   const suggestions: string[] = [];
+  // safe: optional field access — values compared to string literals, no crash on undefined
   const size = analysis.size as string | undefined;
   if (size === 'small') suggestions.push('Consider pro_plan mode for smaller projects');
   if (size === 'large') suggestions.push('Consider max_plan mode with higher worker count');
@@ -22,6 +23,7 @@ export function registerAnalyzeTool(server: McpServer): void {
     },
     async () => {
       const root = process.cwd();
+      // safe: analyzeProject returns ProjectAnalysis — cast to Record for dynamic key spreading into enrichResponse
       const analysis = analyzeProject(root) as unknown as Record<string, unknown>;
       const configSuggestion = generateConfigSuggestion(analysis);
       const enriched = enrichResponse('analyze', { ...analysis, configSuggestion });

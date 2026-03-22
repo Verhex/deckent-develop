@@ -130,18 +130,20 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     // Extract optional Model: override (e.g., "Model: opus")
     const modelLine = lines.find(l => /^[\s-]*Model:\s*/i.test(l.trim()));
     const forceModel = modelLine
-      ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase() as ModelType
+      ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase()
       : undefined;
     const validModels: string[] = ['opus', 'sonnet', 'haiku'];
-    const parsedForceModel = forceModel && validModels.includes(forceModel) ? forceModel : undefined;
+    // safe: validModels.includes() confirms the string is a valid ModelType before assignment
+    const parsedForceModel = (forceModel && validModels.includes(forceModel) ? forceModel : undefined) as ModelType | undefined;
 
     // Extract optional Effort: override (e.g., "Effort: max")
     const effortLine = lines.find(l => /^[\s-]*Effort:\s*/i.test(l.trim()));
     const forceEffort = effortLine
-      ? effortLine.trim().replace(/^-\s+/, '').replace(/^Effort:\s*/i, '').trim().toLowerCase() as TaskEffort
+      ? effortLine.trim().replace(/^-\s+/, '').replace(/^Effort:\s*/i, '').trim().toLowerCase()
       : undefined;
     const validEfforts: string[] = ['low', 'normal', 'high'];
-    const parsedForceEffort = forceEffort && validEfforts.includes(forceEffort) ? forceEffort : undefined;
+    // safe: validEfforts.includes() confirms the string is a valid TaskEffort before assignment
+    const parsedForceEffort = (forceEffort && validEfforts.includes(forceEffort) ? forceEffort : undefined) as TaskEffort | undefined;
 
     tasks.push({ title, description: block.trim(), scope, testTarget, forceModel: parsedForceModel, forceEffort: parsedForceEffort });
   }
@@ -172,6 +174,7 @@ export function plannerTaskToParams(
 
 // 5a. resolveWorkerEffort — determine worker effort level based on task complexity
 export function resolveWorkerEffort(task: Task): 'max' | 'high' | 'medium' | 'low' {
+  // safe: forceEffort is TaskEffort ('low'|'normal'|'high') — subset of the return union type
   if (task.forceEffort) return task.forceEffort as 'max' | 'high' | 'medium' | 'low';
   const score = calculateModelScore(task.title, task.description, task.scope);
   if (score >= 6) return 'max';
@@ -201,8 +204,9 @@ export function buildWorkerPrompt(
   const SKILL_DEFAULT_MAX = 1500;
   let skillBlock = '';
   if (skillPrompts && skillPrompts.length > 0) {
-    const parts: string[] = ['=== Skills ==='];
-    let totalLen = parts[0]!.length;
+    const header = '=== Skills ===';
+    const parts: string[] = [header];
+    let totalLen = header.length;
     for (const sp of skillPrompts) {
       const maxChars = SKILL_DEFAULT_MAX;
       const truncated = sp.content.slice(0, maxChars);

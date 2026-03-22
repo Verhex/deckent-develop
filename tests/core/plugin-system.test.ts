@@ -476,7 +476,7 @@ describe('Error scenarios', () => {
     fs.mkdirSync(pluginDir);
     fs.writeFileSync(path.join(pluginDir, 'manifest.json'), 'null', 'utf8');
     expect(() => loadPlugin(pluginDir)).toThrow(PluginError);
-    expect(() => loadPlugin(pluginDir)).toThrow('must be an object');
+    expect(() => loadPlugin(pluginDir)).toThrow('Failed to parse manifest.json');
   });
 
   it('installPlugin throws PluginError for non-existent source path', async () => {

@@ -3,6 +3,7 @@
 // Data stored in .tasks/shared/{key}.json files.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
+import { ErrorRegistry } from '../core/errors.js';
 
 export interface SharedMemoryEntry {
   value: unknown;
@@ -23,10 +24,10 @@ export class SharedMemory {
    */
   write(key: string, value: unknown, writerId: string): void {
     if (!key || typeof key !== 'string') {
-      throw new Error('SharedMemory.write: key must be a non-empty string');
+      throw ErrorRegistry.createError('DECKENT_E044', { message: 'SharedMemory.write: key must be a non-empty string' });
     }
     if (!writerId || typeof writerId !== 'string') {
-      throw new Error('SharedMemory.write: writerId must be a non-empty string');
+      throw ErrorRegistry.createError('DECKENT_E045', { message: 'SharedMemory.write: writerId must be a non-empty string' });
     }
 
     mkdirSync(this.sharedDir, { recursive: true });
@@ -121,6 +122,7 @@ export class SharedMemory {
     try {
       if (!existsSync(filePath)) return null;
       const content = readFileSync(filePath, 'utf-8');
+      // safe: entry files written by _writeEntry with SharedMemoryEntry shape; null/object check below
       const parsed = JSON.parse(content) as SharedMemoryEntry;
       if (!parsed || typeof parsed !== 'object') return null;
       return parsed;

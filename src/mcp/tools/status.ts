@@ -45,6 +45,7 @@ function loadAgentSkillAssignments(root: string): {
 
     for (const f of files) {
       try {
+        // safe: task files written by createTask with Task shape; TaskData is a subset
         const data = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as TaskData;
         const taskId = data.id ?? f.replace('.json', '');
 
@@ -52,7 +53,7 @@ function loadAgentSkillAssignments(root: string): {
           if (!agentAssignments[data.assignedAgent]) {
             agentAssignments[data.assignedAgent] = [];
           }
-          agentAssignments[data.assignedAgent]!.push(taskId);
+          agentAssignments[data.assignedAgent]?.push(taskId);
         }
 
         if (data.assignedSkills && Array.isArray(data.assignedSkills)) {
@@ -60,7 +61,7 @@ function loadAgentSkillAssignments(root: string): {
             if (!skillAssignments[skill]) {
               skillAssignments[skill] = [];
             }
-            skillAssignments[skill]!.push(taskId);
+            skillAssignments[skill]?.push(taskId);
           }
         }
       } catch {
@@ -98,7 +99,9 @@ export function registerStatusTool(server: McpServer): void {
 
       try {
         const content = readFileSync(dashPath, 'utf-8');
+        // safe: dashboard file written by updateDashboard; accessing as Record for selective field reads
         const state = JSON.parse(content) as Record<string, unknown>;
+        // safe: optional chaining + nullish coalescing guard every access — no crash on missing fields
         const progress = state['progress'] as { done?: number; total?: number } | undefined;
         const done = progress?.done ?? 0;
         const total = progress?.total ?? 0;

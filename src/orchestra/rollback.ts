@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } fr
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BRAIN_DIR, DEBT_FILE } from '../core/constants.js';
+import { ErrorRegistry } from '../core/errors.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -107,13 +108,13 @@ export function createSafetyPoint(projectRoot: string, sprintId: string): Safety
   if (!wasClean) {
     const stashResult = git(['stash', 'push', '-m', `deckent-safety-${sprintId}`], projectRoot);
     if (stashResult.status !== 0) {
-      throw new Error(`Failed to stash changes before creating safety point: ${stashResult.stderr}`);
+      throw ErrorRegistry.createError('DECKENT_E050', { message: `Failed to stash changes before creating safety point: ${stashResult.stderr}` });
     }
   }
 
   const commitSha = getCurrentCommitSha(projectRoot);
   if (!commitSha) {
-    throw new Error('Failed to get current commit SHA — is this a git repository?');
+    throw ErrorRegistry.createError('DECKENT_E051');
   }
 
   // Create the backup branch pointing to current HEAD
@@ -122,7 +123,7 @@ export function createSafetyPoint(projectRoot: string, sprintId: string): Safety
     // Branch may already exist — try to force update
     const forceResult = git(['branch', '-f', branchName], projectRoot);
     if (forceResult.status !== 0) {
-      throw new Error(`Failed to create safety branch "${branchName}": ${branchResult.stderr}`);
+      throw ErrorRegistry.createError('DECKENT_E052', { message: `Failed to create safety branch "${branchName}": ${branchResult.stderr}` });
     }
   }
 

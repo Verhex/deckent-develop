@@ -2,6 +2,7 @@
 // Defines and runs sequential multi-agent pipelines for complex tasks.
 import type { Task } from '../core/types.js';
 import type { SharedContext } from '../agents/shared-context.js';
+import { ErrorRegistry } from '../core/errors.js';
 
 // ═══ Types ═══════════════════════════════════════════════════════════════════
 
@@ -38,19 +39,19 @@ export type PipelineExecutor = (
  */
 export function definePipeline(steps: PipelineStep[]): PipelineStep[] {
   if (!Array.isArray(steps) || steps.length === 0) {
-    throw new Error('Pipeline must have at least 1 step');
+    throw ErrorRegistry.createError('DECKENT_E040');
   }
 
   const seenPhases = new Set<string>();
   for (const step of steps) {
     if (!step.agentId || typeof step.agentId !== 'string') {
-      throw new Error(`Pipeline step has invalid agentId: ${JSON.stringify(step.agentId)}`);
+      throw ErrorRegistry.createError('DECKENT_E041', { message: `Pipeline step has invalid agentId: ${JSON.stringify(step.agentId)}` });
     }
     if (!step.phase || typeof step.phase !== 'string') {
-      throw new Error(`Pipeline step has invalid phase: ${JSON.stringify(step.phase)}`);
+      throw ErrorRegistry.createError('DECKENT_E042', { message: `Pipeline step has invalid phase: ${JSON.stringify(step.phase)}` });
     }
     if (seenPhases.has(step.phase)) {
-      throw new Error(`Pipeline has duplicate phase: "${step.phase}"`);
+      throw ErrorRegistry.createError('DECKENT_E043', { message: `Pipeline has duplicate phase: "${step.phase}"` });
     }
     seenPhases.add(step.phase);
   }

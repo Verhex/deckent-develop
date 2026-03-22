@@ -32,15 +32,15 @@ function parseDebtRows(content: string): DebtRow[] {
     if (cols.length < 9) continue;
 
     rows.push({
-      id: cols[0]!,
-      description: cols[1]!,
-      task: cols[2]!,
-      sprint: cols[3]!,
-      priority: cols[4]!,
-      open: cols[5]!,
-      resolved: cols[6]!,
-      fixedIn: cols[7]!,
-      created: cols[8]!,
+      id: cols[0] ?? '',
+      description: cols[1] ?? '',
+      task: cols[2] ?? '',
+      sprint: cols[3] ?? '',
+      priority: cols[4] ?? '',
+      open: cols[5] ?? '',
+      resolved: cols[6] ?? '',
+      fixedIn: cols[7] ?? '',
+      created: cols[8] ?? '',
     });
   }
   return rows;
