@@ -4,7 +4,9 @@
 
 This document describes the complete 8-phase sprint lifecycle in Deckent. A sprint is the fundamental unit of orchestrated work — it begins with a directive, coordinates parallel workers, evaluates results, and always reaches COMPLETE state without being abandoned.
 
-**Master function:** `runSprint(projectRoot, config, opts?)` — `src/orchestra/brain.ts:1054`
+**Master function:** `runSprint(projectRoot, config, opts?)` — `src/orchestra/sprint-controller.ts`
+
+**Finalize function:** `finalizeSprint(projectRoot, sprint, config)` — `src/orchestra/sprint-controller.ts` (Sprint 037)
 
 ---
 
@@ -13,13 +15,17 @@ This document describes the complete 8-phase sprint lifecycle in Deckent. A spri
 ```
 Phase 0: DIRECTIVE   — You write DIRECTIVES.md (pre-sprint, manual)
 Phase 1: PLAN        — Brain reads context, plans tasks, writes .tasks/*.json
-Phase 2: SPAWN       — Brain launches workers in tmux windows
+                       Plugin hook: beforeSprint (after plan, before spawn)
+Phase 2: SPAWN       — Brain routes tasks to providers, launches workers
 Phase 3: EXECUTE     — Workers run in parallel; auditor scans every 30s
 Phase 4: EVALUATE    — Brain reads .result files, applies GO/NO-GO logic
+                       Plugin hook: afterTask (after each task evaluation)
 Phase 5: FIX         — Brain spawns fix workers for NO-GO tasks
 Phase 6: RETRO       — Brain writes RETRO.md, updates MEMORY.md, metrics
+                       Plugin hook: afterSprint (after retro, before decay)
 Phase 7: DECAY       — Brain compresses .brain/ if over budget
-Phase 8: COMPLETE    — Cleanup, final status, config persisted
+Phase 8: COMPLETE    — finalizeSprint(): sprint log, MEMORY, RETRO,
+                       PROJECT-IDENTITY.md, last_sprint_id, decay, afterSprint hooks
 ```
 
 **Key invariant:** Every phase is wrapped in `try/catch`. A phase failure never stops the sprint — it logs a dashboard alert and continues to the next phase. Sprint is NEVER left incomplete.
@@ -60,6 +66,7 @@ This is the only phase that happens outside of `runSprint()`. DIRECTIVES.md is t
 6. **Deadlock check** — `detectDeadlocks(tasks)` verifies no circular dependencies exist
 7. **Write task files** — Each task is written as `.tasks/task-{id}.json`
 8. **Dashboard reset** — `resetDashboard()` clears stale data from any prior sprint
+9. **Plugin hook: `beforeSprint`** — fired after planning is complete, before any worker is spawned. Plugins receive the full `Sprint` object and may mutate task metadata (e.g. inject environment variables, add labels). Hook failures are non-fatal.
 
 **Files created/updated:**
 - `.tasks/task-{sprintId}-{seq}.json` — one per task (status: `PENDING`)
@@ -94,18 +101,23 @@ SprintPhase.PLAN
 
 **What happens:**
 
-1. **Ensure tmux session** — `ensureSession()` creates the `deckent` tmux session if it doesn't exist
-2. **Build worker prompt** — `buildWorkerPrompt(task)` constructs the worker instruction string including task ID, title, description, scope, heartbeat format, and result format
-3. **Compute allowed tools** — `allowedTools` is scoped to `task.scope.directories + task.scope.filesWrite` (e.g. `Read,Write(src/core/),Bash`)
-4. **Spawn each worker** — `spawnWorker(task.id, model, prompt, projectRoot, opts)` creates a new tmux window named `w-{taskId}`, runs `claude` CLI inside it
-5. **Update dashboard** — All workers marked `AgentStatus.EXECUTING`, progress counter set to `(active: N, done: 0)`
-6. **Start auditor scan loop** — `startScanLoop(projectRoot, sprint.id, undefined, onScanComplete)` begins a `setInterval(30s)` in the Brain process, writing scan results to the dashboard via `writeScanToDashboard()`
+1. **Bootstrap providers** — `bootstrapProviders()` is called at startup to detect and register all available provider adapters (Claude, Codex, Gemini). Only providers whose runtimes are detected on the host are registered. (Sprint 038)
+2. **Ensure tmux session** — `ensureSession()` creates the `deckent` tmux session if it doesn't exist (Claude tasks only)
+3. **Build worker prompt** — `buildWorkerPrompt(task)` constructs the worker instruction string including task ID, title, description, scope, heartbeat format, and result format
+4. **Compute allowed tools** — `allowedTools` is scoped to `task.scope.directories + task.scope.filesWrite` (e.g. `Read,Write(src/core/),Bash`)
+5. **Route each task to its provider** — `task.provider` determines which `ProviderAdapter` handles the task: (Sprint 038)
+   - `claude` (default) → tmux window running the `claude` CLI subprocess
+   - `codex` → `CodexAdapter.spawn(task, prompt, projectRoot)`
+   - `gemini` → `GeminiAdapter.spawn(task, prompt, projectRoot)`
+   - Mixed sprints are fully supported — different tasks in the same sprint may use different providers
+6. **Update dashboard** — All workers marked `AgentStatus.EXECUTING`, progress counter set to `(active: N, done: 0)`
+7. **Start auditor scan loop** — `startScanLoop(projectRoot, sprint.id, undefined, onScanComplete)` begins a `setInterval(30s)` in the Brain process, writing scan results to the dashboard via `writeScanToDashboard()`
 
 **1 retry on failure:** If `spawnWorkers()` throws, Brain retries once. On second failure, it cleans up and throws `BrainError`.
 
 **Files created/updated:**
 - `.dashboard` — written with initial agent list and progress
-- tmux windows `w-{sprintId}-{seq}` (one per task, in-memory; not a file)
+- tmux windows `w-{sprintId}-{seq}` (one per Claude task, in-memory; not a file)
 
 **Blueprint reference:** §7 Phase 2 & Phase 2.5, §10 Dynamic Terminal Management (tmux)
 
@@ -182,6 +194,7 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
    - `GO_WITH_TECH_DEBT` → task status → `DONE`, debt appended to `DEBT.md`
    - `NO_GO` → task status → `NO_GO`, fix task created in `.tasks/`
 5. **Resolve debt** — `resolveDebt()` marks debt items as resolved for DONE/GO_WITH_TECH_DEBT tasks
+6. **Plugin hook: `afterTask`** — fired after each individual task evaluation. Receives the `Task`, its `TaskResult`, and `TaskEvaluation`. Plugins may log metrics, send notifications, or update external trackers. Hook failures are non-fatal.
 
 **Files created/updated:**
 - `.tasks/task-{id}.json` — status updated to `DONE` or `NO_GO`
@@ -242,6 +255,7 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
    - `boundaryViolations`, `crossAssignments`, `contextLinesUsed`
 3. **Write RETRO.md** — `writeRetrospective()` overwrites `.brain/RETRO.md` (max 100 lines per `RETRO_MAX_LINES`)
 4. **Write sprint log** — `writeSprintLog()` appends to `.brain/sprints/sprint-{NNN}.md` (max 80 lines)
+5. **Plugin hook: `afterSprint`** — fired after the retrospective is written, before decay runs. Receives the full `Sprint` object including metrics. Plugins may post summaries, trigger CI, or archive artifacts. Hook failures are non-fatal.
 
 **Files created/updated:**
 - `.brain/RETRO.md` — overwritten with current sprint retrospective
@@ -285,7 +299,9 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
 
 **`SprintPhase.COMPLETE` | `SprintStatus.COMPLETE`**
 
-**Brain function:** `cleanup(projectRoot, sprint)` — `src/orchestra/brain.ts:1001`
+**Brain functions:**
+- `cleanup(projectRoot, sprint)` — `src/orchestra/sprint-controller.ts`
+- `finalizeSprint(projectRoot, sprint, config)` — `src/orchestra/sprint-controller.ts` (Sprint 037)
 
 **What happens:**
 
@@ -296,12 +312,29 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
    - `.tasks/task-{id}.log` — worker logs
    - `.tasks/task-{id}.paused` — paused state files
    - Stale lock files from `.locks/`
-3. **Mark sprint complete** — `sprint.status = SprintStatus.COMPLETE`, `sprint.phase = SprintPhase.COMPLETE`, `sprint.completedAt` set
-4. **Persist sprint ID** — `updateLastSprintId(projectRoot, sprint.id)` writes to `.deckent/config.json` so `getNextSprintId()` never regresses
+3. **`finalizeSprint()` — consolidated post-sprint actions** (Sprint 037): This function was introduced to fix a structured mode gap where post-sprint actions (RETRO, MEMORY update, etc.) were silently skipped. It is called at the end of `runSprint()` and is also exposed via the `deckent finalize` CLI command for manual recovery. It performs ALL of the following in order:
+   a. **Write sprint log** — `writeSprintLog()` appends to `.brain/sprints/sprint-{NNN}.md`
+   b. **Update MEMORY.md** — appends sprint learnings (trimmed to `MEMORY_MAX_LINES`)
+   c. **Write RETRO.md** — overwrites `.brain/RETRO.md` with current sprint retrospective
+   d. **Update PROJECT-IDENTITY.md** — updates the project identity file to reflect the latest sprint state (name, version, last sprint ID, key decisions)
+   e. **Persist sprint ID** — `updateLastSprintId(projectRoot, sprint.id)` writes `last_sprint_id` to `.deckent/config.json` so `getNextSprintId()` never regresses
+   f. **Run decay** — `runDecay()` is called unconditionally; it self-gates on the line budget
+   g. **Fire `afterSprint` hooks** — plugin hooks are executed as the last finalize step
+4. **Mark sprint complete** — `sprint.status = SprintStatus.COMPLETE`, `sprint.phase = SprintPhase.COMPLETE`, `sprint.completedAt` set
 5. **Final dashboard update** — Dashboard updated with `done: sprint.tasks.length`, empty alerts
+
+**CLI entry point:**
+```bash
+deckent finalize          # Re-run finalize on the last sprint (idempotent)
+deckent finalize --sprint sprint-042   # Target a specific sprint
+```
 
 **Files updated:**
 - `.deckent/config.json` — `last_sprint_id` persisted
+- `.brain/MEMORY.md` — sprint learnings appended
+- `.brain/RETRO.md` — overwritten with current sprint retrospective
+- `.brain/sprints/sprint-{NNN}.md` — sprint log created/updated
+- `.deckent/workspace/PROJECT-IDENTITY.md` — updated with latest sprint state
 - `.dashboard` — final state written
 - `.tasks/*.hb`, `.tasks/*.plan`, `.tasks/*.log`, `.tasks/*.paused` — deleted
 - `.locks/*.lock` (stale) — deleted
@@ -322,12 +355,16 @@ User writes DIRECTIVES.md
   │  Phase 1    │  readContext() → checkUsage() → adjustSprintSize()
   │    PLAN     │  planSprint() → writes .tasks/*.json
   │             │  resetDashboard()
+  │             │  hook: beforeSprint (after plan, before spawn)
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐
-  │  Phase 2    │  spawnWorkers() → tmux windows per task
-  │    SPAWN    │  startScanLoop() → setInterval(30s)
+  │  Phase 2    │  bootstrapProviders() → detect Claude/Codex/Gemini
+  │    SPAWN    │  spawnWorkers() → route each task to task.provider
+  │             │    claude → tmux window; codex → CodexAdapter.spawn()
+  │             │    gemini → GeminiAdapter.spawn()
+  │             │  startScanLoop() → setInterval(30s)
   │             │  [1 retry on failure]
   └──────┬──────┘
          │
@@ -343,6 +380,7 @@ User writes DIRECTIVES.md
   │  Phase 4    │  clearInterval(scanInterval)
   │  EVALUATE   │  evaluateResult() per task → DONE / GO_WITH_TECH_DEBT / NO_GO
   │             │  handleEvaluation() → updates task JSON, DEBT.md
+  │             │  hook: afterTask (per task, after evaluation)
   └──────┬──────┘
          │
          ▼
@@ -357,6 +395,7 @@ User writes DIRECTIVES.md
   │  Phase 6    │  calculateMetrics()
   │    RETRO    │  writeRetrospective() → .brain/RETRO.md (max 100 lines)
   │             │  writeSprintLog() → .brain/sprints/sprint-NNN.md
+  │             │  hook: afterSprint (after retro, before decay)
   └──────┬──────┘
          │
          ▼
@@ -369,7 +408,14 @@ User writes DIRECTIVES.md
          ▼
   ┌─────────────┐
   │  Phase 8    │  clearInterval() + cleanup() → remove .hb/.plan/.log/.paused
-  │  COMPLETE   │  updateLastSprintId() → .deckent/config.json
+  │  COMPLETE   │  finalizeSprint():
+  │             │    writeSprintLog() → .brain/sprints/sprint-NNN.md
+  │             │    updateMemory() → .brain/MEMORY.md
+  │             │    writeRetrospective() → .brain/RETRO.md
+  │             │    updateProjectIdentity() → PROJECT-IDENTITY.md
+  │             │    updateLastSprintId() → .deckent/config.json
+  │             │    runDecay() (self-gated on line budget)
+  │             │    hook: afterSprint
   │             │  final updateDashboard()
   └─────────────┘
          │
@@ -392,7 +438,7 @@ User writes DIRECTIVES.md
 | 5: FIX | `.tasks/task-{id}-fix.result` | `.brain/DEBT.md` (escalation) | — |
 | 6: RETRO | `.brain/sprints/sprint-NNN.md` | `.brain/RETRO.md` (overwrite) | — |
 | 7: DECAY | `.brain/archive/*` | `.brain/MEMORY.md`, `.brain/RETRO.md`, `.brain/PATTERNS.md` | Archived sprint logs |
-| 8: COMPLETE | — | `.deckent/config.json`, `.dashboard` | `.tasks/*.hb`, `.tasks/*.plan`, `.tasks/*.log`, `.tasks/*.paused`, `.locks/*.lock` |
+| 8: COMPLETE | `.brain/sprints/sprint-NNN.md` (if not yet written) | `.deckent/config.json`, `.brain/MEMORY.md`, `.brain/RETRO.md`, `.deckent/workspace/PROJECT-IDENTITY.md`, `.dashboard` | `.tasks/*.hb`, `.tasks/*.plan`, `.tasks/*.log`, `.tasks/*.paused`, `.locks/*.lock` |
 
 ---
 
@@ -445,6 +491,8 @@ All constants are defined in `src/core/constants.ts`:
 deckent start                    # Interactive — reads DIRECTIVES.md
 deckent start --auto-approve     # Skip confirmations
 deckent start --dry-run          # Plan only, no workers spawned
+deckent finalize                 # Re-run finalizeSprint on last sprint (idempotent)
+deckent finalize --sprint sprint-042  # Target a specific sprint
 ```
 
 **Via MCP tool:**

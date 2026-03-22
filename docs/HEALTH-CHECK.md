@@ -1,7 +1,7 @@
-# Deckent Health Check — Post-Sprint 30
+# Deckent Health Check — Post-Sprint 38
 
-*Last audit: 2026-03-21 (Sprint 30 complete)*
-*Next audit: Sprint 31 completion*
+*Last audit: 2026-03-22 (Sprint 38 complete)*
+*Next audit: Sprint 39 completion*
 
 ---
 
@@ -88,7 +88,7 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 - No end-to-end flow tests
 
 ### Section 23: Roadmap — Phase 1 MET
-- 3609 tests > 987 target
+- 8555+ tests > 987 target
 - 97.5% coverage > 97% target
 - MCP stable, HTTP API, Web Dashboard, AI planning, task queue validated
 
@@ -98,14 +98,14 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 | Metric | Value | Source |
 |--------|-------|--------|
-| Tests | 4100+ | `npx vitest run` |
+| Tests | 8555+ | `npx vitest run` |
 | Test files | 214 | `npx vitest run` |
 | Coverage | 97.5% | `npx vitest run --coverage` |
 | CLI commands | 28 | src/cli/commands/ |
 | MCP tools | 10 (enriched) | src/mcp/tools/ |
 | MCP resources | 5 | src/mcp/resources/ |
 | HTTP endpoints | 16 | src/api/server.ts |
-| Sprints | 30 | .brain/sprints/ |
+| Sprints | 38 | .brain/sprints/ |
 | .brain/ budget | ~180 / 600 lines | countBrainLines() |
 
 ---
@@ -273,4 +273,44 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 ---
 
-*Updated every sprint. Next audit: Sprint 34.*
+### Sprint 034-037 Features (Beta Cleanup + Architectural Refactor)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| brain.ts God Object Split | WORKING | 1312→58 lines, sprint-controller + result-evaluator + usage-manager extracted |
+| spawn-backend.ts Move | WORKING | core/ → orchestra/ (layer violation fix), all import paths updated |
+| types.ts Split | WORKING | 524 lines → task-types, config-types, monitoring-types, sprint-types + barrel re-export |
+| Non-null Assertion Refactor | WORKING | 48 `!` → guard clause, `.at()`, `?? fallback` across 29 files |
+| Type Cast Improvement | WORKING | enum literals, type guards, Zod validation for JSON parse points |
+| Barrel Export Cleanup | WORKING | orchestra/index.ts: 30+ → 22 public API exports, @internal JSDoc |
+| Auditor Queue Fix | WORKING | shift() O(n) → descending sort + pop() O(1) |
+| PromptAnalytics Merge | WORKING | prompt-metrics + prompt-ab-test → unified PromptAnalytics class |
+
+---
+
+### Sprint 038 Features (Multi-Provider Support)
+
+| Feature | Status | Detail |
+|---------|--------|--------|
+| Multi-provider support | WORKING | Claude (Anthropic), Codex (OpenAI), Gemini (Google) — 3 providers |
+| Provider-aware model selection | WORKING | resolveTaskModel() selects model+provider pair based on task complexity and usage |
+| Provider fallback chain | WORKING | Configurable fallback: primary → secondary → tertiary on failure or quota |
+| Mixed sprint | WORKING | Multiple providers usable within a single sprint — per-task provider assignment |
+| Platform support matrix | WORKING | macOS, Linux, WSL2 — all platforms validated with multi-provider config |
+
+---
+
+## Provider Health Checks
+
+| Check | Function | Status |
+|-------|----------|--------|
+| Provider availability | `detectAvailableProviders()` | Scans for claude/openai/google CLIs and API keys |
+| Claude API key | `ANTHROPIC_API_KEY` env | Required for Claude provider |
+| OpenAI API key | `OPENAI_API_KEY` env | Required for Codex (GPT-4.1, o3, o4-mini) provider |
+| Google API key | `GOOGLE_API_KEY` env | Required for Gemini (gemini-2.5-pro, gemini-2.5-flash) provider |
+| Provider fallback configured | `config.provider_fallback[]` | Optional; recommended for production use |
+| Model-provider compatibility | `validateModelProvider()` | Ensures assigned model exists on configured provider |
+
+---
+
+*Updated every sprint. Next audit: Sprint 39.*

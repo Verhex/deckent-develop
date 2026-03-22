@@ -46,7 +46,7 @@ An agent-agnostic AI orchestration system. You describe goals in natural languag
 **What Deckent Is NOT:**
 - Not another ChatGPT wrapper
 - Not a simple task runner
-- Not limited to Claude (future: multi-provider via provider abstraction layer)
+- Not limited to Claude (multi-provider: Claude, OpenAI Codex, Gemini via provider adapters)
 
 **Core Principles:**
 1. Native-first — installs like a CLI tool, integrates via MCP into Claude Code
@@ -129,7 +129,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 └─────────────────────────────────────────────────────┘
 ```
 
-**Provider Abstraction Layer (Planned — Sprint 27):**
+**Provider Abstraction Layer (Implemented — Sprint 27+38):**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              PROVIDER ADAPTER INTERFACE                    │
@@ -1732,7 +1732,7 @@ $ deckent start "Build REST API for user management"
 - OSS infrastructure (CONTRIBUTING, LICENSE, CI) — ✅ Done (Sprint 24-26)
 - 3442 tests, 136 test files — ✅ Done
 
-## Phase 3: Global Launch Preparation (Sprint 27-29) — IN PROGRESS
+## Phase 3: Global Launch Preparation (Sprint 27-29) — COMPLETE
 
 **Goal:** Technical gap closure → npm publish → real-world testing → beta launch.
 
@@ -1788,7 +1788,7 @@ Full directive: `docs/directives/sprint-029.md`
 
 **Exit criteria:** `npm install -g deckent@beta` works. `deckent init && deckent start "hello"` completes in <60s. 3+ project types tested. Performance benchmarks baselined. Launch docs ready.
 
-## Phase 4: Agent/Skill Intelligence (Sprint 29-33) — PLANNED
+## Phase 4: Agent/Skill Intelligence (Sprint 29-33) — COMPLETE
 
 **Goal:** Dynamic agent pool, composable skills, intelligent Brain decisions, polished UX.
 
@@ -1868,14 +1868,22 @@ Full directive: `docs/directives/sprint-033.md`
 Full directive: `docs/directives/sprint-034.md`
 (Moved from original Sprint 29 plan)
 
-## Phase 5: Multi-Provider & Ecosystem (Sprint 35+) — PLANNED
+## Phase 5: Multi-Provider & Ecosystem (Sprint 35-38) — IN PROGRESS
 
 **Goal:** Run workers on different providers simultaneously. VSCode extension. Community ecosystem.
 
-- Provider adapters: OpenAI Codex CLI, Gemini CLI, local models (Ollama)
-- Brain on Opus (Claude), workers on GPT-4o (OpenAI) — mix and match
+**Completed:**
+- Provider adapters: OpenAI Codex CLI, Gemini CLI — DONE (Sprint 038)
+- Brain on Opus (Claude), workers on GPT-4o (OpenAI) — mix and match — DONE (Sprint 038)
+- Cost optimization: expensive tasks on powerful models, simple on cheap — DONE (tier-based equivalence, Sprint 038)
+- Plugin system v3 (security hardened, skill sandbox AST) — DONE (Sprint 037)
+- Memory system fix — DONE (Sprint 037)
+- Platform decoupling (planner/tmux/subprocess) — DONE (Sprint 038)
+- Beta cleanup: readJsonSafe, error handling, type safety, brain.ts split — DONE (Sprint 035-036)
+
+**Remaining:**
 - Provider-specific tool mapping (allowedTools → function_calling)
-- Cost optimization: expensive tasks on powerful models, simple on cheap
+- Local models (Ollama) adapter
 - VSCode extension (sidebar, status bar, sprint management)
 - GitHub App (issue → sprint → PR automation)
 - Team mode: shared sprints, role-based access
@@ -1931,6 +1939,10 @@ Full directive: `docs/directives/sprint-034.md`
 | 31 | 6400 | 97.5% | Brain Decision Engine: 6-step pipeline, learning loop, parallel pipeline, shared memory, conflict resolver, adaptive agent (prompt A/B, versioning, rollback) |
 | 32 | 6900 | 97.5% | UX: progress bar, rich summary, notifications (terminal/webhook/Discord/Slack), interactive review, agent/skill visibility, theme, output modes |
 | 33 | 7500 | 97.5% | Integration tests (3 project types), skill marketplace, adaptive agent advanced (drift/retirement/genealogy), analytics data, performance caching, security (sandbox/permission guard) |
+| 35 | 7815 | 97.5% | Beta Cleanup Wave 1+2: readJsonSafe migration, error handling unification, silent catch logging, parseBody type safety, utility extraction, EventEmitter fix. 11 tasks |
+| 36 | 8073 | 97.5% | Beta Cleanup Wave 3+4: brain.ts split (1312→58 lines), spawn-backend move, types.ts split, non-null assertion refactor, barrel cleanup, auditor queue fix. 11 tasks, +315 tests |
+| 37 | 8073 | 97.5% | Beta Cleanup Wave 5+6: Security hardening, plugin system, memory fix, skill sandbox AST, JSDoc. 16 tasks, +258 tests, 8073 total |
+| 38 | 8555 | 97.5% | Multi-Provider Infrastructure: ModelType extension (8 models, 3 providers), Codex+Gemini adapters, provider routing, planner/tmux/subprocess decoupling, platform support. 20 tasks, +476 tests |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1967,6 +1979,29 @@ Full directive: `docs/directives/sprint-034.md`
 **UX milestone (Sprint 32):** End-user experience polished. Live progress bar with ETA during sprint execution. Rich sprint summary with categorized file changes, agent performance table, and smart recommendations. Notification system supports terminal bell, webhooks, Discord embeds, and Slack Block Kit. Interactive post-sprint review: approve, reject, or retry individual tasks. Agent and skill visibility across dashboard, status, retro, history, and MCP. Theme system with NO_COLOR support. Output modes: quiet, normal, verbose. 59 files changed, +9481 lines, 539 new tests.
 
 **Integration + Marketplace milestone (Sprint 33):** Comprehensive integration tests cover full sprint E2E with agents+skills across TypeScript/React, Python/FastAPI, and monorepo projects. Skill marketplace foundation: remote registry client, CLI search/publish, rating system, dependency resolution with topological sort. Adaptive agent advanced: cross-sprint analysis, specialization drift detection, auto-retirement for underperformers, prompt evolution logging, agent genealogy. Analytics data modules for dashboard. Performance: LRU agent cache, 500KB skill cache, token counter, lazy loader, batch stats. Security: skill sandbox with quarantine, permission guard blocking agent self-modification. 56 files, +12,063 lines, 559 new tests.
+
+**Beta cleanup milestone (Sprint 35-36):** Two waves of systematic code quality improvements. Wave 1+2 (Sprint 35): readJsonSafe migration replaced 13 inline JSON.parse calls, error handling unified with DeckentError + ErrorRegistry (E039-E053), silent catches got debugLog() with DECKENT_DEBUG env gate, parseBody type safety via 5 Zod schemas, utility extraction (readFileIfExists, listFilesWithExtension, safeMapGet), EventEmitter fix with dedicated _ipcEmitter. 11 tasks. Wave 3+4 (Sprint 36): brain.ts God Object split from 1312→58 lines into sprint-controller.ts + result-evaluator.ts + usage-manager.ts with backward-compatible re-exports. spawn-backend.ts moved from core/ to orchestra/ (layer violation fix). types.ts split into 4 domain files. 48 non-null assertions replaced with safe alternatives. Barrel export cleanup. Auditor queue O(n) shift→O(1) pop. 11 tasks, +315 tests.
+
+**Security + Plugin milestone (Sprint 37):** Beta Cleanup Wave 5+6. Security hardening across the codebase. Plugin system improvements. Memory system fix. Skill sandbox with AST-based analysis. JSDoc documentation added to public APIs. 16 tasks, +258 tests, 8073 total.
+
+**Multi-Provider milestone (Sprint 38):** Full multi-provider infrastructure delivered. ModelType extended to 8 models across 3 providers (Claude, OpenAI/Codex, Gemini). ProviderAdapter interface implemented by ClaudeAdapter, CodexAdapter, and GeminiAdapter. Provider-aware model selection with tier-based equivalence (premium/standard/economy). Provider fallback chain for resilience. spawnWorkers routing supports mixed sprints (Claude+Codex+Gemini workers in same sprint). bootstrapProviders() initializes registry from config. Multi-provider config: brain_provider, worker_provider, fallback_provider. Planner, tmux, and subprocess modules decoupled for platform independence. 20 tasks, +476 tests, 8555 total.
+
+**Provider Architecture (Sprint 38):**
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Brain      │────▶│  ProviderRegistry │────▶│  ClaudeAdapter  │
+│ (Orchestrator)│     │  (Bootstrap)      │     │  CodexAdapter   │
+│              │     │                  │     │  GeminiAdapter  │
+└─────────────┘     └──────────────────┘     └─────────────────┘
+       │                     │                        │
+       ▼                     ▼                        ▼
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ ModelSelector │     │ Model Equivalence │     │  spawnWorkers   │
+│ (Provider-   │     │ (Tier Mapping)    │     │ (Mixed Sprint)  │
+│  Aware)      │     │ premium/std/econ  │     │ Claude+Codex+   │
+└─────────────┘     └──────────────────┘     │ Gemini          │
+                                              └─────────────────┘
+```
 
 ---
 

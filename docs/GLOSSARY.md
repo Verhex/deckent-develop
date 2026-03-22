@@ -76,6 +76,10 @@ Brain'in Worker için oluşturduğu sistem istemi. Kalp atışı dosyası oluşt
 
 ## C
 
+### CostEstimator
+Provider maliyet karşılaştırma modülü. Her provider'ın `costPerMillionTokens` değerlerini kullanarak task başına maliyet tahmini yapar. `cost_optimization=true` olduğunda en ucuz capable provider seçilir.
+**Sprint 037**
+
 ### callBrainPlanner
 `src/orchestra/planner.ts` içindeki fonksiyon; `claude` CLI'yı çağırarak AI tabanlı görev planı oluşturur ve Zod şemasıyla doğrular.
 **Blueprint §9** — "Planner module"
@@ -188,6 +192,10 @@ Brain'in her Worker sonucunu değerlendirdiği fonksiyon; `testsPassed=false` �
 
 ## F
 
+### finalizeSprint()
+Sprint sonrası tüm işlemleri çalıştıran fonksiyon: sprint log, `MEMORY.md`, `RETRO.md`, `PROJECT-IDENTITY.md` güncelleme, decay, plugin hooks. Structured mode'da eksik kalan post-sprint aksiyonlarını düzeltir. `deckent finalize` CLI komutu ile de çağrılabilir.
+**Sprint 038**
+
 ### filesWrite (scope)
 Görev JSON'unda Worker'ın yazma iznine sahip olduğu dosya yollarının listesi; Auditor bu listeyi kapsam ihlali tespitinde kullanır.
 **Blueprint §2** — Task JSON format
@@ -256,6 +264,10 @@ Sprint numarasının geriye gitmemesini garantilemek için `.deckent/config.json
 
 ## M
 
+### ModelTier
+Model kalite seviyesi: `premium` (opus, gpt-4.1, gemini-2.5-pro), `standard` (sonnet, o3, gemini-2.5-flash), `economy` (haiku, o4-mini). Cross-provider model eşleştirmesinde kullanılır.
+**Sprint 037** — `src/core/model-equivalence.ts`
+
 ### max_workers
 Bir sprintte eş zamanlı çalışabilecek maksimum Worker sayısı; plan moduna göre 3–10 arasında değişir.
 **Blueprint §13** — Config
@@ -312,9 +324,29 @@ Worker'ların terminal çıktısını `.tasks/task-{id}.log` dosyasına yönlend
 Görev JSON'unda tanımlanan önem seviyesi: `'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW'`.
 **Blueprint §2** — Task JSON format
 
+### PROJECT-IDENTITY.md
+Kalıcı proje hafızası dosyası (`.brain/` altında). Decay'den muaf. Proje kimliği, mimari, güncel durum, konfigürasyon ve modül haritası içerir. Her sprint sonunda güncellenir.
+**Sprint 037**
+
 ### provider abstraction layer
 Gelecek fazda (Sprint 20+) planlanmış, farklı AI sağlayıcılarını (Claude, OpenAI, Gemini) Worker olarak kullanmayı mümkün kılacak soyutlama katmanı.
 **Blueprint §1** — "What Deckent Is NOT" + §23
+
+### ProviderAdapter
+Provider soyutlama arayüzü. `spawn()`, `kill()`, `listWorkers()`, `checkUsage()`, `isAvailable()`, `buildCommand()` metotlarını tanımlar. `ClaudeAdapter`, `CodexAdapter`, `GeminiAdapter` bu interface'i implement eder.
+**Sprint 037** — `src/core/provider.ts`
+
+### ProviderName
+Desteklenen AI provider'ları: `'claude' | 'codex' | 'gemini'`.
+**Sprint 037** — `src/core/task-types.ts`
+
+### ProviderRegistry
+Singleton provider kayıt sistemi. `register()`, `get()`, `getDefault()` metotları. `bootstrapProviders()` ile startup'ta doldurulur.
+**Sprint 037** — `src/core/provider.ts`
+
+### ProviderRouter
+`spawnWorkers()` içindeki provider yönlendirme mantığı. `task.provider` alanına göre her task'ı doğru `ProviderAdapter`'a yönlendirir. Mixed sprint desteği sağlar.
+**Sprint 037** — `src/orchestra/sprint-controller.ts`
 
 ---
 
@@ -438,4 +470,4 @@ Brain planlayıcısının (`planner.ts`) AI yanıtlarını doğrulamak için kul
 
 ---
 
-*Toplam terim sayısı: 60+. Sözlük son olarak Sprint 18'de güncellenmiştir.*
+*Toplam terim sayısı: 68+. Sözlük son olarak Sprint 037-038'de güncellenmiştir.*

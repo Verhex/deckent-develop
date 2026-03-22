@@ -1,6 +1,6 @@
 # DECKENT TAM DURUM ANALİZİ
 
-> Son güncelleme: 2026-03-22 | Kaynak: Codebase tam tarama | 689 .ts dosya, ~96.428 satır kod, 6.272+ test
+> Son güncelleme: 2026-03-22 | Kaynak: Codebase tam tarama | 689 .ts dosya, ~96.428 satır kod, 8.555+ test
 
 ---
 
@@ -10,11 +10,14 @@ Deckent, **Claude Code CLI üzerine kurulu bir AI ajan orkestrasyon sistemidir**
 
 **Ne yapar:**
 - Bir yazılım projesinde yapılması gereken işleri (DIRECTIVES.md) okur
-- Bu işleri görevlere (task) böler ve her birine uygun model atar (opus/sonnet/haiku)
+- Bu işleri görevlere (task) böler ve her birine uygun model atar (opus/sonnet/haiku/gpt-4.1/o3/o4-mini/gemini-2.5-pro/gemini-2.5-flash)
 - tmux oturumları veya subprocess backend uzerinden paralel worker'lar spawn eder (tmux artik opsiyonel)
-- Her worker bagimsiz bir Claude CLI instance'idir
+- Her worker bagimsiz bir AI CLI instance'idir (Claude, OpenAI veya Gemini)
 - Auditor sürekli izler: sınır ihlali, kilitlenme, stale agent tespiti
 - Sprint sonunda değerlendirme, retrospektif ve bellek yönetimi yapar
+
+**Multi-Provider Desteği (Sprint 038):**
+Deckent artık 3 farklı AI provider'ı destekliyor: Claude (Anthropic), Codex (OpenAI), Gemini (Google). Aynı sprint'te farklı provider'lar kullanılabilir. Her görev için en uygun model+provider çifti otomatik seçilir. Provider fallback zinciri sayesinde kota aşımı veya hata durumunda bir sonraki provider'a geçiş yapılır — maliyet optimizasyonu ve yüksek erişilebilirlik sağlanır.
 
 **Ne DEĞİLDİR:**
 - Bir AI modeli değil — Claude'u araç olarak kullanır
@@ -25,9 +28,10 @@ Deckent, **Claude Code CLI üzerine kurulu bir AI ajan orkestrasyon sistemidir**
 **Teknoloji:**
 - Dil: TypeScript (ESM)
 - Runtime: Node.js >=18
-- Test: Vitest (6.272+ test, 265 test dosyası)
+- Test: Vitest (8.555+ test, 265 test dosyası)
 - Build: tsc
-- Bagimsizlik: Claude CLI, git (tmux opsiyonel — subprocess backend ile calismadan kaldirilabilir)
+- Bagimsizlik: Claude CLI / OpenAI CLI / Google Gemini CLI, git (tmux opsiyonel — subprocess backend ile calismadan kaldirilabilir)
+- Desteklenen Modeller: opus, sonnet, haiku (Claude) | gpt-4.1, o3, o4-mini (Codex) | gemini-2.5-pro, gemini-2.5-flash (Gemini) — toplam 8 model
 
 ---
 
@@ -808,7 +812,7 @@ Son iki sprint'te çeşitli item'lar `GO_WITH_TECH_DEBT` olarak kapatıldı:
 |--------|-------|
 | Toplam .ts dosya | 689 |
 | Toplam kaynak kodu | ~96.428 satır |
-| Test sayisi | 6.272+ (tumu geciyor) |
+| Test sayisi | 8.555+ (tumu geciyor) |
 | Test dosyasi | 265 |
 | Test süresi | ~38s |
 
@@ -859,6 +863,8 @@ Sprint 30 (Skill System): 5.700+ test (+435) — skill sistemi, 10 yerlesik skil
 Sprint 31 (Brain Decision Engine): 6.272+ test (+572) — karar motoru, ogrenme dongusu, paralel pipeline, paylasimli bellek, catisma cozumleme, adaptive agent
 Sprint 32 (UX Polish): 6.811+ test (+539) — ilerleme cubugu, ETA, bildirimler (terminal/webhook/Discord/Slack), interaktif inceleme, tema, cikti modlari
 Sprint 33 (Integration + Marketplace + Analytics): 7.370+ test (+559) — entegrasyon testleri (3 proje tipi), skill marketplace, adaptive agent ileri (kayma/emeklilik/soy agaci), analytics verisi, performans onbellekleme, guvenlik (sandbox/izin korumasi)
+Sprint 34-037 (Beta Cleanup + Mimari Refactor): 8.000+ test (+630) — brain.ts split, spawn-backend tasinmasi, types.ts parcalanmasi, non-null assertion refactor, barrel export temizligi, auditor queue fix, PromptAnalytics birlestirme
+Sprint 38 (Multi-Provider): 8.555+ test (+555) — Claude/Codex/Gemini provider destegi, provider-aware model secimi, fallback zinciri, mixed sprint, 8 model destegi
 ```
 
 ### Konfigürasyon Modları
@@ -872,4 +878,18 @@ Sprint 33 (Integration + Marketplace + Analytics): 7.370+ test (+559) — entegr
 
 ---
 
-*Bu dokuman, deckent code base'inin tam taramasiyla olusturulmustur. Kaynak: 700+ TypeScript dosyasi, ~96.428 satir kod, 6.272+ test.*
+### Multi-Provider Desteği (Sprint 038)
+
+| Özellik | Durum | Açıklama |
+|---------|-------|----------|
+| **Multi-provider** | Tam | Claude (Anthropic), Codex (OpenAI), Gemini (Google) — 3 provider |
+| **Provider-aware model secimi** | Tam | Görev karmaşıklığı ve kullanıma göre model+provider çifti otomatik seçimi |
+| **Provider fallback zinciri** | Tam | Kota aşımı veya hata → bir sonraki provider'a otomatik geçiş |
+| **Mixed sprint** | Tam | Aynı sprint'te birden fazla provider kullanımı, görev başına provider atama |
+| **Desteklenen modeller** | 8 model | opus, sonnet, haiku | gpt-4.1, o3, o4-mini | gemini-2.5-pro, gemini-2.5-flash |
+| **Maliyet optimizasyonu** | Tam | Ucuz model/provider tercih edilir, karmaşık görevlerde güçlü model seçilir |
+| **Platform matris** | Tam | macOS, Linux, WSL2 — tüm platformlarda çok-provider konfigürasyonu doğrulandı |
+
+---
+
+*Bu dokuman, deckent code base'inin tam taramasiyla olusturulmustur. Kaynak: 700+ TypeScript dosyasi, ~96.428 satir kod, 8.555+ test, 38 sprint.*
