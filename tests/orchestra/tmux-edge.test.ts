@@ -46,9 +46,11 @@ beforeEach(() => {
   mockedExistsSync.mockReturnValue(true);
 });
 
+const isWindows = process.platform === 'win32';
+
 // ─── TmuxError ───────────────────────────────────────────────────────
 
-describe('TmuxError', () => {
+describe.skipIf(isWindows)('TmuxError', () => {
   it('has name "TmuxError"', () => {
     const err = new TmuxError('something failed');
     expect(err.name).toBe('TmuxError');
@@ -82,7 +84,7 @@ describe('TmuxError', () => {
 
 // ─── isSessionActive edge cases ──────────────────────────────────────
 
-describe('isSessionActive edge cases', () => {
+describe.skipIf(isWindows)('isSessionActive edge cases', () => {
   it('returns false when spawnSync status is null (unexpected)', () => {
     mockedSpawnSync.mockReturnValue({
       status: null, stdout: '', stderr: '', pid: 0, signal: null, output: [],
@@ -110,7 +112,7 @@ describe('isSessionActive edge cases', () => {
 
 // ─── ensureSession edge cases ─────────────────────────────────────────
 
-describe('ensureSession edge cases', () => {
+describe.skipIf(isWindows)('ensureSession edge cases', () => {
   it('throws TmuxError if new-session fails', () => {
     // has-session → no session
     mockedSpawnSync.mockReturnValueOnce(failResult('no session'));
@@ -146,7 +148,7 @@ describe('ensureSession edge cases', () => {
 
 // ─── spawnWorker edge cases ───────────────────────────────────────────
 
-describe('spawnWorker edge cases', () => {
+describe.skipIf(isWindows)('spawnWorker edge cases', () => {
   it('creates .tasks dir when it does not exist before writing prompt', () => {
     mockedExistsSync.mockReturnValue(false);
     mockedSpawnSync.mockReturnValue(successResult);
@@ -226,7 +228,7 @@ describe('spawnWorker edge cases', () => {
 
 // ─── killWorker edge cases ────────────────────────────────────────────
 
-describe('killWorker edge cases', () => {
+describe.skipIf(isWindows)('killWorker edge cases', () => {
   it('throws TmuxError with the original stderr message', () => {
     mockedSpawnSync.mockReturnValue(failResult('can\'t find window: deckent:w-ghost'));
 
@@ -263,7 +265,7 @@ describe('killWorker edge cases', () => {
 
 // ─── listWorkers edge cases ───────────────────────────────────────────
 
-describe('listWorkers edge cases', () => {
+describe.skipIf(isWindows)('listWorkers edge cases', () => {
   it('returns empty array when output is empty string', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -308,7 +310,7 @@ describe('listWorkers edge cases', () => {
 
 // ─── cleanupPromptFile edge cases ────────────────────────────────────
 
-describe('cleanupPromptFile edge cases', () => {
+describe.skipIf(isWindows)('cleanupPromptFile edge cases', () => {
   it('calls unlinkSync with the given path', () => {
     cleanupPromptFile('/tmp/.prompt-abc123.txt');
     expect(mockedUnlinkSync).toHaveBeenCalledWith('/tmp/.prompt-abc123.txt');

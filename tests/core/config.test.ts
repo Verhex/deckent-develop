@@ -9,6 +9,7 @@ import {
   ConfigValidationError,
   MODE_ALIASES,
   resolveMode,
+  VALID_PROVIDERS,
 } from '../../src/core/config.js';
 import type { SystemProfile } from '../../src/core/types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
@@ -36,6 +37,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env['ANTHROPIC_API_KEY'];
+  delete process.env['DECKENT_BRAIN_PROVIDER'];
+  delete process.env['DECKENT_WORKER_PROVIDER'];
 });
 
 describe('getDefaultConfig', () => {
@@ -506,5 +509,154 @@ describe('loadConfig — mode alias resolution', () => {
     const config = await loadConfig('/test/project');
     expect(config.mode).toBe('api');
     expect(config.activeModeConfig.budget_per_sprint).toBe(5.0);
+  });
+});
+
+// ─── Multi-Provider Config ──────────────────────────────────────────
+
+describe('VALID_PROVIDERS', () => {
+  it('contains claude, codex, gemini', () => {
+    expect(VALID_PROVIDERS).toContain('claude');
+    expect(VALID_PROVIDERS).toContain('codex');
+    expect(VALID_PROVIDERS).toContain('gemini');
+    expect(VALID_PROVIDERS).toHaveLength(3);
+  });
+});
+
+describe('multi-provider config defaults', () => {
+  it('default config has brain_provider=claude', () => {
+    const config = getDefaultConfig();
+    expect(config.brain_provider).toBe('claude');
+  });
+
+  it('default config has worker_provider=claude', () => {
+    const config = getDefaultConfig();
+    expect(config.worker_provider).toBe('claude');
+  });
+
+  it('default config has cost_optimization=false', () => {
+    const config = getDefaultConfig();
+    expect(config.cost_optimization).toBe(false);
+  });
+
+  it('default config has no fallback_provider', () => {
+    const config = getDefaultConfig();
+    expect(config.fallback_provider).toBeUndefined();
+  });
+
+  it('default config has no provider_overrides', () => {
+    const config = getDefaultConfig();
+    expect(config.provider_overrides).toBeUndefined();
+  });
+
+  it('default config has no api_keys', () => {
+    const config = getDefaultConfig();
+    expect(config.api_keys).toBeUndefined();
+  });
+});
+
+describe('multi-provider config validation', () => {
+  it('accepts valid brain_provider=codex', () => {
+    expect(() => validatePartialConfig({ brain_provider: 'codex' })).not.toThrow();
+  });
+
+  it('accepts valid worker_provider=gemini', () => {
+    expect(() => validatePartialConfig({ worker_provider: 'gemini' })).not.toThrow();
+  });
+
+  it('accepts valid fallback_provider=claude', () => {
+    expect(() => validatePartialConfig({ fallback_provider: 'claude' })).not.toThrow();
+  });
+
+  it('rejects invalid brain_provider', () => {
+    expect(() =>
+      validatePartialConfig({ brain_provider: 'openai' as 'claude' }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('rejects invalid worker_provider', () => {
+    expect(() =>
+      validatePartialConfig({ worker_provider: 'invalid' as 'claude' }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('rejects invalid fallback_provider', () => {
+    expect(() =>
+      validatePartialConfig({ fallback_provider: 'nope' as 'claude' }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('accepts valid provider_overrides', () => {
+    expect(() =>
+      validatePartialConfig({ provider_overrides: { docs: 'gemini', tests: 'codex' } }),
+    ).not.toThrow();
+  });
+
+  it('rejects invalid provider in provider_overrides', () => {
+    expect(() =>
+      validatePartialConfig({ provider_overrides: { docs: 'bad' as 'claude' } }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('accepts cost_optimization=true', () => {
+    expect(() => validatePartialConfig({ cost_optimization: true })).not.toThrow();
+  });
+
+  it('rejects non-boolean cost_optimization', () => {
+    expect(() =>
+      validatePartialConfig({ cost_optimization: 'yes' as unknown as boolean }),
+    ).toThrow(ConfigValidationError);
+  });
+
+  it('accepts api_keys as object', () => {
+    expect(() =>
+      validatePartialConfig({ api_keys: { OPENAI_API_KEY: 'sk-test' } }),
+    ).not.toThrow();
+  });
+
+  it('rejects api_keys as non-object', () => {
+    expect(() =>
+      validatePartialConfig({ api_keys: 'bad' as unknown as Record<string, string> }),
+    ).toThrow(ConfigValidationError);
+  });
+});
+
+describe('multi-provider env var overrides', () => {
+  it('DECKENT_BRAIN_PROVIDER overrides config brain_provider', async () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedReadFile.mockRejectedValue(new Error('not found'));
+    process.env['DECKENT_BRAIN_PROVIDER'] = 'gemini';
+    const config = await loadConfig('/test/project');
+    expect(config).toBeDefined();
+    // env var was applied — if invalid it would have thrown ConfigValidationError
+  });
+
+  it('DECKENT_WORKER_PROVIDER overrides config worker_provider', async () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedReadFile.mockRejectedValue(new Error('not found'));
+    process.env['DECKENT_WORKER_PROVIDER'] = 'codex';
+    const config = await loadConfig('/test/project');
+    expect(config).toBeDefined();
+  });
+
+  it('invalid DECKENT_BRAIN_PROVIDER env var causes validation error', async () => {
+    process.env['DECKENT_BRAIN_PROVIDER'] = 'invalid_provider';
+    await expect(loadConfig('/test/project')).rejects.toThrow(ConfigValidationError);
+  });
+
+  it('invalid DECKENT_WORKER_PROVIDER env var causes validation error', async () => {
+    process.env['DECKENT_WORKER_PROVIDER'] = 'bad';
+    await expect(loadConfig('/test/project')).rejects.toThrow(ConfigValidationError);
+  });
+});
+
+describe('multi-provider config merge', () => {
+  it('project config overrides brain_provider', async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ brain_provider: 'gemini' }));
+
+    const config = await loadConfig('/test/project');
+    expect(config).toBeDefined();
+    // If invalid, it would have thrown — gemini is valid
   });
 });

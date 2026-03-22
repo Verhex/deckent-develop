@@ -3,18 +3,26 @@
 import { z } from 'zod';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
-  PlannerTask,
+  PlannerTask, ProviderName,
 } from '../core/types.js';
-import { TaskStatus } from '../core/types.js';
+import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { calculateModelScore } from './model-selector.js';
+
+// ─── Model enum values for Zod schemas ───────────────────────────────────
+// ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
+const MODEL_ENUM_VALUES = ALL_MODELS as unknown as [string, ...string[]];
+
+// ─── Provider enum values for Zod schemas ────────────────────────────────
+const PROVIDER_NAMES = Object.keys(PROVIDER_MODEL_MAP) as [string, ...string[]];
 
 // ═══ Zod Schemas ═══════════════════════════════════════════════════
 
 /** Zod schema for a single directive task section */
 export const DirectiveTaskSchema = z.object({
   title: z.string().min(1, 'Task title must not be empty'),
-  model: z.enum(['opus', 'sonnet', 'haiku']).optional(),
+  model: z.enum(MODEL_ENUM_VALUES).optional(),
   effort: z.enum(['low', 'normal', 'high']).optional(),
+  provider: z.enum(PROVIDER_NAMES).optional(),
   files: z.array(z.string()),
   scope: z.array(z.string()),
   description: z.string(),
@@ -86,6 +94,7 @@ export interface CreateTaskParams {
   isPriorityFix?: boolean;
   fixForTaskId?: string;
   initialStatus?: TaskStatus;
+  provider?: ProviderName;
   forceModel?: ModelType;
   forceEffort?: TaskEffort;
 }
@@ -95,6 +104,7 @@ export interface ParsedDirectiveTask {
   description: string;
   scope: TaskScope;
   testTarget?: string;
+  provider?: ProviderName;
   forceModel?: ModelType;
   forceEffort?: TaskEffort;
 }
@@ -115,6 +125,20 @@ function now(): string {
 export function createTask(params: CreateTaskParams, sequence: number): Task {
   const sprintNumber = params.sprintId.replace('sprint-', '');
   const id = `${sprintNumber}-${String(sequence).padStart(3, '0')}`;
+
+  // Validate model-provider compatibility when both are specified
+  let provider = params.provider;
+  if (provider && params.model) {
+    const allowedModels = PROVIDER_MODEL_MAP[provider];
+    if (!allowedModels || !(allowedModels as readonly string[]).includes(params.model)) {
+      // Log warning but keep provider as-is — task 6's model equivalence will handle later
+      console.warn(
+        `[task-builder] Model "${params.model}" is not compatible with provider "${provider}". ` +
+        `Allowed models for ${provider}: ${(allowedModels ?? []).join(', ')}`,
+      );
+    }
+  }
+
   return {
     id,
     title: params.title,
@@ -130,6 +154,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     sprintId: params.sprintId,
     isPriorityFix: params.isPriorityFix,
     fixForTaskId: params.fixForTaskId,
+    provider,
     forceModel: params.forceModel,
     forceEffort: params.forceEffort,
     createdAt: now(),
@@ -212,9 +237,8 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const forceModel = modelLine
       ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase()
       : undefined;
-    const validModels: string[] = ['opus', 'sonnet', 'haiku'];
-    // safe: validModels.includes() confirms the string is a valid ModelType before assignment
-    const parsedForceModel = (forceModel && validModels.includes(forceModel) ? forceModel : undefined) as ModelType | undefined;
+    // safe: ALL_MODELS.includes() confirms the string is a valid ModelType before assignment
+    const parsedForceModel = (forceModel && (ALL_MODELS as readonly string[]).includes(forceModel) ? forceModel : undefined) as ModelType | undefined;
 
     // Extract optional Effort: override (e.g., "Effort: max")
     const effortLine = lines.find(l => /^[\s-]*Effort:\s*/i.test(l.trim()));
@@ -225,7 +249,16 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     // safe: validEfforts.includes() confirms the string is a valid TaskEffort before assignment
     const parsedForceEffort = (forceEffort && validEfforts.includes(forceEffort) ? forceEffort : undefined) as TaskEffort | undefined;
 
-    tasks.push({ title, description: block.trim(), scope, testTarget, forceModel: parsedForceModel, forceEffort: parsedForceEffort });
+    // Extract optional Provider: override (e.g., "Provider: codex")
+    const providerLine = lines.find(l => /^[\s-]*Provider:\s*/i.test(l.trim()));
+    const rawProvider = providerLine
+      ? providerLine.trim().replace(/^-\s+/, '').replace(/^Provider:\s*/i, '').trim().toLowerCase()
+      : undefined;
+    const validProviders = Object.keys(PROVIDER_MODEL_MAP);
+    // safe: validProviders.includes() confirms the string is a valid ProviderName before assignment
+    const parsedProvider = (rawProvider && validProviders.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
+
+    tasks.push({ title, description: block.trim(), scope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort });
   }
   return tasks;
 }

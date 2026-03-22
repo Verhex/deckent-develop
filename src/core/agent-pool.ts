@@ -50,7 +50,8 @@ export function isTempAgentStale(
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
-const VALID_MODELS = ['opus', 'sonnet', 'haiku'] as const;
+import { ALL_MODELS } from './types.js';
+const VALID_MODELS = ALL_MODELS;
 const VALID_SOURCES = ['builtin', 'user', 'learned'] as const;
 
 export class AgentPoolManager {

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from '
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { ModelType, TaskResult } from '../../core/types.js';
-import { TaskStatus } from '../../core/types.js';
+import { TaskStatus, ALL_MODELS } from '../../core/types.js';
 import { TASKS_DIR } from '../../core/constants.js';
 import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { buildWorkerPrompt } from '../../orchestra/brain.js';
@@ -118,16 +118,15 @@ export function registerRun(program: Command): void {
   program
     .command('run <description>')
     .description('Run a single one-shot task without a sprint cycle')
-    .option('--model <model>', 'Model to use: opus, sonnet, haiku (default: sonnet)', 'sonnet')
+    .option('--model <model>', 'Model to use (default: sonnet). Options: opus, sonnet, haiku, gpt-4.1, o3, o4-mini, gemini-2.5-pro, gemini-2.5-flash', 'sonnet')
     .option('--scope <dir>', 'Worker scope directory (default: ./)', './')
     .action(async (description: string, opts: RunCommandOpts) => {
       const root = resolveProjectRoot();
       const model = (opts.model ?? 'sonnet') as ModelType;
       const scopeDir = opts.scope ?? './';
 
-      const validModels: ModelType[] = ['opus', 'sonnet', 'haiku'];
-      if (!validModels.includes(model)) {
-        printError(new Error(`Invalid model: ${model}. Must be one of: opus, sonnet, haiku`));
+      if (!(ALL_MODELS as readonly string[]).includes(model)) {
+        printError(new Error(`Invalid model: ${model}. Must be one of: ${ALL_MODELS.join(', ')}`));
         process.exitCode = 1;
         return;
       }

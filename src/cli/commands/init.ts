@@ -33,6 +33,7 @@ import { promptText, promptSelect } from '../helpers/prompt.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -274,6 +275,11 @@ Lint: tsc --noEmit
           DASHBOARD_FILE,
           BRAIN_DIR + '/archive/',
         ]);
+
+        // Show detected providers
+        const providers = await detectAvailableProviders();
+        print('');
+        print(formatDetectedProviders(providers));
 
         print('\n' + getMessage('init.initialized', language, { name: projectName, mode, language }));
         print('');

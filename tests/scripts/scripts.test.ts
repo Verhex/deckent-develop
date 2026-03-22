@@ -9,6 +9,8 @@ const PROJECT_ROOT = path.resolve(__dirname, '../../');
 const SCRIPTS_DIR = path.join(PROJECT_ROOT, 'scripts');
 const TMP_TEST_DIR = path.join(PROJECT_ROOT, '.tmp-script-tests');
 
+const isWindows = process.platform === 'win32';
+
 // Helper to run shell scripts
 function runScript(scriptName: string, args: string[] = [], options: any = {}) {
   const scriptPath = path.join(SCRIPTS_DIR, scriptName);
@@ -27,7 +29,7 @@ function runScript(scriptName: string, args: string[] = [], options: any = {}) {
   }
 }
 
-describe('OSS Scripts', () => {
+describe.skipIf(isWindows)('OSS Scripts', () => {
   beforeEach(() => {
     // Ensure test directory exists
     if (!fs.existsSync(TMP_TEST_DIR)) {

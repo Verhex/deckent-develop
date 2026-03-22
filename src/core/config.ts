@@ -19,6 +19,8 @@ import type {
   SystemProfile,
   UsageThresholds,
 } from './types.js';
+import { ALL_MODELS, PROVIDER_MODEL_MAP } from './types.js';
+import type { ProviderName } from './types.js';
 
 // ─── Default Auto Docs Config ───────────────────────────────────────
 export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
@@ -51,8 +53,11 @@ export function resolveMode(mode: string): string {
 // ─── Default Mode Definitions (Blueprint 13) ────────────────────────
 
 const VALID_MODES: readonly PlanMode[] = ['max_plan', 'max5x_plan', 'pro_plan', 'api'] as const;
-const VALID_MODELS = ['opus', 'sonnet', 'haiku'] as const;
+const VALID_MODELS = ALL_MODELS;
 const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
+
+/** All valid provider names */
+export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MODEL_MAP) as ProviderName[];
 
 export const DEFAULT_MODES: Record<PlanMode, PlanModeConfig> = {
   max_plan: {
@@ -241,6 +246,44 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Provider config validation ─────────────────────────────────────
+  if (config.brain_provider !== undefined &&
+      !(VALID_PROVIDERS as readonly string[]).includes(config.brain_provider)) {
+    errors.push(`Invalid brain_provider "${config.brain_provider}". Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+  }
+
+  if (config.worker_provider !== undefined &&
+      !(VALID_PROVIDERS as readonly string[]).includes(config.worker_provider)) {
+    errors.push(`Invalid worker_provider "${config.worker_provider}". Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+  }
+
+  if (config.fallback_provider !== undefined &&
+      !(VALID_PROVIDERS as readonly string[]).includes(config.fallback_provider)) {
+    errors.push(`Invalid fallback_provider "${config.fallback_provider}". Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+  }
+
+  if (config.provider_overrides !== undefined) {
+    if (typeof config.provider_overrides !== 'object' || config.provider_overrides === null || Array.isArray(config.provider_overrides)) {
+      errors.push('provider_overrides must be an object');
+    } else {
+      for (const [key, value] of Object.entries(config.provider_overrides)) {
+        if (!(VALID_PROVIDERS as readonly string[]).includes(value)) {
+          errors.push(`Invalid provider "${value}" in provider_overrides["${key}"]. Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+        }
+      }
+    }
+  }
+
+  if (config.cost_optimization !== undefined && typeof config.cost_optimization !== 'boolean') {
+    errors.push('cost_optimization must be a boolean');
+  }
+
+  if (config.api_keys !== undefined) {
+    if (typeof config.api_keys !== 'object' || config.api_keys === null || Array.isArray(config.api_keys)) {
+      errors.push('api_keys must be an object');
+    }
+  }
+
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }
@@ -284,6 +327,9 @@ export function createDefaultConfig(): DeckentConfig {
   return {
     mode: DEFAULT_MODE,
     modes: structuredClone(DEFAULT_MODES),
+    brain_provider: 'claude',
+    worker_provider: 'claude',
+    cost_optimization: false,
   };
 }
 
@@ -329,6 +375,16 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   // Resolve alias before validation so 'performance' → 'max_plan' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
+  // ─── Env var overrides for provider config ─────────────────────────
+  const envBrainProvider = process.env['DECKENT_BRAIN_PROVIDER'];
+  if (envBrainProvider) {
+    config.brain_provider = envBrainProvider as ProviderName;
+  }
+  const envWorkerProvider = process.env['DECKENT_WORKER_PROVIDER'];
+  if (envWorkerProvider) {
+    config.worker_provider = envWorkerProvider as ProviderName;
+  }
+
   validateConfig(config);
 
   const activeModeConfig = config.modes[config.mode];
@@ -353,6 +409,9 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     spawn_backend: config.spawn_backend,
     skills: config.skills,
+    brain_provider: config.brain_provider,
+    worker_provider: config.worker_provider,
+    fallback_provider: config.fallback_provider,
   };
 }
 

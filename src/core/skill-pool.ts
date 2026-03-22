@@ -14,7 +14,8 @@ const MANIFEST_FILENAME = 'manifest.json';
 
 const VALID_CATEGORIES: SkillCategory[] = ['language', 'framework', 'tool', 'domain', 'workflow'];
 const VALID_POSITIONS = ['prepend', 'append', 'section'] as const;
-const VALID_MODELS = ['opus', 'sonnet', 'haiku'] as const;
+import { ALL_MODELS } from './types.js';
+const VALID_MODELS = ALL_MODELS;
 
 // ─── Skill Pool Manager ────────────────────────────────────────────────────
 

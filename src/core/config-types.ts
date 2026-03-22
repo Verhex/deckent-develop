@@ -3,7 +3,7 @@
 
 import type { DecisionEngineConfig, LearningConfig, CollaborationConfig } from './decision-config.js';
 import type { NotificationConfig } from './notifications.js';
-import type { ModelType } from './task-types.js';
+import type { ModelType, ProviderName } from './task-types.js';
 
 // ─── Usage & Budgeting (Blueprint 9) ────────────────────────────────
 export interface UsageMetrics {
@@ -61,6 +61,18 @@ export interface DeckentConfig {
   notifications?: NotificationConfig;
   /** Auto-remove stale locks (>5min) during auditor scan. Default: false */
   auto_clean_locks?: boolean;
+  /** Provider for Brain planning (default: 'claude') */
+  brain_provider?: ProviderName;
+  /** Default provider for workers (default: 'claude') */
+  worker_provider?: ProviderName;
+  /** Fallback when primary provider unavailable */
+  fallback_provider?: ProviderName;
+  /** Per-task-type provider overrides */
+  provider_overrides?: Record<string, ProviderName>;
+  /** Auto-select cheapest capable provider (default: false) */
+  cost_optimization?: boolean;
+  /** Optional API keys (prefer env vars) */
+  api_keys?: Record<string, string>;
 }
 
 export interface ResolvedConfig {
@@ -76,6 +88,12 @@ export interface ResolvedConfig {
   spawn_backend?: 'tmux' | 'subprocess' | 'auto';
   /** Skill system configuration */
   skills?: SkillConfig;
+  /** Provider for Brain planning (default: 'claude') */
+  brain_provider?: ProviderName;
+  /** Default provider for workers (default: 'claude') */
+  worker_provider?: ProviderName;
+  /** Fallback when primary provider unavailable */
+  fallback_provider?: ProviderName;
 }
 
 // ─── Auto Docs Config ─────────────────────────────────────────────

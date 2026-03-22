@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import { runSprint, BrainError } from '../../orchestra/brain.js';
 import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
@@ -20,6 +21,10 @@ export function registerStartTool(server: McpServer): void {
 
       try {
         const config = await loadConfig(root);
+
+        // Bootstrap provider adapters before sprint operations
+        await bootstrapProviders(config, root);
+
         const jobId = `sprint-${Date.now()}`;
         const startedAt = new Date().toISOString();
 

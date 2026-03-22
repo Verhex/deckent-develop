@@ -12,8 +12,12 @@ import {
   createWatchLayout,
   attachToWorkerPane,
   cleanupPromptFile,
+  buildWorkerCommand,
+  buildClaudeCommand,
   TmuxError,
 } from '../../src/orchestra/tmux.js';
+import type { ProviderAdapter } from '../../src/core/provider.js';
+import type { ModelType } from '../../src/core/types.js';
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -41,7 +45,9 @@ beforeEach(() => {
   mockedExistsSync.mockReturnValue(true);
 });
 
-describe('isSessionActive', () => {
+const isWindows = process.platform === 'win32';
+
+describe.skipIf(isWindows)('isSessionActive', () => {
   it('returns true when session exists (status=0)', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -63,7 +69,7 @@ describe('isSessionActive', () => {
   });
 });
 
-describe('ensureSession', () => {
+describe.skipIf(isWindows)('ensureSession', () => {
   it('creates session when none exists', () => {
     // First call: has-session → fail
     mockedSpawnSync.mockReturnValueOnce({
@@ -99,7 +105,7 @@ describe('ensureSession', () => {
   });
 });
 
-describe('spawnWorker', () => {
+describe.skipIf(isWindows)('spawnWorker', () => {
   it('opens window and sends claude command via tmpfile', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -211,7 +217,7 @@ describe('spawnWorker', () => {
   });
 });
 
-describe('killWorker', () => {
+describe.skipIf(isWindows)('killWorker', () => {
   it('kills the correct window', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -234,7 +240,7 @@ describe('killWorker', () => {
   });
 });
 
-describe('listWorkers', () => {
+describe.skipIf(isWindows)('listWorkers', () => {
   it('parses taskIds with w- prefix stripped, non-workers filtered', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0,
@@ -255,7 +261,7 @@ describe('listWorkers', () => {
   });
 });
 
-describe('startAuditor', () => {
+describe.skipIf(isWindows)('startAuditor', () => {
   it('creates auditor window with sonnet model when not already running', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -318,7 +324,7 @@ describe('startAuditor', () => {
   });
 });
 
-describe('destroy', () => {
+describe.skipIf(isWindows)('destroy', () => {
   it('kills the session', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -341,7 +347,7 @@ describe('destroy', () => {
   });
 });
 
-describe('sendKeys', () => {
+describe.skipIf(isWindows)('sendKeys', () => {
   it('sends correct target and keys', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -357,14 +363,14 @@ describe('sendKeys', () => {
   });
 });
 
-describe('cleanupPromptFile', () => {
+describe.skipIf(isWindows)('cleanupPromptFile', () => {
   it('calls unlinkSync on the given path', () => {
     cleanupPromptFile('/tmp/prompt.txt');
     // No throw means success
   });
 });
 
-describe('attach', () => {
+describe.skipIf(isWindows)('attach', () => {
   it('uses stdio inherit for blocking attach', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
@@ -379,7 +385,7 @@ describe('attach', () => {
   });
 });
 
-describe('createWatchLayout', () => {
+describe.skipIf(isWindows)('createWatchLayout', () => {
   it('creates a watch window and splits it when window does not exist', () => {
     mockedSpawnSync.mockImplementation((_cmd, args) => {
       const argsArr = args as string[];
@@ -433,7 +439,7 @@ describe('createWatchLayout', () => {
   });
 });
 
-describe('attachToWorkerPane', () => {
+describe.skipIf(isWindows)('attachToWorkerPane', () => {
   it('selects the correct worker window and attaches', () => {
     mockedSpawnSync.mockImplementation((_cmd, args) => {
       const argsArr = args as string[];
@@ -468,5 +474,149 @@ describe('attachToWorkerPane', () => {
 
     expect(() => attachToWorkerPane('999-001')).toThrow(TmuxError);
     expect(() => attachToWorkerPane('999-001')).toThrow('Worker window w-999-001 not found');
+  });
+});
+
+// ─── buildWorkerCommand + Provider Decoupling Tests ─────────────────
+
+function createMockAdapter(overrides?: Partial<ProviderAdapter>): ProviderAdapter {
+  return {
+    name: 'mock-provider',
+    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn(() => []),
+    checkUsage: vi.fn(async () => ({ used: 0, limit: 100, remaining: 100, percentUsed: 0 })),
+    isAvailable: vi.fn(async () => true),
+    buildCommand: vi.fn(
+      (model: ModelType, promptPath: string, _opts?: { allowedTools?: string; autoApprove?: boolean }) =>
+        `mock-cli --model ${model} < ${promptPath}`,
+    ),
+    ...overrides,
+  };
+}
+
+describe.skipIf(isWindows)('buildWorkerCommand', () => {
+  it('produces Claude CLI command without adapter (backward compat)', () => {
+    const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
+    expect(cmd).toBe('claude -p - --model sonnet < /tmp/prompt.txt');
+  });
+
+  it('includes --allowedTools when opts provided (no adapter)', () => {
+    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { allowedTools: 'Read,Write' });
+    expect(cmd).toContain("--allowedTools 'Read,Write'");
+    expect(cmd).toContain('claude -p - --model opus');
+  });
+
+  it('includes --dangerously-skip-permissions when autoApprove (no adapter)', () => {
+    const cmd = buildWorkerCommand('haiku', '/tmp/p.txt', { autoApprove: true });
+    expect(cmd).toContain('--dangerously-skip-permissions');
+  });
+
+  it('includes both opts flags together (no adapter)', () => {
+    const cmd = buildWorkerCommand('sonnet', '/tmp/p.txt', {
+      allowedTools: 'Bash',
+      autoApprove: true,
+    });
+    expect(cmd).toContain("--allowedTools 'Bash'");
+    expect(cmd).toContain('--dangerously-skip-permissions');
+    expect(cmd).toContain('< /tmp/p.txt');
+  });
+
+  it('delegates to adapter.buildCommand when adapter is provided', () => {
+    const adapter = createMockAdapter();
+    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', undefined, adapter);
+    expect(adapter.buildCommand).toHaveBeenCalledWith('opus', '/tmp/p.txt', {
+      allowedTools: undefined,
+      autoApprove: undefined,
+    });
+    expect(cmd).toBe('mock-cli --model opus < /tmp/p.txt');
+  });
+
+  it('passes opts to adapter.buildCommand correctly', () => {
+    const adapter = createMockAdapter();
+    buildWorkerCommand('sonnet', '/tmp/p.txt', { allowedTools: 'Read', autoApprove: true }, adapter);
+    expect(adapter.buildCommand).toHaveBeenCalledWith('sonnet', '/tmp/p.txt', {
+      allowedTools: 'Read',
+      autoApprove: true,
+    });
+  });
+
+  it('uses adapter output verbatim (does not append Claude flags)', () => {
+    const adapter = createMockAdapter({
+      buildCommand: vi.fn(() => 'custom-cli run --fast'),
+    });
+    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', { allowedTools: 'Read' }, adapter);
+    expect(cmd).toBe('custom-cli run --fast');
+    expect(cmd).not.toContain('claude');
+    expect(cmd).not.toContain('--allowedTools');
+  });
+});
+
+describe.skipIf(isWindows)('buildClaudeCommand alias', () => {
+  it('is the same function reference as buildWorkerCommand', () => {
+    expect(buildClaudeCommand).toBe(buildWorkerCommand);
+  });
+
+  it('produces identical output to buildWorkerCommand', () => {
+    const a = buildClaudeCommand('opus', '/tmp/p.txt', { allowedTools: 'Bash' });
+    const b = buildWorkerCommand('opus', '/tmp/p.txt', { allowedTools: 'Bash' });
+    expect(a).toBe(b);
+  });
+});
+
+describe.skipIf(isWindows)('spawnWorker with adapter', () => {
+  it('uses adapter command when adapter is provided', () => {
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    const adapter = createMockAdapter({
+      buildCommand: vi.fn(() => 'codex --model o3-mini < /project/.tasks/.prompt-abcdef01.txt'),
+    });
+
+    spawnWorker('task-100', 'opus', 'do work', '/project', undefined, adapter);
+
+    // send-keys call should contain the adapter's command, not claude
+    const sendKeysCall = mockedSpawnSync.mock.calls[1];
+    const args = sendKeysCall![1] as string[];
+    const cmdArg = args.find((a) => a.includes('codex'));
+    expect(cmdArg).toBeDefined();
+    expect(cmdArg).toContain('codex --model o3-mini');
+    expect(cmdArg).not.toContain('claude');
+  });
+
+  it('uses Claude default when no adapter is provided', () => {
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    spawnWorker('task-101', 'sonnet', 'do work', '/project');
+
+    const sendKeysCall = mockedSpawnSync.mock.calls[1];
+    const args = sendKeysCall![1] as string[];
+    const cmdArg = args.find((a) => a.includes('claude'));
+    expect(cmdArg).toBeDefined();
+    expect(cmdArg).toContain('claude -p - --model sonnet');
+  });
+});
+
+describe.skipIf(isWindows)('startAuditor with adapter', () => {
+  it('uses adapter command when adapter is provided', () => {
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    const adapter = createMockAdapter({
+      buildCommand: vi.fn(() => 'gemini-cli --model gemini-pro < /project/.tasks/.prompt-abcdef01.txt'),
+    });
+
+    startAuditor('/project', undefined, adapter);
+
+    // send-keys is 3rd call (list-windows + new-window + send-keys)
+    const sendKeysArgs = mockedSpawnSync.mock.calls[2]![1] as string[];
+    const cmdArg = sendKeysArgs.find((a) => a.includes('gemini-cli'));
+    expect(cmdArg).toBeDefined();
+    expect(cmdArg).not.toContain('claude');
   });
 });

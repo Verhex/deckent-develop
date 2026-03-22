@@ -9,6 +9,10 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
 }));
 
+vi.mock('node:os', () => ({
+  platform: vi.fn().mockReturnValue('linux'),
+}));
+
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
@@ -58,12 +62,13 @@ vi.mock('../../../src/core/constants.js', () => ({
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { platform } from 'node:os';
 import { print, formatDoctorResult } from '../../../src/cli/helpers/output.js';
 import { resolveProjectRoot } from '../../../src/cli/helpers/process.js';
 import { countBrainLines } from '../../../src/core/utils.js';
 import { getSystemProfile } from '../../../src/core/system-profile.js';
 import { detectSubscription } from '../../../src/core/subscription.js';
-import { registerDoctor, runDoctorChecks, formatSystemProfile } from '../../../src/cli/commands/doctor.js';
+import { registerDoctor, runDoctorChecks, formatSystemProfile, checkPlatform, isRunningInWSL } from '../../../src/cli/commands/doctor.js';
 
 // ─── Helper ──────────────────────────────────────────────────────────
 
@@ -88,7 +93,8 @@ describe('registerDoctor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
-    // Default: all tools found, workspace exists
+    // Default: all tools found, workspace exists, linux platform
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
@@ -160,6 +166,7 @@ describe('runDoctorChecks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
@@ -281,6 +288,10 @@ describe('formatDoctorResult (output.ts helper)', () => {
   // We test the real formatDoctorResult from output.ts by importing it directly
   // We need to unmock output and reimport
   // Instead test through runDoctorChecks output shape
+  beforeEach(() => {
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
+  });
+
   it('doctor result checks have name, passed, message, required fields', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
@@ -385,6 +396,7 @@ describe('--profile flag', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
@@ -437,6 +449,7 @@ describe('error handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(countBrainLines).mockReturnValue(50);
@@ -513,6 +526,7 @@ describe('exit code', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(countBrainLines).mockReturnValue(50);
@@ -545,6 +559,7 @@ describe('i18n integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
@@ -567,8 +582,8 @@ describe('i18n integration', () => {
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     const passedMsg = calls.find(c => String(c).includes('checks passed'));
     expect(passedMsg).toBeDefined();
-    // runDoctorChecks returns 10 checks total
-    expect(String(passedMsg)).toMatch(/\/10/);
+    // runDoctorChecks returns 11 checks total (including platform check)
+    expect(String(passedMsg)).toMatch(/\/11/);
   });
 
   it('uses tr language when config has language=tr', async () => {
@@ -605,5 +620,154 @@ describe('i18n integration', () => {
     await runCommand(['doctor']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('checks passed'))).toBe(true);
+  });
+});
+
+// ─── checkPlatform ────────────────────────────────────────────────────
+
+describe('checkPlatform', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns passed=false for win32 with unsupported message', () => {
+    vi.mocked(platform).mockReturnValue('win32' as NodeJS.Platform);
+    const check = checkPlatform();
+    expect(check.passed).toBe(false);
+    expect(check.name).toBe('Platform');
+    expect(check.message).toMatch(/UNSUPPORTED/);
+    expect(check.message).toMatch(/WSL2/);
+  });
+
+  it('win32 check is not required (warning only)', () => {
+    vi.mocked(platform).mockReturnValue('win32' as NodeJS.Platform);
+    const check = checkPlatform();
+    expect(check.required).toBe(false);
+  });
+
+  it('returns passed=true for linux', () => {
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
+    // readFileSync mock: /proc/version returns empty (not WSL)
+    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('no file'); });
+    const check = checkPlatform();
+    expect(check.passed).toBe(true);
+    expect(check.message).toMatch(/Linux/i);
+  });
+
+  it('returns passed=true for darwin (macOS)', () => {
+    vi.mocked(platform).mockReturnValue('darwin' as NodeJS.Platform);
+    const check = checkPlatform();
+    expect(check.passed).toBe(true);
+    expect(check.message).toMatch(/macOS/);
+  });
+
+  it('returns passed=true with untested note for unknown platform', () => {
+    vi.mocked(platform).mockReturnValue('freebsd' as NodeJS.Platform);
+    const check = checkPlatform();
+    expect(check.passed).toBe(true);
+    expect(check.message).toMatch(/untested/);
+  });
+
+  it('detects WSL2 via WSL_DISTRO_NAME env var', () => {
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
+    const original = process.env['WSL_DISTRO_NAME'];
+    process.env['WSL_DISTRO_NAME'] = 'Ubuntu';
+    try {
+      const check = checkPlatform();
+      expect(check.passed).toBe(true);
+      expect(check.message).toMatch(/WSL/i);
+    } finally {
+      if (original === undefined) {
+        delete process.env['WSL_DISTRO_NAME'];
+      } else {
+        process.env['WSL_DISTRO_NAME'] = original;
+      }
+    }
+  });
+
+  it('detects WSL2 via WSL_INTEROP env var', () => {
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
+    const original = process.env['WSL_INTEROP'];
+    process.env['WSL_INTEROP'] = '/run/WSL/1_interop';
+    try {
+      const check = checkPlatform();
+      expect(check.passed).toBe(true);
+      expect(check.message).toMatch(/WSL/i);
+    } finally {
+      if (original === undefined) {
+        delete process.env['WSL_INTEROP'];
+      } else {
+        process.env['WSL_INTEROP'] = original;
+      }
+    }
+  });
+
+  it('native Windows platform check does not affect ok (non-required)', () => {
+    vi.mocked(platform).mockReturnValue('win32' as NodeJS.Platform);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
+    vi.mocked(countBrainLines).mockReturnValue(50);
+    vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
+    const result = runDoctorChecks('/mock/root');
+    // Platform check is not required — ok still true when other required checks pass
+    expect(result.ok).toBe(true);
+    const platformCheck = result.checks.find(c => c.name === 'Platform');
+    expect(platformCheck!.passed).toBe(false);
+  });
+});
+
+// ─── isRunningInWSL ──────────────────────────────────────────────────
+
+describe('isRunningInWSL', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Clear WSL env vars for clean test state
+    delete process.env['WSL_DISTRO_NAME'];
+    delete process.env['WSL_INTEROP'];
+  });
+
+  afterEach(() => {
+    delete process.env['WSL_DISTRO_NAME'];
+    delete process.env['WSL_INTEROP'];
+  });
+
+  it('returns true when WSL_DISTRO_NAME is set', () => {
+    process.env['WSL_DISTRO_NAME'] = 'Ubuntu-22.04';
+    expect(isRunningInWSL()).toBe(true);
+  });
+
+  it('returns true when WSL_INTEROP is set', () => {
+    process.env['WSL_INTEROP'] = '/run/WSL/1_interop';
+    expect(isRunningInWSL()).toBe(true);
+  });
+
+  it('returns true when /proc/version contains "microsoft"', () => {
+    vi.mocked(readFileSync).mockImplementation((p: string) => {
+      if (String(p) === '/proc/version') return 'Linux version 5.15.0-microsoft-standard-WSL2';
+      return '';
+    });
+    expect(isRunningInWSL()).toBe(true);
+  });
+
+  it('returns true when /proc/version contains "Microsoft" (case insensitive)', () => {
+    vi.mocked(readFileSync).mockImplementation((p: string) => {
+      if (String(p) === '/proc/version') return 'Linux version 4.4.0-Microsoft';
+      return '';
+    });
+    expect(isRunningInWSL()).toBe(true);
+  });
+
+  it('returns false when no WSL env vars and /proc/version throws', () => {
+    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    expect(isRunningInWSL()).toBe(false);
+  });
+
+  it('returns false when /proc/version exists but no microsoft mention', () => {
+    vi.mocked(readFileSync).mockImplementation((p: string) => {
+      if (String(p) === '/proc/version') return 'Linux version 5.15.0-75-generic (buildd@ubuntu)';
+      return '';
+    });
+    expect(isRunningInWSL()).toBe(false);
   });
 });

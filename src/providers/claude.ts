@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType, UsageMetrics } from '../core/types.js';
+import { CLAUDE_MODELS } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import {
   spawnWorker,
@@ -15,7 +16,7 @@ import { TASKS_DIR } from '../core/constants.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const SUPPORTED_MODELS: readonly ModelType[] = ['opus', 'sonnet', 'haiku'];
+const SUPPORTED_MODELS: readonly ModelType[] = [...CLAUDE_MODELS];
 const SAFE_USAGE_DEFAULT: UsageMetrics = {
   fiveHourPercent: 50,
   weeklyPercent: 30,

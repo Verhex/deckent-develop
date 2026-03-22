@@ -19,7 +19,7 @@ function computeWaveBreakdown(taskCount: number, maxWorkers: number): Record<str
 }
 
 function computeModelDistribution(tasks: Array<{ model: string }>): Record<string, number> {
-  const dist: Record<string, number> = { opus: 0, sonnet: 0, haiku: 0 };
+  const dist: Record<string, number> = {};
   for (const t of tasks) {
     const m = t.model ?? 'sonnet';
     dist[m] = (dist[m] ?? 0) + 1;

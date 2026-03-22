@@ -4,7 +4,7 @@
   "description": "AI agent orchestration system — your AI development team, orchestrated.",
   "type": "module",
   "bin": {
-    "deckent": "./dist/cli/index.js",
+    "deckent": "./dist/cli/entry.js",
     "deckent-mcp": "./dist/mcp/server.js"
   },
   "main": "./dist/index.js",

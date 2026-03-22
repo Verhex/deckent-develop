@@ -284,7 +284,7 @@ describe('registerPlanTool', () => {
       const result = await server.callTool('deckent_plan', {});
       const content = JSON.parse(result.content[0].text);
 
-      expect(content.modelDistribution).toEqual({ opus: 2, sonnet: 1, haiku: 0 });
+      expect(content.modelDistribution).toEqual({ opus: 2, sonnet: 1 });
     });
 
     it('returns wave breakdown based on maxWorkers', async () => {

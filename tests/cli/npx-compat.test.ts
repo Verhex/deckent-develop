@@ -7,14 +7,14 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, '../../');
 
 describe('npx deckent compatibility', () => {
-  it('src/cli/index.ts has shebang #!/usr/bin/env node', () => {
-    const content = readFileSync(join(PROJECT_ROOT, 'src/cli/index.ts'), 'utf-8');
+  it('src/cli/entry.ts has shebang #!/usr/bin/env node', () => {
+    const content = readFileSync(join(PROJECT_ROOT, 'src/cli/entry.ts'), 'utf-8');
     expect(content.startsWith('#!/usr/bin/env node')).toBe(true);
   });
 
-  it('package.json bin.deckent points to ./dist/cli/index.js', () => {
+  it('package.json bin.deckent points to ./dist/cli/entry.js', () => {
     const pkg = JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8'));
-    expect(pkg.bin.deckent).toBe('./dist/cli/index.js');
+    expect(pkg.bin.deckent).toBe('./dist/cli/entry.js');
   });
 
   it('package.json bin.deckent-mcp points to ./dist/mcp/server.js', () => {

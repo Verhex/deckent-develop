@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import {
   runSprint, readContext, checkUsage, adjustSprintSize, planSprint,
   BrainError,
@@ -49,6 +50,9 @@ export function registerStart(program: Command): void {
       try {
         const config = await loadConfig(root);
         const lang = config.language;
+
+        // Bootstrap provider adapters before any sprint operations
+        await bootstrapProviders(config);
 
         if (description && !warnDirectivesExist && zeroConfigResult) {
           print(getMessage('start.zero_config_created', lang, { description }));

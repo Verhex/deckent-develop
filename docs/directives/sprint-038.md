@@ -1,6 +1,6 @@
-# DIRECTIVES — Sprint 038 (Multi-Provider Infrastructure)
+# DIRECTIVES — Sprint 038 (Multi-Provider Infrastructure + Platform Decoupling)
 
-## Goal: Build the complete multi-provider foundation. Extend ModelType for all providers, add provider field to tasks, implement Codex and Gemini adapters, provider auto-detection, multi-provider config, provider-aware model selection, capability matrix, and model equivalence mapping. 12 tasks — this is the most architecturally critical sprint.
+## Goal: Build the complete multi-provider foundation AND decouple Claude hardcoding from orchestration layer. Extend ModelType, add provider field to tasks, implement Codex and Gemini adapters, provider auto-detection, multi-provider config, provider-aware model selection, capability matrix, model equivalence mapping. Also fix platform support matrix, CLI entrypoint side-effect, planner/tmux/subprocess Claude hardcoding, and add cross-platform test helpers. 20 tasks — architecturally the most critical sprint. Findings from Codex (Windows) and Antigravity (Gemini) analyses integrated.
 
 ---
 
@@ -330,3 +330,148 @@ Retry logic: attempt primary once, fallback once, then fail. No infinite retry l
 - Notification sent on provider switch
 - No infinite retry
 - 10+ tests
+
+---
+
+## Task 13: Platform Support Matrix & Doctor Check
+- Model: sonnet
+- Effort: normal
+- Files: README.md, src/cli/commands/doctor.ts, .github/workflows/ci.yml
+- Scope: src/cli/, .github/, ./
+
+### Description
+SOURCE: Codex analysis Phase 1. Define explicit platform support matrix: Linux FULL SUPPORT, macOS FULL SUPPORT, WSL2 FULL SUPPORT, Native Windows UNSUPPORTED (requires WSL2). Add to README.md in clear Platform Support section. In deckent doctor, detect native Windows (process.platform === 'win32' without WSL) and show early warning. In CI, keep Ubuntu as merge gate; Windows job informational only (allow failure). 10+ tests.
+
+### Tests
+- Doctor detects native Windows and warns
+- Doctor passes on Linux/WSL2
+- README contains platform matrix
+- CI Windows job is allow-failure
+- 10+ tests
+
+---
+
+## Task 14: CLI Entrypoint Side-Effect Fix
+- Model: opus
+- Effort: normal
+- Files: src/cli/index.ts, src/cli/entry.ts (new), tests/cli/index.test.ts
+- Scope: src/cli/, tests/cli/
+
+### Description
+SOURCE: Codex analysis Phase 2. src/cli/index.ts runs parseAsync on import causing side-effects and test timeouts. Extract buildProgram(): Command function that configures program without parsing. Create src/cli/entry.ts as thin wrapper that imports buildProgram and calls parseAsync. Update package.json bin to point to dist/cli/entry.js. index.ts only exports buildProgram with no side effects. Update tests to not hardcode command count. Add import smoke test. 10+ tests.
+
+### Tests
+- Importing index.ts does not trigger parse
+- buildProgram returns Command with all commands registered
+- entry.ts calls parseAsync
+- bin field points to entry.js
+- 10+ tests
+
+---
+
+## Task 15: Planner Provider Decoupling
+- Model: opus
+- Effort: high
+- Files: src/orchestra/planner.ts, tests/orchestra/planner.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+SOURCE: All three analyses (CC audit, Codex, Antigravity). planner.ts hardcodes spawnSync('claude', ...). Decouple: callBrainPlanner should accept ProviderAdapter parameter or get from registry. Use adapter.buildCommand() instead of hardcoded claude command. For structured mode no provider call needed. For AI mode call adapter.spawn() or equivalent. callZeroConfigPlanner same treatment. Backward compat: if no provider passed use ProviderRegistry.getDefault(). Most impactful decoupling task. 15+ tests.
+
+### Tests
+- AI planner works with Claude adapter (backward compat)
+- AI planner works with mock Codex adapter
+- Structured planner needs no provider
+- Zero-config planner uses adapter
+- Missing provider falls back to registry default
+- 15+ tests
+
+---
+
+## Task 16: tmux.ts Provider Decoupling
+- Model: opus
+- Effort: normal
+- Files: src/orchestra/tmux.ts, tests/orchestra/tmux.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+SOURCE: All three analyses. tmux.ts buildClaudeCommand hardcodes claude CLI syntax. Rename to buildWorkerCommand (backward compat alias). Accept ProviderAdapter parameter. Use adapter.buildCommand() instead of claude-specific string. spawnWorker receives adapter from caller. tmux.ts becomes provider-agnostic terminal manager. 10+ tests.
+
+### Tests
+- buildWorkerCommand produces Claude command with ClaudeAdapter
+- buildWorkerCommand produces Codex command with mock adapter
+- spawnWorker accepts adapter parameter
+- Backward compat: no adapter = Claude default
+- 10+ tests
+
+---
+
+## Task 17: subprocess.ts Provider Decoupling
+- Model: opus
+- Effort: normal
+- Files: src/providers/subprocess.ts, tests/providers/subprocess.test.ts
+- Scope: src/providers/, tests/providers/
+
+### Description
+SOURCE: Codex + Antigravity. subprocess.ts hardcodes claude. SubprocessBackend should accept ProviderAdapter in constructor or per-spawn. Use adapter.buildCommand() for command construction. Use adapter.supportedModels for model validation. Remove all hardcoded claude references. Enables SubprocessBackend + CodexAdapter combination — ideal first integration path for non-Claude providers. 10+ tests.
+
+### Tests
+- Subprocess spawns Claude with ClaudeAdapter
+- Subprocess spawns Codex with CodexAdapter (mock)
+- Model validated against adapter.supportedModels
+- No hardcoded claude strings remain
+- 10+ tests
+
+---
+
+## Task 18: Provider Bootstrap Centralization
+- Model: opus
+- Effort: normal
+- Files: src/core/provider.ts, src/cli/commands/start.ts, src/mcp/tools/start.ts
+- Scope: src/core/, src/cli/, src/mcp/
+
+### Description
+SOURCE: Codex + Antigravity. ProviderRegistry exists but not used as central bootstrap point. Create bootstrapProviders(config): detect available providers, register adapters, set default based on config. Called once at startup (CLI start, MCP start). All subsequent code gets providers from registry. Brain, planner, sprint-controller all receive registry reference. Single source of truth. 10+ tests.
+
+### Tests
+- bootstrapProviders registers all available providers
+- Default provider matches config.brain_provider
+- Unavailable providers skipped with warning
+- Registry passed to brain/planner/sprint-controller
+- 10+ tests
+
+---
+
+## Task 19: Cross-Platform Test Helper
+- Model: sonnet
+- Effort: normal
+- Files: tests/helpers/platform.ts (new), tests/helpers/paths.ts (new)
+- Scope: tests/helpers/
+
+### Description
+SOURCE: Codex analysis Phase 5. Create shared test utilities: normalizePath (separator handling), isUnixOnly, skipOnWindows, createTempDir (platform-safe), assertPathEquals (ignore separator differences). Update 5-10 most commonly failing test files as proof of concept. 15+ tests.
+
+### Tests
+- normalizePath handles Windows backslashes
+- normalizePath handles Unix forward slashes
+- skipOnWindows skips on win32
+- assertPathEquals matches equivalent paths
+- 15+ tests
+
+---
+
+## Task 20: Platform-Conditional Test Tags
+- Model: sonnet
+- Effort: normal
+- Files: tests/orchestra/tmux.test.ts, tests/orchestra/tmux-edge.test.ts, tests/scripts/scripts.test.ts, vitest.config.ts
+- Scope: tests/, vitest.config.ts
+
+### Description
+SOURCE: Codex analysis Phase 1. Unix-only test suites should be conditionally skipped: describe.skipIf(process.platform === 'win32') for tmux tests, scripts tests. Document which test patterns are platform-specific in tests/PLATFORM.md. 5+ tests.
+
+### Tests
+- tmux tests skip on Windows
+- tmux tests run on Linux/WSL
+- scripts tests skip on Windows
+- PLATFORM.md documents categories
+- 5+ tests

@@ -106,6 +106,19 @@ Deckent follows a three-step cycle:
 
 ---
 
+## Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch) | **FULL** | Primary development platform |
+| macOS (12+) | **FULL** | All features supported |
+| Windows via WSL2 | **FULL** | Recommended Windows setup — use Ubuntu/Debian WSL2 |
+| Native Windows (cmd / PowerShell) | **UNSUPPORTED** | tmux unavailable, path issues. Use WSL2 instead |
+
+> **Windows users:** Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu, then run deckent inside the WSL2 terminal. Do not use native Windows cmd or PowerShell. Running `deckent doctor` on native Windows will show a platform warning.
+
+---
+
 ## Requirements
 
 | Requirement | Version | Check |

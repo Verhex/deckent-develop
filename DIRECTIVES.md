@@ -1,401 +1,477 @@
-# DIRECTIVES — Sprint 037 (Beta Cleanup Wave 5+6: Security, Performance, Plugin, Memory System Fix)
+# DIRECTIVES — Sprint 038 (Multi-Provider Infrastructure + Platform Decoupling)
 
-## Goal: Harden security (timing-safe auth, credential redaction, stale lock cleanup), optimize performance (agent pool LRU, N+1 elimination, skill sandbox AST), implement full plugin system (npm install, runtime hooks), complete remaining P2/P3 fixes, and fix the memory system so Deckent never forgets its own project. 16 tasks.
-
----
-
-## Task 1: Agent Pool LRU Cleanup
-- Model: sonnet
-- Effort: normal
-- Files: src/core/agent-pool.ts, tests/core/agent-pool.test.ts
-- Scope: src/core/, tests/core/
-
-### Description
-P1-003. AgentPool loads all agents from .tasks/agents/ every sprint but never cleans up old temp agents. Implement LRU eviction: keep max N temp agents (configurable, default 50). On loadAgents(), check agent lastUsedInSprint — remove agents not used in last 5 sprints. Add cleanup(maxAge: number) method. 10+ tests.
-
-### Tests
-- Agents used within 5 sprints retained
-- Agents older than 5 sprints removed
-- Builtin agents never removed
-- Max pool size enforced
-- 10+ tests
+## Goal: Build the complete multi-provider foundation AND decouple Claude hardcoding from orchestration layer. Extend ModelType, add provider field to tasks, implement Codex and Gemini adapters, provider auto-detection, multi-provider config, provider-aware model selection, capability matrix, model equivalence mapping. Also fix platform support matrix, CLI entrypoint side-effect, planner/tmux/subprocess Claude hardcoding, and add cross-platform test helpers. 20 tasks — architecturally the most critical sprint. Findings from Codex (Windows) and Antigravity (Gemini) analyses integrated.
 
 ---
 
-## Task 2: Bearer Token Timing-Safe
-- Model: sonnet
-- Effort: low
-- Files: src/api/server.ts
-- Scope: src/api/
-
-### Description
-P1-004. Replace === token comparison (server.ts:45) with crypto.timingSafeEqual(). Handle different-length tokens gracefully (timingSafeEqual requires equal length — pad or hash first). 5+ tests.
-
-### Tests
-- Valid token accepted
-- Invalid token rejected
-- Different-length token handled without crash
-- Timing is constant regardless of token prefix match
-- 5+ tests
-
----
-
-## Task 3: API Token Warning
-- Model: sonnet
-- Effort: low
-- Files: src/api/server.ts
-- Scope: src/api/
-
-### Description
-P1-005. When API server starts without auth token configured (server.ts:40-41), log a warning to stderr: [deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_token to enable auth. Log once at startup, not per request. 3+ tests.
-
-### Tests
-- Warning logged when no token configured
-- No warning when token is set
-- Warning appears exactly once
-- 3+ tests
-
----
-
-## Task 4: CLI Credential Redaction
-- Model: opus
-- Effort: normal
-- Files: src/cli/helpers/output.ts (or new redaction.ts), src/agents/worker.ts
-- Scope: src/cli/, src/agents/
-
-### Description
-P2-009. Worker logs may contain credentials from environment or config. Create redactSensitive(text: string): string that masks:
-- API keys (patterns: sk-..., key-..., OPENAI_API_KEY=...)
-- Bearer tokens
-- Passwords in URLs
-- Credential file paths
-Apply redaction in worker log output, CLI print helpers, and API log responses. 10+ tests.
-
-### Tests
-- API key patterns redacted
-- Bearer tokens masked
-- URL passwords masked
-- Non-sensitive text unchanged
-- Redaction applied in worker log output
-- 10+ tests
-
----
-
-## Task 5: Stale Lock Auto-Remove
-- Model: sonnet
-- Effort: normal
-- Files: src/monitor/auditor.ts, src/core/constants.ts
-- Scope: src/monitor/, src/core/
-
-### Description
-P2-010. Auditor detects stale locks (>5min) but doesn't remove them. Add configurable auto-cleanup: config.auto_clean_locks: boolean (default: false). When enabled, auditor removes stale locks and logs the action. Add --auto-clean-locks flag to deckent cleanup command. 10+ tests.
-
-### Tests
-- Stale locks removed when auto_clean_locks=true
-- Stale locks kept when auto_clean_locks=false (current behavior)
-- Lock removal logged
-- CLI flag works
-- 10+ tests
-
----
-
-## Task 6: Agent Pool Batch Read
-- Model: sonnet
-- Effort: normal
-- Files: src/core/agent-pool.ts
-- Scope: src/core/
-
-### Description
-P2-015. loadAgents() reads each agent.json separately (N+1 pattern). Refactor to single readdirSync + batch read: read directory once, then map over entries. Use readJsonSafe for each file. Reduces syscalls from O(2N) to O(N+1). 5+ tests.
-
-### Tests
-- All agents loaded correctly (same result as before)
-- Single readdirSync call
-- Invalid agent.json files skipped gracefully
-- 5+ tests
-
----
-
-## Task 7: Skill Sandbox AST Enhancement
+## Task 1: ModelType Extension
 - Model: opus
 - Effort: high
-- Files: src/core/marketplace/skill-sandbox.ts, tests/core/marketplace/skill-sandbox.test.ts
-- Scope: src/core/marketplace/, tests/core/marketplace/
+- Files: src/core/types.ts (or task-types.ts after split), src/orchestra/model-selector.ts, 20+ consuming files
+- Scope: src/core/, src/orchestra/, src/agents/, src/cli/, src/mcp/, src/api/
 
 ### Description
-P3-004. Current sandbox uses regex pattern matching — bypassable with obfuscation. Add basic AST-level check using TypeScript compiler API (ts.createSourceFile + ts.forEachChild). Check for: CallExpression with eval, Function, require('child_process'), import('child_process'). Keep regex as fast first-pass, AST as second-pass for .ts/.js files. 15+ tests.
+CRITICAL FOUNDATION. Extend ModelType from Claude-only to all providers:
+```typescript
+type ClaudeModel = 'opus' | 'sonnet' | 'haiku';
+type OpenAIModel = 'gpt-4.1' | 'o3' | 'o4-mini';
+type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash';
+type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
+type ProviderName = 'claude' | 'codex' | 'gemini';
+```
+Add `ProviderModelMap`: `Record<ProviderName, readonly ModelType[]>` mapping each provider to its models. Add `getProviderForModel(model: ModelType): ProviderName` helper. Update ALL hardcoded `'opus' | 'sonnet' | 'haiku'` checks to use provider-agnostic helpers. This touches 20+ files — careful, methodical migration. 25+ tests.
 
 ### Tests
-- eval() detected by AST
-- Dynamic Function() detected
-- child_process import detected
-- Obfuscated eval (e.g., global['ev'+'al']) detected
-- Regex fallback works for non-TS files
-- Clean SKILL.md passes both checks
-- 15+ tests
+- All Claude models still valid
+- OpenAI models accepted
+- Gemini models accepted
+- getProviderForModel returns correct provider
+- ProviderModelMap complete and accurate
+- Existing model-dependent logic still works for Claude models
+- Config validation accepts new models
+- 25+ tests
 
 ---
 
-## Task 8: DIRECTIVES Zod Schema
-- Model: sonnet
-- Effort: normal
-- Files: src/orchestra/task-builder.ts
-- Scope: src/orchestra/
-
-### Description
-P3-005. Add Zod schema validation for parsed DIRECTIVES.md sections. Define DirectiveSchema: { goal: string, tasks: DirectiveTask[] }. DirectiveTask: { title: string, model?: ModelType, effort?: TaskEffort, files: string[], scope: string[], description: string, tests?: string[] }. Validate after parsing, before task creation. Return clear error messages for malformed directives. 10+ tests.
-
-### Tests
-- Valid directive passes schema
-- Missing required field detected
-- Invalid model value rejected
-- Empty task list rejected
-- Clear error message returned
-- 10+ tests
-
----
-
-## Task 9: Config Mode Aliases
-- Model: sonnet
-- Effort: low
-- Files: src/core/config.ts
-- Scope: src/core/
-
-### Description
-P3-010. Add user-friendly mode aliases: performance -> max_plan, balanced -> max5x_plan, economic -> pro_plan, unlimited -> api. Accept aliases in config.mode field and CLI --mode flag. Resolve alias to canonical mode name in loadConfig. 5+ tests.
-
-### Tests
-- Alias 'performance' resolves to 'max_plan'
-- Alias 'balanced' resolves to 'max5x_plan'
-- Alias 'economic' resolves to 'pro_plan'
-- Alias 'unlimited' resolves to 'api'
-- Canonical names still work
-- 5+ tests
-
----
-
-## Task 10: Plugin Install — Full Implementation
+## Task 2: Task Provider Field
 - Model: opus
 - Effort: high
-- Files: src/cli/commands/plugin.ts, src/core/plugin.ts
-- Scope: src/cli/, src/core/
-
-### Description
-P2-014a. Replace plugin install stub with full implementation. Support two sources:
-- npm registry: deckent plugin install <package-name> — runs npm install in temp dir, copies plugin to .deckent/plugins/, validates manifest
-- Git URL: deckent plugin install https://github.com/user/plugin.git — git clone to temp, copy, validate
-- Local path: deckent plugin install ./my-plugin — copy directory, validate
-After install: validate manifest, check dependencies (using existing DependencyResolver), auto-enable. Rollback on validation failure. 15+ tests.
-
-### Tests
-- npm package installed correctly
-- Git URL cloned and installed
-- Local path copied and installed
-- Invalid manifest causes rollback
-- Dependencies resolved before enable
-- Duplicate install detected
-- 15+ tests
-
----
-
-## Task 11: Plugin Runtime Hook Execution
-- Model: opus
-- Effort: high
-- Files: src/orchestra/sprint-controller.ts, src/core/plugin-hooks.ts, src/core/plugin.ts
-- Scope: src/orchestra/, src/core/
-
-### Description
-P2-014b. Integrate plugin hooks into sprint lifecycle. In sprint-controller.ts (extracted from brain.ts):
-- Before planSprint: runHooks('beforeSprint', { sprintId, tasks, config, projectRoot })
-- After evaluateResult per task: runHooks('afterTask', { task, result, projectRoot })
-- After retro: runHooks('afterSprint', { sprint, projectRoot })
-At sprint start, scan .deckent/plugins/, load enabled plugins, register their hooks. Hooks are non-fatal — errors logged but don't abort sprint. 15+ tests.
-
-### Tests
-- beforeSprint hook called before planning
-- afterTask hook called after each evaluation
-- afterSprint hook called after retro
-- Hook error doesn't abort sprint
-- Disabled plugins' hooks skipped
-- Multiple plugins' hooks run in order
-- 15+ tests
-
----
-
-## Task 12: Dashboard API Documentation
-- Model: sonnet
-- Effort: normal
-- Files: docs/API.md
-- Scope: docs/
-
-### Description
-P2-007. docs/API.md is missing dashboard-specific endpoints. Add documentation for all 15 API endpoints including: request/response examples, authentication requirements, SSE event types, error codes. Add curl examples for each endpoint. Document dashboard WebSocket/SSE connection setup.
-
-### Tests
-- All 15 endpoints documented
-- Request/response examples present
-- Authentication documented
-- SSE events documented
-
----
-
-## Task 13: JSDoc for Public Functions
-- Model: opus
-- Effort: high
-- Files: src/core/*.ts, src/orchestra/*.ts (50+ functions)
+- Files: src/core/types.ts, src/orchestra/task-builder.ts, src/orchestra/brain.ts (planSprint section)
 - Scope: src/core/, src/orchestra/
 
 ### Description
-P3-002. Add JSDoc comments to 50+ public exported functions in core/ and orchestra/. Each JSDoc must include: @param descriptions, @returns description, @throws (if applicable), @example (for complex functions). Priority files: utils.ts, config.ts, brain.ts (remaining functions), model-selector.ts, task-builder.ts, debt-manager.ts, sprint-reporter.ts, sprint-controller.ts, result-evaluator.ts, usage-manager.ts. 10+ test assertions that JSDoc exists.
+Add `provider?: ProviderName` field to Task interface. During planSprint:
+1. If directive specifies `- Provider: codex`, set task.provider = 'codex'
+2. If no directive override, use config's worker_provider (or brain_provider for planning tasks)
+3. task.model must be compatible with task.provider (validate against ProviderModelMap)
+4. If model incompatible with provider, auto-select equivalent model (using Task 6's equivalence map)
+Update task-builder.ts directive parsing to extract provider field. 15+ tests.
 
 ### Tests
-- All exported functions in core/utils.ts have JSDoc
-- All exported functions in core/config.ts have JSDoc
-- All exported functions in orchestra/brain.ts have JSDoc
-- JSDoc includes @param and @returns
-- 10+ tests
-
----
-
-## Task 14: Memory Budget Increase
-- Model: opus
-- Effort: high
-- Files: src/core/constants.ts, tests/core/constants.test.ts, src/orchestra/debt-manager.ts, src/core/utils.ts, docs/MEMORY-SYSTEM.md, docs/PERFORMANCE.md, docs/BRAIN-GUIDE.md
-- Scope: src/core/, src/orchestra/, tests/core/, docs/
-
-### Description
-CRITICAL MEMORY FIX. Current 300-line brain budget is insufficient for 35+ sprint project. Increase limits:
-- BRAIN_TOTAL_LINE_BUDGET: 300 → 600
-- MEMORY_MAX_LINES: 100 → 200
-- MEMORY_DECAY_SPRINTS: 3 → 5 (keep learnings for 5 sprints instead of 3)
-- PATTERN_DECAY_SPRINTS: 5 → 8
-- RETRO_MAX_LINES: 60 → 100
-- SPRINT_LOG_MAX_LINES: 50 → 80
-
-Update ALL references in:
-- constants.ts — change values
-- constants.test.ts — update test assertions to match new values
-- All docs that reference "300 lines" or specific limits (MEMORY-SYSTEM.md, PERFORMANCE.md, BRAIN-GUIDE.md, SPRINT-LIFECYCLE.md)
-- Decay logic in debt-manager.ts — verify decay still works with new thresholds
-- countBrainLines in utils.ts — no code change needed, just verify
-
-Also update .claude/rules/brain.md rule: "Memory budget: 300 lines max" → "Memory budget: 600 lines max". 15+ tests.
-
-### Tests
-- BRAIN_TOTAL_LINE_BUDGET === 600
-- MEMORY_MAX_LINES === 200
-- MEMORY_DECAY_SPRINTS === 5
-- PATTERN_DECAY_SPRINTS === 8
-- RETRO_MAX_LINES === 100
-- SPRINT_LOG_MAX_LINES === 80
-- Decay still triggers correctly at new budget
-- Decay removes entries older than 5 sprints (not 3)
-- countBrainLines works with larger budget
-- All doc references updated
+- Directive provider override parsed correctly
+- Config default provider applied when no override
+- Model-provider compatibility validated
+- Incompatible model auto-resolved to equivalent
+- Provider field written to task JSON
 - 15+ tests
 
 ---
 
-## Task 15: PROJECT-IDENTITY.md — Permanent Project Memory
+## Task 3: Provider Auto-Detection
 - Model: opus
-- Effort: high
-- Files: src/core/constants.ts, src/orchestra/sprint-controller.ts, src/orchestra/sprint-reporter.ts, src/cli/commands/init.ts, src/mcp/tools/init.ts, tests/orchestra/project-identity.test.ts (new)
-- Scope: src/core/, src/orchestra/, src/cli/, src/mcp/, tests/orchestra/
+- Effort: normal
+- Files: src/core/provider.ts, src/cli/commands/doctor.ts, src/cli/commands/init.ts
+- Scope: src/core/, src/cli/
 
 ### Description
-CRITICAL MEMORY FIX. Create new permanent memory file: .brain/PROJECT-IDENTITY.md. This file is NEVER decayed (like DECISIONS.md). Contains project-level knowledge that Brain must always have:
-
-```markdown
-# Project Identity
-
-## What Is This Project
-{Generated during deckent init — project name, description, purpose}
-
-## Architecture
-{Auto-populated from analyzer.ts — detected stack, frameworks, modules, key files}
-
-## Current State
-{Updated every sprint — test count, file count, line count, last sprint ID, total sprints}
-
-## Active Configuration
-{Current mode, brain_model, default_model, max_workers, providers}
-
-## Key Rules
-{References to active ADRs from DECISIONS.md — one-line summaries}
-
-## Module Map
-{Top-level source directories and their purposes — updated when new modules added}
-```
-
-Implementation:
-- Add PROJECT_IDENTITY_FILE = 'PROJECT-IDENTITY.md' to constants.ts
-- deckent init generates initial PROJECT-IDENTITY.md from project analysis
-- Sprint reporter updates "Current State" section after every sprint (test count, sprint ID, metrics)
-- readContext() in brain.ts loads PROJECT-IDENTITY.md alongside MEMORY.md (always loaded)
-- Decay: NEVER — this file is explicitly excluded from decay, same as DECISIONS.md
-- MCP resource: add deckent://project-identity readable resource
-
-Brain always knows: what the project is, how it's structured, what state it's in. No more "forgetting" the project between sprints. 20+ tests.
+`detectAvailableProviders(): Promise<DetectedProvider[]>`. For each known provider:
+- Claude: check `claude --version` in PATH + Claude session auth
+- Codex: check `codex --version` in PATH + `OPENAI_API_KEY` env
+- Gemini: check for `GOOGLE_API_KEY` env (no standard CLI yet)
+Return: `{ name: ProviderName, available: boolean, version?: string, authMethod: 'session' | 'api_key' | 'none', models: ModelType[] }`.
+Integrate into `deckent doctor --profile` and `deckent init` (show detected providers, recommend config). 15+ tests.
 
 ### Tests
-- PROJECT-IDENTITY.md created during init
-- Architecture section populated from analyzer
-- Current State updated after sprint
-- readContext includes project identity
-- Decay never touches PROJECT-IDENTITY.md
-- MCP resource readable
-- File survives decay with force=true
-- Missing file gracefully handled (creates default)
-- Sprint reporter updates test count
-- Sprint reporter updates last sprint ID
-- Module map reflects actual source directories
+- Claude detected when CLI in PATH
+- Codex detected when CLI + API key present
+- Gemini detected when API key present
+- Missing CLI returns available=false
+- Doctor shows provider status
+- Init recommends providers
+- 15+ tests
+
+---
+
+## Task 4: Codex CLI Adapter
+- Model: opus
+- Effort: high
+- Files: src/providers/codex.ts (new), tests/providers/codex.test.ts (new)
+- Scope: src/providers/, tests/providers/
+
+### Description
+`CodexAdapter implements ProviderAdapter`. Full implementation:
+- `spawn(taskId, model, prompt, opts)`: build codex CLI command, spawn via subprocess backend. Command: `codex --model {model} --quiet` with prompt on stdin.
+- `kill(taskId)`: kill subprocess by PID
+- `listWorkers()`: track spawned PIDs
+- `checkUsage()`: query OpenAI API for rate limit headers (X-RateLimit-Remaining)
+- `isAvailable()`: `codex --version` + OPENAI_API_KEY check
+- `buildCommand()`: return full command string for dry-run display
+- `supportedModels`: ['gpt-4.1', 'o3', 'o4-mini']
+Handle Codex-specific prompt format differences from Claude. 20+ tests.
+
+### Tests
+- spawn builds correct codex command
+- Model parameter passed correctly
+- API key from environment used
+- kill terminates subprocess
+- listWorkers tracks active PIDs
+- checkUsage parses rate limit headers
+- isAvailable checks CLI and key
+- Unsupported model rejected
 - 20+ tests
 
 ---
 
-## Task 16: Sprint Lifecycle Completeness — Structured Mode Fix
+## Task 5: Gemini CLI Adapter
 - Model: opus
 - Effort: high
-- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-reporter.ts, src/cli/commands/plan.ts, src/cli/commands/start.ts, src/mcp/tools/start.ts
-- Scope: src/orchestra/, src/cli/, src/mcp/
+- Files: src/providers/gemini.ts (new), tests/providers/gemini.test.ts (new)
+- Scope: src/providers/, tests/providers/
 
 ### Description
-CRITICAL MEMORY FIX. When sprints run via structured planner or agent-based execution (not full runSprint lifecycle), the following post-sprint actions are SKIPPED:
-- MEMORY.md not updated
-- RETRO.md not written
-- Sprint ID not updated in config
-- Decay not triggered
-- PROJECT-IDENTITY.md not updated
-
-Fix: Create finalizeSprint(projectRoot, sprint, results) function in sprint-controller.ts that runs ALL post-sprint actions regardless of how the sprint was executed:
-1. Write sprint log to .brain/sprints/sprint-NNN.md
-2. Update MEMORY.md with sprint learnings (using trimMemoryWithHeader)
-3. Write RETRO.md (using writeRetrospective)
-4. Update PROJECT-IDENTITY.md "Current State" section
-5. Update last_sprint_id in .deckent/config.json
-6. Run decay if over budget
-7. Run plugin afterSprint hooks
-
-finalizeSprint is called by:
-- runSprint() — at the end (existing behavior, refactored to use this function)
-- deckent plan completion — when plan detects all tasks are DONE/resolved
-- MCP deckent_start tool — after sprint completion
-- NEW: deckent finalize CLI command — manually trigger finalization for agent-mode sprints
-
-Also add deckent finalize CLI command: reads .tasks/ for results, constructs Sprint object, calls finalizeSprint. This is the escape hatch for when CC runs tasks as agent instead of through runSprint. 20+ tests.
+`GeminiAdapter implements ProviderAdapter`. Implementation via Google AI API (subprocess with curl or dedicated SDK):
+- `spawn`: create subprocess that calls Gemini API with prompt
+- `checkUsage`: query quota from Google AI API
+- `isAvailable`: check GOOGLE_API_KEY
+- `supportedModels`: ['gemini-2.5-pro', 'gemini-2.5-flash']
+Since Gemini has no standard CLI like Claude/Codex, use API-based subprocess: spawn a Node script that calls the API and writes results. 15+ tests.
 
 ### Tests
-- finalizeSprint updates MEMORY.md
-- finalizeSprint writes RETRO.md
-- finalizeSprint updates last_sprint_id
-- finalizeSprint updates PROJECT-IDENTITY.md
-- finalizeSprint triggers decay when over budget
-- finalizeSprint runs afterSprint hooks
-- runSprint calls finalizeSprint (backward compat)
-- deckent finalize CLI works
-- deckent finalize reads task results from .tasks/
-- deckent finalize handles empty .tasks/ gracefully
-- MCP start tool calls finalizeSprint
-- Sprint log written to .brain/sprints/
-- Memory updated with sprint summary
-- 20+ tests
+- spawn creates correct API call subprocess
+- API key from environment used
+- isAvailable checks key presence
+- checkUsage returns quota info
+- Unsupported model rejected
+- 15+ tests
+
+---
+
+## Task 6: Model Equivalence Mapping
+- Model: opus
+- Effort: normal
+- Files: src/core/model-equivalence.ts (new), tests/core/model-equivalence.test.ts (new)
+- Scope: src/core/, tests/core/
+
+### Description
+Define model tiers and cross-provider equivalence:
+```typescript
+const MODEL_TIERS = {
+  premium: ['opus', 'gpt-4.1', 'gemini-2.5-pro'],
+  standard: ['sonnet', 'o3', 'gemini-2.5-flash'],
+  economy: ['haiku', 'o4-mini'],
+} as const;
+```
+Functions:
+- `getModelTier(model: ModelType): 'premium' | 'standard' | 'economy'`
+- `getEquivalentModel(model: ModelType, targetProvider: ProviderName): ModelType`
+- `isModelAvailable(model: ModelType, provider: ProviderName): boolean`
+When Brain says "this task needs opus-tier", and target provider is Codex, auto-select gpt-4.1. 15+ tests.
+
+### Tests
+- opus maps to gpt-4.1 for codex
+- sonnet maps to o3 for codex
+- haiku maps to o4-mini for codex
+- opus maps to gemini-2.5-pro for gemini
+- Same-provider returns same model
+- Economy tier has no gemini equivalent (fallback to standard)
+- 15+ tests
+
+---
+
+## Task 7: Provider Capability Matrix
+- Model: opus
+- Effort: normal
+- Files: src/core/provider-capabilities.ts (new), tests/core/provider-capabilities.test.ts (new)
+- Scope: src/core/, tests/core/
+
+### Description
+Define what each provider can do:
+```typescript
+interface ProviderCapability {
+  streaming: boolean;
+  toolUse: boolean;
+  vision: boolean;
+  codeExecution: boolean;
+  maxContextTokens: number;
+  costPerMillionTokens: { input: number; output: number };
+}
+```
+`getCapabilities(provider: ProviderName): ProviderCapability`. Brain uses this to match task requirements to provider capabilities. Example: task requires vision → only send to provider with vision=true. 10+ tests.
+
+### Tests
+- Claude capabilities correct
+- Codex capabilities correct
+- Gemini capabilities correct
+- Task requiring vision filters providers
+- Task requiring tool use filters providers
+- Unknown provider throws ProviderNotFoundError
+- 10+ tests
+
+---
+
+## Task 8: Multi-Provider Config
+- Model: opus
+- Effort: high
+- Files: src/core/config.ts, src/core/types.ts
+- Scope: src/core/
+
+### Description
+Add provider configuration to DeckentConfig:
+```typescript
+interface ProviderConfig {
+  brain_provider: ProviderName;
+  worker_provider: ProviderName;
+  fallback_provider?: ProviderName;
+  provider_overrides?: Record<string, ProviderName>;
+  cost_optimization?: boolean;
+  api_keys?: Record<ProviderName, string>;
+}
+```
+Merge into existing config system. Default: brain_provider='claude', worker_provider='claude'. Validate provider names. Support env var override: `DECKENT_BRAIN_PROVIDER`, `DECKENT_WORKER_PROVIDER`. 15+ tests.
+
+### Tests
+- Default config has claude for both
+- Config overrides work
+- Env vars override config
+- Invalid provider name rejected
+- api_keys stored (but prefer env)
+- cost_optimization defaults to false
+- 15+ tests
+
+---
+
+## Task 9: Provider-Aware Model Selector
+- Model: opus
+- Effort: high
+- Files: src/orchestra/model-selector.ts
+- Scope: src/orchestra/
+
+### Description
+Update `resolveTaskModel()` to accept provider parameter. New resolution logic:
+1. If task.forceModel set → validate against provider's supportedModels → use or error
+2. Calculate model tier from existing scoring logic (keyword analysis, complexity, etc.)
+3. Map tier to provider-specific model using model-equivalence
+4. Apply usage pressure (current logic, but per-provider quota)
+5. Apply plan access filter (provider-specific: Claude plan limits, OpenAI rate limits)
+6. Return final model + provider pair
+Keep backward compatible: if no provider specified, assume 'claude' (current behavior). 15+ tests.
+
+### Tests
+- Claude tasks still resolve correctly (backward compat)
+- Codex tasks resolve to gpt-4.1/o3/o4-mini
+- Gemini tasks resolve to gemini-2.5-pro/flash
+- Tier mapping works across providers
+- Usage pressure downgrades within provider's models
+- forceModel validated against provider
+- 15+ tests
+
+---
+
+## Task 10: Provider Usage Balancer
+- Model: opus
+- Effort: high
+- Files: src/orchestra/usage-manager.ts (extracted in Sprint 036)
+- Scope: src/orchestra/
+
+### Description
+Extend usage-manager with multi-provider quota tracking:
+- `checkAllProviderUsage(): Promise<Map<ProviderName, UsageMetrics>>`
+- `selectOptimalProvider(taskTier, providerUsage): ProviderName` — pick provider with most remaining quota for the needed tier
+- When primary provider >80% quota, automatically suggest switching to fallback
+- For API providers: track token count, estimate remaining budget
+- Integrate with adjustSprintSize: if all providers are high usage, reduce sprint. 15+ tests.
+
+### Tests
+- All provider usage checked in parallel
+- Optimal provider selected based on remaining quota
+- High usage triggers fallback suggestion
+- API token budget tracked
+- Sprint size adjusted when all providers high
+- 15+ tests
+
+---
+
+## Task 11: spawnWorkers Provider Routing
+- Model: opus
+- Effort: high
+- Files: src/orchestra/sprint-controller.ts (extracted in Sprint 036)
+- Scope: src/orchestra/
+
+### Description
+Update spawnWorkers() to route each task to the correct provider:
+1. Read task.provider field
+2. Get ProviderAdapter from ProviderRegistry
+3. Call adapter.spawn(taskId, task.model, prompt, opts)
+4. Track which provider owns which worker (for kill/status)
+Mixed sprint support: Task A on Claude, Task B on Codex, Task C on Gemini — all in same sprint. Worker status tracking must handle multiple providers. 15+ tests.
+
+### Tests
+- Task with provider='claude' spawns via ClaudeAdapter
+- Task with provider='codex' spawns via CodexAdapter
+- Mixed sprint: Claude + Codex workers run simultaneously
+- Kill routes to correct provider
+- Status shows provider per worker
+- Provider unavailable triggers fallback
+- 15+ tests
+
+---
+
+## Task 12: Provider Fallback Chain
+- Model: opus
+- Effort: normal
+- Files: src/core/provider.ts, src/orchestra/sprint-controller.ts
+- Scope: src/core/, src/orchestra/
+
+### Description
+When a provider fails (CLI not found, API key expired, rate limited):
+1. Log warning with reason
+2. Check config.fallback_provider
+3. If fallback available: remap task to fallback provider, select equivalent model
+4. If no fallback: fail task with clear error (not silent failure)
+5. Notify user via notification system (if configured)
+Retry logic: attempt primary once, fallback once, then fail. No infinite retry loops. 10+ tests.
+
+### Tests
+- Primary failure triggers fallback
+- Fallback selects equivalent model
+- No fallback configured → clear error
+- Rate limit triggers fallback
+- CLI not found triggers fallback
+- Notification sent on provider switch
+- No infinite retry
+- 10+ tests
+
+---
+
+## Task 13: Platform Support Matrix & Doctor Check
+- Model: sonnet
+- Effort: normal
+- Files: README.md, src/cli/commands/doctor.ts, .github/workflows/ci.yml
+- Scope: src/cli/, .github/, ./
+
+### Description
+SOURCE: Codex analysis Phase 1. Define explicit platform support matrix: Linux FULL SUPPORT, macOS FULL SUPPORT, WSL2 FULL SUPPORT, Native Windows UNSUPPORTED (requires WSL2). Add to README.md in clear Platform Support section. In deckent doctor, detect native Windows (process.platform === 'win32' without WSL) and show early warning. In CI, keep Ubuntu as merge gate; Windows job informational only (allow failure). 10+ tests.
+
+### Tests
+- Doctor detects native Windows and warns
+- Doctor passes on Linux/WSL2
+- README contains platform matrix
+- CI Windows job is allow-failure
+- 10+ tests
+
+---
+
+## Task 14: CLI Entrypoint Side-Effect Fix
+- Model: opus
+- Effort: normal
+- Files: src/cli/index.ts, src/cli/entry.ts (new), tests/cli/index.test.ts
+- Scope: src/cli/, tests/cli/
+
+### Description
+SOURCE: Codex analysis Phase 2. src/cli/index.ts runs parseAsync on import causing side-effects and test timeouts. Extract buildProgram(): Command function that configures program without parsing. Create src/cli/entry.ts as thin wrapper that imports buildProgram and calls parseAsync. Update package.json bin to point to dist/cli/entry.js. index.ts only exports buildProgram with no side effects. Update tests to not hardcode command count. Add import smoke test. 10+ tests.
+
+### Tests
+- Importing index.ts does not trigger parse
+- buildProgram returns Command with all commands registered
+- entry.ts calls parseAsync
+- bin field points to entry.js
+- 10+ tests
+
+---
+
+## Task 15: Planner Provider Decoupling
+- Model: opus
+- Effort: high
+- Files: src/orchestra/planner.ts, tests/orchestra/planner.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+SOURCE: All three analyses (CC audit, Codex, Antigravity). planner.ts hardcodes spawnSync('claude', ...). Decouple: callBrainPlanner should accept ProviderAdapter parameter or get from registry. Use adapter.buildCommand() instead of hardcoded claude command. For structured mode no provider call needed. For AI mode call adapter.spawn() or equivalent. callZeroConfigPlanner same treatment. Backward compat: if no provider passed use ProviderRegistry.getDefault(). Most impactful decoupling task. 15+ tests.
+
+### Tests
+- AI planner works with Claude adapter (backward compat)
+- AI planner works with mock Codex adapter
+- Structured planner needs no provider
+- Zero-config planner uses adapter
+- Missing provider falls back to registry default
+- 15+ tests
+
+---
+
+## Task 16: tmux.ts Provider Decoupling
+- Model: opus
+- Effort: normal
+- Files: src/orchestra/tmux.ts, tests/orchestra/tmux.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+SOURCE: All three analyses. tmux.ts buildClaudeCommand hardcodes claude CLI syntax. Rename to buildWorkerCommand (backward compat alias). Accept ProviderAdapter parameter. Use adapter.buildCommand() instead of claude-specific string. spawnWorker receives adapter from caller. tmux.ts becomes provider-agnostic terminal manager. 10+ tests.
+
+### Tests
+- buildWorkerCommand produces Claude command with ClaudeAdapter
+- buildWorkerCommand produces Codex command with mock adapter
+- spawnWorker accepts adapter parameter
+- Backward compat: no adapter = Claude default
+- 10+ tests
+
+---
+
+## Task 17: subprocess.ts Provider Decoupling
+- Model: opus
+- Effort: normal
+- Files: src/providers/subprocess.ts, tests/providers/subprocess.test.ts
+- Scope: src/providers/, tests/providers/
+
+### Description
+SOURCE: Codex + Antigravity. subprocess.ts hardcodes claude. SubprocessBackend should accept ProviderAdapter in constructor or per-spawn. Use adapter.buildCommand() for command construction. Use adapter.supportedModels for model validation. Remove all hardcoded claude references. Enables SubprocessBackend + CodexAdapter combination — ideal first integration path for non-Claude providers. 10+ tests.
+
+### Tests
+- Subprocess spawns Claude with ClaudeAdapter
+- Subprocess spawns Codex with CodexAdapter (mock)
+- Model validated against adapter.supportedModels
+- No hardcoded claude strings remain
+- 10+ tests
+
+---
+
+## Task 18: Provider Bootstrap Centralization
+- Model: opus
+- Effort: normal
+- Files: src/core/provider.ts, src/cli/commands/start.ts, src/mcp/tools/start.ts
+- Scope: src/core/, src/cli/, src/mcp/
+
+### Description
+SOURCE: Codex + Antigravity. ProviderRegistry exists but not used as central bootstrap point. Create bootstrapProviders(config): detect available providers, register adapters, set default based on config. Called once at startup (CLI start, MCP start). All subsequent code gets providers from registry. Brain, planner, sprint-controller all receive registry reference. Single source of truth. 10+ tests.
+
+### Tests
+- bootstrapProviders registers all available providers
+- Default provider matches config.brain_provider
+- Unavailable providers skipped with warning
+- Registry passed to brain/planner/sprint-controller
+- 10+ tests
+
+---
+
+## Task 19: Cross-Platform Test Helper
+- Model: sonnet
+- Effort: normal
+- Files: tests/helpers/platform.ts (new), tests/helpers/paths.ts (new)
+- Scope: tests/helpers/
+
+### Description
+SOURCE: Codex analysis Phase 5. Create shared test utilities: normalizePath (separator handling), isUnixOnly, skipOnWindows, createTempDir (platform-safe), assertPathEquals (ignore separator differences). Update 5-10 most commonly failing test files as proof of concept. 15+ tests.
+
+### Tests
+- normalizePath handles Windows backslashes
+- normalizePath handles Unix forward slashes
+- skipOnWindows skips on win32
+- assertPathEquals matches equivalent paths
+- 15+ tests
+
+---
+
+## Task 20: Platform-Conditional Test Tags
+- Model: sonnet
+- Effort: normal
+- Files: tests/orchestra/tmux.test.ts, tests/orchestra/tmux-edge.test.ts, tests/scripts/scripts.test.ts, vitest.config.ts
+- Scope: tests/, vitest.config.ts
+
+### Description
+SOURCE: Codex analysis Phase 1. Unix-only test suites should be conditionally skipped: describe.skipIf(process.platform === 'win32') for tmux tests, scripts tests. Document which test patterns are platform-specific in tests/PLATFORM.md. 5+ tests.
+
+### Tests
+- tmux tests skip on Windows
+- tmux tests run on Linux/WSL
+- scripts tests skip on Windows
+- PLATFORM.md documents categories
+- 5+ tests

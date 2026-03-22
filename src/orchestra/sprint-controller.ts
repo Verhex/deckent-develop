@@ -16,6 +16,7 @@ import { spawnSync } from 'node:child_process';
 import {
   TaskStatus, TaskEvaluation, SprintPhase,
   SprintStatus, DebtPriority, AgentStatus, AlertLevel,
+  getProviderForModel,
 } from '../core/types.js';
 
 // ─── Core (type imports) ───────────────────────────────────────────
@@ -23,7 +24,7 @@ import type {
   Task, TaskResult, TaskScope, Sprint, SprintMetrics,
   UsageMetrics, AgentInfo, ResolvedConfig, SystemProfile,
   BrainContext, SprintSizeRecommendation,
-  BrainPlanningMode, PlannerResult,
+  BrainPlanningMode, PlannerResult, ProviderName,
 } from '../core/types.js';
 
 import {
@@ -588,15 +589,24 @@ export function spawnWorkers(
   // Use provided SpawnBackend, or fall back to direct tmux calls (backward compat)
   const backend = spawnOpts?.spawnBackend;
 
-  if (!backend) {
-    // Legacy path: direct tmux session management
-    ensureSession();
-  }
+  // Track whether we need tmux session for any Claude tasks
+  let needsTmuxSession = false;
 
   const systemProfile = getSystemProfile();
   const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
   const activeTasks = sprint.tasks.slice(0, maxWorkers);
   const queuedTasks = sprint.tasks.slice(maxWorkers);
+
+  // Pre-check: do any active tasks need tmux (Claude provider or no provider specified)?
+  if (!backend) {
+    needsTmuxSession = activeTasks.some(task => {
+      const provider = resolveTaskProvider(task);
+      return provider === 'claude';
+    });
+    if (needsTmuxSession) {
+      ensureSession();
+    }
+  }
 
   for (const task of activeTasks) {
     const prompt = buildWorkerPrompt(task);
@@ -606,15 +616,29 @@ export function spawnWorkers(
       ? `Read,Write(${writeTargets.join(',')}),Bash`
       : 'Read,Write,Bash';
 
-    if (backend) {
-      // SpawnBackend abstraction path
+    const taskProvider = resolveTaskProvider(task);
+
+    // Route to non-Claude provider adapter if task specifies a non-Claude provider
+    if (taskProvider !== 'claude') {
+      const adapter = getProviderAdapterForTask(taskProvider);
+      if (adapter) {
+        adapter.spawn(task.id, model, prompt, {
+          allowedTools,
+          autoApprove: spawnOpts?.autoApprove ?? false,
+          projectDir: projectRoot,
+        });
+      }
+      // If no adapter found, fall through — task will be tracked but not spawned
+      // (provider registration is a precondition the caller must satisfy)
+    } else if (backend) {
+      // SpawnBackend abstraction path (Claude)
       backend.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
       });
     } else {
-      // Legacy direct tmux path
+      // Legacy direct tmux path (Claude)
       spawnWorker(task.id, model, prompt, projectRoot, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -634,7 +658,7 @@ export function spawnWorkers(
     model: task.model,
     tmuxWindow: `w-${task.id}`,
     taskId: task.id,
-    currentAction: 'Starting',
+    currentAction: `Starting [${resolveTaskProvider(task)}]`,
     spawnedAt: now(),
   }));
 
@@ -648,6 +672,34 @@ export function spawnWorkers(
   });
 
   return queuedTasks;
+}
+
+/**
+ * Resolve the provider for a task.
+ * Uses task.provider if explicitly set, otherwise infers from model via getProviderForModel().
+ * Falls back to 'claude' if model is unrecognized.
+ * @internal
+ */
+export function resolveTaskProvider(task: Task): ProviderName {
+  if (task.provider) return task.provider;
+  try {
+    return getProviderForModel(task.model);
+  } catch {
+    return 'claude';
+  }
+}
+
+/**
+ * Get a ProviderAdapter from the registry for the given provider name.
+ * Returns null if the provider is not registered (logs no error — caller decides).
+ * @internal
+ */
+function getProviderAdapterForTask(providerName: ProviderName): ProviderAdapter | null {
+  try {
+    return providerRegistry.getProvider(providerName);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -844,6 +896,17 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
       if (spawnBackend) spawnBackend.kill(taskId);
       else killWorker(taskId);
     } catch { /* already dead */ }
+  }
+
+  // Kill workers on non-Claude provider adapters
+  for (const task of sprint.tasks) {
+    const provider = resolveTaskProvider(task);
+    if (provider !== 'claude') {
+      const adapter = getProviderAdapterForTask(provider);
+      if (adapter) {
+        try { adapter.kill(task.id); } catch { /* already dead */ }
+      }
+    }
   }
 
   for (const task of sprint.tasks) {

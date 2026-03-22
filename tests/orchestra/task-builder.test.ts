@@ -926,3 +926,178 @@ describe('validateDirective', () => {
     }
   });
 });
+
+// ─── Provider Field (Task 038-002) ──────────────────────────────────────────
+
+describe('parseStructuredDirectives — provider parsing', () => {
+  it('parses "Provider: codex" into provider field', () => {
+    const content = '## Task 1: Codex Task\n- Provider: codex\n- Scope: src/core/\n\n### Description\nUse codex.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBe('codex');
+  });
+
+  it('parses "Provider: gemini" into provider field', () => {
+    const content = '## Task 1: Gemini Task\n- Provider: gemini\n\n### Description\nUse gemini.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBe('gemini');
+  });
+
+  it('parses "Provider: claude" into provider field', () => {
+    const content = '## Task 1: Claude Task\n- Provider: claude\n\n### Description\nUse claude.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBe('claude');
+  });
+
+  it('returns undefined provider when no Provider line', () => {
+    const content = '## Task 1: No Provider\n\n### Description\nDefault.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBeUndefined();
+  });
+
+  it('ignores invalid provider values', () => {
+    const content = '## Task 1: Bad Provider\n- Provider: openai\n\n### Description\nInvalid.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBeUndefined();
+  });
+
+  it('case-insensitive Provider parsing', () => {
+    const content = '## Task 1: Case Test\n- provider: CODEX\n\n### Description\nTest.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBe('codex');
+  });
+
+  it('parses Provider with leading dash prefix', () => {
+    const content = '## Task 1: Dash Prefix\n- Provider: gemini\n\n### Description\nTest.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBe('gemini');
+  });
+
+  it('parses Provider alongside Model and Effort', () => {
+    const content = '## Task 1: Full Override\n- Model: o3\n- Effort: high\n- Provider: codex\n- Scope: src/\n\n### Description\nBig task.';
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0].provider).toBe('codex');
+    expect(tasks[0].forceModel).toBe('o3');
+    expect(tasks[0].forceEffort).toBe('high');
+  });
+});
+
+describe('DirectiveTaskSchema — provider field', () => {
+  it('accepts valid provider "codex"', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Codex task',
+      provider: 'codex',
+      files: [],
+      scope: [],
+      description: 'desc',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.provider).toBe('codex');
+  });
+
+  it('accepts valid provider "gemini"', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Gemini task',
+      provider: 'gemini',
+      files: [],
+      scope: [],
+      description: 'desc',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.provider).toBe('gemini');
+  });
+
+  it('accepts valid provider "claude"', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Claude task',
+      provider: 'claude',
+      files: [],
+      scope: [],
+      description: 'desc',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.provider).toBe('claude');
+  });
+
+  it('rejects invalid provider value', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Bad provider',
+      provider: 'openai',
+      files: [],
+      scope: [],
+      description: 'desc',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('allows provider to be undefined (optional)', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'No provider',
+      files: [],
+      scope: [],
+      description: 'desc',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.provider).toBeUndefined();
+  });
+});
+
+describe('createTask — provider field', () => {
+  it('passes provider to task when specified', () => {
+    const task = createTask(makeBaseParams({ provider: 'codex' }), 1);
+    expect(task.provider).toBe('codex');
+  });
+
+  it('provider is undefined when not specified', () => {
+    const task = createTask(makeBaseParams(), 1);
+    expect(task.provider).toBeUndefined();
+  });
+
+  it('warns on model-provider incompatibility but still creates task', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // 'opus' is a claude model, not compatible with 'codex' provider
+    const task = createTask(makeBaseParams({ model: 'opus', provider: 'codex' }), 1);
+    expect(task.provider).toBe('codex');
+    expect(task.model).toBe('opus');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not compatible with provider'));
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn when model and provider are compatible', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const task = createTask(makeBaseParams({ model: 'o3', provider: 'codex' }), 1);
+    expect(task.provider).toBe('codex');
+    expect(task.model).toBe('o3');
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn when provider is not specified', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const task = createTask(makeBaseParams({ model: 'opus' }), 1);
+    expect(task.provider).toBeUndefined();
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('provider appears in created task JSON', () => {
+    const task = createTask(makeBaseParams({ provider: 'gemini' }), 1);
+    const json = JSON.parse(JSON.stringify(task));
+    expect(json.provider).toBe('gemini');
+  });
+
+  it('compatible claude model with claude provider does not warn', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const task = createTask(makeBaseParams({ model: 'opus', provider: 'claude' }), 1);
+    expect(task.provider).toBe('claude');
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('compatible gemini model with gemini provider does not warn', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const task = createTask(makeBaseParams({ model: 'gemini-2.5-pro' as any, provider: 'gemini' }), 1);
+    expect(task.provider).toBe('gemini');
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});

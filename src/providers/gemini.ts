@@ -11,105 +11,57 @@ import {
   closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { ModelType, UsageMetrics } from '../core/types.js';
-import { CLAUDE_MODELS } from '../core/types.js';
+import type { ModelType, GeminiModel, UsageMetrics } from '../core/types.js';
+import { PROVIDER_MODEL_MAP } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 
-// ─── SubprocessProviderConfig ───────────────────────────────────────
-/**
- * Configuration for a CLI-based provider used by SubprocessSpawnBackend.
- * Allows decoupling from any specific CLI tool (e.g. claude, codex).
- */
-export interface SubprocessProviderConfig {
-  /** CLI executable name (e.g. 'claude', 'codex') */
-  readonly cliCommand: string;
-  /** Human-readable name for this subprocess backend */
-  readonly name: string;
-  /** Models this provider supports */
-  readonly supportedModels: readonly ModelType[];
-  /**
-   * Build CLI arguments for spawning a worker.
-   * @param model   The model to use
-   * @param opts    Spawn options (allowedTools, autoApprove)
-   * @returns Array of CLI arguments
-   */
-  buildArgs(model: ModelType, opts?: ProviderSpawnOptions): string[];
-  /**
-   * Build the full shell command string for dry-run / display.
-   * @param model       The model to use
-   * @param promptPath  Path to the prompt file (stdin redirection)
-   * @param opts        Spawn options
-   * @returns Shell command string
-   */
-  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string;
-}
+// ─── Constants ───────────────────────────────────────────────────────
 
-/**
- * Default provider config for Claude CLI. Used when no config is provided.
- */
-export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
-  cliCommand: 'claude',
-  name: 'claude-subprocess',
-  supportedModels: [...CLAUDE_MODELS],
-  buildArgs(model: ModelType, opts?: ProviderSpawnOptions): string[] {
-    const args = ['-p', '-', '--model', model];
-    if (opts?.allowedTools) {
-      args.push('--allowedTools', opts.allowedTools);
-    }
-    if (opts?.autoApprove) {
-      args.push('--dangerously-skip-permissions');
-    }
-    return args;
-  },
-  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string {
-    let cmd = `claude -p - --model ${model}`;
-    if (opts?.allowedTools) {
-      cmd += ` --allowedTools '${opts.allowedTools}'`;
-    }
-    if (opts?.autoApprove) {
-      cmd += ' --dangerously-skip-permissions';
-    }
-    cmd += ` < ${promptPath}`;
-    return cmd;
-  },
+const GEMINI_MODELS: readonly GeminiModel[] = [...PROVIDER_MODEL_MAP.gemini] as GeminiModel[];
+
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+const SAFE_USAGE_DEFAULT: UsageMetrics = {
+  fiveHourPercent: 0,
+  weeklyPercent: 0,
+  measuredAt: new Date().toISOString(),
 };
 
-// ─── SubprocessWorkerEntry ────────────────────────────────────────────
-interface SubprocessWorkerEntry {
+// ─── Worker Entry ────────────────────────────────────────────────────
+
+interface GeminiWorkerEntry {
   taskId: string;
   process: ChildProcess;
   logPath: string;
+  model: GeminiModel;
   spawnedAt: string;
   timeoutHandle?: ReturnType<typeof setTimeout>;
 }
 
-// ─── SubprocessSpawnBackend ───────────────────────────────────────────
+// ─── GeminiAdapter ───────────────────────────────────────────────────
+
 /**
- * SubprocessSpawnBackend — runs workers as child_process.spawn instances
- * without requiring tmux. Each worker runs in an isolated child process with
- * stdout/stderr redirected to a log file at .tasks/task-{id}.log.
+ * GeminiAdapter — ProviderAdapter implementation for Google Gemini API.
  *
- * This backend is the foundation for Windows (non-WSL2) support.
+ * Since Gemini has no standard CLI, this adapter spawns a Node.js subprocess
+ * that calls the Google AI API via the built-in fetch API.
+ * Requires GOOGLE_API_KEY environment variable.
  */
-export class SubprocessSpawnBackend implements ProviderAdapter {
-  readonly name: string;
-  readonly supportedModels: readonly ModelType[];
+export class GeminiAdapter implements ProviderAdapter {
+  readonly name = 'gemini';
+  readonly supportedModels: readonly ModelType[] = GEMINI_MODELS;
 
   private readonly projectDir: string;
-  private readonly workers = new Map<string, SubprocessWorkerEntry>();
-  private readonly providerConfig: SubprocessProviderConfig;
+  private readonly workers = new Map<string, GeminiWorkerEntry>();
 
   /** Default timeout in ms before a worker is killed automatically (0 = no timeout) */
   protected defaultTimeoutMs: number;
 
-  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number; providerConfig?: SubprocessProviderConfig }) {
+  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number }) {
     this.projectDir = projectDir;
     this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
-    this.providerConfig = opts?.providerConfig ?? CLAUDE_SUBPROCESS_CONFIG;
-    this.name = this.providerConfig.name;
-    this.supportedModels = this.providerConfig.supportedModels;
   }
 
   // ─── spawn() ───────────────────────────────────────────────────────
@@ -127,6 +79,21 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       );
     }
 
+    if (!this.isSupportedModel(model)) {
+      throw new ProviderError(
+        `Unsupported model "${model}" for Gemini provider. Supported: ${GEMINI_MODELS.join(', ')}`,
+        this.name,
+      );
+    }
+
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      throw new ProviderError(
+        'GOOGLE_API_KEY environment variable is not set',
+        this.name,
+      );
+    }
+
     const dir = opts?.projectDir ?? this.projectDir;
     const tasksDir = join(dir, TASKS_DIR);
     ensureDir(tasksDir);
@@ -134,23 +101,27 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     const logPath = join(tasksDir, `task-${taskId}.log`);
     const logFd = openSync(logPath, 'a');
 
-    const args = this.providerConfig.buildArgs(model, opts);
+    // Build the inline Node.js script that calls the Gemini API
+    const apiUrl = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
+    const script = this.buildApiScript(apiUrl, prompt);
+
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
       env: { ...process.env },
     };
 
-    const child = spawn(this.providerConfig.cliCommand, args, spawnOpts);
+    const child = spawn('node', ['-e', script], spawnOpts);
     closeSync(logFd);
 
     // Write heartbeat
     this.writeHeartbeat(taskId, dir, 'EXECUTING');
 
-    const entry: SubprocessWorkerEntry = {
+    const entry: GeminiWorkerEntry = {
       taskId,
       process: child,
       logPath,
+      model: model as GeminiModel,
       spawnedAt: new Date().toISOString(),
     };
 
@@ -163,12 +134,6 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     }
 
     this.workers.set(taskId, entry);
-
-    // Send prompt via stdin
-    if (child.stdin) {
-      child.stdin.write(prompt, 'utf-8');
-      child.stdin.end();
-    }
 
     // Cleanup on exit
     child.once('exit', () => {
@@ -193,11 +158,10 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
   // ─── checkUsage() ──────────────────────────────────────────────────
 
   async checkUsage(): Promise<UsageMetrics> {
-    // Subprocess backend defers usage tracking to the UsageTracker.
-    // Return a neutral default — actual tracking happens via brain.ts.
+    // Google AI API does not expose a simple quota endpoint via CLI.
+    // Return neutral defaults; actual quota tracking is external.
     return {
-      fiveHourPercent: 0,
-      weeklyPercent: 0,
+      ...SAFE_USAGE_DEFAULT,
       measuredAt: new Date().toISOString(),
     };
   }
@@ -205,14 +169,7 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
   // ─── isAvailable() ─────────────────────────────────────────────────
 
   async isAvailable(): Promise<boolean> {
-    return new Promise((resolve) => {
-      const child = spawn(this.providerConfig.cliCommand, ['--version'], {
-        stdio: 'pipe',
-        timeout: 5_000,
-      });
-      child.once('exit', (code) => resolve(code === 0));
-      child.once('error', () => resolve(false));
-    });
+    return this.getApiKey() !== undefined;
   }
 
   // ─── buildCommand() ────────────────────────────────────────────────
@@ -220,12 +177,49 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
   buildCommand(
     model: ModelType,
     promptPath: string,
-    opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
+    _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    return this.providerConfig.buildCommandString(model, promptPath, opts);
+    const apiKey = this.getApiKey() ?? '<GOOGLE_API_KEY>';
+    const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
+    return `curl -s -X POST "${url}" -H "Content-Type: application/json" -d @${promptPath}`;
   }
 
   // ─── Internal helpers ──────────────────────────────────────────────
+
+  /**
+   * Build inline Node.js script that calls the Gemini REST API via fetch.
+   */
+  private buildApiScript(apiUrl: string, prompt: string): string {
+    // Escape prompt for embedding in a JS string literal
+    const escapedPrompt = prompt
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
+
+    return [
+      `const body = JSON.stringify({`,
+      `  contents: [{ parts: [{ text: '${escapedPrompt}' }] }],`,
+      `  generationConfig: { maxOutputTokens: 65536 }`,
+      `});`,
+      `fetch('${apiUrl}', {`,
+      `  method: 'POST',`,
+      `  headers: { 'Content-Type': 'application/json' },`,
+      `  body`,
+      `}).then(r => r.json()).then(d => {`,
+      `  const text = d?.candidates?.[0]?.content?.parts?.[0]?.text ?? JSON.stringify(d);`,
+      `  process.stdout.write(text);`,
+      `}).catch(e => { process.stderr.write(e.message); process.exit(1); });`,
+    ].join('\n');
+  }
+
+  private isSupportedModel(model: ModelType): model is GeminiModel {
+    return (GEMINI_MODELS as readonly string[]).includes(model);
+  }
+
+  private getApiKey(): string | undefined {
+    return process.env.GOOGLE_API_KEY;
+  }
 
   private killWithSignal(taskId: string, signal: NodeJS.Signals): void {
     const entry = this.workers.get(taskId);
@@ -245,10 +239,10 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
   protected writeHeartbeat(taskId: string, dir: string, status: string): void {
     const hbPath = join(dir, TASKS_DIR, `task-${taskId}.hb`);
     const hb = {
-      workerId: `subprocess-${taskId}`,
+      workerId: `gemini-${taskId}`,
       taskId,
       status,
-      currentAction: 'Subprocess worker running',
+      currentAction: 'Gemini API worker running',
       timestamp: new Date().toISOString(),
       filesChangedCount: 0,
       sequence: 0,
@@ -262,7 +256,7 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
 
   // ─── Accessors (for testing/subclassing) ───────────────────────────
 
-  getWorkerEntry(taskId: string): SubprocessWorkerEntry | undefined {
+  getWorkerEntry(taskId: string): GeminiWorkerEntry | undefined {
     return this.workers.get(taskId);
   }
 
@@ -272,10 +266,6 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
 
   getProjectDir(): string {
     return this.projectDir;
-  }
-
-  getProviderConfig(): SubprocessProviderConfig {
-    return this.providerConfig;
   }
 }
 
@@ -289,9 +279,12 @@ function ensureDir(dir: string): void {
 
 // ─── Factory ─────────────────────────────────────────────────────────
 
-export function createSubprocessBackend(
+/**
+ * Create a GeminiAdapter instance for the given project directory.
+ */
+export function createGeminiAdapter(
   projectDir: string,
-  opts?: { defaultTimeoutMs?: number; providerConfig?: SubprocessProviderConfig },
-): SubprocessSpawnBackend {
-  return new SubprocessSpawnBackend(projectDir, opts);
+  opts?: { defaultTimeoutMs?: number },
+): GeminiAdapter {
+  return new GeminiAdapter(projectDir, opts);
 }

@@ -232,7 +232,7 @@ describe('doctor command', () => {
     });
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('[PASS]');
-    expect(stdout()).toContain('10/10 checks passed');
+    expect(stdout()).toContain('11/11 checks passed');
   });
 
   it('reports failing required check', async () => {

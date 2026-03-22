@@ -122,7 +122,7 @@ describe('init.ts npm publish compatibility', () => {
     expect(realPkg.files).toContain('LICENSE');
   });
 
-  it('bin entry points to dist/cli/index.js', () => {
+  it('bin entry points to dist/cli/entry.js', () => {
     const pkgPath = join(
       dirname(fileURLToPath(import.meta.url)),
       '..',
@@ -130,7 +130,7 @@ describe('init.ts npm publish compatibility', () => {
       'package.json',
     );
     const realPkg = require(pkgPath);
-    expect(realPkg.bin.deckent).toBe('./dist/cli/index.js');
+    expect(realPkg.bin.deckent).toBe('./dist/cli/entry.js');
   });
 
   it('DECKENT_VERSION resolves relative to package install path', () => {

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
-import { SubprocessSpawnBackend, createSubprocessBackend } from '../../src/providers/subprocess.js';
+import { SubprocessSpawnBackend, createSubprocessBackend, CLAUDE_SUBPROCESS_CONFIG } from '../../src/providers/subprocess.js';
+import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
+import type { ModelType } from '../../src/core/types.js';
 
 // ─── Mock node:child_process ─────────────────────────────────────────
 
@@ -455,5 +457,213 @@ describe('createSubprocessBackend', () => {
   it('should accept timeout option', () => {
     const backend = createSubprocessBackend('/dir', { defaultTimeoutMs: 3000 });
     expect(backend).toBeInstanceOf(SubprocessSpawnBackend);
+  });
+
+  it('should accept providerConfig option', () => {
+    const config: SubprocessProviderConfig = {
+      cliCommand: 'my-cli',
+      name: 'my-subprocess',
+      supportedModels: ['opus', 'sonnet'],
+      buildArgs: (model) => ['--model', model],
+      buildCommandString: (model, path) => `my-cli --model ${model} < ${path}`,
+    };
+    const backend = createSubprocessBackend('/dir', { providerConfig: config });
+    expect(backend.name).toBe('my-subprocess');
+  });
+});
+
+// ─── Provider Decoupling Tests ──────────────────────────────────────
+
+describe('SubprocessSpawnBackend — Provider Decoupling', () => {
+  const projectDir = '/tmp/test-project';
+
+  // A custom (non-Claude) provider config for testing
+  const customConfig: SubprocessProviderConfig = {
+    cliCommand: 'my-ai-cli',
+    name: 'custom-subprocess',
+    supportedModels: ['opus', 'sonnet'] as readonly ModelType[],
+    buildArgs(model: ModelType, opts?: ProviderSpawnOptions): string[] {
+      const args = ['run', '--model', model];
+      if (opts?.allowedTools) {
+        args.push('--tools', opts.allowedTools);
+      }
+      if (opts?.autoApprove) {
+        args.push('--yes');
+      }
+      return args;
+    },
+    buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string {
+      let cmd = `my-ai-cli run --model ${model}`;
+      if (opts?.allowedTools) {
+        cmd += ` --tools '${opts.allowedTools}'`;
+      }
+      if (opts?.autoApprove) {
+        cmd += ' --yes';
+      }
+      cmd += ` < ${promptPath}`;
+      return cmd;
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockExistsSync.mockReturnValue(true);
+    mockOpenSync.mockReturnValue(3);
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+  });
+
+  // ─── Backward Compatibility ───────────────────────────────────────
+
+  it('should default to CLAUDE_SUBPROCESS_CONFIG when no providerConfig given', () => {
+    const backend = new SubprocessSpawnBackend(projectDir);
+    expect(backend.getProviderConfig()).toBe(CLAUDE_SUBPROCESS_CONFIG);
+  });
+
+  it('should spawn with "claude" command by default (backward compat)', () => {
+    setupMockChild();
+    const backend = new SubprocessSpawnBackend(projectDir);
+    backend.spawn('task-001', 'opus', 'test prompt');
+    const [cmd] = mockSpawn.mock.calls[0];
+    expect(cmd).toBe('claude');
+  });
+
+  it('should have name "claude-subprocess" by default', () => {
+    const backend = new SubprocessSpawnBackend(projectDir);
+    expect(backend.name).toBe('claude-subprocess');
+  });
+
+  it('should support claude models by default', () => {
+    const backend = new SubprocessSpawnBackend(projectDir);
+    expect(backend.supportedModels).toContain('opus');
+    expect(backend.supportedModels).toContain('sonnet');
+    expect(backend.supportedModels).toContain('haiku');
+  });
+
+  // ─── Custom Provider Config ───────────────────────────────────────
+
+  it('should use custom cliCommand when providerConfig provided', () => {
+    setupMockChild();
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    backend.spawn('task-001', 'opus', 'test prompt');
+    const [cmd] = mockSpawn.mock.calls[0];
+    expect(cmd).toBe('my-ai-cli');
+  });
+
+  it('should use custom name from providerConfig', () => {
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    expect(backend.name).toBe('custom-subprocess');
+  });
+
+  it('should use custom supportedModels from providerConfig', () => {
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    expect(backend.supportedModels).toEqual(['opus', 'sonnet']);
+    expect(backend.supportedModels).not.toContain('haiku');
+  });
+
+  it('should use adapter.buildArgs when adapter provided', () => {
+    setupMockChild();
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    backend.spawn('task-001', 'opus', 'test prompt');
+    const [, args] = mockSpawn.mock.calls[0];
+    // customConfig buildArgs produces ['run', '--model', model]
+    expect(args).toEqual(['run', '--model', 'opus']);
+  });
+
+  it('should pass allowedTools through custom buildArgs', () => {
+    setupMockChild();
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    backend.spawn('task-001', 'opus', 'test prompt', { allowedTools: 'Read,Write' });
+    const [, args] = mockSpawn.mock.calls[0];
+    expect(args).toContain('--tools');
+    expect(args).toContain('Read,Write');
+  });
+
+  it('should pass autoApprove through custom buildArgs', () => {
+    setupMockChild();
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    backend.spawn('task-001', 'opus', 'test', { autoApprove: true });
+    const [, args] = mockSpawn.mock.calls[0];
+    expect(args).toContain('--yes');
+    // Should NOT contain claude-specific flag
+    expect(args).not.toContain('--dangerously-skip-permissions');
+  });
+
+  it('should use custom buildCommandString for buildCommand()', () => {
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    const cmd = backend.buildCommand('opus', '/tmp/prompt.txt');
+    expect(cmd).toBe('my-ai-cli run --model opus < /tmp/prompt.txt');
+    expect(cmd).not.toContain('claude');
+  });
+
+  it('should use custom cliCommand in isAvailable()', async () => {
+    const child = {
+      once: vi.fn().mockImplementation((event, cb) => {
+        if (event === 'exit') cb(0);
+        return child;
+      }),
+    };
+    mockSpawn.mockReturnValue(child);
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    await backend.isAvailable();
+    const [cmd] = mockSpawn.mock.calls[0];
+    expect(cmd).toBe('my-ai-cli');
+  });
+
+  // ─── Different adapters produce different commands ─────────────────
+
+  it('should produce different commands for different provider configs', () => {
+    const claudeBackend = new SubprocessSpawnBackend(projectDir);
+    const customBackend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+
+    const claudeCmd = claudeBackend.buildCommand('opus', '/tmp/p.txt');
+    const customCmd = customBackend.buildCommand('opus', '/tmp/p.txt');
+
+    expect(claudeCmd).not.toEqual(customCmd);
+    expect(claudeCmd).toContain('claude');
+    expect(customCmd).toContain('my-ai-cli');
+  });
+
+  it('should produce different spawn commands for different configs', () => {
+    const child1 = setupMockChild();
+    const claudeBackend = new SubprocessSpawnBackend(projectDir);
+    claudeBackend.spawn('task-c', 'opus', 'test');
+    const [claudeCliCmd, claudeArgs] = mockSpawn.mock.calls[0];
+
+    const child2 = setupMockChild();
+    const customBackend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    customBackend.spawn('task-x', 'opus', 'test');
+    const [customCliCmd, customArgs] = mockSpawn.mock.calls[1];
+
+    expect(claudeCliCmd).toBe('claude');
+    expect(customCliCmd).toBe('my-ai-cli');
+    expect(claudeArgs).not.toEqual(customArgs);
+  });
+
+  // ─── CLAUDE_SUBPROCESS_CONFIG exported correctly ───────────────────
+
+  it('should export CLAUDE_SUBPROCESS_CONFIG with correct cliCommand', () => {
+    expect(CLAUDE_SUBPROCESS_CONFIG.cliCommand).toBe('claude');
+  });
+
+  it('should export CLAUDE_SUBPROCESS_CONFIG with correct name', () => {
+    expect(CLAUDE_SUBPROCESS_CONFIG.name).toBe('claude-subprocess');
+  });
+
+  it('should export CLAUDE_SUBPROCESS_CONFIG with buildArgs producing correct args', () => {
+    const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet');
+    expect(args).toEqual(['-p', '-', '--model', 'sonnet']);
+  });
+
+  it('should export CLAUDE_SUBPROCESS_CONFIG with buildCommandString producing correct command', () => {
+    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('opus', '/tmp/p.txt');
+    expect(cmd).toBe('claude -p - --model opus < /tmp/p.txt');
+  });
+
+  it('should store providerConfig accessible via getProviderConfig()', () => {
+    const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
+    expect(backend.getProviderConfig()).toBe(customConfig);
   });
 });

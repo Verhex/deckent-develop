@@ -3,6 +3,7 @@ import { writeFileSync, unlinkSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { ModelType } from '../core/types.js';
+import type { ProviderAdapter } from '../core/provider.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
@@ -64,11 +65,26 @@ export function cleanupPromptFile(promptPath: string): void {
   try { unlinkSync(promptPath); } catch { /* already deleted */ }
 }
 
-function buildClaudeCommand(
+/**
+ * Build the shell command to invoke a worker.
+ * If a ProviderAdapter is supplied, delegates to adapter.buildCommand().
+ * Otherwise falls back to the default Claude CLI syntax.
+ */
+export function buildWorkerCommand(
   model: ModelType,
   promptFilePath: string,
   opts?: SpawnOptions,
+  adapter?: ProviderAdapter,
 ): string {
+  // Delegate to provider adapter when available
+  if (adapter) {
+    return adapter.buildCommand(model, promptFilePath, {
+      allowedTools: opts?.allowedTools,
+      autoApprove: opts?.autoApprove,
+    });
+  }
+
+  // Default: Claude CLI syntax (backward compat)
   // Use stdin redirection from file — no shell metacharacter risk
   let cmd = `claude -p - --model ${model}`;
   if (opts?.allowedTools) {
@@ -81,6 +97,9 @@ function buildClaudeCommand(
   cmd += ` < ${promptFilePath}`;
   return cmd;
 }
+
+/** @deprecated Use buildWorkerCommand instead. Kept for backward compatibility. */
+export const buildClaudeCommand = buildWorkerCommand;
 
 // ─── Public API ─────────────────────────────────────────────────────
 
@@ -102,6 +121,7 @@ export function spawnWorker(
   prompt: string,
   projectDir: string,
   opts?: SpawnOptions,
+  adapter?: ProviderAdapter,
 ): void {
   const windowName = workerWindowName(taskId);
   run([
@@ -111,7 +131,7 @@ export function spawnWorker(
     '-c', projectDir,
   ]);
   const promptPath = writePromptFile(projectDir, prompt);
-  const cmd = buildClaudeCommand(model, promptPath, opts);
+  const cmd = buildWorkerCommand(model, promptPath, opts, adapter);
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${windowName}`,
@@ -167,7 +187,7 @@ function windowExists(windowName: string): boolean {
  * @internal Used only within orchestra/ — spawns auditor in a tmux window.
  * Not part of the public API surface.
  */
-export function startAuditor(projectDir: string, opts?: SpawnOptions): void {
+export function startAuditor(projectDir: string, opts?: SpawnOptions, adapter?: ProviderAdapter): void {
   if (!windowExists(TMUX_AUDITOR_WINDOW)) {
     run([
       'new-window',
@@ -177,7 +197,7 @@ export function startAuditor(projectDir: string, opts?: SpawnOptions): void {
     ]);
   }
   const promptPath = writePromptFile(projectDir, 'auditor');
-  const cmd = buildClaudeCommand('sonnet', promptPath, opts);
+  const cmd = buildWorkerCommand('sonnet', promptPath, opts, adapter);
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${TMUX_AUDITOR_WINDOW}`,

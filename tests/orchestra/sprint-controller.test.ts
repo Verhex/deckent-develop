@@ -166,6 +166,12 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
 vi.mock('../../src/core/provider.js', () => ({
   providerRegistry: {
     getDefault: vi.fn().mockReturnValue(null),
+    registerProvider: vi.fn(),
+    getProvider: vi.fn().mockImplementation((name: string) => {
+      throw new Error(`Provider not found: "${name}"`);
+    }),
+    hasProvider: vi.fn().mockReturnValue(false),
+    listProviders: vi.fn().mockReturnValue([]),
     register: vi.fn(),
     get: vi.fn(),
     list: vi.fn().mockReturnValue([]),
@@ -220,7 +226,7 @@ vi.mock('../../src/agents/worker-ipc.js', () => {
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { killWorker, listWorkers } from '../../src/orchestra/tmux.js';
+import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
 import { updateDashboard } from '../../src/monitor/auditor.js';
 import { releaseAllLocks } from '../../src/agents/worker.js';
 
@@ -238,6 +244,8 @@ import {
   checkUsage,
   getDefaultProvider,
   getChannelRegistry,
+  spawnWorkers,
+  resolveTaskProvider,
 } from '../../src/orchestra/sprint-controller.js';
 
 import type {
@@ -253,10 +261,16 @@ const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedStatSync = vi.mocked(statSync);
 const mockedSpawnSync = vi.mocked(spawnSync);
+const mockedEnsureSession = vi.mocked(ensureSession);
+const mockedSpawnWorker = vi.mocked(spawnWorker);
 const mockedKillWorker = vi.mocked(killWorker);
 const mockedListWorkers = vi.mocked(listWorkers);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
+
+// Provider registry mock access
+import { providerRegistry } from '../../src/core/provider.js';
+const mockedProviderRegistry = vi.mocked(providerRegistry);
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -917,5 +931,361 @@ describe('getChannelRegistry', () => {
     expect(typeof registry.get).toBe('function');
     expect(typeof registry.register).toBe('function');
     expect(typeof registry.remove).toBe('function');
+  });
+});
+
+// ═══ resolveTaskProvider ═══════════════════════════════════════════
+
+describe('resolveTaskProvider', () => {
+  it('returns task.provider when explicitly set', () => {
+    const task = makeTask({ provider: 'codex', model: 'opus' });
+    expect(resolveTaskProvider(task)).toBe('codex');
+  });
+
+  it('infers claude from opus model', () => {
+    const task = makeTask({ model: 'opus' });
+    expect(resolveTaskProvider(task)).toBe('claude');
+  });
+
+  it('infers claude from sonnet model', () => {
+    const task = makeTask({ model: 'sonnet' });
+    expect(resolveTaskProvider(task)).toBe('claude');
+  });
+
+  it('infers claude from haiku model', () => {
+    const task = makeTask({ model: 'haiku' });
+    expect(resolveTaskProvider(task)).toBe('claude');
+  });
+
+  it('infers codex from o3 model', () => {
+    const task = makeTask({ model: 'o3' });
+    expect(resolveTaskProvider(task)).toBe('codex');
+  });
+
+  it('infers codex from gpt-4.1 model', () => {
+    const task = makeTask({ model: 'gpt-4.1' });
+    expect(resolveTaskProvider(task)).toBe('codex');
+  });
+
+  it('infers gemini from gemini-2.5-pro model', () => {
+    const task = makeTask({ model: 'gemini-2.5-pro' });
+    expect(resolveTaskProvider(task)).toBe('gemini');
+  });
+
+  it('infers gemini from gemini-2.5-flash model', () => {
+    const task = makeTask({ model: 'gemini-2.5-flash' });
+    expect(resolveTaskProvider(task)).toBe('gemini');
+  });
+
+  it('explicit provider overrides model inference', () => {
+    const task = makeTask({ model: 'opus', provider: 'gemini' });
+    expect(resolveTaskProvider(task)).toBe('gemini');
+  });
+
+  it('falls back to claude for unknown model', () => {
+    const task = makeTask({ model: 'unknown-model' as any });
+    expect(resolveTaskProvider(task)).toBe('claude');
+  });
+});
+
+// ═══ spawnWorkers — Provider Routing ══════════════════════════════
+
+describe('spawnWorkers — provider routing', () => {
+  const mockCodexAdapter = {
+    name: 'codex',
+    supportedModels: ['gpt-4.1', 'o3', 'o4-mini'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('codex --model o3'),
+  };
+
+  const mockGeminiAdapter = {
+    name: 'gemini',
+    supportedModels: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('gemini --model gemini-2.5-pro'),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedListWorkers.mockReturnValue([] as unknown as ReturnType<typeof listWorkers>);
+    // By default, getProvider throws (no adapters registered)
+    mockedProviderRegistry.getProvider.mockImplementation((name: string) => {
+      if (name === 'codex') return mockCodexAdapter as any;
+      if (name === 'gemini') return mockGeminiAdapter as any;
+      throw new Error(`Provider not found: "${name}"`);
+    });
+  });
+
+  it('spawns Claude tasks via tmux (backward compat, no backend)', () => {
+    const task = makeTask({ id: '001-001', model: 'opus' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockedEnsureSession).toHaveBeenCalled();
+    expect(mockedSpawnWorker).toHaveBeenCalledWith(
+      '001-001', 'opus', expect.any(String), '/tmp/test',
+      expect.objectContaining({ autoApprove: false }),
+    );
+    expect(mockCodexAdapter.spawn).not.toHaveBeenCalled();
+    expect(mockGeminiAdapter.spawn).not.toHaveBeenCalled();
+  });
+
+  it('spawns Claude tasks via SpawnBackend when provided', () => {
+    const mockBackend = { name: 'test', spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+    const task = makeTask({ id: '001-001', model: 'sonnet' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
+
+    expect(mockBackend.spawn).toHaveBeenCalledWith(
+      '001-001', 'sonnet', expect.any(String),
+      expect.objectContaining({ projectDir: '/tmp/test' }),
+    );
+    expect(mockedEnsureSession).not.toHaveBeenCalled();
+    expect(mockedSpawnWorker).not.toHaveBeenCalled();
+  });
+
+  it('routes codex task to CodexAdapter.spawn', () => {
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockCodexAdapter.spawn).toHaveBeenCalledWith(
+      '002-001', 'o3', expect.any(String),
+      expect.objectContaining({ projectDir: '/tmp/test' }),
+    );
+    expect(mockedSpawnWorker).not.toHaveBeenCalled();
+  });
+
+  it('routes gemini task to GeminiAdapter.spawn', () => {
+    const task = makeTask({ id: '003-001', model: 'gemini-2.5-pro', provider: 'gemini' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockGeminiAdapter.spawn).toHaveBeenCalledWith(
+      '003-001', 'gemini-2.5-pro', expect.any(String),
+      expect.objectContaining({ projectDir: '/tmp/test' }),
+    );
+    expect(mockedSpawnWorker).not.toHaveBeenCalled();
+  });
+
+  it('infers codex provider from o3 model (no explicit provider)', () => {
+    const task = makeTask({ id: '002-002', model: 'o3' }); // no provider field
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockCodexAdapter.spawn).toHaveBeenCalledWith(
+      '002-002', 'o3', expect.any(String),
+      expect.objectContaining({ projectDir: '/tmp/test' }),
+    );
+  });
+
+  it('infers gemini provider from gemini-2.5-flash model', () => {
+    const task = makeTask({ id: '003-002', model: 'gemini-2.5-flash' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockGeminiAdapter.spawn).toHaveBeenCalledWith(
+      '003-002', 'gemini-2.5-flash', expect.any(String),
+      expect.objectContaining({ projectDir: '/tmp/test' }),
+    );
+  });
+
+  it('handles mixed sprint: Claude + Codex + Gemini tasks', () => {
+    const claudeTask = makeTask({ id: '001-001', model: 'opus' });
+    const codexTask = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const geminiTask = makeTask({ id: '003-001', model: 'gemini-2.5-pro', provider: 'gemini' });
+    const sprint = makeSprint({ tasks: [claudeTask, codexTask, geminiTask] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    // Claude via tmux
+    expect(mockedEnsureSession).toHaveBeenCalled();
+    expect(mockedSpawnWorker).toHaveBeenCalledTimes(1);
+    expect(mockedSpawnWorker).toHaveBeenCalledWith(
+      '001-001', 'opus', expect.any(String), '/tmp/test', expect.any(Object),
+    );
+    // Codex via adapter
+    expect(mockCodexAdapter.spawn).toHaveBeenCalledTimes(1);
+    expect(mockCodexAdapter.spawn).toHaveBeenCalledWith(
+      '002-001', 'o3', expect.any(String), expect.any(Object),
+    );
+    // Gemini via adapter
+    expect(mockGeminiAdapter.spawn).toHaveBeenCalledTimes(1);
+    expect(mockGeminiAdapter.spawn).toHaveBeenCalledWith(
+      '003-001', 'gemini-2.5-pro', expect.any(String), expect.any(Object),
+    );
+  });
+
+  it('does not call ensureSession when no Claude tasks exist', () => {
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockedEnsureSession).not.toHaveBeenCalled();
+  });
+
+  it('no provider field defaults to claude for Claude models', () => {
+    const task = makeTask({ id: '001-001', model: 'haiku' }); // no provider, Claude model
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockedEnsureSession).toHaveBeenCalled();
+    expect(mockedSpawnWorker).toHaveBeenCalledWith(
+      '001-001', 'haiku', expect.any(String), '/tmp/test', expect.any(Object),
+    );
+  });
+
+  it('returns queued tasks beyond max_workers', () => {
+    const tasks = [
+      makeTask({ id: '001-001', model: 'opus' }),
+      makeTask({ id: '001-002', model: 'opus' }),
+      makeTask({ id: '001-003', model: 'opus' }),
+      makeTask({ id: '001-004', model: 'opus' }),
+      makeTask({ id: '001-005', model: 'opus' }),
+    ];
+    const sprint = makeSprint({ tasks });
+    const config = makeConfig(); // maxWorkers = 4
+
+    const queued = spawnWorkers('/tmp/test', sprint, config);
+
+    expect(queued).toHaveLength(1);
+    expect(queued[0].id).toBe('001-005');
+  });
+
+  it('records usage for non-Claude providers', () => {
+    const mockTracker = { recordCall: vi.fn(), getSprintUsage: vi.fn(), getTotalUsage: vi.fn(), getModelBreakdown: vi.fn(), listSprints: vi.fn() };
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config, { usageTracker: mockTracker as any });
+
+    expect(mockTracker.recordCall).toHaveBeenCalledWith('o3', 5_000, '002-001', 'sprint-001');
+  });
+
+  it('updates dashboard with provider info in currentAction', () => {
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    expect(mockedUpdateDashboard).toHaveBeenCalled();
+    const dashCall = mockedUpdateDashboard.mock.calls[0];
+    const agents = dashCall[1].agents;
+    expect(agents[0].currentAction).toBe('Starting [codex]');
+  });
+
+  it('passes allowedTools with scope directories to adapter', () => {
+    const task = makeTask({
+      id: '002-001', model: 'o3', provider: 'codex',
+      scope: { directories: ['src/test/'], filesRead: [], filesWrite: ['src/test/file.ts'] },
+    });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config);
+
+    const spawnCall = mockCodexAdapter.spawn.mock.calls[0];
+    expect(spawnCall[3].allowedTools).toBe('Read,Write(src/test/,src/test/file.ts),Bash');
+  });
+
+  it('passes autoApprove option to non-Claude adapter', () => {
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config, { autoApprove: true });
+
+    const spawnCall = mockCodexAdapter.spawn.mock.calls[0];
+    expect(spawnCall[3].autoApprove).toBe(true);
+  });
+
+  it('gracefully handles missing provider adapter (not registered)', () => {
+    mockedProviderRegistry.getProvider.mockImplementation(() => {
+      throw new Error('Provider not found');
+    });
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    // Should not throw — gracefully skips
+    expect(() => spawnWorkers('/tmp/test', sprint, config)).not.toThrow();
+  });
+});
+
+// ═══ cleanup — Provider Routing ═══════════════════════════════════
+
+describe('cleanup — provider kill routing', () => {
+  const mockCodexAdapter = {
+    name: 'codex',
+    supportedModels: ['gpt-4.1', 'o3', 'o4-mini'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn(),
+    isAvailable: vi.fn(),
+    buildCommand: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedListWorkers.mockReturnValue([] as unknown as ReturnType<typeof listWorkers>);
+    mockedExistsSync.mockReturnValue(false);
+    mockedProviderRegistry.getProvider.mockImplementation((name: string) => {
+      if (name === 'codex') return mockCodexAdapter as any;
+      throw new Error(`Provider not found: "${name}"`);
+    });
+  });
+
+  it('kills non-Claude workers via provider adapter during cleanup', () => {
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+
+    cleanup('/tmp/test', sprint);
+
+    expect(mockCodexAdapter.kill).toHaveBeenCalledWith('002-001');
+  });
+
+  it('does not call adapter kill for Claude tasks during cleanup', () => {
+    const task = makeTask({ id: '001-001', model: 'opus' });
+    const sprint = makeSprint({ tasks: [task] });
+
+    cleanup('/tmp/test', sprint);
+
+    expect(mockCodexAdapter.kill).not.toHaveBeenCalled();
+  });
+
+  it('handles adapter kill errors gracefully', () => {
+    mockCodexAdapter.kill.mockImplementation(() => { throw new Error('already dead'); });
+    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
+    const sprint = makeSprint({ tasks: [task] });
+
+    expect(() => cleanup('/tmp/test', sprint)).not.toThrow();
   });
 });

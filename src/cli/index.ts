@@ -1,8 +1,5 @@
-#!/usr/bin/env node
-
 import { Command } from 'commander';
 import { DECKENT_VERSION } from '../core/constants.js';
-import { handleCliError } from './helpers/process.js';
 import { buildVersionString, buildVersionJson } from './version-info.js';
 import { registerInit } from './commands/init.js';
 import { registerStart } from './commands/start.js';
@@ -34,46 +31,50 @@ import { registerSkill } from './commands/skill.js';
 import { registerReview } from './commands/review.js';
 import { registerFinalize } from './commands/finalize.js';
 
-const program = new Command()
-  .name('deckent')
-  .description('AI agent orchestration system — your AI development team, orchestrated.')
-  .version(buildVersionString(DECKENT_VERSION), '-V, --version', 'output the version number with environment info')
-  .option('--version-json', 'output version info as JSON')
-  .on('option:version-json', () => {
-    console.log(JSON.stringify(buildVersionJson(DECKENT_VERSION), null, 2));
-    process.exit(0);
-  });
+/**
+ * Build and configure the CLI program with all commands registered.
+ * Does NOT call parseAsync — caller is responsible for parsing.
+ */
+export function buildProgram(): Command {
+  const program = new Command()
+    .name('deckent')
+    .description('AI agent orchestration system — your AI development team, orchestrated.')
+    .version(buildVersionString(DECKENT_VERSION), '-V, --version', 'output the version number with environment info')
+    .option('--version-json', 'output version info as JSON')
+    .on('option:version-json', () => {
+      console.log(JSON.stringify(buildVersionJson(DECKENT_VERSION), null, 2));
+      process.exit(0);
+    });
 
-registerInit(program);
-registerStart(program);
-registerPlan(program);
-registerStatus(program);
-registerAttach(program);
-registerSpawn(program);
-registerKill(program);
-registerRetro(program);
-registerCleanup(program);
-registerDoctor(program);
-registerConfig(program);
-registerUsage(program);
-registerHistory(program);
-registerPlugin(program);
-registerUpgrade(program);
-registerOnboard(program);
-registerAnalyze(program);
-registerArchiveDebt(program);
-registerDashboard(program);
-registerServe(program);
-registerWeb(program);
-registerSync(program);
-registerWatch(program);
-registerRun(program);
-registerTestRun(program);
-registerAgent(program);
-registerSkill(program);
-registerReview(program);
-registerFinalize(program);
+  registerInit(program);
+  registerStart(program);
+  registerPlan(program);
+  registerStatus(program);
+  registerAttach(program);
+  registerSpawn(program);
+  registerKill(program);
+  registerRetro(program);
+  registerCleanup(program);
+  registerDoctor(program);
+  registerConfig(program);
+  registerUsage(program);
+  registerHistory(program);
+  registerPlugin(program);
+  registerUpgrade(program);
+  registerOnboard(program);
+  registerAnalyze(program);
+  registerArchiveDebt(program);
+  registerDashboard(program);
+  registerServe(program);
+  registerWeb(program);
+  registerSync(program);
+  registerWatch(program);
+  registerRun(program);
+  registerTestRun(program);
+  registerAgent(program);
+  registerSkill(program);
+  registerReview(program);
+  registerFinalize(program);
 
-program.parseAsync(process.argv).catch((err: unknown) => {
-  handleCliError(err);
-});
+  return program;
+}

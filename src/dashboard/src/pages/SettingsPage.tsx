@@ -27,7 +27,7 @@ interface DoctorData {
 }
 
 const MODE_OPTIONS = ["max_plan", "max5x_plan", "pro_plan", "api"] as const;
-const MODEL_OPTIONS = ["opus", "sonnet", "haiku"] as const;
+const MODEL_OPTIONS = ["opus", "sonnet", "haiku", "gpt-4.1", "o3", "o4-mini", "gemini-2.5-pro", "gemini-2.5-flash"] as const;
 const LANGUAGE_OPTIONS = ["en", "tr"] as const;
 
 export default function SettingsPage() {

@@ -1,27 +1,30 @@
 // ─── Token Counter ──────────────────────────────────────────────────────────
 // Estimates token counts for prompts. Pure logic, no fs.
 
+import type { ModelType } from './task-types.js';
+
 // ─── Types ──────────────────────────────────────────────────────────
 
-export type ModelName = 'opus' | 'sonnet' | 'haiku';
+/** @deprecated Use ModelType from task-types.ts instead */
+export type ModelName = ModelType;
 
-export interface TokenBudget {
-  opus: number;
-  sonnet: number;
-  haiku: number;
-}
+/**
+ * Token budget per model. Uses a Record so any ModelType can have a budget.
+ * Claude models are provided by default; other providers share the same default.
+ */
+export type TokenBudget = Record<string, number>;
 
 export interface PromptSizeEstimate {
   agentTokens: number;
   skillTokens: number;
   taskTokens: number;
   totalTokens: number;
-  model: ModelName;
+  model: ModelType;
   withinBudget: boolean;
 }
 
 export interface BudgetWarning {
-  model: ModelName;
+  model: ModelType;
   estimated: number;
   budget: number;
   overBy: number;
@@ -32,10 +35,17 @@ export interface BudgetWarning {
 
 const WORDS_PER_TOKEN = 0.75;
 
+const DEFAULT_BUDGET = 200000;
+
 const DEFAULT_BUDGETS: TokenBudget = {
-  opus: 200000,
-  sonnet: 200000,
-  haiku: 200000,
+  opus: DEFAULT_BUDGET,
+  sonnet: DEFAULT_BUDGET,
+  haiku: DEFAULT_BUDGET,
+  'gpt-4.1': DEFAULT_BUDGET,
+  o3: DEFAULT_BUDGET,
+  'o4-mini': DEFAULT_BUDGET,
+  'gemini-2.5-pro': DEFAULT_BUDGET,
+  'gemini-2.5-flash': DEFAULT_BUDGET,
 };
 
 // ─── TokenCounter ───────────────────────────────────────────────────
@@ -43,7 +53,7 @@ const DEFAULT_BUDGETS: TokenBudget = {
 export class TokenCounter {
   private _budgets: TokenBudget;
 
-  constructor(budgets: Partial<TokenBudget> = {}) {
+  constructor(budgets: TokenBudget = {}) {
     this._budgets = { ...DEFAULT_BUDGETS, ...budgets };
   }
 
@@ -63,7 +73,7 @@ export class TokenCounter {
     agentPrompt: string,
     skillContents: string[],
     taskDescription: string,
-    model: ModelName,
+    model: ModelType,
   ): PromptSizeEstimate {
     const agentTokens = this.countTokens(agentPrompt);
     const skillTokens = skillContents.reduce(
@@ -87,8 +97,8 @@ export class TokenCounter {
   /**
    * Check if a token count is within the budget for a model.
    */
-  isWithinBudget(tokens: number, model: ModelName): boolean {
-    const budget = this._budgets[model];
+  isWithinBudget(tokens: number, model: ModelType): boolean {
+    const budget = this._budgets[model] ?? DEFAULT_BUDGET;
     return tokens <= budget;
   }
 
@@ -96,8 +106,8 @@ export class TokenCounter {
    * Get a warning if the token count exceeds the budget.
    * Returns null if within budget.
    */
-  warnIfExceeding(tokens: number, model: ModelName): BudgetWarning | null {
-    const budget = this._budgets[model];
+  warnIfExceeding(tokens: number, model: ModelType): BudgetWarning | null {
+    const budget = this._budgets[model] ?? DEFAULT_BUDGET;
     if (tokens <= budget) return null;
 
     const overBy = tokens - budget;
@@ -122,14 +132,14 @@ export class TokenCounter {
   /**
    * Get the budget for a specific model.
    */
-  getBudget(model: ModelName): number {
-    return this._budgets[model];
+  getBudget(model: ModelType): number {
+    return this._budgets[model] ?? DEFAULT_BUDGET;
   }
 
   /**
    * Update the budget for a specific model.
    */
-  setBudget(model: ModelName, budget: number): void {
+  setBudget(model: ModelType, budget: number): void {
     this._budgets[model] = budget;
   }
 }

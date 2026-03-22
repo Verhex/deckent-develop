@@ -91,6 +91,24 @@ jobs:
         run: npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
         timeout-minutes: 10
 
+  test-windows:
+    name: Tests — Windows (allow-failure)
+    runs-on: windows-latest
+    # Windows is unsupported — this job is informational only
+    continue-on-error: true
+    needs: typecheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+      - run: npm ci
+      - name: Run core tests (Windows informational)
+        run: npx vitest run tests/core/ tests/agents/
+        timeout-minutes: 10
+        continue-on-error: true
+
   build:
     name: Build
     runs-on: ubuntu-latest

@@ -1,0 +1,265 @@
+import { describe, it, expect } from 'vitest';
+import { resolveTaskModel } from '../../src/orchestra/model-selector.js';
+import type { ResolvedConfig, UsageMetrics, TaskScope, ModelType, ProviderName } from '../../src/core/types.js';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
+  return {
+    mode: 'max_plan',
+    activeModeConfig: {
+      max_workers: 4,
+      brain_model: 'opus',
+      default_model: 'sonnet',
+      haiku_allowed: true,
+      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
+    },
+    modes: {} as never,
+    language: 'en',
+    projectName: 'test',
+    projectRoot: '/tmp/test',
+    version: '0.1.0',
+    ...overrides,
+  };
+}
+
+function makeUsage(overrides: Partial<UsageMetrics> = {}): UsageMetrics {
+  return {
+    fiveHourPercent: 10,
+    weeklyPercent: 10,
+    measuredAt: '2026-03-22T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeScope(dirs: string[], filesWrite: string[] = []): TaskScope {
+  return { directories: dirs, filesRead: [], filesWrite };
+}
+
+// ─── Backward Compatibility (no provider = claude) ──────────────────────────
+
+describe('resolveTaskModel — provider parameter backward compat', () => {
+  const config = makeConfig();
+  const usage = makeUsage();
+
+  it('no provider parameter returns Claude model (haiku)', () => {
+    const scope = makeScope(['src/cli/']);
+    const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config, usage);
+    expect(result).toBe('haiku');
+  });
+
+  it('no provider parameter returns Claude model (sonnet)', () => {
+    const scope = makeScope(['src/core/', 'src/cli/']);
+    const result = resolveTaskModel('Normal task', 'Some description', scope, config, usage);
+    expect(result).toBe('sonnet');
+  });
+
+  it('no provider parameter returns Claude model (opus)', () => {
+    const scope = makeScope(['src/core/', 'src/orchestra/']);
+    const result = resolveTaskModel(
+      'Architect migration refactor', 'Cross-cutting refactor', scope, config, usage,
+    );
+    expect(result).toBe('opus');
+  });
+
+  it('explicit provider=claude returns same as no provider', () => {
+    const scope = makeScope(['src/cli/']);
+    const withoutProvider = resolveTaskModel('Simple fix', 'A tiny change', scope, config, usage);
+    const withProvider = resolveTaskModel(
+      'Simple fix', 'A tiny change', scope, config, usage,
+      undefined, undefined, undefined, 'claude',
+    );
+    expect(withProvider).toBe(withoutProvider);
+  });
+});
+
+// ─── Codex Provider ──────────────────────────────────────────────────────────
+
+describe('resolveTaskModel — codex provider', () => {
+  const config = makeConfig();
+  const usage = makeUsage();
+
+  it('simple task resolves to o4-mini (economy tier)', () => {
+    const scope = makeScope(['src/cli/']);
+    const result = resolveTaskModel(
+      'Simple fix', 'A tiny change', scope, config, usage,
+      undefined, undefined, undefined, 'codex',
+    );
+    expect(result).toBe('o4-mini');
+  });
+
+  it('medium task resolves to o3 (standard tier)', () => {
+    const scope = makeScope(['src/core/', 'src/cli/']);
+    const result = resolveTaskModel(
+      'Normal task', 'Some description', scope, config, usage,
+      undefined, undefined, undefined, 'codex',
+    );
+    expect(result).toBe('o3');
+  });
+
+  it('complex task resolves to gpt-4.1 (premium tier)', () => {
+    const scope = makeScope(['src/core/', 'src/orchestra/']);
+    const result = resolveTaskModel(
+      'Architect migration refactor', 'Cross-cutting refactor', scope, config, usage,
+      undefined, undefined, undefined, 'codex',
+    );
+    expect(result).toBe('gpt-4.1');
+  });
+
+  it('usage pressure downgrades gpt-4.1 to o3', () => {
+    const highUsage = makeUsage({ fiveHourPercent: 90 });
+    const scope = makeScope(['src/core/', 'src/orchestra/']);
+    const result = resolveTaskModel(
+      'Architect migration refactor', 'Cross-cutting refactor', scope, config, highUsage,
+      undefined, undefined, undefined, 'codex',
+    );
+    // opus -> sonnet (usage pressure) -> o3 (codex mapping)
+    expect(result).toBe('o3');
+  });
+});
+
+// ─── Gemini Provider ─────────────────────────────────────────────────────────
+
+describe('resolveTaskModel — gemini provider', () => {
+  const config = makeConfig();
+  const usage = makeUsage();
+
+  it('simple task resolves to gemini-2.5-flash (economy -> standard fallback)', () => {
+    const scope = makeScope(['src/cli/']);
+    const result = resolveTaskModel(
+      'Simple fix', 'A tiny change', scope, config, usage,
+      undefined, undefined, undefined, 'gemini',
+    );
+    // haiku -> economy tier, but gemini has no economy -> falls back to standard (gemini-2.5-flash)
+    expect(result).toBe('gemini-2.5-flash');
+  });
+
+  it('medium task resolves to gemini-2.5-flash (standard tier)', () => {
+    const scope = makeScope(['src/core/', 'src/cli/']);
+    const result = resolveTaskModel(
+      'Normal task', 'Some description', scope, config, usage,
+      undefined, undefined, undefined, 'gemini',
+    );
+    expect(result).toBe('gemini-2.5-flash');
+  });
+
+  it('complex task resolves to gemini-2.5-pro (premium tier)', () => {
+    const scope = makeScope(['src/core/', 'src/orchestra/']);
+    const result = resolveTaskModel(
+      'Architect migration refactor', 'Cross-cutting refactor', scope, config, usage,
+      undefined, undefined, undefined, 'gemini',
+    );
+    expect(result).toBe('gemini-2.5-pro');
+  });
+});
+
+// ─── forceModel with provider ────────────────────────────────────────────────
+
+describe('resolveTaskModel — forceModel + provider', () => {
+  const config = makeConfig();
+  const usage = makeUsage();
+
+  it('forceModel=opus on codex maps to gpt-4.1', () => {
+    const scope = makeScope(['src/core/']);
+    const result = resolveTaskModel(
+      'Forced task', 'Forced model', scope, config, usage,
+      undefined, 'opus', undefined, 'codex',
+    );
+    expect(result).toBe('gpt-4.1');
+  });
+
+  it('forceModel=sonnet on gemini maps to gemini-2.5-flash', () => {
+    const scope = makeScope(['src/core/']);
+    const result = resolveTaskModel(
+      'Forced task', 'Forced model', scope, config, usage,
+      undefined, 'sonnet', undefined, 'gemini',
+    );
+    expect(result).toBe('gemini-2.5-flash');
+  });
+
+  it('forceModel=gpt-4.1 on codex returns gpt-4.1 directly (same provider)', () => {
+    const scope = makeScope(['src/core/']);
+    const result = resolveTaskModel(
+      'Forced task', 'Forced model', scope, config, usage,
+      undefined, 'gpt-4.1', undefined, 'codex',
+    );
+    expect(result).toBe('gpt-4.1');
+  });
+
+  it('forceModel=opus on claude returns opus directly', () => {
+    const scope = makeScope(['src/core/']);
+    const result = resolveTaskModel(
+      'Forced task', 'Forced model', scope, config, usage,
+      undefined, 'opus', undefined, 'claude',
+    );
+    expect(result).toBe('opus');
+  });
+
+  it('forceModel=haiku on gemini maps to gemini-2.5-flash (economy->standard fallback)', () => {
+    const scope = makeScope(['src/core/']);
+    const result = resolveTaskModel(
+      'Forced task', 'Forced model', scope, config, usage,
+      undefined, 'haiku', undefined, 'gemini',
+    );
+    expect(result).toBe('gemini-2.5-flash');
+  });
+});
+
+// ─── Layer interactions with provider ────────────────────────────────────────
+
+describe('resolveTaskModel — layer interactions with provider', () => {
+  it('pro_plan + codex: opus->sonnet(plan filter)->o3(codex mapping)', () => {
+    const proConfig = makeConfig({ mode: 'pro_plan' });
+    const usage = makeUsage();
+    const scope = makeScope(['src/core/', 'src/orchestra/']);
+    const result = resolveTaskModel(
+      'Architect migration refactor', 'Cross-cutting refactor', scope, proConfig, usage,
+      undefined, undefined, undefined, 'codex',
+    );
+    expect(result).toBe('o3');
+  });
+
+  it('haiku_allowed=false + gemini: haiku->sonnet(filter)->gemini-2.5-flash', () => {
+    const config = makeConfig({
+      activeModeConfig: {
+        max_workers: 4,
+        brain_model: 'opus',
+        default_model: 'sonnet',
+        haiku_allowed: false,
+        usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
+      },
+    });
+    const usage = makeUsage();
+    const scope = makeScope(['src/cli/']);
+    const result = resolveTaskModel(
+      'Simple fix', 'A tiny change', scope, config, usage,
+      undefined, undefined, undefined, 'gemini',
+    );
+    // haiku (score-based) -> sonnet (haiku not allowed) -> gemini-2.5-flash
+    expect(result).toBe('gemini-2.5-flash');
+  });
+
+  it('doc scope + codex: opus->sonnet(doc cap)->o3(codex)', () => {
+    const config = makeConfig();
+    const usage = makeUsage();
+    const scope = makeScope(['docs/']);
+    const result = resolveTaskModel(
+      'Write docs', 'Documentation', scope, config, usage,
+      undefined, undefined, ['opus'], 'codex',
+    );
+    // skill upgrades to opus, Layer 3 caps to sonnet, then codex mapping -> o3
+    expect(result).toBe('o3');
+  });
+
+  it('skillModels + provider maps correctly', () => {
+    const config = makeConfig();
+    const usage = makeUsage();
+    const scope = makeScope(['src/cli/']);
+    const result = resolveTaskModel(
+      'Simple fix', 'A tiny change', scope, config, usage,
+      undefined, undefined, ['opus'], 'codex',
+    );
+    // skill upgrades to opus, no caps apply, codex mapping -> gpt-4.1
+    expect(result).toBe('gpt-4.1');
+  });
+});

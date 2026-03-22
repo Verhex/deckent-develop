@@ -2,7 +2,106 @@
 // Split from types.ts — Task, planning, and model-related types
 
 // ─── Models ──────────────────────────────────────────────────────────
-export type ModelType = 'opus' | 'sonnet' | 'haiku';
+
+/** Claude-family model identifiers */
+export type ClaudeModel = 'opus' | 'sonnet' | 'haiku';
+
+/** OpenAI / Codex model identifiers */
+export type OpenAIModel = 'gpt-4.1' | 'o3' | 'o4-mini';
+
+/** Gemini model identifiers */
+export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash';
+
+/** Union of all supported model identifiers across providers */
+export type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
+
+/** Supported AI provider names */
+export type ProviderName = 'claude' | 'codex' | 'gemini';
+
+/** Mapping from each provider to its supported model list */
+export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = {
+  claude: ['opus', 'sonnet', 'haiku'] as const,
+  codex: ['gpt-4.1', 'o3', 'o4-mini'] as const,
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash'] as const,
+} as const;
+
+/** All Claude model names (backward-compat convenience) */
+export const CLAUDE_MODELS: readonly ClaudeModel[] = ['opus', 'sonnet', 'haiku'] as const;
+
+/** All valid model names across all providers */
+export const ALL_MODELS: readonly ModelType[] = [
+  ...CLAUDE_MODELS,
+  'gpt-4.1', 'o3', 'o4-mini',
+  'gemini-2.5-pro', 'gemini-2.5-flash',
+] as const;
+
+/** Error thrown when a model is not recognized */
+export class UnknownModelError extends TypeError {
+  constructor(model: string) {
+    super(`Unknown model: ${model}`);
+    this.name = 'UnknownModelError';
+  }
+}
+
+/**
+ * Get the provider name for a given model.
+ * @throws {UnknownModelError} if model is not recognized
+ */
+export function getProviderForModel(model: ModelType): ProviderName {
+  for (const [provider, models] of Object.entries(PROVIDER_MODEL_MAP)) {
+    if ((models as readonly string[]).includes(model)) {
+      return provider as ProviderName;
+    }
+  }
+  // Should never reach here with valid ModelType — guard for runtime safety
+  throw new UnknownModelError(model);
+}
+
+/** Type guard: checks whether a model is a Claude model */
+export function isClaudeModel(model: ModelType): model is ClaudeModel {
+  return (CLAUDE_MODELS as readonly string[]).includes(model);
+}
+
+/** Type guard: checks whether a model is an OpenAI/Codex model */
+export function isOpenAIModel(model: ModelType): model is OpenAIModel {
+  return (PROVIDER_MODEL_MAP.codex as readonly string[]).includes(model);
+}
+
+/** Type guard: checks whether a model is a Gemini model */
+export function isGeminiModel(model: ModelType): model is GeminiModel {
+  return (PROVIDER_MODEL_MAP.gemini as readonly string[]).includes(model);
+}
+
+/**
+ * Get a numeric rank for model capability tier (provider-agnostic).
+ * Higher = more capable. Used for model comparison/upgrade logic.
+ *   Tier 0 (lightweight): haiku, o4-mini, gemini-2.5-flash
+ *   Tier 1 (balanced): sonnet, o3, gemini-2.5-pro
+ *   Tier 2 (strongest): opus, gpt-4.1
+ */
+export function getModelTier(model: ModelType): number {
+  switch (model) {
+    case 'haiku':
+    case 'o4-mini':
+    case 'gemini-2.5-flash':
+      return 0;
+    case 'sonnet':
+    case 'o3':
+    case 'gemini-2.5-pro':
+      return 1;
+    case 'opus':
+    case 'gpt-4.1':
+      return 2;
+  }
+}
+
+/**
+ * Check if a string is a valid model name.
+ */
+export function isValidModel(value: string): value is ModelType {
+  return (ALL_MODELS as readonly string[]).includes(value);
+}
+
 export type TaskEffort = 'low' | 'normal' | 'high';
 export type TaskPriority = 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW';
 
@@ -58,6 +157,8 @@ export interface Task {
   assignedWorker?: string;
   isPriorityFix?: boolean;
   fixForTaskId?: string;
+  /** User-specified provider from DIRECTIVES.md (e.g., 'codex', 'gemini') */
+  provider?: ProviderName;
   /** User-specified model override from DIRECTIVES.md (bypasses all auto-selection layers) */
   forceModel?: ModelType;
   /** User-specified effort override from DIRECTIVES.md */

@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { platform } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
@@ -15,6 +16,7 @@ import { print, formatDoctorResult } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
+import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 
 interface DoctorCheck {
   name: string;
@@ -34,6 +36,56 @@ function readLanguage(root: string): string {
     // fallback
   }
   return 'en';
+}
+
+export function isRunningInWSL(): boolean {
+  // Check WSL environment variable (set by WSL2 interop)
+  if (process.env['WSL_DISTRO_NAME'] !== undefined || process.env['WSL_INTEROP'] !== undefined) {
+    return true;
+  }
+  // Check /proc/version for "microsoft" signature (WSL1 and WSL2)
+  try {
+    const procVersion = readFileSync('/proc/version', 'utf-8');
+    return procVersion.toLowerCase().includes('microsoft');
+  } catch {
+    // /proc/version not readable — not Linux/WSL
+    return false;
+  }
+}
+
+export function checkPlatform(): DoctorCheck {
+  const currentPlatform = platform();
+  if (currentPlatform === 'win32') {
+    return {
+      name: 'Platform',
+      passed: false,
+      message: 'Native Windows is UNSUPPORTED — deckent requires tmux and POSIX paths. Install WSL2 (Ubuntu) and run from inside WSL2.',
+      required: false,
+    };
+  }
+  if (currentPlatform === 'linux') {
+    const inWSL = isRunningInWSL();
+    return {
+      name: 'Platform',
+      passed: true,
+      message: inWSL ? 'WSL2/Linux (fully supported)' : 'Linux (fully supported)',
+      required: false,
+    };
+  }
+  if (currentPlatform === 'darwin') {
+    return {
+      name: 'Platform',
+      passed: true,
+      message: 'macOS (fully supported)',
+      required: false,
+    };
+  }
+  return {
+    name: 'Platform',
+    passed: true,
+    message: `${currentPlatform} (untested — may work)`,
+    required: false,
+  };
 }
 
 function checkNode(): DoctorCheck {
@@ -230,6 +282,7 @@ export function formatSystemProfile(profile: SystemProfile, subscription?: strin
 
 export function runDoctorChecks(root: string): DoctorResult {
   const checks: DoctorCheck[] = [
+    checkPlatform(),
     checkNode(), checkGit(), checkTmux(), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
@@ -245,7 +298,7 @@ export function registerDoctor(program: Command): void {
     .command('doctor')
     .description('Check system dependencies and health')
     .option('--profile', 'Show system profile information')
-    .action((opts: { profile?: boolean }) => {
+    .action(async (opts: { profile?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -262,6 +315,11 @@ export function registerDoctor(program: Command): void {
         passed: String(passed),
         total: String(total),
       }));
+
+      // Show detected providers
+      const providers = await detectAvailableProviders();
+      print('');
+      print(formatDetectedProviders(providers));
 
       if (opts.profile) {
         const profile = getSystemProfile();

@@ -1,6 +1,8 @@
 // ─── Model Selection Logic ─────────────────────────────────────────
 // Extracted from brain.ts — score-based and layered model selection
-import type { TaskScope, ModelType, ResolvedConfig, UsageMetrics, PatternEntry } from '../core/types.js';
+import type { TaskScope, ModelType, ResolvedConfig, UsageMetrics, PatternEntry, ProviderName } from '../core/types.js';
+import { getModelTier } from '../core/types.js';
+import { getEquivalentModel, isModelAvailable } from '../core/model-equivalence.js';
 
 /**
  * Calculate a numeric complexity score for a task based on its title, description, and scope.
@@ -131,6 +133,7 @@ export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntr
  *   3. Task type filter: doc/test-only scope caps at sonnet
  *   4. Score system: inferModelFromDirective as base
  *   5. Pattern-based upgrade and skill model preferences
+ *   6. Provider mapping: map final model to target provider via tier equivalence
  * @param title - Task title text
  * @param description - Task description text
  * @param scope - Task scope defining directories and files
@@ -139,7 +142,8 @@ export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntr
  * @param patterns - Optional pattern entries for model upgrade suggestions
  * @param forceModel - Optional user override that bypasses all auto-selection
  * @param skillModels - Optional model preferences from assigned skills
- * @returns The final resolved model type
+ * @param provider - Optional target provider; defaults to 'claude' for backward compat
+ * @returns The final resolved model type for the target provider
  */
 export function resolveTaskModel(
   title: string,
@@ -150,11 +154,20 @@ export function resolveTaskModel(
   patterns?: PatternEntry[],
   forceModel?: ModelType,
   skillModels?: ModelType[],
+  provider?: ProviderName,
 ): ModelType {
-  // Layer 0: user override from DIRECTIVES.md — bypasses all auto-selection
-  if (forceModel) return forceModel;
+  const targetProvider: ProviderName = provider ?? 'claude';
 
-  // Layer 4: base model from score system
+  // Layer 0: user override from DIRECTIVES.md — bypasses all auto-selection
+  if (forceModel) {
+    // Validate forceModel against target provider; if mismatch, map to equivalent
+    if (!isModelAvailable(forceModel, targetProvider)) {
+      return getEquivalentModel(forceModel, targetProvider);
+    }
+    return forceModel;
+  }
+
+  // Layer 4: base model from score system (always Claude-centric internally)
   let model: ModelType = inferModelFromDirective(title, description, scope);
 
   // Layer 4b: pattern-based upgrade
@@ -167,9 +180,8 @@ export function resolveTaskModel(
 
   // Layer 4d: skill model preference (highest model among skills wins)
   if (skillModels && skillModels.length > 0) {
-    const modelRank: Record<string, number> = { haiku: 0, sonnet: 1, opus: 2 };
-    const highest = skillModels.reduce<ModelType>((best, m) => (modelRank[m] ?? 0) > (modelRank[best] ?? 0) ? m : best, model);
-    if ((modelRank[highest] ?? 0) > (modelRank[model] ?? 0)) model = highest;
+    const highest = skillModels.reduce<ModelType>((best, m) => getModelTier(m) > getModelTier(best) ? m : best, model);
+    if (getModelTier(highest) > getModelTier(model)) model = highest;
   }
 
   // Layer 3: task type filter — docs or test-only → cap at sonnet
@@ -182,25 +194,31 @@ export function resolveTaskModel(
     scope.filesWrite.every(f => f.includes('.test.') || f.includes('.spec.'));
 
   if (isDocScope || isTestOnly) {
-    if (model === 'opus') model = 'sonnet';
+    // Downgrade tier-2 models to tier-1 equivalent for doc/test scope
+    if (getModelTier(model) >= 2) model = 'sonnet';
   }
 
-  // Layer 2: usage pressure — 80%+ → downgrade opus to sonnet
+  // Layer 2: usage pressure — 80%+ → downgrade tier-2 to tier-1
   const usageHigh = usage.fiveHourPercent >= 80 || usage.weeklyPercent >= 80;
-  if (usageHigh && model === 'opus') {
+  if (usageHigh && getModelTier(model) >= 2) {
     model = 'sonnet';
   }
 
   // Layer 1: plan access filter (highest priority)
   const mode = config.mode;
   const isProPlan = mode === 'pro_plan';
-  if (isProPlan && model === 'opus') {
+  if (isProPlan && getModelTier(model) >= 2) {
     model = 'sonnet';
   }
 
   const haikuAllowed = config.activeModeConfig.haiku_allowed;
-  if (!haikuAllowed && model === 'haiku') {
+  if (!haikuAllowed && getModelTier(model) === 0) {
     model = 'sonnet';
+  }
+
+  // Layer 6: provider mapping — convert Claude model to target provider equivalent
+  if (targetProvider !== 'claude') {
+    model = getEquivalentModel(model, targetProvider);
   }
 
   return model;

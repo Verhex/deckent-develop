@@ -35,7 +35,8 @@ export class PluginError extends Error {
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
-const VALID_MODELS: ModelType[] = ['opus', 'sonnet', 'haiku'];
+import { ALL_MODELS } from './types.js';
+const VALID_MODELS: readonly ModelType[] = ALL_MODELS;
 
 export function validateManifest(raw: unknown, pluginDir: string): PluginManifest {
   if (!raw || typeof raw !== 'object') {
