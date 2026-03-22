@@ -11,13 +11,58 @@ const AGENTS_DIR = '.deckent/agents';
 const TEMP_AGENTS_DIR = '.tasks/agents';
 const AGENT_FILENAME = 'agent.json';
 
+/** Default maximum number of temp agents to keep in pool. */
+export const DEFAULT_MAX_TEMP_AGENTS = 50;
+
+/** Default maximum age (in sprints) for temp agents before eviction. */
+export const DEFAULT_MAX_AGENT_AGE = 5;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Extract the numeric sprint number from a sprint ID string (e.g. "sprint-037" → 37).
+ * Returns 0 if the format is not recognized.
+ */
+function sprintNumber(sprintId: string): number {
+  const match = /sprint-(\d+)/i.exec(sprintId);
+  if (!match || !match[1]) return 0;
+  return parseInt(match[1], 10);
+}
+
+/**
+ * Determine whether a temp agent should be evicted based on last-used sprint.
+ * @param lastUsedInSprint - The sprint ID when the agent was last used.
+ * @param currentSprintId  - The current sprint ID (used as reference point).
+ * @param maxAge           - Maximum number of sprints an agent can be unused.
+ * @returns true when the agent is old enough to evict.
+ */
+export function isTempAgentStale(
+  lastUsedInSprint: string,
+  currentSprintId: string,
+  maxAge: number,
+): boolean {
+  if (!lastUsedInSprint) return true;
+  const lastNum = sprintNumber(lastUsedInSprint);
+  const currentNum = sprintNumber(currentSprintId);
+  if (lastNum === 0 || currentNum === 0) return false; // cannot determine — keep safe
+  return currentNum - lastNum > maxAge;
+}
+
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 const VALID_MODELS = ['opus', 'sonnet', 'haiku'] as const;
 const VALID_SOURCES = ['builtin', 'user', 'learned'] as const;
 
 export class AgentPoolManager {
-  constructor(private projectRoot: string) {}
+  /** Maximum number of temp agents to keep in pool (LRU eviction). */
+  private maxTempAgents: number;
+
+  constructor(projectRoot: string, maxTempAgents = DEFAULT_MAX_TEMP_AGENTS) {
+    this.projectRoot = projectRoot;
+    this.maxTempAgents = maxTempAgents;
+  }
+
+  private projectRoot: string;
 
   // ─── Load ────────────────────────────────────────────────────────────────────
 
@@ -25,21 +70,46 @@ export class AgentPoolManager {
    * Load all agents from .deckent/agents/ and .tasks/agents/ directories.
    * Returns an AgentPool (Map<string, AgentDefinition>).
    * Skips directories with invalid agent.json files silently.
+   * Applies LRU eviction: keeps only the most-recently-used temp agents
+   * up to `maxTempAgents` (default 50).
    */
   loadAgents(): AgentPool {
     const pool: AgentPool = new Map();
 
-    // Load persistent agents from .deckent/agents/
+    // Load persistent agents from .deckent/agents/ (never evicted)
     const persistentDir = path.join(this.projectRoot, AGENTS_DIR);
     this._loadFromDir(persistentDir, pool);
 
-    // Load temp agents from .tasks/agents/
+    // Load temp agents from .tasks/agents/ with LRU eviction
     const tempDir = path.join(this.projectRoot, TEMP_AGENTS_DIR);
-    this._loadFromDir(tempDir, pool);
+    const tempPool: AgentPool = new Map();
+    this._loadFromDir(tempDir, tempPool);
+
+    // Apply LRU eviction: keep only maxTempAgents most-recently-used temp agents
+    if (tempPool.size > this.maxTempAgents) {
+      const sorted = Array.from(tempPool.values()).sort((a, b) => {
+        const aNum = sprintNumber(a.stats?.lastUsedInSprint ?? '');
+        const bNum = sprintNumber(b.stats?.lastUsedInSprint ?? '');
+        return bNum - aNum; // descending: most recent first
+      });
+      const kept = sorted.slice(0, this.maxTempAgents);
+      for (const agent of kept) {
+        pool.set(agent.id, agent);
+      }
+    } else {
+      for (const [id, agent] of tempPool) {
+        pool.set(id, agent);
+      }
+    }
 
     return pool;
   }
 
+  /**
+   * Batch-read all agent definitions from a directory.
+   * Single readdirSync to list subdirectories, then map over entries — O(N+1) syscalls.
+   * readJsonSafe handles missing/invalid agent.json files gracefully (returns null).
+   */
   private _loadFromDir(dir: string, pool: AgentPool): void {
     if (!fs.existsSync(dir)) return;
     let entries: fs.Dirent[];
@@ -48,10 +118,11 @@ export class AgentPoolManager {
     } catch {
       return;
     }
+    // Batch read: map over all directory entries, attempt to read agent.json for each.
+    // No per-entry existsSync — readJsonSafe returns null for missing or invalid files.
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const agentFile = path.join(dir, entry.name, AGENT_FILENAME);
-      if (!fs.existsSync(agentFile)) continue;
       const raw = readJsonSafe<Record<string, unknown>>(agentFile);
       if (raw) {
         const validation = AgentPoolManager.validateAgentDefinition(raw);
@@ -150,6 +221,78 @@ export class AgentPoolManager {
         fs.rmSync(path.join(tempDir, entry.name), { recursive: true, force: true });
       }
     }
+  }
+
+  /**
+   * LRU-based cleanup: remove temp agents that have not been used in the last
+   * `maxAge` sprints relative to `currentSprintId`.
+   * Builtin agents (source === 'builtin') in .deckent/agents/ are NEVER removed.
+   *
+   * @param maxAge         - Maximum number of sprints an agent can be unused (default 5).
+   * @param currentSprintId - The reference sprint ID (e.g. "sprint-037").
+   *                          Defaults to the highest sprint number found in the temp dir.
+   * @returns number of agents removed.
+   */
+  cleanup(maxAge = DEFAULT_MAX_AGENT_AGE, currentSprintId?: string): number {
+    const tempDir = path.join(this.projectRoot, TEMP_AGENTS_DIR);
+    if (!fs.existsSync(tempDir)) return 0;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(tempDir, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+
+    // If no currentSprintId provided, infer it from the highest sprint number
+    // seen in agent lastUsedInSprint fields. Batch read: no per-entry existsSync.
+    let resolvedCurrentSprint = currentSprintId ?? '';
+    if (!resolvedCurrentSprint) {
+      let maxNum = 0;
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const agentFile = path.join(tempDir, entry.name, AGENT_FILENAME);
+        const raw = readJsonSafe<Record<string, unknown>>(agentFile);
+        if (raw) {
+          const stats = raw['stats'] as Record<string, unknown> | undefined;
+          const lastUsed = (stats?.['lastUsedInSprint'] as string | undefined) ?? '';
+          const num = sprintNumber(lastUsed);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+      if (maxNum > 0) {
+        resolvedCurrentSprint = `sprint-${String(maxNum).padStart(3, '0')}`;
+      }
+    }
+
+    // If still no reference sprint, nothing to evict
+    if (!resolvedCurrentSprint) return 0;
+
+    let removed = 0;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const agentFile = path.join(tempDir, entry.name, AGENT_FILENAME);
+      const raw = readJsonSafe<Record<string, unknown>>(agentFile);
+      if (!raw) continue;
+
+      const validation = AgentPoolManager.validateAgentDefinition(raw);
+      if (!validation.valid) continue;
+
+      const agent = raw as unknown as AgentDefinition;
+
+      // Builtin agents are never removed
+      if (agent.source === 'builtin') continue;
+
+      const stats = agent.stats;
+      const lastUsed = stats?.lastUsedInSprint ?? '';
+
+      if (isTempAgentStale(lastUsed, resolvedCurrentSprint, maxAge)) {
+        fs.rmSync(path.join(tempDir, entry.name), { recursive: true, force: true });
+        removed++;
+      }
+    }
+
+    return removed;
   }
 
   // ─── Stats ───────────────────────────────────────────────────────────────────

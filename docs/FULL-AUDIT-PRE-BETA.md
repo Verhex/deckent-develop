@@ -720,11 +720,11 @@ tests/
 | Dosya | Limit | Durum |
 |-------|-------|-------|
 | `MEMORY.md` | Max 100 satır | TAM — Sprint sonlarında kırpılıyor |
-| `RETRO.md` | Max 60 satır | TAM — Her sprint'te üzerine yazılıyor |
+| `RETRO.md` | Max 100 satır | TAM — Her sprint'te üzerine yazılıyor |
 | `PATTERNS.md` | Append-only | TAM — Asla üzerine yazılmıyor |
 | `DECISIONS.md` | ADR format | TAM |
 | `DEBT.md` | Markdown table | TAM |
-| Budget total | 300 satır | TAM — `countBrainLines()` ile zorlanıyor |
+| Budget total | 600 satır | TAM — `countBrainLines()` ile zorlanıyor |
 | Decay mechanism | Auto-triggered | TAM — `runDecay()` force option |
 
 ## J) Sprint Lifecycle

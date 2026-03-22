@@ -457,18 +457,18 @@ Auditor **asla kaynak kodu yazmaz**. 30 saniyelik döngülerle sistemi tarar.
 ### Bellek Bütçesi
 
 ```
-.brain/ toplam: max 300 satır (BRAIN_TOTAL_LINE_BUDGET)
-├── MEMORY.md: max 100 satır
-├── RETRO.md: max 60 satır
+.brain/ toplam: max 600 satır (BRAIN_TOTAL_LINE_BUDGET)
+├── MEMORY.md: max 200 satır
+├── RETRO.md: max 100 satır
 ├── PATTERNS.md: max 80 satır
 ├── DEBT.md: bütçeden hariç (ayrı yönetilir)
 ├── DECISIONS.md: bütçeden hariç
-└── sprints/: bütçeden hariç (50 satır per dosya)
+└── sprints/: bütçeden hariç (80 satır per dosya)
 ```
 
 ### Decay Mekanizması
 
-`runDecay()` (`src/orchestra/debt-manager.ts`, 300 satır) sprint sonunda çalışır:
+`runDecay()` (`src/orchestra/debt-manager.ts`) sprint sonunda çalışır:
 
 1. **Resolved debt temizliği:** `shouldRemoveResolvedDebt()` — çözülmüş + 3 sprint geçmiş → sil, çözülmüş + <3 sprint → tut
 2. **Memory kırpma:** `trimMemoryWithHeader()` — ilk 10 satır (header) korunur, ortadan kırpılır, son bölüm tutulur
@@ -583,7 +583,7 @@ buildPlanPrompt() → callBrainPlanner() → parsePlannerResponse()
 ┌─ 7. DECAY ────────────────────────────────────────────────┐
 │  runDecay() — resolved debt temizliği (3 sprint kuralı)   │
 │  Memory kırpma, pattern temizliği                         │
-│  Bütçe kontrolü: .brain/ < 300 satır                      │
+│  Bütçe kontrolü: .brain/ < 600 satır                      │
 └───────────────────────────────────────────────────────────┘
          │
 ┌─ 8. CLEANUP ──────────────────────────────────────────────┐

@@ -44,7 +44,17 @@ function getSprintNumber(sprintId: string): number {
 
 // ═══ Exported Functions ════════════════════════════════════════════
 
-// 9. handleEvaluation
+/**
+ * Handle a task evaluation result by updating task status, releasing locks,
+ * and creating debt items or fix tasks as needed.
+ * - DONE: marks task done, releases locks
+ * - GO_WITH_TECH_DEBT: marks done, releases locks, adds debt entry
+ * - NO_GO: marks no-go, creates a priority fix task
+ * @param projectRoot - Project root directory
+ * @param task - The evaluated task
+ * @param evaluation - The evaluation outcome
+ * @param result - The worker's task result
+ */
 export function handleEvaluation(
   projectRoot: string,
   task: Task,
@@ -111,7 +121,15 @@ export function handleEvaluation(
   );
 }
 
-// 10. handleCrossDependencies
+/**
+ * Detect and create fix tasks for cross-dependency failures.
+ * When a NO_GO task depends on a completed task, a cross-fix task is created
+ * for the dependency to investigate whether it caused the failure.
+ * @param projectRoot - Project root directory
+ * @param sprint - The current sprint with all tasks
+ * @param evaluations - Map of task ID to evaluation result
+ * @returns Array of newly created cross-fix tasks
+ */
 export function handleCrossDependencies(
   projectRoot: string,
   sprint: Sprint,
@@ -158,7 +176,11 @@ export function handleCrossDependencies(
   return fixTasks;
 }
 
-// 11. escalateDebt
+/**
+ * Escalate open debt items by incrementing sprintsOpen and promoting priority.
+ * Items open >= 3 sprints become HIGH, items open >= 5 sprints become CRITICAL.
+ * @param projectRoot - Project root directory
+ */
 export function escalateDebt(projectRoot: string): void {
   const debtPath = join(projectRoot, BRAIN_DIR, DEBT_FILE);
   const content = readFileSafe(debtPath);
@@ -186,7 +208,13 @@ export function escalateDebt(projectRoot: string): void {
   }
 }
 
-// 11b. resolveDebt
+/**
+ * Mark a debt item as resolved in the given sprint.
+ * @param projectRoot - Project root directory
+ * @param debtId - The debt item ID to resolve (e.g., "debt-037-001")
+ * @param resolvedInSprintId - Sprint ID where the debt was resolved
+ * @returns true if the item was found and resolved, false otherwise
+ */
 export function resolveDebt(projectRoot: string, debtId: string, resolvedInSprintId: string): boolean {
   const debtPath = join(projectRoot, BRAIN_DIR, DEBT_FILE);
   const content = readFileSafe(debtPath);
@@ -207,6 +235,15 @@ export interface RunDecayOptions {
   force?: boolean;
 }
 
+/**
+ * Run the brain memory decay process to keep .brain/ within budget.
+ * Removes resolved patterns, resolved debt (with retention window),
+ * archives old sprint logs, and trims MEMORY.md if needed.
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint ID for retention calculations
+ * @param opts - Optional settings; force=true runs decay even under budget
+ * @returns Summary of what was removed and the before/after line counts
+ */
 export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayOptions): DecayResult {
   const linesBefore = countBrainLines(projectRoot);
   const brainPath = join(projectRoot, BRAIN_DIR);
@@ -294,7 +331,11 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   return { linesBefore, linesAfter, archivedSprints, removedDebtCount, removedPatternCount };
 }
 
-// 15b. decay — backward-compatible alias for runDecay
+/**
+ * Backward-compatible alias for runDecay. Runs decay without force option.
+ * @param projectRoot - Project root directory
+ * @param currentSprintId - Current sprint ID for retention calculations
+ */
 export function decay(projectRoot: string, currentSprintId: string): void {
   runDecay(projectRoot, currentSprintId);
 }

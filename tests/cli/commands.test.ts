@@ -285,9 +285,9 @@ describe('doctor command', () => {
 
   it('reports brain budget over limit', async () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
-    vi.mocked(countBrainLines).mockReturnValue(350);
+    vi.mocked(countBrainLines).mockReturnValue(650);
     await runCommand(registerDoctor, ['doctor']);
-    expect(stdout()).toContain('350/300');
+    expect(stdout()).toContain('650/600');
     expect(stdout()).toContain('OVER BUDGET');
   });
 
@@ -1187,11 +1187,6 @@ describe('plan command', () => {
 describe('stub commands', () => {
   beforeEach(() => { vi.clearAllMocks(); captureOutput(); });
   afterEach(() => restoreOutput());
-
-  it('plugin install shows not implemented', async () => {
-    await runCommand(registerPlugin, ['plugin', 'install', 'test-plugin']);
-    expect(stdout()).toContain('not yet implemented');
-  });
 
   it('plugin list shows no plugins message', async () => {
     await runCommand(registerPlugin, ['plugin', 'list']);

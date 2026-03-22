@@ -25,7 +25,9 @@ import {
   DEBT_FILE,
   PATTERNS_FILE,
   RETRO_FILE,
+  PROJECT_IDENTITY_FILE,
 } from '../../core/constants.js';
+import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { ensureDeckentImport } from '../../core/utils.js';
 import { promptText, promptSelect } from '../helpers/prompt.js';
 import { print, printError } from '../helpers/output.js';
@@ -164,7 +166,7 @@ export function registerInit(program: Command): void {
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
 - Sprint is NEVER left incomplete
-- Memory budget: 300 lines max in .brain/
+- Memory budget: 600 lines max in .brain/
 
 ## Context
 @DIRECTIVES.md
@@ -194,7 +196,7 @@ Lint: tsc --noEmit
         // 8. Claude rules (blueprint-quality templates with frontmatter)
         writeIfNotExists(
           join(root, CLAUDE_RULES_DIR, 'brain.md'),
-          `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 100 lines)\n- Write RETRO.md (overwrite, max 60 lines)\n- Trigger decay if .brain/ exceeds 300 lines\n- Sprint is NEVER left incomplete\n`,
+          `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 200 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 600 lines\n- Sprint is NEVER left incomplete\n`,
         );
         writeIfNotExists(
           join(root, CLAUDE_RULES_DIR, 'auditor.md'),
@@ -217,6 +219,29 @@ Lint: tsc --noEmit
         writeIfNotExists(join(root, BRAIN_DIR, DEBT_FILE), '# Tech Debt\n');
         writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
         writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
+
+        // 10a. PROJECT-IDENTITY.md (permanent memory — never decayed)
+        try {
+          const analysis = options.auto ? analyzeProject(root) : undefined;
+          writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
+            projectName,
+            sprintId: 'sprint-000',
+            totalSprints: 0,
+            mode,
+            language: analysis?.language ?? 'unknown',
+            framework: analysis?.framework ?? 'unknown',
+            testFramework: analysis?.testFramework ?? 'unknown',
+            buildTool: analysis?.buildTool ?? 'unknown',
+          }));
+        } catch {
+          // Non-fatal — create minimal identity
+          writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
+            projectName,
+            sprintId: 'sprint-000',
+            totalSprints: 0,
+            mode,
+          }));
+        }
 
         // 10b. Workspace: TOOLS.md + BOOT.md
         writeIfNotExists(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));

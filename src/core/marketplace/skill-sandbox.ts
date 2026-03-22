@@ -1,5 +1,6 @@
 // ─── Skill Sandbox ───────────────────────────────────────────────────────────
 // Security validation and quarantine system for skills from the marketplace.
+// Two-pass scanning: regex (fast, all files) + AST (accurate, .ts/.js only).
 
 import {
   existsSync,
@@ -9,6 +10,7 @@ import {
   renameSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -45,6 +47,157 @@ const SUSPICIOUS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
   { pattern: /Proxy\s*\(/, description: 'Proxy usage (potential interception)' },
   { pattern: /require\s*\(\s*['"]net['"]/, description: 'Network module access' },
 ];
+
+// ─── AST Scanning ───────────────────────────────────────────────────────────
+
+/** @internal Dangerous module names that should not be imported/required */
+const DANGEROUS_MODULES = new Set([
+  'child_process',
+  'node:child_process',
+  'fs',
+  'node:fs',
+  'os',
+  'node:os',
+  'net',
+  'node:net',
+]);
+
+/** @internal Dangerous global function names */
+const DANGEROUS_CALLS = new Set(['eval', 'Function']);
+
+/** @internal Functions dangerous when called with string arguments */
+const DANGEROUS_STRING_ARG_CALLS = new Set(['setTimeout', 'setInterval']);
+
+/**
+ * AST-level security scan for .ts/.js files.
+ * Uses TypeScript compiler API (ts.createSourceFile) for accurate detection
+ * that regex patterns cannot catch (e.g., obfuscated eval via bracket access).
+ * @internal
+ */
+export function scanCodeAST(content: string, fileName: string): string[] {
+  // Lazy-load typescript — it's a devDependency, may not be available at runtime
+  let ts: typeof import('typescript') | undefined;
+  try {
+    const esmRequire = createRequire(import.meta.url);
+    ts = esmRequire('typescript') as typeof import('typescript');
+  } catch {
+    // TypeScript not available at runtime — skip AST scanning
+    return [];
+  }
+
+  const violations: string[] = [];
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    content,
+    ts.ScriptTarget.Latest,
+    true, // setParentNodes
+    ts.ScriptKind.TS,
+  );
+
+  function visit(node: import('typescript').Node): void {
+    if (!ts) return;
+
+    // ─── CallExpression: eval(...), Function(...), require('child_process'), etc.
+    if (ts.isCallExpression(node)) {
+      const expr = node.expression;
+
+      // Direct calls: eval(), Function()
+      if (ts.isIdentifier(expr)) {
+        const name = expr.text;
+        if (DANGEROUS_CALLS.has(name)) {
+          violations.push(`AST: Dangerous call to ${name}()`);
+        }
+        if (DANGEROUS_STRING_ARG_CALLS.has(name) && node.arguments.length > 0) {
+          const firstArg = node.arguments[0];
+          if (firstArg && ts.isStringLiteral(firstArg)) {
+            violations.push(`AST: ${name}() called with string argument (code execution)`);
+          }
+        }
+
+        // require('child_process') etc.
+        if (name === 'require' && node.arguments.length > 0) {
+          const firstArg = node.arguments[0];
+          if (firstArg && ts.isStringLiteral(firstArg) && DANGEROUS_MODULES.has(firstArg.text)) {
+            violations.push(`AST: require('${firstArg.text}') — dangerous module`);
+          }
+        }
+      }
+
+      // Bracket-access calls: global['eval'](...), globalThis['eval'](...)
+      if (ts.isElementAccessExpression(expr)) {
+        const arg = expr.argumentExpression;
+        if (ts.isStringLiteral(arg)) {
+          if (DANGEROUS_CALLS.has(arg.text)) {
+            violations.push(`AST: Bracket-access call to ['${arg.text}']()`);
+          }
+        }
+        // String concatenation in bracket: global['ev'+'al']
+        if (ts.isBinaryExpression(arg) && arg.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+          const resolved = tryResolveStringConcat(arg, ts);
+          if (resolved !== null && DANGEROUS_CALLS.has(resolved)) {
+            violations.push(`AST: Obfuscated bracket-access call to ['${resolved}']()`);
+          }
+        }
+      }
+    }
+
+    // ─── Dynamic import: import('child_process')
+    if (ts.isCallExpression(node) &&
+        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        node.arguments.length > 0) {
+      const firstArg = node.arguments[0];
+      if (firstArg && ts.isStringLiteral(firstArg) && DANGEROUS_MODULES.has(firstArg.text)) {
+        violations.push(`AST: Dynamic import('${firstArg.text}') — dangerous module`);
+      }
+    }
+
+    // ─── NewExpression: new Function(...)
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+      const name = node.expression.text;
+      if (DANGEROUS_CALLS.has(name)) {
+        violations.push(`AST: Dangerous call to new ${name}()`);
+      }
+    }
+
+    // ─── Property access: global.eval, globalThis.eval
+    if (ts.isPropertyAccessExpression(node)) {
+      const objName = ts.isIdentifier(node.expression) ? node.expression.text : '';
+      if ((objName === 'global' || objName === 'globalThis') && DANGEROUS_CALLS.has(node.name.text)) {
+        violations.push(`AST: Property access ${objName}.${node.name.text}`);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
+/** @internal Try to resolve a binary string concatenation ('ev' + 'al') at AST level */
+function tryResolveStringConcat(
+  node: import('typescript').BinaryExpression,
+  ts: typeof import('typescript'),
+): string | null {
+  const left = node.left;
+  const right = node.right;
+
+  const leftStr = ts.isStringLiteral(left)
+    ? left.text
+    : (ts.isBinaryExpression(left) && left.operatorToken.kind === ts.SyntaxKind.PlusToken)
+      ? tryResolveStringConcat(left, ts)
+      : null;
+  const rightStr = ts.isStringLiteral(right)
+    ? right.text
+    : (ts.isBinaryExpression(right) && right.operatorToken.kind === ts.SyntaxKind.PlusToken)
+      ? tryResolveStringConcat(right, ts)
+      : null;
+
+  if (leftStr !== null && rightStr !== null) {
+    return leftStr + rightStr;
+  }
+  return null;
+}
 
 // ─── Built-in Trusted Skills ─────────────────────────────────────────────────
 
@@ -109,10 +262,20 @@ export class SkillSandbox {
       scannedFiles++;
       try {
         const content = this.fs.readFileSync(file, 'utf-8') as string;
+        const relFile = file.replace(resolvedPath + '/', '');
+
+        // Pass 1: Fast regex scan (all file types)
         for (const { pattern, description } of SUSPICIOUS_PATTERNS) {
           if (pattern.test(content)) {
-            const relFile = file.replace(resolvedPath + '/', '');
             issues.push(`${relFile}: ${description}`);
+          }
+        }
+
+        // Pass 2: AST scan (.ts/.js files only — more accurate, catches obfuscation)
+        if (/\.(ts|js|mjs|cjs)$/.test(file)) {
+          const astViolations = scanCodeAST(content, file);
+          for (const v of astViolations) {
+            issues.push(`${relFile}: ${v}`);
           }
         }
       } catch {

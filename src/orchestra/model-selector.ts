@@ -2,7 +2,16 @@
 // Extracted from brain.ts — score-based and layered model selection
 import type { TaskScope, ModelType, ResolvedConfig, UsageMetrics, PatternEntry } from '../core/types.js';
 
-// 4c1. calculateModelScore — score-based heuristic for model selection
+/**
+ * Calculate a numeric complexity score for a task based on its title, description, and scope.
+ * Higher scores indicate more complex tasks that benefit from stronger models.
+ * Scoring factors: cross-module scope (+3), architectural keywords (+2), file count (+1..+3),
+ * doc/config-only scope (-2), single directory (-1), test-only (-1).
+ * @param title - Task title text
+ * @param description - Task description text
+ * @param scope - Task scope defining directories and files
+ * @returns Numeric score; higher = more complex
+ */
 export function calculateModelScore(title: string, description: string, scope: TaskScope): number {
   const text = `${title}\n${description}`.toLowerCase();
   let score = 0;
@@ -52,7 +61,14 @@ export function calculateModelScore(title: string, description: string, scope: T
   return score;
 }
 
-// 4c. inferModelFromDirective — score-based model selection for structured mode
+/**
+ * Infer the appropriate AI model based on task complexity score.
+ * Score >= 4 maps to opus, score <= -1 maps to haiku, otherwise sonnet.
+ * @param title - Task title text
+ * @param description - Task description text
+ * @param scope - Task scope defining directories and files
+ * @returns The recommended model type
+ */
 export function inferModelFromDirective(title: string, description: string, scope: TaskScope): ModelType {
   const score = calculateModelScore(title, description, scope);
 
@@ -107,13 +123,24 @@ export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntr
   return null;
 }
 
-// 4c2. resolveTaskModel — layered model selection (top-level selector)
-// Layer order (highest priority first):
-//   1. Plan access filter: pro_plan → no opus; haiku_allowed=false → no haiku
-//   2. Usage pressure: 80%+ → downgrade opus to sonnet
-//   3. Task type filter: docs/test-only scope → max sonnet
-//   4. Score system: inferModelFromDirective as base
-//   5. Pattern-based upgrade (optional)
+/**
+ * Top-level model selector that applies layered filtering rules.
+ * Layer order (highest priority first):
+ *   1. Plan access filter: pro_plan disallows opus; haiku_allowed=false disallows haiku
+ *   2. Usage pressure: 80%+ usage downgrades opus to sonnet
+ *   3. Task type filter: doc/test-only scope caps at sonnet
+ *   4. Score system: inferModelFromDirective as base
+ *   5. Pattern-based upgrade and skill model preferences
+ * @param title - Task title text
+ * @param description - Task description text
+ * @param scope - Task scope defining directories and files
+ * @param config - Resolved project configuration
+ * @param usage - Current usage metrics (percentage-based)
+ * @param patterns - Optional pattern entries for model upgrade suggestions
+ * @param forceModel - Optional user override that bypasses all auto-selection
+ * @param skillModels - Optional model preferences from assigned skills
+ * @returns The final resolved model type
+ */
 export function resolveTaskModel(
   title: string,
   description: string,

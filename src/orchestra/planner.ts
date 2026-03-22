@@ -79,6 +79,9 @@ export function buildPlanPrompt(
   if (context.decisions) {
     sections.push(`DECISIONS:\n${context.decisions}`);
   }
+  if (context.projectIdentity) {
+    sections.push(`PROJECT IDENTITY:\n${context.projectIdentity}`);
+  }
 
   const fileTree = context.projectState.fileTree.slice(0, 100);
   if (fileTree.length > 0) {

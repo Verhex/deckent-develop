@@ -32,8 +32,13 @@ function resolveMaxWorkersNumeric(config: ResolvedConfig, systemProfile?: System
   return maxWorkers;
 }
 
-// ─── checkUsage — real integration (synchronous, direct claude CLI) ──
-
+/**
+ * Check current API usage by invoking the claude CLI synchronously.
+ * Parses 5-hour and weekly usage percentages from the output.
+ * Returns safe defaults (50% / 30%) if the CLI call fails.
+ * @param _config - Resolved config (reserved for future use)
+ * @returns Current usage metrics with percentage values
+ */
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
   const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
   try {
@@ -78,8 +83,15 @@ export function getDefaultProvider(): ProviderAdapter | null {
   }
 }
 
-// ─── adjustSprintSize (pure) ────────────────────────────────────────
-
+/**
+ * Recommend sprint size based on current usage vs configured thresholds.
+ * Returns 'minimal' (1 worker) when both thresholds exceeded, 'reduced' (half workers)
+ * when one exceeded, or 'full' when usage is within limits.
+ * @param config - Resolved project configuration
+ * @param usage - Current usage metrics
+ * @param systemProfile - Optional system profile for 'auto' worker resolution
+ * @returns Sprint size recommendation with worker count and model constraint
+ */
 export function adjustSprintSize(
   config: ResolvedConfig,
   usage: UsageMetrics,

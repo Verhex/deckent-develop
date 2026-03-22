@@ -860,6 +860,62 @@ describe('createHttpServer', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  // ─── Startup auth warning ────────────────────────────────────
+  describe('startup auth warning', () => {
+    let stderrSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    });
+
+    afterEach(() => {
+      stderrSpy.mockRestore();
+    });
+
+    it('logs a warning to stderr when no token is configured', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const calls = stderrSpy.mock.calls.map((c) => String(c[0]));
+      const warnCall = calls.find((s) => s.includes('[deckent:warn]'));
+      expect(warnCall).toBeDefined();
+      expect(warnCall).toContain('API server running without authentication');
+    });
+
+    it('does not log a warning when a token is configured', async () => {
+      api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'secret-token' });
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const calls = stderrSpy.mock.calls.map((c) => String(c[0]));
+      const warnCall = calls.find((s) => s.includes('[deckent:warn]'));
+      expect(warnCall).toBeUndefined();
+    });
+
+    it('warning is logged exactly once at server creation, not per request', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      // Make a couple of requests
+      await request(api, '/api/status');
+      await request(api, '/api/status');
+
+      const warnCalls = stderrSpy.mock.calls
+        .map((c) => String(c[0]))
+        .filter((s) => s.includes('[deckent:warn]'));
+      expect(warnCalls).toHaveLength(1);
+    });
+
+    it('warning message includes how to configure auth token', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const calls = stderrSpy.mock.calls.map((c) => String(c[0]));
+      const warnCall = calls.find((s) => s.includes('[deckent:warn]'));
+      expect(warnCall).toContain('DECKENT_API_TOKEN');
+      expect(warnCall).toContain('config.api_token');
+    });
+  });
 });
 
 // ─── parseBody unit tests ────────────────────────────────────────
@@ -955,5 +1011,108 @@ describe('watchDashboard', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
 
     w.close();
+  });
+});
+
+// ─── Bearer token timing-safe auth tests ────────────────────────
+describe('Bearer token timing-safe auth (checkAuth)', () => {
+  let api: HttpApi;
+
+  // Helper: send POST with custom Authorization header
+  function requestWithAuth(
+    a: HttpApi,
+    authHeader: string | null,
+  ): Promise<{ status: number }> {
+    return new Promise((resolve, reject) => {
+      const addr = a.server.address();
+      if (!addr || typeof addr === 'string') return reject(new Error('No address'));
+      const headers: Record<string, string | number> = {
+        'Content-Type': 'application/json',
+        'Content-Length': 2,
+      };
+      if (authHeader !== null) headers['Authorization'] = authHeader;
+      const req = http.request(
+        { hostname: '127.0.0.1', port: (addr as { port: number }).port, path: '/api/start', method: 'POST', headers },
+        (res) => {
+          res.resume();
+          res.on('end', () => resolve({ status: res.statusCode ?? 0 }));
+        },
+      );
+      req.on('error', reject);
+      req.write('{}');
+      req.end();
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetActiveJob();
+    mockExistsSync.mockReturnValue(false);
+    mockReadJsonSafe.mockReturnValue(null);
+  });
+
+  afterEach(async () => {
+    if (api) await api.close();
+  });
+
+  it('accepts valid token (exact match)', async () => {
+    api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'correct-token-abc' });
+    await new Promise<void>((r) => api.server.once('listening', r));
+
+    const res = await requestWithAuth(api, 'Bearer correct-token-abc');
+    // 202 = accepted, sprint started
+    expect(res.status).toBe(202);
+  });
+
+  it('rejects wrong token', async () => {
+    api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'correct-token-abc' });
+    await new Promise<void>((r) => api.server.once('listening', r));
+
+    const res = await requestWithAuth(api, 'Bearer wrong-token-xyz');
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects missing Authorization header', async () => {
+    api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'secret' });
+    await new Promise<void>((r) => api.server.once('listening', r));
+
+    const res = await requestWithAuth(api, null);
+    expect(res.status).toBe(401);
+  });
+
+  it('handles shorter token without crashing (no timingSafeEqual length error)', async () => {
+    // timingSafeEqual requires equal-length buffers; SHA-256 hashing normalises length
+    api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'a-very-long-token-that-exceeds-short-one' });
+    await new Promise<void>((r) => api.server.once('listening', r));
+
+    // Provide a much shorter token — should return 401, not throw
+    const res = await requestWithAuth(api, 'Bearer short');
+    expect(res.status).toBe(401);
+  });
+
+  it('handles longer-than-expected token without crashing', async () => {
+    api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'tok' });
+    await new Promise<void>((r) => api.server.once('listening', r));
+
+    const res = await requestWithAuth(api, 'Bearer this-is-a-very-long-token-that-is-much-longer-than-tok');
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects wrong Bearer scheme (Basic instead of Bearer)', async () => {
+    api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'secret' });
+    await new Promise<void>((r) => api.server.once('listening', r));
+
+    const res = await requestWithAuth(api, 'Basic secret');
+    expect(res.status).toBe(401);
+  });
+
+  it('allows all requests when no token configured (auth disabled)', async () => {
+    // No apiToken → backward-compatible open access
+    api = createHttpServer(PROJECT_ROOT, { port: 0 });
+    await new Promise<void>((r) => api.server.once('listening', r));
+
+    const res = await requestWithAuth(api, null);
+    // Should reach the handler and get 202 (not 401)
+    expect(res.status).toBe(202);
   });
 });

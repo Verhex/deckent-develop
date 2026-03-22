@@ -70,7 +70,7 @@ Deckent is an **AI agent orchestration CLI** that manages multiple Claude Code a
 | **Single orchestrator** | Brain is the only module that coordinates the system. Workers never plan. |
 | **Scope isolation** | Every worker operates in a declared file/directory sandbox. |
 | **Observer independence** | Auditor runs in-process but never modifies source code or creates tasks. |
-| **Memory budget** | `.brain/` directory capped at 300 lines; automatic decay maintains the budget. |
+| **Memory budget** | `.brain/` directory capped at 600 lines; automatic decay maintains the budget. |
 | **Import discipline** | Module dependency graph is an explicit security boundary (ADR-008). |
 | **Sprint completeness** | Every sprint always runs to completion — errors never leave a sprint incomplete. |
 
@@ -614,7 +614,7 @@ brain.ts: runSprint()
         │     write .brain/sprints/sprint-NNN.md
         │
         └─► runDecay()
-              if countBrainLines() > 300: compress
+              if countBrainLines() > 600: compress
               step1: remove resolved PATTERNS
               step2: remove resolved DEBT rows
               step3: archive oldest sprint logs
@@ -822,12 +822,12 @@ Deckent's memory system is a **3-tier, file-based knowledge store** in `.brain/`
 
 ```
 .brain/
-├── MEMORY.md          ← Tier 1: Short-term (always loaded, max 100 lines)
+├── MEMORY.md          ← Tier 1: Short-term (always loaded, max 200 lines)
 ├── PATTERNS.md        ← Tier 2: Long-term patterns (JSON array, max 80 lines)
 ├── DECISIONS.md       ← Tier 3: Permanent ADRs (never decayed)
 ├── DEBT.md            ← Tech debt ledger (markdown table, 9 columns)
-├── RETRO.md           ← Latest retrospective (overwritten each sprint, max 60 lines)
-├── sprints/           ← Per-sprint logs (max 50 lines each)
+├── RETRO.md           ← Latest retrospective (overwritten each sprint, max 100 lines)
+├── sprints/           ← Per-sprint logs (max 80 lines each)
 │   ├── sprint-001.md
 │   └── sprint-NNN.md
 └── archive/           ← Archived sprint logs (deep history, no limit)
@@ -836,12 +836,12 @@ Deckent's memory system is a **3-tier, file-based knowledge store** in `.brain/`
 
 ### Tier 1 — MEMORY.md (Short-Term Memory)
 
-- **Max lines:** 100 (`MEMORY_MAX_LINES`)
+- **Max lines:** 200 (`MEMORY_MAX_LINES`)
 - **Written:** After every sprint retrospective
 - **Loaded:** Into Brain context at the start of every sprint via `@import`
 - **Content:** Recent learnings, wave summaries, sprint-to-sprint patterns
 
-**Decay Rule:** Sections with sprint number ≥ 3 sprints behind current are removed. If budget is still exceeded, hard-truncate to 50 lines.
+**Decay Rule:** Sections with sprint number ≥ 5 sprints behind current are removed. If budget is still exceeded, hard-truncate to 50 lines.
 
 ### Tier 2 — PATTERNS.md (Long-Term Patterns)
 
@@ -892,13 +892,13 @@ Current ADRs (Sprint 25):
 
 | File | Max Lines | Decay Strategy |
 |------|:---------:|----------------|
-| `MEMORY.md` | 100 | Remove sections ≥ 3 sprints old; hard-truncate to 50 as last resort |
+| `MEMORY.md` | 200 | Remove sections ≥ 5 sprints old; hard-truncate to 50 as last resort |
 | `PATTERNS.md` | 80 | Remove `resolved: true` entries when budget exceeded |
 | `DECISIONS.md` | ∞ | Never decayed |
-| `RETRO.md` | 60 | Overwritten every sprint |
+| `RETRO.md` | 100 | Overwritten every sprint |
 | `DEBT.md` | ∞ | Remove resolved rows when budget exceeded |
-| `sprints/sprint-NNN.md` | 50 | Archive oldest (keep last 2 active) |
-| **Total `.brain/` budget** | **300** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
+| `sprints/sprint-NNN.md` | 80 | Archive oldest (keep last 2 active) |
+| **Total `.brain/` budget** | **600** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
 
 ### Decay Cycle
 
@@ -912,7 +912,7 @@ function runDecay(projectRoot: string, sprintId: string, opts?: { force?: boolea
   // Step 1: Remove resolved patterns from PATTERNS.md
   // Step 2: Remove resolved debt rows from DEBT.md
   // Step 3: Archive oldest sprint logs (keep last 2)
-  // Step 4: Trim old MEMORY.md sections (>= 3 sprints old)
+  // Step 4: Trim old MEMORY.md sections (>= 5 sprints old)
   // Step 5: Hard-truncate MEMORY.md to 50 lines (last resort)
 }
 ```
@@ -1098,7 +1098,7 @@ Locks held >5 minutes generate a `WARNING` alert from the Auditor.
 | Concurrent write conflict | File-based lock mutex in `.locks/` |
 | Deadlocked task graph | Kahn's algorithm circular dependency detection |
 | Brain overreach | `--allowedTools` excludes DIRECTIVES and config paths |
-| Memory budget overflow | `runDecay()` triggered at sprint end when >300 lines |
+| Memory budget overflow | `runDecay()` triggered at sprint end when >600 lines |
 | Sprint abandonment | `runSprint()` wraps all phases in try/catch; always reaches COMPLETE |
 
 ### Operating Modes
@@ -1133,12 +1133,12 @@ project/
 │       └── {plugin-name}/      ← Plugin directories (gitignored)
 │
 ├── .brain/                     ← Memory system (3 tiers)
-│   ├── MEMORY.md               ← Tier 1: Short-term (max 100 lines)
+│   ├── MEMORY.md               ← Tier 1: Short-term (max 200 lines)
 │   ├── PATTERNS.md             ← Tier 2: Long-term patterns (JSON)
 │   ├── DECISIONS.md            ← Tier 3: Permanent ADRs
 │   ├── DEBT.md                 ← Tech debt ledger (markdown table)
-│   ├── RETRO.md                ← Latest retrospective (max 60 lines)
-│   ├── sprints/                ← Per-sprint logs (max 50 lines each)
+│   ├── RETRO.md                ← Latest retrospective (max 100 lines)
+│   ├── sprints/                ← Per-sprint logs (max 80 lines each)
 │   │   └── sprint-NNN.md
 │   └── archive/                ← Archived sprint logs
 │       └── sprint-NNN.md
@@ -1188,7 +1188,7 @@ DIRECTIVE → PLAN → SPAWN → AUDIT_START → EXECUTE → AUDIT_STOP → EVAL
 | **EVALUATE** | Brain | Grade each result: DONE / GO_DEBT / NO_GO | Evaluation records |
 | **FIX** | Brain | Spawn priority-fix workers for NO_GO tasks | Fixed tasks (or recorded as debt) |
 | **RETRO** | Brain | Update MEMORY, RETRO, DECISIONS, sprint log | Updated `.brain/` files |
-| **DECAY** | Brain | Compress if `.brain/` > 300 lines | Cleaned `.brain/` |
+| **DECAY** | Brain | Compress if `.brain/` > 600 lines | Cleaned `.brain/` |
 | **TRANSITION** | Brain | More directives? Loop. Done? Report. | Sprint complete |
 
 **Invariant:** Sprints are **never** left incomplete. Every phase is wrapped in try/catch, and the sprint always reaches the COMPLETE state even if individual tasks fail.

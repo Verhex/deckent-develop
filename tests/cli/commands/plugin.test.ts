@@ -7,6 +7,8 @@ vi.mock('../../../src/core/plugin.js', () => ({
   loadPlugin: vi.fn(),
   listPlugins: vi.fn(),
   scanPlugins: vi.fn(),
+  installPlugin: vi.fn(),
+  createPlugin: vi.fn(),
   PluginError: class PluginError extends Error {
     constructor(msg: string) { super(msg); this.name = 'PluginError'; }
   },
@@ -21,7 +23,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
-import { loadPlugin, scanPlugins } from '../../../src/core/plugin.js';
+import { loadPlugin, scanPlugins, installPlugin } from '../../../src/core/plugin.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { registerPlugin } from '../../../src/cli/commands/plugin.js';
 
@@ -91,9 +93,48 @@ describe('plugin install', () => {
   beforeEach(() => { vi.clearAllMocks(); });
   afterEach(() => { process.exitCode = undefined; });
 
-  it('prints not implemented message for install', async () => {
+  it('calls installPlugin with source and prints success', async () => {
+    const plugin = makePlugin();
+    vi.mocked(installPlugin).mockResolvedValue(plugin);
+
     await runCommand(['plugin', 'install', 'my-plugin']);
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('my-plugin'));
+
+    expect(installPlugin).toHaveBeenCalledWith(
+      'my-plugin',
+      expect.stringContaining('.deckent/plugins')
+    );
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('test-plugin@1.0.0'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('installed successfully'));
+  });
+
+  it('prints plugin location after install', async () => {
+    const plugin = makePlugin();
+    vi.mocked(installPlugin).mockResolvedValue(plugin);
+
+    await runCommand(['plugin', 'install', './local-plugin']);
+
+    expect(print).toHaveBeenCalledWith(expect.stringContaining(plugin.dir));
+  });
+
+  it('sets exitCode=1 and calls printError when installPlugin throws', async () => {
+    vi.mocked(installPlugin).mockRejectedValue(new Error('install failed'));
+
+    await runCommand(['plugin', 'install', 'bad-plugin']);
+
+    expect(printError).toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('passes git URL source to installPlugin', async () => {
+    const plugin = makePlugin();
+    vi.mocked(installPlugin).mockResolvedValue(plugin);
+
+    await runCommand(['plugin', 'install', 'https://github.com/org/repo.git']);
+
+    expect(installPlugin).toHaveBeenCalledWith(
+      'https://github.com/org/repo.git',
+      expect.any(String)
+    );
   });
 });
 

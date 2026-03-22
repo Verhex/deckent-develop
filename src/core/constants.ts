@@ -27,6 +27,7 @@ export const DECISIONS_FILE = 'DECISIONS.md' as const;
 export const DEBT_FILE = 'DEBT.md' as const;
 export const PATTERNS_FILE = 'PATTERNS.md' as const;
 export const RETRO_FILE = 'RETRO.md' as const;
+export const PROJECT_IDENTITY_FILE = 'PROJECT-IDENTITY.md' as const;
 export const SPRINTS_DIR = 'sprints' as const;
 export const ARCHIVE_DIR = 'archive' as const;
 
@@ -44,13 +45,13 @@ export const LOCK_TIMEOUT_MS = 30_000 as const;
 export const LOCK_STALE_THRESHOLD_MS = 300_000 as const;
 
 // ─── Memory Limits ───────────────────────────────────────────────────
-export const MEMORY_MAX_LINES = 100 as const;
+export const MEMORY_MAX_LINES = 200 as const;
 export const PATTERNS_MAX_LINES = 80 as const;
-export const RETRO_MAX_LINES = 60 as const;
-export const SPRINT_LOG_MAX_LINES = 50 as const;
-export const BRAIN_TOTAL_LINE_BUDGET = 300 as const;
-export const MEMORY_DECAY_SPRINTS = 3 as const;
-export const PATTERN_DECAY_SPRINTS = 5 as const;
+export const RETRO_MAX_LINES = 100 as const;
+export const SPRINT_LOG_MAX_LINES = 80 as const;
+export const BRAIN_TOTAL_LINE_BUDGET = 600 as const;
+export const MEMORY_DECAY_SPRINTS = 5 as const;
+export const PATTERN_DECAY_SPRINTS = 8 as const;
 
 // ─── Task File Extensions ────────────────────────────────────────────
 export const TASK_FILE_EXTENSIONS = ['.json', '.plan', '.hb', '.result', '.paused', '.log'] as const;

@@ -27,9 +27,9 @@ import type {
 } from '../core/types.js';
 
 import {
-  BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE,
+  BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE, SPRINTS_DIR,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE,
-  RETRO_FILE, TASK_FILE_EXTENSIONS,
+  RETRO_FILE, PROJECT_IDENTITY_FILE, TASK_FILE_EXTENSIONS,
   LOCKS_DIR,
 } from '../core/constants.js';
 
@@ -91,8 +91,12 @@ import {
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
 import { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay } from './debt-manager.js';
-import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs } from './sprint-reporter.js';
+import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity } from './sprint-reporter.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
+
+// ─── Plugin Hooks ─────────────────────────────────────────────────
+import { loadPluginHooks, runHooks, clearHooks } from '../core/plugin-hooks.js';
+import type { BeforeSprintContext, AfterTaskContext, AfterSprintContext } from '../core/plugin-hooks.js';
 
 // ═══ Types ═════════════════════════════════════════════════════════
 
@@ -228,7 +232,12 @@ const PAUSE_STATE_FILE = '.deckent/pause-state.json';
 
 // ═══ Exported Functions ════════════════════════════════════════════
 
-// --- readContext ---
+/**
+ * Read the full brain context from disk: directives, memory, retro, patterns,
+ * decisions, debt, existing tasks, git status, and file tree.
+ * @param projectRoot - Project root directory
+ * @returns Complete brain context for sprint planning
+ */
 export function readContext(projectRoot: string): BrainContext {
   const brainPath = join(projectRoot, BRAIN_DIR);
 
@@ -237,6 +246,7 @@ export function readContext(projectRoot: string): BrainContext {
   const retro = readFileSafe(join(brainPath, RETRO_FILE));
   const patterns = readFileSafe(join(brainPath, PATTERNS_FILE));
   const decisions = readFileSafe(join(brainPath, DECISIONS_FILE));
+  const projectIdentity = readFileSafe(join(brainPath, PROJECT_IDENTITY_FILE));
 
   const debtContent = readFileSafe(join(brainPath, DEBT_FILE));
   const debt = debtContent ? parseDebtTable(debtContent) : [];
@@ -259,10 +269,16 @@ export function readContext(projectRoot: string): BrainContext {
     ? (treeResult.stdout ?? '').split('\n').filter(Boolean)
     : [];
 
-  return { directives, memory, retro, debt, patterns, decisions, existingTasks, projectState: { gitStatus, fileTree } };
+  return { directives, memory, retro, debt, patterns, decisions, projectIdentity, existingTasks, projectState: { gitStatus, fileTree } };
 }
 
-// --- checkUsage ---
+/**
+ * Check current API usage by invoking the claude CLI synchronously.
+ * Parses 5-hour and weekly usage percentages from the output.
+ * Returns safe defaults if the CLI call fails.
+ * @param _config - Resolved config (reserved for future use)
+ * @returns Current usage metrics with percentage values
+ */
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
   const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
   try {
@@ -283,12 +299,19 @@ export function checkUsage(_config: ResolvedConfig): UsageMetrics {
   }
 }
 
-// --- checkUsageWithProvider ---
+/**
+ * Check usage via a ProviderAdapter (async, provider-based).
+ * @param provider - The provider adapter to delegate usage checking to
+ * @returns Usage metrics from the provider
+ */
 export async function checkUsageWithProvider(provider: ProviderAdapter): Promise<UsageMetrics> {
   return provider.checkUsage();
 }
 
-// --- getDefaultProvider ---
+/**
+ * Get the default registered ProviderAdapter from the provider registry.
+ * @returns The default provider, or null if none is registered or an error occurs
+ */
 export function getDefaultProvider(): ProviderAdapter | null {
   try {
     return providerRegistry.getDefault();
@@ -297,7 +320,15 @@ export function getDefaultProvider(): ProviderAdapter | null {
   }
 }
 
-// --- adjustSprintSize ---
+/**
+ * Recommend sprint size based on current usage vs configured thresholds.
+ * Returns 'minimal' (1 worker) when both thresholds exceeded, 'reduced' (half workers)
+ * when one exceeded, or 'full' when usage is within limits.
+ * @param config - Resolved project configuration
+ * @param usage - Current usage metrics
+ * @param systemProfile - Optional system profile for 'auto' worker resolution
+ * @returns Sprint size recommendation with worker count and model constraint
+ */
 export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics, systemProfile?: SystemProfile): SprintSizeRecommendation {
   const thresholds = config.activeModeConfig.usage_thresholds;
   const fiveHrExceeded = usage.fiveHourPercent / 100 >= thresholds['5hr'];
@@ -330,7 +361,18 @@ export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics, sy
   };
 }
 
-// --- planSprint ---
+/**
+ * Plan a new sprint by creating task definitions from directives.
+ * Handles critical debt priority fixes, AI planner with structured fallback,
+ * deadlock detection, agent selection, and skill assignment.
+ * @param projectRoot - Project root directory
+ * @param config - Resolved project configuration
+ * @param context - Brain context with directives, memory, debt, etc.
+ * @param recommendation - Sprint size recommendation from adjustSprintSize
+ * @param options - Optional planning mode, draft flag, and usage metrics
+ * @returns The planned sprint with all tasks
+ * @throws {BrainError} When AI planner fails in 'ai' mode or circular dependencies detected
+ */
 export async function planSprint(
   projectRoot: string,
   config: ResolvedConfig,
@@ -509,7 +551,11 @@ export async function planSprint(
   };
 }
 
-// --- confirmDraftTasks ---
+/**
+ * Transition all DRAFT tasks in a sprint to PENDING status and persist changes.
+ * @param projectRoot - Project root directory
+ * @param sprint - Sprint whose draft tasks should be confirmed
+ */
 export function confirmDraftTasks(projectRoot: string, sprint: Sprint): void {
   const tasksPath = join(projectRoot, TASKS_DIR);
   for (const task of sprint.tasks) {
@@ -524,7 +570,15 @@ export function confirmDraftTasks(projectRoot: string, sprint: Sprint): void {
   }
 }
 
-// --- spawnWorkers ---
+/**
+ * Spawn worker agents for sprint tasks via the configured backend.
+ * Respects max_workers limit; excess tasks are returned as a queue.
+ * @param projectRoot - Project root directory
+ * @param sprint - Sprint containing tasks to execute
+ * @param config - Resolved project configuration
+ * @param spawnOpts - Optional spawn settings (auto-approve, usage tracker, backend)
+ * @returns Array of queued tasks that exceeded the worker limit
+ */
 export function spawnWorkers(
   projectRoot: string,
   sprint: Sprint,
@@ -596,7 +650,16 @@ export function spawnWorkers(
   return queuedTasks;
 }
 
-// --- waitForResults ---
+/**
+ * Wait for task result files to appear on disk using fs.watch with fallback polling.
+ * Supports queued task execution: as workers finish, queued tasks are spawned.
+ * @param projectRoot - Project root directory
+ * @param sprint - Sprint whose results to wait for
+ * @param timeoutMs - Maximum wait time in ms (default: 30 minutes)
+ * @param queue - Optional queued tasks to spawn as slots open
+ * @param spawnOpts - Optional spawn settings for queued task execution
+ * @returns Array of collected task results
+ */
 export async function waitForResults(
   projectRoot: string,
   sprint: Sprint,
@@ -710,11 +773,11 @@ export async function waitForResults(
   return results;
 }
 
-// --- evaluateResult ---
-
 /**
  * Returns true if the task is doc-only (no source code directories).
  * Source code scopes: src/, tests/, lib/ -- everything else is a doc task.
+ * @param task - The task to check
+ * @returns true if all directories in scope are non-source-code
  */
 export function isDocTask(task: Task): boolean {
   const dirs = task.scope?.directories ?? [];
@@ -722,6 +785,14 @@ export function isDocTask(task: Task): boolean {
   return dirs.every(d => !isSourceCodeDir(d));
 }
 
+/**
+ * Evaluate a worker's task result and return DONE, GO_WITH_TECH_DEBT, or NO_GO.
+ * Checks self-assessment, test results, doc-task status, and coverage threshold (90%).
+ * @param result - The worker's task result
+ * @param task - The task that was executed
+ * @param vitestJsonOutput - Optional raw vitest JSON for coverage validation
+ * @returns The evaluation outcome
+ */
 export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string): TaskEvaluation {
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
   if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;
@@ -758,7 +829,13 @@ export function isStaleTaskFile(filePath: string, maxAgeMs: number = 86_400_000)
   }
 }
 
-// --- cleanup ---
+/**
+ * Clean up all sprint resources: kill workers, release locks, remove task files
+ * (.json, .plan, .hb, .result, .paused, .log), stale files, and lock files.
+ * @param projectRoot - Project root directory
+ * @param sprint - Sprint whose resources should be cleaned up
+ * @param spawnBackend - Optional spawn backend for killing workers
+ */
 export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: SpawnBackend): void {
   // Kill all active workers via backend or direct tmux calls
   const workers = spawnBackend ? spawnBackend.list() : listWorkers();
@@ -808,9 +885,129 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
       try { unlinkSync(join(locksDir, file)); } catch { /* skip */ }
     }
   }
+
+  // Clear plugin hooks so they don't persist across sprints
+  clearHooks();
 }
 
-// --- runSprint --- Master Orchestrator
+// ═══ Finalize Sprint ══════════════════════════════════════════════
+
+/**
+ * Options for finalizeSprint.
+ */
+export interface FinalizeSprintOptions {
+  /** Skip decay phase */
+  skipDecay?: boolean;
+  /** Skip plugin hooks */
+  skipHooks?: boolean;
+  /** Resolved config (used for updateProjectDocs) */
+  config?: ResolvedConfig;
+  /** Usage tracker for retro usage section */
+  usageTracker?: UsageTracker;
+}
+
+/**
+ * Run ALL post-sprint finalization actions. This function is idempotent-safe:
+ * calling it multiple times with the same data won't corrupt state (MEMORY.md
+ * may get duplicate entries if sprint learnings already exist, but trimming
+ * keeps it within budget).
+ *
+ * Actions performed:
+ * 1. Calculate metrics from evaluations + results
+ * 2. Write sprint log to .brain/sprints/sprint-NNN.md
+ * 3. Update MEMORY.md with sprint learnings (trimMemoryWithHeader)
+ * 4. Write RETRO.md (writeRetrospective)
+ * 5. Update PROJECT-IDENTITY.md "Current State" section
+ * 6. Update last_sprint_id in .deckent/config.json
+ * 7. Run decay if over budget
+ * 8. Run afterSprint plugin hooks
+ * 9. Update project docs (doc-updaters registry)
+ *
+ * @param projectRoot - Project root directory
+ * @param sprint - The completed sprint (must have tasks populated)
+ * @param evaluations - Map of task ID to evaluation result
+ * @param results - Array of worker task results
+ * @param opts - Optional finalization settings
+ * @returns The computed sprint metrics
+ */
+export async function finalizeSprint(
+  projectRoot: string,
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  results: TaskResult[],
+  opts?: FinalizeSprintOptions,
+): Promise<SprintMetrics> {
+  // 1. Calculate metrics
+  const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
+  const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
+  sprint.metrics = metrics;
+
+  // 2. Write sprint log
+  try {
+    writeSprintLog(projectRoot, sprint, metrics, evaluations);
+  } catch { /* non-fatal: sprint log write failure */ }
+
+  // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
+  try {
+    writeRetrospective(projectRoot, sprint, evaluations, metrics, opts?.usageTracker);
+  } catch { /* non-fatal: retro write failure */ }
+
+  // 5. Update PROJECT-IDENTITY.md
+  try {
+    // Count total sprints from .brain/sprints/ directory
+    const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+    let totalSprints = 1;
+    try {
+      if (existsSync(sprintsPath)) {
+        totalSprints = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).length;
+      }
+    } catch { /* default to 1 */ }
+    updateProjectIdentity(projectRoot, sprint.id, metrics, totalSprints);
+  } catch { /* non-fatal: project identity update failure */ }
+
+  // 6. Update last_sprint_id in config
+  try {
+    updateLastSprintId(projectRoot, sprint.id);
+  } catch { /* non-fatal */ }
+
+  // 7. Run decay if over budget
+  if (!opts?.skipDecay) {
+    try {
+      runDecay(projectRoot, sprint.id);
+    } catch { /* non-fatal: decay failure */ }
+  }
+
+  // 8. Run afterSprint plugin hooks
+  if (!opts?.skipHooks) {
+    try {
+      await runHooks('afterSprint', {
+        hook: 'afterSprint',
+        sprint,
+        projectRoot,
+      } satisfies AfterSprintContext);
+    } catch { /* afterSprint hook failure is non-fatal */ }
+  }
+
+  // 9. Update project docs
+  if (opts?.config) {
+    try {
+      updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, opts.config);
+    } catch { /* non-fatal */ }
+  }
+
+  return metrics;
+}
+
+/**
+ * Master orchestrator: runs a complete sprint lifecycle through all phases
+ * (PLAN, SPAWN, EXECUTE, EVALUATE, FIX, RETRO, DECAY, CLEANUP).
+ * Includes rollback support when all tasks fail.
+ * @param projectRoot - Project root directory
+ * @param config - Resolved project configuration
+ * @param opts - Optional sprint options (auto-approve, sandbox, timeout, rollback, etc.)
+ * @returns The completed sprint with metrics and final status
+ * @throws {BrainError} When plan or spawn phase fails
+ */
 export async function runSprint(
   projectRoot: string,
   config: ResolvedConfig,
@@ -838,6 +1035,11 @@ export async function runSprint(
   const rollbackEnabled = opts?.rollback !== false;
   let safetyPoint: import('./rollback.js').SafetyPoint | null = null;
 
+  // Load plugin hooks at sprint start (non-fatal)
+  try {
+    await loadPluginHooks(projectRoot);
+  } catch { /* plugin hook loading failure is non-fatal */ }
+
   // Phase 1: PLAN
   try {
     const context = readContext(projectRoot);
@@ -848,6 +1050,17 @@ export async function runSprint(
     const recommendation = adjustSprintSize(config, usage);
     sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
+
+    // Run beforeSprint hooks after planning (non-fatal)
+    try {
+      await runHooks('beforeSprint', {
+        hook: 'beforeSprint',
+        sprintId: sprint.id,
+        tasks: sprint.tasks,
+        config,
+        projectRoot,
+      } satisfies BeforeSprintContext);
+    } catch { /* beforeSprint hook failure is non-fatal */ }
 
     // Create git safety point after planning (we now have sprint.id) but before workers spawn.
     if (rollbackEnabled) {
@@ -919,6 +1132,15 @@ export async function runSprint(
         evaluations.set(task.id, evaluation);
         // Record evaluation call in usage tracker
         usageTracker.recordCall(task.model, 2_000, task.id, sprint.id);
+        // Run afterTask hooks (non-fatal)
+        try {
+          await runHooks('afterTask', {
+            hook: 'afterTask',
+            task,
+            result,
+            projectRoot,
+          } satisfies AfterTaskContext);
+        } catch { /* afterTask hook failure is non-fatal */ }
         if (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT) {
           if (task.isPriorityFix && task.fixForTaskId) {
             resolveDebt(projectRoot, `debt-${task.fixForTaskId}`, sprint.id);
@@ -941,6 +1163,15 @@ export async function runSprint(
         evaluations.set(task.id, TaskEvaluation.NO_GO);
         // Record evaluation call for timeout tasks too
         usageTracker.recordCall(task.model, 1_000, task.id, sprint.id);
+        // Run afterTask hooks for timeout tasks too (non-fatal)
+        try {
+          await runHooks('afterTask', {
+            hook: 'afterTask',
+            task,
+            result: syntheticResult,
+            projectRoot,
+          } satisfies AfterTaskContext);
+        } catch { /* afterTask hook failure is non-fatal */ }
       }
     }
   } catch (err) {
@@ -1003,17 +1234,15 @@ export async function runSprint(
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // Phase 6: RETRO (skipped in testMode)
+  // Phase 6+7: RETRO + DECAY via finalizeSprint (skipped in testMode)
   if (!opts?.testMode) {
     try {
       sprint.status = SprintStatus.RETROSPECTIVE;
       sprint.phase = SprintPhase.RETRO;
-      const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
-      metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
-      sprint.metrics = metrics;
-      writeRetrospective(projectRoot, sprint, evaluations, metrics, usageTracker);
-      writeSprintLog(projectRoot, sprint, metrics, evaluations);
-      try { updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, config); } catch { /* non-critical */ }
+      metrics = await finalizeSprint(projectRoot, sprint, evaluations, results, {
+        config,
+        usageTracker,
+      });
     } catch (err) {
       safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -1023,16 +1252,6 @@ export async function runSprint(
       metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
       sprint.metrics = metrics;
     } catch { /* metrics calculation failed in test mode -- non-fatal */ }
-  }
-
-  // Phase 7: DECAY (skipped in testMode)
-  if (!opts?.testMode) {
-    try {
-      sprint.phase = SprintPhase.DECAY;
-      runDecay(projectRoot, sprint.id);
-    } catch (err) {
-      safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
-    }
   }
 
   // Phase 8: CLEANUP (skipped when skipCleanup is true)
@@ -1058,10 +1277,6 @@ export async function runSprint(
       modelBreakdown: sprintUsage.modelBreakdown,
     };
   } catch { /* non-fatal */ }
-
-  if (!opts?.testMode) {
-    updateLastSprintId(projectRoot, sprint.id);
-  }
 
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },

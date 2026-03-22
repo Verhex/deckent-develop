@@ -211,14 +211,14 @@ deckent plan --mode structured
 
 ---
 
-### 2.4 Brain Budget over 300 lines — `deckent doctor` warning
+### 2.4 Brain Budget over 600 lines — `deckent doctor` warning
 
 **Symptom:**
 ```
-○ Brain Budget  312/300 lines — OVER BUDGET, run cleanup --decay
+○ Brain Budget  612/600 lines — OVER BUDGET, run cleanup --decay
 ```
 
-**Cause:** `.brain/` files have accumulated beyond the 300-line memory budget.
+**Cause:** `.brain/` files have accumulated beyond the 600-line memory budget.
 
 **Solution:**
 ```bash
@@ -642,7 +642,7 @@ Run `deckent doctor` to get a system health report. All required checks must pas
 | Workspace | ○ No | `.deckent/` exists | `deckent init` |
 | Brain Dir | ○ No | `.brain/` with all files | `deckent init` |
 | Directives | ○ No | `DIRECTIVES.md` non-empty | Create `DIRECTIVES.md` |
-| Brain Budget | ○ No | ≤ 300 lines | `deckent cleanup --decay` |
+| Brain Budget | ○ No | ≤ 600 lines | `deckent cleanup --decay` |
 | Debt | ○ No | No CRITICAL items | `deckent archive-debt` |
 | Locks | ○ No | No stale locks (>5min) | `rm .locks/*.lock` |
 

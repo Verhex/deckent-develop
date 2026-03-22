@@ -110,17 +110,46 @@ describe('Memory limits', () => {
     }
   });
 
-  it('MEMORY_MAX_LINES === 100 (Blueprint 6)', () => {
-    expect(MEMORY_MAX_LINES).toBe(100);
+  it('MEMORY_MAX_LINES === 200 (Sprint 037 increase)', () => {
+    expect(MEMORY_MAX_LINES).toBe(200);
   });
 
-  it('BRAIN_TOTAL_LINE_BUDGET === 300 (Blueprint 6)', () => {
-    expect(BRAIN_TOTAL_LINE_BUDGET).toBe(300);
+  it('RETRO_MAX_LINES === 100 (Sprint 037 increase)', () => {
+    expect(RETRO_MAX_LINES).toBe(100);
   });
 
-  it('MEMORY_DECAY_SPRINTS === 3, PATTERN_DECAY_SPRINTS === 5 (Blueprint 6)', () => {
-    expect(MEMORY_DECAY_SPRINTS).toBe(3);
-    expect(PATTERN_DECAY_SPRINTS).toBe(5);
+  it('SPRINT_LOG_MAX_LINES === 80 (Sprint 037 increase)', () => {
+    expect(SPRINT_LOG_MAX_LINES).toBe(80);
+  });
+
+  it('BRAIN_TOTAL_LINE_BUDGET === 600 (Sprint 037 increase)', () => {
+    expect(BRAIN_TOTAL_LINE_BUDGET).toBe(600);
+  });
+
+  it('MEMORY_DECAY_SPRINTS === 5, PATTERN_DECAY_SPRINTS === 8 (Sprint 037 increase)', () => {
+    expect(MEMORY_DECAY_SPRINTS).toBe(5);
+    expect(PATTERN_DECAY_SPRINTS).toBe(8);
+  });
+
+  it('BRAIN_TOTAL_LINE_BUDGET >= sum of individual limits', () => {
+    // Budget should accommodate MEMORY + RETRO + PATTERNS + at least one sprint log
+    const minRequired = MEMORY_MAX_LINES + RETRO_MAX_LINES + PATTERNS_MAX_LINES + SPRINT_LOG_MAX_LINES;
+    expect(BRAIN_TOTAL_LINE_BUDGET).toBeGreaterThanOrEqual(minRequired);
+  });
+
+  it('MEMORY_DECAY_SPRINTS < PATTERN_DECAY_SPRINTS', () => {
+    expect(MEMORY_DECAY_SPRINTS).toBeLessThan(PATTERN_DECAY_SPRINTS);
+  });
+
+  it('decay sprints are reasonable for 35+ sprint projects', () => {
+    // Memory should persist long enough for multi-sprint context
+    expect(MEMORY_DECAY_SPRINTS).toBeGreaterThanOrEqual(5);
+    expect(PATTERN_DECAY_SPRINTS).toBeGreaterThanOrEqual(8);
+  });
+
+  it('individual file limits fit within total budget', () => {
+    // Even with all files at max, should fit in budget
+    expect(MEMORY_MAX_LINES + RETRO_MAX_LINES + PATTERNS_MAX_LINES).toBeLessThan(BRAIN_TOTAL_LINE_BUDGET);
   });
 });
 

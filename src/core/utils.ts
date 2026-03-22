@@ -12,6 +12,8 @@ function isDebtPriority(value: string): value is DebtPriority {
 
 /**
  * Read a file safely, returning empty string on any error.
+ * @param filePath - Absolute or relative path to the file
+ * @returns File contents as string, or empty string on failure
  */
 export function readFileSafe(filePath: string): string {
   try {
@@ -23,6 +25,8 @@ export function readFileSafe(filePath: string): string {
 
 /**
  * Parse a JSON file safely, returning null on any error.
+ * @param filePath - Path to the JSON file
+ * @returns Parsed object of type T, or null on failure
  */
 export function readJsonSafe<T>(filePath: string): T | null {
   try {
@@ -35,6 +39,8 @@ export function readJsonSafe<T>(filePath: string): T | null {
 
 /**
  * Async variant of readJsonSafe. Parse a JSON file safely, returning null on any error.
+ * @param filePath - Path to the JSON file
+ * @returns Parsed object of type T, or null on failure
  */
 export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> {
   try {
@@ -49,6 +55,8 @@ export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> 
 /**
  * Count total lines in .brain/ directory (excluding archive/).
  * Used by brain decay and doctor health checks.
+ * @param projectRoot - Project root directory
+ * @returns Total line count across all .brain/ files
  */
 export function countBrainLines(projectRoot: string): number {
   const brainPath = join(projectRoot, BRAIN_DIR);
@@ -151,6 +159,13 @@ export function shouldRemoveResolvedDebt(
   return diff >= retentionSprints;                          // old enough → remove
 }
 
+/**
+ * Parse a DEBT.md markdown table into an array of DebtItem objects.
+ * Expects a pipe-delimited table with columns: ID, Description, OriginTaskId,
+ * OriginSprintId, Priority, SprintsOpen, Resolved, ResolvedInSprintId, CreatedAt.
+ * @param content - Raw markdown content containing the debt table
+ * @returns Parsed debt items; returns empty array if no valid table found
+ */
 export function parseDebtTable(content: string): DebtItem[] {
   const lines = content.split('\n');
   const items: DebtItem[] = [];
@@ -180,6 +195,12 @@ export function parseDebtTable(content: string): DebtItem[] {
   return items;
 }
 
+/**
+ * Generate a pipe-delimited markdown table string from an array of DebtItem objects.
+ * Produces a table with header, separator, and one row per item.
+ * @param items - Debt items to render as table rows
+ * @returns Formatted markdown table string
+ */
 export function generateDebtTable(items: DebtItem[]): string {
   const separator = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
   const rows = items.map(d =>
@@ -190,9 +211,10 @@ export function generateDebtTable(items: DebtItem[]): string {
 
 /**
  * Ensure a file contains `@DECKENT.md` reference.
- * - File doesn't exist → create with `@DECKENT.md\n`
- * - File exists without reference → prepend `@DECKENT.md\n\n` to existing content
- * - File exists with reference → no-op (idempotent)
+ * - File doesn't exist -> create with `@DECKENT.md\n`
+ * - File exists without reference -> prepend `@DECKENT.md\n\n` to existing content
+ * - File exists with reference -> no-op (idempotent)
+ * @param filePath - Path to the file to check/update
  */
 export function ensureDeckentImport(filePath: string): void {
   const ref = `@${DECKENT_FILE}`;
@@ -216,6 +238,9 @@ const DATE_LOCALES: Record<string, string> = {
 /**
  * Format a Date or ISO string according to the given language.
  * Supported lang values: 'en' (default), 'tr'
+ * @param date - Date object or ISO date string to format
+ * @param lang - Language code ('en' or 'tr')
+ * @returns Formatted date string in the given locale
  */
 export function formatDate(date: Date | string, lang: string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -232,8 +257,11 @@ const DURATION_UNITS: Array<{ ms: number; en: string; tr: string }> = [
 
 /**
  * Format a duration in milliseconds into a human-readable string.
- * e.g. formatDuration(300000, 'en') → "5 minutes"
- *      formatDuration(300000, 'tr') → "5 dakika"
+ * e.g. formatDuration(300000, 'en') -> "5 minutes"
+ *      formatDuration(300000, 'tr') -> "5 dakika"
+ * @param ms - Duration in milliseconds
+ * @param lang - Language code ('en' or 'tr')
+ * @returns Human-readable duration string
  */
 export function formatDuration(ms: number, lang: string): string {
   if (ms < 0) ms = 0;
@@ -253,9 +281,12 @@ export function formatDuration(ms: number, lang: string): string {
 
 /**
  * Format the time elapsed since `date` as a relative string.
- * e.g. formatRelativeTime(pastDate, 'en') → "3 seconds ago"
- *      formatRelativeTime(pastDate, 'tr') → "3 saniye önce"
+ * e.g. formatRelativeTime(pastDate, 'en') -> "3 seconds ago"
+ *      formatRelativeTime(pastDate, 'tr') -> "3 saniye once"
  * For future dates: "in 3 seconds" / "3 saniye sonra"
+ * @param date - The reference date to compare against now
+ * @param lang - Language code ('en' or 'tr')
+ * @returns Relative time string like "5 minutes ago"
  */
 export function formatRelativeTime(date: Date, lang: string): string {
   const diffMs = Date.now() - date.getTime();

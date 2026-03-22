@@ -89,7 +89,7 @@ Each phase is wrapped in `try/catch` in `runSprint()`. **Sprints are never left 
 | `writeRetrospective(root, sprint, evals, metrics)` | Writes RETRO.md + appends to MEMORY.md |
 | `writeSprintLog(root, sprint, metrics)` | Writes `.brain/sprints/sprint-NNN.md` |
 | `escalateDebt(root)` | Increments `sprintsOpen`; escalates NORMAL→HIGH→CRITICAL |
-| `runDecay(root, sprintId, opts)` | Compresses `.brain/` if over 300-line budget |
+| `runDecay(root, sprintId, opts)` | Compresses `.brain/` if over 600-line budget |
 
 ---
 
@@ -169,20 +169,20 @@ CRITICAL debt items are automatically added as priority fix tasks at the **start
 
 | Tier | File | Max Lines | Loaded When | Decay |
 |------|------|-----------|-------------|-------|
-| 1 | `.brain/MEMORY.md` | 100 | Always (via @import) | Trimmed when budget exceeded |
-| 2 | `.brain/sprints/sprint-NNN.md` | 50 each | Brain reads last 2 | Archived after 2 sprints |
+| 1 | `.brain/MEMORY.md` | 200 | Always (via @import) | Trimmed when budget exceeded |
+| 2 | `.brain/sprints/sprint-NNN.md` | 80 each | Brain reads last 2 | Archived after 2 sprints |
 | 3 | `.brain/archive/` | Unlimited | On-demand grep | Never |
 
-Total `.brain/` budget: **300 lines** (excluding archive).
+Total `.brain/` budget: **600 lines** (excluding archive).
 
 ### Decay (`runDecay`)
 
-Runs at sprint end when `.brain/` exceeds 300 lines (or with `force: true`):
+Runs at sprint end when `.brain/` exceeds 600 lines (or with `force: true`):
 
 1. Remove resolved patterns from `PATTERNS.md`
 2. Remove resolved debt from `DEBT.md`
 3. Archive old sprint logs (keep last 2) → `.brain/archive/`
-4. Trim MEMORY.md to `MEMORY_MAX_LINES` (100)
+4. Trim MEMORY.md to `MEMORY_MAX_LINES` (200)
 
 `runDecay()` returns a `DecayResult` with counts of what was removed/archived.
 

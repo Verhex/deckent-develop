@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   registerHook,
   runHooks,
   clearHooks,
   clearHook,
   getHookCount,
+  loadPluginHooks,
+  registerPluginHooks,
+  loadHookModule,
   type PluginHook,
   type HookCallback,
   type HookContext,
@@ -13,6 +18,7 @@ import {
   type BeforeTaskContext,
   type AfterTaskContext,
 } from '../../src/core/plugin-hooks.js';
+import type { Plugin } from '../../src/core/plugin.js';
 import type { Task, Sprint, TaskResult, ResolvedConfig } from '../../src/core/types.js';
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 
@@ -412,6 +418,319 @@ describe('plugin-hooks', () => {
       await runHooks('afterTask', { hook: 'afterTask', task, result, projectRoot: '/tmp' });
       expect(capturedCtx?.task.id).toBe('task-001');
       expect(capturedCtx?.result.selfAssessment).toBe('DONE');
+    });
+  });
+
+  // ─── loadHookModule ────────────────────────────────────────────────
+
+  describe('loadHookModule', () => {
+    it('returns null when hook file does not exist', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const result = await loadHookModule('/nonexistent/plugin', 'hooks/before.js');
+      expect(result).toBeNull();
+      expect(stderrSpy).toHaveBeenCalled();
+      stderrSpy.mockRestore();
+    });
+
+    it('logs error for nonexistent hook file', async () => {
+      const stderrOutput: string[] = [];
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((data) => {
+        stderrOutput.push(String(data));
+        return true;
+      });
+      await loadHookModule('/nonexistent/dir', 'hook.js');
+      expect(stderrOutput.some(s => s.includes('Hook file not found'))).toBe(true);
+      stderrSpy.mockRestore();
+    });
+  });
+
+  // ─── registerPluginHooks ──────────────────────────────────────────
+
+  describe('registerPluginHooks', () => {
+    it('returns 0 when plugin has no hooks', async () => {
+      const plugin: Plugin = {
+        manifest: {
+          name: 'test-plugin',
+          version: '1.0.0',
+          description: 'Test',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+        },
+        dir: '/tmp/plugins/test-plugin',
+      };
+      const count = await registerPluginHooks(plugin);
+      expect(count).toBe(0);
+    });
+
+    it('returns 0 when hooks object is empty', async () => {
+      const plugin: Plugin = {
+        manifest: {
+          name: 'test-plugin',
+          version: '1.0.0',
+          description: 'Test',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: {},
+        },
+        dir: '/tmp/plugins/test-plugin',
+      };
+      const count = await registerPluginHooks(plugin);
+      expect(count).toBe(0);
+    });
+
+    it('logs error and returns 0 for nonexistent hook files', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const plugin: Plugin = {
+        manifest: {
+          name: 'test-plugin',
+          version: '1.0.0',
+          description: 'Test',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: { beforeSprint: 'nonexistent.js' },
+        },
+        dir: '/tmp/nonexistent-plugin-dir',
+      };
+      const count = await registerPluginHooks(plugin);
+      expect(count).toBe(0);
+      stderrSpy.mockRestore();
+    });
+  });
+
+  // ─── loadPluginHooks ──────────────────────────────────────────────
+
+  describe('loadPluginHooks', () => {
+    it('returns 0 when plugins directory does not exist', async () => {
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const count = await loadPluginHooks(tmpDir);
+      expect(count).toBe(0);
+    });
+
+    it('returns 0 when plugins directory is empty', async () => {
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const pluginsDir = path.join(tmpDir, '.deckent', 'plugins');
+      fs.mkdirSync(pluginsDir, { recursive: true });
+      try {
+        const count = await loadPluginHooks(tmpDir);
+        expect(count).toBe(0);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it('clears previously registered hooks before scanning', async () => {
+      registerHook('beforeSprint', vi.fn());
+      expect(getHookCount('beforeSprint')).toBe(1);
+
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      await loadPluginHooks(tmpDir);
+      expect(getHookCount('beforeSprint')).toBe(0);
+    });
+
+    it('skips disabled plugins', async () => {
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const pluginDir = path.join(tmpDir, '.deckent', 'plugins', 'disabled-plugin');
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginDir, 'manifest.json'),
+        JSON.stringify({
+          name: 'disabled-plugin',
+          version: '1.0.0',
+          description: 'Disabled',
+          entrypoint: 'SKILL.md',
+          enabled: false,
+          hooks: { beforeSprint: 'hook.js' },
+        }),
+      );
+      try {
+        const count = await loadPluginHooks(tmpDir);
+        expect(count).toBe(0);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it('loads hooks from enabled plugin with valid hook module', async () => {
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const pluginDir = path.join(tmpDir, '.deckent', 'plugins', 'test-plugin');
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginDir, 'manifest.json'),
+        JSON.stringify({
+          name: 'test-plugin',
+          version: '1.0.0',
+          description: 'Test',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: { beforeSprint: 'before-sprint.mjs' },
+        }),
+      );
+      // Write a valid hook module
+      fs.writeFileSync(
+        path.join(pluginDir, 'before-sprint.mjs'),
+        'export default function(ctx) { /* noop */ }\n',
+      );
+      try {
+        const count = await loadPluginHooks(tmpDir);
+        expect(count).toBe(1);
+        expect(getHookCount('beforeSprint')).toBe(1);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it('loads multiple hooks from a single plugin', async () => {
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const pluginDir = path.join(tmpDir, '.deckent', 'plugins', 'multi-hook-plugin');
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginDir, 'manifest.json'),
+        JSON.stringify({
+          name: 'multi-hook-plugin',
+          version: '1.0.0',
+          description: 'Multi hook',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: {
+            beforeSprint: 'before-sprint.mjs',
+            afterSprint: 'after-sprint.mjs',
+          },
+        }),
+      );
+      fs.writeFileSync(
+        path.join(pluginDir, 'before-sprint.mjs'),
+        'export default function(ctx) {}\n',
+      );
+      fs.writeFileSync(
+        path.join(pluginDir, 'after-sprint.mjs'),
+        'export default function(ctx) {}\n',
+      );
+      try {
+        const count = await loadPluginHooks(tmpDir);
+        expect(count).toBe(2);
+        expect(getHookCount('beforeSprint')).toBe(1);
+        expect(getHookCount('afterSprint')).toBe(1);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it('loads hooks from multiple plugins in registration order', async () => {
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const pluginsDir = path.join(tmpDir, '.deckent', 'plugins');
+
+      // Plugin A
+      const pluginADir = path.join(pluginsDir, 'aaa-plugin');
+      fs.mkdirSync(pluginADir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginADir, 'manifest.json'),
+        JSON.stringify({
+          name: 'aaa-plugin',
+          version: '1.0.0',
+          description: 'A',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: { beforeSprint: 'hook.mjs' },
+        }),
+      );
+      fs.writeFileSync(
+        path.join(pluginADir, 'hook.mjs'),
+        'export default function(ctx) {}\n',
+      );
+
+      // Plugin B
+      const pluginBDir = path.join(pluginsDir, 'bbb-plugin');
+      fs.mkdirSync(pluginBDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginBDir, 'manifest.json'),
+        JSON.stringify({
+          name: 'bbb-plugin',
+          version: '1.0.0',
+          description: 'B',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: { beforeSprint: 'hook.mjs' },
+        }),
+      );
+      fs.writeFileSync(
+        path.join(pluginBDir, 'hook.mjs'),
+        'export default function(ctx) {}\n',
+      );
+
+      try {
+        const count = await loadPluginHooks(tmpDir);
+        expect(count).toBe(2);
+        expect(getHookCount('beforeSprint')).toBe(2);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it('handles invalid hook module gracefully', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const pluginDir = path.join(tmpDir, '.deckent', 'plugins', 'bad-plugin');
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginDir, 'manifest.json'),
+        JSON.stringify({
+          name: 'bad-plugin',
+          version: '1.0.0',
+          description: 'Bad',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: { beforeSprint: 'bad-hook.mjs' },
+        }),
+      );
+      // Write a module that doesn't export a function
+      fs.writeFileSync(
+        path.join(pluginDir, 'bad-hook.mjs'),
+        'export default "not-a-function";\n',
+      );
+      try {
+        const count = await loadPluginHooks(tmpDir);
+        expect(count).toBe(0);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        stderrSpy.mockRestore();
+      }
+    });
+
+    it('hook callback receives correct context when executed', async () => {
+      const tmpDir = path.join('/tmp', `plugin-hooks-test-${Date.now()}`);
+      const pluginDir = path.join(tmpDir, '.deckent', 'plugins', 'ctx-plugin');
+      fs.mkdirSync(pluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(pluginDir, 'manifest.json'),
+        JSON.stringify({
+          name: 'ctx-plugin',
+          version: '1.0.0',
+          description: 'Context test',
+          entrypoint: 'SKILL.md',
+          enabled: true,
+          hooks: { afterSprint: 'after.mjs' },
+        }),
+      );
+      // Hook that writes to a global for verification
+      fs.writeFileSync(
+        path.join(pluginDir, 'after.mjs'),
+        `export default function(ctx) {
+          if (!globalThis.__hookTestCalls) globalThis.__hookTestCalls = [];
+          globalThis.__hookTestCalls.push(ctx.hook);
+        }\n`,
+      );
+      try {
+        await loadPluginHooks(tmpDir);
+        expect(getHookCount('afterSprint')).toBe(1);
+        const sprint = makeSprint();
+        await runHooks('afterSprint', { hook: 'afterSprint', sprint, projectRoot: tmpDir });
+        // Verify the hook was called
+        const calls = (globalThis as Record<string, unknown>).__hookTestCalls as string[] | undefined;
+        expect(calls).toContain('afterSprint');
+      } finally {
+        delete (globalThis as Record<string, unknown>).__hookTestCalls;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
   });
 });

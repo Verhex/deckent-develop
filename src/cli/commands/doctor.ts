@@ -6,7 +6,7 @@ import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import {
   DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, LOCK_STALE_THRESHOLD_MS, DEBT_TABLE_HEADER,
-  PROJECT_CONFIG_PATH,
+  PROJECT_CONFIG_PATH, BRAIN_TOTAL_LINE_BUDGET,
 } from '../../core/constants.js';
 import { countBrainLines } from '../../core/utils.js';
 import { getSystemProfile } from '../../core/system-profile.js';
@@ -146,11 +146,11 @@ function checkDirectives(root: string): DoctorCheck {
 
 function checkBrainBudget(root: string): DoctorCheck {
   const lines = countBrainLines(root);
-  const passed = lines <= 300;
+  const passed = lines <= BRAIN_TOTAL_LINE_BUDGET;
   return {
     name: 'Brain Budget',
     passed,
-    message: `${lines}/300 lines${passed ? '' : ' — OVER BUDGET, run cleanup --decay'}`,
+    message: `${lines}/${BRAIN_TOTAL_LINE_BUDGET} lines${passed ? '' : ' — OVER BUDGET, run cleanup --decay'}`,
     required: false,
   };
 }

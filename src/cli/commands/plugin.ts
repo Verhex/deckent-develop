@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import { loadPlugin, scanPlugins, createPlugin } from '../../core/plugin.js';
+import { loadPlugin, scanPlugins, createPlugin, installPlugin } from '../../core/plugin.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
@@ -10,10 +10,19 @@ export function registerPlugin(program: Command): void {
     .description('Manage plugins');
 
   cmd
-    .command('install <name>')
-    .description('Install a plugin')
-    .action((name: string) => {
-      print(`Plugin system not yet implemented. Cannot install "${name}".`);
+    .command('install <source>')
+    .description('Install a plugin from npm, git URL, or local path')
+    .action(async (source: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const pluginsDir = join(root, '.deckent', 'plugins');
+        const plugin = await installPlugin(source, pluginsDir);
+        print(`Plugin "${plugin.manifest.name}@${plugin.manifest.version}" installed successfully.`);
+        print(`  Location: ${plugin.dir}`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
     });
 
   cmd

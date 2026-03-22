@@ -27,6 +27,27 @@ export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
   tier3: false,
 };
 
+// ─── Mode Aliases ────────────────────────────────────────────────────
+
+/**
+ * User-friendly aliases for canonical plan mode names.
+ * Accepted in config.mode and --mode CLI flag.
+ */
+export const MODE_ALIASES: Readonly<Record<string, PlanMode>> = {
+  performance: 'max_plan',
+  balanced: 'max5x_plan',
+  economic: 'pro_plan',
+  unlimited: 'api',
+} as const;
+
+/**
+ * Resolve a mode string (alias or canonical) to a canonical PlanMode name.
+ * Returns the input as-is when it is already canonical or unknown.
+ */
+export function resolveMode(mode: string): string {
+  return MODE_ALIASES[mode] ?? mode;
+}
+
 // ─── Default Mode Definitions (Blueprint 13) ────────────────────────
 
 const VALID_MODES: readonly PlanMode[] = ['max_plan', 'max5x_plan', 'pro_plan', 'api'] as const;
@@ -88,6 +109,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Deep-merge two plain objects, returning a new object with all keys from base
+ * overridden by non-undefined keys from override. Nested objects are merged recursively.
+ * @param base - The base object to start from
+ * @param override - Partial override whose values take precedence
+ * @returns A new deep-cloned object with merged values
+ */
 export function deepMerge<T>(base: T, override: Partial<T>): T {
   const result = structuredClone(base);
   // safe: generic T is always a plain object type; Record view needed for dynamic key iteration
@@ -109,6 +137,14 @@ export function deepMerge<T>(base: T, override: Partial<T>): T {
   return result;
 }
 
+/**
+ * Validate a complete DeckentConfig object against all known rules.
+ * Checks mode validity, language support, worker counts, model names,
+ * usage thresholds, brain planning mode, and skills config.
+ * @param config - The full configuration object to validate
+ * @returns Array of warning strings (non-fatal); empty if no warnings
+ * @throws {ConfigValidationError} When validation errors are found
+ */
 export function validateConfig(config: DeckentConfig): string[] {
   const errors: string[] = [];
   const maxWorkersWarnings: string[] = [];
@@ -240,6 +276,10 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
 
 // ─── Public API ──────────────────────────────────────────────────────
 
+/**
+ * Create a fresh default DeckentConfig with default mode and mode definitions.
+ * @returns A new DeckentConfig instance with default values
+ */
 export function createDefaultConfig(): DeckentConfig {
   return {
     mode: DEFAULT_MODE,
@@ -247,14 +287,29 @@ export function createDefaultConfig(): DeckentConfig {
   };
 }
 
+/**
+ * Alias for createDefaultConfig. Returns a fresh default configuration.
+ * @returns A new DeckentConfig instance with default values
+ */
 export function getDefaultConfig(): DeckentConfig {
   return createDefaultConfig();
 }
 
+/**
+ * Get a deep clone of the default mode definitions for all plan modes.
+ * @returns A record mapping each PlanMode to its default PlanModeConfig
+ */
 export function getDefaultModes(): Record<PlanMode, PlanModeConfig> {
   return structuredClone(DEFAULT_MODES);
 }
 
+/**
+ * Load and resolve the full configuration by merging defaults, global config,
+ * and project-level config. Resolves mode aliases and validates the result.
+ * @param projectRoot - Project root directory; defaults to process.cwd()
+ * @returns Fully resolved configuration ready for use
+ * @throws {ConfigValidationError} When merged config fails validation or API key is missing
+ */
 export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> {
   const root = resolve(projectRoot ?? process.cwd());
 
@@ -270,6 +325,9 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   if (projectConfig) {
     config = deepMerge(config, projectConfig);
   }
+
+  // Resolve alias before validation so 'performance' → 'max_plan' etc.
+  config.mode = resolveMode(config.mode) as PlanMode;
 
   validateConfig(config);
 
@@ -298,6 +356,12 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   };
 }
 
+/**
+ * Validate a partial config by merging it over defaults and running full validation.
+ * Useful for checking user-provided overrides before persisting.
+ * @param partial - Partial configuration to validate
+ * @throws {ConfigValidationError} When the merged result fails validation
+ */
 export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
   const merged = deepMerge(createDefaultConfig(), partial);
   validateConfig(merged);
@@ -348,6 +412,9 @@ export function mergeConfigs(
   if (projectConfig) {
     config = deepMerge(config, projectConfig);
   }
+
+  // Resolve alias before validation so 'performance' → 'max_plan' etc.
+  config.mode = resolveMode(config.mode) as PlanMode;
 
   validateConfig(config);
 

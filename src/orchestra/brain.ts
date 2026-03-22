@@ -26,6 +26,7 @@ export {
   isStaleTaskFile,
   cleanup,
   runSprint,
+  finalizeSprint,
   pauseSprint,
   resumeSprint,
   checkAndAutoPause,
@@ -34,7 +35,7 @@ export {
   registerWorkerChannel,
   unregisterWorkerChannel,
 } from './sprint-controller.js';
-export type { PauseState, RunSprintOptions } from './sprint-controller.js';
+export type { PauseState, RunSprintOptions, FinalizeSprintOptions } from './sprint-controller.js';
 
 // ─── Type re-exports (backward compat) ─────────────────────────────
 export type { BrainContext, ProjectState, SprintSizeRecommendation } from '../core/types.js';
@@ -52,7 +53,7 @@ export { createTask, extractScopeFromDirective, parseStructuredDirectives, build
 export type { CreateTaskParams, ParsedDirectiveTask } from './task-builder.js';
 export { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay, decay } from './debt-manager.js';
 export type { RunDecayOptions } from './debt-manager.js';
-export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics, buildAgentPerformance, formatAgentPerformanceTable, buildSkillPerformance, formatSkillPerformanceTable } from './sprint-reporter.js';
-export type { SprintComparison, AgentPerformanceRow, SkillPerformanceRow } from './sprint-reporter.js';
+export { trimMemoryWithHeader, writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, compareWithPreviousSprint, readPreviousSprintMetrics, buildAgentPerformance, formatAgentPerformanceTable, buildSkillPerformance, formatSkillPerformanceTable, generateProjectIdentity, updateProjectIdentity } from './sprint-reporter.js';
+export type { SprintComparison, AgentPerformanceRow, SkillPerformanceRow, ProjectIdentityInfo } from './sprint-reporter.js';
 export { parseCoverageFromVitest, validateCoverage, validateWorkerCoverage, isDocOnlyTask } from './coverage-validator.js';
 export type { CoverageResult, CoverageWarningLevel, ParsedVitestOutput, VitestCoverageSummary, VitestCoverageData } from './coverage-validator.js';

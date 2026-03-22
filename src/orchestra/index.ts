@@ -15,6 +15,7 @@
 //   confirmDraftTasks  — prompt user to confirm draft tasks (plan.ts)
 //   buildWorkerPrompt  — build a worker's task prompt (run.ts)
 //   cleanup            — clean up task files and locks (cleanup.ts)
+//   finalizeSprint     — run all post-sprint actions (finalize.ts, start.ts)
 //   runDecay           — run memory/debt decay (cleanup.ts)
 //   BrainError         — error class for orchestration failures
 //
@@ -66,6 +67,7 @@ export {
   buildWorkerPrompt,
   cleanup,
   runSprint,
+  finalizeSprint,
   runDecay,
 } from './brain.js';
 
@@ -79,7 +81,7 @@ export type {
   BrainPlanningMode,
   SprintResult,
 } from '../core/types.js';
-export type { CreateTaskParams, RunDecayOptions } from './brain.js';
+export type { CreateTaskParams, RunDecayOptions, FinalizeSprintOptions } from './brain.js';
 export type { RunSprintOptions } from './sprint-controller.js';
 
 // ─── Doc Updater plugin API (public: for external plugin authors) ────

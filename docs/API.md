@@ -466,13 +466,13 @@ const LOCK_STALE_THRESHOLD_MS       = 300_000;  // 5 minutes
 ### Memory Limits
 
 ```ts
-const MEMORY_MAX_LINES       = 100;
+const MEMORY_MAX_LINES       = 200;
 const PATTERNS_MAX_LINES     = 80;
-const RETRO_MAX_LINES        = 60;
-const SPRINT_LOG_MAX_LINES   = 50;
-const BRAIN_TOTAL_LINE_BUDGET = 300;
-const MEMORY_DECAY_SPRINTS   = 3;    // Unused entries decay after 3 sprints
-const PATTERN_DECAY_SPRINTS  = 5;
+const RETRO_MAX_LINES        = 100;
+const SPRINT_LOG_MAX_LINES   = 80;
+const BRAIN_TOTAL_LINE_BUDGET = 600;
+const MEMORY_DECAY_SPRINTS   = 5;    // Unused entries decay after 5 sprints
+const PATTERN_DECAY_SPRINTS  = 8;
 ```
 
 ### Debt Escalation
@@ -1645,7 +1645,7 @@ Or let `deckent init` handle registration automatically. The MCP server is regis
 
 ### Authentication
 
-No authentication is required for the MCP server or the HTTP API when running locally. Both are intended for local development use only.
+No authentication is required for the MCP server when running locally. It is intended for local development use only. The HTTP API supports optional Bearer token authentication for POST endpoints — see [Section 11](#11-http-api) for details.
 
 ---
 
@@ -1653,117 +1653,565 @@ No authentication is required for the MCP server or the HTTP API when running lo
 
 **Source:** `src/api/server.ts`, `src/api/watcher.ts`
 
-Start the server with `deckent serve` (API only) or `deckent web` (API + web dashboard). Default port: 3100. No authentication required for local use.
+Start the server with `deckent serve` (API only) or `deckent web` (API + web dashboard). Default port: **3100**. The server binds to `127.0.0.1` (localhost only) and is intended for local development use.
+
+---
+
+### Authentication
+
+POST endpoints are protected by an optional Bearer token. GET endpoints (including `/api/events`) do **not** require authentication.
+
+**Enabling auth:** Set the token via environment variable or project config:
+
+```bash
+# Environment variable (takes precedence)
+export DECKENT_API_TOKEN=your-secret-token
+
+# Or in .deckent/config.json
+{ "api_token": "your-secret-token" }
+```
+
+If no token is configured, auth is disabled and a warning is printed to stderr:
+
+```
+[deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_token to enable auth.
+```
+
+**Request header for protected routes:**
+
+```
+Authorization: Bearer <token>
+```
+
+**Auth error response (401):**
+
+```json
+{ "error": "Unauthorized — provide Authorization: Bearer <token>" }
+```
+
+Token comparison uses SHA-256 + `timingSafeEqual` to prevent timing side-channel attacks. Tokens with incorrect scheme (not `Bearer`) are rejected.
+
+---
 
 ### `createHttpServer`
 
 ```ts
-function createHttpServer(
-  projectRoot: string,
-  port?: number,
-  staticDir?: string,
-): HttpApi
+function createHttpServer(projectRoot: string, opts?: HttpServerOptions): HttpApi
+
+interface HttpServerOptions {
+  port?: number;       // Default: 3100
+  staticDir?: string;  // Serve static files from this directory (deckent web)
+  apiToken?: string;   // Bearer token for POST endpoints
+  host?: string;       // Bind address. Default: '127.0.0.1'
+}
+
+interface HttpApi {
+  server: Server;
+  close(): Promise<void>;
+}
 ```
 
-Creates an HTTP server with all API routes and optional static file serving. Returns `{ server, listen() }`.
+Creates an HTTP server with all API routes and optional static file serving for the web dashboard. Returns an object with the raw Node.js `Server` and a `close()` method that shuts down the server and terminates all active SSE connections.
 
-### Routes (16 Endpoints + SSE)
+---
 
-#### GET Routes
+### CORS
 
-| Route | Response | Description |
-|-------|----------|-------------|
-| `GET /api/status` | `DashboardState` JSON | Current dashboard state |
-| `GET /api/sprint` | Sprint log + metrics | Latest sprint with task details |
-| `GET /api/history` | Sprint log array | All sprint history entries |
-| `GET /api/config` | `DeckentConfig` JSON | Project configuration |
-| `GET /api/doctor` | `DoctorResult` JSON | System health check results |
-| `GET /api/memory` | text/markdown | `.brain/MEMORY.md` content |
-| `GET /api/debt` | text/markdown | `.brain/DEBT.md` content |
-| `GET /api/job/:jobId` | Job status JSON | Active sprint job status (running/completed/failed) |
-| `GET /api/events` | SSE stream | Server-Sent Events, pushes dashboard updates on file change |
-| `GET /api/worker/:taskId/log` | Task JSON + log | Worker task JSON + terminal log output |
+All responses include `Access-Control-Allow-Origin` restricted to `http://localhost:*` and `http://127.0.0.1:*`. Cross-origin requests from external hosts are blocked. Preflight (`OPTIONS`) requests are handled automatically.
 
-#### POST Routes
+---
 
-| Route | Body | Description |
-|-------|------|-------------|
-| `POST /api/start` | `{ autoApprove? }` | Start a sprint (async, returns jobId) |
-| `POST /api/plan` | `{ mode? }` | Generate sprint plan |
-| `POST /api/kill/:workerId` | -- | Kill a running worker |
-| `POST /api/set-directives` | `{ content }` | Update DIRECTIVES.md |
-| `POST /api/config` | Partial config | Merge-update project config |
+### Error Response Format
 
-#### Curl Examples
+All error responses use HTTP status codes and return JSON:
+
+```json
+{ "error": "Human-readable error message" }
+```
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Bad request — invalid JSON body or failed schema validation |
+| `401` | Unauthorized — missing or invalid Bearer token on a POST route |
+| `403` | Forbidden — path traversal attempt on static file serving |
+| `404` | Not found — resource does not exist (no active sprint, missing file, etc.) |
+| `405` | Method not allowed — HTTP method not supported for this route |
+| `409` | Conflict — sprint already running when `POST /api/start` is called |
+| `500` | Internal server error — unexpected failure |
+
+---
+
+### GET Endpoints
+
+#### `GET /api/status`
+
+Returns the current dashboard state from the `.dashboard` file.
+
+**Authentication:** Not required.
+
+**Response `200`:**
+
+```json
+{
+  "sprint": {
+    "id": "sprint-037",
+    "number": 37,
+    "phase": "EXECUTE",
+    "status": "ACTIVE"
+  },
+  "agents": [...],
+  "alerts": [...],
+  "metrics": { ... }
+}
+```
+
+**Error `404`:** `{ "error": "No active sprint" }` — returned when no `.dashboard` file exists.
 
 ```bash
-# Get current dashboard status
 curl http://localhost:3100/api/status
+```
 
-# Get system health
-curl http://localhost:3100/api/doctor
+---
 
-# Get project config
-curl http://localhost:3100/api/config
+#### `GET /api/sprint`
 
-# Get sprint history
-curl http://localhost:3100/api/history
+Returns the latest sprint log parsed from `.brain/sprints/sprint-NNN.md`.
 
-# Get brain memory
-curl http://localhost:3100/api/memory
+**Authentication:** Not required.
 
-# Get technical debt
-curl http://localhost:3100/api/debt
+**Response `200`:**
 
-# Get latest sprint details
+```json
+{
+  "id": "sprint-037",
+  "metrics": {
+    "tasks": "11",
+    "completed": "11",
+    "noGoRate": "0%",
+    "coverage": "92%",
+    "duration": "47m"
+  },
+  "tasks": [
+    "001 Extract sprint-controller.ts — DONE",
+    "002 Extract result-evaluator.ts — DONE"
+  ]
+}
+```
+
+**Error `404`:** `{ "error": "No sprint logs found" }` — returned when no sprint log files exist.
+
+```bash
 curl http://localhost:3100/api/sprint
+```
 
-# Get worker log for a specific task
+---
+
+#### `GET /api/history`
+
+Returns all sprint logs as an array, sorted oldest-first.
+
+**Authentication:** Not required.
+
+**Response `200`:** Array of sprint log objects (same shape as `/api/sprint` metrics, plus `id` field). Returns `[]` if no sprint logs exist.
+
+```bash
+curl http://localhost:3100/api/history
+```
+
+---
+
+#### `GET /api/config`
+
+Returns the project configuration from `.deckent/config.json`.
+
+**Authentication:** Not required.
+
+**Response `200`:**
+
+```json
+{
+  "mode": "max_plan",
+  "language": "en",
+  "brain_planning": "ai",
+  "max_plan": { "max_workers": 8, "model": "opus" },
+  "pro_plan": { "max_workers": 4, "model": "sonnet" }
+}
+```
+
+**Error `404`:** `{ "error": "Config not found" }` — returned when `.deckent/config.json` does not exist.
+
+```bash
+curl http://localhost:3100/api/config
+```
+
+---
+
+#### `GET /api/doctor`
+
+Runs system health checks and returns results.
+
+**Authentication:** Not required.
+
+**Response `200`:**
+
+```json
+{
+  "ok": true,
+  "checks": [
+    { "name": "tmux", "passed": true, "message": "tmux 3.3a found", "required": true },
+    { "name": "claude", "passed": true, "message": "claude CLI found", "required": true },
+    { "name": "node", "passed": true, "message": "Node.js v20.11.0 found", "required": true }
+  ]
+}
+```
+
+`ok` is `true` only when all checks with `required: true` pass.
+
+```bash
+curl http://localhost:3100/api/doctor
+```
+
+---
+
+#### `GET /api/memory`
+
+Returns the content of `.brain/MEMORY.md` as a JSON-wrapped string.
+
+**Authentication:** Not required.
+
+**Response `200`:**
+
+```json
+{ "content": "## Sprint 036 Learnings\n- brain.ts split: 1312 → 58 lines\n..." }
+```
+
+**Error `404`:** `{ "error": "Memory file not found" }`.
+
+```bash
+curl http://localhost:3100/api/memory
+```
+
+---
+
+#### `GET /api/debt`
+
+Returns the content of `.brain/DEBT.md` as a JSON-wrapped string.
+
+**Authentication:** Not required.
+
+**Response `200`:**
+
+```json
+{ "content": "| ID | Description | Priority | Sprint |\n|---|---|---|---|\n| D-001 | ... |" }
+```
+
+**Error `404`:** `{ "error": "Debt file not found" }`.
+
+```bash
+curl http://localhost:3100/api/debt
+```
+
+---
+
+#### `GET /api/job/:jobId`
+
+Returns the status of an async sprint job started via `POST /api/start`.
+
+**Authentication:** Not required.
+
+**Path parameter:** `jobId` — the job ID returned by `POST /api/start` (format: `job-<timestamp>`).
+
+**Response `200`:**
+
+```json
+{
+  "id": "job-1710768000000",
+  "status": "running"
+}
+```
+
+```json
+{
+  "id": "job-1710768000000",
+  "status": "completed",
+  "result": { ... }
+}
+```
+
+```json
+{
+  "id": "job-1710768000000",
+  "status": "failed",
+  "error": "Sprint failed: no tasks found in DIRECTIVES.md"
+}
+```
+
+`status` values: `"running"` | `"completed"` | `"failed"`
+
+**Error `404`:** `{ "error": "Job not found" }` — returned when the job ID does not match the current active job.
+
+```bash
+curl http://localhost:3100/api/job/job-1710768000000
+```
+
+---
+
+#### `GET /api/worker/:taskId/log`
+
+Returns the task JSON and terminal log output for a specific worker.
+
+**Authentication:** Not required.
+
+**Path parameter:** `taskId` — task identifier (e.g. `001-001`).
+
+**Response `200`:**
+
+```json
+{
+  "taskId": "001-001",
+  "log": "Worker started...\ntsc --noEmit passed\nvitest run: 42 tests passed",
+  "task": {
+    "id": "001-001",
+    "title": "Extract sprint-controller.ts",
+    "status": "DONE",
+    "model": "opus",
+    "effort": "high"
+  }
+}
+```
+
+`log` may be `null` if no log file exists yet. `task` is the parsed `.tasks/task-{taskId}.json`.
+
+**Error `400`:** `{ "error": "Missing taskId" }`.
+
+**Error `404`:** `{ "error": "Task not found" }` — task JSON file does not exist.
+
+```bash
 curl http://localhost:3100/api/worker/001-001/log
+```
 
-# Check job status
-curl http://localhost:3100/api/job/sprint-1710768000000
+---
 
-# Start a sprint
-curl -X POST http://localhost:3100/api/start \
-  -H "Content-Type: application/json" \
-  -d '{"autoApprove": true}'
+#### `GET /api/events`
 
-# Plan without executing
-curl -X POST http://localhost:3100/api/plan \
-  -H "Content-Type: application/json" \
-  -d '{"mode": "ai"}'
+Opens a Server-Sent Events (SSE) stream. The server pushes a `data:` line containing the full dashboard state as JSON whenever the `.dashboard` file changes. Changes are debounced at 500ms.
 
-# Kill a worker
-curl -X POST http://localhost:3100/api/kill/001-002
+**Authentication:** Not required.
 
-# Set directives
-curl -X POST http://localhost:3100/api/set-directives \
-  -H "Content-Type: application/json" \
-  -d '{"content": "# DIRECTIVES\n\n## Task 1: Fix bug\n- Fix the login bug"}'
+**Response headers:**
 
-# Update config
-curl -X POST http://localhost:3100/api/config \
-  -H "Content-Type: application/json" \
-  -d '{"mode": "pro_plan"}'
+```
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+```
 
-# Subscribe to SSE events
+**Event format:**
+
+Each event is a bare `data:` line (no named event type) followed by a blank line:
+
+```
+data: {"sprint":{"id":"sprint-037","number":37,"phase":"EXECUTE","status":"ACTIVE"},...}
+
+data: {"sprint":{"id":"sprint-037","number":37,"phase":"EVALUATE","status":"EVALUATING"},...}
+```
+
+The watcher is initialized lazily on the first SSE client connection. When a client connects, any existing dashboard state is sent immediately. When the client disconnects, it is removed from the broadcast set.
+
+**Connection setup (JavaScript):**
+
+```js
+const es = new EventSource('http://localhost:3100/api/events');
+es.onmessage = (event) => {
+  const state = JSON.parse(event.data);
+  console.log(state.sprint.phase);
+};
+es.onerror = () => console.error('SSE connection lost');
+```
+
+```bash
+# Stream events (Ctrl-C to stop)
 curl -N http://localhost:3100/api/events
 ```
 
-#### SSE Stream Format
+---
 
-The `/api/events` endpoint returns Server-Sent Events. Each event is a JSON-encoded `DashboardState` object:
+### POST Endpoints
 
+All POST endpoints require `Content-Type: application/json`. If an `api_token` is configured, all POST endpoints also require `Authorization: Bearer <token>`.
+
+---
+
+#### `POST /api/start`
+
+Starts a sprint asynchronously. Returns a `jobId` immediately (HTTP 202). Poll `GET /api/job/:jobId` to track progress.
+
+**Authentication:** Required if `api_token` is configured.
+
+**Request body:**
+
+```json
+{ "autoApprove": true }
 ```
-event: dashboard
-data: {"sprint":{"id":"sprint-1","number":1,"phase":"EXECUTE","status":"ACTIVE"},...}
 
-event: dashboard
-data: {"sprint":{"id":"sprint-1","number":1,"phase":"EVALUATE","status":"EVALUATING"},...}
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `autoApprove` | `boolean` | No | Pass `--dangerously-skip-permissions` to workers |
+
+**Response `202`:**
+
+```json
+{ "jobId": "job-1710768000000", "status": "started" }
 ```
 
-Events are pushed whenever the `.dashboard` file changes (500ms debounce).
+**Error `400`:** Body failed schema validation.
+
+**Error `409`:** `{ "error": "Sprint already running" }` — a job with `status: "running"` already exists.
+
+```bash
+# Start with manual approval (default)
+curl -X POST http://localhost:3100/api/start \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-token" \
+  -d '{}'
+
+# Start with auto-approve
+curl -X POST http://localhost:3100/api/start \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-token" \
+  -d '{"autoApprove": true}'
+```
+
+---
+
+#### `POST /api/plan`
+
+Generates a sprint plan from `DIRECTIVES.md` and returns the task list synchronously. Does **not** spawn workers.
+
+**Authentication:** Required if `api_token` is configured.
+
+**Request body:**
+
+```json
+{ "mode": "ai" }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mode` | `"ai" \| "structured" \| "auto"` | No | Planning mode override. Defaults to the project config value. |
+
+**Response `200`:** The generated sprint plan object (array of task drafts with id, title, model, effort, scope, go/no-go criteria).
+
+**Error `400`:** Body failed schema validation (e.g. `mode` value not in allowed enum).
+
+**Error `500`:** Planning failed (e.g. AI planner returned invalid output).
+
+```bash
+curl -X POST http://localhost:3100/api/plan \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-token" \
+  -d '{"mode": "ai"}'
+```
+
+---
+
+#### `POST /api/kill/:workerId`
+
+Kills a running worker tmux window by worker ID.
+
+**Authentication:** Required if `api_token` is configured.
+
+**Path parameter:** `workerId` — must match `[a-zA-Z0-9-]+`.
+
+**Response `200`:**
+
+```json
+{ "success": true }
+```
+
+**Error `400`:** Missing or invalid `workerId` format.
+
+**Error `500`:** Kill command failed.
+
+```bash
+curl -X POST http://localhost:3100/api/kill/001-002 \
+  -H "Authorization: Bearer your-secret-token"
+```
+
+---
+
+#### `POST /api/set-directives`
+
+Overwrites `DIRECTIVES.md` with the provided content. Also returns a count of `## Task` blocks found in the content.
+
+**Authentication:** Required if `api_token` is configured.
+
+**Request body:**
+
+```json
+{ "content": "# DIRECTIVES — Sprint 038\n\n## Task 1: Fix login bug\n..." }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | `string` | Yes | Full file content. Must be non-empty. |
+
+**Response `200`:**
+
+```json
+{ "success": true, "taskCount": 5 }
+```
+
+`taskCount` is the number of `## Task` headings found (lines matching `^## Task`).
+
+**Error `400`:** `{ "error": "Missing content field" }` — `content` is missing or empty.
+
+**Error `500`:** File write failed.
+
+```bash
+curl -X POST http://localhost:3100/api/set-directives \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-token" \
+  -d '{"content": "# DIRECTIVES — Sprint 038\n\n## Task 1: Fix the login bug\n- Description: ...\n"}'
+```
+
+---
+
+#### `POST /api/config`
+
+Merges the provided fields into the project config (`/.deckent/config.json`) and returns the full merged result. Unknown keys are preserved.
+
+**Authentication:** Required if `api_token` is configured.
+
+**Request body:** Any JSON object. Keys are merged with the existing config using shallow merge (`{ ...existing, ...body }`).
+
+```json
+{ "mode": "pro_plan", "language": "en" }
+```
+
+**Response `200`:** The full merged config object after writing to disk.
+
+```json
+{
+  "mode": "pro_plan",
+  "language": "en",
+  "brain_planning": "ai",
+  "max_plan": { "max_workers": 8, "model": "opus" }
+}
+```
+
+**Error `400`:** Body is not a valid JSON object.
+
+**Error `500`:** File write failed.
+
+```bash
+curl -X POST http://localhost:3100/api/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-token" \
+  -d '{"mode": "pro_plan"}'
+```
+
+---
 
 ### `watchDashboard`
 
@@ -1772,9 +2220,13 @@ function watchDashboard(
   filePath: string,
   onChange: () => void,
 ): DashboardWatcher
+
+interface DashboardWatcher {
+  close(): void;
+}
 ```
 
-Watches the `.dashboard` file for changes and calls `onChange` with 500ms debounce. Returns `{ close(): void }`.
+Watches the `.dashboard` file for changes using `fs.watch` and calls `onChange` with a 500ms debounce. The returned object has a `close()` method that cancels any pending debounce timer and closes the underlying file watcher.
 
 ---
 

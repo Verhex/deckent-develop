@@ -8,7 +8,7 @@ import type {
   SprintResult,
 } from '../core/types.js';
 import {
-  BRAIN_DIR, SPRINTS_DIR, MEMORY_FILE,
+  BRAIN_DIR, SPRINTS_DIR, MEMORY_FILE, PROJECT_IDENTITY_FILE,
   RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
@@ -30,6 +30,13 @@ function readFileSafe(filePath: string): string {
 /** Header-preserving memory trim: keep first HEADER_LINES lines, trim middle, keep recent entries */
 const MEMORY_HEADER_LINES = 10;
 
+/**
+ * Trim memory content to maxLines while preserving the header section.
+ * Keeps the first MEMORY_HEADER_LINES lines as header and fills the rest from the end.
+ * @param lines - Array of lines from MEMORY.md
+ * @param maxLines - Maximum number of lines to keep
+ * @returns Trimmed content as a single string
+ */
 export function trimMemoryWithHeader(lines: string[], maxLines: number): string {
   if (lines.length <= maxLines) return lines.join('\n');
   const headerEnd = Math.min(MEMORY_HEADER_LINES, maxLines);
@@ -181,7 +188,18 @@ export function formatSkillPerformanceTable(rows: SkillPerformanceRow[]): string
   return lines;
 }
 
-// 12. writeRetrospective
+/**
+ * Write the sprint retrospective to RETRO.md and append learnings to MEMORY.md.
+ * Includes metrics summary, per-task results, comparison with previous sprint,
+ * usage report, agent performance, and skill performance sections.
+ * @param projectRoot - Project root directory
+ * @param sprint - The completed sprint
+ * @param evaluations - Map of task ID to evaluation result
+ * @param metrics - Calculated sprint metrics
+ * @param usageTracker - Optional usage tracker for cost/token reporting
+ * @param agentMap - Optional map of task ID to agent ID
+ * @param skillMap - Optional map of task ID to skill ID array
+ */
 export function writeRetrospective(
   projectRoot: string,
   sprint: Sprint,
@@ -277,7 +295,14 @@ export function writeRetrospective(
   writeFileSync(memoryPath, trimmed, 'utf-8');
 }
 
-// 13. writeSprintLog
+/**
+ * Write a sprint log markdown file to .brain/sprints/{sprintId}.md.
+ * Contains a metrics table and per-task status listing.
+ * @param projectRoot - Project root directory
+ * @param sprint - The completed sprint
+ * @param metrics - Calculated sprint metrics
+ * @param evaluations - Optional map of task ID to evaluation result
+ */
 export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: SprintMetrics, evaluations?: Map<string, TaskEvaluation>): void {
   const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
   mkdirSync(sprintsPath, { recursive: true });
@@ -307,7 +332,16 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
   );
 }
 
-// 14. calculateMetrics (pure)
+/**
+ * Calculate sprint metrics from evaluation results and task outputs.
+ * Counts completed, tech-debt, and no-go tasks; computes coverage average,
+ * no-go rate, duration, and debt statistics.
+ * @param sprint - The sprint being measured
+ * @param evaluations - Map of task ID to evaluation result
+ * @param results - Array of worker task results
+ * @param debt - Optional array of debt items for debt counting
+ * @returns Computed sprint metrics
+ */
 export function calculateMetrics(
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
@@ -350,7 +384,15 @@ export function calculateMetrics(
   };
 }
 
-// 16c. updateProjectDocs — registry-based auto-update after sprint completion
+/**
+ * Run all registered document updaters after sprint completion.
+ * Uses the doc-updaters registry to automatically update project documentation
+ * based on sprint results and configuration.
+ * @param projectRoot - Project root directory
+ * @param sprintResult - Sprint result containing sprint, evaluations, and metrics
+ * @param config - Optional resolved config; defaults are created if not provided
+ * @returns Array of document update results from each updater
+ */
 export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult, config?: ResolvedConfig): DocUpdateResult[] {
   const isInternalProject = existsSync(join(projectRoot, 'DECKENT-MASTER-BLUEPRINT.md'));
   const resolvedConfig: ResolvedConfig = config ?? {
@@ -459,4 +501,165 @@ function parseSprintLogMetrics(content: string): SprintMetrics | null {
     crossAssignments: 0,
     contextLinesUsed: 0,
   };
+}
+
+// ═══ Project Identity ═════════════════════════════════════════════
+
+export interface ProjectIdentityInfo {
+  projectName: string;
+  description?: string;
+  testCount?: number;
+  fileCount?: number;
+  lineCount?: number;
+  sprintId: string;
+  totalSprints?: number;
+  mode?: string;
+  brainModel?: string;
+  defaultModel?: string;
+  maxWorkers?: number;
+  framework?: string;
+  language?: string;
+  testFramework?: string;
+  buildTool?: string;
+  moduleMap?: Record<string, string>;
+}
+
+/**
+ * Generate the initial PROJECT-IDENTITY.md content.
+ * Called during `deckent init` to create the permanent project memory file.
+ * @param info - Project identity information
+ * @returns Markdown content for PROJECT-IDENTITY.md
+ */
+export function generateProjectIdentity(info: ProjectIdentityInfo): string {
+  const lines: string[] = [
+    '# Project Identity',
+    '',
+    '## What Is This Project',
+    `- Name: ${info.projectName}`,
+  ];
+  if (info.description) {
+    lines.push(`- Description: ${info.description}`);
+  }
+  lines.push('');
+
+  lines.push('## Architecture');
+  if (info.language) lines.push(`- Language: ${info.language}`);
+  if (info.framework) lines.push(`- Framework: ${info.framework}`);
+  if (info.testFramework) lines.push(`- Test Framework: ${info.testFramework}`);
+  if (info.buildTool) lines.push(`- Build Tool: ${info.buildTool}`);
+  lines.push('');
+
+  lines.push('## Current State');
+  if (info.testCount !== undefined) lines.push(`- Test Count: ${info.testCount}`);
+  if (info.fileCount !== undefined) lines.push(`- File Count: ${info.fileCount}`);
+  if (info.lineCount !== undefined) lines.push(`- Line Count: ${info.lineCount}`);
+  lines.push(`- Last Sprint: ${info.sprintId}`);
+  if (info.totalSprints !== undefined) lines.push(`- Total Sprints: ${info.totalSprints}`);
+  lines.push('');
+
+  lines.push('## Active Configuration');
+  if (info.mode) lines.push(`- Mode: ${info.mode}`);
+  if (info.brainModel) lines.push(`- Brain Model: ${info.brainModel}`);
+  if (info.defaultModel) lines.push(`- Default Model: ${info.defaultModel}`);
+  if (info.maxWorkers !== undefined) lines.push(`- Max Workers: ${info.maxWorkers}`);
+  lines.push('');
+
+  lines.push('## Key Rules');
+  lines.push('- See .brain/DECISIONS.md for architecture decision records');
+  lines.push('');
+
+  lines.push('## Module Map');
+  if (info.moduleMap && Object.keys(info.moduleMap).length > 0) {
+    for (const [dir, purpose] of Object.entries(info.moduleMap)) {
+      lines.push(`- ${dir}: ${purpose}`);
+    }
+  } else {
+    lines.push('- (auto-populated after first sprint)');
+  }
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+/**
+ * Update the "Current State" section of PROJECT-IDENTITY.md after each sprint.
+ * Preserves all other sections. Creates the file with defaults if missing.
+ * @param projectRoot - Project root directory
+ * @param sprintId - Completed sprint ID
+ * @param metrics - Sprint metrics for updating state
+ * @param totalSprints - Total number of sprints run so far
+ */
+export function updateProjectIdentity(
+  projectRoot: string,
+  sprintId: string,
+  metrics: SprintMetrics,
+  totalSprints?: number,
+): void {
+  const brainPath = join(projectRoot, BRAIN_DIR);
+  mkdirSync(brainPath, { recursive: true });
+  const filePath = join(brainPath, PROJECT_IDENTITY_FILE);
+
+  let content = readFileSafe(filePath);
+
+  // If file doesn't exist, create a minimal one
+  if (!content) {
+    const dirName = projectRoot.split(/[\\/]/).pop() ?? 'unknown';
+    content = generateProjectIdentity({
+      projectName: dirName,
+      sprintId,
+      totalSprints: totalSprints ?? 1,
+    });
+    writeFileSync(filePath, content, 'utf-8');
+    return;
+  }
+
+  // Update the "Current State" section
+  const lines = content.split('\n');
+  const newLines: string[] = [];
+  let inCurrentState = false;
+  let replacedCurrentState = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+
+    if (line === '## Current State') {
+      inCurrentState = true;
+      replacedCurrentState = true;
+      newLines.push('## Current State');
+      newLines.push(`- Test Count: ${metrics.totalTasks}`);
+      newLines.push(`- Coverage: ${metrics.coveragePercent.toFixed(1)}%`);
+      newLines.push(`- Last Sprint: ${sprintId}`);
+      if (totalSprints !== undefined) newLines.push(`- Total Sprints: ${totalSprints}`);
+      newLines.push(`- Completed Tasks: ${metrics.completedTasks}`);
+      newLines.push(`- No-Go Rate: ${metrics.noGoRate.toFixed(1)}%`);
+      continue;
+    }
+
+    if (inCurrentState) {
+      // Skip old current state content until next section
+      if (line.startsWith('## ')) {
+        inCurrentState = false;
+        newLines.push('');
+        newLines.push(line);
+      }
+      continue;
+    }
+
+    newLines.push(line);
+  }
+
+  if (!replacedCurrentState) {
+    // Section didn't exist, append it
+    newLines.push('');
+    newLines.push('## Current State');
+    newLines.push(`- Test Count: ${metrics.totalTasks}`);
+    newLines.push(`- Coverage: ${metrics.coveragePercent.toFixed(1)}%`);
+    newLines.push(`- Last Sprint: ${sprintId}`);
+    if (totalSprints !== undefined) newLines.push(`- Total Sprints: ${totalSprints}`);
+    newLines.push(`- Completed Tasks: ${metrics.completedTasks}`);
+    newLines.push(`- No-Go Rate: ${metrics.noGoRate.toFixed(1)}%`);
+    newLines.push('');
+  }
+
+  writeFileSync(filePath, newLines.join('\n'), 'utf-8');
 }

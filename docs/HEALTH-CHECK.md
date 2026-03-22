@@ -106,7 +106,7 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 | MCP resources | 5 | src/mcp/resources/ |
 | HTTP endpoints | 16 | src/api/server.ts |
 | Sprints | 30 | .brain/sprints/ |
-| .brain/ budget | ~180 / 300 lines | countBrainLines() |
+| .brain/ budget | ~180 / 600 lines | countBrainLines() |
 
 ---
 

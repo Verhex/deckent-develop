@@ -39,12 +39,12 @@ Each task is stored as `.tasks/task-{id}.json`:
 
 ## .brain/ File Formats
 
-- `MEMORY.md`: Markdown, max 100 lines, sprint learnings
+- `MEMORY.md`: Markdown, max 200 lines, sprint learnings
 - `DEBT.md`: Markdown table format (pipe-delimited)
 - `PATTERNS.md`: JSON array of PatternEntry objects
-- `RETRO.md`: Markdown, max 60 lines, overwritten each sprint
+- `RETRO.md`: Markdown, max 100 lines, overwritten each sprint
 - `DECISIONS.md`: Markdown, architecture decision records
-- `sprints/sprint-NNN.md`: Markdown sprint log, max 50 lines
+- `sprints/sprint-NNN.md`: Markdown sprint log, max 80 lines
 
 ## Lock File Format
 

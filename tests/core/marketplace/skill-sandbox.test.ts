@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SkillSandbox } from '../../../src/core/marketplace/skill-sandbox.js';
+import { SkillSandbox, scanCodeAST } from '../../../src/core/marketplace/skill-sandbox.js';
 import type { SkillSandboxFS, SafetyReport, ManifestValidation } from '../../../src/core/marketplace/skill-sandbox.js';
 
 // ─── Mock FS ─────────────────────────────────────────────────────────────────
@@ -127,6 +127,51 @@ describe('SkillSandbox', () => {
 
       const result = sandbox.validateSkillSafety('/skills/multi');
       expect(result.scannedFiles).toBe(3);
+    });
+
+    it('detects AST violations in .ts files during safety scan', () => {
+      const fs = createMockFS({
+        '/skills/sneaky/code.ts': 'const x = globalThis["eval"]("alert(1)");',
+      }, new Set(['/skills/sneaky']));
+      const sandbox = new SkillSandbox(projectRoot, { fs });
+
+      const result = sandbox.validateSkillSafety('/skills/sneaky');
+      expect(result.safe).toBe(false);
+      // Should have both regex and AST hits
+      expect(result.issues.some((i) => i.includes('AST'))).toBe(true);
+    });
+
+    it('does not run AST scan on .json files', () => {
+      const fs = createMockFS({
+        '/skills/jsononly/config.json': '{"eval": "safe string mentioning eval"}',
+      }, new Set(['/skills/jsononly']));
+      const sandbox = new SkillSandbox(projectRoot, { fs });
+
+      const result = sandbox.validateSkillSafety('/skills/jsononly');
+      // JSON files only get regex scan, not AST
+      expect(result.issues.every((i) => !i.includes('AST'))).toBe(true);
+    });
+
+    it('does not run AST scan on .md files', () => {
+      const fs = createMockFS({
+        '/skills/docs/SKILL.md': '# Skill\nUse eval() for debugging purposes.',
+      }, new Set(['/skills/docs']));
+      const sandbox = new SkillSandbox(projectRoot, { fs });
+
+      const result = sandbox.validateSkillSafety('/skills/docs');
+      // .md files do not get AST scan
+      expect(result.issues.every((i) => !i.includes('AST'))).toBe(true);
+    });
+
+    it('clean SKILL.md passes both checks', () => {
+      const fs = createMockFS({
+        '/skills/good/SKILL.md': '# My Skill\nThis skill helps with formatting code.\n\n## Usage\nJust run it.',
+      }, new Set(['/skills/good']));
+      const sandbox = new SkillSandbox(projectRoot, { fs });
+
+      const result = sandbox.validateSkillSafety('/skills/good');
+      expect(result.safe).toBe(true);
+      expect(result.issues).toHaveLength(0);
     });
   });
 
@@ -257,5 +302,129 @@ describe('SkillSandbox', () => {
       expect(builtins).toContain('node-expert');
       expect(builtins.length).toBeGreaterThanOrEqual(5);
     });
+  });
+});
+
+// ─── AST Scanning Unit Tests ────────────────────────────────────────────────
+
+describe('scanCodeAST', () => {
+  it('detects eval() call', () => {
+    const violations = scanCodeAST('const x = eval("2+2");', 'test.ts');
+    expect(violations.some((v) => v.includes('eval()'))).toBe(true);
+  });
+
+  it('detects Function() constructor call', () => {
+    const violations = scanCodeAST('const fn = Function("return 1");', 'test.ts');
+    expect(violations.some((v) => v.includes('Function()'))).toBe(true);
+  });
+
+  it('detects new Function() constructor', () => {
+    const violations = scanCodeAST('const fn = new Function("return 1");', 'test.ts');
+    expect(violations.some((v) => v.includes('Function()'))).toBe(true);
+  });
+
+  it('detects require("child_process")', () => {
+    const violations = scanCodeAST('const cp = require("child_process");', 'test.ts');
+    expect(violations.some((v) => v.includes("require('child_process')"))).toBe(true);
+  });
+
+  it('detects require("node:child_process")', () => {
+    const violations = scanCodeAST('const cp = require("node:child_process");', 'test.ts');
+    expect(violations.some((v) => v.includes("require('node:child_process')"))).toBe(true);
+  });
+
+  it('detects require("fs")', () => {
+    const violations = scanCodeAST('const fs = require("fs");', 'test.ts');
+    expect(violations.some((v) => v.includes("require('fs')"))).toBe(true);
+  });
+
+  it('detects require("os")', () => {
+    const violations = scanCodeAST('const os = require("os");', 'test.ts');
+    expect(violations.some((v) => v.includes("require('os')"))).toBe(true);
+  });
+
+  it('detects dynamic import("child_process")', () => {
+    const violations = scanCodeAST('const cp = await import("child_process");', 'test.ts');
+    expect(violations.some((v) => v.includes("import('child_process')"))).toBe(true);
+  });
+
+  it('detects dynamic import("node:fs")', () => {
+    const violations = scanCodeAST('const fs = await import("node:fs");', 'test.ts');
+    expect(violations.some((v) => v.includes("import('node:fs')"))).toBe(true);
+  });
+
+  it('detects bracket-access eval: globalThis["eval"]()', () => {
+    const violations = scanCodeAST('globalThis["eval"]("alert(1)");', 'test.ts');
+    expect(violations.some((v) => v.includes("Bracket-access call to ['eval']"))).toBe(true);
+  });
+
+  it('detects obfuscated eval via string concatenation: global["ev"+"al"]()', () => {
+    const violations = scanCodeAST('(global as any)["ev" + "al"]("alert(1)");', 'test.ts');
+    expect(violations.some((v) => v.includes('Obfuscated'))).toBe(true);
+  });
+
+  it('detects property access: global.eval', () => {
+    const violations = scanCodeAST('const e = global.eval;', 'test.ts');
+    expect(violations.some((v) => v.includes('Property access global.eval'))).toBe(true);
+  });
+
+  it('detects property access: globalThis.Function', () => {
+    const violations = scanCodeAST('const f = globalThis.Function;', 'test.ts');
+    expect(violations.some((v) => v.includes('Property access globalThis.Function'))).toBe(true);
+  });
+
+  it('detects setTimeout with string argument', () => {
+    const violations = scanCodeAST('setTimeout("alert(1)", 100);', 'test.ts');
+    expect(violations.some((v) => v.includes('setTimeout() called with string argument'))).toBe(true);
+  });
+
+  it('detects setInterval with string argument', () => {
+    const violations = scanCodeAST('setInterval("doSomething()", 1000);', 'test.ts');
+    expect(violations.some((v) => v.includes('setInterval() called with string argument'))).toBe(true);
+  });
+
+  it('allows setTimeout with function argument', () => {
+    const violations = scanCodeAST('setTimeout(() => console.log("ok"), 100);', 'test.ts');
+    expect(violations.every((v) => !v.includes('setTimeout'))).toBe(true);
+  });
+
+  it('returns empty for clean code', () => {
+    const violations = scanCodeAST(
+      'export function add(a: number, b: number): number { return a + b; }',
+      'test.ts',
+    );
+    expect(violations).toHaveLength(0);
+  });
+
+  it('returns empty for clean code with imports', () => {
+    const violations = scanCodeAST(
+      'import { readFileSync } from "node:fs";\nexport const x = readFileSync("file.txt", "utf-8");',
+      'test.ts',
+    );
+    // Note: 'node:fs' import is detected but only as a require, not static import
+    // Static imports are caught by regex, not AST (AST catches require/dynamic import)
+    expect(violations.every((v) => !v.includes('require'))).toBe(true);
+  });
+
+  it('detects multiple violations in single file', () => {
+    const code = `
+      const e = eval("1");
+      const cp = require("child_process");
+      const fn = Function("return 2");
+    `;
+    const violations = scanCodeAST(code, 'test.ts');
+    expect(violations.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('handles empty content', () => {
+    const violations = scanCodeAST('', 'test.ts');
+    expect(violations).toHaveLength(0);
+  });
+
+  it('handles syntax errors gracefully', () => {
+    // TypeScript parser is lenient — it produces a tree even with errors
+    const violations = scanCodeAST('const x = {{{', 'test.ts');
+    // Should not throw, may or may not find violations depending on parse recovery
+    expect(Array.isArray(violations)).toBe(true);
   });
 });

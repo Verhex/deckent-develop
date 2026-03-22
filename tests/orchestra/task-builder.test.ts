@@ -6,6 +6,9 @@ import {
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
+  DirectiveTaskSchema,
+  DirectiveSchema,
+  validateDirective,
 } from '../../src/orchestra/task-builder.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, PlannerTask, CreateTaskParams } from '../../src/core/types.js';
@@ -583,5 +586,343 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
     const prompt = buildWorkerPrompt(task, agentPrompt);
     expect(prompt).toContain('Line 1');
     expect(prompt).toContain('Line 3');
+  });
+});
+
+// ─── DirectiveTaskSchema ───────────────────────────────────────────────────
+
+describe('DirectiveTaskSchema', () => {
+  it('accepts a valid task with all required fields', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Implement feature',
+      files: ['src/core/utils.ts'],
+      scope: ['src/core/'],
+      description: 'Add utility helpers',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts optional model field with valid value', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Audit security',
+      model: 'opus',
+      files: [],
+      scope: [],
+      description: 'Security review',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.model).toBe('opus');
+  });
+
+  it('rejects invalid model value', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Bad model task',
+      model: 'gpt4',
+      files: [],
+      scope: [],
+      description: 'Test',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts all valid model values', () => {
+    for (const model of ['opus', 'sonnet', 'haiku'] as const) {
+      const result = DirectiveTaskSchema.safeParse({
+        title: 'Task',
+        model,
+        files: [],
+        scope: [],
+        description: 'desc',
+      });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('accepts optional effort field with valid value', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Hard task',
+      effort: 'high',
+      files: [],
+      scope: [],
+      description: 'Hard work',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.effort).toBe('high');
+  });
+
+  it('rejects invalid effort value', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Bad effort',
+      effort: 'max',
+      files: [],
+      scope: [],
+      description: 'Test',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts all valid effort values', () => {
+    for (const effort of ['low', 'normal', 'high'] as const) {
+      const result = DirectiveTaskSchema.safeParse({
+        title: 'Task',
+        effort,
+        files: [],
+        scope: [],
+        description: 'desc',
+      });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('rejects missing title', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      files: [],
+      scope: [],
+      description: 'No title here',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty title', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: '',
+      files: [],
+      scope: [],
+      description: 'Empty title',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts optional tests array', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'Tested task',
+      files: [],
+      scope: [],
+      description: 'Has tests',
+      tests: ['All pass', 'No regressions'],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.tests).toHaveLength(2);
+  });
+
+  it('allows model and effort to be undefined (optional)', () => {
+    const result = DirectiveTaskSchema.safeParse({
+      title: 'No overrides',
+      files: ['src/core/foo.ts'],
+      scope: ['src/core/'],
+      description: 'Plain task',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.model).toBeUndefined();
+      expect(result.data.effort).toBeUndefined();
+    }
+  });
+});
+
+// ─── DirectiveSchema ───────────────────────────────────────────────────────
+
+describe('DirectiveSchema', () => {
+  function validDirective() {
+    return {
+      goal: 'Refactor the codebase',
+      tasks: [
+        {
+          title: 'Extract module',
+          files: ['src/orchestra/brain.ts'],
+          scope: ['src/orchestra/'],
+          description: 'Move logic to new file',
+        },
+      ],
+    };
+  }
+
+  it('accepts a valid directive with goal and one task', () => {
+    const result = DirectiveSchema.safeParse(validDirective());
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts multiple tasks', () => {
+    const input = {
+      ...validDirective(),
+      tasks: [
+        { title: 'Task 1', files: [], scope: [], description: 'First' },
+        { title: 'Task 2', files: [], scope: [], description: 'Second' },
+      ],
+    };
+    const result = DirectiveSchema.safeParse(input);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.tasks).toHaveLength(2);
+  });
+
+  it('rejects missing goal', () => {
+    const { goal: _g, ...noGoal } = validDirective();
+    const result = DirectiveSchema.safeParse(noGoal);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty goal string', () => {
+    const result = DirectiveSchema.safeParse({ ...validDirective(), goal: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing tasks field', () => {
+    const { tasks: _t, ...noTasks } = validDirective();
+    const result = DirectiveSchema.safeParse(noTasks);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty tasks array', () => {
+    const result = DirectiveSchema.safeParse({ ...validDirective(), tasks: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects when a task in array has invalid model', () => {
+    const result = DirectiveSchema.safeParse({
+      goal: 'Do stuff',
+      tasks: [
+        { title: 'Bad task', model: 'unknown-model', files: [], scope: [], description: 'test' },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('detects partial valid + partial invalid tasks', () => {
+    const result = DirectiveSchema.safeParse({
+      goal: 'Mixed tasks',
+      tasks: [
+        { title: 'Good task', files: [], scope: [], description: 'Fine' },
+        { title: '', files: [], scope: [], description: 'Empty title — bad' },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── validateDirective ─────────────────────────────────────────────────────
+
+describe('validateDirective', () => {
+  function validInput() {
+    return {
+      goal: 'Clean up the codebase',
+      tasks: [
+        {
+          title: 'Refactor utils',
+          files: ['src/core/utils.ts'],
+          scope: ['src/core/'],
+          description: 'Extract shared helpers',
+          tests: ['All helpers tested'],
+        },
+      ],
+    };
+  }
+
+  it('returns success=true for valid directive', () => {
+    const result = validateDirective(validInput());
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.goal).toBe('Clean up the codebase');
+      expect(result.data.tasks).toHaveLength(1);
+    }
+  });
+
+  it('returns success=false for missing goal', () => {
+    const { goal: _g, ...noGoal } = validInput();
+    const result = validateDirective(noGoal);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toContain('DIRECTIVES validation failed');
+  });
+
+  it('returns clear error message for missing goal field', () => {
+    const result = validateDirective({ tasks: [{ title: 'T', files: [], scope: [], description: 'D' }] });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/goal/i);
+    }
+  });
+
+  it('returns success=false for empty tasks array', () => {
+    const result = validateDirective({ ...validInput(), tasks: [] });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toBeTruthy();
+  });
+
+  it('returns error mentioning task field for invalid model', () => {
+    const result = validateDirective({
+      goal: 'Some goal',
+      tasks: [{ title: 'T', model: 'gpt4', files: [], scope: [], description: 'D' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toBeTruthy();
+  });
+
+  it('returns error mentioning task field for invalid effort', () => {
+    const result = validateDirective({
+      goal: 'Some goal',
+      tasks: [{ title: 'T', effort: 'extreme', files: [], scope: [], description: 'D' }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toBeTruthy();
+  });
+
+  it('returns error for missing title in a task', () => {
+    const result = validateDirective({
+      goal: 'Goal',
+      tasks: [{ files: [], scope: [], description: 'No title' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('returns error for empty title in a task', () => {
+    const result = validateDirective({
+      goal: 'Goal',
+      tasks: [{ title: '', files: [], scope: [], description: 'Empty title' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('does not throw on invalid input — returns error object instead', () => {
+    expect(() => validateDirective(null)).not.toThrow();
+    expect(() => validateDirective(42)).not.toThrow();
+    expect(() => validateDirective(undefined)).not.toThrow();
+    const result = validateDirective(null);
+    expect(result.success).toBe(false);
+  });
+
+  it('succeeds with optional fields absent', () => {
+    const result = validateDirective({
+      goal: 'Minimal directive',
+      tasks: [{ title: 'Only required fields', files: [], scope: [], description: 'Minimal' }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('succeeds with all optional fields present', () => {
+    const result = validateDirective({
+      goal: 'Full directive',
+      tasks: [{
+        title: 'Full task',
+        model: 'sonnet',
+        effort: 'normal',
+        files: ['src/core/foo.ts'],
+        scope: ['src/core/'],
+        description: 'Complete description',
+        tests: ['Test A', 'Test B'],
+      }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.tasks[0].model).toBe('sonnet');
+      expect(result.data.tasks[0].effort).toBe('normal');
+      expect(result.data.tasks[0].tests).toEqual(['Test A', 'Test B']);
+    }
+  });
+
+  it('error message starts with DIRECTIVES validation failed prefix', () => {
+    const result = validateDirective({});
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/^DIRECTIVES validation failed:/);
+    }
   });
 });

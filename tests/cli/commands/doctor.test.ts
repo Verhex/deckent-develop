@@ -53,6 +53,7 @@ vi.mock('../../../src/core/constants.js', () => ({
   LOCK_STALE_THRESHOLD_MS: 300000,
   DEBT_TABLE_HEADER: '| ID',
   PROJECT_CONFIG_PATH: '.deckent/config.json',
+  BRAIN_TOTAL_LINE_BUDGET: 600,
 }));
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -496,9 +497,9 @@ describe('error handling', () => {
     expect(check!.message).toMatch(/stale/i);
   });
 
-  it('brain budget over 300 — check passes=false with decay hint', () => {
+  it('brain budget over 600 — check passes=false with decay hint', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
-    vi.mocked(countBrainLines).mockReturnValue(350);
+    vi.mocked(countBrainLines).mockReturnValue(650);
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Brain Budget');
     expect(check!.passed).toBe(false);

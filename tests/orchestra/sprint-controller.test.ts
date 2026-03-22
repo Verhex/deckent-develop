@@ -174,6 +174,8 @@ vi.mock('../../src/core/provider.js', () => ({
 
 vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn().mockResolvedValue(undefined),
+  clearHooks: vi.fn(),
+  loadPluginHooks: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock('../../src/core/stack-detector.js', () => ({

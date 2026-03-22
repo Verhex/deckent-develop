@@ -116,7 +116,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │
 ┌──────────▼──────────────────────────────────────────┐
 │              MEMORY SYSTEM (.brain/)                  │
-│  Tier 1: MEMORY.md (always loaded, ~100 lines)      │
+│  Tier 1: MEMORY.md (always loaded, ~200 lines)      │
 │  Tier 2: sprint logs (per-sprint, auto-archived)    │
 │  Tier 3: deep knowledge (searchable archive)        │
 └─────────────────────────────────────────────────────┘
@@ -287,7 +287,7 @@ my-project/
 │       └── tr.json
 │
 ├── .brain/                            # Memory system (Brain + Auditor only)
-│   ├── MEMORY.md                      # Tier 1: always loaded (~100 lines)
+│   ├── MEMORY.md                      # Tier 1: always loaded (~200 lines)
 │   ├── DECISIONS.md                   # Architecture Decision Records
 │   ├── DEBT.md                        # Technical debt log
 │   ├── PATTERNS.md                    # Auditor findings
@@ -398,7 +398,7 @@ DECKENT.md structure:
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
 - Sprint is NEVER left incomplete
-- Memory budget: 300 lines max in .brain/
+- Memory budget: 600 lines max in .brain/
 
 ## Context
 @DIRECTIVES.md
@@ -552,11 +552,11 @@ Worker spawns with that model. No runtime switching — model is fixed for task 
 Inspired by OpenClaw's tiered memory.
 
 ## Tier 1: Always Loaded (MEMORY.md)
-- Max 100 lines
+- Max 200 lines
 - Brain writes after every sprint
 - Loaded into every agent's context via @import in AGENTS.md
 - Contains: learned patterns, key conventions, critical rules
-- Decay: oldest entries archived after 3 sprints of non-use
+- Decay: oldest entries archived after 5 sprints of non-use
 
 ## Tier 2: Sprint Logs (.brain/sprints/)
 - One file per sprint: sprint-001.md, sprint-002.md
@@ -574,12 +574,12 @@ Inspired by OpenClaw's tiered memory.
 ```
 Every sprint end:
 1. Count total lines in .brain/ (excluding archive/)
-2. If > 300 lines → compress:
-   a. MEMORY.md: archive entries unused for 3+ sprints
+2. If > 600 lines → compress:
+   a. MEMORY.md: archive entries unused for 5+ sprints
    b. PATTERNS.md: remove resolved patterns
    c. DEBT.md: remove resolved debts
    d. Move old sprint logs to archive/
-3. Verify total < 300 lines
+3. Verify total < 600 lines
 ```
 
 ## Memory Files
@@ -644,7 +644,7 @@ Phase 6: RETRO (Brain)
   Calculate metrics
   
 Phase 7: DECAY
-  Compress if .brain/ > 300 lines
+  Compress if .brain/ > 600 lines
   Archive old sprint logs
   Clean .tasks/, .locks/
 
@@ -1089,7 +1089,7 @@ Layer 3: Brain Regression Test (sprint transition)
 - Cross-assignments: {n}
 - Test coverage: {before}% → {after}%
 - Tech debt: {new} new, {resolved} resolved, {total} open
-- Context budget: {used}/300 lines
+- Context budget: {used}/600 lines
 
 ## Learnings
 {from RETRO.md}
@@ -1726,7 +1726,7 @@ $ deckent start "Build REST API for user management"
 - Brain learns from its own retros and improves plans — ✅ Done
 - Auditor catches real boundary violations — ✅ Done
 - Tech debt escalation triggers automatically — ✅ Done
-- Memory decay keeps `.brain/` under 300 lines — ✅ Done
+- Memory decay keeps `.brain/` under 600 lines — ✅ Done
 - Plugin system v2 (install/create/remove/hooks) — ✅ Done (Sprint 24)
 - i18n runtime — ✅ Done (Sprint 24)
 - OSS infrastructure (CONTRIBUTING, LICENSE, CI) — ✅ Done (Sprint 24-26)

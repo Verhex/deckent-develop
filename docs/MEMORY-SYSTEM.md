@@ -10,7 +10,7 @@ Deckent's memory system is a **three-tiered, file-based knowledge store** that l
 
 ```
 .brain/
-├── MEMORY.md          ← Tier 1: Short-term (always loaded, ~100 lines)
+├── MEMORY.md          ← Tier 1: Short-term (always loaded, ~200 lines)
 ├── PATTERNS.md        ← Tier 2: Long-term (JSON array, ~80 lines)
 ├── DECISIONS.md       ← Tier 3: Permanent (ADR records, never decayed)
 ├── DEBT.md            ← Tech debt ledger (markdown table)
@@ -48,9 +48,9 @@ Plain Markdown. Organized by wave/sprint sections:
 ### Limits
 | Constraint | Value | Source |
 |---|---|---|
-| Max lines | **100** | `MEMORY_MAX_LINES` in `src/core/constants.ts:47` |
-| Decay trigger | 300 lines total `.brain/` budget | `BRAIN_TOTAL_LINE_BUDGET` in `src/core/constants.ts:51` |
-| Decay age | Sections older than **3 sprints** are removed | `MEMORY_DECAY_SPRINTS = 3` in `src/core/constants.ts:52` |
+| Max lines | **200** | `MEMORY_MAX_LINES` in `src/core/constants.ts:47` |
+| Decay trigger | 600 lines total `.brain/` budget | `BRAIN_TOTAL_LINE_BUDGET` in `src/core/constants.ts:51` |
+| Decay age | Sections older than **5 sprints** are removed | `MEMORY_DECAY_SPRINTS = 5` in `src/core/constants.ts:52` |
 | Last-resort truncation | Trimmed to 50 lines when budget still exceeded | `brain.ts:970-975` |
 
 ### When Written
@@ -59,7 +59,7 @@ Plain Markdown. Organized by wave/sprint sections:
 - Long sections from old sprints are pruned during decay
 
 ### Decay Rule
-When `countBrainLines(projectRoot) > 300`, Brain removes any MEMORY.md section whose sprint number is `>= 3 sprints` behind the current sprint. If the budget is still exceeded after section removal, the file is hard-truncated to the last 50 lines.
+When `countBrainLines(projectRoot) > 600`, Brain removes any MEMORY.md section whose sprint number is `>= 5 sprints` behind the current sprint. If the budget is still exceeded after section removal, the file is hard-truncated to the last 50 lines.
 
 ```typescript
 // src/orchestra/brain.ts — decay step 4
@@ -99,9 +99,9 @@ JSON array of `PatternEntry` objects:
 | Constraint | Value | Source |
 |---|---|---|
 | Max lines | **80** | `PATTERNS_MAX_LINES` in `src/core/constants.ts:48` |
-| Decay trigger | Budget exceeded (300 lines total) | `BRAIN_TOTAL_LINE_BUDGET` |
+| Decay trigger | Budget exceeded (600 lines total) | `BRAIN_TOTAL_LINE_BUDGET` |
 | Decay rule | Resolved patterns removed first | `runDecay` step 1 in `brain.ts:909-919` |
-| Pattern lifetime | **5 sprints** before auto-resolve | `PATTERN_DECAY_SPRINTS = 5` in `src/core/constants.ts:53` |
+| Pattern lifetime | **8 sprints** before auto-resolve | `PATTERN_DECAY_SPRINTS = 8` in `src/core/constants.ts:53` |
 
 ### When Written
 - Auditor appends new patterns during scan loop (never overwrites, only appends)
@@ -180,14 +180,14 @@ Each ADR follows the format:
 Decay removes `resolved: true` rows when budget is exceeded (step 2 of `runDecay`).
 
 ### RETRO.md — Sprint Retrospective
-Overwritten (not appended) after every sprint. Max **60 lines** (`RETRO_MAX_LINES`). Contains:
+Overwritten (not appended) after every sprint. Max **100 lines** (`RETRO_MAX_LINES`). Contains:
 - Sprint summary (tasks completed, GO/NO-GO rates)
 - What went well
 - What needs improvement
 - Debt created vs resolved
 
 ### sprints/sprint-NNN.md — Per-Sprint Logs
-Max **50 lines** per file (`SPRINT_LOG_MAX_LINES`). Contains task list, results, and summary for a single sprint. Kept in `sprints/` directory. Oldest files are archived to `archive/` when decay runs.
+Max **80 lines** per file (`SPRINT_LOG_MAX_LINES`). Contains task list, results, and summary for a single sprint. Kept in `sprints/` directory. Oldest files are archived to `archive/` when decay runs.
 
 ---
 
@@ -201,7 +201,7 @@ The decay cycle runs automatically at the end of every sprint, triggered by `run
 runDecay(projectRoot, sprint.id);
 ```
 
-Decay always runs at sprint end. If total `.brain/` line count ≤ 300, it returns immediately with no changes. If `force: true` is passed, it runs regardless of budget.
+Decay always runs at sprint end. If total `.brain/` line count ≤ 600, it returns immediately with no changes. If `force: true` is passed, it runs regardless of budget.
 
 ### Decay Steps (in order)
 
@@ -209,7 +209,7 @@ Decay always runs at sprint end. If total `.brain/` line count ≤ 300, it retur
 Step 1 — Remove resolved patterns from PATTERNS.md
 Step 2 — Remove resolved debt rows from DEBT.md
 Step 3 — Archive old sprint logs (keep last 2 active, move rest to archive/)
-Step 4 — Trim old MEMORY.md sections (sections >= 3 sprints old)
+Step 4 — Trim old MEMORY.md sections (sections >= 5 sprints old)
 Step 5 — Last resort: hard-truncate MEMORY.md to 50 lines
 ```
 
@@ -247,13 +247,13 @@ Counts all lines in `.brain/` (excluding `archive/`), including `sprints/`. Used
 
 | File | Max Lines | Decay Strategy |
 |---|---|---|
-| `MEMORY.md` | 100 | Remove sections ≥ 3 sprints old; hard-truncate to 50 as last resort |
+| `MEMORY.md` | 200 | Remove sections ≥ 5 sprints old; hard-truncate to 50 as last resort |
 | `PATTERNS.md` | 80 | Remove `resolved: true` entries on budget exceeded |
 | `DECISIONS.md` | Unlimited | Never decayed |
-| `RETRO.md` | 60 | Overwritten every sprint |
+| `RETRO.md` | 100 | Overwritten every sprint |
 | `DEBT.md` | Unlimited | Remove resolved rows on budget exceeded |
-| `sprints/sprint-NNN.md` | 50 | Archive oldest (keep last 2 active) |
-| **Total `.brain/` budget** | **300** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
+| `sprints/sprint-NNN.md` | 80 | Archive oldest (keep last 2 active) |
+| **Total `.brain/` budget** | **600** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
 
 ---
 

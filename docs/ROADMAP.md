@@ -33,7 +33,7 @@ Use Deckent to build Deckent. Validate the sprint loop on real development work.
 - [x] Brain learns from its own retros and improves plans
 - [x] Auditor catches real boundary violations and pattern regressions
 - [x] Tech debt escalation triggers automatically (2 sprint → HIGH, 3 sprint → CRITICAL)
-- [x] Memory decay keeps `.brain/` under 300 lines
+- [x] Memory decay keeps `.brain/` under 600 lines
 - [x] DECKENT.md as single source of truth (Sprint 15 — additive adapter pattern)
 - [ ] Plugin system: first community skill template
 

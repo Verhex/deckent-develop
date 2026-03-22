@@ -127,6 +127,7 @@ export interface BrainContext {
   debt: DebtItem[];
   patterns: string;
   decisions: string;
+  projectIdentity?: string;
   existingTasks: Task[];
   projectState: ProjectState;
 }

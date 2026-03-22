@@ -207,7 +207,8 @@ export function disablePlugin(pluginName: string, pluginsDir: string): boolean {
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 
-function isGitUrl(source: string): boolean {
+/** @internal */
+export function isGitUrl(source: string): boolean {
   return (
     source.startsWith('https://') ||
     source.startsWith('http://') ||
@@ -216,54 +217,154 @@ function isGitUrl(source: string): boolean {
   );
 }
 
+/** @internal */
+export function isLocalPath(source: string): boolean {
+  return source.startsWith('.') || source.startsWith('/');
+}
+
 /**
- * Install a plugin from a local directory path or a git URL.
- * - Local path: copies the directory into pluginsDir
- * - Git URL: clones the repo into pluginsDir
+ * Detect source type for plugin installation.
+ * - 'npm': plain package name (e.g. "my-plugin", "@scope/my-plugin")
+ * - 'git': git URL (https://, http://, git@, or ends with .git)
+ * - 'local': relative or absolute path (starts with . or /)
+ */
+export function detectSourceType(source: string): 'npm' | 'git' | 'local' {
+  if (isGitUrl(source)) return 'git';
+  if (isLocalPath(source)) return 'local';
+  return 'npm';
+}
+
+/**
+ * Install a plugin from npm, a git URL, or a local directory.
+ * - npm: runs `npm pack` in temp dir, extracts, validates manifest, copies to pluginsDir
+ * - git URL: clones the repo into temp dir, validates, moves to pluginsDir
+ * - local path: copies the directory into pluginsDir
+ *
+ * After install: validates manifest, auto-enables the plugin.
+ * On validation failure: rolls back (removes copied directory).
+ *
  * Throws PluginError if:
  * - manifest is invalid
  * - a plugin with the same name already exists
  * - source path does not exist (local)
- * - git clone fails
+ * - git clone / npm install fails
  */
 export async function installPlugin(source: string, pluginsDir: string): Promise<Plugin> {
   await fsp.mkdir(pluginsDir, { recursive: true });
 
-  if (isGitUrl(source)) {
-    const tmpDir = path.join(pluginsDir, `.tmp-install-${Date.now()}`);
-    try {
-      const result = spawnSync('git', ['clone', source, tmpDir], { encoding: 'utf8' });
-      if (result.status !== 0) {
-        throw new PluginError(
-          `Failed to clone ${source}: ${result.stderr?.trim() || 'unknown error'}`
-        );
-      }
-      const plugin = loadPlugin(tmpDir);
-      const destDir = path.join(pluginsDir, plugin.manifest.name);
-      if (fs.existsSync(destDir)) {
-        throw new PluginError(`Plugin "${plugin.manifest.name}" is already installed`);
-      }
-      await fsp.rename(tmpDir, destDir);
-      return { manifest: plugin.manifest, dir: destDir };
-    } catch (err) {
-      if (fs.existsSync(tmpDir)) {
-        await fsp.rm(tmpDir, { recursive: true, force: true });
-      }
-      throw err;
+  const sourceType = detectSourceType(source);
+
+  let plugin: Plugin;
+
+  switch (sourceType) {
+    case 'npm':
+      plugin = await installFromNpm(source, pluginsDir);
+      break;
+    case 'git':
+      plugin = await installFromGit(source, pluginsDir);
+      break;
+    case 'local':
+      plugin = await installFromLocal(source, pluginsDir);
+      break;
+  }
+
+  // Auto-enable the plugin after successful install
+  enablePlugin(plugin.manifest.name, pluginsDir);
+
+  return plugin;
+}
+
+/** @internal Install plugin from npm registry */
+async function installFromNpm(packageName: string, pluginsDir: string): Promise<Plugin> {
+  const tmpDir = path.join(pluginsDir, `.tmp-npm-${Date.now()}`);
+  try {
+    await fsp.mkdir(tmpDir, { recursive: true });
+
+    // npm install the package into the temp directory
+    const result = spawnSync(
+      'npm',
+      ['install', '--prefix', tmpDir, packageName],
+      { encoding: 'utf8', timeout: 60_000 }
+    );
+    if (result.status !== 0) {
+      throw new PluginError(
+        `Failed to install npm package "${packageName}": ${result.stderr?.trim() || 'unknown error'}`
+      );
     }
-  } else {
-    const sourceDir = path.resolve(source);
-    if (!fs.existsSync(sourceDir)) {
-      throw new PluginError(`Source path does not exist: ${sourceDir}`);
+
+    // Find the installed package in node_modules
+    // Handle scoped packages (@scope/name) and regular packages
+    const installedDir = path.join(tmpDir, 'node_modules', packageName);
+    if (!fs.existsSync(installedDir)) {
+      throw new PluginError(
+        `Package "${packageName}" was installed but could not be found in node_modules`
+      );
     }
-    const plugin = loadPlugin(sourceDir);
+
+    // Validate manifest exists and is valid
+    const plugin = loadPlugin(installedDir);
     const destDir = path.join(pluginsDir, plugin.manifest.name);
     if (fs.existsSync(destDir)) {
       throw new PluginError(`Plugin "${plugin.manifest.name}" is already installed`);
     }
-    await fsp.cp(sourceDir, destDir, { recursive: true });
+
+    // Copy from node_modules to final destination
+    await fsp.cp(installedDir, destDir, { recursive: true });
     return { manifest: plugin.manifest, dir: destDir };
+  } catch (err) {
+    // Rollback: remove temp dir
+    if (fs.existsSync(tmpDir)) {
+      await fsp.rm(tmpDir, { recursive: true, force: true });
+    }
+    // Also rollback dest dir if it was partially created
+    if (err instanceof PluginError) throw err;
+    throw err;
+  } finally {
+    // Always clean up temp dir
+    if (fs.existsSync(tmpDir)) {
+      await fsp.rm(tmpDir, { recursive: true, force: true });
+    }
   }
+}
+
+/** @internal Install plugin from git URL */
+async function installFromGit(source: string, pluginsDir: string): Promise<Plugin> {
+  const tmpDir = path.join(pluginsDir, `.tmp-install-${Date.now()}`);
+  try {
+    const result = spawnSync('git', ['clone', source, tmpDir], { encoding: 'utf8' });
+    if (result.status !== 0) {
+      throw new PluginError(
+        `Failed to clone ${source}: ${result.stderr?.trim() || 'unknown error'}`
+      );
+    }
+    const plugin = loadPlugin(tmpDir);
+    const destDir = path.join(pluginsDir, plugin.manifest.name);
+    if (fs.existsSync(destDir)) {
+      throw new PluginError(`Plugin "${plugin.manifest.name}" is already installed`);
+    }
+    await fsp.rename(tmpDir, destDir);
+    return { manifest: plugin.manifest, dir: destDir };
+  } catch (err) {
+    if (fs.existsSync(tmpDir)) {
+      await fsp.rm(tmpDir, { recursive: true, force: true });
+    }
+    throw err;
+  }
+}
+
+/** @internal Install plugin from local directory */
+async function installFromLocal(source: string, pluginsDir: string): Promise<Plugin> {
+  const sourceDir = path.resolve(source);
+  if (!fs.existsSync(sourceDir)) {
+    throw new PluginError(`Source path does not exist: ${sourceDir}`);
+  }
+  const plugin = loadPlugin(sourceDir);
+  const destDir = path.join(pluginsDir, plugin.manifest.name);
+  if (fs.existsSync(destDir)) {
+    throw new PluginError(`Plugin "${plugin.manifest.name}" is already installed`);
+  }
+  await fsp.cp(sourceDir, destDir, { recursive: true });
+  return { manifest: plugin.manifest, dir: destDir };
 }
 
 // ─── Remove ───────────────────────────────────────────────────────────────────

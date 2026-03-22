@@ -8,7 +8,7 @@
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
 - Sprint is NEVER left incomplete
-- Memory budget: 300 lines max in .brain/
+- Memory budget: 600 lines max in .brain/
 
 ## Context
 @DIRECTIVES.md

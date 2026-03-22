@@ -12,6 +12,7 @@ import type {
 } from '../core/types.js';
 import { TASKS_DIR, LOCKS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
+import { redactSensitive } from '../cli/helpers/output.js';
 
 // ─── Error Classes ──────────────────────────────────────────────────
 
@@ -336,7 +337,8 @@ export function releaseAllLocks(
 export function readWorkerLog(projectRoot: string, taskId: string): string | null {
   const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
   if (!existsSync(logPath)) return null;
-  return readFileSync(logPath, 'utf-8');
+  const raw = readFileSync(logPath, 'utf-8');
+  return redactSensitive(raw);
 }
 
 export function isWithinScope(filePath: string, scope: TaskScope): boolean {

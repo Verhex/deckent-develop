@@ -129,7 +129,7 @@ Web ve terminal gösterge panelinin veri modeli; PLAN fazında sıfırlanır, sp
 **Blueprint §6** — "Memory Files"
 
 ### decay
-`.brain/` dizininin 300 satır sınırını aşması durumunda eski bellek girdilerini arşivleyen mekanizma. Her sprint sonunda tetiklenir.
+`.brain/` dizininin 600 satır sınırını aşması durumunda eski bellek girdilerini arşivleyen mekanizma. Her sprint sonunda tetiklenir.
 **Blueprint §6** — "Decay Mechanism"
 
 ### deckent init
@@ -321,11 +321,11 @@ Gelecek fazda (Sprint 20+) planlanmış, farklı AI sağlayıcılarını (Claude
 ## R
 
 ### RETRO.md
-`.brain/RETRO.md` — Son sprintin retrospektif özeti; Brain tarafından her sprint sonunda üzerine yazılır, maks. 60 satır.
+`.brain/RETRO.md` — Son sprintin retrospektif özeti; Brain tarafından her sprint sonunda üzerine yazılır, maks. 100 satır.
 **Blueprint §6** — "Memory Files"
 
 ### runDecay
-Brain'in `.brain/` dizinini 300 satır sınırı altında tutmak için çalıştırdığı sıkıştırma/arşivleme fonksiyonu.
+Brain'in `.brain/` dizinini 600 satır sınırı altında tutmak için çalıştırdığı sıkıştırma/arşivleme fonksiyonu.
 **Blueprint §6** — "Decay Mechanism"
 
 ### runSprint

@@ -299,15 +299,15 @@ describe('writeRetrospective', () => {
   it('trims MEMORY.md when it exceeds MEMORY_MAX_LINES', () => {
     const memPath = join(tmpDir, '.brain', 'MEMORY.md');
     mkdirSync(join(tmpDir, '.brain'), { recursive: true });
-    // Fill with 100 lines
-    const bigContent = Array.from({ length: 100 }, (_, i) => `line-${i}`).join('\n');
+    // Fill with 200 lines (MEMORY_MAX_LINES)
+    const bigContent = Array.from({ length: 200 }, (_, i) => `line-${i}`).join('\n');
     writeFileSync(memPath, bigContent, 'utf-8');
     const sprint = makeSprint();
     const evals = new Map([[sprint.tasks[0].id, TaskEvaluation.NO_GO]]);
     writeRetrospective(tmpDir, sprint, evals, makeMetrics());
     const content = readFileSync(memPath, 'utf-8');
     const lineCount = content.split('\n').length;
-    expect(lineCount).toBeLessThanOrEqual(100);
+    expect(lineCount).toBeLessThanOrEqual(200);
   });
 
   it('handles sprint with no tasks', () => {
@@ -395,14 +395,14 @@ describe('writeSprintLog', () => {
     expect(content).toContain('- 001: Solo Task (DONE)');
   });
 
-  it('truncates output to SPRINT_LOG_MAX_LINES (50 lines)', () => {
-    // Create a sprint with many tasks so output would exceed 50 lines
-    const tasks = Array.from({ length: 60 }, (_, i) => makeTask({ id: `${i + 1}`.padStart(3, '0'), title: `Task ${i + 1}` }));
+  it('truncates output to SPRINT_LOG_MAX_LINES (80 lines)', () => {
+    // Create a sprint with many tasks so output would exceed 80 lines
+    const tasks = Array.from({ length: 100 }, (_, i) => makeTask({ id: `${i + 1}`.padStart(3, '0'), title: `Task ${i + 1}` }));
     const sprint = makeSprint({ tasks });
     writeSprintLog(tmpDir, sprint, makeMetrics());
     const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
     const lineCount = content.split('\n').length;
-    expect(lineCount).toBeLessThanOrEqual(50);
+    expect(lineCount).toBeLessThanOrEqual(80);
   });
 
   it('handles sprint with no tasks gracefully', () => {

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, normalize } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from '../core/types.js';
@@ -164,25 +164,28 @@ function isFileInScope(filePath: string, scope: TaskScope): boolean {
   return false;
 }
 
-export function checkStaleLocks(projectRoot: string): {
+export function checkStaleLocks(projectRoot: string, autoClean = false): {
   locks: LockInfo[];
   staleLocks: BoundaryViolation[];
   alerts: Alert[];
+  removedLocks: string[];
 } {
   const locksDir = join(projectRoot, LOCKS_DIR);
   const locks: LockInfo[] = [];
   const staleLocks: BoundaryViolation[] = [];
   const alerts: Alert[] = [];
+  const removedLocks: string[] = [];
 
   if (!existsSync(locksDir)) {
-    return { locks, staleLocks, alerts };
+    return { locks, staleLocks, alerts, removedLocks };
   }
 
   const files = readdirSync(locksDir).filter((f) => f.endsWith('.lock'));
   const currentTime = Date.now();
 
   for (const file of files) {
-    const lock = readJsonSafe<LockInfo>(join(locksDir, file));
+    const lockPath = join(locksDir, file);
+    const lock = readJsonSafe<LockInfo>(lockPath);
     if (!lock) continue;
 
     locks.push(lock);
@@ -195,17 +198,41 @@ export function checkStaleLocks(projectRoot: string): {
         detail: `Stale lock on ${lock.filePath} held for ${Math.round(elapsed / 1000)}s`,
         timestamp: now(),
       });
-      alerts.push(
-        createAlert(
-          AlertLevel.WARNING,
-          `Stale lock: ${lock.filePath} by ${lock.ownerWorkerId}`,
-          lock.ownerWorkerId,
-        ),
-      );
+
+      if (autoClean) {
+        try {
+          unlinkSync(lockPath);
+          removedLocks.push(lock.filePath);
+          alerts.push(
+            createAlert(
+              AlertLevel.INFO,
+              `Auto-removed stale lock: ${lock.filePath} by ${lock.ownerWorkerId}`,
+              lock.ownerWorkerId,
+            ),
+          );
+        } catch {
+          // Lock file may already be removed by another process — non-fatal
+          alerts.push(
+            createAlert(
+              AlertLevel.WARNING,
+              `Stale lock: ${lock.filePath} by ${lock.ownerWorkerId}`,
+              lock.ownerWorkerId,
+            ),
+          );
+        }
+      } else {
+        alerts.push(
+          createAlert(
+            AlertLevel.WARNING,
+            `Stale lock: ${lock.filePath} by ${lock.ownerWorkerId}`,
+            lock.ownerWorkerId,
+          ),
+        );
+      }
     }
   }
 
-  return { locks, staleLocks, alerts };
+  return { locks, staleLocks, alerts, removedLocks };
 }
 
 export function detectDeadlocks(tasks: Task[]): BoundaryViolation[] {
@@ -383,12 +410,13 @@ export interface ScanResult {
 export function runScanCycle(
   projectRoot: string,
   currentSprintId: string,
+  autoCleanLocks = false,
 ): ScanResult {
   try {
     const hbResult = scanHeartbeats(projectRoot);
     const workerScopes = buildWorkerScopeMap(projectRoot);
     const boundaryViolations = checkBoundaryViolations(projectRoot, workerScopes);
-    const lockResult = checkStaleLocks(projectRoot);
+    const lockResult = checkStaleLocks(projectRoot, autoCleanLocks);
 
     // Read tasks for deadlock detection
     const tasksDir = join(projectRoot, TASKS_DIR);
@@ -436,11 +464,12 @@ export function startScanLoop(
   currentSprintId: string,
   intervalMs?: number,
   onScanComplete?: (result: ScanResult) => void,
+  autoCleanLocks = false,
 ): ReturnType<typeof setInterval> {
   const interval = intervalMs ?? AUDITOR_SCAN_INTERVAL_MS;
   return setInterval(() => {
     try {
-      const result = runScanCycle(projectRoot, currentSprintId);
+      const result = runScanCycle(projectRoot, currentSprintId, autoCleanLocks);
       if (onScanComplete) {
         try { onScanComplete(result); } catch { /* callback must not kill loop */ }
       }

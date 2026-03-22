@@ -69,6 +69,8 @@ vi.mock('../../src/orchestra/planner.js', () => ({
 
 vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn().mockResolvedValue(undefined),
+  clearHooks: vi.fn(),
+  loadPluginHooks: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock('../../src/orchestra/result-watcher.js', () => ({

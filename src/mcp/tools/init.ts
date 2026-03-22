@@ -7,8 +7,10 @@ import {
   DECKENT_DIR, BRAIN_DIR, TASKS_DIR, LOCKS_DIR, CLAUDE_RULES_DIR,
   WORKSPACE_DIR, PLUGINS_DIR, I18N_DIR, DASHBOARD_FILE, DIRECTIVES_FILE,
   AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE, MEMORY_FILE, DECISIONS_FILE, DEBT_FILE,
-  PATTERNS_FILE, RETRO_FILE,
+  PATTERNS_FILE, RETRO_FILE, PROJECT_IDENTITY_FILE,
 } from '../../core/constants.js';
+import { analyzeProject } from '../../core/analyzer.js';
+import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { ensureDeckentImport } from '../../core/utils.js';
 import { enrichResponse } from '../helpers/enrich.js';
 
@@ -111,7 +113,7 @@ export function registerInitTool(server: McpServer): void {
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
 - Sprint is NEVER left incomplete
-- Memory budget: 300 lines max in .brain/
+- Memory budget: 600 lines max in .brain/
 
 ## Context
 @DIRECTIVES.md
@@ -141,7 +143,7 @@ Lint: tsc --noEmit
       created.push(AGENTS_FILE, CLAUDE_FILE);
 
       // Claude rules (blueprint-quality templates with frontmatter)
-      writeIfNotExists(join(root, CLAUDE_RULES_DIR, 'brain.md'), `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 100 lines)\n- Write RETRO.md (overwrite, max 60 lines)\n- Trigger decay if .brain/ exceeds 300 lines\n- Sprint is NEVER left incomplete\n`);
+      writeIfNotExists(join(root, CLAUDE_RULES_DIR, 'brain.md'), `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 200 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 600 lines\n- Sprint is NEVER left incomplete\n`);
       writeIfNotExists(join(root, CLAUDE_RULES_DIR, 'auditor.md'), `---\npaths: [".dashboard", ".brain/PATTERNS.md"]\n---\n# Auditor Rules\n- NEVER write source code\n- Scan every 30 seconds\n- Read all heartbeat files → detect stale agents (>2min = alert)\n- Run git diff --stat → detect boundary violations\n- Check .locks/ → detect stale locks (>5min)\n- Detect circular dependencies / deadlocks\n- Overwrite .dashboard on every scan (never append)\n- Append new patterns to PATTERNS.md (never overwrite)\n- Write alerts for critical issues\n`);
       writeIfNotExists(join(root, CLAUDE_RULES_DIR, 'worker-default.md'), `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run tests before marking done (npx vitest run)\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`);
 
@@ -154,6 +156,29 @@ Lint: tsc --noEmit
       writeIfNotExists(join(root, BRAIN_DIR, DEBT_FILE), '# Tech Debt\n');
       writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
       writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
+
+      // PROJECT-IDENTITY.md (permanent memory — never decayed)
+      try {
+        const analysis = analyzeProject(root);
+        writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
+          projectName,
+          sprintId: 'sprint-000',
+          totalSprints: 0,
+          mode: mode as string,
+          language: analysis.language,
+          framework: analysis.framework,
+          testFramework: analysis.testFramework,
+          buildTool: analysis.buildTool,
+        }));
+      } catch {
+        // Non-fatal — create minimal identity
+        writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
+          projectName,
+          sprintId: 'sprint-000',
+          totalSprints: 0,
+          mode: mode as string,
+        }));
+      }
 
       // Workspace: TOOLS.md + BOOT.md
       writeIfNotExists(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));

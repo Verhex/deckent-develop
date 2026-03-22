@@ -145,6 +145,16 @@ const MESSAGES: MessageMap = {
     tr: 'Temizlik tamamlandı. {count} görevin artifaktları silindi.',
   },
 
+  // ─── finalize command ────────────────────────────────────────────────
+  'finalize.no_tasks': {
+    en: 'No tasks found in .tasks/ directory. Nothing to finalize.',
+    tr: '.tasks/ dizininde görev bulunamadı. Sonlandırılacak bir şey yok.',
+  },
+  'finalize.complete': {
+    en: 'Sprint {sprintId} finalized: {total} tasks ({done} done, {debt} debt, {noGo} no-go). MEMORY.md, RETRO.md, and config updated.',
+    tr: 'Sprint {sprintId} sonlandırıldı: {total} görev ({done} tamam, {debt} borç, {noGo} no-go). MEMORY.md, RETRO.md ve config güncellendi.',
+  },
+
   // ─── doctor command ──────────────────────────────────────────────────
   'doctor.checks_passed': {
     en: 'Result: {passed}/{total} checks passed',

@@ -417,7 +417,7 @@ describe('runDecay', () => {
   });
 
   it('returns early (no decay) when below budget and no force', () => {
-    vi.mocked(countBrainLines).mockReturnValue(100); // under 300
+    vi.mocked(countBrainLines).mockReturnValue(100); // under 600
     const result = runDecay('/root', 'sprint-001');
     expect(result.linesBefore).toBe(100);
     expect(result.linesAfter).toBe(100);
@@ -436,14 +436,14 @@ describe('runDecay', () => {
   });
 
   it('runs decay when over budget', () => {
-    vi.mocked(countBrainLines).mockReturnValue(400); // over 300
+    vi.mocked(countBrainLines).mockReturnValue(700); // over 600
     vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
     const result = runDecay('/root', 'sprint-001');
-    expect(result.linesBefore).toBe(400);
+    expect(result.linesBefore).toBe(700);
   });
 
   it('removes resolved patterns from PATTERNS.json', () => {
-    vi.mocked(countBrainLines).mockReturnValue(400);
+    vi.mocked(countBrainLines).mockReturnValue(700);
     // existsSync: true for PATTERNS file, false for sprints dir
     vi.mocked(existsSync).mockImplementation((p: any) =>
       String(p).includes('PATTERNS') ? true : false
@@ -469,7 +469,7 @@ describe('runDecay', () => {
   });
 
   it('archives old sprint logs keeping last 2', () => {
-    vi.mocked(countBrainLines).mockReturnValue(400);
+    vi.mocked(countBrainLines).mockReturnValue(700);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([
       'sprint-001.md', 'sprint-002.md', 'sprint-003.md', 'sprint-004.md',
@@ -487,7 +487,7 @@ describe('runDecay', () => {
   });
 
   it('removes resolved debt entries old enough', () => {
-    vi.mocked(countBrainLines).mockReturnValue(400);
+    vi.mocked(countBrainLines).mockReturnValue(700);
     vi.mocked(existsSync).mockReturnValue(false);
     const resolvedItem = makeDebtItem({
       id: 'debt-old',

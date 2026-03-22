@@ -59,6 +59,8 @@ export interface DeckentConfig {
   collaboration?: CollaborationConfig;
   /** Notification configuration */
   notifications?: NotificationConfig;
+  /** Auto-remove stale locks (>5min) during auditor scan. Default: false */
+  auto_clean_locks?: boolean;
 }
 
 export interface ResolvedConfig {

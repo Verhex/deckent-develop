@@ -7,6 +7,8 @@ import {
   validateConfig,
   resolveEffectiveWorkers,
   ConfigValidationError,
+  MODE_ALIASES,
+  resolveMode,
 } from '../../src/core/config.js';
 import type { SystemProfile } from '../../src/core/types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
@@ -403,5 +405,106 @@ describe('validateConfig — max_workers warnings', () => {
     const warnings = validateConfig(config);
     const autoWarnings = warnings.filter(w => w.includes('max_workers'));
     expect(autoWarnings).toHaveLength(0);
+  });
+});
+
+// ─── MODE_ALIASES & resolveMode ──────────────────────────────────────
+
+describe('MODE_ALIASES', () => {
+  it('maps performance to max_plan', () => {
+    expect(MODE_ALIASES['performance']).toBe('max_plan');
+  });
+
+  it('maps balanced to max5x_plan', () => {
+    expect(MODE_ALIASES['balanced']).toBe('max5x_plan');
+  });
+
+  it('maps economic to pro_plan', () => {
+    expect(MODE_ALIASES['economic']).toBe('pro_plan');
+  });
+
+  it('maps unlimited to api', () => {
+    expect(MODE_ALIASES['unlimited']).toBe('api');
+  });
+
+  it('has exactly 4 aliases', () => {
+    expect(Object.keys(MODE_ALIASES)).toHaveLength(4);
+  });
+});
+
+describe('resolveMode', () => {
+  it("resolves 'performance' to 'max_plan'", () => {
+    expect(resolveMode('performance')).toBe('max_plan');
+  });
+
+  it("resolves 'balanced' to 'max5x_plan'", () => {
+    expect(resolveMode('balanced')).toBe('max5x_plan');
+  });
+
+  it("resolves 'economic' to 'pro_plan'", () => {
+    expect(resolveMode('economic')).toBe('pro_plan');
+  });
+
+  it("resolves 'unlimited' to 'api'", () => {
+    expect(resolveMode('unlimited')).toBe('api');
+  });
+
+  it('passes through canonical name max_plan unchanged', () => {
+    expect(resolveMode('max_plan')).toBe('max_plan');
+  });
+
+  it('passes through canonical name max5x_plan unchanged', () => {
+    expect(resolveMode('max5x_plan')).toBe('max5x_plan');
+  });
+
+  it('passes through canonical name pro_plan unchanged', () => {
+    expect(resolveMode('pro_plan')).toBe('pro_plan');
+  });
+
+  it('passes through canonical name api unchanged', () => {
+    expect(resolveMode('api')).toBe('api');
+  });
+
+  it('returns unknown mode string as-is', () => {
+    expect(resolveMode('totally_unknown_mode')).toBe('totally_unknown_mode');
+  });
+});
+
+describe('loadConfig — mode alias resolution', () => {
+  it("resolves alias 'performance' in project config to 'max_plan'", async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'performance' }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('max_plan');
+    expect(config.activeModeConfig.max_workers).toBe(8);
+  });
+
+  it("resolves alias 'balanced' in project config to 'max5x_plan'", async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'balanced' }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('max5x_plan');
+    expect(config.activeModeConfig.max_workers).toBe(5);
+  });
+
+  it("resolves alias 'economic' in project config to 'pro_plan'", async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'economic' }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('pro_plan');
+    expect(config.activeModeConfig.brain_model).toBe('sonnet');
+  });
+
+  it("resolves alias 'unlimited' in project config to 'api' (with API key)", async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'unlimited' }));
+    process.env['ANTHROPIC_API_KEY'] = 'test-key';
+
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('api');
+    expect(config.activeModeConfig.budget_per_sprint).toBe(5.0);
   });
 });

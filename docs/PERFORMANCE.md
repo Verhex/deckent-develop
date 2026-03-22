@@ -293,17 +293,17 @@ Tasks 1+2 run in parallel; tasks 3+4 run in parallel. Zero idle time, zero queue
 
 ## 4. Memory Budget Management
 
-The `.brain/` directory is a 3-tier memory system with a 300-line budget. Exceeding this budget degrades sprint planning quality and triggers automatic decay.
+The `.brain/` directory is a 3-tier memory system with a 600-line budget. Exceeding this budget degrades sprint planning quality and triggers automatic decay.
 
 ### 4.1 Memory Architecture
 
 | Tier | File | Max Lines | Loaded When |
 |------|------|-----------|-------------|
-| 1 | `.brain/MEMORY.md` | 100 | Always (every sprint) |
-| 2 | `.brain/sprints/sprint-NNN.md` | 50 each | Brain reads last 2 |
+| 1 | `.brain/MEMORY.md` | 200 | Always (every sprint) |
+| 2 | `.brain/sprints/sprint-NNN.md` | 80 each | Brain reads last 2 |
 | 3 | `.brain/archive/` | No limit | On-demand only |
 
-**Total budget: 300 lines** (excluding archive). Each sprint adds ~50 lines (retro + memory update). After ~4–6 sprints, decay is needed.
+**Total budget: 600 lines** (excluding archive). Each sprint adds ~50 lines (retro + memory update). After ~8–12 sprints, decay is needed.
 
 ### 4.2 Monitoring Memory Usage
 
@@ -312,8 +312,8 @@ The `.brain/` directory is a 3-tier memory system with a 300-line budget. Exceed
 deckent doctor
 
 # Output example:
-# ✓ Brain Budget  247/300 lines
-# ○ Brain Budget  312/300 lines — OVER BUDGET, run cleanup --decay
+# ✓ Brain Budget  247/600 lines
+# ○ Brain Budget  612/600 lines — OVER BUDGET, run cleanup --decay
 ```
 
 Or check directly:
@@ -323,10 +323,10 @@ wc -l .brain/MEMORY.md .brain/RETRO.md .brain/DEBT.md .brain/PATTERNS.md .brain/
 
 ### 4.3 Decay and Compression
 
-When `.brain/` exceeds 300 lines, Brain automatically triggers decay at the end of the sprint (DECAY phase). You can also trigger it manually:
+When `.brain/` exceeds 600 lines, Brain automatically triggers decay at the end of the sprint (DECAY phase). You can also trigger it manually:
 
 ```bash
-# Automatic decay (only runs if over 300 lines)
+# Automatic decay (only runs if over 600 lines)
 deckent cleanup --decay
 
 # Force decay even if under budget
@@ -334,19 +334,19 @@ deckent cleanup --force
 ```
 
 Decay removes:
-- **Old sprint logs** — logs older than 3 sprints are archived to `.brain/archive/`
+- **Old sprint logs** — logs older than 5 sprints are archived to `.brain/archive/`
 - **Resolved debt** — `DEBT.md` entries resolved 3+ sprints ago are removed
-- **Stale patterns** — `PATTERNS.md` entries not seen in 5+ sprints are pruned
+- **Stale patterns** — `PATTERNS.md` entries not seen in 8+ sprints are pruned
 
 ### 4.4 Memory Budget Best Practices
 
 **Keep MEMORY.md focused:**
-- Maximum 100 lines enforced
+- Maximum 200 lines enforced
 - Each entry should be a unique, actionable learning
 - Remove duplicates and outdated facts after major refactors
 
 **Keep RETRO.md concise:**
-- Maximum 60 lines per retro
+- Maximum 100 lines per retro
 - Focus on decisions and surprises, not task summaries
 - Brain overwrites RETRO.md each sprint — it doesn't accumulate
 
@@ -369,7 +369,7 @@ mv .brain/sprints/sprint-002.md .brain/archive/
 |---------|-------|-----|
 | Brain plans duplicate tasks | MEMORY.md context is stale/contradictory | Run decay, clean MEMORY.md manually |
 | Planning quality decreases | Too much noise in context window | Compress MEMORY.md to key facts only |
-| `doctor` warns over budget | .brain/ > 300 lines | `deckent cleanup --decay` |
+| `doctor` warns over budget | .brain/ > 600 lines | `deckent cleanup --decay` |
 | Slow sprint planning | Large MEMORY/PATTERNS context | Prune irrelevant entries |
 
 ---
@@ -525,7 +525,7 @@ cat .tasks/task-XXX.log
 
 ### 6.2 Memory Overflow
 
-**Symptom:** `deckent doctor` warns `Brain Budget over 300 lines`.
+**Symptom:** `deckent doctor` warns `Brain Budget over 600 lines`.
 
 ```bash
 # Step 1: Check what's taking space
@@ -536,7 +536,7 @@ deckent cleanup --decay
 
 # Step 3: If still over budget, manually trim MEMORY.md
 # Remove duplicate or outdated entries
-# Keep total under 100 lines
+# Keep total under 200 lines
 
 # Step 4: Archive old sprint logs manually
 mkdir -p .brain/archive

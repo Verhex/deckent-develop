@@ -1248,16 +1248,16 @@ describe('writeRetrospective', () => {
     expect(retroCall![1]).toContain('Sprint sprint-001 Retrospective');
   });
 
-  it('respects 60-line RETRO limit', () => {
+  it('respects 100-line RETRO limit', () => {
     mockedReadFileSync.mockReturnValue('');
-    const manyTasks = Array.from({ length: 100 }, (_, i) => makeTask({ id: `001-${String(i).padStart(3, '0')}` }));
+    const manyTasks = Array.from({ length: 200 }, (_, i) => makeTask({ id: `001-${String(i).padStart(3, '0')}` }));
     const sprint = makeSprint({ tasks: manyTasks });
     const evals = new Map(manyTasks.map(t => [t.id, TaskEvaluation.DONE] as const));
 
     writeRetrospective(ROOT, sprint, evals, metrics);
     const retroCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('RETRO'));
     const lines = (retroCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(60);
+    expect(lines.length).toBeLessThanOrEqual(100);
   });
 
   it('appends learnings to MEMORY.md', () => {
@@ -1271,15 +1271,15 @@ describe('writeRetrospective', () => {
     expect(memCall![1]).toContain('Existing');
   });
 
-  it('respects 100-line MEMORY limit', () => {
-    const bigMemory = Array.from({ length: 120 }, (_, i) => `Line ${i}`).join('\n');
+  it('respects 200-line MEMORY limit', () => {
+    const bigMemory = Array.from({ length: 220 }, (_, i) => `Line ${i}`).join('\n');
     mockedReadFileSync.mockReturnValue(bigMemory);
     const evals = new Map([['001-001', TaskEvaluation.NO_GO]]);
 
     writeRetrospective(ROOT, makeSprint(), evals, metrics);
     const memCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('MEMORY'));
     const lines = (memCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(100);
+    expect(lines.length).toBeLessThanOrEqual(200);
   });
 });
 
@@ -1309,14 +1309,14 @@ describe('writeSprintLog', () => {
     expect(mockedMkdirSync).toHaveBeenCalled();
   });
 
-  it('respects 50-line limit', () => {
-    const manyTasks = Array.from({ length: 100 }, (_, i) => makeTask({ id: `001-${String(i).padStart(3, '0')}` }));
+  it('respects 80-line limit', () => {
+    const manyTasks = Array.from({ length: 200 }, (_, i) => makeTask({ id: `001-${String(i).padStart(3, '0')}` }));
     const sprint = makeSprint({ tasks: manyTasks });
     writeSprintLog(ROOT, sprint, metrics);
 
     const writeCall = mockedWriteFileSync.mock.calls[0];
     const lines = (writeCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(50);
+    expect(lines.length).toBeLessThanOrEqual(80);
   });
 });
 

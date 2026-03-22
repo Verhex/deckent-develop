@@ -234,7 +234,7 @@ describe('Internal functions are NOT exported from the barrel', () => {
 describe('Barrel exports form a minimal public surface', () => {
   const EXPECTED_PUBLIC_FUNCTIONS = [
     // Brain API
-    'runSprint', 'readContext', 'checkUsage', 'adjustSprintSize',
+    'runSprint', 'finalizeSprint', 'readContext', 'checkUsage', 'adjustSprintSize',
     'planSprint', 'confirmDraftTasks', 'buildWorkerPrompt', 'cleanup', 'runDecay',
     'BrainError',
     // Tmux API

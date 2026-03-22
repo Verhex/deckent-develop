@@ -1,7 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR,
@@ -36,14 +36,26 @@ export function generateApiToken(): string {
   return randomBytes(32).toString('hex');
 }
 
-/** Check bearer token from Authorization header */
+/**
+ * Hash a token with SHA-256 so timingSafeEqual always compares equal-length buffers.
+ * This prevents length-based timing side-channels.
+ */
+function hashToken(token: string): Buffer {
+  return createHash('sha256').update(token).digest();
+}
+
+/** Check bearer token from Authorization header using timing-safe comparison */
 function checkAuth(req: IncomingMessage, token: string | null): boolean {
   // If no token configured, auth is disabled (backward-compatible)
   if (!token) return true;
   const authHeader = req.headers['authorization'];
   if (!authHeader) return false;
   const [scheme, value] = authHeader.split(' ', 2);
-  return scheme === 'Bearer' && value === token;
+  if (scheme !== 'Bearer' || value === undefined) return false;
+  // Use SHA-256 hashes so buffers are always 32 bytes — required by timingSafeEqual
+  const expected = hashToken(token);
+  const actual = hashToken(value);
+  return timingSafeEqual(actual, expected);
 }
 
 // ─── Zod Schemas for POST validation ────────────────────────────
@@ -510,6 +522,13 @@ export function createHttpServer(
     resolvedStaticDir = staticDir;
     resolvedToken = apiToken;
     host = LOCALHOST_ONLY;
+  }
+
+  // Warn once at startup if no auth token is configured
+  if (!resolvedToken) {
+    process.stderr.write(
+      '[deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_token to enable auth.\n',
+    );
   }
 
   const dashPath = join(projectRoot, DASHBOARD_FILE);

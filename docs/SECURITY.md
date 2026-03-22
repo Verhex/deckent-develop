@@ -270,7 +270,7 @@ Deckent supports three operating modes with different risk/convenience trade-off
 | **Deadlocked tasks** | Task A depends on B depends on A | Kahn's algorithm circular dependency detection |
 | **Brain overreach** | Brain modifies DIRECTIVES or config | `--allowedTools` excludes those file paths |
 | **Concurrent write conflict** | Two workers write the same file | `.locks/` file-based mutex |
-| **Memory budget overflow** | `.brain/` exceeds 300 lines | Brain's `runDecay` forced at budget limit |
+| **Memory budget overflow** | `.brain/` exceeds 600 lines | Brain's `runDecay` forced at budget limit |
 | **Sprint abandonment** | Error mid-sprint leaves tasks incomplete | `runSprint` wraps all phases in try/catch; always reaches COMPLETE |
 
 ### Out-of-Scope Threats

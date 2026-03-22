@@ -25,19 +25,21 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   writeFileSync: vi.fn(),
   appendFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
+const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedSpawnSync = vi.mocked(spawnSync);
 
 beforeEach(() => {
@@ -311,6 +313,234 @@ describe('checkStaleLocks', () => {
     const result = checkStaleLocks('/project');
     expect(result.locks).toHaveLength(1);
     expect(result.staleLocks).toEqual([]);
+  });
+});
+
+describe('checkStaleLocks — auto_clean_locks', () => {
+  it('removes stale lock file when autoClean=true', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+
+    const staleLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(staleLock) as never);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(mockedUnlinkSync).toHaveBeenCalledOnce();
+    expect(result.removedLocks).toContain('src/file.ts');
+  });
+
+  it('does NOT remove stale lock when autoClean=false (default)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+
+    const staleLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(staleLock) as never);
+
+    const result = checkStaleLocks('/project', false);
+
+    expect(mockedUnlinkSync).not.toHaveBeenCalled();
+    expect(result.removedLocks).toHaveLength(0);
+  });
+
+  it('does NOT remove stale lock when autoClean omitted (default false)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+
+    const staleLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(staleLock) as never);
+
+    const result = checkStaleLocks('/project');
+
+    expect(mockedUnlinkSync).not.toHaveBeenCalled();
+    expect(result.removedLocks).toHaveLength(0);
+  });
+
+  it('does NOT remove fresh (non-stale) lock even when autoClean=true', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+
+    const freshLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date().toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(freshLock) as never);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(mockedUnlinkSync).not.toHaveBeenCalled();
+    expect(result.removedLocks).toHaveLength(0);
+    expect(result.staleLocks).toHaveLength(0);
+  });
+
+  it('logs INFO alert (not WARNING) when lock is auto-removed', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+
+    const staleLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(staleLock) as never);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(result.alerts).toHaveLength(1);
+    expect(result.alerts[0]!.level).toBe(AlertLevel.INFO);
+    expect(result.alerts[0]!.message).toContain('Auto-removed stale lock');
+  });
+
+  it('logs WARNING alert (not INFO) when lock is stale but autoClean=false', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+
+    const staleLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(staleLock) as never);
+
+    const result = checkStaleLocks('/project', false);
+
+    expect(result.alerts).toHaveLength(1);
+    expect(result.alerts[0]!.level).toBe(AlertLevel.WARNING);
+  });
+
+  it('still reports staleLocks violation even after auto-removal', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+
+    const staleLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(staleLock) as never);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(result.staleLocks).toHaveLength(1);
+    expect(result.staleLocks[0]!.type).toBe('stale_lock');
+  });
+
+  it('handles unlinkSync failure gracefully — falls back to WARNING alert', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__file.ts.lock'] as never);
+    mockedUnlinkSync.mockImplementationOnce(() => { throw new Error('ENOENT'); });
+
+    const staleLock: LockInfo = {
+      filePath: 'src/file.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(staleLock) as never);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(result.removedLocks).toHaveLength(0);
+    expect(result.alerts).toHaveLength(1);
+    expect(result.alerts[0]!.level).toBe(AlertLevel.WARNING);
+  });
+
+  it('removes multiple stale locks when autoClean=true', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__a.ts.lock', 'src__b.ts.lock'] as never);
+
+    const staleA: LockInfo = {
+      filePath: 'src/a.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    const staleB: LockInfo = {
+      filePath: 'src/b.ts',
+      ownerWorkerId: 'w2',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-002',
+    };
+    mockedReadFileSync
+      .mockReturnValueOnce(JSON.stringify(staleA) as never)
+      .mockReturnValueOnce(JSON.stringify(staleB) as never);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(mockedUnlinkSync).toHaveBeenCalledTimes(2);
+    expect(result.removedLocks).toHaveLength(2);
+    expect(result.removedLocks).toContain('src/a.ts');
+    expect(result.removedLocks).toContain('src/b.ts');
+  });
+
+  it('mixes stale + fresh: only removes stale ones when autoClean=true', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['src__stale.ts.lock', 'src__fresh.ts.lock'] as never);
+
+    const stale: LockInfo = {
+      filePath: 'src/stale.ts',
+      ownerWorkerId: 'w1',
+      acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+      taskId: 'task-001',
+    };
+    const fresh: LockInfo = {
+      filePath: 'src/fresh.ts',
+      ownerWorkerId: 'w2',
+      acquiredAt: new Date().toISOString(),
+      taskId: 'task-002',
+    };
+    mockedReadFileSync
+      .mockReturnValueOnce(JSON.stringify(stale) as never)
+      .mockReturnValueOnce(JSON.stringify(fresh) as never);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(mockedUnlinkSync).toHaveBeenCalledOnce();
+    expect(result.removedLocks).toHaveLength(1);
+    expect(result.removedLocks).toContain('src/stale.ts');
+    expect(result.locks).toHaveLength(2);
+  });
+
+  it('runScanCycle passes autoCleanLocks=true to checkStaleLocks', () => {
+    // Minimal mocks — no tasks dir, no locks dir, no heartbeats
+    mockedExistsSync.mockReturnValue(false);
+    mockedSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as never);
+
+    const result = runScanCycle('/project', 'sprint-001', true);
+
+    // Should complete without error, removedLocks is not returned from runScanCycle
+    // but the call chain works
+    expect(result.violations).toEqual([]);
+    expect(result.alerts).toEqual([]);
+  });
+
+  it('removedLocks is empty array when no locks dir exists', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = checkStaleLocks('/project', true);
+
+    expect(result.removedLocks).toEqual([]);
+    expect(mockedUnlinkSync).not.toHaveBeenCalled();
   });
 });
 

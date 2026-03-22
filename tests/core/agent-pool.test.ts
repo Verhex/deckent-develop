@@ -10,7 +10,7 @@ vi.mock('node:fs', () => ({
 }));
 
 import * as fs from 'node:fs';
-import { AgentPoolManager } from '../../src/core/agent-pool.js';
+import { AgentPoolManager, isTempAgentStale, DEFAULT_MAX_TEMP_AGENTS, DEFAULT_MAX_AGENT_AGE } from '../../src/core/agent-pool.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import type { AgentDefinition } from '../../src/core/agent-types.js';
 
@@ -76,13 +76,11 @@ describe('AgentPoolManager', () => {
       expect(pool.size).toBe(0);
     });
 
-    it('skips directories without agent.json', () => {
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
-        const s = String(p);
-        if (s.endsWith('agent.json')) return false;
-        return true;
-      });
+    it('skips directories without agent.json (readJsonSafe returns null for missing file)', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true); // dir exists
       vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('orphan')] as any);
+      // Simulate missing agent.json by making readFileSync throw ENOENT
+      vi.mocked(fs.readFileSync).mockImplementation(() => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); });
       const pool = manager.loadAgents();
       expect(pool.size).toBe(0);
     });
@@ -518,5 +516,425 @@ describe('AgentPoolManager.validateAgentDefinition', () => {
     expect(result.errors).toEqual(expect.arrayContaining([
       expect.stringContaining('"description"'),
     ]));
+  });
+});
+
+// ─── isTempAgentStale ────────────────────────────────────────────────────────
+
+describe('isTempAgentStale', () => {
+  it('returns true when lastUsedInSprint is empty', () => {
+    expect(isTempAgentStale('', 'sprint-037', 5)).toBe(true);
+  });
+
+  it('returns false when difference equals maxAge exactly (boundary)', () => {
+    expect(isTempAgentStale('sprint-032', 'sprint-037', 5)).toBe(false);
+  });
+
+  it('returns true when difference exceeds maxAge by 1', () => {
+    expect(isTempAgentStale('sprint-031', 'sprint-037', 5)).toBe(true);
+  });
+
+  it('returns false when agent was used recently (within maxAge)', () => {
+    expect(isTempAgentStale('sprint-035', 'sprint-037', 5)).toBe(false);
+  });
+
+  it('returns false when sprint IDs cannot be parsed (safe default)', () => {
+    expect(isTempAgentStale('unknown', 'sprint-037', 5)).toBe(false);
+  });
+
+  it('returns false when currentSprintId cannot be parsed', () => {
+    expect(isTempAgentStale('sprint-001', 'invalid-id', 5)).toBe(false);
+  });
+
+  it('handles zero-padded sprint IDs correctly', () => {
+    expect(isTempAgentStale('sprint-001', 'sprint-010', 5)).toBe(true);  // diff = 9
+    expect(isTempAgentStale('sprint-006', 'sprint-010', 5)).toBe(false); // diff = 4
+  });
+
+  it('handles maxAge=0 (evict everything not used in current sprint)', () => {
+    expect(isTempAgentStale('sprint-036', 'sprint-037', 0)).toBe(true);  // diff = 1 > 0
+    expect(isTempAgentStale('sprint-037', 'sprint-037', 0)).toBe(false); // diff = 0
+  });
+});
+
+// ─── LRU eviction in loadAgents ──────────────────────────────────────────────
+
+describe('AgentPoolManager LRU eviction (loadAgents)', () => {
+  let manager: AgentPoolManager;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Create a manager that allows max 3 temp agents
+    manager = new AgentPoolManager(ROOT, 3);
+  });
+
+  it('loads all temp agents when count <= maxTempAgents', () => {
+    const agents = [
+      makeAgent({ id: 'a1', name: 'A1', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-010' } }),
+      makeAgent({ id: 'a2', name: 'A2', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-009' } }),
+    ];
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.includes('.tasks/agents')) return true;
+      if (s.includes('.deckent/agents') && !s.includes('.tasks')) return false;
+      if (s.includes('agent.json')) return true;
+      return false;
+    });
+    vi.mocked(fs.readdirSync).mockReturnValue([
+      mockDirEntry('sprint-010-a1'),
+      mockDirEntry('sprint-009-a2'),
+    ] as any);
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(JSON.stringify(agents[0]))
+      .mockReturnValueOnce(JSON.stringify(agents[1]));
+
+    const pool = manager.loadAgents();
+    expect(pool.size).toBe(2);
+  });
+
+  it('keeps only the maxTempAgents most recent agents when over limit', () => {
+    // 5 agents but max is 3 — should keep sprint-010, sprint-009, sprint-008
+    const agents = [
+      makeAgent({ id: 'a1', name: 'A1', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-005' } }),
+      makeAgent({ id: 'a2', name: 'A2', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-010' } }),
+      makeAgent({ id: 'a3', name: 'A3', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-007' } }),
+      makeAgent({ id: 'a4', name: 'A4', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-008' } }),
+      makeAgent({ id: 'a5', name: 'A5', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-009' } }),
+    ];
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.includes('.tasks/agents')) return true;
+      if (s.includes('.deckent/agents') && !s.includes('.tasks')) return false;
+      if (s.includes('agent.json')) return true;
+      return false;
+    });
+    vi.mocked(fs.readdirSync).mockReturnValue(
+      agents.map((a) => mockDirEntry(`sprint-xxx-${a.id}`)) as any,
+    );
+    for (const a of agents) {
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(JSON.stringify(a));
+    }
+
+    const pool = manager.loadAgents();
+    expect(pool.size).toBe(3);
+    // The 3 most recent should be a2 (010), a5 (009), a4 (008)
+    expect(pool.has('a2')).toBe(true);
+    expect(pool.has('a5')).toBe(true);
+    expect(pool.has('a4')).toBe(true);
+    expect(pool.has('a1')).toBe(false); // sprint-005 — evicted
+    expect(pool.has('a3')).toBe(false); // sprint-007 — evicted
+  });
+
+  it('DEFAULT_MAX_TEMP_AGENTS is 50', () => {
+    expect(DEFAULT_MAX_TEMP_AGENTS).toBe(50);
+  });
+
+  it('DEFAULT_MAX_AGENT_AGE is 5', () => {
+    expect(DEFAULT_MAX_AGENT_AGE).toBe(5);
+  });
+
+  it('persistent agents are never evicted by LRU', () => {
+    const persistentAgent = makeAgent({ id: 'p1', name: 'P1', source: 'builtin' });
+    const tempAgent = makeAgent({ id: 't1', name: 'T1', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-001' } });
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync)
+      .mockReturnValueOnce([mockDirEntry('p1')] as any)  // .deckent/agents/
+      .mockReturnValueOnce([mockDirEntry('sprint-001-t1')] as any); // .tasks/agents/
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(JSON.stringify(persistentAgent))
+      .mockReturnValueOnce(JSON.stringify(tempAgent));
+
+    const pool = manager.loadAgents();
+    expect(pool.has('p1')).toBe(true); // persistent agent always kept
+  });
+});
+
+// ─── cleanup(maxAge) ─────────────────────────────────────────────────────────
+
+describe('AgentPoolManager.cleanup', () => {
+  let manager: AgentPoolManager;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    manager = new AgentPoolManager(ROOT);
+  });
+
+  it('returns 0 when .tasks/agents does not exist', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    expect(manager.cleanup(5, 'sprint-037')).toBe(0);
+  });
+
+  it('returns 0 when readdirSync throws', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockImplementation(() => { throw new Error('fail'); });
+    expect(manager.cleanup(5, 'sprint-037')).toBe(0);
+  });
+
+  it('removes stale temp agents and returns count', () => {
+    const staleAgent = makeAgent({
+      id: 'stale-1',
+      name: 'Stale',
+      source: 'user',
+      stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-010' },
+    });
+    const freshAgent = makeAgent({
+      id: 'fresh-1',
+      name: 'Fresh',
+      source: 'user',
+      stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-034' },
+    });
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([
+      mockDirEntry('sprint-010-stale-1'),
+      mockDirEntry('sprint-034-fresh-1'),
+    ] as any);
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(JSON.stringify(staleAgent))
+      .mockReturnValueOnce(JSON.stringify(freshAgent));
+
+    const removed = manager.cleanup(5, 'sprint-037');
+    expect(removed).toBe(1);
+    expect(fs.rmSync).toHaveBeenCalledWith(
+      expect.stringContaining('sprint-010-stale-1'),
+      { recursive: true, force: true },
+    );
+    expect(fs.rmSync).not.toHaveBeenCalledWith(
+      expect.stringContaining('sprint-034-fresh-1'),
+      expect.anything(),
+    );
+  });
+
+  it('never removes builtin agents', () => {
+    const builtinAgent = makeAgent({
+      id: 'builtin-1',
+      name: 'Builtin',
+      source: 'builtin',
+      stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-001' },
+    });
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('sprint-001-builtin-1')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValueOnce(JSON.stringify(builtinAgent));
+
+    const removed = manager.cleanup(5, 'sprint-037');
+    expect(removed).toBe(0);
+    expect(fs.rmSync).not.toHaveBeenCalled();
+  });
+
+  it('infers current sprint from highest lastUsedInSprint when not provided', () => {
+    const staleAgent = makeAgent({
+      id: 'stale-a',
+      name: 'Stale A',
+      source: 'user',
+      stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-010' },
+    });
+    const recentAgent = makeAgent({
+      id: 'recent-a',
+      name: 'Recent A',
+      source: 'user',
+      stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-037' },
+    });
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([
+      mockDirEntry('sprint-010-stale-a'),
+      mockDirEntry('sprint-037-recent-a'),
+    ] as any);
+    // cleanup reads each file twice: once to find max sprint, once to evict
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(JSON.stringify(staleAgent))
+      .mockReturnValueOnce(JSON.stringify(recentAgent))
+      .mockReturnValueOnce(JSON.stringify(staleAgent))
+      .mockReturnValueOnce(JSON.stringify(recentAgent));
+
+    const removed = manager.cleanup(5); // no currentSprintId — infer from data
+    expect(removed).toBe(1);
+  });
+
+  it('returns 0 when no agents have parseable sprint IDs and no currentSprintId given', () => {
+    const agentNoSprint = makeAgent({
+      id: 'nosprint',
+      name: 'No Sprint',
+      source: 'user',
+      stats: { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' },
+    });
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('nosprint')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValueOnce(JSON.stringify(agentNoSprint));
+
+    const removed = manager.cleanup(5);
+    expect(removed).toBe(0);
+  });
+
+  it('skips directories without agent.json (readJsonSafe returns null for missing file)', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('orphan-dir')] as any);
+    // Simulate missing agent.json — readFileSync throws
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); });
+
+    const removed = manager.cleanup(5, 'sprint-037');
+    expect(removed).toBe(0);
+    expect(fs.rmSync).not.toHaveBeenCalled();
+  });
+
+  it('skips invalid agent.json files during cleanup', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('broken-agent')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValueOnce('INVALID_JSON');
+
+    const removed = manager.cleanup(5, 'sprint-037');
+    expect(removed).toBe(0);
+  });
+
+  it('removes all stale agents when many are old', () => {
+    const staleAgents = [
+      makeAgent({ id: 'old1', name: 'Old1', source: 'user', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-001' } }),
+      makeAgent({ id: 'old2', name: 'Old2', source: 'learned', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-002' } }),
+    ];
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([
+      mockDirEntry('sprint-001-old1'),
+      mockDirEntry('sprint-002-old2'),
+    ] as any);
+    for (const a of staleAgents) {
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(JSON.stringify(a));
+    }
+
+    const removed = manager.cleanup(5, 'sprint-037');
+    expect(removed).toBe(2);
+    expect(fs.rmSync).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── Batch Read (Task 037-006) ────────────────────────────────────────────────
+
+describe('AgentPoolManager batch read (loadAgents — O(N+1) syscalls)', () => {
+  let manager: AgentPoolManager;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    manager = new AgentPoolManager(ROOT);
+  });
+
+  it('calls readdirSync exactly once per directory (O(N+1) pattern)', () => {
+    const agent = makeAgent({ id: 'batch-agent', name: 'Batch Agent' });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('batch-agent')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agent));
+
+    manager.loadAgents();
+
+    // readdirSync called once per dir (persistent + temp = 2 calls total)
+    expect(fs.readdirSync).toHaveBeenCalledTimes(2);
+  });
+
+  it('does NOT call existsSync for individual agent.json files', () => {
+    const agent = makeAgent({ id: 'no-exists-check', name: 'No Exists Check' });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('no-exists-check')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agent));
+
+    manager.loadAgents();
+
+    // existsSync should only be called for directory-level checks (persistent dir + temp dir)
+    // NOT for individual agent.json file paths
+    const existsCalls = vi.mocked(fs.existsSync).mock.calls.map((c) => String(c[0]));
+    const agentJsonCalls = existsCalls.filter((p) => p.endsWith('agent.json'));
+    expect(agentJsonCalls).toHaveLength(0);
+  });
+
+  it('loads multiple agents from a single directory in one batch', () => {
+    const agents = [
+      makeAgent({ id: 'batch-1', name: 'Batch 1' }),
+      makeAgent({ id: 'batch-2', name: 'Batch 2' }),
+      makeAgent({ id: 'batch-3', name: 'Batch 3' }),
+    ];
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync)
+      .mockReturnValueOnce(agents.map((a) => mockDirEntry(a.id)) as any) // persistent
+      .mockReturnValueOnce([] as any); // temp
+    for (const a of agents) {
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(JSON.stringify(a));
+    }
+
+    const pool = manager.loadAgents();
+    expect(pool.size).toBe(3);
+    for (const a of agents) {
+      expect(pool.has(a.id)).toBe(true);
+    }
+  });
+
+  it('handles mixed valid/invalid agent.json files in the same directory batch', () => {
+    const validAgent = makeAgent({ id: 'valid-batch', name: 'Valid' });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync)
+      .mockReturnValueOnce([
+        mockDirEntry('valid-batch'),
+        mockDirEntry('invalid-batch'),
+        mockDirEntry('missing-batch'),
+      ] as any)
+      .mockReturnValueOnce([] as any);
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(JSON.stringify(validAgent))    // valid
+      .mockReturnValueOnce('NOT_JSON')                    // invalid JSON
+      .mockImplementationOnce(() => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); }); // missing
+
+    const pool = manager.loadAgents();
+    expect(pool.size).toBe(1);
+    expect(pool.has('valid-batch')).toBe(true);
+  });
+
+  it('handles empty directory without calling readFileSync', () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([] as any);
+
+    manager.loadAgents();
+
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
+  it('preserves all LRU eviction logic while using batch read pattern', () => {
+    // 4 temp agents but max is 2 — LRU must still evict 2 oldest
+    const batchManager = new AgentPoolManager(ROOT, 2);
+    const agents = [
+      makeAgent({ id: 'lru-a', name: 'LRU A', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-037' } }),
+      makeAgent({ id: 'lru-b', name: 'LRU B', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-036' } }),
+      makeAgent({ id: 'lru-c', name: 'LRU C', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-010' } }),
+      makeAgent({ id: 'lru-d', name: 'LRU D', stats: { totalUses: 1, successRate: 1, avgCoverage: 90, lastUsedInSprint: 'sprint-005' } }),
+    ];
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.includes('.tasks/agents')) return true;
+      if (s.includes('.deckent/agents') && !s.includes('.tasks')) return false;
+      return true;
+    });
+    vi.mocked(fs.readdirSync).mockReturnValue(
+      agents.map((a) => mockDirEntry(`sprint-xxx-${a.id}`)) as any,
+    );
+    for (const a of agents) {
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(JSON.stringify(a));
+    }
+
+    const pool = batchManager.loadAgents();
+    expect(pool.size).toBe(2);
+    expect(pool.has('lru-a')).toBe(true);  // sprint-037 — most recent
+    expect(pool.has('lru-b')).toBe(true);  // sprint-036 — second most recent
+    expect(pool.has('lru-c')).toBe(false); // evicted
+    expect(pool.has('lru-d')).toBe(false); // evicted
+  });
+
+  it('batch read result matches pre-refactor behavior for 0-agent case', () => {
+    // When directory is empty, pool must be empty
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    const pool = manager.loadAgents();
+    expect(pool.size).toBe(0);
+    expect(fs.readdirSync).not.toHaveBeenCalled();
   });
 });

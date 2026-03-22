@@ -450,7 +450,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
     { "name": "tmux", "status": "ok", "detail": "tmux 3.3a" },
     { "name": "claude_cli", "status": "ok", "detail": "claude 1.2.3" },
     { "name": "workspace", "status": "ok", "detail": ".deckent/ found" },
-    { "name": "brain_budget", "status": "ok", "detail": "185/300 lines" },
+    { "name": "brain_budget", "status": "ok", "detail": "185/600 lines" },
     { "name": "debt", "status": "warning", "detail": "3 open debt items" },
     { "name": "stale_locks", "status": "ok", "detail": "No stale locks" }
   ]
