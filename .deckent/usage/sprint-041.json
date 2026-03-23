@@ -1,0 +1,68 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "041-001",
+    "timestamp": "2026-03-23T12:35:20.631Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "041-002",
+    "timestamp": "2026-03-23T12:35:20.675Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "041-003",
+    "timestamp": "2026-03-23T12:35:20.728Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "041-004",
+    "timestamp": "2026-03-23T12:35:20.843Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "041-001",
+    "timestamp": "2026-03-23T12:48:33.407Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "041-002",
+    "timestamp": "2026-03-23T12:48:33.408Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "041-003",
+    "timestamp": "2026-03-23T12:48:33.408Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "041-004",
+    "timestamp": "2026-03-23T12:48:33.408Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "041-005",
+    "timestamp": "2026-03-23T12:48:33.409Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "041-006",
+    "timestamp": "2026-03-23T12:48:33.409Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "041-007",
+    "timestamp": "2026-03-23T12:48:33.409Z"
+  }
+]

@@ -255,12 +255,12 @@ describe('MCP deckent_doctor includeProfile', () => {
     const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: true });
     const parsed = JSON.parse(result.content[0]!.text);
 
-    expect(parsed).toHaveProperty('systemProfile');
-    expect(parsed.systemProfile).toHaveProperty('cpuCores');
-    expect(parsed.systemProfile).toHaveProperty('totalMemMB');
-    expect(parsed.systemProfile).toHaveProperty('freeMemMB');
-    expect(parsed.systemProfile).toHaveProperty('recommendedMaxWorkers');
-    expect(parsed.systemProfile).toHaveProperty('subscription');
+    expect(parsed.data ?? parsed).toHaveProperty('systemProfile');
+    expect((parsed.data ?? parsed).systemProfile).toHaveProperty('cpuCores');
+    expect((parsed.data ?? parsed).systemProfile).toHaveProperty('totalMemMB');
+    expect((parsed.data ?? parsed).systemProfile).toHaveProperty('freeMemMB');
+    expect((parsed.data ?? parsed).systemProfile).toHaveProperty('recommendedMaxWorkers');
+    expect((parsed.data ?? parsed).systemProfile).toHaveProperty('subscription');
   });
 
   it('includeProfile=false → no systemProfile field', async () => {
@@ -271,7 +271,7 @@ describe('MCP deckent_doctor includeProfile', () => {
     const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
     const parsed = JSON.parse(result.content[0]!.text);
 
-    expect(parsed).not.toHaveProperty('systemProfile');
+    expect(parsed.data ?? parsed).not.toHaveProperty('systemProfile');
   });
 
   it('includeProfile omitted → no systemProfile field (defaults to false)', async () => {
@@ -282,7 +282,7 @@ describe('MCP deckent_doctor includeProfile', () => {
     const result = await mock.tools.get('deckent_doctor')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
 
-    expect(parsed).not.toHaveProperty('systemProfile');
+    expect(parsed.data ?? parsed).not.toHaveProperty('systemProfile');
   });
 
   it('includeProfile=true → systemProfile.subscription matches detected value', async () => {
@@ -293,8 +293,8 @@ describe('MCP deckent_doctor includeProfile', () => {
     const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: true });
     const parsed = JSON.parse(result.content[0]!.text);
 
-    expect(parsed.systemProfile.subscription).toBe('max');
-    expect(parsed.systemProfile.subscriptionMethod).toBe('opus_probe');
+    expect((parsed.data ?? parsed).systemProfile.subscription).toBe('max');
+    expect((parsed.data ?? parsed).systemProfile.subscriptionMethod).toBe('opus_probe');
   });
 
   it('existing fields (ok, checks) are preserved with includeProfile=true', async () => {
@@ -305,9 +305,9 @@ describe('MCP deckent_doctor includeProfile', () => {
     const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: true });
     const parsed = JSON.parse(result.content[0]!.text);
 
-    expect(parsed).toHaveProperty('ok');
-    expect(parsed).toHaveProperty('checks');
-    expect(Array.isArray(parsed.checks)).toBe(true);
+    expect(parsed.data ?? parsed).toHaveProperty('ok');
+    expect(parsed.data ?? parsed).toHaveProperty('checks');
+    expect(Array.isArray((parsed.data ?? parsed).checks)).toBe(true);
   });
 
   it('existing fields (ok, checks) are preserved with includeProfile=false', async () => {
@@ -318,7 +318,7 @@ describe('MCP deckent_doctor includeProfile', () => {
     const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
     const parsed = JSON.parse(result.content[0]!.text);
 
-    expect(parsed).toHaveProperty('ok');
-    expect(parsed).toHaveProperty('checks');
+    expect(parsed.data ?? parsed).toHaveProperty('ok');
+    expect(parsed.data ?? parsed).toHaveProperty('checks');
   });
 });

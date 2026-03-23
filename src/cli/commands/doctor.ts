@@ -296,6 +296,37 @@ export interface HumanDoctorInput {
 }
 
 /**
+ * Compute a tiered memory health label based on usage percentage.
+ */
+export function getMemoryHealthLabel(pct: number): string {
+  if (pct > 100) return 'OVER BUDGET';
+  if (pct >= 80) return 'high';
+  if (pct >= 50) return 'moderate';
+  return 'healthy';
+}
+
+/**
+ * Compute a provider summary: "N/M providers ready"
+ */
+export function getProviderSummary(providers: DetectedProvider[]): string {
+  const ready = providers.filter(p => p.available).length;
+  const total = providers.length;
+  return `${ready}/${total} providers ready`;
+}
+
+/**
+ * Compute overall readiness assessment.
+ */
+export function getReadinessLabel(result: DoctorResult, brainLines: number, brainBudget: number): string {
+  const failedRequired = result.checks.filter(c => c.required && !c.passed);
+  if (failedRequired.length > 0) return 'NOT READY';
+  if (brainLines > brainBudget) return 'READY (with warnings)';
+  const failedOptional = result.checks.filter(c => !c.required && !c.passed);
+  if (failedOptional.length > 0) return 'READY (with warnings)';
+  return 'READY';
+}
+
+/**
  * Format a human-friendly doctor output.
  * Groups checks into System and Project sections, adds recommendations.
  */
@@ -306,14 +337,14 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   lines.push('Deckent Health Check');
   lines.push('');
 
-  // ─── Your System ──────────────────────────────────
+  // --- Your System ---
   lines.push('Your System:');
 
   const systemCheckNames = ['Platform', 'Node.js', 'git', 'tmux', 'Claude CLI'];
   for (const check of result.checks) {
     if (systemCheckNames.includes(check.name)) {
       const icon = check.passed ? 'OK' : 'FAIL';
-      lines.push(`  ${icon} ${check.name} — ${check.message}`);
+      lines.push(`  ${icon} ${check.name} \u2014 ${check.message}`);
     }
   }
 
@@ -323,31 +354,34 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
     if (p.available) {
       const auth = p.authMethod === 'session' ? 'session auth' : p.authMethod === 'api_key' ? 'API key set' : '';
       const authLabel = auth ? ` (${auth})` : '';
-      lines.push(`  OK ${capitalize(p.name)} CLI${version} — Ready${authLabel}`);
+      lines.push(`  OK ${capitalize(p.name)} CLI${version} \u2014 Ready${authLabel}`);
     } else {
       const hint = getProviderHint(p.name);
-      lines.push(`  FAIL ${capitalize(p.name)} — Not configured${hint}`);
+      lines.push(`  FAIL ${capitalize(p.name)} \u2014 Not configured${hint}`);
     }
   }
 
+  // Provider summary line
+  lines.push(`  ${getProviderSummary(providers)}`);
+
   lines.push('');
 
-  // ─── Your Project ─────────────────────────────────
+  // --- Your Project ---
   lines.push('Your Project:');
 
   const projectCheckNames = ['Workspace', 'Brain Dir', 'Directives'];
   for (const check of result.checks) {
     if (projectCheckNames.includes(check.name)) {
       const icon = check.passed ? 'OK' : 'FAIL';
-      lines.push(`  ${icon} ${check.name} — ${check.message}`);
+      lines.push(`  ${icon} ${check.name} \u2014 ${check.message}`);
     }
   }
 
-  // Memory budget
+  // Memory budget with tiered health
   const memPct = Math.round((brainLines / brainBudget) * 100);
-  const memHealth = brainLines <= brainBudget ? 'healthy' : 'OVER BUDGET';
+  const memHealth = getMemoryHealthLabel(memPct);
   const memIcon = brainLines <= brainBudget ? 'OK' : 'FAIL';
-  lines.push(`  ${memIcon} Memory: ${brainLines}/${brainBudget} lines (${memPct}% — ${memHealth})`);
+  lines.push(`  ${memIcon} Memory: ${brainLines}/${brainBudget} lines (${memPct}% \u2014 ${memHealth})`);
 
   // Last sprint
   if (lastSprintId) {
@@ -371,14 +405,19 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
 
   lines.push('');
 
-  // ─── Recommendation ───────────────────────────────
+  // --- Readiness ---
+  const readiness = getReadinessLabel(result, brainLines, brainBudget);
+  lines.push(`Status: ${readiness}`);
+  lines.push('');
+
+  // --- Recommendation ---
   lines.push('Recommendation:');
 
   const failedRequired = result.checks.filter(c => c.required && !c.passed);
   if (failedRequired.length > 0) {
     lines.push(`  Fix ${failedRequired.length} required issue${failedRequired.length > 1 ? 's' : ''} before starting a sprint.`);
     for (const c of failedRequired) {
-      lines.push(`  → ${c.name}: ${c.message}`);
+      lines.push(`  \u2192 ${c.name}: ${c.message}`);
     }
   } else {
     lines.push('  Everything looks good! You can start a new sprint with `deckent start`.');
@@ -405,6 +444,7 @@ function getProviderHint(name: string): string {
   switch (name) {
     case 'gemini': return ' (set GOOGLE_API_KEY to enable)';
     case 'codex': return ' (set OPENAI_API_KEY to enable)';
+    case 'claude': return ' (install Claude CLI: npm i -g @anthropic-ai/claude-code)';
     default: return '';
   }
 }
@@ -420,6 +460,9 @@ export function getProviderTips(providers: DetectedProvider[]): string[] {
         case 'codex':
           tips.push('Set OPENAI_API_KEY to enable Codex as a worker provider.');
           break;
+        case 'claude':
+          tips.push('Install Claude CLI (npm i -g @anthropic-ai/claude-code) to enable Claude as a provider.');
+          break;
       }
     }
   }
@@ -430,8 +473,8 @@ export function formatSystemProfile(profile: SystemProfile, subscription?: strin
   const totalGB = (profile.totalMemMB / 1024).toFixed(1);
   const freeGB = (profile.freeMemMB / 1024).toFixed(1);
   const inner = 54;
-  const top = `\u2554${'═'.repeat(inner)}\u2557`;
-  const bot = `\u255A${'═'.repeat(inner)}\u255D`;
+  const top = `\u2554${'\u2550'.repeat(inner)}\u2557`;
+  const bot = `\u255A${'\u2550'.repeat(inner)}\u255D`;
   const row = (content: string): string => {
     const padded = content.length >= inner - 2
       ? content.slice(0, inner - 2)

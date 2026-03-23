@@ -5,12 +5,15 @@
     "@modelcontextprotocol/sdk",
     "commander",
     "zod",
+    "@testing-library/jest-dom",
+    "@testing-library/react",
     "@types/node",
     "@vitest/coverage-v8",
+    "happy-dom",
     "typescript",
     "vitest"
   ],
   "buildTool": "tsc",
   "testFramework": "vitest",
-  "detectedAt": "2026-03-23T10:57:22.997Z"
+  "detectedAt": "2026-03-23T12:33:23.800Z"
 }

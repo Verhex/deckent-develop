@@ -4,6 +4,7 @@ import { runDoctorChecks } from '../../cli/commands/doctor.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { formatDoctorResponse, wrapResponse, type DoctorData } from '../helpers/format.js';
 
 export function registerDoctorTool(server: McpServer): void {
   server.registerTool(
@@ -51,11 +52,12 @@ export function registerDoctorTool(server: McpServer): void {
       response['healthScore'] = healthScore;
 
       const enriched = enrichResponse('doctor', response);
+      const summary = formatDoctorResponse(response as DoctorData);
 
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify(enriched),
+          text: JSON.stringify(wrapResponse(enriched, summary)),
         }],
       };
     },

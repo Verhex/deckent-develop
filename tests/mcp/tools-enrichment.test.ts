@@ -81,12 +81,14 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed).toHaveProperty('recommendations');
-      expect(Array.isArray(parsed.recommendations)).toBe(true);
-      expect(parsed).toHaveProperty('healthScore');
-      expect(typeof parsed.healthScore).toBe('number');
-      expect(parsed).toHaveProperty('_enriched');
-      expect(parsed._enriched.summary).toBeTruthy();
+      expect(parsed).toHaveProperty('data');
+      expect(parsed).toHaveProperty('summary');
+      expect(parsed.data).toHaveProperty('recommendations');
+      expect(Array.isArray(parsed.data.recommendations)).toBe(true);
+      expect(parsed.data).toHaveProperty('healthScore');
+      expect(typeof parsed.data.healthScore).toBe('number');
+      expect(parsed.data).toHaveProperty('_enriched');
+      expect(parsed.data._enriched.summary).toBeTruthy();
     });
 
     it('preserves original checks field', async () => {
@@ -104,8 +106,9 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed).toHaveProperty('ok');
-      expect(parsed).toHaveProperty('checks');
+      expect(parsed).toHaveProperty('data');
+      expect(parsed.data).toHaveProperty('ok');
+      expect(parsed.data).toHaveProperty('checks');
     });
   });
 
@@ -154,11 +157,13 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_retro')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed).toHaveProperty('highlights');
-      expect(Array.isArray(parsed.highlights)).toBe(true);
-      expect(parsed.highlights).toContain('Learned X');
-      expect(parsed.highlights).toContain('Improved Y');
-      expect(parsed).toHaveProperty('_enriched');
+      expect(parsed).toHaveProperty('data');
+      expect(parsed).toHaveProperty('summary');
+      expect(parsed.data).toHaveProperty('highlights');
+      expect(Array.isArray(parsed.data.highlights)).toBe(true);
+      expect(parsed.data.highlights).toContain('Learned X');
+      expect(parsed.data.highlights).toContain('Improved Y');
+      expect(parsed.data).toHaveProperty('_enriched');
     });
 
     it('preserves content field', async () => {
@@ -172,7 +177,7 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_retro')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.content).toContain('# Retro');
+      expect(parsed.data.content).toContain('# Retro');
     });
 
     it('returns empty highlights when no retro file', async () => {
@@ -185,8 +190,9 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_retro')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.content).toBeNull();
-      expect(parsed).toHaveProperty('_enriched');
+      expect(parsed).toHaveProperty('data');
+      expect(parsed.data.content).toBeNull();
+      expect(parsed.data).toHaveProperty('_enriched');
     });
   });
 
@@ -208,9 +214,11 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_history')!.handler({ last: 5 });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed).toHaveProperty('trend');
-      expect(parsed.trend).toBe('improving');
-      expect(parsed).toHaveProperty('_enriched');
+      expect(parsed).toHaveProperty('data');
+      expect(parsed).toHaveProperty('summary');
+      expect(parsed.data).toHaveProperty('trend');
+      expect(parsed.data.trend).toBe('improving');
+      expect(parsed.data).toHaveProperty('_enriched');
     });
 
     it('returns insufficient_data trend when no sprints', async () => {
@@ -223,8 +231,8 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_history')!.handler({ last: 5 });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.trend).toBe('insufficient_data');
-      expect(parsed.sprints).toHaveLength(0);
+      expect(parsed.data.trend).toBe('insufficient_data');
+      expect(parsed.data.sprints).toHaveLength(0);
     });
 
     it('preserves sprints array', async () => {
@@ -241,8 +249,8 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_history')!.handler({ last: 2 });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.sprints).toHaveLength(1);
-      expect(parsed.sprints[0].id).toBe('sprint-007');
+      expect(parsed.data.sprints).toHaveLength(1);
+      expect(parsed.data.sprints[0].id).toBe('sprint-007');
     });
   });
 
@@ -347,13 +355,15 @@ describe('MCP Tools Enrichment (Task 5)', () => {
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed._enriched).toHaveProperty('summary');
-      expect(parsed._enriched).toHaveProperty('hints');
-      expect(parsed._enriched).toHaveProperty('timestamp');
-      expect(typeof parsed._enriched.summary).toBe('string');
-      expect(Array.isArray(parsed._enriched.hints)).toBe(true);
+      expect(parsed).toHaveProperty('data');
+      expect(parsed).toHaveProperty('summary');
+      expect(parsed.data._enriched).toHaveProperty('summary');
+      expect(parsed.data._enriched).toHaveProperty('hints');
+      expect(parsed.data._enriched).toHaveProperty('timestamp');
+      expect(typeof parsed.data._enriched.summary).toBe('string');
+      expect(Array.isArray(parsed.data._enriched.hints)).toBe(true);
       // timestamp should be ISO format
-      expect(new Date(parsed._enriched.timestamp).toISOString()).toBe(parsed._enriched.timestamp);
+      expect(new Date(parsed.data._enriched.timestamp).toISOString()).toBe(parsed.data._enriched.timestamp);
     });
   });
 });

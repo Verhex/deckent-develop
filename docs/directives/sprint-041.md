@@ -7,11 +7,11 @@
 ## Task 1: MCP Tool Response — Human-Friendly Format
 - Model: opus
 - Effort: high
-- Files: src/mcp/tools/status.ts, src/mcp/tools/start.ts, src/mcp/tools/plan.ts, src/mcp/tools/doctor.ts, src/mcp/tools/retro.ts, src/mcp/tools/history.ts, src/mcp/helpers/format.ts, tests/mcp/helpers/format.test.ts (new)
+- Files: src/mcp/tools/status.ts, src/mcp/tools/start.ts, src/mcp/tools/plan.ts, src/mcp/tools/doctor.ts, src/mcp/tools/retro.ts, src/mcp/tools/history.ts, src/mcp/helpers/format.ts (new), tests/mcp/helpers/format.test.ts (new)
 - Scope: src/mcp/, tests/mcp/
 
 ### Description
-Every MCP tool response must include both `data` (JSON for programmatic use) AND `summary` (human-readable string for Claude Code chat display). Update or create `src/mcp/helpers/format.ts`:
+Every MCP tool response must include both `data` (JSON for programmatic use) AND `summary` (human-readable string for Claude Code chat display). Create `src/mcp/helpers/format.ts`:
 - `formatStatusResponse(data)` → "Sprint 040: 7/12 done, 3 active workers, ~8 min remaining"
 - `formatPlanResponse(data)` → "Planned 12 tasks: 4 opus (complex), 8 sonnet (standard). Estimated 35 min."
 - `formatStartResponse(data)` → "Sprint started! 4 workers launched. Watch: deckent status --watch"
@@ -34,7 +34,7 @@ Update ALL MCP tool handlers to use formatters. 20+ tests.
 ## Task 2: Dashboard — Human-Friendly SprintSummary Component
 - Model: opus
 - Effort: high
-- Files: src/dashboard/src/pages/StatusPage.tsx, src/dashboard/src/components/SprintSummary.tsx, src/dashboard/src/components/TaskCard.tsx (new)
+- Files: src/dashboard/src/pages/StatusPage.tsx, src/dashboard/src/components/SprintSummary.tsx (new), src/dashboard/src/components/TaskCard.tsx (new)
 - Scope: src/dashboard/
 
 ### Description
@@ -62,20 +62,37 @@ Replace raw data tables with a storytelling dashboard:
 
 ---
 
-## Task 3: CLI Doctor — Human-Friendly Health Check Enhancement
+## Task 3: CLI Doctor — Human-Friendly Health Check
 - Model: opus
 - Effort: normal
 - Files: src/cli/commands/doctor.ts, tests/cli/commands/doctor.test.ts
 - Scope: src/cli/, tests/cli/
 
 ### Description
-Enhance deckent doctor output to be welcoming and actionable. Current doctor already has some human-friendly output from Sprint 040, but needs enhancement:
-1. Category labels: "Your System:" and "Your Project:" sections
-2. Provider status with auth method (session auth, API key)
-3. Memory percentage with health indicator
-4. Context-aware recommendations based on actual state
-5. Setup tips for missing providers
-Do NOT break existing test expectations — only ADD new sections/enhancements. 10+ tests.
+Rewrite deckent doctor output to be welcoming and actionable:
+```
+Deckent Health Check
+━━━━━━━━━━━━━━━━━━━
+
+Your System:
+  ✅ Node.js v22.1.0 — Good
+  ✅ Claude CLI v2.1 — Ready (session auth)
+  ✅ Codex CLI v1.0 — Ready (API key set)
+  ❌ Gemini — Not configured (set GOOGLE_API_KEY to enable)
+  ✅ tmux v3.4 — Available
+  ✅ Git v2.43 — Clean working tree
+
+Your Project:
+  ✅ Deckent initialized
+  ✅ Memory: 347/600 lines (57% — healthy)
+  ✅ Last sprint: sprint-040 (completed)
+  ⚠️ 2 open tech debt items
+
+Recommendation:
+  Everything looks good! Start a sprint: deckent start
+  💡 Set GOOGLE_API_KEY to enable Gemini workers.
+```
+Each check category (System, Project) clearly labeled. Recommendations context-aware. 10+ tests.
 
 ### Tests
 - System checks show versions
@@ -87,27 +104,50 @@ Do NOT break existing test expectations — only ADD new sections/enhancements. 
 
 ---
 
-## Task 4: RETRO Format — Human-Readable Retrospective Enhancement
+## Task 4: RETRO Format — Human-Readable Retrospective
 - Model: opus
 - Effort: normal
 - Files: src/orchestra/sprint-reporter.ts, tests/orchestra/sprint-reporter.test.ts
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Enhance writeRetrospective to include self-healing metrics from feedbackLoop data:
-1. Summary line must include self-healing rate when feedbackLoop data available
-2. Highlights section: list tasks that self-healed (auto-fixed errors)
-3. Issues section: list NO_GO tasks with brief reason
-4. Metrics table: include self-healed count, new tests, code changes
-5. Learnings: extract from sprint patterns and debt
-Do NOT change the existing ## Summary / ## Highlights / ## Issues / ## Metrics structure — only enhance content within those sections. 10+ tests.
+Rewrite writeRetrospective to produce readable markdown:
+```markdown
+# Sprint 040 Retrospective
+
+## Summary
+Completed 7/13 tasks in 41 minutes. Self-healing rate: 75%.
+
+## Highlights
+- Worker feedback loop operational — 3 tasks auto-fixed errors
+- Agent/skill injection now working in sprint-controller
+- NO_GO rate dropped from 94.7% to 46.2%
+
+## Issues
+- 6 tasks NO_GO — mostly output formatting (non-blocking)
+- MCP format task needs dedicated helper module
+
+## Metrics
+| What | Value |
+|------|-------|
+| Tasks completed | 7/13 |
+| Self-healed | 3 |
+| New tests | +364 |
+| Code changes | +4,026 / -753 |
+| Sprint time | 41 min |
+
+## Learnings
+- Worker verify loop dramatically reduces false NO_GO
+- Agent/skill injection was dormant for 10 sprints — always verify feature connectivity
+```
+Include self-healing rate from feedbackLoop metrics. 10+ tests.
 
 ### Tests
-- Summary line includes self-healing rate
-- Highlights lists self-healed tasks
-- Issues lists NO_GO with reasons
-- Metrics table has self-healing row
-- Learnings section non-empty
+- Summary line includes task count, time, self-healing rate
+- Highlights section non-empty
+- Issues section lists NO_GO tasks
+- Metrics table formatted correctly
+- Learnings extracted from sprint data
 - 10+ tests
 
 ---
@@ -121,7 +161,7 @@ Do NOT change the existing ## Summary / ## Highlights / ## Issues / ## Metrics s
 ### Description
 Every DeckentError should display:
 ```
-Error: Sprint planning failed [DECKENT_E003]
+❌ Sprint planning failed [DECKENT_E003]
 
 What happened:
   Brain couldn't read your DIRECTIVES.md file.
@@ -133,6 +173,8 @@ How to fix:
   1. Open DIRECTIVES.md
   2. Add at least one task: ## Task 1: [description]
   3. Run `deckent plan` again
+
+Docs: https://docs.deckent.dev/directives
 ```
 Add to ErrorRegistry entries: `whatHappened: string`, `why: string`, `howToFix: string[]`. Update handleError in error-handler.ts to format these fields. Update ALL existing error codes (10+) with human-friendly messages. 15+ tests.
 
@@ -158,18 +200,18 @@ Worker log output (visible via deckent attach, dashboard, .tasks/*.log) must be 
 [040-003] Starting: Planner Provider Decoupling
 [040-003] Scope: src/orchestra/planner.ts (1 file)
 [040-003] Writing: 3 files modified
-[040-003] Verify: tsc --noEmit... Pass
-[040-003] Test: vitest run... Fail 2 failures
+[040-003] Verify: tsc --noEmit... ✅ Pass
+[040-003] Test: vitest run... ❌ 2 failures
 [040-003] Fix: planner.test.ts (assertion mismatch)
-[040-003] Test: retry 2/3... Pass
+[040-003] Test: retry 2/3... ✅ Pass
 [040-003] Done: DONE (1 retry, 4 min)
 ```
 Create `formatWorkerLog(taskId, action, detail, emoji?): string` helper. Apply to all worker lifecycle events: start, scope read, file write, tsc, vitest, retry, result. 10+ tests.
 
 ### Tests
 - Log format consistent across all events
-- Status indicators correct
+- Emoji status indicators correct
 - Retry attempts numbered
 - Final result includes timing
-- Fallback for --no-color mode
+- Non-emoji fallback for --no-color mode
 - 10+ tests

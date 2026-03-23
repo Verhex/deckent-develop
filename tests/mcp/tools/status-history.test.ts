@@ -17,6 +17,7 @@ vi.mock('../../../src/mcp/tools/job-runner.js', () => ({
 
 vi.mock('../../../src/mcp/helpers/format.js', () => ({
   formatStatusResponse: vi.fn(() => 'mocked summary'),
+  formatHistoryResponse: vi.fn(() => 'mocked history summary'),
   wrapResponse: vi.fn((<T>(data: T, _summary: string) => data) as <T>(data: T, summary: string) => T),
 }));
 

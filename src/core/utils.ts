@@ -5,6 +5,19 @@ import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, P
 import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
 
+/**
+ * Log a debug message to stderr when DECKENT_DEBUG environment variable is set.
+ * Used in silent catch blocks to surface errors during debugging without
+ * affecting normal operation.
+ * @param context - Short label describing where the error occurred (e.g. 'readJsonSafe')
+ * @param error - The caught error or message to log
+ */
+export function debugLog(context: string, error: unknown): void {
+  if (!process.env['DECKENT_DEBUG']) return;
+  const msg = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`[deckent:debug] ${context}: ${msg}\n`);
+}
+
 /** Type guard: validates that a string is a valid DebtPriority enum value. */
 function isDebtPriority(value: string): value is DebtPriority {
   return Object.values(DebtPriority).includes(value as DebtPriority);
@@ -18,7 +31,8 @@ function isDebtPriority(value: string): value is DebtPriority {
 export function readFileSafe(filePath: string): string {
   try {
     return readFileSync(filePath, 'utf-8');
-  } catch {
+  } catch (e) {
+    debugLog('readFileSafe', e);
     return '';
   }
 }
@@ -32,7 +46,8 @@ export function readJsonSafe<T>(filePath: string): T | null {
   try {
     // safe: generic T is caller-supplied; validation is deferred to caller; null returned on parse failure
     return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
-  } catch {
+  } catch (e) {
+    debugLog('readJsonSafe', e);
     return null;
   }
 }
@@ -47,7 +62,8 @@ export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> 
     const content = await readFile(filePath, 'utf-8');
     // safe: generic T is caller-supplied; validation is deferred to caller; null returned on parse failure
     return JSON.parse(content) as T;
-  } catch {
+  } catch (e) {
+    debugLog('readJsonSafeAsync', e);
     return null;
   }
 }
@@ -66,13 +82,13 @@ export function countBrainLines(projectRoot: string): number {
   const entries = readdirSync(brainPath);
   for (const entry of entries) {
     if (entry === ARCHIVE_DIR || entry === SPRINTS_DIR) continue;
-    try { total += readFileSync(join(brainPath, entry), 'utf-8').split('\n').length; } catch { /* dir */ }
+    try { total += readFileSync(join(brainPath, entry), 'utf-8').split('\n').length; } catch (e) { debugLog('countBrainLines', e); }
   }
 
   const sprintsPath = join(brainPath, SPRINTS_DIR);
   if (existsSync(sprintsPath)) {
     for (const file of readdirSync(sprintsPath)) {
-      try { total += readFileSync(join(sprintsPath, file), 'utf-8').split('\n').length; } catch { /* skip */ }
+      try { total += readFileSync(join(sprintsPath, file), 'utf-8').split('\n').length; } catch (e) { debugLog('countBrainLines:sprints', e); }
     }
   }
   return total;
@@ -127,7 +143,7 @@ export function updateLastSprintId(projectRoot: string, sprintId: string): void 
     const config: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
     config.last_sprint_id = sprintId;
     writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
-  } catch { /* ignore — non-critical */ }
+  } catch (e) { debugLog('updateLastSprintId', e); }
 }
 
 /**

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BRAIN_DIR, RETRO_FILE } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { formatRetroResponse, wrapResponse, type RetroData } from '../helpers/format.js';
 
 function extractHighlights(content: string): string[] {
   const highlights: string[] = [];
@@ -28,17 +29,21 @@ export function registerRetroTool(server: McpServer): void {
       const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
 
       if (!existsSync(retroPath)) {
+        const noRetroData = { content: null };
+        const summary = formatRetroResponse(noRetroData as RetroData);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(enrichResponse('retro', { content: null })) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enrichResponse('retro', noRetroData), summary)) }],
         };
       }
 
       const content = readFileSync(retroPath, 'utf-8');
       const highlights = content ? extractHighlights(content) : [];
-      const enriched = enrichResponse('retro', { content: content || null, highlights });
+      const retroData = { content: content || null, highlights };
+      const enriched = enrichResponse('retro', retroData);
+      const summary = formatRetroResponse(retroData as RetroData);
 
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enriched, summary)) }],
       };
     },
   );

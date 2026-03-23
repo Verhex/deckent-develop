@@ -1,13 +1,15 @@
 /**
- * Tests for catch block behavior in utils.ts.
- * All catch blocks are currently silent (no logging).
- * Fallback return values must remain unchanged.
+ * Tests for debugLog() helper and catch block debug logging in utils.ts.
+ * When DECKENT_DEBUG is set, catch blocks log to stderr via debugLog().
+ * When DECKENT_DEBUG is unset, catch blocks remain silent.
+ * Fallback return values are always preserved regardless of debug state.
  */
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  debugLog,
   readFileSafe,
   readJsonSafe,
   readJsonSafeAsync,
@@ -22,12 +24,12 @@ const originalEnv = process.env['DECKENT_DEBUG'];
 beforeEach(() => {
   mkdirSync(TMP, { recursive: true });
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  delete process.env['DECKENT_DEBUG'];
 });
 
 afterEach(() => {
   rmSync(TMP, { recursive: true, force: true });
   stderrSpy.mockRestore();
-  // Restore original env state
   if (originalEnv === undefined) {
     delete process.env['DECKENT_DEBUG'];
   } else {
@@ -35,13 +37,70 @@ afterEach(() => {
   }
 });
 
+// --- debugLog ---
+
+describe('debugLog', () => {
+  it('does nothing when DECKENT_DEBUG is not set', () => {
+    debugLog('test', new Error('fail'));
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('writes to stderr when DECKENT_DEBUG is set', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    debugLog('myContext', new Error('something broke'));
+    expect(stderrSpy).toHaveBeenCalledOnce();
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('[deckent:debug]');
+    expect(output).toContain('myContext');
+    expect(output).toContain('something broke');
+  });
+
+  it('handles string errors', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    debugLog('ctx', 'string error');
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('string error');
+  });
+
+  it('handles non-Error objects', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    debugLog('ctx', { code: 'ENOENT' });
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('[object Object]');
+  });
+
+  it('handles null/undefined errors', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    debugLog('ctx', null);
+    expect(stderrSpy).toHaveBeenCalledOnce();
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('null');
+  });
+
+  it('format includes newline', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    debugLog('ctx', 'msg');
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toMatch(/\n$/);
+  });
+});
+
 // --- readFileSafe ---
 
-describe('readFileSafe — catch behavior', () => {
-  it('returns empty string on missing file without stderr output', () => {
+describe('readFileSafe — debug logging', () => {
+  it('returns empty string on missing file without stderr when debug off', () => {
     const result = readFileSafe(join(TMP, 'nonexistent.txt'));
     expect(result).toBe('');
     expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs to stderr on missing file when DECKENT_DEBUG is set', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    const result = readFileSafe(join(TMP, 'nonexistent.txt'));
+    expect(result).toBe('');
+    expect(stderrSpy).toHaveBeenCalled();
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('readFileSafe');
   });
 
   it('returns empty string (fallback) regardless of DECKENT_DEBUG state', () => {
@@ -67,19 +126,37 @@ describe('readFileSafe — catch behavior', () => {
 
 // --- readJsonSafe ---
 
-describe('readJsonSafe — catch behavior', () => {
-  it('returns null on missing file without stderr output', () => {
+describe('readJsonSafe — debug logging', () => {
+  it('returns null on missing file without stderr when debug off', () => {
     const result = readJsonSafe(join(TMP, 'missing.json'));
     expect(result).toBeNull();
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it('returns null on malformed JSON without stderr output', () => {
+  it('logs to stderr on missing file when DECKENT_DEBUG is set', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    const result = readJsonSafe(join(TMP, 'missing.json'));
+    expect(result).toBeNull();
+    expect(stderrSpy).toHaveBeenCalled();
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('readJsonSafe');
+  });
+
+  it('returns null on malformed JSON without stderr when debug off', () => {
     const file = join(TMP, 'bad.json');
     writeFileSync(file, '{ not valid }');
     const result = readJsonSafe(file);
     expect(result).toBeNull();
     expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs to stderr on malformed JSON when DECKENT_DEBUG is set', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    const file = join(TMP, 'bad2.json');
+    writeFileSync(file, '{ not valid }');
+    const result = readJsonSafe(file);
+    expect(result).toBeNull();
+    expect(stderrSpy).toHaveBeenCalled();
   });
 
   it('returns null (fallback) on error regardless of DECKENT_DEBUG state', () => {
@@ -100,11 +177,20 @@ describe('readJsonSafe — catch behavior', () => {
 
 // --- readJsonSafeAsync ---
 
-describe('readJsonSafeAsync — catch behavior', () => {
-  it('returns null on missing file without stderr output', async () => {
+describe('readJsonSafeAsync — debug logging', () => {
+  it('returns null on missing file without stderr when debug off', async () => {
     const result = await readJsonSafeAsync(join(TMP, 'async-missing.json'));
     expect(result).toBeNull();
     expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs to stderr on missing file when DECKENT_DEBUG is set', async () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    const result = await readJsonSafeAsync(join(TMP, 'async-missing.json'));
+    expect(result).toBeNull();
+    expect(stderrSpy).toHaveBeenCalled();
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('readJsonSafeAsync');
   });
 
   it('returns null on malformed JSON', async () => {
@@ -132,10 +218,18 @@ describe('readJsonSafeAsync — catch behavior', () => {
 
 // --- updateLastSprintId ---
 
-describe('updateLastSprintId — catch behavior', () => {
-  it('does not throw or write to stderr when write fails', () => {
+describe('updateLastSprintId — debug logging', () => {
+  it('does not throw or write to stderr when write fails (debug off)', () => {
     updateLastSprintId('/nonexistent/path', 'sprint-099');
     expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs to stderr when write fails and DECKENT_DEBUG is set', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    updateLastSprintId('/nonexistent/path', 'sprint-099');
+    expect(stderrSpy).toHaveBeenCalled();
+    const output = stderrSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('[deckent:debug]');
   });
 
   it('writes config successfully when path is valid', () => {

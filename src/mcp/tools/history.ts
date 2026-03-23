@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { formatHistoryResponse, wrapResponse, type HistoryData } from '../helpers/format.js';
 
 function detectTrend(sprints: Array<{ id: string; content: string }>): string {
   if (sprints.length < 2) return 'insufficient_data';
@@ -39,8 +40,10 @@ export function registerHistoryTool(server: McpServer): void {
       const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
 
       if (!existsSync(sprintsDir)) {
+        const emptyData = { sprints: [], trend: 'insufficient_data' };
+        const summary = formatHistoryResponse(emptyData as HistoryData);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(enrichResponse('history', { sprints: [], trend: 'insufficient_data' })) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enrichResponse('history', emptyData), summary)) }],
         };
       }
 
@@ -55,10 +58,12 @@ export function registerHistoryTool(server: McpServer): void {
       }));
 
       const trend = detectTrend(sprints);
-      const enriched = enrichResponse('history', { sprints, trend });
+      const historyData = { sprints, trend };
+      const enriched = enrichResponse('history', historyData);
+      const summary = formatHistoryResponse(historyData as HistoryData);
 
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
+        content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enriched, summary)) }],
       };
     },
   );

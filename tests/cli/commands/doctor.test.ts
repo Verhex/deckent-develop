@@ -80,6 +80,7 @@ import { detectSubscription } from '../../../src/core/subscription.js';
 import {
   registerDoctor, runDoctorChecks, formatSystemProfile, checkPlatform, isRunningInWSL,
   formatHumanDoctor, getLastSprintId, countDebtItems, getProviderTips,
+  getMemoryHealthLabel, getProviderSummary, getReadinessLabel,
 } from '../../../src/cli/commands/doctor.js';
 import type { HumanDoctorInput } from '../../../src/cli/commands/doctor.js';
 import type { DetectedProvider } from '../../../src/core/provider.js';
@@ -872,7 +873,7 @@ describe('formatHumanDoctor', () => {
 
   it('shows memory percentage and health', () => {
     const output = formatHumanDoctor(baseInput);
-    expect(output).toContain('Memory: 347/600 lines (58% — healthy)');
+    expect(output).toContain('Memory: 347/600 lines (58% — moderate)');
   });
 
   it('shows memory OVER BUDGET when exceeds limit', () => {
@@ -1099,5 +1100,244 @@ describe('getProviderTips', () => {
       makeProvider('gemini', false),
     ]);
     expect(tips).toHaveLength(2);
+  });
+
+  it('returns Claude tip when Claude unavailable', () => {
+    const tips = getProviderTips([makeProvider('claude', false)]);
+    expect(tips).toHaveLength(1);
+    expect(tips[0]).toContain('Claude CLI');
+  });
+});
+
+// --- getMemoryHealthLabel ---
+
+describe('getMemoryHealthLabel', () => {
+  it('returns "healthy" for usage below 50%', () => {
+    expect(getMemoryHealthLabel(0)).toBe('healthy');
+    expect(getMemoryHealthLabel(10)).toBe('healthy');
+    expect(getMemoryHealthLabel(49)).toBe('healthy');
+  });
+
+  it('returns "moderate" for usage 50-79%', () => {
+    expect(getMemoryHealthLabel(50)).toBe('moderate');
+    expect(getMemoryHealthLabel(65)).toBe('moderate');
+    expect(getMemoryHealthLabel(79)).toBe('moderate');
+  });
+
+  it('returns "high" for usage 80-100%', () => {
+    expect(getMemoryHealthLabel(80)).toBe('high');
+    expect(getMemoryHealthLabel(90)).toBe('high');
+    expect(getMemoryHealthLabel(100)).toBe('high');
+  });
+
+  it('returns "OVER BUDGET" for usage above 100%', () => {
+    expect(getMemoryHealthLabel(101)).toBe('OVER BUDGET');
+    expect(getMemoryHealthLabel(150)).toBe('OVER BUDGET');
+  });
+});
+
+// --- getProviderSummary ---
+
+describe('getProviderSummary', () => {
+  function makeProvider(name: string, available: boolean): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, authMethod: 'none', models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  it('returns "2/3 providers ready" when 2 of 3 available', () => {
+    const summary = getProviderSummary([
+      makeProvider('claude', true),
+      makeProvider('codex', true),
+      makeProvider('gemini', false),
+    ]);
+    expect(summary).toBe('2/3 providers ready');
+  });
+
+  it('returns "0/3 providers ready" when none available', () => {
+    const summary = getProviderSummary([
+      makeProvider('claude', false),
+      makeProvider('codex', false),
+      makeProvider('gemini', false),
+    ]);
+    expect(summary).toBe('0/3 providers ready');
+  });
+
+  it('returns "3/3 providers ready" when all available', () => {
+    const summary = getProviderSummary([
+      makeProvider('claude', true),
+      makeProvider('codex', true),
+      makeProvider('gemini', true),
+    ]);
+    expect(summary).toBe('3/3 providers ready');
+  });
+
+  it('returns "0/0 providers ready" for empty array', () => {
+    expect(getProviderSummary([])).toBe('0/0 providers ready');
+  });
+});
+
+// --- getReadinessLabel ---
+
+describe('getReadinessLabel', () => {
+  function makeCheck(name: string, passed: boolean, required: boolean) {
+    return { name, passed, message: '', required };
+  }
+
+  it('returns "READY" when all checks pass', () => {
+    const result = {
+      ok: true,
+      checks: [
+        makeCheck('Node.js', true, true),
+        makeCheck('git', true, true),
+        makeCheck('Workspace', true, false),
+      ],
+    };
+    expect(getReadinessLabel(result, 100, 600)).toBe('READY');
+  });
+
+  it('returns "NOT READY" when a required check fails', () => {
+    const result = {
+      ok: false,
+      checks: [
+        makeCheck('Node.js', false, true),
+        makeCheck('git', true, true),
+      ],
+    };
+    expect(getReadinessLabel(result, 100, 600)).toBe('NOT READY');
+  });
+
+  it('returns "READY (with warnings)" when brain over budget', () => {
+    const result = {
+      ok: true,
+      checks: [
+        makeCheck('Node.js', true, true),
+        makeCheck('git', true, true),
+      ],
+    };
+    expect(getReadinessLabel(result, 700, 600)).toBe('READY (with warnings)');
+  });
+
+  it('returns "READY (with warnings)" when optional check fails', () => {
+    const result = {
+      ok: true,
+      checks: [
+        makeCheck('Node.js', true, true),
+        makeCheck('Workspace', false, false),
+      ],
+    };
+    expect(getReadinessLabel(result, 100, 600)).toBe('READY (with warnings)');
+  });
+});
+
+// --- formatHumanDoctor enhancements ---
+
+describe('formatHumanDoctor enhancements', () => {
+  function makeCheck(name: string, passed: boolean, message: string, required = false) {
+    return { name, passed, message, required };
+  }
+
+  function makeProvider(name: string, available: boolean, version?: string, authMethod: 'session' | 'api_key' | 'none' = 'none'): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, version, authMethod, models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  const baseInput: HumanDoctorInput = {
+    result: {
+      ok: true,
+      checks: [
+        makeCheck('Platform', true, 'Linux (fully supported)'),
+        makeCheck('Node.js', true, 'v22.1.0 (>=18 required)', true),
+        makeCheck('git', true, 'v2.43.0', true),
+        makeCheck('tmux', true, 'tmux 3.4', true),
+        makeCheck('Claude CLI', true, 'v2.1', true),
+        makeCheck('Workspace', true, '.deckent/ found'),
+        makeCheck('Brain Dir', true, 'All brain files present'),
+        makeCheck('Directives', true, 'DIRECTIVES.md found'),
+        makeCheck('Brain Budget', true, '347/600 lines'),
+        makeCheck('Debt', true, 'No debt file'),
+        makeCheck('Locks', true, 'No lock files'),
+      ],
+    },
+    providers: [
+      makeProvider('claude', true, '2.1', 'session'),
+      makeProvider('codex', true, '1.0', 'api_key'),
+      makeProvider('gemini', false),
+    ],
+    brainLines: 347,
+    brainBudget: 600,
+    lastSprintId: 'sprint-039',
+    debtItems: { total: 0, critical: 0 },
+  };
+
+  it('shows provider summary line', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('2/3 providers ready');
+  });
+
+  it('shows Status: READY when all ok', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Status: READY');
+  });
+
+  it('shows Status: NOT READY when required check fails', () => {
+    const input = {
+      ...baseInput,
+      result: {
+        ok: false,
+        checks: baseInput.result.checks.map(c =>
+          c.name === 'tmux' ? { ...c, passed: false } : c,
+        ),
+      },
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Status: NOT READY');
+  });
+
+  it('shows Status: READY (with warnings) when optional check fails', () => {
+    const input = {
+      ...baseInput,
+      result: {
+        ok: true,
+        checks: baseInput.result.checks.map(c =>
+          c.name === 'Workspace' ? { ...c, passed: false } : c,
+        ),
+      },
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Status: READY (with warnings)');
+  });
+
+  it('shows tiered memory label "healthy" for low usage', () => {
+    const input = { ...baseInput, brainLines: 100, brainBudget: 600 };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('17% — healthy');
+  });
+
+  it('shows tiered memory label "high" for 80%+ usage', () => {
+    const input = { ...baseInput, brainLines: 500, brainBudget: 600 };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('83% — high');
+  });
+
+  it('shows claude provider hint when claude is missing', () => {
+    const input = {
+      ...baseInput,
+      providers: [
+        makeProvider('claude', false),
+        makeProvider('codex', true, '1.0', 'api_key'),
+        makeProvider('gemini', false),
+      ],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('FAIL Claude — Not configured (install Claude CLI');
+  });
+
+  it('shows claude provider tip when claude is unavailable', () => {
+    const input = {
+      ...baseInput,
+      providers: [
+        makeProvider('claude', false),
+      ],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Tip: Install Claude CLI');
   });
 });

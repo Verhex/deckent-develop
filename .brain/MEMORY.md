@@ -112,3 +112,5 @@
 - RETRO Format — Human-Friendly Retrospective: NO_GO
 - Error Messages — Human-Friendly: NO_GO
 - Log Output — Human-Friendly Worker Logs: NO_GO
+## Sprint sprint-041 Learnings
+- MCP Tool Response — Human-Friendly Format: GO_WITH_TECH_DEBT

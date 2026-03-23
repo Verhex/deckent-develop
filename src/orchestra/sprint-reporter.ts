@@ -5,12 +5,13 @@ import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
   TaskResult, Sprint, SprintMetrics, DebtItem, ResolvedConfig,
-  SprintResult,
+  SprintResult, PatternEntry,
 } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import {
   BRAIN_DIR, SPRINTS_DIR, MEMORY_FILE, PROJECT_IDENTITY_FILE,
   RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
+  PATTERNS_FILE, DEBT_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
@@ -200,6 +201,8 @@ export interface HumanRetroData {
   agentRows?: AgentPerformanceRow[];
   skillRows?: SkillPerformanceRow[];
   previousMetrics?: SprintMetrics | null;
+  patterns?: PatternEntry[];
+  debt?: DebtItem[];
 }
 
 /**
@@ -256,6 +259,10 @@ export function formatHumanRetro(data: HumanRetroData): string {
     lines.push(`| Self-healed | ${healingRate.healed} task${healingRate.healed !== 1 ? 's' : ''} |`);
   }
   if (results && results.length > 0) {
+    const newTestFiles = countNewTestFiles(results);
+    if (newTestFiles > 0) {
+      lines.push(`| New test files | ${newTestFiles} |`);
+    }
     const totalAdded = results.reduce((sum, r) => sum + (r.linesAdded ?? 0), 0);
     const totalRemoved = results.reduce((sum, r) => sum + (r.linesRemoved ?? 0), 0);
     if (totalAdded > 0 || totalRemoved > 0) {
@@ -287,7 +294,7 @@ export function formatHumanRetro(data: HumanRetroData): string {
   }
 
   // ─── Learnings ─────────────────────────────────────────────────
-  const learnings = buildRetroLearnings(sprint, evaluations, results);
+  const learnings = buildRetroLearnings(sprint, evaluations, results, data.patterns, data.debt);
   if (learnings.length > 0) {
     lines.push('## Learnings');
     for (const l of learnings) {
@@ -375,6 +382,8 @@ export function buildRetroLearnings(
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
   results?: TaskResult[],
+  patterns?: PatternEntry[],
+  debt?: DebtItem[],
 ): string[] {
   const items: string[] = [];
 
@@ -394,6 +403,24 @@ export function buildRetroLearnings(
     const healingRate = calculateSelfHealingRate(results);
     if (healingRate && healingRate.percent < 50 && healingRate.attempted > 0) {
       items.push('Low self-healing rate — consider improving worker verification prompts');
+    }
+  }
+
+  // Recurring patterns generate learnings
+  if (patterns && patterns.length > 0) {
+    const recurring = patterns.filter(p => !p.resolved && p.occurrences >= 2);
+    for (const p of recurring.slice(0, 3)) {
+      if (items.length >= 12) break;
+      items.push(`Recurring pattern (${p.occurrences}x): ${p.pattern}`);
+    }
+  }
+
+  // Open high-priority debt generates learnings
+  if (debt && debt.length > 0) {
+    const openHighDebt = debt.filter(d => !d.resolved && (d.priority === 'HIGH' || d.priority === 'CRITICAL'));
+    for (const d of openHighDebt.slice(0, 3)) {
+      if (items.length >= 12) break;
+      items.push(`Open ${d.priority} debt: ${d.description}`);
     }
   }
 
@@ -439,6 +466,19 @@ export function writeRetrospective(
   // Read previous sprint metrics for comparison
   const previousMetrics = readPreviousSprintMetrics(projectRoot, sprint.id);
 
+  // Read patterns and debt for learnings
+  let patterns: PatternEntry[] = [];
+  try {
+    const patternsRaw = readFileSafe(join(brainPath, PATTERNS_FILE));
+    if (patternsRaw) patterns = JSON.parse(patternsRaw);
+  } catch { /* non-fatal */ }
+
+  let debt: DebtItem[] = [];
+  try {
+    const debtRaw = readFileSafe(join(brainPath, DEBT_FILE));
+    if (debtRaw) debt = JSON.parse(debtRaw);
+  } catch { /* non-fatal — DEBT.md may be markdown, not JSON */ }
+
   // Generate human-friendly RETRO content
   const retroContent = formatHumanRetro({
     sprint,
@@ -449,6 +489,8 @@ export function writeRetrospective(
     agentRows,
     skillRows,
     previousMetrics,
+    patterns,
+    debt,
   });
 
   // Truncate to max lines
@@ -1053,6 +1095,20 @@ export function countFirstTryTasks(results?: TaskResult[]): number {
     if (!fl) return r.selfAssessment === 'DONE' || r.selfAssessment === 'GO_WITH_TECH_DEBT';
     return fl.tscAttempts <= 1 && fl.testAttempts <= 1;
   }).length;
+}
+
+/** Count new test files across all task results. */
+export function countNewTestFiles(results?: TaskResult[]): number {
+  if (!results) return 0;
+  const testFiles = new Set<string>();
+  for (const r of results) {
+    for (const f of r.filesChanged) {
+      if (f.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/)) {
+        testFiles.add(f);
+      }
+    }
+  }
+  return testFiles.size;
 }
 
 /** Count tasks that needed retries but still succeeded. */

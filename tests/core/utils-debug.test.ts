@@ -28,7 +28,6 @@ describe('readFileSafe — silent catch behavior', () => {
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const result = readFileSafe(join(TMP, 'nonexistent.txt'));
     expect(result).toBe('');
-    // Catch blocks in current implementation are silent
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
@@ -123,7 +122,7 @@ describe('countBrainLines — fallback behavior', () => {
     expect(lines).toBe(3);
   });
 
-  it('skips subdirectories gracefully', () => {
+  it('skips subdirectories gracefully (no stderr when debug off)', () => {
     const brainDir = join(TMP, '.brain');
     const subDir = join(brainDir, 'subdir');
     mkdirSync(subDir, { recursive: true });

@@ -11,6 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
+import { TaskCard, type TaskCardData } from "./TaskCard";
 import type { AgentInfo, DashboardState } from "../types";
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -23,6 +24,11 @@ export interface TaskInfo {
   retries?: number;
   startedAt?: string;
   completedAt?: string;
+  currentAction?: string;
+  filesChanged?: string[];
+  testResults?: { passed: number; failed: number; total: number };
+  retryHistory?: Array<{ attempt: number; reason: string }>;
+  dependsOn?: string[];
   feedbackLoop?: {
     tscAttempts: number;
     testAttempts: number;
@@ -320,42 +326,9 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-1.5" data-testid="task-list">
-              {tasks.map((task) => {
-                const Icon = getStatusIcon(task.status);
-                const colorClass = getTaskStatusColor(task.status);
-                const bgClass = getTaskStatusBg(task.status);
-                return (
-                  <div
-                    key={task.id}
-                    className={`flex items-center justify-between rounded-md border px-3 py-2 ${bgClass}`}
-                    data-testid={`task-${task.id}`}
-                    data-status={task.status}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon className={`h-4 w-4 ${colorClass}`} />
-                      <span className="text-sm text-zinc-200">
-                        Task {task.id}
-                      </span>
-                      <span className="text-sm text-zinc-400">
-                        {task.title}
-                      </span>
-                    </div>
-                    <Badge
-                      variant={
-                        task.status === "DONE"
-                          ? "success"
-                          : task.status === "EXECUTING"
-                            ? "info"
-                            : task.status === "NO_GO"
-                              ? "warning"
-                              : "secondary"
-                      }
-                    >
-                      {getStatusLabel(task.status)}
-                    </Badge>
-                  </div>
-                );
-              })}
+              {tasks.map((task) => (
+                <TaskCard key={task.id} task={task as TaskCardData} />
+              ))}
             </div>
           </CardContent>
         </Card>

@@ -107,7 +107,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(Array.isArray(parsed.checks)).toBe(true);
       expect(parsed.checks.length).toBeGreaterThan(0);
@@ -124,7 +125,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       const nodeCheck = parsed.checks.find((c: { name: string }) => c.name === 'Node.js');
       expect(nodeCheck).toBeDefined();
@@ -145,7 +147,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       const gitCheck = parsed.checks.find((c: { name: string }) => c.name === 'git');
       expect(gitCheck).toBeDefined();
@@ -166,7 +169,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       const tmuxCheck = parsed.checks.find((c: { name: string }) => c.name === 'tmux');
       expect(tmuxCheck).toBeDefined();
@@ -187,7 +191,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       const claudeCheck = parsed.checks.find((c: { name: string }) => c.name === 'Claude CLI');
       expect(claudeCheck).toBeDefined();
@@ -224,7 +229,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(typeof parsed.healthScore).toBe('number');
       expect(parsed.healthScore).toBeGreaterThanOrEqual(0);
@@ -242,7 +248,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(Array.isArray(parsed.recommendations)).toBe(true);
     });
@@ -258,7 +265,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed._enriched).toBeDefined();
       expect(parsed._enriched.summary).toBeTruthy();
@@ -277,7 +285,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(typeof parsed.ok).toBe('boolean');
     });
@@ -301,7 +310,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.recommendations.length).toBeGreaterThan(0);
       expect(parsed.recommendations.some((r: string) => r.includes('tmux') || r.includes('Claude'))).toBe(true);
@@ -318,7 +328,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.healthScore).toBe(0);
     });
@@ -337,7 +348,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.ok).toBe(false);
     });
@@ -357,7 +369,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: true });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.systemProfile).toBeDefined();
       expect(parsed.systemProfile.cpuCores).toBe(8);
@@ -376,7 +389,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: false });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.systemProfile).toBeUndefined();
     });
@@ -392,7 +406,8 @@ describe('MCP Tool: deckent_doctor', () => {
       vi.mocked(readdirSync).mockReturnValue([]);
 
       const result = await mock.tools.get('deckent_doctor')!.handler({ includeProfile: true });
-      const parsed = JSON.parse(result.content[0]!.text);
+      const wrapped = JSON.parse(result.content[0]!.text);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.systemProfile.subscription).toBe('max');
       expect(parsed.systemProfile.subscriptionMethod).toBe('config');

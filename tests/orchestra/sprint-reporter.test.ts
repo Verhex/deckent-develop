@@ -19,12 +19,13 @@ import {
   calculateSelfHealingRate,
   countFirstTryTasks,
   countSelfHealedTasks,
+  countNewTestFiles,
   buildWhatWentWell,
   buildWhatNeedsAttention,
   formatHumanSprintComplete,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
-import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig } from '../../src/core/types.js';
+import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────
 
@@ -1581,5 +1582,267 @@ describe('formatHumanSprintComplete', () => {
     const sprint = makeSprint({ metrics: makeMetrics({ totalOpenDebt: 3 }) });
     const output = formatHumanSprintComplete({ sprint });
     expect(output).toContain('deckent status --debt');
+  });
+});
+
+// ═══ Task 041-005: Enhanced RETRO — new tests, patterns, debt ═════════
+
+describe('countNewTestFiles', () => {
+  it('returns 0 for undefined', () => {
+    expect(countNewTestFiles(undefined)).toBe(0);
+  });
+
+  it('returns 0 for empty results', () => {
+    expect(countNewTestFiles([])).toBe(0);
+  });
+
+  it('counts .test.ts files', () => {
+    const results = [makeResult({ filesChanged: ['src/foo.ts', 'tests/foo.test.ts'] })];
+    expect(countNewTestFiles(results)).toBe(1);
+  });
+
+  it('counts .spec.ts files', () => {
+    const results = [makeResult({ filesChanged: ['src/bar.spec.ts'] })];
+    expect(countNewTestFiles(results)).toBe(1);
+  });
+
+  it('counts .test.tsx and .test.js files', () => {
+    const results = [makeResult({ filesChanged: ['a.test.tsx', 'b.test.js', 'c.test.jsx'] })];
+    expect(countNewTestFiles(results)).toBe(3);
+  });
+
+  it('deduplicates test files across results', () => {
+    const results = [
+      makeResult({ taskId: '001', filesChanged: ['tests/foo.test.ts'] }),
+      makeResult({ taskId: '002', filesChanged: ['tests/foo.test.ts', 'tests/bar.test.ts'] }),
+    ];
+    expect(countNewTestFiles(results)).toBe(2);
+  });
+
+  it('excludes non-test files', () => {
+    const results = [makeResult({ filesChanged: ['src/foo.ts', 'README.md'] })];
+    expect(countNewTestFiles(results)).toBe(0);
+  });
+});
+
+describe('formatHumanRetro — new test files metric', () => {
+  it('includes new test files row when test files present', () => {
+    const results = [makeResult({ filesChanged: ['src/foo.ts', 'tests/foo.test.ts', 'tests/bar.test.ts'] })];
+    const output = formatHumanRetro({
+      sprint: makeSprint(),
+      evaluations: new Map([['001', TaskEvaluation.DONE]]),
+      metrics: makeMetrics(),
+      results,
+    });
+    expect(output).toContain('| New test files | 2 |');
+  });
+
+  it('omits new test files row when no test files', () => {
+    const results = [makeResult({ filesChanged: ['src/foo.ts'] })];
+    const output = formatHumanRetro({
+      sprint: makeSprint(),
+      evaluations: new Map([['001', TaskEvaluation.DONE]]),
+      metrics: makeMetrics(),
+      results,
+    });
+    expect(output).not.toContain('New test files');
+  });
+});
+
+describe('buildRetroLearnings — patterns and debt', () => {
+  it('includes recurring pattern when occurrences >= 2', () => {
+    const patterns: PatternEntry[] = [{
+      pattern: 'Worker timeout in tmux',
+      occurrences: 3,
+      firstDetectedInSprint: 'sprint-038',
+      lastDetectedInSprint: 'sprint-040',
+      resolved: false,
+    }];
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      patterns,
+    );
+    expect(items).toContainEqual(expect.stringContaining('Recurring pattern (3x)'));
+    expect(items).toContainEqual(expect.stringContaining('Worker timeout in tmux'));
+  });
+
+  it('excludes resolved patterns', () => {
+    const patterns: PatternEntry[] = [{
+      pattern: 'Old issue',
+      occurrences: 5,
+      firstDetectedInSprint: 'sprint-030',
+      lastDetectedInSprint: 'sprint-035',
+      resolved: true,
+    }];
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      patterns,
+    );
+    expect(items).not.toContainEqual(expect.stringContaining('Old issue'));
+  });
+
+  it('excludes patterns with only 1 occurrence', () => {
+    const patterns: PatternEntry[] = [{
+      pattern: 'One-off issue',
+      occurrences: 1,
+      firstDetectedInSprint: 'sprint-040',
+      lastDetectedInSprint: 'sprint-040',
+      resolved: false,
+    }];
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      patterns,
+    );
+    expect(items).not.toContainEqual(expect.stringContaining('One-off issue'));
+  });
+
+  it('includes open HIGH priority debt', () => {
+    const debt: DebtItem[] = [{
+      id: 'debt-001',
+      description: 'Missing error handling in planner',
+      originTaskId: '039-002',
+      originSprintId: 'sprint-039',
+      priority: 'HIGH' as any,
+      sprintsOpen: 2,
+      resolved: false,
+      createdAt: '2026-03-20T00:00:00Z',
+    }];
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      undefined,
+      debt,
+    );
+    expect(items).toContainEqual(expect.stringContaining('Open HIGH debt'));
+    expect(items).toContainEqual(expect.stringContaining('Missing error handling in planner'));
+  });
+
+  it('includes open CRITICAL priority debt', () => {
+    const debt: DebtItem[] = [{
+      id: 'debt-002',
+      description: 'Security vulnerability in auth',
+      originTaskId: '038-001',
+      originSprintId: 'sprint-038',
+      priority: 'CRITICAL' as any,
+      sprintsOpen: 3,
+      resolved: false,
+      createdAt: '2026-03-18T00:00:00Z',
+    }];
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      undefined,
+      debt,
+    );
+    expect(items).toContainEqual(expect.stringContaining('Open CRITICAL debt'));
+  });
+
+  it('excludes resolved debt', () => {
+    const debt: DebtItem[] = [{
+      id: 'debt-003',
+      description: 'Resolved issue',
+      originTaskId: '037-001',
+      originSprintId: 'sprint-037',
+      priority: 'HIGH' as any,
+      sprintsOpen: 1,
+      resolved: true,
+      resolvedInSprintId: 'sprint-040',
+      createdAt: '2026-03-15T00:00:00Z',
+    }];
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      undefined,
+      debt,
+    );
+    expect(items).not.toContainEqual(expect.stringContaining('Resolved issue'));
+  });
+
+  it('excludes NORMAL/LOW priority debt', () => {
+    const debt: DebtItem[] = [{
+      id: 'debt-004',
+      description: 'Low priority thing',
+      originTaskId: '036-001',
+      originSprintId: 'sprint-036',
+      priority: 'NORMAL' as any,
+      sprintsOpen: 1,
+      resolved: false,
+      createdAt: '2026-03-14T00:00:00Z',
+    }];
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      undefined,
+      debt,
+    );
+    expect(items).not.toContainEqual(expect.stringContaining('Low priority thing'));
+  });
+
+  it('limits patterns to 3 max', () => {
+    const patterns: PatternEntry[] = Array.from({ length: 5 }, (_, i) => ({
+      pattern: `Pattern ${i}`,
+      occurrences: 2 + i,
+      firstDetectedInSprint: 'sprint-035',
+      lastDetectedInSprint: 'sprint-040',
+      resolved: false,
+    }));
+    const items = buildRetroLearnings(
+      makeSprint({ tasks: [] }),
+      new Map(),
+      undefined,
+      patterns,
+    );
+    const patternItems = items.filter(i => i.includes('Recurring pattern'));
+    expect(patternItems.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('writeRetrospective reads patterns and debt', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('includes pattern learnings in RETRO.md when PATTERNS.md has recurring patterns', () => {
+    const brainDir = join(tempDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+    writeFileSync(join(brainDir, 'PATTERNS.md'), JSON.stringify([
+      { pattern: 'Worker crash on large files', occurrences: 4, firstDetectedInSprint: 'sprint-038', lastDetectedInSprint: 'sprint-040', resolved: false },
+    ]));
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    writeRetrospective(tempDir, sprint, evals, metrics, undefined, undefined, undefined, [makeResult()]);
+    const retro = readFileSync(join(brainDir, 'RETRO.md'), 'utf-8');
+    expect(retro).toContain('Worker crash on large files');
+  });
+
+  it('includes debt learnings in RETRO.md when DEBT.md has open high debt', () => {
+    const brainDir = join(tempDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+    writeFileSync(join(brainDir, 'DEBT.md'), JSON.stringify([
+      { id: 'd1', description: 'Unhandled edge case in planner', originTaskId: '039-001', originSprintId: 'sprint-039', priority: 'HIGH', sprintsOpen: 2, resolved: false, createdAt: '2026-03-20T00:00:00Z' },
+    ]));
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    writeRetrospective(tempDir, sprint, evals, metrics, undefined, undefined, undefined, [makeResult()]);
+    const retro = readFileSync(join(brainDir, 'RETRO.md'), 'utf-8');
+    expect(retro).toContain('Unhandled edge case in planner');
   });
 });

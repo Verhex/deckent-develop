@@ -316,10 +316,11 @@ Fix critical bug.
     });
 
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed._enriched).toBeDefined();
-    expect(parsed._enriched.summary).toBeDefined();
-    expect(parsed._enriched.hints).toBeInstanceOf(Array);
-    expect(parsed._enriched.timestamp).toBeDefined();
+    const data = parsed.data ?? parsed;
+    expect(data._enriched).toBeDefined();
+    expect(data._enriched.summary).toBeDefined();
+    expect(data._enriched.hints).toBeInstanceOf(Array);
+    expect(data._enriched.timestamp).toBeDefined();
   });
 
   // ── Test 5: doctor tool with includeProfile ──────────────────────
@@ -342,10 +343,11 @@ Fix critical bug.
     });
 
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed._enriched).toBeDefined();
-    expect(parsed.healthScore).toBeDefined();
-    expect(typeof parsed.healthScore).toBe('number');
-    expect(parsed.recommendations).toBeInstanceOf(Array);
+    const data = parsed.data ?? parsed;
+    expect(data._enriched).toBeDefined();
+    expect(data.healthScore).toBeDefined();
+    expect(typeof data.healthScore).toBe('number');
+    expect(data.recommendations).toBeInstanceOf(Array);
   });
 
   // ── Test 6: MCP flow chain (init → directives → doctor) ──────────
@@ -407,8 +409,9 @@ Test MCP flow integration.
         includeProfile: false,
       });
       const doctorParsed = JSON.parse(doctorResult.content[0]!.text);
-      expect(doctorParsed._enriched).toBeDefined();
-      expect(doctorParsed.checks).toBeInstanceOf(Array);
+      const doctorData = doctorParsed.data ?? doctorParsed;
+      expect(doctorData._enriched).toBeDefined();
+      expect(doctorData.checks).toBeInstanceOf(Array);
     });
   });
 

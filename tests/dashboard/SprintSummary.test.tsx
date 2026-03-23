@@ -377,16 +377,16 @@ describe("SprintSummary component", () => {
     const taskList = screen.getByTestId("task-list");
     expect(taskList).toBeTruthy();
 
-    const task1 = screen.getByTestId("task-001");
+    const task1 = screen.getByTestId("task-card-001");
     expect(task1.getAttribute("data-status")).toBe("DONE");
 
-    const task2 = screen.getByTestId("task-002");
+    const task2 = screen.getByTestId("task-card-002");
     expect(task2.getAttribute("data-status")).toBe("EXECUTING");
 
-    const task3 = screen.getByTestId("task-003");
+    const task3 = screen.getByTestId("task-card-003");
     expect(task3.getAttribute("data-status")).toBe("NO_GO");
 
-    const task4 = screen.getByTestId("task-004");
+    const task4 = screen.getByTestId("task-card-004");
     expect(task4.getAttribute("data-status")).toBe("PENDING");
   });
 

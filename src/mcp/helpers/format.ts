@@ -32,6 +32,29 @@ export interface StartData {
   error?: string;
 }
 
+export interface DoctorData {
+  ok?: boolean;
+  checks?: Array<{ ok: boolean; name?: string; label?: string; message?: string }>;
+  healthScore?: number;
+  recommendations?: string[];
+  systemProfile?: { subscription?: string };
+}
+
+export interface RetroData {
+  content?: string | null;
+  highlights?: string[];
+  sprintId?: string;
+  successRate?: number;
+  selfHealingRate?: number;
+  selfHealedCount?: number;
+}
+
+export interface HistoryData {
+  sprints?: Array<{ id: string; content?: string }>;
+  trend?: string;
+  avgSuccessRate?: number;
+}
+
 export interface ErrorData {
   code?: string;
   message?: string;
@@ -135,6 +158,99 @@ export function formatStartResponse(data: StartData): string {
   parts.push('Watch progress: `deckent status --watch`.');
 
   return parts.join(' ');
+}
+
+export function formatDoctorResponse(data: DoctorData): string {
+  const checks = data.checks ?? [];
+  const total = checks.length;
+  const passed = checks.filter(c => c.ok).length;
+  const failed = total - passed;
+
+  if (total === 0) {
+    return 'No health checks available.';
+  }
+
+  const status = failed === 0 ? 'System healthy' : `System has ${failed} ${pluralize(failed, 'issue')}`;
+  const parts: string[] = [status];
+
+  if (data.healthScore !== undefined) {
+    parts.push(`${data.healthScore}% health score`);
+  }
+
+  const failedChecks = checks.filter(c => !c.ok);
+  if (failedChecks.length > 0) {
+    const names = failedChecks
+      .map(c => c.name ?? c.label ?? 'unknown')
+      .slice(0, 3)
+      .join(', ');
+    parts.push(`fix: ${names}`);
+  }
+
+  if (data.recommendations && data.recommendations.length > 0) {
+    parts.push(`${data.recommendations.length} ${pluralize(data.recommendations.length, 'recommendation')}`);
+  }
+
+  return parts.join('. ') + '.';
+}
+
+export function formatRetroResponse(data: RetroData): string {
+  if (!data.content) {
+    return 'No retrospective available.';
+  }
+
+  const parts: string[] = [];
+
+  if (data.sprintId) {
+    parts.push(`Sprint ${data.sprintId}`);
+  }
+
+  if (data.successRate !== undefined) {
+    parts.push(`${data.successRate}% success`);
+  }
+
+  if (data.selfHealingRate !== undefined) {
+    parts.push(`self-healing rate ${data.selfHealingRate}%`);
+  }
+
+  if (data.selfHealedCount !== undefined && data.selfHealedCount > 0) {
+    parts.push(`${data.selfHealedCount} ${pluralize(data.selfHealedCount, 'task')} auto-fixed`);
+  }
+
+  if (parts.length === 0) {
+    const highlightCount = data.highlights?.length ?? 0;
+    if (highlightCount > 0) {
+      return `Retrospective available with ${highlightCount} ${pluralize(highlightCount, 'highlight')}.`;
+    }
+    return 'Retrospective available.';
+  }
+
+  return parts.join('. ') + '.';
+}
+
+export function formatHistoryResponse(data: HistoryData): string {
+  const count = data.sprints?.length ?? 0;
+  if (count === 0) {
+    return 'No sprint history available.';
+  }
+
+  const parts: string[] = [`Last ${count} ${pluralize(count, 'sprint')}`];
+
+  if (data.avgSuccessRate !== undefined) {
+    parts.push(`${data.avgSuccessRate}% avg success rate`);
+  }
+
+  const trend = data.trend ?? 'insufficient_data';
+  const trendLabels: Record<string, string> = {
+    improving: 'trending up',
+    declining: 'trending down',
+    stable: 'stable',
+  };
+  const trendLabel = trendLabels[trend];
+  if (trendLabel) {
+    parts.push(trendLabel);
+  }
+
+  return parts.join(', ') + '.';
 }
 
 export function formatErrorResponse(data: ErrorData): string {

@@ -79,6 +79,9 @@ vi.mock('../../src/mcp/helpers/format.js', () => ({
   formatStatusResponse: vi.fn(() => 'mocked summary'),
   formatPlanResponse: vi.fn(() => 'mocked summary'),
   formatStartResponse: vi.fn(() => 'mocked summary'),
+  formatDoctorResponse: vi.fn(() => 'mocked doctor summary'),
+  formatRetroResponse: vi.fn(() => 'mocked retro summary'),
+  formatHistoryResponse: vi.fn(() => 'mocked history summary'),
   formatErrorResponse: vi.fn(() => 'mocked error summary'),
   wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
 }));

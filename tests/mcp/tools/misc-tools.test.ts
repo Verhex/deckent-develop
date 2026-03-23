@@ -97,7 +97,8 @@ describe('registerRetroTool', () => {
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
-      const parsed = parseToolResult(result);
+      const wrapped = parseToolResult(result);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.content).toContain('# Retro');
       expect(parsed._enriched).toBeDefined();
@@ -109,7 +110,8 @@ describe('registerRetroTool', () => {
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
-      const parsed = parseToolResult(result);
+      const wrapped = parseToolResult(result);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.highlights).toBeInstanceOf(Array);
       expect(parsed.highlights.length).toBeGreaterThan(0);
@@ -122,7 +124,8 @@ describe('registerRetroTool', () => {
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
-      const parsed = parseToolResult(result);
+      const wrapped = parseToolResult(result);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.highlights.length).toBeLessThanOrEqual(5);
     });
@@ -134,7 +137,8 @@ describe('registerRetroTool', () => {
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
-      const parsed = parseToolResult(result);
+      const wrapped = parseToolResult(result);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.content).toBeNull();
     });
@@ -156,7 +160,8 @@ describe('registerRetroTool', () => {
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
-      const parsed = parseToolResult(result);
+      const wrapped = parseToolResult(result);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed.content).toBeFalsy();
       expect(parsed.highlights).toEqual([]);
@@ -170,7 +175,8 @@ describe('registerRetroTool', () => {
 
       const tool = await getRetroTool();
       const result = await tool.handler({});
-      const parsed = parseToolResult(result);
+      const wrapped = parseToolResult(result);
+      const parsed = wrapped.data ?? wrapped;
 
       expect(parsed._enriched).toBeDefined();
       expect(parsed._enriched.summary).toBeDefined();
