@@ -8,12 +8,15 @@ import type { DashboardState } from '../../../src/core/types.js';
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
+  readdirSync: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
   formatDashboard: vi.fn().mockReturnValue('Dashboard Output'),
+  formatHumanStatus: vi.fn().mockReturnValue('Human Status Output'),
+  formatTable: vi.fn().mockReturnValue('Table'),
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
@@ -21,7 +24,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 }));
 
 import { readFileSync, existsSync } from 'node:fs';
-import { print, printError, formatDashboard } from '../../../src/cli/helpers/output.js';
+import { print, printError, formatDashboard, formatHumanStatus } from '../../../src/cli/helpers/output.js';
 import { registerStatus } from '../../../src/cli/commands/status.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -60,13 +63,14 @@ describe('status command (isolated)', () => {
     process.exitCode = undefined;
   });
 
-  it('registers status command with --watch and --json options', () => {
+  it('registers status command with --watch, --json, and --raw options', () => {
     const program = new Command();
     registerStatus(program);
     const cmd = program.commands.find(c => c.name() === 'status');
     expect(cmd).toBeDefined();
     expect(cmd!.options.some(o => o.long === '--watch')).toBe(true);
     expect(cmd!.options.some(o => o.long === '--json')).toBe(true);
+    expect(cmd!.options.some(o => o.long === '--raw')).toBe(true);
   });
 
   it('shows no active sprint message when dashboard does not exist', async () => {
@@ -75,10 +79,18 @@ describe('status command (isolated)', () => {
     expect(print).toHaveBeenCalledWith(expect.stringContaining('No active sprint'));
   });
 
-  it('renders formatted dashboard when file exists', async () => {
+  it('renders human-friendly output by default', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
     await runCommand(['status']);
+    expect(formatHumanStatus).toHaveBeenCalled();
+    expect(print).toHaveBeenCalledWith('Human Status Output');
+  });
+
+  it('--raw renders legacy formatted dashboard', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    await runCommand(['status', '--raw']);
     expect(formatDashboard).toHaveBeenCalled();
     expect(print).toHaveBeenCalledWith('Dashboard Output');
   });
@@ -88,7 +100,7 @@ describe('status command (isolated)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
     await runCommand(['status', '--json']);
-    // Should print JSON, not call formatDashboard
+    // Should print JSON, not call formatDashboard or formatHumanStatus
     const printCalls = vi.mocked(print).mock.calls;
     const jsonOutput = printCalls.find(c => c[0].includes('sprint-001'));
     expect(jsonOutput).toBeDefined();
@@ -135,7 +147,29 @@ describe('status command (isolated)', () => {
     onSpy.mockRestore();
   });
 
-  it('dashboard with agents renders correctly', async () => {
+  it('--watch uses human-friendly output by default', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(42 as any);
+    const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    await runCommand(['status', '--watch']);
+    expect(formatHumanStatus).toHaveBeenCalled();
+    setIntervalSpy.mockRestore();
+    onSpy.mockRestore();
+  });
+
+  it('--watch --raw uses legacy dashboard', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(42 as any);
+    const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    await runCommand(['status', '--watch', '--raw']);
+    expect(formatDashboard).toHaveBeenCalled();
+    setIntervalSpy.mockRestore();
+    onSpy.mockRestore();
+  });
+
+  it('human-friendly output is called with dashboard data', async () => {
     const state = makeDashboard({
       agents: [
         { id: 'w-001', role: 'worker' as any, status: 'EXECUTING' as any, model: 'sonnet', tmuxWindow: 'w-001', taskId: '001', currentAction: 'coding', spawnedAt: '' },
@@ -144,20 +178,33 @@ describe('status command (isolated)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
     await runCommand(['status']);
-    expect(formatDashboard).toHaveBeenCalledWith(expect.objectContaining({
-      agents: expect.arrayContaining([expect.objectContaining({ id: 'w-001' })]),
+    expect(formatHumanStatus).toHaveBeenCalledWith(expect.objectContaining({
+      dashboard: expect.objectContaining({
+        agents: expect.arrayContaining([expect.objectContaining({ id: 'w-001' })]),
+      }),
     }));
   });
 
-  it('dashboard with alerts renders correctly', async () => {
+  it('human-friendly output includes tasks from loadTaskFiles', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    await runCommand(['status']);
+    expect(formatHumanStatus).toHaveBeenCalledWith(expect.objectContaining({
+      tasks: expect.any(Array),
+    }));
+  });
+
+  it('dashboard with alerts renders in human-friendly mode', async () => {
     const state = makeDashboard({
       alerts: [{ level: 'WARNING' as any, message: 'stale heartbeat', timestamp: '' }],
     });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
     await runCommand(['status']);
-    expect(formatDashboard).toHaveBeenCalledWith(expect.objectContaining({
-      alerts: expect.arrayContaining([expect.objectContaining({ message: 'stale heartbeat' })]),
+    expect(formatHumanStatus).toHaveBeenCalledWith(expect.objectContaining({
+      dashboard: expect.objectContaining({
+        alerts: expect.arrayContaining([expect.objectContaining({ message: 'stale heartbeat' })]),
+      }),
     }));
   });
 });

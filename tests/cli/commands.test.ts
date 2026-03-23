@@ -231,8 +231,8 @@ describe('doctor command', () => {
       return { status: 0, stdout: outputs[cmd as string] ?? '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
-    expect(stdout()).toContain('[PASS]');
-    expect(stdout()).toContain('11/11 checks passed');
+    expect(stdout()).toContain('Deckent Health Check');
+    expect(stdout()).toContain('OK Node.js');
   });
 
   it('reports failing required check', async () => {
@@ -241,7 +241,7 @@ describe('doctor command', () => {
       return { status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>;
     });
     await runCommand(registerDoctor, ['doctor']);
-    expect(stdout()).toContain('[FAIL]');
+    expect(stdout()).toContain('FAIL tmux');
     expect(process.exitCode).toBe(1);
   });
 
@@ -300,7 +300,7 @@ describe('doctor command', () => {
       return '# Content\nSome data';
     });
     await runCommand(registerDoctor, ['doctor']);
-    expect(stdout()).toContain('CRITICAL debt');
+    expect(stdout()).toContain('critical');
   });
 
   it('reports stale locks', async () => {
@@ -458,7 +458,7 @@ describe('status command', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
     await runCommand(registerStatus, ['status']);
-    expect(stdout()).toContain('Sprint 1');
+    expect(stdout()).toContain('Sprint 001');
   });
 
   it('prints message when no dashboard', async () => {
@@ -475,7 +475,7 @@ describe('status command', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it('renders box-drawing characters', async () => {
+  it('renders human-friendly status by default', async () => {
     const state: DashboardState = {
       sprint: { id: 's-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
@@ -487,7 +487,7 @@ describe('status command', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
     await runCommand(registerStatus, ['status']);
-    expect(stdout()).toContain('\u2554');
+    expect(stdout()).toContain('Progress:');
   });
 
   it('--json outputs parseable JSON', async () => {
@@ -919,7 +919,7 @@ describe('start command', () => {
     vi.mocked(runSprint).mockResolvedValue(makeSprint());
     await runCommand(registerStart, ['start']);
     expect(runSprint).toHaveBeenCalled();
-    expect(stdout()).toContain('Sprint 1');
+    expect(stdout()).toContain('Sprint 001');
   });
 
   it('handles --auto-approve', async () => {
@@ -1234,7 +1234,7 @@ describe('init command', () => {
 
     expect(mkdirSync).toHaveBeenCalled();
     expect(writeFileSync).toHaveBeenCalled();
-    expect(stdout()).toContain('initialized');
+    expect(stdout()).toContain('Setting up your AI development team');
   });
 
   it('creates config with selected mode', async () => {
@@ -1376,7 +1376,7 @@ describe('init command', () => {
     vi.mocked(readFileSync).mockReturnValue('');
 
     await runCommand(registerInit, ['init']);
-    expect(stdout()).toContain('DIRECTIVES.md');
+    expect(stdout()).toContain('deckent set-directives');
     expect(stdout()).toContain('deckent start');
   });
 

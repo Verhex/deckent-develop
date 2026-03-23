@@ -76,6 +76,18 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
   readLatestJobState: vi.fn(),
 }));
 
+vi.mock('../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn(),
+}));
+
+vi.mock('../../src/mcp/helpers/format.js', () => ({
+  formatStatusResponse: vi.fn(() => 'mocked summary'),
+  formatPlanResponse: vi.fn(() => 'mocked summary'),
+  formatStartResponse: vi.fn(() => 'mocked summary'),
+  formatErrorResponse: vi.fn(() => 'mocked error summary'),
+  wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import {
   readContext, checkUsage, adjustSprintSize, planSprint, runSprint,

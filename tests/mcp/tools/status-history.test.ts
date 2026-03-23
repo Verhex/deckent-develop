@@ -15,6 +15,11 @@ vi.mock('../../../src/mcp/tools/job-runner.js', () => ({
   readLatestJobState: vi.fn(),
 }));
 
+vi.mock('../../../src/mcp/helpers/format.js', () => ({
+  formatStatusResponse: vi.fn(() => 'mocked summary'),
+  wrapResponse: vi.fn((<T>(data: T, _summary: string) => data) as <T>(data: T, summary: string) => T),
+}));
+
 vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
   enrichResponse: vi.fn((toolName: string, response: Record<string, unknown>) => ({
     ...response,

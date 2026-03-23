@@ -4,6 +4,7 @@ import { platform } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
+import type { DetectedProvider } from '../../core/provider.js';
 import {
   DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, LOCK_STALE_THRESHOLD_MS, DEBT_TABLE_HEADER,
@@ -253,6 +254,178 @@ function checkStaleLocks(root: string): DoctorCheck {
   }
 }
 
+/**
+ * Read the last sprint ID from .deckent/config.json.
+ * Returns e.g. "sprint-039" or null if not found.
+ */
+export function getLastSprintId(root: string): string | null {
+  try {
+    const configPath = join(root, PROJECT_CONFIG_PATH);
+    if (!existsSync(configPath)) return null;
+    const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { last_sprint_id?: string };
+    return config.last_sprint_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Count open debt items from DEBT.md.
+ * Returns total count and critical count.
+ */
+export function countDebtItems(root: string): { total: number; critical: number } {
+  const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
+  if (!existsSync(debtPath)) return { total: 0, critical: 0 };
+  try {
+    const content = readFileSync(debtPath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.startsWith('|') && !l.startsWith(DEBT_TABLE_HEADER.slice(0, 5)) && !l.startsWith('|-'));
+    const critical = lines.filter(l => l.includes('CRITICAL')).length;
+    return { total: lines.length, critical };
+  } catch {
+    return { total: 0, critical: 0 };
+  }
+}
+
+export interface HumanDoctorInput {
+  result: DoctorResult;
+  providers: DetectedProvider[];
+  brainLines: number;
+  brainBudget: number;
+  lastSprintId: string | null;
+  debtItems: { total: number; critical: number };
+}
+
+/**
+ * Format a human-friendly doctor output.
+ * Groups checks into System and Project sections, adds recommendations.
+ */
+export function formatHumanDoctor(input: HumanDoctorInput): string {
+  const { result, providers, brainLines, brainBudget, lastSprintId, debtItems } = input;
+  const lines: string[] = [];
+
+  lines.push('Deckent Health Check');
+  lines.push('');
+
+  // ─── Your System ──────────────────────────────────
+  lines.push('Your System:');
+
+  const systemCheckNames = ['Platform', 'Node.js', 'git', 'tmux', 'Claude CLI'];
+  for (const check of result.checks) {
+    if (systemCheckNames.includes(check.name)) {
+      const icon = check.passed ? 'OK' : 'FAIL';
+      lines.push(`  ${icon} ${check.name} — ${check.message}`);
+    }
+  }
+
+  // Provider status
+  for (const p of providers) {
+    const version = p.version ? ` v${p.version}` : '';
+    if (p.available) {
+      const auth = p.authMethod === 'session' ? 'session auth' : p.authMethod === 'api_key' ? 'API key set' : '';
+      const authLabel = auth ? ` (${auth})` : '';
+      lines.push(`  OK ${capitalize(p.name)} CLI${version} — Ready${authLabel}`);
+    } else {
+      const hint = getProviderHint(p.name);
+      lines.push(`  FAIL ${capitalize(p.name)} — Not configured${hint}`);
+    }
+  }
+
+  lines.push('');
+
+  // ─── Your Project ─────────────────────────────────
+  lines.push('Your Project:');
+
+  const projectCheckNames = ['Workspace', 'Brain Dir', 'Directives'];
+  for (const check of result.checks) {
+    if (projectCheckNames.includes(check.name)) {
+      const icon = check.passed ? 'OK' : 'FAIL';
+      lines.push(`  ${icon} ${check.name} — ${check.message}`);
+    }
+  }
+
+  // Memory budget
+  const memPct = Math.round((brainLines / brainBudget) * 100);
+  const memHealth = brainLines <= brainBudget ? 'healthy' : 'OVER BUDGET';
+  const memIcon = brainLines <= brainBudget ? 'OK' : 'FAIL';
+  lines.push(`  ${memIcon} Memory: ${brainLines}/${brainBudget} lines (${memPct}% — ${memHealth})`);
+
+  // Last sprint
+  if (lastSprintId) {
+    lines.push(`  OK Last sprint: ${lastSprintId} (completed)`);
+  }
+
+  // Debt
+  if (debtItems.total > 0) {
+    if (debtItems.critical > 0) {
+      lines.push(`  Warning ${debtItems.critical} critical + ${debtItems.total - debtItems.critical} open debt items (run \`deckent status --debt\`)`);
+    } else {
+      lines.push(`  Warning ${debtItems.total} open debt items (run \`deckent status --debt\`)`);
+    }
+  }
+
+  // Stale locks
+  const lockCheck = result.checks.find(c => c.name === 'Locks');
+  if (lockCheck && !lockCheck.passed) {
+    lines.push(`  Warning ${lockCheck.message}`);
+  }
+
+  lines.push('');
+
+  // ─── Recommendation ───────────────────────────────
+  lines.push('Recommendation:');
+
+  const failedRequired = result.checks.filter(c => c.required && !c.passed);
+  if (failedRequired.length > 0) {
+    lines.push(`  Fix ${failedRequired.length} required issue${failedRequired.length > 1 ? 's' : ''} before starting a sprint.`);
+    for (const c of failedRequired) {
+      lines.push(`  → ${c.name}: ${c.message}`);
+    }
+  } else {
+    lines.push('  Everything looks good! You can start a new sprint with `deckent start`.');
+  }
+
+  // Tips based on missing providers
+  const tips = getProviderTips(providers);
+  for (const tip of tips) {
+    lines.push(`  Tip: ${tip}`);
+  }
+
+  if (brainLines > brainBudget) {
+    lines.push('  Tip: Run `deckent cleanup --decay` to reduce memory usage.');
+  }
+
+  return lines.join('\n');
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function getProviderHint(name: string): string {
+  switch (name) {
+    case 'gemini': return ' (set GOOGLE_API_KEY to enable)';
+    case 'codex': return ' (set OPENAI_API_KEY to enable)';
+    default: return '';
+  }
+}
+
+export function getProviderTips(providers: DetectedProvider[]): string[] {
+  const tips: string[] = [];
+  for (const p of providers) {
+    if (!p.available) {
+      switch (p.name) {
+        case 'gemini':
+          tips.push('Set GOOGLE_API_KEY to enable Gemini as a worker provider.');
+          break;
+        case 'codex':
+          tips.push('Set OPENAI_API_KEY to enable Codex as a worker provider.');
+          break;
+      }
+    }
+  }
+  return tips;
+}
+
 export function formatSystemProfile(profile: SystemProfile, subscription?: string): string {
   const totalGB = (profile.totalMemMB / 1024).toFixed(1);
   const freeGB = (profile.freeMemMB / 1024).toFixed(1);
@@ -298,7 +471,8 @@ export function registerDoctor(program: Command): void {
     .command('doctor')
     .description('Check system dependencies and health')
     .option('--profile', 'Show system profile information')
-    .action(async (opts: { profile?: boolean }) => {
+    .option('--legacy', 'Use legacy output format')
+    .action(async (opts: { profile?: boolean; legacy?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -307,19 +481,34 @@ export function registerDoctor(program: Command): void {
       }
       const lang = readLanguage(root);
       const result = runDoctorChecks(root);
-      print(formatDoctorResult(result));
-
-      const passed = result.checks.filter(c => c.passed).length;
-      const total = result.checks.length;
-      print(getMessage('doctor.checks_passed', lang, {
-        passed: String(passed),
-        total: String(total),
-      }));
-
-      // Show detected providers
       const providers = await detectAvailableProviders();
-      print('');
-      print(formatDetectedProviders(providers));
+
+      if (opts.legacy) {
+        // Legacy format
+        print(formatDoctorResult(result));
+        const passed = result.checks.filter(c => c.passed).length;
+        const total = result.checks.length;
+        print(getMessage('doctor.checks_passed', lang, {
+          passed: String(passed),
+          total: String(total),
+        }));
+        print('');
+        print(formatDetectedProviders(providers));
+      } else {
+        // Human-friendly format
+        const brainLines = countBrainLines(root);
+        const lastSprintId = getLastSprintId(root);
+        const debtItems = countDebtItems(root);
+
+        print(formatHumanDoctor({
+          result,
+          providers,
+          brainLines,
+          brainBudget: BRAIN_TOTAL_LINE_BUDGET,
+          lastSprintId,
+          debtItems,
+        }));
+      }
 
       if (opts.profile) {
         const profile = getSystemProfile();

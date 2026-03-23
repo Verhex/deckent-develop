@@ -24,6 +24,10 @@ vi.mock('../../../src/mcp/tools/job-runner.js', () => ({
   writeJobState: vi.fn(),
 }));
 
+vi.mock('../../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn(),
+}));
+
 vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
   enrichResponse: vi.fn((toolName, response, _ctx) => ({
     ...response,
@@ -33,6 +37,12 @@ vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
       timestamp: '2026-03-20T00:00:00.000Z',
     },
   })),
+}));
+
+vi.mock('../../../src/mcp/helpers/format.js', () => ({
+  formatStartResponse: vi.fn(() => 'mocked summary'),
+  formatErrorResponse: vi.fn(() => 'mocked error summary'),
+  wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
 }));
 
 import { loadConfig } from '../../../src/core/config.js';

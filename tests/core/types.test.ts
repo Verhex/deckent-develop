@@ -53,8 +53,8 @@ describe('SprintStatus enum', () => {
 });
 
 describe('AgentStatus enum', () => {
-  it('has 11 members (DOCUMENTING included)', () => {
-    expect(Object.values(AgentStatus)).toHaveLength(11);
+  it('has 12 members (VERIFYING added)', () => {
+    expect(Object.values(AgentStatus)).toHaveLength(12);
   });
 
   it('includes DOCUMENTING', () => {

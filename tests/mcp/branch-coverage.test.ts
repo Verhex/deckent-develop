@@ -77,6 +77,17 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
   readLatestJobState: vi.fn(),
 }));
 
+vi.mock('../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn(),
+}));
+
+vi.mock('../../src/mcp/helpers/format.js', () => ({
+  formatStatusResponse: vi.fn(() => 'mocked summary'),
+  formatStartResponse: vi.fn(() => 'mocked summary'),
+  formatErrorResponse: vi.fn(() => 'mocked error summary'),
+  wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import { runSprint, BrainError } from '../../src/orchestra/brain.js';
 import { writeJobState } from '../../src/mcp/tools/job-runner.js';
@@ -128,10 +139,11 @@ describe('MCP Branch Coverage', () => {
 
       const result = await mock.tools.get('deckent_status')!.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
+      const data = parsed.data ?? parsed;
 
       expect(result.isError).toBe(true);
-      expect(parsed.active).toBe(false);
-      expect(parsed.message).toBe('Cannot parse dashboard file.');
+      expect(data.active).toBe(false);
+      expect(data.message).toBe('Cannot parse dashboard file.');
     });
   });
 
@@ -314,10 +326,11 @@ describe('MCP Branch Coverage', () => {
 
       const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
       const parsed = JSON.parse(result.content[0]!.text);
+      const data = parsed.data ?? parsed;
 
       // Returns immediately with RUNNING
-      expect(parsed.success).toBe(true);
-      expect(parsed.status).toBe('RUNNING');
+      expect(data.success).toBe(true);
+      expect(data.status).toBe('RUNNING');
 
       // Reject in background
       rejectRun(brainError);
@@ -342,9 +355,10 @@ describe('MCP Branch Coverage', () => {
 
       const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
       const parsed = JSON.parse(result.content[0]!.text);
+      const data = parsed.data ?? parsed;
 
-      expect(parsed.success).toBe(false);
-      expect(parsed.error).toBe('string error');
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('string error');
       expect(result.isError).toBe(true);
     });
   });

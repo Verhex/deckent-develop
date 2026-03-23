@@ -359,6 +359,9 @@ describe('finalizeSprint', () => {
       evaluations,
       expect.objectContaining({ totalTasks: 3 }),
       undefined, // no usageTracker passed
+      undefined, // agentMap
+      undefined, // skillMap
+      results,
     );
   });
 
@@ -377,6 +380,9 @@ describe('finalizeSprint', () => {
       evaluations,
       expect.any(Object),
       mockTracker,
+      undefined, // agentMap
+      undefined, // skillMap
+      results,
     );
   });
 
@@ -633,7 +639,10 @@ describe('finalizeSprint', () => {
       sprint,
       evaluations,
       expect.any(Object),
-      undefined,
+      undefined, // no usageTracker
+      undefined, // agentMap
+      undefined, // skillMap
+      results,
     );
   });
 

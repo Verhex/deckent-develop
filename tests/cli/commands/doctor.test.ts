@@ -46,6 +46,15 @@ vi.mock('../../../src/core/subscription.js', () => ({
   }),
 }));
 
+vi.mock('../../../src/core/provider.js', () => ({
+  detectAvailableProviders: vi.fn().mockResolvedValue([
+    { name: 'claude', available: true, version: '2.1', authMethod: 'session', models: [] },
+    { name: 'codex', available: false, authMethod: 'none', models: [] },
+    { name: 'gemini', available: false, authMethod: 'none', models: [] },
+  ]),
+  formatDetectedProviders: vi.fn().mockReturnValue('Providers:\n  mock'),
+}));
+
 vi.mock('../../../src/core/constants.js', () => ({
   DECKENT_DIR: '.deckent',
   BRAIN_DIR: '.brain',
@@ -68,7 +77,12 @@ import { resolveProjectRoot } from '../../../src/cli/helpers/process.js';
 import { countBrainLines } from '../../../src/core/utils.js';
 import { getSystemProfile } from '../../../src/core/system-profile.js';
 import { detectSubscription } from '../../../src/core/subscription.js';
-import { registerDoctor, runDoctorChecks, formatSystemProfile, checkPlatform, isRunningInWSL } from '../../../src/cli/commands/doctor.js';
+import {
+  registerDoctor, runDoctorChecks, formatSystemProfile, checkPlatform, isRunningInWSL,
+  formatHumanDoctor, getLastSprintId, countDebtItems, getProviderTips,
+} from '../../../src/cli/commands/doctor.js';
+import type { HumanDoctorInput } from '../../../src/cli/commands/doctor.js';
+import type { DetectedProvider } from '../../../src/core/provider.js';
 
 // ─── Helper ──────────────────────────────────────────────────────────
 
@@ -129,10 +143,16 @@ describe('registerDoctor', () => {
     expect(cmd!.description()).toMatch(/check/i);
   });
 
-  it('calls formatDoctorResult and print on basic run', async () => {
-    await runCommand(['doctor']);
+  it('calls formatDoctorResult and print on --legacy run', async () => {
+    await runCommand(['doctor', '--legacy']);
     expect(formatDoctorResult).toHaveBeenCalled();
     expect(print).toHaveBeenCalledWith('Doctor Output');
+  });
+
+  it('uses human-friendly format by default', async () => {
+    await runCommand(['doctor']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('Deckent Health Check'))).toBe(true);
   });
 
   it('does NOT show profile info without --profile flag', async () => {
@@ -155,8 +175,8 @@ describe('registerDoctor', () => {
   it('falls back to process.cwd() if resolveProjectRoot throws', async () => {
     vi.mocked(resolveProjectRoot).mockImplementationOnce(() => { throw new Error('no root'); });
     await runCommand(['doctor']);
-    // Should not throw, should still call formatDoctorResult
-    expect(formatDoctorResult).toHaveBeenCalled();
+    // Should not throw, should still call print
+    expect(print).toHaveBeenCalled();
   });
 });
 
@@ -571,14 +591,14 @@ describe('i18n integration', () => {
     process.exitCode = undefined;
   });
 
-  it('prints doctor.checks_passed message after running checks', async () => {
-    await runCommand(['doctor']);
+  it('prints doctor.checks_passed message in legacy mode', async () => {
+    await runCommand(['doctor', '--legacy']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('checks passed'))).toBe(true);
   });
 
-  it('checks_passed message includes total check count', async () => {
-    await runCommand(['doctor']);
+  it('checks_passed message includes total check count in legacy mode', async () => {
+    await runCommand(['doctor', '--legacy']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     const passedMsg = calls.find(c => String(c).includes('checks passed'));
     expect(passedMsg).toBeDefined();
@@ -586,7 +606,7 @@ describe('i18n integration', () => {
     expect(String(passedMsg)).toMatch(/\/11/);
   });
 
-  it('uses tr language when config has language=tr', async () => {
+  it('uses tr language when config has language=tr in legacy mode', async () => {
     vi.mocked(existsSync).mockImplementation((p: string) => {
       if (String(p).includes('config.json')) return true;
       return true;
@@ -595,29 +615,29 @@ describe('i18n integration', () => {
       if (String(p).includes('config.json')) return JSON.stringify({ language: 'tr' });
       return '# Content';
     });
-    await runCommand(['doctor']);
+    await runCommand(['doctor', '--legacy']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     // Turkish: 'Sonuç: {passed}/{total} kontrol geçti'
     expect(calls.some(c => String(c).includes('kontrol geçti'))).toBe(true);
   });
 
-  it('falls back to en when config missing', async () => {
+  it('falls back to en when config missing in legacy mode', async () => {
     vi.mocked(existsSync).mockImplementation((p: string) => {
       if (String(p).includes('config.json')) return false;
       return true;
     });
-    await runCommand(['doctor']);
+    await runCommand(['doctor', '--legacy']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('checks passed'))).toBe(true);
   });
 
-  it('falls back to en when config has invalid JSON', async () => {
+  it('falls back to en when config has invalid JSON in legacy mode', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockImplementation((p: string) => {
       if (String(p).includes('config.json')) return 'NOT JSON';
       return '# Content';
     });
-    await runCommand(['doctor']);
+    await runCommand(['doctor', '--legacy']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('checks passed'))).toBe(true);
   });
@@ -769,5 +789,315 @@ describe('isRunningInWSL', () => {
       return '';
     });
     expect(isRunningInWSL()).toBe(false);
+  });
+});
+
+// ─── formatHumanDoctor ──────────────────────────────────────────────
+
+describe('formatHumanDoctor', () => {
+  function makeCheck(name: string, passed: boolean, message: string, required = false) {
+    return { name, passed, message, required };
+  }
+
+  function makeProvider(name: string, available: boolean, version?: string, authMethod: 'session' | 'api_key' | 'none' = 'none'): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, version, authMethod, models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  const baseInput: HumanDoctorInput = {
+    result: {
+      ok: true,
+      checks: [
+        makeCheck('Platform', true, 'Linux (fully supported)'),
+        makeCheck('Node.js', true, 'v22.1.0 (>=18 required)', true),
+        makeCheck('git', true, 'v2.43.0', true),
+        makeCheck('tmux', true, 'tmux 3.4', true),
+        makeCheck('Claude CLI', true, 'v2.1', true),
+        makeCheck('Workspace', true, '.deckent/ found'),
+        makeCheck('Brain Dir', true, 'All brain files present'),
+        makeCheck('Directives', true, 'DIRECTIVES.md found'),
+        makeCheck('Brain Budget', true, '347/600 lines'),
+        makeCheck('Debt', true, 'No debt file'),
+        makeCheck('Locks', true, 'No lock files'),
+      ],
+    },
+    providers: [
+      makeProvider('claude', true, '2.1', 'session'),
+      makeProvider('codex', true, '1.0', 'api_key'),
+      makeProvider('gemini', false),
+    ],
+    brainLines: 347,
+    brainBudget: 600,
+    lastSprintId: 'sprint-039',
+    debtItems: { total: 0, critical: 0 },
+  };
+
+  it('starts with "Deckent Health Check" header', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toMatch(/^Deckent Health Check/);
+  });
+
+  it('shows "Your System:" section', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Your System:');
+  });
+
+  it('shows "Your Project:" section', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Your Project:');
+  });
+
+  it('shows "Recommendation:" section', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Recommendation:');
+  });
+
+  it('shows system checks with version numbers', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('OK Node.js');
+    expect(output).toContain('v22.1.0');
+    expect(output).toContain('OK git');
+    expect(output).toContain('v2.43.0');
+  });
+
+  it('shows provider status with auth method', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('OK Claude CLI v2.1 — Ready (session auth)');
+    expect(output).toContain('OK Codex CLI v1.0 — Ready (API key set)');
+  });
+
+  it('shows failed provider with hint', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('FAIL Gemini — Not configured (set GOOGLE_API_KEY to enable)');
+  });
+
+  it('shows memory percentage and health', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Memory: 347/600 lines (58% — healthy)');
+  });
+
+  it('shows memory OVER BUDGET when exceeds limit', () => {
+    const input = { ...baseInput, brainLines: 650 };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('FAIL Memory: 650/600 lines');
+    expect(output).toContain('OVER BUDGET');
+  });
+
+  it('shows last sprint ID', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('OK Last sprint: sprint-039 (completed)');
+  });
+
+  it('omits last sprint when null', () => {
+    const input = { ...baseInput, lastSprintId: null };
+    const output = formatHumanDoctor(input);
+    expect(output).not.toContain('Last sprint');
+  });
+
+  it('shows debt items with warning', () => {
+    const input = { ...baseInput, debtItems: { total: 5, critical: 0 } };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Warning 5 open debt items');
+    expect(output).toContain('deckent status --debt');
+  });
+
+  it('shows critical debt items count', () => {
+    const input = { ...baseInput, debtItems: { total: 5, critical: 2 } };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Warning 2 critical + 3 open debt items');
+  });
+
+  it('shows positive recommendation when all ok', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Everything looks good!');
+    expect(output).toContain('deckent start');
+  });
+
+  it('shows fix recommendation when required check fails', () => {
+    const input = {
+      ...baseInput,
+      result: {
+        ok: false,
+        checks: [
+          ...baseInput.result.checks.map(c =>
+            c.name === 'tmux' ? { ...c, passed: false, message: 'not found' } : c,
+          ),
+        ],
+      },
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Fix 1 required issue');
+    expect(output).toContain('tmux: not found');
+  });
+
+  it('shows provider tips for unavailable providers', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Tip: Set GOOGLE_API_KEY to enable Gemini');
+  });
+
+  it('shows brain decay tip when over budget', () => {
+    const input = { ...baseInput, brainLines: 650 };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Tip: Run `deckent cleanup --decay`');
+  });
+
+  it('shows stale lock warning in project section', () => {
+    const input = {
+      ...baseInput,
+      result: {
+        ok: true,
+        checks: baseInput.result.checks.map(c =>
+          c.name === 'Locks' ? { ...c, passed: false, message: '2 stale lock(s)' } : c,
+        ),
+      },
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Warning 2 stale lock(s)');
+  });
+
+  it('shows codex provider hint when unavailable', () => {
+    const input = {
+      ...baseInput,
+      providers: [
+        makeProvider('claude', true, '2.1', 'session'),
+        makeProvider('codex', false),
+        makeProvider('gemini', false),
+      ],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('FAIL Codex — Not configured (set OPENAI_API_KEY to enable)');
+  });
+
+  it('shows all providers as OK when all available', () => {
+    const input = {
+      ...baseInput,
+      providers: [
+        makeProvider('claude', true, '2.1', 'session'),
+        makeProvider('codex', true, '1.0', 'api_key'),
+        makeProvider('gemini', true, undefined, 'api_key'),
+      ],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).not.toContain('FAIL Gemini');
+    expect(output).not.toContain('FAIL Codex');
+    expect(output).toContain('OK Gemini');
+  });
+
+  it('does not include tips when all providers available', () => {
+    const input = {
+      ...baseInput,
+      providers: [
+        makeProvider('claude', true, '2.1', 'session'),
+        makeProvider('codex', true, '1.0', 'api_key'),
+        makeProvider('gemini', true, undefined, 'api_key'),
+      ],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).not.toContain('Tip:');
+  });
+});
+
+// ─── getLastSprintId ────────────────────────────────────────────────
+
+describe('getLastSprintId', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns sprint ID from config', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-039' }));
+    expect(getLastSprintId('/mock/root')).toBe('sprint-039');
+  });
+
+  it('returns null when config file does not exist', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    expect(getLastSprintId('/mock/root')).toBeNull();
+  });
+
+  it('returns null when config has no last_sprint_id', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ language: 'en' }));
+    expect(getLastSprintId('/mock/root')).toBeNull();
+  });
+
+  it('returns null when config is invalid JSON', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('NOT JSON');
+    expect(getLastSprintId('/mock/root')).toBeNull();
+  });
+});
+
+// ─── countDebtItems ─────────────────────────────────────────────────
+
+describe('countDebtItems', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns zero when no debt file', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const result = countDebtItems('/mock/root');
+    expect(result).toEqual({ total: 0, critical: 0 });
+  });
+
+  it('counts debt lines (excluding header)', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(
+      '| ID | Description | Priority |\n|---|---|---|\n| D001 | foo | HIGH |\n| D002 | bar | CRITICAL |\n| D003 | baz | LOW |'
+    );
+    const result = countDebtItems('/mock/root');
+    expect(result.total).toBe(3);
+    expect(result.critical).toBe(1);
+  });
+
+  it('returns zero for empty debt file', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('');
+    const result = countDebtItems('/mock/root');
+    expect(result).toEqual({ total: 0, critical: 0 });
+  });
+
+  it('handles read error gracefully', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('read error'); });
+    const result = countDebtItems('/mock/root');
+    expect(result).toEqual({ total: 0, critical: 0 });
+  });
+});
+
+// ─── getProviderTips ────────────────────────────────────────────────
+
+describe('getProviderTips', () => {
+  function makeProvider(name: string, available: boolean): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, authMethod: 'none', models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  it('returns Gemini tip when Gemini unavailable', () => {
+    const tips = getProviderTips([makeProvider('gemini', false)]);
+    expect(tips).toHaveLength(1);
+    expect(tips[0]).toContain('GOOGLE_API_KEY');
+  });
+
+  it('returns Codex tip when Codex unavailable', () => {
+    const tips = getProviderTips([makeProvider('codex', false)]);
+    expect(tips).toHaveLength(1);
+    expect(tips[0]).toContain('OPENAI_API_KEY');
+  });
+
+  it('returns no tips when all providers available', () => {
+    const tips = getProviderTips([
+      makeProvider('claude', true),
+      makeProvider('codex', true),
+      makeProvider('gemini', true),
+    ]);
+    expect(tips).toHaveLength(0);
+  });
+
+  it('returns multiple tips when multiple providers unavailable', () => {
+    const tips = getProviderTips([
+      makeProvider('codex', false),
+      makeProvider('gemini', false),
+    ]);
+    expect(tips).toHaveLength(2);
   });
 });

@@ -307,19 +307,14 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
     expect(prompt).toContain('task-002-007.result');
   });
 
-  it('instructs worker to write *.test.ts test files', () => {
-    const prompt = buildWorkerPrompt(makeTask());
-    expect(prompt).toContain('.test.ts');
-  });
-
   it('instructs worker to run vitest (npx vitest run)', () => {
     const prompt = buildWorkerPrompt(makeTask());
     expect(prompt).toContain('npx vitest run');
   });
 
-  it('specifies 80% as minimum coverage goal', () => {
+  it('instructs worker to run tsc --noEmit', () => {
     const prompt = buildWorkerPrompt(makeTask());
-    expect(prompt).toContain('80%');
+    expect(prompt).toContain('tsc --noEmit');
   });
 
   it('marks result file as REQUIRED', () => {
@@ -343,10 +338,9 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
     expect(prompt).toContain('NO_GO');
   });
 
-  it('places test files in same directory as source (same-name instruction)', () => {
+  it('includes scope rules section', () => {
     const prompt = buildWorkerPrompt(makeTask());
-    // Instruction should mention same directory or same name with .test.ts
-    expect(prompt).toMatch(/same.*directory|same.*name|\.test\.ts/i);
+    expect(prompt).toContain('Scope Rules');
   });
 
   it('instructs worker to write test result to .result file', () => {

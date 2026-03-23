@@ -51,7 +51,6 @@ vi.mock('../../../src/core/provider.js', () => ({
   detectAvailableProviders: vi.fn().mockResolvedValue([
     { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
   ]),
-  formatDetectedProviders: vi.fn().mockReturnValue('Claude: available (session)'),
 }));
 
 vi.mock('../../../src/cli/helpers/wizard.js', () => ({
@@ -83,7 +82,7 @@ import { detectSubscription } from '../../../src/core/subscription.js';
 import { analyzeProject } from '../../../src/core/analyzer.js';
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { registerInit } from '../../../src/cli/commands/init.js';
-import { detectAvailableProviders, formatDetectedProviders } from '../../../src/core/provider.js';
+import { detectAvailableProviders } from '../../../src/core/provider.js';
 import {
   detectIDEEnvironment,
   getMCPGuidance,
@@ -107,7 +106,7 @@ async function runCommand(args: string[]): Promise<void> {
 }
 
 // Ensure imported mocked functions are referenced to prevent lint removal
-const _providerMocks = { detectAvailableProviders, formatDetectedProviders, detectIDEEnvironment, getMCPGuidance, buildProviderWizardSteps, resolveProviderWizardResult, formatProviderAuthGuidance, runWizard };
+const _providerMocks = { detectAvailableProviders, detectIDEEnvironment, getMCPGuidance, buildProviderWizardSteps, resolveProviderWizardResult, formatProviderAuthGuidance, runWizard };
 void _providerMocks;
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -564,19 +563,16 @@ describe('init command (isolated)', () => {
       expect(promptText).not.toHaveBeenCalled();
     });
 
-    it('prints recommendation reasons in --auto mode', async () => {
-      vi.mocked(generateSetupRecommendation).mockReturnValue({
-        mode: 'max_plan',
-        reasons: ['Detected Max plan', 'High-spec machine'],
-      });
+    it('prints welcome banner in --auto mode', async () => {
       await runCommand(['init', '--auto']);
-      expect(print).toHaveBeenCalledWith(expect.stringContaining('Detected Max plan'));
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Welcome to Deckent'))).toBe(true);
     });
 
-    it('prints success message after init', async () => {
+    it('prints next steps after init', async () => {
       await runCommand(['init', '--auto']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      expect(calls.some(c => String(c).includes('initialized'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes("You're ready"))).toBe(true);
     });
   });
 
@@ -639,57 +635,56 @@ describe('init command (isolated)', () => {
   // ─── i18n integration ──────────────────────────────────────────────
 
   describe('i18n integration', () => {
-    it('prints auto_detecting message in --auto mode using getMessage', async () => {
+    it('prints welcome banner in --auto mode', async () => {
       await runCommand(['init', '--auto']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      // English: 'Auto-detecting system, subscription, and project...'
-      expect(calls.some(c => String(c).includes('Auto-detecting'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Welcome to Deckent'))).toBe(true);
     });
 
-    it('prints recommendation header in --auto mode using getMessage', async () => {
+    it('prints detected setup in --auto mode', async () => {
       await runCommand(['init', '--auto']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      expect(calls.some(c => String(c).includes('Recommendation'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('I detected your setup'))).toBe(true);
     });
 
-    it('prints initialized message using getMessage', async () => {
+    it('prints setup progress with checkmarks', async () => {
       await runCommand(['init', '--auto']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      expect(calls.some(c => String(c).includes('initialized'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Setting up your AI development team'))).toBe(true);
     });
 
-    it('prints next_steps header using getMessage', async () => {
+    it('prints next steps with numbered instructions (en)', async () => {
       await runCommand(['init', '--auto']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      expect(calls.some(c => String(c).includes('Next steps'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('1. Write your goals'))).toBe(true);
+      expect(calls.some(c => c.includes('2. Plan the sprint'))).toBe(true);
+      expect(calls.some(c => c.includes('3. Start working'))).toBe(true);
     });
 
-    it('prints next_step_directives using getMessage', async () => {
+    it('prints zero-config hint with deckent start example', async () => {
       await runCommand(['init', '--auto']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      expect(calls.some(c => String(c).includes('DIRECTIVES.md'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('deckent start "Add JWT'))).toBe(true);
     });
 
-    it('prints tr initialized message when language is tr (interactive mode)', async () => {
+    it('prints Turkish next steps when language is tr (interactive mode)', async () => {
       vi.mocked(promptSelect)
         .mockResolvedValueOnce('max_plan' as any)
         .mockResolvedValueOnce('tr' as any);
       vi.mocked(promptText).mockResolvedValue('my-project');
       await runCommand(['init']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      // Turkish: 'Deckent "{name}" için başlatıldı'
-      expect(calls.some(c => String(c).includes('için başlatıldı'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Hazırsınız'))).toBe(true);
     });
 
-    it('prints tr next_steps when language is tr (interactive mode)', async () => {
+    it('prints Turkish zero-config mode when language is tr', async () => {
       vi.mocked(promptSelect)
         .mockResolvedValueOnce('max_plan' as any)
         .mockResolvedValueOnce('tr' as any);
       vi.mocked(promptText).mockResolvedValue('my-project');
       await runCommand(['init']);
-      const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-      // Turkish: 'Sonraki adımlar:'
-      expect(calls.some(c => String(c).includes('Sonraki adımlar'))).toBe(true);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('doğrudan ne yapılacağını söyleyin'))).toBe(true);
     });
   });
 
@@ -701,11 +696,10 @@ describe('init command (isolated)', () => {
       expect(detectAvailableProviders).toHaveBeenCalled();
     });
 
-    it('calls formatDetectedProviders with detected providers', async () => {
+    it('shows detected provider info in human-friendly output', async () => {
       await runCommand(['init', '--auto']);
-      expect(formatDetectedProviders).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ name: 'claude' })]),
-      );
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('I detected your setup'))).toBe(true);
     });
 
     it('calls buildProviderWizardSteps', async () => {
@@ -875,6 +869,203 @@ describe('init command (isolated)', () => {
       await runCommand(['init', '--auto', '--cursor']);
       const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
       expect(calls.some(c => c.includes('Cursor detected'))).toBe(true);
+    });
+  });
+});
+
+// ─── Human-Friendly Output Format Tests ─────────────────────────────────
+
+import {
+  formatWelcomeBanner,
+  formatDetectedSetup,
+  formatSetupProgress,
+  formatNextSteps,
+} from '../../../src/cli/commands/init.js';
+import type { DetectedSetup, SetupStep } from '../../../src/cli/commands/init.js';
+
+describe('human-friendly init output', () => {
+  // ─── formatWelcomeBanner ────────────────────────────────────────────
+
+  describe('formatWelcomeBanner', () => {
+    it('includes "Welcome to Deckent!"', () => {
+      expect(formatWelcomeBanner()).toContain('Welcome to Deckent!');
+    });
+  });
+
+  // ─── formatDetectedSetup ───────────────────────────────────────────
+
+  describe('formatDetectedSetup', () => {
+    it('shows "I detected your setup:" header', () => {
+      const setup: DetectedSetup = { providers: [] };
+      expect(formatDetectedSetup(setup)).toContain('I detected your setup');
+    });
+
+    it('shows Node.js version when provided', () => {
+      const setup: DetectedSetup = { nodeVersion: 'v22.1.0', providers: [] };
+      expect(formatDetectedSetup(setup)).toContain('Node.js v22.1.0');
+    });
+
+    it('shows available providers with auth method', () => {
+      const setup: DetectedSetup = {
+        providers: [{ name: 'claude', available: true, authMethod: 'session' }],
+      };
+      const output = formatDetectedSetup(setup);
+      expect(output).toContain('Claude CLI');
+      expect(output).toContain('session');
+    });
+
+    it('shows unavailable providers as "Not configured"', () => {
+      const setup: DetectedSetup = {
+        providers: [{ name: 'gemini', available: false }],
+      };
+      expect(formatDetectedSetup(setup)).toContain('Not configured');
+    });
+
+    it('shows project stack from analysis', () => {
+      const setup: DetectedSetup = {
+        providers: [],
+        stack: { language: 'typescript', framework: 'react' },
+      };
+      const output = formatDetectedSetup(setup);
+      expect(output).toContain('Typescript + React');
+      expect(output).toContain('detected from package.json');
+    });
+
+    it('skips unknown stack values', () => {
+      const setup: DetectedSetup = {
+        providers: [],
+        stack: { language: 'unknown', framework: 'unknown' },
+      };
+      const output = formatDetectedSetup(setup);
+      expect(output).not.toContain('Project:');
+    });
+
+    it('skips framework "none" in stack', () => {
+      const setup: DetectedSetup = {
+        providers: [],
+        stack: { language: 'typescript', framework: 'none' },
+      };
+      const output = formatDetectedSetup(setup);
+      expect(output).toContain('Typescript');
+      expect(output).not.toContain('None');
+    });
+
+    it('shows provider version when provided', () => {
+      const setup: DetectedSetup = {
+        providers: [{ name: 'claude', available: true, version: '2.1.0' }],
+      };
+      expect(formatDetectedSetup(setup)).toContain('v2.1.0');
+    });
+
+    it('handles multiple providers', () => {
+      const setup: DetectedSetup = {
+        providers: [
+          { name: 'claude', available: true, authMethod: 'session' },
+          { name: 'codex', available: true, authMethod: 'API key' },
+          { name: 'gemini', available: false },
+        ],
+      };
+      const output = formatDetectedSetup(setup);
+      expect(output).toContain('Claude');
+      expect(output).toContain('Codex');
+      expect(output).toContain('Gemini');
+      expect(output).toContain('Not configured');
+    });
+  });
+
+  // ─── formatSetupProgress ──────────────────────────────────────────
+
+  describe('formatSetupProgress', () => {
+    it('includes "Setting up your AI development team..." header', () => {
+      const output = formatSetupProgress([]);
+      expect(output).toContain('Setting up your AI development team');
+    });
+
+    it('shows completed steps with ✓ icon', () => {
+      const steps: SetupStep[] = [
+        { label: 'Created .deckent/ configuration', done: true },
+      ];
+      const output = formatSetupProgress(steps);
+      expect(output).toContain('✓');
+      expect(output).toContain('Created .deckent/ configuration');
+    });
+
+    it('shows incomplete steps with · icon', () => {
+      const steps: SetupStep[] = [
+        { label: 'Pending step', done: false },
+      ];
+      const output = formatSetupProgress(steps);
+      expect(output).toContain('·');
+      expect(output).toContain('Pending step');
+    });
+
+    it('shows multiple steps in order', () => {
+      const steps: SetupStep[] = [
+        { label: 'Step A', done: true },
+        { label: 'Step B', done: true },
+        { label: 'Step C', done: false },
+      ];
+      const output = formatSetupProgress(steps);
+      const indexA = output.indexOf('Step A');
+      const indexB = output.indexOf('Step B');
+      const indexC = output.indexOf('Step C');
+      expect(indexA).toBeLessThan(indexB);
+      expect(indexB).toBeLessThan(indexC);
+    });
+  });
+
+  // ─── formatNextSteps ──────────────────────────────────────────────
+
+  describe('formatNextSteps', () => {
+    it('includes numbered steps 1-3 in English', () => {
+      const output = formatNextSteps('en');
+      expect(output).toContain('1. Write your goals');
+      expect(output).toContain('2. Plan the sprint');
+      expect(output).toContain('3. Start working');
+    });
+
+    it('includes deckent set-directives command example', () => {
+      const output = formatNextSteps('en');
+      expect(output).toContain('deckent set-directives');
+    });
+
+    it('includes deckent plan command', () => {
+      const output = formatNextSteps('en');
+      expect(output).toContain('deckent plan');
+    });
+
+    it('includes deckent start command', () => {
+      const output = formatNextSteps('en');
+      expect(output).toContain('deckent start');
+    });
+
+    it('includes zero-config mode hint with deckent start + description', () => {
+      const output = formatNextSteps('en');
+      expect(output).toContain('Or just tell me what to build');
+      expect(output).toContain('deckent start "Add JWT');
+    });
+
+    it('includes "You\'re ready!" message in English', () => {
+      const output = formatNextSteps('en');
+      expect(output).toContain("You're ready!");
+    });
+
+    it('returns Turkish steps when language is tr', () => {
+      const output = formatNextSteps('tr');
+      expect(output).toContain('Hazırsınız!');
+      expect(output).toContain('1. Hedeflerinizi yazın');
+      expect(output).toContain('2. Sprint planlayın');
+      expect(output).toContain('3. Çalışmaya başlayın');
+    });
+
+    it('includes Turkish zero-config hint', () => {
+      const output = formatNextSteps('tr');
+      expect(output).toContain('doğrudan ne yapılacağını söyleyin');
+    });
+
+    it('defaults to English for unknown language', () => {
+      const output = formatNextSteps('de');
+      expect(output).toContain("You're ready!");
     });
   });
 });

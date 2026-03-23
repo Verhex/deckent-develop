@@ -617,6 +617,47 @@ export function confirmDraftTasks(projectRoot: string, sprint: Sprint): void {
 }
 
 /**
+ * Resolve the PROMPT.md content for a task's assigned agent.
+ * Returns undefined if the agent is 'generic' or the file cannot be read.
+ */
+export function resolveAgentPrompt(projectRoot: string, task: Task): string | undefined {
+  const agentId = task.assignedAgent;
+  if (!agentId || agentId === 'generic') return undefined;
+  // Try persistent agents first, then temp agents
+  const paths = [
+    join(projectRoot, '.deckent', 'agents', agentId, 'PROMPT.md'),
+    join(projectRoot, TASKS_DIR, 'agents', agentId, 'PROMPT.md'),
+  ];
+  for (const p of paths) {
+    try {
+      return readFileSync(p, 'utf-8');
+    } catch { /* not found, try next */ }
+  }
+  return undefined;
+}
+
+/**
+ * Resolve SKILL.md content for all skills assigned to a task.
+ * Returns an array of { name, content } for each loadable skill.
+ */
+export function resolveSkillPrompts(
+  projectRoot: string,
+  task: Task,
+): Array<{ name: string; content: string }> {
+  const skillIds = task.assignedSkills;
+  if (!skillIds || skillIds.length === 0) return [];
+  const results: Array<{ name: string; content: string }> = [];
+  for (const skillId of skillIds) {
+    const skillPath = join(projectRoot, '.deckent', 'skills', skillId, 'SKILL.md');
+    try {
+      const content = readFileSync(skillPath, 'utf-8');
+      results.push({ name: skillId, content });
+    } catch { /* skill not found, skip */ }
+  }
+  return results;
+}
+
+/**
  * Spawn worker agents for sprint tasks via the configured backend.
  * Respects max_workers limit; excess tasks are returned as a queue.
  * @param projectRoot - Project root directory
@@ -654,7 +695,9 @@ export function spawnWorkers(
   }
 
   for (const task of activeTasks) {
-    const prompt = buildWorkerPrompt(task);
+    const agentPrompt = resolveAgentPrompt(projectRoot, task);
+    const taskSkillPrompts = resolveSkillPrompts(projectRoot, task);
+    const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts);
     const model = task.model;
     const writeTargets = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
     const allowedTools = writeTargets.length > 0
@@ -818,8 +861,10 @@ export async function waitForResults(
       } catch { /* ignore */ }
       const nextTask = remainingQueue.shift(); // length > 0 checked above
       if (!nextTask) break;
-      const prompt = buildWorkerPrompt(nextTask);
-      const writeTargets = [...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
+      const queueAgentPrompt = resolveAgentPrompt(projectRoot, nextTask);
+      const queueSkillPrompts = resolveSkillPrompts(projectRoot, nextTask);
+      const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
+      const writeTargets = ['.tasks/', ...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
       const allowedTools = writeTargets.length > 0
         ? `Read,Write(${writeTargets.join(',')}),Bash`
         : 'Read,Write,Bash';
@@ -1074,7 +1119,7 @@ export async function finalizeSprint(
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
   try {
-    writeRetrospective(projectRoot, sprint, evaluations, metrics, opts?.usageTracker);
+    writeRetrospective(projectRoot, sprint, evaluations, metrics, opts?.usageTracker, undefined, undefined, results);
   } catch { /* non-fatal: retro write failure */ }
 
   // 5. Update PROJECT-IDENTITY.md

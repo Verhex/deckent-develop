@@ -125,8 +125,8 @@ describe('types.ts barrel re-export — enums', () => {
     expect(TaskEvaluation.GO_WITH_TECH_DEBT).toBe('GO_WITH_TECH_DEBT');
   });
 
-  it('re-exports AgentStatus with 11 members', () => {
-    expect(Object.values(AgentStatus)).toHaveLength(11);
+  it('re-exports AgentStatus with 12 members', () => {
+    expect(Object.values(AgentStatus)).toHaveLength(12);
     expect(AgentStatus.DOCUMENTING).toBe('DOCUMENTING');
   });
 

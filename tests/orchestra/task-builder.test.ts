@@ -371,14 +371,21 @@ describe('resolveWorkerEffort', () => {
   });
 });
 
-// ─── buildWorkerPrompt ─────────────────────────────────────────────────────
+// ─── buildWorkerPrompt — human-friendly format ────────────────────────────
 
 describe('buildWorkerPrompt', () => {
-  it('includes task id and title in prompt', () => {
+  it('includes task id and title in "Your Task" section', () => {
     const task = makeTask({ id: '025-007', title: 'My Special Task' });
     const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('## Your Task');
     expect(prompt).toContain('025-007');
     expect(prompt).toContain('My Special Task');
+  });
+
+  it('includes task description alongside title', () => {
+    const task = makeTask({ id: '025-001', title: 'Fix Bug', description: 'Fix the login bug' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('Fix Bug — Fix the login bug');
   });
 
   it('includes model in prompt', () => {
@@ -387,39 +394,125 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('Model: opus');
   });
 
-  it('includes effort with --effort flag instruction', () => {
+  it('includes effort level', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    // resolveWorkerEffort returns a value; prompt should show it
     const effort = resolveWorkerEffort(task);
-    expect(prompt).toContain(`--effort ${effort}`);
+    expect(prompt).toContain(`Effort: ${effort}`);
   });
 
-  it('includes heartbeat instructions', () => {
+  it('includes "What To Do" section with all 6 steps', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('## What To Do');
+    expect(prompt).toContain('1. Read the task scope carefully');
+    expect(prompt).toContain('2. Write the code changes');
+    expect(prompt).toContain('3. Verify: run `tsc --noEmit`');
+    expect(prompt).toContain('4. Test: run `npx vitest run`');
+    expect(prompt).toContain('5. Document:');
+    expect(prompt).toContain('6. Report: write your result file');
+  });
+
+  it('includes "Scope Rules" section with directories', () => {
+    const task = makeTask({ scope: { directories: ['src/core/', 'src/cli/'], filesRead: [], filesWrite: [] } });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('## Scope Rules');
+    expect(prompt).toContain('  - src/core/');
+    expect(prompt).toContain('  - src/cli/');
+  });
+
+  it('includes filesWrite in scope section', () => {
+    const task = makeTask({ scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/foo.ts', 'src/core/bar.ts'] } });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('  - src/core/foo.ts');
+    expect(prompt).toContain('  - src/core/bar.ts');
+  });
+
+  it('shows no-restriction message when directories are empty', () => {
+    const task = makeTask({ scope: { directories: [], filesRead: [], filesWrite: [] } });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('(no directory restriction)');
+  });
+
+  it('warns about auditor boundary violations', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('auditor will flag violations');
+  });
+
+  it('includes heartbeat file path', () => {
     const task = makeTask({ id: '025-007' });
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('.tasks/task-025-007.hb');
+  });
+
+  it('includes "Result File" section with correct path', () => {
+    const task = makeTask({ id: '025-007' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('## Result File');
     expect(prompt).toContain('.tasks/task-025-007.result');
   });
 
-  it('uses scope directories in prompt', () => {
-    const task = makeTask({ scope: { directories: ['src/core/', 'src/cli/'], filesRead: [], filesWrite: [] } });
-    const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('src/core/');
-    expect(prompt).toContain('src/cli/');
-  });
-
-  it('uses "any" when no scope directories', () => {
-    const task = makeTask({ scope: { directories: [], filesRead: [], filesWrite: [] } });
-    const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Scope: any');
-  });
-
-  it('includes selfAssessment format in result template', () => {
+  it('includes selfAssessment options in result template', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('selfAssessment');
-    expect(prompt).toContain('DONE');
+    expect(prompt).toContain('"DONE"');
+    expect(prompt).toContain('GO_WITH_TECH_DEBT');
+    expect(prompt).toContain('NO_GO');
+  });
+
+  it('includes "If Something Goes Wrong" section', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('## If Something Goes Wrong');
+    expect(prompt).toContain('tsc fails after 3 attempts');
+    expect(prompt).toContain('Tests fail after 3 attempts');
+    expect(prompt).toContain('Blocked by another task');
+  });
+
+  it('mentions max 3 attempts for tsc', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('max 3 attempts');
+  });
+
+  it('mentions max 3 attempts for tests', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    const matches = prompt.match(/max 3 attempts/g);
+    // Should appear at least twice (in What To Do steps + If Something Goes Wrong)
+    expect(matches!.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('prompt is structured with markdown headers', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    const headers = prompt.match(/^## .+$/gm);
+    expect(headers).not.toBeNull();
+    expect(headers!.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('includes heartbeat JSON template', () => {
+    const task = makeTask({ id: '040-001' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('"workerId": "w-040-001"');
+    expect(prompt).toContain('"taskId": "040-001"');
+  });
+
+  it('includes result JSON template', () => {
+    const task = makeTask({ id: '040-001' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('"taskId": "040-001"');
+    expect(prompt).toContain('"filesChanged"');
+    expect(prompt).toContain('"linesAdded"');
+    expect(prompt).toContain('"testsPassed"');
+  });
+
+  it('result file is marked as REQUIRED', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('REQUIRED');
   });
 });
 

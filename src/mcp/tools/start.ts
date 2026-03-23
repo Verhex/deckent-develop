@@ -5,6 +5,7 @@ import { bootstrapProviders } from '../../core/provider.js';
 import { runSprint, BrainError } from '../../orchestra/brain.js';
 import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
 
 export function registerStartTool(server: McpServer): void {
   server.registerTool(
@@ -53,7 +54,7 @@ export function registerStartTool(server: McpServer): void {
           });
         });
 
-        const startResponse = enrichResponse('start', {
+        const startData = {
           success: true,
           jobId,
           status: 'RUNNING',
@@ -61,12 +62,15 @@ export function registerStartTool(server: McpServer): void {
           activeWorkers: 0,
           queuedTasks: 0,
           estimatedDuration: '~10-30 minutes',
-        });
+        };
+
+        const enrichedStart = enrichResponse('start', startData);
+        const summary = formatStartResponse(startData);
 
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify(startResponse),
+            text: JSON.stringify(wrapResponse(enrichedStart, summary)),
           }],
         };
       } catch (error) {
@@ -74,8 +78,10 @@ export function registerStartTool(server: McpServer): void {
           ? `Sprint failed at phase ${error.phase ?? 'unknown'}: ${error.message}`
           : error instanceof Error ? error.message : String(error);
 
+        const errData = { success: false, error: message };
+        const errSummary = formatErrorResponse({ message });
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: message }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(errData, errSummary)) }],
           isError: true,
         };
       }

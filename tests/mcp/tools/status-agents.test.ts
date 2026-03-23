@@ -26,6 +26,11 @@ vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
   })),
 }));
 
+vi.mock('../../../src/mcp/helpers/format.js', () => ({
+  formatStatusResponse: vi.fn(() => 'mocked summary'),
+  wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
+}));
+
 import { readLatestJobState } from '../../../src/mcp/tools/job-runner.js';
 
 // ─── Mock Server ─────────────────────────────────────────────────────

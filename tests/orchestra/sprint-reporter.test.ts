@@ -11,6 +11,17 @@ import {
   updateProjectDocs,
   compareWithPreviousSprint,
   readPreviousSprintMetrics,
+  formatHumanRetro,
+  buildRetroHighlights,
+  buildRetroIssues,
+  buildRetroLearnings,
+  formatDuration,
+  calculateSelfHealingRate,
+  countFirstTryTasks,
+  countSelfHealedTasks,
+  buildWhatWentWell,
+  buildWhatNeedsAttention,
+  formatHumanSprintComplete,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig } from '../../src/core/types.js';
@@ -226,23 +237,23 @@ describe('writeRetrospective', () => {
   it('RETRO.md includes metrics section', () => {
     const sprint = makeSprint();
     const evals = new Map([[sprint.tasks[0].id, TaskEvaluation.DONE]]);
-    const metrics = makeMetrics({ totalTasks: 10, completedTasks: 8, noGoRate: 10.5 });
+    const metrics = makeMetrics({ totalTasks: 10, completedTasks: 8, noGoRate: 10.5, noGoTasks: 1 });
     writeRetrospective(tmpDir, sprint, evals, metrics);
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
     expect(content).toContain('## Metrics');
-    expect(content).toContain('Tasks: 10 total, 8 done');
-    expect(content).toContain('No-Go Rate: 10.5%');
+    expect(content).toContain('Tasks completed | 8/10');
+    expect(content).toContain('NO_GO rate | 11%');
   });
 
-  it('RETRO.md includes task results section', () => {
+  it('RETRO.md includes learnings for tech debt tasks', () => {
     const task = makeTask({ id: '001', title: 'My Task' });
     const sprint = makeSprint({ tasks: [task] });
     const evals = new Map([['001', TaskEvaluation.GO_WITH_TECH_DEBT]]);
     const metrics = makeMetrics();
     writeRetrospective(tmpDir, sprint, evals, metrics);
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
-    expect(content).toContain('## Results');
-    expect(content).toContain('001: My Task -> GO_WITH_TECH_DEBT');
+    expect(content).toContain('## Learnings');
+    expect(content).toContain('My Task: completed with tech debt');
   });
 
   it('RETRO.md is overwritten on second call', () => {
@@ -318,13 +329,14 @@ describe('writeRetrospective', () => {
     expect(content).toContain('# Sprint sprint-001 Retrospective');
   });
 
-  it('shows UNKNOWN for tasks missing from evaluations map', () => {
+  it('writes RETRO.md even for tasks missing from evaluations map', () => {
     const task = makeTask({ id: '999', title: 'Unknown Task' });
     const sprint = makeSprint({ tasks: [task] });
     const evals = new Map<string, TaskEvaluation>(); // empty
     writeRetrospective(tmpDir, sprint, evals, makeMetrics());
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
-    expect(content).toContain('999: Unknown Task -> UNKNOWN');
+    expect(content).toContain('## Summary');
+    expect(content).toContain('## Metrics');
   });
 });
 
@@ -924,20 +936,19 @@ describe('writeRetrospective comparison section', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('includes comparison section when previous sprint exists', () => {
+  it('includes improvement highlight when previous sprint exists with worse NO_GO rate', () => {
     // Write sprint-001 log first
     const sprint001 = makeSprint({ id: 'sprint-001' });
     writeSprintLog(tmpDir, sprint001, makeMetrics({ durationMs: 3600000, noGoRate: 20 }));
 
-    // Write retrospective for sprint-002
-    const sprint002 = makeSprint({ id: 'sprint-002' });
+    // Write retrospective for sprint-002 with improved NO_GO rate
+    const sprint002 = makeSprint({ id: 'sprint-002', metrics: makeMetrics({ noGoRate: 10 }) });
     const evals = new Map([[sprint002.tasks[0].id, TaskEvaluation.DONE]]);
     writeRetrospective(tmpDir, sprint002, evals, makeMetrics({ durationMs: 7200000, noGoRate: 10 }));
 
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
-    expect(content).toContain('## Comparison with Previous Sprint');
-    expect(content).toContain('Duration:');
-    expect(content).toContain('No-Go Rate:');
+    expect(content).toContain('## Highlights');
+    expect(content).toContain('NO_GO rate improved');
   });
 
   it('omits comparison section when no previous sprint exists', () => {
@@ -947,5 +958,628 @@ describe('writeRetrospective comparison section', () => {
 
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
     expect(content).not.toContain('## Comparison with Previous Sprint');
+  });
+});
+
+// ─── formatHumanRetro ─────────────────────────────────────────────────
+
+describe('formatHumanRetro', () => {
+  it('summary includes task count and time', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics({ totalTasks: 12, completedTasks: 11, durationMs: 2100000 });
+    const result = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(result).toContain('## Summary');
+    expect(result).toContain('Completed 11/12 tasks');
+    expect(result).toContain('35 minutes');
+  });
+
+  it('summary shows self-healing rate when results have feedbackLoop', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    const results: TaskResult[] = [
+      makeResult({ taskId: '001', feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 5000 } }),
+      makeResult({ taskId: '002', feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
+    ];
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics, results });
+    expect(output).toContain('Self-healing rate: 100%');
+  });
+
+  it('includes Highlights section when tasks complete on first try', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    const results: TaskResult[] = [
+      makeResult({ taskId: '001', feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
+    ];
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics, results });
+    expect(output).toContain('## Highlights');
+    expect(output).toContain('1 task completed on first try');
+  });
+
+  it('includes Issues section for NO_GO tasks', () => {
+    const noGoTask = makeTask({ id: '002', title: 'Broken Task', status: 'NO_GO' as any });
+    const sprint = makeSprint({ id: 'sprint-040', tasks: [makeTask(), noGoTask] });
+    const evals = new Map([['001', TaskEvaluation.DONE], ['002', TaskEvaluation.NO_GO]]);
+    const metrics = makeMetrics({ noGoTasks: 1, noGoRate: 50 });
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(output).toContain('## Issues');
+    expect(output).toContain('Broken Task');
+    expect(output).toContain('failed');
+  });
+
+  it('includes readable Metrics table', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics({ totalTasks: 12, completedTasks: 11, noGoTasks: 1, noGoRate: 8.3, coveragePercent: 85.5 });
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(output).toContain('| What | Value |');
+    expect(output).toContain('Tasks completed | 11/12');
+    expect(output).toContain('NO_GO rate | 8%');
+    expect(output).toContain('Coverage | 85.5%');
+  });
+
+  it('includes Learnings section for NO_GO and tech debt tasks', () => {
+    const debtTask = makeTask({ id: '002', title: 'Debt Task' });
+    const sprint = makeSprint({ id: 'sprint-040', tasks: [makeTask(), debtTask] });
+    const evals = new Map([['001', TaskEvaluation.DONE], ['002', TaskEvaluation.GO_WITH_TECH_DEBT]]);
+    const metrics = makeMetrics();
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(output).toContain('## Learnings');
+    expect(output).toContain('Debt Task: completed with tech debt');
+  });
+
+  it('includes code change stats when results provided', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    const results = [makeResult({ linesAdded: 1245, linesRemoved: 380 })];
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics, results });
+    expect(output).toContain('+1245 / -380');
+  });
+
+  it('shows sprint time in human format', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics({ durationMs: 720000 }); // 12 minutes
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(output).toContain('12 minutes');
+  });
+
+  it('omits Highlights section when nothing went well', () => {
+    const sprint = makeSprint({ id: 'sprint-040', metrics: { ...makeMetrics(), boundaryViolations: 2 } });
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const metrics = makeMetrics({ completedTasks: 0, noGoTasks: 1 });
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics, results: [] });
+    expect(output).not.toContain('## Highlights');
+  });
+
+  it('omits Issues section when no issues', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics({ noGoTasks: 0 });
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(output).not.toContain('## Issues');
+  });
+
+  it('omits Learnings section when all tasks DONE', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(output).not.toContain('## Learnings');
+  });
+
+  it('title contains sprint ID', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
+    expect(output).toMatch(/^# Sprint sprint-040 Retrospective/);
+  });
+
+  it('includes agent performance when agentRows provided', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    const agentRows = [{ agent: 'security-agent', tasks: 3, done: 2, debt: 1, noGo: 0, avgCoverage: 90 }];
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics, agentRows });
+    expect(output).toContain('## Agent Performance');
+    expect(output).toContain('security-agent');
+  });
+
+  it('includes skill performance when skillRows provided', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const metrics = makeMetrics();
+    const skillRows = [{ skill: 'test-writer', tasks: 5, done: 4, debt: 1, noGo: 0 }];
+    const output = formatHumanRetro({ sprint, evaluations: evals, metrics, skillRows });
+    expect(output).toContain('## Skill Performance');
+    expect(output).toContain('test-writer');
+  });
+});
+
+// ─── buildRetroHighlights ────────────────────────────────────────────
+
+describe('buildRetroHighlights', () => {
+  it('reports first-try tasks', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const results = [makeResult({ feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } })];
+    const highlights = buildRetroHighlights(sprint, evals, results);
+    expect(highlights).toContainEqual(expect.stringContaining('completed on first try'));
+  });
+
+  it('reports self-healed tasks', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const results = [makeResult({ feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 3000 } })];
+    const highlights = buildRetroHighlights(sprint, evals, results);
+    expect(highlights).toContainEqual(expect.stringContaining('self-healed'));
+  });
+
+  it('reports no boundary violations', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ boundaryViolations: 0 }) });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const highlights = buildRetroHighlights(sprint, evals);
+    expect(highlights).toContainEqual(expect.stringContaining('No boundary violations'));
+  });
+
+  it('reports NO_GO rate improvement vs previous sprint', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ noGoRate: 5 }) });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const previous = makeMetrics({ noGoRate: 20 });
+    const highlights = buildRetroHighlights(sprint, evals, undefined, previous);
+    expect(highlights).toContainEqual(expect.stringContaining('NO_GO rate improved'));
+  });
+});
+
+// ─── buildRetroIssues ─────────────────────────────────────────────────
+
+describe('buildRetroIssues', () => {
+  it('lists NO_GO tasks', () => {
+    const noGoTask = makeTask({ id: '002', title: 'Broken' });
+    const sprint = makeSprint({ tasks: [makeTask(), noGoTask] });
+    const evals = new Map([['001', TaskEvaluation.DONE], ['002', TaskEvaluation.NO_GO]]);
+    const issues = buildRetroIssues(sprint, evals);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain('Broken');
+    expect(issues[0]).toContain('failed');
+  });
+
+  it('includes notes from result in issue description', () => {
+    const noGoTask = makeTask({ id: '002', title: 'Broken' });
+    const sprint = makeSprint({ tasks: [noGoTask] });
+    const evals = new Map([['002', TaskEvaluation.NO_GO]]);
+    const results = [makeResult({ taskId: '002', selfAssessment: 'NO_GO', notes: 'vitest timeout on large component' })];
+    const issues = buildRetroIssues(sprint, evals, results);
+    expect(issues[0]).toContain('vitest timeout');
+  });
+
+  it('reports tasks with many retries', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const results = [makeResult({ taskId: '001', feedbackLoop: { tscAttempts: 3, testAttempts: 1, tscErrorsFixed: 2, testFailuresFixed: 0, totalRetryTimeMs: 10000 } })];
+    const issues = buildRetroIssues(sprint, evals, results);
+    expect(issues).toContainEqual(expect.stringContaining('multiple retries'));
+  });
+
+  it('reports boundary violations', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ boundaryViolations: 2 }) });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const issues = buildRetroIssues(sprint, evals);
+    expect(issues).toContainEqual(expect.stringContaining('2 boundary violations'));
+  });
+
+  it('returns empty when no issues', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ boundaryViolations: 0 }) });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    expect(buildRetroIssues(sprint, evals)).toHaveLength(0);
+  });
+});
+
+// ─── buildRetroLearnings ──────────────────────────────────────────────
+
+describe('buildRetroLearnings', () => {
+  it('generates learning for NO_GO task', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const learnings = buildRetroLearnings(sprint, evals);
+    expect(learnings).toContainEqual(expect.stringContaining('failed'));
+    expect(learnings).toContainEqual(expect.stringContaining('investigate root cause'));
+  });
+
+  it('generates learning for tech debt task', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.GO_WITH_TECH_DEBT]]);
+    const learnings = buildRetroLearnings(sprint, evals);
+    expect(learnings).toContainEqual(expect.stringContaining('tech debt'));
+    expect(learnings).toContainEqual(expect.stringContaining('schedule cleanup'));
+  });
+
+  it('adds low self-healing insight when rate < 50%', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const results = [
+      makeResult({ taskId: '001', selfAssessment: 'NO_GO', feedbackLoop: { tscAttempts: 3, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 10000 } }),
+    ];
+    const learnings = buildRetroLearnings(sprint, evals, results);
+    expect(learnings).toContainEqual(expect.stringContaining('Low self-healing rate'));
+  });
+
+  it('returns empty when all tasks DONE', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    expect(buildRetroLearnings(sprint, evals)).toHaveLength(0);
+  });
+
+  it('limits learnings to 10 items max', () => {
+    const tasks = Array.from({ length: 15 }, (_, i) => makeTask({ id: `${i + 1}`.padStart(3, '0'), title: `Task ${i + 1}` }));
+    const sprint = makeSprint({ tasks });
+    const evals = new Map(tasks.map(t => [t.id, TaskEvaluation.NO_GO] as const));
+    const learnings = buildRetroLearnings(sprint, evals);
+    expect(learnings.length).toBeLessThanOrEqual(11); // 10 from tasks + possible self-healing insight
+  });
+});
+
+// ─── writeRetrospective human-friendly output ─────────────────────────
+
+describe('writeRetrospective human-friendly', () => {
+  let tmpDir: string;
+  beforeEach(() => { tmpDir = makeTempDir(); });
+  afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
+
+  it('writes RETRO.md with human-friendly Summary section', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics());
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('## Summary');
+    expect(content).toContain('Completed');
+  });
+
+  it('writes RETRO.md with Metrics table', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics());
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('## Metrics');
+    expect(content).toContain('| What | Value |');
+    expect(content).toContain('Tasks completed');
+  });
+
+  it('writes RETRO.md with results data when results passed', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const results = [makeResult({ linesAdded: 200, linesRemoved: 50 })];
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, undefined, results);
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('+200 / -50');
+  });
+
+  it('writes RETRO.md with self-healing metrics when feedbackLoop results passed', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const results = [makeResult({
+      feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 5000 },
+    })];
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, undefined, results);
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('Self-healing rate');
+  });
+
+  it('RETRO.md includes Highlights section with first-try tasks', () => {
+    const tasks = [makeTask({ id: '001' }), makeTask({ id: '002' })];
+    const sprint = makeSprint({ id: 'sprint-040', tasks });
+    const evals = new Map([['001', TaskEvaluation.DONE], ['002', TaskEvaluation.DONE]]);
+    const results = [
+      makeResult({ taskId: '001', feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
+      makeResult({ taskId: '002', feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
+    ];
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, undefined, results);
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('## Highlights');
+    expect(content).toContain('completed on first try');
+  });
+
+  it('RETRO.md includes Issues section for NO_GO tasks', () => {
+    const tasks = [makeTask({ id: '001', title: 'Broken Feature' })];
+    const sprint = makeSprint({ id: 'sprint-040', tasks });
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const results = [makeResult({ taskId: '001', selfAssessment: 'NO_GO', notes: 'Timeout' })];
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics({ noGoTasks: 1 }), undefined, undefined, undefined, results);
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('## Issues');
+    expect(content).toContain('Broken Feature');
+  });
+
+  it('RETRO.md includes Learnings section', () => {
+    const tasks = [makeTask({ id: '001', title: 'Flaky Task' })];
+    const sprint = makeSprint({ id: 'sprint-040', tasks });
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics({ noGoTasks: 1 }));
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('## Learnings');
+    expect(content).toContain('Flaky Task');
+    expect(content).toContain('investigate root cause');
+  });
+
+  it('RETRO.md includes coverage when > 0', () => {
+    const sprint = makeSprint({ id: 'sprint-040' });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics({ coveragePercent: 92.3 }));
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('92.3%');
+  });
+
+  it('RETRO.md NO_GO rate shown as percentage', () => {
+    const tasks = [makeTask({ id: '001' }), makeTask({ id: '002' })];
+    const sprint = makeSprint({ id: 'sprint-040', tasks });
+    const evals = new Map([['001', TaskEvaluation.DONE], ['002', TaskEvaluation.NO_GO]]);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics({ noGoRate: 50, noGoTasks: 1, totalTasks: 2 }));
+    const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
+    expect(content).toContain('NO_GO rate');
+    expect(content).toContain('50%');
+  });
+});
+
+// ─── formatDuration ──────────────────────────────────────────────────
+
+describe('formatDuration', () => {
+  it('returns empty string for undefined', () => {
+    expect(formatDuration(undefined)).toBe('');
+  });
+
+  it('returns empty string for 0', () => {
+    expect(formatDuration(0)).toBe('');
+  });
+
+  it('returns seconds for < 60s', () => {
+    expect(formatDuration(30000)).toBe('30 seconds total');
+  });
+
+  it('returns minutes for < 60min', () => {
+    expect(formatDuration(120000)).toBe('2 minutes total');
+  });
+
+  it('returns minutes with seconds when not exact', () => {
+    expect(formatDuration(90000)).toBe('1 minute 30s total');
+  });
+
+  it('returns hours and minutes for >= 60min', () => {
+    expect(formatDuration(5400000)).toBe('1h 30m total');
+  });
+});
+
+// ─── calculateSelfHealingRate ────────────────────────────────────────
+
+describe('calculateSelfHealingRate', () => {
+  it('returns null for empty results', () => {
+    expect(calculateSelfHealingRate([])).toBeNull();
+  });
+
+  it('returns null for undefined', () => {
+    expect(calculateSelfHealingRate(undefined)).toBeNull();
+  });
+
+  it('returns null when no results have feedbackLoop', () => {
+    expect(calculateSelfHealingRate([makeResult()])).toBeNull();
+  });
+
+  it('returns null when no retries attempted', () => {
+    const result = makeResult({
+      feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 },
+    });
+    expect(calculateSelfHealingRate([result])).toBeNull();
+  });
+
+  it('calculates 100% when all retries succeeded', () => {
+    const result = makeResult({
+      selfAssessment: 'DONE',
+      feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 5000 },
+    });
+    const rate = calculateSelfHealingRate([result]);
+    expect(rate).toEqual({ percent: 100, healed: 1, attempted: 1 });
+  });
+
+  it('calculates 0% when all retries failed', () => {
+    const result = makeResult({
+      selfAssessment: 'NO_GO',
+      feedbackLoop: { tscAttempts: 3, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 10000 },
+    });
+    const rate = calculateSelfHealingRate([result]);
+    expect(rate).toEqual({ percent: 0, healed: 0, attempted: 1 });
+  });
+
+  it('calculates partial rate correctly', () => {
+    const results = [
+      makeResult({ taskId: '001', selfAssessment: 'DONE', feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 3000 } }),
+      makeResult({ taskId: '002', selfAssessment: 'NO_GO', feedbackLoop: { tscAttempts: 3, testAttempts: 3, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 15000 } }),
+    ];
+    const rate = calculateSelfHealingRate(results);
+    expect(rate).toEqual({ percent: 50, healed: 1, attempted: 2 });
+  });
+
+  it('counts GO_WITH_TECH_DEBT as healed', () => {
+    const result = makeResult({
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      feedbackLoop: { tscAttempts: 2, testAttempts: 2, tscErrorsFixed: 1, testFailuresFixed: 1, totalRetryTimeMs: 8000 },
+    });
+    const rate = calculateSelfHealingRate([result]);
+    expect(rate).toEqual({ percent: 100, healed: 1, attempted: 1 });
+  });
+});
+
+// ─── countFirstTryTasks / countSelfHealedTasks ───────────────────────
+
+describe('countFirstTryTasks', () => {
+  it('returns 0 for undefined', () => {
+    expect(countFirstTryTasks(undefined)).toBe(0);
+  });
+
+  it('counts tasks with no retries as first-try', () => {
+    const results = [
+      makeResult({ feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
+    ];
+    expect(countFirstTryTasks(results)).toBe(1);
+  });
+
+  it('excludes NO_GO tasks', () => {
+    const results = [
+      makeResult({ selfAssessment: 'NO_GO', feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
+    ];
+    expect(countFirstTryTasks(results)).toBe(0);
+  });
+
+  it('excludes tasks with retries', () => {
+    const results = [
+      makeResult({ feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 3000 } }),
+    ];
+    expect(countFirstTryTasks(results)).toBe(0);
+  });
+
+  it('counts DONE tasks without feedbackLoop as first-try', () => {
+    expect(countFirstTryTasks([makeResult()])).toBe(1);
+  });
+});
+
+describe('countSelfHealedTasks', () => {
+  it('returns 0 for undefined', () => {
+    expect(countSelfHealedTasks(undefined)).toBe(0);
+  });
+
+  it('counts tasks that had retries but succeeded', () => {
+    const results = [
+      makeResult({ feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 3000 } }),
+    ];
+    expect(countSelfHealedTasks(results)).toBe(1);
+  });
+
+  it('excludes NO_GO tasks', () => {
+    const results = [
+      makeResult({ selfAssessment: 'NO_GO', feedbackLoop: { tscAttempts: 3, testAttempts: 3, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 10000 } }),
+    ];
+    expect(countSelfHealedTasks(results)).toBe(0);
+  });
+
+  it('excludes tasks without feedbackLoop', () => {
+    expect(countSelfHealedTasks([makeResult()])).toBe(0);
+  });
+});
+
+// ─── buildWhatWentWell / buildWhatNeedsAttention ────────────────────
+
+describe('buildWhatWentWell', () => {
+  it('reports first-try tasks', () => {
+    const sprint = makeSprint();
+    const results = [makeResult({ feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } })];
+    const items = buildWhatWentWell(sprint, results);
+    expect(items.some(i => i.includes('first try'))).toBe(true);
+  });
+
+  it('reports self-healed tasks', () => {
+    const sprint = makeSprint();
+    const results = [makeResult({ feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 3000 } })];
+    const items = buildWhatWentWell(sprint, results);
+    expect(items.some(i => i.includes('self-healed'))).toBe(true);
+  });
+
+  it('reports no boundary violations', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ boundaryViolations: 0 }) });
+    const items = buildWhatWentWell(sprint);
+    expect(items.some(i => i.includes('boundary violations'))).toBe(true);
+  });
+});
+
+describe('buildWhatNeedsAttention', () => {
+  it('reports NO_GO tasks', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001', title: 'Broken', status: 'NO_GO' })] });
+    const items = buildWhatNeedsAttention(sprint);
+    expect(items.some(i => i.includes('NO_GO'))).toBe(true);
+  });
+
+  it('reports tasks with many retries', () => {
+    const sprint = makeSprint();
+    const results = [makeResult({
+      feedbackLoop: { tscAttempts: 3, testAttempts: 1, tscErrorsFixed: 2, testFailuresFixed: 0, totalRetryTimeMs: 10000 },
+    })];
+    const items = buildWhatNeedsAttention(sprint, results);
+    expect(items.some(i => i.includes('retries'))).toBe(true);
+  });
+
+  it('includes notes from NO_GO result', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001', title: 'Task A', status: 'NO_GO' })] });
+    const results = [makeResult({ taskId: '001', selfAssessment: 'NO_GO', notes: 'vitest timeout error' })];
+    const items = buildWhatNeedsAttention(sprint, results);
+    expect(items.some(i => i.includes('vitest timeout'))).toBe(true);
+  });
+});
+
+// ─── formatHumanSprintComplete ──────────────────────────────────────
+
+describe('formatHumanSprintComplete', () => {
+  it('includes sprint number in title', () => {
+    const sprint = makeSprint({ number: 40 });
+    const output = formatHumanSprintComplete({ sprint });
+    expect(output).toContain('Sprint 040 Complete!');
+  });
+
+  it('shows results with succeeded count', () => {
+    const sprint = makeSprint({ number: 40, metrics: makeMetrics({ completedTasks: 11, totalTasks: 12, noGoTasks: 1 }) });
+    const output = formatHumanSprintComplete({ sprint });
+    expect(output).toContain('11/12 tasks succeeded');
+    expect(output).toContain('1 needs attention');
+  });
+
+  it('shows time duration', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ durationMs: 2100000 }) });
+    const output = formatHumanSprintComplete({ sprint });
+    expect(output).toContain('35 minutes total');
+  });
+
+  it('shows code stats from results', () => {
+    const sprint = makeSprint();
+    const results = [makeResult({ linesAdded: 1245, linesRemoved: 380 })];
+    const output = formatHumanSprintComplete({ sprint, results });
+    expect(output).toContain('+1245 lines added');
+    expect(output).toContain('-380 removed');
+  });
+
+  it('shows What went well section', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ boundaryViolations: 0 }) });
+    const results = [makeResult({ feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } })];
+    const output = formatHumanSprintComplete({ sprint, results });
+    expect(output).toContain('What went well:');
+  });
+
+  it('shows What needs attention for NO_GO tasks', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001', title: 'Bad Task', status: 'NO_GO' })] });
+    const output = formatHumanSprintComplete({ sprint });
+    expect(output).toContain('What needs attention:');
+  });
+
+  it('shows self-healing rate', () => {
+    const sprint = makeSprint();
+    const results = [makeResult({
+      selfAssessment: 'DONE',
+      feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 5000 },
+    })];
+    const output = formatHumanSprintComplete({ sprint, results });
+    expect(output).toContain('Self-healing rate: 100%');
+  });
+
+  it('shows Next steps section', () => {
+    const sprint = makeSprint();
+    const output = formatHumanSprintComplete({ sprint });
+    expect(output).toContain('Next steps:');
+    expect(output).toContain('deckent retro');
+    expect(output).toContain('Ready for next sprint');
+  });
+
+  it('shows debt status link when open debt exists', () => {
+    const sprint = makeSprint({ metrics: makeMetrics({ totalOpenDebt: 3 }) });
+    const output = formatHumanSprintComplete({ sprint });
+    expect(output).toContain('deckent status --debt');
   });
 });

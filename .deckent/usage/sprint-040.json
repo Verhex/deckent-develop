@@ -1,0 +1,128 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-001",
+    "timestamp": "2026-03-23T11:23:22.813Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-002",
+    "timestamp": "2026-03-23T11:23:22.900Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-003",
+    "timestamp": "2026-03-23T11:23:23.013Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-004",
+    "timestamp": "2026-03-23T11:23:23.142Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "040-001",
+    "timestamp": "2026-03-23T11:53:28.492Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "040-002",
+    "timestamp": "2026-03-23T11:53:28.493Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "040-003",
+    "timestamp": "2026-03-23T11:53:28.493Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "040-004",
+    "timestamp": "2026-03-23T11:53:28.495Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "040-005",
+    "timestamp": "2026-03-23T11:53:28.496Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "040-006",
+    "timestamp": "2026-03-23T11:53:28.509Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "040-007",
+    "timestamp": "2026-03-23T11:53:28.510Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "040-008",
+    "timestamp": "2026-03-23T11:53:28.520Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "040-009",
+    "timestamp": "2026-03-23T11:53:28.524Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "040-010",
+    "timestamp": "2026-03-23T11:53:28.536Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "040-011",
+    "timestamp": "2026-03-23T11:53:28.539Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "040-012",
+    "timestamp": "2026-03-23T11:53:28.540Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "040-013",
+    "timestamp": "2026-03-23T11:53:28.541Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-007-fix",
+    "timestamp": "2026-03-23T11:53:28.663Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-008-fix",
+    "timestamp": "2026-03-23T11:53:28.769Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-009-fix",
+    "timestamp": "2026-03-23T11:53:28.909Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "040-011-fix",
+    "timestamp": "2026-03-23T11:53:28.985Z"
+  }
+]

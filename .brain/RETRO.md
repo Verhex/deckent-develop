@@ -1,44 +1,37 @@
-# Sprint sprint-039 Retrospective
+# Sprint sprint-040 Retrospective
 
 ## Metrics
-- Tasks: 19 total, 1 done, 0 debt, 18 no-go
-- Coverage: 95.0%
-- No-Go Rate: 94.7%
-- Duration: 2408326ms
+- Tasks: 13 total, 7 done, 1 debt, 6 no-go
+- Coverage: 92.1%
+- No-Go Rate: 46.2%
+- Duration: 2411984ms
 
 ## Results
-- 039-001: Codex Adapter Real CLI Fix -> DONE
-- 039-002: Gemini Adapter API Verification -> NO_GO
-- 039-003: Planner Full Provider Decoupling -> NO_GO
-- 039-004: Model Equivalence Update -> NO_GO
-- 039-005: Init Wizard — Provider Selection -> NO_GO
-- 039-006: Cross-Environment Detection -> NO_GO
-- 039-007: Provider Health Dashboard -> NO_GO
-- 039-008: Smart Provider Routing -> NO_GO
-- 039-009: Agent-Provider Compatibility -> NO_GO
-- 039-010: Cost Estimator -> NO_GO
-- 039-011: Multi-Provider Integration Test -> NO_GO
-- 039-012: Cursor MCP Auto-Registration -> NO_GO
-- 039-013: Multi-Provider Documentation -> NO_GO
-- 039-014: Provider Config in Dashboard Settings -> NO_GO
-- 039-015: Blueprint & Architecture Update -> NO_GO
-- 039-016: Pre-Publish Validation Script -> NO_GO
-- 039-017: Windows New Test Failures Fix -> NO_GO
-- 039-018: deckent finalize .result File Generation -> NO_GO
-- 039-019: npm Beta Publish Preparation -> NO_GO
+- 040-001: Worker Internal Verify Loop — tsc Check -> DONE
+- 040-002: Worker Internal Verify Loop — Test Check -> DONE
+- 040-003: Worker Feedback Metrics -> DONE
+- 040-004: Worker Prompt Overhaul — Human Instructions + Agent/Skill Injection Fix -> DONE
+- 040-005: CLI Output — Human-Friendly Status -> GO_WITH_TECH_DEBT
+- 040-006: CLI Output — Human-Friendly Sprint Complete -> DONE
+- 040-007: MCP Tool Response — Human-Friendly -> NO_GO
+- 040-008: Dashboard — Human-Friendly Web UI -> NO_GO
+- 040-009: CLI Doctor — Human-Friendly Health Check -> NO_GO
+- 040-010: CLI Init — Human-Friendly Wizard -> DONE
+- 040-011: RETRO Format — Human-Friendly Retrospective -> NO_GO
+- 040-012: Error Messages — Human-Friendly -> NO_GO
+- 040-013: Log Output — Human-Friendly Worker Logs -> NO_GO
 
 ## Comparison with Previous Sprint
-- Duration: +0.0%
-- No-Go Rate: -5.3pp
-- Coverage: +95.0pp
+- Duration: +0.2%
+- No-Go Rate: -48.6pp
+- Coverage: -2.9pp
 
 ## Usage
-- Total Calls: 27
+- Total Calls: 21
 - Total Tokens (est): 60000
-  - opus: 26 calls, 59000 tokens
-  - sonnet: 1 calls, 1000 tokens
+  - opus: 21 calls, 60000 tokens
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| generic | 19 | 1 | 0 | 18 | 0% |
+| generic | 13 | 6 | 1 | 6 | 0% |

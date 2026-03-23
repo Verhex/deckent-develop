@@ -482,7 +482,7 @@ describe('buildWorkerPrompt', () => {
   it('includes task id and title', () => {
     const task = makeTask({ id: '002-003', title: 'Build feature X' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Task 002-003');
+    expect(prompt).toContain('002-003');
     expect(prompt).toContain('Build feature X');
   });
 
@@ -497,13 +497,13 @@ describe('buildWorkerPrompt', () => {
   it('shows scope directories when available', () => {
     const task = makeTask({ scope: { directories: ['src/core/'], filesRead: [], filesWrite: [] } });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Scope: src/core/');
+    expect(prompt).toContain('src/core/');
   });
 
-  it('shows "any" when no scope directories', () => {
+  it('shows fallback message when no scope directories', () => {
     const task = makeTask({ scope: { directories: [], filesRead: [], filesWrite: [] } });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('Scope: any');
+    expect(prompt).toContain('(no directory restriction)');
   });
 
   it('preserves single quotes in prompt (tmux handles escaping)', () => {
@@ -512,28 +512,22 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain("'quotes'");
   });
 
-  it('includes test writing instruction for every function', () => {
-    const task = makeTask();
-    const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('*.test.ts');
-  });
-
   it('includes vitest run instruction', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('npx vitest run');
   });
 
-  it('includes coverage goal of 80%', () => {
+  it('includes tsc verify instruction', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('80%');
+    expect(prompt).toContain('tsc --noEmit');
   });
 
-  it('includes test file placement instruction (same directory, .test.ts)', () => {
+  it('includes error handling instructions', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('.test.ts extension');
+    expect(prompt).toContain('If Something Goes Wrong');
   });
 
   it('marks result file as REQUIRED', () => {

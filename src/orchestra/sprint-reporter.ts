@@ -7,6 +7,7 @@ import type {
   TaskResult, Sprint, SprintMetrics, DebtItem, ResolvedConfig,
   SprintResult,
 } from '../core/types.js';
+import { TaskStatus } from '../core/types.js';
 import {
   BRAIN_DIR, SPRINTS_DIR, MEMORY_FILE, PROJECT_IDENTITY_FILE,
   RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
@@ -188,6 +189,217 @@ export function formatSkillPerformanceTable(rows: SkillPerformanceRow[]): string
   return lines;
 }
 
+// ═══ Human-Friendly RETRO Format ═════════════════════════════════
+
+export interface HumanRetroData {
+  sprint: Sprint;
+  evaluations: Map<string, TaskEvaluation>;
+  metrics: SprintMetrics;
+  results?: TaskResult[];
+  usageTracker?: UsageTracker;
+  agentRows?: AgentPerformanceRow[];
+  skillRows?: SkillPerformanceRow[];
+  previousMetrics?: SprintMetrics | null;
+}
+
+/**
+ * Format a human-friendly retrospective markdown string.
+ * Produces a readable RETRO.md with Summary, Highlights, Issues, Metrics, and Learnings sections.
+ */
+export function formatHumanRetro(data: HumanRetroData): string {
+  const { sprint, evaluations, metrics, results, previousMetrics } = data;
+  const lines: string[] = [];
+
+  // ─── Title ─────────────────────────────────────────────────────
+  lines.push(`# Sprint ${sprint.id} Retrospective`);
+  lines.push('');
+
+  // ─── Summary ───────────────────────────────────────────────────
+  lines.push('## Summary');
+  const durationStr = formatDuration(metrics.durationMs);
+  const healingRate = calculateSelfHealingRate(results);
+  let summaryLine = `Completed ${metrics.completedTasks}/${metrics.totalTasks} tasks`;
+  if (durationStr) summaryLine += ` in ${durationStr.replace(' total', '')}`;
+  summaryLine += '.';
+  if (healingRate !== null) {
+    summaryLine += ` Self-healing rate: ${healingRate.percent}%.`;
+  }
+  lines.push(summaryLine);
+  lines.push('');
+
+  // ─── Highlights ────────────────────────────────────────────────
+  const highlights = buildRetroHighlights(sprint, evaluations, results, previousMetrics ?? undefined);
+  if (highlights.length > 0) {
+    lines.push('## Highlights');
+    for (const h of highlights) {
+      lines.push(`- ${h}`);
+    }
+    lines.push('');
+  }
+
+  // ─── Issues ────────────────────────────────────────────────────
+  const issues = buildRetroIssues(sprint, evaluations, results);
+  if (issues.length > 0) {
+    lines.push('## Issues');
+    for (const issue of issues) {
+      lines.push(`- ${issue}`);
+    }
+    lines.push('');
+  }
+
+  // ─── Metrics Table ─────────────────────────────────────────────
+  lines.push('## Metrics');
+  lines.push('| What | Value |');
+  lines.push('|------|-------|');
+  lines.push(`| Tasks completed | ${metrics.completedTasks}/${metrics.totalTasks} |`);
+  if (healingRate !== null) {
+    lines.push(`| Self-healed | ${healingRate.healed} task${healingRate.healed !== 1 ? 's' : ''} |`);
+  }
+  if (results && results.length > 0) {
+    const totalAdded = results.reduce((sum, r) => sum + (r.linesAdded ?? 0), 0);
+    const totalRemoved = results.reduce((sum, r) => sum + (r.linesRemoved ?? 0), 0);
+    if (totalAdded > 0 || totalRemoved > 0) {
+      lines.push(`| Code changes | +${totalAdded} / -${totalRemoved} |`);
+    }
+  }
+  if (durationStr) {
+    lines.push(`| Sprint time | ${durationStr.replace(' total', '')} |`);
+  }
+  if (metrics.totalTasks > 0) {
+    const noGoPercent = Math.round(metrics.noGoRate);
+    lines.push(`| NO_GO rate | ${noGoPercent}% (${metrics.noGoTasks}/${metrics.totalTasks}) |`);
+  }
+  if (metrics.coveragePercent > 0) {
+    lines.push(`| Coverage | ${metrics.coveragePercent.toFixed(1)}% |`);
+  }
+  lines.push('');
+
+  // ─── Agent Performance ─────────────────────────────────────────
+  if (data.agentRows && data.agentRows.length > 0) {
+    lines.push(...formatAgentPerformanceTable(data.agentRows));
+    lines.push('');
+  }
+
+  // ─── Skill Performance ─────────────────────────────────────────
+  if (data.skillRows && data.skillRows.length > 0) {
+    lines.push(...formatSkillPerformanceTable(data.skillRows));
+    lines.push('');
+  }
+
+  // ─── Learnings ─────────────────────────────────────────────────
+  const learnings = buildRetroLearnings(sprint, evaluations, results);
+  if (learnings.length > 0) {
+    lines.push('## Learnings');
+    for (const l of learnings) {
+      lines.push(`- ${l}`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/** Build highlight items for retro — things that went well. */
+export function buildRetroHighlights(
+  sprint: Sprint,
+  _evaluations: Map<string, TaskEvaluation>,
+  results?: TaskResult[],
+  previousMetrics?: SprintMetrics,
+): string[] {
+  const items: string[] = [];
+
+  const firstTry = countFirstTryTasks(results);
+  if (firstTry > 0) {
+    items.push(`${firstTry} task${firstTry !== 1 ? 's' : ''} completed on first try`);
+  }
+
+  const selfHealed = countSelfHealedTasks(results);
+  if (selfHealed > 0) {
+    items.push(`${selfHealed} task${selfHealed !== 1 ? 's' : ''} self-healed (auto-fixed errors)`);
+  }
+
+  if (sprint.metrics && sprint.metrics.boundaryViolations === 0) {
+    items.push('No boundary violations detected');
+  }
+
+  // Compare with previous sprint improvements
+  if (previousMetrics && sprint.metrics) {
+    if (sprint.metrics.noGoRate < previousMetrics.noGoRate) {
+      items.push(`NO_GO rate improved from ${previousMetrics.noGoRate.toFixed(0)}% to ${sprint.metrics.noGoRate.toFixed(0)}%`);
+    }
+  }
+
+  return items;
+}
+
+/** Build issue items for retro — things that need attention. */
+export function buildRetroIssues(
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  results?: TaskResult[],
+): string[] {
+  const items: string[] = [];
+
+  // NO_GO tasks
+  for (const task of sprint.tasks) {
+    const ev = evaluations.get(task.id);
+    if (ev === TaskEvaluation.NO_GO) {
+      const result = results?.find(r => r.taskId === task.id);
+      const reason = result?.notes ? ` — ${truncateNotes(result.notes)}` : '';
+      items.push(`Task ${task.id} (${task.title}) failed${reason}`);
+    }
+  }
+
+  // Tasks with many retries
+  if (results) {
+    for (const r of results) {
+      const fl = r.feedbackLoop;
+      if (fl && (fl.tscAttempts > 2 || fl.testAttempts > 2) && r.selfAssessment !== 'NO_GO') {
+        const task = sprint.tasks.find(t => t.id === r.taskId);
+        const name = task ? task.title : r.taskId;
+        items.push(`Task ${r.taskId} (${name}) needed multiple retries`);
+      }
+    }
+  }
+
+  // Boundary violations
+  if (sprint.metrics && sprint.metrics.boundaryViolations > 0) {
+    items.push(`${sprint.metrics.boundaryViolations} boundary violation${sprint.metrics.boundaryViolations !== 1 ? 's' : ''} detected`);
+  }
+
+  return items;
+}
+
+/** Build learning items for retro — actionable takeaways. */
+export function buildRetroLearnings(
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  results?: TaskResult[],
+): string[] {
+  const items: string[] = [];
+
+  // NO_GO and tech debt tasks generate learnings
+  for (const task of sprint.tasks) {
+    const ev = evaluations.get(task.id);
+    if (ev === TaskEvaluation.NO_GO) {
+      items.push(`${task.title}: failed — investigate root cause`);
+    } else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
+      items.push(`${task.title}: completed with tech debt — schedule cleanup`);
+    }
+    if (items.length >= 10) break;
+  }
+
+  // Self-healing insights
+  if (results) {
+    const healingRate = calculateSelfHealingRate(results);
+    if (healingRate && healingRate.percent < 50 && healingRate.attempted > 0) {
+      items.push('Low self-healing rate — consider improving worker verification prompts');
+    }
+  }
+
+  return items;
+}
+
 /**
  * Write the sprint retrospective to RETRO.md and append learnings to MEMORY.md.
  * Includes metrics summary, per-task results, comparison with previous sprint,
@@ -208,68 +420,39 @@ export function writeRetrospective(
   usageTracker?: UsageTracker,
   agentMap?: Map<string, string>,
   skillMap?: Map<string, string[]>,
+  results?: TaskResult[],
 ): void {
   const brainPath = join(projectRoot, BRAIN_DIR);
   mkdirSync(brainPath, { recursive: true });
 
-  // Write RETRO.md (overwrite)
-  const retroLines: string[] = [
-    `# Sprint ${sprint.id} Retrospective`, '',
-    '## Metrics',
-    `- Tasks: ${metrics.totalTasks} total, ${metrics.completedTasks} done, ${metrics.techDebtTasks} debt, ${metrics.noGoTasks} no-go`,
-    `- Coverage: ${metrics.coveragePercent.toFixed(1)}%`,
-    `- No-Go Rate: ${metrics.noGoRate.toFixed(1)}%`,
-    `- Duration: ${metrics.durationMs}ms`, '',
-    '## Results',
-  ];
-  for (const task of sprint.tasks) {
-    retroLines.push(`- ${task.id}: ${task.title} -> ${evaluations.get(task.id) ?? 'UNKNOWN'}`);
-  }
+  // Build agent/skill performance data
+  let agentRows: AgentPerformanceRow[] = [];
+  try {
+    agentRows = buildAgentPerformance(sprint, evaluations, results ?? [], agentMap);
+  } catch { /* non-fatal */ }
 
-  // Add comparison section if previous sprint exists
+  let skillRows: SkillPerformanceRow[] = [];
+  try {
+    skillRows = buildSkillPerformance(sprint, evaluations, skillMap);
+  } catch { /* non-fatal */ }
+
+  // Read previous sprint metrics for comparison
   const previousMetrics = readPreviousSprintMetrics(projectRoot, sprint.id);
-  if (previousMetrics) {
-    const cmp = compareWithPreviousSprint(metrics, previousMetrics);
-    retroLines.push('', '## Comparison with Previous Sprint');
-    const durationSign = cmp.durationChangePct >= 0 ? '+' : '';
-    retroLines.push(`- Duration: ${durationSign}${cmp.durationChangePct.toFixed(1)}%`);
-    const noGoSign = cmp.noGoRateChange >= 0 ? '+' : '';
-    retroLines.push(`- No-Go Rate: ${noGoSign}${cmp.noGoRateChange.toFixed(1)}pp`);
-    const covSign = cmp.coverageDelta >= 0 ? '+' : '';
-    retroLines.push(`- Coverage: ${covSign}${cmp.coverageDelta.toFixed(1)}pp`);
-  }
 
-  // Add usage summary if tracker provided
-  if (usageTracker) {
-    try {
-      const sprintUsage = usageTracker.getSprintUsage(sprint.id);
-      retroLines.push('', '## Usage');
-      retroLines.push(`- Total Calls: ${sprintUsage.totalCalls}`);
-      retroLines.push(`- Total Tokens (est): ${sprintUsage.totalTokens}`);
-      for (const mb of sprintUsage.modelBreakdown) {
-        retroLines.push(`  - ${mb.model}: ${mb.calls} calls, ${mb.tokens} tokens`);
-      }
-    } catch { /* non-fatal — usage data may not be available */ }
-  }
+  // Generate human-friendly RETRO content
+  const retroContent = formatHumanRetro({
+    sprint,
+    evaluations,
+    metrics,
+    results,
+    usageTracker,
+    agentRows,
+    skillRows,
+    previousMetrics,
+  });
 
-  // Add agent performance section
-  try {
-    // Use calculateMetrics results array — we need TaskResult[] but don't have it here.
-    // Build from evaluations + sprint tasks instead.
-    const perfRows = buildAgentPerformance(sprint, evaluations, [], agentMap);
-    if (perfRows.length > 0) {
-      retroLines.push(...formatAgentPerformanceTable(perfRows));
-    }
-  } catch { /* non-fatal */ }
-
-  // Add skill performance section
-  try {
-    const skillRows = buildSkillPerformance(sprint, evaluations, skillMap);
-    if (skillRows.length > 0) {
-      retroLines.push(...formatSkillPerformanceTable(skillRows));
-    }
-  } catch { /* non-fatal */ }
-
+  // Truncate to max lines
+  const retroLines = retroContent.split('\n');
   writeFileSync(
     join(brainPath, RETRO_FILE),
     retroLines.slice(0, RETRO_MAX_LINES).join('\n'),
@@ -662,4 +845,223 @@ export function updateProjectIdentity(
   }
 
   writeFileSync(filePath, newLines.join('\n'), 'utf-8');
+}
+
+// ═══ Human-Friendly Sprint Complete ══════════════════════════════
+
+export interface SprintCompleteData {
+  sprint: Sprint;
+  results?: TaskResult[];
+}
+
+/**
+ * Format a human-friendly sprint completion summary.
+ * No JSON, no technical jargon — a human reads this and knows exactly what happened.
+ */
+export function formatHumanSprintComplete(data: SprintCompleteData): string {
+  const { sprint, results } = data;
+  const m = sprint.metrics;
+  const lines: string[] = [];
+
+  // ─── Title ─────────────────────────────────────────────────────
+  lines.push(`Sprint ${sprint.number.toString().padStart(3, '0')} Complete!`);
+  lines.push('');
+
+  // ─── Results summary ──────────────────────────────────────────
+  if (m) {
+    const succeeded = m.completedTasks;
+    const needsAttention = m.noGoTasks;
+    const attentionNote = needsAttention > 0
+      ? `, ${needsAttention} need${needsAttention === 1 ? 's' : ''} attention`
+      : '';
+    lines.push(`Results: ${succeeded}/${m.totalTasks} tasks succeeded${attentionNote}`);
+  } else {
+    lines.push(`Results: ${sprint.tasks.length} tasks`);
+  }
+
+  // ─── Time ─────────────────────────────────────────────────────
+  const durationStr = formatDuration(m?.durationMs);
+  if (durationStr) {
+    lines.push(`Time: ${durationStr}`);
+  }
+
+  // ─── Code stats from results ──────────────────────────────────
+  if (results && results.length > 0) {
+    const totalAdded = results.reduce((sum, r) => sum + (r.linesAdded ?? 0), 0);
+    const totalRemoved = results.reduce((sum, r) => sum + (r.linesRemoved ?? 0), 0);
+    if (totalAdded > 0 || totalRemoved > 0) {
+      lines.push(`Code: +${totalAdded} lines added, -${totalRemoved} removed`);
+    }
+  }
+
+  lines.push('');
+
+  // ─── What went well ───────────────────────────────────────────
+  const wentWell = buildWhatWentWell(sprint, results);
+  if (wentWell.length > 0) {
+    lines.push('What went well:');
+    for (const item of wentWell) {
+      lines.push(`  ✓ ${item}`);
+    }
+    lines.push('');
+  }
+
+  // ─── What needs attention ─────────────────────────────────────
+  const needsAttention = buildWhatNeedsAttention(sprint, results);
+  if (needsAttention.length > 0) {
+    lines.push('What needs attention:');
+    for (const item of needsAttention) {
+      lines.push(`  ⚠ ${item}`);
+    }
+    lines.push('');
+  }
+
+  // ─── Self-healing rate ────────────────────────────────────────
+  const healingRate = calculateSelfHealingRate(results);
+  if (healingRate !== null) {
+    lines.push(`Self-healing rate: ${healingRate.percent}% (${healingRate.healed}/${healingRate.attempted} retries succeeded)`);
+    lines.push('');
+  }
+
+  // ─── Next steps ───────────────────────────────────────────────
+  lines.push('Next steps:');
+  lines.push('  → Run `deckent retro` for detailed retrospective');
+  if (m && m.totalOpenDebt > 0) {
+    lines.push('  → Run `deckent status --debt` to see tech debt');
+  }
+  lines.push('  → Ready for next sprint');
+
+  return lines.join('\n');
+}
+
+/** Format milliseconds into a human-friendly duration string. */
+export function formatDuration(ms: number | undefined): string {
+  if (ms === undefined || ms <= 0) return '';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds} seconds total`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return seconds > 0
+      ? `${minutes} minute${minutes !== 1 ? 's' : ''} ${seconds}s total`
+      : `${minutes} minute${minutes !== 1 ? 's' : ''} total`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m total`;
+}
+
+/** Build "What went well" items from sprint data. */
+export function buildWhatWentWell(sprint: Sprint, results?: TaskResult[]): string[] {
+  const items: string[] = [];
+
+  // Count tasks that completed on first try (no retries)
+  const firstTryCount = countFirstTryTasks(results);
+  if (firstTryCount > 0) {
+    items.push(`${firstTryCount} task${firstTryCount !== 1 ? 's' : ''} completed on first try`);
+  }
+
+  // Count self-healed tasks (had retries but still succeeded)
+  const selfHealedCount = countSelfHealedTasks(results);
+  if (selfHealedCount > 0) {
+    items.push(`${selfHealedCount} task${selfHealedCount !== 1 ? 's' : ''} self-healed (fixed their own errors)`);
+  }
+
+  // Check boundary violations
+  if (sprint.metrics && sprint.metrics.boundaryViolations === 0) {
+    items.push('No boundary violations');
+  }
+
+  return items;
+}
+
+/** Build "What needs attention" items from sprint data. */
+export function buildWhatNeedsAttention(sprint: Sprint, results?: TaskResult[]): string[] {
+  const items: string[] = [];
+
+  // Find NO_GO tasks
+  const noGoTasks = sprint.tasks.filter(t => t.status === TaskStatus.NO_GO);
+  for (const task of noGoTasks) {
+    const result = results?.find(r => r.taskId === task.id);
+    const reason = result?.notes ? `: ${truncateNotes(result.notes)}` : '';
+    items.push(`Task ${task.id} (${task.title}) — NO_GO${reason}`);
+  }
+
+  // Find tasks with many retries
+  if (results) {
+    for (const result of results) {
+      const fl = result.feedbackLoop;
+      if (fl && (fl.tscAttempts > 2 || fl.testAttempts > 2) && result.selfAssessment !== 'NO_GO') {
+        const task = sprint.tasks.find(t => t.id === result.taskId);
+        const name = task ? task.title : result.taskId;
+        const totalRetries = (fl.tscAttempts - 1) + (fl.testAttempts - 1);
+        items.push(`Task ${result.taskId} (${name}) had ${totalRetries} retries — may need attention`);
+      }
+    }
+  }
+
+  return items;
+}
+
+/** Truncate notes to a reasonable length for display. */
+function truncateNotes(notes: string): string {
+  const firstLine = notes.split('\n')[0] ?? notes;
+  if (firstLine.length > 60) return firstLine.slice(0, 57) + '...';
+  return firstLine;
+}
+
+export interface SelfHealingRate {
+  percent: number;
+  healed: number;
+  attempted: number;
+}
+
+/** Calculate the self-healing rate from task results with feedbackLoop data. */
+export function calculateSelfHealingRate(results?: TaskResult[]): SelfHealingRate | null {
+  if (!results || results.length === 0) return null;
+
+  let attempted = 0;
+  let healed = 0;
+
+  for (const r of results) {
+    const fl = r.feedbackLoop;
+    if (!fl) continue;
+    const hadRetries = fl.tscAttempts > 1 || fl.testAttempts > 1;
+    if (hadRetries) {
+      attempted++;
+      if (r.selfAssessment === 'DONE' || r.selfAssessment === 'GO_WITH_TECH_DEBT') {
+        healed++;
+      }
+    }
+  }
+
+  if (attempted === 0) return null;
+
+  return {
+    percent: Math.round((healed / attempted) * 100),
+    healed,
+    attempted,
+  };
+}
+
+/** Count tasks that completed without any retries. */
+export function countFirstTryTasks(results?: TaskResult[]): number {
+  if (!results) return 0;
+  return results.filter(r => {
+    if (r.selfAssessment === 'NO_GO') return false;
+    const fl = r.feedbackLoop;
+    if (!fl) return r.selfAssessment === 'DONE' || r.selfAssessment === 'GO_WITH_TECH_DEBT';
+    return fl.tscAttempts <= 1 && fl.testAttempts <= 1;
+  }).length;
+}
+
+/** Count tasks that needed retries but still succeeded. */
+export function countSelfHealedTasks(results?: TaskResult[]): number {
+  if (!results) return 0;
+  return results.filter(r => {
+    if (r.selfAssessment === 'NO_GO') return false;
+    const fl = r.feedbackLoop;
+    if (!fl) return false;
+    return fl.tscAttempts > 1 || fl.testAttempts > 1;
+  }).length;
 }

@@ -4,6 +4,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
 import { readLatestJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { formatStatusResponse, wrapResponse, type StatusData } from '../helpers/format.js';
 
 function buildProgressBar(done: number, total: number, width = 10): string {
   if (total <= 0) return '\u2591'.repeat(width);
@@ -89,10 +90,12 @@ export function registerStatusTool(server: McpServer): void {
       const latestJob = readLatestJobState(root);
 
       if (!existsSync(dashPath)) {
+        const noSprintData = { active: false, message: 'No active sprint.', job: latestJob };
+        const summary = formatStatusResponse(noSprintData);
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({ active: false, message: 'No active sprint.', job: latestJob }),
+            text: JSON.stringify(wrapResponse(noSprintData, summary)),
           }],
         };
       }
@@ -127,14 +130,25 @@ export function registerStatusTool(server: McpServer): void {
           skillAssignments,
         });
 
+        const summary = formatStatusResponse({
+          sprint: sprint as StatusData['sprint'],
+          progress: progress as StatusData['progress'],
+          agents: agents as StatusData['agents'],
+          alerts: alerts as StatusData['alerts'],
+          eta,
+          active: true,
+        });
+
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(enrichedState) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enrichedState, summary)) }],
         };
       } catch {
+        const errData = { active: false, message: 'Cannot parse dashboard file.', job: latestJob };
+        const summary = formatStatusResponse(errData);
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({ active: false, message: 'Cannot parse dashboard file.', job: latestJob }),
+            text: JSON.stringify(wrapResponse(errData, summary)),
           }],
           isError: true,
         };

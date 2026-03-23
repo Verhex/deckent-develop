@@ -104,3 +104,11 @@
 - Agent-Provider Compatibility: NO_GO
 - Cost Estimator: NO_GO
 - Multi-Provider Integration Test: NO_GO
+## Sprint sprint-040 Learnings
+- CLI Output — Human-Friendly Status: GO_WITH_TECH_DEBT
+- MCP Tool Response — Human-Friendly: NO_GO
+- Dashboard — Human-Friendly Web UI: NO_GO
+- CLI Doctor — Human-Friendly Health Check: NO_GO
+- RETRO Format — Human-Friendly Retrospective: NO_GO
+- Error Messages — Human-Friendly: NO_GO
+- Log Output — Human-Friendly Worker Logs: NO_GO

@@ -324,9 +324,6 @@ export function buildWorkerPrompt(
   agentPrompt?: string,
   skillPrompts?: Array<{ name: string; content: string }>,
 ): string {
-  const scopeStr = task.scope.directories.length > 0
-    ? task.scope.directories.join(', ')
-    : 'any';
   const effort = resolveWorkerEffort(task);
 
   // Agent context block: prepended when a specialized agent is assigned
@@ -355,25 +352,28 @@ export function buildWorkerPrompt(
     }
   }
 
-  return `${agentBlock}${skillBlock}You are a Deckent worker agent. Your task:
+  // ─── Scope Rules ───────────────────────────────────────────────────
+  const scopeDirs = task.scope.directories.length > 0
+    ? task.scope.directories.map(d => `  - ${d}`).join('\n')
+    : '  - (no directory restriction)';
+  const scopeFiles = task.scope.filesWrite.length > 0
+    ? task.scope.filesWrite.map(f => `  - ${f}`).join('\n')
+    : '  - (determined by your task scope)';
 
-Task ${task.id}: ${task.title}
-Description: ${task.description}
-Model: ${task.model}
-Scope: ${scopeStr}
+  // ─── Result file JSON template ─────────────────────────────────────
+  const resultTemplate = `{
+  "taskId": "${task.id}",
+  "filesChanged": ["list/of/files/you/created/or/modified"],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Brief summary of what was done"
+}`;
 
-Worker effort: --effort ${effort}
-
-Instructions:
-1. Complete the task described above
-2. Stay within the assigned scope
-3. Write tests for every function you write (*.test.ts)
-4. Place test files in the same directory as the source file, with the same name and .test.ts extension
-5. Run: npx vitest run — then write the test results to the .result file
-6. Coverage goal: minimum 80%
-7. Create a heartbeat file at .tasks/task-${task.id}.hb BEFORE starting work (JSON format):
-
-{
+  // ─── Heartbeat JSON template ───────────────────────────────────────
+  const heartbeatTemplate = `{
   "workerId": "w-${task.id}",
   "taskId": "${task.id}",
   "status": "EXECUTING",
@@ -381,7 +381,36 @@ Instructions:
   "timestamp": "<use new Date().toISOString() — UTC ISO 8601, e.g. 2026-01-01T00:00:00.000Z>",
   "filesChangedCount": 0,
   "sequence": 0
-}
+}`;
+
+  return `${agentBlock}${skillBlock}You are a Deckent worker agent.
+
+## Your Task
+${task.id}: ${task.title} — ${task.description}
+- Model: ${task.model}
+- Effort: ${effort}
+
+## What To Do
+1. Read the task scope carefully — understand what files you may touch
+2. Write the code changes described above
+3. Verify: run \`tsc --noEmit\` — fix any errors (max 3 attempts)
+4. Test: run \`npx vitest run\` — fix any failures (max 3 attempts)
+5. Document: update relevant docs if your changes affect them
+6. Report: write your result file to .tasks/task-${task.id}.result
+
+## Scope Rules
+You may ONLY modify files in these directories:
+${scopeDirs}
+
+You may ONLY write to these files:
+${scopeFiles}
+
+DO NOT touch files outside your scope — the auditor will flag violations.
+
+## Heartbeat
+Create .tasks/task-${task.id}.hb BEFORE starting work:
+
+${heartbeatTemplate}
 
 IMPORTANT: The timestamp field MUST be a valid UTC ISO 8601 string produced by new Date().toISOString(). Never use locale date strings, relative times, or placeholder text.
 
@@ -392,19 +421,18 @@ Update this file periodically as you work:
 - Update filesChangedCount as you modify files
 - Always refresh the timestamp using new Date().toISOString() on each update
 
-8. When finished, create the result file at .tasks/task-${task.id}.result — this file is REQUIRED (JSON format):
+## Result File
+Write to: .tasks/task-${task.id}.result
+Format:
 
-{
-  "taskId": "${task.id}",
-  "filesChanged": ["list/of/files/you/created/or/modified"],
-  "linesAdded": 0,
-  "linesRemoved": 0,
-  "testsPassed": true,
-  "coverage": 0,
-  "selfAssessment": "DONE",
-  "notes": "Brief summary of what was done"
-}
+${resultTemplate}
 
 selfAssessment must be one of: "DONE", "GO_WITH_TECH_DEBT", "NO_GO"
-The result file at .tasks/task-${task.id}.result is REQUIRED — without it your work cannot be evaluated.`;
+The result file is REQUIRED — without it your work cannot be evaluated.
+
+## If Something Goes Wrong
+- tsc fails after 3 attempts → write NO_GO result with error details
+- Tests fail after 3 attempts → write NO_GO result with failing test names
+- Blocked by another task → write NO_GO result explaining the dependency
+- Unsure about scope → err on the side of caution, do NOT touch files outside your scope`;
 }

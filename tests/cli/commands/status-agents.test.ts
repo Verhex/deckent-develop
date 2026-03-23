@@ -15,6 +15,7 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
   formatDashboard: vi.fn().mockReturnValue('Dashboard Output'),
+  formatHumanStatus: vi.fn().mockReturnValue('Human Status Output'),
   formatTable: vi.fn().mockImplementation((headers: string[], rows: string[][]) => {
     return [headers.join(' | '), ...rows.map((r) => r.join(' | '))].join('\n');
   }),
@@ -108,7 +109,8 @@ describe('status command agent/skill display', () => {
       return JSON.stringify(task);
     });
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
-    await runCommand(['status']);
+    // Agent/skill assignments are shown with --verbose in human-friendly mode
+    await runCommand(['status', '--verbose']);
     const printCalls = vi.mocked(print).mock.calls.map((c) => c[0]);
     const hasAgents = printCalls.some((c) => c.includes('Agent Assignments'));
     const hasSkills = printCalls.some((c) => c.includes('Skill Assignments'));
@@ -125,8 +127,8 @@ describe('status command agent/skill display', () => {
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
     vi.mocked(readdirSync).mockReturnValue([] as any);
     await runCommand(['status']);
-    // Should still print dashboard
-    expect(print).toHaveBeenCalledWith('Dashboard Output');
+    // Default mode uses formatHumanStatus, should still print output
+    expect(print).toHaveBeenCalledWith('Human Status Output');
   });
 });
 

@@ -32,8 +32,7 @@ import { ensureDeckentImport } from '../../core/utils.js';
 import { promptText, promptSelect } from '../helpers/prompt.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
-import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
+import { detectAvailableProviders } from '../../core/provider.js';
 import {
   detectIDEEnvironment,
   getMCPGuidance,
@@ -52,6 +51,91 @@ function writeIfNotExists(filePath: string, content: string): void {
   if (!existsSync(filePath)) {
     writeFileSync(filePath, content);
   }
+}
+
+// ─── Human-Friendly Output Helpers ───────────────────────────────────
+
+export interface DetectedSetup {
+  nodeVersion?: string;
+  providers: Array<{ name: string; available: boolean; authMethod?: string; version?: string }>;
+  stack?: { language?: string; framework?: string; testFramework?: string };
+}
+
+export function formatWelcomeBanner(): string {
+  return '\nWelcome to Deckent!\n';
+}
+
+export function formatDetectedSetup(setup: DetectedSetup): string {
+  const lines: string[] = ['I detected your setup:'];
+
+  if (setup.nodeVersion) {
+    lines.push(`  → Node.js ${setup.nodeVersion}`);
+  }
+
+  for (const p of setup.providers) {
+    if (p.available) {
+      const auth = p.authMethod ? ` (${p.authMethod})` : '';
+      const ver = p.version ? ` v${p.version}` : '';
+      lines.push(`  → ${capitalize(p.name)} CLI${ver}${auth}`);
+    } else {
+      lines.push(`  → ${capitalize(p.name)} — Not configured`);
+    }
+  }
+
+  if (setup.stack) {
+    const parts: string[] = [];
+    if (setup.stack.language && setup.stack.language !== 'unknown') parts.push(capitalize(setup.stack.language));
+    if (setup.stack.framework && setup.stack.framework !== 'unknown' && setup.stack.framework !== 'none') parts.push(capitalize(setup.stack.framework));
+    if (parts.length > 0) {
+      lines.push(`  → Project: ${parts.join(' + ')} (detected from package.json)`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+export interface SetupStep {
+  label: string;
+  done: boolean;
+}
+
+export function formatSetupProgress(steps: SetupStep[]): string {
+  const lines: string[] = ['', 'Setting up your AI development team...'];
+  for (const step of steps) {
+    const icon = step.done ? '  ✓' : '  ·';
+    lines.push(`${icon} ${step.label}`);
+  }
+  return lines.join('\n');
+}
+
+export function formatNextSteps(language: string): string {
+  if (language === 'tr') {
+    return [
+      '',
+      'Hazırsınız! Sonraki adımlar:',
+      '  1. Hedeflerinizi yazın:  deckent set-directives "Kullanıcı doğrulama ekle"',
+      '  2. Sprint planlayın:     deckent plan',
+      '  3. Çalışmaya başlayın:   deckent start',
+      '',
+      'Ya da doğrudan ne yapılacağını söyleyin:',
+      '  deckent start "Express API\'ye JWT authentication ekle"',
+    ].join('\n');
+  }
+  return [
+    '',
+    "You're ready! Here's what to do next:",
+    '  1. Write your goals:  deckent set-directives "Add user authentication"',
+    '  2. Plan the sprint:   deckent plan',
+    '  3. Start working:     deckent start',
+    '',
+    'Or just tell me what to build:',
+    '  deckent start "Add JWT authentication to the Express API"',
+  ].join('\n');
+}
+
+function capitalize(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function generateToolsContent(root: string): string {
@@ -98,28 +182,24 @@ export function registerInit(program: Command): void {
         let mode: PlanMode;
         let language: string;
         let projectName: string;
+        let detectedAnalysis: ReturnType<typeof analyzeProject> | undefined;
 
         const dirName = root.split(/[\\/]/).pop() ?? 'my-project';
 
+        // Welcome banner
+        print(formatWelcomeBanner());
+
         if (options.auto && !options.manual) {
           // Auto-detect mode
-          print(getMessage('init.auto_detecting', 'en'));
           const systemProfile = getSystemProfile();
           const subscription = detectSubscription();
-          const analysis = analyzeProject(root);
+          detectedAnalysis = analyzeProject(root);
 
           const recommendation = generateSetupRecommendation(
             systemProfile,
             subscription.detected,
-            analysis,
+            detectedAnalysis,
           );
-
-          print('');
-          print(getMessage('init.recommendation', 'en'));
-          for (const reason of recommendation.reasons) {
-            print(`  • ${reason}`);
-          }
-          print('');
 
           mode = recommendation.mode;
           language = 'en';
@@ -289,8 +369,44 @@ Lint: tsc --noEmit
 
         // ── Provider detection & wizard ──────────────────────────────
         const providers = await detectAvailableProviders();
-        print('');
-        print(formatDetectedProviders(providers));
+
+        // Show detected setup (human-friendly)
+        const nodeVer = process.version;
+        const detectedSetup: DetectedSetup = {
+          nodeVersion: nodeVer,
+          providers: providers.map(p => ({
+            name: p.name,
+            available: p.available,
+            authMethod: (p as any).authMethod,
+            version: (p as any).version,
+          })),
+          stack: detectedAnalysis ? {
+            language: detectedAnalysis.language,
+            framework: detectedAnalysis.framework,
+            testFramework: detectedAnalysis.testFramework,
+          } : undefined,
+        };
+        print(formatDetectedSetup(detectedSetup));
+
+        // Show setup progress
+        const availableProviderNames = providers.filter(p => p.available).map(p => p.name);
+        const setupSteps: SetupStep[] = [
+          { label: 'Created .deckent/ configuration', done: true },
+          { label: 'Created .brain/ memory system', done: true },
+          { label: `Set up ${availableProviderNames[0] ? capitalize(availableProviderNames[0]) : 'Claude'} as brain (Opus), workers (Sonnet)`, done: true },
+        ];
+        if (availableProviderNames.length > 1) {
+          setupSteps.push({ label: `Enabled ${capitalize(availableProviderNames[1]!)} as secondary worker provider`, done: true });
+        }
+        if (detectedAnalysis) {
+          const stackParts: string[] = [];
+          if (detectedAnalysis.language && detectedAnalysis.language !== 'unknown') stackParts.push(capitalize(detectedAnalysis.language));
+          if (detectedAnalysis.framework && detectedAnalysis.framework !== 'unknown' && (detectedAnalysis.framework as string) !== 'none') stackParts.push(capitalize(detectedAnalysis.framework));
+          if (stackParts.length > 0) {
+            setupSteps.push({ label: `Detected project stack: ${stackParts.join(' + ')}`, done: true });
+          }
+        }
+        print(formatSetupProgress(setupSteps));
 
         // Show auth guidance for unavailable providers
         const authGuidance = formatProviderAuthGuidance(providers);
@@ -354,11 +470,8 @@ Lint: tsc --noEmit
           print(line);
         }
 
-        print('\n' + getMessage('init.initialized', language, { name: projectName, mode, language }));
-        print('');
-        print(getMessage('init.next_steps', language));
-        print(getMessage('init.next_step_directives', language));
-        print(getMessage('init.next_step_start', language));
+        // Human-friendly next steps (replaces old getMessage-based output)
+        print(formatNextSteps(language));
       } catch (error) {
         printError(error);
         process.exitCode = 1;

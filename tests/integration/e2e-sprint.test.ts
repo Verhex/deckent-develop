@@ -359,8 +359,8 @@ describe('Full sprint lifecycle with mock tmux', () => {
 
       const retro = readFileSync(retroPath, 'utf-8');
       expect(retro).toContain('Retrospective');
+      expect(retro).toContain('## Summary');
       expect(retro).toContain('## Metrics');
-      expect(retro).toContain('## Results');
     });
 
     it('updates MEMORY.md with sprint learnings', () => {

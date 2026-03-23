@@ -229,9 +229,8 @@ describe('formatSprintSummary', () => {
       phase: SprintPhase.COMPLETE, tasks: [], workers: [],
     };
     const output = formatSprintSummary(sprint);
-    expect(output).toContain('Sprint 1');
-    expect(output).toContain('s-001');
-    expect(output).toContain('COMPLETE');
+    expect(output).toContain('Sprint 001 Complete!');
+    expect(output).toContain('Next steps:');
   });
 
   it('shows metrics when available', () => {
@@ -246,9 +245,8 @@ describe('formatSprintSummary', () => {
       },
     };
     const output = formatSprintSummary(sprint);
-    expect(output).toContain('4/5');
-    expect(output).toContain('91.5%');
-    expect(output).toContain('60s');
+    expect(output).toContain('4/5 tasks succeeded');
+    expect(output).toContain('1 minute total');
   });
 });
 

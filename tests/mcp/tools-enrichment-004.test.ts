@@ -71,6 +71,18 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
   readLatestJobState: vi.fn(),
 }));
 
+vi.mock('../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn(),
+}));
+
+vi.mock('../../src/mcp/helpers/format.js', () => ({
+  formatStatusResponse: vi.fn(() => 'mocked summary'),
+  formatPlanResponse: vi.fn(() => 'mocked summary'),
+  formatStartResponse: vi.fn(() => 'mocked summary'),
+  formatErrorResponse: vi.fn(() => 'mocked error summary'),
+  wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import { readContext, checkUsage, adjustSprintSize, planSprint, runSprint } from '../../src/orchestra/brain.js';
 import { readLatestJobState } from '../../src/mcp/tools/job-runner.js';
@@ -233,10 +245,11 @@ describe('MCP Enrichment 004 — plan', () => {
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.waveBreakdown).toBeDefined();
-    expect(typeof parsed.waveBreakdown).toBe('object');
-    expect(parsed.waveBreakdown.wave1).toBe(2);
+    expect(data.waveBreakdown).toBeDefined();
+    expect(typeof data.waveBreakdown).toBe('object');
+    expect(data.waveBreakdown.wave1).toBe(2);
   });
 
   it('12 tasks with maxWorkers=8 → wave1=8, wave2=4', async () => {
@@ -255,9 +268,10 @@ describe('MCP Enrichment 004 — plan', () => {
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.waveBreakdown.wave1).toBe(8);
-    expect(parsed.waveBreakdown.wave2).toBe(4);
+    expect(data.waveBreakdown.wave1).toBe(8);
+    expect(data.waveBreakdown.wave2).toBe(4);
   });
 
   it('enriched response has modelDistribution field', async () => {
@@ -276,10 +290,11 @@ describe('MCP Enrichment 004 — plan', () => {
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.modelDistribution).toBeDefined();
-    expect(parsed.modelDistribution.opus).toBe(2);
-    expect(parsed.modelDistribution.haiku).toBe(1);
+    expect(data.modelDistribution).toBeDefined();
+    expect(data.modelDistribution.opus).toBe(2);
+    expect(data.modelDistribution.haiku).toBe(1);
   });
 
   it('riskAssessment is low for 0-3 tasks', async () => {
@@ -298,8 +313,9 @@ describe('MCP Enrichment 004 — plan', () => {
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.riskAssessment).toBe('low');
+    expect(data.riskAssessment).toBe('low');
   });
 
   it('riskAssessment is high for 9+ tasks', async () => {
@@ -318,8 +334,9 @@ describe('MCP Enrichment 004 — plan', () => {
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.riskAssessment).toBe('high');
+    expect(data.riskAssessment).toBe('high');
   });
 
   it('existing fields (sprintId, tasks, recommendation) preserved', async () => {
@@ -338,12 +355,13 @@ describe('MCP Enrichment 004 — plan', () => {
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.sprintId).toBe('sprint-022');
-    expect(parsed.sprintNumber).toBe(22);
-    expect(parsed.recommendation).toBeDefined();
-    expect(parsed._enriched).toBeDefined();
-    expect(parsed._enriched.summary).toBeTruthy();
+    expect(data.sprintId).toBe('sprint-022');
+    expect(data.sprintNumber).toBe(22);
+    expect(data.recommendation).toBeDefined();
+    expect(data._enriched).toBeDefined();
+    expect(data._enriched.summary).toBeTruthy();
   });
 });
 
@@ -362,10 +380,11 @@ describe('MCP Enrichment 004 — start', () => {
 
     const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.activeWorkers).toBeDefined();
-    expect(typeof parsed.activeWorkers).toBe('number');
-    expect(parsed.activeWorkers).toBe(0);
+    expect(data.activeWorkers).toBeDefined();
+    expect(typeof data.activeWorkers).toBe('number');
+    expect(data.activeWorkers).toBe(0);
   });
 
   it('enriched response has queuedTasks field', async () => {
@@ -378,9 +397,10 @@ describe('MCP Enrichment 004 — start', () => {
 
     const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.queuedTasks).toBeDefined();
-    expect(parsed.queuedTasks).toBe(0);
+    expect(data.queuedTasks).toBeDefined();
+    expect(data.queuedTasks).toBe(0);
   });
 
   it('enriched response has estimatedDuration hint string', async () => {
@@ -393,10 +413,11 @@ describe('MCP Enrichment 004 — start', () => {
 
     const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.estimatedDuration).toBeDefined();
-    expect(typeof parsed.estimatedDuration).toBe('string');
-    expect(parsed.estimatedDuration.length).toBeGreaterThan(0);
+    expect(data.estimatedDuration).toBeDefined();
+    expect(typeof data.estimatedDuration).toBe('string');
+    expect(data.estimatedDuration.length).toBeGreaterThan(0);
   });
 
   it('existing fields (success, jobId, status, message) preserved', async () => {
@@ -409,12 +430,13 @@ describe('MCP Enrichment 004 — start', () => {
 
     const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.success).toBe(true);
-    expect(parsed.jobId).toMatch(/^sprint-\d+$/);
-    expect(parsed.status).toBe('RUNNING');
-    expect(parsed.message).toContain('background');
-    expect(parsed._enriched).toBeDefined();
+    expect(data.success).toBe(true);
+    expect(data.jobId).toMatch(/^sprint-\d+$/);
+    expect(data.status).toBe('RUNNING');
+    expect(data.message).toContain('background');
+    expect(data._enriched).toBeDefined();
   });
 });
 
@@ -435,12 +457,13 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.progressBar).toBeDefined();
-    expect(typeof parsed.progressBar).toBe('string');
-    expect(parsed.progressBar).toContain('█');
-    expect(parsed.progressBar).toContain('░');
-    expect(parsed.progressBar.length).toBe(10);
+    expect(data.progressBar).toBeDefined();
+    expect(typeof data.progressBar).toBe('string');
+    expect(data.progressBar).toContain('█');
+    expect(data.progressBar).toContain('░');
+    expect(data.progressBar.length).toBe(10);
   });
 
   it('progressBar is all-empty when done=0', async () => {
@@ -455,8 +478,9 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.progressBar).toBe('░'.repeat(10));
+    expect(data.progressBar).toBe('░'.repeat(10));
   });
 
   it('progressBar is all-filled when done=total', async () => {
@@ -471,8 +495,9 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.progressBar).toBe('█'.repeat(10));
+    expect(data.progressBar).toBe('█'.repeat(10));
   });
 
   it('enriched response has eta field', async () => {
@@ -487,9 +512,10 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.eta).toBeDefined();
-    expect(typeof parsed.eta).toBe('string');
+    expect(data.eta).toBeDefined();
+    expect(typeof data.eta).toBe('string');
   });
 
   it('workerSummary shows correct active count', async () => {
@@ -509,8 +535,9 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.workerSummary).toBe('3 active');
+    expect(data.workerSummary).toBe('3 active');
   });
 
   it('alertSummary shows correct alert count', async () => {
@@ -530,8 +557,9 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.alertSummary).toBe('2 alerts');
+    expect(data.alertSummary).toBe('2 alerts');
   });
 
   it('singular alert count shows "1 alert"', async () => {
@@ -546,8 +574,9 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.alertSummary).toBe('1 alert');
+    expect(data.alertSummary).toBe('1 alert');
   });
 
   it('existing sprint and job fields preserved after enrichment', async () => {
@@ -562,9 +591,10 @@ describe('MCP Enrichment 004 — status', () => {
 
     const result = await mock.tools.get('deckent_status')!.handler({});
     const parsed = JSON.parse(result.content[0]!.text);
+    const data = parsed.data ?? parsed;
 
-    expect(parsed.sprint.id).toBe('sprint-022');
-    expect(parsed.job.jobId).toBe('sprint-999');
-    expect(parsed._enriched).toBeDefined();
+    expect(data.sprint.id).toBe('sprint-022');
+    expect(data.job.jobId).toBe('sprint-999');
+    expect(data._enriched).toBeDefined();
   });
 });

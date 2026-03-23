@@ -7,9 +7,8 @@
 ## Task 1: Worker Internal Verify Loop — tsc Check
 - Model: opus
 - Effort: high
-- Files: src/agents/worker.ts, tests/agents/worker-feedback.test.ts (new)
-- Scope: src/agents/, tests/agents/
-- CONFLICT NOTE: Only add NEW functions (verifyCompilation) to worker.ts. Do NOT modify buildWorkerPrompt — Task 4 handles prompt changes.
+- Files: src/agents/worker.ts, src/orchestra/task-builder.ts (buildWorkerPrompt), tests/agents/worker-feedback.test.ts (new)
+- Scope: src/agents/, src/orchestra/, tests/agents/
 
 ### Description
 CORE FEATURE. After worker writes code, it must run `tsc --noEmit` BEFORE marking task done. If tsc fails, worker reads the error output and fixes the code. Max 3 retries. Flow:
@@ -38,9 +37,8 @@ Implementation:
 ## Task 2: Worker Internal Verify Loop — Test Check
 - Model: opus
 - Effort: high
-- Files: src/agents/worker.ts, tests/agents/worker-feedback.test.ts
-- Scope: src/agents/, tests/agents/
-- CONFLICT NOTE: Only add NEW functions (verifyTests) to worker.ts. Do NOT modify buildWorkerPrompt — Task 4 handles prompt changes.
+- Files: src/agents/worker.ts, src/orchestra/task-builder.ts, tests/agents/worker-feedback.test.ts
+- Scope: src/agents/, src/orchestra/, tests/agents/
 
 ### Description
 CORE FEATURE. After tsc passes, worker runs tests. If tests fail, worker reads output and fixes. Max 3 retries. Flow:
@@ -79,11 +77,11 @@ Track feedback loop effectiveness. Extend TaskResult with:
 interface TaskResult {
   // ...existing fields
   feedbackLoop?: {
-    tscAttempts: number;
-    testAttempts: number;
-    tscErrorsFixed: number;
-    testFailuresFixed: number;
-    totalRetryTimeMs: number;
+    tscAttempts: number;        // How many tsc runs (1 = first pass)
+    testAttempts: number;       // How many vitest runs
+    tscErrorsFixed: number;     // Total tsc errors auto-fixed
+    testFailuresFixed: number;  // Total test failures auto-fixed
+    totalRetryTimeMs: number;   // Time spent in retry cycles
   };
 }
 ```
@@ -99,15 +97,13 @@ Brain uses this data in RETRO to track "self-healing rate": percentage of tasks 
 
 ---
 
-## Task 4: Worker Prompt Overhaul — Human Instructions + Agent/Skill Injection Fix
+## Task 4: Worker Prompt Overhaul — Human Instructions
 - Model: opus
 - Effort: high
-- Files: src/orchestra/task-builder.ts, src/orchestra/sprint-controller.ts, tests/orchestra/task-builder.test.ts
+- Files: src/orchestra/task-builder.ts, tests/orchestra/task-builder.test.ts
 - Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-CRITICAL FIX INCLUDED: sprint-controller.ts:657 and :821 call buildWorkerPrompt(task) WITHOUT passing agentPrompt or skillPrompts. Fix both callsites to resolve agent PROMPT.md and skill SKILL.md content and pass them: buildWorkerPrompt(task, agentPrompt, skillPrompts). Also fix queue path at line 822 — add '.tasks/' to writeTargets (same fix as line 659).
-
 Current buildWorkerPrompt produces technical instructions. Rewrite to be clear, structured, and foolproof:
 ```
 ## Your Task
@@ -157,21 +153,23 @@ Format: [clear JSON template with comments]
 Current `deckent status` shows raw metrics. Rewrite to tell a story:
 ```
 Sprint 040 — Worker Feedback Loop
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 Progress: 7/12 tasks done (58%)
 Active: 3 workers running
 Time: 12 min elapsed, ~8 min remaining
 
 What's happening:
-  Done Task 1 (tsc verify loop) — Done in 4 min
-  Done Task 2 (test verify loop) — Done in 6 min, 1 retry needed
-  Active Task 5 (CLI output) — Writing code (2 min)
-  Active Task 6 (MCP output) — Running tests, attempt 2/3
-  Active Task 7 (dashboard) — Type checking
-  Waiting Task 8 (retro format) — Waiting for Task 7
-  Waiting Task 9-12 — Queued
+  ✅ Task 1 (tsc verify loop) — Done in 4 min
+  ✅ Task 2 (test verify loop) — Done in 6 min, 1 retry needed
+  🔄 Task 5 (CLI output) — Writing code (2 min)
+  🔄 Task 6 (MCP output) — Running tests, attempt 2/3
+  🔄 Task 7 (dashboard) — Type checking
+  ⏳ Task 8 (retro format) — Waiting for Task 7
+  ⏳ Task 9-12 — Queued
 
 Issues:
-  Warning Task 3 had 2 test retries — may need attention
+  ⚠️ Task 3 had 2 test retries — may need attention
 
 Next: Tasks 8-12 will start as workers free up
 ```
@@ -181,7 +179,7 @@ No JSON, no technical jargon. A human reads this and knows exactly what's happen
 - Progress shows percentage and fraction
 - Active worker count shown
 - Time elapsed and ETA shown
-- Each task has clear status
+- Each task has clear emoji status
 - Issues highlighted with warning
 - Queue shown for pending tasks
 - 15+ tests
@@ -198,6 +196,7 @@ No JSON, no technical jargon. A human reads this and knows exactly what's happen
 When sprint completes, show a clear summary:
 ```
 Sprint 040 Complete!
+━━━━━━━━━━━━━━━━━━━
 
 Results: 11/12 tasks succeeded, 1 needs attention
 Time: 35 minutes total
@@ -205,12 +204,12 @@ Tests: 8,704 → 8,892 (+188 new tests)
 Code: +1,245 lines added, -380 removed
 
 What went well:
-  Done 8 tasks completed on first try
-  Done 3 tasks self-healed (fixed their own errors)
-  Done No boundary violations
+  ✅ 8 tasks completed on first try
+  ✅ 3 tasks self-healed (fixed their own errors)
+  ✅ No boundary violations
 
 What needs attention:
-  Warning Task 9 (dashboard chart) — NO_GO: vitest timeout
+  ⚠️ Task 9 (dashboard chart) — NO_GO: vitest timeout
      → Added to tech debt, will auto-fix next sprint
 
 Self-healing rate: 75% (3/4 retries succeeded)
@@ -294,24 +293,25 @@ No developer needs to interpret raw JSON or metric tables. 10+ tests.
 Current `deckent doctor` shows checkmarks and technical names. Rewrite:
 ```
 Deckent Health Check
+━━━━━━━━━━━━━━━━━━━
 
 Your System:
-  OK Node.js v22.1.0 — Good
-  OK Claude CLI v2.1 — Ready (session auth)
-  OK Codex CLI v1.0 — Ready (API key set)
-  FAIL Gemini — Not configured (set GOOGLE_API_KEY to enable)
-  OK tmux v3.4 — Available
-  OK Git v2.43 — Clean working tree
+  ✅ Node.js v22.1.0 — Good
+  ✅ Claude CLI v2.1 — Ready (session auth)
+  ✅ Codex CLI v1.0 — Ready (API key set)
+  ❌ Gemini — Not configured (set GOOGLE_API_KEY to enable)
+  ✅ tmux v3.4 — Available
+  ✅ Git v2.43 — Clean working tree
 
 Your Project:
-  OK Deckent initialized (.deckent/ exists)
-  OK Memory: 347/600 lines (57% — healthy)
-  OK Last sprint: sprint-039 (completed)
-  Warning 2 open tech debt items (run `deckent status --debt`)
+  ✅ Deckent initialized (.deckent/ exists)
+  ✅ Memory: 347/600 lines (57% — healthy)
+  ✅ Last sprint: sprint-039 (completed)
+  ⚠️ 2 open tech debt items (run `deckent status --debt`)
 
 Recommendation:
   Everything looks good! You can start a new sprint with `deckent start`.
-  Tip: Set GOOGLE_API_KEY to enable Gemini as a worker provider.
+  💡 Tip: Set GOOGLE_API_KEY to enable Gemini as a worker provider.
 ```
 10+ tests.
 
@@ -334,7 +334,8 @@ Recommendation:
 ### Description
 Current init wizard is functional but dry. Make it welcoming:
 ```
-Welcome to Deckent!
+Welcome to Deckent! 🎛️
+━━━━━━━━━━━━━━━━━━━━━━
 
 I detected your setup:
   → Node.js v22.1.0
@@ -343,11 +344,11 @@ I detected your setup:
   → Project: TypeScript + React (detected from package.json)
 
 Setting up your AI development team...
-  OK Created .deckent/ configuration
-  OK Created .brain/ memory system
-  OK Set up Claude as brain (Opus), workers (Sonnet)
-  OK Enabled Codex as secondary worker provider
-  OK Detected project stack: TypeScript + React
+  ✅ Created .deckent/ configuration
+  ✅ Created .brain/ memory system
+  ✅ Set up Claude as brain (Opus), workers (Sonnet)
+  ✅ Enabled Codex as secondary worker provider
+  ✅ Detected project stack: TypeScript + React
 
 You're ready! Here's what to do next:
   1. Write your goals:  deckent set-directives "Add user authentication"
@@ -428,7 +429,7 @@ Completed 11/12 tasks in 35 minutes. Self-healing rate: 75%.
 ### Description
 Current DeckentError shows code + message. Add human context:
 ```
-Error Sprint planning failed [DECKENT_E003]
+❌ Sprint planning failed [DECKENT_E003]
 
 What happened:
   Brain couldn't read your DIRECTIVES.md file.
@@ -440,6 +441,8 @@ How to fix:
   1. Open DIRECTIVES.md in your editor
   2. Add at least one task: ## Task 1: [description]
   3. Run `deckent plan` again
+
+Need help? See: https://docs.deckent.dev/directives
 ```
 Update all 10+ error codes in ErrorRegistry with: `whatHappened`, `why`, `howToFix` fields. Error handler formats these into the readable output above. 15+ tests.
 
@@ -448,6 +451,7 @@ Update all 10+ error codes in ErrorRegistry with: `whatHappened`, `why`, `howToF
 - Error shows why it happened
 - Error shows how to fix
 - All error codes have human-friendly messages
+- Link to docs included
 - 15+ tests
 
 ---
@@ -464,10 +468,10 @@ Worker logs (viewed via `deckent attach` or dashboard) should be human-readable:
 [Worker 040-003] Starting: Planner Provider Decoupling
 [Worker 040-003] Reading task scope: src/orchestra/planner.ts
 [Worker 040-003] Writing changes: 3 files modified
-[Worker 040-003] Verifying: tsc --noEmit... OK Pass
-[Worker 040-003] Testing: vitest run... FAIL 2 failures
+[Worker 040-003] Verifying: tsc --noEmit... ✅ Pass
+[Worker 040-003] Testing: vitest run... ❌ 2 failures
 [Worker 040-003] Fixing: planner.test.ts (assertion mismatch)
-[Worker 040-003] Testing: vitest run (retry 2/3)... OK Pass
+[Worker 040-003] Testing: vitest run (retry 2/3)... ✅ Pass
 [Worker 040-003] Result: DONE (1 retry needed, 4 min total)
 ```
 Not raw Claude output, but structured progress messages. 10+ tests.
@@ -475,7 +479,7 @@ Not raw Claude output, but structured progress messages. 10+ tests.
 ### Tests
 - Log shows task start with title
 - Log shows file operations
-- Log shows verify results
+- Log shows verify results with emoji
 - Log shows retry attempts
 - Log shows final result with timing
 - 10+ tests

@@ -25,6 +25,11 @@ vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
   })),
 }));
 
+vi.mock('../../../src/mcp/helpers/format.js', () => ({
+  formatPlanResponse: vi.fn(() => 'mocked summary'),
+  wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
+}));
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 import { loadConfig } from '../../../src/core/config.js';

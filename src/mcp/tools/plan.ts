@@ -4,6 +4,7 @@ import { loadConfig } from '../../core/config.js';
 import { readContext, checkUsage, adjustSprintSize, planSprint } from '../../orchestra/brain.js';
 import type { BrainPlanningMode } from '../../core/types.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
 
 function computeWaveBreakdown(taskCount: number, maxWorkers: number): Record<string, number> {
   const waves: Record<string, number> = {};
@@ -81,10 +82,13 @@ export function registerPlanTool(server: McpServer): void {
         riskAssessment,
       };
 
+      const enrichedPlan = enrichResponse('plan', baseResponse);
+      const summary = formatPlanResponse(baseResponse);
+
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify(enrichResponse('plan', baseResponse)),
+          text: JSON.stringify(wrapResponse(enrichedPlan, summary)),
         }],
       };
     },

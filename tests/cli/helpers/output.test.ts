@@ -340,33 +340,21 @@ describe('formatDoctorResult', () => {
 // ─── formatSprintSummary ─────────────────────────────────────────────
 
 describe('formatSprintSummary', () => {
-  it('includes sprint number and id', () => {
+  it('includes sprint number in title', () => {
     const result = formatSprintSummary(makeSprint());
-    expect(result).toContain('Sprint 1');
-    expect(result).toContain('sprint-001');
+    expect(result).toContain('Sprint 001 Complete!');
   });
 
-  it('includes sprint status', () => {
-    const result = formatSprintSummary(makeSprint());
-    expect(result).toContain('COMPLETE');
-  });
-
-  it('shows task count', () => {
-    const sprint = makeSprint({ tasks: [{} as never, {} as never, {} as never] });
-    const result = formatSprintSummary(sprint);
-    expect(result).toContain('3 total');
-  });
-
-  it('shows metrics when present', () => {
+  it('shows results summary with metrics', () => {
     const sprint = makeSprint({
       metrics: {
         totalTasks: 5,
         completedTasks: 4,
         techDebtTasks: 1,
-        noGoTasks: 0,
+        noGoTasks: 1,
         durationMs: 120000,
         coveragePercent: 87.5,
-        noGoRate: 0,
+        noGoRate: 20,
         newDebtCount: 1,
         resolvedDebtCount: 0,
         totalOpenDebt: 2,
@@ -376,28 +364,18 @@ describe('formatSprintSummary', () => {
       },
     });
     const result = formatSprintSummary(sprint);
-    expect(result).toContain('4/5');
-    expect(result).toContain('87.5%');
-    expect(result).toContain('120s');
-    expect(result).toContain('Tech Debt: 1');
-    expect(result).toContain('NO-GO: 0');
+    expect(result).toContain('4/5 tasks succeeded');
+    expect(result).toContain('1 needs attention');
   });
 
-  it('omits metrics section when metrics is undefined', () => {
-    const sprint = makeSprint({ metrics: undefined });
-    const result = formatSprintSummary(sprint);
-    expect(result).not.toContain('Completed:');
-    expect(result).not.toContain('Coverage:');
-  });
-
-  it('rounds duration to seconds', () => {
+  it('shows time duration', () => {
     const sprint = makeSprint({
       metrics: {
         totalTasks: 1,
         completedTasks: 1,
         techDebtTasks: 0,
         noGoTasks: 0,
-        durationMs: 65500,
+        durationMs: 120000,
         coveragePercent: 90,
         noGoRate: 0,
         newDebtCount: 0,
@@ -409,7 +387,42 @@ describe('formatSprintSummary', () => {
       },
     });
     const result = formatSprintSummary(sprint);
-    expect(result).toContain('66s');
+    expect(result).toContain('2 minutes total');
+  });
+
+  it('includes next steps', () => {
+    const result = formatSprintSummary(makeSprint());
+    expect(result).toContain('Next steps:');
+    expect(result).toContain('deckent retro');
+  });
+
+  it('shows what went well section when no boundary violations', () => {
+    const sprint = makeSprint({
+      metrics: {
+        totalTasks: 1,
+        completedTasks: 1,
+        techDebtTasks: 0,
+        noGoTasks: 0,
+        durationMs: 60000,
+        coveragePercent: 90,
+        noGoRate: 0,
+        newDebtCount: 0,
+        resolvedDebtCount: 0,
+        totalOpenDebt: 0,
+        boundaryViolations: 0,
+        crossAssignments: 0,
+        contextLinesUsed: 0,
+      },
+    });
+    const result = formatSprintSummary(sprint);
+    expect(result).toContain('What went well:');
+    expect(result).toContain('No boundary violations');
+  });
+
+  it('shows task count when no metrics', () => {
+    const sprint = makeSprint({ tasks: [{} as never, {} as never], metrics: undefined });
+    const result = formatSprintSummary(sprint);
+    expect(result).toContain('2 tasks');
   });
 });
 

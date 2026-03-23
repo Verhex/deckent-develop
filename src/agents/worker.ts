@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, openSync, closeSync, constants as fsConstants } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { join, normalize, sep } from 'node:path';
-import { TaskStatus } from '../core/types.js';
+import { TaskStatus, AgentStatus } from '../core/types.js';
 import type {
   Task,
   TaskPlan,
@@ -8,7 +9,8 @@ import type {
   Heartbeat,
   LockInfo,
   TaskScope,
-  AgentStatus,
+  FeedbackLoop,
+  VerifyTestsResult,
 } from '../core/types.js';
 import { TASKS_DIR, LOCKS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
@@ -86,6 +88,7 @@ export function calculateProgress(heartbeat: { status: AgentStatus | string; fil
   switch (status) {
     case 'EXECUTING': return 10;
     case 'CODING': return 30 + Math.min(filesChanged, 5) * 6;
+    case 'VERIFYING': return 65;
     case 'TESTING': return 70;
     case 'DOCUMENTING': return 85;
     case 'DONE': return 100;
@@ -341,6 +344,235 @@ export function readWorkerLog(projectRoot: string, taskId: string): string | nul
   return redactSensitive(raw);
 }
 
+// ─── Test Verify Loop ───────────────────────────────────────────────
+
+/** Max retry attempts for the test verify loop */
+export const MAX_TEST_RETRIES = 3;
+
+/**
+ * Parse vitest output to extract failing test names and summary.
+ * Handles both verbose and default vitest output formats.
+ */
+export function parseVitestOutput(output: string): { failedTests: string[]; summary: string } {
+  const failedTests: string[] = [];
+
+  // Match vitest FAIL lines: "FAIL tests/foo.test.ts > suite > test name"
+  // or "× test name" patterns
+  const failLineRegex = /^\s*(?:FAIL|×|✕)\s+(.+)$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = failLineRegex.exec(output)) !== null) {
+    const testName = (match[1] ?? '').trim();
+    if (testName && !failedTests.includes(testName)) {
+      failedTests.push(testName);
+    }
+  }
+
+  // Also match "FAIL" file-level markers: "FAIL  tests/agents/worker.test.ts"
+  const failFileRegex = /^\s*FAIL\s+([\w/.\\-]+\.test\.\w+)/gm;
+  while ((match = failFileRegex.exec(output)) !== null) {
+    const fileName = (match[1] ?? '').trim();
+    if (fileName && !failedTests.includes(fileName)) {
+      failedTests.push(fileName);
+    }
+  }
+
+  // Extract summary line: "Tests  3 failed | 12 passed (15)"
+  const summaryMatch = output.match(/Tests?\s+.*(?:failed|passed).*$/m);
+  const summary = summaryMatch ? summaryMatch[0].trim() : '';
+
+  return { failedTests, summary };
+}
+
+/**
+ * Run vitest with optional scope filtering and return structured results.
+ * Executes `npx vitest run` in the given projectRoot, optionally scoped to
+ * specific directories from the task scope.
+ */
+export function verifyTests(
+  projectRoot: string,
+  scope?: string[],
+): VerifyTestsResult {
+  const scopeArgs = scope && scope.length > 0 ? ` ${scope.join(' ')}` : '';
+  const command = `npx vitest run --reporter=verbose${scopeArgs}`;
+
+  try {
+    const stdout = execSync(command, {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      timeout: 120_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    return {
+      success: true,
+      failedTests: [],
+      output: stdout,
+    };
+  } catch (err: unknown) {
+    // execSync throws on non-zero exit code — vitest returns 1 on test failures
+    const output =
+      err instanceof Error && 'stdout' in err
+        ? String((err as { stdout: unknown }).stdout)
+        : err instanceof Error && 'stderr' in err
+          ? String((err as { stderr: unknown }).stderr)
+          : err instanceof Error
+            ? err.message
+            : String(err);
+
+    const { failedTests } = parseVitestOutput(output);
+
+    return {
+      success: false,
+      failedTests,
+      output,
+    };
+  }
+}
+
+/**
+ * Run the full test verify loop: execute vitest, retry on failure up to MAX_TEST_RETRIES.
+ * Returns the final result and the number of attempts made.
+ * The `runFix` callback is invoked between retries to allow the caller to fix failing tests.
+ */
+export function runTestVerifyLoop(
+  projectRoot: string,
+  scope?: string[],
+  runFix?: (failedTests: string[], output: string) => void,
+): { result: VerifyTestsResult; attempts: number; failuresFixed: number } {
+  let attempts = 0;
+  let failuresFixed = 0;
+  let lastResult: VerifyTestsResult = { success: false, failedTests: [], output: '' };
+
+  for (let i = 0; i < MAX_TEST_RETRIES; i++) {
+    attempts++;
+    lastResult = verifyTests(projectRoot, scope);
+
+    if (lastResult.success) {
+      return { result: lastResult, attempts, failuresFixed };
+    }
+
+    // If not the last attempt, invoke fix callback
+    if (i < MAX_TEST_RETRIES - 1 && runFix) {
+      const prevFailCount = lastResult.failedTests.length;
+      runFix(lastResult.failedTests, lastResult.output);
+      failuresFixed += prevFailCount;
+    }
+  }
+
+  return { result: lastResult, attempts, failuresFixed };
+}
+
+// ─── Compilation Verify Loop ─────────────────────────────────────────
+
+/** Max retry attempts for the compilation verify loop */
+export const MAX_COMPILATION_RETRIES = 3;
+
+export interface CompilationResult {
+  success: boolean;
+  errors: string[];
+}
+
+export interface CompilationLoopResult {
+  success: boolean;
+  attempts: number;
+  errors: string[];
+}
+
+/**
+ * Parse tsc error output into individual error strings.
+ * Extracts lines matching TypeScript error patterns (e.g., file.ts(line,col): error TS1234).
+ * Falls back to first 20 non-empty lines if no TS error patterns found.
+ */
+export function parseCompilationErrors(err: unknown): string[] {
+  let output = '';
+  if (err && typeof err === 'object') {
+    const execErr = err as { stdout?: string; stderr?: string; message?: string };
+    output = execErr.stdout || execErr.stderr || execErr.message || '';
+  } else if (typeof err === 'string') {
+    output = err;
+  }
+  if (!output) return ['Unknown compilation error'];
+
+  const lines = output.split('\n').filter((line) => line.trim().length > 0);
+  if (lines.length === 0) return ['Unknown compilation error'];
+
+  // Filter to lines that look like TS errors (file.ts(line,col): error TS...)
+  const errorLines = lines.filter((line) =>
+    /\(\d+,\d+\):\s*error\s+TS\d+/.test(line) || /error\s+TS\d+/.test(line),
+  );
+
+  return errorLines.length > 0 ? errorLines : lines.slice(0, 20);
+}
+
+/**
+ * Run `tsc --noEmit` in the given project root and return success/errors.
+ * This is a single-shot check — use `runCompilationLoop` for retry logic.
+ */
+export function verifyCompilation(projectRoot: string): CompilationResult {
+  try {
+    execSync('npx tsc --noEmit', {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 120_000,
+    });
+    return { success: true, errors: [] };
+  } catch (err: unknown) {
+    const errors = parseCompilationErrors(err);
+    return { success: false, errors };
+  }
+}
+
+/**
+ * Run compilation verification with retry loop.
+ * Updates heartbeat on each attempt with VERIFYING status.
+ * Returns the loop result including total attempts and remaining errors.
+ *
+ * @param projectRoot - Project root directory
+ * @param workerId - Worker ID for heartbeat updates
+ * @param taskId - Task ID for heartbeat updates
+ * @param maxRetries - Maximum number of retry attempts (default: MAX_COMPILATION_RETRIES)
+ * @param onAttempt - Optional callback invoked after each failed attempt (for logging/fixing)
+ */
+export function runCompilationLoop(
+  projectRoot: string,
+  workerId: string,
+  taskId: string,
+  maxRetries: number = MAX_COMPILATION_RETRIES,
+  onAttempt?: (attempt: number, maxRetries: number, errors: string[]) => void,
+): CompilationLoopResult {
+  let lastErrors: string[] = [];
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Update heartbeat to VERIFYING
+    const hb = createHeartbeat(
+      workerId,
+      taskId,
+      AgentStatus.VERIFYING,
+      `Type checking (attempt ${attempt}/${maxRetries})`,
+      undefined,
+      undefined,
+      undefined,
+    );
+    writeHeartbeat(projectRoot, hb);
+
+    const result = verifyCompilation(projectRoot);
+
+    if (result.success) {
+      return { success: true, attempts: attempt, errors: [] };
+    }
+
+    lastErrors = result.errors;
+
+    // Notify caller of failed attempt (for logging/fixing)
+    if (onAttempt) {
+      onAttempt(attempt, maxRetries, result.errors);
+    }
+  }
+
+  return { success: false, attempts: maxRetries, errors: lastErrors };
+}
+
 export function isWithinScope(filePath: string, scope: TaskScope): boolean {
   const normalizedFile = normalize(filePath).split(sep).join('/');
 
@@ -360,4 +592,114 @@ export function isWithinScope(filePath: string, scope: TaskScope): boolean {
   }
 
   return false;
+}
+
+// ─── Feedback Loop Helpers ──────────────────────────────────────────
+
+/** Create a fresh FeedbackLoop tracker with zero counts */
+export function createFeedbackLoop(): FeedbackLoop {
+  return {
+    tscAttempts: 0,
+    testAttempts: 0,
+    tscErrorsFixed: 0,
+    testFailuresFixed: 0,
+    totalRetryTimeMs: 0,
+  };
+}
+
+/**
+ * Record a tsc verification attempt.
+ * @param loop - The feedback loop tracker to update (mutated in place)
+ * @param success - Whether tsc passed on this attempt
+ * @param durationMs - Time spent on this attempt
+ */
+export function recordTscAttempt(loop: FeedbackLoop, success: boolean, durationMs: number): void {
+  loop.tscAttempts += 1;
+  loop.totalRetryTimeMs += durationMs;
+  if (success && loop.tscAttempts > 1) {
+    loop.tscErrorsFixed += 1;
+  }
+}
+
+/**
+ * Record a test verification attempt.
+ * @param loop - The feedback loop tracker to update (mutated in place)
+ * @param success - Whether tests passed on this attempt
+ * @param durationMs - Time spent on this attempt
+ */
+export function recordTestAttempt(loop: FeedbackLoop, success: boolean, durationMs: number): void {
+  loop.testAttempts += 1;
+  loop.totalRetryTimeMs += durationMs;
+  if (success && loop.testAttempts > 1) {
+    loop.testFailuresFixed += 1;
+  }
+}
+
+/**
+ * Calculate self-healing rate from an array of task results.
+ * Self-healing rate = percentage of tasks that needed retries AND succeeded.
+ * @returns Rate between 0 and 100 (percentage), or 0 if no tasks needed retries
+ */
+export function calculateSelfHealingRate(results: TaskResult[]): number {
+  const withFeedback = results.filter(r => r.feedbackLoop != null);
+  if (withFeedback.length === 0) return 0;
+
+  const neededRetries = withFeedback.filter(r => {
+    const fl = r.feedbackLoop;
+    if (!fl) return false;
+    return fl.tscAttempts > 1 || fl.testAttempts > 1;
+  });
+
+  if (neededRetries.length === 0) return 0;
+
+  const selfHealed = neededRetries.filter(r => r.selfAssessment !== 'NO_GO');
+  return Math.round((selfHealed.length / neededRetries.length) * 100);
+}
+
+/**
+ * Aggregate feedback loop stats across multiple results.
+ */
+export function aggregateFeedbackLoops(results: TaskResult[]): {
+  totalTscAttempts: number;
+  totalTestAttempts: number;
+  totalTscErrorsFixed: number;
+  totalTestFailuresFixed: number;
+  totalRetryTimeMs: number;
+  tasksWithRetries: number;
+  tasksFirstPassSuccess: number;
+} {
+  let totalTscAttempts = 0;
+  let totalTestAttempts = 0;
+  let totalTscErrorsFixed = 0;
+  let totalTestFailuresFixed = 0;
+  let totalRetryTimeMs = 0;
+  let tasksWithRetries = 0;
+  let tasksFirstPassSuccess = 0;
+
+  for (const r of results) {
+    const fl = r.feedbackLoop;
+    if (!fl) continue;
+
+    totalTscAttempts += fl.tscAttempts;
+    totalTestAttempts += fl.testAttempts;
+    totalTscErrorsFixed += fl.tscErrorsFixed;
+    totalTestFailuresFixed += fl.testFailuresFixed;
+    totalRetryTimeMs += fl.totalRetryTimeMs;
+
+    if (fl.tscAttempts > 1 || fl.testAttempts > 1) {
+      tasksWithRetries += 1;
+    } else {
+      tasksFirstPassSuccess += 1;
+    }
+  }
+
+  return {
+    totalTscAttempts,
+    totalTestAttempts,
+    totalTscErrorsFixed,
+    totalTestFailuresFixed,
+    totalRetryTimeMs,
+    tasksWithRetries,
+    tasksFirstPassSuccess,
+  };
 }

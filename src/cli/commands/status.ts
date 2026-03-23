@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
-import { print, printError, formatDashboard, formatTable } from '../helpers/output.js';
+import { print, printError, formatDashboard, formatTable, formatHumanStatus } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 
@@ -11,6 +11,40 @@ interface StatusOpts {
   watch?: boolean;
   json?: boolean;
   verbose?: boolean;
+  raw?: boolean;
+}
+
+interface SprintMeta {
+  title?: string;
+  startedAt?: string;
+}
+
+function readSprintMeta(root: string, _sprintId: string): SprintMeta {
+  try {
+    const directivesPath = join(root, 'DIRECTIVES.md');
+    if (existsSync(directivesPath)) {
+      const content = readFileSync(directivesPath, 'utf-8');
+      // Extract title from first heading: # DIRECTIVES — Sprint 040 (Title)
+      const titleMatch = content.match(/^#\s+DIRECTIVES\s*—\s*Sprint\s+\d+\s*\(([^)]+)\)/m);
+      const title = titleMatch?.[1];
+      return { title };
+    }
+  } catch {
+    // ignore
+  }
+
+  // Try reading sprint config for startedAt
+  try {
+    const configPath = join(root, '.deckent', 'config.json');
+    if (existsSync(configPath)) {
+      const cfg = JSON.parse(readFileSync(configPath, 'utf-8')) as { sprint_started_at?: string };
+      return { startedAt: cfg.sprint_started_at };
+    }
+  } catch {
+    // ignore
+  }
+
+  return {};
 }
 
 function readDashboard(dashPath: string): DashboardState | null {
@@ -125,6 +159,7 @@ export function registerStatus(program: Command): void {
     .description('Show the current sprint dashboard')
     .option('--watch', 'Auto-refresh every 2 seconds')
     .option('--json', 'Output raw JSON instead of formatted dashboard')
+    .option('--raw', 'Show legacy raw dashboard (box format)')
     .option('--verbose', 'Show detailed agent and skill assignment info')
     .action((opts: StatusOpts) => {
       const root = resolveProjectRoot();
@@ -143,8 +178,17 @@ export function registerStatus(program: Command): void {
             process.stdout.write('\x1Bc'); // clear screen
             if (opts.json) {
               print(JSON.stringify(state, null, 2));
-            } else {
+            } else if (opts.raw) {
               print(formatDashboard(state));
+            } else {
+              const tasks = loadTaskFiles(root);
+              const meta = readSprintMeta(root, state.sprint.id);
+              print(formatHumanStatus({
+                dashboard: state,
+                tasks,
+                sprintTitle: meta.title,
+                sprintStartedAt: meta.startedAt,
+              }));
             }
           }
         };
@@ -157,19 +201,32 @@ export function registerStatus(program: Command): void {
       }
 
       try {
-        const raw = readFileSync(dashPath, 'utf-8');
-        const state = JSON.parse(raw) as DashboardState;
+        const rawData = readFileSync(dashPath, 'utf-8');
+        const state = JSON.parse(rawData) as DashboardState;
         if (opts.json) {
           print(JSON.stringify(state, null, 2));
-        } else {
+        } else if (opts.raw) {
           print(formatDashboard(state));
-        }
-
-        // Show agent and skill assignments
-        const tasks = loadTaskFiles(root);
-        if (tasks.length > 0) {
-          print(formatAgentAssignments(tasks, !!opts.verbose));
-          print(formatSkillAssignments(tasks, !!opts.verbose));
+          // Show agent and skill assignments in raw mode
+          const tasks = loadTaskFiles(root);
+          if (tasks.length > 0) {
+            print(formatAgentAssignments(tasks, !!opts.verbose));
+            print(formatSkillAssignments(tasks, !!opts.verbose));
+          }
+        } else {
+          // Human-friendly output (default)
+          const tasks = loadTaskFiles(root);
+          const meta = readSprintMeta(root, state.sprint.id);
+          print(formatHumanStatus({
+            dashboard: state,
+            tasks,
+            sprintTitle: meta.title,
+            sprintStartedAt: meta.startedAt,
+          }));
+          if (opts.verbose) {
+            print(formatAgentAssignments(tasks, true));
+            print(formatSkillAssignments(tasks, true));
+          }
         }
       } catch (error) {
         printError(new Error(getMessage('status.dashboard_read_failed', lang)));

@@ -175,6 +175,23 @@ export interface Task {
   updatedAt?: string;
 }
 
+// ─── Feedback Loop Metrics ───────────────────────────────────────────
+/** Tracks worker self-healing attempts (tsc + test verify loops) */
+export interface FeedbackLoop {
+  tscAttempts: number;
+  testAttempts: number;
+  tscErrorsFixed: number;
+  testFailuresFixed: number;
+  totalRetryTimeMs: number;
+}
+
+/** Result from running vitest verify loop */
+export interface VerifyTestsResult {
+  success: boolean;
+  failedTests: string[];
+  output: string;
+}
+
 // ─── TaskResult ──────────────────────────────────────────────────────
 export interface TaskResult {
   taskId: string;
@@ -192,6 +209,8 @@ export interface TaskResult {
   skillIds?: string[];
   completedAt?: string;
   durationMs?: number;
+  /** Worker feedback loop metrics (tsc/test verify retries) */
+  feedbackLoop?: FeedbackLoop;
 }
 
 // ─── TaskPlan ────────────────────────────────────────────────────────

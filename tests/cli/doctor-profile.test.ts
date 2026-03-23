@@ -205,14 +205,14 @@ describe('doctor --profile flag', () => {
   it('with --profile: normal doctor checks still appear', async () => {
     await runCommand(['doctor', '--profile']);
     const out = stdout();
-    // Doctor output contains check icons
-    expect(out).toContain('[PASS]');
+    // Human-friendly format contains section headers
+    expect(out).toContain('Deckent Health Check');
   });
 
   it('without --profile: normal doctor output is unchanged', async () => {
     await runCommand(['doctor']);
     const out = stdout();
-    expect(out).toContain('Result:');
+    expect(out).toContain('Deckent Health Check');
     expect(out).not.toContain('╔');
   });
 });
