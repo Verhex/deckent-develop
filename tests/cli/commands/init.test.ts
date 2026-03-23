@@ -47,6 +47,33 @@ vi.mock('../../../src/core/utils.js', () => ({
   ensureDeckentImport: vi.fn(),
 }));
 
+vi.mock('../../../src/core/provider.js', () => ({
+  detectAvailableProviders: vi.fn().mockResolvedValue([
+    { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+  ]),
+  formatDetectedProviders: vi.fn().mockReturnValue('Claude: available (session)'),
+}));
+
+vi.mock('../../../src/cli/helpers/wizard.js', () => ({
+  detectIDEEnvironment: vi.fn().mockReturnValue('terminal'),
+  getMCPGuidance: vi.fn().mockReturnValue(['Terminal mode — MCP tools available via: deckent mcp']),
+  buildProviderWizardSteps: vi.fn().mockReturnValue({
+    autoConfig: {
+      brain_provider: 'claude',
+      worker_provider: 'claude',
+      selectedProviders: ['claude'],
+    },
+    steps: [],
+  }),
+  resolveProviderWizardResult: vi.fn().mockReturnValue({
+    brain_provider: 'claude',
+    worker_provider: 'claude',
+    selectedProviders: ['claude'],
+  }),
+  formatProviderAuthGuidance: vi.fn().mockReturnValue([]),
+  runWizard: vi.fn().mockResolvedValue({ brain_provider: 'claude', worker_provider: 'claude' }),
+}));
+
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { promptText, promptSelect } from '../../../src/cli/helpers/prompt.js';
@@ -56,6 +83,15 @@ import { detectSubscription } from '../../../src/core/subscription.js';
 import { analyzeProject } from '../../../src/core/analyzer.js';
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { registerInit } from '../../../src/cli/commands/init.js';
+import { detectAvailableProviders, formatDetectedProviders } from '../../../src/core/provider.js';
+import {
+  detectIDEEnvironment,
+  getMCPGuidance,
+  buildProviderWizardSteps,
+  resolveProviderWizardResult,
+  formatProviderAuthGuidance,
+  runWizard,
+} from '../../../src/cli/helpers/wizard.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -69,6 +105,10 @@ async function runCommand(args: string[]): Promise<void> {
     // Commander exitOverride
   }
 }
+
+// Ensure imported mocked functions are referenced to prevent lint removal
+const _providerMocks = { detectAvailableProviders, formatDetectedProviders, detectIDEEnvironment, getMCPGuidance, buildProviderWizardSteps, resolveProviderWizardResult, formatProviderAuthGuidance, runWizard };
+void _providerMocks;
 
 // ─── Tests ───────────────────────────────────────────────────────────
 
@@ -650,6 +690,191 @@ describe('init command (isolated)', () => {
       const calls = vi.mocked(print).mock.calls.map(c => c[0]);
       // Turkish: 'Sonraki adımlar:'
       expect(calls.some(c => String(c).includes('Sonraki adımlar'))).toBe(true);
+    });
+  });
+
+  // ─── Provider detection & wizard ────────────────────────────────────
+
+  describe('provider detection & wizard', () => {
+    it('calls detectAvailableProviders during init', async () => {
+      await runCommand(['init', '--auto']);
+      expect(detectAvailableProviders).toHaveBeenCalled();
+    });
+
+    it('calls formatDetectedProviders with detected providers', async () => {
+      await runCommand(['init', '--auto']);
+      expect(formatDetectedProviders).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: 'claude' })]),
+      );
+    });
+
+    it('calls buildProviderWizardSteps', async () => {
+      await runCommand(['init', '--auto']);
+      expect(buildProviderWizardSteps).toHaveBeenCalled();
+    });
+
+    it('writes provider config to config.json', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasProviderConfig = configCalls.some(c => {
+        const content = JSON.parse(String(c[1]));
+        return content.brain_provider !== undefined;
+      });
+      expect(hasProviderConfig).toBe(true);
+    });
+
+    it('auto-configures single provider without wizard in --auto mode', async () => {
+      await runCommand(['init', '--auto']);
+      expect(runWizard).not.toHaveBeenCalled();
+    });
+
+    it('runs wizard when autoConfig is null (multiple providers, interactive)', async () => {
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: null,
+        steps: [
+          { id: 'brain_provider', prompt: 'Brain?', type: 'select', choices: [{ label: 'claude', value: 'claude' }], default: 'claude' },
+          { id: 'worker_provider', prompt: 'Worker?', type: 'select', choices: [{ label: 'claude', value: 'claude' }], default: 'claude' },
+        ],
+      });
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+      await runCommand(['init']);
+      expect(runWizard).toHaveBeenCalled();
+    });
+
+    it('resolves wizard result with resolveProviderWizardResult', async () => {
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: null,
+        steps: [
+          { id: 'brain_provider', prompt: 'Brain?', type: 'select', choices: [{ label: 'claude', value: 'claude' }], default: 'claude' },
+        ],
+      });
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+      await runCommand(['init']);
+      expect(resolveProviderWizardResult).toHaveBeenCalled();
+    });
+
+    it('calls formatProviderAuthGuidance', async () => {
+      await runCommand(['init', '--auto']);
+      expect(formatProviderAuthGuidance).toHaveBeenCalled();
+    });
+
+    it('prints auth guidance when providers are unavailable', async () => {
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([
+        '  ⚠ codex: Set OPENAI_API_KEY environment variable to enable',
+      ]);
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('OPENAI_API_KEY'))).toBe(true);
+    });
+
+    it('skips auth guidance print when all providers available', async () => {
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      await runCommand(['init', '--auto']);
+      expect(formatProviderAuthGuidance).toHaveBeenCalled();
+    });
+
+    it('writes fallback_provider to config when present', async () => {
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: {
+          brain_provider: 'claude' as any,
+          worker_provider: 'codex' as any,
+          fallback_provider: 'gemini' as any,
+          selectedProviders: ['claude', 'codex', 'gemini'] as any[],
+        },
+        steps: [],
+      });
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('config.json'));
+      vi.mocked(readFileSync).mockImplementation((p) => {
+        if (String(p).includes('config.json')) {
+          return JSON.stringify({ mode: 'max_plan', language: 'en', projectName: 'test' });
+        }
+        return '';
+      });
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasFallback = configCalls.some(c => {
+        const content = JSON.parse(String(c[1]));
+        return content.fallback_provider === 'gemini';
+      });
+      expect(hasFallback).toBe(true);
+    });
+
+    it('merges provider config into existing config.json', async () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('config.json'));
+      vi.mocked(readFileSync).mockImplementation((p) => {
+        if (String(p).includes('config.json')) {
+          return JSON.stringify({ mode: 'max_plan', language: 'en', projectName: 'test', customField: 'keep' });
+        }
+        return '';
+      });
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const lastConfig = JSON.parse(String(configCalls[configCalls.length - 1]![1]));
+      expect(lastConfig.brain_provider).toBe('claude');
+      expect(lastConfig.customField).toBe('keep');
+    });
+  });
+
+  // ─── IDE environment flags ─────────────────────────────────────────
+
+  describe('IDE environment flags', () => {
+    it('registers --cursor flag', () => {
+      const program = new Command();
+      registerInit(program);
+      const cmd = program.commands.find(c => c.name() === 'init');
+      expect(cmd!.options.some(o => o.long === '--cursor')).toBe(true);
+    });
+
+    it('registers --claude-code flag', () => {
+      const program = new Command();
+      registerInit(program);
+      const cmd = program.commands.find(c => c.name() === 'init');
+      expect(cmd!.options.some(o => o.long === '--claude-code')).toBe(true);
+    });
+
+    it('calls getMCPGuidance during init', async () => {
+      await runCommand(['init', '--auto']);
+      expect(getMCPGuidance).toHaveBeenCalled();
+    });
+
+    it('uses cursor IDE when --cursor flag is passed', async () => {
+      await runCommand(['init', '--auto', '--cursor']);
+      expect(getMCPGuidance).toHaveBeenCalledWith('cursor');
+    });
+
+    it('uses claude-code IDE when --claude-code flag is passed', async () => {
+      await runCommand(['init', '--auto', '--claude-code']);
+      expect(getMCPGuidance).toHaveBeenCalledWith('claude-code');
+    });
+
+    it('calls detectIDEEnvironment when no IDE flag is passed', async () => {
+      await runCommand(['init', '--auto']);
+      expect(detectIDEEnvironment).toHaveBeenCalled();
+    });
+
+    it('does NOT call detectIDEEnvironment when --cursor is passed', async () => {
+      await runCommand(['init', '--auto', '--cursor']);
+      expect(detectIDEEnvironment).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call detectIDEEnvironment when --claude-code is passed', async () => {
+      await runCommand(['init', '--auto', '--claude-code']);
+      expect(detectIDEEnvironment).not.toHaveBeenCalled();
+    });
+
+    it('prints MCP guidance lines', async () => {
+      vi.mocked(getMCPGuidance).mockReturnValue([
+        'Cursor detected — add deckent MCP to ~/.cursor/mcp.json:',
+      ]);
+      await runCommand(['init', '--auto', '--cursor']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Cursor detected'))).toBe(true);
     });
   });
 });

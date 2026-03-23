@@ -70,6 +70,16 @@ export interface ProviderAdapter {
    * @param opts          Spawn options (allowedTools, autoApprove)
    */
   buildCommand(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>): string;
+
+  /**
+   * Build CLI command + args for planner invocations.
+   * Each provider can override this to produce provider-specific args
+   * instead of the default Claude-shaped args.
+   * @param prompt  The planner prompt text
+   * @param model   Model to use
+   * @returns command (CLI binary) and args array
+   */
+  buildPlannerCommand?(prompt: string, model: ModelType): { command: string; args: string[] };
 }
 
 // ─── ProviderError ───────────────────────────────────────────────────

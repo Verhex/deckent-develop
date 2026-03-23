@@ -7,10 +7,10 @@
 export type ClaudeModel = 'opus' | 'sonnet' | 'haiku';
 
 /** OpenAI / Codex model identifiers */
-export type OpenAIModel = 'gpt-4.1' | 'o3' | 'o4-mini';
+export type OpenAIModel = 'gpt-5' | 'gpt-5-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'o3' | 'o4-mini';
 
 /** Gemini model identifiers */
-export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash';
+export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-flash';
 
 /** Union of all supported model identifiers across providers */
 export type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
@@ -21,8 +21,8 @@ export type ProviderName = 'claude' | 'codex' | 'gemini';
 /** Mapping from each provider to its supported model list */
 export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = {
   claude: ['opus', 'sonnet', 'haiku'] as const,
-  codex: ['gpt-4.1', 'o3', 'o4-mini'] as const,
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash'] as const,
+  codex: ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'] as const,
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'] as const,
 } as const;
 
 /** All Claude model names (backward-compat convenience) */
@@ -31,8 +31,8 @@ export const CLAUDE_MODELS: readonly ClaudeModel[] = ['opus', 'sonnet', 'haiku']
 /** All valid model names across all providers */
 export const ALL_MODELS: readonly ModelType[] = [
   ...CLAUDE_MODELS,
-  'gpt-4.1', 'o3', 'o4-mini',
-  'gemini-2.5-pro', 'gemini-2.5-flash',
+  'gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
+  'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash',
 ] as const;
 
 /** Error thrown when a model is not recognized */
@@ -75,22 +75,26 @@ export function isGeminiModel(model: ModelType): model is GeminiModel {
 /**
  * Get a numeric rank for model capability tier (provider-agnostic).
  * Higher = more capable. Used for model comparison/upgrade logic.
- *   Tier 0 (lightweight): haiku, o4-mini, gemini-2.5-flash
- *   Tier 1 (balanced): sonnet, o3, gemini-2.5-pro
- *   Tier 2 (strongest): opus, gpt-4.1
+ *   Tier 0 (economy): haiku, gpt-5-mini, gpt-4.1-mini, o4-mini, gemini-2.0-flash
+ *   Tier 1 (standard): sonnet, gpt-4.1, o3, gemini-2.5-flash
+ *   Tier 2 (premium): opus, gpt-5, gemini-2.5-pro
  */
 export function getModelTier(model: ModelType): number {
   switch (model) {
     case 'haiku':
+    case 'gpt-5-mini':
+    case 'gpt-4.1-mini':
     case 'o4-mini':
-    case 'gemini-2.5-flash':
+    case 'gemini-2.0-flash':
       return 0;
     case 'sonnet':
+    case 'gpt-4.1':
     case 'o3':
-    case 'gemini-2.5-pro':
+    case 'gemini-2.5-flash':
       return 1;
     case 'opus':
-    case 'gpt-4.1':
+    case 'gpt-5':
+    case 'gemini-2.5-pro':
       return 2;
   }
 }

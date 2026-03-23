@@ -23,6 +23,9 @@ const GEMINI_MODELS: readonly GeminiModel[] = [...PROVIDER_MODEL_MAP.gemini] as 
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+/** Auth header name per official Google AI docs */
+export const GEMINI_AUTH_HEADER = 'x-goog-api-key';
+
 const SAFE_USAGE_DEFAULT: UsageMetrics = {
   fiveHourPercent: 0,
   weeklyPercent: 0,
@@ -47,6 +50,7 @@ interface GeminiWorkerEntry {
  *
  * Since Gemini has no standard CLI, this adapter spawns a Node.js subprocess
  * that calls the Google AI API via the built-in fetch API.
+ * Auth via x-goog-api-key header per official Google AI docs.
  * Requires GOOGLE_API_KEY environment variable.
  */
 export class GeminiAdapter implements ProviderAdapter {
@@ -102,8 +106,9 @@ export class GeminiAdapter implements ProviderAdapter {
     const logFd = openSync(logPath, 'a');
 
     // Build the inline Node.js script that calls the Gemini API
-    const apiUrl = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
-    const script = this.buildApiScript(apiUrl, prompt);
+    // Auth via x-goog-api-key header (per official docs — avoids key in URL/logs)
+    const apiUrl = `${GEMINI_API_BASE}/${model}:generateContent`;
+    const script = this.buildApiScript(apiUrl, apiKey, prompt);
 
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
@@ -180,16 +185,68 @@ export class GeminiAdapter implements ProviderAdapter {
     _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
     const apiKey = this.getApiKey() ?? '<GOOGLE_API_KEY>';
-    const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
-    return `curl -s -X POST "${url}" -H "Content-Type: application/json" -d @${promptPath}`;
+    const url = `${GEMINI_API_BASE}/${model}:generateContent`;
+    return `curl -s -X POST "${url}" -H "Content-Type: application/json" -H "${GEMINI_AUTH_HEADER}: ${apiKey}" -d @${promptPath}`;
+  }
+
+  /**
+   * Build a curl command for the streaming endpoint.
+   */
+  buildStreamCommand(
+    model: ModelType,
+    promptPath: string,
+  ): string {
+    const apiKey = this.getApiKey() ?? '<GOOGLE_API_KEY>';
+    const url = `${GEMINI_API_BASE}/${model}:streamGenerateContent?alt=sse`;
+    return `curl -s --no-buffer -X POST "${url}" -H "Content-Type: application/json" -H "${GEMINI_AUTH_HEADER}: ${apiKey}" -d @${promptPath}`;
+  }
+
+  // ─── buildPlannerCommand() ─────────────────────────────────────────
+
+  /**
+   * Build CLI command + args for planner invocations.
+   * Gemini uses node -e with an inline API script (no CLI binary).
+   */
+  buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      throw new ProviderError(
+        'GOOGLE_API_KEY environment variable is not set',
+        this.name,
+      );
+    }
+    const apiUrl = `${GEMINI_API_BASE}/${model}:generateContent`;
+    const script = this.buildApiScript(apiUrl, apiKey, prompt);
+    return { command: 'node', args: ['-e', script] };
+  }
+
+  // ─── validateApiKey() ───────────────────────────────────────────────
+
+  /**
+   * Basic validation of GOOGLE_API_KEY format.
+   * Google AI API keys are typically 39 characters starting with "AIza".
+   */
+  validateApiKey(): { valid: boolean; reason: string } {
+    const key = this.getApiKey();
+    if (!key) {
+      return { valid: false, reason: 'GOOGLE_API_KEY is not set' };
+    }
+    if (key.length < 10) {
+      return { valid: false, reason: 'API key is too short' };
+    }
+    if (!key.startsWith('AIza') && key.length < 30) {
+      return { valid: false, reason: 'API key does not match expected Google AI format (AIza...)' };
+    }
+    return { valid: true, reason: 'API key format looks valid' };
   }
 
   // ─── Internal helpers ──────────────────────────────────────────────
 
   /**
    * Build inline Node.js script that calls the Gemini REST API via fetch.
+   * Auth is sent via x-goog-api-key header per official Google AI docs.
    */
-  private buildApiScript(apiUrl: string, prompt: string): string {
+  buildApiScript(apiUrl: string, apiKey: string, prompt: string): string {
     // Escape prompt for embedding in a JS string literal
     const escapedPrompt = prompt
       .replace(/\\/g, '\\\\')
@@ -204,7 +261,10 @@ export class GeminiAdapter implements ProviderAdapter {
       `});`,
       `fetch('${apiUrl}', {`,
       `  method: 'POST',`,
-      `  headers: { 'Content-Type': 'application/json' },`,
+      `  headers: {`,
+      `    'Content-Type': 'application/json',`,
+      `    '${GEMINI_AUTH_HEADER}': '${apiKey}'`,
+      `  },`,
       `  body`,
       `}).then(r => r.json()).then(d => {`,
       `  const text = d?.candidates?.[0]?.content?.parts?.[0]?.text ?? JSON.stringify(d);`,
@@ -213,12 +273,75 @@ export class GeminiAdapter implements ProviderAdapter {
     ].join('\n');
   }
 
+  /**
+   * Build inline Node.js script that calls the Gemini streaming API via SSE.
+   * Uses streamGenerateContent?alt=sse endpoint per official docs.
+   */
+  buildStreamingApiScript(model: string, apiKey: string, prompt: string): string {
+    const escapedPrompt = prompt
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r');
+
+    const streamUrl = `${GEMINI_API_BASE}/${model}:streamGenerateContent?alt=sse`;
+
+    return [
+      `const body = JSON.stringify({`,
+      `  contents: [{ parts: [{ text: '${escapedPrompt}' }] }],`,
+      `  generationConfig: { maxOutputTokens: 65536 }`,
+      `});`,
+      `fetch('${streamUrl}', {`,
+      `  method: 'POST',`,
+      `  headers: {`,
+      `    'Content-Type': 'application/json',`,
+      `    '${GEMINI_AUTH_HEADER}': '${apiKey}'`,
+      `  },`,
+      `  body`,
+      `}).then(async r => {`,
+      `  const reader = r.body.getReader();`,
+      `  const decoder = new TextDecoder();`,
+      `  let buf = '';`,
+      `  while (true) {`,
+      `    const { done, value } = await reader.read();`,
+      `    if (done) break;`,
+      `    buf += decoder.decode(value, { stream: true });`,
+      `    const lines = buf.split('\\n');`,
+      `    buf = lines.pop();`,
+      `    for (const line of lines) {`,
+      `      if (line.startsWith('data: ')) {`,
+      `        try {`,
+      `          const d = JSON.parse(line.slice(6));`,
+      `          const text = d?.candidates?.[0]?.content?.parts?.[0]?.text;`,
+      `          if (text) process.stdout.write(text);`,
+      `        } catch {}`,
+      `      }`,
+      `    }`,
+      `  }`,
+      `}).catch(e => { process.stderr.write(e.message); process.exit(1); });`,
+    ].join('\n');
+  }
+
   private isSupportedModel(model: ModelType): model is GeminiModel {
     return (GEMINI_MODELS as readonly string[]).includes(model);
   }
 
-  private getApiKey(): string | undefined {
+  getApiKey(): string | undefined {
     return process.env.GOOGLE_API_KEY;
+  }
+
+  /**
+   * Get the streaming endpoint URL for a given model.
+   */
+  getStreamingEndpoint(model: string): string {
+    return `${GEMINI_API_BASE}/${model}:streamGenerateContent?alt=sse`;
+  }
+
+  /**
+   * Get the standard (non-streaming) endpoint URL for a given model.
+   */
+  getEndpoint(model: string): string {
+    return `${GEMINI_API_BASE}/${model}:generateContent`;
   }
 
   private killWithSignal(taskId: string, signal: NodeJS.Signals): void {

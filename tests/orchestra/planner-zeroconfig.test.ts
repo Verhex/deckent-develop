@@ -13,10 +13,31 @@ import {
   callZeroConfigPlanner,
   buildZeroConfigFallbackPlan,
 } from '../../src/orchestra/planner.js';
-import type { BrainContext, SprintSizeRecommendation, Task } from '../../src/core/types.js';
+import type { BrainContext, SprintSizeRecommendation, Task, ModelType } from '../../src/core/types.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
+import type { ProviderAdapter } from '../../src/core/provider.js';
 
 const mockedSpawnSync = vi.mocked(spawnSync);
+
+// ─── Mock ProviderAdapter ─────────────────────────────────────────────────
+function makeMockAdapter(): ProviderAdapter {
+  return {
+    name: 'claude',
+    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('claude --model sonnet /dev/null'),
+    buildPlannerCommand: (prompt: string, model: ModelType) => ({
+      command: 'claude',
+      args: ['-p', prompt, '--model', model, '--output-format', 'json'],
+    }),
+  };
+}
+
+const mockAdapter = makeMockAdapter();
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -190,7 +211,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    const result = callZeroConfigPlanner('Add login page', 'sonnet', 'my-app');
+    const result = callZeroConfigPlanner('Add login page', 'sonnet', 'my-app', [], mockAdapter);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(4);
     expect(result!.reasoning).toBe('Zero-config split plan');
@@ -206,7 +227,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    const result = callZeroConfigPlanner('Fix the bug', 'sonnet', 'app');
+    const result = callZeroConfigPlanner('Fix the bug', 'sonnet', 'app', [], mockAdapter);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(3);
   });
@@ -221,7 +242,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app');
+    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
     expect(result).toBeNull();
   });
 
@@ -235,7 +256,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app');
+    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
     expect(result).toBeNull();
   });
 
@@ -249,7 +270,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app');
+    const result = callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
     expect(result).toBeNull();
   });
 
@@ -263,7 +284,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    callZeroConfigPlanner('Add feature', 'opus', 'app');
+    callZeroConfigPlanner('Add feature', 'opus', 'app', [], mockAdapter);
 
     const args = mockedSpawnSync.mock.calls[0]![1] as string[];
     const modelIdx = args.indexOf('--model');
@@ -280,7 +301,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    callZeroConfigPlanner('Add feature', 'sonnet', 'app');
+    callZeroConfigPlanner('Add feature', 'sonnet', 'app', [], mockAdapter);
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'claude',
@@ -299,7 +320,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    callZeroConfigPlanner('Add feature', 'sonnet', 'app', ['src/auth.ts', 'src/api.ts']);
+    callZeroConfigPlanner('Add feature', 'sonnet', 'app', ['src/auth.ts', 'src/api.ts'], mockAdapter);
 
     const promptArg = (mockedSpawnSync.mock.calls[0]![1] as string[])[1]!;
     expect(promptArg).toContain('src/auth.ts');
@@ -315,7 +336,7 @@ describe('callZeroConfigPlanner', () => {
       output: [],
     } as never);
 
-    const result = callZeroConfigPlanner('Complex feature', 'opus', 'app');
+    const result = callZeroConfigPlanner('Complex feature', 'opus', 'app', [], mockAdapter);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(5);
   });

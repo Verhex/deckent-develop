@@ -100,8 +100,8 @@ describe('resolveProviderWithFallback', () => {
       registry,
     );
 
-    // opus (premium tier on claude) -> gpt-4.1 (premium tier on codex)
-    expect(result.model).toBe('gpt-4.1');
+    // opus (premium tier on claude) -> gpt-5 (premium tier on codex)
+    expect(result.model).toBe('gpt-5');
   });
 
   it('remaps standard-tier model correctly on fallback', async () => {
@@ -115,8 +115,8 @@ describe('resolveProviderWithFallback', () => {
       registry,
     );
 
-    // sonnet (standard tier on claude) -> o3 (standard tier on codex)
-    expect(result.model).toBe('o3');
+    // sonnet (standard tier on claude) -> gpt-4.1 (standard tier on codex)
+    expect(result.model).toBe('gpt-4.1');
   });
 
   it('remaps economy-tier model correctly on fallback', async () => {
@@ -130,8 +130,8 @@ describe('resolveProviderWithFallback', () => {
       registry,
     );
 
-    // haiku (economy tier on claude) -> o4-mini (economy tier on codex)
-    expect(result.model).toBe('o4-mini');
+    // haiku (economy tier on claude) -> gpt-5-mini (economy tier on codex)
+    expect(result.model).toBe('gpt-5-mini');
   });
 
   // --- Primary unavailable + no fallback configured ---

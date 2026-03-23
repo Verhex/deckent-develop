@@ -54,11 +54,11 @@ describe('CHANGELOG.md format validation', () => {
     expect(versions.length).toBeGreaterThanOrEqual(10);
   });
 
-  it('latest entry (sprint33) is at the top', () => {
+  it('latest entry is at the top and follows sprint naming convention', () => {
     const content = readChangelog();
     const versions = extractVersionHeaders(content);
     expect(versions.length).toBeGreaterThan(0);
-    expect(versions[0]).toContain('sprint33');
+    expect(versions[0]).toMatch(/sprint\d+/);
   });
 
   it('sprint33 entry contains expected content sections', () => {

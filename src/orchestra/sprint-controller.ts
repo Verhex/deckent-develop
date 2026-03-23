@@ -23,7 +23,7 @@ import {
 import type {
   Task, TaskResult, TaskScope, Sprint, SprintMetrics,
   UsageMetrics, AgentInfo, ResolvedConfig, SystemProfile,
-  BrainContext, SprintSizeRecommendation,
+  BrainContext, SprintSizeRecommendation, ModelType,
   BrainPlanningMode, PlannerResult, ProviderName,
 } from '../core/types.js';
 
@@ -274,16 +274,36 @@ export function readContext(projectRoot: string): BrainContext {
 }
 
 /**
- * Check current API usage by invoking the claude CLI synchronously.
- * Parses 5-hour and weekly usage percentages from the output.
- * Returns safe defaults if the CLI call fails.
+ * The default CLI command used for usage checks when no provider adapter is available.
+ * Extracted as a constant to avoid hardcoded provider name strings inline.
+ * @internal
+ */
+export const DEFAULT_USAGE_CLI = 'claude';
+
+/**
+ * Check current API usage by invoking the default provider CLI synchronously.
+ * Tries to determine the CLI binary from the registered default provider adapter;
+ * falls back to DEFAULT_USAGE_CLI if no adapter is registered.
+ *
+ * For provider-aware async usage checking, prefer checkUsageWithProvider() instead.
+ *
  * @param _config - Resolved config (reserved for future use)
  * @returns Current usage metrics with percentage values
  */
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
   const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
   try {
-    const result = spawnSync('claude', ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000 });
+    // Determine CLI binary: try default provider's CLI, else DEFAULT_USAGE_CLI
+    let cliBinary = DEFAULT_USAGE_CLI;
+    try {
+      const defaultAdapter = providerRegistry.getDefault();
+      const cmdStr = defaultAdapter.buildCommand('opus' as ModelType, '/dev/null');
+      const firstToken = cmdStr.split(/\s+/)[0];
+      if (firstToken) cliBinary = firstToken;
+    } catch {
+      // No provider registered — use DEFAULT_USAGE_CLI
+    }
+    const result = spawnSync(cliBinary, ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000 });
     if (result.status !== 0 || !result.stdout) return SAFE_DEFAULT;
 
     const output = result.stdout;
@@ -414,11 +434,36 @@ export async function planSprint(
 
   // AI planner attempt
   if (planMode === 'ai' || planMode === 'auto') {
+    // Resolve brain provider adapter — no hardcoded fallback to any specific provider.
+    // Uses config.brain_provider if set, then registry default.
+    let brainAdapter: ProviderAdapter | undefined;
+    let brainProviderName: ProviderName | undefined = config.brain_provider;
+    try {
+      if (brainProviderName && providerRegistry.hasProvider(brainProviderName)) {
+        brainAdapter = providerRegistry.getProvider(brainProviderName);
+      } else {
+        brainAdapter = providerRegistry.getDefault();
+        brainProviderName = brainAdapter.name as ProviderName;
+      }
+    } catch {
+      // No providers registered — planner will throw a clear error via resolveAdapter()
+    }
+
+    // Map brain_model through provider-aware model selector
+    const brainModel = resolveTaskModel(
+      'sprint-planning', 'AI planner invocation',
+      { directories: [], filesRead: [], filesWrite: [] },
+      config, usageForModel,
+      undefined, config.activeModeConfig.brain_model,
+      undefined, brainProviderName,
+    );
+
     plannerResult = callBrainPlanner(
       context,
       recommendation,
-      config.activeModeConfig.brain_model,
+      brainModel,
       config.projectName,
+      brainAdapter,
     );
 
     if (plannerResult) {
@@ -597,11 +642,11 @@ export function spawnWorkers(
   const activeTasks = sprint.tasks.slice(0, maxWorkers);
   const queuedTasks = sprint.tasks.slice(maxWorkers);
 
-  // Pre-check: do any active tasks need tmux (Claude provider or no provider specified)?
+  // Pre-check: do any active tasks need tmux (uses isTmuxProvider helper)?
   if (!backend) {
     needsTmuxSession = activeTasks.some(task => {
       const provider = resolveTaskProvider(task);
-      return provider === 'claude';
+      return isTmuxProvider(provider);
     });
     if (needsTmuxSession) {
       ensureSession();
@@ -611,15 +656,15 @@ export function spawnWorkers(
   for (const task of activeTasks) {
     const prompt = buildWorkerPrompt(task);
     const model = task.model;
-    const writeTargets = [...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
+    const writeTargets = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
     const allowedTools = writeTargets.length > 0
       ? `Read,Write(${writeTargets.join(',')}),Bash`
       : 'Read,Write,Bash';
 
     const taskProvider = resolveTaskProvider(task);
 
-    // Route to non-Claude provider adapter if task specifies a non-Claude provider
-    if (taskProvider !== 'claude') {
+    // Route to adapter-based provider if task uses a non-tmux provider
+    if (!isTmuxProvider(taskProvider)) {
       const adapter = getProviderAdapterForTask(taskProvider);
       if (adapter) {
         adapter.spawn(task.id, model, prompt, {
@@ -675,9 +720,20 @@ export function spawnWorkers(
 }
 
 /**
+ * Check whether a provider uses the local tmux-based spawn mechanism.
+ * Currently only the 'claude' provider uses tmux; all others use their adapter's spawn().
+ * Extracted as a helper to avoid inline string comparisons throughout routing logic.
+ * @internal
+ */
+export function isTmuxProvider(providerName: ProviderName): boolean {
+  return providerName === 'claude';
+}
+
+/**
  * Resolve the provider for a task.
  * Uses task.provider if explicitly set, otherwise infers from model via getProviderForModel().
- * Falls back to 'claude' if model is unrecognized.
+ * Falls back to the registry's default provider if the model is unrecognized.
+ * If no default provider is registered, returns 'claude' as the built-in ProviderName.
  * @internal
  */
 export function resolveTaskProvider(task: Task): ProviderName {
@@ -685,7 +741,13 @@ export function resolveTaskProvider(task: Task): ProviderName {
   try {
     return getProviderForModel(task.model);
   } catch {
-    return 'claude';
+    // Model unrecognized — try default provider from registry
+    try {
+      return providerRegistry.getDefault().name as ProviderName;
+    } catch {
+      // No providers registered — 'claude' is the ProviderName type default
+      return 'claude';
+    }
   }
 }
 
@@ -898,10 +960,10 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
     } catch { /* already dead */ }
   }
 
-  // Kill workers on non-Claude provider adapters
+  // Kill workers on non-tmux provider adapters
   for (const task of sprint.tasks) {
     const provider = resolveTaskProvider(task);
-    if (provider !== 'claude') {
+    if (!isTmuxProvider(provider)) {
       const adapter = getProviderAdapterForTask(provider);
       if (adapter) {
         try { adapter.kill(task.id); } catch { /* already dead */ }

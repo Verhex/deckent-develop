@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildPlanPrompt, parsePlannerResponse, callBrainPlanner } from '../../src/orchestra/planner.js';
-import type { BrainContext, SprintSizeRecommendation } from '../../src/core/types.js';
+import type { BrainContext, SprintSizeRecommendation, ModelType } from '../../src/core/types.js';
 import { BRAIN_PLAN_MAX_CONTEXT_LINES } from '../../src/core/constants.js';
+import type { ProviderAdapter } from '../../src/core/provider.js';
 
 // ─── Mock child_process ───────────────────────────────────────────────────
 vi.mock('node:child_process', () => ({
@@ -9,6 +10,24 @@ vi.mock('node:child_process', () => ({
 }));
 
 import { spawnSync } from 'node:child_process';
+
+// ─── Mock ProviderAdapter ─────────────────────────────────────────────────
+function makeMockAdapter(): ProviderAdapter {
+  return {
+    name: 'claude',
+    supportedModels: ['opus', 'sonnet', 'haiku'] as readonly ModelType[],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('claude --model sonnet /dev/null'),
+    buildPlannerCommand: (prompt: string, model: ModelType) => ({
+      command: 'claude',
+      args: ['-p', prompt, '--model', model, '--output-format', 'json'],
+    }),
+  };
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -518,6 +537,8 @@ describe('parsePlannerResponse', () => {
 // ─── callBrainPlanner ─────────────────────────────────────────────────────
 
 describe('callBrainPlanner', () => {
+  const adapter = makeMockAdapter();
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -532,7 +553,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj');
+    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
     expect(result).toBeNull();
   });
 
@@ -546,7 +567,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj');
+    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
     expect(result).toBeNull();
   });
 
@@ -560,7 +581,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as unknown as ReturnType<typeof spawnSync>);
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj');
+    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
     expect(result).toBeNull();
   });
 
@@ -574,7 +595,7 @@ describe('callBrainPlanner', () => {
       signal: 'SIGTERM',
     } as unknown as ReturnType<typeof spawnSync>);
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj');
+    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter);
     expect(result).toBeNull();
   });
 
@@ -588,7 +609,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj');
+    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
     expect(result).toBeNull();
   });
 
@@ -602,7 +623,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj');
+    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
     expect(result).toBeNull();
   });
 
@@ -616,7 +637,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj');
+    const result = callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
     expect(result).not.toBeNull();
     expect(result!.tasks).toHaveLength(1);
   });
@@ -631,7 +652,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj');
+    callBrainPlanner(makeContext(), makeRecommendation(), 'opus', 'proj', adapter);
 
     expect(spawnSync).toHaveBeenCalledWith(
       'claude',
@@ -650,7 +671,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj');
+    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'proj', adapter);
 
     expect(spawnSync).toHaveBeenCalledWith(
       'claude',
@@ -669,7 +690,7 @@ describe('callBrainPlanner', () => {
       signal: null,
     } as ReturnType<typeof spawnSync>);
 
-    callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'proj');
+    callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'proj', adapter);
 
     expect(spawnSync).toHaveBeenCalledWith(
       'claude',

@@ -9,7 +9,7 @@ import type {
 import { ALL_MODELS } from '../core/types.js';
 import { BRAIN_PLAN_TIMEOUT_MS, BRAIN_PLAN_MAX_CONTEXT_LINES } from '../core/constants.js';
 import type { ProviderAdapter } from '../core/provider.js';
-import { providerRegistry } from '../core/provider.js';
+import { providerRegistry, ProviderError } from '../core/provider.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 const MODEL_ENUM_VALUES = ALL_MODELS as unknown as [string, ...string[]];
@@ -166,38 +166,43 @@ export function parsePlannerResponse(raw: string): PlannerResult | null {
 // ─── Provider Command Extraction ──────────────────────────────────
 
 /**
- * @internal Extract CLI binary and build planner-specific args from a ProviderAdapter.
- * Parses the first token of adapter.buildCommand() as the CLI binary name,
- * then builds the appropriate args for a planner invocation (-p prompt, --model, --output-format json).
+ * @internal Build planner-specific spawn args from a ProviderAdapter.
+ * If the adapter implements buildPlannerCommand(), delegates entirely to it.
+ * Otherwise extracts CLI binary from adapter.buildCommand() and builds
+ * generic args (first token as command, standard flags).
  */
 export function buildPlannerSpawnArgs(
   adapter: ProviderAdapter,
   prompt: string,
   model: ModelType,
 ): { command: string; args: string[] } {
-  // Extract CLI binary from adapter.buildCommand() — first token of the shell string
+  // Delegate to adapter if it provides its own planner command builder
+  if (typeof adapter.buildPlannerCommand === 'function') {
+    return adapter.buildPlannerCommand(prompt, model);
+  }
+
+  // Generic fallback: extract CLI binary from adapter.buildCommand()
   const shellCommand = adapter.buildCommand(model, '/dev/null');
-  const command = shellCommand.split(/\s+/)[0] ?? 'claude';
+  const firstToken = shellCommand.split(/\s+/)[0];
+  if (!firstToken) {
+    throw new ProviderError(`Provider "${adapter.name}" returned empty buildCommand result`, adapter.name);
+  }
   return {
-    command,
+    command: firstToken,
     args: ['-p', prompt, '--model', model, '--output-format', 'json'],
   };
 }
 
 /**
  * @internal Resolve the provider adapter to use for planner calls.
- * If an adapter is explicitly provided, use it. Otherwise fall back to
- * ProviderRegistry.getDefault(). If the registry is empty, returns undefined
- * (caller uses hardcoded 'claude' fallback).
+ * If an adapter is explicitly provided, use it. Otherwise uses
+ * ProviderRegistry.getDefault(). Throws if no provider is available —
+ * callers must ensure at least one provider is registered.
  */
-function resolveAdapter(adapter?: ProviderAdapter): ProviderAdapter | undefined {
+export function resolveAdapter(adapter?: ProviderAdapter): ProviderAdapter {
   if (adapter) return adapter;
-  try {
-    return providerRegistry.getDefault();
-  } catch {
-    // No providers registered — caller will use legacy 'claude' fallback
-    return undefined;
-  }
+  // Throws ProviderError('No providers registered') if registry is empty
+  return providerRegistry.getDefault();
 }
 
 // ─── callBrainPlanner ─────────────────────────────────────────────
@@ -207,7 +212,7 @@ function resolveAdapter(adapter?: ProviderAdapter): ProviderAdapter | undefined 
  * Not part of the public API surface.
  *
  * @param adapter  Optional ProviderAdapter. If omitted, uses ProviderRegistry.getDefault().
- *                 If registry is empty, falls back to hardcoded 'claude' for backward compat.
+ *                 Throws if no provider is available (no silent fallback).
  */
 export function callBrainPlanner(
   context: BrainContext,
@@ -217,19 +222,8 @@ export function callBrainPlanner(
   adapter?: ProviderAdapter,
 ): PlannerResult | null {
   const prompt = buildPlanPrompt(context, recommendation, projectName);
-
   const resolved = resolveAdapter(adapter);
-  let command: string;
-  let args: string[];
-  if (resolved) {
-    const spawned = buildPlannerSpawnArgs(resolved, prompt, model);
-    command = spawned.command;
-    args = spawned.args;
-  } else {
-    // Legacy fallback: hardcoded claude
-    command = 'claude';
-    args = ['-p', prompt, '--model', model, '--output-format', 'json'];
-  }
+  const { command, args } = buildPlannerSpawnArgs(resolved, prompt, model);
 
   const result = spawnSync(command, args, {
     encoding: 'utf-8',
@@ -311,7 +305,7 @@ MODEL SEÇİM KRİTERLERİ:
  * structured (single-task) mode in that case.
  *
  * @param adapter  Optional ProviderAdapter. If omitted, uses ProviderRegistry.getDefault().
- *                 If registry is empty, falls back to hardcoded 'claude' for backward compat.
+ *                 Throws if no provider is available (no silent fallback).
  */
 export function callZeroConfigPlanner(
   description: string,
@@ -321,19 +315,8 @@ export function callZeroConfigPlanner(
   adapter?: ProviderAdapter,
 ): PlannerResult | null {
   const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree);
-
   const resolved = resolveAdapter(adapter);
-  let command: string;
-  let args: string[];
-  if (resolved) {
-    const spawned = buildPlannerSpawnArgs(resolved, prompt, model);
-    command = spawned.command;
-    args = spawned.args;
-  } else {
-    // Legacy fallback: hardcoded claude
-    command = 'claude';
-    args = ['-p', prompt, '--model', model, '--output-format', 'json'];
-  }
+  const { command, args } = buildPlannerSpawnArgs(resolved, prompt, model);
 
   const result = spawnSync(command, args, {
     encoding: 'utf-8',

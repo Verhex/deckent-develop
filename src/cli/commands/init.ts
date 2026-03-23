@@ -34,6 +34,15 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
+import {
+  detectIDEEnvironment,
+  getMCPGuidance,
+  buildProviderWizardSteps,
+  resolveProviderWizardResult,
+  formatProviderAuthGuidance,
+  runWizard,
+} from '../helpers/wizard.js';
+import type { ProviderName } from '../../core/task-types.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -80,7 +89,9 @@ export function registerInit(program: Command): void {
     .description('Initialize a new Deckent project')
     .option('--auto', 'Auto-detect system, subscription, and project to generate recommendations')
     .option('--manual', 'Skip auto-detection, use interactive prompts only')
-    .action(async (options: { auto?: boolean; manual?: boolean }) => {
+    .option('--cursor', 'Configure for Cursor IDE environment')
+    .option('--claude-code', 'Configure for Claude Code environment (default)')
+    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean }) => {
       const root = resolveProjectRoot();
 
       try {
@@ -276,10 +287,72 @@ Lint: tsc --noEmit
           BRAIN_DIR + '/archive/',
         ]);
 
-        // Show detected providers
+        // ── Provider detection & wizard ──────────────────────────────
         const providers = await detectAvailableProviders();
         print('');
         print(formatDetectedProviders(providers));
+
+        // Show auth guidance for unavailable providers
+        const authGuidance = formatProviderAuthGuidance(providers);
+        if (authGuidance.length > 0) {
+          print('');
+          for (const line of authGuidance) {
+            print(line);
+          }
+        }
+
+        // Provider selection
+        const { autoConfig, steps: providerSteps } = buildProviderWizardSteps(providers);
+        let providerConfig: { brain_provider: ProviderName; worker_provider: ProviderName; fallback_provider?: ProviderName };
+
+        if (autoConfig) {
+          // Single or zero providers — auto-configured
+          providerConfig = autoConfig;
+          if (autoConfig.selectedProviders.length === 1) {
+            print(`\n  Auto-configured: ${autoConfig.selectedProviders[0]} (only available provider)`);
+          }
+        } else if (options.auto) {
+          // --auto mode with multiple providers: use first available as brain + worker
+          const firstAvailable = providers.find(p => p.available)!.name;
+          providerConfig = {
+            brain_provider: firstAvailable,
+            worker_provider: firstAvailable,
+          };
+        } else {
+          // Interactive: run provider wizard
+          print('');
+          const wizardResult = await runWizard(providerSteps, { nonInteractive: false });
+          providerConfig = resolveProviderWizardResult(wizardResult, providers);
+        }
+
+        // Write provider config to config.json (merge into existing or write fresh)
+        const providerConfigPath = join(root, DECKENT_DIR, 'config.json');
+        const providerMerge: Record<string, unknown> = {
+          brain_provider: providerConfig.brain_provider,
+          worker_provider: providerConfig.worker_provider,
+        };
+        if (providerConfig.fallback_provider) {
+          providerMerge['fallback_provider'] = providerConfig.fallback_provider;
+        }
+        try {
+          const existing = JSON.parse(readFileSync(providerConfigPath, 'utf-8')) as Record<string, unknown>;
+          Object.assign(existing, providerMerge);
+          writeFileSync(providerConfigPath, JSON.stringify(existing, null, 2) + '\n');
+        } catch {
+          // Config file not readable yet — write fresh with provider fields
+          const freshConfig: Record<string, unknown> = { mode, language, projectName, ...providerMerge };
+          writeFileSync(providerConfigPath, JSON.stringify(freshConfig, null, 2) + '\n');
+        }
+
+        // ── IDE environment detection & MCP guidance ────────────────
+        const ideEnv = options.cursor ? 'cursor' as const
+          : options.claudeCode ? 'claude-code' as const
+          : detectIDEEnvironment(root);
+        const mcpGuidance = getMCPGuidance(ideEnv);
+        print('');
+        for (const line of mcpGuidance) {
+          print(line);
+        }
 
         print('\n' + getMessage('init.initialized', language, { name: projectName, mode, language }));
         print('');

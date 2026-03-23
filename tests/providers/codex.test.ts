@@ -73,8 +73,14 @@ describe('CodexAdapter', () => {
       expect(adapter.supportedModels).toContain('o4-mini');
     });
 
-    it('should support exactly 3 models', () => {
-      expect(adapter.supportedModels).toHaveLength(3);
+    it('should support exactly 6 models', () => {
+      expect(adapter.supportedModels).toHaveLength(6);
+    });
+
+    it('should support gpt-5, gpt-5-mini, gpt-4.1-mini models', () => {
+      expect(adapter.supportedModels).toContain('gpt-5');
+      expect(adapter.supportedModels).toContain('gpt-5-mini');
+      expect(adapter.supportedModels).toContain('gpt-4.1-mini');
     });
 
     it('should implement ProviderAdapter interface', () => {
@@ -92,13 +98,19 @@ describe('CodexAdapter', () => {
   // ─── spawn() ───────────────────────────────────────────────────────
 
   describe('spawn()', () => {
-    it('should spawn codex process with correct model', () => {
+    it('should spawn codex process with exec subcommand and correct model', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'test prompt');
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        expect.arrayContaining(['--model', 'gpt-4.1', '--quiet']),
+        expect.arrayContaining(['exec', '--model', 'gpt-4.1', '--quiet']),
         expect.any(Object),
       );
+    });
+
+    it('should have exec as the first arg', () => {
+      adapter.spawn('task-001', 'gpt-4.1', 'test prompt');
+      const args = mockSpawn.mock.calls[0][1] as string[];
+      expect(args[0]).toBe('exec');
     });
 
     it('should pass o3 model correctly', () => {
@@ -182,22 +194,19 @@ describe('CodexAdapter', () => {
       );
     });
 
-    it('should include --full-auto when autoApprove is true', () => {
+    it('should include --approval-mode full-auto when autoApprove is true', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt', { autoApprove: true });
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        expect.arrayContaining(['--full-auto']),
+        expect.arrayContaining(['--approval-mode', 'full-auto']),
         expect.any(Object),
       );
     });
 
-    it('should include --allowed-tools when provided', () => {
+    it('should not include --allowed-tools (not an official Codex CLI flag)', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt', { allowedTools: 'Read,Write' });
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'codex',
-        expect.arrayContaining(['--allowed-tools', 'Read,Write']),
-        expect.any(Object),
-      );
+      const args = mockSpawn.mock.calls[0][1] as string[];
+      expect(args).not.toContain('--allowed-tools');
     });
 
     it('should register exit handler on child process', () => {
@@ -321,9 +330,9 @@ describe('CodexAdapter', () => {
   // ─── buildCommand() ────────────────────────────────────────────────
 
   describe('buildCommand()', () => {
-    it('should build basic command with --quiet flag', () => {
+    it('should build command with exec subcommand and --quiet flag', () => {
       const cmd = adapter.buildCommand('gpt-4.1', '/tmp/prompt.txt');
-      expect(cmd).toBe('codex --model gpt-4.1 --quiet < /tmp/prompt.txt');
+      expect(cmd).toBe('codex exec --model gpt-4.1 --quiet < /tmp/prompt.txt');
     });
 
     it('should include correct model in command', () => {
@@ -332,19 +341,20 @@ describe('CodexAdapter', () => {
       expect(adapter.buildCommand('o4-mini', '/p')).toContain('--model o4-mini');
     });
 
-    it('should include --allowed-tools when provided', () => {
+    it('should not include --allowed-tools (not an official Codex CLI flag)', () => {
       const cmd = adapter.buildCommand('o3', '/tmp/p.txt', { allowedTools: 'Read,Write' });
-      expect(cmd).toContain("--allowed-tools 'Read,Write'");
+      expect(cmd).not.toContain('--allowed-tools');
     });
 
-    it('should include --full-auto when autoApprove is true', () => {
+    it('should include --approval-mode full-auto when autoApprove is true', () => {
       const cmd = adapter.buildCommand('o3', '/tmp/p.txt', { autoApprove: true });
-      expect(cmd).toContain('--full-auto');
+      expect(cmd).toContain('--approval-mode full-auto');
+      expect(cmd).not.toContain('--full-auto');
     });
 
-    it('should not include --full-auto when autoApprove is false', () => {
+    it('should not include --approval-mode when autoApprove is false', () => {
       const cmd = adapter.buildCommand('o3', '/tmp/p.txt', { autoApprove: false });
-      expect(cmd).not.toContain('--full-auto');
+      expect(cmd).not.toContain('--approval-mode');
     });
 
     it('should use stdin redirection from promptPath', () => {
@@ -352,13 +362,18 @@ describe('CodexAdapter', () => {
       expect(cmd).toContain('< /path/to/prompt.txt');
     });
 
-    it('should combine allowedTools and autoApprove', () => {
+    it('should start with codex exec', () => {
+      const cmd = adapter.buildCommand('gpt-4.1', '/tmp/p.txt');
+      expect(cmd.startsWith('codex exec ')).toBe(true);
+    });
+
+    it('should combine autoApprove with model (allowedTools ignored)', () => {
       const cmd = adapter.buildCommand('gpt-4.1', '/tmp/p.txt', {
         allowedTools: 'Read',
         autoApprove: true,
       });
-      expect(cmd).toContain("--allowed-tools 'Read'");
-      expect(cmd).toContain('--full-auto');
+      expect(cmd).not.toContain('--allowed-tools');
+      expect(cmd).toContain('--approval-mode full-auto');
     });
   });
 

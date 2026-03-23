@@ -93,3 +93,14 @@
 - CLI Entrypoint: buildProgram() + entry.ts, no side-effects on import
 - bootstrapProviders(): single startup point, detect + register + set default
 - Platform: describe.skipIf(isWindows) for tmux/scripts tests, cross-platform helpers
+## Sprint sprint-039 Learnings
+- Gemini Adapter API Verification: NO_GO
+- Planner Full Provider Decoupling: NO_GO
+- Model Equivalence Update: NO_GO
+- Init Wizard — Provider Selection: NO_GO
+- Cross-Environment Detection: NO_GO
+- Provider Health Dashboard: NO_GO
+- Smart Provider Routing: NO_GO
+- Agent-Provider Compatibility: NO_GO
+- Cost Estimator: NO_GO
+- Multi-Provider Integration Test: NO_GO

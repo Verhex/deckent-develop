@@ -204,28 +204,117 @@ Each worker (a Claude Code CLI instance in a tmux window) independently:
 
 ---
 
-## Phase 5: FIX
+## Phase 5: FIX — Autonomous Recovery Cycle
 
 **`SprintPhase.FIX` | `SprintStatus.FIXING`**
 
 **Brain functions:**
-- `handleCrossDependencies(projectRoot, sprint, evaluations)` — `src/orchestra/brain.ts:678`
+- `handleCrossDependencies(projectRoot, sprint, evaluations)` — `src/orchestra/debt-manager.ts:133`
 - `spawnWorkers()` (reused) + `waitForResults()` (reused, 10 min timeout)
-- `escalateDebt(projectRoot)` — `src/orchestra/brain.ts:725`
+- `evaluateResult()` (reused for fix results)
+- `escalateDebt(projectRoot)` — `src/orchestra/debt-manager.ts`
 
-**What happens:**
+**Overview:** The FIX phase is Brain's autonomous recovery mechanism. When Phase 4 (EVALUATE) identifies NO_GO tasks, Brain doesn't simply mark them as failed — it analyzes **why** they failed, creates targeted fix tasks, spawns new workers to address the issues, and re-evaluates the results. This is a self-healing loop that distinguishes deckent from simple task runners.
 
-1. **Cross-dependency check** — If Task A got NO-GO because Task B's output was broken, Task B gets a priority fix task even if B was marked GO or GO+DEBT
-2. **Collect fix tasks** — Scans `.tasks/` for any `isPriorityFix === true` tasks with status `PENDING`
-3. **If fix tasks exist:**
-   - Spawns fix workers (same tmux mechanism as Phase 2)
-   - Waits up to 10 minutes for fix results
-   - Evaluates fix results and resolves debt for completed fixes
-4. **Debt escalation** — `escalateDebt()` upgrades debt priorities:
-   - 2 sprints unfixed → `HIGH`
-   - 3+ sprints unfixed → `CRITICAL` (auto-included next sprint)
+### Step 1: Cross-Dependency Analysis
 
-**Skipped if:** No NO-GO tasks exist (no fix tasks generated in Phase 4)
+```
+handleCrossDependencies(projectRoot, sprint, evaluations)
+```
+
+Brain examines all NO_GO tasks and their dependency chains:
+
+- **For each NO_GO task:** check all tasks in its `dependencies[]` array
+- **If a dependency was DONE or GO_WITH_TECH_DEBT:** that dependency's output may have caused the downstream failure → create a **cross-fix task** for the dependency to investigate
+- **Cross-fix tasks** carry `isPriorityFix: true` and `fixForTaskId` pointing to the original dependency
+
+**Example:** Task 003 (Planner Decoupling) depends on Task 001 (Codex Adapter Fix). Task 001 passed but Task 003 got NO_GO. Brain creates a fix task for Task 001 to investigate whether its output broke Task 003.
+
+### Step 2: Fix Task Collection
+
+Brain scans `.tasks/` for all tasks matching:
+```typescript
+task.isPriorityFix === true && task.status === TaskStatus.PENDING
+```
+
+Fix tasks are created in two ways:
+1. **Phase 4's `handleEvaluation()`** — every NO_GO creates a direct fix task
+2. **Phase 5's `handleCrossDependencies()`** — cross-dependency failures create investigation fix tasks
+
+### Step 3: Fix Worker Spawn + Evaluation
+
+If fix tasks exist, Brain reuses the same spawn mechanism as Phase 2:
+
+```
+fixSprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) }
+spawnWorkers(projectRoot, fixSprint, config, opts)
+fixResults = await waitForResults(projectRoot, fixSprint, 10 * 60 * 1000)
+```
+
+- Fix workers run with the **same tmux backend** as main workers
+- Timeout is shorter: **10 minutes** (vs 30 minutes for main phase)
+- Fix workers receive the original task's context plus the failure reason
+
+After results arrive, each fix result is evaluated:
+```
+evaluateResult(fixResult, fixTask) → DONE / GO_WITH_TECH_DEBT / NO_GO
+```
+
+- **Fix DONE + has `fixForTaskId`** → `resolveDebt()` clears the original task's debt entry
+- **Fix NO_GO** → debt remains, escalated in next step
+
+### Step 4: Debt Escalation
+
+```
+escalateDebt(projectRoot)
+```
+
+After fix attempts, Brain escalates unresolved debt based on age:
+
+| Sprints Unfixed | New Priority | Effect |
+|-----------------|-------------|--------|
+| 1 sprint | NORMAL | Regular debt tracking |
+| 2 sprints | **HIGH** | Highlighted in `deckent status` |
+| 3+ sprints | **CRITICAL** | Auto-included as priority fix in next sprint's Phase 1 |
+
+**Skipped if:** No NO_GO tasks exist (no fix tasks generated in Phase 4)
+
+### Complete FIX Phase Flow
+
+```
+Phase 4 produces NO_GO tasks
+         │
+         ▼
+  handleCrossDependencies()
+  ├── For each NO_GO task:
+  │   └── Check dependencies → DONE dep caused failure? → create cross-fix
+  │
+  ▼
+  Collect all isPriorityFix tasks
+         │
+         ▼ (if any exist)
+  spawnWorkers(fixTasks)  ← same tmux/provider backend
+         │
+  waitForResults(10 min timeout)
+         │
+         ▼
+  evaluateResult(fixResult) per fix task
+  ├── DONE → resolveDebt(original task)
+  ├── GO_WITH_TECH_DEBT → partial resolution
+  └── NO_GO → debt persists
+         │
+         ▼
+  escalateDebt()
+  ├── 2 sprints → HIGH
+  └── 3+ sprints → CRITICAL (auto-fix next sprint)
+```
+
+### Key Design Decisions
+
+- **Single retry, no infinite loops:** Fix workers get one attempt. If the fix also fails, the debt is recorded and escalated — Brain never enters a retry loop.
+- **Cross-dependency intelligence:** Brain doesn't just re-run failed tasks. It traces failure **upstream** through dependency chains and creates targeted investigation tasks.
+- **Same infrastructure:** Fix workers use the exact same spawn backend (tmux/subprocess/provider) as main workers. No separate "fix mode" — consistent execution model.
+- **Time-bounded:** 10-minute timeout prevents fix phase from dominating sprint duration. If fixes are slow, they're cut and deferred to next sprint.
 
 **Files created/updated:**
 - `.tasks/task-{id}-fix.json` — new fix task files

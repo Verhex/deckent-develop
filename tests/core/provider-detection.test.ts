@@ -174,9 +174,9 @@ describe('detectAvailableProviders', () => {
     const claude = providers.find(p => p.name === 'claude')!;
     expect(claude.models).toEqual(['opus', 'sonnet', 'haiku']);
     const codex = providers.find(p => p.name === 'codex')!;
-    expect(codex.models).toEqual(['gpt-4.1', 'o3', 'o4-mini']);
+    expect(codex.models).toEqual(['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini']);
     const gemini = providers.find(p => p.name === 'gemini')!;
-    expect(gemini.models).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash']);
+    expect(gemini.models).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });
 
   it('empty OPENAI_API_KEY is treated as missing', async () => {

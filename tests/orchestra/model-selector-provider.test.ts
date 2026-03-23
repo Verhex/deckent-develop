@@ -79,42 +79,42 @@ describe('resolveTaskModel — codex provider', () => {
   const config = makeConfig();
   const usage = makeUsage();
 
-  it('simple task resolves to o4-mini (economy tier)', () => {
+  it('simple task resolves to gpt-5-mini (economy tier)', () => {
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
       'Simple fix', 'A tiny change', scope, config, usage,
       undefined, undefined, undefined, 'codex',
     );
-    expect(result).toBe('o4-mini');
+    expect(result).toBe('gpt-5-mini');
   });
 
-  it('medium task resolves to o3 (standard tier)', () => {
+  it('medium task resolves to gpt-4.1 (standard tier)', () => {
     const scope = makeScope(['src/core/', 'src/cli/']);
     const result = resolveTaskModel(
       'Normal task', 'Some description', scope, config, usage,
       undefined, undefined, undefined, 'codex',
     );
-    expect(result).toBe('o3');
+    expect(result).toBe('gpt-4.1');
   });
 
-  it('complex task resolves to gpt-4.1 (premium tier)', () => {
+  it('complex task resolves to gpt-5 (premium tier)', () => {
     const scope = makeScope(['src/core/', 'src/orchestra/']);
     const result = resolveTaskModel(
       'Architect migration refactor', 'Cross-cutting refactor', scope, config, usage,
       undefined, undefined, undefined, 'codex',
     );
-    expect(result).toBe('gpt-4.1');
+    expect(result).toBe('gpt-5');
   });
 
-  it('usage pressure downgrades gpt-4.1 to o3', () => {
+  it('usage pressure downgrades gpt-5 to gpt-4.1', () => {
     const highUsage = makeUsage({ fiveHourPercent: 90 });
     const scope = makeScope(['src/core/', 'src/orchestra/']);
     const result = resolveTaskModel(
       'Architect migration refactor', 'Cross-cutting refactor', scope, config, highUsage,
       undefined, undefined, undefined, 'codex',
     );
-    // opus -> sonnet (usage pressure) -> o3 (codex mapping)
-    expect(result).toBe('o3');
+    // opus -> sonnet (usage pressure) -> gpt-4.1 (codex mapping)
+    expect(result).toBe('gpt-4.1');
   });
 });
 
@@ -124,14 +124,14 @@ describe('resolveTaskModel — gemini provider', () => {
   const config = makeConfig();
   const usage = makeUsage();
 
-  it('simple task resolves to gemini-2.5-flash (economy -> standard fallback)', () => {
+  it('simple task resolves to gemini-2.0-flash (economy tier)', () => {
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
       'Simple fix', 'A tiny change', scope, config, usage,
       undefined, undefined, undefined, 'gemini',
     );
-    // haiku -> economy tier, but gemini has no economy -> falls back to standard (gemini-2.5-flash)
-    expect(result).toBe('gemini-2.5-flash');
+    // haiku -> economy tier -> gemini-2.0-flash (economy on gemini)
+    expect(result).toBe('gemini-2.0-flash');
   });
 
   it('medium task resolves to gemini-2.5-flash (standard tier)', () => {
@@ -159,13 +159,13 @@ describe('resolveTaskModel — forceModel + provider', () => {
   const config = makeConfig();
   const usage = makeUsage();
 
-  it('forceModel=opus on codex maps to gpt-4.1', () => {
+  it('forceModel=opus on codex maps to gpt-5', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, usage,
       undefined, 'opus', undefined, 'codex',
     );
-    expect(result).toBe('gpt-4.1');
+    expect(result).toBe('gpt-5');
   });
 
   it('forceModel=sonnet on gemini maps to gemini-2.5-flash', () => {
@@ -195,20 +195,20 @@ describe('resolveTaskModel — forceModel + provider', () => {
     expect(result).toBe('opus');
   });
 
-  it('forceModel=haiku on gemini maps to gemini-2.5-flash (economy->standard fallback)', () => {
+  it('forceModel=haiku on gemini maps to gemini-2.0-flash (economy tier)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Forced task', 'Forced model', scope, config, usage,
       undefined, 'haiku', undefined, 'gemini',
     );
-    expect(result).toBe('gemini-2.5-flash');
+    expect(result).toBe('gemini-2.0-flash');
   });
 });
 
 // ─── Layer interactions with provider ────────────────────────────────────────
 
 describe('resolveTaskModel — layer interactions with provider', () => {
-  it('pro_plan + codex: opus->sonnet(plan filter)->o3(codex mapping)', () => {
+  it('pro_plan + codex: opus->sonnet(plan filter)->gpt-4.1(codex mapping)', () => {
     const proConfig = makeConfig({ mode: 'pro_plan' });
     const usage = makeUsage();
     const scope = makeScope(['src/core/', 'src/orchestra/']);
@@ -216,7 +216,7 @@ describe('resolveTaskModel — layer interactions with provider', () => {
       'Architect migration refactor', 'Cross-cutting refactor', scope, proConfig, usage,
       undefined, undefined, undefined, 'codex',
     );
-    expect(result).toBe('o3');
+    expect(result).toBe('gpt-4.1');
   });
 
   it('haiku_allowed=false + gemini: haiku->sonnet(filter)->gemini-2.5-flash', () => {
@@ -239,7 +239,7 @@ describe('resolveTaskModel — layer interactions with provider', () => {
     expect(result).toBe('gemini-2.5-flash');
   });
 
-  it('doc scope + codex: opus->sonnet(doc cap)->o3(codex)', () => {
+  it('doc scope + codex: opus->sonnet(doc cap)->gpt-4.1(codex)', () => {
     const config = makeConfig();
     const usage = makeUsage();
     const scope = makeScope(['docs/']);
@@ -247,8 +247,8 @@ describe('resolveTaskModel — layer interactions with provider', () => {
       'Write docs', 'Documentation', scope, config, usage,
       undefined, undefined, ['opus'], 'codex',
     );
-    // skill upgrades to opus, Layer 3 caps to sonnet, then codex mapping -> o3
-    expect(result).toBe('o3');
+    // skill upgrades to opus, Layer 3 caps to sonnet, then codex mapping -> gpt-4.1
+    expect(result).toBe('gpt-4.1');
   });
 
   it('skillModels + provider maps correctly', () => {
@@ -259,7 +259,7 @@ describe('resolveTaskModel — layer interactions with provider', () => {
       'Simple fix', 'A tiny change', scope, config, usage,
       undefined, undefined, ['opus'], 'codex',
     );
-    // skill upgrades to opus, no caps apply, codex mapping -> gpt-4.1
-    expect(result).toBe('gpt-4.1');
+    // skill upgrades to opus, no caps apply, codex mapping -> gpt-5
+    expect(result).toBe('gpt-5');
   });
 });

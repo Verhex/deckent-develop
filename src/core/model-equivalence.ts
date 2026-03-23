@@ -1,6 +1,6 @@
 // ─── Model Equivalence Mapping ──────────────────────────────────────────────
 // Cross-provider model tier mapping for multi-provider orchestration.
-// When Brain specifies "opus-tier" and target is Codex, auto-selects gpt-4.1.
+// When Brain specifies "opus-tier" and target is Codex, auto-selects gpt-5.
 
 import { DeckentError } from './errors.js';
 import type { ClaudeModel, OpenAIModel, GeminiModel, ModelType, ProviderName } from './task-types.js';
@@ -10,34 +10,34 @@ export type ModelTier = 'premium' | 'standard' | 'economy';
 
 // ─── Tier Definitions ───────────────────────────────────────────────────────
 export const MODEL_TIERS = {
-  premium: ['opus', 'gpt-4.1', 'gemini-2.5-pro'],
-  standard: ['sonnet', 'o3', 'gemini-2.5-flash'],
-  economy: ['haiku', 'o4-mini'],
+  premium: ['opus', 'gpt-5', 'gemini-2.5-pro'],
+  standard: ['sonnet', 'gpt-4.1', 'o3', 'gemini-2.5-flash'],
+  economy: ['haiku', 'gpt-5-mini', 'gpt-4.1-mini', 'o4-mini', 'gemini-2.0-flash'],
 } as const;
 
 // ─── Provider → Model Mapping ───────────────────────────────────────────────
 const PROVIDER_MODELS: Record<ProviderName, readonly MultiProviderModelType[]> = {
   claude: ['opus', 'sonnet', 'haiku'],
-  codex: ['gpt-4.1', 'o3', 'o4-mini'],
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+  codex: ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'],
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
 };
 
 // ─── Tier → Provider → Model Lookup ────────────────────────────────────────
 const TIER_PROVIDER_MAP: Record<ModelTier, Partial<Record<ProviderName, MultiProviderModelType>>> = {
   premium: {
     claude: 'opus',
-    codex: 'gpt-4.1',
+    codex: 'gpt-5',
     gemini: 'gemini-2.5-pro',
   },
   standard: {
     claude: 'sonnet',
-    codex: 'o3',
+    codex: 'gpt-4.1',
     gemini: 'gemini-2.5-flash',
   },
   economy: {
     claude: 'haiku',
-    codex: 'o4-mini',
-    // No gemini economy model — fallback handled in getEquivalentModel
+    codex: 'gpt-5-mini',
+    gemini: 'gemini-2.0-flash',
   },
 };
 
@@ -58,7 +58,7 @@ export function getModelTier(model: MultiProviderModelType): ModelTier {
 
 /**
  * Returns the equivalent model for a target provider.
- * Economy tier has no Gemini equivalent — falls back to standard (gemini-2.5-flash).
+ * All tiers now have entries for all providers (gemini-2.0-flash covers economy).
  * Same-provider returns the same model.
  */
 export function getEquivalentModel(
@@ -75,11 +75,6 @@ export function getEquivalentModel(
 
   if (equivalent) {
     return equivalent;
-  }
-
-  // Economy tier fallback for gemini: promote to standard
-  if (tier === 'economy' && targetProvider === 'gemini') {
-    return TIER_PROVIDER_MAP.standard[targetProvider]!;
   }
 
   // Should not reach here with valid inputs

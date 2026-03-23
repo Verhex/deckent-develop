@@ -21,6 +21,8 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  statSync: vi.fn(),
+  appendFileSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -36,13 +38,161 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 }));
 
 vi.mock('../../src/monitor/auditor.js', () => ({
+  resetDashboard: vi.fn(),
   updateDashboard: vi.fn(),
   detectDeadlocks: vi.fn().mockReturnValue([]),
+  startScanLoop: vi.fn().mockReturnValue(setInterval(() => {}, 99999)),
+  writeScanToDashboard: vi.fn(),
 }));
 
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn(),
   releaseAllLocks: vi.fn(),
+}));
+
+vi.mock('../../src/core/provider.js', () => {
+  const mockAdapter = {
+    name: 'claude',
+    supportedModels: ['opus', 'sonnet', 'haiku'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('claude --model sonnet /dev/null'),
+    buildPlannerCommand: (prompt: string, model: string) => ({
+      command: 'claude',
+      args: ['-p', prompt, '--model', model, '--output-format', 'json'],
+    }),
+  };
+  return {
+    providerRegistry: {
+      getDefault: vi.fn().mockReturnValue(mockAdapter),
+      registerProvider: vi.fn(),
+      getProvider: vi.fn().mockReturnValue(mockAdapter),
+      hasProvider: vi.fn().mockReturnValue(false),
+      listProviders: vi.fn().mockReturnValue([]),
+      setDefault: vi.fn(),
+      unregisterProvider: vi.fn(),
+      clear: vi.fn(),
+      size: 0,
+    },
+    ProviderError: class ProviderError extends Error {
+      providerName: string;
+      constructor(message: string, providerName: string) {
+        super(message);
+        this.name = 'ProviderError';
+        this.providerName = providerName;
+      }
+    },
+    ProviderNotFoundError: class ProviderNotFoundError extends Error {
+      providerName: string;
+      constructor(providerName: string) {
+        super(`Provider not found: "${providerName}"`);
+        this.name = 'ProviderNotFoundError';
+        this.providerName = providerName;
+      }
+    },
+  };
+});
+
+vi.mock('../../src/core/plugin-hooks.js', () => ({
+  runHooks: vi.fn().mockResolvedValue(undefined),
+  clearHooks: vi.fn(),
+  loadPluginHooks: vi.fn().mockResolvedValue(0),
+}));
+
+vi.mock('../../src/core/stack-detector.js', () => ({
+  detectProjectStack: vi.fn().mockReturnValue({ languages: [], frameworks: [], tools: [] }),
+}));
+
+vi.mock('../../src/core/skill-pool.js', () => ({
+  SkillPoolManager: vi.fn().mockImplementation(() => ({
+    loadSkills: vi.fn().mockReturnValue(new Map()),
+  })),
+}));
+
+vi.mock('../../src/core/skill-selector.js', () => ({
+  selectSkills: vi.fn().mockReturnValue({ skills: [], reason: '' }),
+}));
+
+vi.mock('../../src/orchestra/spawn-backend.js', () => ({
+  TmuxBackend: vi.fn(),
+  SubprocessBackend: vi.fn(),
+  SpawnBackendFactory: { create: vi.fn() },
+}));
+
+vi.mock('../../src/orchestra/result-watcher.js', () => ({
+  createResultWatcher: vi.fn().mockReturnValue({
+    waitForChange: vi.fn().mockImplementation(() => new Promise(resolve => setTimeout(resolve, 5_000))),
+    close: vi.fn(),
+  }),
+}));
+
+vi.mock('../../src/orchestra/rollback.js', () => ({
+  createSafetyPoint: vi.fn().mockReturnValue({ id: 'sp-001', sprintId: 'sprint-001', branchName: 'deckent-backup-sprint-001', createdAt: new Date().toISOString() }),
+  rollback: vi.fn().mockReturnValue({ success: true }),
+  getRollbackPolicy: vi.fn().mockReturnValue('skip'),
+  recordRollbackInDebt: vi.fn(),
+  saveSafetyPoint: vi.fn(),
+  deleteSafetyPoint: vi.fn(),
+  isCleanWorkingTree: vi.fn().mockReturnValue(true),
+  safetyBranchExists: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('../../src/core/usage-tracker.js', () => ({
+  UsageTracker: vi.fn().mockImplementation(() => ({
+    recordCall: vi.fn(),
+    getSprintUsage: vi.fn().mockReturnValue({ sprintId: 'sprint-001', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [] }),
+    getTotalUsage: vi.fn(),
+    getModelBreakdown: vi.fn().mockReturnValue([]),
+    listSprints: vi.fn().mockReturnValue([]),
+  })),
+}));
+
+vi.mock('../../src/orchestra/coverage-validator.js', () => ({
+  parseCoverageFromVitest: vi.fn(),
+  validateCoverage: vi.fn(),
+  validateWorkerCoverage: vi.fn().mockReturnValue(null),
+  isDocOnlyTask: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('../../src/core/system-profile.js', () => ({
+  getSystemProfile: vi.fn().mockReturnValue({
+    platform: 'linux',
+    hasTmux: true,
+    recommendedMaxWorkers: 4,
+    cpuCores: 4,
+    totalMemMB: 16000,
+    freeMemMB: 8000,
+  }),
+}));
+
+vi.mock('../../src/core/config.js', () => ({
+  resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
+}));
+
+vi.mock('../../src/core/agent-pool.js', () => ({
+  AgentPoolManager: vi.fn().mockImplementation(() => ({
+    loadAgents: vi.fn().mockReturnValue(new Map()),
+    selectOrCreateAgent: vi.fn().mockReturnValue(null),
+    releaseAgent: vi.fn(),
+    cleanup: vi.fn(),
+  })),
+}));
+
+vi.mock('../../src/core/agent-selector.js', () => ({
+  selectAgent: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('../../src/agents/worker-ipc.js', () => ({
+  ChannelRegistry: vi.fn().mockImplementation(() => ({
+    register: vi.fn(),
+    unregister: vi.fn(),
+    get: vi.fn().mockReturnValue(undefined),
+    getAll: vi.fn().mockReturnValue(new Map()),
+    size: 0,
+  })),
 }));
 
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';

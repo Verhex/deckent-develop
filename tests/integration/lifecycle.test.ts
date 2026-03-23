@@ -78,6 +78,8 @@ import {
   planSprint, writeRetrospective, writeSprintLog, calculateMetrics,
   decay, cleanup,
 } from '../../src/orchestra/brain.js';
+import { providerRegistry } from '../../src/core/provider.js';
+import type { ProviderAdapter } from '../../src/core/provider.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -575,9 +577,28 @@ describe('Sprint mini-cycle integration', () => {
   beforeAll(() => {
     root = mkdtempSync(join(tmpdir(), 'deckent-sprint-'));
     setupProjectDir(root);
+
+    // Register a mock provider so planSprint can resolve the default adapter
+    providerRegistry.clear();
+    const mockAdapter: ProviderAdapter = {
+      name: 'claude',
+      supportedModels: ['opus', 'sonnet', 'haiku'],
+      spawn: () => {},
+      kill: () => {},
+      listWorkers: () => [],
+      checkUsage: async () => ({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() }),
+      isAvailable: async () => true,
+      buildCommand: (model: string) => `claude -p --model ${model}`,
+      buildPlannerCommand: (prompt: string, model: string) => ({
+        command: 'claude',
+        args: ['-p', prompt, '--model', model, '--output-format', 'json'],
+      }),
+    };
+    providerRegistry.registerProvider(mockAdapter, true);
   });
 
   afterAll(() => {
+    providerRegistry.clear();
     rmSync(root, { recursive: true, force: true });
   });
 

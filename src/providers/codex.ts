@@ -179,6 +179,8 @@ export class CodexAdapter implements ProviderAdapter {
 
   /**
    * Check whether the Codex CLI is available and OPENAI_API_KEY is set.
+   * Note: ChatGPT OAuth login (`codex --login`) is another valid auth path,
+   * but we only detect the API key method here for non-interactive use.
    */
   async isAvailable(): Promise<boolean> {
     try {
@@ -202,19 +204,16 @@ export class CodexAdapter implements ProviderAdapter {
 
   /**
    * Build the shell command string for running codex CLI.
-   * Format: `codex --model {model} --quiet < {promptPath}`
+   * Format: `codex exec --model {model} --quiet --approval-mode full-auto < {promptPath}`
    */
   buildCommand(
     model: ModelType,
     promptPath: string,
     opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    let cmd = `codex --model ${model} --quiet`;
-    if (opts?.allowedTools) {
-      cmd += ` --allowed-tools '${opts.allowedTools}'`;
-    }
+    let cmd = `codex exec --model ${model} --quiet`;
     if (opts?.autoApprove) {
-      cmd += ' --full-auto';
+      cmd += ' --approval-mode full-auto';
     }
     cmd += ` < ${promptPath}`;
     return cmd;
@@ -223,12 +222,9 @@ export class CodexAdapter implements ProviderAdapter {
   // ─── Internal helpers ───────────────────────────────────────────────
 
   private buildArgs(model: ModelType, opts?: ProviderSpawnOptions): string[] {
-    const args = ['--model', model, '--quiet'];
-    if (opts?.allowedTools) {
-      args.push('--allowed-tools', opts.allowedTools);
-    }
+    const args = ['exec', '--model', model, '--quiet'];
     if (opts?.autoApprove) {
-      args.push('--full-auto');
+      args.push('--approval-mode', 'full-auto');
     }
     return args;
   }

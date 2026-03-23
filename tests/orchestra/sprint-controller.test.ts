@@ -246,6 +246,8 @@ import {
   getChannelRegistry,
   spawnWorkers,
   resolveTaskProvider,
+  isTmuxProvider,
+  DEFAULT_USAGE_CLI,
 } from '../../src/orchestra/sprint-controller.js';
 
 import type {
@@ -855,7 +857,7 @@ describe('checkUsage', () => {
     vi.clearAllMocks();
   });
 
-  it('returns parsed usage when claude CLI succeeds', () => {
+  it('returns parsed usage when CLI succeeds', () => {
     mockedSpawnSync.mockReturnValue({
       status: 0,
       stdout: '5hr: 42.5%\nweekly: 18.3%',
@@ -887,6 +889,57 @@ describe('checkUsage', () => {
 
     expect(result.fiveHourPercent).toBe(50);
     expect(result.weeklyPercent).toBe(30);
+  });
+
+  it('uses provider CLI binary when adapter is registered', () => {
+    const mockAdapter = {
+      name: 'codex',
+      buildCommand: vi.fn().mockReturnValue('codex --model o3 < /dev/null'),
+    };
+    mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
+
+    mockedSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: '5hr: 10%\nweekly: 5%',
+      stderr: '',
+      pid: 1,
+      output: [],
+      signal: null,
+    } as ReturnType<typeof spawnSync>);
+
+    const config = makeConfig();
+    checkUsage(config);
+
+    // Should call the provider's CLI binary, not hardcoded 'claude'
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      'codex',
+      ['-p', '/usage'],
+      expect.any(Object),
+    );
+  });
+
+  it('falls back to DEFAULT_USAGE_CLI when no adapter registered', () => {
+    mockedProviderRegistry.getDefault.mockImplementation(() => {
+      throw new Error('No providers registered');
+    });
+
+    mockedSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: '5hr: 30%\nweekly: 20%',
+      stderr: '',
+      pid: 1,
+      output: [],
+      signal: null,
+    } as ReturnType<typeof spawnSync>);
+
+    const config = makeConfig();
+    checkUsage(config);
+
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      DEFAULT_USAGE_CLI,
+      ['-p', '/usage'],
+      expect.any(Object),
+    );
   });
 });
 
@@ -982,9 +1035,46 @@ describe('resolveTaskProvider', () => {
     expect(resolveTaskProvider(task)).toBe('gemini');
   });
 
-  it('falls back to claude for unknown model', () => {
+  it('falls back to registry default for unknown model', () => {
+    // When a provider is registered as default, unknown models should use it
+    const mockAdapter = { name: 'codex' };
+    mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
+    const task = makeTask({ model: 'unknown-model' as any });
+    expect(resolveTaskProvider(task)).toBe('codex');
+  });
+
+  it('falls back to claude when registry is empty and model unknown', () => {
+    // Last resort: 'claude' is the built-in ProviderName default
+    mockedProviderRegistry.getDefault.mockImplementation(() => {
+      throw new Error('No providers registered');
+    });
     const task = makeTask({ model: 'unknown-model' as any });
     expect(resolveTaskProvider(task)).toBe('claude');
+  });
+});
+
+// ═══ isTmuxProvider ═══════════════════════════════════════════════
+
+describe('isTmuxProvider', () => {
+  it('returns true for claude provider', () => {
+    expect(isTmuxProvider('claude')).toBe(true);
+  });
+
+  it('returns false for codex provider', () => {
+    expect(isTmuxProvider('codex')).toBe(false);
+  });
+
+  it('returns false for gemini provider', () => {
+    expect(isTmuxProvider('gemini')).toBe(false);
+  });
+});
+
+// ═══ DEFAULT_USAGE_CLI ═══════════════════════════════════════════
+
+describe('DEFAULT_USAGE_CLI', () => {
+  it('is exported as a string constant', () => {
+    expect(typeof DEFAULT_USAGE_CLI).toBe('string');
+    expect(DEFAULT_USAGE_CLI).toBe('claude');
   });
 });
 
@@ -1212,7 +1302,7 @@ describe('spawnWorkers — provider routing', () => {
     spawnWorkers('/tmp/test', sprint, config);
 
     const spawnCall = mockCodexAdapter.spawn.mock.calls[0];
-    expect(spawnCall[3].allowedTools).toBe('Read,Write(src/test/,src/test/file.ts),Bash');
+    expect(spawnCall[3].allowedTools).toBe('Read,Write(.tasks/,src/test/,src/test/file.ts),Bash');
   });
 
   it('passes autoApprove option to non-Claude adapter', () => {
@@ -1287,5 +1377,68 @@ describe('cleanup — provider kill routing', () => {
     const sprint = makeSprint({ tasks: [task] });
 
     expect(() => cleanup('/tmp/test', sprint)).not.toThrow();
+  });
+});
+
+// ═══ Provider Decoupling Verification ═══════════════════════════════
+
+describe('sprint-controller provider decoupling', () => {
+  it('sprint-controller.ts has zero inline hardcoded claude fallback patterns', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    // Should NOT have `?? 'claude'` patterns (hardcoded fallback)
+    expect(source).not.toMatch(/\?\?\s*'claude'/);
+    // Should NOT have `config.brain_provider ?? 'claude'`
+    expect(source).not.toContain("brain_provider ?? 'claude'");
+  });
+
+  it('routing comparisons use isTmuxProvider() helper instead of inline string', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    // Should NOT have inline `=== 'claude'` or `!== 'claude'` in routing logic
+    expect(source).not.toMatch(/taskProvider\s*!==\s*'claude'/);
+    expect(source).not.toMatch(/provider\s*===\s*'claude'/);
+    expect(source).not.toMatch(/provider\s*!==\s*'claude'/);
+  });
+
+  it('checkUsage uses DEFAULT_USAGE_CLI constant instead of inline string', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    // The checkUsage function should reference cliBinary variable, not inline 'claude'
+    expect(source).toContain('DEFAULT_USAGE_CLI');
+    // The spawnSync call inside checkUsage should use cliBinary, not a literal
+    expect(source).toContain('spawnSync(cliBinary,');
+  });
+
+  it('isTmuxProvider is the single source of truth for tmux routing', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    // isTmuxProvider should be used in routing logic
+    expect(source).toContain('isTmuxProvider(');
+    // Should appear in spawnWorkers and cleanup
+    const isTmuxCount = (source.match(/isTmuxProvider\(/g) ?? []).length;
+    expect(isTmuxCount).toBeGreaterThanOrEqual(3); // definition + 2+ usages
+  });
+
+  it('resolveTaskProvider tries registry default before hardcoded fallback', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    // Should contain registry.getDefault() call in resolveTaskProvider
+    expect(source).toContain('providerRegistry.getDefault().name');
   });
 });

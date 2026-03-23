@@ -1,45 +1,44 @@
-# Sprint 038 Retrospective (Multi-Provider Infrastructure + Platform Decoupling)
+# Sprint sprint-039 Retrospective
 
 ## Metrics
-- Tasks: 20/20 DONE (100%)
-- Tests: 8555 total (+476 new), 0 failures
-- Files Changed: 65
-- Lines: +7440 / -468
+- Tasks: 19 total, 1 done, 0 debt, 18 no-go
+- Coverage: 95.0%
+- No-Go Rate: 94.7%
+- Duration: 2408326ms
 
 ## Results
-- 038-001: ModelType Extension → DONE (51 tests, 14 source files updated)
-- 038-002: Task Provider Field → DONE (20 tests)
-- 038-003: Provider Auto-Detection → DONE (23 tests)
-- 038-004: Codex CLI Adapter → DONE (49 tests)
-- 038-005: Gemini CLI Adapter → DONE (28 tests)
-- 038-006: Model Equivalence Mapping → DONE (39 tests)
-- 038-007: Provider Capability Matrix → DONE (17 tests)
-- 038-008: Multi-Provider Config → DONE (25 tests)
-- 038-009: Provider-Aware Model Selector → DONE (20 tests)
-- 038-010: Provider Usage Balancer → DONE (25 tests)
-- 038-011: spawnWorkers Provider Routing → DONE (28 tests)
-- 038-012: Provider Fallback Chain → DONE (16 tests)
-- 038-013: Platform Support Matrix → DONE (14 tests)
-- 038-014: CLI Entrypoint Side-Effect Fix → DONE (14 tests)
-- 038-015: Planner Provider Decoupling → DONE (20 tests)
-- 038-016: tmux.ts Provider Decoupling → DONE (14 tests)
-- 038-017: subprocess.ts Provider Decoupling → DONE (20 tests)
-- 038-018: Provider Bootstrap Centralization → DONE (16 tests)
-- 038-019: Cross-Platform Test Helper → DONE (35 tests)
-- 038-020: Platform-Conditional Test Tags → DONE (11 tests)
+- 039-001: Codex Adapter Real CLI Fix -> DONE
+- 039-002: Gemini Adapter API Verification -> NO_GO
+- 039-003: Planner Full Provider Decoupling -> NO_GO
+- 039-004: Model Equivalence Update -> NO_GO
+- 039-005: Init Wizard — Provider Selection -> NO_GO
+- 039-006: Cross-Environment Detection -> NO_GO
+- 039-007: Provider Health Dashboard -> NO_GO
+- 039-008: Smart Provider Routing -> NO_GO
+- 039-009: Agent-Provider Compatibility -> NO_GO
+- 039-010: Cost Estimator -> NO_GO
+- 039-011: Multi-Provider Integration Test -> NO_GO
+- 039-012: Cursor MCP Auto-Registration -> NO_GO
+- 039-013: Multi-Provider Documentation -> NO_GO
+- 039-014: Provider Config in Dashboard Settings -> NO_GO
+- 039-015: Blueprint & Architecture Update -> NO_GO
+- 039-016: Pre-Publish Validation Script -> NO_GO
+- 039-017: Windows New Test Failures Fix -> NO_GO
+- 039-018: deckent finalize .result File Generation -> NO_GO
+- 039-019: npm Beta Publish Preparation -> NO_GO
 
-## What Went Well
-- Task 1 (ModelType) completed cleanly — foundation solid for all subsequent tasks
-- 5-wave execution with proper dependency ordering
-- model-equivalence.ts conflict resolved quickly (local types → import from task-types)
-- All backward compatibility maintained — Claude-only code still works unchanged
+## Comparison with Previous Sprint
+- Duration: +0.0%
+- No-Go Rate: -5.3pp
+- Coverage: +95.0pp
 
-## What Could Improve
-- deckent finalize reports NO_GO for agent-executed tasks (no .result files)
-- Need .result file generation for CC agent mode execution
+## Usage
+- Total Calls: 27
+- Total Tokens (est): 60000
+  - opus: 26 calls, 59000 tokens
+  - sonnet: 1 calls, 1000 tokens
 
-## Architecture Decisions
-- ProviderAdapter interface: spawn/kill/listWorkers/checkUsage/isAvailable/buildCommand
-- Tier-based model equivalence: premium/standard/economy with fallback
-- SubprocessProviderConfig: decouples subprocess.ts from any specific CLI
-- buildProgram()/entry.ts pattern: eliminates CLI import side-effects
+## Agent Performance
+| Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
+|-------|-------|------|------|------|-------------|
+| generic | 19 | 1 | 0 | 18 | 0% |

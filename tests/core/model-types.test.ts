@@ -26,12 +26,12 @@ describe('PROVIDER_MODEL_MAP', () => {
     expect(PROVIDER_MODEL_MAP.claude).toEqual(['opus', 'sonnet', 'haiku']);
   });
 
-  it('maps codex to gpt-4.1, o3, o4-mini', () => {
-    expect(PROVIDER_MODEL_MAP.codex).toEqual(['gpt-4.1', 'o3', 'o4-mini']);
+  it('maps codex to gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, o3, o4-mini', () => {
+    expect(PROVIDER_MODEL_MAP.codex).toEqual(['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini']);
   });
 
-  it('maps gemini to gemini-2.5-pro, gemini-2.5-flash', () => {
-    expect(PROVIDER_MODEL_MAP.gemini).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash']);
+  it('maps gemini to gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash', () => {
+    expect(PROVIDER_MODEL_MAP.gemini).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });
 
   it('has exactly 3 providers', () => {
@@ -55,8 +55,8 @@ describe('CLAUDE_MODELS', () => {
 // ─── ALL_MODELS ──────────────────────────────────────────────────────────────
 
 describe('ALL_MODELS', () => {
-  it('contains all 8 model names', () => {
-    expect(ALL_MODELS).toHaveLength(8);
+  it('contains all 12 model names', () => {
+    expect(ALL_MODELS).toHaveLength(12);
   });
 
   it('includes all Claude models', () => {
@@ -66,7 +66,10 @@ describe('ALL_MODELS', () => {
   });
 
   it('includes OpenAI models', () => {
+    expect(ALL_MODELS).toContain('gpt-5');
+    expect(ALL_MODELS).toContain('gpt-5-mini');
     expect(ALL_MODELS).toContain('gpt-4.1');
+    expect(ALL_MODELS).toContain('gpt-4.1-mini');
     expect(ALL_MODELS).toContain('o3');
     expect(ALL_MODELS).toContain('o4-mini');
   });
@@ -74,6 +77,7 @@ describe('ALL_MODELS', () => {
   it('includes Gemini models', () => {
     expect(ALL_MODELS).toContain('gemini-2.5-pro');
     expect(ALL_MODELS).toContain('gemini-2.5-flash');
+    expect(ALL_MODELS).toContain('gemini-2.0-flash');
   });
 
   it('covers every model in PROVIDER_MODEL_MAP', () => {
@@ -196,24 +200,28 @@ describe('isGeminiModel', () => {
 // ─── getModelTier ────────────────────────────────────────────────────────────
 
 describe('getModelTier', () => {
-  it('tier 0: haiku, o4-mini, gemini-2.5-flash', () => {
+  it('tier 0 (economy): haiku, gpt-5-mini, gpt-4.1-mini, o4-mini, gemini-2.0-flash', () => {
     expect(getModelTier('haiku')).toBe(0);
+    expect(getModelTier('gpt-5-mini')).toBe(0);
+    expect(getModelTier('gpt-4.1-mini')).toBe(0);
     expect(getModelTier('o4-mini')).toBe(0);
-    expect(getModelTier('gemini-2.5-flash')).toBe(0);
+    expect(getModelTier('gemini-2.0-flash')).toBe(0);
   });
 
-  it('tier 1: sonnet, o3, gemini-2.5-pro', () => {
+  it('tier 1 (standard): sonnet, gpt-4.1, o3, gemini-2.5-flash', () => {
     expect(getModelTier('sonnet')).toBe(1);
+    expect(getModelTier('gpt-4.1')).toBe(1);
     expect(getModelTier('o3')).toBe(1);
-    expect(getModelTier('gemini-2.5-pro')).toBe(1);
+    expect(getModelTier('gemini-2.5-flash')).toBe(1);
   });
 
-  it('tier 2: opus, gpt-4.1', () => {
+  it('tier 2 (premium): opus, gpt-5, gemini-2.5-pro', () => {
     expect(getModelTier('opus')).toBe(2);
-    expect(getModelTier('gpt-4.1')).toBe(2);
+    expect(getModelTier('gpt-5')).toBe(2);
+    expect(getModelTier('gemini-2.5-pro')).toBe(2);
   });
 
-  it('all 8 models have a defined tier', () => {
+  it('all 12 models have a defined tier', () => {
     for (const m of ALL_MODELS) {
       expect(typeof getModelTier(m)).toBe('number');
     }
@@ -249,7 +257,7 @@ describe('Type compatibility', () => {
   });
 
   it('OpenAIModel values are valid ModelType values', () => {
-    const models: OpenAIModel[] = ['gpt-4.1', 'o3', 'o4-mini'];
+    const models: OpenAIModel[] = ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'];
     for (const m of models) {
       const _mt: ModelType = m;
       expect(isValidModel(_mt)).toBe(true);
@@ -257,7 +265,7 @@ describe('Type compatibility', () => {
   });
 
   it('GeminiModel values are valid ModelType values', () => {
-    const models: GeminiModel[] = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+    const models: GeminiModel[] = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
     for (const m of models) {
       const _mt: ModelType = m;
       expect(isValidModel(_mt)).toBe(true);
