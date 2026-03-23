@@ -1,11 +1,61 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ProviderAdapter } from '../../src/core/provider.js';
+import type { ModelType } from '../../src/core/types.js';
+import type { ResolvedConfig } from '../../src/core/config-types.js';
+
+// ─── Mock child_process to prevent real spawnSync calls ─────────────────────
+
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn().mockReturnValue({ status: 1, stdout: '', stderr: '', error: null }),
+  spawn: vi.fn(),
+  execSync: vi.fn().mockReturnValue(''),
+}));
+
+// Mock dynamic imports for provider adapters
+vi.mock('../../src/providers/claude.js', () => ({
+  createClaudeAdapter: vi.fn().mockReturnValue({
+    name: 'claude',
+    supportedModels: ['opus', 'sonnet', 'haiku'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: new Date().toISOString() }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('claude -p test'),
+  }),
+}));
+
+vi.mock('../../src/providers/codex.js', () => ({
+  createCodexAdapter: vi.fn().mockReturnValue({
+    name: 'codex',
+    supportedModels: ['gpt-4.1', 'o3', 'o4-mini'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: new Date().toISOString() }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('codex exec test'),
+  }),
+}));
+
+vi.mock('../../src/providers/gemini.js', () => ({
+  createGeminiAdapter: vi.fn().mockReturnValue({
+    name: 'gemini',
+    supportedModels: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    listWorkers: vi.fn().mockReturnValue([]),
+    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: new Date().toISOString() }),
+    isAvailable: vi.fn().mockResolvedValue(true),
+    buildCommand: vi.fn().mockReturnValue('node -e gemini'),
+  }),
+}));
+
+import { spawnSync } from 'node:child_process';
 import {
   ProviderRegistry,
   bootstrapProviders,
 } from '../../src/core/provider.js';
-import type { ProviderAdapter } from '../../src/core/provider.js';
-import type { ModelType } from '../../src/core/types.js';
-import type { ResolvedConfig } from '../../src/core/config-types.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -32,63 +82,41 @@ function makeConfig(overrides: Partial<Pick<ResolvedConfig, 'brain_provider' | '
   } as Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot'>;
 }
 
-// ─── Mock detectAvailableProviders and adapter factories ─────────────────────
+/** Configure spawnSync mock to make claude detected as available */
+function mockClaudeAvailable() {
+  vi.mocked(spawnSync).mockImplementation((cmd: string) => {
+    if (cmd === 'claude') {
+      return { status: 0, stdout: '1.0.0\n', stderr: '', error: null, pid: 0, output: [], signal: null } as any;
+    }
+    return { status: 1, stdout: '', stderr: '', error: null, pid: 0, output: [], signal: null } as any;
+  });
+}
 
-// We mock the detection and dynamic imports at the module level
-vi.mock('../../src/core/provider.js', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../src/core/provider.js')>();
-  return {
-    ...original,
-    // Keep everything but let us override detectAvailableProviders per test
-  };
-});
+/** Configure spawnSync mock so all CLIs are unavailable */
+function mockNoneAvailable() {
+  vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', error: null, pid: 0, output: [], signal: null } as any);
+}
 
-// Actually, since bootstrapProviders calls detectAvailableProviders internally,
-// and we want to test the function directly with a fresh registry, let's just
-// test with the real function but mock the imports at a different level.
-
-// Better approach: test with a fresh registry and mock the dynamic imports
-// by passing a pre-populated registry.
+// ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('bootstrapProviders', () => {
   let registry: ProviderRegistry;
 
   beforeEach(() => {
     registry = new ProviderRegistry();
-  });
-
-  // Since bootstrapProviders calls detectAvailableProviders which uses spawnSync,
-  // we need to mock it. Let's use vi.spyOn approach.
-  const mockDetect = vi.fn();
-
-  beforeEach(() => {
-    // Mock the detect function via module mock
-    vi.doMock('../../src/core/provider.js', async (importOriginal) => {
-      const orig = await importOriginal<typeof import('../../src/core/provider.js')>();
-      return {
-        ...orig,
-        detectAvailableProviders: mockDetect,
-      };
-    });
+    vi.clearAllMocks();
+    mockNoneAvailable();
+    // Clear env vars that affect detection
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['GOOGLE_API_KEY'];
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.resetModules();
   });
-
-  // Since dynamic module mocking is complex, let's test bootstrapProviders
-  // behavior using the actual function with environment manipulation.
-  // The key behaviors we need to verify:
-  // 1. Returns BootstrapResult shape
-  // 2. Skips unavailable providers
-  // 3. Registers available providers
-  // 4. Sets correct default
-  // 5. Handles already-registered providers (idempotent)
 
   describe('BootstrapResult shape', () => {
     it('should return registered, skipped, and defaultProvider fields', async () => {
-      // bootstrapProviders with real detection — in CI, claude CLI likely missing
       const config = makeConfig();
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
@@ -100,6 +128,7 @@ describe('bootstrapProviders', () => {
     });
 
     it('should have ProviderName types in registered array', async () => {
+      mockClaudeAvailable();
       const config = makeConfig();
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
@@ -122,27 +151,24 @@ describe('bootstrapProviders', () => {
 
   describe('default provider selection', () => {
     it('should set default to brain_provider when available and registered', async () => {
-      // Pre-register a provider so it appears in the registry
       const claudeAdapter = makeAdapter('claude');
       registry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
 
       const config = makeConfig({ brain_provider: 'claude' });
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
-      // claude was already registered, should be set as default
       expect(result.defaultProvider).toBe('claude');
       expect(registry.getDefault().name).toBe('claude');
     });
 
     it('should fall back to first registered when brain_provider unavailable', async () => {
-      // Pre-register codex but not claude
       const codexAdapter = makeAdapter('codex', ['gpt-4.1', 'o3', 'o4-mini'] as ModelType[]);
       registry.registerProvider(codexAdapter);
 
       const config = makeConfig({ brain_provider: 'claude' });
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
-      // claude not in registry, should fall back
       if (result.registered.length > 0) {
         expect(result.defaultProvider).not.toBeNull();
       }
@@ -151,20 +177,18 @@ describe('bootstrapProviders', () => {
     it('should default to claude when no brain_provider configured', async () => {
       const claudeAdapter = makeAdapter('claude');
       registry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
 
-      const config = makeConfig(); // no brain_provider
+      const config = makeConfig();
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
       expect(result.defaultProvider).toBe('claude');
     });
 
     it('should return null defaultProvider when no providers registered', async () => {
-      // Empty registry, and likely no providers available in CI
       const config = makeConfig({ brain_provider: 'gemini' });
-      // Use a brand new registry with nothing registered
       const emptyRegistry = new ProviderRegistry();
 
-      // Mock: all providers unavailable by not having CLI/keys
       const result = await bootstrapProviders(config, '/tmp/test', emptyRegistry);
 
       if (result.registered.length === 0) {
@@ -177,13 +201,12 @@ describe('bootstrapProviders', () => {
     it('should skip already-registered providers without error', async () => {
       const claudeAdapter = makeAdapter('claude');
       registry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
 
       const config = makeConfig();
-      // Call twice — should not throw
       const result1 = await bootstrapProviders(config, '/tmp/test', registry);
       const result2 = await bootstrapProviders(config, '/tmp/test', registry);
 
-      // Both should succeed without throwing ProviderError
       expect(result1).toBeDefined();
       expect(result2).toBeDefined();
     });
@@ -191,11 +214,11 @@ describe('bootstrapProviders', () => {
     it('should count pre-registered providers in registered array', async () => {
       const claudeAdapter = makeAdapter('claude');
       registry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
 
       const config = makeConfig();
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
-      // If claude detection says available, it should be in registered (already there)
       if (result.registered.includes('claude')) {
         expect(registry.hasProvider('claude')).toBe(true);
       }
@@ -207,7 +230,6 @@ describe('bootstrapProviders', () => {
       const config = makeConfig();
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
-      // Total of registered + skipped should equal number of known providers (3)
       const totalHandled = result.registered.length + result.skipped.filter(
         s => !s.reason.includes('Configured brain_provider')
       ).length;
@@ -224,15 +246,13 @@ describe('bootstrapProviders', () => {
     });
 
     it('should warn when configured brain_provider is unavailable', async () => {
-      // Configure a provider that is definitely not available
       const config = makeConfig({ brain_provider: 'gemini' });
-      // Pre-register claude so there's a fallback
       const claudeAdapter = makeAdapter('claude');
       registry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
 
       const result = await bootstrapProviders(config, '/tmp/test', registry);
 
-      // If gemini is not registered, should have a warning in skipped
       if (!registry.hasProvider('gemini')) {
         const warning = result.skipped.find(s => s.reason.includes('brain_provider'));
         expect(warning).toBeDefined();
@@ -244,7 +264,6 @@ describe('bootstrapProviders', () => {
   describe('projectRoot handling', () => {
     it('should use explicit projectRoot when provided', async () => {
       const config = makeConfig({ projectRoot: '/default/root' });
-      // The explicit projectRoot parameter should take precedence
       const result = await bootstrapProviders(config, '/explicit/root', registry);
       expect(result).toBeDefined();
     });
@@ -262,8 +281,6 @@ describe('bootstrapProviders', () => {
       const config = makeConfig();
       await bootstrapProviders(config, '/tmp/test', customRegistry);
 
-      // customRegistry may or may not have providers depending on env
-      // but global singleton should not be affected
       expect(customRegistry).not.toBe(registry);
     });
 
@@ -271,6 +288,7 @@ describe('bootstrapProviders', () => {
       const customRegistry = new ProviderRegistry();
       const claudeAdapter = makeAdapter('claude');
       customRegistry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
 
       const config = makeConfig();
       const result = await bootstrapProviders(config, '/tmp/test', customRegistry);

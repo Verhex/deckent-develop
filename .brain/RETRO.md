@@ -1,31 +1,41 @@
-# Sprint sprint-041 Retrospective
+# Sprint sprint-042 Retrospective
+
+## Summary
+Completed 3/8 tasks in 40 minutes 5s.
+
+## Highlights
+- 3 tasks completed on first try
+- No boundary violations detected
+
+## Issues
+- Task 042-001 (Close All Open Tech Debt) failed
+- Task 042-002 (Test Suite Stabilization) failed
+- Task 042-006 (Documentation Final Review) failed
+- Task 042-007 (CHANGELOG + Release Notes) failed
+- Task 042-008 (Version Bump + Git Tag) failed
 
 ## Metrics
-- Tasks: 7 total, 7 done, 1 debt, 0 no-go
-- Coverage: 94.3%
-- No-Go Rate: 0.0%
-- Duration: 792932ms
+| What | Value |
+|------|-------|
+| Tasks completed | 3/8 |
+| New test files | 4 |
+| Code changes | +1935 / -1 |
+| Sprint time | 40 minutes 5s |
+| NO_GO rate | 63% (5/8) |
 
-## Results
-- 041-001: Fix debt: Tech debt from 033-016-fix: Added debugLog() helper function to src/core/utils.t -> DONE
-- 041-002: MCP Tool Response — Human-Friendly Format -> GO_WITH_TECH_DEBT
-- 041-003: Dashboard — Human-Friendly SprintSummary Component -> DONE
-- 041-004: CLI Doctor — Human-Friendly Health Check Enhancement -> DONE
-- 041-005: RETRO Format — Human-Readable Retrospective Enhancement -> DONE
-- 041-006: Error Messages — Human Context -> DONE
-- 041-007: Worker Logs — Human-Readable Progress -> DONE
-
-## Comparison with Previous Sprint
-- Duration: -67.1%
-- No-Go Rate: -46.2pp
-- Coverage: +2.2pp
-
-## Usage
-- Total Calls: 11
-- Total Tokens (est): 34000
-  - opus: 11 calls, 34000 tokens
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| generic | 7 | 6 | 1 | 0 | 0% |
+| generic | 8 | 0 | 3 | 5 | 0% |
+
+## Learnings
+- Close All Open Tech Debt: failed — investigate root cause
+- Test Suite Stabilization: failed — investigate root cause
+- npm Publish Validation: completed with tech debt — schedule cleanup
+- Global Install E2E Test: completed with tech debt — schedule cleanup
+- Provider Adapter Smoke Tests: completed with tech debt — schedule cleanup
+- Documentation Final Review: failed — investigate root cause
+- CHANGELOG + Release Notes: failed — investigate root cause
+- Version Bump + Git Tag: failed — investigate root cause
+- Recurring pattern (2947x): stale_heartbeat

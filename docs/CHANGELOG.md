@@ -5,95 +5,158 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-sprint41] - 2026-03-23
+## [0.1.0-sprint42] - 2026-03-23
 
-### Added
-
-- Dashboard — Human-Friendly SprintSummary Component
-- CLI Doctor — Human-Friendly Health Check Enhancement
-- RETRO Format — Human-Readable Retrospective Enhancement
-- Error Messages — Human Context
-- Worker Logs — Human-Readable Progress
 
 ### Changed
 
-- MCP Tool Response — Human-Friendly Format (completed with tech debt)
-
-### Fixed
-
-- Fix debt: Tech debt from 033-016-fix: Added debugLog() helper function to src/core/utils.t
+- npm Publish Validation (completed with tech debt)
+- Global Install E2E Test (completed with tech debt)
+- Provider Adapter Smoke Tests (completed with tech debt)
 
 
-_Tasks: 7 total, 7 done, 1 tech debt, 0 no-go_
+_Tasks: 8 total, 3 done, 3 tech debt, 5 no-go_
 
-## [0.1.0-sprint40] - 2026-03-23
+## [0.2.0-beta.1] — 2026-03-23 (Stabilization — Beta Ready)
 
 ### Added
-
-- Worker Internal Verify Loop — tsc Check
-- Worker Internal Verify Loop — Test Check
-- Worker Feedback Metrics
-- CLI Output — Human-Friendly Sprint Complete
-- CLI Init — Human-Friendly Wizard
+- **CHANGELOG**: Sprint 035-042 entries in semver format
+- **RELEASE-NOTES-BETA.md**: Beta release notes with features, metrics, getting started, known limitations, and roadmap
+- **npm Publish Validation**: `scripts/validate-publish.ts` and `npm run validate:publish` for automated publish checks
+- **E2E Tests**: Global install flow and first-sprint journey tests (`tests/e2e/`)
+- **Provider Smoke Tests**: Adapter smoke tests for Claude, Codex, and Gemini without real API calls
 
 ### Changed
-
-- CLI Output — Human-Friendly Status (completed with tech debt)
-
-### Fixed
-
-- Worker Prompt Overhaul — Human Instructions + Agent/Skill Injection Fix
-
-
-_Tasks: 13 total, 7 done, 1 tech debt, 6 no-go_
-
-## [0.1.0-sprint39] - 2026-03-22
-
+- Version bumped from 0.1.0 to 0.2.0-beta.1
+- All open tech debt items closed or documented in DECISIONS.md
+- Documentation final review pass (README, QUICKSTART, CONFIG-REFERENCE, CONTRIBUTING)
 
 ### Fixed
+- Test suite stabilized: 0 failures on Linux/WSL
+- All flaky tests resolved (timing, concurrency, platform-specific)
 
-- Codex Adapter Real CLI Fix
+_Sprint 042: Stabilization — Beta Ready_
 
+## [0.1.0-sprint041] — 2026-03-23 (Human-Friendly Output Complete)
 
-_Tasks: 19 total, 1 done, 0 tech debt, 18 no-go_
+### Added
+- **Dashboard SprintSummary**: Human-friendly SprintSummary component for web dashboard
+- **CLI Doctor Enhancement**: Human-friendly health check output with categorized results
+- **RETRO Enhancement**: Human-readable retrospective format with comparison metrics
+- **Error Messages**: Human-context error messages with suggestions and fix hints
+- **Worker Logs**: Human-readable progress output for worker execution logs
 
-## [0.1.0-sprint38] — 2026-03-22 (Multi-Provider Infrastructure + Platform Decoupling)
+### Changed
+- MCP tool responses reformatted to human-friendly format (with tech debt)
+
+### Fixed
+- debugLog() helper function tech debt from Sprint 033 resolved
+
+_Tasks: 7 total, 7 done, 1 tech debt, 0 no-go | Coverage: 94.3%_
+
+## [0.1.0-sprint040] — 2026-03-23 (Worker Feedback Loop + Human-Friendly Output)
+
+### Added
+- **Worker Verify Loop**: Internal tsc and test verification within worker execution
+- **Worker Feedback Metrics**: Worker self-assessment metrics collection
+- **Human-Friendly Sprint Complete**: Colored, categorized sprint completion output
+- **Human-Friendly Init Wizard**: Interactive init wizard with guided setup
+
+### Changed
+- CLI status output reformatted to human-friendly format (with tech debt)
+
+### Fixed
+- Worker prompt overhaul: human-readable instructions and agent/skill injection fix
+
+_Tasks: 13 total, 7 done, 1 tech debt, 6 no-go | Coverage: 92.1%_
+
+## [0.1.0-sprint039] — 2026-03-22 (Provider Fixes)
+
+### Fixed
+- **Codex Adapter**: Real CLI integration fix for Codex provider adapter
+
+_Tasks: 19 total, 1 done, 0 tech debt, 18 no-go | Coverage: 95.0%_
+
+## [0.1.0-sprint038] — 2026-03-22 (Multi-Provider Infrastructure)
 
 ### Added
 - **ModelType Extended**: 8 model variants across 3 providers (Claude, Codex, Gemini)
 - **Codex Adapter**: OpenAI Codex provider adapter with usage tracking
 - **Gemini Adapter**: Google Gemini provider adapter with usage tracking
-- **Provider-Aware Model Selection**: model-selector.ts updated to route across all 3 providers
+- **Provider-Aware Model Selection**: model-selector.ts routes across all 3 providers
 - **spawnWorkers Routing**: Worker spawn routing based on provider/model assignment
 - **Planner Decoupling**: planner.ts decoupled from tmux/subprocess specifics
 - **tmux Decoupling**: tmux.ts platform abstraction layer
 - **Subprocess Decoupling**: subprocess backend abstraction improvements
-- **CLI Entrypoint Fix**: CLI entrypoint corrected for multi-provider environment
-- **Platform Support Matrix**: Documented macOS/Linux/WSL2 support matrix
+- **CLI Entrypoint Fix**: Side-effect-free entrypoint via buildProgram() + entry.ts
+- **Platform Support Matrix**: macOS/Linux/WSL2 support matrix documented
+- **bootstrapProviders()**: Single startup point for provider detection and registration
 
 ### Changed
 - ModelType enum extended with Codex and Gemini model variants
-- ProviderRegistry updated to support dynamic provider registration
-- spawnWorkers now routes tasks to provider-appropriate backends
+- ProviderRegistry supports dynamic provider registration
 - Config supports per-provider API key and endpoint configuration
 
 _Tasks: 20 total, 20 done, 0 tech debt, 0 no-go — +476 tests (8073 → 8555)_
 
-## [0.1.0-sprint37] — 2026-03-22 (Beta Cleanup Wave 5+6: Security, Performance, Plugin, Memory System Fix)
+## [0.1.0-sprint037] — 2026-03-22 (Security, Performance, Plugin System)
 
 ### Added
-- **Timing-Safe Auth**: Constant-time comparison for authentication tokens (prevents timing attacks)
-- **Credential Redaction**: Automatic redaction of secrets/keys from logs and error messages
-- **Skill Sandbox AST**: AST-based static analysis for skill sandboxing and permission enforcement
-- **Plugin Install + Hooks**: Plugin installation lifecycle with pre/post install hooks
-- **PROJECT-IDENTITY.md**: Project identity file generation during init
-- **finalizeSprint()**: Dedicated sprint finalization function extracted from brain.ts
+- **Timing-Safe Auth**: Constant-time comparison for authentication tokens (SHA-256 hash)
+- **Credential Redaction**: Automatic redaction of API keys, Bearer tokens, and URL passwords from logs
+- **Skill Sandbox AST**: TypeScript compiler API second-pass for eval/Function/child_process detection
+- **DIRECTIVES Validation**: Zod schema validation (DirectiveSchema + DirectiveTaskSchema) before task creation
+- **Plugin System**: Full install lifecycle (npm/git/local + rollback), runtime hooks (beforeSprint/afterTask/afterSprint)
+- **PROJECT-IDENTITY.md**: Permanent project identity file, never decayed, updated every sprint
+- **finalizeSprint()**: Dedicated sprint finalization function + `deckent finalize` CLI command
+- **Config Mode Aliases**: performance/balanced/economic/unlimited mapped to canonical mode names
 
 ### Changed
-- Memory budget increased from 300 to 600 lines to accommodate richer sprint learnings
-- Plugin system hooks integrated into install/uninstall lifecycle
+- Memory budget increased from 300 to 600 lines
+- Decay threshold extended from 3 to 5 sprints
+- RETRO max lines increased from 60 to 100
+- Sprint log max lines increased from 50 to 80
+- Agent pool uses LRU eviction (max 50 temp, 5 sprint age) with batch read
 
 _Tasks: 16 total, 16 done, 0 tech debt, 0 no-go — +258 tests (7815 → 8073)_
+
+## [0.1.0-sprint036] — 2026-03-22 (Architectural Cleanup)
+
+### Added
+- **sprint-controller.ts**: Sprint lifecycle management extracted from brain.ts
+- **result-evaluator.ts**: Task result evaluation logic extracted from brain.ts
+- **usage-manager.ts**: Usage tracking and budget management extracted from brain.ts
+- **Type Modules**: types.ts split into task-types, config-types, monitoring-types, sprint-types + barrel
+
+### Changed
+- **brain.ts God Object Split**: 1312 → 58 lines, now a pure re-export layer with backward compatibility
+- **spawn-backend.ts**: Moved from core/ to orchestra/ (layer violation fix)
+- **Non-null Assertions**: 48 `!` operators replaced with guard clauses, `.at()`, and `?? fallback` across 29 files
+- **Type Casts**: Replaced with enum literals (`TaskStatus.DONE`) and type guards
+- **Barrel Cleanup**: orchestra/index.ts reduced from 30+ to 22 public API exports with @internal JSDoc
+- **Auditor Queue**: shift() O(n) replaced with descending sort + pop() O(1)
+- **PromptAnalytics**: prompt-metrics + prompt-ab-test unified into single class
+
+_Tasks: 11 total, 11 done, 0 tech debt, 0 no-go — +315 tests_
+
+## [0.1.0-sprint035] — 2026-03-22 (Beta Cleanup Wave 1+2)
+
+### Added
+- **readJsonSafeAsync()**: Async variant of readJsonSafe for non-blocking JSON file reads
+- **Utility Extraction**: readFileIfExists, listFilesWithExtension, safeMapGet moved to utils.ts
+- **Error Registry Expansion**: Error codes E039-E053 with fix suggestions
+
+### Changed
+- **readJsonSafe Migration**: 13 inline JSON.parse calls replaced with readJsonSafe()
+- **Error Handling Unification**: 11 generic throw statements replaced with DeckentError + ErrorRegistry
+- **Silent Catch Logging**: debugLog() helper with DECKENT_DEBUG env gate across 8 catch blocks
+- **parseBody Type Safety**: 5 Zod schemas (Start/Plan/Directives/Config/Kill) + parseBodyWithSchema()
+- **EventEmitter Fix**: Dedicated _ipcEmitter with setMaxListeners(0), removed process EventEmitter usage
+
+### Fixed
+- **tmux Worker Crash Recovery**: Agent-based subprocess fallback for crashed tmux workers
+
+_Sprint 035: Beta Cleanup Wave 1+2_
 
 ## [0.1.0-sprint33] - 2026-03-22
 

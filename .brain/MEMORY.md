@@ -114,3 +114,12 @@
 - Log Output — Human-Friendly Worker Logs: NO_GO
 ## Sprint sprint-041 Learnings
 - MCP Tool Response — Human-Friendly Format: GO_WITH_TECH_DEBT
+## Sprint sprint-042 Learnings
+- Close All Open Tech Debt: NO_GO
+- Test Suite Stabilization: NO_GO
+- npm Publish Validation: GO_WITH_TECH_DEBT
+- Global Install E2E Test: GO_WITH_TECH_DEBT
+- Provider Adapter Smoke Tests: GO_WITH_TECH_DEBT
+- Documentation Final Review: NO_GO
+- CHANGELOG + Release Notes: NO_GO
+- Version Bump + Git Tag: NO_GO

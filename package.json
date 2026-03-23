@@ -1,6 +1,6 @@
 {
   "name": "deckent",
-  "version": "0.1.0",
+  "version": "0.2.0-beta.1",
   "description": "AI agent orchestration system — your AI development team, orchestrated.",
   "type": "module",
   "bin": {
@@ -24,6 +24,7 @@
     "test:dashboard": "vitest run --config vitest.dashboard.config.ts",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
+    "validate:publish": "npx tsx scripts/validate-publish.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -39,6 +40,13 @@
   ],
   "author": "Alperen @ Verhex",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VerhexIO/deckent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VerhexIO/deckent/issues"
+  },
   "homepage": "https://deckent.agency",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",

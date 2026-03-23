@@ -29,10 +29,10 @@ Read .brain/DEBT.md. For EVERY open debt item (resolved=false): either fix it or
 - Scope: tests/
 
 ### Description
-Run `npx vitest run` and fix ALL failing tests. Current baseline: ~6 known flaky failures (vitest concurrency/timeout). For each:
+Run `npx vitest run` and fix ALL failing tests. Current baseline: ~36 known failures (platform-related). For each:
 1. If genuine bug → fix the source code
 2. If platform-specific (Windows) → add `skipIf(process.platform === 'win32')` with clear comment
-3. If flaky (timing/concurrency) → use `vi.useFakeTimers()` or increase timeout or isolate test
+3. If flaky (timing) → use `vi.useFakeTimers()` or increase timeout
 4. If stale expectation → update test to match current code
 Target: 0 fail on Linux/WSL. Document any skipped tests in tests/PLATFORM.md. 20+ test fixes.
 
@@ -162,7 +162,39 @@ No code changes — documentation only.
 
 ### Description
 1. Update CHANGELOG.md with Sprint 035-042 entries in semver format
-2. Create RELEASE-NOTES-BETA.md with: What's New, Key Metrics, Getting Started, Known Limitations, Roadmap
+2. Create RELEASE-NOTES-BETA.md:
+```markdown
+# Deckent v0.2.0-beta.1 Release Notes
+
+## What's New
+- Multi-provider support (Claude + Codex + Gemini)
+- Worker feedback loop (self-healing: tsc + test verify)
+- Human-friendly output (CLI, MCP, Dashboard, Doctor)
+- Plugin system (install, hooks, lifecycle)
+- Agent/skill system (8 agents, 10 skills, auto-selection)
+- Provider-agnostic orchestration (decoupled from Claude)
+
+## Key Metrics
+- 9,400+ tests, 94% coverage
+- 42 sprints of dogfooding
+- 97+ tasks completed across 7 stabilization sprints
+- NO_GO rate: 94.7% → 0% (worker feedback loop)
+
+## Getting Started
+npm install -g deckent
+deckent init
+deckent start "Build a REST API"
+
+## Known Limitations
+- Native Windows requires WSL2
+- Codex/Gemini adapters need real CLI validation
+- Skill marketplace registry not yet live
+
+## Roadmap
+- Messaging integration (Telegram/Discord)
+- Proactive heartbeat (repo watching)
+- Self-improvement loop (Brain prompt evolution)
+```
 
 ### Tests
 - CHANGELOG entries in semver format

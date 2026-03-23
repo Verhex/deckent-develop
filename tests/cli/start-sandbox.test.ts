@@ -39,6 +39,10 @@ vi.mock('../../src/core/constants.js', () => ({
   TMUX_SESSION_NAME: 'deckent',
 }));
 
+vi.mock('../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+}));
+
 vi.mock('../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn(),
 }));

@@ -1,6 +1,6 @@
 # Deckent — Frequently Asked Questions (FAQ)
 
-> **Last Updated:** Sprint 038 | **Language:** English
+> **Last Updated:** Sprint 042 | **Language:** English
 
 This FAQ addresses the most common questions about Deckent, its capabilities, requirements, and workflow.
 

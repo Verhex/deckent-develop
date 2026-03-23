@@ -195,9 +195,9 @@ src/
 
 | Tier | Claude | OpenAI | Gemini |
 |------|--------|--------|--------|
-| Premium | opus | o3 | gemini-2.5-pro |
-| Standard | sonnet | gpt-4.1 | gemini-2.0-flash |
-| Economy | haiku | gpt-4.1-mini | gemini-2.0-flash-lite |
+| Premium | opus | gpt-5 | gemini-2.5-pro |
+| Standard | sonnet | gpt-4.1 | gemini-2.5-flash |
+| Economy | haiku | gpt-5-mini | gemini-2.0-flash |
 
 **Provider-aware model selection:** `resolveTaskModel(task, provider?)` maps task requirements to the best model for the target provider using tier equivalence.
 

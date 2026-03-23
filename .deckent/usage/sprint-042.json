@@ -1,0 +1,98 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-001",
+    "timestamp": "2026-03-23T15:39:01.329Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-002",
+    "timestamp": "2026-03-23T15:39:01.430Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-003",
+    "timestamp": "2026-03-23T15:39:01.531Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-004",
+    "timestamp": "2026-03-23T15:39:01.641Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "042-001",
+    "timestamp": "2026-03-23T16:09:05.439Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "042-002",
+    "timestamp": "2026-03-23T16:09:05.439Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "042-003",
+    "timestamp": "2026-03-23T16:09:05.442Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "042-004",
+    "timestamp": "2026-03-23T16:09:05.453Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "042-005",
+    "timestamp": "2026-03-23T16:09:05.454Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "042-006",
+    "timestamp": "2026-03-23T16:09:05.455Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "042-007",
+    "timestamp": "2026-03-23T16:09:05.456Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 1000,
+    "taskId": "042-008",
+    "timestamp": "2026-03-23T16:09:05.456Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-001-fix",
+    "timestamp": "2026-03-23T16:09:05.658Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-002-fix",
+    "timestamp": "2026-03-23T16:09:05.759Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-006-fix",
+    "timestamp": "2026-03-23T16:09:05.895Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "042-007-fix",
+    "timestamp": "2026-03-23T16:09:06.006Z"
+  }
+]

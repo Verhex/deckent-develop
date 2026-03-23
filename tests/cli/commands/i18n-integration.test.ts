@@ -247,6 +247,13 @@ vi.mock('../../../src/orchestra/tmux.js', () => ({
   setupWatchWindow: vi.fn(),
 }));
 vi.mock('../../../src/core/constants.js', () => ({ TMUX_SESSION_NAME: 'deckent', DASHBOARD_FILE: '.dashboard' }));
+vi.mock('../../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
+}));
+vi.mock('../../../src/cli/commands/quick-start.js', () => ({
+  prepareZeroConfig: vi.fn(),
+  cleanupZeroConfig: vi.fn(),
+}));
 vi.mock('../../../src/cli/commands/doctor.js', () => ({ runDoctorChecks: vi.fn() }));
 vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),

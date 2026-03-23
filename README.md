@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-3609%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-9300%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -79,7 +79,8 @@ Deckent follows a three-step cycle:
 - **Memory and Learning** -- Brain stores learnings in `.brain/MEMORY.md` and patterns in `PATTERNS.md`, improving with every sprint
 - **Auditor Quality Gate** -- Continuous monitoring: stale heartbeat detection, boundary violation scanning, deadlock detection via Kahn's algorithm
 - **GO / NO-GO Evaluation** -- Every task result is evaluated against defined criteria. NO-GO tasks get logged and optionally retried
-- **Provider Agnostic** -- Works with tmux backend (default) or subprocess backend. No tmux? No problem
+- **Multi-Provider Support** -- Works with Claude (default), OpenAI Codex, and Google Gemini. Configure per-role (brain, worker) or per-task
+- **Provider Fallback Chain** -- Primary provider fails? Automatic fallback to alternative provider with model equivalence mapping
 - **Usage-Aware Planning** -- Automatically adjusts sprint size based on your Claude plan usage (5-hour and weekly thresholds)
 - **Plugin System** -- Extend Deckent with custom hooks, commands, and patterns
 - **MCP Integration** -- 10 MCP tools + 5 resources for seamless Claude Code IDE integration
@@ -102,6 +103,7 @@ Deckent follows a three-step cycle:
 | Open source | Yes (MIT) | No | No | Yes | Partial |
 | MCP integration | Yes (10 tools) | N/A | N/A | N/A | N/A |
 | Web dashboard | Yes | Built-in | Built-in | No | No |
+| Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
 | Works offline (local models) | Planned | Yes | No | Yes | No |
 
 ---
@@ -127,6 +129,8 @@ Deckent follows a three-step cycle:
 | git | any | `git --version` |
 | Claude Code CLI | any | `claude --version` |
 | tmux | any (optional) | `tmux -V` |
+| OpenAI Codex CLI | any (optional) | `codex --version` |
+| Google Gemini API | any (optional) | `GOOGLE_API_KEY` env var |
 
 **Claude Subscription:** Pro ($20/mo), Max 5x ($100/mo), Max 20x ($200/mo), or API key (pay-as-you-go)
 
@@ -263,6 +267,8 @@ Output:
 | `deckent sync` | Sync adapter files with DECKENT.md |
 | `deckent watch` | Live tmux split view |
 | `deckent test` | Run project tests |
+| `deckent set-directives` | Set sprint directives |
+| `deckent finalize` | Finalize current sprint |
 | `deckent run <cmd>` | Run arbitrary command |
 
 ---
@@ -330,6 +336,10 @@ Configuration lives in `.deckent/config.json` (project) and `~/.deckent/config.j
 | `pro_plan` | Pro ($20/mo) | 3 | sonnet | sonnet |
 | `api` | API key | 10 | opus | sonnet |
 
+**Mode Aliases:** You can also use `performance`, `balanced`, `economic`, or `unlimited` as friendly aliases for the canonical mode names.
+
+**Multi-Provider:** Configure `brain_provider`, `worker_provider`, and `fallback_provider` to use Claude, Codex, or Gemini. See [docs/MULTI-PROVIDER-GUIDE.md](docs/MULTI-PROVIDER-GUIDE.md).
+
 See [docs/CONFIG-REFERENCE.md](docs/CONFIG-REFERENCE.md) for the full reference.
 
 ---
@@ -393,6 +403,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing guide, cod
 - [Quickstart Tutorial](docs/QUICKSTART.md)
 - [API Reference](docs/API.md)
 - [Configuration Reference](docs/CONFIG-REFERENCE.md)
+- [Multi-Provider Guide](docs/MULTI-PROVIDER-GUIDE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Sprint Lifecycle](docs/SPRINT-LIFECYCLE.md)
 - [MCP Guide](docs/MCP-GUIDE.md)

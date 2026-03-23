@@ -8,6 +8,36 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   printError: vi.fn(),
 }));
 
+vi.mock('../../../src/cli/helpers/process.js', () => ({
+  resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
+}));
+
+vi.mock('../../../src/core/system-profile.js', () => ({
+  getSystemProfile: vi.fn().mockReturnValue({
+    cpuCores: 4,
+    totalMemMB: 8192,
+    recommendedMaxWorkers: 3,
+  }),
+}));
+
+vi.mock('../../../src/cli/helpers/wizard.js', () => ({
+  runWizard: vi.fn().mockResolvedValue({ language: 'en', mode: 'max_plan', runInit: false }),
+}));
+
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: '1.0.0\n', stderr: '', error: null }),
+}));
+
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn().mockReturnValue(false),
+  readFileSync: vi.fn().mockReturnValue('{}'),
+}));
+
+vi.mock('../../../src/core/constants.js', () => ({
+  DECKENT_DIR: '.deckent',
+  DECKENT_VERSION: '0.2.0-beta.1',
+}));
+
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { registerOnboard } from '../../../src/cli/commands/onboard.js';
 

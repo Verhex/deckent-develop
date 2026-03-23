@@ -75,7 +75,7 @@ npm run clean        # Remove dist/
 
 ```bash
 npm run lint    # Should exit with no errors
-npm test        # Should pass all tests (3609+)
+npm test        # Should pass all tests (9300+)
 npm run build   # Should produce dist/ with no errors
 ```
 
@@ -94,7 +94,7 @@ deckent/
 │   │   ├── utils.ts        --Shared utility functions (countBrainLines, etc.)
 │   │   ├── analyzer.ts     --Project stack/size/methodology analysis
 │   │   └── index.ts        --Barrel: re-exports core public API
-│   ├── providers/          --Provider adapters (Claude, subprocess, sandbox)
+│   ├── providers/          --Provider adapters (Claude, Codex, Gemini, subprocess, sandbox)
 │   ├── orchestra/          --Sprint orchestration and tmux management
 │   │   ├── brain.ts        --Sprint lifecycle: plan → run → evaluate → decay
 │   │   ├── planner.ts      --AI task planning (Zod-validated, imports only core/)
@@ -120,12 +120,14 @@ deckent/
 │   └── dashboard/          --Web Dashboard (React+Vite+Tailwind, 4 pages)
 ├── tests/                  --Test files mirroring src/ structure
 │   ├── core/
+│   ├── providers/
 │   ├── orchestra/
 │   ├── agents/
 │   ├── monitor/
 │   ├── cli/
 │   ├── mcp/
-│   └── integration/        --End-to-end integration tests
+│   ├── e2e/                --End-to-end tests (install flow, provider smoke)
+│   └── integration/        --Integration tests
 ├── docs/                   --API reference and architecture docs
 ├── package.json            --Dependencies, scripts, engine constraints
 ├── tsconfig.json           --TypeScript compiler config (strict, Node16, ESM)
@@ -139,6 +141,7 @@ deckent/
 | Module | Responsibility |
 |---|---|
 | `src/core` | Types, constants, config loading/validation, shared utilities, project analyzer, system profile, subscription detection |
+| `src/providers` | Provider adapters (Claude, Codex, Gemini), fallback chain, model equivalence mapping, provider registry |
 | `src/orchestra` | Sprint planning (AI + structured + auto fallback), agent spawning, result evaluation, debt decay, layered model selection |
 | `src/agents` | Worker lifecycle: task claim, file lock, heartbeat, result write |
 | `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state, alert dedup |

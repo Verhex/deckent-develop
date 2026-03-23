@@ -40,7 +40,7 @@ sudo apt install tmux
 sudo dnf install tmux
 ```
 
-You also need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key.
+You also need an active Claude subscription (Pro, Max 5x, Max 20x) or an Anthropic API key. Alternatively, you can use OpenAI Codex or Google Gemini as providers -- see [MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md).
 
 ---
 
@@ -351,6 +351,7 @@ cat .brain/MEMORY.md
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** -- How Brain, Workers, and Auditor work together
 - **[SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md)** -- The full PLAN, SPAWN, EXECUTE, EVALUATE, RETRO, DECAY cycle
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** -- Solutions for common issues
+- **[MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md)** -- Using Claude, Codex, and Gemini together
 - **[PLUGIN-GUIDE.md](PLUGIN-GUIDE.md)** -- How to extend Deckent with plugins
 - **[GLOSSARY.md](GLOSSARY.md)** -- Terminology reference
 

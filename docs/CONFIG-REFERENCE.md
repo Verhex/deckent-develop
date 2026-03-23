@@ -57,12 +57,15 @@ These fields sit at the root of `.deckent/config.json`:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | `PlanMode` | `"max_plan"` | Active plan mode. Determines model limits and worker count. |
+| `mode` | `PlanMode` | `"max_plan"` | Active plan mode. Determines model limits and worker count. Also accepts aliases (see section 4.1). |
 | `modes` | `Record<PlanMode, PlanModeConfig>` | (see section 4) | Per-mode configuration blocks. |
 | `language` | `"en"` or `"tr"` | `"en"` | CLI output language. |
 | `projectName` | `string` | `"deckent-project"` | Project name shown in dashboard and logs. |
 | `version` | `string` | (from package.json) | Deckent version. Usually not set manually. |
 | `brain_planning` | `BrainPlanningMode` | `"auto"` | Planning mode. Can also be set per-mode. |
+| `brain_provider` | `ProviderName` | `"claude"` | Provider for Brain planning and evaluation. One of: `claude`, `codex`, `gemini`. |
+| `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker tasks. |
+| `fallback_provider` | `ProviderName` | -- | Fallback provider when primary fails. |
 | `last_sprint_id` | `string` | -- | Last sprint ID. Managed by Brain. Do not edit manually. |
 
 ### Minimal Valid Config
@@ -97,6 +100,23 @@ Deckent ships with four built-in plan modes, each tuned for a different Claude s
 | `budget_per_sprint` | -- | -- | -- | $5.00 |
 | `requires` env var | -- | -- | -- | `ANTHROPIC_API_KEY` |
 | `brain_planning` | `"auto"` | `"auto"` | `"auto"` | `"auto"` |
+
+### 4.1 Mode Aliases
+
+For convenience, you can use friendly aliases instead of canonical mode names:
+
+| Alias | Canonical Mode |
+|-------|---------------|
+| `performance` | `max_plan` |
+| `balanced` | `max5x_plan` |
+| `economic` | `pro_plan` |
+| `unlimited` | `api` |
+
+Aliases are resolved automatically in config files and CLI flags:
+
+```bash
+deckent config set mode performance   # Same as: deckent config set mode max_plan
+```
 
 ### max_plan -- Claude Max 20x
 
@@ -474,6 +494,9 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 | `modes.<name>.usage_thresholds.weekly` | Number between 0.0 and 1.0 |
 | `modes.<name>.budget_per_sprint` | Positive number (API mode only) |
 | `modes.<name>.brain_planning` | One of: `ai`, `structured`, `auto` |
+| `brain_provider` | One of: `claude`, `codex`, `gemini` (if set) |
+| `worker_provider` | One of: `claude`, `codex`, `gemini` (if set) |
+| `fallback_provider` | One of: `claude`, `codex`, `gemini` (if set) |
 | API mode + `ANTHROPIC_API_KEY` | Environment variable must be set when mode is `"api"` |
 
 ### Example Validation Error
@@ -487,9 +510,65 @@ ConfigValidationError: Config validation failed:
 
 ---
 
+## 12. Multi-Provider Configuration
+
+Deckent supports three AI providers. Configure them at the top level of your config:
+
+### Provider Names
+
+| Provider | Description | Prerequisite |
+|----------|-------------|-------------|
+| `claude` | Claude via Claude Code CLI (default) | `claude --version` |
+| `codex` | OpenAI Codex via Codex CLI | `codex --version` + `OPENAI_API_KEY` |
+| `gemini` | Google Gemini via API | `GOOGLE_API_KEY` env var |
+
+### Provider Config Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `brain_provider` | `ProviderName` | `"claude"` | Provider used by Brain for planning and evaluation |
+| `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker tasks |
+| `fallback_provider` | `ProviderName` | -- | Fallback when primary provider fails |
+
+### Model Equivalence
+
+When switching providers, models are mapped to equivalent tiers:
+
+| Tier | Claude | Codex | Gemini |
+|------|--------|-------|--------|
+| Premium | `opus` | `gpt-5` | `gemini-2.5-pro` |
+| Standard | `sonnet` | `gpt-4.1` | `gemini-2.5-flash` |
+| Economy | `haiku` | `gpt-5-mini` | `gemini-2.0-flash` |
+
+### Example: Mixed Provider Config
+
+```json
+{
+  "mode": "max_plan",
+  "brain_provider": "claude",
+  "worker_provider": "codex",
+  "fallback_provider": "gemini"
+}
+```
+
+### Environment Variables
+
+Provider selection can also be overridden via environment variables:
+
+```bash
+DECKENT_BRAIN_PROVIDER=claude
+DECKENT_WORKER_PROVIDER=codex
+DECKENT_FALLBACK_PROVIDER=gemini
+```
+
+See [MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md) for the full multi-provider setup guide.
+
+---
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) -- System architecture overview
 - [BRAIN-GUIDE.md](BRAIN-GUIDE.md) -- Brain planning internals
+- [MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md) -- Multi-provider setup and usage
 - [SPRINT-LIFECYCLE.md](SPRINT-LIFECYCLE.md) -- Sprint phases and flow
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) -- Common config issues

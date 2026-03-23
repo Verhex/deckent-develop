@@ -41,6 +41,10 @@ vitest.dashboard.config.ts
 # Scripts (shell scripts not needed in package)
 scripts/
 
+# Environment / secrets
+.env
+.env.*
+
 # Misc
 *.tgz
 .tmp-script-tests/
