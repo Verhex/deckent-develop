@@ -892,6 +892,17 @@ function readPreviousCompletedTasks(content: string): number {
 }
 
 /**
+ * Read the previous "Coverage" value from PROJECT-IDENTITY.md content.
+ * Returns the percentage (0-100), or null if not found.
+ */
+function readPreviousCoverage(content: string): number | null {
+  const match = content.match(/- Coverage:\s*([\d.]+)%/);
+  if (!match) return null;
+  const value = parseFloat(match[1] ?? '0');
+  return isNaN(value) ? null : value;
+}
+
+/**
  * Update the "Current State" section of PROJECT-IDENTITY.md after each sprint.
  * Preserves all other sections. Creates the file with defaults if missing.
  * @param projectRoot - Project root directory
@@ -914,7 +925,18 @@ export function updateProjectIdentity(
   // Gather real project stats
   const realTestCount = countProjectTestCases(projectRoot);
   const realCoverage = parseCoverageFromClover(projectRoot);
-  const coverageValue = realCoverage !== null ? realCoverage : metrics.coveragePercent;
+
+  // Coverage fallback chain:
+  // 1. clover.xml (real coverage data)
+  // 2. Previous PROJECT-IDENTITY.md value (preserve existing)
+  // 3. Sprint metrics coveragePercent (worker self-assessment)
+  // 4. Default to 0
+  const previousCoverage = readPreviousCoverage(content);
+  const coverageValue =
+    (realCoverage !== null && realCoverage > 0) ? realCoverage :
+    (previousCoverage !== null && previousCoverage > 0) ? previousCoverage :
+    (metrics.coveragePercent > 0) ? metrics.coveragePercent :
+    0;
 
   // Total sprints: prefer sprint ID number, fallback to file count, then parameter
   const sprintNumber = extractSprintNumber(sprintId);

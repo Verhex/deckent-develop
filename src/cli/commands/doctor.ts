@@ -289,6 +289,31 @@ export function countDebtItems(root: string): { total: number; critical: number 
   }
 }
 
+/**
+ * Count open (unresolved) debt items from DEBT.md.
+ * Looks for table rows where the "Resolved" column is not "true".
+ */
+export function countOpenDebtItems(root: string): number {
+  const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
+  if (!existsSync(debtPath)) return 0;
+  try {
+    const content = readFileSync(debtPath, 'utf-8');
+    const dataLines = content.split('\n').filter(
+      l => l.startsWith('|') && !l.startsWith(DEBT_TABLE_HEADER.slice(0, 5)) && !l.startsWith('|-')
+    );
+    // Each row: | ID | Desc | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
+    // Column index 6 (0-based after split) is "Resolved"
+    return dataLines.filter(l => {
+      const cols = l.split('|').map(c => c.trim());
+      // cols[0] is empty (before first |), cols[7] is Resolved
+      const resolved = cols[7] ?? '';
+      return resolved !== 'true';
+    }).length;
+  } catch {
+    return 0;
+  }
+}
+
 export interface HumanDoctorInput {
   result: DoctorResult;
   providers: DetectedProvider[];
@@ -471,6 +496,31 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   const lockCheck = result.checks.find(c => c.name === 'Locks');
   if (lockCheck && !lockCheck.passed) {
     lines.push(`  Warning ${lockCheck.message}`);
+  }
+
+  lines.push('');
+
+  // --- System Health ---
+  lines.push('System Health:');
+
+  // Memory usage with percentage and warning
+  const memWarning = memPct >= 80 ? ' [WARNING: >80%]' : '';
+  lines.push(`  Memory: ${brainLines}/${brainBudget} lines (${memPct}%)${memWarning}`);
+
+  // Open debt count
+  const openDebtCount = countOpenDebtItems(input.projectRoot ?? process.cwd());
+  if (openDebtCount > 0) {
+    lines.push(`  Debt: ${openDebtCount} open item(s)`);
+  } else {
+    lines.push('  Debt: 0 open items');
+  }
+
+  // Sprint count from config
+  if (lastSprintId) {
+    const sprintNum = lastSprintId.replace('sprint-', '');
+    lines.push(`  Sprints: ${sprintNum} completed (last: ${lastSprintId})`);
+  } else {
+    lines.push('  Sprints: none yet');
   }
 
   lines.push('');
