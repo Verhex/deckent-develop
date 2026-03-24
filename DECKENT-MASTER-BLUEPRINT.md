@@ -90,7 +90,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  9 Tools + 4 Resources                              │
+│  10 Tools + 5 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -334,7 +334,7 @@ my-project/
 │   ├── api/                          # HTTP API + SSE
 │   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
-│   ├── cli/                          # CLI commands (commander.js, 21 files)
+│   ├── cli/                          # CLI commands (commander.js, 32+ files)
 │   ├── mcp/                          # MCP server integration
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
 │   │   ├── tools/                   # 9 tool handlers
@@ -1943,6 +1943,15 @@ Full directive: `docs/directives/sprint-034.md`
 | 36 | 8073 | 97.5% | Beta Cleanup Wave 3+4: brain.ts split (1312→58 lines), spawn-backend move, types.ts split, non-null assertion refactor, barrel cleanup, auditor queue fix. 11 tasks, +315 tests |
 | 37 | 8073 | 97.5% | Beta Cleanup Wave 5+6: Security hardening, plugin system, memory fix, skill sandbox AST, JSDoc. 16 tasks, +258 tests, 8073 total |
 | 38 | 8555 | 97.5% | Multi-Provider Infrastructure: ModelType extension (8 models, 3 providers), Codex+Gemini adapters, provider routing, planner/tmux/subprocess decoupling, platform support. 20 tasks, +476 tests |
+| 039 | 8560 | 97.5% | Beta final sprint: Codex adapter real CLI fix (1/19 done, 18 NO_GO), .result file generation fix, FIX phase stabilization |
+| 040 | 8750 | 97.5% | Worker feedback loop + human-friendly output: worker verify loop (tsc+vitest), feedback metrics, prompt overhaul, CLI sprint summary. 7/13 done |
+| 041 | 8960 | 97.5% | Human-friendly output complete: MCP format, dashboard SprintSummary, doctor, retro, error messages, worker logs. 7/7 done, 0 NO_GO |
+| 042 | 9100 | 97.5% | Stabilization: npm validation, global install E2E, provider smoke tests, version bump 0.2.0-beta.1. 3/8 done |
+| 043 | 9300 | 97.5% | Fix & stabilization: hardcoded claude removed, verify-publish semver fix, project-identity fix, auditor stale filtering, single-provider E2E tests |
+| 044 | 9600 | 97.5% | MCP-Native Providers foundation: .deck secrets, full config, Kraken splash, environment detection, task router, connector, sync+explain commands, rich sprint output, DEBT auto-resolve |
+| 045 | 9900 | 97.5% | MCP-Native Providers wired: connector+router in sprint lifecycle, Codex/Gemini real CLI adapters, .deck auth, doctor health, rich output, env-aware init, smoke tests |
+| 046 | 10127 | 97.5% | Multi-environment runtime: deckent start lifecycle, vscode extension stub, stack detection expansion, multi-env init wizard, language-agnostic verify. 8/10 done, 10K+ tests |
+| 047 | 10127 | 97.5% | Stabilization sprint: 0/10 (all NO_GO), manual debt resolution, MEMORY decayed, all debt resolved |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -1985,6 +1994,12 @@ Full directive: `docs/directives/sprint-034.md`
 **Security + Plugin milestone (Sprint 37):** Beta Cleanup Wave 5+6. Security hardening across the codebase. Plugin system improvements. Memory system fix. Skill sandbox with AST-based analysis. JSDoc documentation added to public APIs. 16 tasks, +258 tests, 8073 total.
 
 **Multi-Provider milestone (Sprint 38):** Full multi-provider infrastructure delivered. ModelType extended to 8 models across 3 providers (Claude, OpenAI/Codex, Gemini). ProviderAdapter interface implemented by ClaudeAdapter, CodexAdapter, and GeminiAdapter. Provider-aware model selection with tier-based equivalence (premium/standard/economy). Provider fallback chain for resilience. spawnWorkers routing supports mixed sprints (Claude+Codex+Gemini workers in same sprint). bootstrapProviders() initializes registry from config. Multi-provider config: brain_provider, worker_provider, fallback_provider. Planner, tmux, and subprocess modules decoupled for platform independence. 20 tasks, +476 tests, 8555 total.
+
+**Human-friendly output milestone (Sprint 040-041):** End-user experience overhaul. Worker internal verify loop (tsc + vitest) runs before reporting completion. Worker feedback metrics track NO_GO causes. Sprint summary output redesigned for readability. MCP tool responses, CLI doctor, retro format, error messages, and worker logs all upgraded to human-friendly format. Sprint 041 achieved 7/7 tasks with 0 NO_GO — first perfect sprint since Sprint 37.
+
+**MCP-Native Providers milestone (Sprint 044-045):** Full provider ecosystem wired into sprint lifecycle. .deck secrets file for API key management. Kraken splash screen added. Environment detection (vscode/codex/gemini/cursor/shell/ci). Task router (TaskRouter) + Connector module integrated into bootstrapProviders flow. Codex CLI (`codex exec --full-auto`) and Gemini CLI (`gemini -p`) upgraded to real command execution. `deckent sync` and `deckent explain` CLI commands added. Rich sprint summary (7 sections) wired into finalizeSprint. 10 MCP tools + 5 resources.
+
+**10K tests milestone (Sprint 046):** Test count exceeded 10,000 for the first time. Multi-environment runtime with deckent start lifecycle improvements. vscode extension stub, stack detection expansion (10+ stacks), multi-IDE lock files, multi-env init wizard, language-agnostic verify flow. 32+ CLI commands. 8/10 tasks done.
 
 **Provider Architecture (Sprint 38):**
 ```

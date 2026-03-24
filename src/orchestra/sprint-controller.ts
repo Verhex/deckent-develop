@@ -783,10 +783,47 @@ export function spawnWorkers(
  * Extracted as a helper to avoid inline string comparisons throughout routing logic.
  * @internal
  */
-// TODO: Subprocess backend workers (Codex/Gemini) lack live log capture.
-// Consider adding IPC-based log streaming for feature parity with tmux workers.
 export function isTmuxProvider(providerName: ProviderName): boolean {
   return providerName === 'claude';
+}
+
+/**
+ * Get the log file path for a subprocess worker.
+ * Subprocess (Codex/Gemini) workers redirect stdout/stderr to .tasks/task-{id}.log
+ * via file descriptor-based capture (stdio: ['pipe', logFd, logFd]).
+ * @param projectRoot - Project root directory
+ * @param taskId - Task identifier
+ * @returns Absolute path to the worker log file
+ */
+export function getSubprocessWorkerLogPath(projectRoot: string, taskId: string): string {
+  return join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+}
+
+/**
+ * Read the log contents of a subprocess worker.
+ * Returns the log file contents if it exists, or null if the log file is not found.
+ * @param projectRoot - Project root directory
+ * @param taskId - Task identifier
+ * @returns Log file contents as string, or null if not found
+ */
+export function readSubprocessWorkerLog(projectRoot: string, taskId: string): string | null {
+  const logPath = getSubprocessWorkerLogPath(projectRoot, taskId);
+  if (!existsSync(logPath)) return null;
+  try {
+    return readFileSync(logPath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether a subprocess worker log file exists.
+ * @param projectRoot - Project root directory
+ * @param taskId - Task identifier
+ * @returns true if the log file exists
+ */
+export function hasSubprocessWorkerLog(projectRoot: string, taskId: string): boolean {
+  return existsSync(getSubprocessWorkerLogPath(projectRoot, taskId));
 }
 
 /**

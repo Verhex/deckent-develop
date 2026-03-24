@@ -37,6 +37,15 @@ const SAFE_USAGE_DEFAULT: UsageMetrics = {
   measuredAt: new Date().toISOString(),
 };
 
+/**
+ * Informative error message for MCP backend — includes sprint context,
+ * alternatives, and roadmap reference so callers know what to do instead.
+ */
+const MCP_NOT_IMPLEMENTED_MESSAGE =
+  'MCP backend is not yet implemented (deferred past Sprint 048). ' +
+  "Alternatives: set claude_backend to 'tmux' (default) or 'subprocess'. " +
+  'Roadmap: see DECKENT-MASTER-BLUEPRINT.md for planned MCP integration.';
+
 // ─── ClaudeAdapter ───────────────────────────────────────────────────
 
 /**
@@ -62,13 +71,6 @@ export class ClaudeAdapter implements ProviderAdapter {
     this.projectDir = projectDir;
     this.backend = opts?.claude_backend ?? 'tmux';
 
-    if (this.backend === 'mcp') {
-      throw new ProviderError(
-        'MCP backend not yet implemented. Use tmux or subprocess.',
-        'claude',
-      );
-    }
-
     if (this.backend === 'subprocess') {
       this.subprocessBackend = new SubprocessSpawnBackend(projectDir, {
         providerConfig: CLAUDE_SUBPROCESS_CONFIG,
@@ -85,6 +87,7 @@ export class ClaudeAdapter implements ProviderAdapter {
 
   /**
    * Spawn a worker using the configured backend.
+   * Throws ProviderError if backend is 'mcp' (not yet implemented).
    */
   spawn(
     taskId: string,
@@ -92,6 +95,10 @@ export class ClaudeAdapter implements ProviderAdapter {
     prompt: string,
     opts?: ProviderSpawnOptions,
   ): void {
+    if (this.backend === 'mcp') {
+      throw new ProviderError(MCP_NOT_IMPLEMENTED_MESSAGE, 'claude');
+    }
+
     if (this.backend === 'subprocess' && this.subprocessBackend) {
       this.subprocessBackend.spawn(taskId, model, prompt, opts);
       return;
@@ -186,10 +193,15 @@ export class ClaudeAdapter implements ProviderAdapter {
   }
 
   /**
-   * Check whether the Claude CLI is available in the current environment.
-   * Runs `claude --version` and checks exit code.
+   * Check whether this adapter is available in the current environment.
+   * Returns false immediately for MCP backend (not yet implemented).
+   * For tmux/subprocess: runs `claude --version` and checks exit code.
    */
   async isAvailable(): Promise<boolean> {
+    if (this.backend === 'mcp') {
+      return false;
+    }
+
     try {
       const result = spawnSync('claude', ['--version'], {
         encoding: 'utf-8',

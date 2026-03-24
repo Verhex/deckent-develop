@@ -3,6 +3,7 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { UsageTracker } from '../../core/usage-tracker.js';
 import type { ModelBreakdown, SprintUsage, TotalUsage } from '../../core/usage-tracker.js';
+import { readAuthMode } from '../../core/config.js';
 
 // Cost estimates per 1K tokens (in USD) — rough API mode estimates
 const TOKEN_COST_PER_1K: Record<string, number> = {
@@ -56,13 +57,14 @@ export interface UsageCommandOptions {
   json?: boolean;
   sprint?: string;
   projectRoot?: string;
+  isApiMode?: boolean;
 }
 
 export function buildUsageOutput(
   tracker: UsageTracker,
   opts: UsageCommandOptions = {},
 ): { text: string; data: unknown } {
-  const isApiMode = false; // TODO: read from config when API mode is implemented
+  const isApiMode = opts.isApiMode ?? false;
 
   if (opts.sprint) {
     const sprintUsage = tracker.getSprintUsage(opts.sprint);
@@ -119,11 +121,13 @@ export function registerUsage(program: Command): void {
     .description('Show usage metrics')
     .option('--json', 'Output as JSON')
     .option('--sprint <id>', 'Filter by sprint ID')
-    .action((opts: UsageCommandOptions) => {
+    .action(async (opts: UsageCommandOptions) => {
       try {
         const root = resolveProjectRoot();
+        const authMode = await readAuthMode(root);
+        const isApiMode = authMode === 'api';
         const tracker = new UsageTracker(root);
-        const { text, data } = buildUsageOutput(tracker, opts);
+        const { text, data } = buildUsageOutput(tracker, { ...opts, isApiMode });
 
         if (opts.json) {
           print(JSON.stringify(data, null, 2));

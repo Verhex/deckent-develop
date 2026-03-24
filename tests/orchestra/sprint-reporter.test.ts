@@ -2164,6 +2164,111 @@ describe('updateProjectIdentity', () => {
   });
 });
 
+// ═══ Coverage Fallback Chain ═════════════════════════════════════════
+
+describe('coverage fallback chain in updateProjectIdentity', () => {
+  let tempDir: string;
+  let brainDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    brainDir = join(tempDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+  });
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it('preserves previous coverage from PROJECT-IDENTITY.md when clover.xml is missing', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- Coverage: 87.5%', '- Last Sprint: sprint-010', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 0 });
+    updateProjectIdentity(tempDir, 'sprint-011', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Coverage: 87.5%');
+  });
+
+  it('does not write 90+ by default when all coverage sources are 0', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 0', '- Coverage: 0.0%', '- Last Sprint: sprint-001', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 0 });
+    updateProjectIdentity(tempDir, 'sprint-002', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Coverage: 0.0%');
+    // Must NOT silently write some high default value
+    expect(content).not.toMatch(/Coverage: 9\d\.\d%/);
+  });
+
+  it('adds coverage not measured note when coverage is 0 on first sprint', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 0', '- Coverage: 0.0%', '- Last Sprint: sprint-001', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 0 });
+    updateProjectIdentity(tempDir, 'sprint-002', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('coverage not measured');
+  });
+
+  it('does NOT add coverage not measured note when coverage is > 0', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- Coverage: 87.5%', '- Last Sprint: sprint-010', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 0 });
+    updateProjectIdentity(tempDir, 'sprint-011', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).not.toContain('coverage not measured');
+  });
+
+  it('prefers clover.xml over previous coverage in PROJECT-IDENTITY.md', () => {
+    const covDir = join(tempDir, 'coverage');
+    mkdirSync(covDir, { recursive: true });
+    writeFileSync(join(covDir, 'clover.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="123" clover="3.2.0">
+  <project timestamp="123" name="All files">
+    <metrics statements="100" coveredstatements="92" conditionals="0" coveredconditionals="0" methods="10" coveredmethods="9" elements="110" coveredelements="101"/>
+  </project>
+</coverage>`);
+
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- Coverage: 87.5%', '- Last Sprint: sprint-010', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 0 });
+    updateProjectIdentity(tempDir, 'sprint-011', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    // clover says 92%, previous was 87.5%
+    expect(content).toContain('- Coverage: 92.0%');
+    expect(content).not.toContain('- Coverage: 87.5%');
+  });
+
+  it('uses metrics.coveragePercent when no clover.xml and no previous coverage', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Architecture', '- Language: TypeScript', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 78.3 });
+    updateProjectIdentity(tempDir, 'sprint-001', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Coverage: 78.3%');
+    expect(content).not.toContain('coverage not measured');
+  });
+});
+
 // ═══ autoResolveDebt ═════════════════════════════════════════════
 
 describe('autoResolveDebt', () => {

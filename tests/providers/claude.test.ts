@@ -573,20 +573,54 @@ describe('ClaudeAdapter — claude_backend', () => {
     expect(adapter.isSessionActive()).toBe(true);
   });
 
-  // ─── MCP mode throws ─────────────────────────────────────────────
+  // ─── MCP mode ────────────────────────────────────────────────────
 
-  it('should throw ProviderError when backend is mcp', () => {
-    expect(() => new ClaudeAdapter(projectDir, { claude_backend: 'mcp' }))
-      .toThrow(ProviderError);
+  it('should allow constructing ClaudeAdapter with mcp backend without throwing', () => {
+    expect(() => new ClaudeAdapter(projectDir, { claude_backend: 'mcp' })).not.toThrow();
   });
 
-  it('should throw with "not yet implemented" message for mcp backend', () => {
-    expect(() => new ClaudeAdapter(projectDir, { claude_backend: 'mcp' }))
-      .toThrow('MCP backend not yet implemented. Use tmux or subprocess.');
+  it('should set backend to mcp when configured', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    expect(adapter.getBackend()).toBe('mcp');
   });
 
-  it('should throw ProviderError via createClaudeAdapter for mcp backend', () => {
-    expect(() => createClaudeAdapter(projectDir, { claude_backend: 'mcp' }))
-      .toThrow('MCP backend not yet implemented');
+  it('should throw ProviderError on spawn() when backend is mcp', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    expect(() => adapter.spawn('task-001', 'opus', 'test prompt')).toThrow(ProviderError);
+  });
+
+  it('should throw with Sprint 048 context in error message for mcp spawn', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    expect(() => adapter.spawn('task-001', 'opus', 'test prompt'))
+      .toThrow('Sprint 048');
+  });
+
+  it('should include alternatives in mcp spawn error message', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    expect(() => adapter.spawn('task-001', 'opus', 'test prompt'))
+      .toThrow(/tmux|subprocess/);
+  });
+
+  it('should include roadmap reference in mcp spawn error message', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    expect(() => adapter.spawn('task-001', 'opus', 'test prompt'))
+      .toThrow(/DECKENT-MASTER-BLUEPRINT\.md/);
+  });
+
+  it('should return false from isAvailable() when backend is mcp', async () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    expect(await adapter.isAvailable()).toBe(false);
+  });
+
+  it('should not call spawnSync for isAvailable() when backend is mcp', async () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    await adapter.isAvailable();
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+  });
+
+  it('should create ClaudeAdapter with mcp backend via createClaudeAdapter', () => {
+    const adapter = createClaudeAdapter(projectDir, { claude_backend: 'mcp' });
+    expect(adapter).toBeInstanceOf(ClaudeAdapter);
+    expect(adapter.getBackend()).toBe('mcp');
   });
 });

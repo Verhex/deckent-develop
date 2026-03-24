@@ -27,6 +27,7 @@ vi.mock('node:readline/promises', () => ({
 vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
   validatePartialConfig: vi.fn(),
+  readAuthMode: vi.fn().mockResolvedValue('subscription'),
   ConfigValidationError: class ConfigValidationError extends Error {
     errors: string[];
     constructor(errors: string[]) {

@@ -412,7 +412,13 @@ export function parseVitestOutput(output: string): { failedTests: string[]; summ
 export function verifyTests(
   projectRoot: string,
   scope?: string[],
+  taskScope?: TaskScope,
 ): VerifyTestsResult {
+  // Skip verification for doc-only tasks
+  if (isDocOnlyScope(taskScope)) {
+    return { success: true, failedTests: [], output: '' };
+  }
+
   const { test: testCmd } = getVerifyCommands(projectRoot);
 
   // Empty test command means no test step for this stack
@@ -469,14 +475,20 @@ export function runTestVerifyLoop(
   projectRoot: string,
   scope?: string[],
   runFix?: (failedTests: string[], output: string) => void,
+  taskScope?: TaskScope,
 ): { result: VerifyTestsResult; attempts: number; failuresFixed: number } {
+  // Skip verification for doc-only tasks
+  if (isDocOnlyScope(taskScope)) {
+    return { result: { success: true, failedTests: [], output: '' }, attempts: 0, failuresFixed: 0 };
+  }
+
   let attempts = 0;
   let failuresFixed = 0;
   let lastResult: VerifyTestsResult = { success: false, failedTests: [], output: '' };
 
   for (let i = 0; i < MAX_TEST_RETRIES; i++) {
     attempts++;
-    lastResult = verifyTests(projectRoot, scope);
+    lastResult = verifyTests(projectRoot, scope, taskScope);
 
     if (lastResult.success) {
       return { result: lastResult, attempts, failuresFixed };
@@ -495,8 +507,26 @@ export function runTestVerifyLoop(
 
 // ─── Compilation Verify Loop ─────────────────────────────────────────
 
-// TODO: Skip tsc/vitest for doc-only tasks (scope contains only docs/ or *.md files)
-// See: isDocTask() in result-evaluator.ts for doc task detection logic
+// ─── Doc-Only Task Detection ─────────────────────────────────────────
+
+/** Source code directory prefixes — mirrors isDocTask() logic in result-evaluator.ts */
+const DOC_SKIP_SOURCE_PREFIXES = ['src/', 'src\\', 'tests/', 'tests\\', 'lib/', 'lib\\'];
+const DOC_SKIP_SOURCE_EXACT = ['src', 'tests', 'lib'];
+
+/**
+ * Returns true if the scope contains only non-source-code directories.
+ * When true, tsc and vitest verification should be skipped.
+ * Scope with only docs/, *.md, or other non-source paths qualifies.
+ * Empty directories array returns false (no scope = no skip).
+ */
+export function isDocOnlyScope(scope?: TaskScope): boolean {
+  const dirs = scope?.directories ?? [];
+  if (dirs.length === 0) return false;
+  return dirs.every(d => {
+    if (DOC_SKIP_SOURCE_EXACT.includes(d)) return false;
+    return !DOC_SKIP_SOURCE_PREFIXES.some(p => d.startsWith(p));
+  });
+}
 
 /** Max retry attempts for the compilation verify loop */
 export const MAX_COMPILATION_RETRIES = 3;
@@ -544,7 +574,12 @@ export function parseCompilationErrors(err: unknown): string[] {
  * `go build ./...` for Go). If build command is empty, skips verification.
  * This is a single-shot check — use `runCompilationLoop` for retry logic.
  */
-export function verifyCompilation(projectRoot: string): CompilationResult {
+export function verifyCompilation(projectRoot: string, taskScope?: TaskScope): CompilationResult {
+  // Skip verification for doc-only tasks
+  if (isDocOnlyScope(taskScope)) {
+    return { success: true, errors: [] };
+  }
+
   const { build } = getVerifyCommands(projectRoot);
 
   // Empty build command means no compilation step (e.g. some C projects with no lint)
@@ -586,7 +621,13 @@ export function runCompilationLoop(
   taskId: string,
   maxRetries: number = MAX_COMPILATION_RETRIES,
   onAttempt?: (attempt: number, maxRetries: number, errors: string[]) => void,
+  taskScope?: TaskScope,
 ): CompilationLoopResult {
+  // Skip verification for doc-only tasks
+  if (isDocOnlyScope(taskScope)) {
+    return { success: true, attempts: 0, errors: [] };
+  }
+
   let lastErrors: string[] = [];
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {

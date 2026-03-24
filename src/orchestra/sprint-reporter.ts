@@ -1013,14 +1013,20 @@ function buildCurrentStateLines(
   completedTasks: number,
   noGoRate: number,
 ): string[] {
-  return [
+  const lines = [
     `- Test Count: ${testCount}`,
     `- Coverage: ${coveragePercent.toFixed(1)}%`,
+  ];
+  if (coveragePercent === 0) {
+    lines.push('- Coverage Note: coverage not measured');
+  }
+  lines.push(
     `- Last Sprint: ${sprintId}`,
     `- Total Sprints: ${totalSprints}`,
     `- Completed Tasks: ${completedTasks}`,
     `- No-Go Rate: ${noGoRate.toFixed(1)}%`,
-  ];
+  );
+  return lines;
 }
 
 // ═══ Human-Friendly Sprint Complete ══════════════════════════════

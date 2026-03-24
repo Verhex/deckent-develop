@@ -439,6 +439,32 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
 }
 
 /**
+ * Read the auth_mode from the merged (global + project) config without full validation.
+ * Returns 'subscription' when the config file is missing or auth_mode is not set.
+ * @param projectRoot - Project root directory; defaults to process.cwd()
+ */
+export async function readAuthMode(
+  projectRoot?: string,
+): Promise<'subscription' | 'api' | 'hybrid'> {
+  const root = resolve(projectRoot ?? process.cwd());
+
+  let authMode: 'subscription' | 'api' | 'hybrid' = 'subscription';
+
+  const globalConfig = await readJsonFile<Partial<DeckentConfig>>(GLOBAL_CONFIG_PATH);
+  if (globalConfig?.auth_mode) {
+    authMode = globalConfig.auth_mode;
+  }
+
+  const projectConfigPath = join(root, PROJECT_CONFIG_PATH);
+  const projectConfig = await readJsonFile<Partial<DeckentConfig>>(projectConfigPath);
+  if (projectConfig?.auth_mode) {
+    authMode = projectConfig.auth_mode;
+  }
+
+  return authMode;
+}
+
+/**
  * Validate a partial config by merging it over defaults and running full validation.
  * Useful for checking user-provided overrides before persisting.
  * @param partial - Partial configuration to validate

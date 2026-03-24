@@ -16,3 +16,10 @@
 | debt-046-010 | Tech debt from 046-010: Integration test file already existed and contained 17 p | 046-010 | sprint-046 | NORMAL | 0 | true | sprint-046 | 2026-03-24T12:28:26.926Z |
 | debt-046-001-fix | Tech debt from 046-001-fix: Connector integration into bootstrapProviders comple | 046-001-fix | sprint-046 | HIGH | 0 | true | sprint-047 | 2026-03-24T12:36:45.192Z |
 | debt-046-004-fix | Tech debt from 046-004-fix: Gemini adapter already fully implements DIRECTIVES T | 046-004-fix | sprint-046 | HIGH | 0 | true | sprint-047 | 2026-03-24T12:36:45.193Z |
+| debt-048-001 | Tech debt from 048-001: MCP backend stub iyileştirmesi tamamlandı. Değişiklikler | 048-001 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.856Z |
+| debt-048-002 | Tech debt from 048-002: Sandbox mode handling enhanced: (1) Replaced early retur | 048-002 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.859Z |
+| debt-048-003 | Tech debt from 048-003: Added readAuthMode() helper to config.ts that reads auth | 048-003 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.860Z |
+| debt-048-005 | Tech debt from 048-005: Subprocess worker log capture implemented. Removed TODO | 048-005 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.861Z |
+| debt-048-006 | Tech debt from 048-006: Coverage fallback chain validated and enhanced. Modified | 048-006 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.862Z |
+| debt-048-007 | Tech debt from 048-007: Blueprint §24 sprint history updated with sprints 039-04 | 048-007 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.863Z |
+| debt-048-008 | Tech debt from 048-008: Updated RELEASE-NOTES-BETA.md with Sprint 047 results: t | 048-008 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.863Z |

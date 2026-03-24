@@ -71,3 +71,12 @@
 - CLI Entrypoint: buildProgram() + entry.ts, no side-effects on import
 - bootstrapProviders(): single startup point, detect + register + set default
 - Platform: describe.skipIf(isWindows) for tmux/scripts tests, cross-platform helpers
+
+## Sprint sprint-048 Learnings
+- Claude MCP Backend Stub Completion: GO_WITH_TECH_DEBT
+- Sandbox Mode Graceful Handling: GO_WITH_TECH_DEBT
+- API Mode Usage Integration: GO_WITH_TECH_DEBT
+- Subprocess Worker Log Enhancement: GO_WITH_TECH_DEBT
+- Coverage Metric Preservation: GO_WITH_TECH_DEBT
+- Blueprint Section Numbers Update: GO_WITH_TECH_DEBT
+- RELEASE-NOTES-BETA.md Final Update: GO_WITH_TECH_DEBT

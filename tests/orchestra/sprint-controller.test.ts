@@ -272,6 +272,9 @@ import {
   spawnWorkers,
   resolveTaskProvider,
   isTmuxProvider,
+  getSubprocessWorkerLogPath,
+  readSubprocessWorkerLog,
+  hasSubprocessWorkerLog,
   resolveDefaultUsageCli,
   routeSprintTasks,
   finalizeSprint,
@@ -1104,6 +1107,60 @@ describe('isTmuxProvider', () => {
 
   it('returns false for gemini provider', () => {
     expect(isTmuxProvider('gemini')).toBe(false);
+  });
+});
+
+// ═══ Subprocess Worker Log Capture ════════════════════════════════
+
+describe('getSubprocessWorkerLogPath', () => {
+  it('returns path under .tasks/ directory', () => {
+    const logPath = getSubprocessWorkerLogPath('/project', '001-001');
+    expect(logPath).toContain('.tasks');
+    expect(logPath).toContain('task-001-001.log');
+  });
+
+  it('includes project root in path', () => {
+    const logPath = getSubprocessWorkerLogPath('/my/project', '002-001');
+    expect(logPath.startsWith('/my/project')).toBe(true);
+  });
+
+  it('uses task ID in log file name', () => {
+    const logPath = getSubprocessWorkerLogPath('/root', '003-005');
+    expect(logPath).toMatch(/task-003-005\.log$/);
+  });
+});
+
+describe('readSubprocessWorkerLog', () => {
+  it('returns null when log file does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+    const result = readSubprocessWorkerLog('/project', '001-001');
+    expect(result).toBeNull();
+  });
+
+  it('returns log content when file exists', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('worker output line 1\nworker output line 2\n');
+    const result = readSubprocessWorkerLog('/project', '001-001');
+    expect(result).toBe('worker output line 1\nworker output line 2\n');
+  });
+
+  it('returns null when readFileSync throws', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockImplementation(() => { throw new Error('EACCES'); });
+    const result = readSubprocessWorkerLog('/project', '001-001');
+    expect(result).toBeNull();
+  });
+});
+
+describe('hasSubprocessWorkerLog', () => {
+  it('returns true when log file exists', () => {
+    mockedExistsSync.mockReturnValue(true);
+    expect(hasSubprocessWorkerLog('/project', '001-001')).toBe(true);
+  });
+
+  it('returns false when log file does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+    expect(hasSubprocessWorkerLog('/project', '001-001')).toBe(false);
   });
 });
 
