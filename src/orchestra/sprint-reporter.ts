@@ -1,6 +1,7 @@
 // ─── Sprint Reporting ──────────────────────────────────────────────
 // Extracted from brain.ts — retrospective, sprint log, metrics, doc updates
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
@@ -11,7 +12,7 @@ import { TaskStatus } from '../core/types.js';
 import {
   BRAIN_DIR, SPRINTS_DIR, MEMORY_FILE, PROJECT_IDENTITY_FILE,
   RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
-  PATTERNS_FILE, DEBT_FILE,
+  PATTERNS_FILE, DEBT_FILE, DECISIONS_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
@@ -1231,4 +1232,186 @@ export function countSelfHealedTasks(results?: TaskResult[]): number {
     if (!fl) return false;
     return fl.tscAttempts > 1 || fl.testAttempts > 1;
   }).length;
+}
+
+// ═══ DEBT.md Auto-Resolve ════════════════════════════════════════
+
+/**
+ * Auto-resolve DEBT.md entries for tasks that were fixed during the FIX phase.
+ * A task is "fixed" if it was NO_GO in initial evaluation but became DONE/GO_WITH_TECH_DEBT after FIX.
+ * @param projectRoot - Project root directory
+ * @param sprint - Current sprint object
+ * @param evaluations - Map of task ID to final evaluation result
+ */
+export function autoResolveDebt(
+  projectRoot: string,
+  sprint: { id: string; tasks: Array<{ id: string; isPriorityFix?: boolean; fixForTaskId?: string }> },
+  evaluations: Map<string, string>,
+): number {
+  const debtPath = join(projectRoot, BRAIN_DIR, DEBT_FILE);
+  if (!existsSync(debtPath)) return 0;
+
+  const content = readFileSync(debtPath, 'utf-8');
+  if (!content.trim()) return 0;
+
+  // Collect fix task IDs that resolved successfully
+  const resolvedTaskIds = new Set<string>();
+  for (const task of sprint.tasks) {
+    if (!task.isPriorityFix || !task.fixForTaskId) continue;
+    const ev = evaluations.get(task.id);
+    if (ev === 'DONE' || ev === TaskEvaluation.DONE) {
+      resolvedTaskIds.add(task.fixForTaskId);
+    }
+  }
+
+  if (resolvedTaskIds.size === 0) return 0;
+
+  // Process DEBT.md line by line
+  const lines = content.split('\n');
+  let resolvedCount = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    // Match markdown table rows: | ... | taskId | ... | resolved | ...
+    // Also match lines that contain a task ID reference
+    for (const taskId of resolvedTaskIds) {
+      if (line.includes(taskId) && !line.includes('resolved=true') && !line.includes('✅')) {
+        // Mark as resolved by appending resolution info
+        lines[i] = line.replace(/\|\s*$/, `| resolved=${sprint.id} |`)
+          .replace(/resolved\s*=\s*false/, `resolved=true`)
+          .replace(/\bfalse\b(?=[^|]*$)/, `true (${sprint.id})`);
+        // If the line didn't have a resolved column pattern, append marker
+        if (!lines[i]!.includes(sprint.id)) {
+          lines[i] = `${line} <!-- resolved in ${sprint.id} -->`;
+        }
+        resolvedCount++;
+      }
+    }
+  }
+
+  if (resolvedCount > 0) {
+    writeFileSync(debtPath, lines.join('\n'), 'utf-8');
+  }
+
+  return resolvedCount;
+}
+
+// ═══ DECISIONS.md Auto-Draft ADR ═════════════════════════════════
+
+/**
+ * Auto-draft ADR entries for new modules detected in the sprint.
+ * Scans git diff for new directories under src/ and drafts a PROPOSED ADR for each.
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint ID (e.g., "sprint-044")
+ */
+export function autoDraftDecisions(
+  projectRoot: string,
+  sprintId: string,
+): number {
+  // Get list of added files from git
+  let diffOutput: string;
+  try {
+    diffOutput = execSync('git diff --name-status HEAD~1', {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+  } catch {
+    return 0;
+  }
+
+  if (!diffOutput.trim()) return 0;
+
+  // Parse added files under src/
+  const addedFiles: string[] = [];
+  for (const line of diffOutput.split('\n')) {
+    const match = line.match(/^A\t(.+)$/);
+    if (match && match[1]?.startsWith('src/')) {
+      addedFiles.push(match[1]);
+    }
+  }
+
+  if (addedFiles.length === 0) return 0;
+
+  // Extract unique directories from added files
+  const newDirs = new Set<string>();
+  for (const filePath of addedFiles) {
+    const parts = filePath.split('/');
+    // We care about directories like src/foo/ — at least 2 segments before the file
+    if (parts.length >= 3) {
+      const dir = parts.slice(0, -1).join('/');
+      newDirs.add(dir);
+    }
+  }
+
+  if (newDirs.size === 0) return 0;
+
+  // Filter out directories that already existed (have files other than the newly added ones)
+  const trulyNewDirs: string[] = [];
+  for (const dir of newDirs) {
+    const fullDir = join(projectRoot, dir);
+    if (!existsSync(fullDir)) continue;
+    try {
+      const entries = readdirSync(fullDir);
+      // A directory is "new" if ALL its files are in our addedFiles list
+      const dirPrefix = dir + '/';
+      const allNew = entries.every(entry => {
+        const entryPath = dirPrefix + entry;
+        return addedFiles.includes(entryPath);
+      });
+      if (allNew && entries.length > 0) {
+        trulyNewDirs.push(dir);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (trulyNewDirs.length === 0) return 0;
+
+  // Read existing DECISIONS.md to determine next ADR number
+  const decisionsPath = join(projectRoot, BRAIN_DIR, DECISIONS_FILE);
+  const brainPath = join(projectRoot, BRAIN_DIR);
+  mkdirSync(brainPath, { recursive: true });
+
+  let existingContent = '';
+  if (existsSync(decisionsPath)) {
+    existingContent = readFileSync(decisionsPath, 'utf-8');
+  }
+
+  // Count existing ADRs to determine next number
+  const adrMatches = existingContent.match(/## ADR-(\d+)/g) ?? [];
+  let maxAdr = 0;
+  for (const m of adrMatches) {
+    const numMatch = m.match(/ADR-(\d+)/);
+    if (numMatch && numMatch[1]) {
+      const num = parseInt(numMatch[1], 10);
+      if (num > maxAdr) maxAdr = num;
+    }
+  }
+
+  // Extract sprint number for display
+  const sprintNum = extractSprintNumber(sprintId) ?? sprintId;
+
+  // Draft new ADR entries
+  const newEntries: string[] = [];
+  let adrCount = 0;
+
+  for (const dir of trulyNewDirs) {
+    const dirName = dir.split('/').pop() ?? dir;
+    const adrNumber = String(maxAdr + adrCount + 1).padStart(3, '0');
+    newEntries.push('');
+    newEntries.push(`## ADR-${adrNumber}: ${dirName} (Draft — Sprint #${sprintNum})`);
+    newEntries.push(`**Status:** PROPOSED`);
+    newEntries.push(`**Context:** New module added in Sprint #${sprintNum}`);
+    newEntries.push(`**Decision:** [To be documented]`);
+    adrCount++;
+  }
+
+  if (adrCount > 0) {
+    const finalContent = existingContent.trimEnd() + '\n' + newEntries.join('\n') + '\n';
+    writeFileSync(decisionsPath, finalContent, 'utf-8');
+  }
+
+  return adrCount;
 }

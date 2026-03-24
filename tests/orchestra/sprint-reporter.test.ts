@@ -27,6 +27,8 @@ import {
   countProjectTestCases,
   parseCoverageFromClover,
   extractSprintNumber,
+  autoResolveDebt,
+  autoDraftDecisions,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
@@ -2159,5 +2161,332 @@ describe('updateProjectIdentity', () => {
     expect(content).toContain('## Architecture');
     expect(content).toContain('- Language: TypeScript');
     expect(content).toContain('- Last Sprint: sprint-002');
+  });
+});
+
+// ═══ autoResolveDebt ═════════════════════════════════════════════
+
+describe('autoResolveDebt', () => {
+  let tempDir: string;
+  let brainDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    brainDir = join(tempDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('resolves matching debt entry when fix task is DONE', () => {
+    writeFileSync(join(brainDir, 'DEBT.md'), [
+      '| ID | Description | Task | Priority | resolved |',
+      '|-----|-------------|------|----------|----------|',
+      '| D001 | Broken tests | task-001 | HIGH | resolved=false |',
+    ].join('\n'));
+
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
+      ],
+    };
+    const evaluations = new Map([['fix-001', 'DONE']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(1);
+
+    const content = readFileSync(join(brainDir, 'DEBT.md'), 'utf-8');
+    expect(content).toContain('resolved=true');
+  });
+
+  it('skips non-fix tasks (isPriorityFix=false)', () => {
+    writeFileSync(join(brainDir, 'DEBT.md'), [
+      '| ID | Description | Task | Priority | resolved |',
+      '|-----|-------------|------|----------|----------|',
+      '| D001 | Broken tests | task-001 | HIGH | resolved=false |',
+    ].join('\n'));
+
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'task-002', isPriorityFix: false, fixForTaskId: 'task-001' },
+      ],
+    };
+    const evaluations = new Map([['task-002', 'DONE']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(0);
+  });
+
+  it('skips tasks without fixForTaskId', () => {
+    writeFileSync(join(brainDir, 'DEBT.md'), [
+      '| ID | Description | Task | Priority | resolved |',
+      '|-----|-------------|------|----------|----------|',
+      '| D001 | Broken tests | task-001 | HIGH | resolved=false |',
+    ].join('\n'));
+
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'fix-001', isPriorityFix: true },
+      ],
+    };
+    const evaluations = new Map([['fix-001', 'DONE']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(0);
+  });
+
+  it('returns 0 when no matches found', () => {
+    writeFileSync(join(brainDir, 'DEBT.md'), [
+      '| ID | Description | Task | Priority | resolved |',
+      '|-----|-------------|------|----------|----------|',
+      '| D001 | Broken tests | task-999 | HIGH | resolved=false |',
+    ].join('\n'));
+
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
+      ],
+    };
+    const evaluations = new Map([['fix-001', 'DONE']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(0);
+  });
+
+  it('returns 0 when DEBT.md does not exist', () => {
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
+      ],
+    };
+    const evaluations = new Map([['fix-001', 'DONE']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(0);
+  });
+
+  it('returns 0 when DEBT.md is empty', () => {
+    writeFileSync(join(brainDir, 'DEBT.md'), '');
+
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
+      ],
+    };
+    const evaluations = new Map([['fix-001', 'DONE']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(0);
+  });
+
+  it('skips fix tasks with NO_GO evaluation', () => {
+    writeFileSync(join(brainDir, 'DEBT.md'), [
+      '| ID | Description | Task | Priority | resolved |',
+      '|-----|-------------|------|----------|----------|',
+      '| D001 | Broken tests | task-001 | HIGH | resolved=false |',
+    ].join('\n'));
+
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
+      ],
+    };
+    const evaluations = new Map([['fix-001', 'NO_GO']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(0);
+  });
+
+  it('resolves multiple debt entries in one pass', () => {
+    writeFileSync(join(brainDir, 'DEBT.md'), [
+      '| ID | Description | Task | Priority | resolved |',
+      '|-----|-------------|------|----------|----------|',
+      '| D001 | Broken tests | task-001 | HIGH | resolved=false |',
+      '| D002 | Missing types | task-002 | NORMAL | resolved=false |',
+    ].join('\n'));
+
+    const sprint = {
+      id: 'sprint-044',
+      tasks: [
+        { id: 'fix-001', isPriorityFix: true, fixForTaskId: 'task-001' },
+        { id: 'fix-002', isPriorityFix: true, fixForTaskId: 'task-002' },
+      ],
+    };
+    const evaluations = new Map([['fix-001', 'DONE'], ['fix-002', 'DONE']]);
+
+    const count = autoResolveDebt(tempDir, sprint, evaluations);
+    expect(count).toBe(2);
+  });
+});
+
+// ═══ autoDraftDecisions ══════════════════════════════════════════
+
+describe('autoDraftDecisions', () => {
+  let tempDir: string;
+  let brainDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    brainDir = join(tempDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('returns 0 when git diff fails (not a git repo)', () => {
+    const count = autoDraftDecisions(tempDir, 'sprint-044');
+    expect(count).toBe(0);
+  });
+
+  it('returns 0 when no new files under src/', () => {
+    // Initialize a git repo with a commit so HEAD~1 works
+    const { execSync } = require('node:child_process');
+    execSync('git init && git add -A && git commit --allow-empty -m "init" && git commit --allow-empty -m "second"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    const count = autoDraftDecisions(tempDir, 'sprint-044');
+    expect(count).toBe(0);
+  });
+
+  it('creates ADR for a truly new directory under src/', () => {
+    const { execSync } = require('node:child_process');
+    execSync('git init && git commit --allow-empty -m "init"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    // Create a new directory with a file and commit it
+    const newDir = join(tempDir, 'src', 'connector');
+    mkdirSync(newDir, { recursive: true });
+    writeFileSync(join(newDir, 'index.ts'), 'export const x = 1;');
+    execSync('git add -A && git commit -m "add connector"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    const count = autoDraftDecisions(tempDir, 'sprint-044');
+    expect(count).toBe(1);
+
+    const content = readFileSync(join(brainDir, 'DECISIONS.md'), 'utf-8');
+    expect(content).toContain('ADR-001');
+    expect(content).toContain('connector');
+    expect(content).toContain('PROPOSED');
+    expect(content).toContain('Sprint #44');
+  });
+
+  it('ADR numbering continues from last existing ADR', () => {
+    const { execSync } = require('node:child_process');
+    execSync('git init && git commit --allow-empty -m "init"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    // Pre-populate DECISIONS.md with existing ADRs
+    writeFileSync(join(brainDir, 'DECISIONS.md'), [
+      '# Architecture Decision Records',
+      '',
+      '## ADR-001: core (Draft — Sprint #40)',
+      '**Status:** ACCEPTED',
+      '',
+      '## ADR-005: orchestra (Draft — Sprint #42)',
+      '**Status:** ACCEPTED',
+    ].join('\n'));
+
+    // Create a new directory with a file and commit it
+    const newDir = join(tempDir, 'src', 'plugins');
+    mkdirSync(newDir, { recursive: true });
+    writeFileSync(join(newDir, 'loader.ts'), 'export const y = 2;');
+    execSync('git add -A && git commit -m "add plugins"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    const count = autoDraftDecisions(tempDir, 'sprint-044');
+    expect(count).toBe(1);
+
+    const content = readFileSync(join(brainDir, 'DECISIONS.md'), 'utf-8');
+    expect(content).toContain('ADR-006');
+    expect(content).toContain('plugins');
+  });
+
+  it('skips existing directories (with pre-existing files)', () => {
+    const { execSync } = require('node:child_process');
+
+    // Create an existing src/core directory
+    const existingDir = join(tempDir, 'src', 'core');
+    mkdirSync(existingDir, { recursive: true });
+    writeFileSync(join(existingDir, 'old-file.ts'), 'export const old = 1;');
+    execSync('git init && git add -A && git commit -m "init with existing"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    // Add a new file to the existing directory
+    writeFileSync(join(existingDir, 'new-file.ts'), 'export const n = 2;');
+    execSync('git add -A && git commit -m "add new file to existing dir"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    const count = autoDraftDecisions(tempDir, 'sprint-044');
+    expect(count).toBe(0);
+  });
+
+  it('creates DECISIONS.md if it does not exist', () => {
+    const { execSync } = require('node:child_process');
+    execSync('git init && git commit --allow-empty -m "init"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    const newDir = join(tempDir, 'src', 'newmod');
+    mkdirSync(newDir, { recursive: true });
+    writeFileSync(join(newDir, 'mod.ts'), 'export const z = 3;');
+    execSync('git add -A && git commit -m "add newmod"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    expect(existsSync(join(brainDir, 'DECISIONS.md'))).toBe(false);
+    const count = autoDraftDecisions(tempDir, 'sprint-044');
+    expect(count).toBe(1);
+    expect(existsSync(join(brainDir, 'DECISIONS.md'))).toBe(true);
+  });
+
+  it('ADR entry contains correct format fields', () => {
+    const { execSync } = require('node:child_process');
+    execSync('git init && git commit --allow-empty -m "init"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    const newDir = join(tempDir, 'src', 'analytics');
+    mkdirSync(newDir, { recursive: true });
+    writeFileSync(join(newDir, 'tracker.ts'), 'export const t = 1;');
+    execSync('git add -A && git commit -m "add analytics"', {
+      cwd: tempDir,
+      stdio: 'pipe',
+    });
+
+    autoDraftDecisions(tempDir, 'sprint-044');
+    const content = readFileSync(join(brainDir, 'DECISIONS.md'), 'utf-8');
+
+    expect(content).toContain('## ADR-001: analytics (Draft — Sprint #44)');
+    expect(content).toContain('**Status:** PROPOSED');
+    expect(content).toContain('**Context:** New module added in Sprint #44');
+    expect(content).toContain('**Decision:** [To be documented]');
   });
 });
