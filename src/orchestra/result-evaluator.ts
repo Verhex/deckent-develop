@@ -34,22 +34,36 @@ export function isDocTask(task: Task): boolean {
 /**
  * Evaluates a worker's task result and returns DONE, GO_WITH_TECH_DEBT, or NO_GO.
  *
+ * Brain makes the final call — worker selfAssessment is only a hint, not the decision.
+ *
  * Evaluation order:
- * 1. If selfAssessment is NO_GO → NO_GO
- * 2. If selfAssessment is GO_WITH_TECH_DEBT → GO_WITH_TECH_DEBT
- * 3. If tests failed → NO_GO
- * 4. If doc task → DONE (skip coverage)
- * 5. If vitest JSON provided and coverage mismatch → GO_WITH_TECH_DEBT
- * 6. If coverage < 90% → GO_WITH_TECH_DEBT
- * 7. Otherwise → DONE
+ * 1. selfAssessment NO_GO → NO_GO (hard failure always respected)
+ * 2. tests failed → NO_GO (regardless of self-assessment)
+ * 3. doc task → DONE (skip coverage)
+ * 4. vitest JSON coverage mismatch → GO_WITH_TECH_DEBT
+ * 5. tests pass + new test files written → DONE
+ * 6. tests pass + no new tests + coverage < 90 → GO_WITH_TECH_DEBT
+ * 7. coverage >= 90 → DONE
+ * 8. worker hint GO_WITH_TECH_DEBT (fallback only) → GO_WITH_TECH_DEBT
+ * 9. default → DONE
  */
 export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string): TaskEvaluation {
+  // Step 1: Hard failures — NO_GO regardless of self-assessment
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
-  if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
+
+  // Step 2: Doc tasks — DONE if tests pass (skip coverage)
   if (isDocTask(task)) return TaskEvaluation.DONE;
 
-  // Coverage validation: if vitest JSON output provided, validate reported vs actual
+  // Step 3: Brain makes the final call based on objective criteria
+  // Worker self-assessment is just a HINT, not the final decision
+
+  // Check: did worker write new test files?
+  const hasNewTests = result.filesChanged?.some(f =>
+    f.includes('.test.') || f.includes('.spec.')
+  ) ?? false;
+
+  // Check: vitest coverage validation (if JSON available)
   if (vitestJsonOutput !== undefined) {
     const coverageCheck = validateWorkerCoverage({
       reportedCoverage: result.coverage,
@@ -61,7 +75,24 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
     }
   }
 
-  if (result.coverage < 90) return TaskEvaluation.GO_WITH_TECH_DEBT;
+  // If tests pass AND worker wrote tests → DONE
+  if (result.testsPassed && hasNewTests) {
+    return TaskEvaluation.DONE;
+  }
+
+  // If tests pass but no new tests AND coverage < 90 → TECH_DEBT
+  if (result.testsPassed && !hasNewTests && result.coverage < 90) {
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+
+  // Coverage >= 90 with passing tests → DONE
+  if (result.coverage >= 90) return TaskEvaluation.DONE;
+
+  // Default: respect worker hint for edge cases only
+  if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+
   return TaskEvaluation.DONE;
 }
 

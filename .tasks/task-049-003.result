@@ -1,0 +1,13 @@
+{
+  "taskId": "049-003",
+  "filesChanged": [
+    "src/orchestra/sprint-reporter.ts",
+    "tests/orchestra/sprint-reporter.test.ts"
+  ],
+  "linesAdded": 175,
+  "linesRemoved": 15,
+  "testsPassed": true,
+  "coverage": 85,
+  "selfAssessment": "DONE",
+  "notes": "updateProjectIdentity() tamamen yeniden yazıldı. Yeni fallback chain: test count (vitest JSON → previous → regex), coverage (vitest --coverage → clover.xml → previous → metrics → 0), total sprints (sprint ID number → param → 1), cumulative completed tasks. getTestCountFromVitest, getCoverageFromVitest, readPreviousTestCount helper'lar eklendi. package.json guard ile temp dir'lerde gereksiz spawnSync önlendi. 20+ yeni test eklendi. 242 test toplam, 0 regression."
+}

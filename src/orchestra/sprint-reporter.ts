@@ -1,7 +1,7 @@
 // ─── Sprint Reporting ──────────────────────────────────────────────
 // Extracted from brain.ts — retrospective, sprint log, metrics, doc updates
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
@@ -903,12 +903,78 @@ function readPreviousCoverage(content: string): number | null {
 }
 
 /**
+ * Get test count from vitest --reporter=json output.
+ * Returns numTotalTests or null if vitest fails/times out.
+ */
+export function getTestCountFromVitest(projectRoot: string): number | null {
+  try {
+    // Skip if no package.json — vitest won't work without a project
+    if (!existsSync(join(projectRoot, 'package.json'))) return null;
+    const result = spawnSync('npx', ['vitest', 'run', '--reporter=json'], {
+      cwd: projectRoot,
+      timeout: 30_000,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    if (result.status !== 0 && result.status !== 1) return null;
+    const output = result.stdout ?? '';
+    // vitest JSON output may have non-JSON preamble; find the JSON object
+    const jsonStart = output.indexOf('{');
+    if (jsonStart === -1) return null;
+    const parsed = JSON.parse(output.slice(jsonStart)) as { numTotalTests?: number };
+    if (typeof parsed.numTotalTests === 'number' && parsed.numTotalTests > 0) {
+      return parsed.numTotalTests;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get coverage percentage from vitest --coverage text output.
+ * Parses "All files" line from the text summary. Returns percentage or null.
+ */
+export function getCoverageFromVitest(projectRoot: string): number | null {
+  try {
+    // Skip if no package.json — vitest won't work without a project
+    if (!existsSync(join(projectRoot, 'package.json'))) return null;
+    const result = spawnSync('npx', ['vitest', 'run', '--coverage', '--reporter=default'], {
+      cwd: projectRoot,
+      timeout: 60_000,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    if (result.status !== 0 && result.status !== 1) return null;
+    const output = (result.stdout ?? '') + (result.stderr ?? '');
+    // Look for "All files" line in coverage table: "All files  |  85.5 | ..."
+    const allFilesMatch = output.match(/All files[^|]*\|\s*([\d.]+)/);
+    if (!allFilesMatch) return null;
+    const value = parseFloat(allFilesMatch[1] ?? '0');
+    return isNaN(value) ? null : value;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the previous "Test Count" value from PROJECT-IDENTITY.md content.
+ */
+export function readPreviousTestCount(content: string): number | null {
+  const match = content.match(/- Test Count:\s*(\d+)/);
+  if (!match) return null;
+  const value = parseInt(match[1] ?? '0', 10);
+  return value > 0 ? value : null;
+}
+
+/**
  * Update the "Current State" section of PROJECT-IDENTITY.md after each sprint.
  * Preserves all other sections. Creates the file with defaults if missing.
- * @param projectRoot - Project root directory
- * @param sprintId - Completed sprint ID
- * @param metrics - Sprint metrics for updating state
- * @param totalSprints - Total number of sprints run so far
+ *
+ * Test count fallback chain: vitest JSON → previous value → regex scan
+ * Coverage fallback chain: vitest --coverage → clover.xml → previous value → metrics → 0
+ * Total sprints: sprint ID number → parameter → 1
+ * Completed tasks: cumulative (previous + current)
  */
 export function updateProjectIdentity(
   projectRoot: string,
@@ -922,15 +988,22 @@ export function updateProjectIdentity(
 
   let content = readFileSafe(filePath);
 
-  // Gather real project stats
-  const realTestCount = countProjectTestCases(projectRoot);
-  const realCoverage = parseCoverageFromClover(projectRoot);
+  // Test count fallback chain:
+  // 1. vitest --reporter=json (accurate runtime count)
+  // 2. Previous PROJECT-IDENTITY.md value (preserve existing)
+  // 3. Regex scan of test files (last resort)
+  const vitestTestCount = getTestCountFromVitest(projectRoot);
+  const previousTestCount = readPreviousTestCount(content);
+  const realTestCount = vitestTestCount ?? previousTestCount ?? countProjectTestCases(projectRoot);
 
   // Coverage fallback chain:
-  // 1. clover.xml (real coverage data)
-  // 2. Previous PROJECT-IDENTITY.md value (preserve existing)
-  // 3. Sprint metrics coveragePercent (worker self-assessment)
-  // 4. Default to 0
+  // 1. vitest --coverage text summary
+  // 2. clover.xml (real coverage data)
+  // 3. Previous PROJECT-IDENTITY.md value (preserve existing)
+  // 4. Sprint metrics coveragePercent (worker self-assessment)
+  // 5. Default to 0
+  const vitestCoverage = getCoverageFromVitest(projectRoot);
+  const realCoverage = vitestCoverage ?? parseCoverageFromClover(projectRoot);
   const previousCoverage = readPreviousCoverage(content);
   const coverageValue =
     (realCoverage !== null && realCoverage > 0) ? realCoverage :
@@ -938,7 +1011,7 @@ export function updateProjectIdentity(
     (metrics.coveragePercent > 0) ? metrics.coveragePercent :
     0;
 
-  // Total sprints: prefer sprint ID number, fallback to file count, then parameter
+  // Total sprints: prefer sprint ID number, fallback to parameter
   const sprintNumber = extractSprintNumber(sprintId);
   const resolvedTotalSprints = sprintNumber ?? totalSprints ?? 1;
 

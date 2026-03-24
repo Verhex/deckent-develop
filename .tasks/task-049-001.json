@@ -1,0 +1,37 @@
+{
+  "id": "049-001",
+  "title": "evaluateResult() — Brain Override Worker Self-Assessment",
+  "description": "evaluateResult() — Brain Override Worker Self-Assessment\n- Model: opus\n- Effort: high\n- Files: src/orchestra/result-evaluator.ts, tests/orchestra/result-evaluator.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nCRITICAL FIX. Mevcut evaluateResult() satır 47-48: worker selfAssessment='GO_WITH_TECH_DEBT' dediğinde Brain bunu körü körüne kabul ediyor. Bu yüzden sprint'lerin %70+'ı TECH_DEBT oluyor.\n\nYENİ MANTIK — selfAssessment sadece ipucu, Brain kendi doğrulamasını yapar:\n\n```typescript\nexport function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string): TaskEvaluation {\n  // Step 1: Hard failures — NO_GO regardless of self-assessment\n  if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;\n  if (!result.testsPassed) return TaskEvaluation.NO_GO;\n  \n  // Step 2: Doc tasks — DONE if tests pass (skip coverage)\n  if (isDocTask(task)) return TaskEvaluation.DONE;\n  \n  // Step 3: Brain makes the final call based on objective criteria\n  // Worker self-assessment is just a HINT, not the final decision\n  \n  // Check: did worker write new test files?\n  const hasNewTests = result.filesChanged?.some(f => \n    f.includes('.test.') || f.includes('.spec.')\n  ) ?? false;\n  \n  // Check: vitest coverage validation (if JSON available)\n  if (vitestJsonOutput !== undefined) {\n    const coverageCheck = validateWorkerCoverage({\n      reportedCoverage: result.coverage,\n      vitestJsonOutput,\n      taskScope: { directories: task.scope?.directories ?? [] },\n    });\n    if (coverageCheck && coverageCheck.level === 'WARNING') {\n      return TaskEvaluation.GO_WITH_TECH_DEBT;\n    }\n  }\n  \n  // If tsc passes AND tests pass AND worker wrote tests → DONE\n  // (tsc pass is implied by testsPassed since vitest uses tsc)\n  if (result.testsPassed && hasNewTests) {\n    return TaskEvaluation.DONE;\n  }\n  \n  // If tsc passes AND tests pass but no new tests → TECH_DEBT\n  if (result.testsPassed && !hasNewTests && result.coverage < 90) {\n    return TaskEvaluation.GO_WITH_TECH_DEBT;\n  }\n  \n  // Coverage >= 90 with passing tests → DONE\n  if (result.coverage >= 90) return TaskEvaluation.DONE;\n  \n  // Default: respect worker hint for edge cases\n  if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {\n    return TaskEvaluation.GO_WITH_TECH_DEBT;\n  }\n  \n  return TaskEvaluation.DONE;\n}\n```\n\nKEY CHANGE: Satır 48'deki `if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;` KALDIRILDI. Worker'ın ipucusu sadece en sonda fallback olarak kullanılıyor.\n\nAyrıca .brain/PATTERNS.md dosyasını oku, high_tech_debt_rate pattern'ını resolved olarak işaretle: `\"resolved\": true, \"resolvedInSprint\": \"sprint-049\"`.\n\n20+ test yaz:\n- testsPassed=true + hasNewTests=true → DONE (worker GO_WITH_TECH_DEBT dese bile)\n- testsPassed=true + hasNewTests=false + coverage<90 → GO_WITH_TECH_DEBT\n- testsPassed=true + coverage>=90 → DONE\n- testsPassed=false → NO_GO (worker DONE dese bile)\n- selfAssessment=NO_GO → NO_GO (her zaman)\n- isDocTask → DONE (test geçiyorsa)\n- hasNewTests algılama: .test.ts, .spec.ts dosyaları\n- Mevcut testleri KIRMA — eski test expectation'larını yeni mantığa göre güncelle\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/result-evaluator.ts",
+      "tests/orchestra/result-evaluator.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass",
+    "noGoCriteria": "Build fails",
+    "techDebtAcceptable": "Minor issues"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-049",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "createdAt": "2026-03-24T17:22:30.253Z",
+  "assignedAgent": "generic",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert",
+    "api-builder"
+  ]
+}

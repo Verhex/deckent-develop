@@ -1,0 +1,13 @@
+{
+  "taskId": "049-002",
+  "filesChanged": [
+    ".brain/DECISIONS.md",
+    "tests/brain/decisions.test.ts"
+  ],
+  "linesAdded": 92,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "ADR-014 through ADR-021 added to .brain/DECISIONS.md following existing format. 12 tests written covering ADR count (>=21), sequential numbering, format (Context/Decision/Consequence), and content validation for each new ADR. tsc error in sprint-reporter.ts is pre-existing and outside this task's scope."
+}

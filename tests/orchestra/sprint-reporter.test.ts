@@ -27,6 +27,9 @@ import {
   countProjectTestCases,
   parseCoverageFromClover,
   extractSprintNumber,
+  getTestCountFromVitest,
+  getCoverageFromVitest,
+  readPreviousTestCount,
   autoResolveDebt,
   autoDraftDecisions,
 } from '../../src/orchestra/sprint-reporter.js';
@@ -2593,5 +2596,192 @@ describe('autoDraftDecisions', () => {
     expect(content).toContain('**Status:** PROPOSED');
     expect(content).toContain('**Context:** New module added in Sprint #44');
     expect(content).toContain('**Decision:** [To be documented]');
+  });
+});
+
+// ═══ getTestCountFromVitest ═══════════════════════════════════════════
+
+describe('getTestCountFromVitest', () => {
+  it('returns null when vitest is not available (temp dir)', () => {
+    const tempDir = makeTempDir();
+    try {
+      const result = getTestCountFromVitest(tempDir);
+      expect(result).toBeNull();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ═══ getCoverageFromVitest ═══════════════════════════════════════════
+
+describe('getCoverageFromVitest', () => {
+  it('returns null when vitest is not available (temp dir)', () => {
+    const tempDir = makeTempDir();
+    try {
+      const result = getCoverageFromVitest(tempDir);
+      expect(result).toBeNull();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ═══ readPreviousTestCount ═══════════════════════════════════════════
+
+describe('readPreviousTestCount', () => {
+  it('parses test count from PROJECT-IDENTITY content', () => {
+    expect(readPreviousTestCount('- Test Count: 10088')).toBe(10088);
+  });
+
+  it('returns null when no test count found', () => {
+    expect(readPreviousTestCount('# Project Identity')).toBeNull();
+  });
+
+  it('returns null when test count is 0', () => {
+    expect(readPreviousTestCount('- Test Count: 0')).toBeNull();
+  });
+
+  it('parses single digit test count', () => {
+    expect(readPreviousTestCount('- Test Count: 5')).toBe(5);
+  });
+
+  it('parses large test count', () => {
+    expect(readPreviousTestCount('- Test Count: 100000')).toBe(100000);
+  });
+});
+
+// ═══ extractSprintNumber (extended) ══════════════════════════════════
+
+describe('extractSprintNumber', () => {
+  it('extracts number from sprint-048', () => {
+    expect(extractSprintNumber('sprint-048')).toBe(48);
+  });
+
+  it('extracts number from sprint-001', () => {
+    expect(extractSprintNumber('sprint-001')).toBe(1);
+  });
+
+  it('extracts number from sprint-100', () => {
+    expect(extractSprintNumber('sprint-100')).toBe(100);
+  });
+
+  it('returns null for invalid format', () => {
+    expect(extractSprintNumber('invalid')).toBeNull();
+  });
+
+  it('handles sprint-0 edge case', () => {
+    expect(extractSprintNumber('sprint-0')).toBe(0);
+  });
+});
+
+// ═══ updateProjectIdentity — new vitest fallback chain tests ════════
+
+describe('updateProjectIdentity vitest fallback chain', () => {
+  let tempDir: string;
+  let brainDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    brainDir = join(tempDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+  });
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it('falls back to previous test count when vitest unavailable and no test files', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 10088', '- Coverage: 85.0%', '- Last Sprint: sprint-048', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ completedTasks: 3 });
+    updateProjectIdentity(tempDir, 'sprint-049', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    // vitest fails in temp dir, no test files → falls back to previous 10088
+    expect(content).toContain('- Test Count: 10088');
+  });
+
+  it('uses regex scan as last resort when no previous count and no vitest', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Coverage: 85.0%', '- Last Sprint: sprint-001', '',
+    ].join('\n'));
+
+    const testsDir = join(tempDir, 'tests');
+    mkdirSync(testsDir, { recursive: true });
+    writeFileSync(join(testsDir, 'a.test.ts'), `
+      it('one', () => {});
+      it('two', () => {});
+    `);
+
+    const metrics = makeMetrics();
+    updateProjectIdentity(tempDir, 'sprint-002', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Test Count: 2');
+  });
+
+  it('uses sprint ID for total sprints instead of file count', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- Total Sprints: 5', '- Last Sprint: sprint-005', '',
+    ].join('\n'));
+
+    // Even though there are no sprint log files, sprint-048 → 48
+    const metrics = makeMetrics();
+    updateProjectIdentity(tempDir, 'sprint-048', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Total Sprints: 48');
+  });
+
+  it('cumulative completed tasks adds current sprint to previous', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- Completed Tasks: 200', '- Last Sprint: sprint-040', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ completedTasks: 8 });
+    updateProjectIdentity(tempDir, 'sprint-041', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Completed Tasks: 208');
+  });
+
+  it('preserves previous coverage when all new coverage sources fail', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- Coverage: 92.3%', '- Last Sprint: sprint-010', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 0 });
+    updateProjectIdentity(tempDir, 'sprint-011', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Coverage: 92.3%');
+  });
+
+  it('correctly writes noGoRate from current sprint', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- No-Go Rate: 50.0%', '- Last Sprint: sprint-010', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ noGoRate: 12.5 });
+    updateProjectIdentity(tempDir, 'sprint-011', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- No-Go Rate: 12.5%');
+  });
+
+  it('handles first-ever sprint with no previous identity file', () => {
+    const metrics = makeMetrics({ completedTasks: 3 });
+    updateProjectIdentity(tempDir, 'sprint-001', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('## Current State');
+    expect(content).toContain('- Last Sprint: sprint-001');
+    expect(content).toContain('- Total Sprints: 1');
   });
 });

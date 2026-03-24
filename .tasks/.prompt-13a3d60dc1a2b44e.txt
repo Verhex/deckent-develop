@@ -1,0 +1,201 @@
+=== Skills ===
+--- typescript-expert ---
+# TypeScript Expert
+
+## Strict Mode
+- Always enable `strict: true` in tsconfig.json. This includes strictNullChecks, noImplicitAny, strictFunctionTypes, and all other strict family options.
+- Never use `// @ts-ignore` or `// @ts-expect-error` without a preceding comment explaining why the suppression is necessary.
+- Prefer `unknown` over `any` in all cases. If `any` is absolutely required, document the reason.
+
+## Type Design
+- Prefer `interface` over `type` for public API contracts. Interfaces support declaration merging and produce clearer error messages.
+- Use `type` for unions, intersections, mapped types, and internal utility types.
+- Use discriminated unions for state machines and variant types. Always include a `kind` or `type` literal field as the discriminant.
+- Avoid `enum` in favor of `as const` objects with derived union types. Enums have runtime overhead and unexpected behavior with reverse mappings.
+
+## Utility Types
+- Use `Partial<T>` for optional update payloads, `Required<T>` for strict construction.
+- Use `Pick<T, K>` and `Omit<T, K>` to create focused sub-types from larger interfaces.
+- Use `Record<K, V>` for dictionary-like structures with known key types.
+- Use `Readonly<T>` and `ReadonlyArray<T>` for immutable data structures.
+- Use `Extract<T, U>` and `Exclude<T, U>` for narrowing union types.
+- Use `ReturnType<T>` and `Parameters<T>` to derive types from function signatures.
+
+## Generics
+- Name generic parameters descriptively when there are multiple: 
+--- testing-expert ---
+# Testing Expert
+
+## Test Pyramid
+- Unit tests form the base: fast, isolated, no I/O. Aim for 70% of total tests.
+- Integration tests in the middle: test module boundaries, database queries, API endpoints. Aim for 20%.
+- E2E tests at the top: critical user flows only. Aim for 10%. Keep these minimal and stable.
+- If a bug can be caught by a unit test, do not write an integration test for it. Push tests down the pyramid.
+
+## Arrange-Act-Assert (AAA)
+- Structure every test with three clear sections:
+  - Arrange: set up preconditions, create test data, configure mocks.
+  - Act: execute the code under test. One action per test.
+  - Assert: verify the expected outcome. Prefer specific assertions over generic truthiness checks.
+- Keep each section focused. If Arrange is complex, extract a helper or fixture.
+- One logical assertion per test. Multiple `expect` calls are fine if they verify the same behavior.
+
+## Test Isolation
+- Each test must be independent: no shared mutable state between tests.
+- Use `beforeEach` for setup, `afterEach` for cleanup. Avoid `beforeAll` for mutable state.
+- Reset mocks between tests: `vi.restoreAllMocks()` or `jest.restoreAllMocks()`.
+- Use in-memory databases or test containers for database tests. Never hit production data.
+- Use deterministic data (fixed dates, seeded random) to prevent flaky tests.
+
+## Mocking Boundaries
+- Mock at module boundaries: external APIs, databases, file system, time, randomness.
+- Never mock the code under test. Mock its 
+
+You are a Deckent worker agent.
+
+## Your Task
+049-001: evaluateResult() — Brain Override Worker Self-Assessment — evaluateResult() — Brain Override Worker Self-Assessment
+- Model: opus
+- Effort: high
+- Files: src/orchestra/result-evaluator.ts, tests/orchestra/result-evaluator.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+CRITICAL FIX. Mevcut evaluateResult() satır 47-48: worker selfAssessment='GO_WITH_TECH_DEBT' dediğinde Brain bunu körü körüne kabul ediyor. Bu yüzden sprint'lerin %70+'ı TECH_DEBT oluyor.
+
+YENİ MANTIK — selfAssessment sadece ipucu, Brain kendi doğrulamasını yapar:
+
+```typescript
+export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string): TaskEvaluation {
+  // Step 1: Hard failures — NO_GO regardless of self-assessment
+  if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
+  if (!result.testsPassed) return TaskEvaluation.NO_GO;
+  
+  // Step 2: Doc tasks — DONE if tests pass (skip coverage)
+  if (isDocTask(task)) return TaskEvaluation.DONE;
+  
+  // Step 3: Brain makes the final call based on objective criteria
+  // Worker self-assessment is just a HINT, not the final decision
+  
+  // Check: did worker write new test files?
+  const hasNewTests = result.filesChanged?.some(f => 
+    f.includes('.test.') || f.includes('.spec.')
+  ) ?? false;
+  
+  // Check: vitest coverage validation (if JSON available)
+  if (vitestJsonOutput !== undefined) {
+    const coverageCheck = validateWorkerCoverage({
+      reportedCoverage: result.coverage,
+      vitestJsonOutput,
+      taskScope: { directories: task.scope?.directories ?? [] },
+    });
+    if (coverageCheck && coverageCheck.level === 'WARNING') {
+      return TaskEvaluation.GO_WITH_TECH_DEBT;
+    }
+  }
+  
+  // If tsc passes AND tests pass AND worker wrote tests → DONE
+  // (tsc pass is implied by testsPassed since vitest uses tsc)
+  if (result.testsPassed && hasNewTests) {
+    return TaskEvaluation.DONE;
+  }
+  
+  // If tsc passes AND tests pass but no new tests → TECH_DEBT
+  if (result.testsPassed && !hasNewTests && result.coverage < 90) {
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+  
+  // Coverage >= 90 with passing tests → DONE
+  if (result.coverage >= 90) return TaskEvaluation.DONE;
+  
+  // Default: respect worker hint for edge cases
+  if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+  
+  return TaskEvaluation.DONE;
+}
+```
+
+KEY CHANGE: Satır 48'deki `if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;` KALDIRILDI. Worker'ın ipucusu sadece en sonda fallback olarak kullanılıyor.
+
+Ayrıca .brain/PATTERNS.md dosyasını oku, high_tech_debt_rate pattern'ını resolved olarak işaretle: `"resolved": true, "resolvedInSprint": "sprint-049"`.
+
+20+ test yaz:
+- testsPassed=true + hasNewTests=true → DONE (worker GO_WITH_TECH_DEBT dese bile)
+- testsPassed=true + hasNewTests=false + coverage<90 → GO_WITH_TECH_DEBT
+- testsPassed=true + coverage>=90 → DONE
+- testsPassed=false → NO_GO (worker DONE dese bile)
+- selfAssessment=NO_GO → NO_GO (her zaman)
+- isDocTask → DONE (test geçiyorsa)
+- hasNewTests algılama: .test.ts, .spec.ts dosyaları
+- Mevcut testleri KIRMA — eski test expectation'larını yeni mantığa göre güncelle
+
+---
+- Model: opus
+- Effort: high
+
+## What To Do
+1. Read the task scope carefully — understand what files you may touch
+2. Write the code changes described above
+3. Verify: run `tsc --noEmit` — fix any errors (max 3 attempts)
+4. Test: run `npx vitest run` — fix any failures (max 3 attempts)
+5. Document: update relevant docs if your changes affect them
+6. Report: write your result file to .tasks/task-049-001.result
+
+## Scope Rules
+You may ONLY modify files in these directories:
+  - src/orchestra/
+  - tests/orchestra/
+
+You may ONLY write to these files:
+  - src/orchestra/result-evaluator.ts
+  - tests/orchestra/result-evaluator.test.ts
+
+DO NOT touch files outside your scope — the auditor will flag violations.
+
+## Heartbeat
+Create .tasks/task-049-001.hb BEFORE starting work:
+
+{
+  "workerId": "w-049-001",
+  "taskId": "049-001",
+  "status": "EXECUTING",
+  "currentAction": "Starting task",
+  "timestamp": "<use new Date().toISOString() — UTC ISO 8601, e.g. 2026-01-01T00:00:00.000Z>",
+  "filesChangedCount": 0,
+  "sequence": 0
+}
+
+IMPORTANT: The timestamp field MUST be a valid UTC ISO 8601 string produced by new Date().toISOString(). Never use locale date strings, relative times, or placeholder text.
+
+Update this file periodically as you work:
+- Change status to CODING, TESTING, DOCUMENTING as appropriate
+- Update currentAction with what you're doing
+- Increment sequence on each update
+- Update filesChangedCount as you modify files
+- Always refresh the timestamp using new Date().toISOString() on each update
+
+## Result File
+Write to: .tasks/task-049-001.result
+Format:
+
+{
+  "taskId": "049-001",
+  "filesChanged": ["list/of/files/you/created/or/modified"],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Brief summary of what was done"
+}
+
+selfAssessment must be one of: "DONE", "GO_WITH_TECH_DEBT", "NO_GO"
+The result file is REQUIRED — without it your work cannot be evaluated.
+
+## If Something Goes Wrong
+- tsc fails after 3 attempts → write NO_GO result with error details
+- Tests fail after 3 attempts → write NO_GO result with failing test names
+- Blocked by another task → write NO_GO result explaining the dependency
+- Unsure about scope → err on the side of caution, do NOT touch files outside your scope
