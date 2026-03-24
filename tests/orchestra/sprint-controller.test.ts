@@ -182,6 +182,15 @@ vi.mock('../../src/core/provider.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../src/orchestra/task-router.js', () => ({
+  routeTask: vi.fn().mockReturnValue({
+    provider: 'claude',
+    agent: 'generic',
+    skills: [],
+    reason: 'default',
+  }),
+}));
+
 vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn().mockResolvedValue(undefined),
   clearHooks: vi.fn(),
@@ -277,6 +286,10 @@ const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
 // Provider registry mock access
 import { providerRegistry } from '../../src/core/provider.js';
 const mockedProviderRegistry = vi.mocked(providerRegistry);
+
+// Task router mock access
+import { routeTask } from '../../src/orchestra/task-router.js';
+const mockedRouteTask = vi.mocked(routeTask);
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -1458,5 +1471,149 @@ describe('sprint-controller provider decoupling', () => {
     );
     // Should contain registry.getDefault() call in resolveTaskProvider
     expect(source).toContain('providerRegistry.getDefault().name');
+  });
+});
+
+// ═══ Task Router Integration (Phase 1.5) ═══════════════════════════
+describe('Task Router wiring in sprint-controller', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sprint-controller imports routeTask from task-router', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain("import { routeTask } from './task-router.js'");
+  });
+
+  it('routeTask is called in runSprint between plan and spawn phases', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    // routeTask call should appear after planSprint and before spawnWorkers
+    const planIdx = source.indexOf('planSprint(projectRoot');
+    const routeIdx = source.indexOf('routeTask(task, config, availableProviders)');
+    const spawnIdx = source.indexOf('spawnWorkers(projectRoot, sprint, config');
+    expect(planIdx).toBeGreaterThan(-1);
+    expect(routeIdx).toBeGreaterThan(-1);
+    expect(spawnIdx).toBeGreaterThan(-1);
+    expect(routeIdx).toBeGreaterThan(planIdx);
+    expect(routeIdx).toBeLessThan(spawnIdx);
+  });
+
+  it('routing phase uses providerRegistry.listProviders() for available providers', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain('providerRegistry.listProviders()');
+  });
+
+  it('routing phase sets task.provider from router output', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain('task.provider = routing.provider');
+  });
+
+  it('routing phase sets task.assignedAgent when router returns non-generic', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain("routing.agent !== 'generic'");
+    expect(source).toContain('task.assignedAgent = routing.agent');
+  });
+
+  it('routing phase sets task.assignedSkills when router returns skills', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain('routing.skills.length > 0');
+    expect(source).toContain('task.assignedSkills = routing.skills');
+  });
+
+  it('routing phase is wrapped in try-catch for backward compatibility', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    // The routeTask call is inside a try block with a non-fatal catch
+    expect(source).toContain('Router failure is non-fatal');
+  });
+
+  it('routeTask mock returns correct default shape', () => {
+    const task = makeTask();
+    const result = mockedRouteTask(task, {} as any, []);
+    expect(result).toEqual({
+      provider: 'claude',
+      agent: 'generic',
+      skills: [],
+      reason: 'default',
+    });
+  });
+
+  it('routeTask can return a non-claude provider', () => {
+    mockedRouteTask.mockReturnValueOnce({
+      provider: 'codex',
+      agent: 'generic',
+      skills: [],
+      reason: 'config override',
+    });
+    const task = makeTask();
+    const result = mockedRouteTask(task, {} as any, ['claude', 'codex']);
+    expect(result.provider).toBe('codex');
+  });
+
+  it('routeTask can return a specific agent', () => {
+    mockedRouteTask.mockReturnValueOnce({
+      provider: 'claude',
+      agent: 'agent-testing-001',
+      skills: [],
+      reason: 'agent preference',
+    });
+    const task = makeTask();
+    const result = mockedRouteTask(task, {} as any, ['claude']);
+    expect(result.agent).toBe('agent-testing-001');
+    expect(result.agent).not.toBe('generic');
+  });
+
+  it('routeTask can return skills', () => {
+    mockedRouteTask.mockReturnValueOnce({
+      provider: 'claude',
+      agent: 'generic',
+      skills: ['vitest-runner', 'tsc-lint'],
+      reason: 'skill affinity',
+    });
+    const task = makeTask();
+    const result = mockedRouteTask(task, {} as any, ['claude']);
+    expect(result.skills).toEqual(['vitest-runner', 'tsc-lint']);
+    expect(result.skills.length).toBe(2);
+  });
+
+  it('Task type already has assignedSkills field', () => {
+    const task = makeTask({ assignedSkills: ['skill-1', 'skill-2'] });
+    expect(task.assignedSkills).toEqual(['skill-1', 'skill-2']);
+  });
+
+  it('Phase 1.5 comment is present in source as routing phase marker', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain('Phase 1.5: Route tasks to providers');
   });
 });

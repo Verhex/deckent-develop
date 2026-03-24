@@ -56,6 +56,7 @@ import {
   ProviderRegistry,
   bootstrapProviders,
 } from '../../src/core/provider.js';
+import { Connector } from '../../src/orchestra/connector.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -296,6 +297,142 @@ describe('bootstrapProviders', () => {
       if (result.registered.includes('claude')) {
         expect(customRegistry.hasProvider('claude')).toBe(true);
       }
+    });
+  });
+
+  // ─── Connector integration ───────────────────────────────────────────────
+
+  describe('Connector wiring', () => {
+    it('should return a connector field in BootstrapResult', async () => {
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(result).toHaveProperty('connector');
+      expect(result.connector).toBeInstanceOf(Connector);
+    });
+
+    it('should create Connector with available providers', async () => {
+      mockClaudeAvailable();
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      // Connector should have the same providers that were registered
+      for (const name of result.registered) {
+        expect(result.connector.isProviderReady(name)).toBe(true);
+      }
+    });
+
+    it('should have same providers in Connector as in registry', async () => {
+      mockClaudeAvailable();
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      const connectorProviders = result.connector.getAvailableProviders();
+      for (const name of result.registered) {
+        expect(connectorProviders).toContain(name);
+      }
+      expect(connectorProviders.length).toBe(result.registered.length);
+    });
+
+    it('should run health check during bootstrap', async () => {
+      mockClaudeAvailable();
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      // Health check ran — connector should have cached results
+      // Re-check to verify it doesn't throw
+      const healthResults = await result.connector.healthCheck();
+      expect(Array.isArray(healthResults)).toBe(true);
+    });
+
+    it('should keep unhealthy providers registered in Connector', async () => {
+      // Claude available but adapter.isAvailable returns true by default
+      // Register a provider that is "unhealthy" — we mock isAvailable to false
+      const unhealthyAdapter = makeAdapter('claude');
+      (unhealthyAdapter.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+      registry.registerProvider(unhealthyAdapter);
+      mockClaudeAvailable();
+
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      // Provider should still be in connector despite unhealthy status
+      if (result.registered.includes('claude')) {
+        expect(result.connector.isProviderReady('claude')).toBe(true);
+      }
+    });
+
+    it('should return empty Connector when no providers available', async () => {
+      mockNoneAvailable();
+      const config = makeConfig();
+      const emptyRegistry = new ProviderRegistry();
+      const result = await bootstrapProviders(config, '/tmp/test', emptyRegistry);
+
+      expect(result.connector).toBeInstanceOf(Connector);
+      expect(result.connector.size).toBe(0);
+    });
+
+    it('backward compat: providerRegistry.getDefault() still works after bootstrap', async () => {
+      const claudeAdapter = makeAdapter('claude');
+      registry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
+
+      const config = makeConfig({ brain_provider: 'claude' });
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      // providerRegistry (the passed registry) should still work as before
+      expect(registry.getDefault().name).toBe('claude');
+      // And connector also has it
+      expect(result.connector.isProviderReady('claude')).toBe(true);
+    });
+
+    it('should not throw when health check fails internally', async () => {
+      // Register a provider whose isAvailable throws
+      const throwingAdapter = makeAdapter('claude');
+      (throwingAdapter.isAvailable as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network timeout'));
+      registry.registerProvider(throwingAdapter);
+      mockClaudeAvailable();
+
+      const config = makeConfig();
+      // Should not throw — health check errors are caught
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+      expect(result.connector).toBeInstanceOf(Connector);
+    });
+
+    it('Connector size matches registered provider count', async () => {
+      mockClaudeAvailable();
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(result.connector.size).toBe(result.registered.length);
+    });
+
+    it('Connector getProvider returns same adapter as registry', async () => {
+      const claudeAdapter = makeAdapter('claude');
+      registry.registerProvider(claudeAdapter);
+      mockClaudeAvailable();
+
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      if (result.registered.includes('claude')) {
+        const fromConnector = result.connector.getProvider('claude');
+        const fromRegistry = registry.getProvider('claude');
+        expect(fromConnector).toBe(fromRegistry);
+      }
+    });
+
+    it('existing BootstrapResult fields still present alongside connector', async () => {
+      mockClaudeAvailable();
+      const config = makeConfig();
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(result).toHaveProperty('registered');
+      expect(result).toHaveProperty('skipped');
+      expect(result).toHaveProperty('defaultProvider');
+      expect(result).toHaveProperty('connector');
+      expect(Array.isArray(result.registered)).toBe(true);
+      expect(Array.isArray(result.skipped)).toBe(true);
     });
   });
 });

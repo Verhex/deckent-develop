@@ -1,465 +1,386 @@
-# DIRECTIVES — Sprint 044: Foundation Upgrade
+# DIRECTIVES — Sprint 045: MCP-Native Providers & Module Integration
 
-## Goal: .deck secrets, full config, rich output, kraken splash, Router, Connector, sync, explain
+## Goal: Connect Sprint 044 modules to real providers, enable Codex/Gemini execution, integrate Router+Connector into sprint lifecycle
 
-This sprint establishes the foundation for Deckent's multi-environment beta. It adds the `.deck` secret file system, makes all config parameters visible, introduces Router and Connector modules, enriches sprint output, adds the Kraken ASCII splash, and creates `deckent sync` + `deckent explain` commands.
+Sprint 044 built the foundation (Router, Connector, .deck, env detection, rich output). Sprint 045 wires these modules into the live sprint pipeline and upgrades provider adapters to use real CLI commands with subscription auth.
 
 ---
 
-## Task 1: .deck Secret File System
-- Model: sonnet
+## Task 1: Connector Integration into bootstrapProviders
+- Model: opus
 - Effort: high
-- Files: src/core/deck-file.ts (new), tests/core/deck-file.test.ts (new)
-- Scope: src/core/, tests/core/
+- Files: src/core/provider.ts, src/orchestra/connector.ts, tests/core/provider.test.ts
+- Scope: src/core/, src/orchestra/, tests/
 
 ### Description
-Create `.deck` secret file system — Deckent's own `.env` equivalent that never conflicts with project `.env` files.
+Wire the Connector module (Sprint 044) into the existing bootstrapProviders() flow.
 
-**deck-file.ts exports:**
-- `parseDeckFile(content: string): Record<string, string>` — parse key=value format, `#` comments, blank lines skip, trim whitespace
-- `loadDeckSecrets(projectRoot: string): Record<string, string>` — read `.deck` file, return parsed secrets. Does NOT inject into process.env (Brain decides what to pass)
-- `validateDeckFile(secrets: Record<string, string>): DeckFileValidation` — check for unknown keys, empty required keys, format errors
-- `createDeckTemplate(projectRoot: string): void` — create `.deck` with all known keys as empty values with comments
-- `ensureDeckGitignore(projectRoot: string): void` — ensure `.deck` is in `.gitignore`, add if missing
-- `isDeckFileCommitted(projectRoot: string): boolean` — check git status, return true if `.deck` is tracked
+**Changes:**
+- `bootstrapProviders()` now creates a Connector instance and registers providers through it
+- Connector tracks health status for each registered provider
+- `bootstrapProviders()` returns `{ connector, registered, skipped }` instead of just `{ registered, skipped }`
+- All downstream code that calls `providerRegistry.get()` continues to work (backward compat)
+- Connector.healthCheck() called during bootstrap — unhealthy providers logged as warning but still registered
 
-**Known keys (all start with DECKENT_ prefix):**
-```
-# === Provider API Keys ===
-DECKENT_CLAUDE_API_KEY=
-DECKENT_OPENAI_API_KEY=
-DECKENT_GOOGLE_API_KEY=
-
-# === Notifications ===
-DECKENT_SMTP_HOST=
-DECKENT_SMTP_USER=
-DECKENT_SMTP_PASS=
-DECKENT_WEBHOOK_URL=
-
-# === Storage ===
-DECKENT_DB_URL=
-
-# === Telemetry ===
-DECKENT_TELEMETRY_ID=
-
-# === Custom (for plugins) ===
-# DECKENT_CUSTOM_*=
-```
-
-**Security rules:**
-- Worker processes NEVER receive `.deck` path or full contents — Brain injects only needed env vars
-- Auditor checks: if `.deck` is committed to git → CRITICAL alert
-- `.deck` is always in `.gitignore`
+**Integration points:**
+- `src/cli/commands/start.ts` — receives connector from bootstrap
+- `src/mcp/tools/start.ts` — receives connector from bootstrap
+- Sprint-controller receives connector reference for runtime health checks
 
 ### Tests
-- Parse valid .deck file (key=value, comments, blanks)
-- Parse edge cases (= in value, quotes, unicode)
-- Empty/missing file returns empty record
-- Template creation includes all known keys
-- .gitignore ensured (append, no duplicate)
-- Committed detection works
-- Validation catches unknown keys
-- 15+ tests
+- Bootstrap creates Connector with all available providers
+- Health check runs during bootstrap
+- Unhealthy provider still registered (with warning)
+- Connector accessible from sprint-controller
+- Backward compat: existing providerRegistry.get() still works
+- 10+ tests
 
 ---
 
-## Task 2: Config — All Parameters Visible
-- Model: sonnet
+## Task 2: Router Integration into Sprint Lifecycle
+- Model: opus
 - Effort: high
-- Files: src/core/config.ts, src/core/config-types.ts, tests/core/config.test.ts
-- Scope: src/core/, tests/core/
+- Files: src/orchestra/sprint-controller.ts, tests/orchestra/sprint-controller.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Extend DeckentConfig type and createDefaultConfig() so every possible parameter is present, even if null/default. User opening `.deckent/config.json` sees ALL capabilities.
+Wire the TaskRouter (Sprint 044) into sprint-controller.ts between planSprint() and spawnWorkers().
 
-**New config fields to add (with defaults):**
+**Changes to sprint-controller.ts:**
+- After `planSprint()` creates tasks, call `routeTask()` for each task
+- Router assigns: `task.provider`, refines `task.assignedAgent`, adds `task.assignedSkills`
+- Router uses Connector to check provider availability
+- If Router assigns a non-Claude provider, spawnWorkers() uses SubprocessBackend (not tmux)
+- Config `skill_routing.*` overrides respected
 
+**Flow:**
+```
+planSprint() → tasks created
+  ↓
+routeTask(task, config, connector.getAvailableProviders()) → each task gets provider+agent+skill
+  ↓
+spawnWorkers() → uses task.provider to select backend
+```
+
+**Backward compat:** If Router is not available or fails, fall back to existing behavior (all tasks → brain_provider).
+
+### Tests
+- Router called after planSprint
+- Task.provider set by router
+- Skill routing config respected
+- Router failure falls back to default
+- Non-Claude provider routes to subprocess
+- 10+ tests
+
+---
+
+## Task 3: Codex Adapter — Real CLI Integration
+- Model: opus
+- Effort: high
+- Files: src/providers/codex.ts, tests/providers/codex.test.ts
+- Scope: src/providers/, tests/providers/
+
+### Description
+Upgrade CodexAdapter to use real Codex CLI commands with subscription auth.
+
+**Current state:** CodexAdapter exists but uses mock/placeholder commands.
+
+**Target:**
+- `spawn()`: runs `codex exec --full-auto "<prompt>" --model <model>` via SubprocessBackend
+- `buildCommand()`: generates correct `codex exec` command string
+- `isAvailable()`: checks `which codex` + auth status via `codex auth status` or similar
+- `checkUsage()`: returns usage metrics (parse from codex CLI if available, else estimate)
+- Auth: supports both ChatGPT subscription (browser auth) and API key (OPENAI_API_KEY / DECKENT_OPENAI_API_KEY from .deck)
+
+**Model mapping update:**
 ```typescript
-interface DeckentConfig {
-  // ... existing fields ...
-
-  // Output
-  output_splash: boolean;          // true — show kraken on init/version
-  output_mode: 'quiet' | 'normal' | 'verbose';  // 'normal'
-  output_theme: 'default' | 'minimal' | 'rich';  // 'default'
-
-  // Skill Routing
-  skill_routing: {
-    design: ProviderName | 'auto' | null;    // null
-    testing: ProviderName | 'auto' | null;   // null
-    docs: ProviderName | 'auto' | null;      // null
-    default: ProviderName | 'auto';          // 'auto'
-  };
-
-  // Online Search
-  search_enabled: boolean;         // true
-  search_provider: 'context7' | 'web' | 'none';  // 'context7'
-  search_cache_ttl: number;        // 3600
-
-  // Notifications
-  notify_on_complete: boolean;     // false
-  notify_channel: 'slack' | 'discord' | 'email' | 'webhook' | null;  // null
-  notify_url: string | null;       // null
-
-  // Telemetry
-  telemetry_enabled: boolean;      // false
-  telemetry_anonymous: boolean;    // true
-
-  // Environment
-  detected_env: 'vscode' | 'codex' | 'gemini' | 'cursor' | 'tmux' | 'shell' | null;  // null (auto)
-  multi_ide_mode: boolean;         // false
-
-  // Auth
-  auth_mode: 'subscription' | 'api' | 'hybrid';  // 'subscription'
-}
+const CODEX_MODELS = {
+  premium: 'gpt-5',           // was gpt-5 ✓
+  standard: 'gpt-4.1',        // was gpt-4.1 ✓
+  economy: 'gpt-4.1-mini',    // update
+  codex: 'gpt-5.3-codex',     // new — codex-specific model
+};
 ```
 
-**createDefaultConfig() must include ALL fields with their defaults.**
-**Config validation must accept null values for optional fields.**
-**Existing tests must not break — backward compatible.**
+**Important:** Do NOT break existing mock tests. Add new test file for real CLI integration: `tests/providers/codex-integration.test.ts` (skipped in CI if codex CLI not available).
 
 ### Tests
-- Default config has all new fields
-- Null values accepted for optional fields
-- Existing config files load without errors (missing new fields get defaults)
-- Config validation catches invalid enum values
+- buildCommand generates correct codex exec string
+- spawn calls SubprocessBackend with correct command
+- isAvailable checks CLI existence
+- Auth mode detection (subscription vs API key)
+- .deck file API key loaded when present
+- Model mapping correct
+- 12+ tests
+
+---
+
+## Task 4: Gemini Adapter — Real CLI Integration
+- Model: opus
+- Effort: high
+- Files: src/providers/gemini.ts, tests/providers/gemini.test.ts
+- Scope: src/providers/, tests/providers/
+
+### Description
+Upgrade GeminiAdapter to use real Gemini CLI commands.
+
+**Target:**
+- `spawn()`: runs `gemini -p "<prompt>" --output-format json` via SubprocessBackend
+- `buildCommand()`: generates `gemini -p` command with correct flags
+- `isAvailable()`: checks `which gemini` + auth (GOOGLE_API_KEY or Google account)
+- `checkUsage()`: parse JSON output stats (token counts from headless mode response)
+- Result parsing: extract response from JSON output `{ response: "...", stats: {...} }`
+
+**Model mapping update:**
+```typescript
+const GEMINI_MODELS = {
+  premium: 'gemini-2.5-pro',
+  standard: 'gemini-2.5-flash',
+  economy: 'gemini-2.0-flash',
+};
+```
+
+**Gemini CLI specifics:**
+- Uses `-p` flag for headless/non-interactive mode
+- `--output-format json` gives structured output with stats
+- Auth: Google account (default) or GOOGLE_API_KEY env var
+- GEMINI.md context file support (equivalent to CLAUDE.md)
+
+### Tests
+- buildCommand generates correct gemini -p string
+- JSON output parsing extracts response and stats
+- isAvailable checks CLI + auth
+- .deck file API key loaded when present
+- Model mapping correct
 - 10+ tests
 
 ---
 
-## Task 3: Task Router Module
-- Model: opus
-- Effort: high
-- Files: src/orchestra/task-router.ts (new), tests/orchestra/task-router.test.ts (new)
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-New TaskRouter module — decides which provider, agent, and skill handles each task.
-
-**Exports:**
-- `routeTask(task: Task, config: ResolvedConfig, availableProviders: ProviderName[]): TaskRouting`
-- `TaskRouting = { provider: ProviderName; agent: string; skills: string[]; reason: string }`
-
-**Routing logic (priority order):**
-1. **Config override** — if `skill_routing.design = 'gemini'` and task matches design skill → gemini
-2. **Task force** — if task has `forceModel` → use that provider
-3. **Agent preference** — if assigned agent has `preferredProvider` → use it
-4. **Skill affinity** — match task type to skill, skill to provider (e.g., design skills → gemini)
-5. **Provider availability** — fallback if primary unavailable
-6. **Default** — use `skill_routing.default` (default: 'auto' → brain_provider)
-
-**Task type detection:**
-- Source code patterns (src/, .ts, .py, .java) → code task
-- Test patterns (tests/, .test., .spec.) → test task
-- Doc patterns (docs/, .md, README) → doc task
-- Design patterns (ui/, components/, .css, .html) → design task
-
-### Tests
-- Config override respected
-- Force model respected
-- Agent preference used when available
-- Skill affinity routing correct
-- Fallback when provider unavailable
-- Default routing works
-- Task type detection accurate
-- 15+ tests
-
----
-
-## Task 4: Connector Module
-- Model: opus
-- Effort: high
-- Files: src/orchestra/connector.ts (new), tests/orchestra/connector.test.ts (new)
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-MCP connection manager — handles provider lifecycle.
-
-**Exports:**
-- `Connector` class:
-  - `registerProvider(name: ProviderName, adapter: ProviderAdapter): void`
-  - `getProvider(name: ProviderName): ProviderAdapter | null`
-  - `healthCheck(name?: ProviderName): HealthCheckResult[]`
-  - `getAvailableProviders(): ProviderName[]`
-  - `isProviderReady(name: ProviderName): boolean`
-
-- `HealthCheckResult = { provider: ProviderName; available: boolean; authStatus: 'ok' | 'missing' | 'expired'; cliVersion: string | null; error: string | null }`
-
-**Behavior:**
-- Lazy initialization: provider started only when first needed
-- Health check: CLI exists? Auth valid? Connection alive?
-- Auditor integration: emits alerts on connection failure
-- Thread-safe: no race conditions on concurrent access
-
-### Tests
-- Provider registration and retrieval
-- Health check detects missing CLI
-- Health check detects missing auth
-- Available providers list correct
-- Unavailable provider returns null
-- 10+ tests
-
----
-
-## Task 5: Rich Sprint Output
-- Model: opus
-- Effort: high
-- Files: src/cli/helpers/output.ts, src/cli/helpers/sprint-summary-rich.ts (new), tests/cli/helpers/sprint-summary-rich.test.ts (new)
-- Scope: src/cli/, tests/cli/
-
-### Description
-Replace plain formatSprintSummary() with rich, informative output.
-
-**New formatRichSprintSummary(sprint, evaluations, gitDiff?, agentPerf?): string**
-
-**Sections:**
-1. **Header** — `● Sprint #N Complete` + duration (right-aligned)
-2. **Results** — `✓ X done  ⚡ Y debt  ✗ Z no-go  coverage%` with ANSI colors
-3. **Changes** — git diff stat per file (path, +lines, -lines, tags like `(new)`, `(deleted)`)
-   - Show max 5 files, "... N more files" if truncated
-   - Use `git diff --stat` output parsing
-4. **Tests** — `+N new │ total │ fail │ coverage (delta)`
-5. **Agent Performance** — table with agent name, tasks, done ratio, provider, avg coverage
-   - Use existing `buildAgentPerformance()` from sprint-reporter.ts
-6. **Learnings** — Top 3 items from MEMORY.md sprint entry (✓ success, ⚠ warning)
-7. **Next Steps** — Auto-generated actionable items:
-   - If NO_GO tasks: "Fix N NO_GO tasks..."
-   - If debt: "Review tech debt..."
-   - Always: "Run `deckent start` to continue"
-
-**Color system:**
-- Use ANSI escape codes directly (no new dependency — chalk is optional, stick with existing approach)
-- Respect NO_COLOR env var
-- Respect output_mode: quiet → only Results line, normal → full, verbose → full + worker logs
-
-**Integration:**
-- Replace call to formatSprintSummary() in finalizeSprint flow with formatRichSprintSummary()
-- Keep formatSprintSummary() as fallback for quiet mode
-
-### Tests
-- Full output contains all 7 sections
-- NO_COLOR produces clean text (no ANSI)
-- Quiet mode shows only results
-- Verbose mode includes extra detail
-- Git diff parsing handles various formats
-- Agent performance table renders correctly
-- Empty sprint (0 tasks) handles gracefully
-- 10+ tests
-
----
-
-## Task 6: Kraken ASCII Splash
+## Task 5: Claude Adapter — MCP Server Mode Option
 - Model: sonnet
 - Effort: normal
-- Files: src/cli/helpers/splash.ts (new), tests/cli/helpers/splash.test.ts (new), src/cli/commands/init.ts, src/cli/commands/version.ts
-- Scope: src/cli/, tests/cli/
+- Files: src/providers/claude.ts, tests/providers/claude.test.ts
+- Scope: src/providers/, tests/providers/
 
 ### Description
-Add Deckent's Kraken mascot splash screen.
+Add MCP server mode to ClaudeAdapter alongside existing tmux mode.
 
-**Finalized Kraken design (V2 — small head, 8 tentacles, even length):**
-```
-        ▄████▄
-       ████████
-        ██████
-      ▐▌▐▌▐▌▐▌▐▌
-     ▐▌▐▌ ▐▌ ▐▌▐▌
-    ▐▌ ▐▌ ▐▌ ▐▌ ▐▌
-    ▀  ▀  ▀  ▀  ▀
-```
+**Current:** ClaudeAdapter uses tmux backend exclusively.
 
-**splash.ts exports:**
-- `KRAKEN_ASCII: string` — the raw ASCII art (no colors)
-- `showSplash(version: string): string` — returns colored splash:
-  - Kraken body: teal ANSI color (38;2;77;184;164)
-  - "DECKENT" text: gold ANSI color (38;2;196;168;85), bold
-  - Version: dim/gray
-  - Tagline: "AI Agent Orchestrator" in dim
-- `showSplashIfEnabled(config: { output_splash: boolean }, version: string): string | null`
+**Add:** Config option `claude_backend: 'tmux' | 'subprocess' | 'mcp'`
+- `tmux` (default): existing behavior
+- `subprocess`: uses SubprocessBackend with `claude -p` headless
+- `mcp`: future — Claude as MCP server (stub for now, full implementation Sprint 046)
 
-**Where to show:**
-- `deckent init` — after successful init, before summary
-- `deckent --version` — splash + version info
-
-**Config:** `output_splash = true` (default). Set to `false` to disable.
-**NO_COLOR:** When set, splash renders without ANSI colors (plain ASCII).
+**Subprocess mode details:**
+- `claude -p "<prompt>" --dangerously-skip-permissions` 
+- Output captured via stdout
+- No tmux dependency — works in any terminal
+- Useful for environments where tmux is unavailable
 
 ### Tests
-- Splash renders with correct kraken shape
-- ANSI colors applied (teal body, gold text)
-- NO_COLOR returns plain text
-- output_splash=false returns null
-- Version string included
-- 5+ tests
-
----
-
-## Task 7: deckent sync Command
-- Model: sonnet
-- Effort: normal
-- Files: src/cli/commands/sync.ts (new), tests/cli/commands/sync.test.ts (new)
-- Scope: src/cli/, tests/cli/
-
-### Description
-New CLI command: detect out-of-band changes made while Deckent wasn't running.
-
-**`deckent sync` behavior:**
-1. Find last sprint's end timestamp from `.brain/sprints/` (latest file mtime)
-2. Run `git log --oneline --since=<timestamp>` to find commits since last sprint
-3. Run `git diff HEAD~N --stat` to get changed files summary
-4. Categorize changes: new files, modified files, deleted files
-5. Write summary to MEMORY.md under `## Out-of-band Changes`
-6. Print summary to terminal
-
-**Output format:**
-```
-Synced: 3 commits since Sprint #42
-  Modified: src/auth/jwt.ts, src/middleware/guard.ts
-  New: src/utils/crypto.ts
-  Deleted: src/old-auth.ts
-  → Added to MEMORY.md for next sprint context
-```
-
-**Edge cases:**
-- No git repo → skip, print warning
-- No previous sprint → skip, print info
-- No changes → print "No changes since last sprint"
-
-### Tests
-- Detects commits since last sprint
-- Writes to MEMORY.md correctly
-- Handles no git repo
-- Handles no previous sprint
-- Handles no changes
+- Subprocess mode generates correct command
+- tmux mode unchanged (backward compat)
+- Config claude_backend respected
+- MCP mode stub returns not-implemented error
 - 8+ tests
 
 ---
 
-## Task 8: deckent explain Command
+## Task 6: .deck Secret Loading in Provider Auth
 - Model: sonnet
 - Effort: normal
-- Files: src/cli/commands/explain.ts (new), tests/cli/commands/explain.test.ts (new)
-- Scope: src/cli/, tests/cli/
+- Files: src/core/provider.ts, src/core/deck-file.ts, tests/core/provider.test.ts
+- Scope: src/core/, tests/core/
 
 ### Description
-New CLI command: explain what the last sprint did in human-friendly language.
+When auth_mode is 'api' or 'hybrid', load API keys from .deck file.
 
-**`deckent explain` behavior:**
-1. Find latest sprint log from `.brain/sprints/`
-2. Read sprint log + RETRO.md
-3. Format a human-readable summary:
-   - What was the goal (from original directives)
-   - What tasks were planned
-   - Which succeeded, which failed
-   - Key learnings
-   - What to do next
+**Flow:**
+1. bootstrapProviders() calls loadDeckSecrets()
+2. For each provider, check .deck for API key:
+   - Codex: DECKENT_OPENAI_API_KEY → set as OPENAI_API_KEY in spawn env
+   - Gemini: DECKENT_GOOGLE_API_KEY → set as GOOGLE_API_KEY in spawn env
+   - Claude: DECKENT_CLAUDE_API_KEY → set as ANTHROPIC_API_KEY in spawn env
+3. .deck keys take precedence over system env vars (explicit > implicit)
+4. If auth_mode = 'subscription', skip .deck loading entirely
 
-**Output format:**
-```
-Sprint #42 Summary
-━━━━━━━━━━━━━━━━━
-
-Goal: Fix hardcoded provider fallbacks and stabilize tests
-
-What happened:
-  • 5 tasks completed successfully (provider fix, semver, identity update...)
-  • 3 tasks failed (doc generation tasks — workers struggled with output format)
-  • Added 43 new tests, bringing total to 9,406
-
-Key learnings:
-  • Doc tasks need structured templates to succeed
-  • Worker verify loop prevented false NO_GO on code tasks
-
-Next: Run `deckent start` to continue, or `deckent plan` to see next sprint
-```
+**Worker env injection:**
+- SubprocessBackend.spawn() receives `env` override parameter
+- Only the needed key is passed to worker process (not full .deck contents)
 
 ### Tests
-- Reads latest sprint log correctly
-- Formats readable output
-- Handles missing sprint log
-- Handles empty retro
-- 5+ tests
-
----
-
-## Task 9: DEBT Auto-Resolve & DECISIONS Auto-Draft
-- Model: sonnet
-- Effort: normal
-- Files: src/orchestra/sprint-reporter.ts, tests/orchestra/sprint-reporter.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-Two improvements to automatic documentation:
-
-**9a. DEBT.md auto-resolve:**
-When FIX phase successfully fixes a NO_GO task, mark the corresponding DEBT.md entry as `resolved`.
-- In `writeRetrospective()` or `finalizeSprint()`: scan evaluations for tasks that were NO_GO in initial eval but GO after FIX
-- Find matching DEBT.md entry by task title/ID
-- Update status column from `open` to `resolved`
-- Add resolution date
-
-**9b. DECISIONS.md auto-draft:**
-When sprint introduces a new module (new directory under src/) or significantly changes architecture:
-- In `finalizeSprint()`: detect new directories in git diff
-- If new directory found: append draft ADR to DECISIONS.md
-- Format: `### ADR-NNN: [Module Name] (Draft — Sprint #N)\nStatus: PROPOSED\nContext: Added in Sprint #N\nDecision: [placeholder]\n`
-- Brain can refine in next sprint
-
-### Tests
-- DEBT entry marked resolved after successful fix
-- No false resolves (task must actually pass after fix)
-- ADR draft created for new directories
-- No ADR for existing directories
+- .deck API key loaded for codex provider
+- .deck API key loaded for gemini provider
+- .deck takes precedence over system env
+- subscription mode skips .deck
+- Worker receives only needed key (not full secrets)
 - 8+ tests
 
 ---
 
-## Task 10: Environment Detection
+## Task 7: Provider Health in deckent doctor
 - Model: sonnet
 - Effort: normal
-- Files: src/core/environment.ts (new), tests/core/environment.test.ts (new)
-- Scope: src/core/, tests/core/
+- Files: src/cli/commands/doctor.ts, tests/cli/commands/doctor.test.ts
+- Scope: src/cli/, tests/cli/
 
 ### Description
-Auto-detect which IDE/environment Deckent is running in.
+Extend `deckent doctor` to show provider health status using Connector.
 
-**detectEnvironment(): DetectedEnv**
-
-```typescript
-type DetectedEnv = 'vscode' | 'codex' | 'gemini' | 'cursor' | 'tmux' | 'shell';
-
-function detectEnvironment(): DetectedEnv {
-  // VS Code: VSCODE_PID, VSCODE_CWD, TERM_PROGRAM='vscode'
-  // Codex: CODEX_SESSION, process.argv includes 'codex'
-  // Gemini: GEMINI_CLI, parent process is 'gemini'
-  // Cursor: CURSOR_SESSION, TERM_PROGRAM='cursor'
-  // tmux: TMUX env var present
-  // shell: fallback
-}
+**New checks:**
+```
+[PASS] Claude CLI    claude v2.1.81 — session auth active
+[PASS] Codex CLI     codex v1.2.0 — ChatGPT subscription
+[WARN] Gemini CLI    not installed — install: npm i -g @google/gemini-cli
+[PASS] .deck file    found, 3/9 keys configured
+[PASS] Environment   vscode detected
 ```
 
-**Integration:**
-- `deckent doctor` shows detected environment
-- `deckent init` uses detected env to choose config file template (CLAUDE.md vs AGENTS.md vs GEMINI.md)
-- Stored in config as `detected_env` (auto-updated on each run)
+**Implementation:**
+- Call Connector.healthCheck() for all providers
+- Show CLI version, auth status, and availability
+- Show .deck file status (found/missing, keys configured count)
+- Show detected environment
 
 ### Tests
-- VS Code detected from VSCODE_PID
-- Codex detected from CODEX_SESSION
-- Gemini detected from GEMINI_CLI
-- Cursor detected from CURSOR_SESSION
-- tmux detected from TMUX
-- Fallback to shell
-- 5+ tests
+- Doctor shows provider health
+- Missing CLI shows install command
+- .deck status reported
+- Environment shown
+- 8+ tests
+
+---
+
+## Task 8: Rich Output Integration into finalizeSprint
+- Model: sonnet
+- Effort: normal
+- Files: src/orchestra/sprint-controller.ts, src/cli/helpers/sprint-summary-rich.ts
+- Scope: src/orchestra/, src/cli/
+
+### Description
+Wire Sprint 044's formatRichSprintSummary into the actual finalizeSprint flow.
+
+**Changes:**
+- finalizeSprint() calls formatRichSprintSummary() instead of formatSprintSummary()
+- Pass git diff stats (from `git diff --stat HEAD~1`)
+- Pass agent performance data (from buildAgentPerformance())
+- Pass evaluations map for learnings section
+- Respect config.output_mode: quiet → minimal, normal → rich, verbose → rich + logs
+- Kraken splash shown at sprint START (not end) — first sprint only
+
+**Fallback:** If formatRichSprintSummary throws, fall back to formatSprintSummary.
+
+### Tests
+- Rich output called during finalize
+- Git diff stats included
+- Agent performance table populated
+- Output mode respected
+- Fallback works on error
+- 8+ tests
+
+---
+
+## Task 9: Environment-Aware deckent init
+- Model: sonnet
+- Effort: normal
+- Files: src/cli/commands/init.ts, tests/cli/commands/init.test.ts
+- Scope: src/cli/, tests/cli/
+
+### Description
+Upgrade `deckent init` to use environment detection and create correct config files.
+
+**Flow:**
+1. Show Kraken splash
+2. detectEnvironment() → detected_env
+3. Based on env, create appropriate config file:
+   - vscode/shell → CLAUDE.md with @DECKENT.md (existing)
+   - codex → AGENTS.md with Deckent instructions
+   - gemini → GEMINI.md with Deckent context
+   - cursor → .cursor/rules/deckent.mdc (if not exists)
+4. Create .deck template
+5. Run deckent doctor (provider health check)
+6. Show summary: what was created, what providers are available
+
+**AGENTS.md template (for Codex):**
+```markdown
+# AGENTS.md — Deckent Integration
+
+This project uses Deckent for AI agent orchestration.
+
+## Sprint Instructions
+- Read DIRECTIVES.md for current sprint goals
+- Follow task scope boundaries strictly
+- Write tests for all changes
+- Report results in .tasks/ directory
+
+## Project Context
+@DECKENT.md
+```
+
+**GEMINI.md template (for Gemini CLI):**
+```markdown
+# GEMINI.md — Deckent Integration
+
+This project uses Deckent for AI agent orchestration.
+
+## Context
+@DECKENT.md
+
+## Rules
+- Follow DIRECTIVES.md for sprint goals
+- Respect file scope boundaries
+- Run tests before reporting completion
+```
+
+### Tests
+- Init creates CLAUDE.md in vscode env
+- Init creates AGENTS.md in codex env
+- Init creates GEMINI.md in gemini env
+- Init creates .cursor/rules in cursor env
+- Init creates .deck template
+- Kraken splash shown
+- Doctor runs after init
+- 10+ tests
+
+---
+
+## Task 10: Sprint 044 Module Smoke Tests
+- Model: sonnet
+- Effort: normal
+- Files: tests/integration/sprint-044-modules.test.ts (new)
+- Scope: tests/integration/
+
+### Description
+Integration tests verifying all Sprint 044 modules work together in a realistic flow.
+
+**Test scenarios:**
+1. **Full init flow:** detectEnvironment() → createDeckTemplate() → loadConfig() → showSplash() → formatDoctorResult()
+2. **Route + Connect flow:** Connector registers Claude → routeTask() → task gets provider=claude
+3. **Sync + Explain flow:** git changes detected → MEMORY.md updated → explain reads sprint log
+4. **Rich output flow:** mock sprint data → formatRichSprintSummary() → all 7 sections present
+5. **Config roundtrip:** createDefaultConfig() → add all new fields → validate → resolve → all fields present
+6. **DEBT auto-resolve:** create debt entry → mark task fixed → debt entry resolved
+7. **Env detection matrix:** set various env vars → correct env detected each time
+
+### Tests
+- Init flow produces valid output
+- Route+Connect assigns provider correctly
+- Sync writes to MEMORY.md
+- Rich output has all sections
+- Config roundtrip preserves all fields
+- DEBT auto-resolve works end-to-end
+- Env detection correct for all 6 environments
+- 15+ tests
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
 - All new tests MUST pass
-- Existing 9,406 tests: 0 regression
-- All code in English (comments, variables, docs)
-- All CLI output respects NO_COLOR env var
-- output_mode quiet/normal/verbose respected where applicable
-- No new runtime dependencies (use existing ANSI codes, not chalk)
-- Every new file has JSDoc on exported functions
+- Existing 9,626 tests: 0 regression
+- All code in English
+- No new runtime dependencies
+- Codex/Gemini integration tests: skip if CLI not available (`describe.skipIf`)
+- Every modified function retains JSDoc
+- Backward compatibility: existing Claude-only sprints must work identically

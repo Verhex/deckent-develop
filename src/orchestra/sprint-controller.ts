@@ -62,6 +62,9 @@ import { selectSkills } from '../core/skill-selector.js';
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner } from './planner.js';
 
+// ─── Task Router ────────────────────────────────────────────────
+import { routeTask } from './task-router.js';
+
 // ─── Wave 2 — tmux ────────────────────────────────────────────────
 import { ensureSession, spawnWorker, killWorker, listWorkers } from './tmux.js';
 
@@ -1248,6 +1251,17 @@ export async function runSprint(
       SprintPhase.PLAN,
     );
   }
+
+  // Phase 1.5: Route tasks to providers (non-fatal — falls back to existing behavior)
+  try {
+    const availableProviders = providerRegistry.listProviders() as ProviderName[];
+    for (const task of sprint.tasks) {
+      const routing = routeTask(task, config, availableProviders);
+      task.provider = routing.provider;
+      if (routing.agent !== 'generic') task.assignedAgent = routing.agent;
+      if (routing.skills.length > 0) task.assignedSkills = routing.skills;
+    }
+  } catch { /* Router failure is non-fatal — all tasks use brain_provider */ }
 
   // Reset dashboard for new sprint
   try {

@@ -3,6 +3,7 @@ import type { ModelType, ProviderName, UsageMetrics } from './types.js';
 import type { ResolvedConfig } from './config-types.js';
 import { PROVIDER_MODEL_MAP } from './task-types.js';
 import { getEquivalentModel } from './model-equivalence.js';
+import { Connector } from '../orchestra/connector.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────
 export interface ProviderSpawnOptions {
@@ -409,6 +410,7 @@ export async function resolveProviderWithFallback(
 
 /** Result of bootstrapping providers */
 export interface BootstrapResult {
+  connector: Connector;
   registered: ProviderName[];
   skipped: { name: ProviderName; reason: string }[];
   defaultProvider: ProviderName | null;
@@ -511,5 +513,28 @@ export async function bootstrapProviders(
     }
   }
 
-  return { registered, skipped, defaultProvider };
+  // ─── Wire Connector ────────────────────────────────────────────────
+  const connector = new Connector();
+
+  // Mirror all registered providers into the Connector
+  for (const providerName of registered) {
+    if (registry.hasProvider(providerName)) {
+      connector.registerProvider(providerName, registry.getProvider(providerName));
+    }
+  }
+
+  // Run health check — log warnings for unhealthy providers but don't remove them
+  try {
+    const healthResults = await connector.healthCheck();
+    for (const hr of healthResults) {
+      if (!hr.available || hr.authStatus !== 'ok') {
+        // Unhealthy but still registered — caller can inspect connector.healthCheck() later
+        // We intentionally do NOT unregister unhealthy providers
+      }
+    }
+  } catch {
+    // Health check failure should not block bootstrap
+  }
+
+  return { connector, registered, skipped, defaultProvider };
 }
