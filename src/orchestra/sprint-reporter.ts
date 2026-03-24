@@ -512,9 +512,13 @@ export function writeRetrospective(
     }
     if (learnings.length >= 11) break; // header + max 10
   }
-  const newMemory = existingMemory
-    ? existingMemory + '\n' + learnings.join('\n')
-    : learnings.join('\n');
+  const sprintHeader = `## Sprint ${sprint.id} Learnings`;
+  const alreadyHasLearnings = existingMemory?.includes(sprintHeader);
+  const newMemory = alreadyHasLearnings
+    ? existingMemory // Skip — already has this sprint's learnings
+    : existingMemory
+      ? existingMemory + '\n' + learnings.join('\n')
+      : learnings.join('\n');
   const memoryLines = newMemory.split('\n');
   const trimmed = trimMemoryWithHeader(memoryLines, MEMORY_MAX_LINES);
   writeFileSync(memoryPath, trimmed, 'utf-8');

@@ -464,6 +464,9 @@ export function runTestVerifyLoop(
 
 // ─── Compilation Verify Loop ─────────────────────────────────────────
 
+// TODO: Skip tsc/vitest for doc-only tasks (scope contains only docs/ or *.md files)
+// See: isDocTask() in result-evaluator.ts for doc task detection logic
+
 /** Max retry attempts for the compilation verify loop */
 export const MAX_COMPILATION_RETRIES = 3;
 

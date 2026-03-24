@@ -770,6 +770,8 @@ export function spawnWorkers(
  * Extracted as a helper to avoid inline string comparisons throughout routing logic.
  * @internal
  */
+// TODO: Subprocess backend workers (Codex/Gemini) lack live log capture.
+// Consider adding IPC-based log streaming for feature parity with tmux workers.
 export function isTmuxProvider(providerName: ProviderName): boolean {
   return providerName === 'claude';
 }

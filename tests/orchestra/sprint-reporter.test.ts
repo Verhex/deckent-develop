@@ -343,6 +343,18 @@ describe('writeRetrospective', () => {
     expect(content).toContain('## Summary');
     expect(content).toContain('## Metrics');
   });
+
+  it('does not duplicate MEMORY.md learnings when called twice with the same sprint', () => {
+    const task = makeTask({ id: '001', title: 'Dup Task' });
+    const sprint = makeSprint({ id: 'sprint-dup', tasks: [task] });
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const metrics = makeMetrics();
+    writeRetrospective(tmpDir, sprint, evals, metrics);
+    writeRetrospective(tmpDir, sprint, evals, metrics);
+    const content = readFileSync(join(tmpDir, '.brain', 'MEMORY.md'), 'utf-8');
+    const headerCount = content.split('## Sprint sprint-dup Learnings').length - 1;
+    expect(headerCount).toBe(1);
+  });
 });
 
 // ─── writeSprintLog ──────────────────────────────────────────────────
