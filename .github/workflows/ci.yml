@@ -124,6 +124,8 @@ jobs:
       - name: Verify dist
         run: |
           test -f dist/cli/index.js
+          test -f dist/cli/entry.js
           test -f dist/mcp/server.js
           test -f dist/index.js
-          head -1 dist/cli/index.js | grep -q "#!/usr/bin/env node"
+          head -1 dist/cli/entry.js | grep -q "#!/usr/bin/env node"
+          head -1 dist/mcp/server.js | grep -q "#!/usr/bin/env node"
