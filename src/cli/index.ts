@@ -31,6 +31,7 @@ import { registerSkill } from './commands/skill.js';
 import { registerReview } from './commands/review.js';
 import { registerFinalize } from './commands/finalize.js';
 import { registerExplain } from './commands/explain.js';
+import { showSplash } from './helpers/splash.js';
 
 /**
  * Build and configure the CLI program with all commands registered.
@@ -40,8 +41,13 @@ export function buildProgram(): Command {
   const program = new Command()
     .name('deckent')
     .description('AI agent orchestration system — your AI development team, orchestrated.')
-    .version(buildVersionString(DECKENT_VERSION), '-V, --version', 'output the version number with environment info')
+    .option('-V, --version', 'output the version number with splash')
     .option('--version-json', 'output version info as JSON')
+    .on('option:version', () => {
+      console.log(showSplash(DECKENT_VERSION));
+      console.log(`\n  ${buildVersionString(DECKENT_VERSION)}`);
+      process.exit(0);
+    })
     .on('option:version-json', () => {
       console.log(JSON.stringify(buildVersionJson(DECKENT_VERSION), null, 2));
       process.exit(0);

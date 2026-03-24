@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -126,6 +126,7 @@ export function validateDeckFile(secrets: Record<string, string>): DeckFileValid
  * Create .deck template with all known keys as empty values with comments.
  */
 export function createDeckTemplate(projectRoot: string): void {
+  mkdirSync(projectRoot, { recursive: true });
   const deckPath = join(projectRoot, DECK_FILE_NAME);
 
   const lines: string[] = [
