@@ -660,3 +660,152 @@ describe('multi-provider config merge', () => {
     // If invalid, it would have thrown — gemini is valid
   });
 });
+
+// ─── Extended Config Fields ──────────────────────────────────────────
+
+describe('extended config defaults', () => {
+  it('default config has output_splash=true', () => {
+    const config = getDefaultConfig();
+    expect(config.output_splash).toBe(true);
+  });
+
+  it('default config has output_mode=normal', () => {
+    const config = getDefaultConfig();
+    expect(config.output_mode).toBe('normal');
+  });
+
+  it('default config has output_theme=default', () => {
+    const config = getDefaultConfig();
+    expect(config.output_theme).toBe('default');
+  });
+
+  it('default config has search_enabled=true', () => {
+    const config = getDefaultConfig();
+    expect(config.search_enabled).toBe(true);
+  });
+
+  it('default config has search_provider=context7', () => {
+    const config = getDefaultConfig();
+    expect(config.search_provider).toBe('context7');
+  });
+
+  it('default config has search_cache_ttl=3600', () => {
+    const config = getDefaultConfig();
+    expect(config.search_cache_ttl).toBe(3600);
+  });
+
+  it('default config has notify_on_complete=false', () => {
+    const config = getDefaultConfig();
+    expect(config.notify_on_complete).toBe(false);
+  });
+
+  it('default config has notify_channel=null', () => {
+    const config = getDefaultConfig();
+    expect(config.notify_channel).toBeNull();
+  });
+
+  it('default config has notify_url=null', () => {
+    const config = getDefaultConfig();
+    expect(config.notify_url).toBeNull();
+  });
+
+  it('default config has telemetry_enabled=false', () => {
+    const config = getDefaultConfig();
+    expect(config.telemetry_enabled).toBe(false);
+  });
+
+  it('default config has telemetry_anonymous=true', () => {
+    const config = getDefaultConfig();
+    expect(config.telemetry_anonymous).toBe(true);
+  });
+
+  it('default config has detected_env=null', () => {
+    const config = getDefaultConfig();
+    expect(config.detected_env).toBeNull();
+  });
+
+  it('default config has multi_ide_mode=false', () => {
+    const config = getDefaultConfig();
+    expect(config.multi_ide_mode).toBe(false);
+  });
+
+  it('default config has auth_mode=subscription', () => {
+    const config = getDefaultConfig();
+    expect(config.auth_mode).toBe('subscription');
+  });
+
+  it('default config has skill_routing=undefined', () => {
+    const config = getDefaultConfig();
+    expect(config.skill_routing).toBeUndefined();
+  });
+});
+
+describe('extended config validation', () => {
+  it('accepts output_mode=quiet via partial config', () => {
+    expect(() => validatePartialConfig({ output_mode: 'quiet' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts output_mode=verbose via partial config', () => {
+    expect(() => validatePartialConfig({ output_mode: 'verbose' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts output_theme=rich via partial config', () => {
+    expect(() => validatePartialConfig({ output_theme: 'rich' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts output_theme=minimal via partial config', () => {
+    expect(() => validatePartialConfig({ output_theme: 'minimal' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts search_provider=web via partial config', () => {
+    expect(() => validatePartialConfig({ search_provider: 'web' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts search_provider=none via partial config', () => {
+    expect(() => validatePartialConfig({ search_provider: 'none' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts notify_channel=slack via partial config', () => {
+    expect(() => validatePartialConfig({ notify_channel: 'slack' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts notify_channel=null via partial config', () => {
+    expect(() => validatePartialConfig({ notify_channel: null } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts auth_mode=api via partial config', () => {
+    expect(() => validatePartialConfig({ auth_mode: 'api' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts auth_mode=hybrid via partial config', () => {
+    expect(() => validatePartialConfig({ auth_mode: 'hybrid' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts skill_routing with provider values', () => {
+    expect(() => validatePartialConfig({
+      skill_routing: { design: 'claude', testing: 'codex', docs: 'gemini', default: 'claude' },
+    } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts skill_routing with null values', () => {
+    expect(() => validatePartialConfig({
+      skill_routing: { design: null, testing: null, docs: null },
+    } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('existing config files load without error when new fields absent', async () => {
+    // Simulate a legacy config that has none of the new fields
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'pro_plan', language: 'tr' }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('pro_plan');
+    // New fields should be available via defaults after merge
+  });
+
+  it('detected_env accepts all valid enum values', () => {
+    for (const env of ['vscode', 'codex', 'gemini', 'cursor', 'tmux', 'shell', null] as const) {
+      expect(() => validatePartialConfig({ detected_env: env } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+    }
+  });
+});

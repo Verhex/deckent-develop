@@ -330,6 +330,28 @@ export function createDefaultConfig(): DeckentConfig {
     brain_provider: 'claude',
     worker_provider: 'claude',
     cost_optimization: false,
+    // Output & Display
+    output_splash: true,
+    output_mode: 'normal',
+    output_theme: 'default',
+    // Skill-Based Provider Routing
+    skill_routing: undefined,
+    // Search & Documentation
+    search_enabled: true,
+    search_provider: 'context7',
+    search_cache_ttl: 3600,
+    // Notifications
+    notify_on_complete: false,
+    notify_channel: null,
+    notify_url: null,
+    // Telemetry
+    telemetry_enabled: false,
+    telemetry_anonymous: true,
+    // Environment Detection
+    detected_env: null,
+    multi_ide_mode: false,
+    // Auth
+    auth_mode: 'subscription',
   };
 }
 

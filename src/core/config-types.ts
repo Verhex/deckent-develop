@@ -73,6 +73,55 @@ export interface DeckentConfig {
   cost_optimization?: boolean;
   /** Optional API keys (prefer env vars) */
   api_keys?: Record<string, string>;
+
+  // ─── Output & Display ──────────────────────────────────────────────
+  /** Show kraken splash on init/version (default: true) */
+  output_splash?: boolean;
+  /** Output verbosity: quiet (minimal), normal (default), verbose (extra detail) */
+  output_mode?: 'quiet' | 'normal' | 'verbose';
+  /** Output theme (default: 'default') */
+  output_theme?: 'default' | 'minimal' | 'rich';
+
+  // ─── Skill-Based Provider Routing ──────────────────────────────────
+  /** Skill-based provider routing overrides */
+  skill_routing?: {
+    design?: string | null;
+    testing?: string | null;
+    docs?: string | null;
+    default?: string;
+  };
+
+  // ─── Search & Documentation ────────────────────────────────────────
+  /** Enable online search for documentation (default: true) */
+  search_enabled?: boolean;
+  /** Search provider (default: 'context7') */
+  search_provider?: 'context7' | 'web' | 'none';
+  /** Search cache TTL in seconds (default: 3600) */
+  search_cache_ttl?: number;
+
+  // ─── Notifications ─────────────────────────────────────────────────
+  /** Notify on sprint completion (default: false) */
+  notify_on_complete?: boolean;
+  /** Notification channel */
+  notify_channel?: 'slack' | 'discord' | 'email' | 'webhook' | null;
+  /** Notification webhook URL */
+  notify_url?: string | null;
+
+  // ─── Telemetry ─────────────────────────────────────────────────────
+  /** Telemetry enabled (default: false) */
+  telemetry_enabled?: boolean;
+  /** Anonymous telemetry (default: true) */
+  telemetry_anonymous?: boolean;
+
+  // ─── Environment Detection ─────────────────────────────────────────
+  /** Auto-detected environment */
+  detected_env?: 'vscode' | 'codex' | 'gemini' | 'cursor' | 'tmux' | 'shell' | null;
+  /** Multi-IDE mode (default: false) */
+  multi_ide_mode?: boolean;
+
+  // ─── Auth ──────────────────────────────────────────────────────────
+  /** Auth mode (default: 'subscription') */
+  auth_mode?: 'subscription' | 'api' | 'hybrid';
 }
 
 export interface ResolvedConfig {
