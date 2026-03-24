@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import type { DetectedProvider } from '../../core/provider.js';
+import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
   DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, LOCK_STALE_THRESHOLD_MS, DEBT_TABLE_HEADER,
@@ -296,6 +297,8 @@ export interface HumanDoctorInput {
   lastSprintId: string | null;
   debtItems: { total: number; critical: number };
   projectRoot?: string;
+  /** Optional: health check results from Connector. When provided, replaces formatProviderHealthSection. */
+  connectorHealthResults?: HealthCheckResult[];
 }
 
 /**
@@ -327,6 +330,70 @@ export function getReadinessLabel(result: DoctorResult, brainLines: number, brai
   const failedOptional = result.checks.filter(c => !c.required && !c.passed);
   if (failedOptional.length > 0) return 'READY (with warnings)';
   return 'READY';
+}
+
+/**
+ * Get CLI install hint for a missing provider.
+ * Returns an install command suggestion string, or empty string if unknown.
+ */
+export function getProviderInstallHint(name: string): string {
+  switch (name) {
+    case 'claude': return 'install: npm i -g @anthropic-ai/claude-code';
+    case 'codex': return 'install: npm i -g @openai/codex';
+    case 'gemini': return 'install: npm i -g @google/gemini-cli';
+    default: return '';
+  }
+}
+
+/**
+ * Build HealthCheckResult entries from DetectedProvider list.
+ * Converts provider detection output to the Connector health format for display.
+ */
+export function buildConnectorHealthResults(providers: DetectedProvider[]): HealthCheckResult[] {
+  return providers.map(p => ({
+    provider: p.name,
+    available: p.available,
+    authStatus: (p.authMethod !== 'none' ? 'ok' : 'missing') as HealthCheckResult['authStatus'],
+    cliVersion: p.version ?? null,
+    error: null,
+  }));
+}
+
+/**
+ * Format Connector health check results in [PASS]/[WARN]/[FAIL] style.
+ * Includes provider CLI status, .deck file summary, and detected environment.
+ */
+export function formatConnectorHealthLines(
+  results: HealthCheckResult[],
+  root: string,
+): string[] {
+  const lines: string[] = ['Provider Health:'];
+
+  for (const r of results) {
+    const versionStr = r.cliVersion ? ` ${r.cliVersion}` : '';
+    if (r.available && r.authStatus === 'ok') {
+      const authLabel = r.provider === 'claude' ? 'session auth active' : 'API key configured';
+      lines.push(`  [PASS] ${capitalize(r.provider)} CLI${versionStr} — ${authLabel}`);
+    } else if (!r.available) {
+      const hint = getProviderInstallHint(r.provider);
+      const msg = hint ? `not installed — ${hint}` : 'not available';
+      lines.push(`  [WARN] ${capitalize(r.provider)} CLI — ${msg}`);
+    } else {
+      // available but auth missing or expired
+      lines.push(`  [WARN] ${capitalize(r.provider)} CLI${versionStr} — auth missing`);
+    }
+  }
+
+  // .deck status
+  const deckStatus = getDeckFileStatus(root);
+  const deckIcon = deckStatus.includes('not found') ? '[WARN]' : '[PASS]';
+  lines.push(`  ${deckIcon} .deck file — ${deckStatus}`);
+
+  // Environment detection
+  const env = detectEnvironment();
+  lines.push(`  [PASS] Environment — ${env} detected`);
+
+  return lines;
 }
 
 /**
@@ -410,8 +477,15 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
 
   // --- Provider Health ---
   if (input.projectRoot) {
-    const providerHealthLines = formatProviderHealthSection(providers, input.projectRoot);
-    lines.push(...providerHealthLines);
+    if (input.connectorHealthResults) {
+      // Use Connector health format with [PASS]/[WARN]/[FAIL]
+      const healthLines = formatConnectorHealthLines(input.connectorHealthResults, input.projectRoot);
+      lines.push(...healthLines);
+    } else {
+      // Fall back to legacy format
+      const providerHealthLines = formatProviderHealthSection(providers, input.projectRoot);
+      lines.push(...providerHealthLines);
+    }
     lines.push('');
   }
 
@@ -609,10 +683,11 @@ export function registerDoctor(program: Command): void {
         print('');
         print(formatDetectedProviders(providers));
       } else {
-        // Human-friendly format
+        // Human-friendly format — build Connector health results from detected providers
         const brainLines = countBrainLines(root);
         const lastSprintId = getLastSprintId(root);
         const debtItems = countDebtItems(root);
+        const connectorHealthResults = buildConnectorHealthResults(providers);
 
         print(formatHumanDoctor({
           result,
@@ -622,6 +697,7 @@ export function registerDoctor(program: Command): void {
           lastSprintId,
           debtItems,
           projectRoot: root,
+          connectorHealthResults,
         }));
       }
 

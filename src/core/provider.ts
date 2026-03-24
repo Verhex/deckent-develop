@@ -12,6 +12,8 @@ export interface ProviderSpawnOptions {
   autoApprove?: boolean;
   projectDir?: string;
   logPath?: string;
+  /** Environment variable overrides injected into the worker process (only provider-specific keys) */
+  env?: Record<string, string>;
 }
 
 // ─── Provider Worker Info ────────────────────────────────────────────
@@ -416,6 +418,49 @@ export async function resolveProviderWithFallback(
   };
 }
 
+// ─── .deck Secret Application ───────────────────────────────────────
+
+/**
+ * Apply .deck secrets to process.env and return per-provider env override maps.
+ *
+ * .deck keys take PRECEDENCE over system env vars (explicit > implicit).
+ * This means DECKENT_*_API_KEY values always override any existing env vars.
+ *
+ * Only the provider-specific key is included in each override entry — the worker
+ * process should only receive the key it needs, not the full .deck contents.
+ *
+ * @param secrets  Key-value pairs loaded from the .deck file
+ * @returns  Map of ProviderName → { ENV_VAR: value } for each provider with a key
+ */
+export function applyDeckSecretsToEnv(
+  secrets: Record<string, string>,
+): Record<string, Record<string, string>> {
+  const providerEnvOverrides: Record<string, Record<string, string>> = {};
+
+  // Claude: DECKENT_CLAUDE_API_KEY → ANTHROPIC_API_KEY (.deck takes precedence)
+  const claudeKey = secrets['DECKENT_CLAUDE_API_KEY'];
+  if (claudeKey && claudeKey.length > 0) {
+    process.env['ANTHROPIC_API_KEY'] = claudeKey;
+    providerEnvOverrides['claude'] = { ANTHROPIC_API_KEY: claudeKey };
+  }
+
+  // Codex: DECKENT_OPENAI_API_KEY → OPENAI_API_KEY (.deck takes precedence)
+  const openaiKey = secrets['DECKENT_OPENAI_API_KEY'];
+  if (openaiKey && openaiKey.length > 0) {
+    process.env['OPENAI_API_KEY'] = openaiKey;
+    providerEnvOverrides['codex'] = { OPENAI_API_KEY: openaiKey };
+  }
+
+  // Gemini: DECKENT_GOOGLE_API_KEY → GOOGLE_API_KEY (.deck takes precedence)
+  const googleKey = secrets['DECKENT_GOOGLE_API_KEY'];
+  if (googleKey && googleKey.length > 0) {
+    process.env['GOOGLE_API_KEY'] = googleKey;
+    providerEnvOverrides['gemini'] = { GOOGLE_API_KEY: googleKey };
+  }
+
+  return providerEnvOverrides;
+}
+
 // ─── Bootstrap Providers ────────────────────────────────────────────
 
 /** Result of bootstrapping providers */
@@ -424,6 +469,13 @@ export interface BootstrapResult {
   registered: ProviderName[];
   skipped: { name: ProviderName; reason: string }[];
   defaultProvider: ProviderName | null;
+  /**
+   * Per-provider env overrides loaded from .deck file.
+   * Keys are ProviderName values ('claude' | 'codex' | 'gemini').
+   * Only contains the provider-specific API key — not the full .deck contents.
+   * Intended for passing to SubprocessBackend.spawn() env option.
+   */
+  providerEnvOverrides: Record<string, Record<string, string>>;
 }
 
 /**
@@ -446,27 +498,12 @@ export async function bootstrapProviders(
   const root = projectRoot ?? config.projectRoot;
 
   // ─── Load .deck secrets for provider auth ────────────────────────
-  // Skip .deck loading in subscription mode (subscription uses session auth)
+  // Skip .deck loading in subscription mode (subscription uses session auth).
+  // When auth_mode is 'api' or 'hybrid', .deck keys take precedence over system env vars.
+  let providerEnvOverrides: Record<string, Record<string, string>> = {};
   if (config.auth_mode !== 'subscription') {
     const secrets = loadDeckSecrets(root);
-
-    // Claude: DECKENT_CLAUDE_API_KEY → ANTHROPIC_API_KEY
-    const claudeKey = secrets['DECKENT_CLAUDE_API_KEY'];
-    if (claudeKey && claudeKey.length > 0 && !process.env['ANTHROPIC_API_KEY']) {
-      process.env['ANTHROPIC_API_KEY'] = claudeKey;
-    }
-
-    // Codex: DECKENT_OPENAI_API_KEY → OPENAI_API_KEY
-    const openaiKey = secrets['DECKENT_OPENAI_API_KEY'];
-    if (openaiKey && openaiKey.length > 0 && !process.env['OPENAI_API_KEY']) {
-      process.env['OPENAI_API_KEY'] = openaiKey;
-    }
-
-    // Gemini: DECKENT_GOOGLE_API_KEY → GOOGLE_API_KEY
-    const googleKey = secrets['DECKENT_GOOGLE_API_KEY'];
-    if (googleKey && googleKey.length > 0 && !process.env['GOOGLE_API_KEY']) {
-      process.env['GOOGLE_API_KEY'] = googleKey;
-    }
+    providerEnvOverrides = applyDeckSecretsToEnv(secrets);
   }
 
   const detected = await detectAvailableProviders();
@@ -571,5 +608,5 @@ export async function bootstrapProviders(
     // Health check failure should not block bootstrap
   }
 
-  return { connector, registered, skipped, defaultProvider };
+  return { connector, registered, skipped, defaultProvider, providerEnvOverrides };
 }

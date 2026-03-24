@@ -22,6 +22,19 @@ import { TASKS_DIR } from '../core/constants.js';
 
 const CODEX_MODELS: readonly OpenAIModel[] = [...PROVIDER_MODEL_MAP.codex] as OpenAIModel[];
 
+/**
+ * Tier-based model mapping for Codex CLI.
+ * Used by getModelForTier() to select appropriate models.
+ */
+export const CODEX_TIER_MODELS = {
+  premium: 'gpt-5' as OpenAIModel,
+  standard: 'gpt-4.1' as OpenAIModel,
+  economy: 'gpt-4.1-mini' as OpenAIModel,
+} as const;
+
+/** Auth modes supported by Codex CLI */
+export type CodexAuthMode = 'api_key' | 'subscription' | 'none';
+
 const SAFE_USAGE_DEFAULT: UsageMetrics = {
   fiveHourPercent: 50,
   weeklyPercent: 30,
@@ -47,7 +60,7 @@ interface CodexWorkerEntry {
  * with stdout/stderr redirected to log files. Each worker tracks its PID
  * for kill/list operations.
  *
- * Requires: `codex` CLI installed + OPENAI_API_KEY environment variable.
+ * Requires: `codex` CLI installed + OPENAI_API_KEY or ChatGPT subscription auth.
  */
 export class CodexAdapter implements ProviderAdapter {
   readonly name = 'codex';
@@ -94,10 +107,18 @@ export class CodexAdapter implements ProviderAdapter {
     const logFd = openSync(logPath, 'a');
 
     const args = this.buildArgs(model, prompt, opts);
+
+    // Build env — inject API key from DECKENT_OPENAI_API_KEY if available
+    const spawnEnv = { ...process.env };
+    const deckentKey = process.env['DECKENT_OPENAI_API_KEY'];
+    if (deckentKey && !spawnEnv['OPENAI_API_KEY']) {
+      spawnEnv['OPENAI_API_KEY'] = deckentKey;
+    }
+
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
-      env: { ...process.env },
+      env: spawnEnv,
     };
 
     const child = spawn('codex', args, spawnOpts);
@@ -149,18 +170,28 @@ export class CodexAdapter implements ProviderAdapter {
 
   /**
    * Check OpenAI API usage / rate limit status.
-   * Attempts to query the OpenAI API via the codex CLI.
+   * Attempts to query the Codex CLI for usage info.
    * Falls back to safe defaults if unavailable.
    */
   async checkUsage(): Promise<UsageMetrics> {
     try {
-      const apiKey = process.env['OPENAI_API_KEY'];
-      if (!apiKey) {
+      const authMode = this.detectAuthMode();
+      if (authMode === 'none') {
         return { ...SAFE_USAGE_DEFAULT, measuredAt: new Date().toISOString() };
       }
 
-      // OpenAI doesn't expose a simple CLI usage command like Claude.
-      // Return conservative defaults — actual tracking is handled by brain.ts UsageTracker.
+      // Attempt to get usage from codex CLI
+      const result = spawnSync('codex', ['usage'], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+      });
+
+      if (result.status === 0 && result.stdout) {
+        const parsed = parseCodexUsageOutput(result.stdout);
+        if (parsed) return parsed;
+      }
+
+      // CLI doesn't expose usage — return conservative defaults
       return {
         fiveHourPercent: 0,
         weeklyPercent: 0,
@@ -174,28 +205,54 @@ export class CodexAdapter implements ProviderAdapter {
   // ─── isAvailable() ──────────────────────────────────────────────────
 
   /**
-   * Check whether the Codex CLI is available and an OpenAI API key is set.
-   * Checks both OPENAI_API_KEY and DECKENT_OPENAI_API_KEY env vars.
-   * Note: ChatGPT OAuth login (`codex --login`) is another valid auth path,
-   * but we only detect the API key method here for non-interactive use.
+   * Check whether the Codex CLI is available and auth is configured.
+   * Checks both API key auth (OPENAI_API_KEY / DECKENT_OPENAI_API_KEY)
+   * and ChatGPT subscription auth (via `codex auth status`).
    */
   async isAvailable(): Promise<boolean> {
     try {
-      // Check for API key (either standard or deckent-specific)
-      const apiKey = process.env['OPENAI_API_KEY'] ?? process.env['DECKENT_OPENAI_API_KEY'];
-      if (!apiKey) {
-        return false;
-      }
-
-      // Check codex CLI availability
-      const result = spawnSync('codex', ['--version'], {
+      // Check codex CLI availability first
+      const versionResult = spawnSync('codex', ['--version'], {
         encoding: 'utf-8',
         timeout: 5_000,
       });
-      return result.status === 0;
+      if (versionResult.status !== 0) return false;
+
+      // Check auth — API key or subscription
+      const authMode = this.detectAuthMode();
+      return authMode !== 'none';
     } catch {
       return false;
     }
+  }
+
+  // ─── detectAuthMode() ─────────────────────────────────────────────
+
+  /**
+   * Detect the current auth mode for Codex CLI.
+   * Returns 'api_key' if OPENAI_API_KEY or DECKENT_OPENAI_API_KEY is set,
+   * 'subscription' if `codex auth status` reports active login,
+   * or 'none' if no auth is available.
+   */
+  detectAuthMode(): CodexAuthMode {
+    // Check API key first (fastest path)
+    const apiKey = process.env['OPENAI_API_KEY'] ?? process.env['DECKENT_OPENAI_API_KEY'];
+    if (apiKey) return 'api_key';
+
+    // Check subscription auth via codex CLI
+    try {
+      const result = spawnSync('codex', ['auth', 'status'], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+      });
+      if (result.status === 0 && result.stdout?.includes('logged in')) {
+        return 'subscription';
+      }
+    } catch {
+      // CLI not available or auth check failed
+    }
+
+    return 'none';
   }
 
   // ─── buildCommand() ─────────────────────────────────────────────────
@@ -224,6 +281,15 @@ export class CodexAdapter implements ProviderAdapter {
       command: 'codex',
       args: ['exec', '--full-auto', prompt, '--model', model],
     };
+  }
+
+  // ─── getModelForTier() ─────────────────────────────────────────────
+
+  /**
+   * Get the recommended Codex model for a given capability tier.
+   */
+  getModelForTier(tier: 'premium' | 'standard' | 'economy'): OpenAIModel {
+    return CODEX_TIER_MODELS[tier];
   }
 
   // ─── Internal helpers ───────────────────────────────────────────────
@@ -287,6 +353,40 @@ function ensureDir(dir: string): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
+}
+
+/**
+ * Parse codex CLI usage output into UsageMetrics.
+ * Expected format varies — attempts to extract percentage values.
+ * Returns null if parsing fails.
+ */
+export function parseCodexUsageOutput(stdout: string): UsageMetrics | null {
+  try {
+    // Try JSON format first
+    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    if (typeof parsed['usage_percent'] === 'number') {
+      return {
+        fiveHourPercent: (parsed['usage_percent'] as number) ?? 0,
+        weeklyPercent: (parsed['weekly_percent'] as number) ?? 0,
+        measuredAt: new Date().toISOString(),
+      };
+    }
+  } catch {
+    // Not JSON — try text parsing
+  }
+
+  // Try text format: "Usage: 45% (5h) / 20% (weekly)"
+  const fiveHourMatch = /(\d+)%\s*\(5h\)/i.exec(stdout);
+  const weeklyMatch = /(\d+)%\s*\(weekly\)/i.exec(stdout);
+  if (fiveHourMatch || weeklyMatch) {
+    return {
+      fiveHourPercent: fiveHourMatch ? parseInt(fiveHourMatch[1]!, 10) : 0,
+      weeklyPercent: weeklyMatch ? parseInt(weeklyMatch[1]!, 10) : 0,
+      measuredAt: new Date().toISOString(),
+    };
+  }
+
+  return null;
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────

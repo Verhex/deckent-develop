@@ -504,7 +504,7 @@ describe('bootstrapProviders', () => {
       expect(process.env['ANTHROPIC_API_KEY']).toBe('sk-ant-deck-test');
     });
 
-    it('should NOT overwrite existing OPENAI_API_KEY from environment', async () => {
+    it('should OVERWRITE existing OPENAI_API_KEY — .deck takes precedence over system env', async () => {
       process.env['OPENAI_API_KEY'] = 'sk-existing-openai';
       vi.mocked(loadDeckSecrets).mockReturnValue({
         DECKENT_OPENAI_API_KEY: 'sk-deck-openai-override',
@@ -513,10 +513,11 @@ describe('bootstrapProviders', () => {
       const config = makeConfig({ projectRoot: '/tmp/test' });
       await bootstrapProviders(config, '/tmp/test', registry);
 
-      expect(process.env['OPENAI_API_KEY']).toBe('sk-existing-openai');
+      // .deck keys take precedence over system env vars (explicit > implicit)
+      expect(process.env['OPENAI_API_KEY']).toBe('sk-deck-openai-override');
     });
 
-    it('should NOT overwrite existing GOOGLE_API_KEY from environment', async () => {
+    it('should OVERWRITE existing GOOGLE_API_KEY — .deck takes precedence over system env', async () => {
       process.env['GOOGLE_API_KEY'] = 'AIza-existing-google';
       vi.mocked(loadDeckSecrets).mockReturnValue({
         DECKENT_GOOGLE_API_KEY: 'AIza-deck-google-override',
@@ -525,7 +526,8 @@ describe('bootstrapProviders', () => {
       const config = makeConfig({ projectRoot: '/tmp/test' });
       await bootstrapProviders(config, '/tmp/test', registry);
 
-      expect(process.env['GOOGLE_API_KEY']).toBe('AIza-existing-google');
+      // .deck keys take precedence over system env vars (explicit > implicit)
+      expect(process.env['GOOGLE_API_KEY']).toBe('AIza-deck-google-override');
     });
 
     it('should skip .deck loading when auth_mode is subscription', async () => {

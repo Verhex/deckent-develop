@@ -1,41 +1,40 @@
-# Sprint sprint-042 Retrospective
+# Sprint sprint-046 Retrospective
 
 ## Summary
-Completed 3/8 tasks in 40 minutes 5s.
+Completed 8/10 tasks in 38 minutes 24s.
 
 ## Highlights
-- 3 tasks completed on first try
+- 8 tasks completed on first try
 - No boundary violations detected
+- NO_GO rate improved from 63% to 20%
 
 ## Issues
-- Task 042-001 (Close All Open Tech Debt) failed
-- Task 042-002 (Test Suite Stabilization) failed
-- Task 042-006 (Documentation Final Review) failed
-- Task 042-007 (CHANGELOG + Release Notes) failed
-- Task 042-008 (Version Bump + Git Tag) failed
+- Task 046-001 (Connector Integration into bootstrapProviders) failed — File write permissions denied for all target files (src/o...
+- Task 046-004 (Gemini Adapter — Real CLI Integration) failed
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 3/8 |
-| New test files | 4 |
-| Code changes | +1935 / -1 |
-| Sprint time | 40 minutes 5s |
-| NO_GO rate | 63% (5/8) |
+| Tasks completed | 8/10 |
+| New test files | 8 |
+| Code changes | +708 / -90 |
+| Sprint time | 38 minutes 24s |
+| NO_GO rate | 20% (2/10) |
+| Coverage | 10.0% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| generic | 8 | 0 | 3 | 5 | 0% |
+| generic | 10 | 1 | 7 | 2 | 10% |
 
 ## Learnings
-- Close All Open Tech Debt: failed — investigate root cause
-- Test Suite Stabilization: failed — investigate root cause
-- npm Publish Validation: completed with tech debt — schedule cleanup
-- Global Install E2E Test: completed with tech debt — schedule cleanup
-- Provider Adapter Smoke Tests: completed with tech debt — schedule cleanup
-- Documentation Final Review: failed — investigate root cause
-- CHANGELOG + Release Notes: failed — investigate root cause
-- Version Bump + Git Tag: failed — investigate root cause
-- Recurring pattern (2947x): stale_heartbeat
+- Connector Integration into bootstrapProviders: failed — investigate root cause
+- Router Integration into Sprint Lifecycle: completed with tech debt — schedule cleanup
+- Codex Adapter — Real CLI Integration: completed with tech debt — schedule cleanup
+- Gemini Adapter — Real CLI Integration: failed — investigate root cause
+- Claude Adapter — MCP Server Mode Option: completed with tech debt — schedule cleanup
+- .deck Secret Loading in Provider Auth: completed with tech debt — schedule cleanup
+- Provider Health in deckent doctor: completed with tech debt — schedule cleanup
+- Environment-Aware deckent init: completed with tech debt — schedule cleanup
+- Sprint 044 Module Smoke Tests: completed with tech debt — schedule cleanup

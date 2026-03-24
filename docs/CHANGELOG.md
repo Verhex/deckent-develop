@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint46] - 2026-03-24
+
+### Added
+
+- Rich Output Integration into finalizeSprint
+
+### Changed
+
+- Router Integration into Sprint Lifecycle (completed with tech debt)
+- Codex Adapter — Real CLI Integration (completed with tech debt)
+- Claude Adapter — MCP Server Mode Option (completed with tech debt)
+- .deck Secret Loading in Provider Auth (completed with tech debt)
+- Provider Health in deckent doctor (completed with tech debt)
+- Environment-Aware deckent init (completed with tech debt)
+- Sprint 044 Module Smoke Tests (completed with tech debt)
+
+
+_Tasks: 10 total, 8 done, 7 tech debt, 2 no-go_
+
 ## [0.1.0-sprint42] - 2026-03-23
 
 

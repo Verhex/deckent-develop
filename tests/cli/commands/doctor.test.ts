@@ -96,8 +96,10 @@ import {
   formatHumanDoctor, getLastSprintId, countDebtItems, getProviderTips,
   getMemoryHealthLabel, getProviderSummary, getReadinessLabel,
   getDeckFileStatus, formatProviderHealthSection,
+  getProviderInstallHint, buildConnectorHealthResults, formatConnectorHealthLines,
 } from '../../../src/cli/commands/doctor.js';
 import type { HumanDoctorInput } from '../../../src/cli/commands/doctor.js';
+import type { HealthCheckResult } from '../../../src/orchestra/connector.js';
 import type { DetectedProvider } from '../../../src/core/provider.js';
 import { detectEnvironment } from '../../../src/core/environment.js';
 import { loadDeckSecrets, validateDeckFile } from '../../../src/core/deck-file.js';
@@ -1561,5 +1563,282 @@ describe('formatHumanDoctor with provider health', () => {
     vi.mocked(detectEnvironment).mockReturnValue('cursor');
     const output = formatHumanDoctor(baseInput);
     expect(output).toContain('Environment: cursor detected');
+  });
+});
+// ─── getProviderInstallHint ──────────────────────────────────────────
+
+describe('getProviderInstallHint', () => {
+  it('returns npm install command for claude', () => {
+    const hint = getProviderInstallHint('claude');
+    expect(hint).toContain('npm i -g');
+    expect(hint).toContain('@anthropic-ai/claude-code');
+  });
+
+  it('returns npm install command for codex', () => {
+    const hint = getProviderInstallHint('codex');
+    expect(hint).toContain('npm i -g');
+    expect(hint).toContain('@openai/codex');
+  });
+
+  it('returns npm install command for gemini', () => {
+    const hint = getProviderInstallHint('gemini');
+    expect(hint).toContain('npm i -g');
+    expect(hint).toContain('@google/gemini-cli');
+  });
+
+  it('returns empty string for unknown provider', () => {
+    expect(getProviderInstallHint('unknown')).toBe('');
+  });
+
+  it('all install hints start with "install:"', () => {
+    expect(getProviderInstallHint('claude')).toMatch(/^install:/);
+    expect(getProviderInstallHint('codex')).toMatch(/^install:/);
+    expect(getProviderInstallHint('gemini')).toMatch(/^install:/);
+  });
+});
+
+// ─── buildConnectorHealthResults ────────────────────────────────────
+
+describe('buildConnectorHealthResults', () => {
+  function makeProvider(name: string, available: boolean, version?: string, authMethod: 'session' | 'api_key' | 'none' = 'none'): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, version, authMethod, models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  it('maps available provider with session auth to ok status', () => {
+    const results = buildConnectorHealthResults([makeProvider('claude', true, '2.1.81', 'session')]);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      provider: 'claude',
+      available: true,
+      authStatus: 'ok',
+      cliVersion: '2.1.81',
+      error: null,
+    });
+  });
+
+  it('maps unavailable provider to missing auth status', () => {
+    const results = buildConnectorHealthResults([makeProvider('gemini', false)]);
+    expect(results[0]).toMatchObject({
+      provider: 'gemini',
+      available: false,
+      authStatus: 'missing',
+      cliVersion: null,
+    });
+  });
+
+  it('converts full provider list to health results', () => {
+    const providers = [
+      makeProvider('claude', true, '2.1', 'session'),
+      makeProvider('codex', false),
+      makeProvider('gemini', false),
+    ];
+    const results = buildConnectorHealthResults(providers);
+    expect(results).toHaveLength(3);
+    expect(results.map(r => r.provider)).toEqual(['claude', 'codex', 'gemini']);
+  });
+
+  it('returns empty array for empty provider list', () => {
+    expect(buildConnectorHealthResults([])).toHaveLength(0);
+  });
+
+  it('maps api_key auth to ok status', () => {
+    const results = buildConnectorHealthResults([makeProvider('codex', true, '1.0', 'api_key')]);
+    expect(results[0]?.authStatus).toBe('ok');
+  });
+
+  it('sets cliVersion to null when version is undefined', () => {
+    const results = buildConnectorHealthResults([makeProvider('gemini', false, undefined)]);
+    expect(results[0]?.cliVersion).toBeNull();
+  });
+});
+
+// ─── formatConnectorHealthLines ─────────────────────────────────────
+
+describe('formatConnectorHealthLines', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    vi.mocked(validateDeckFile).mockReturnValue({ valid: true, warnings: [], errors: [] });
+    vi.mocked(detectEnvironment).mockReturnValue('vscode');
+  });
+
+  function makeResult(
+    provider: string,
+    available: boolean,
+    authStatus: 'ok' | 'missing' | 'expired' = 'ok',
+    cliVersion: string | null = null,
+  ): HealthCheckResult {
+    return { provider: provider as HealthCheckResult['provider'], available, authStatus, cliVersion, error: null };
+  }
+
+  it('starts with "Provider Health:" header', () => {
+    const lines = formatConnectorHealthLines([], '/mock/root');
+    expect(lines[0]).toBe('Provider Health:');
+  });
+
+  it('shows [PASS] for available provider with ok auth', () => {
+    const results = [makeResult('claude', true, 'ok', 'v2.1.81')];
+    const lines = formatConnectorHealthLines(results, '/mock/root');
+    const claudeLine = lines.find(l => l.includes('Claude'));
+    expect(claudeLine).toContain('[PASS]');
+    expect(claudeLine).toContain('v2.1.81');
+    expect(claudeLine).toContain('session auth active');
+  });
+
+  it('shows [PASS] with API key label for non-Claude provider', () => {
+    const results = [makeResult('codex', true, 'ok', 'v1.2.0')];
+    const lines = formatConnectorHealthLines(results, '/mock/root');
+    const codexLine = lines.find(l => l.includes('Codex'));
+    expect(codexLine).toContain('[PASS]');
+    expect(codexLine).toContain('API key configured');
+  });
+
+  it('shows [WARN] with install hint for unavailable provider', () => {
+    const results = [makeResult('gemini', false, 'missing')];
+    const lines = formatConnectorHealthLines(results, '/mock/root');
+    const geminiLine = lines.find(l => l.includes('Gemini'));
+    expect(geminiLine).toContain('[WARN]');
+    expect(geminiLine).toContain('not installed');
+    expect(geminiLine).toContain('install: npm i -g @google/gemini-cli');
+  });
+
+  it('shows [WARN] with auth missing for available provider with missing auth', () => {
+    const results = [makeResult('codex', true, 'missing', 'v1.0')];
+    const lines = formatConnectorHealthLines(results, '/mock/root');
+    const codexLine = lines.find(l => l.includes('Codex'));
+    expect(codexLine).toContain('[WARN]');
+    expect(codexLine).toContain('auth missing');
+  });
+
+  it('shows .deck file status line', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({
+      DECKENT_CLAUDE_API_KEY: 'sk-test',
+    });
+    const lines = formatConnectorHealthLines([], '/mock/root');
+    const deckLine = lines.find(l => l.includes('.deck'));
+    expect(deckLine).toBeDefined();
+    expect(deckLine).toContain('[PASS]');
+    expect(deckLine).toContain('1/9 keys configured');
+  });
+
+  it('shows [WARN] for missing .deck file', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    const lines = formatConnectorHealthLines([], '/mock/root');
+    const deckLine = lines.find(l => l.includes('.deck'));
+    expect(deckLine).toContain('[WARN]');
+  });
+
+  it('shows environment detection line', () => {
+    vi.mocked(detectEnvironment).mockReturnValue('cursor');
+    const lines = formatConnectorHealthLines([], '/mock/root');
+    const envLine = lines.find(l => l.includes('Environment'));
+    expect(envLine).toContain('[PASS]');
+    expect(envLine).toContain('cursor detected');
+  });
+
+  it('shows install hint for codex when unavailable', () => {
+    const results = [makeResult('codex', false, 'missing')];
+    const lines = formatConnectorHealthLines(results, '/mock/root');
+    const codexLine = lines.find(l => l.includes('Codex'));
+    expect(codexLine).toContain('@openai/codex');
+  });
+
+  it('shows install hint for claude when unavailable', () => {
+    const results = [makeResult('claude', false, 'missing')];
+    const lines = formatConnectorHealthLines(results, '/mock/root');
+    const claudeLine = lines.find(l => l.includes('Claude'));
+    expect(claudeLine).toContain('@anthropic-ai/claude-code');
+  });
+});
+
+// ─── formatHumanDoctor with connectorHealthResults ──────────────────
+
+describe('formatHumanDoctor with connectorHealthResults', () => {
+  function makeCheck(name: string, passed: boolean, message: string, required = false) {
+    return { name, passed, message, required };
+  }
+
+  function makeProvider(name: string, available: boolean, version?: string, authMethod: 'session' | 'api_key' | 'none' = 'none'): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, version, authMethod, models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  function makeHealthResult(
+    provider: string,
+    available: boolean,
+    authStatus: 'ok' | 'missing' | 'expired' = 'ok',
+    cliVersion: string | null = null,
+  ): HealthCheckResult {
+    return { provider: provider as HealthCheckResult['provider'], available, authStatus, cliVersion, error: null };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    vi.mocked(validateDeckFile).mockReturnValue({ valid: true, warnings: [], errors: [] });
+    vi.mocked(detectEnvironment).mockReturnValue('vscode');
+  });
+
+  const baseInput: HumanDoctorInput = {
+    result: {
+      ok: true,
+      checks: [
+        makeCheck('Platform', true, 'Linux'),
+        makeCheck('Node.js', true, 'v22.1.0', true),
+        makeCheck('git', true, 'v2.43.0', true),
+        makeCheck('tmux', true, 'tmux 3.4', true),
+        makeCheck('Claude CLI', true, 'v2.1', true),
+        makeCheck('Workspace', true, '.deckent/ found'),
+        makeCheck('Brain Dir', true, 'All brain files present'),
+        makeCheck('Directives', true, 'DIRECTIVES.md found'),
+        makeCheck('Brain Budget', true, '347/600 lines'),
+        makeCheck('Debt', true, 'No debt file'),
+        makeCheck('Locks', true, 'No lock files'),
+      ],
+    },
+    providers: [makeProvider('claude', true, '2.1', 'session')],
+    brainLines: 347,
+    brainBudget: 600,
+    lastSprintId: 'sprint-046',
+    debtItems: { total: 0, critical: 0 },
+    projectRoot: '/mock/root',
+  };
+
+  it('uses connector format ([PASS]) when connectorHealthResults provided', () => {
+    const input = {
+      ...baseInput,
+      connectorHealthResults: [makeHealthResult('claude', true, 'ok', 'v2.1.81')],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('[PASS]');
+    expect(output).toContain('session auth active');
+  });
+
+  it('shows [WARN] for missing provider in connector format', () => {
+    const input = {
+      ...baseInput,
+      connectorHealthResults: [makeHealthResult('gemini', false, 'missing')],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('[WARN]');
+    expect(output).toContain('not installed');
+  });
+
+  it('falls back to OK/FAIL format when connectorHealthResults absent', () => {
+    const input = { ...baseInput };
+    // No connectorHealthResults — should use old formatProviderHealthSection
+    const output = formatHumanDoctor(input);
+    // Old format uses "OK" not "[PASS]"
+    expect(output).toContain('OK Claude CLI');
+    expect(output).not.toContain('[PASS]');
+  });
+
+  it('shows environment in connector health section', () => {
+    vi.mocked(detectEnvironment).mockReturnValue('tmux');
+    const input = {
+      ...baseInput,
+      connectorHealthResults: [makeHealthResult('claude', true, 'ok', 'v2.1')],
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('[PASS] Environment — tmux detected');
   });
 });

@@ -18,7 +18,8 @@ vi.mock('node:fs', () => ({
   closeSync: vi.fn(),
 }));
 
-import { CodexAdapter, createCodexAdapter } from '../../src/providers/codex.js';
+import { CodexAdapter, createCodexAdapter, CODEX_TIER_MODELS, parseCodexUsageOutput } from '../../src/providers/codex.js';
+import type { CodexAuthMode } from '../../src/providers/codex.js';
 import { ProviderError } from '../../src/core/provider.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { spawn, spawnSync } from 'node:child_process';
@@ -213,6 +214,22 @@ describe('CodexAdapter', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt');
       expect(mockChildProcess.once).toHaveBeenCalledWith('exit', expect.any(Function));
     });
+
+    it('should inject DECKENT_OPENAI_API_KEY as OPENAI_API_KEY when OPENAI_API_KEY is missing', () => {
+      delete process.env['OPENAI_API_KEY'];
+      process.env['DECKENT_OPENAI_API_KEY'] = 'sk-deck-key-456';
+      adapter.spawn('task-001', 'gpt-4.1', 'prompt');
+      const spawnOpts = mockSpawn.mock.calls[0][2] as { env: Record<string, string> };
+      expect(spawnOpts.env['OPENAI_API_KEY']).toBe('sk-deck-key-456');
+    });
+
+    it('should not overwrite OPENAI_API_KEY with DECKENT_OPENAI_API_KEY when both present', () => {
+      process.env['OPENAI_API_KEY'] = 'sk-original';
+      process.env['DECKENT_OPENAI_API_KEY'] = 'sk-deck-key-456';
+      adapter.spawn('task-001', 'gpt-4.1', 'prompt');
+      const spawnOpts = mockSpawn.mock.calls[0][2] as { env: Record<string, string> };
+      expect(spawnOpts.env['OPENAI_API_KEY']).toBe('sk-original');
+    });
   });
 
   // ─── kill() ────────────────────────────────────────────────────────
@@ -266,28 +283,55 @@ describe('CodexAdapter', () => {
     });
 
     it('should return UsageMetrics shape', async () => {
+      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
       const metrics = await adapter.checkUsage();
       expect(typeof metrics.fiveHourPercent).toBe('number');
       expect(typeof metrics.weeklyPercent).toBe('number');
       expect(typeof metrics.measuredAt).toBe('string');
     });
 
-    it('should return zero defaults when API key is present', async () => {
+    it('should return zero defaults when API key is present and codex usage fails', async () => {
+      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
       const metrics = await adapter.checkUsage();
       expect(metrics.fiveHourPercent).toBe(0);
       expect(metrics.weeklyPercent).toBe(0);
     });
 
-    it('should return safe defaults when OPENAI_API_KEY is missing', async () => {
+    it('should return safe defaults when no auth is available', async () => {
       delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
       const metrics = await adapter.checkUsage();
       expect(metrics.fiveHourPercent).toBe(50);
       expect(metrics.weeklyPercent).toBe(30);
     });
 
     it('should include measuredAt as ISO 8601 string', async () => {
+      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
       const metrics = await adapter.checkUsage();
       expect(metrics.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    });
+
+    it('should parse JSON usage output from codex CLI', async () => {
+      mockSpawnSync.mockReturnValue({
+        status: 0,
+        stdout: JSON.stringify({ usage_percent: 42, weekly_percent: 15 }),
+        stderr: '',
+      });
+      const metrics = await adapter.checkUsage();
+      expect(metrics.fiveHourPercent).toBe(42);
+      expect(metrics.weeklyPercent).toBe(15);
+    });
+
+    it('should parse text usage output from codex CLI', async () => {
+      mockSpawnSync.mockReturnValue({
+        status: 0,
+        stdout: 'Usage: 35% (5h) / 22% (weekly)',
+        stderr: '',
+      });
+      const metrics = await adapter.checkUsage();
+      expect(metrics.fiveHourPercent).toBe(35);
+      expect(metrics.weeklyPercent).toBe(22);
     });
   });
 
@@ -299,9 +343,13 @@ describe('CodexAdapter', () => {
       expect(await adapter.isAvailable()).toBe(true);
     });
 
-    it('should return false when both OPENAI_API_KEY and DECKENT_OPENAI_API_KEY are missing', async () => {
+    it('should return false when both OPENAI_API_KEY and DECKENT_OPENAI_API_KEY are missing and no subscription', async () => {
       delete process.env['OPENAI_API_KEY'];
       delete process.env['DECKENT_OPENAI_API_KEY'];
+      // codex --version succeeds but codex auth status fails
+      mockSpawnSync
+        .mockReturnValueOnce({ status: 0, stdout: 'codex 1.0.0', stderr: '' })
+        .mockReturnValueOnce({ status: 1, stdout: '', stderr: '' });
       expect(await adapter.isAvailable()).toBe(false);
     });
 
@@ -332,6 +380,58 @@ describe('CodexAdapter', () => {
         ['--version'],
         expect.objectContaining({ encoding: 'utf-8' }),
       );
+    });
+
+    it('should return true with subscription auth when no API key', async () => {
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      mockSpawnSync
+        .mockReturnValueOnce({ status: 0, stdout: 'codex 1.0.0', stderr: '' }) // --version
+        .mockReturnValueOnce({ status: 0, stdout: 'logged in as user@example.com', stderr: '' }); // auth status
+      expect(await adapter.isAvailable()).toBe(true);
+    });
+  });
+
+  // ─── detectAuthMode() ─────────────────────────────────────────────
+
+  describe('detectAuthMode()', () => {
+    it('should return api_key when OPENAI_API_KEY is set', () => {
+      expect(adapter.detectAuthMode()).toBe('api_key');
+    });
+
+    it('should return api_key when only DECKENT_OPENAI_API_KEY is set', () => {
+      delete process.env['OPENAI_API_KEY'];
+      process.env['DECKENT_OPENAI_API_KEY'] = 'sk-deck-key';
+      expect(adapter.detectAuthMode()).toBe('api_key');
+    });
+
+    it('should return subscription when codex auth status reports logged in', () => {
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: 'logged in as user@example.com', stderr: '' });
+      expect(adapter.detectAuthMode()).toBe('subscription');
+    });
+
+    it('should return none when no API key and auth status fails', () => {
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'not logged in' });
+      expect(adapter.detectAuthMode()).toBe('none');
+    });
+
+    it('should return none when no API key and spawnSync throws', () => {
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
+      mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+      expect(adapter.detectAuthMode()).toBe('none');
+    });
+
+    it('should prefer API key over subscription check', () => {
+      // API key set — should not call spawnSync for auth status
+      process.env['OPENAI_API_KEY'] = 'sk-test';
+      const result = adapter.detectAuthMode();
+      expect(result).toBe('api_key');
+      expect(mockSpawnSync).not.toHaveBeenCalled();
     });
   });
 
@@ -414,6 +514,73 @@ describe('CodexAdapter', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt');
       const spawnOpts = mockSpawn.mock.calls[0][2] as NodeJS.ProcessEnv;
       expect((spawnOpts as any).stdio[0]).toBe('ignore');
+    });
+  });
+
+  // ─── CODEX_TIER_MODELS ─────────────────────────────────────────────
+
+  describe('CODEX_TIER_MODELS', () => {
+    it('should map premium to gpt-5', () => {
+      expect(CODEX_TIER_MODELS.premium).toBe('gpt-5');
+    });
+
+    it('should map standard to gpt-4.1', () => {
+      expect(CODEX_TIER_MODELS.standard).toBe('gpt-4.1');
+    });
+
+    it('should map economy to gpt-4.1-mini', () => {
+      expect(CODEX_TIER_MODELS.economy).toBe('gpt-4.1-mini');
+    });
+  });
+
+  // ─── getModelForTier() ────────────────────────────────────────────
+
+  describe('getModelForTier()', () => {
+    it('should return correct model for each tier', () => {
+      expect(adapter.getModelForTier('premium')).toBe('gpt-5');
+      expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
+      expect(adapter.getModelForTier('economy')).toBe('gpt-4.1-mini');
+    });
+  });
+
+  // ─── parseCodexUsageOutput() ──────────────────────────────────────
+
+  describe('parseCodexUsageOutput()', () => {
+    it('should parse JSON format with usage_percent', () => {
+      const result = parseCodexUsageOutput(JSON.stringify({ usage_percent: 45, weekly_percent: 20 }));
+      expect(result).not.toBeNull();
+      expect(result!.fiveHourPercent).toBe(45);
+      expect(result!.weeklyPercent).toBe(20);
+    });
+
+    it('should parse text format "Usage: X% (5h) / Y% (weekly)"', () => {
+      const result = parseCodexUsageOutput('Usage: 35% (5h) / 22% (weekly)');
+      expect(result).not.toBeNull();
+      expect(result!.fiveHourPercent).toBe(35);
+      expect(result!.weeklyPercent).toBe(22);
+    });
+
+    it('should return null for unparseable output', () => {
+      expect(parseCodexUsageOutput('random text')).toBeNull();
+      expect(parseCodexUsageOutput('')).toBeNull();
+    });
+
+    it('should handle JSON without usage_percent', () => {
+      expect(parseCodexUsageOutput(JSON.stringify({ foo: 'bar' }))).toBeNull();
+    });
+
+    it('should handle partial text match (only 5h)', () => {
+      const result = parseCodexUsageOutput('Rate: 60% (5h)');
+      expect(result).not.toBeNull();
+      expect(result!.fiveHourPercent).toBe(60);
+      expect(result!.weeklyPercent).toBe(0);
+    });
+
+    it('should handle partial text match (only weekly)', () => {
+      const result = parseCodexUsageOutput('Rate: 25% (weekly)');
+      expect(result).not.toBeNull();
+      expect(result!.fiveHourPercent).toBe(0);
+      expect(result!.weeklyPercent).toBe(25);
     });
   });
 

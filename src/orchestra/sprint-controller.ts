@@ -31,7 +31,7 @@ import {
   BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE, SPRINTS_DIR,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE,
   RETRO_FILE, PROJECT_IDENTITY_FILE, TASK_FILE_EXTENSIONS,
-  LOCKS_DIR,
+  LOCKS_DIR, DECKENT_VERSION,
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
@@ -54,6 +54,9 @@ import { providerRegistry, ProviderError } from '../core/provider.js';
 import type { SpawnBackend } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
 
+
+// ─── Connector (provider lifecycle) ─────────────────────────────
+import type { Connector } from './connector.js';
 // ─── Core — skill system ─────────────────────────────────────────
 import { detectProjectStack } from '../core/stack-detector.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
@@ -95,7 +98,7 @@ import {
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
 import { handleEvaluation, handleCrossDependencies, escalateDebt, resolveDebt, runDecay } from './debt-manager.js';
-import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity } from './sprint-reporter.js';
+import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance } from './sprint-reporter.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
@@ -104,6 +107,8 @@ import type { BeforeSprintContext, AfterTaskContext, AfterSprintContext } from '
 
 // ─── Rich Output ──────────────────────────────────────────────────
 import { formatRichSprintSummary } from '../cli/helpers/sprint-summary-rich.js';
+import { showSplash } from '../cli/helpers/splash.js';
+
 
 // ═══ Types ═════════════════════════════════════════════════════════
 
@@ -141,6 +146,8 @@ export interface RunSprintOptions {
    * When false: disables rollback entirely.
    */
   rollback?: boolean;
+  /** Optional Connector instance — when provided, router uses connector.getAvailableProviders() */
+  connector?: Connector;
 }
 
 // ═══ IPC Channel Registry ══════════════════════════════════════════
@@ -783,6 +790,27 @@ export function isTmuxProvider(providerName: ProviderName): boolean {
 }
 
 /**
+ * Route all sprint tasks to providers using the TaskRouter.
+ * Sets task.provider, task.assignedAgent, and task.assignedSkills based on routing decisions.
+ * Exported for testability — called from runSprint Phase 1.5.
+ * @param tasks - Array of tasks to route
+ * @param config - Resolved config with skill_routing overrides
+ * @param availableProviders - List of available provider names (from Connector or registry)
+ */
+export function routeSprintTasks(
+  tasks: Task[],
+  config: ResolvedConfig,
+  availableProviders: ProviderName[],
+): void {
+  for (const task of tasks) {
+    const routing = routeTask(task, config, availableProviders);
+    task.provider = routing.provider;
+    if (routing.agent !== 'generic') task.assignedAgent = routing.agent;
+    if (routing.skills.length > 0) task.assignedSkills = routing.skills;
+  }
+}
+
+/**
  * Resolve the provider for a task.
  * Uses task.provider if explicitly set, otherwise infers from model via getProviderForModel().
  * Falls back to the registry's default provider if the model is unrecognized.
@@ -1181,10 +1209,23 @@ export async function finalizeSprint(
     const rawConfig = opts?.config as Record<string, unknown> | undefined;
     const outputMode = (rawConfig?.['output_mode'] as string) ?? 'normal';
     const richInput = { id: sprint.id, number: sprint.number, tasks: sprint.tasks.map(t => ({ id: t.id, title: t.title })), metrics: sprint.metrics ? { ...sprint.metrics } : undefined };
+    // Build agent performance data for the performance table
+    const agentRows = buildAgentPerformance(sprint, evaluations, results);
+    const agentPerf = agentRows.map(row => ({
+      agentId: row.agent,
+      totalTasks: row.tasks,
+      doneTasks: row.done,
+      successRate: row.tasks > 0 ? Math.round((row.done / row.tasks) * 100) : 0,
+    }));
+    // Extract learnings from evaluation results (task notes from results)
+    const learnings = results
+      .filter(r => r.notes && r.notes.trim().length > 0)
+      .map(r => r.notes as string)
+      .slice(0, 5);
     const richOutput = formatRichSprintSummary(
       richInput,
       evaluations,
-      { gitDiff, outputMode: outputMode as 'quiet' | 'normal' | 'verbose' },
+      { gitDiff, agentPerf, learnings, outputMode: outputMode as 'quiet' | 'normal' | 'verbose' },
     );
     if (richOutput) console.log(richOutput);
   } catch { /* Rich output failure is non-fatal */ }
@@ -1245,6 +1286,14 @@ export async function runSprint(
     sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
 
+    // Show Kraken splash on first sprint start (non-fatal)
+    if (sprint.number === 1) {
+      try {
+        const splash = showSplash(DECKENT_VERSION);
+        if (splash) console.log(splash);
+      } catch { /* splash failure is non-fatal */ }
+    }
+
     // Run beforeSprint hooks after planning (non-fatal)
     try {
       await runHooks('beforeSprint', {
@@ -1270,16 +1319,24 @@ export async function runSprint(
     );
   }
 
-  // Phase 1.5: Route tasks to providers (non-fatal — falls back to existing behavior)
+  // Phase 1.5: Route tasks to providers via Connector or registry (non-fatal)
   try {
-    const availableProviders = providerRegistry.listProviders() as ProviderName[];
-    for (const task of sprint.tasks) {
-      const routing = routeTask(task, config, availableProviders);
-      task.provider = routing.provider;
-      if (routing.agent !== 'generic') task.assignedAgent = routing.agent;
-      if (routing.skills.length > 0) task.assignedSkills = routing.skills;
-    }
+    const connector = opts?.connector;
+    const availableProviders = connector
+      ? connector.getAvailableProviders()
+      : providerRegistry.listProviders() as ProviderName[];
+    routeSprintTasks(sprint.tasks, config, availableProviders);
   } catch { /* Router failure is non-fatal — all tasks use brain_provider */ }
+
+
+
+
+
+
+
+
+
+
 
   // Reset dashboard for new sprint
   try {

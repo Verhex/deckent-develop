@@ -52,7 +52,7 @@ export function registerStart(program: Command): void {
         const lang = config.language;
 
         // Bootstrap provider adapters before any sprint operations
-        await bootstrapProviders(config);
+        const bootstrap = await bootstrapProviders(config);
 
         if (description && !warnDirectivesExist && zeroConfigResult) {
           print(getMessage('start.zero_config_created', lang, { description }));
@@ -125,6 +125,7 @@ export function registerStart(program: Command): void {
         }
 
         const sprint = await runSprint(root, config, {
+          connector: bootstrap.connector,
           autoApprove: opts.autoApprove ?? false,
           sandboxMode: opts.sandboxMode,
         });

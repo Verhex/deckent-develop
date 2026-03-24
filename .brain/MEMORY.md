@@ -123,3 +123,13 @@
 - Documentation Final Review: NO_GO
 - CHANGELOG + Release Notes: NO_GO
 - Version Bump + Git Tag: NO_GO
+## Sprint sprint-046 Learnings
+- Connector Integration into bootstrapProviders: NO_GO
+- Router Integration into Sprint Lifecycle: GO_WITH_TECH_DEBT
+- Codex Adapter — Real CLI Integration: GO_WITH_TECH_DEBT
+- Gemini Adapter — Real CLI Integration: NO_GO
+- Claude Adapter — MCP Server Mode Option: GO_WITH_TECH_DEBT
+- .deck Secret Loading in Provider Auth: GO_WITH_TECH_DEBT
+- Provider Health in deckent doctor: GO_WITH_TECH_DEBT
+- Environment-Aware deckent init: GO_WITH_TECH_DEBT
+- Sprint 044 Module Smoke Tests: GO_WITH_TECH_DEBT

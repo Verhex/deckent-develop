@@ -133,6 +133,10 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
     crossAssignments: 0, contextLinesUsed: 0,
   }),
   updateProjectDocs: vi.fn(),
+  updateProjectIdentity: vi.fn(),
+  buildAgentPerformance: vi.fn().mockReturnValue([
+    { agent: 'worker-001', tasks: 2, done: 2, debt: 0, noGo: 0, avgCoverage: 90 },
+  ]),
 }));
 
 vi.mock('../../src/core/usage-tracker.js', () => ({
@@ -201,6 +205,10 @@ vi.mock('../../src/cli/helpers/sprint-summary-rich.js', () => ({
   formatRichSprintSummary: vi.fn().mockReturnValue('Rich Sprint Summary Output'),
 }));
 
+vi.mock('../../src/cli/helpers/splash.js', () => ({
+  showSplash: vi.fn().mockReturnValue('KRAKEN SPLASH'),
+}));
+
 vi.mock('../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn().mockReturnValue({ languages: [], frameworks: [], tools: [] }),
 }));
@@ -265,6 +273,7 @@ import {
   resolveTaskProvider,
   isTmuxProvider,
   resolveDefaultUsageCli,
+  routeSprintTasks,
   finalizeSprint,
 } from '../../src/orchestra/sprint-controller.js';
 
@@ -1506,7 +1515,7 @@ describe('Task Router wiring in sprint-controller', () => {
     );
     // routeTask call should appear after planSprint and before spawnWorkers
     const planIdx = source.indexOf('planSprint(projectRoot');
-    const routeIdx = source.indexOf('routeTask(task, config, availableProviders)');
+    const routeIdx = source.indexOf('routeSprintTasks(sprint.tasks, config, availableProviders)');
     const spawnIdx = source.indexOf('spawnWorkers(projectRoot, sprint, config');
     expect(planIdx).toBeGreaterThan(-1);
     expect(routeIdx).toBeGreaterThan(-1);
@@ -1726,5 +1735,199 @@ describe('finalizeSprint — rich output integration', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith('RICH OUTPUT HERE');
     consoleSpy.mockRestore();
+  });
+
+  it('passes agentPerf data from buildAgentPerformance to formatRichSprintSummary', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
+    const opts = callArgs[2];
+    expect(opts?.agentPerf).toBeDefined();
+    expect(Array.isArray(opts?.agentPerf)).toBe(true);
+  });
+});
+
+// ═══ routeSprintTasks — Connector Integration ═══════════════════════
+describe('routeSprintTasks — Router + Connector integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('routes all tasks and sets task.provider', () => {
+    mockedRouteTask.mockReturnValue({
+      provider: 'codex',
+      agent: 'generic',
+      skills: [],
+      reason: 'worker_provider',
+    });
+
+    const tasks = [makeTask({ id: '001-001' }), makeTask({ id: '001-002' })];
+    routeSprintTasks(tasks, makeConfig() as any, ['claude', 'codex']);
+
+    expect(mockedRouteTask).toHaveBeenCalledTimes(2);
+    expect(tasks[0]!.provider).toBe('codex');
+    expect(tasks[1]!.provider).toBe('codex');
+  });
+
+  it('sets task.assignedAgent when router returns non-generic agent', () => {
+    mockedRouteTask.mockReturnValue({
+      provider: 'claude',
+      agent: 'agent-testing-001',
+      skills: [],
+      reason: 'agent preference',
+    });
+
+    const tasks = [makeTask()];
+    routeSprintTasks(tasks, makeConfig() as any, ['claude']);
+
+    expect(tasks[0]!.assignedAgent).toBe('agent-testing-001');
+  });
+
+  it('does not override assignedAgent when router returns generic', () => {
+    mockedRouteTask.mockReturnValue({
+      provider: 'claude',
+      agent: 'generic',
+      skills: [],
+      reason: 'default',
+    });
+
+    const tasks = [makeTask({ assignedAgent: 'existing-agent' })];
+    routeSprintTasks(tasks, makeConfig() as any, ['claude']);
+
+    // 'generic' should NOT override — assignedAgent keeps its existing value
+    expect(tasks[0]!.assignedAgent).toBe('existing-agent');
+  });
+
+  it('sets task.assignedSkills when router returns skills', () => {
+    mockedRouteTask.mockReturnValue({
+      provider: 'claude',
+      agent: 'generic',
+      skills: ['vitest-runner', 'tsc-lint'],
+      reason: 'skill affinity',
+    });
+
+    const tasks = [makeTask()];
+    routeSprintTasks(tasks, makeConfig() as any, ['claude']);
+
+    expect(tasks[0]!.assignedSkills).toEqual(['vitest-runner', 'tsc-lint']);
+  });
+
+  it('does not set assignedSkills when router returns empty skills', () => {
+    mockedRouteTask.mockReturnValue({
+      provider: 'claude',
+      agent: 'generic',
+      skills: [],
+      reason: 'default',
+    });
+
+    const tasks = [makeTask({ assignedSkills: undefined })];
+    routeSprintTasks(tasks, makeConfig() as any, ['claude']);
+
+    expect(tasks[0]!.assignedSkills).toBeUndefined();
+  });
+
+  it('passes config to routeTask for skill_routing overrides', () => {
+    mockedRouteTask.mockReturnValue({
+      provider: 'gemini',
+      agent: 'generic',
+      skills: [],
+      reason: 'config override',
+    });
+
+    const config = makeConfig() as any;
+    const tasks = [makeTask()];
+    routeSprintTasks(tasks, config, ['claude', 'gemini']);
+
+    expect(mockedRouteTask).toHaveBeenCalledWith(tasks[0], config, ['claude', 'gemini']);
+  });
+
+  it('passes availableProviders from connector to routeTask', () => {
+    mockedRouteTask.mockReturnValue({
+      provider: 'claude',
+      agent: 'generic',
+      skills: [],
+      reason: 'default',
+    });
+
+    const tasks = [makeTask()];
+    const providers: any[] = ['claude', 'codex', 'gemini'];
+    routeSprintTasks(tasks, makeConfig() as any, providers);
+
+    expect(mockedRouteTask).toHaveBeenCalledWith(tasks[0], expect.anything(), providers);
+  });
+
+  it('handles empty task array gracefully', () => {
+    const tasks: Task[] = [];
+    routeSprintTasks(tasks, makeConfig() as any, ['claude']);
+
+    expect(mockedRouteTask).not.toHaveBeenCalled();
+  });
+
+  it('routes each task independently (different routing per task)', () => {
+    mockedRouteTask
+      .mockReturnValueOnce({ provider: 'claude', agent: 'generic', skills: [], reason: 'first' })
+      .mockReturnValueOnce({ provider: 'codex', agent: 'agent-code', skills: ['ts-expert'], reason: 'second' });
+
+    const tasks = [makeTask({ id: '001-001' }), makeTask({ id: '001-002' })];
+    routeSprintTasks(tasks, makeConfig() as any, ['claude', 'codex']);
+
+    expect(tasks[0]!.provider).toBe('claude');
+    expect(tasks[1]!.provider).toBe('codex');
+    expect(tasks[1]!.assignedAgent).toBe('agent-code');
+    expect(tasks[1]!.assignedSkills).toEqual(['ts-expert']);
+  });
+
+  it('non-Claude provider routes to subprocess in spawnWorkers', () => {
+    const task = makeTask({ provider: 'codex' as any });
+    const result = resolveTaskProvider(task);
+    expect(result).toBe('codex');
+    expect(isTmuxProvider(result)).toBe(false);
+  });
+
+  it('Claude provider routes to tmux in spawnWorkers', () => {
+    const task = makeTask({ provider: 'claude' as any });
+    const result = resolveTaskProvider(task);
+    expect(result).toBe('claude');
+    expect(isTmuxProvider(result)).toBe(true);
+  });
+
+  it('RunSprintOptions accepts connector field', () => {
+    const opts: RunSprintOptions = {
+      connector: { getAvailableProviders: () => ['claude'] } as any,
+    };
+    expect(opts.connector).toBeDefined();
+    expect(opts.connector!.getAvailableProviders()).toEqual(['claude']);
+  });
+
+  it('source uses connector.getAvailableProviders() when connector provided', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain('connector.getAvailableProviders()');
+    expect(source).toContain('opts?.connector');
+  });
+
+  it('source falls back to providerRegistry when no connector', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain('providerRegistry.listProviders()');
+  });
+
+  it('routeSprintTasks is exported from sprint-controller', async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const source = actualFs.readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    expect(source).toContain('export function routeSprintTasks(');
   });
 });

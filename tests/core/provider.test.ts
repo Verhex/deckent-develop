@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ProviderRegistry,
   ProviderError,
@@ -249,5 +249,222 @@ describe('Provider error classes', () => {
 describe('providerRegistry global singleton', () => {
   it('is a ProviderRegistry instance', () => {
     expect(providerRegistry).toBeInstanceOf(ProviderRegistry);
+  });
+});
+
+// ─── applyDeckSecretsToEnv ────────────────────────────────────────────────────
+
+import { applyDeckSecretsToEnv } from '../../src/core/provider.js';
+
+describe('applyDeckSecretsToEnv', () => {
+  // Save and restore process.env for each test
+  let savedEnv: NodeJS.ProcessEnv;
+
+  beforeEach(() => {
+    savedEnv = { ...process.env };
+    // Clear relevant keys before each test
+    delete process.env['ANTHROPIC_API_KEY'];
+    delete process.env['OPENAI_API_KEY'];
+    delete process.env['GOOGLE_API_KEY'];
+  });
+
+  afterEach(() => {
+    // Restore original env
+    process.env['ANTHROPIC_API_KEY'] = savedEnv['ANTHROPIC_API_KEY'];
+    process.env['OPENAI_API_KEY'] = savedEnv['OPENAI_API_KEY'];
+    process.env['GOOGLE_API_KEY'] = savedEnv['GOOGLE_API_KEY'];
+    if (savedEnv['ANTHROPIC_API_KEY'] === undefined) delete process.env['ANTHROPIC_API_KEY'];
+    if (savedEnv['OPENAI_API_KEY'] === undefined) delete process.env['OPENAI_API_KEY'];
+    if (savedEnv['GOOGLE_API_KEY'] === undefined) delete process.env['GOOGLE_API_KEY'];
+  });
+
+  it('returns empty object for empty secrets', () => {
+    const overrides = applyDeckSecretsToEnv({});
+    expect(overrides).toEqual({});
+  });
+
+  it('sets ANTHROPIC_API_KEY from DECKENT_CLAUDE_API_KEY', () => {
+    applyDeckSecretsToEnv({ DECKENT_CLAUDE_API_KEY: 'sk-claude-test-key' });
+    expect(process.env['ANTHROPIC_API_KEY']).toBe('sk-claude-test-key');
+  });
+
+  it('returns claude override with only ANTHROPIC_API_KEY', () => {
+    const overrides = applyDeckSecretsToEnv({ DECKENT_CLAUDE_API_KEY: 'sk-claude-123' });
+    expect(overrides['claude']).toEqual({ ANTHROPIC_API_KEY: 'sk-claude-123' });
+    // Codex and Gemini overrides should NOT be set
+    expect(overrides['codex']).toBeUndefined();
+    expect(overrides['gemini']).toBeUndefined();
+  });
+
+  it('sets OPENAI_API_KEY from DECKENT_OPENAI_API_KEY', () => {
+    applyDeckSecretsToEnv({ DECKENT_OPENAI_API_KEY: 'sk-openai-test-key' });
+    expect(process.env['OPENAI_API_KEY']).toBe('sk-openai-test-key');
+  });
+
+  it('returns codex override with only OPENAI_API_KEY', () => {
+    const overrides = applyDeckSecretsToEnv({ DECKENT_OPENAI_API_KEY: 'sk-openai-456' });
+    expect(overrides['codex']).toEqual({ OPENAI_API_KEY: 'sk-openai-456' });
+    expect(overrides['claude']).toBeUndefined();
+    expect(overrides['gemini']).toBeUndefined();
+  });
+
+  it('sets GOOGLE_API_KEY from DECKENT_GOOGLE_API_KEY', () => {
+    applyDeckSecretsToEnv({ DECKENT_GOOGLE_API_KEY: 'google-test-key' });
+    expect(process.env['GOOGLE_API_KEY']).toBe('google-test-key');
+  });
+
+  it('returns gemini override with only GOOGLE_API_KEY', () => {
+    const overrides = applyDeckSecretsToEnv({ DECKENT_GOOGLE_API_KEY: 'google-789' });
+    expect(overrides['gemini']).toEqual({ GOOGLE_API_KEY: 'google-789' });
+    expect(overrides['claude']).toBeUndefined();
+    expect(overrides['codex']).toBeUndefined();
+  });
+
+  it('.deck key takes precedence over existing system env var', () => {
+    // Set a system env var first
+    process.env['OPENAI_API_KEY'] = 'system-openai-key';
+    // .deck should override it
+    applyDeckSecretsToEnv({ DECKENT_OPENAI_API_KEY: 'deck-openai-key' });
+    expect(process.env['OPENAI_API_KEY']).toBe('deck-openai-key');
+  });
+
+  it('.deck key takes precedence for claude provider', () => {
+    process.env['ANTHROPIC_API_KEY'] = 'system-anthropic-key';
+    applyDeckSecretsToEnv({ DECKENT_CLAUDE_API_KEY: 'deck-anthropic-key' });
+    expect(process.env['ANTHROPIC_API_KEY']).toBe('deck-anthropic-key');
+  });
+
+  it('.deck key takes precedence for gemini provider', () => {
+    process.env['GOOGLE_API_KEY'] = 'system-google-key';
+    applyDeckSecretsToEnv({ DECKENT_GOOGLE_API_KEY: 'deck-google-key' });
+    expect(process.env['GOOGLE_API_KEY']).toBe('deck-google-key');
+  });
+
+  it('skips empty string values — does not overwrite env or add override', () => {
+    process.env['OPENAI_API_KEY'] = 'original-key';
+    const overrides = applyDeckSecretsToEnv({ DECKENT_OPENAI_API_KEY: '' });
+    // Empty string in .deck → skip, env unchanged
+    expect(process.env['OPENAI_API_KEY']).toBe('original-key');
+    expect(overrides['codex']).toBeUndefined();
+  });
+
+  it('sets all three providers when all keys present', () => {
+    const overrides = applyDeckSecretsToEnv({
+      DECKENT_CLAUDE_API_KEY: 'key-claude',
+      DECKENT_OPENAI_API_KEY: 'key-openai',
+      DECKENT_GOOGLE_API_KEY: 'key-google',
+    });
+    expect(overrides['claude']).toEqual({ ANTHROPIC_API_KEY: 'key-claude' });
+    expect(overrides['codex']).toEqual({ OPENAI_API_KEY: 'key-openai' });
+    expect(overrides['gemini']).toEqual({ GOOGLE_API_KEY: 'key-google' });
+    expect(process.env['ANTHROPIC_API_KEY']).toBe('key-claude');
+    expect(process.env['OPENAI_API_KEY']).toBe('key-openai');
+    expect(process.env['GOOGLE_API_KEY']).toBe('key-google');
+  });
+
+  it('ignores unknown .deck keys — does not affect env or overrides', () => {
+    const overrides = applyDeckSecretsToEnv({
+      DECKENT_SMTP_HOST: 'smtp.example.com',
+      DECKENT_WEBHOOK_URL: 'https://example.com/hook',
+    });
+    // No env vars set, no overrides returned
+    expect(overrides).toEqual({});
+    expect(process.env['DECKENT_SMTP_HOST']).toBeUndefined();
+  });
+
+  it('worker receives only needed key — codex override has only OPENAI_API_KEY', () => {
+    const overrides = applyDeckSecretsToEnv({
+      DECKENT_CLAUDE_API_KEY: 'claude-key',
+      DECKENT_OPENAI_API_KEY: 'openai-key',
+      DECKENT_GOOGLE_API_KEY: 'google-key',
+      DECKENT_SMTP_HOST: 'smtp.host',
+    });
+    // Each provider override contains only its own key
+    expect(Object.keys(overrides['codex']!)).toEqual(['OPENAI_API_KEY']);
+    expect(Object.keys(overrides['claude']!)).toEqual(['ANTHROPIC_API_KEY']);
+    expect(Object.keys(overrides['gemini']!)).toEqual(['GOOGLE_API_KEY']);
+  });
+});
+
+// ─── BootstrapResult + Connector integration ─────────────────────────────────
+
+import { Connector } from '../../src/orchestra/connector.js';
+import type { BootstrapResult } from '../../src/core/provider.js';
+
+describe('BootstrapResult Connector contract', () => {
+  it('BootstrapResult connector field accepts Connector instance', () => {
+    const connector = new Connector();
+    const result: BootstrapResult = {
+      connector,
+      registered: [],
+      skipped: [],
+      defaultProvider: null,
+      providerEnvOverrides: {},
+    };
+    expect(result.connector).toBeInstanceOf(Connector);
+  });
+
+  it('Connector registered via bootstrap mirrors registry providers', () => {
+    const registry = new ProviderRegistry();
+    const adapter = makeAdapter('claude');
+    registry.registerProvider(adapter);
+
+    const connector = new Connector();
+    for (const name of registry.listProviders()) {
+      connector.registerProvider(name as any, registry.getProvider(name));
+    }
+
+    expect(connector.isProviderReady('claude' as any)).toBe(true);
+    expect(connector.getProvider('claude' as any)).toBe(adapter);
+  });
+
+  it('Connector getAvailableProviders returns same names as registry.listProviders', () => {
+    const registry = new ProviderRegistry();
+    registry.registerProvider(makeAdapter('claude'));
+    registry.registerProvider(makeAdapter('codex'));
+
+    const connector = new Connector();
+    for (const name of registry.listProviders()) {
+      connector.registerProvider(name as any, registry.getProvider(name));
+    }
+
+    expect(connector.getAvailableProviders().sort()).toEqual(registry.listProviders().sort());
+  });
+
+  it('Connector health check does not throw for available providers', async () => {
+    const connector = new Connector();
+    const adapter = makeAdapter('claude');
+    connector.registerProvider('claude' as any, adapter);
+
+    const results = await connector.healthCheck();
+    expect(results).toHaveLength(1);
+    expect(results[0]!.provider).toBe('claude');
+    expect(results[0]!.available).toBe(true);
+  });
+
+  it('Connector health check returns available=false for unavailable providers', async () => {
+    const connector = new Connector();
+    const adapter = makeAdapter('codex');
+    (adapter.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    connector.registerProvider('codex' as any, adapter);
+
+    const results = await connector.healthCheck();
+    expect(results[0]!.available).toBe(false);
+  });
+
+  it('BootstrapResult providerEnvOverrides only contains provider-specific keys', () => {
+    const result: BootstrapResult = {
+      connector: new Connector(),
+      registered: ['claude', 'codex'],
+      skipped: [],
+      defaultProvider: 'claude',
+      providerEnvOverrides: {
+        claude: { ANTHROPIC_API_KEY: 'key1' },
+        codex: { OPENAI_API_KEY: 'key2' },
+      },
+    };
+
+    expect(Object.keys(result.providerEnvOverrides['claude']!)).toHaveLength(1);
+    expect(Object.keys(result.providerEnvOverrides['codex']!)).toHaveLength(1);
   });
 });

@@ -59,6 +59,10 @@ vi.mock('../../../src/core/deck-file.js', () => ({
   createDeckTemplate: vi.fn(),
 }));
 
+vi.mock('../../../src/cli/commands/doctor.js', () => ({
+  runDoctorChecks: vi.fn().mockReturnValue({ ok: true, checks: [] }),
+}));
+
 vi.mock('../../../src/cli/helpers/codex-config.js', () => ({
   generateCodexConfig: vi.fn().mockReturnValue({ global: '/home/.codex/config.toml', project: '/mock/root/.codex/config.toml' }),
 }));
@@ -123,6 +127,7 @@ import { detectSubscription } from '../../../src/core/subscription.js';
 import { analyzeProject } from '../../../src/core/analyzer.js';
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { registerInit } from '../../../src/cli/commands/init.js';
+import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
 import { detectAvailableProviders } from '../../../src/core/provider.js';
 import { showSplash } from '../../../src/cli/helpers/splash.js';
 import { detectEnvironment } from '../../../src/core/environment.js';
@@ -159,6 +164,8 @@ const _providerMocks = { detectAvailableProviders, detectIDEEnvironment, getMCPG
 void _providerMocks;
 const _envMocks = { generateCodexConfig, generateGeminiConfig, generateCursorConfig, generateAgentsMd, generateGeminiMd, generateCursorRules, detectFullStack };
 void _envMocks;
+const _doctorMocks = { runDoctorChecks };
+void _doctorMocks;
 
 // ─── Tests ───────────────────────────────────────────────────────────
 
@@ -178,6 +185,7 @@ describe('init command (isolated)', () => {
     vi.mocked(detectEnvironment).mockReturnValue('shell');
     vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
     vi.mocked(createDeckTemplate).mockImplementation(() => {});
+    vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
   });
 
   afterEach(() => {
@@ -868,6 +876,77 @@ describe('init command (isolated)', () => {
       const lastConfig = JSON.parse(String(configCalls[configCalls.length - 1]![1]));
       expect(lastConfig.brain_provider).toBe('claude');
       expect(lastConfig.customField).toBe('keep');
+    });
+  });
+
+  // ─── Doctor integration ──────────────────────────────────────────
+
+  describe('doctor integration', () => {
+    it('calls runDoctorChecks during init', async () => {
+      await runCommand(['init', '--auto']);
+      expect(runDoctorChecks).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('prints health issue message when doctor returns not-ok', async () => {
+      vi.mocked(runDoctorChecks).mockReturnValue({
+        ok: false,
+        checks: [{ name: 'Claude', passed: false, required: true, message: 'Claude not found' }],
+      });
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Health check') && c.includes('1 issue'))).toBe(true);
+    });
+
+    it('does NOT print health message when doctor returns ok', async () => {
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Health check'))).toBe(false);
+    });
+
+    it('continues if runDoctorChecks throws', async () => {
+      vi.mocked(runDoctorChecks).mockImplementationOnce(() => { throw new Error('doctor fail'); });
+      await runCommand(['init', '--auto']);
+      // Should still complete
+      expect(mkdirSync).toHaveBeenCalled();
+    });
+  });
+
+  // ─── Environment: CLAUDE.md (vscode/shell) ────────────────────────
+
+  describe('CLAUDE.md for vscode/shell environment', () => {
+    it('calls ensureDeckentImport for CLAUDE.md in shell environment', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      await runCommand(['init', '--auto']);
+      expect(ensureDeckentImport).toHaveBeenCalledWith(
+        expect.stringContaining('CLAUDE.md'),
+      );
+    });
+
+    it('calls ensureDeckentImport for CLAUDE.md in vscode environment', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('vscode');
+      await runCommand(['init', '--auto']);
+      expect(ensureDeckentImport).toHaveBeenCalledWith(
+        expect.stringContaining('CLAUDE.md'),
+      );
+    });
+
+    it('does NOT write GEMINI.md in shell environment', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const geminiCall = writeCalls.find(c => String(c[0]).endsWith('GEMINI.md'));
+      expect(geminiCall).toBeUndefined();
+    });
+
+    it('does NOT write cursor rules in shell environment', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const cursorCall = writeCalls.find(c => String(c[0]).includes('deckent.mdc'));
+      expect(cursorCall).toBeUndefined();
     });
   });
 

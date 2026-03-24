@@ -24,7 +24,7 @@ export function registerStartTool(server: McpServer): void {
         const config = await loadConfig(root);
 
         // Bootstrap provider adapters before sprint operations
-        await bootstrapProviders(config, root);
+        const bootstrap = await bootstrapProviders(config, root);
 
         const jobId = `sprint-${Date.now()}`;
         const startedAt = new Date().toISOString();
@@ -32,7 +32,7 @@ export function registerStartTool(server: McpServer): void {
         writeJobState(root, { jobId, status: 'RUNNING', startedAt });
 
         // Fire and forget — don't await. Sprint runs in background.
-        runSprint(root, config, { autoApprove }).then(sprint => {
+        runSprint(root, config, { autoApprove, connector: bootstrap?.connector }).then(sprint => {
           writeJobState(root, {
             jobId,
             status: 'COMPLETE',

@@ -53,6 +53,7 @@ import {
   runWizard,
 } from '../helpers/wizard.js';
 import type { ProviderName } from '../../core/task-types.js';
+import { runDoctorChecks } from './doctor.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -596,6 +597,15 @@ globs: ["**/*"]
           const freshConfig: Record<string, unknown> = { mode, language, projectName, ...providerMerge };
           writeFileSync(providerConfigPath, JSON.stringify(freshConfig, null, 2) + '\n');
         }
+
+        // 7e. Run deckent doctor (provider health check)
+        try {
+          const doctorResult = runDoctorChecks(root);
+          if (!doctorResult.ok) {
+            const failedChecks = doctorResult.checks.filter(c => c.required && !c.passed);
+            print(`\n  Health check: ${failedChecks.length} issue(s) found — run 'deckent doctor' for details`);
+          }
+        } catch { /* doctor failure is non-fatal */ }
 
         // ── IDE environment detection & MCP guidance ────────────────
         const ideEnv = options.cursor ? 'cursor' as const
