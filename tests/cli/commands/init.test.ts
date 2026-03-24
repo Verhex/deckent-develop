@@ -59,6 +59,35 @@ vi.mock('../../../src/core/deck-file.js', () => ({
   createDeckTemplate: vi.fn(),
 }));
 
+vi.mock('../../../src/cli/helpers/codex-config.js', () => ({
+  generateCodexConfig: vi.fn().mockReturnValue({ global: '/home/.codex/config.toml', project: '/mock/root/.codex/config.toml' }),
+}));
+
+vi.mock('../../../src/cli/helpers/gemini-config.js', () => ({
+  generateGeminiConfig: vi.fn().mockReturnValue({ settingsPath: '/home/.gemini/settings.json' }),
+}));
+
+vi.mock('../../../src/cli/helpers/cursor-config.js', () => ({
+  generateCursorConfig: vi.fn().mockReturnValue({ mcpPath: '/mock/root/.cursor/mcp.json', rulesPath: '/mock/root/.cursor/rules/deckent.mdc' }),
+}));
+
+vi.mock('../../../src/cli/helpers/agent-templates.js', () => ({
+  generateAgentsMd: vi.fn().mockReturnValue('# AGENTS.md — Deckent Integration\n\nProject: test (typescript/unknown)\n'),
+  generateGeminiMd: vi.fn().mockReturnValue('# GEMINI.md — Deckent Integration\n\nProject: test (typescript/unknown)\n'),
+  generateCursorRules: vi.fn().mockReturnValue('---\ndescription: Deckent rules\nglobs: **/*\n---\n# Deckent Integration\n'),
+  appendDeckentSection: vi.fn(),
+}));
+
+vi.mock('../../../src/core/stack-detector.js', () => ({
+  detectFullStack: vi.fn().mockReturnValue({
+    language: 'typescript',
+    framework: 'express',
+    buildTool: 'tsc',
+    testFramework: 'vitest',
+    commands: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
+  }),
+}));
+
 vi.mock('../../../src/core/provider.js', () => ({
   detectAvailableProviders: vi.fn().mockResolvedValue([
     { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
@@ -98,6 +127,11 @@ import { detectAvailableProviders } from '../../../src/core/provider.js';
 import { showSplash } from '../../../src/cli/helpers/splash.js';
 import { detectEnvironment } from '../../../src/core/environment.js';
 import { createDeckTemplate } from '../../../src/core/deck-file.js';
+import { generateCodexConfig } from '../../../src/cli/helpers/codex-config.js';
+import { generateGeminiConfig } from '../../../src/cli/helpers/gemini-config.js';
+import { generateCursorConfig } from '../../../src/cli/helpers/cursor-config.js';
+import { generateAgentsMd, generateGeminiMd, generateCursorRules } from '../../../src/cli/helpers/agent-templates.js';
+import { detectFullStack } from '../../../src/core/stack-detector.js';
 import {
   detectIDEEnvironment,
   getMCPGuidance,
@@ -123,6 +157,8 @@ async function runCommand(args: string[]): Promise<void> {
 // Ensure imported mocked functions are referenced to prevent lint removal
 const _providerMocks = { detectAvailableProviders, detectIDEEnvironment, getMCPGuidance, buildProviderWizardSteps, resolveProviderWizardResult, formatProviderAuthGuidance, runWizard };
 void _providerMocks;
+const _envMocks = { generateCodexConfig, generateGeminiConfig, generateCursorConfig, generateAgentsMd, generateGeminiMd, generateCursorRules, detectFullStack };
+void _envMocks;
 
 // ─── Tests ───────────────────────────────────────────────────────────
 
@@ -900,8 +936,9 @@ import {
   formatDetectedSetup,
   formatSetupProgress,
   formatNextSteps,
+  applyEnvConfig,
 } from '../../../src/cli/commands/init.js';
-import type { DetectedSetup, SetupStep } from '../../../src/cli/commands/init.js';
+import type { DetectedSetup, SetupStep, EnvName } from '../../../src/cli/commands/init.js';
 
 describe('human-friendly init output', () => {
   // ─── formatWelcomeBanner ────────────────────────────────────────────
@@ -1193,6 +1230,208 @@ describe('human-friendly init output', () => {
       await runCommand(['init', '--auto']);
       const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
       expect(calls.some(c => c.includes('AGENTS.md') && c.includes('Codex'))).toBe(true);
+    });
+  });
+
+  // ─── Multi-environment support (--env / --all-envs) ─────────────────
+
+  describe('multi-environment support', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] } as any,
+      ]);
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: {
+          brain_provider: 'claude' as any,
+          worker_provider: 'claude' as any,
+          selectedProviders: ['claude'] as any[],
+        },
+        steps: [],
+      });
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(getMCPGuidance).mockReturnValue(['Terminal mode']);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal' as any);
+      vi.mocked(detectFullStack).mockReturnValue({
+        language: 'typescript',
+        framework: 'express',
+        buildTool: 'tsc',
+        testFramework: 'vitest',
+        commands: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
+      });
+    });
+
+    it('registers --env flag', () => {
+      const program = new Command();
+      registerInit(program);
+      const cmd = program.commands.find(c => c.name() === 'init');
+      expect(cmd!.options.some(o => o.long === '--env')).toBe(true);
+    });
+
+    it('registers --all-envs flag', () => {
+      const program = new Command();
+      registerInit(program);
+      const cmd = program.commands.find(c => c.name() === 'init');
+      expect(cmd!.options.some(o => o.long === '--all-envs')).toBe(true);
+    });
+
+    it('default init (no --env) does NOT call generateCodexConfig', async () => {
+      await runCommand(['init', '--auto']);
+      expect(generateCodexConfig).not.toHaveBeenCalled();
+    });
+
+    it('default init (no --env) does NOT call generateGeminiConfig', async () => {
+      await runCommand(['init', '--auto']);
+      expect(generateGeminiConfig).not.toHaveBeenCalled();
+    });
+
+    it('--env codex calls generateCodexConfig', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      expect(generateCodexConfig).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('--env codex writes AGENTS.md via generateAgentsMd', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      expect(generateAgentsMd).toHaveBeenCalled();
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const agentsCall = writeCalls.find(c => String(c[0]).endsWith('AGENTS.md') && String(c[1]).includes('Deckent Integration'));
+      expect(agentsCall).toBeDefined();
+    });
+
+    it('--env gemini calls generateGeminiConfig', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'gemini']);
+      expect(generateGeminiConfig).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('--env gemini writes GEMINI.md via generateGeminiMd', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'gemini']);
+      expect(generateGeminiMd).toHaveBeenCalled();
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const geminiCall = writeCalls.find(c => String(c[0]).endsWith('GEMINI.md') && String(c[1]).includes('Deckent Integration'));
+      expect(geminiCall).toBeDefined();
+    });
+
+    it('--env cursor calls generateCursorConfig', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'cursor']);
+      expect(generateCursorConfig).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('--env cursor writes cursor rules via generateCursorRules', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'cursor']);
+      expect(generateCursorRules).toHaveBeenCalled();
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const cursorCall = writeCalls.find(c => String(c[0]).includes('deckent.mdc') && String(c[1]).includes('Deckent'));
+      expect(cursorCall).toBeDefined();
+    });
+
+    it('--env codex,cursor creates both environment configs', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'codex,cursor']);
+      expect(generateCodexConfig).toHaveBeenCalled();
+      expect(generateCursorConfig).toHaveBeenCalled();
+    });
+
+    it('--all-envs calls generateCodexConfig, generateGeminiConfig, and generateCursorConfig', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--all-envs']);
+      expect(generateCodexConfig).toHaveBeenCalled();
+      expect(generateGeminiConfig).toHaveBeenCalled();
+      expect(generateCursorConfig).toHaveBeenCalled();
+    });
+
+    it('--all-envs writes AGENTS.md, GEMINI.md, and cursor rules', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--all-envs']);
+      expect(generateAgentsMd).toHaveBeenCalled();
+      expect(generateGeminiMd).toHaveBeenCalled();
+      expect(generateCursorRules).toHaveBeenCalled();
+    });
+
+    it('multi_ide_mode set in config when --env has multiple values', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'codex,cursor']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasMultiIde = configCalls.some(c => {
+        try {
+          const content = JSON.parse(String(c[1]));
+          return content.multi_ide_mode === true;
+        } catch { return false; }
+      });
+      expect(hasMultiIde).toBe(true);
+    });
+
+    it('multi_ide_mode set when --all-envs is used', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--all-envs']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasMultiIde = configCalls.some(c => {
+        try {
+          const content = JSON.parse(String(c[1]));
+          return content.multi_ide_mode === true;
+        } catch { return false; }
+      });
+      expect(hasMultiIde).toBe(true);
+    });
+
+    it('multi_ide_mode NOT set when only single env specified', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasMultiIde = configCalls.some(c => {
+        try {
+          const content = JSON.parse(String(c[1]));
+          return content.multi_ide_mode === true;
+        } catch { return false; }
+      });
+      expect(hasMultiIde).toBe(false);
+    });
+
+    it('detectFullStack is called for stack-aware templates when --env is used', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      expect(detectFullStack).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('stack info is passed to template generators', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      expect(generateAgentsMd).toHaveBeenCalledWith(expect.objectContaining({
+        language: 'typescript',
+        framework: 'express',
+        commands: expect.objectContaining({ build: 'npx tsc' }),
+      }));
+    });
+
+    it('gracefully handles detectFullStack failure', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectFullStack).mockImplementationOnce(() => { throw new Error('stack detection fail'); });
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      // Should still complete with fallback info
+      expect(generateAgentsMd).toHaveBeenCalledWith(expect.objectContaining({
+        language: 'unknown',
+      }));
+    });
+
+    it('ignores invalid env names in --env flag', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--env', 'invalid,codex']);
+      expect(generateCodexConfig).toHaveBeenCalled();
+      // invalid should have been filtered out, no crash
     });
   });
 

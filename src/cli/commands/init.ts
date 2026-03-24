@@ -10,6 +10,12 @@ import { showSplash } from '../helpers/splash.js';
 import { detectEnvironment } from '../../core/environment.js';
 import type { DetectedEnv } from '../../core/environment.js';
 import { createDeckTemplate } from '../../core/deck-file.js';
+import { generateCodexConfig } from '../helpers/codex-config.js';
+import { generateGeminiConfig } from '../helpers/gemini-config.js';
+import { generateCursorConfig } from '../helpers/cursor-config.js';
+import { generateAgentsMd, generateGeminiMd, generateCursorRules } from '../helpers/agent-templates.js';
+import { detectFullStack } from '../../core/stack-detector.js';
+import type { FullStackResult } from '../../core/stack-detector.js';
 import {
   DECKENT_DIR,
   BRAIN_DIR,
@@ -172,6 +178,30 @@ function appendToGitignore(root: string, entries: string[]): void {
   }
 }
 
+/** Valid environment names for --env flag */
+export type EnvName = 'codex' | 'cursor' | 'gemini' | 'vscode' | 'shell';
+const ALL_ENV_NAMES: EnvName[] = ['codex', 'cursor', 'gemini', 'vscode', 'shell'];
+
+/**
+ * Apply multi-environment config for a single environment name.
+ * Creates environment-specific files using stack-aware templates.
+ */
+export function applyEnvConfig(env: EnvName, root: string, projectInfo: { name: string; language: string; framework: string; commands: { build: string; test: string; lint: string } }): void {
+  if (env === 'codex') {
+    generateCodexConfig(root);
+    writeFileSync(join(root, 'AGENTS.md'), generateAgentsMd(projectInfo));
+  } else if (env === 'gemini') {
+    generateGeminiConfig(root);
+    writeFileSync(join(root, 'GEMINI.md'), generateGeminiMd(projectInfo));
+  } else if (env === 'cursor') {
+    generateCursorConfig(root);
+    const cursorRulesDir = join(root, '.cursor', 'rules');
+    mkdirSync(cursorRulesDir, { recursive: true });
+    writeFileSync(join(cursorRulesDir, 'deckent.mdc'), generateCursorRules(projectInfo));
+  }
+  // vscode and shell: CLAUDE.md already handled by default flow
+}
+
 export function registerInit(program: Command): void {
   program
     .command('init')
@@ -180,7 +210,9 @@ export function registerInit(program: Command): void {
     .option('--manual', 'Skip auto-detection, use interactive prompts only')
     .option('--cursor', 'Configure for Cursor IDE environment')
     .option('--claude-code', 'Configure for Claude Code environment (default)')
-    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean }) => {
+    .option('--env <envs>', 'Comma-separated environments to configure (codex,cursor,gemini,vscode,shell)')
+    .option('--all-envs', 'Configure ALL environment configs')
+    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean }) => {
       const root = resolveProjectRoot();
 
       try {
@@ -338,7 +370,54 @@ globs: ["**/*"]
           }
         }
 
-        // 7c. Create .deck template
+        // 7c. Multi-environment config (--env / --all-envs flags)
+        const requestedEnvs: EnvName[] = options.allEnvs
+          ? [...ALL_ENV_NAMES]
+          : options.env
+            ? options.env.split(',').map(e => e.trim()).filter(e => ALL_ENV_NAMES.includes(e as EnvName)) as EnvName[]
+            : [];
+
+        if (requestedEnvs.length > 0) {
+          // Detect full stack for stack-aware templates
+          let stackResult: FullStackResult;
+          try {
+            stackResult = detectFullStack(root);
+          } catch {
+            stackResult = {
+              language: 'unknown',
+              framework: 'unknown',
+              buildTool: 'unknown',
+              testFramework: 'unknown',
+              commands: { build: '', test: '', lint: '' },
+            };
+          }
+
+          const projectInfo = {
+            name: projectName,
+            language: stackResult.language,
+            framework: stackResult.framework,
+            commands: stackResult.commands,
+          };
+
+          for (const env of requestedEnvs) {
+            applyEnvConfig(env, root, projectInfo);
+          }
+
+          // Set multi_ide_mode if multiple envs
+          if (requestedEnvs.length > 1) {
+            const multiConfigPath = join(root, DECKENT_DIR, 'config.json');
+            try {
+              const existing = JSON.parse(readFileSync(multiConfigPath, 'utf-8')) as Record<string, unknown>;
+              existing['multi_ide_mode'] = true;
+              writeFileSync(multiConfigPath, JSON.stringify(existing, null, 2) + '\n');
+            } catch {
+              // Config not yet written — will be merged later
+              writeFileSync(multiConfigPath, JSON.stringify({ multi_ide_mode: true }, null, 2) + '\n');
+            }
+          }
+        }
+
+        // 7d. Create .deck template
         try {
           createDeckTemplate(root);
         } catch { /* non-fatal */ }

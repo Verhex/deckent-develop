@@ -15,6 +15,7 @@ import type {
 import { TASKS_DIR, LOCKS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { redactSensitive } from '../cli/helpers/output.js';
+import { detectFullStack, STACK_COMMANDS } from '../core/stack-detector.js';
 
 // ─── Error Classes ──────────────────────────────────────────────────
 
@@ -77,6 +78,25 @@ function ensureDir(dirPath: string): void {
   if (!existsSync(dirPath)) {
     mkdirSync(dirPath, { recursive: true });
   }
+}
+
+// ─── Stack-Aware Verify Commands ────────────────────────────────────
+
+/**
+ * Get build and test commands for the current project stack.
+ * Falls back to TypeScript commands if stack is unknown.
+ */
+export function getVerifyCommands(projectRoot: string): { build: string; test: string } {
+  const stack = detectFullStack(projectRoot);
+  const key = stack.language === 'java'
+    ? `java_${stack.buildTool}`
+    : stack.language === 'c' || stack.language === 'cpp'
+    ? `c_${stack.buildTool}`
+    : stack.language;
+  const commands = STACK_COMMANDS[key];
+  return commands
+    ? { build: commands.build, test: commands.test }
+    : { build: 'npx tsc', test: 'npx vitest run' };
 }
 
 // ─── Progress Calculation ───────────────────────────────────────────
@@ -384,16 +404,27 @@ export function parseVitestOutput(output: string): { failedTests: string[]; summ
 }
 
 /**
- * Run vitest with optional scope filtering and return structured results.
- * Executes `npx vitest run` in the given projectRoot, optionally scoped to
- * specific directories from the task scope.
+ * Run test verification with optional scope filtering and return structured results.
+ * Uses stack-detected test command (e.g. `npx vitest run` for TypeScript,
+ * `pytest` for Python, `go test ./...` for Go). If test command is empty,
+ * skips verification and returns success.
  */
 export function verifyTests(
   projectRoot: string,
   scope?: string[],
 ): VerifyTestsResult {
+  const { test: testCmd } = getVerifyCommands(projectRoot);
+
+  // Empty test command means no test step for this stack
+  if (!testCmd) {
+    return { success: true, failedTests: [], output: '' };
+  }
+
   const scopeArgs = scope && scope.length > 0 ? ` ${scope.join(' ')}` : '';
-  const command = `npx vitest run --reporter=verbose${scopeArgs}`;
+  // For vitest, add --reporter=verbose; for other test runners, use as-is
+  const command = testCmd.includes('vitest')
+    ? `${testCmd} --reporter=verbose${scopeArgs}`
+    : `${testCmd}${scopeArgs}`;
 
   try {
     const stdout = execSync(command, {
@@ -508,12 +539,24 @@ export function parseCompilationErrors(err: unknown): string[] {
 }
 
 /**
- * Run `tsc --noEmit` in the given project root and return success/errors.
+ * Run build verification in the given project root and return success/errors.
+ * Uses stack-detected build command (e.g. `npx tsc --noEmit` for TypeScript,
+ * `go build ./...` for Go). If build command is empty, skips verification.
  * This is a single-shot check — use `runCompilationLoop` for retry logic.
  */
 export function verifyCompilation(projectRoot: string): CompilationResult {
+  const { build } = getVerifyCommands(projectRoot);
+
+  // Empty build command means no compilation step (e.g. some C projects with no lint)
+  if (!build) {
+    return { success: true, errors: [] };
+  }
+
+  // For TypeScript, add --noEmit flag to avoid generating output files
+  const command = build === 'npx tsc' ? 'npx tsc --noEmit' : build;
+
   try {
-    execSync('npx tsc --noEmit', {
+    execSync(command, {
       cwd: projectRoot,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
