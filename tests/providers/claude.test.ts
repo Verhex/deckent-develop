@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { ClaudeAdapter, createClaudeAdapter } from '../../src/providers/claude.js';
+import type { ClaudeBackend } from '../../src/providers/claude.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
+import { ProviderError } from '../../src/core/provider.js';
 
 // ─── Mock tmux module ────────────────────────────────────────────────
 
@@ -22,6 +24,10 @@ vi.mock('node:fs', async () => {
     ...actual,
     readdirSync: vi.fn().mockReturnValue([]),
     existsSync: vi.fn().mockReturnValue(false),
+    openSync: vi.fn().mockReturnValue(42),
+    closeSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
   };
 });
 
@@ -29,6 +35,14 @@ vi.mock('node:fs', async () => {
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  spawn: vi.fn().mockReturnValue({
+    stdin: { write: vi.fn(), end: vi.fn() },
+    stdout: { on: vi.fn() },
+    stderr: { on: vi.fn() },
+    once: vi.fn(),
+    kill: vi.fn(),
+    pid: 12345,
+  }),
 }));
 
 import * as tmux from '../../src/orchestra/tmux.js';
@@ -457,5 +471,122 @@ describe('createClaudeAdapter', () => {
       '/my/project',
       expect.any(Object),
     );
+  });
+
+  it('should accept claude_backend option', () => {
+    const adapter = createClaudeAdapter('/some/dir', { claude_backend: 'subprocess' });
+    expect(adapter).toBeInstanceOf(ClaudeAdapter);
+    expect(adapter.getBackend()).toBe('subprocess');
+  });
+});
+
+// ─── claude_backend config ──────────────────────────────────────────
+
+describe('ClaudeAdapter — claude_backend', () => {
+  const projectDir = '/tmp/test-project';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Ensure existsSync returns true for subprocess spawn (tasks dir check)
+    mockExistsSync.mockReturnValue(true);
+  });
+
+  // ─── Default is tmux ──────────────────────────────────────────────
+
+  it('should default to tmux backend when no option provided', () => {
+    const adapter = new ClaudeAdapter(projectDir);
+    expect(adapter.getBackend()).toBe('tmux');
+  });
+
+  it('should default to tmux backend when claude_backend is undefined', () => {
+    const adapter = new ClaudeAdapter(projectDir, {});
+    expect(adapter.getBackend()).toBe('tmux');
+  });
+
+  // ─── tmux mode unchanged ──────────────────────────────────────────
+
+  it('should use tmux spawn when backend is tmux', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'tmux' });
+    adapter.spawn('task-001', 'opus', 'test prompt');
+    expect(mockTmuxEnsureSession).toHaveBeenCalledOnce();
+    expect(mockTmuxSpawnWorker).toHaveBeenCalledOnce();
+  });
+
+  it('should use tmux kill when backend is tmux', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'tmux' });
+    adapter.kill('task-001');
+    expect(mockTmuxKillWorker).toHaveBeenCalledWith('task-001');
+  });
+
+  it('should delegate listWorkers to tmux when backend is tmux', () => {
+    mockTmuxListWorkers.mockReturnValue(['task-001']);
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'tmux' });
+    expect(adapter.listWorkers()).toEqual(['task-001']);
+  });
+
+  it('should build tmux-style command when backend is tmux', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'tmux' });
+    const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
+    expect(cmd).toBe('claude -p - --model opus < /tmp/prompt.txt');
+  });
+
+  // ─── subprocess mode ──────────────────────────────────────────────
+
+  it('should set backend to subprocess when configured', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
+    expect(adapter.getBackend()).toBe('subprocess');
+  });
+
+  it('should NOT call tmux.ensureSession when backend is subprocess', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
+    adapter.spawn('task-001', 'opus', 'test prompt');
+    expect(mockTmuxEnsureSession).not.toHaveBeenCalled();
+    expect(mockTmuxSpawnWorker).not.toHaveBeenCalled();
+  });
+
+  it('should NOT call tmux.killWorker when backend is subprocess', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
+    // Spawn first so there's a worker to kill
+    adapter.spawn('task-001', 'opus', 'test prompt');
+    adapter.kill('task-001');
+    expect(mockTmuxKillWorker).not.toHaveBeenCalled();
+  });
+
+  it('should build subprocess-style command with --dangerously-skip-permissions', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
+    const cmd = adapter.buildCommand('opus', '/tmp/prompt.txt');
+    expect(cmd).toContain('--dangerously-skip-permissions');
+    expect(cmd).toContain('--model opus');
+    expect(cmd).toContain('claude -p "/tmp/prompt.txt"');
+    expect(cmd).not.toContain('< /tmp/prompt.txt');
+  });
+
+  it('should include --allowedTools in subprocess command when provided', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
+    const cmd = adapter.buildCommand('sonnet', '/tmp/p.txt', { allowedTools: 'Read,Write' });
+    expect(cmd).toContain("--allowedTools 'Read,Write'");
+    expect(cmd).toContain('--dangerously-skip-permissions');
+  });
+
+  it('should return true for isSessionActive when backend is subprocess', () => {
+    const adapter = new ClaudeAdapter(projectDir, { claude_backend: 'subprocess' });
+    expect(adapter.isSessionActive()).toBe(true);
+  });
+
+  // ─── MCP mode throws ─────────────────────────────────────────────
+
+  it('should throw ProviderError when backend is mcp', () => {
+    expect(() => new ClaudeAdapter(projectDir, { claude_backend: 'mcp' }))
+      .toThrow(ProviderError);
+  });
+
+  it('should throw with "not yet implemented" message for mcp backend', () => {
+    expect(() => new ClaudeAdapter(projectDir, { claude_backend: 'mcp' }))
+      .toThrow('MCP backend not yet implemented. Use tmux or subprocess.');
+  });
+
+  it('should throw ProviderError via createClaudeAdapter for mcp backend', () => {
+    expect(() => createClaudeAdapter(projectDir, { claude_backend: 'mcp' }))
+      .toThrow('MCP backend not yet implemented');
   });
 });

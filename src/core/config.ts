@@ -330,6 +330,7 @@ export function createDefaultConfig(): DeckentConfig {
     brain_provider: 'claude',
     worker_provider: 'claude',
     cost_optimization: false,
+    claude_backend: 'tmux',
     // Output & Display
     output_splash: true,
     output_mode: 'normal',

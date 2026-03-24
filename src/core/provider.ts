@@ -282,16 +282,25 @@ function detectCodex(): DetectedProvider {
 }
 
 /**
- * Detect Gemini availability.
- * No CLI yet — checks GOOGLE_API_KEY env variable only.
+ * Detect Gemini CLI availability.
+ * Checks `gemini --version` CLI and GOOGLE_API_KEY / DECKENT_GOOGLE_API_KEY env variable.
+ * Both CLI and API key are needed for full availability.
  */
 function detectGemini(): DetectedProvider {
-  const hasApiKey = typeof process.env['GOOGLE_API_KEY'] === 'string' && process.env['GOOGLE_API_KEY'].length > 0;
+  const version = detectCliVersion('gemini');
+  const hasApiKey =
+    (typeof process.env['GOOGLE_API_KEY'] === 'string' && process.env['GOOGLE_API_KEY'].length > 0) ||
+    (typeof process.env['DECKENT_GOOGLE_API_KEY'] === 'string' && process.env['DECKENT_GOOGLE_API_KEY'].length > 0);
+  const available = version !== undefined && hasApiKey;
+  let authMethod: DetectedProvider['authMethod'] = 'none';
+  if (hasApiKey) {
+    authMethod = 'api_key';
+  }
   return {
     name: 'gemini',
-    available: hasApiKey,
-    version: undefined,
-    authMethod: hasApiKey ? 'api_key' : 'none',
+    available,
+    version,
+    authMethod,
     models: [...PROVIDER_MODEL_MAP.gemini],
   };
 }

@@ -112,21 +112,21 @@ describe('Codex Adapter Smoke Tests', () => {
   it('buildCommand produces valid codex exec string', () => {
     const cmd = adapter.buildCommand('gpt-5', '/tmp/prompt.txt');
     expect(cmd).toContain('codex exec');
+    expect(cmd).toContain('--full-auto');
     expect(cmd).toContain('--model gpt-5');
-    expect(cmd).toContain('--quiet');
-    expect(cmd).toContain('< /tmp/prompt.txt');
+    expect(cmd).toContain('$(cat /tmp/prompt.txt)');
   });
 
-  it('buildCommand includes --approval-mode full-auto when autoApprove', () => {
-    const cmd = adapter.buildCommand('gpt-4.1', '/tmp/prompt.txt', {
-      autoApprove: true,
-    });
-    expect(cmd).toContain('--approval-mode full-auto');
+  it('buildCommand includes --full-auto in base command', () => {
+    const cmd = adapter.buildCommand('gpt-4.1', '/tmp/prompt.txt');
+    expect(cmd).toContain('--full-auto');
   });
 
-  it('buildCommand without autoApprove omits approval flag', () => {
-    const cmd = adapter.buildCommand('o3', '/tmp/prompt.txt');
-    expect(cmd).not.toContain('--approval-mode');
+  it('buildCommand always includes --full-auto regardless of autoApprove option', () => {
+    const cmdWithout = adapter.buildCommand('o3', '/tmp/prompt.txt');
+    const cmdWith = adapter.buildCommand('o3', '/tmp/prompt.txt', { autoApprove: true });
+    expect(cmdWithout).toContain('--full-auto');
+    expect(cmdWith).toContain('--full-auto');
   });
 
   it('isAvailable checks OPENAI_API_KEY and codex CLI', async () => {
@@ -168,13 +168,13 @@ describe('Gemini Adapter Smoke Tests', () => {
     expect(adapter.supportedModels).toContain('gemini-2.0-flash');
   });
 
-  it('buildCommand produces valid curl command with API URL', () => {
+  it('buildCommand produces valid gemini CLI string', () => {
     const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/prompt.json');
-    expect(cmd).toContain('curl');
-    expect(cmd).toContain('generativelanguage.googleapis.com');
-    expect(cmd).toContain('gemini-2.5-pro:generateContent');
-    expect(cmd).toContain(`${GEMINI_AUTH_HEADER}:`);
-    expect(cmd).toContain('-d @/tmp/prompt.json');
+    expect(cmd).toContain('gemini');
+    expect(cmd).toContain('-p');
+    expect(cmd).toContain('--output-format json');
+    expect(cmd).toContain('--model gemini-2.5-pro');
+    expect(cmd).toContain('/tmp/prompt.json');
   });
 
   it('isAvailable checks GOOGLE_API_KEY env var', async () => {

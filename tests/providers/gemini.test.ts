@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
-import { GeminiAdapter, createGeminiAdapter, GEMINI_AUTH_HEADER } from '../../src/providers/gemini.js';
+import { GeminiAdapter, createGeminiAdapter, GEMINI_AUTH_HEADER, parseGeminiOutput } from '../../src/providers/gemini.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { ProviderError } from '../../src/core/provider.js';
 
@@ -18,6 +18,7 @@ const mockChildProcess = {
 
 vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
+  spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: '0.1.0\n' }),
 }));
 
 // ─── Mock node:fs ────────────────────────────────────────────────────
@@ -30,10 +31,11 @@ vi.mock('node:fs', () => ({
   closeSync: vi.fn(),
 }));
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, openSync, closeSync } from 'node:fs';
 
 const mockSpawn = spawn as unknown as MockInstance;
+const mockSpawnSync = spawnSync as unknown as MockInstance;
 const mockWriteFileSync = writeFileSync as unknown as MockInstance;
 const mockMkdirSync = mkdirSync as unknown as MockInstance;
 const mockExistsSync = existsSync as unknown as MockInstance;
@@ -67,6 +69,7 @@ describe('GeminiAdapter', () => {
     adapter = new GeminiAdapter(projectDir);
     mockExistsSync.mockReturnValue(true);
     mockOpenSync.mockReturnValue(3);
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '0.1.0\n' });
   });
 
   afterEach(() => {
@@ -124,65 +127,98 @@ describe('GeminiAdapter', () => {
     expect(adapter.getApiKey()).toBe('my-key-abc');
   });
 
-  it('getApiKey returns undefined when env var missing', () => {
+  it('getApiKey prefers DECKENT_GOOGLE_API_KEY over GOOGLE_API_KEY', () => {
+    process.env.GOOGLE_API_KEY = 'regular-key';
+    process.env.DECKENT_GOOGLE_API_KEY = 'deckent-key';
+    expect(adapter.getApiKey()).toBe('deckent-key');
+  });
+
+  it('getApiKey returns undefined when both env vars missing', () => {
     delete process.env.GOOGLE_API_KEY;
+    delete process.env.DECKENT_GOOGLE_API_KEY;
     expect(adapter.getApiKey()).toBeUndefined();
+  });
+
+  it('getApiKey falls back to GOOGLE_API_KEY when DECKENT_GOOGLE_API_KEY is not set', () => {
+    delete process.env.DECKENT_GOOGLE_API_KEY;
+    process.env.GOOGLE_API_KEY = 'fallback-key';
+    expect(adapter.getApiKey()).toBe('fallback-key');
   });
 
   // ─── isAvailable() ─────────────────────────────────────────────────
 
-  it('isAvailable returns true when GOOGLE_API_KEY is set', async () => {
+  it('isAvailable returns true when gemini CLI installed and API key is set', async () => {
     process.env.GOOGLE_API_KEY = 'some-key';
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '0.1.0\n' });
     const result = await adapter.isAvailable();
     expect(result).toBe(true);
   });
 
   it('isAvailable returns false when GOOGLE_API_KEY is not set', async () => {
     delete process.env.GOOGLE_API_KEY;
+    delete process.env.DECKENT_GOOGLE_API_KEY;
     const result = await adapter.isAvailable();
     expect(result).toBe(false);
   });
 
-  // ─── Request Format Verification ───────────────────────────────────
-
-  it('buildApiScript uses contents[].parts[].text format per API spec', () => {
-    const script = adapter.buildApiScript(
-      'https://example.com/api',
-      'test-key',
-      'Hello world',
-    );
-    expect(script).toContain("contents: [{ parts: [{ text: 'Hello world' }] }]");
-    expect(script).toContain('generationConfig');
-    expect(script).toContain('maxOutputTokens');
+  it('isAvailable returns false when gemini CLI is not installed', async () => {
+    process.env.GOOGLE_API_KEY = 'some-key';
+    mockSpawnSync.mockReturnValue({ status: 1, stdout: '' });
+    const result = await adapter.isAvailable();
+    expect(result).toBe(false);
   });
 
-  it('buildApiScript sends auth via x-goog-api-key header (not query param)', () => {
-    const script = adapter.buildApiScript(
-      'https://example.com/api',
-      'secret-key-xyz',
-      'Test',
-    );
-    expect(script).toContain("'x-goog-api-key': 'secret-key-xyz'");
-    expect(script).not.toContain('?key=');
+  it('isAvailable returns false when gemini CLI throws', async () => {
+    process.env.GOOGLE_API_KEY = 'some-key';
+    mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+    const result = await adapter.isAvailable();
+    expect(result).toBe(false);
   });
 
-  it('buildApiScript parses response candidates[0].content.parts[0].text', () => {
-    const script = adapter.buildApiScript('https://example.com', 'k', 'test');
-    expect(script).toContain('candidates?.[0]?.content?.parts?.[0]?.text');
+  // ─── isCliInstalled() ─────────────────────────────────────────────
+
+  it('isCliInstalled returns true when gemini --version exits 0', () => {
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '0.1.0\n' });
+    expect(adapter.isCliInstalled()).toBe(true);
+    expect(mockSpawnSync).toHaveBeenCalledWith('gemini', ['--version'], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
   });
 
-  it('request body uses contents array with parts (not messages)', () => {
-    const script = adapter.buildApiScript('url', 'key', 'test');
-    expect(script).toContain('contents:');
-    expect(script).toContain('parts:');
-    expect(script).not.toContain('messages:');
+  it('isCliInstalled returns false when gemini --version fails', () => {
+    mockSpawnSync.mockReturnValue({ status: 1, stdout: '' });
+    expect(adapter.isCliInstalled()).toBe(false);
   });
 
-  it('auth header is x-goog-api-key (not Authorization Bearer)', () => {
-    const script = adapter.buildApiScript('url', 'my-key', 'test');
-    expect(script).toContain('x-goog-api-key');
-    expect(script).not.toContain('Authorization');
-    expect(script).not.toContain('Bearer');
+  it('isCliInstalled returns false when gemini binary not found', () => {
+    mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+    expect(adapter.isCliInstalled()).toBe(false);
+  });
+
+  // ─── buildArgs() ──────────────────────────────────────────────────
+
+  it('buildArgs returns correct Gemini CLI arguments', () => {
+    const args = adapter.buildArgs('gemini-2.5-pro', 'Hello Gemini');
+    expect(args).toEqual(['-p', 'Hello Gemini', '--output-format', 'json', '--model', 'gemini-2.5-pro']);
+  });
+
+  it('buildArgs includes -p flag for headless mode', () => {
+    const args = adapter.buildArgs('gemini-2.5-flash', 'test');
+    expect(args[0]).toBe('-p');
+    expect(args[1]).toBe('test');
+  });
+
+  it('buildArgs includes --output-format json', () => {
+    const args = adapter.buildArgs('gemini-2.5-pro', 'prompt');
+    expect(args).toContain('--output-format');
+    expect(args).toContain('json');
+  });
+
+  it('buildArgs includes --model flag', () => {
+    const args = adapter.buildArgs('gemini-2.5-pro', 'prompt');
+    expect(args).toContain('--model');
+    expect(args).toContain('gemini-2.5-pro');
   });
 
   // ─── Streaming Support ─────────────────────────────────────────────
@@ -223,25 +259,28 @@ describe('GeminiAdapter', () => {
 
   // ─── spawn() ───────────────────────────────────────────────────────
 
-  it('spawn creates subprocess with node -e for API call', () => {
+  it('spawn creates subprocess with gemini CLI', () => {
     const child = setupMockChild();
     adapter.spawn('task-001', 'gemini-2.5-pro', 'Hello Gemini');
 
     expect(mockSpawn).toHaveBeenCalledTimes(1);
     const [cmd, args] = mockSpawn.mock.calls[0];
-    expect(cmd).toBe('node');
-    expect(args[0]).toBe('-e');
-    expect(args[1]).toContain('gemini-2.5-pro');
-    expect(args[1]).toContain('generateContent');
+    expect(cmd).toBe('gemini');
+    expect(args).toContain('-p');
+    expect(args).toContain('Hello Gemini');
+    expect(args).toContain('--output-format');
+    expect(args).toContain('json');
+    expect(args).toContain('--model');
+    expect(args).toContain('gemini-2.5-pro');
   });
 
-  it('spawn uses header auth, not query param', () => {
+  it('spawn passes GOOGLE_API_KEY in env', () => {
     setupMockChild();
     adapter.spawn('task-001a', 'gemini-2.5-pro', 'Hello');
 
-    const script = mockSpawn.mock.calls[0][1][1];
-    expect(script).toContain("'x-goog-api-key': 'test-api-key-123'");
-    expect(script).not.toContain('?key=');
+    const spawnCall = mockSpawn.mock.calls[0];
+    const spawnOpts = spawnCall[2];
+    expect(spawnOpts.env.GOOGLE_API_KEY).toBe('test-api-key-123');
   });
 
   it('spawn writes heartbeat file', () => {
@@ -277,6 +316,7 @@ describe('GeminiAdapter', () => {
 
   it('spawn throws when API key is missing', () => {
     delete process.env.GOOGLE_API_KEY;
+    delete process.env.DECKENT_GOOGLE_API_KEY;
     expect(() =>
       adapter.spawn('task-005', 'gemini-2.5-pro', 'Test'),
     ).toThrow(ProviderError);
@@ -327,16 +367,6 @@ describe('GeminiAdapter', () => {
     expect(exitCb).toBeDefined();
     exitCb(0);
     expect(adapter.listWorkers()).not.toContain('task-009');
-  });
-
-  it('spawn escapes special characters in prompt', () => {
-    setupMockChild();
-    adapter.spawn('task-010', 'gemini-2.5-pro', "It's a\nnewline\\test");
-
-    const script = mockSpawn.mock.calls[0][1][1];
-    expect(script).toContain("\\'");
-    expect(script).toContain('\\n');
-    expect(script).toContain('\\\\');
   });
 
   it('spawn log file is created in tasks directory', () => {
@@ -404,65 +434,55 @@ describe('GeminiAdapter', () => {
 
   // ─── buildCommand() ────────────────────────────────────────────────
 
-  it('buildCommand returns curl with header auth (not query param)', () => {
+  it('buildCommand returns gemini CLI command with correct flags', () => {
     const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/prompt.json');
-    expect(cmd).toContain('curl');
-    expect(cmd).toContain('x-goog-api-key: test-api-key-123');
-    expect(cmd).toContain('gemini-2.5-pro:generateContent');
+    expect(cmd).toContain('gemini');
+    expect(cmd).toContain('-p');
+    expect(cmd).toContain('--output-format json');
+    expect(cmd).toContain('--model gemini-2.5-pro');
     expect(cmd).toContain('/tmp/prompt.json');
-    expect(cmd).not.toContain('?key=');
   });
 
-  it('buildCommand uses placeholder when API key is missing', () => {
-    delete process.env.GOOGLE_API_KEY;
+  it('buildCommand uses cat to read prompt file', () => {
     const cmd = adapter.buildCommand('gemini-2.5-flash', '/tmp/p.json');
-    expect(cmd).toContain('<GOOGLE_API_KEY>');
+    expect(cmd).toContain('$(cat /tmp/p.json)');
   });
 
-  it('buildCommand includes actual API key when present', () => {
-    process.env.GOOGLE_API_KEY = 'my-key';
+  it('buildCommand includes model parameter', () => {
     const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/p.json');
-    expect(cmd).toContain('my-key');
-  });
-
-  it('buildCommand URL uses generativelanguage.googleapis.com', () => {
-    const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/p.json');
-    expect(cmd).toContain('generativelanguage.googleapis.com');
+    expect(cmd).toContain('--model gemini-2.5-pro');
   });
 
   // ─── buildPlannerCommand() ─────────────────────────────────────────
 
-  it('buildPlannerCommand returns node -e with API script', () => {
+  it('buildPlannerCommand returns gemini CLI command + args', () => {
     const result = adapter.buildPlannerCommand('Plan this sprint', 'gemini-2.5-pro');
-    expect(result.command).toBe('node');
-    expect(result.args[0]).toBe('-e');
-    expect(result.args[1]).toContain('generateContent');
-    expect(result.args[1]).toContain('gemini-2.5-pro');
+    expect(result.command).toBe('gemini');
+    expect(result.args).toContain('-p');
+    expect(result.args).toContain('Plan this sprint');
+    expect(result.args).toContain('--output-format');
+    expect(result.args).toContain('json');
+    expect(result.args).toContain('--model');
+    expect(result.args).toContain('gemini-2.5-pro');
   });
 
-  it('buildPlannerCommand includes API key in script', () => {
-    process.env.GOOGLE_API_KEY = 'planner-key-123';
+  it('buildPlannerCommand uses correct model in args', () => {
     const result = adapter.buildPlannerCommand('Plan', 'gemini-2.5-flash');
-    expect(result.args[1]).toContain('planner-key-123');
+    expect(result.args).toContain('gemini-2.5-flash');
   });
 
-  it('buildPlannerCommand throws when API key missing', () => {
+  it('buildPlannerCommand does not throw when API key is missing', () => {
+    // Unlike the old node -e approach, the CLI reads its own env
     delete process.env.GOOGLE_API_KEY;
-    expect(() => adapter.buildPlannerCommand('Plan', 'gemini-2.5-pro'))
-      .toThrow(ProviderError);
-  });
-
-  it('buildPlannerCommand uses correct endpoint URL', () => {
-    const result = adapter.buildPlannerCommand('Plan', 'gemini-2.5-pro');
-    expect(result.args[1]).toContain(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
-    );
+    delete process.env.DECKENT_GOOGLE_API_KEY;
+    expect(() => adapter.buildPlannerCommand('Plan', 'gemini-2.5-pro')).not.toThrow();
   });
 
   // ─── validateApiKey() ──────────────────────────────────────────────
 
   it('validateApiKey returns invalid when key is not set', () => {
     delete process.env.GOOGLE_API_KEY;
+    delete process.env.DECKENT_GOOGLE_API_KEY;
     const result = adapter.validateApiKey();
     expect(result.valid).toBe(false);
     expect(result.reason).toContain('not set');
@@ -549,15 +569,69 @@ describe('GeminiAdapter', () => {
 
   // ─── Edge Cases ────────────────────────────────────────────────────
 
-  it('buildApiScript escapes backticks in prompt', () => {
+  it('buildApiScript escapes backticks in prompt (REST fallback)', () => {
     const script = adapter.buildApiScript('url', 'key', 'test `code` here');
     expect(script).toContain('`code`');
   });
 
-  it('buildApiScript escapes carriage returns', () => {
+  it('buildApiScript escapes carriage returns (REST fallback)', () => {
     const script = adapter.buildApiScript('url', 'key', "line\rwith\rcr");
     expect(script).toContain('\\r');
     expect(script).not.toContain('\r');
+  });
+
+  // ─── parseGeminiOutput() ──────────────────────────────────────────
+
+  it('parseGeminiOutput parses JSON with response field', () => {
+    const output = JSON.stringify({ response: 'Hello world' });
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('Hello world');
+  });
+
+  it('parseGeminiOutput parses JSON with candidates structure', () => {
+    const output = JSON.stringify({
+      candidates: [{ content: { parts: [{ text: 'Generated text' }] } }],
+    });
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('Generated text');
+  });
+
+  it('parseGeminiOutput extracts usage metadata', () => {
+    const output = JSON.stringify({
+      response: 'Hello',
+      usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20 },
+    });
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('Hello');
+    expect(result.stats).toEqual({ inputTokens: 10, outputTokens: 20 });
+  });
+
+  it('parseGeminiOutput handles plain text (non-JSON) output', () => {
+    const result = parseGeminiOutput('Just plain text response');
+    expect(result.response).toBe('Just plain text response');
+    expect(result.stats).toBeUndefined();
+  });
+
+  it('parseGeminiOutput handles empty string', () => {
+    const result = parseGeminiOutput('');
+    expect(result.response).toBe('');
+  });
+
+  it('parseGeminiOutput handles whitespace-only string', () => {
+    const result = parseGeminiOutput('   \n  ');
+    expect(result.response).toBe('');
+  });
+
+  it('parseGeminiOutput handles JSON string value', () => {
+    const output = JSON.stringify('simple string');
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('simple string');
+  });
+
+  it('parseGeminiOutput without usageMetadata returns undefined stats', () => {
+    const output = JSON.stringify({ response: 'no stats' });
+    const result = parseGeminiOutput(output);
+    expect(result.stats).toBeUndefined();
   });
 
   // ─── Factory ───────────────────────────────────────────────────────

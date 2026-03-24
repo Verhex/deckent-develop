@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { ModelType, UsageMetrics } from '../core/types.js';
 import { CLAUDE_MODELS } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
+import { ProviderError } from '../core/provider.js';
 import {
   spawnWorker,
   killWorker,
@@ -13,6 +14,19 @@ import {
   cleanupPromptFile,
 } from '../orchestra/tmux.js';
 import { TASKS_DIR } from '../core/constants.js';
+import {
+  SubprocessSpawnBackend,
+  CLAUDE_SUBPROCESS_CONFIG,
+} from './subprocess.js';
+
+// ─── Types ──────────────────────────────────────────────────────────
+
+export type ClaudeBackend = 'tmux' | 'subprocess' | 'mcp';
+
+export interface ClaudeAdapterOptions {
+  /** Execution backend: 'tmux' (default), 'subprocess' (headless), 'mcp' (future) */
+  claude_backend?: ClaudeBackend;
+}
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -30,19 +44,47 @@ const SAFE_USAGE_DEFAULT: UsageMetrics = {
  *
  * Wraps tmux.ts functions (spawnWorker, killWorker, listWorkers, isSessionActive)
  * and exposes them through the ProviderAdapter interface.
+ *
+ * Supports three backends via `claude_backend` config:
+ * - 'tmux' (default): uses tmux sessions for worker management
+ * - 'subprocess': headless child_process.spawn via SubprocessSpawnBackend
+ * - 'mcp': future — throws ProviderError if selected
  */
 export class ClaudeAdapter implements ProviderAdapter {
   readonly name = 'claude-tmux';
   readonly supportedModels: readonly ModelType[] = SUPPORTED_MODELS;
 
   private readonly projectDir: string;
+  private readonly backend: ClaudeBackend;
+  private subprocessBackend: SubprocessSpawnBackend | null = null;
 
-  constructor(projectDir: string) {
+  constructor(projectDir: string, opts?: ClaudeAdapterOptions) {
     this.projectDir = projectDir;
+    this.backend = opts?.claude_backend ?? 'tmux';
+
+    if (this.backend === 'mcp') {
+      throw new ProviderError(
+        'MCP backend not yet implemented. Use tmux or subprocess.',
+        'claude',
+      );
+    }
+
+    if (this.backend === 'subprocess') {
+      this.subprocessBackend = new SubprocessSpawnBackend(projectDir, {
+        providerConfig: CLAUDE_SUBPROCESS_CONFIG,
+      });
+    }
   }
 
   /**
-   * Spawn a tmux worker window running Claude CLI with the given prompt.
+   * Get the active backend name.
+   */
+  getBackend(): ClaudeBackend {
+    return this.backend;
+  }
+
+  /**
+   * Spawn a worker using the configured backend.
    */
   spawn(
     taskId: string,
@@ -50,6 +92,12 @@ export class ClaudeAdapter implements ProviderAdapter {
     prompt: string,
     opts?: ProviderSpawnOptions,
   ): void {
+    if (this.backend === 'subprocess' && this.subprocessBackend) {
+      this.subprocessBackend.spawn(taskId, model, prompt, opts);
+      return;
+    }
+
+    // tmux backend (default)
     const dir = opts?.projectDir ?? this.projectDir;
     ensureSession();
     spawnWorker(taskId, model, prompt, dir, {
@@ -59,9 +107,15 @@ export class ClaudeAdapter implements ProviderAdapter {
   }
 
   /**
-   * Kill a running worker tmux window and clean up any orphaned prompt tmpfiles.
+   * Kill a running worker and clean up.
    */
   kill(taskId: string): void {
+    if (this.backend === 'subprocess' && this.subprocessBackend) {
+      this.subprocessBackend.kill(taskId);
+      return;
+    }
+
+    // tmux backend (default)
     killWorker(taskId);
     this._cleanupOrphanedPromptFiles();
   }
@@ -86,9 +140,12 @@ export class ClaudeAdapter implements ProviderAdapter {
   }
 
   /**
-   * List currently active worker task IDs from tmux windows.
+   * List currently active worker task IDs.
    */
   listWorkers(): string[] {
+    if (this.backend === 'subprocess' && this.subprocessBackend) {
+      return this.subprocessBackend.listWorkers();
+    }
     return listWorkers();
   }
 
@@ -146,13 +203,24 @@ export class ClaudeAdapter implements ProviderAdapter {
 
   /**
    * Build the shell command string that Claude CLI would use.
-   * Equivalent to tmux.ts buildClaudeCommand().
+   * Command format varies by backend:
+   * - tmux: `claude -p - --model ${model} [opts] < ${promptPath}`
+   * - subprocess: `claude -p "${prompt}" --dangerously-skip-permissions --model ${model}`
    */
   buildCommand(
     model: ModelType,
     promptPath: string,
     opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
+    if (this.backend === 'subprocess') {
+      let cmd = `claude -p "${promptPath}" --dangerously-skip-permissions --model ${model}`;
+      if (opts?.allowedTools) {
+        cmd += ` --allowedTools '${opts.allowedTools}'`;
+      }
+      return cmd;
+    }
+
+    // tmux backend (default)
     let cmd = `claude -p - --model ${model}`;
     if (opts?.allowedTools) {
       cmd += ` --allowedTools '${opts.allowedTools}'`;
@@ -166,8 +234,12 @@ export class ClaudeAdapter implements ProviderAdapter {
 
   /**
    * Check whether the tmux session is active.
+   * Only meaningful for tmux backend.
    */
   isSessionActive(): boolean {
+    if (this.backend === 'subprocess') {
+      return true; // subprocess doesn't need tmux session
+    }
     return isSessionActive();
   }
 }
@@ -177,6 +249,9 @@ export class ClaudeAdapter implements ProviderAdapter {
 /**
  * Create a ClaudeAdapter instance for the given project directory.
  */
-export function createClaudeAdapter(projectDir: string): ClaudeAdapter {
-  return new ClaudeAdapter(projectDir);
+export function createClaudeAdapter(
+  projectDir: string,
+  opts?: ClaudeAdapterOptions,
+): ClaudeAdapter {
+  return new ClaudeAdapter(projectDir, opts);
 }

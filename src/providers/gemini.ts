@@ -1,5 +1,6 @@
 import {
   spawn,
+  spawnSync,
   type ChildProcess,
   type SpawnOptions as NodeSpawnOptions,
 } from 'node:child_process';
@@ -23,7 +24,7 @@ const GEMINI_MODELS: readonly GeminiModel[] = [...PROVIDER_MODEL_MAP.gemini] as 
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-/** Auth header name per official Google AI docs */
+/** Auth header name per official Google AI docs (used by REST API fallback) */
 export const GEMINI_AUTH_HEADER = 'x-goog-api-key';
 
 const SAFE_USAGE_DEFAULT: UsageMetrics = {
@@ -31,6 +32,45 @@ const SAFE_USAGE_DEFAULT: UsageMetrics = {
   weeklyPercent: 0,
   measuredAt: new Date().toISOString(),
 };
+
+// ─── Gemini CLI Output Parser ────────────────────────────────────────
+
+/**
+ * Parse stdout from `gemini -p ... --output-format json`.
+ * The Gemini CLI returns structured JSON with the response text and optional usage stats.
+ */
+export function parseGeminiOutput(stdout: string): {
+  response: string;
+  stats?: { inputTokens: number; outputTokens: number };
+} {
+  if (!stdout.trim()) {
+    return { response: '' };
+  }
+
+  try {
+    const parsed = JSON.parse(stdout);
+
+    // Gemini CLI --output-format json typically returns { response, candidates, usageMetadata }
+    const response =
+      parsed?.response ??
+      parsed?.candidates?.[0]?.content?.parts?.[0]?.text ??
+      (typeof parsed === 'string' ? parsed : JSON.stringify(parsed));
+
+    let stats: { inputTokens: number; outputTokens: number } | undefined;
+    const usage = parsed?.usageMetadata;
+    if (usage && typeof usage.promptTokenCount === 'number' && typeof usage.candidatesTokenCount === 'number') {
+      stats = {
+        inputTokens: usage.promptTokenCount,
+        outputTokens: usage.candidatesTokenCount,
+      };
+    }
+
+    return { response, stats };
+  } catch {
+    // If not valid JSON, treat the entire stdout as plain text response
+    return { response: stdout.trim() };
+  }
+}
 
 // ─── Worker Entry ────────────────────────────────────────────────────
 
@@ -46,12 +86,12 @@ interface GeminiWorkerEntry {
 // ─── GeminiAdapter ───────────────────────────────────────────────────
 
 /**
- * GeminiAdapter — ProviderAdapter implementation for Google Gemini API.
+ * GeminiAdapter — ProviderAdapter implementation for Google Gemini CLI.
  *
- * Since Gemini has no standard CLI, this adapter spawns a Node.js subprocess
- * that calls the Google AI API via the built-in fetch API.
- * Auth via x-goog-api-key header per official Google AI docs.
- * Requires GOOGLE_API_KEY environment variable.
+ * Uses the `gemini` CLI binary with `-p` flag for headless/non-interactive mode
+ * and `--output-format json` for structured output parsing.
+ *
+ * Requires: `gemini` CLI installed + GOOGLE_API_KEY or DECKENT_GOOGLE_API_KEY env variable.
  */
 export class GeminiAdapter implements ProviderAdapter {
   readonly name = 'gemini';
@@ -105,18 +145,16 @@ export class GeminiAdapter implements ProviderAdapter {
     const logPath = join(tasksDir, `task-${taskId}.log`);
     const logFd = openSync(logPath, 'a');
 
-    // Build the inline Node.js script that calls the Gemini API
-    // Auth via x-goog-api-key header (per official docs — avoids key in URL/logs)
-    const apiUrl = `${GEMINI_API_BASE}/${model}:generateContent`;
-    const script = this.buildApiScript(apiUrl, apiKey, prompt);
+    // Build args for the Gemini CLI
+    const args = this.buildArgs(model, prompt);
 
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
-      env: { ...process.env },
+      env: { ...process.env, GOOGLE_API_KEY: apiKey },
     };
 
-    const child = spawn('node', ['-e', script], spawnOpts);
+    const child = spawn('gemini', args, spawnOpts);
     closeSync(logFd);
 
     // Write heartbeat
@@ -174,7 +212,22 @@ export class GeminiAdapter implements ProviderAdapter {
   // ─── isAvailable() ─────────────────────────────────────────────────
 
   async isAvailable(): Promise<boolean> {
+    // Check 1: gemini CLI must be installed
+    if (!this.isCliInstalled()) {
+      return false;
+    }
+    // Check 2: API key must be set
     return this.getApiKey() !== undefined;
+  }
+
+  // ─── buildArgs() ───────────────────────────────────────────────────
+
+  /**
+   * Build CLI arguments for `gemini` binary invocation.
+   * Uses `-p` flag for headless/non-interactive mode.
+   */
+  buildArgs(model: ModelType, prompt: string): string[] {
+    return ['-p', prompt, '--output-format', 'json', '--model', model];
   }
 
   // ─── buildCommand() ────────────────────────────────────────────────
@@ -184,13 +237,11 @@ export class GeminiAdapter implements ProviderAdapter {
     promptPath: string,
     _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    const apiKey = this.getApiKey() ?? '<GOOGLE_API_KEY>';
-    const url = `${GEMINI_API_BASE}/${model}:generateContent`;
-    return `curl -s -X POST "${url}" -H "Content-Type: application/json" -H "${GEMINI_AUTH_HEADER}: ${apiKey}" -d @${promptPath}`;
+    return `gemini -p "$(cat ${promptPath})" --output-format json --model ${model}`;
   }
 
   /**
-   * Build a curl command for the streaming endpoint.
+   * Build a curl command for the streaming endpoint (REST API fallback).
    */
   buildStreamCommand(
     model: ModelType,
@@ -205,19 +256,13 @@ export class GeminiAdapter implements ProviderAdapter {
 
   /**
    * Build CLI command + args for planner invocations.
-   * Gemini uses node -e with an inline API script (no CLI binary).
+   * Uses the Gemini CLI binary with -p flag.
    */
   buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      throw new ProviderError(
-        'GOOGLE_API_KEY environment variable is not set',
-        this.name,
-      );
-    }
-    const apiUrl = `${GEMINI_API_BASE}/${model}:generateContent`;
-    const script = this.buildApiScript(apiUrl, apiKey, prompt);
-    return { command: 'node', args: ['-e', script] };
+    return {
+      command: 'gemini',
+      args: this.buildArgs(model, prompt),
+    };
   }
 
   // ─── validateApiKey() ───────────────────────────────────────────────
@@ -245,6 +290,7 @@ export class GeminiAdapter implements ProviderAdapter {
   /**
    * Build inline Node.js script that calls the Gemini REST API via fetch.
    * Auth is sent via x-goog-api-key header per official Google AI docs.
+   * @deprecated Use buildArgs() + Gemini CLI instead. Kept for REST API fallback.
    */
   buildApiScript(apiUrl: string, apiKey: string, prompt: string): string {
     // Escape prompt for embedding in a JS string literal
@@ -276,6 +322,7 @@ export class GeminiAdapter implements ProviderAdapter {
   /**
    * Build inline Node.js script that calls the Gemini streaming API via SSE.
    * Uses streamGenerateContent?alt=sse endpoint per official docs.
+   * @deprecated Use Gemini CLI instead. Kept for REST API fallback.
    */
   buildStreamingApiScript(model: string, apiKey: string, prompt: string): string {
     const escapedPrompt = prompt
@@ -322,12 +369,27 @@ export class GeminiAdapter implements ProviderAdapter {
     ].join('\n');
   }
 
+  /**
+   * Check if the `gemini` CLI binary is installed and accessible.
+   */
+  isCliInstalled(): boolean {
+    try {
+      const result = spawnSync('gemini', ['--version'], {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      return result.status === 0;
+    } catch {
+      return false;
+    }
+  }
+
   private isSupportedModel(model: ModelType): model is GeminiModel {
     return (GEMINI_MODELS as readonly string[]).includes(model);
   }
 
   getApiKey(): string | undefined {
-    return process.env.GOOGLE_API_KEY;
+    return process.env.DECKENT_GOOGLE_API_KEY ?? process.env.GOOGLE_API_KEY;
   }
 
   /**
@@ -365,7 +427,7 @@ export class GeminiAdapter implements ProviderAdapter {
       workerId: `gemini-${taskId}`,
       taskId,
       status,
-      currentAction: 'Gemini API worker running',
+      currentAction: 'Gemini CLI worker running',
       timestamp: new Date().toISOString(),
       filesChangedCount: 0,
       sequence: 0,

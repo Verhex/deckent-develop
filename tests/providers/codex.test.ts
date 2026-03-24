@@ -33,7 +33,6 @@ const mockWriteFileSync = writeFileSync as unknown as MockInstance;
 
 function createMockChildProcess() {
   return {
-    stdin: { write: vi.fn().mockReturnValue(true), end: vi.fn() },
     once: vi.fn().mockReturnThis(),
     kill: vi.fn(),
     pid: 12345,
@@ -98,19 +97,20 @@ describe('CodexAdapter', () => {
   // ─── spawn() ───────────────────────────────────────────────────────
 
   describe('spawn()', () => {
-    it('should spawn codex process with exec subcommand and correct model', () => {
+    it('should spawn codex process with exec --full-auto and correct model', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'test prompt');
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        expect.arrayContaining(['exec', '--model', 'gpt-4.1', '--quiet']),
+        ['exec', '--full-auto', 'test prompt', '--model', 'gpt-4.1'],
         expect.any(Object),
       );
     });
 
-    it('should have exec as the first arg', () => {
+    it('should have exec as the first arg and --full-auto as second', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'test prompt');
       const args = mockSpawn.mock.calls[0][1] as string[];
       expect(args[0]).toBe('exec');
+      expect(args[1]).toBe('--full-auto');
     });
 
     it('should pass o3 model correctly', () => {
@@ -151,10 +151,11 @@ describe('CodexAdapter', () => {
       );
     });
 
-    it('should write prompt to stdin', () => {
+    it('should pass prompt as positional arg (not stdin)', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'hello codex');
-      expect(mockChildProcess.stdin.write).toHaveBeenCalledWith('hello codex', 'utf-8');
-      expect(mockChildProcess.stdin.end).toHaveBeenCalled();
+      const args = mockSpawn.mock.calls[0][1] as string[];
+      expect(args).toContain('hello codex');
+      expect(args[2]).toBe('hello codex');
     });
 
     it('should use opts.projectDir if provided', () => {
@@ -194,13 +195,12 @@ describe('CodexAdapter', () => {
       );
     });
 
-    it('should include --approval-mode full-auto when autoApprove is true', () => {
+    it('should always use --full-auto (autoApprove has no separate effect)', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt', { autoApprove: true });
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'codex',
-        expect.arrayContaining(['--approval-mode', 'full-auto']),
-        expect.any(Object),
-      );
+      const args = mockSpawn.mock.calls[0][1] as string[];
+      expect(args).toContain('--full-auto');
+      // --approval-mode is not used — --full-auto is the Codex CLI equivalent
+      expect(args).not.toContain('--approval-mode');
     });
 
     it('should not include --allowed-tools (not an official Codex CLI flag)', () => {
@@ -299,9 +299,17 @@ describe('CodexAdapter', () => {
       expect(await adapter.isAvailable()).toBe(true);
     });
 
-    it('should return false when OPENAI_API_KEY is missing', async () => {
+    it('should return false when both OPENAI_API_KEY and DECKENT_OPENAI_API_KEY are missing', async () => {
       delete process.env['OPENAI_API_KEY'];
+      delete process.env['DECKENT_OPENAI_API_KEY'];
       expect(await adapter.isAvailable()).toBe(false);
+    });
+
+    it('should return true when only DECKENT_OPENAI_API_KEY is set', async () => {
+      delete process.env['OPENAI_API_KEY'];
+      process.env['DECKENT_OPENAI_API_KEY'] = 'sk-deck-test-123';
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: 'codex 1.0.0', stderr: '' });
+      expect(await adapter.isAvailable()).toBe(true);
     });
 
     it('should return false when codex --version fails', async () => {
@@ -330,9 +338,9 @@ describe('CodexAdapter', () => {
   // ─── buildCommand() ────────────────────────────────────────────────
 
   describe('buildCommand()', () => {
-    it('should build command with exec subcommand and --quiet flag', () => {
+    it('should build command with exec --full-auto and $(cat promptPath)', () => {
       const cmd = adapter.buildCommand('gpt-4.1', '/tmp/prompt.txt');
-      expect(cmd).toBe('codex exec --model gpt-4.1 --quiet < /tmp/prompt.txt');
+      expect(cmd).toBe('codex exec --full-auto "$(cat /tmp/prompt.txt)" --model gpt-4.1');
     });
 
     it('should include correct model in command', () => {
@@ -346,20 +354,21 @@ describe('CodexAdapter', () => {
       expect(cmd).not.toContain('--allowed-tools');
     });
 
-    it('should include --approval-mode full-auto when autoApprove is true', () => {
+    it('should always use --full-auto regardless of autoApprove option', () => {
       const cmd = adapter.buildCommand('o3', '/tmp/p.txt', { autoApprove: true });
-      expect(cmd).toContain('--approval-mode full-auto');
-      expect(cmd).not.toContain('--full-auto');
-    });
-
-    it('should not include --approval-mode when autoApprove is false', () => {
-      const cmd = adapter.buildCommand('o3', '/tmp/p.txt', { autoApprove: false });
+      expect(cmd).toContain('--full-auto');
+      // --approval-mode is not used in the new format
       expect(cmd).not.toContain('--approval-mode');
     });
 
-    it('should use stdin redirection from promptPath', () => {
+    it('should use --full-auto even when autoApprove is false', () => {
+      const cmd = adapter.buildCommand('o3', '/tmp/p.txt', { autoApprove: false });
+      expect(cmd).toContain('--full-auto');
+    });
+
+    it('should use $(cat promptPath) for file-based prompt', () => {
       const cmd = adapter.buildCommand('gpt-4.1', '/path/to/prompt.txt');
-      expect(cmd).toContain('< /path/to/prompt.txt');
+      expect(cmd).toContain('$(cat /path/to/prompt.txt)');
     });
 
     it('should start with codex exec', () => {
@@ -367,13 +376,44 @@ describe('CodexAdapter', () => {
       expect(cmd.startsWith('codex exec ')).toBe(true);
     });
 
-    it('should combine autoApprove with model (allowedTools ignored)', () => {
-      const cmd = adapter.buildCommand('gpt-4.1', '/tmp/p.txt', {
-        allowedTools: 'Read',
-        autoApprove: true,
-      });
-      expect(cmd).not.toContain('--allowed-tools');
-      expect(cmd).toContain('--approval-mode full-auto');
+    it('should not include --quiet (removed in exec format)', () => {
+      const cmd = adapter.buildCommand('gpt-4.1', '/tmp/p.txt');
+      expect(cmd).not.toContain('--quiet');
+    });
+
+    it('should not include stdin redirection (prompt is inline arg)', () => {
+      const cmd = adapter.buildCommand('gpt-4.1', '/tmp/p.txt');
+      expect(cmd).not.toMatch(/ < /);
+    });
+  });
+
+  // ─── buildPlannerCommand() ─────────────────────────────────────────
+
+  describe('buildPlannerCommand()', () => {
+    it('should return command "codex" with exec --full-auto args', () => {
+      const result = adapter.buildPlannerCommand('plan this', 'gpt-4.1');
+      expect(result.command).toBe('codex');
+      expect(result.args).toEqual(['exec', '--full-auto', 'plan this', '--model', 'gpt-4.1']);
+    });
+
+    it('should include the prompt as positional arg', () => {
+      const result = adapter.buildPlannerCommand('my prompt here', 'o3');
+      expect(result.args[2]).toBe('my prompt here');
+    });
+
+    it('should include the model', () => {
+      const result = adapter.buildPlannerCommand('prompt', 'o4-mini');
+      expect(result.args).toContain('o4-mini');
+    });
+  });
+
+  // ─── spawn stdio ─────────────────────────────────────────────────
+
+  describe('spawn stdio', () => {
+    it('should use ignore for stdin (prompt passed as arg, not piped)', () => {
+      adapter.spawn('task-001', 'gpt-4.1', 'prompt');
+      const spawnOpts = mockSpawn.mock.calls[0][2] as NodeJS.ProcessEnv;
+      expect((spawnOpts as any).stdio[0]).toBe('ignore');
     });
   });
 

@@ -143,12 +143,15 @@ describe('detectAvailableProviders', () => {
   });
 
   it('detects Gemini as available when GOOGLE_API_KEY set', async () => {
-    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(1, '') as ReturnType<typeof spawnSync>);
+    vi.mocked(spawnSync).mockImplementation((cmd: string) => {
+      if (cmd === 'gemini') return makeSpawnResult(0, '1.0.0') as ReturnType<typeof spawnSync>;
+      return makeSpawnResult(1, '') as ReturnType<typeof spawnSync>;
+    });
     process.env['GOOGLE_API_KEY'] = 'AIzaSy-test-key';
     const providers = await detectAvailableProviders();
     const gemini = providers.find(p => p.name === 'gemini')!;
     expect(gemini.available).toBe(true);
-    expect(gemini.version).toBeUndefined();
+    expect(gemini.version).toBe('1.0.0');
     expect(gemini.authMethod).toBe('api_key');
   });
 

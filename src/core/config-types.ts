@@ -71,6 +71,8 @@ export interface DeckentConfig {
   provider_overrides?: Record<string, ProviderName>;
   /** Auto-select cheapest capable provider (default: false) */
   cost_optimization?: boolean;
+  /** Claude execution backend: 'tmux' (default), 'subprocess' (headless), 'mcp' (future) */
+  claude_backend?: 'tmux' | 'subprocess' | 'mcp';
   /** Optional API keys (prefer env vars) */
   api_keys?: Record<string, string>;
 

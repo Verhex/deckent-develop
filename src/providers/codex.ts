@@ -93,10 +93,10 @@ export class CodexAdapter implements ProviderAdapter {
     const logPath = opts?.logPath ?? join(tasksDir, `task-${taskId}.log`);
     const logFd = openSync(logPath, 'a');
 
-    const args = this.buildArgs(model, opts);
+    const args = this.buildArgs(model, prompt, opts);
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
-      stdio: ['pipe', logFd, logFd],
+      stdio: ['ignore', logFd, logFd],
       env: { ...process.env },
     };
 
@@ -123,11 +123,7 @@ export class CodexAdapter implements ProviderAdapter {
 
     this.workers.set(taskId, entry);
 
-    // Send prompt via stdin
-    if (child.stdin) {
-      child.stdin.write(prompt, 'utf-8');
-      child.stdin.end();
-    }
+    // Prompt is passed as a positional arg to `codex exec`, no stdin needed.
 
     // Cleanup on exit
     child.once('exit', () => {
@@ -178,14 +174,16 @@ export class CodexAdapter implements ProviderAdapter {
   // ─── isAvailable() ──────────────────────────────────────────────────
 
   /**
-   * Check whether the Codex CLI is available and OPENAI_API_KEY is set.
+   * Check whether the Codex CLI is available and an OpenAI API key is set.
+   * Checks both OPENAI_API_KEY and DECKENT_OPENAI_API_KEY env vars.
    * Note: ChatGPT OAuth login (`codex --login`) is another valid auth path,
    * but we only detect the API key method here for non-interactive use.
    */
   async isAvailable(): Promise<boolean> {
     try {
-      // Check for API key
-      if (!process.env['OPENAI_API_KEY']) {
+      // Check for API key (either standard or deckent-specific)
+      const apiKey = process.env['OPENAI_API_KEY'] ?? process.env['DECKENT_OPENAI_API_KEY'];
+      if (!apiKey) {
         return false;
       }
 
@@ -204,28 +202,34 @@ export class CodexAdapter implements ProviderAdapter {
 
   /**
    * Build the shell command string for running codex CLI.
-   * Format: `codex exec --model {model} --quiet --approval-mode full-auto < {promptPath}`
+   * Format: `codex exec --full-auto "<prompt>" --model <model>`
+   * For file-based prompts, the prompt file content is read and passed as arg.
    */
   buildCommand(
     model: ModelType,
     promptPath: string,
-    opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
+    _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    let cmd = `codex exec --model ${model} --quiet`;
-    if (opts?.autoApprove) {
-      cmd += ' --approval-mode full-auto';
-    }
-    cmd += ` < ${promptPath}`;
-    return cmd;
+    return `codex exec --full-auto "$(cat ${promptPath})" --model ${model}`;
+  }
+
+  // ─── buildPlannerCommand() ──────────────────────────────────────────
+
+  /**
+   * Build CLI command + args for planner invocations using Codex.
+   * Format: codex exec --full-auto <prompt> --model <model>
+   */
+  buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
+    return {
+      command: 'codex',
+      args: ['exec', '--full-auto', prompt, '--model', model],
+    };
   }
 
   // ─── Internal helpers ───────────────────────────────────────────────
 
-  private buildArgs(model: ModelType, opts?: ProviderSpawnOptions): string[] {
-    const args = ['exec', '--model', model, '--quiet'];
-    if (opts?.autoApprove) {
-      args.push('--approval-mode', 'full-auto');
-    }
+  private buildArgs(model: ModelType, prompt: string, _opts?: ProviderSpawnOptions): string[] {
+    const args = ['exec', '--full-auto', prompt, '--model', model];
     return args;
   }
 
