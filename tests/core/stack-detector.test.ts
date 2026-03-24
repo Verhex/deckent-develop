@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
+  readdirSync: vi.fn().mockReturnValue([]),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   statSync: vi.fn(),
@@ -10,7 +11,7 @@ vi.mock('node:fs', () => ({
 }));
 
 import * as fs from 'node:fs';
-import { detectProjectStack, isStackStale, refreshStack } from '../../src/core/stack-detector.js';
+import { detectProjectStack, isStackStale, refreshStack, detectFullStack, STACK_COMMANDS } from '../../src/core/stack-detector.js';
 
 const ROOT = '/test/project';
 
@@ -591,5 +592,365 @@ describe('stack cache integration', () => {
 
     const stack = detectProjectStack(ROOT);
     expect(stack.language).toBe('typescript');
+  });
+});
+
+// ─── Extended Language Detection ──────────────────────────────────────────
+
+describe('detectProjectStack — extended languages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fs.readdirSync).mockReturnValue([]);
+  });
+
+  // ─── Python Extended ────────────────────────────────────────────────────
+
+  it('detects Python when requirements.txt exists', () => {
+    mockFileExistence(['requirements.txt']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('python');
+  });
+
+  it('detects Python when Pipfile exists', () => {
+    mockFileExistence(['Pipfile']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('python');
+  });
+
+  it('detects Django framework via manage.py', () => {
+    mockFileExistence(['pyproject.toml', 'manage.py']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('python');
+    expect(stack.framework).toBe('django');
+  });
+
+  it('detects Flask framework from requirements.txt', () => {
+    mockFileExistence(['requirements.txt']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('requirements.txt')) return 'flask==2.3.0\nrequests==2.28.0';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.framework).toBe('flask');
+  });
+
+  it('detects FastAPI framework from pyproject.toml', () => {
+    mockFileExistence(['pyproject.toml']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('pyproject.toml')) return '[project]\ndependencies = ["fastapi>=0.100"]';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.framework).toBe('fastapi');
+  });
+
+  it('detects pytest via conftest.py for Python', () => {
+    mockFileExistence(['requirements.txt', 'conftest.py']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.testFramework).toBe('pytest');
+  });
+
+  it('falls back to unittest when no pytest indicators for Python', () => {
+    mockFileExistence(['requirements.txt']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('requirements.txt')) return 'requests==2.28.0';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.testFramework).toBe('unittest');
+  });
+
+  // ─── Java ───────────────────────────────────────────────────────────────
+
+  it('detects Java with Maven (pom.xml)', () => {
+    mockFileExistence(['pom.xml']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('pom.xml')) return '<project><dependencies></dependencies></project>';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('java');
+    expect(stack.buildTool).toBe('maven');
+  });
+
+  it('detects Java with Gradle (build.gradle)', () => {
+    mockFileExistence(['build.gradle']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('build.gradle')) return 'apply plugin: "java"';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('java');
+    expect(stack.buildTool).toBe('gradle');
+  });
+
+  it('detects Spring framework from pom.xml', () => {
+    mockFileExistence(['pom.xml']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('pom.xml')) return '<dependency>spring-boot-starter-web</dependency>';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.framework).toBe('spring');
+  });
+
+  it('detects JUnit test framework from pom.xml', () => {
+    mockFileExistence(['pom.xml']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('pom.xml')) return '<dependency>junit-jupiter</dependency>';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.testFramework).toBe('junit');
+  });
+
+  // ─── C/C++ ──────────────────────────────────────────────────────────────
+
+  it('detects C project with CMakeLists.txt (no CXX hints)', () => {
+    mockFileExistence(['CMakeLists.txt']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('CMakeLists.txt')) return 'project(myapp)\nadd_executable(myapp main.c)';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('c');
+    expect(stack.buildTool).toBe('cmake');
+    expect(stack.testFramework).toBe('ctest');
+  });
+
+  it('detects C++ project with CMakeLists.txt with CXX', () => {
+    mockFileExistence(['CMakeLists.txt']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('CMakeLists.txt')) return 'project(myapp CXX)\nadd_executable(myapp main.cpp)';
+      throw new Error('ENOENT');
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('cpp');
+    expect(stack.buildTool).toBe('cmake');
+  });
+
+  it('detects C project with Makefile and .c files', () => {
+    mockFileExistence(['Makefile']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    vi.mocked(fs.readdirSync).mockReturnValue(['main.c', 'util.h'] as unknown as fs.Dirent[]);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('c');
+    expect(stack.buildTool).toBe('make');
+  });
+
+  it('detects C++ project with meson.build', () => {
+    mockFileExistence(['meson.build']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    vi.mocked(fs.readdirSync).mockReturnValue(['main.cpp'] as unknown as fs.Dirent[]);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('cpp');
+    expect(stack.buildTool).toBe('meson');
+  });
+
+  // ─── Go ─────────────────────────────────────────────────────────────────
+
+  it('detects Go test framework when _test.go files exist', () => {
+    mockFileExistence(['go.mod']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    vi.mocked(fs.readdirSync).mockReturnValue(['main.go', 'main_test.go'] as unknown as fs.Dirent[]);
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('go');
+    expect(stack.buildTool).toBe('go');
+    expect(stack.testFramework).toBe('go_test');
+  });
+
+  // ─── Rust ───────────────────────────────────────────────────────────────
+
+  it('detects Rust with cargo_test framework', () => {
+    mockFileExistence(['Cargo.toml']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.language).toBe('rust');
+    expect(stack.buildTool).toBe('cargo');
+    expect(stack.testFramework).toBe('cargo_test');
+  });
+});
+
+// ─── STACK_COMMANDS ───────────────────────────────────────────────────────
+
+describe('STACK_COMMANDS', () => {
+  it('has entries for all expected stacks', () => {
+    expect(STACK_COMMANDS).toHaveProperty('typescript');
+    expect(STACK_COMMANDS).toHaveProperty('python');
+    expect(STACK_COMMANDS).toHaveProperty('java_maven');
+    expect(STACK_COMMANDS).toHaveProperty('java_gradle');
+    expect(STACK_COMMANDS).toHaveProperty('c_cmake');
+    expect(STACK_COMMANDS).toHaveProperty('c_make');
+    expect(STACK_COMMANDS).toHaveProperty('go');
+    expect(STACK_COMMANDS).toHaveProperty('rust');
+  });
+
+  it('each entry has build, test, lint fields', () => {
+    for (const key of Object.keys(STACK_COMMANDS)) {
+      expect(STACK_COMMANDS[key]).toHaveProperty('build');
+      expect(STACK_COMMANDS[key]).toHaveProperty('test');
+      expect(STACK_COMMANDS[key]).toHaveProperty('lint');
+    }
+  });
+
+  it('rust commands are correct', () => {
+    expect(STACK_COMMANDS['rust'].build).toBe('cargo build');
+    expect(STACK_COMMANDS['rust'].test).toBe('cargo test');
+    expect(STACK_COMMANDS['rust'].lint).toBe('cargo clippy');
+  });
+
+  it('go commands are correct', () => {
+    expect(STACK_COMMANDS['go'].build).toBe('go build ./...');
+    expect(STACK_COMMANDS['go'].test).toBe('go test ./...');
+    expect(STACK_COMMANDS['go'].lint).toBe('golangci-lint run');
+  });
+});
+
+// ─── detectFullStack ──────────────────────────────────────────────────────
+
+describe('detectFullStack', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fs.readdirSync).mockReturnValue([]);
+  });
+
+  it('returns commands for TypeScript project', () => {
+    mockFileExistence(['package.json', 'tsconfig.json']);
+    mockPackageJson({}, { typescript: '^5.0.0' });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('typescript');
+    expect(result.commands.build).toBe('npx tsc');
+    expect(result.commands.test).toBe('npx vitest run');
+    expect(result.commands.lint).toBe('npx eslint');
+  });
+
+  it('returns commands for Rust project', () => {
+    mockFileExistence(['Cargo.toml']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('rust');
+    expect(result.commands.build).toBe('cargo build');
+    expect(result.commands.test).toBe('cargo test');
+    expect(result.commands.lint).toBe('cargo clippy');
+  });
+
+  it('returns commands for Go project', () => {
+    mockFileExistence(['go.mod']);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('go');
+    expect(result.commands.build).toBe('go build ./...');
+    expect(result.commands.test).toBe('go test ./...');
+  });
+
+  it('returns commands for Java Maven project', () => {
+    mockFileExistence(['pom.xml']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('pom.xml')) return '<project></project>';
+      throw new Error('ENOENT');
+    });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('java');
+    expect(result.buildTool).toBe('maven');
+    expect(result.commands.build).toBe('mvn compile');
+    expect(result.commands.test).toBe('mvn test');
+  });
+
+  it('returns commands for Java Gradle project', () => {
+    mockFileExistence(['build.gradle']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('build.gradle')) return 'apply plugin: "java"';
+      throw new Error('ENOENT');
+    });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('java');
+    expect(result.buildTool).toBe('gradle');
+    expect(result.commands.build).toBe('gradle build');
+    expect(result.commands.test).toBe('gradle test');
+  });
+
+  it('returns commands for C CMake project', () => {
+    mockFileExistence(['CMakeLists.txt']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('CMakeLists.txt')) return 'project(myapp)\nadd_executable(myapp main.c)';
+      throw new Error('ENOENT');
+    });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('c');
+    expect(result.commands.build).toBe('cmake --build build');
+    expect(result.commands.test).toBe('ctest --test-dir build');
+  });
+
+  it('returns commands for Python project', () => {
+    mockFileExistence(['requirements.txt']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('requirements.txt')) return 'flask==2.3.0';
+      throw new Error('ENOENT');
+    });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('python');
+    expect(result.commands.build).toBe('python -m py_compile');
+    expect(result.commands.test).toBe('pytest');
+    expect(result.commands.lint).toBe('ruff check');
+  });
+
+  it('returns empty commands for unknown language', () => {
+    mockFileExistence([]);
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const result = detectFullStack(ROOT);
+    expect(result.language).toBe('unknown');
+    expect(result.commands.build).toBe('');
+    expect(result.commands.test).toBe('');
+    expect(result.commands.lint).toBe('');
+  });
+
+  it('includes framework and testFramework in result', () => {
+    mockFileExistence(['pom.xml']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('pom.xml')) return '<dependency>spring-boot-starter-web</dependency><dependency>junit</dependency>';
+      throw new Error('ENOENT');
+    });
+
+    const result = detectFullStack(ROOT);
+    expect(result.framework).toBe('spring');
+    expect(result.testFramework).toBe('junit');
   });
 });

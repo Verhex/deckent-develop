@@ -195,10 +195,10 @@ export interface SetupRecommendation {
 }
 
 // ─── Project Analysis ──────────────────────────────────────────────
-export type DetectedFramework = 'react' | 'next' | 'express' | 'nest' | 'vue' | 'angular' | 'svelte' | 'unknown';
-export type DetectedLanguage = 'typescript' | 'javascript' | 'python' | 'rust' | 'mixed' | 'unknown';
-export type DetectedTestFramework = 'vitest' | 'jest' | 'mocha' | 'pytest' | 'unknown';
-export type DetectedBuildTool = 'tsc' | 'vite' | 'webpack' | 'esbuild' | 'turbo' | 'unknown';
+export type DetectedFramework = 'react' | 'next' | 'express' | 'nest' | 'vue' | 'angular' | 'svelte' | 'django' | 'flask' | 'fastapi' | 'spring' | 'unknown';
+export type DetectedLanguage = 'typescript' | 'javascript' | 'python' | 'rust' | 'go' | 'java' | 'c' | 'cpp' | 'mixed' | 'unknown';
+export type DetectedTestFramework = 'vitest' | 'jest' | 'mocha' | 'pytest' | 'unittest' | 'junit' | 'go_test' | 'cargo_test' | 'ctest' | 'unknown';
+export type DetectedBuildTool = 'tsc' | 'vite' | 'webpack' | 'esbuild' | 'turbo' | 'cargo' | 'go' | 'maven' | 'gradle' | 'cmake' | 'make' | 'meson' | 'setuptools' | 'unknown';
 export type DetectedCI = 'github-actions' | 'gitlab-ci' | 'circleci' | 'unknown';
 export type ProjectSize = 'small' | 'medium' | 'large';
 export type MethodologyRecommendation = 'micro-sprint' | 'sprint' | 'agile' | 'hybrid';
