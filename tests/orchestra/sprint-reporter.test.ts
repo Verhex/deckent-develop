@@ -2460,7 +2460,7 @@ describe('autoDraftDecisions', () => {
   it('returns 0 when no new files under src/', () => {
     // Initialize a git repo with a commit so HEAD~1 works
     const { execSync } = require('node:child_process');
-    execSync('git init && git add -A && git commit --allow-empty -m "init" && git commit --allow-empty -m "second"', {
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add -A && git commit --allow-empty -m "init" && git commit --allow-empty -m "second"', {
       cwd: tempDir,
       stdio: 'pipe',
     });
@@ -2471,7 +2471,7 @@ describe('autoDraftDecisions', () => {
 
   it('creates ADR for a truly new directory under src/', () => {
     const { execSync } = require('node:child_process');
-    execSync('git init && git commit --allow-empty -m "init"', {
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit --allow-empty -m "init"', {
       cwd: tempDir,
       stdio: 'pipe',
     });
@@ -2497,7 +2497,7 @@ describe('autoDraftDecisions', () => {
 
   it('ADR numbering continues from last existing ADR', () => {
     const { execSync } = require('node:child_process');
-    execSync('git init && git commit --allow-empty -m "init"', {
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit --allow-empty -m "init"', {
       cwd: tempDir,
       stdio: 'pipe',
     });
@@ -2537,7 +2537,7 @@ describe('autoDraftDecisions', () => {
     const existingDir = join(tempDir, 'src', 'core');
     mkdirSync(existingDir, { recursive: true });
     writeFileSync(join(existingDir, 'old-file.ts'), 'export const old = 1;');
-    execSync('git init && git add -A && git commit -m "init with existing"', {
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git add -A && git commit -m "init with existing"', {
       cwd: tempDir,
       stdio: 'pipe',
     });
@@ -2555,7 +2555,7 @@ describe('autoDraftDecisions', () => {
 
   it('creates DECISIONS.md if it does not exist', () => {
     const { execSync } = require('node:child_process');
-    execSync('git init && git commit --allow-empty -m "init"', {
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit --allow-empty -m "init"', {
       cwd: tempDir,
       stdio: 'pipe',
     });
@@ -2576,7 +2576,7 @@ describe('autoDraftDecisions', () => {
 
   it('ADR entry contains correct format fields', () => {
     const { execSync } = require('node:child_process');
-    execSync('git init && git commit --allow-empty -m "init"', {
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test" && git commit --allow-empty -m "init"', {
       cwd: tempDir,
       stdio: 'pipe',
     });
