@@ -1,40 +1,44 @@
-# Sprint sprint-046 Retrospective
+# Sprint sprint-047 Retrospective
 
 ## Summary
-Completed 8/10 tasks in 38 minutes 24s.
+Completed 0/10 tasks in 40 minutes 8s.
 
 ## Highlights
-- 8 tasks completed on first try
 - No boundary violations detected
-- NO_GO rate improved from 63% to 20%
 
 ## Issues
-- Task 046-001 (Connector Integration into bootstrapProviders) failed — File write permissions denied for all target files (src/o...
-- Task 046-004 (Gemini Adapter — Real CLI Integration) failed
+- Task 047-001 (Open Debt Fix — Connector Integration) failed
+- Task 047-002 (Open Debt Fix — Gemini Adapter .result) failed
+- Task 047-003 (Coverage Hesaplama Fix) failed
+- Task 047-004 (MEMORY.md Decay Tetikleme) failed
+- Task 047-005 (TECH_DEBT Pattern Kök Neden Analizi) failed
+- Task 047-006 (docs/directives Arşiv Analizi) failed
+- Task 047-007 (Stale PATTERNS.md Temizlik) failed
+- Task 047-008 (Sprint Output — Rich Summary Doğrulama) failed
+- Task 047-009 (deckent doctor Genişletme) failed
+- Task 047-010 (Self-Audit Sonuç Raporu) failed
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 8/10 |
-| New test files | 8 |
-| Code changes | +708 / -90 |
-| Sprint time | 38 minutes 24s |
-| NO_GO rate | 20% (2/10) |
-| Coverage | 10.0% |
+| Tasks completed | 0/10 |
+| Sprint time | 40 minutes 8s |
+| NO_GO rate | 100% (10/10) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| generic | 10 | 1 | 7 | 2 | 10% |
+| generic | 10 | 0 | 0 | 10 | 0% |
 
 ## Learnings
-- Connector Integration into bootstrapProviders: failed — investigate root cause
-- Router Integration into Sprint Lifecycle: completed with tech debt — schedule cleanup
-- Codex Adapter — Real CLI Integration: completed with tech debt — schedule cleanup
-- Gemini Adapter — Real CLI Integration: failed — investigate root cause
-- Claude Adapter — MCP Server Mode Option: completed with tech debt — schedule cleanup
-- .deck Secret Loading in Provider Auth: completed with tech debt — schedule cleanup
-- Provider Health in deckent doctor: completed with tech debt — schedule cleanup
-- Environment-Aware deckent init: completed with tech debt — schedule cleanup
-- Sprint 044 Module Smoke Tests: completed with tech debt — schedule cleanup
+- Open Debt Fix — Connector Integration: failed — investigate root cause
+- Open Debt Fix — Gemini Adapter .result: failed — investigate root cause
+- Coverage Hesaplama Fix: failed — investigate root cause
+- MEMORY.md Decay Tetikleme: failed — investigate root cause
+- TECH_DEBT Pattern Kök Neden Analizi: failed — investigate root cause
+- docs/directives Arşiv Analizi: failed — investigate root cause
+- Stale PATTERNS.md Temizlik: failed — investigate root cause
+- Sprint Output — Rich Summary Doğrulama: failed — investigate root cause
+- deckent doctor Genişletme: failed — investigate root cause
+- Self-Audit Sonuç Raporu: failed — investigate root cause

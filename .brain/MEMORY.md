@@ -133,3 +133,14 @@
 - Provider Health in deckent doctor: GO_WITH_TECH_DEBT
 - Environment-Aware deckent init: GO_WITH_TECH_DEBT
 - Sprint 044 Module Smoke Tests: GO_WITH_TECH_DEBT
+## Sprint sprint-047 Learnings
+- Open Debt Fix — Connector Integration: NO_GO
+- Open Debt Fix — Gemini Adapter .result: NO_GO
+- Coverage Hesaplama Fix: NO_GO
+- MEMORY.md Decay Tetikleme: NO_GO
+- TECH_DEBT Pattern Kök Neden Analizi: NO_GO
+- docs/directives Arşiv Analizi: NO_GO
+- Stale PATTERNS.md Temizlik: NO_GO
+- Sprint Output — Rich Summary Doğrulama: NO_GO
+- deckent doctor Genişletme: NO_GO
+- Self-Audit Sonuç Raporu: NO_GO

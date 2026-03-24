@@ -1084,3 +1084,34 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 046-010: Sprint 044 Module Smoke Tests (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 47 — sprint-047
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-24
+**Duration:** 2408s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 10 |
+| Coverage | 0.0% |
+| Duration | 2407617ms |
+
+### Tasks
+
+- 047-001: Open Debt Fix — Connector Integration (NO_GO)
+- 047-002: Open Debt Fix — Gemini Adapter .result (NO_GO)
+- 047-003: Coverage Hesaplama Fix (NO_GO)
+- 047-004: MEMORY.md Decay Tetikleme (NO_GO)
+- 047-005: TECH_DEBT Pattern Kök Neden Analizi (NO_GO)
+- 047-006: docs/directives Arşiv Analizi (NO_GO)
+- 047-007: Stale PATTERNS.md Temizlik (NO_GO)
+- 047-008: Sprint Output — Rich Summary Doğrulama (NO_GO)
+- 047-009: deckent doctor Genişletme (NO_GO)
+- 047-010: Self-Audit Sonuç Raporu (NO_GO)
+
+---

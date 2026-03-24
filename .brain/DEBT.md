@@ -14,5 +14,5 @@
 | debt-046-007 | Tech debt from 046-007: Added getProviderInstallHint, buildConnectorHealthResult | 046-007 | sprint-046 | NORMAL | 0 | true | sprint-046 | 2026-03-24T12:28:26.924Z |
 | debt-046-009 | Tech debt from 046-009: Added runDoctorChecks call to registerInit action in ini | 046-009 | sprint-046 | NORMAL | 0 | true | sprint-046 | 2026-03-24T12:28:26.925Z |
 | debt-046-010 | Tech debt from 046-010: Integration test file already existed and contained 17 p | 046-010 | sprint-046 | NORMAL | 0 | true | sprint-046 | 2026-03-24T12:28:26.926Z |
-| debt-046-001-fix | Tech debt from 046-001-fix: Connector integration into bootstrapProviders comple | 046-001-fix | sprint-046 | NORMAL | 1 | false | - | 2026-03-24T12:36:45.192Z |
-| debt-046-004-fix | Tech debt from 046-004-fix: Gemini adapter already fully implements DIRECTIVES T | 046-004-fix | sprint-046 | NORMAL | 1 | false | - | 2026-03-24T12:36:45.193Z |
+| debt-046-001-fix | Tech debt from 046-001-fix: Connector integration into bootstrapProviders comple | 046-001-fix | sprint-046 | HIGH | 2 | false | - | 2026-03-24T12:36:45.192Z |
+| debt-046-004-fix | Tech debt from 046-004-fix: Gemini adapter already fully implements DIRECTIVES T | 046-004-fix | sprint-046 | HIGH | 2 | false | - | 2026-03-24T12:36:45.193Z |
