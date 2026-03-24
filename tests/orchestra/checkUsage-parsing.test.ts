@@ -44,6 +44,27 @@ vi.mock('../../src/agents/worker.js', () => ({
   releaseAllLocks: vi.fn(),
 }));
 
+vi.mock('../../src/core/provider.js', () => ({
+  providerRegistry: {
+    getDefault: vi.fn().mockReturnValue({
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+    }),
+    registerProvider: vi.fn(),
+    getProvider: vi.fn(),
+    listProviders: vi.fn().mockReturnValue([]),
+    hasProvider: vi.fn().mockReturnValue(false),
+    unregisterProvider: vi.fn().mockReturnValue(false),
+    clear: vi.fn(),
+    setDefault: vi.fn(),
+    size: 0,
+  },
+  ProviderError: class ProviderError extends Error {},
+  ProviderNotFoundError: class ProviderNotFoundError extends Error {},
+  ProviderUnavailableError: class ProviderUnavailableError extends Error {},
+  getProviderForModel: vi.fn().mockReturnValue('claude'),
+}));
+
 import { spawnSync } from 'node:child_process';
 import { checkUsage, adjustSprintSize } from '../../src/orchestra/brain.js';
 

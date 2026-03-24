@@ -163,20 +163,24 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
   safetyBranchExists: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('../../src/core/provider.js', () => ({
-  providerRegistry: {
-    getDefault: vi.fn().mockReturnValue(null),
-    registerProvider: vi.fn(),
-    getProvider: vi.fn().mockImplementation((name: string) => {
-      throw new Error(`Provider not found: "${name}"`);
-    }),
-    hasProvider: vi.fn().mockReturnValue(false),
-    listProviders: vi.fn().mockReturnValue([]),
-    register: vi.fn(),
-    get: vi.fn(),
-    list: vi.fn().mockReturnValue([]),
-  },
-}));
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/provider.js')>();
+  return {
+    ...actual,
+    providerRegistry: {
+      getDefault: vi.fn().mockReturnValue(null),
+      registerProvider: vi.fn(),
+      getProvider: vi.fn().mockImplementation((name: string) => {
+        throw new Error(`Provider not found: "${name}"`);
+      }),
+      hasProvider: vi.fn().mockReturnValue(false),
+      listProviders: vi.fn().mockReturnValue([]),
+      register: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+    },
+  };
+});
 
 vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn().mockResolvedValue(undefined),
@@ -247,7 +251,7 @@ import {
   spawnWorkers,
   resolveTaskProvider,
   isTmuxProvider,
-  DEFAULT_USAGE_CLI,
+  resolveDefaultUsageCli,
 } from '../../src/orchestra/sprint-controller.js';
 
 import type {
@@ -328,6 +332,13 @@ function makeConfig(thresholds = { '5hr': 0.8, weekly: 0.9 }): ResolvedConfig {
 }
 
 function mockClaudeUsage(fiveHrPercent: number, weeklyPercent: number): void {
+  // Set up provider registry so checkUsage can resolve a CLI binary
+  const mockAdapter = {
+    name: 'claude',
+    buildCommand: vi.fn().mockReturnValue('claude -p /dev/null'),
+  };
+  mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
+
   mockedSpawnSync.mockReturnValue({
     status: 0,
     stdout: `5hr: ${fiveHrPercent}%\nweekly: ${weeklyPercent}%`,
@@ -858,6 +869,12 @@ describe('checkUsage', () => {
   });
 
   it('returns parsed usage when CLI succeeds', () => {
+    const mockAdapter = {
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude -p /dev/null'),
+    };
+    mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
+
     mockedSpawnSync.mockReturnValue({
       status: 0,
       stdout: '5hr: 42.5%\nweekly: 18.3%',
@@ -918,28 +935,19 @@ describe('checkUsage', () => {
     );
   });
 
-  it('falls back to DEFAULT_USAGE_CLI when no adapter registered', () => {
+  it('returns SAFE_DEFAULT when no adapter registered', () => {
     mockedProviderRegistry.getDefault.mockImplementation(() => {
       throw new Error('No providers registered');
     });
 
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: '5hr: 30%\nweekly: 20%',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
     const config = makeConfig();
-    checkUsage(config);
+    const result = checkUsage(config);
 
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      DEFAULT_USAGE_CLI,
-      ['-p', '/usage'],
-      expect.any(Object),
-    );
+    // No spawnSync call should be made when no provider is available
+    expect(mockedSpawnSync).not.toHaveBeenCalled();
+    // Should return safe default values
+    expect(result.fiveHourPercent).toBe(50);
+    expect(result.weeklyPercent).toBe(30);
   });
 });
 
@@ -1043,13 +1051,12 @@ describe('resolveTaskProvider', () => {
     expect(resolveTaskProvider(task)).toBe('codex');
   });
 
-  it('falls back to claude when registry is empty and model unknown', () => {
-    // Last resort: 'claude' is the built-in ProviderName default
+  it('throws ProviderError when registry is empty and model unknown', () => {
     mockedProviderRegistry.getDefault.mockImplementation(() => {
       throw new Error('No providers registered');
     });
     const task = makeTask({ model: 'unknown-model' as any });
-    expect(resolveTaskProvider(task)).toBe('claude');
+    expect(() => resolveTaskProvider(task)).toThrow(/No providers registered/);
   });
 });
 
@@ -1069,12 +1076,23 @@ describe('isTmuxProvider', () => {
   });
 });
 
-// ═══ DEFAULT_USAGE_CLI ═══════════════════════════════════════════
+// ═══ resolveDefaultUsageCli ═══════════════════════════════════════
 
-describe('DEFAULT_USAGE_CLI', () => {
-  it('is exported as a string constant', () => {
-    expect(typeof DEFAULT_USAGE_CLI).toBe('string');
-    expect(DEFAULT_USAGE_CLI).toBe('claude');
+describe('resolveDefaultUsageCli', () => {
+  it('returns undefined when no provider is registered', () => {
+    mockedProviderRegistry.getDefault.mockImplementation(() => {
+      throw new Error('No providers registered');
+    });
+    expect(resolveDefaultUsageCli()).toBeUndefined();
+  });
+
+  it('returns CLI binary from default provider', () => {
+    const mockAdapter = {
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude -p /dev/null'),
+    };
+    mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
+    expect(resolveDefaultUsageCli()).toBe('claude');
   });
 });
 
@@ -1407,14 +1425,14 @@ describe('sprint-controller provider decoupling', () => {
     expect(source).not.toMatch(/provider\s*!==\s*'claude'/);
   });
 
-  it('checkUsage uses DEFAULT_USAGE_CLI constant instead of inline string', async () => {
+  it('checkUsage uses resolveDefaultUsageCli instead of hardcoded string', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
     const source = actualFs.readFileSync(
       new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
       'utf-8',
     );
-    // The checkUsage function should reference cliBinary variable, not inline 'claude'
-    expect(source).toContain('DEFAULT_USAGE_CLI');
+    // The checkUsage function should use resolveDefaultUsageCli() to get CLI binary
+    expect(source).toContain('resolveDefaultUsageCli');
     // The spawnSync call inside checkUsage should use cliBinary, not a literal
     expect(source).toContain('spawnSync(cliBinary,');
   });

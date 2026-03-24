@@ -55,6 +55,24 @@ vi.mock('../../src/orchestra/planner.js', () => ({
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock('../../src/core/provider.js', () => ({
+  providerRegistry: {
+    getDefault: vi.fn().mockReturnValue({
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+      checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 10, measuredAt: new Date().toISOString() }),
+      isAvailable: vi.fn().mockResolvedValue(true),
+    }),
+    registerProvider: vi.fn(),
+    getProvider: vi.fn(),
+    listProviders: vi.fn().mockReturnValue([]),
+    hasProvider: vi.fn().mockReturnValue(false),
+    setDefault: vi.fn(),
+  },
+  ProviderError: class ProviderError extends Error {},
+  getProviderForModel: vi.fn().mockReturnValue('claude'),
+}));
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';

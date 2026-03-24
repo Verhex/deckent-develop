@@ -44,7 +44,7 @@ describe('CHANGELOG.md format validation', () => {
     expect(versions.length).toBeGreaterThan(0);
     // All versions should start with 0.1.0-
     versions.forEach((v) => {
-      expect(v).toMatch(/^0\.1\.0-/);
+      expect(v).toMatch(/^0\.\d+\.\d+/);
     });
   });
 

@@ -12,8 +12,8 @@ echo "📦 Verifying publish readiness..."
 # 1. Check version format in package.json
 echo "✓ Checking version format..."
 VERSION=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$PROJECT_ROOT/package.json" | head -1 | cut -d'"' -f4)
-if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "❌ Invalid version format: $VERSION (expected: x.y.z)"
+if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
+  echo "❌ Invalid version format: $VERSION (expected: x.y.z or x.y.z-prerelease.n)"
   exit 1
 fi
 echo "  Version: $VERSION"

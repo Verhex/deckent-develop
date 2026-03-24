@@ -283,7 +283,9 @@ describe('updateProjectIdentity', () => {
     const content = readIdentityFile(root);
     expect(content).toContain('- Last Sprint: sprint-003');
     expect(content).toContain('- Total Sprints: 3');
-    expect(content).toContain('- Test Count: 15');
+    // Test count is now determined by countProjectTestCases() scanning actual test files.
+    // The temp dir has no tests/ directory, so count is 0.
+    expect(content).toContain('- Test Count: 0');
     expect(content).not.toContain('- Last Sprint: sprint-002');
     expect(content).not.toContain('- Last Sprint: sprint-001');
   });

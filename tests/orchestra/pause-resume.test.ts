@@ -108,6 +108,22 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   updateProjectDocs: vi.fn(),
 }));
 
+vi.mock('../../src/core/provider.js', () => ({
+  providerRegistry: {
+    getDefault: vi.fn().mockReturnValue({
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+    }),
+    registerProvider: vi.fn(),
+    getProvider: vi.fn(),
+    listProviders: vi.fn().mockReturnValue([]),
+    hasProvider: vi.fn().mockReturnValue(false),
+    setDefault: vi.fn(),
+  },
+  ProviderError: class ProviderError extends Error {},
+  getProviderForModel: vi.fn().mockReturnValue('claude'),
+}));
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { updateDashboard } from '../../src/monitor/auditor.js';

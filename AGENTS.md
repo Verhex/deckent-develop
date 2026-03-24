@@ -13,6 +13,12 @@
 - Auditor: src/monitor/auditor.ts (monitoring, boundary scanning)
 - Config: brain_planning = 'ai' | 'structured' | 'auto'
 
+## Providers
+- Default: Claude (tmux backend, session auth)
+- Optional: Codex (set OPENAI_API_KEY), Gemini (set GOOGLE_API_KEY)
+- Config: brain_provider, worker_provider, fallback_provider in .deckent/config.json
+- Model equivalence: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash, haiku↔gpt-5-mini↔gemini-2.0-flash
+
 ## Commands
 Build: tsc
 Test: npx vitest run

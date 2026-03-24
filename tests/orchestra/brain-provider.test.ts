@@ -94,7 +94,10 @@ vi.mock('../../src/core/provider.js', async (importOriginal) => {
   return {
     ...actual,
     providerRegistry: {
-      getDefault: vi.fn().mockImplementation(() => { throw new Error('No providers registered'); }),
+      getDefault: vi.fn().mockReturnValue({
+        name: 'claude',
+        buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+      }),
       registerProvider: vi.fn(),
       getProvider: vi.fn(),
       listProviders: vi.fn().mockReturnValue([]),
@@ -551,6 +554,16 @@ describe('SpawnBackendFactory re-export', () => {
 });
 
 describe('checkUsage (existing sync implementation)', () => {
+  beforeEach(() => {
+    // Restore provider mock so resolveDefaultUsageCli() returns 'claude'
+    vi.mocked(providerRegistry.getDefault).mockReturnValue({
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+      checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 10, measuredAt: new Date().toISOString() }),
+      isAvailable: vi.fn().mockResolvedValue(true),
+    } as never);
+  });
+
   it('returns safe defaults when spawnSync fails', () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: 'error', pid: 1, signal: null, output: [] } as never);
     const config = makeConfig();

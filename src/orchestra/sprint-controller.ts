@@ -48,7 +48,7 @@ import { UsageTracker } from '../core/usage-tracker.js';
 
 // ─── Core — provider abstraction ──────────────────────────────────
 import type { ProviderAdapter } from '../core/provider.js';
-import { providerRegistry } from '../core/provider.js';
+import { providerRegistry, ProviderError } from '../core/provider.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -274,11 +274,20 @@ export function readContext(projectRoot: string): BrainContext {
 }
 
 /**
- * The default CLI command used for usage checks when no provider adapter is available.
- * Extracted as a constant to avoid hardcoded provider name strings inline.
+ * Resolve the CLI binary from the default provider in the registry.
+ * Returns undefined if no provider is registered.
  * @internal
  */
-export const DEFAULT_USAGE_CLI = 'claude';
+export function resolveDefaultUsageCli(): string | undefined {
+  try {
+    const defaultAdapter = providerRegistry.getDefault();
+    const cmdStr = defaultAdapter.buildCommand('opus' as ModelType, '/dev/null');
+    const firstToken = cmdStr.split(/\s+/)[0];
+    return firstToken || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Check current API usage by invoking the default provider CLI synchronously.
@@ -293,16 +302,9 @@ export const DEFAULT_USAGE_CLI = 'claude';
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
   const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
   try {
-    // Determine CLI binary: try default provider's CLI, else DEFAULT_USAGE_CLI
-    let cliBinary = DEFAULT_USAGE_CLI;
-    try {
-      const defaultAdapter = providerRegistry.getDefault();
-      const cmdStr = defaultAdapter.buildCommand('opus' as ModelType, '/dev/null');
-      const firstToken = cmdStr.split(/\s+/)[0];
-      if (firstToken) cliBinary = firstToken;
-    } catch {
-      // No provider registered — use DEFAULT_USAGE_CLI
-    }
+    // Determine CLI binary from provider registry; skip usage check if none available
+    const cliBinary = resolveDefaultUsageCli();
+    if (!cliBinary) return SAFE_DEFAULT;
     const result = spawnSync(cliBinary, ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000 });
     if (result.status !== 0 || !result.stdout) return SAFE_DEFAULT;
 
@@ -788,8 +790,7 @@ export function resolveTaskProvider(task: Task): ProviderName {
     try {
       return providerRegistry.getDefault().name as ProviderName;
     } catch {
-      // No providers registered — 'claude' is the ProviderName type default
-      return 'claude';
+      throw new ProviderError(`No providers registered and model '${task.model}' is unrecognized — cannot resolve provider`, 'unknown');
     }
   }
 }

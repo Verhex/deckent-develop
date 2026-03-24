@@ -807,6 +807,86 @@ export function generateProjectIdentity(info: ProjectIdentityInfo): string {
 }
 
 /**
+ * Count real test cases by scanning test files for it()/test() calls.
+ * Returns the total number of test cases found in tests/ directory.
+ */
+export function countProjectTestCases(projectRoot: string): number {
+  const testsDir = join(projectRoot, 'tests');
+  if (!existsSync(testsDir)) return 0;
+
+  let totalTests = 0;
+  const testPattern = /\b(?:it|test)\s*\(/g;
+
+  function scanDir(dir: string): void {
+    try {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          scanDir(fullPath);
+        } else if (entry.name.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/)) {
+          try {
+            const content = readFileSync(fullPath, 'utf-8');
+            const matches = content.match(testPattern);
+            if (matches) totalTests += matches.length;
+          } catch { /* skip unreadable files */ }
+        }
+      }
+    } catch { /* skip unreadable directories */ }
+  }
+
+  scanDir(testsDir);
+  return totalTests;
+}
+
+/**
+ * Parse statement coverage percentage from coverage/clover.xml if it exists.
+ * Returns the coverage percentage (0-100), or null if unavailable.
+ */
+export function parseCoverageFromClover(projectRoot: string): number | null {
+  const cloverPath = join(projectRoot, 'coverage', 'clover.xml');
+  if (!existsSync(cloverPath)) return null;
+
+  try {
+    const xml = readFileSync(cloverPath, 'utf-8');
+    // Find the project-level <metrics> element (first one after <project>)
+    const projectMetrics = xml.match(/<project[^>]*>[\s\S]*?<metrics\s([^/]*?)\/>/);
+    if (!projectMetrics) return null;
+
+    const attrs = projectMetrics[1] ?? '';
+    const statementsMatch = attrs.match(/statements="(\d+)"/);
+    const coveredMatch = attrs.match(/coveredstatements="(\d+)"/);
+    if (!statementsMatch || !coveredMatch) return null;
+
+    const total = parseInt(statementsMatch[1] ?? '0', 10);
+    const covered = parseInt(coveredMatch[1] ?? '0', 10);
+    if (total === 0) return 0;
+
+    return (covered / total) * 100;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract sprint number from sprint ID string (e.g., "sprint-042" → 42).
+ */
+export function extractSprintNumber(sprintId: string): number | null {
+  const match = sprintId.match(/sprint-0*(\d+)/);
+  if (!match) return null;
+  return parseInt(match[1] ?? '0', 10);
+}
+
+/**
+ * Read the previous "Completed Tasks" value from PROJECT-IDENTITY.md.
+ */
+function readPreviousCompletedTasks(content: string): number {
+  const match = content.match(/- Completed Tasks:\s*(\d+)/);
+  if (!match) return 0;
+  return parseInt(match[1] ?? '0', 10);
+}
+
+/**
  * Update the "Current State" section of PROJECT-IDENTITY.md after each sprint.
  * Preserves all other sections. Creates the file with defaults if missing.
  * @param projectRoot - Project root directory
@@ -826,13 +906,27 @@ export function updateProjectIdentity(
 
   let content = readFileSafe(filePath);
 
+  // Gather real project stats
+  const realTestCount = countProjectTestCases(projectRoot);
+  const realCoverage = parseCoverageFromClover(projectRoot);
+  const coverageValue = realCoverage !== null ? realCoverage : metrics.coveragePercent;
+
+  // Total sprints: prefer sprint ID number, fallback to file count, then parameter
+  const sprintNumber = extractSprintNumber(sprintId);
+  const resolvedTotalSprints = sprintNumber ?? totalSprints ?? 1;
+
+  // Completed tasks: accumulate from previous value + current sprint
+  const previousCompleted = readPreviousCompletedTasks(content);
+  const cumulativeCompleted = previousCompleted + metrics.completedTasks;
+
   // If file doesn't exist, create a minimal one
   if (!content) {
     const dirName = projectRoot.split(/[\\/]/).pop() ?? 'unknown';
     content = generateProjectIdentity({
       projectName: dirName,
       sprintId,
-      totalSprints: totalSprints ?? 1,
+      totalSprints: resolvedTotalSprints,
+      testCount: realTestCount,
     });
     writeFileSync(filePath, content, 'utf-8');
     return;
@@ -844,6 +938,10 @@ export function updateProjectIdentity(
   let inCurrentState = false;
   let replacedCurrentState = false;
 
+  const stateLines = buildCurrentStateLines(
+    realTestCount, coverageValue, sprintId, resolvedTotalSprints, cumulativeCompleted, metrics.noGoRate,
+  );
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
 
@@ -851,12 +949,7 @@ export function updateProjectIdentity(
       inCurrentState = true;
       replacedCurrentState = true;
       newLines.push('## Current State');
-      newLines.push(`- Test Count: ${metrics.totalTasks}`);
-      newLines.push(`- Coverage: ${metrics.coveragePercent.toFixed(1)}%`);
-      newLines.push(`- Last Sprint: ${sprintId}`);
-      if (totalSprints !== undefined) newLines.push(`- Total Sprints: ${totalSprints}`);
-      newLines.push(`- Completed Tasks: ${metrics.completedTasks}`);
-      newLines.push(`- No-Go Rate: ${metrics.noGoRate.toFixed(1)}%`);
+      newLines.push(...stateLines);
       continue;
     }
 
@@ -877,16 +970,30 @@ export function updateProjectIdentity(
     // Section didn't exist, append it
     newLines.push('');
     newLines.push('## Current State');
-    newLines.push(`- Test Count: ${metrics.totalTasks}`);
-    newLines.push(`- Coverage: ${metrics.coveragePercent.toFixed(1)}%`);
-    newLines.push(`- Last Sprint: ${sprintId}`);
-    if (totalSprints !== undefined) newLines.push(`- Total Sprints: ${totalSprints}`);
-    newLines.push(`- Completed Tasks: ${metrics.completedTasks}`);
-    newLines.push(`- No-Go Rate: ${metrics.noGoRate.toFixed(1)}%`);
+    newLines.push(...stateLines);
     newLines.push('');
   }
 
   writeFileSync(filePath, newLines.join('\n'), 'utf-8');
+}
+
+/** Build the lines for the "Current State" section. */
+function buildCurrentStateLines(
+  testCount: number,
+  coveragePercent: number,
+  sprintId: string,
+  totalSprints: number,
+  completedTasks: number,
+  noGoRate: number,
+): string[] {
+  return [
+    `- Test Count: ${testCount}`,
+    `- Coverage: ${coveragePercent.toFixed(1)}%`,
+    `- Last Sprint: ${sprintId}`,
+    `- Total Sprints: ${totalSprints}`,
+    `- Completed Tasks: ${completedTasks}`,
+    `- No-Go Rate: ${noGoRate.toFixed(1)}%`,
+  ];
 }
 
 // ═══ Human-Friendly Sprint Complete ══════════════════════════════

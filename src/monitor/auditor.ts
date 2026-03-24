@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, normalize } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from '../core/types.js';
+import { AgentStatus, AlertLevel, SprintPhase, SprintStatus, TaskStatus } from '../core/types.js';
 import type {
   Heartbeat,
   LockInfo,
@@ -82,19 +82,36 @@ export function scanHeartbeats(projectRoot: string): {
     if (isNaN(parsedTime)) continue; // malformed timestamp — skip, do not mark as stale
     const elapsed = currentTime - parsedTime;
     if (elapsed > HEARTBEAT_STALE_THRESHOLD_MS) {
-      staleAgents.push({
-        type: 'stale_heartbeat',
-        agentId: hb.workerId,
-        detail: `Heartbeat stale for ${Math.round(elapsed / 1000)}s (task: ${hb.taskId})`,
-        timestamp: now(),
-      });
-      alerts.push(
-        createAlert(
-          AlertLevel.CRITICAL,
-          `Stale agent detected: ${hb.workerId} (task: ${hb.taskId})`,
-          hb.workerId,
-        ),
-      );
+      // Check if the worker's task is already completed (DONE or NO_GO).
+      // Completed workers stop updating heartbeats — this is expected, not a real stale agent.
+      const taskFilePath = join(tasksDir, `task-${hb.taskId}.json`);
+      const task = readJsonSafe<Task>(taskFilePath);
+      const isCompleted = task?.status === TaskStatus.DONE || task?.status === TaskStatus.NO_GO;
+
+      if (isCompleted) {
+        // Downgrade to WARNING — worker finished its task, stale heartbeat is expected
+        alerts.push(
+          createAlert(
+            AlertLevel.WARNING,
+            `Stale heartbeat from completed worker: ${hb.workerId} (task: ${hb.taskId}, status: ${task?.status})`,
+            hb.workerId,
+          ),
+        );
+      } else {
+        staleAgents.push({
+          type: 'stale_heartbeat',
+          agentId: hb.workerId,
+          detail: `Heartbeat stale for ${Math.round(elapsed / 1000)}s (task: ${hb.taskId})`,
+          timestamp: now(),
+        });
+        alerts.push(
+          createAlert(
+            AlertLevel.CRITICAL,
+            `Stale agent detected: ${hb.workerId} (task: ${hb.taskId})`,
+            hb.workerId,
+          ),
+        );
+      }
     }
   }
 

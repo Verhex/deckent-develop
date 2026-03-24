@@ -156,11 +156,21 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
 
 vi.mock('../../src/core/provider.js', () => ({
   providerRegistry: {
-    getDefault: vi.fn().mockReturnValue(null),
+    getDefault: vi.fn().mockReturnValue({
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+    }),
     register: vi.fn(),
     get: vi.fn(),
     list: vi.fn().mockReturnValue([]),
+    registerProvider: vi.fn(),
+    getProvider: vi.fn(),
+    listProviders: vi.fn().mockReturnValue([]),
+    hasProvider: vi.fn().mockReturnValue(false),
+    setDefault: vi.fn(),
   },
+  ProviderError: class ProviderError extends Error {},
+  getProviderForModel: vi.fn().mockReturnValue('claude'),
 }));
 
 // ─── Imports (after mocks) ───────────────────────────────────────────

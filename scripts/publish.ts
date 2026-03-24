@@ -99,8 +99,10 @@ export function readVersion(projectRoot: string): string {
  * Bump version string based on bump type.
  */
 export function bumpVersion(currentVersion: string, bumpType: BumpType): string {
-  const parts = currentVersion.split('.');
-  if (parts.length !== 3) {
+  // Strip pre-release/build metadata before parsing (e.g., 0.2.0-beta.1 → 0.2.0)
+  const coreVersion = currentVersion.replace(/-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/, '').replace(/\+.*$/, '');
+  const parts = coreVersion.split('.');
+  if (parts.length !== 3 || parts.some(p => isNaN(Number(p)))) {
     throw new Error(`Invalid version format: ${currentVersion}`);
   }
 

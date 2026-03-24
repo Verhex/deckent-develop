@@ -94,7 +94,11 @@ describe('scanHeartbeats — edge cases', () => {
     const stale = new Date(Date.now() - 200_000).toISOString();
     mockedReadFileSync
       .mockReturnValueOnce(JSON.stringify(makeHb('w1', 'task-001', stale)) as never)
-      .mockReturnValueOnce(JSON.stringify(makeHb('w2', 'task-002', stale)) as never);
+      // task JSON read for task-001 — simulate missing file (throws ENOENT)
+      .mockImplementationOnce(() => { throw new Error('ENOENT'); })
+      .mockReturnValueOnce(JSON.stringify(makeHb('w2', 'task-002', stale)) as never)
+      // task JSON read for task-002 — simulate missing file (throws ENOENT)
+      .mockImplementationOnce(() => { throw new Error('ENOENT'); });
 
     const result = scanHeartbeats('/project');
 

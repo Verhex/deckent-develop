@@ -23,6 +23,10 @@ import {
   buildWhatWentWell,
   buildWhatNeedsAttention,
   formatHumanSprintComplete,
+  updateProjectIdentity,
+  countProjectTestCases,
+  parseCoverageFromClover,
+  extractSprintNumber,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
@@ -1844,5 +1848,304 @@ describe('writeRetrospective reads patterns and debt', () => {
     writeRetrospective(tempDir, sprint, evals, metrics, undefined, undefined, undefined, [makeResult()]);
     const retro = readFileSync(join(brainDir, 'RETRO.md'), 'utf-8');
     expect(retro).toContain('Unhandled edge case in planner');
+  });
+});
+
+// ═══ countProjectTestCases ═══════════════════════════════════════════
+
+describe('countProjectTestCases', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it('returns 0 when tests/ directory does not exist', () => {
+    expect(countProjectTestCases(tempDir)).toBe(0);
+  });
+
+  it('counts it() calls in test files', () => {
+    const testsDir = join(tempDir, 'tests');
+    mkdirSync(testsDir, { recursive: true });
+    writeFileSync(join(testsDir, 'foo.test.ts'), `
+      describe('foo', () => {
+        it('does A', () => {});
+        it('does B', () => {});
+        it('does C', () => {});
+      });
+    `);
+    expect(countProjectTestCases(tempDir)).toBe(3);
+  });
+
+  it('counts test() calls in test files', () => {
+    const testsDir = join(tempDir, 'tests');
+    mkdirSync(testsDir, { recursive: true });
+    writeFileSync(join(testsDir, 'bar.test.ts'), `
+      test('alpha', () => {});
+      test('beta', () => {});
+    `);
+    expect(countProjectTestCases(tempDir)).toBe(2);
+  });
+
+  it('counts mixed it() and test() calls', () => {
+    const testsDir = join(tempDir, 'tests');
+    mkdirSync(testsDir, { recursive: true });
+    writeFileSync(join(testsDir, 'mix.test.ts'), `
+      it('one', () => {});
+      test('two', () => {});
+      it('three', () => {});
+    `);
+    expect(countProjectTestCases(tempDir)).toBe(3);
+  });
+
+  it('scans nested directories', () => {
+    const nested = join(tempDir, 'tests', 'sub', 'deep');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(join(nested, 'deep.test.ts'), `
+      it('nested test', () => {});
+    `);
+    expect(countProjectTestCases(tempDir)).toBe(1);
+  });
+
+  it('ignores non-test files', () => {
+    const testsDir = join(tempDir, 'tests');
+    mkdirSync(testsDir, { recursive: true });
+    writeFileSync(join(testsDir, 'helper.ts'), `
+      it('this should not be counted', () => {});
+    `);
+    writeFileSync(join(testsDir, 'actual.test.ts'), `
+      it('counted', () => {});
+    `);
+    expect(countProjectTestCases(tempDir)).toBe(1);
+  });
+
+  it('handles .spec.ts files', () => {
+    const testsDir = join(tempDir, 'tests');
+    mkdirSync(testsDir, { recursive: true });
+    writeFileSync(join(testsDir, 'foo.spec.ts'), `
+      it('spec test', () => {});
+      it('another spec', () => {});
+    `);
+    expect(countProjectTestCases(tempDir)).toBe(2);
+  });
+});
+
+// ═══ parseCoverageFromClover ═════════════════════════════════════════
+
+describe('parseCoverageFromClover', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+  });
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it('returns null when coverage/clover.xml does not exist', () => {
+    expect(parseCoverageFromClover(tempDir)).toBeNull();
+  });
+
+  it('parses statement coverage from clover.xml', () => {
+    const covDir = join(tempDir, 'coverage');
+    mkdirSync(covDir, { recursive: true });
+    writeFileSync(join(covDir, 'clover.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="123" clover="3.2.0">
+  <project timestamp="123" name="All files">
+    <metrics statements="100" coveredstatements="75" conditionals="10" coveredconditionals="5" methods="20" coveredmethods="15" elements="130" coveredelements="95" complexity="0" loc="100" ncloc="100" packages="1" files="5" classes="5"/>
+  </project>
+</coverage>`);
+    const result = parseCoverageFromClover(tempDir);
+    expect(result).toBeCloseTo(75.0, 1);
+  });
+
+  it('returns 0 when statements is 0', () => {
+    const covDir = join(tempDir, 'coverage');
+    mkdirSync(covDir, { recursive: true });
+    writeFileSync(join(covDir, 'clover.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="123" clover="3.2.0">
+  <project timestamp="123" name="All files">
+    <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0" elements="0" coveredelements="0"/>
+  </project>
+</coverage>`);
+    expect(parseCoverageFromClover(tempDir)).toBe(0);
+  });
+
+  it('returns null for malformed XML', () => {
+    const covDir = join(tempDir, 'coverage');
+    mkdirSync(covDir, { recursive: true });
+    writeFileSync(join(covDir, 'clover.xml'), 'not xml at all');
+    expect(parseCoverageFromClover(tempDir)).toBeNull();
+  });
+});
+
+// ═══ extractSprintNumber ═════════════════════════════════════════════
+
+describe('extractSprintNumber', () => {
+  it('extracts number from sprint-042', () => {
+    expect(extractSprintNumber('sprint-042')).toBe(42);
+  });
+
+  it('extracts number from sprint-001', () => {
+    expect(extractSprintNumber('sprint-001')).toBe(1);
+  });
+
+  it('extracts number from sprint-100', () => {
+    expect(extractSprintNumber('sprint-100')).toBe(100);
+  });
+
+  it('returns null for invalid sprint ID', () => {
+    expect(extractSprintNumber('invalid')).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(extractSprintNumber('')).toBeNull();
+  });
+});
+
+// ═══ updateProjectIdentity ═══════════════════════════════════════════
+
+describe('updateProjectIdentity', () => {
+  let tempDir: string;
+  let brainDir: string;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    brainDir = join(tempDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+  });
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it('creates PROJECT-IDENTITY.md when it does not exist', () => {
+    const metrics = makeMetrics();
+    updateProjectIdentity(tempDir, 'sprint-005', metrics, 5);
+    const filePath = join(brainDir, 'PROJECT-IDENTITY.md');
+    expect(existsSync(filePath)).toBe(true);
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('## Current State');
+    expect(content).toContain('- Last Sprint: sprint-005');
+  });
+
+  it('uses real test count from test files, not metrics.totalTasks', () => {
+    // Create test files in tests/ directory
+    const testsDir = join(tempDir, 'tests');
+    mkdirSync(testsDir, { recursive: true });
+    writeFileSync(join(testsDir, 'a.test.ts'), `
+      it('test1', () => {});
+      it('test2', () => {});
+      it('test3', () => {});
+      test('test4', () => {});
+      test('test5', () => {});
+    `);
+
+    // Create existing identity file
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 0', '- Last Sprint: sprint-001', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ totalTasks: 8 }); // 8 tasks, NOT 8 tests
+    updateProjectIdentity(tempDir, 'sprint-010', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    // Should show 5 (real test count), not 8 (totalTasks)
+    expect(content).toContain('- Test Count: 5');
+    expect(content).not.toContain('- Test Count: 8');
+  });
+
+  it('extracts total sprints from sprint ID number', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 0', '- Last Sprint: sprint-001', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics();
+    updateProjectIdentity(tempDir, 'sprint-042', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Total Sprints: 42');
+  });
+
+  it('accumulates completed tasks across sprints', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 100', '- Completed Tasks: 50', '- Last Sprint: sprint-010', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ completedTasks: 7 });
+    updateProjectIdentity(tempDir, 'sprint-011', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    // 50 previous + 7 current = 57
+    expect(content).toContain('- Completed Tasks: 57');
+  });
+
+  it('reads coverage from clover.xml when available', () => {
+    // Create clover.xml
+    const covDir = join(tempDir, 'coverage');
+    mkdirSync(covDir, { recursive: true });
+    writeFileSync(join(covDir, 'clover.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="123" clover="3.2.0">
+  <project timestamp="123" name="All files">
+    <metrics statements="200" coveredstatements="188" conditionals="10" coveredconditionals="5" methods="20" coveredmethods="15" elements="230" coveredelements="208"/>
+  </project>
+</coverage>`);
+
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 0', '- Coverage: 0.0%', '- Last Sprint: sprint-001', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 0 }); // metrics says 0
+    updateProjectIdentity(tempDir, 'sprint-005', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    // 188/200 = 94.0%
+    expect(content).toContain('- Coverage: 94.0%');
+  });
+
+  it('falls back to metrics coverage when clover.xml is missing', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Current State',
+      '- Test Count: 0', '- Coverage: 0.0%', '- Last Sprint: sprint-001', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics({ coveragePercent: 85.5 });
+    updateProjectIdentity(tempDir, 'sprint-005', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('- Coverage: 85.5%');
+  });
+
+  it('appends Current State section when it does not exist in file', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '', '## Architecture', '- Language: TypeScript', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics();
+    updateProjectIdentity(tempDir, 'sprint-003', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('## Current State');
+    expect(content).toContain('- Last Sprint: sprint-003');
+    expect(content).toContain('## Architecture');
+  });
+
+  it('preserves other sections when updating Current State', () => {
+    writeFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), [
+      '# Project Identity', '',
+      '## What Is This Project', '- Name: myapp', '',
+      '## Current State', '- Test Count: 0', '- Last Sprint: sprint-001', '',
+      '## Architecture', '- Language: TypeScript', '',
+    ].join('\n'));
+
+    const metrics = makeMetrics();
+    updateProjectIdentity(tempDir, 'sprint-002', metrics);
+
+    const content = readFileSync(join(brainDir, 'PROJECT-IDENTITY.md'), 'utf-8');
+    expect(content).toContain('## What Is This Project');
+    expect(content).toContain('- Name: myapp');
+    expect(content).toContain('## Architecture');
+    expect(content).toContain('- Language: TypeScript');
+    expect(content).toContain('- Last Sprint: sprint-002');
   });
 });

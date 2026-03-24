@@ -62,7 +62,7 @@ describe('README.md', () => {
     expect(content).toContain('Sprint Lifecycle');
     expect(content).toContain('Multi-Worker Parallel');
     expect(content).toContain('GO / NO-GO Evaluation');
-    expect(content).toContain('Provider Agnostic');
+    expect(content).toContain('Multi-Provider Support');
   });
 
   it('contains Comparison table', () => {
