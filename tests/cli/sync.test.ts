@@ -1,13 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
+  appendFileSync: vi.fn(),
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
+  statSync: vi.fn(),
+}));
+
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(),
 }));
 
 vi.mock('node:readline/promises', () => ({
@@ -49,6 +56,10 @@ describe('CLI: deckent sync', () => {
 
   it('calls ensureDeckentImport for CLAUDE.md and AGENTS.md when DECKENT.md exists', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([]);
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0, stdout: 'true\n', stderr: '', pid: 1, output: [], signal: null,
+    });
 
     await program.parseAsync(['node', 'deckent', 'sync']);
 
@@ -59,6 +70,10 @@ describe('CLI: deckent sync', () => {
 
   it('does not set error exitCode when DECKENT.md exists', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([]);
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0, stdout: 'true\n', stderr: '', pid: 1, output: [], signal: null,
+    });
 
     await program.parseAsync(['node', 'deckent', 'sync']);
 

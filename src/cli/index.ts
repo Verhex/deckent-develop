@@ -30,6 +30,7 @@ import { registerAgent } from './commands/agent.js';
 import { registerSkill } from './commands/skill.js';
 import { registerReview } from './commands/review.js';
 import { registerFinalize } from './commands/finalize.js';
+import { registerExplain } from './commands/explain.js';
 
 /**
  * Build and configure the CLI program with all commands registered.
@@ -75,6 +76,7 @@ export function buildProgram(): Command {
   registerSkill(program);
   registerReview(program);
   registerFinalize(program);
+  registerExplain(program);
 
   return program;
 }
