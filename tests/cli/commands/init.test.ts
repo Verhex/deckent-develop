@@ -47,6 +47,18 @@ vi.mock('../../../src/core/utils.js', () => ({
   ensureDeckentImport: vi.fn(),
 }));
 
+vi.mock('../../../src/cli/helpers/splash.js', () => ({
+  showSplash: vi.fn().mockReturnValue('KRAKEN SPLASH'),
+}));
+
+vi.mock('../../../src/core/environment.js', () => ({
+  detectEnvironment: vi.fn().mockReturnValue('shell'),
+}));
+
+vi.mock('../../../src/core/deck-file.js', () => ({
+  createDeckTemplate: vi.fn(),
+}));
+
 vi.mock('../../../src/core/provider.js', () => ({
   detectAvailableProviders: vi.fn().mockResolvedValue([
     { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
@@ -83,6 +95,9 @@ import { analyzeProject } from '../../../src/core/analyzer.js';
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { registerInit } from '../../../src/cli/commands/init.js';
 import { detectAvailableProviders } from '../../../src/core/provider.js';
+import { showSplash } from '../../../src/cli/helpers/splash.js';
+import { detectEnvironment } from '../../../src/core/environment.js';
+import { createDeckTemplate } from '../../../src/core/deck-file.js';
 import {
   detectIDEEnvironment,
   getMCPGuidance,
@@ -122,6 +137,11 @@ describe('init command (isolated)', () => {
     // Default prompt responses
     vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
     vi.mocked(promptText).mockResolvedValue('my-project');
+
+    // Default environment: shell (must reset after other tests change it)
+    vi.mocked(detectEnvironment).mockReturnValue('shell');
+    vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+    vi.mocked(createDeckTemplate).mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -1066,6 +1086,129 @@ describe('human-friendly init output', () => {
     it('defaults to English for unknown language', () => {
       const output = formatNextSteps('de');
       expect(output).toContain("You're ready!");
+    });
+  });
+
+  // ─── Splash ─────────────────────────────────────────────────────────
+
+  describe('splash on init', () => {
+    it('calls showSplash during init', async () => {
+      await runCommand(['init', '--auto']);
+      expect(showSplash).toHaveBeenCalled();
+    });
+
+    it('prints splash output', async () => {
+      vi.mocked(showSplash).mockReturnValueOnce('KRAKEN ART');
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('KRAKEN ART'))).toBe(true);
+    });
+
+    it('continues if showSplash throws', async () => {
+      vi.mocked(showSplash).mockImplementationOnce(() => { throw new Error('splash fail'); });
+      await runCommand(['init', '--auto']);
+      // Should still complete — check that directories were created
+      expect(mkdirSync).toHaveBeenCalled();
+    });
+  });
+
+  // ─── Environment-Aware Config Files ─────────────────────────────────
+
+  describe('environment-aware config', () => {
+    it('calls detectEnvironment during init', async () => {
+      await runCommand(['init', '--auto']);
+      expect(detectEnvironment).toHaveBeenCalled();
+    });
+
+    it('creates AGENTS.md template when codex environment detected', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('codex');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const agentsCall = writeCalls.find(c => String(c[0]).endsWith('AGENTS.md'));
+      // AGENTS.md is written (either default or codex template)
+      expect(agentsCall).toBeDefined();
+    });
+
+    it('AGENTS.md for codex contains Deckent Integration header', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('codex');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const agentsCall = writeCalls.find(c => String(c[0]).endsWith('AGENTS.md') && String(c[1]).includes('Deckent Integration'));
+      expect(agentsCall).toBeDefined();
+    });
+
+    it('creates GEMINI.md template when gemini environment detected', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('gemini');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const geminiCall = writeCalls.find(c => String(c[0]).endsWith('GEMINI.md'));
+      expect(geminiCall).toBeDefined();
+    });
+
+    it('GEMINI.md contains correct context reference', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('gemini');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const geminiCall = writeCalls.find(c => String(c[0]).endsWith('GEMINI.md'));
+      expect(String(geminiCall?.[1])).toContain('@DECKENT.md');
+    });
+
+    it('creates .cursor/rules/deckent.mdc when cursor environment detected', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('cursor');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const cursorCall = writeCalls.find(c => String(c[0]).includes('deckent.mdc'));
+      expect(cursorCall).toBeDefined();
+    });
+
+    it('cursor rule file contains DECKENT.md reference', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('cursor');
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const cursorCall = writeCalls.find(c => String(c[0]).includes('deckent.mdc'));
+      expect(String(cursorCall?.[1])).toContain('@DECKENT.md');
+    });
+
+    it('prints environment info line in summary for any environment', async () => {
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Environment:'))).toBe(true);
+    });
+
+    it('prints environment info in summary', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('gemini');
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('Environment: gemini'))).toBe(true);
+    });
+
+    it('prints codex-specific message for codex environment', async () => {
+      vi.mocked(detectEnvironment).mockReturnValue('codex');
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('AGENTS.md') && c.includes('Codex'))).toBe(true);
+    });
+  });
+
+  // ─── .deck template ─────────────────────────────────────────────────
+
+  describe('.deck template creation', () => {
+    it('calls createDeckTemplate during init', async () => {
+      await runCommand(['init', '--auto']);
+      expect(createDeckTemplate).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('continues if createDeckTemplate throws', async () => {
+      vi.mocked(createDeckTemplate).mockImplementationOnce(() => { throw new Error('deck fail'); });
+      await runCommand(['init', '--auto']);
+      // Should still complete
+      expect(mkdirSync).toHaveBeenCalled();
     });
   });
 });

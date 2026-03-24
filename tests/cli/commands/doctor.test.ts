@@ -55,6 +55,20 @@ vi.mock('../../../src/core/provider.js', () => ({
   formatDetectedProviders: vi.fn().mockReturnValue('Providers:\n  mock'),
 }));
 
+vi.mock('../../../src/core/environment.js', () => ({
+  detectEnvironment: vi.fn().mockReturnValue('vscode'),
+}));
+
+vi.mock('../../../src/core/deck-file.js', () => ({
+  loadDeckSecrets: vi.fn().mockReturnValue({}),
+  validateDeckFile: vi.fn().mockReturnValue({ valid: true, warnings: [], errors: [] }),
+  KNOWN_DECK_KEYS: [
+    'DECKENT_CLAUDE_API_KEY', 'DECKENT_OPENAI_API_KEY', 'DECKENT_GOOGLE_API_KEY',
+    'DECKENT_SMTP_HOST', 'DECKENT_SMTP_USER', 'DECKENT_SMTP_PASS',
+    'DECKENT_WEBHOOK_URL', 'DECKENT_DB_URL', 'DECKENT_TELEMETRY_ID',
+  ],
+}));
+
 vi.mock('../../../src/core/constants.js', () => ({
   DECKENT_DIR: '.deckent',
   BRAIN_DIR: '.brain',
@@ -81,9 +95,12 @@ import {
   registerDoctor, runDoctorChecks, formatSystemProfile, checkPlatform, isRunningInWSL,
   formatHumanDoctor, getLastSprintId, countDebtItems, getProviderTips,
   getMemoryHealthLabel, getProviderSummary, getReadinessLabel,
+  getDeckFileStatus, formatProviderHealthSection,
 } from '../../../src/cli/commands/doctor.js';
 import type { HumanDoctorInput } from '../../../src/cli/commands/doctor.js';
 import type { DetectedProvider } from '../../../src/core/provider.js';
+import { detectEnvironment } from '../../../src/core/environment.js';
+import { loadDeckSecrets, validateDeckFile } from '../../../src/core/deck-file.js';
 
 // ─── Helper ──────────────────────────────────────────────────────────
 
@@ -1339,5 +1356,210 @@ describe('formatHumanDoctor enhancements', () => {
     };
     const output = formatHumanDoctor(input);
     expect(output).toContain('Tip: Install Claude CLI');
+  });
+});
+
+// ─── Provider Health Section ────────────────────────────────────────
+
+describe('formatProviderHealthSection', () => {
+  function makeProvider(name: string, available: boolean, version?: string, authMethod: 'session' | 'api_key' | 'none' = 'none'): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, version, authMethod, models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    vi.mocked(validateDeckFile).mockReturnValue({ valid: true, warnings: [], errors: [] });
+    vi.mocked(detectEnvironment).mockReturnValue('vscode');
+  });
+
+  it('shows "Provider Health:" header', () => {
+    const providers = [makeProvider('claude', true, '2.1.81', 'session')];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    expect(lines[0]).toBe('Provider Health:');
+  });
+
+  it('shows available provider with session auth', () => {
+    const providers = [makeProvider('claude', true, '2.1.81', 'session')];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    const claudeLine = lines.find(l => l.includes('Claude'));
+    expect(claudeLine).toContain('OK Claude CLI v2.1.81');
+    expect(claudeLine).toContain('session auth active');
+  });
+
+  it('shows available provider with API key auth', () => {
+    const providers = [makeProvider('codex', true, '1.0', 'api_key')];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    const codexLine = lines.find(l => l.includes('Codex'));
+    expect(codexLine).toContain('OK Codex CLI v1.0');
+    expect(codexLine).toContain('API key configured');
+  });
+
+  it('shows unavailable provider with hint', () => {
+    const providers = [makeProvider('gemini', false)];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    const geminiLine = lines.find(l => l.includes('Gemini'));
+    expect(geminiLine).toContain('FAIL Gemini');
+    expect(geminiLine).toContain('not available');
+  });
+
+  it('shows .deck file status when secrets exist', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({
+      DECKENT_CLAUDE_API_KEY: 'sk-test',
+      DECKENT_OPENAI_API_KEY: 'sk-openai',
+      DECKENT_GOOGLE_API_KEY: 'AIza-test',
+    });
+    const providers = [makeProvider('claude', true, '2.1', 'session')];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    const deckLine = lines.find(l => l.includes('.deck'));
+    expect(deckLine).toContain('OK');
+    expect(deckLine).toContain('3/9 keys configured');
+  });
+
+  it('shows .deck file not found status', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    const providers = [makeProvider('claude', true, '2.1', 'session')];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    const deckLine = lines.find(l => l.includes('.deck'));
+    expect(deckLine).toContain('WARN');
+    expect(deckLine).toContain('not found');
+  });
+
+  it('shows detected environment', () => {
+    vi.mocked(detectEnvironment).mockReturnValue('vscode');
+    const providers = [makeProvider('claude', true, '2.1', 'session')];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    const envLine = lines.find(l => l.includes('Environment'));
+    expect(envLine).toContain('OK Environment: vscode detected');
+  });
+
+  it('shows tmux environment when detected', () => {
+    vi.mocked(detectEnvironment).mockReturnValue('tmux');
+    const providers = [makeProvider('claude', true, '2.1', 'session')];
+    const lines = formatProviderHealthSection(providers, '/mock/root');
+    const envLine = lines.find(l => l.includes('Environment'));
+    expect(envLine).toContain('tmux detected');
+  });
+});
+
+// ─── getDeckFileStatus ──────────────────────────────────────────────
+
+describe('getDeckFileStatus', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    vi.mocked(validateDeckFile).mockReturnValue({ valid: true, warnings: [], errors: [] });
+  });
+
+  it('returns "not found" when no secrets loaded', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    const status = getDeckFileStatus('/mock/root');
+    expect(status).toContain('not found');
+  });
+
+  it('returns configured key count when secrets present', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({
+      DECKENT_CLAUDE_API_KEY: 'sk-test',
+      DECKENT_OPENAI_API_KEY: 'sk-openai',
+    });
+    const status = getDeckFileStatus('/mock/root');
+    expect(status).toContain('2/9 keys configured');
+    expect(status).toContain('.deck file found');
+  });
+
+  it('does not count empty string values as configured', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({
+      DECKENT_CLAUDE_API_KEY: '',
+      DECKENT_OPENAI_API_KEY: 'sk-openai',
+    });
+    const status = getDeckFileStatus('/mock/root');
+    expect(status).toContain('1/9 keys configured');
+  });
+
+  it('shows error flag when validation fails', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({
+      'INVALID KEY': 'value',
+    });
+    vi.mocked(validateDeckFile).mockReturnValue({
+      valid: false,
+      warnings: [],
+      errors: ['Invalid key format'],
+    });
+    const status = getDeckFileStatus('/mock/root');
+    expect(status).toContain('has errors');
+  });
+
+  it('does not show error flag when validation passes', () => {
+    vi.mocked(loadDeckSecrets).mockReturnValue({
+      DECKENT_CLAUDE_API_KEY: 'sk-test',
+    });
+    vi.mocked(validateDeckFile).mockReturnValue({ valid: true, warnings: [], errors: [] });
+    const status = getDeckFileStatus('/mock/root');
+    expect(status).not.toContain('has errors');
+  });
+});
+
+// ─── formatHumanDoctor with provider health section ────────────────
+
+describe('formatHumanDoctor with provider health', () => {
+  function makeCheck(name: string, passed: boolean, message: string, required = false) {
+    return { name, passed, message, required };
+  }
+
+  function makeProvider(name: string, available: boolean, version?: string, authMethod: 'session' | 'api_key' | 'none' = 'none'): DetectedProvider {
+    return { name: name as DetectedProvider['name'], available, version, authMethod, models: [] as unknown as DetectedProvider['models'] };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
+    vi.mocked(validateDeckFile).mockReturnValue({ valid: true, warnings: [], errors: [] });
+    vi.mocked(detectEnvironment).mockReturnValue('vscode');
+  });
+
+  const baseInput: HumanDoctorInput = {
+    result: {
+      ok: true,
+      checks: [
+        makeCheck('Platform', true, 'Linux'),
+        makeCheck('Node.js', true, 'v22.1.0', true),
+        makeCheck('git', true, 'v2.43.0', true),
+        makeCheck('tmux', true, 'tmux 3.4', true),
+        makeCheck('Claude CLI', true, 'v2.1', true),
+        makeCheck('Workspace', true, '.deckent/ found'),
+        makeCheck('Brain Dir', true, 'All brain files present'),
+        makeCheck('Directives', true, 'DIRECTIVES.md found'),
+        makeCheck('Brain Budget', true, '347/600 lines'),
+        makeCheck('Debt', true, 'No debt file'),
+        makeCheck('Locks', true, 'No lock files'),
+      ],
+    },
+    providers: [
+      makeProvider('claude', true, '2.1', 'session'),
+      makeProvider('codex', false),
+      makeProvider('gemini', false),
+    ],
+    brainLines: 347,
+    brainBudget: 600,
+    lastSprintId: 'sprint-042',
+    debtItems: { total: 0, critical: 0 },
+    projectRoot: '/mock/root',
+  };
+
+  it('includes Provider Health section when projectRoot is provided', () => {
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Provider Health:');
+  });
+
+  it('does not include Provider Health section when projectRoot is missing', () => {
+    const input = { ...baseInput, projectRoot: undefined };
+    const output = formatHumanDoctor(input);
+    expect(output).not.toContain('Provider Health:');
+  });
+
+  it('shows environment detection in provider health section', () => {
+    vi.mocked(detectEnvironment).mockReturnValue('cursor');
+    const output = formatHumanDoctor(baseInput);
+    expect(output).toContain('Environment: cursor detected');
   });
 });

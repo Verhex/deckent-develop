@@ -197,6 +197,10 @@ vi.mock('../../src/core/plugin-hooks.js', () => ({
   loadPluginHooks: vi.fn().mockResolvedValue(0),
 }));
 
+vi.mock('../../src/cli/helpers/sprint-summary-rich.js', () => ({
+  formatRichSprintSummary: vi.fn().mockReturnValue('Rich Sprint Summary Output'),
+}));
+
 vi.mock('../../src/core/stack-detector.js', () => ({
   detectProjectStack: vi.fn().mockReturnValue({ languages: [], frameworks: [], tools: [] }),
 }));
@@ -261,6 +265,7 @@ import {
   resolveTaskProvider,
   isTmuxProvider,
   resolveDefaultUsageCli,
+  finalizeSprint,
 } from '../../src/orchestra/sprint-controller.js';
 
 import type {
@@ -285,6 +290,10 @@ const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
 
 // Provider registry mock access
 import { providerRegistry } from '../../src/core/provider.js';
+
+// Rich output mock access
+import { formatRichSprintSummary } from '../../src/cli/helpers/sprint-summary-rich.js';
+const mockedFormatRichSprintSummary = vi.mocked(formatRichSprintSummary);
 const mockedProviderRegistry = vi.mocked(providerRegistry);
 
 // Task router mock access
@@ -1615,5 +1624,107 @@ describe('Task Router wiring in sprint-controller', () => {
       'utf-8',
     );
     expect(source).toContain('Phase 1.5: Route tasks to providers');
+  });
+});
+
+// ─── finalizeSprint + Rich Output Integration ────────────────────────
+
+describe('finalizeSprint — rich output integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupFileMocks();
+    mockedExistsSync.mockReturnValue(false);
+    mockedReaddirSync.mockReturnValue([]);
+    mockedSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: ' src/foo.ts | 10 ++++\n 1 file changed, 10 insertions(+)\n',
+      stderr: '',
+      pid: 1,
+      output: [],
+      signal: null,
+    } as ReturnType<typeof spawnSync>);
+  });
+
+  it('calls formatRichSprintSummary during finalization', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    expect(mockedFormatRichSprintSummary).toHaveBeenCalled();
+  });
+
+  it('passes sprint data and evaluations to formatRichSprintSummary', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
+    expect(callArgs[0]).toMatchObject({ id: sprint.id });
+    expect(callArgs[1]).toBe(evaluations);
+  });
+
+  it('includes gitDiff from spawnSync in rich output options', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
+    const opts = callArgs[2];
+    expect(opts?.gitDiff).toContain('src/foo.ts');
+  });
+
+  it('completes normally when formatRichSprintSummary throws', async () => {
+    mockedFormatRichSprintSummary.mockImplementationOnce(() => { throw new Error('format error'); });
+
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    const metrics = await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    expect(metrics).toBeDefined();
+    expect(metrics.totalTasks).toBeDefined();
+  });
+
+  it('respects output_mode from config', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    const config = { ...makeConfig(), output_mode: 'quiet' } as any;
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true, config });
+
+    const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
+    expect(callArgs[2]?.outputMode).toBe('quiet');
+  });
+
+  it('defaults output_mode to normal when config has no output_mode', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
+    expect(callArgs[2]?.outputMode).toBe('normal');
+  });
+
+  it('logs rich output to console when formatRichSprintSummary returns a string', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockedFormatRichSprintSummary.mockReturnValueOnce('RICH OUTPUT HERE');
+
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
+    const results = [{ taskId: sprint.tasks[0]!.id, status: 'DONE', filesChanged: [], linesAdded: 0, linesRemoved: 0, testResults: { passed: 1, failed: 0, skipped: 0 }, coverage: 90, selfAssessment: 'DONE' as const, notes: '' }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    expect(consoleSpy).toHaveBeenCalledWith('RICH OUTPUT HERE');
+    consoleSpy.mockRestore();
   });
 });

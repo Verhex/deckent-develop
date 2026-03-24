@@ -6,6 +6,10 @@ import { generateSetupRecommendation } from '../auto-setup.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { analyzeProject } from '../../core/analyzer.js';
+import { showSplash } from '../helpers/splash.js';
+import { detectEnvironment } from '../../core/environment.js';
+import type { DetectedEnv } from '../../core/environment.js';
+import { createDeckTemplate } from '../../core/deck-file.js';
 import {
   DECKENT_DIR,
   BRAIN_DIR,
@@ -26,6 +30,7 @@ import {
   PATTERNS_FILE,
   RETRO_FILE,
   PROJECT_IDENTITY_FILE,
+  DECKENT_VERSION,
 } from '../../core/constants.js';
 import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { ensureDeckentImport } from '../../core/utils.js';
@@ -186,6 +191,12 @@ export function registerInit(program: Command): void {
 
         const dirName = root.split(/[\\/]/).pop() ?? 'my-project';
 
+        // Kraken splash (non-fatal)
+        try {
+          const splash = showSplash(DECKENT_VERSION);
+          if (splash) print(splash);
+        } catch { /* splash failure is non-fatal */ }
+
         // Welcome banner
         print(formatWelcomeBanner());
 
@@ -284,6 +295,53 @@ Lint: tsc --noEmit
         writeIfNotExists(join(root, AGENTS_FILE), `@${DECKENT_FILE}\n`);
         ensureDeckentImport(join(root, AGENTS_FILE));
         ensureDeckentImport(join(root, CLAUDE_FILE));
+
+        // 7b. Environment-aware config files
+        const detectedEnv: DetectedEnv = detectEnvironment();
+        if (detectedEnv === 'codex') {
+          const agentsMdContent = `# AGENTS.md — Deckent Integration
+This project uses Deckent for AI agent orchestration.
+## Sprint Instructions
+- Read DIRECTIVES.md for current sprint goals
+- Follow task scope boundaries strictly
+- Write tests for all changes
+## Project Context
+@DECKENT.md
+`;
+          writeIfNotExists(join(root, AGENTS_FILE), agentsMdContent);
+        } else if (detectedEnv === 'gemini') {
+          const geminiMdContent = `# GEMINI.md — Deckent Integration
+This project uses Deckent for AI agent orchestration.
+## Context
+@DECKENT.md
+## Rules
+- Follow DIRECTIVES.md for sprint goals
+- Respect file scope boundaries
+- Run tests before reporting completion
+`;
+          writeIfNotExists(join(root, 'GEMINI.md'), geminiMdContent);
+        } else if (detectedEnv === 'cursor') {
+          const cursorRulesDir = join(root, '.cursor', 'rules');
+          const cursorRulePath = join(cursorRulesDir, 'deckent.mdc');
+          if (!existsSync(cursorRulePath)) {
+            mkdirSync(cursorRulesDir, { recursive: true });
+            writeFileSync(cursorRulePath, `---
+description: Deckent orchestration rules
+globs: ["**/*"]
+---
+# Deckent Integration
+@DECKENT.md
+- Follow DIRECTIVES.md for sprint goals
+- Respect file scope boundaries
+- Run tests before reporting completion
+`);
+          }
+        }
+
+        // 7c. Create .deck template
+        try {
+          createDeckTemplate(root);
+        } catch { /* non-fatal */ }
 
         // 8. Claude rules (blueprint-quality templates with frontmatter)
         writeIfNotExists(
@@ -468,6 +526,16 @@ Lint: tsc --noEmit
         print('');
         for (const line of mcpGuidance) {
           print(line);
+        }
+
+        // Show detected environment info
+        print(`\n  Environment: ${detectedEnv}`);
+        if (detectedEnv === 'codex') {
+          print('  Created AGENTS.md for Codex integration');
+        } else if (detectedEnv === 'gemini') {
+          print('  Created GEMINI.md for Gemini integration');
+        } else if (detectedEnv === 'cursor') {
+          print('  Created .cursor/rules/deckent.mdc for Cursor integration');
         }
 
         // Human-friendly next steps (replaces old getMessage-based output)

@@ -18,6 +18,8 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
+import { detectEnvironment } from '../../core/environment.js';
+import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS } from '../../core/deck-file.js';
 
 interface DoctorCheck {
   name: string;
@@ -293,6 +295,7 @@ export interface HumanDoctorInput {
   brainBudget: number;
   lastSprintId: string | null;
   debtItems: { total: number; critical: number };
+  projectRoot?: string;
 }
 
 /**
@@ -405,6 +408,13 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
 
   lines.push('');
 
+  // --- Provider Health ---
+  if (input.projectRoot) {
+    const providerHealthLines = formatProviderHealthSection(providers, input.projectRoot);
+    lines.push(...providerHealthLines);
+    lines.push('');
+  }
+
   // --- Readiness ---
   const readiness = getReadinessLabel(result, brainLines, brainBudget);
   lines.push(`Status: ${readiness}`);
@@ -447,6 +457,67 @@ function getProviderHint(name: string): string {
     case 'claude': return ' (install Claude CLI: npm i -g @anthropic-ai/claude-code)';
     default: return '';
   }
+}
+
+/**
+ * Get .deck file status summary for doctor output.
+ * Returns a human-readable string like: ".deck file found, 3/9 keys configured"
+ */
+export function getDeckFileStatus(root: string): string {
+  const secrets = loadDeckSecrets(root);
+  const totalKeys = KNOWN_DECK_KEYS.length;
+
+  if (Object.keys(secrets).length === 0) {
+    return '.deck file not found or empty';
+  }
+
+  const configuredCount = KNOWN_DECK_KEYS.filter(
+    key => secrets[key] !== undefined && secrets[key] !== ''
+  ).length;
+
+  const validation = validateDeckFile(secrets);
+  const validLabel = validation.valid ? '' : ' (has errors)';
+
+  return `.deck file found, ${configuredCount}/${totalKeys} keys configured${validLabel}`;
+}
+
+/**
+ * Format provider health section for human-friendly doctor output.
+ */
+export function formatProviderHealthSection(
+  providers: DetectedProvider[],
+  root: string,
+): string[] {
+  const lines: string[] = [];
+
+  lines.push('Provider Health:');
+
+  for (const p of providers) {
+    const version = p.version ? ` v${p.version}` : '';
+    if (p.available) {
+      const authLabel = p.authMethod === 'session'
+        ? 'session auth active'
+        : p.authMethod === 'api_key'
+          ? 'API key configured'
+          : '';
+      const authSuffix = authLabel ? ` — ${authLabel}` : '';
+      lines.push(`  OK ${capitalize(p.name)} CLI${version}${authSuffix}`);
+    } else {
+      const hint = getProviderHint(p.name);
+      lines.push(`  FAIL ${capitalize(p.name)} — not available${hint}`);
+    }
+  }
+
+  // .deck status
+  const deckStatus = getDeckFileStatus(root);
+  const deckIcon = deckStatus.includes('not found') ? 'WARN' : 'OK';
+  lines.push(`  ${deckIcon} ${deckStatus}`);
+
+  // Environment detection
+  const env = detectEnvironment();
+  lines.push(`  OK Environment: ${env} detected`);
+
+  return lines;
 }
 
 export function getProviderTips(providers: DetectedProvider[]): string[] {
@@ -550,6 +621,7 @@ export function registerDoctor(program: Command): void {
           brainBudget: BRAIN_TOTAL_LINE_BUDGET,
           lastSprintId,
           debtItems,
+          projectRoot: root,
         }));
       }
 

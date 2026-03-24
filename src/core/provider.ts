@@ -4,6 +4,7 @@ import type { ResolvedConfig } from './config-types.js';
 import { PROVIDER_MODEL_MAP } from './task-types.js';
 import { getEquivalentModel } from './model-equivalence.js';
 import { Connector } from '../orchestra/connector.js';
+import { loadDeckSecrets } from './deck-file.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────
 export interface ProviderSpawnOptions {
@@ -438,11 +439,36 @@ export interface BootstrapResult {
  * @param registry    Provider registry (defaults to global singleton)
  */
 export async function bootstrapProviders(
-  config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot'>,
+  config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot'> & { auth_mode?: 'subscription' | 'api' | 'hybrid' },
   projectRoot?: string,
   registry: ProviderRegistry = providerRegistry,
 ): Promise<BootstrapResult> {
   const root = projectRoot ?? config.projectRoot;
+
+  // ─── Load .deck secrets for provider auth ────────────────────────
+  // Skip .deck loading in subscription mode (subscription uses session auth)
+  if (config.auth_mode !== 'subscription') {
+    const secrets = loadDeckSecrets(root);
+
+    // Claude: DECKENT_CLAUDE_API_KEY → ANTHROPIC_API_KEY
+    const claudeKey = secrets['DECKENT_CLAUDE_API_KEY'];
+    if (claudeKey && claudeKey.length > 0 && !process.env['ANTHROPIC_API_KEY']) {
+      process.env['ANTHROPIC_API_KEY'] = claudeKey;
+    }
+
+    // Codex: DECKENT_OPENAI_API_KEY → OPENAI_API_KEY
+    const openaiKey = secrets['DECKENT_OPENAI_API_KEY'];
+    if (openaiKey && openaiKey.length > 0 && !process.env['OPENAI_API_KEY']) {
+      process.env['OPENAI_API_KEY'] = openaiKey;
+    }
+
+    // Gemini: DECKENT_GOOGLE_API_KEY → GOOGLE_API_KEY
+    const googleKey = secrets['DECKENT_GOOGLE_API_KEY'];
+    if (googleKey && googleKey.length > 0 && !process.env['GOOGLE_API_KEY']) {
+      process.env['GOOGLE_API_KEY'] = googleKey;
+    }
+  }
+
   const detected = await detectAvailableProviders();
 
   const registered: ProviderName[] = [];

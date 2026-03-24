@@ -102,6 +102,9 @@ import { validateWorkerCoverage } from './coverage-validator.js';
 import { loadPluginHooks, runHooks, clearHooks } from '../core/plugin-hooks.js';
 import type { BeforeSprintContext, AfterTaskContext, AfterSprintContext } from '../core/plugin-hooks.js';
 
+// ─── Rich Output ──────────────────────────────────────────────────
+import { formatRichSprintSummary } from '../cli/helpers/sprint-summary-rich.js';
+
 // ═══ Types ═════════════════════════════════════════════════════════
 
 export class BrainError extends Error {
@@ -1170,6 +1173,21 @@ export async function finalizeSprint(
       updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, opts.config);
     } catch { /* non-fatal */ }
   }
+
+  // 10. Rich output (non-fatal — sprint completes even if formatting fails)
+  try {
+    const gitDiff = spawnSync('git', ['diff', '--stat', 'HEAD~1'], { encoding: 'utf-8', cwd: projectRoot }).stdout;
+    // output_mode lives on DeckentConfig (raw), not ResolvedConfig — access via cast
+    const rawConfig = opts?.config as Record<string, unknown> | undefined;
+    const outputMode = (rawConfig?.['output_mode'] as string) ?? 'normal';
+    const richInput = { id: sprint.id, number: sprint.number, tasks: sprint.tasks.map(t => ({ id: t.id, title: t.title })), metrics: sprint.metrics ? { ...sprint.metrics } : undefined };
+    const richOutput = formatRichSprintSummary(
+      richInput,
+      evaluations,
+      { gitDiff, outputMode: outputMode as 'quiet' | 'normal' | 'verbose' },
+    );
+    if (richOutput) console.log(richOutput);
+  } catch { /* Rich output failure is non-fatal */ }
 
   return metrics;
 }

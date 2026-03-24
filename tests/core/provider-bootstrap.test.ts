@@ -51,12 +51,18 @@ vi.mock('../../src/providers/gemini.js', () => ({
   }),
 }));
 
+// Mock deck-file for .deck secret loading tests
+vi.mock('../../src/core/deck-file.js', () => ({
+  loadDeckSecrets: vi.fn().mockReturnValue({}),
+}));
+
 import { spawnSync } from 'node:child_process';
 import {
   ProviderRegistry,
   bootstrapProviders,
 } from '../../src/core/provider.js';
 import { Connector } from '../../src/orchestra/connector.js';
+import { loadDeckSecrets } from '../../src/core/deck-file.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -107,6 +113,8 @@ describe('bootstrapProviders', () => {
     registry = new ProviderRegistry();
     vi.clearAllMocks();
     mockNoneAvailable();
+    // Default: loadDeckSecrets returns empty (no .deck file)
+    vi.mocked(loadDeckSecrets).mockReturnValue({});
     // Clear env vars that affect detection
     delete process.env['OPENAI_API_KEY'];
     delete process.env['GOOGLE_API_KEY'];
@@ -433,6 +441,156 @@ describe('bootstrapProviders', () => {
       expect(result).toHaveProperty('connector');
       expect(Array.isArray(result.registered)).toBe(true);
       expect(Array.isArray(result.skipped)).toBe(true);
+    });
+  });
+
+  // ─── .deck secret loading ────────────────────────────────────────────────
+
+  describe('.deck secret loading', () => {
+    const savedEnv: Record<string, string | undefined> = {};
+
+    beforeEach(() => {
+      // Save env vars we may modify
+      savedEnv['OPENAI_API_KEY'] = process.env['OPENAI_API_KEY'];
+      savedEnv['GOOGLE_API_KEY'] = process.env['GOOGLE_API_KEY'];
+      savedEnv['ANTHROPIC_API_KEY'] = process.env['ANTHROPIC_API_KEY'];
+      // Clear them for clean tests
+      delete process.env['OPENAI_API_KEY'];
+      delete process.env['GOOGLE_API_KEY'];
+      delete process.env['ANTHROPIC_API_KEY'];
+    });
+
+    afterEach(() => {
+      // Restore env vars
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    });
+
+    it('should load .deck API key for codex (OPENAI_API_KEY)', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_OPENAI_API_KEY: 'sk-deck-openai-test',
+      });
+
+      const config = makeConfig({ projectRoot: '/tmp/test' });
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(process.env['OPENAI_API_KEY']).toBe('sk-deck-openai-test');
+    });
+
+    it('should load .deck API key for gemini (GOOGLE_API_KEY)', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_GOOGLE_API_KEY: 'AIza-deck-google-test',
+      });
+
+      const config = makeConfig({ projectRoot: '/tmp/test' });
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(process.env['GOOGLE_API_KEY']).toBe('AIza-deck-google-test');
+    });
+
+    it('should load .deck API key for claude (ANTHROPIC_API_KEY)', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_CLAUDE_API_KEY: 'sk-ant-deck-test',
+      });
+
+      const config = makeConfig({ projectRoot: '/tmp/test' });
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(process.env['ANTHROPIC_API_KEY']).toBe('sk-ant-deck-test');
+    });
+
+    it('should NOT overwrite existing OPENAI_API_KEY from environment', async () => {
+      process.env['OPENAI_API_KEY'] = 'sk-existing-openai';
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_OPENAI_API_KEY: 'sk-deck-openai-override',
+      });
+
+      const config = makeConfig({ projectRoot: '/tmp/test' });
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(process.env['OPENAI_API_KEY']).toBe('sk-existing-openai');
+    });
+
+    it('should NOT overwrite existing GOOGLE_API_KEY from environment', async () => {
+      process.env['GOOGLE_API_KEY'] = 'AIza-existing-google';
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_GOOGLE_API_KEY: 'AIza-deck-google-override',
+      });
+
+      const config = makeConfig({ projectRoot: '/tmp/test' });
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(process.env['GOOGLE_API_KEY']).toBe('AIza-existing-google');
+    });
+
+    it('should skip .deck loading when auth_mode is subscription', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_OPENAI_API_KEY: 'sk-should-not-load',
+        DECKENT_GOOGLE_API_KEY: 'AIza-should-not-load',
+        DECKENT_CLAUDE_API_KEY: 'sk-ant-should-not-load',
+      });
+
+      const config = { ...makeConfig({ projectRoot: '/tmp/test' }), auth_mode: 'subscription' as const };
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(loadDeckSecrets).not.toHaveBeenCalled();
+      expect(process.env['OPENAI_API_KEY']).toBeUndefined();
+      expect(process.env['GOOGLE_API_KEY']).toBeUndefined();
+      expect(process.env['ANTHROPIC_API_KEY']).toBeUndefined();
+    });
+
+    it('should not crash when .deck file is missing (empty secrets)', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({});
+
+      const config = makeConfig({ projectRoot: '/tmp/test' });
+      const result = await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(result).toBeDefined();
+      expect(loadDeckSecrets).toHaveBeenCalledWith('/tmp/test');
+    });
+
+    it('should ignore empty string values from .deck', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_OPENAI_API_KEY: '',
+        DECKENT_GOOGLE_API_KEY: '',
+        DECKENT_CLAUDE_API_KEY: '',
+      });
+
+      const config = makeConfig({ projectRoot: '/tmp/test' });
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(process.env['OPENAI_API_KEY']).toBeUndefined();
+      expect(process.env['GOOGLE_API_KEY']).toBeUndefined();
+      expect(process.env['ANTHROPIC_API_KEY']).toBeUndefined();
+    });
+
+    it('should load .deck when auth_mode is api', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_OPENAI_API_KEY: 'sk-api-mode-test',
+      });
+
+      const config = { ...makeConfig({ projectRoot: '/tmp/test' }), auth_mode: 'api' as const };
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(loadDeckSecrets).toHaveBeenCalledWith('/tmp/test');
+      expect(process.env['OPENAI_API_KEY']).toBe('sk-api-mode-test');
+    });
+
+    it('should load .deck when auth_mode is hybrid', async () => {
+      vi.mocked(loadDeckSecrets).mockReturnValue({
+        DECKENT_GOOGLE_API_KEY: 'AIza-hybrid-test',
+      });
+
+      const config = { ...makeConfig({ projectRoot: '/tmp/test' }), auth_mode: 'hybrid' as const };
+      await bootstrapProviders(config, '/tmp/test', registry);
+
+      expect(loadDeckSecrets).toHaveBeenCalledWith('/tmp/test');
+      expect(process.env['GOOGLE_API_KEY']).toBe('AIza-hybrid-test');
     });
   });
 });
