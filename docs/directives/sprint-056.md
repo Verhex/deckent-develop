@@ -1,58 +1,58 @@
-# DIRECTIVES — Sprint 056: Continuous Watch Mode
+# DIRECTIVES — Sprint 054: GitHub Issue Mode
 
-## Goal: `deckent watch --act` → Repo'yu izle, ne yapılması gerektiğini öner, onay al, sprint çalıştır. "Yaşayan organizma" deneyimi.
+## Goal: `deckent do --issue 42` → GitHub issue'yu oku, sprint başlat. "Projeyi al götür" deneyiminin temeli.
 
 ---
 
-## Task 1: Repository Analyzer (Continuous)
+## Task 1: GitHub Issue Reader
 - Model: opus
 - Effort: high
-- Files: src/orchestra/repo-analyzer.ts (new)
+- Files: src/integrations/github.ts (new), src/core/issue-types.ts (new)
+- Scope: src/integrations/, src/core/
+
+### Description
+GitHub API ile issue oku (gh CLI veya REST API). Issue → structured format: title, body, labels, comments, linked PRs. `GITHUB_TOKEN` env var ile auth. Rate limiting handle. Public repo'lar için token opsiyonel.
+8+ test.
+
+---
+
+## Task 2: Issue-to-DIRECTIVES Converter
+- Model: opus
+- Effort: high
+- Files: src/orchestra/issue-to-directives.ts (new)
 - Scope: src/orchestra/
 
 ### Description
-Repo'yu periyodik analiz et (her 5 dakika veya file change): open TODO/FIXME sayısı, test coverage trend, stale branches, dependency updates, open issues (GitHub API). Her analiz sonucu "suggestion" listesi oluştur.
-8+ test.
+GitHub issue'yu DIRECTIVES.md formatına çevir. Label-based model selection: `bug` → sonnet, `feature` → opus, `docs` → haiku. Body'den scope inference (dosya adları, modül isimleri tespit et). Multi-issue support: `deckent do --issue 42,43,44` → tek sprint.
+10+ test.
 
 ---
 
-## Task 2: Suggestion Engine
-- Model: opus
-- Effort: high
-- Files: src/orchestra/suggestion-engine.ts (new), src/core/suggestion-types.ts (new)
-- Scope: src/orchestra/, src/core/
-
-### Description
-Repo analysis + MEMORY + PATTERNS'tan sprint önerileri üret. Priority scoring: TODO count (high), coverage drop (critical), dependency update (low). Suggestion format: { title, description, priority, estimatedEffort, suggestedModel }. Max 5 suggestion at a time.
-8+ test.
-
----
-
-## Task 3: Watch Mode CLI
+## Task 3: `deckent do` CLI Command
 - Model: sonnet
 - Effort: normal
-- Files: src/cli/commands/watch.ts (modify), src/cli/commands/continuous.ts (new)
+- Files: src/cli/commands/do.ts (new)
 - Scope: src/cli/
 
 ### Description
-`deckent watch --act` → sürekli izle + öner + onayla + çalış döngüsü. Interactive: "3 öneri var: 1) Fix 5 TODO, 2) Update deps, 3) Increase coverage. Hangisini yapayım? [1/2/3/all/skip]". `--auto` mode: priority > HIGH olanları otomatik çalıştır.
+`deckent do "description"` → inline sprint (mevcut zero-config mode genişletmesi). `deckent do --issue 42` → GitHub issue mode. `deckent do --file TODO.md` → dosyadan oku. Tüm modları planner'a yönlendir. `--auto-approve` flag.
 8+ test.
 
 ---
 
-## Task 4: Watch Dashboard Integration
+## Task 4: Sprint Result → GitHub Comment
 - Model: sonnet
 - Effort: normal
-- Files: src/api/server.ts, src/dashboard/ (modify)
-- Scope: src/api/, src/dashboard/
+- Files: src/integrations/github-reporter.ts (new)
+- Scope: src/integrations/
 
 ### Description
-Web dashboard'da "Suggestions" tab. Real-time suggestion listesi, one-click sprint başlatma. SSE ile live update. Suggestion history (kabul/red edilen öneriler).
+Sprint tamamlandığında GitHub issue'ya yorum yaz: task listesi, GO/NO_GO sonuçları, değişen dosyalar, coverage. `gh issue comment` veya REST API. Config: `github_auto_comment: true/false`.
 5+ test.
 
 ---
 
 ## Quality Rules
-- Watch mode CPU < %5 idle
-- Suggestion kalitesi: false positive < %20
-- Auto mode güvenli (destructive action yok)
+- `gh` CLI veya REST API ile çalışır (ikisi de desteklenmeli)
+- Rate limiting handle edilmeli
+- Token yoksa public repo'lar hala çalışmalı

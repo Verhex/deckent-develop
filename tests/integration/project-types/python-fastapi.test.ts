@@ -451,7 +451,7 @@ describe('Python + FastAPI Project Integration', () => {
       const task = makeTask({
         title: 'Update API documentation',
         description: 'Document FastAPI endpoints in README',
-        scope: makeScope(['docs/'], ['docs/API.md']),
+        scope: makeScope(['docs/'], ['docs/reference/api.md']),
       });
 
       const result = orch.decide(task);

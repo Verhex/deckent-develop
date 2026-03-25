@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const DOC_PATH = join(process.cwd(), 'docs', 'RELEASE-CHECKLIST.md');
+const DOC_PATH = join(process.cwd(), 'docs', 'release', 'release-checklist.md');
 
-describe('docs/RELEASE-CHECKLIST.md', () => {
+describe('docs/release/release-checklist.md', () => {
   const content = readFileSync(DOC_PATH, 'utf-8');
 
   it('exists and is non-empty', () => {

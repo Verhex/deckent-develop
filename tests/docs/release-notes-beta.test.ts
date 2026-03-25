@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..', '..');
-const RELEASE_NOTES_PATH = join(ROOT, 'docs', 'RELEASE-NOTES-BETA.md');
+const RELEASE_NOTES_PATH = join(ROOT, 'docs', 'release', 'release-notes.md');
 
 function readReleaseNotes(): string {
   return readFileSync(RELEASE_NOTES_PATH, 'utf-8');

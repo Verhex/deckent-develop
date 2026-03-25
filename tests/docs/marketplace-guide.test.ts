@@ -4,8 +4,8 @@ import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 
-describe('docs/MARKETPLACE-GUIDE.md', () => {
-  const guidePath = join(ROOT, 'docs', 'MARKETPLACE-GUIDE.md');
+describe('docs/reference/marketplace.md', () => {
+  const guidePath = join(ROOT, 'docs', 'reference', 'marketplace.md');
 
   it('file exists', () => {
     expect(existsSync(guidePath)).toBe(true);

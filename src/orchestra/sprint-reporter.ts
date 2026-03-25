@@ -1516,3 +1516,167 @@ export function autoDraftDecisions(
 
   return adrCount;
 }
+
+// ═══ Brain Self-Learning ═══════════════════════════════════════════
+
+export interface ConfigSuggestion {
+  field: string;
+  currentValue: unknown;
+  suggestedValue: unknown;
+  reason: string;
+}
+
+/**
+ * Analyze sprint result and generate config improvement suggestions.
+ */
+export function generateConfigSuggestions(sprintResult: SprintResult): ConfigSuggestion[] {
+  const suggestions: ConfigSuggestion[] = [];
+  const { metrics } = sprintResult;
+
+  if (metrics.noGoRate > 0.5) {
+    suggestions.push({
+      field: 'brain_planning',
+      currentValue: 'structured',
+      suggestedValue: 'ai',
+      reason: `NO_GO rate ${(metrics.noGoRate * 100).toFixed(0)}% > 50% — AI planning may produce better task breakdowns`,
+    });
+  }
+
+  if (metrics.coveragePercent < 40) {
+    suggestions.push({
+      field: 'active_skills',
+      currentValue: [],
+      suggestedValue: ['test-writer'],
+      reason: `Coverage ${metrics.coveragePercent.toFixed(0)}% < 40% — enable testing skill to improve coverage`,
+    });
+  }
+
+  const ONE_HOUR_MS = 3_600_000;
+  if (metrics.durationMs > ONE_HOUR_MS) {
+    suggestions.push({
+      field: 'max_workers',
+      currentValue: 3,
+      suggestedValue: 5,
+      reason: `Sprint duration ${formatDuration(metrics.durationMs)} > 1h — increase max_workers to parallelize`,
+    });
+  }
+
+  return suggestions;
+}
+
+/**
+ * Detect files that appear in NO_GO tasks across 3+ sprints.
+ */
+export function detectRecurringFileErrors(_projectRoot: string, sprintResults: SprintResult[]): string[] {
+  const last3 = sprintResults.slice(-3);
+  if (last3.length < 3) return [];
+
+  // Map: filePath → Set<sprintId>
+  const fileSprintMap = new Map<string, Set<string>>();
+
+  for (const sr of last3) {
+    const sprintId = sr.sprint.id;
+    for (const task of sr.sprint.tasks) {
+      const evalResult = sr.evaluations.get(task.id);
+      if (evalResult !== TaskEvaluation.NO_GO) continue;
+
+      const files = [
+        ...task.scope.directories,
+        ...task.scope.filesWrite,
+      ];
+      for (const f of files) {
+        if (!fileSprintMap.has(f)) fileSprintMap.set(f, new Set());
+        fileSprintMap.get(f)!.add(sprintId);
+      }
+    }
+  }
+
+  const recurring: string[] = [];
+  for (const [filePath, sprints] of fileSprintMap) {
+    if (sprints.size >= 3) recurring.push(filePath);
+  }
+
+  return recurring.sort();
+}
+
+/**
+ * Add recurring error files as patterns to .brain/PATTERNS.md.
+ * Returns the number of new patterns added.
+ */
+export function addRecurringPatternsToFile(projectRoot: string, recurringFiles: string[]): number {
+  if (recurringFiles.length === 0) return 0;
+
+  const patternsPath = join(projectRoot, BRAIN_DIR, PATTERNS_FILE);
+  const brainPath = join(projectRoot, BRAIN_DIR);
+  mkdirSync(brainPath, { recursive: true });
+
+  let data: { active: PatternEntry[]; resolved: PatternEntry[] } = { active: [], resolved: [] };
+  if (existsSync(patternsPath)) {
+    try {
+      data = JSON.parse(readFileSync(patternsPath, 'utf-8'));
+    } catch {
+      // corrupt file, start fresh
+    }
+  }
+  if (!Array.isArray(data.active)) data.active = [];
+  if (!Array.isArray(data.resolved)) data.resolved = [];
+
+  const existingPatterns = new Set([
+    ...data.active.map(p => p.pattern),
+    ...data.resolved.map(p => p.pattern),
+  ]);
+
+  let added = 0;
+  for (const filePath of recurringFiles) {
+    const patternName = `recurring_error_${filePath.replace(/[/.]/g, '_')}`;
+    if (existingPatterns.has(patternName)) continue;
+
+    data.active.push({
+      pattern: patternName,
+      occurrences: 3,
+      firstDetectedInSprint: 'auto-detected',
+      lastDetectedInSprint: 'auto-detected',
+      resolved: false,
+    });
+    added++;
+  }
+
+  if (added > 0) {
+    writeFileSync(patternsPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+  }
+
+  return added;
+}
+
+/**
+ * Build a markdown "Brain Insights" block for sprint reports.
+ */
+export function buildBrainInsights(
+  sprintResult: SprintResult,
+  configSuggestions: ConfigSuggestion[],
+  recurringFiles: string[],
+): string {
+  const { metrics } = sprintResult;
+  const lines: string[] = [];
+
+  lines.push('### Brain Insights');
+  lines.push('');
+  lines.push(`- **Sprint Score:** ${metrics.completedTasks}/${metrics.totalTasks} tasks completed (${(metrics.noGoRate * 100).toFixed(0)}% NO_GO rate)`);
+  lines.push(`- **Coverage:** ${metrics.coveragePercent.toFixed(0)}%`);
+  lines.push(`- **Duration:** ${formatDuration(metrics.durationMs)}`);
+
+  if (configSuggestions.length > 0) {
+    lines.push('');
+    lines.push('**Config Suggestions:**');
+    for (const s of configSuggestions) {
+      lines.push(`- \`${s.field}\`: ${s.reason}`);
+    }
+  }
+
+  if (recurringFiles.length > 0) {
+    lines.push('');
+    lines.push(`**Recurring Problem Files (${recurringFiles.length}):** ${recurringFiles.join(', ')}`);
+  }
+
+  return lines.join('\n');
+}

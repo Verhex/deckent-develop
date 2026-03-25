@@ -84,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Orchestration smoke test**: First real `runSprint` execution since Sprint 10 — 10 parallel doc tasks planned, 8 executed
 - **8 documentation files** (~135 KB total): GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
-- **Sprint observation report**: `docs/SPRINT-18-OBSERVATION.md` — detailed phase-by-phase orchestration analysis
+- **Sprint observation report**: `docs/archive/observations/SPRINT-18-OBSERVATION.md` — detailed phase-by-phase orchestration analysis
 - **6 bugs discovered**: planner max_workers task limit, heartbeat timestamp drift, dashboard progress lag, alert dedup missing, doc task coverage criteria, DEBT.md empty table test
 - **End-to-end validation**: PLAN → SPAWN → EXECUTE → EVALUATE → RETRO → CLEANUP completed in 260s with 8 parallel sonnet workers
 - **Test suite**: 1027 tests (0 new — doc-only sprint), 97.5% coverage, 0 regressions
@@ -190,9 +190,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **CONTRIBUTING.md**: Full contributing guide (setup, standards, testing, PR process)
-- **docs/API.md**: Complete programmatic API reference (1491 lines)
-- **docs/ARCHITECTURE.md**: Condensed architecture overview
-- **docs/ROADMAP.md**: Phase-based roadmap
+- **docs/reference/api.md**: Complete programmatic API reference (1491 lines)
+- **docs/architecture/architecture.md**: Condensed architecture overview
+- **docs/release/roadmap.md**: Phase-based roadmap
 - **MCP dogfooding**: Used Deckent's own MCP tools during development
 - **Test suite**: 669 tests, 95% coverage
 

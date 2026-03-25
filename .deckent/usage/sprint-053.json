@@ -1,0 +1,98 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "053-001",
+    "timestamp": "2026-03-25T08:25:56.338Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "053-002",
+    "timestamp": "2026-03-25T08:25:56.367Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "053-003",
+    "timestamp": "2026-03-25T08:25:56.399Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "053-004",
+    "timestamp": "2026-03-25T08:25:56.436Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "053-001",
+    "timestamp": "2026-03-25T08:55:59.023Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "053-002",
+    "timestamp": "2026-03-25T08:55:59.024Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "053-003",
+    "timestamp": "2026-03-25T08:55:59.024Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 1000,
+    "taskId": "053-004",
+    "timestamp": "2026-03-25T08:55:59.024Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 1000,
+    "taskId": "053-005",
+    "timestamp": "2026-03-25T08:55:59.025Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 1000,
+    "taskId": "053-006",
+    "timestamp": "2026-03-25T08:55:59.025Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 1000,
+    "taskId": "053-007",
+    "timestamp": "2026-03-25T08:55:59.026Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 1000,
+    "taskId": "053-008",
+    "timestamp": "2026-03-25T08:55:59.026Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "053-002-fix",
+    "timestamp": "2026-03-25T08:55:59.069Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "053-004-fix",
+    "timestamp": "2026-03-25T08:55:59.093Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "053-005-fix",
+    "timestamp": "2026-03-25T08:55:59.127Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "053-006-fix",
+    "timestamp": "2026-03-25T08:55:59.166Z"
+  }
+]

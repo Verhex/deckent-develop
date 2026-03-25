@@ -6,12 +6,12 @@ export const healthCheckUpdater: DocUpdater = {
   name: 'health-check',
   tier: 2,
   internal: true,
-  targetFile: 'docs/HEALTH-CHECK.md',
+  targetFile: 'docs/reference/health-check.md',
 
   shouldRun(ctx: DocUpdateContext): boolean {
     if (ctx.config.auto_docs?.tier2 === false) return false;
     if (!ctx.isInternalProject) return false;
-    return existsSync(join(ctx.projectRoot, 'docs', 'HEALTH-CHECK.md'));
+    return existsSync(join(ctx.projectRoot, 'docs', 'reference', 'health-check.md'));
   },
 
   run(ctx: DocUpdateContext): DocUpdateResult {

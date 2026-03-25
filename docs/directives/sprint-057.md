@@ -1,70 +1,59 @@
-# DIRECTIVES — Sprint 057: Community Infrastructure
+# DIRECTIVES — Sprint 055: Epic→Multi-Sprint Decomposition
 
-## Goal: GitHub Discussions, Discord, CONTRIBUTING overhaul. Community büyümesi için altyapı.
-
----
-
-## Task 1: GitHub Discussions Setup
-- Model: sonnet
-- Effort: normal
-- Files: .github/DISCUSSION_TEMPLATE/ (new), docs/COMMUNITY.md (new)
-- Scope: .github/, docs/
-
-### Description
-GitHub Discussions kategori yapısı: Ideas (feature requests), Q&A (help), Show & Tell (projeler), Announcements. Discussion template'leri. COMMUNITY.md: Discord link, contribution guide, code of conduct referansı.
-5+ test.
+## Goal: Büyük hedefleri otomatik alt-sprint'lere böl. "Build me an e-commerce site" → 5 sprint, sıralı execution, cross-sprint MEMORY.
 
 ---
 
-## Task 2: CONTRIBUTING.md Overhaul
+## Task 1: Epic Planner
 - Model: opus
 - Effort: high
-- Files: CONTRIBUTING.md
-- Scope: ./
+- Files: src/orchestra/epic-planner.ts (new), src/core/epic-types.ts (new)
+- Scope: src/orchestra/, src/core/
 
 ### Description
-CONTRIBUTING.md'yi yeniden yaz. Sections: Quick Start (5 dakika dev setup), Architecture Overview (module map), Development Workflow (branch → test → PR), Plugin Development, Skill Development, Translation Guide. "Good First Issue" rehberi. Code review checklist.
-8+ test.
+`EpicPlanner` class: büyük hedefi alt-sprint'lere böl. Input: natural language goal + project analysis. Output: EpicPlan { sprints: SprintGoal[], dependencies: string[][], estimatedTotal: number }. AI planner'ı kullan (mevcut planner.ts pattern). Zod validation. Max 10 sprint per epic.
+10+ test.
 
 ---
 
-## Task 3: Issue Label System
-- Model: haiku
-- Effort: low
-- Files: .github/labels.yml (new), scripts/sync-labels.ts (new)
-- Scope: .github/, scripts/
+## Task 2: Sequential Sprint Executor
+- Model: opus
+- Effort: high
+- Files: src/orchestra/epic-executor.ts (new), src/orchestra/sprint-controller.ts
+- Scope: src/orchestra/
 
 ### Description
-Standart label seti: `good first issue`, `help wanted`, `bug`, `enhancement`, `plugin`, `skill`, `docs`, `provider:claude`, `provider:codex`, `provider:gemini`, `priority:p0-p3`, `area:brain`, `area:worker`, `area:auditor`, `area:api`, `area:dashboard`. GitHub API ile sync script.
-3+ test.
+EpicPlan'ı sırayla execute et: Sprint 1 → evaluate → Sprint 2 → ... Her sprint arası MEMORY güncelle. Önceki sprint'in sonuçlarını sonraki sprint'in context'ine ekle. Pause/resume epic level. `deckent start --epic "Build e-commerce site"`.
+10+ test.
 
 ---
 
-## Task 4: Discord Bot (Webhook)
+## Task 3: Epic Progress Tracking
 - Model: sonnet
 - Effort: normal
-- Files: src/integrations/discord-webhook.ts (new)
-- Scope: src/integrations/
+- Files: src/orchestra/epic-tracker.ts (new), src/api/server.ts
+- Scope: src/orchestra/, src/api/
 
 ### Description
-Sprint complete → Discord webhook notification. Format: embed with sprint summary, task count, NO_GO rate. Config: `discord_webhook_url`. Mevcut notification system'e entegre (NotificationConfig).
+Epic durumunu .deckent/epics/{id}.json'a kaydet. API endpoint: GET /api/epic/{id} → progress. Dashboard'da epic view (sprint listesi, overall progress). `deckent status --epic` komutu.
 5+ test.
 
 ---
 
-## Task 5: Code of Conduct
-- Model: haiku
-- Effort: low
-- Files: CODE_OF_CONDUCT.md (new)
-- Scope: ./
+## Task 4: Cross-Sprint Context
+- Model: sonnet
+- Effort: normal
+- Files: src/orchestra/cross-sprint-context.ts (new)
+- Scope: src/orchestra/
 
 ### Description
-Contributor Covenant v2.1 adapte et. İletişim: community@deckent.agency. Enforcement guidelines.
-2+ test.
+Sprint N'in sonuçlarını Sprint N+1'in DIRECTIVES'ine otomatik ekle: "Önceki sprint'te Auth tamamlandı, şimdi Products üzerine çalış. Auth modülü src/auth/ altında, JWT token formatı: ...". MEMORY + git diff + task results birleştir.
+5+ test.
 
 ---
 
 ## Quality Rules
-- Tüm template'ler GitHub API ile uyumlu
-- Discord webhook test edilmiş
-- CONTRIBUTING.md 5 dakika dev setup çalışır
+- Epic plan Zod-validated
+- Cross-sprint MEMORY tutarlı
+- Epic pause/resume çalışır
+- 10+ sprint'lik epic test

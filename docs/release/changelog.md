@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint54] - 2026-03-25
+
+### Changed
+
+- Agent Activation — systemPrompt + Worker Injection (completed with tech debt)
+- Brain Self-Learning — Config Suggestions + Pattern Detection (completed with tech debt)
+- Rich Sprint Output + README Update (completed with tech debt)
+- docs/ Reorganization + .claude/rules/ Update (completed with tech debt)
+
+_Tasks: 4 total, 4 done, 4 tech debt, 0 no-go_
+
+## [0.2.0-beta.1-sprint53] - 2026-03-25
+
+### Added
+
+- Skill Injection — 10 Skill'i Worker'lara Inject Et
+
+### Changed
+
+- Self-Healing Bootstrap — Auto-Migration on Startup (completed with tech debt)
+
+
+_Tasks: 8 total, 2 done, 1 tech debt, 6 no-go_
+
 ## [0.2.0-beta.1-sprint52] - 2026-03-25
 
 

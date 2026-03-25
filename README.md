@@ -270,6 +270,13 @@ Output:
 | `deckent set-directives` | Set sprint directives |
 | `deckent finalize` | Finalize current sprint |
 | `deckent run <cmd>` | Run arbitrary command |
+| `deckent explain <topic>` | Explain a concept or command |
+| `deckent quick-start` | Quick-start wizard for new projects |
+| `deckent skill` | List or manage installed skills |
+| `deckent skill-marketplace` | Browse and install skills from marketplace |
+| `deckent agent` | Manage agent pool (list, inspect, reset) |
+| `deckent review` | Review last sprint results |
+| `deckent config migrate` | Migrate config to latest schema version |
 
 ---
 
@@ -338,9 +345,9 @@ Configuration lives in `.deckent/config.json` (project) and `~/.deckent/config.j
 
 **Mode Aliases:** You can also use `performance`, `balanced`, `economic`, or `unlimited` as friendly aliases for the canonical mode names.
 
-**Multi-Provider:** Configure `brain_provider`, `worker_provider`, and `fallback_provider` to use Claude, Codex, or Gemini. See [docs/MULTI-PROVIDER-GUIDE.md](docs/MULTI-PROVIDER-GUIDE.md).
+**Multi-Provider:** Configure `brain_provider`, `worker_provider`, and `fallback_provider` to use Claude, Codex, or Gemini. See [docs/reference/multi-provider.md](docs/reference/multi-provider.md).
 
-See [docs/CONFIG-REFERENCE.md](docs/CONFIG-REFERENCE.md) for the full reference.
+See [docs/reference/config-reference.md](docs/reference/config-reference.md) for the full reference.
 
 ---
 
@@ -360,7 +367,7 @@ React + Vite + Tailwind -- 4 pages (Dashboard, Settings, History, Memory), SSE r
 deckent serve   # API only at localhost:3100
 ```
 
-16 endpoints + SSE stream. See [docs/API.md](docs/API.md) for the full reference.
+16 endpoints + SSE stream. See [docs/reference/api.md](docs/reference/api.md) for the full reference.
 
 ---
 
@@ -400,16 +407,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing guide, cod
 
 ## Documentation
 
-- [Quickstart Tutorial](docs/QUICKSTART.md)
-- [API Reference](docs/API.md)
-- [Configuration Reference](docs/CONFIG-REFERENCE.md)
-- [Multi-Provider Guide](docs/MULTI-PROVIDER-GUIDE.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Sprint Lifecycle](docs/SPRINT-LIFECYCLE.md)
-- [MCP Guide](docs/MCP-GUIDE.md)
-- [Plugin Guide](docs/PLUGIN-GUIDE.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [FAQ](docs/FAQ.md)
+- [Quickstart Tutorial](docs/guide/quickstart.md)
+- [API Reference](docs/reference/api.md)
+- [Configuration Reference](docs/reference/config-reference.md)
+- [Multi-Provider Guide](docs/reference/multi-provider.md)
+- [Architecture](docs/architecture/architecture.md)
+- [Sprint Lifecycle](docs/architecture/sprint-lifecycle.md)
+- [MCP Guide](docs/reference/mcp-guide.md)
+- [Plugin Guide](docs/development/plugin-guide.md)
+- [Troubleshooting](docs/development/troubleshooting.md)
+- [FAQ](docs/guide/faq.md)
 
 ---
 

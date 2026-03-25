@@ -36,3 +36,7 @@
 | debt-051-007 | Tech debt from 051-007: Created src/core/config-migration.ts with migrateConfig( | 051-007 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.115Z |
 | debt-051-008 | Tech debt from 051-008: Created GitHub Pages deployment workflow (.github/workfl | 051-008 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.116Z |
 | debt-052-001 | Tech debt from 052-001: Dashboard full expansion tamamlandı: (A) ConfigPage.tsx | 052-001 | sprint-052 | NORMAL | 0 | true | sprint-052 | 2026-03-25T08:11:25.348Z |
+| debt-054-001 | Tech debt from 054-001: A) 8 agent JSON'a domain-specific systemPrompt eklendi ( | 054-001 | sprint-054 | NORMAL | 0 | true | sprint-054 | 2026-03-25T09:52:52.588Z |
+| debt-054-002 | Tech debt from 054-002: 4 brain self-learning fonksiyonu eklendi: generateConfig | 054-002 | sprint-054 | NORMAL | 0 | true | sprint-054 | 2026-03-25T09:52:52.589Z |
+| debt-054-003 | Tech debt from 054-003: A) sprint-summary-rich.ts genişletildi: TaskTableRow ara | 054-003 | sprint-054 | NORMAL | 0 | true | sprint-054 | 2026-03-25T09:52:52.590Z |
+| debt-054-004 | Tech debt from 054-004: Created tests/docs/docs-structure.test.ts with 19 tests | 054-004 | sprint-054 | NORMAL | 0 | true | sprint-054 | 2026-03-25T09:52:52.592Z |

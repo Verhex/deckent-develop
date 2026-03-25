@@ -96,3 +96,8 @@
 - Deploy Configuration: GO_WITH_TECH_DEBT
 ## Sprint sprint-052 Learnings
 - Dashboard Full Expansion: GO_WITH_TECH_DEBT
+## Sprint sprint-054 Learnings
+- Agent Activation — systemPrompt + Worker Injection: GO_WITH_TECH_DEBT
+- Brain Self-Learning — Config Suggestions + Pattern Detection: GO_WITH_TECH_DEBT
+- Rich Sprint Output + README Update: GO_WITH_TECH_DEBT
+- docs/ Reorganization + .claude/rules/ Update: GO_WITH_TECH_DEBT

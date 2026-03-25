@@ -1098,7 +1098,7 @@ Every task declares a `scope` that defines the worker's write sandbox:
   "scope": {
     "directories": ["src/core/", "src/monitor/"],
     "filesRead": ["AGENTS.md", ".contracts/api-surface.md"],
-    "filesWrite": ["docs/SECURITY.md"]
+    "filesWrite": ["docs/reference/security.md"]
   }
 }
 ```

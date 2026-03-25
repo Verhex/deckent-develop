@@ -1,59 +1,58 @@
-# DIRECTIVES — Sprint 058: Git Auto-Workflow
+# DIRECTIVES — Sprint 056: Continuous Watch Mode
 
-## Goal: Branch-per-sprint, auto-commit-per-task, sprint PR oluşturma. Git workflow otomasyonu.
+## Goal: `deckent watch --act` → Repo'yu izle, ne yapılması gerektiğini öner, onay al, sprint çalıştır. "Yaşayan organizma" deneyimi.
 
 ---
 
-## Task 1: Branch-per-Sprint
+## Task 1: Repository Analyzer (Continuous)
 - Model: opus
 - Effort: high
-- Files: src/orchestra/git-workflow.ts (new), src/orchestra/sprint-controller.ts
+- Files: src/orchestra/repo-analyzer.ts (new)
 - Scope: src/orchestra/
 
 ### Description
-Sprint başladığında otomatik branch oluştur: `deckent/sprint-{id}`. Config: `git_auto_branch: true/false` (default: false — backward compat). Sprint tamamlandığında main'e merge önerisi. Dirty working tree handle: stash → branch → pop.
-10+ test.
-
----
-
-## Task 2: Auto-Commit-per-Task
-- Model: sonnet
-- Effort: normal
-- Files: src/orchestra/git-workflow.ts, src/agents/worker.ts
-- Scope: src/orchestra/, src/agents/
-
-### Description
-Her task tamamlandığında otomatik commit: `deckent(sprint-051): Task 1 - Add login endpoint`. Conventional commits format. Scope: task'ın scope.directories'i. Config: `git_auto_commit: true/false`. Sadece DONE veya GO_WITH_TECH_DEBT task'lar commit edilir.
+Repo'yu periyodik analiz et (her 5 dakika veya file change): open TODO/FIXME sayısı, test coverage trend, stale branches, dependency updates, open issues (GitHub API). Her analiz sonucu "suggestion" listesi oluştur.
 8+ test.
 
 ---
 
-## Task 3: Sprint PR Generator
-- Model: sonnet
-- Effort: normal
-- Files: src/integrations/github-pr.ts (new)
-- Scope: src/integrations/
+## Task 2: Suggestion Engine
+- Model: opus
+- Effort: high
+- Files: src/orchestra/suggestion-engine.ts (new), src/core/suggestion-types.ts (new)
+- Scope: src/orchestra/, src/core/
 
 ### Description
-Sprint tamamlandığında PR oluştur (gh CLI). Title: `deckent(sprint-051): npm Publish + README Overhaul`. Body: task listesi (checkbox), metrics (coverage, test count), RETRO özeti, files changed. Draft PR default. Config: `github_auto_pr: true/false`.
-5+ test.
+Repo analysis + MEMORY + PATTERNS'tan sprint önerileri üret. Priority scoring: TODO count (high), coverage drop (critical), dependency update (low). Suggestion format: { title, description, priority, estimatedEffort, suggestedModel }. Max 5 suggestion at a time.
+8+ test.
 
 ---
 
-## Task 4: Merge Conflict Detection
+## Task 3: Watch Mode CLI
 - Model: sonnet
 - Effort: normal
-- Files: src/orchestra/git-workflow.ts
-- Scope: src/orchestra/
+- Files: src/cli/commands/watch.ts (modify), src/cli/commands/continuous.ts (new)
+- Scope: src/cli/
 
 ### Description
-Sprint sırasında main branch'te değişiklik olursa: rebase attempt, conflict varsa alert. Auditor'a merge conflict detection ekle. Dashboard'da "merge conflict" uyarısı.
+`deckent watch --act` → sürekli izle + öner + onayla + çalış döngüsü. Interactive: "3 öneri var: 1) Fix 5 TODO, 2) Update deps, 3) Increase coverage. Hangisini yapayım? [1/2/3/all/skip]". `--auto` mode: priority > HIGH olanları otomatik çalıştır.
+8+ test.
+
+---
+
+## Task 4: Watch Dashboard Integration
+- Model: sonnet
+- Effort: normal
+- Files: src/api/server.ts, src/dashboard/ (modify)
+- Scope: src/api/, src/dashboard/
+
+### Description
+Web dashboard'da "Suggestions" tab. Real-time suggestion listesi, one-click sprint başlatma. SSE ile live update. Suggestion history (kabul/red edilen öneriler).
 5+ test.
 
 ---
 
 ## Quality Rules
-- Branch naming consistent
-- Commit messages conventional
-- PR template populated
-- Conflict detection false positive < %5
+- Watch mode CPU < %5 idle
+- Suggestion kalitesi: false positive < %20
+- Auto mode güvenli (destructive action yok)

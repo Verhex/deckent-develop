@@ -68,12 +68,24 @@ export interface AgentPerfEntry {
   successRate: number;
 }
 
+/** Per-task row for the task table. */
+export interface TaskTableRow {
+  id: string;
+  title: string;
+  status: string;
+  agent?: string;
+  durationMs?: number;
+}
+
 /** Options for formatting the rich sprint summary. */
 export interface RichSummaryOpts {
   gitDiff?: string;
   agentPerf?: AgentPerfEntry[];
   learnings?: string[];
   outputMode?: 'quiet' | 'normal' | 'verbose';
+  taskRows?: TaskTableRow[];
+  configMigrated?: boolean;
+  brainInsights?: string;
 }
 
 // ─── Section Renderers ──────────────────────────────────────────────
@@ -262,6 +274,94 @@ function renderNextSteps(evaluations: Map<string, string>, sprint: RichSprintInp
   return parts.join('\n');
 }
 
+/**
+ * Render task-by-task table.
+ * Columns: ID | Title | Status | Agent | Duration
+ */
+function renderTaskTable(taskRows?: TaskTableRow[], evaluations?: Map<string, string>): string {
+  const header = c(ANSI.bold, 'Task Breakdown');
+
+  const rows: TaskTableRow[] = taskRows ?? [];
+  if (rows.length === 0 && (!evaluations || evaluations.size === 0)) {
+    return `${header}\n  ${c(ANSI.dim, 'No task data available')}`;
+  }
+
+  // Build rows from evaluations if taskRows not provided
+  const effectiveRows: TaskTableRow[] =
+    rows.length > 0
+      ? rows
+      : evaluations
+        ? Array.from(evaluations.entries()).map(([id, status]) => ({ id, title: id, status }))
+        : [];
+
+  const COL_ID = 10;
+  const COL_TITLE = 24;
+  const COL_STATUS = 20;
+  const COL_AGENT = 14;
+  const COL_DUR = 8;
+
+  const pad = (s: string, n: number) => s.slice(0, n).padEnd(n);
+  const divider = c(
+    ANSI.dim,
+    `  ${'─'.repeat(COL_ID)}┬${'─'.repeat(COL_TITLE)}┬${'─'.repeat(COL_STATUS)}┬${'─'.repeat(COL_AGENT)}┬${'─'.repeat(COL_DUR)}`,
+  );
+  const headRow = c(
+    ANSI.dim,
+    `  ${pad('ID', COL_ID)}│${pad('Title', COL_TITLE)}│${pad('Status', COL_STATUS)}│${pad('Agent', COL_AGENT)}│${'Duration'.padEnd(COL_DUR)}`,
+  );
+
+  const parts: string[] = [header, headRow, divider];
+
+  for (const row of effectiveRows) {
+    const status = (evaluations?.get(row.id) ?? row.status ?? '').replace('GO_WITH_TECH_DEBT', 'TECH_DEBT');
+    const color =
+      status === 'DONE' ? ANSI.green : status === 'NO_GO' ? ANSI.red : status === 'TECH_DEBT' ? ANSI.yellow : ANSI.dim;
+    const dur = row.durationMs ? formatDuration(row.durationMs) : '-';
+    parts.push(
+      `  ${pad(row.id, COL_ID)}│${pad(row.title, COL_TITLE)}│${c(color, pad(status, COL_STATUS))}│${pad(row.agent ?? '-', COL_AGENT)}│${dur.padEnd(COL_DUR)}`,
+    );
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Render GO/NO_GO/TECH_DEBT summary counts on separate lines.
+ */
+function renderEvalCounts(evaluations: Map<string, string>): string {
+  const { done, debt, nogo } = countEvals(evaluations);
+  const header = c(ANSI.bold, 'Evaluation Summary');
+  const lines = [
+    header,
+    `  ${c(ANSI.green, `GO (DONE):`)}        ${done}`,
+    `  ${c(ANSI.yellow, `GO_WITH_TECH_DEBT:`)} ${debt}`,
+    `  ${c(ANSI.red, `NO_GO:`)}             ${nogo}`,
+  ];
+  return lines.join('\n');
+}
+
+/**
+ * Render config migration notice if a migration was applied.
+ */
+function renderConfigMigration(migrated?: boolean): string | null {
+  if (!migrated) return null;
+  return `${c(ANSI.bold, 'Config Migration')}\n  ${c(ANSI.green, '\u2713')} Config schema migrated to current version`;
+}
+
+/**
+ * Render brain insights block.
+ */
+function renderBrainInsights(insights?: string): string | null {
+  if (!insights || insights.trim().length === 0) return null;
+  const header = c(ANSI.bold, 'Brain Insights');
+  const lines = insights
+    .trim()
+    .split('\n')
+    .map((l) => `  ${l}`)
+    .join('\n');
+  return `${header}\n${lines}`;
+}
+
 // ─── Main Export ────────────────────────────────────────────────────
 
 /**
@@ -291,11 +391,19 @@ export function formatRichSprintSummary(
 
   sections.push(renderHeader(sprint));
   sections.push(renderResults(evaluations));
+  sections.push(renderEvalCounts(evaluations));
+  sections.push(renderTaskTable(opts?.taskRows, evaluations));
   sections.push(renderChanges(opts?.gitDiff));
   sections.push(renderTests(sprint, verbose));
   sections.push(renderAgentPerformance(opts?.agentPerf));
   sections.push(renderLearnings(opts?.learnings));
   sections.push(renderNextSteps(evaluations, sprint));
+
+  const migration = renderConfigMigration(opts?.configMigrated);
+  if (migration) sections.push(migration);
+
+  const insights = renderBrainInsights(opts?.brainInsights);
+  if (insights) sections.push(insights);
 
   if (verbose) {
     // Extra detail: per-task breakdown

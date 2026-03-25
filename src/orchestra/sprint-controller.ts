@@ -648,6 +648,21 @@ export function resolveAgentPrompt(projectRoot: string, task: Task): string | un
       return readFileSync(p, 'utf-8');
     } catch { /* not found, try next */ }
   }
+  // Fall back to systemPrompt + expertise from agent.json
+  const agentJsonPaths = [
+    join(projectRoot, '.deckent', 'agents', agentId, 'agent.json'),
+    join(projectRoot, TASKS_DIR, 'agents', agentId, 'agent.json'),
+  ];
+  for (const p of agentJsonPaths) {
+    try {
+      const raw = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
+      const systemPrompt = raw['systemPrompt'] as string | undefined;
+      if (systemPrompt) {
+        const expertise = Array.isArray(raw['expertise']) ? (raw['expertise'] as string[]).join(', ') : '';
+        return expertise ? `${systemPrompt}\n\nExpertise: ${expertise}` : systemPrompt;
+      }
+    } catch { /* not found, try next */ }
+  }
   return undefined;
 }
 
@@ -1231,6 +1246,20 @@ export async function finalizeSprint(
       } satisfies AfterSprintContext);
     } catch { /* afterSprint hook failure is non-fatal */ }
   }
+
+  // 8b. Update agent stats
+  try {
+    const poolManager = new AgentPoolManager(projectRoot);
+    for (const task of sprint.tasks) {
+      const agentId = task.assignedAgent;
+      if (!agentId || agentId === 'generic') continue;
+      const evaluation = evaluations.get(task.id);
+      if (!evaluation) continue;
+      const taskResult = results.find(r => r.taskId === task.id);
+      const coverage = taskResult?.coverage ?? 0;
+      poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
+    }
+  } catch { /* non-fatal: agent stats update failure */ }
 
   // 9. Update project docs
   if (opts?.config) {

@@ -201,7 +201,7 @@ function makeSprintTasks(): Task[] {
       id: '033-005',
       title: 'Update API documentation',
       description: 'Document new security endpoints and authentication flow in README',
-      scope: makeScope(['docs/'], ['docs/API.md', 'docs/SECURITY.md']),
+      scope: makeScope(['docs/'], ['docs/reference/api.md', 'docs/reference/security.md']),
     }),
     // 1 refactor task
     makeTask({

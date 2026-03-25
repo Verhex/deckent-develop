@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const DOC_PATH = join(process.cwd(), 'docs', 'landing-page-content.md');
+const DOC_PATH = join(process.cwd(), 'docs', 'archive', 'landing-page-content.md');
 
-describe('docs/landing-page-content.md', () => {
+describe('docs/archive/landing-page-content.md', () => {
   const content = readFileSync(DOC_PATH, 'utf-8');
 
   it('exists and is non-empty', () => {

@@ -4,8 +4,8 @@ import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 
-describe('docs/SKILLS.md', () => {
-  const skillsPath = join(ROOT, 'docs', 'SKILLS.md');
+describe('docs/reference/skills.md', () => {
+  const skillsPath = join(ROOT, 'docs', 'reference', 'skills.md');
 
   it('file exists', () => {
     expect(existsSync(skillsPath)).toBe(true);

@@ -349,7 +349,7 @@ Deckent ilk kez kendini çalıştırdı:
 
 ## Sprint 8: Dokümantasyon ve MCP Dogfooding
 
-- CONTRIBUTING.md, tam API referansı (docs/API.md)
+- CONTRIBUTING.md, tam API referansı (docs/reference/api.md)
 - MCP dogfooding: Deckent'in kendi MCP araçlarıyla geliştirme
 - 669 test, %95 kapsam
 
@@ -443,7 +443,7 @@ Deckent ilk kez kendini çalıştırdı:
 - 8 sonnet worker paralel çalıştı, tümü 260 saniyede tamamlandı
 - 3 DONE, 5 GO_WITH_TECH_DEBT, 0 NO_GO
 - 6 bug keşfedildi: planner görev limiti, heartbeat zaman damgası, dashboard ilerleme gecikmesi, alert tekrar sorunu, doküman coverage kriterleri, DEBT.md test hatası
-- Gözlem raporu: docs/SPRINT-18-OBSERVATION.md
+- Gözlem raporu: docs/archive/observations/SPRINT-18-OBSERVATION.md
 - 1027 test (sadece doküman sprint'i — yeni test yok), %97.5 kapsam, 0 regresyon
 
 ## Sprint 19: Motor Onarımı — 6 Bug Fix
@@ -453,7 +453,7 @@ Deckent ilk kez kendini çalıştırdı:
 - `isDocTask()`: doküman scope'ları için coverage kontrolü atlanıyor
 - `updateProjectDocs()`: sprint sonrası dokümanlar otomatik güncelleniyor
 - +96 test (1027→1123), +1555 kaynak satırı, 0 regresyon
-- Gözlem raporu: docs/SPRINT-19-OBSERVATION.md
+- Gözlem raporu: docs/archive/observations/SPRINT-19-OBSERVATION.md
 
 ## Sprint 20: Fix Doğrulama
 
@@ -464,7 +464,7 @@ Deckent ilk kez kendini çalıştırdı:
 - Görev kuyruğu: BAŞARISIZ (planner hala max_workers ile sınırlı — Sprint 21'de düzeltildi)
 - 8/14 görev planlandı (planner bug'ı aktif), 113 saniye
 - 1027 test (doğrulama sprint'i), 0 regresyon
-- Gözlem raporu: docs/SPRINT-20-OBSERVATION.md
+- Gözlem raporu: docs/archive/observations/SPRINT-20-OBSERVATION.md
 
 ## Sprint 21: Parametrik Orkestrasyon
 
@@ -476,7 +476,7 @@ Deckent ilk kez kendini çalıştırdı:
 - Planner görev kuyruğu düzeltmesi: `planSprint` TÜM görevleri planlıyor, `spawnWorkers` parallelism sınırını uyguluyor
 - DEBT.md decay bug'ı tekrar oluştu (3. kez) — Sprint 22'de kalıcı fix
 - 8/8 görev (7 DONE, 1 TECH_DEBT), +137 test (1123→1260), 631 saniye
-- Gözlem raporu: docs/SPRINT-21-OBSERVATION.md
+- Gözlem raporu: docs/archive/observations/SPRINT-21-OBSERVATION.md
 
 ## Sprint 22: Decay Fix + Auto Setup + MCP Enrichment
 

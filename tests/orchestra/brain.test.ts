@@ -2521,7 +2521,7 @@ describe('calculateModelScore + inferModelFromDirective', () => {
       {
         directories: ['docs'],
         filesRead: [],
-        filesWrite: ['docs/BRAIN-GUIDE.md'],
+        filesWrite: ['docs/development/brain-guide.md'],
       }
     );
     // -2 (docs) -1 (single dir) = -3 ≤ -1 → haiku

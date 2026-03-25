@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const DOC_PATH = join(process.cwd(), 'docs', 'CONFIG-REFERENCE.md');
+const DOC_PATH = join(process.cwd(), 'docs', 'reference', 'config-reference.md');
 
-describe('docs/CONFIG-REFERENCE.md', () => {
+describe('docs/reference/config-reference.md', () => {
   const content = readFileSync(DOC_PATH, 'utf-8');
 
   it('exists and is non-empty', () => {

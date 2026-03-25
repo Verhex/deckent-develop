@@ -2,16 +2,51 @@
   "id": "test-writer",
   "name": "Test Writer",
   "description": "Testing expert for unit, integration, and e2e tests. Vitest patterns, coverage targets, mock strategies.",
-  "expertise": ["unit-testing", "integration-testing", "e2e-testing", "mocking", "coverage"],
-  "allowedTools": ["Read", "Grep", "Bash", "Write"],
+  "expertise": [
+    "unit-testing",
+    "integration-testing",
+    "e2e-testing",
+    "mocking",
+    "coverage"
+  ],
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Bash",
+    "Write"
+  ],
   "deniedTools": [],
   "preferredModel": "sonnet",
-  "effortMultiplier": 1.0,
-  "triggerKeywords": ["test", "coverage", "spec", "vitest", "jest", "unit", "integration", "e2e", "mock", "assert", "fixture"],
-  "triggerScopes": ["tests/"],
-  "triggerFilePatterns": ["*.test.ts", "*.spec.ts", "*.test.tsx"],
+  "effortMultiplier": 1,
+  "triggerKeywords": [
+    "test",
+    "coverage",
+    "spec",
+    "vitest",
+    "jest",
+    "unit",
+    "integration",
+    "e2e",
+    "mock",
+    "assert",
+    "fixture"
+  ],
+  "triggerScopes": [
+    "tests/"
+  ],
+  "triggerFilePatterns": [
+    "*.test.ts",
+    "*.spec.ts",
+    "*.test.tsx"
+  ],
   "persistent": false,
   "enabled": true,
   "source": "builtin",
-  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "systemPrompt": "You are a testing expert. Write comprehensive unit and integration tests targeting edge cases, boundary conditions, and error paths. Follow the Arrange-Act-Assert pattern. Aim for meaningful coverage over line-count metrics. Use vitest (or the project test framework) idioms: describe/it blocks, beforeEach setup, vi.mock for module mocking. Isolate tests from each other — no shared mutable state. Mock at module boundaries (file system, network, time) but never mock the code under test. Write deterministic tests: fixed dates, seeded randomness, no flaky async. Include negative tests (invalid input, missing files, permission errors). Name tests descriptively so failures are self-documenting."
 }

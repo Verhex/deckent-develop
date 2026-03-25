@@ -1230,7 +1230,7 @@ Deckent ran itself for the first time:
 
 ## Sprint 8: Documentation & MCP Dogfooding
 
-- CONTRIBUTING.md, full API reference (docs/API.md)
+- CONTRIBUTING.md, full API reference (docs/reference/api.md)
 - MCP dogfooding: used Deckent's own MCP tools to develop
 - 669 tests, 95% coverage
 
@@ -1324,7 +1324,7 @@ Deckent ran itself for the first time:
 - 8 sonnet workers ran in parallel, all completed in 260s
 - 3 DONE, 5 GO_WITH_TECH_DEBT, 0 NO_GO
 - 6 bugs discovered: planner task limit, heartbeat timestamp, dashboard progress lag, alert dedup, doc coverage criteria, DEBT.md test
-- Observation report: docs/SPRINT-18-OBSERVATION.md
+- Observation report: docs/archive/observations/SPRINT-18-OBSERVATION.md
 - 1027 tests (doc-only sprint — no new tests), 97.5% coverage, 0 regressions
 
 ## Sprint 19: Motor Repair — 6 Bug Fixes
@@ -1334,7 +1334,7 @@ Deckent ran itself for the first time:
 - `isDocTask()`: doc scopes skip coverage check
 - `updateProjectDocs()`: auto-updates docs after sprint
 - +96 tests (1027→1123), +1555 source lines, 0 regressions
-- Observation report: docs/SPRINT-19-OBSERVATION.md
+- Observation report: docs/archive/observations/SPRINT-19-OBSERVATION.md
 
 ## Sprint 20: Fix Validation
 
@@ -1345,7 +1345,7 @@ Deckent ran itself for the first time:
 - Task queue: FAILED (planner still limited by max_workers — fixed in Sprint 21)
 - 8/14 tasks planned (planner bug still active), 113s
 - 1027 tests (validation sprint), 0 regressions
-- Observation report: docs/SPRINT-20-OBSERVATION.md
+- Observation report: docs/archive/observations/SPRINT-20-OBSERVATION.md
 
 ## Sprint 21: Parametric Orchestration
 
@@ -1357,7 +1357,7 @@ Deckent ran itself for the first time:
 - Planner task queue fix: `planSprint` plans ALL tasks, `spawnWorkers` enforces parallelism limit
 - DEBT.md decay bug recurred (3rd time) — resolved entries being removed
 - 8/8 tasks (7 DONE, 1 TECH_DEBT), +137 tests (1123→1260), 631s
-- Observation report: docs/SPRINT-21-OBSERVATION.md
+- Observation report: docs/archive/observations/SPRINT-21-OBSERVATION.md
 
 ## Sprint 22: Decay Fix + Auto Setup + MCP Enrichment
 
@@ -1792,7 +1792,7 @@ Full directive: `docs/directives/sprint-029.md`
 
 **Goal:** Dynamic agent pool, composable skills, intelligent Brain decisions, polished UX.
 
-Full architecture: `docs/AGENT-SKILL-ARCHITECTURE.md`
+Full architecture: `docs/architecture/agent-skill-architecture.md`
 
 ### Sprint 29: Agent Pool Core + Brain Integration (30 tasks)
 Full directive: `docs/directives/sprint-029.md`

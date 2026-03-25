@@ -104,7 +104,7 @@ Every task JSON file declares a `scope` object that defines the worker's write b
   "scope": {
     "directories": ["src/core/", "src/monitor/"],
     "filesRead": ["AGENTS.md", ".contracts/api-surface.md"],
-    "filesWrite": ["docs/SECURITY.md"]
+    "filesWrite": ["docs/reference/security.md"]
   }
 }
 ```
@@ -169,7 +169,7 @@ File path separators (`/`) are replaced with `__` (double underscore) to avoid n
 | File Path | Lock File Name |
 |---|---|
 | `src/core/types.ts` | `src__core__types.ts.lock` |
-| `docs/SECURITY.md` | `docs__SECURITY.md.lock` |
+| `docs/reference/security.md` | `docs__SECURITY.md.lock` |
 
 ### Lock Lifecycle
 
@@ -336,8 +336,8 @@ Brain reads this file but cannot write it. Workers have no access to it. Changes
 ## Related Documentation
 
 - [DECKENT-MASTER-BLUEPRINT.md §15](../DECKENT-MASTER-BLUEPRINT.md) — Primary security specification
-- [WORKER-GUIDE.md](WORKER-GUIDE.md) — Worker scope and lock rules
-- [BRAIN-GUIDE.md](BRAIN-GUIDE.md) — Brain permission boundaries
-- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — Overall system architecture
+- [worker-guide.md](../development/worker-guide.md) — Worker scope and lock rules
+- [brain-guide.md](../development/brain-guide.md) — Brain permission boundaries
+- [architecture.md](../architecture/architecture.md) — Overall system architecture
 - `.contracts/api-surface.md` — Worker scope contract definition
 - `.claude/rules/auditor.md` — Auditor operational rules

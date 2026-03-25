@@ -45,7 +45,7 @@ Review the file list. Verify:
 
 ### 5. Update CHANGELOG
 
-Open `docs/CHANGELOG.md` and add an entry for this release:
+Open `docs/release/changelog.md` and add an entry for this release:
 
 ```markdown
 ## [X.Y.Z] - YYYY-MM-DD

@@ -889,7 +889,7 @@ The `_enriched` field contains:
 - [ ] Input schema is complete and validated
 - [ ] Tool is registered in `src/mcp/server.ts`
 - [ ] All new test mocks include the new tool/resource in exports
-- [ ] Documentation mentions the new tool/resource in [docs/API.md](docs/API.md)
+- [ ] Documentation mentions the new tool/resource in [docs/reference/api.md](docs/reference/api.md)
 - [ ] Response is enriched with `enrichResponse()` if it's a tool
 
 ---
@@ -897,6 +897,6 @@ The `_enriched` field contains:
 ## Questions?
 
 - Open an issue on [GitHub](https://github.com/VerhexIO/deckent/issues)
-- Read the [Architecture docs](docs/ARCHITECTURE.md) for system design details
-- Check [docs/API.md](docs/API.md) for the full API reference
+- Read the [Architecture docs](docs/architecture/architecture.md) for system design details
+- Check [docs/reference/api.md](docs/reference/api.md) for the full API reference
 - Visit [deckent.agency](https://deckent.agency) for more information

@@ -296,7 +296,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - First real `runSprint` execution since Sprint 10
 - 8 documentation files: GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
 - 2 docs not planned (BRAIN-GUIDE, DASHBOARD-GUIDE) — planner treated max_workers as task count limit
-- Observation report: [docs/SPRINT-18-OBSERVATION.md](SPRINT-18-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-18-OBSERVATION.md](observations/SPRINT-18-OBSERVATION.md)
 
 ### Bugs Discovered
 
@@ -334,7 +334,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - inferModelFromDirective fix: opus aşırı atama düzeltildi
 - isDocTask(): doc scope'ları için coverage check atlanıyor
 - updateProjectDocs(): sprint sonrası otomatik doc güncelleme
-- Observation report: [docs/SPRINT-19-OBSERVATION.md](SPRINT-19-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-19-OBSERVATION.md](observations/SPRINT-19-OBSERVATION.md)
 
 ---
 
@@ -361,7 +361,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - Task queue: FAILED (planner still limited by max_workers)
 - Doc task criteria: PARTIAL
 - Model inference: could not validate
-- Observation report: [docs/SPRINT-20-OBSERVATION.md](SPRINT-20-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-20-OBSERVATION.md](observations/SPRINT-20-OBSERVATION.md)
 
 ---
 
@@ -390,7 +390,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - deckent test + deckent run CLI komutları
 - Planner task queue fix: tüm görevler planlanıyor, spawnWorkers parallelism sınırını uygular
 - DEBT.md decay bug tekrar oluştu (3. kez) — Sprint 22'de kalıcı fix
-- Observation report: [docs/SPRINT-21-OBSERVATION.md](SPRINT-21-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-21-OBSERVATION.md](observations/SPRINT-21-OBSERVATION.md)
 
 ---
 
@@ -1219,5 +1219,60 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 ### Tasks
 
 - 052-001: Dashboard Full Expansion (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 53 — sprint-053
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 2405s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 2 |
+| Tech Debt | 1 |
+| No-Go | 6 |
+| Coverage | 46.0% |
+| Duration | 2405455ms |
+
+### Tasks
+
+- 053-001: Self-Healing Bootstrap — Auto-Migration on Startup (GO_WITH_TECH_DEBT)
+- 053-002: Agent Activation — 8 Agent'ı Gerçekten Çalıştır (NO_GO)
+- 053-003: Skill Injection — 10 Skill'i Worker'lara Inject Et (DONE)
+- 053-004: Rich Sprint Output — Normal Mode'da Tam Bilgi (NO_GO)
+- 053-005: docs/ Reorganizasyonu + Core Docs Güncellemesi (NO_GO)
+- 053-006: Brain Self-Learning Enhancement (NO_GO)
+- 053-007: README + .claude/rules/ + Dogfooding Güncellemesi (NO_GO)
+- 053-008: Easy Create + Provider Native Support (NO_GO)
+
+---
+
+## Sprint 54 — sprint-054
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 185s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 184662ms |
+
+### Tasks
+
+- 054-001: Agent Activation — systemPrompt + Worker Injection (GO_WITH_TECH_DEBT)
+- 054-002: Brain Self-Learning — Config Suggestions + Pattern Detection (GO_WITH_TECH_DEBT)
+- 054-003: Rich Sprint Output + README Update (GO_WITH_TECH_DEBT)
+- 054-004: docs/ Reorganization + .claude/rules/ Update (GO_WITH_TECH_DEBT)
 
 ---
