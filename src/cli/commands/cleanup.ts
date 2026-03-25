@@ -3,35 +3,46 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
 import { SprintStatus, SprintPhase } from '../../core/types.js';
-import { TASKS_DIR, PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
 import { cleanup, runDecay } from '../../orchestra/brain.js';
 import { destroy } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
-
-function readLanguage(root: string): string {
-  try {
-    const configPath = join(root, PROJECT_CONFIG_PATH);
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { language?: string };
-      return config.language ?? 'en';
-    }
-  } catch {
-    // fallback
-  }
-  return 'en';
-}
+import { getLangFromConfig } from '../helpers/config-reader.js';
 
 export function registerCleanup(program: Command): void {
   program
     .command('cleanup')
     .description('Clean up after a sprint')
     .option('--decay', 'Force run memory decay (compress .brain/ files)')
-    .action((opts: { decay?: boolean }) => {
+    .option('--dry-run', 'Preview what would be deleted without actually deleting')
+    .action((opts: { decay?: boolean; dryRun?: boolean }) => {
       const root = resolveProjectRoot();
-      const lang = readLanguage(root);
+      const lang = getLangFromConfig(root);
       const tasksDir = join(root, TASKS_DIR);
+
+      if (opts.dryRun) {
+        const locksDir = join(root, LOCKS_DIR);
+        const taskFiles = existsSync(tasksDir)
+          ? readdirSync(tasksDir).filter(f => /\.(json|plan|hb|result|paused|log)$/.test(f))
+          : [];
+        const promptFiles = existsSync(tasksDir)
+          ? readdirSync(tasksDir).filter(f => f.startsWith('.prompt-'))
+          : [];
+        const lockFiles = existsSync(locksDir) ? readdirSync(locksDir) : [];
+
+        print('[dry-run] Would delete:');
+        for (const f of taskFiles) print(`  task: ${f}`);
+        for (const f of lockFiles) print(`  lock: ${f}`);
+        for (const f of promptFiles) print(`  prompt: ${f}`);
+        print(`  ${taskFiles.length} task file(s)`);
+        print(`  ${lockFiles.length} lock file(s)`);
+        print(`  ${promptFiles.length} prompt file(s)`);
+        print('  tmux session: deckent-orchestra');
+        print('\nRun without --dry-run to execute.');
+        return;
+      }
 
       try {
         if (opts.decay) {

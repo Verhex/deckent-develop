@@ -7,6 +7,8 @@ interface SprintHistoryRecord {
   sprint: string;
   tasks: string;
   completed: string;
+  techDebt: string;
+  noGo: string;
   noGoRate: string;
   coverage: string;
   duration: string;
@@ -46,8 +48,10 @@ export default function HistoryPage() {
                     <tr>
                       <th className="px-4 py-3">Sprint ID</th>
                       <th className="px-4 py-3">Tasks</th>
-                      <th className="px-4 py-3">Completed</th>
-                      <th className="px-4 py-3">No-Go Rate</th>
+                      <th className="px-4 py-3">Done</th>
+                      <th className="px-4 py-3">Tech Debt</th>
+                      <th className="px-4 py-3">No-Go</th>
+                      <th className="px-4 py-3">No-Go %</th>
                       <th className="px-4 py-3">Coverage</th>
                       <th className="px-4 py-3">Duration</th>
                     </tr>
@@ -60,7 +64,9 @@ export default function HistoryPage() {
                       >
                         <td className="px-4 py-3 font-mono text-blue-400">{record.sprint}</td>
                         <td className="px-4 py-3 text-zinc-200">{record.tasks}</td>
-                        <td className="px-4 py-3 text-zinc-200">{record.completed}</td>
+                        <td className="px-4 py-3 text-green-400">{record.completed}</td>
+                        <td className="px-4 py-3 text-yellow-400">{record.techDebt}</td>
+                        <td className="px-4 py-3 text-red-400">{record.noGo}</td>
                         <td className="px-4 py-3 text-zinc-200">{record.noGoRate}</td>
                         <td className="px-4 py-3 text-zinc-200">{record.coverage}</td>
                         <td className="px-4 py-3 text-zinc-400">{record.duration}</td>

@@ -101,3 +101,14 @@
 - Brain Self-Learning — Config Suggestions + Pattern Detection: GO_WITH_TECH_DEBT
 - Rich Sprint Output + README Update: GO_WITH_TECH_DEBT
 - docs/ Reorganization + .claude/rules/ Update: GO_WITH_TECH_DEBT
+## Sprint sprint-055 Learnings
+- Retro Parse/Write Format Uyumsuzluğu Fix + --compare Bug (P0 KRİTİK): GO_WITH_TECH_DEBT
+- Kill Komutu Task Status + Lock Temizliği + --all Flag (P0 KRİTİK): GO_WITH_TECH_DEBT
+- readLanguage + readJsonSafe Tam DRY Temizliği (P1): GO_WITH_TECH_DEBT
+- Config Set Nested Key + Import DeepMerge + Config Get (P1): GO_WITH_TECH_DEBT
+- Spawn Komutu Prompt Zenginleştirme + Status Kontrolü (P1): GO_WITH_TECH_DEBT
+- Doctor --json + Retro --json Flag'leri (P2): GO_WITH_TECH_DEBT
+- Cleanup --dry-run Flag'i (P2): GO_WITH_TECH_DEBT
+- Agent Delete + Edit Komutları (P2): GO_WITH_TECH_DEBT
+- Skill Enable/Disable + Delete Komutları (P2): GO_WITH_TECH_DEBT
+- Explain --sprint Flag + Goal Bilgisi + Dil Desteği (P2): GO_WITH_TECH_DEBT

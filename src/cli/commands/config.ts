@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
-import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../core/config.js';
-import { migrateConfig } from '../../core/config-migration.js';
+import { loadConfig, validatePartialConfig, ConfigValidationError, deepMerge } from '../../core/config.js';
+import { migrateConfig, setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
@@ -62,7 +62,7 @@ export function importConfig(importPath: string, configPath: string): void {
     }
   }
 
-  const merged = { ...existing, ...importData };
+  const merged = deepMerge(existing, importData) as Record<string, unknown>;
   writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
 }
 
@@ -101,8 +101,11 @@ export function registerConfig(program: Command): void {
           // keep as string
         }
 
-        // Simple top-level keys only
-        (existing as Record<string, unknown>)[key] = parsed;
+        if (key.includes('.')) {
+          setNestedValue(existing as Record<string, unknown>, key, parsed);
+        } else {
+          (existing as Record<string, unknown>)[key] = parsed;
+        }
 
         validatePartialConfig(existing);
         writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
@@ -113,6 +116,26 @@ export function registerConfig(program: Command): void {
         } else {
           printError(error);
         }
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('get <key>')
+    .description('Get a configuration value by key (supports dot notation)')
+    .action(async (key: string) => {
+      const root = resolveProjectRoot();
+      try {
+        const config = await loadConfig(root);
+        const value = getNestedValue(config as unknown as Record<string, unknown>, key);
+        if (value === undefined) {
+          printError(new Error(`Key not found: ${key}`));
+          process.exitCode = 1;
+          return;
+        }
+        print(typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value));
+      } catch (error) {
+        printError(error);
         process.exitCode = 1;
       }
     });

@@ -533,7 +533,7 @@ describe('history command', () => {
   beforeEach(() => { vi.clearAllMocks(); captureOutput(); });
   afterEach(() => restoreOutput());
 
-  it('shows sprint history table with 6 columns', async () => {
+  it('shows sprint history table with 8 columns', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['sprint-001.md'] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue(

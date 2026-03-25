@@ -288,6 +288,105 @@ export function registerSkill(program: Command): void {
       }
     });
 
+  // ─── skill enable ──────────────────────────────────────────────
+  skillCmd
+    .command('enable <name>')
+    .description('Enable a skill')
+    .action(async (name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const skillDir = join(getSkillsDir(root), name);
+        const manifestPath = join(skillDir, 'manifest.json');
+        if (!existsSync(manifestPath)) {
+          throw ErrorRegistry.createError('DECKENT_E023', { message: `Skill "${name}" not found.` });
+        }
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillDefinition;
+        manifest.enabled = true;
+        writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+        print(`Skill "${name}" enabled.`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── skill disable ─────────────────────────────────────────────
+  skillCmd
+    .command('disable <name>')
+    .description('Disable a skill')
+    .action(async (name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const skillDir = join(getSkillsDir(root), name);
+        const manifestPath = join(skillDir, 'manifest.json');
+        if (!existsSync(manifestPath)) {
+          throw ErrorRegistry.createError('DECKENT_E023', { message: `Skill "${name}" not found.` });
+        }
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillDefinition;
+        manifest.enabled = false;
+        writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+        print(`Skill "${name}" disabled.`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── skill delete ──────────────────────────────────────────────
+  skillCmd
+    .command('delete <name>')
+    .description('Delete a skill')
+    .action(async (name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const skillDir = join(getSkillsDir(root), name);
+        if (!existsSync(skillDir)) {
+          throw ErrorRegistry.createError('DECKENT_E023', { message: `Skill "${name}" not found.` });
+        }
+        rmSync(skillDir, { recursive: true, force: true });
+        print(`Skill "${name}" deleted.`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── skill info ───────────────────────────────────────────────
+  skillCmd
+    .command('info <name>')
+    .description('Show skill details')
+    .action(async (name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const skillDir = join(getSkillsDir(root), name);
+        const manifestPath = join(skillDir, 'manifest.json');
+        if (!existsSync(manifestPath)) {
+          throw ErrorRegistry.createError('DECKENT_E023', { message: `Skill "${name}" not found.` });
+        }
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillDefinition;
+        print(`Skill: ${manifest.name}`);
+        print(`  ID:       ${manifest.id}`);
+        print(`  Version:  ${manifest.version}`);
+        print(`  Category: ${manifest.category}`);
+        print(`  Enabled:  ${manifest.enabled}`);
+        print(`  Priority: ${manifest.priority}`);
+        if (manifest.triggers && manifest.triggers.length > 0) {
+          print(`  Triggers: ${manifest.triggers.join(', ')}`);
+        }
+
+        const skillMdPath = join(skillDir, 'SKILL.md');
+        if (existsSync(skillMdPath)) {
+          const content = readFileSync(skillMdPath, 'utf-8');
+          const lines = content.split('\n').slice(0, 10);
+          print('\n--- SKILL.md (first 10 lines) ---');
+          print(lines.join('\n'));
+        }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
   // ─── marketplace subcommands (search, publish) ────────────────────
   registerSkillMarketplace(skillCmd);
 }

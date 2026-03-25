@@ -12,7 +12,7 @@ import {
   BRAIN_TOTAL_LINE_BUDGET, MEMORY_DECAY_SPRINTS,
   DEBT_HIGH_PRIORITY_SPRINTS, DEBT_CRITICAL_SPRINTS,
 } from '../core/constants.js';
-import { countBrainLines, parseDebtTable, generateDebtTable, shouldRemoveResolvedDebt } from '../core/utils.js';
+import { countBrainLines, parseDebtTable, generateDebtTable, shouldRemoveResolvedDebt, readJsonSafe } from '../core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
@@ -25,13 +25,6 @@ function readFileSafe(filePath: string): string {
   }
 }
 
-function readJsonSafe<T>(filePath: string): T | null {
-  try {
-    return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
-  } catch {
-    return null;
-  }
-}
 
 function now(): string {
   return new Date().toISOString();

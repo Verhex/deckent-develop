@@ -21,25 +21,13 @@ import { ErrorRegistry } from '../../core/errors.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS } from '../../core/deck-file.js';
+import { getLangFromConfig } from '../helpers/config-reader.js';
 
 interface DoctorCheck {
   name: string;
   passed: boolean;
   message: string;
   required: boolean;
-}
-
-function readLanguage(root: string): string {
-  try {
-    const configPath = join(root, PROJECT_CONFIG_PATH);
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { language?: string };
-      return config.language ?? 'en';
-    }
-  } catch {
-    // fallback
-  }
-  return 'en';
 }
 
 export function isRunningInWSL(): boolean {
@@ -710,16 +698,36 @@ export function registerDoctor(program: Command): void {
     .description('Check system dependencies and health')
     .option('--profile', 'Show system profile information')
     .option('--legacy', 'Use legacy output format')
-    .action(async (opts: { profile?: boolean; legacy?: boolean }) => {
+    .option('--json', 'Output results as JSON')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
       } catch {
         root = process.cwd();
       }
-      const lang = readLanguage(root);
+      const lang = getLangFromConfig(root);
       const result = runDoctorChecks(root);
       const providers = await detectAvailableProviders();
+
+      if (opts.json) {
+        const jsonOutput: Record<string, unknown> = {
+          ok: result.ok,
+          checks: result.checks,
+          providers,
+        };
+        if (opts.profile) {
+          const profile = getSystemProfile();
+          const sub = detectSubscription();
+          jsonOutput.profile = profile;
+          jsonOutput.subscription = sub.detected === 'unknown' ? 'unknown' : sub.detected;
+        }
+        print(JSON.stringify(jsonOutput, null, 2));
+        if (!result.ok) {
+          process.exitCode = 1;
+        }
+        return;
+      }
 
       if (opts.legacy) {
         // Legacy format

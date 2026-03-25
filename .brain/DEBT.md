@@ -40,3 +40,13 @@
 | debt-054-002 | Tech debt from 054-002: 4 brain self-learning fonksiyonu eklendi: generateConfig | 054-002 | sprint-054 | NORMAL | 0 | true | sprint-054 | 2026-03-25T09:52:52.589Z |
 | debt-054-003 | Tech debt from 054-003: A) sprint-summary-rich.ts genişletildi: TaskTableRow ara | 054-003 | sprint-054 | NORMAL | 0 | true | sprint-054 | 2026-03-25T09:52:52.590Z |
 | debt-054-004 | Tech debt from 054-004: Created tests/docs/docs-structure.test.ts with 19 tests | 054-004 | sprint-054 | NORMAL | 0 | true | sprint-054 | 2026-03-25T09:52:52.592Z |
+| debt-055-001 | Tech debt from 055-001: Fixed parseRetroToRichSummary regex to match sprint-repo | 055-001 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.284Z |
+| debt-055-002 | Tech debt from 055-002: Kill komutu 4 iyileştirmeyle genişletildi: (A) Kill sonr | 055-002 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.288Z |
+| debt-055-003 | Tech debt from 055-003: Created getLangFromConfig helper in config-reader.ts. Re | 055-003 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.290Z |
+| debt-055-004 | Tech debt from 055-004: A) config set nested key: dot-notation keys use setNeste | 055-004 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.291Z |
+| debt-055-005 | Tech debt from 055-005: Spawn command enhanced: (A) Rich prompt via buildWorkerP | 055-005 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.295Z |
+| debt-055-006 | Tech debt from 055-006: Added --json flag to both doctor and retro commands. Doc | 055-006 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.297Z |
+| debt-055-007 | Tech debt from 055-007: Added --dry-run flag to cleanup command. Lists task file | 055-007 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.298Z |
+| debt-055-008 | Tech debt from 055-008: Added agent delete, edit, and info subcommands. Delete r | 055-008 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.300Z |
+| debt-055-009 | Tech debt from 055-009: Added skill enable, disable, delete, info subcommands. E | 055-009 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.301Z |
+| debt-055-010 | Tech debt from 055-010: Added --sprint <id> flag, --json flag, goal extraction ( | 055-010 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.302Z |

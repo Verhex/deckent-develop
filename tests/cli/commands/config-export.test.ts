@@ -24,6 +24,7 @@ vi.mock('../../../src/core/config.js', () => {
     validatePartialConfig: vi.fn(),
     loadGlobalConfig: vi.fn(),
     saveGlobalConfig: vi.fn(),
+    deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),
     ConfigValidationError: MockConfigValidationError,
   };
 });

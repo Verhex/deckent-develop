@@ -21,6 +21,7 @@ vi.mock('../../src/core/config.js', () => ({
   saveGlobalConfig: vi.fn(),
   mergeConfigs: vi.fn(),
   validatePartialConfig: vi.fn(),
+  deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),
   ConfigValidationError: class ConfigValidationError extends Error {
     public readonly errors: string[];
     constructor(errors: string[]) {

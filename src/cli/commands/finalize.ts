@@ -1,36 +1,17 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, TaskResult } from '../../core/types.js';
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../core/types.js';
-import { TASKS_DIR, PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { TASKS_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
 import { evaluateResult } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
-
-function readLanguage(root: string): string {
-  try {
-    const configPath = join(root, PROJECT_CONFIG_PATH);
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { language?: string };
-      return config.language ?? 'en';
-    }
-  } catch {
-    // fallback
-  }
-  return 'en';
-}
-
-function readJsonSafe<T>(filePath: string): T | null {
-  try {
-    return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
-  } catch {
-    return null;
-  }
-}
+import { getLangFromConfig } from '../helpers/config-reader.js';
+import { readJsonSafe } from '../../core/utils.js';
 
 /**
  * Build a Sprint object and evaluations from .tasks/ directory contents.
@@ -91,7 +72,7 @@ export function registerFinalize(program: Command): void {
     .option('--skip-hooks', 'Skip plugin afterSprint hooks')
     .action(async (opts: { skipDecay?: boolean; skipHooks?: boolean }) => {
       const root = resolveProjectRoot();
-      const lang = readLanguage(root);
+      const lang = getLangFromConfig(root);
 
       try {
         const { sprintId, tasks, results, evaluations } = buildSprintFromTasks(root);

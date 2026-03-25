@@ -35,7 +35,7 @@ import {
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { getNextSprintId, parseDebtTable, updateLastSprintId } from '../core/utils.js';
+import { getNextSprintId, parseDebtTable, updateLastSprintId, readJsonSafe } from '../core/utils.js';
 
 // ─── Core — config ────────────────────────────────────────────────
 import { resolveEffectiveWorkers } from '../core/config.js';
@@ -193,14 +193,6 @@ function readFileSafe(filePath: string): string {
   }
 }
 
-function readJsonSafe<T>(filePath: string): T | null {
-  try {
-    // safe: generic T is caller-supplied; validation deferred to caller; null returned on parse failure
-    return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
-  } catch {
-    return null;
-  }
-}
 
 function now(): string {
   return new Date().toISOString();

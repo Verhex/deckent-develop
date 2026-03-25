@@ -27,6 +27,15 @@ vi.mock('../../../src/core/config.js', () => ({
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
 }));
 
+vi.mock('../../../src/orchestra/task-builder.js', () => ({
+  buildWorkerPrompt: vi.fn().mockReturnValue('You are a Worker agent. Rich prompt content here.'),
+}));
+
+vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
+  resolveAgentPrompt: vi.fn().mockReturnValue(undefined),
+  resolveSkillPrompts: vi.fn().mockReturnValue([]),
+}));
+
 import { readTask } from '../../../src/agents/worker.js';
 import { ensureSession, spawnWorker } from '../../../src/orchestra/tmux.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';

@@ -423,7 +423,7 @@ System Profile: CPU, RAM, max worker, subscription tier (opus probe)
 6. **Stale Lock Temizleme Önerisi Yok** — Sadece sayı, ne yapılacağı söylenmiyor.
 7. **Disk/Permission Check Yok** — Yazma izni kontrolü yok.
 8. **Claude CLI Auth Kontrolü Yok** — Sadece version check, login durumu kontrol edilmiyor.
-9. **`--json` Flag'i Yok** — CI/CD entegrasyonu için lazım.
+9. **[DONE] `--json` Flag'i Yok** — CI/CD entegrasyonu için lazım. *Sprint 055: --json flag eklendi, JSON çıktı {ok, checks, providers}.*
 10. **`detectSubscription()` Sadece `--profile`'da** — Mode uyumluluk kontrolü ana doctor'da yok.
 
 ---
@@ -455,9 +455,9 @@ Max 100 satır. Sprint sonunda overwrite.
 
 ### Geliştirme Önerileri
 
-1. **Parse ↔ Write Format Uyumsuzluğu (KRİTİK)** — Yazma `| Tasks completed |` kullanıyor, okuma `| Completed |` arıyor. Regex match etmez → tüm değerler 0.
-2. **`--compare` Yanlış Dosyayı Karşılaştırır** — Son sprint logunu kendisiyle karşılaştırıyor (delta=0). Sondan bir öncekini almalı.
-3. **`--json` Flag'i Yok**.
+1. **[DONE] Parse ↔ Write Format Uyumsuzluğu (KRİTİK)** — Yazma `| Tasks completed |` kullanıyor, okuma `| Completed |` arıyor. Regex match etmez → tüm değerler 0. *Sprint 055: retro.ts regex'leri sprint-reporter.ts formatına eşleştirildi.*
+2. **[DONE] `--compare` Yanlış Dosyayı Karşılaştırır** — Son sprint logunu kendisiyle karşılaştırıyor (delta=0). Sondan bir öncekini almalı. *Sprint 055: loadPreviousRetro files.at(-2) ile fix edildi.*
+3. **[DONE] `--json` Flag'i Yok**. *Sprint 055: --json flag eklendi.*
 4. **Sprint Log Parse Fragile** — Header formatları tutarsız.
 5. **Learnings Sığ** — Her zaman generic mesajlar, result.notes kullanılmıyor.
 6. **Retro Dil Desteği Yok** — İngilizce hardcode, `config.language` kontrol edilmiyor.
@@ -503,7 +503,7 @@ deckent cleanup [--decay]
 
 1. **Cleanup'ta Decay Otomatik Çağrılmıyor** — Budget uyarısı bile yok.
 2. **Task Dosyası Silme Çift Geçiş Gereksiz** — İlk geçiş hepsini sildi, ikinci geçiş bir şey bulamaz.
-3. **`--dry-run` Yok** — Geri dönüşü olmayan silme için preview lazım.
+3. **[DONE] `--dry-run` Yok** — Geri dönüşü olmayan silme için preview lazım. *Sprint 055: --dry-run flag eklendi, silinecek dosyalar listelenir.*
 4. **Sahte Sprint Objesi** — CLI'da yapay Sprint oluşturuluyor.
 5. **`destroy()` Her Zaman Çağrılıyor** — Diğer projelerin tmux session'ını da öldürebilir.
 6. **Decay "Son Çare" Truncation Agresif** — Önemli erken learnings kaybı.
@@ -626,8 +626,8 @@ mode, language, max_workers (1-100 veya 'auto'), brain_model, default_model, hai
 
 ### Geliştirme Önerileri
 
-1. **`config set` Sadece Top-Level** — Nested key (`modes.max_plan.max_workers`) desteklenmiyor, `setNestedValue` var ama kullanılmıyor.
-2. **`config import` Shallow Merge** — Nested obje alanları ezilir, `loadConfig` deep merge ama import shallow.
+1. **[DONE] `config set` Sadece Top-Level** — Nested key (`modes.max_plan.max_workers`) desteklenmiyor, `setNestedValue` var ama kullanılmıyor. *Sprint 055: setNestedValue bağlandı, dot notation destekleniyor.*
+2. **[DONE] `config import` Shallow Merge** — Nested obje alanları ezilir, `loadConfig` deep merge ama import shallow. *Sprint 055: deepMerge kullanılıyor.*
 3. **`autoMigrateOnLoad` Yok** — `loadConfig` içinde otomatik migration implement edilmemiş.
 4. **Migration `modes` Atlanıyor** — Yeni mode field'ları algılanmaz.
 5. **Config Çıktısı Resolved** — Raw config değil, default'larla merge edilmiş. `--raw` lazım.
@@ -677,15 +677,15 @@ Shell injection koruması: prompt dosyaya yazılıp stdin redirection, hiçbir z
 
 ### Geliştirme Önerileri
 
-1. **spawn Prompt Çok Basit** — Tek cümle. `spawnWorkers()` ise agent+skill+scope inject ediyor.
+1. **[DONE] spawn Prompt Çok Basit** — Tek cümle. `spawnWorkers()` ise agent+skill+scope inject ediyor. *Sprint 055: buildWorkerPrompt + agent/skill context injection eklendi.*
 2. **spawn Sadece tmux** — Multi-provider (Codex/Gemini) desteklenmiyor.
-3. **spawn Task Status Kontrol Yok** — DONE task tekrar spawn edilebilir.
-4. **spawn autoApprove Hardcode false** — CLI flag yok.
+3. **[DONE] spawn Task Status Kontrol Yok** — DONE task tekrar spawn edilebilir. *Sprint 055: Status kontrolü + --force flag eklendi.*
+4. **[DONE] spawn autoApprove Hardcode false** — CLI flag yok. *Sprint 055: --auto-approve flag eklendi.*
 5. **kill Sadece tmux Worker** — Subprocess worker öldüremez.
-6. **kill Lock Temizlemiyor** — Worker lock'ları serbest bırakılmıyor.
-7. **kill Task Status Güncellemiyor** — Task hâlâ EXECUTING kalır.
-8. **kill --all Flag'i Yok** — Tek tek öldürmek gerekiyor.
-9. **Prompt Dosyası Temizlenmiyor** — `.prompt-*` dosyaları kalır.
+6. **[DONE] kill Lock Temizlemiyor** — Worker lock'ları serbest bırakılmıyor. *Sprint 055: releaseLocks() ile lock temizliği eklendi.*
+7. **[DONE] kill Task Status Güncellemiyor** — Task hâlâ EXECUTING kalır. *Sprint 055: Kill sonrası task PAUSED olarak güncelleniyor.*
+8. **[DONE] kill --all Flag'i Yok** — Tek tek öldürmek gerekiyor. *Sprint 055: --all flag ile toplu kill eklendi.*
+9. **[DONE] Prompt Dosyası Temizlenmiyor** — `.prompt-*` dosyaları kalır. *Sprint 055: cleanPromptFiles() eklendi.*
 10. **spawn Scope/AllowedTools Yok** — Worker sınırsız erişim, boundary enforcement bozulur.
 
 ---
@@ -772,7 +772,7 @@ Property-value tablosu: Framework, Language, Test Framework, Build Tool, CI, Fil
 ## Genel Cross-Cutting Sorunlar
 
 ### Format Tutarsızlıkları
-- RETRO.md yazma `| Tasks completed |`, okuma `| Completed |` arıyor → **parse bozuk**
+- [DONE] ~~RETRO.md yazma `| Tasks completed |`, okuma `| Completed |` arıyor → **parse bozuk**~~ *Sprint 055: regex'ler yazma formatına eşleştirildi.*
 - Sprint log yazma `| Total Tasks |`, history okuma doğru eşleşiyor
 - Agent/skill bilgisi sprint log'a yazılmıyor → history'de hep "-"
 
@@ -1113,8 +1113,8 @@ Son sprint'in ne yaptığını insan-dostu dille anlatır. Sprint log + RETRO.md
 ### Geliştirme Önerileri
 
 1. **Regex Parse Fragile** — Whitespace-sensitive markdown parsing.
-2. **Dil Desteği Yok** — İngilizce hardcode.
-3. **`--sprint <id>` Flag'i Yok** — Sadece son sprint.
+2. **[DONE] Dil Desteği Yok** — İngilizce hardcode. *Sprint 055: Türkçe/İngilizce i18n etiketler eklendi.*
+3. **[DONE] `--sprint <id>` Flag'i Yok** — Sadece son sprint. *Sprint 055: --sprint flag + --json flag eklendi.*
 
 ---
 
@@ -1189,6 +1189,575 @@ Resolved debt item'larını `.brain/archive/DEBT-ARCHIVE.md`'ye taşır.
 
 ---
 
+---
+
+# Detaylı Kaynak Kod İncelemeleri (Kalan Komutlar)
+
+Aşağıdaki komutlar kaynak koddan satır satır incelenerek analiz edilmiştir.
+
+---
+
+## 17. `deckent sync` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/sync.ts` (283 satır)
+
+### İç Mekanizma
+
+**Adım 1 — Adapter Sync:**
+- `ensureDeckentImport(CLAUDE.md)` → dosyanın başına `@DECKENT.md` satırını ekler (yoksa)
+- `ensureDeckentImport(AGENTS.md)` → aynı işlem
+- Mevcut dosya içeriği korunur, sadece import satırı ensure edilir
+
+**Adım 2 — Git Change Detection:**
+```
+getLastSprintTimestamp(root):
+  .brain/sprints/ dizinindeki dosyaların mtime'ını karşılaştır
+  → En son değiştirilen sprint dosyasının timestamp'ını döndür
+
+getCommitsSince(root, since):
+  git log --oneline --since={ISO timestamp}
+  → Commit listesi
+
+getChangedFiles(root, commitCount):
+  git diff --name-status HEAD~{N} HEAD
+  → M (modified), A (added), D (deleted), R (renamed) kategorize
+```
+
+**Adım 3 — MEMORY.md Güncelleme:**
+```
+writeSyncToMemory():
+  "## Out-of-band Changes" section varsa → regex ile replace
+  yoksa → append
+
+  İçerik:
+  - N commit(s) since Sprint #052
+  - Modified: src/foo.ts, src/bar.ts
+  - New: src/baz.ts
+  - Deleted: old/removed.ts
+```
+
+### Kritik Detaylar
+
+1. **Sprint timestamp mtime-based** — dosya sistemi mtime kullanıyor, git commit date değil. Dosya move/copy edilirse mtime değişir ve yanlış timestamp alınır.
+
+2. **`HEAD~N` Overflow** — `getChangedFiles(root, commits.length)` commit sayısı kadar HEAD geri gidiyor. Eğer repo'da toplam commit commits.length'ten azsa git hata verir ama `status !== 0` ile sessizce geçilir.
+
+3. **Regex Section Replace** — `sectionRegex = /## Out-of-band Changes[\s\S]*?(?=\n## |\n*$)/` — non-greedy match. Eğer "## Out-of-band Changes" son section ise ve sonrasında `\n## ` yoksa `\n*$` ile eşleşir. MEMORY.md'nin sonuna yeni section eklenirse eski out-of-band section düzgün silinir ama edge case'lerde fragile.
+
+4. **Adapter sync GEMINI.md ve .cursor/rules yok** — Sadece CLAUDE.md ve AGENTS.md sync ediliyor. init'te Gemini ve Cursor dosyaları da oluşturuluyor ama sync'te atlanıyor.
+
+### Geliştirme Önerileri
+
+1. **mtime yerine git commit date kullanılmalı** — `git log -1 --format=%aI .brain/sprints/sprint-NNN.md`
+2. **Çok fazla değişiklik → MEMORY.md şişmesi** — 100+ dosya değişmişse hepsini listeliyor. Limit veya kategorize edilmeli.
+3. **`--json` flag yok** — Programmatic kullanım için.
+4. **Gemini/Cursor adapter sync eksik** — init'te oluşturulan tüm adapter dosyaları sync edilmeli.
+5. **Dry-run yok** — MEMORY.md'ye ne yazılacağını preview edemezsin.
+
+---
+
+## 18. `deckent run` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/run.ts` (189 satır)
+
+### İç Mekanizma
+
+```
+1. Model validation (ALL_MODELS listesine karşı)
+2. createRunTaskId() → "run-{timestamp}-{counter}" (global counter)
+3. buildRunTask() → Task objesi:
+   - title: description'ın ilk 80 karakteri
+   - scope: { directories: [scopeDir], filesRead: [], filesWrite: [] }
+   - goNogo: generic criteria
+4. Task JSON yaz → .tasks/task-run-{id}.json
+5. ensureSession() → tmux
+6. buildWorkerPrompt(task) → sprint-controller'daki prompt builder
+7. spawnWorker() → tmux window
+8. waitForRunResult() → 5 dakika timeout, 5 saniye polling
+9. Sonuç göster + cleanupRunTask()
+```
+
+### Kritik Detaylar
+
+1. **`buildWorkerPrompt(task)` kullanılıyor** — spawn komutundan farklı olarak düzgün prompt builder. Ama agent/skill context inject edilmiyor çünkü `resolveAgentPrompt` ve `resolveSkillPrompts` çağrılmıyor.
+
+2. **Global counter `_runTaskCounter`** — Process içinde artan counter. Ama process restart'ta sıfırlanır. Aynı milisaniyede 2 run çağrılırsa farklı ID üretir (counter sayesinde).
+
+3. **Cleanup her zaman yapılıyor** — Başarılı veya başarısız, task dosyaları silinir. Kullanıcı sonucu inceleyemez. `--keep` flag'i yok.
+
+4. **[DONE] readJsonSafe lokal duplicate** — `src/core/utils.ts`'de aynı fonksiyon var ama run.ts kendi versiyonunu tanımlıyor. *Sprint 055: utils.ts'den import edildi.*
+
+5. **autoApprove: false hardcode** — `deckent start --auto-approve` var ama `run`'da yok.
+
+### Geliştirme Önerileri
+
+1. **`--timeout` flag lazım** — 5 dakika hardcode. Opus ile karmaşık task 5 dakikada bitmez.
+2. **`--keep` flag lazım** — Sonuç dosyalarını koruma.
+3. **`--auto-approve` flag lazım** — Çalıştırma sırasında permission yönetimi.
+4. **Agent/skill injection eksik** — `buildWorkerPrompt` agent/skill olmadan çağrılıyor.
+5. **Multi-provider desteği yok** — Sadece tmux/Claude.
+6. **`fs.watch` kullanılabilir** — 5s polling yerine event-driven.
+7. **[DONE] readJsonSafe duplicate** — Import from utils.ts kullanılmalı. *Sprint 055: tüm 5 duplicate temizlendi.*
+8. **`--verbose` flag** — Worker'ın canlı çıktısını gösterme (tail -f log).
+
+---
+
+## 19. `deckent test` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/test-run.ts` (79 satır)
+
+### İç Mekanizma
+
+```
+1. DIRECTIVES.md varlık kontrolü
+2. loadConfig(root)
+3. timeout parse (default 5 dakika, NaN check)
+4. runSprint(root, config, { testMode: true, skipCleanup: opts.keep, timeoutMs })
+5. NO_GO kontrolü → exit 1
+6. formatSprintSummary(sprint)
+```
+
+**`testMode: true` ne değiştirir:**
+- `finalizeSprint()` atlanır → MEMORY.md, RETRO.md, PROJECT-IDENTITY.md güncellenmez
+- Decay çalışmaz
+- Sprint log yazılmaz
+- Ama planlama, spawn, execute, evaluate hepsi çalışır
+
+### Kritik Detaylar
+
+1. **`hasNoGo` çift kontrol** — `task.status === 'NO_GO' || sprint.metrics?.noGoTasks > 0` — ikisi de aynı şeyi kontrol ediyor. metrics task status'tan üretildiği için redundant. Ama edge case: metrics hesaplanmamışsa (testMode'da calculateMetrics hata atarsa) task status güvenli yol.
+
+2. **`timeoutMs` runSprint'e geçiliyor** — Ama `RunSprintOptions` type'ında `timeoutMs` field'ı var mı kontrol edelim — evet, `waitForResults` fonksiyonuna geçiyor.
+
+3. **Test sprint gerçek worker spawn ediyor** — Sandbox değil, gerçek tmux worker'lar çalışıyor. Projeyi değiştirebilirler. `--sandbox` flag'i veya git stash/restore ile korunmalı.
+
+### Geliştirme Önerileri
+
+1. **`--directives <file>` flag** — Proje DIRECTIVES yerine test-specific DIRECTIVES kullanma.
+2. **`--sandbox` flag** — Worker'ların projeyi değiştirmemesi için git stash + restore.
+3. **CI çıktı formatı** — JUnit XML, TAP, GitHub Actions annotations.
+4. **`--model` override** — Tüm task'ları belirli modelle çalıştırma (maliyet kontrolü).
+5. **Coverage threshold** — `--min-coverage 80` gibi başarı kriteri.
+
+---
+
+## 20. `deckent agent` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/agent.ts` (222 satır)
+
+### Veri Yapısı
+
+```json
+// .deckent/agents/{name}/agent.json
+{
+  "name": "typescript-expert",
+  "type": "custom",
+  "enabled": true,
+  "model": "sonnet",
+  "triggers": [],
+  "description": "Custom agent: typescript-expert",
+  "uses": 0,
+  "successRate": 0,
+  "createdAt": "2026-03-25T...",
+  "updatedAt": "2026-03-25T..."
+}
+```
+
+```markdown
+// .deckent/agents/{name}/PROMPT.md
+# Agent: typescript-expert
+## Role
+Describe what this agent specializes in.
+## Instructions
+- Follow project conventions
+...
+```
+
+### Kritik Detaylar
+
+1. **Name validation**: `/^[a-zA-Z0-9][a-zA-Z0-9-]*$/` + max 64 char. İlk karakter harf/rakam olmalı.
+
+2. **`uses` ve `successRate` CLI'dan güncellenmiyor** — Sadece `sprint-controller.ts` içindeki `AgentPoolManager.updateAgentStats()` günceller. CLI'da `--stats` sütunları gösteriliyor ama değerler hep 0 kalabilir (agent activation henüz tam çalışmıyorsa).
+
+3. **PROMPT.md template generic** — `{name}` placeholder'ı replace ediliyor ama Role, Instructions, Triggers bölümleri boş kalıyor. Interactive wizard olsa daha faydalı.
+
+4. **[DONE] `agent delete` komutu yok** — Create, enable, disable var ama delete yok. Dosyayı manuel silmek gerekiyor. *Sprint 055: agent delete eklendi.*
+
+5. **[DONE] `agent edit` komutu yok** — Agent config'i güncellemek için JSON dosyasını elle düzenlemek gerekiyor. *Sprint 055: agent edit eklendi.*
+
+### Geliştirme Önerileri
+
+1. **[DONE] `agent delete <name>` ekle** — Dizini sil + onay sor. *Sprint 055: agent delete komutu eklendi.*
+2. **[DONE] `agent edit <name>` ekle** — Interactive: model, triggers, description güncelleme. *Sprint 055: agent edit --model/--description/--enable/--disable eklendi.*
+3. **`agent stats <name>` ekle** — Belirli agent'ın sprint-by-sprint performansı.
+4. **Trigger pattern wizard** — Create sırasında trigger keyword sorma.
+5. **Model seçimi create'de** — Default sonnet yerine interactive seçim.
+6. **systemPrompt alanı yok** — agent.json'da systemPrompt field'ı yok, sadece PROMPT.md var. PROMPT.md → systemPrompt eşlemesi `resolveAgentPrompt()`'ta yapılıyor.
+
+---
+
+## 21. `deckent skill` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/skill.ts` (282 satır)
+
+### Veri Yapısı
+
+```json
+// .deckent/skills/{id}/manifest.json
+{
+  "id": "testing-expert",
+  "name": "testing-expert",
+  "version": "1.0.0",
+  "description": "Custom skill: testing-expert",
+  "category": "general",
+  "triggers": [],
+  "enabled": true,
+  "priority": 5,
+  ...
+}
+```
+
+### Git Install Akışı
+
+```
+1. isGitUrl(source) → https://, git://, git@, .git
+2. git clone --depth 1 {source} .deckent/skills/.tmp-clone (30s timeout)
+3. manifest.json var mı kontrol
+4. validateManifest(data) → id, name, version string mi
+5. Target dizin var mı + --force kontrolü
+6. .git dizinini sil (clone'dan)
+7. cpSync(tmp → target)
+8. rmSync(tmp)
+```
+
+### Local Install Akışı
+
+```
+1. resolve(source) → absolute path
+2. Kaynak dizin var mı kontrol
+3. manifest.json oku + validate
+4. Target dizin var mı + --force kontrolü
+5. cpSync(source → target, recursive)
+```
+
+### Kritik Detaylar
+
+1. **Manifest validation çok gevşek** — Sadece `id`, `name`, `version` string mi kontrol. `category`, `triggers`, `enabled` vb. kontrol edilmiyor. Malformed manifest kabul edilir.
+
+2. **Git clone hata temizliği** — Clone başarısız olursa tmp dizin kalır (satır 202-203'te var ama clone hatası catch'te tmp silinmiyor — sadece manifest hatasında siliniyor). Aslında satır 210'da status check var, hatada return ediliyor ama tmp temizlenmemiyor.
+
+3. **`--force` sadece git install'da soruluyor** — Local install'da da aynı kontrol var (satır 258-262 civarı).
+
+4. **cpSync recursive** — Tüm dosyaları kopyalıyor, node_modules gibi büyük dizinler de kopyalanır.
+
+### Geliştirme Önerileri
+
+1. **Manifest Zod validation** — Gevşek type guard yerine Zod schema.
+2. **Git clone tmp cleanup** — Her error path'te `.tmp-clone` silinmeli.
+3. **node_modules exclude** — Git clone'da .gitignore işliyor ama local install'da node_modules kopyalanır.
+4. **[DONE] `skill delete <name>` ekle**. *Sprint 055: skill delete komutu eklendi.*
+5. **`skill update <name>` ekle** — Git source'u hatırlayıp re-clone.
+6. **Checksum/integrity check** — İndirilen skill'in doğrulanması.
+7. **[DONE] `skill enable/disable <name>` ekle** — Agent'ta var, skill'de yok. *Sprint 055: skill enable/disable eklendi.*
+
+---
+
+## 22. `deckent review` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/review.ts` (174 satır)
+
+### Auto-Review Karar Mantığı
+
+```
+autoReviewTask(result):
+  result yok              → 'pending'
+  DONE + tests pass       → 'approved'
+  NO_GO                   → 'rejected'
+  TECH_DEBT + tests pass  → 'approved'
+  diğer                   → 'retry'   ← bu durum oluşur: DONE + tests fail
+```
+
+### ReviewState Persistence
+
+`.tasks/review-{sprintId}.json` — task dizininde saklanır. `cleanup()` ile silinir.
+
+### Kritik Detaylar
+
+1. **`retry` decision gerçekten kullanılıyor** — DONE + testsPassed=false durumunda `retry` döner. Bu worker'ın "ben bitirdim" dediği ama testlerin geçmediği durum. Ama retry sonrası ne oluyor? Hiçbir komut retry decision'ı alıp task'ı tekrar çalıştırmıyor. Dead end.
+
+2. **Review state `.tasks/`'te** — cleanup sonrası kaybolur. Sprint'in review durumu kalıcı değil.
+
+3. **Manuel review yok** — `--auto` olmadan çalıştırınca sadece mevcut durumu gösterir, karar değiştirme imkanı yok. Interactive prompt (approve/reject her task için) olmalı.
+
+4. **Review → finalize bağlantısı yok** — Review sonucu finalize'ı etkilemiyor. Review rejected olsa bile finalize hepsini kabul eder.
+
+### Geliştirme Önerileri
+
+1. **Interactive review modu** — Her task için approve/reject/retry prompt.
+2. **Retry → respawn mekanizması** — Retry decision'ı worker'ı tekrar çalıştırsın.
+3. **Review state kalıcı olsun** — `.brain/reviews/` veya sprint log'a ekle.
+4. **Review → finalize entegrasyonu** — Rejected task'lar finalize'da NO_GO sayılsın.
+5. **`--approve-all` / `--reject-all` shortcuts**.
+
+---
+
+## 23. `deckent finalize` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/finalize.ts` (135 satır)
+
+### İç Mekanizma
+
+```
+buildSprintFromTasks(root):
+  1. .tasks/task-*.json → Task[] oku
+  2. sprintId = tasks[0].sprintId
+  3. .tasks/task-*.result → TaskResult[] oku
+  4. Her task için evaluateResult(result, task) → evaluation
+  5. Result yoksa → NO_GO
+
+Sprint objesi oluştur:
+  { id, number, status: COMPLETE, phase: COMPLETE, tasks, workers, completedAt }
+
+finalizeSprint(root, sprint, evaluations, results, opts):
+  1. calculateMetrics
+  2. writeSprintLog → .brain/sprints/
+  3. writeRetrospective → .brain/RETRO.md + MEMORY.md append
+  4. Update PROJECT-IDENTITY.md
+  5. Update last_sprint_id in config
+  6. runDecay (if not --skip-decay)
+  7. runHooks('afterSprint') (if not --skip-hooks)
+```
+
+### Kritik Detaylar
+
+1. **Sprint tamamlanma kontrolü yok** — EXECUTING durumundaki task'lar da finalize edilir. Worker hâlâ çalışıyor olabilir.
+
+2. **sprintId ilk task'tan** — `tasks[0]?.sprintId` — task yoksa `sprint-unknown`. Farklı sprint'lerdeki task'lar karışmışsa yanlış sprintId.
+
+3. **[DONE] `readJsonSafe` lokal duplicate** — run.ts gibi burada da lokal tanım var. *Sprint 055: utils.ts'den import edildi.*
+
+4. **evaluateResult import** — `sprint-controller.ts`'den import ediliyor, brain.ts re-export'undan değil. Direkt import doğru yaklaşım (ADR-008 uyumlu).
+
+### Geliştirme Önerileri
+
+1. **Sprint completion guard** — EXECUTING/CLAIMED task varsa uyar veya reddet.
+2. **Mixed sprint detection** — Farklı sprintId'li task'lar varsa uyar.
+3. **`--sprint <id>` flag** — Belirli sprint'i finalize et (task filter).
+4. **Idempotency check** — Aynı sprint 2 kez finalize edilirse MEMORY.md'de duplicate learning oluşur (writeRetrospective header check var ama edge case'ler mümkün).
+
+---
+
+## 24. `deckent explain` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/explain.ts` (204 satır)
+
+### İç Mekanizma
+
+```
+1. findLatestSprintLog() → .brain/sprints/ dizininden sort().reverse()[0]
+2. parseSprintLog(content) → regex ile metrics tablosu parse
+3. parseSprintNumber(filename) → fallback (heading parse başarısızsa)
+4. parseRetroLearnings(RETRO.md) → "## Learnings" section, max 3 item
+5. buildExplainOutput(summary, learnings) → human-friendly text
+```
+
+### Çıktı Örneği
+
+```
+Sprint #052 Summary
+━━━━━━━━━━━━━━━━━
+
+Goal: No goal recorded
+
+What happened:
+  • 1 tasks completed successfully
+  • 0 tasks failed (NO_GO)
+  • 1 tasks completed with tech debt
+  • Duration: 3m 38s
+
+Key learnings:
+  • Dashboard Full Expansion: GO_WITH_TECH_DEBT
+
+Next: Run `deckent start` to continue, or `deckent plan` to see next sprint
+```
+
+### Kritik Detaylar
+
+1. **Goal her zaman "No goal recorded"** — Sprint log'da goal bilgisi yazılmıyor. DIRECTIVES.md'den veya sprint title'dan alınabilir.
+
+2. **`doneCount = completed + techDebt`** — Sprint log'da "Completed" ayrı, "Tech Debt" ayrı. Explain bunları topluyor. Doğru mantık: completed = DONE, techDebt = GO_WITH_TECH_DEBT.
+
+3. **Max 3 learning** — `parseRetroLearnings` max 3 item alıyor. Sebebi çıktıyı kısa tutmak ama configurable değil.
+
+4. **Unicode karakterler** — `\u2501` (━) ve `\u2022` (•) kullanılıyor. NO_COLOR desteği yok.
+
+### Geliştirme Önerileri
+
+1. **Goal bilgisi** — DIRECTIVES.md'den "## Goal" veya ilk heading'i al.
+2. **`--sprint <id>` flag** — Belirli sprint'i explain et.
+3. **`--verbose` flag** — Tüm learning'ler + dosya değişiklikleri.
+4. **Dil desteği** — config.language kontrol edilmeli, Türkçe çıktı.
+5. **`--json` flag**.
+
+---
+
+## 25. `deckent onboard` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/onboard.ts` (173 satır)
+
+### Wizard Adımları
+
+```
+1. Welcome + version
+2. Claude CLI detection → version veya "not found"
+3. System profile → CPU cores, RAM, recommended workers
+4. Project analysis → name, language, package.json, tsconfig.json
+5. Already initialized check → .deckent/ var mı
+6. Wizard:
+   - language: en/tr
+   - mode: max_plan/pro_plan/max5x_plan
+   - runInit: confirm
+7. npx deckent init --force (30s timeout, stdio inherit)
+8. Ready message
+```
+
+### Kritik Detaylar
+
+1. **`api` mode seçimi yok** — Wizard'da 3 seçenek: max_plan, pro_plan, max5x_plan. API mode eksik.
+
+2. **Wizard answer'ları init'e geçmiyor** — `npx deckent init --force` çağrılıyor ama language ve mode seçimleri argüman olarak geçilmiyor. Init tekrar interactive soracak (veya default kullanacak).
+
+3. **Already initialized → init atlanıyor** — `.deckent/` varsa init çağrılmıyor. Ama kullanıcı re-onboard isteyebilir (config güncellemek için).
+
+4. **Project detection sığ** — Sadece package.json ve tsconfig.json. analyzeProject() veya detectProjectStack() kullanılmıyor.
+
+5. **Non-interactive TTY check** — `!process.stdin.isTTY` → otomatik non-interactive. CI ortamlarında doğru davranış.
+
+### Geliştirme Önerileri
+
+1. **Wizard answer'larını init'e geç** — `--mode max_plan --language tr` argümanları.
+2. **`api` mode ekle** — Wizard seçeneklerine.
+3. **detectProjectStack() kullan** — Daha zengin analiz.
+4. **`--force` flag** — Already initialized olsa bile re-run.
+5. **Provider detection** — Codex/Gemini kurulu mu göster, init wizard'ına bağla.
+
+---
+
+## 26. `deckent upgrade` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/upgrade.ts` (100 satır)
+
+### İç Mekanizma
+
+```
+compareVersions("1.2.3", "1.3.0"):
+  [1,2,3] vs [1,3,0] → -1 (current < latest)
+
+checkLatestVersion():
+  npm view deckent version (15s timeout)
+  → "1.3.0" veya null
+
+runUpgradeInstall():
+  npm install -g deckent@latest (60s timeout, stdio inherit)
+  → true/false
+```
+
+### Kritik Detaylar
+
+1. **Version compare doğru** — Segment-by-segment number karşılaştırma, 0 padding. `1.0` vs `1.0.1` → -1 (doğru). Ama `1.0.0-beta.1` → `Number("0-beta")` = NaN → karşılaştırma bozulur.
+
+2. **npm view deckent** — Paket adı hardcode "deckent". Eğer paket ismi değişirse veya scoped package olursa (`@deckent/cli`) bozulur.
+
+3. **Global install** — `npm install -g` — npx ile çalışan kullanıcı için yanlış. Local dev dependency olabilir.
+
+4. **Rollback yok** — Install başarısız olursa veya yeni versiyon bozuksa geri dönüş yok.
+
+### Geliştirme Önerileri
+
+1. **Pre-release version desteği** — Semver library (semver npm) kullanılmalı.
+2. **Install strategy detection** — Global mı, local mı, npx mi tespit et.
+3. **Changelog göster** — `npm view deckent --json` ile changelog bilgisi.
+4. **`--force` flag** — Aynı versiyon olsa bile reinstall.
+5. **`--canary` / `--beta` flag** — Pre-release channel desteği.
+
+---
+
+## 27. `deckent plugin` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/plugin.ts` (84 satır)
+
+### Alt Komutlar
+
+Thin wrapper — tüm iş `src/core/plugin.ts`'e delegate:
+- `install <source>` → `installPlugin(source, pluginsDir)`
+- `list` → `scanPlugins(root)`
+- `info <dir>` → `loadPlugin(dir)`
+- `create <name>` → `createPlugin(name, pluginsDir)`
+
+### Kritik Detaylar
+
+1. **`info <dir>` absolute path gerektirir** — Relative path'te çalışır mı belirsiz (resolve edilmiyor).
+
+2. **`install` source types belirsiz** — npm, git, local destekleniyor ama hangi format? Kullanıcıya rehber yok.
+
+3. **`uninstall` / `remove` yok** — Plugin kaldırma komutu eksik.
+
+4. **Plugin hook sistemi** — `loadPluginHooks()` sprint'te çağrılıyor ama hangi hook'lar destekleniyor (`beforeSprint`, `afterTask`, `afterSprint`) burada açıklanmıyor.
+
+### Geliştirme Önerileri
+
+1. **`plugin remove <name>` ekle**.
+2. **`plugin update <name>` ekle** — Source'u hatırlayıp reinstall.
+3. **`plugin test <name>` ekle** — Plugin'in hook'larını dry-run test et.
+4. **`info` relative path** — `resolveProjectRoot()` + relative path resolve.
+5. **`--json` flag list'e** — Programmatic kullanım.
+
+---
+
+## 28. `deckent archive-debt` — Detaylı Analiz
+
+### Kaynak: `src/cli/commands/archive-debt.ts` (103 satır)
+
+### İç Mekanizma
+
+```
+1. DEBT.md oku
+2. parseDebtRows(content) → header satırını bul, pipe-split, 9 kolon
+3. Filter: resolved === 'true' → archive, diğerleri → keep
+4. formatDebtTable(unresolved) → DEBT.md'ye yaz
+5. mkdirSync(.brain/archive/)
+6. DEBT-ARCHIVE.md yoksa → header + separator yaz
+7. appendFileSync → resolved satırları ekle
+```
+
+### Tablo Formatı
+
+```
+| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
+|----|-------------|------|--------|----------|------|----------|----------|---------|
+| debt-052-001 | Missing tests | 052-001 | sprint-052 | HIGH | true | true | sprint-053 | 2026-03-25 |
+```
+
+### Kritik Detaylar
+
+1. **Separator hardcode** — `'|----|-------------|------|--------|----------|------|----------|----------|---------|'` — kolon genişlikleri sabit. Eğer description uzunsa tablo bozulur (ama markdown'da sorun yok, sadece görsel).
+
+2. **Header'ı `| ID |` ile buluyor** — `line.includes('| ID |')` ile header satırını tespit ediyor. Eğer description "ID" içerirse false positive olabilir (ama `| ID |` pattern'i spesifik enough).
+
+3. **9 kolon zorunlu** — `cols.length < 9` → skip. DEBT.md formatı değişirse (kolon ekleme/kaldırma) tüm satırlar atlanır.
+
+4. **Archive'a sadece append** — Hiçbir zaman archive temizlenmiyor. Proje ömrü boyunca büyür.
+
+### Geliştirme Önerileri
+
+1. **`--dry-run` flag** — Preview.
+2. **Archive rotation** — Eski archive'ları tarih bazlı böl.
+3. **`--before <sprint>` flag** — Belirli sprint öncesi resolved'ları arşivle.
+4. **parseDebtTable ile tutarlılık** — `debt-manager.ts`'de de `parseDebtTable()` var. İki ayrı parser tutarsızlık riski.
+5. **`--count` flag** — Sadece kaç tane arşivlenecek göster.
+
+---
+
 ## Toplam İstatistikler
 
 | Metrik | Değer |
@@ -1196,7 +1765,8 @@ Resolved debt item'larını `.brain/archive/DEBT-ARCHIVE.md`'ye taşır.
 | Toplam CLI komutu | 31 (+ alt komutlar) |
 | İncelenen komut | 29 |
 | Toplam geliştirme önerisi | ~180 |
-| Kritik bug | 2 (retro parse uyumsuzluğu, compare yanlış dosya) |
+| Kritik bug | ~~2~~ 0 (Sprint 055'te fix edildi: retro parse uyumsuzluğu, compare yanlış dosya) |
 | Dead code | 3 (loadLearningData, --sandbox-mode, review retry) |
-| Format tutarsızlığı | 4 (retro/sprint log header'lar) |
+| Format tutarsızlığı | ~~4~~ 3 (Sprint 055'te retro format fix edildi) |
 | Provider uyumsuzluğu | 5 komut (spawn, kill, attach, watch, run) tmux-only |
+| Sprint 055'te çözülen | 22 öneri (2 P0 bug, 9 DRY, 5 fonksiyonel, 6 CRUD/flag) |

@@ -18,11 +18,27 @@ export interface RichSprintSummary {
 
 export function parseRetroToRichSummary(content: string): RichSprintSummary {
   const sprintMatch = content.match(/(?:sprint|Sprint)\s*[:#-]?\s*(\S+)/i);
+
+  // Primary: match sprint-reporter.ts format "| Tasks completed | X/Y |"
+  const tasksCompletedMatch = content.match(/\|\s*Tasks completed\s*\|\s*(\d+)\s*\/\s*(\d+)\s*\|/i);
+  // Legacy format fallbacks
   const totalMatch = content.match(/\|\s*Total Tasks?\s*\|\s*(\d+)\s*\|/i);
   const completedMatch = content.match(/\|\s*Completed\s*\|\s*(\d+)\s*\|/i);
+
+  // Primary: "| NO_GO rate | Z% (A/B) |"
+  const noGoRateMatch = content.match(/\|\s*NO_GO rate\s*\|[^|]*\((\d+)\/\d+\)\s*\|/i);
   const noGoMatch = content.match(/\|\s*No-Go\s*\|\s*(\d+)\s*\|/i);
+
+  // Tech debt: count GO_WITH_TECH_DEBT occurrences as fallback
   const debtMatch = content.match(/\|\s*Tech Debt\s*\|\s*(\d+)\s*\|/i);
+  const techDebtCount = debtMatch
+    ? parseInt(debtMatch[1] ?? '0', 10)
+    : (content.match(/GO_WITH_TECH_DEBT/g) ?? []).length;
+
   const coverageMatch = content.match(/\|\s*Coverage\s*\|\s*(\S+)\s*\|/i);
+
+  // Primary: "| Sprint time | ... |"
+  const sprintTimeMatch = content.match(/\|\s*Sprint time\s*\|\s*(.+?)\s*\|/i);
   const durationMatch = content.match(/\|\s*Duration\s*\|\s*(\S+)\s*\|/i);
 
   // Fallback to non-table
@@ -30,14 +46,26 @@ export function parseRetroToRichSummary(content: string): RichSprintSummary {
   const fbCoverage = content.match(/Coverage:\s*(\S+)/i);
   const fbDuration = content.match(/Duration:\s*(\S+)/i);
 
+  let totalTasks = 0;
+  let completed = 0;
+  if (tasksCompletedMatch) {
+    completed = parseInt(tasksCompletedMatch[1] ?? '0', 10);
+    totalTasks = parseInt(tasksCompletedMatch[2] ?? '0', 10);
+  } else if (totalMatch) {
+    totalTasks = parseInt(totalMatch[1] ?? '0', 10);
+    completed = completedMatch ? parseInt(completedMatch[1] ?? '0', 10) : 0;
+  } else if (fbTotal) {
+    totalTasks = parseInt(fbTotal[1] ?? '0', 10);
+  }
+
   return {
     sprintId: sprintMatch?.[1] ?? 'unknown',
-    totalTasks: totalMatch ? parseInt(totalMatch[1] ?? '0', 10) : (fbTotal ? parseInt(fbTotal[1] ?? '0', 10) : 0),
-    completed: completedMatch ? parseInt(completedMatch[1] ?? '0', 10) : 0,
-    noGo: noGoMatch ? parseInt(noGoMatch[1] ?? '0', 10) : 0,
-    techDebt: debtMatch ? parseInt(debtMatch[1] ?? '0', 10) : 0,
+    totalTasks,
+    completed,
+    noGo: noGoRateMatch ? parseInt(noGoRateMatch[1] ?? '0', 10) : (noGoMatch ? parseInt(noGoMatch[1] ?? '0', 10) : 0),
+    techDebt: techDebtCount,
     coverage: coverageMatch?.[1] ?? fbCoverage?.[1] ?? '-',
-    duration: durationMatch?.[1] ?? fbDuration?.[1] ?? '-',
+    duration: sprintTimeMatch?.[1] ?? durationMatch?.[1] ?? fbDuration?.[1] ?? '-',
     raw: content,
   };
 }
@@ -82,10 +110,26 @@ function loadPreviousRetro(root: string): string | null {
   const files = readdirSync(sprintsDir)
     .filter((f) => f.startsWith('sprint-') && f.endsWith('.md'))
     .sort();
-  if (files.length < 1) return null;
-  // Return the last sprint log as previous
-  const lastFile = files.at(-1);
-  if (!lastFile) return null;
+  if (files.length === 0) return null;
+
+  // Read current retro to find current sprint ID
+  const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
+  let currentSprintId: string | undefined;
+  if (existsSync(retroPath)) {
+    const retroContent = readFileSync(retroPath, 'utf-8');
+    const match = retroContent.match(/(?:sprint|Sprint)\s*[:#-]?\s*(sprint-\S+)/i);
+    currentSprintId = match?.[1];
+  }
+
+  // If last file matches current sprint, use second-to-last
+  const lastFile = files.at(-1)!;
+  if (currentSprintId && lastFile === `${currentSprintId}.md`) {
+    if (files.length < 2) return null;
+    const prevFile = files.at(-2)!;
+    return readFileSync(join(sprintsDir, prevFile), 'utf-8');
+  }
+
+  // Otherwise last file IS the previous sprint
   return readFileSync(join(sprintsDir, lastFile), 'utf-8');
 }
 
@@ -95,7 +139,8 @@ export function registerRetro(program: Command): void {
     .description('Show the latest sprint retrospective')
     .option('--raw', 'Show raw RETRO.md content without formatting')
     .option('--compare', 'Show delta comparison with previous sprint')
-    .action((opts: { raw?: boolean; compare?: boolean }) => {
+    .option('--json', 'Output results as JSON')
+    .action((opts: { raw?: boolean; compare?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
       const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
       if (!existsSync(retroPath)) {
@@ -105,6 +150,28 @@ export function registerRetro(program: Command): void {
       const content = readFileSync(retroPath, 'utf-8');
       if (!content.trim()) {
         print('Retrospective file is empty.');
+        return;
+      }
+
+      if (opts.json) {
+        const summary = parseRetroToRichSummary(content);
+        const output: Record<string, unknown> = { ...summary };
+        delete output.raw;
+        if (opts.compare) {
+          const prevContent = loadPreviousRetro(root);
+          if (prevContent) {
+            const prevSummary = parseRetroToRichSummary(prevContent);
+            const curRate = summary.totalTasks > 0 ? (summary.completed / summary.totalTasks) * 100 : 0;
+            const prevRate = prevSummary.totalTasks > 0 ? (prevSummary.completed / prevSummary.totalTasks) * 100 : 0;
+            output.delta = {
+              successRate: Math.round(curRate - prevRate),
+              noGo: summary.noGo - prevSummary.noGo,
+              techDebt: summary.techDebt - prevSummary.techDebt,
+              previous: (() => { const p: Record<string, unknown> = { ...prevSummary }; delete p.raw; return p; })(),
+            };
+          }
+        }
+        print(JSON.stringify(output, null, 2));
         return;
       }
 

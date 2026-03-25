@@ -24,17 +24,9 @@ import {
   PATTERNS_MAX_LINES,
 } from '../core/constants.js';
 
-// ─── Internal Helpers ───────────────────────────────────────────────
+import { readJsonSafe } from '../core/utils.js';
 
-function readJsonSafe<T>(filePath: string): T | null {
-  try {
-    const content = readFileSync(filePath, 'utf-8');
-    // safe: generic T is caller-provided; JSON.parse returns unknown, cast defers validation to caller
-    return JSON.parse(content) as T;
-  } catch {
-    return null;
-  }
-}
+// ─── Internal Helpers ───────────────────────────────────────────────
 
 function now(): string {
   return new Date().toISOString();

@@ -470,8 +470,8 @@ describe('resumeSprint', () => {
       pausedTaskIds: ['001'],
       reason: 'test reason',
     };
-    // brain.ts has a LOCAL readJsonSafe that calls readFileSync — mock it to return the saved state
-    vi.mocked(readFileSync).mockReturnValueOnce(JSON.stringify(savedState) as unknown as Buffer);
+    // readJsonSafe is now imported from core/utils.js — mock it to return the saved state
+    mockedReadJsonSafe.mockReturnValueOnce(savedState);
 
     const tasks = [makeTask('001', TaskStatus.PAUSED)];
     const sprint = makeSprint(tasks);

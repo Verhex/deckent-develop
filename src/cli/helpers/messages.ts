@@ -176,6 +176,30 @@ const MESSAGES: MessageMap = {
     en: 'Worker not found: {taskId}',
     tr: 'Worker bulunamadı: {taskId}',
   },
+  'kill.task_status_updated': {
+    en: 'Task {taskId} status updated to PAUSED.',
+    tr: '{taskId} görev durumu PAUSED olarak güncellendi.',
+  },
+  'kill.task_not_found': {
+    en: 'Warning: Task file not found for {taskId} (worker was killed).',
+    tr: 'Uyarı: {taskId} için görev dosyası bulunamadı (worker durduruldu).',
+  },
+  'kill.locks_released': {
+    en: '{count} lock(s) released for task {taskId}.',
+    tr: '{taskId} görevi için {count} kilit serbest bırakıldı.',
+  },
+  'kill.prompts_cleaned': {
+    en: '{count} prompt file(s) cleaned for task {taskId}.',
+    tr: '{taskId} görevi için {count} prompt dosyası temizlendi.',
+  },
+  'kill.all_killed': {
+    en: '{count} worker(s) killed.',
+    tr: '{count} worker durduruldu.',
+  },
+  'kill.no_active_workers': {
+    en: 'No active workers found.',
+    tr: 'Aktif worker bulunamadı.',
+  },
 
   // ─── spawn command ─────────────────────────────────────────────────
   'spawn.worker_spawned': {

@@ -64,18 +64,12 @@ describe('kill command (isolated)', () => {
     expect(cmd!.description()).toContain('Kill a running worker');
   });
 
-  it('requires taskId argument', async () => {
-    let errorThrown = false;
-    try {
-      const program = new Command();
-      program.exitOverride();
-      registerKill(program);
-      // Try to run kill without taskId - should throw
-      await program.parseAsync(['node', 'test', 'kill']);
-    } catch (e) {
-      errorThrown = true;
-    }
-    expect(errorThrown).toBe(true);
+  it('requires taskId argument (or --all flag)', async () => {
+    await runCommand(['kill']);
+    expect(printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('taskId is required'),
+    }));
+    expect(process.exitCode).toBe(1);
   });
 
   it('calls killWorker with the provided taskId', async () => {

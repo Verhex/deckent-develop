@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { ModelType, TaskResult } from '../../core/types.js';
@@ -34,13 +34,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function readJsonSafe<T>(filePath: string): T | null {
-  try {
-    return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
-  } catch {
-    return null;
-  }
-}
+import { readJsonSafe } from '../../core/utils.js';
 
 let _runTaskCounter = 0;
 export function createRunTaskId(): string {

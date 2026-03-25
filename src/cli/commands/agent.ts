@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { print, printError, formatTable } from '../helpers/output.js';
@@ -213,6 +213,109 @@ export function registerAgent(program: Command): void {
         agent.updatedAt = new Date().toISOString();
         saveAgentConfig(root, agent);
         print(`Agent "${name}" disabled.`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── agent delete ──────────────────────────────────────────────
+  agentCmd
+    .command('delete <name>')
+    .description('Delete an agent from the pool')
+    .action(async (name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const agentDir = join(getAgentsDir(root), name);
+        if (!existsSync(agentDir)) {
+          throw ErrorRegistry.createError('DECKENT_E031', {
+            message: `Agent '${name}' not found`,
+          });
+        }
+        rmSync(agentDir, { recursive: true, force: true });
+        print(`Agent '${name}' deleted.`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── agent edit ────────────────────────────────────────────────
+  agentCmd
+    .command('edit <name>')
+    .description('Edit an agent configuration')
+    .option('--model <model>', 'Update model')
+    .option('--description <desc>', 'Update description')
+    .option('--enable', 'Enable the agent')
+    .option('--disable', 'Disable the agent')
+    .action(async (name: string, opts: { model?: string; description?: string; enable?: boolean; disable?: boolean }) => {
+      try {
+        const root = resolveProjectRoot();
+        const agentDir = join(getAgentsDir(root), name);
+        const agent = loadAgentConfig(agentDir);
+
+        const updates: string[] = [];
+        if (opts.model) {
+          agent.model = opts.model;
+          updates.push(`model=${opts.model}`);
+        }
+        if (opts.description) {
+          agent.description = opts.description;
+          updates.push(`description=${opts.description}`);
+        }
+        if (opts.enable) {
+          agent.enabled = true;
+          updates.push('enabled=true');
+        }
+        if (opts.disable) {
+          agent.enabled = false;
+          updates.push('enabled=false');
+        }
+
+        if (updates.length === 0) {
+          print(`Agent: ${agent.name}`);
+          print(`  Type: ${agent.type}`);
+          print(`  Model: ${agent.model}`);
+          print(`  Enabled: ${agent.enabled}`);
+          print(`  Description: ${agent.description}`);
+          print(`  Uses: ${agent.uses}, Success: ${Math.round(agent.successRate)}%`);
+          return;
+        }
+
+        agent.updatedAt = new Date().toISOString();
+        saveAgentConfig(root, agent);
+        print(`Updated: ${updates.join(', ')}`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── agent info ────────────────────────────────────────────────
+  agentCmd
+    .command('info <name>')
+    .description('Show detailed agent information')
+    .action(async (name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const agentDir = join(getAgentsDir(root), name);
+        const agent = loadAgentConfig(agentDir);
+
+        print(`Agent: ${agent.name}`);
+        print(`  Type: ${agent.type}`);
+        print(`  Model: ${agent.model}`);
+        print(`  Enabled: ${agent.enabled}`);
+        print(`  Description: ${agent.description}`);
+        print(`  Uses: ${agent.uses}`);
+        print(`  Success Rate: ${Math.round(agent.successRate)}%`);
+        print(`  Created: ${agent.createdAt}`);
+        print(`  Updated: ${agent.updatedAt}`);
+
+        const promptPath = join(agentDir, 'PROMPT.md');
+        if (existsSync(promptPath)) {
+          const promptContent = readFileSync(promptPath, 'utf-8');
+          print(`\n--- PROMPT.md ---\n${promptContent}`);
+        }
       } catch (error) {
         printError(error);
         process.exitCode = 1;

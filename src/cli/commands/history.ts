@@ -9,6 +9,8 @@ interface SprintRecord {
   sprint: string;
   tasks: string;
   completed: string;
+  techDebt: string;
+  noGo: string;
   noGoRate: string;
   coverage: string;
   duration: string;
@@ -58,6 +60,7 @@ export function parseSprintLog(content: string): SprintRecord {
   const titleMatch = content.match(/^#\s+(.+)/m);
   const totalMatch = content.match(/\|\s*Total Tasks\s*\|\s*(\d+)\s*\|/i);
   const completedMatch = content.match(/\|\s*Completed\s*\|\s*(\d+)\s*\|/i);
+  const techDebtMatch = content.match(/\|\s*Tech Debt\s*\|\s*(\d+)\s*\|/i);
   const noGoMatch = content.match(/\|\s*No-Go\s*\|\s*(\d+)\s*\|/i);
   const coverageMatch = content.match(/\|\s*Coverage\s*\|\s*(\S+)\s*\|/i);
   const durationMatch = content.match(/\|\s*Duration\s*\|\s*(\S+)\s*\|/i);
@@ -69,6 +72,7 @@ export function parseSprintLog(content: string): SprintRecord {
 
   const totalTasks = totalMatch ? parseInt(totalMatch[1] ?? '0', 10) : NaN;
   const completed = completedMatch ? parseInt(completedMatch[1] ?? '0', 10) : NaN;
+  const techDebt = techDebtMatch ? parseInt(techDebtMatch[1] ?? '0', 10) : NaN;
   const noGo = noGoMatch ? parseInt(noGoMatch[1] ?? '0', 10) : NaN;
 
   let noGoRate = '-';
@@ -86,6 +90,8 @@ export function parseSprintLog(content: string): SprintRecord {
     sprint: titleMatch?.[1] ?? 'Unknown',
     tasks: totalMatch ? String(totalTasks) : (fallbackTasks?.[1] ?? '-'),
     completed: !isNaN(completed) ? String(completed) : '-',
+    techDebt: !isNaN(techDebt) ? String(techDebt) : '-',
+    noGo: !isNaN(noGo) ? String(noGo) : '-',
     noGoRate,
     coverage: coverageMatch?.[1] ?? fallbackCoverage?.[1] ?? '-',
     duration: formatDurationMs(rawDuration),
@@ -189,8 +195,8 @@ export function registerHistory(program: Command): void {
         return;
       }
 
-      const headers = ['Sprint', 'Tasks', 'Completed', 'No-Go Rate', 'Coverage', 'Duration', 'Agents', 'Skills'];
-      const rows = records.map((r) => [r.sprint, r.tasks, r.completed, r.noGoRate, r.coverage, r.duration, r.agents, r.skills]);
+      const headers = ['Sprint', 'Tasks', 'Completed', 'Tech Debt', 'No-Go', 'No-Go Rate', 'Coverage', 'Duration', 'Agents', 'Skills'];
+      const rows = records.map((r) => [r.sprint, r.tasks, r.completed, r.techDebt, r.noGo, r.noGoRate, r.coverage, r.duration, r.agents, r.skills]);
       print(formatTable(headers, rows));
     });
 }

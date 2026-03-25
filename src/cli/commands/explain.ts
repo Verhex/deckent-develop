@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLangFromConfig } from '../helpers/config-reader.js';
 
 /** Parsed sprint log data */
 export interface SprintSummary {
@@ -125,37 +126,87 @@ export function formatDuration(ms: number): string {
 }
 
 /**
+ * Extract goal from DIRECTIVES.md (first `## Goal:` line).
+ */
+export function extractGoalFromDirectives(root: string): string | null {
+  const directivesPath = join(root, 'DIRECTIVES.md');
+  if (!existsSync(directivesPath)) return null;
+  try {
+    const content = readFileSync(directivesPath, 'utf-8');
+    const match = content.match(/^##\s*Goal[:\s]*(.+)$/m);
+    return match?.[1]?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract goal from sprint log content (first non-empty line after heading).
+ */
+export function extractGoalFromSprintLog(content: string): string | null {
+  const match = content.match(/^#\s+(?:Sprint\s+)?sprint-\d+[^\n]*\n+([^\n#]+)/m);
+  const line = match?.[1]?.trim();
+  if (!line || line.length === 0) return null;
+  // Skip table lines (starting with |) — not a goal
+  if (line.startsWith('|')) return null;
+  return line;
+}
+
+/** i18n labels for explain output */
+const EXPLAIN_LABELS: Record<string, Record<string, string>> = {
+  summary: { en: 'Summary', tr: 'Özet' },
+  goal: { en: 'Goal', tr: 'Hedef' },
+  whatHappened: { en: 'What happened:', tr: 'Ne oldu:' },
+  tasksCompleted: { en: 'tasks completed successfully', tr: 'görev başarıyla tamamlandı' },
+  tasksFailed: { en: 'tasks failed (NO_GO)', tr: 'görev başarısız (NO_GO)' },
+  tasksDebt: { en: 'tasks completed with tech debt', tr: 'görev teknik borçla tamamlandı' },
+  duration: { en: 'Duration', tr: 'Süre' },
+  keyLearnings: { en: 'Key learnings:', tr: 'Temel öğrenmeler:' },
+  next: {
+    en: 'Next: Run `deckent start` to continue, or `deckent plan` to see next sprint',
+    tr: 'Sonraki: Devam etmek için `deckent start`, planlamak için `deckent plan` çalıştırın',
+  },
+  noGoal: { en: 'No goal recorded', tr: 'Hedef kaydedilmemiş' },
+};
+
+function label(key: string, lang: string): string {
+  const entry = EXPLAIN_LABELS[key];
+  if (!entry) return key;
+  return entry[lang === 'tr' ? 'tr' : 'en'] ?? entry['en'] ?? key;
+}
+
+/**
  * Build the human-readable explain output string.
  */
-export function buildExplainOutput(summary: SprintSummary, learnings: RetroLearnings): string {
+export function buildExplainOutput(summary: SprintSummary, learnings: RetroLearnings, lang = 'en'): string {
   const lines: string[] = [];
 
-  lines.push(`Sprint #${summary.sprintNumber} Summary`);
+  lines.push(`Sprint #${summary.sprintNumber} ${label('summary', lang)}`);
   lines.push('\u2501'.repeat(17));
   lines.push('');
-  lines.push(`Goal: ${summary.goal}`);
+  lines.push(`${label('goal', lang)}: ${summary.goal === 'No goal recorded' ? label('noGoal', lang) : summary.goal}`);
   lines.push('');
-  lines.push('What happened:');
+  lines.push(label('whatHappened', lang));
 
   const doneCount = summary.completed + summary.techDebt;
-  lines.push(`  \u2022 ${doneCount} tasks completed successfully`);
-  lines.push(`  \u2022 ${summary.noGo} tasks failed (NO_GO)`);
-  lines.push(`  \u2022 ${summary.techDebt} tasks completed with tech debt`);
+  lines.push(`  \u2022 ${doneCount} ${label('tasksCompleted', lang)}`);
+  lines.push(`  \u2022 ${summary.noGo} ${label('tasksFailed', lang)}`);
+  lines.push(`  \u2022 ${summary.techDebt} ${label('tasksDebt', lang)}`);
 
   if (summary.durationMs > 0) {
-    lines.push(`  \u2022 Duration: ${formatDuration(summary.durationMs)}`);
+    lines.push(`  \u2022 ${label('duration', lang)}: ${formatDuration(summary.durationMs)}`);
   }
 
   if (learnings.items.length > 0) {
     lines.push('');
-    lines.push('Key learnings:');
+    lines.push(label('keyLearnings', lang));
     for (const item of learnings.items) {
       lines.push(`  \u2022 ${item}`);
     }
   }
 
   lines.push('');
-  lines.push('Next: Run `deckent start` to continue, or `deckent plan` to see next sprint');
+  lines.push(label('next', lang));
 
   return lines.join('\n');
 }
@@ -168,22 +219,51 @@ export function registerExplain(program: Command): void {
   program
     .command('explain')
     .description('Explain what the last sprint did in human-friendly language')
-    .action(() => {
+    .option('--sprint <id>', 'Show a specific sprint by ID (e.g. 042)')
+    .option('--json', 'Output results as JSON')
+    .action((opts: { sprint?: string; json?: boolean }) => {
       const root = resolveProjectRoot();
-      const latestFile = findLatestSprintLog(root);
+      const lang = getLangFromConfig(root);
 
-      if (!latestFile) {
+      let sprintFile: string | null;
+      if (opts.sprint) {
+        const paddedId = opts.sprint.padStart(3, '0');
+        const filename = `sprint-${paddedId}.md`;
+        const filePath = join(root, '.brain', 'sprints', filename);
+        if (!existsSync(filePath)) {
+          print(`Sprint ${opts.sprint} not found`);
+          return;
+        }
+        sprintFile = filename;
+      } else {
+        sprintFile = findLatestSprintLog(root);
+      }
+
+      if (!sprintFile) {
         print('No sprints found. Run `deckent start` to begin.');
         return;
       }
 
-      const sprintPath = join(root, '.brain', 'sprints', latestFile);
+      const sprintPath = join(root, '.brain', 'sprints', sprintFile);
       const sprintContent = readFileSync(sprintPath, 'utf-8');
       const summary = parseSprintLog(sprintContent);
 
       // Use filename-based sprint number if heading parse failed
       if (summary.sprintNumber === 0) {
-        summary.sprintNumber = parseSprintNumber(latestFile);
+        summary.sprintNumber = parseSprintNumber(sprintFile);
+      }
+
+      // Goal extraction: DIRECTIVES.md → sprint log → fallback
+      if (summary.goal === 'No goal recorded') {
+        const directivesGoal = extractGoalFromDirectives(root);
+        if (directivesGoal) {
+          summary.goal = directivesGoal;
+        } else {
+          const logGoal = extractGoalFromSprintLog(sprintContent);
+          if (logGoal) {
+            summary.goal = logGoal;
+          }
+        }
       }
 
       // Read RETRO.md for learnings
@@ -198,6 +278,23 @@ export function registerExplain(program: Command): void {
         }
       }
 
-      print(buildExplainOutput(summary, learnings));
+      if (opts.json) {
+        const output: Record<string, unknown> = {
+          sprintId: summary.sprintNumber,
+          goal: summary.goal,
+          metrics: {
+            totalTasks: summary.totalTasks,
+            completed: summary.completed,
+            techDebt: summary.techDebt,
+            noGo: summary.noGo,
+            durationMs: summary.durationMs,
+          },
+          learnings: learnings.items,
+        };
+        print(JSON.stringify(output, null, 2));
+        return;
+      }
+
+      print(buildExplainOutput(summary, learnings, lang));
     });
 }
