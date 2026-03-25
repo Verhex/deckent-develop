@@ -1,70 +1,58 @@
-# DIRECTIVES — Sprint 057: Community Infrastructure
+# DIRECTIVES — Sprint 059: Continuous Watch Mode
 
-## Goal: GitHub Discussions, Discord, CONTRIBUTING overhaul. Community büyümesi için altyapı.
-
----
-
-## Task 1: GitHub Discussions Setup
-- Model: sonnet
-- Effort: normal
-- Files: .github/DISCUSSION_TEMPLATE/ (new), docs/COMMUNITY.md (new)
-- Scope: .github/, docs/
-
-### Description
-GitHub Discussions kategori yapısı: Ideas (feature requests), Q&A (help), Show & Tell (projeler), Announcements. Discussion template'leri. COMMUNITY.md: Discord link, contribution guide, code of conduct referansı.
-5+ test.
+## Goal: `deckent watch --act` → Repo'yu izle, ne yapılması gerektiğini öner, onay al, sprint çalıştır. "Yaşayan organizma" deneyimi.
 
 ---
 
-## Task 2: CONTRIBUTING.md Overhaul
+## Task 1: Repository Analyzer (Continuous)
 - Model: opus
 - Effort: high
-- Files: CONTRIBUTING.md
-- Scope: ./
+- Files: src/orchestra/repo-analyzer.ts (new)
+- Scope: src/orchestra/
 
 ### Description
-CONTRIBUTING.md'yi yeniden yaz. Sections: Quick Start (5 dakika dev setup), Architecture Overview (module map), Development Workflow (branch → test → PR), Plugin Development, Skill Development, Translation Guide. "Good First Issue" rehberi. Code review checklist.
+Repo'yu periyodik analiz et (her 5 dakika veya file change): open TODO/FIXME sayısı, test coverage trend, stale branches, dependency updates, open issues (GitHub API). Her analiz sonucu "suggestion" listesi oluştur.
 8+ test.
 
 ---
 
-## Task 3: Issue Label System
-- Model: haiku
-- Effort: low
-- Files: .github/labels.yml (new), scripts/sync-labels.ts (new)
-- Scope: .github/, scripts/
+## Task 2: Suggestion Engine
+- Model: opus
+- Effort: high
+- Files: src/orchestra/suggestion-engine.ts (new), src/core/suggestion-types.ts (new)
+- Scope: src/orchestra/, src/core/
 
 ### Description
-Standart label seti: `good first issue`, `help wanted`, `bug`, `enhancement`, `plugin`, `skill`, `docs`, `provider:claude`, `provider:codex`, `provider:gemini`, `priority:p0-p3`, `area:brain`, `area:worker`, `area:auditor`, `area:api`, `area:dashboard`. GitHub API ile sync script.
-3+ test.
+Repo analysis + MEMORY + PATTERNS'tan sprint önerileri üret. Priority scoring: TODO count (high), coverage drop (critical), dependency update (low). Suggestion format: { title, description, priority, estimatedEffort, suggestedModel }. Max 5 suggestion at a time.
+8+ test.
 
 ---
 
-## Task 4: Discord Bot (Webhook)
+## Task 3: Watch Mode CLI
 - Model: sonnet
 - Effort: normal
-- Files: src/integrations/discord-webhook.ts (new)
-- Scope: src/integrations/
+- Files: src/cli/commands/watch.ts (modify), src/cli/commands/continuous.ts (new)
+- Scope: src/cli/
 
 ### Description
-Sprint complete → Discord webhook notification. Format: embed with sprint summary, task count, NO_GO rate. Config: `discord_webhook_url`. Mevcut notification system'e entegre (NotificationConfig).
+`deckent watch --act` → sürekli izle + öner + onayla + çalış döngüsü. Interactive: "3 öneri var: 1) Fix 5 TODO, 2) Update deps, 3) Increase coverage. Hangisini yapayım? [1/2/3/all/skip]". `--auto` mode: priority > HIGH olanları otomatik çalıştır.
+8+ test.
+
+---
+
+## Task 4: Watch Dashboard Integration
+- Model: sonnet
+- Effort: normal
+- Files: src/api/server.ts, src/dashboard/ (modify)
+- Scope: src/api/, src/dashboard/
+
+### Description
+Web dashboard'da "Suggestions" tab. Real-time suggestion listesi, one-click sprint başlatma. SSE ile live update. Suggestion history (kabul/red edilen öneriler).
 5+ test.
 
 ---
 
-## Task 5: Code of Conduct
-- Model: haiku
-- Effort: low
-- Files: CODE_OF_CONDUCT.md (new)
-- Scope: ./
-
-### Description
-Contributor Covenant v2.1 adapte et. İletişim: community@deckent.agency. Enforcement guidelines.
-2+ test.
-
----
-
 ## Quality Rules
-- Tüm template'ler GitHub API ile uyumlu
-- Discord webhook test edilmiş
-- CONTRIBUTING.md 5 dakika dev setup çalışır
+- Watch mode CPU < %5 idle
+- Suggestion kalitesi: false positive < %20
+- Auto mode güvenli (destructive action yok)

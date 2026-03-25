@@ -1,58 +1,59 @@
-# DIRECTIVES — Sprint 064: GitHub Issue Mode
+# DIRECTIVES — Sprint 064: Git Auto-Workflow
 
-## Goal: `deckent do --issue 42` → GitHub issue'yu oku, sprint başlat. "Projeyi al götür" deneyiminin temeli.
-
----
-
-## Task 1: GitHub Issue Reader
-- Model: opus
-- Effort: high
-- Files: src/integrations/github.ts (new), src/core/issue-types.ts (new)
-- Scope: src/integrations/, src/core/
-
-### Description
-GitHub API ile issue oku (gh CLI veya REST API). Issue → structured format: title, body, labels, comments, linked PRs. `GITHUB_TOKEN` env var ile auth. Rate limiting handle. Public repo'lar için token opsiyonel.
-8+ test.
+## Goal: Branch-per-sprint, auto-commit-per-task, sprint PR oluşturma. Git workflow otomasyonu.
 
 ---
 
-## Task 2: Issue-to-DIRECTIVES Converter
+## Task 1: Branch-per-Sprint
 - Model: opus
 - Effort: high
-- Files: src/orchestra/issue-to-directives.ts (new)
+- Files: src/orchestra/git-workflow.ts (new), src/orchestra/sprint-controller.ts
 - Scope: src/orchestra/
 
 ### Description
-GitHub issue'yu DIRECTIVES.md formatına çevir. Label-based model selection: `bug` → sonnet, `feature` → opus, `docs` → haiku. Body'den scope inference (dosya adları, modül isimleri tespit et). Multi-issue support: `deckent do --issue 42,43,44` → tek sprint.
+Sprint başladığında otomatik branch oluştur: `deckent/sprint-{id}`. Config: `git_auto_branch: true/false` (default: false — backward compat). Sprint tamamlandığında main'e merge önerisi. Dirty working tree handle: stash → branch → pop.
 10+ test.
 
 ---
 
-## Task 3: `deckent do` CLI Command
+## Task 2: Auto-Commit-per-Task
 - Model: sonnet
 - Effort: normal
-- Files: src/cli/commands/do.ts (new)
-- Scope: src/cli/
+- Files: src/orchestra/git-workflow.ts, src/agents/worker.ts
+- Scope: src/orchestra/, src/agents/
 
 ### Description
-`deckent do "description"` → inline sprint (mevcut zero-config mode genişletmesi). `deckent do --issue 42` → GitHub issue mode. `deckent do --file TODO.md` → dosyadan oku. Tüm modları planner'a yönlendir. `--auto-approve` flag.
+Her task tamamlandığında otomatik commit: `deckent(sprint-051): Task 1 - Add login endpoint`. Conventional commits format. Scope: task'ın scope.directories'i. Config: `git_auto_commit: true/false`. Sadece DONE veya GO_WITH_TECH_DEBT task'lar commit edilir.
 8+ test.
 
 ---
 
-## Task 4: Sprint Result → GitHub Comment
+## Task 3: Sprint PR Generator
 - Model: sonnet
 - Effort: normal
-- Files: src/integrations/github-reporter.ts (new)
+- Files: src/integrations/github-pr.ts (new)
 - Scope: src/integrations/
 
 ### Description
-Sprint tamamlandığında GitHub issue'ya yorum yaz: task listesi, GO/NO_GO sonuçları, değişen dosyalar, coverage. `gh issue comment` veya REST API. Config: `github_auto_comment: true/false`.
+Sprint tamamlandığında PR oluştur (gh CLI). Title: `deckent(sprint-051): npm Publish + README Overhaul`. Body: task listesi (checkbox), metrics (coverage, test count), RETRO özeti, files changed. Draft PR default. Config: `github_auto_pr: true/false`.
+5+ test.
+
+---
+
+## Task 4: Merge Conflict Detection
+- Model: sonnet
+- Effort: normal
+- Files: src/orchestra/git-workflow.ts
+- Scope: src/orchestra/
+
+### Description
+Sprint sırasında main branch'te değişiklik olursa: rebase attempt, conflict varsa alert. Auditor'a merge conflict detection ekle. Dashboard'da "merge conflict" uyarısı.
 5+ test.
 
 ---
 
 ## Quality Rules
-- `gh` CLI veya REST API ile çalışır (ikisi de desteklenmeli)
-- Rate limiting handle edilmeli
-- Token yoksa public repo'lar hala çalışmalı
+- Branch naming consistent
+- Commit messages conventional
+- PR template populated
+- Conflict detection false positive < %5

@@ -1,59 +1,59 @@
-# DIRECTIVES — Sprint 063: Git Auto-Workflow
+# DIRECTIVES — Sprint 063: Epic→Multi-Sprint Decomposition
 
-## Goal: Branch-per-sprint, auto-commit-per-task, sprint PR oluşturma. Git workflow otomasyonu.
+## Goal: Büyük hedefleri otomatik alt-sprint'lere böl. "Build me an e-commerce site" → 5 sprint, sıralı execution, cross-sprint MEMORY.
 
 ---
 
-## Task 1: Branch-per-Sprint
+## Task 1: Epic Planner
 - Model: opus
 - Effort: high
-- Files: src/orchestra/git-workflow.ts (new), src/orchestra/sprint-controller.ts
-- Scope: src/orchestra/
+- Files: src/orchestra/epic-planner.ts (new), src/core/epic-types.ts (new)
+- Scope: src/orchestra/, src/core/
 
 ### Description
-Sprint başladığında otomatik branch oluştur: `deckent/sprint-{id}`. Config: `git_auto_branch: true/false` (default: false — backward compat). Sprint tamamlandığında main'e merge önerisi. Dirty working tree handle: stash → branch → pop.
+`EpicPlanner` class: büyük hedefi alt-sprint'lere böl. Input: natural language goal + project analysis. Output: EpicPlan { sprints: SprintGoal[], dependencies: string[][], estimatedTotal: number }. AI planner'ı kullan (mevcut planner.ts pattern). Zod validation. Max 10 sprint per epic.
 10+ test.
 
 ---
 
-## Task 2: Auto-Commit-per-Task
-- Model: sonnet
-- Effort: normal
-- Files: src/orchestra/git-workflow.ts, src/agents/worker.ts
-- Scope: src/orchestra/, src/agents/
+## Task 2: Sequential Sprint Executor
+- Model: opus
+- Effort: high
+- Files: src/orchestra/epic-executor.ts (new), src/orchestra/sprint-controller.ts
+- Scope: src/orchestra/
 
 ### Description
-Her task tamamlandığında otomatik commit: `deckent(sprint-051): Task 1 - Add login endpoint`. Conventional commits format. Scope: task'ın scope.directories'i. Config: `git_auto_commit: true/false`. Sadece DONE veya GO_WITH_TECH_DEBT task'lar commit edilir.
-8+ test.
+EpicPlan'ı sırayla execute et: Sprint 1 → evaluate → Sprint 2 → ... Her sprint arası MEMORY güncelle. Önceki sprint'in sonuçlarını sonraki sprint'in context'ine ekle. Pause/resume epic level. `deckent start --epic "Build e-commerce site"`.
+10+ test.
 
 ---
 
-## Task 3: Sprint PR Generator
+## Task 3: Epic Progress Tracking
 - Model: sonnet
 - Effort: normal
-- Files: src/integrations/github-pr.ts (new)
-- Scope: src/integrations/
+- Files: src/orchestra/epic-tracker.ts (new), src/api/server.ts
+- Scope: src/orchestra/, src/api/
 
 ### Description
-Sprint tamamlandığında PR oluştur (gh CLI). Title: `deckent(sprint-051): npm Publish + README Overhaul`. Body: task listesi (checkbox), metrics (coverage, test count), RETRO özeti, files changed. Draft PR default. Config: `github_auto_pr: true/false`.
+Epic durumunu .deckent/epics/{id}.json'a kaydet. API endpoint: GET /api/epic/{id} → progress. Dashboard'da epic view (sprint listesi, overall progress). `deckent status --epic` komutu.
 5+ test.
 
 ---
 
-## Task 4: Merge Conflict Detection
+## Task 4: Cross-Sprint Context
 - Model: sonnet
 - Effort: normal
-- Files: src/orchestra/git-workflow.ts
+- Files: src/orchestra/cross-sprint-context.ts (new)
 - Scope: src/orchestra/
 
 ### Description
-Sprint sırasında main branch'te değişiklik olursa: rebase attempt, conflict varsa alert. Auditor'a merge conflict detection ekle. Dashboard'da "merge conflict" uyarısı.
+Sprint N'in sonuçlarını Sprint N+1'in DIRECTIVES'ine otomatik ekle: "Önceki sprint'te Auth tamamlandı, şimdi Products üzerine çalış. Auth modülü src/auth/ altında, JWT token formatı: ...". MEMORY + git diff + task results birleştir.
 5+ test.
 
 ---
 
 ## Quality Rules
-- Branch naming consistent
-- Commit messages conventional
-- PR template populated
-- Conflict detection false positive < %5
+- Epic plan Zod-validated
+- Cross-sprint MEMORY tutarlı
+- Epic pause/resume çalışır
+- 10+ sprint'lik epic test

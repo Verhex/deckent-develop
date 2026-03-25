@@ -1,59 +1,70 @@
-# DIRECTIVES — Sprint 058: Git Auto-Workflow
+# DIRECTIVES — Sprint 060: Community Infrastructure
 
-## Goal: Branch-per-sprint, auto-commit-per-task, sprint PR oluşturma. Git workflow otomasyonu.
-
----
-
-## Task 1: Branch-per-Sprint
-- Model: opus
-- Effort: high
-- Files: src/orchestra/git-workflow.ts (new), src/orchestra/sprint-controller.ts
-- Scope: src/orchestra/
-
-### Description
-Sprint başladığında otomatik branch oluştur: `deckent/sprint-{id}`. Config: `git_auto_branch: true/false` (default: false — backward compat). Sprint tamamlandığında main'e merge önerisi. Dirty working tree handle: stash → branch → pop.
-10+ test.
+## Goal: GitHub Discussions, Discord, CONTRIBUTING overhaul. Community büyümesi için altyapı.
 
 ---
 
-## Task 2: Auto-Commit-per-Task
+## Task 1: GitHub Discussions Setup
 - Model: sonnet
 - Effort: normal
-- Files: src/orchestra/git-workflow.ts, src/agents/worker.ts
-- Scope: src/orchestra/, src/agents/
+- Files: .github/DISCUSSION_TEMPLATE/ (new), docs/COMMUNITY.md (new)
+- Scope: .github/, docs/
 
 ### Description
-Her task tamamlandığında otomatik commit: `deckent(sprint-051): Task 1 - Add login endpoint`. Conventional commits format. Scope: task'ın scope.directories'i. Config: `git_auto_commit: true/false`. Sadece DONE veya GO_WITH_TECH_DEBT task'lar commit edilir.
+GitHub Discussions kategori yapısı: Ideas (feature requests), Q&A (help), Show & Tell (projeler), Announcements. Discussion template'leri. COMMUNITY.md: Discord link, contribution guide, code of conduct referansı.
+5+ test.
+
+---
+
+## Task 2: CONTRIBUTING.md Overhaul
+- Model: opus
+- Effort: high
+- Files: CONTRIBUTING.md
+- Scope: ./
+
+### Description
+CONTRIBUTING.md'yi yeniden yaz. Sections: Quick Start (5 dakika dev setup), Architecture Overview (module map), Development Workflow (branch → test → PR), Plugin Development, Skill Development, Translation Guide. "Good First Issue" rehberi. Code review checklist.
 8+ test.
 
 ---
 
-## Task 3: Sprint PR Generator
+## Task 3: Issue Label System
+- Model: haiku
+- Effort: low
+- Files: .github/labels.yml (new), scripts/sync-labels.ts (new)
+- Scope: .github/, scripts/
+
+### Description
+Standart label seti: `good first issue`, `help wanted`, `bug`, `enhancement`, `plugin`, `skill`, `docs`, `provider:claude`, `provider:codex`, `provider:gemini`, `priority:p0-p3`, `area:brain`, `area:worker`, `area:auditor`, `area:api`, `area:dashboard`. GitHub API ile sync script.
+3+ test.
+
+---
+
+## Task 4: Discord Bot (Webhook)
 - Model: sonnet
 - Effort: normal
-- Files: src/integrations/github-pr.ts (new)
+- Files: src/integrations/discord-webhook.ts (new)
 - Scope: src/integrations/
 
 ### Description
-Sprint tamamlandığında PR oluştur (gh CLI). Title: `deckent(sprint-051): npm Publish + README Overhaul`. Body: task listesi (checkbox), metrics (coverage, test count), RETRO özeti, files changed. Draft PR default. Config: `github_auto_pr: true/false`.
+Sprint complete → Discord webhook notification. Format: embed with sprint summary, task count, NO_GO rate. Config: `discord_webhook_url`. Mevcut notification system'e entegre (NotificationConfig).
 5+ test.
 
 ---
 
-## Task 4: Merge Conflict Detection
-- Model: sonnet
-- Effort: normal
-- Files: src/orchestra/git-workflow.ts
-- Scope: src/orchestra/
+## Task 5: Code of Conduct
+- Model: haiku
+- Effort: low
+- Files: CODE_OF_CONDUCT.md (new)
+- Scope: ./
 
 ### Description
-Sprint sırasında main branch'te değişiklik olursa: rebase attempt, conflict varsa alert. Auditor'a merge conflict detection ekle. Dashboard'da "merge conflict" uyarısı.
-5+ test.
+Contributor Covenant v2.1 adapte et. İletişim: community@deckent.agency. Enforcement guidelines.
+2+ test.
 
 ---
 
 ## Quality Rules
-- Branch naming consistent
-- Commit messages conventional
-- PR template populated
-- Conflict detection false positive < %5
+- Tüm template'ler GitHub API ile uyumlu
+- Discord webhook test edilmiş
+- CONTRIBUTING.md 5 dakika dev setup çalışır
