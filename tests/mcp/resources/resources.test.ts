@@ -456,10 +456,224 @@ describe('MCP Resources — Comprehensive Suite', () => {
     });
   });
 
+  // ── retro resource ─────────────────────────────────────────────────
+
+  describe('deckent://retro', () => {
+    it('registers retro resource with correct name and mimeType', async () => {
+      const { registerRetroResource } = await import('../../../src/mcp/resources/retro.js');
+      const mock = createMockServer();
+      registerRetroResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      expect(mock.resources.has('retro')).toBe(true);
+      const cfg = mock.resources.get('retro')!.config as { mimeType?: string };
+      expect(cfg.mimeType).toBe('text/markdown');
+    });
+
+    it('returns RETRO.md content when file exists', async () => {
+      const { registerRetroResource } = await import('../../../src/mcp/resources/retro.js');
+      const mock = createMockServer();
+      registerRetroResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const content = '# Sprint Retro\n\n## What went well\n- Fast delivery\n';
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(content);
+
+      const handler = mock.resources.get('retro')!.handler;
+      const result = await handler(new URL('deckent://retro'));
+
+      expect(result.contents[0]!.text).toBe(content);
+      expect(result.contents[0]!.mimeType).toBe('text/markdown');
+    });
+
+    it('returns empty string when RETRO.md does not exist', async () => {
+      const { registerRetroResource } = await import('../../../src/mcp/resources/retro.js');
+      const mock = createMockServer();
+      registerRetroResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const handler = mock.resources.get('retro')!.handler;
+      const result = await handler(new URL('deckent://retro'));
+
+      expect(result.contents[0]!.text).toBe('');
+    });
+
+    it('returns correct uri in content', async () => {
+      const { registerRetroResource } = await import('../../../src/mcp/resources/retro.js');
+      const mock = createMockServer();
+      registerRetroResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const handler = mock.resources.get('retro')!.handler;
+      const result = await handler(new URL('deckent://retro'));
+
+      expect(result.contents[0]!.uri).toContain('deckent://retro');
+    });
+  });
+
+  // ── usage resource ─────────────────────────────────────────────────
+
+  describe('deckent://usage', () => {
+    it('registers usage resource with correct name and mimeType', async () => {
+      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
+      const mock = createMockServer();
+      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      expect(mock.resources.has('usage')).toBe(true);
+      const cfg = mock.resources.get('usage')!.config as { mimeType?: string };
+      expect(cfg.mimeType).toBe('application/json');
+    });
+
+    it('returns usage entries for current sprint', async () => {
+      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
+      const mock = createMockServer();
+      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const entries = [{ model: 'sonnet', tokenEstimate: 5000, taskId: '059-001' }];
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync)
+        .mockReturnValueOnce(JSON.stringify({ last_sprint_id: 'sprint-059' }))
+        .mockReturnValueOnce(JSON.stringify(entries));
+
+      const handler = mock.resources.get('usage')!.handler;
+      const result = await handler(new URL('deckent://usage'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.sprintId).toBe('sprint-059');
+      expect(parsed.entries).toHaveLength(1);
+      expect(parsed.entries[0].taskId).toBe('059-001');
+    });
+
+    it('returns error when no sprint found in config', async () => {
+      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
+      const mock = createMockServer();
+      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const handler = mock.resources.get('usage')!.handler;
+      const result = await handler(new URL('deckent://usage'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.error).toBeDefined();
+    });
+
+    it('returns empty entries when usage file missing', async () => {
+      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
+      const mock = createMockServer();
+      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync)
+        .mockReturnValueOnce(true)   // config exists
+        .mockReturnValueOnce(false); // usage file missing
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-059' }));
+
+      const handler = mock.resources.get('usage')!.handler;
+      const result = await handler(new URL('deckent://usage'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.sprintId).toBe('sprint-059');
+      expect(parsed.entries).toHaveLength(0);
+    });
+  });
+
+  // ── tasks resource ─────────────────────────────────────────────────
+
+  describe('deckent://tasks', () => {
+    it('registers tasks resource with correct name and mimeType', async () => {
+      const { registerTasksResource } = await import('../../../src/mcp/resources/tasks.js');
+      const mock = createMockServer();
+      registerTasksResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      expect(mock.resources.has('tasks')).toBe(true);
+      const cfg = mock.resources.get('tasks')!.config as { mimeType?: string };
+      expect(cfg.mimeType).toBe('application/json');
+    });
+
+    it('returns task list when .tasks dir exists', async () => {
+      const { registerTasksResource } = await import('../../../src/mcp/resources/tasks.js');
+      const mock = createMockServer();
+      registerTasksResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const taskJson = { id: '059-001', title: 'My Task', status: 'EXECUTING' };
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked((await import('node:fs')).readdirSync).mockReturnValue(['task-059-001.json'] as unknown as ReturnType<typeof import('node:fs').readdirSync>);
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify(taskJson));
+
+      const handler = mock.resources.get('tasks')!.handler;
+      const result = await handler(new URL('deckent://tasks'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.tasks).toHaveLength(1);
+      expect(parsed.tasks[0].id).toBe('059-001');
+    });
+
+    it('returns empty task list when .tasks dir does not exist', async () => {
+      const { registerTasksResource } = await import('../../../src/mcp/resources/tasks.js');
+      const mock = createMockServer();
+      registerTasksResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const handler = mock.resources.get('tasks')!.handler;
+      const result = await handler(new URL('deckent://tasks'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.tasks).toHaveLength(0);
+    });
+  });
+
+  // ── agents resource ────────────────────────────────────────────────
+
+  describe('deckent://agents', () => {
+    it('registers agents resource with correct name and mimeType', async () => {
+      const { registerAgentsResource } = await import('../../../src/mcp/resources/agents.js');
+      const mock = createMockServer();
+      registerAgentsResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      expect(mock.resources.has('agents')).toBe(true);
+      const cfg = mock.resources.get('agents')!.config as { mimeType?: string };
+      expect(cfg.mimeType).toBe('application/json');
+    });
+
+    it('returns agent list when .deckent/agents dir exists', async () => {
+      const { registerAgentsResource } = await import('../../../src/mcp/resources/agents.js');
+      const mock = createMockServer();
+      registerAgentsResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      const agentJson = { id: 'bug-fixer', name: 'Bug Fixer', enabled: true };
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked((await import('node:fs')).readdirSync).mockReturnValue(['bug-fixer'] as unknown as ReturnType<typeof import('node:fs').readdirSync>);
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify(agentJson));
+
+      const handler = mock.resources.get('agents')!.handler;
+      const result = await handler(new URL('deckent://agents'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.agents).toHaveLength(1);
+      expect(parsed.agents[0].id).toBe('bug-fixer');
+    });
+
+    it('returns empty agents list when .deckent/agents dir does not exist', async () => {
+      const { registerAgentsResource } = await import('../../../src/mcp/resources/agents.js');
+      const mock = createMockServer();
+      registerAgentsResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
+
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      const handler = mock.resources.get('agents')!.handler;
+      const result = await handler(new URL('deckent://agents'));
+
+      const parsed = JSON.parse(result.contents[0]!.text);
+      expect(parsed.agents).toHaveLength(0);
+    });
+  });
+
   // ── registerResources index ────────────────────────────────────────
 
   describe('registerResources (index)', () => {
-    it('registers all 5 resources on the server', async () => {
+    it('registers all 9 resources on the server', async () => {
       const { registerResources } = await import('../../../src/mcp/resources/index.js');
       const mock = createMockServer();
       registerResources(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
@@ -469,6 +683,10 @@ describe('MCP Resources — Comprehensive Suite', () => {
       expect(mock.resources.has('directives')).toBe(true);
       expect(mock.resources.has('memory')).toBe(true);
       expect(mock.resources.has('debt')).toBe(true);
+      expect(mock.resources.has('retro')).toBe(true);
+      expect(mock.resources.has('usage')).toBe(true);
+      expect(mock.resources.has('tasks')).toBe(true);
+      expect(mock.resources.has('agents')).toBe(true);
     });
   });
 

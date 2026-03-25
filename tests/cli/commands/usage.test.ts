@@ -13,9 +13,13 @@ vi.mock('../../../src/core/usage-tracker.js', () => {
   const tracker = {
     getTotalUsage: vi.fn(() => ({ totalCalls: 0, totalTokens: 0, sprintCount: 0, modelBreakdown: [] })),
     listSprints: vi.fn(() => []),
-    getSprintUsage: vi.fn(() => ({ sprintId: '', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [] })),
+    listSprintsFiltered: vi.fn(() => []),
+    getSprintUsage: vi.fn(() => ({ sprintId: '', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [], providerBreakdown: [], taskBreakdown: [] })),
   };
-  return { UsageTracker: vi.fn(() => tracker) };
+  return {
+    UsageTracker: vi.fn(() => tracker),
+    DEFAULT_TOKEN_COSTS: { opus: 0.015, sonnet: 0.003, haiku: 0.00025 },
+  };
 });
 
 vi.mock('../../../src/core/config.js', () => ({

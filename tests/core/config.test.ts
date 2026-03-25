@@ -648,6 +648,33 @@ describe('multi-provider env var overrides', () => {
     process.env['DECKENT_WORKER_PROVIDER'] = 'bad';
     await expect(loadConfig('/test/project')).rejects.toThrow(ConfigValidationError);
   });
+
+  it('DECKENT_MODE overrides config mode', async () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedReadFile.mockRejectedValue(new Error('not found'));
+    process.env['DECKENT_MODE'] = 'pro_plan';
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('pro_plan');
+    delete process.env['DECKENT_MODE'];
+  });
+
+  it('DECKENT_MODE resolves aliases', async () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedReadFile.mockRejectedValue(new Error('not found'));
+    process.env['DECKENT_MODE'] = 'balanced';
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('max5x_plan');
+    delete process.env['DECKENT_MODE'];
+  });
+
+  it('DECKENT_LANGUAGE overrides config language', async () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedReadFile.mockRejectedValue(new Error('not found'));
+    process.env['DECKENT_LANGUAGE'] = 'tr';
+    const config = await loadConfig('/test/project');
+    expect(config.language).toBe('tr');
+    delete process.env['DECKENT_LANGUAGE'];
+  });
 });
 
 describe('multi-provider config merge', () => {

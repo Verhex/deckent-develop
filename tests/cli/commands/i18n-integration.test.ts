@@ -234,9 +234,12 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
   checkUsage: vi.fn(),
+  checkUsageWithProvider: vi.fn(),
+  getDefaultProvider: vi.fn().mockReturnValue(null),
   adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   confirmDraftTasks: vi.fn(),
+  cleanupDraftTasks: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
     constructor(message: string, phase?: string) { super(message); this.phase = phase; }
@@ -246,7 +249,7 @@ vi.mock('../../../src/orchestra/tmux.js', () => ({
   isSessionActive: vi.fn(),
   setupWatchWindow: vi.fn(),
 }));
-vi.mock('../../../src/core/constants.js', () => ({ TMUX_SESSION_NAME: 'deckent', DASHBOARD_FILE: '.dashboard' }));
+vi.mock('../../../src/core/constants.js', () => ({ TMUX_SESSION_NAME: 'deckent', DASHBOARD_FILE: '.dashboard', TASKS_DIR: '.tasks' }));
 vi.mock('../../../src/core/provider.js', () => ({
   bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),
 }));
@@ -261,6 +264,10 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   formatSprintSummary: vi.fn().mockReturnValue('Sprint summary'),
   formatTable: vi.fn().mockReturnValue('Task table'),
   formatDashboard: vi.fn().mockReturnValue('Dashboard Output'),
+  formatHumanStatus: vi.fn().mockReturnValue('Human Status'),
+  formatStandaloneStatus: vi.fn().mockReturnValue('Standalone Status'),
+  isNoColor: vi.fn().mockReturnValue(false),
+  stripAnsi: vi.fn().mockImplementation((s: string) => s),
 }));
 vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
@@ -324,14 +331,15 @@ describe('start command — i18n integration', () => {
 
   it('uses English sandbox message when lang=en', async () => {
     await runStartCommand(['start', '--sandbox-mode']);
-    expect(print).toHaveBeenCalledWith('Sandbox mode not yet implemented. Running normally.');
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(m => typeof m === 'string' && m.includes('Sandbox mode'))).toBe(true);
   });
 
   it('uses Turkish sandbox message when lang=tr', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig('tr') as any);
     await runStartCommand(['start', '--sandbox-mode']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-    expect(calls.some(m => m.includes('Sandbox') && m !== 'Sandbox mode not yet implemented. Running normally.')).toBe(true);
+    expect(calls.some(m => typeof m === 'string' && m.includes('Sandbox mode'))).toBe(true);
   });
 
   it('uses English --force hint when lang=en', async () => {

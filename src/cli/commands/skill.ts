@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, cpSync, rmSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
@@ -82,6 +83,64 @@ function isGitUrl(source: string): boolean {
   );
 }
 
+/**
+ * Parse git URL with optional version pinning.
+ * Supports: https://github.com/user/repo#v1.0.0 or https://github.com/user/repo@v1.0.0
+ * Returns { url, ref } where ref is the git ref (branch/tag/commit).
+ */
+export function parseGitSource(source: string): { url: string; ref?: string } {
+  // Check for #ref suffix
+  const hashIdx = source.lastIndexOf('#');
+  if (hashIdx > 0 && !source.startsWith('#')) {
+    return { url: source.slice(0, hashIdx), ref: source.slice(hashIdx + 1) };
+  }
+  // Check for @ref suffix (but not @host part of git@github.com)
+  const atIdx = source.lastIndexOf('@');
+  if (atIdx > 0 && !source.startsWith('git@')) {
+    return { url: source.slice(0, atIdx), ref: source.slice(atIdx + 1) };
+  }
+  return { url: source };
+}
+
+/**
+ * Compute SHA-256 hash of all files in a directory (for checksum verification).
+ */
+export function computeDirectoryHash(dirPath: string): string {
+  const hash = createHash('sha256');
+  const files: string[] = [];
+
+  function collectFiles(dir: string): void {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        collectFiles(fullPath);
+      } else {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  collectFiles(dirPath);
+  files.sort(); // Deterministic order
+
+  for (const file of files) {
+    hash.update(readFileSync(file));
+  }
+  return hash.digest('hex');
+}
+
+/**
+ * Copy a directory, excluding node_modules.
+ * Uses cpSync with a filter function to skip node_modules directories.
+ */
+function cpSyncExcludeNodeModules(src: string, dest: string): void {
+  cpSync(src, dest, {
+    recursive: true,
+    filter: (source: string) => !source.includes('node_modules'),
+  });
+}
+
 const SKILL_TEMPLATE = `# Skill: {name}
 
 ## Expertise
@@ -95,6 +154,29 @@ Describe what this skill specializes in.
 ## Triggers
 Keywords or patterns that should activate this skill.
 `;
+
+// ─── Source tracking for update support ─────────────────────────────
+
+interface SkillSourceMeta {
+  source: string;
+  type: 'git' | 'local';
+  installedAt: string;
+  checksum?: string;
+}
+
+function saveSourceMeta(skillDir: string, meta: SkillSourceMeta): void {
+  writeFileSync(join(skillDir, '.source.json'), JSON.stringify(meta, null, 2) + '\n');
+}
+
+function loadSourceMeta(skillDir: string): SkillSourceMeta | null {
+  const metaPath = join(skillDir, '.source.json');
+  if (!existsSync(metaPath)) return null;
+  try {
+    return JSON.parse(readFileSync(metaPath, 'utf-8')) as SkillSourceMeta;
+  } catch {
+    return null;
+  }
+}
 
 // ─── Registration ───────────────────────────────────────────────────
 
@@ -188,21 +270,29 @@ export function registerSkill(program: Command): void {
   // ─── skill install ──────────────────────────────────────────────
   skillCmd
     .command('install <source>')
-    .description('Install a skill from local path or git URL')
+    .description('Install a skill from local path or git URL (supports version pinning: url#tag)')
     .option('--force', 'Overwrite existing')
     .action(async (source: string, opts: { force?: boolean }) => {
       try {
         const root = resolveProjectRoot();
         const skillsDir = getSkillsDir(root);
 
-        if (isGitUrl(source)) {
-          // Clone from git
+        if (isGitUrl(source) || source.includes('#')) {
+          const { url, ref } = parseGitSource(source);
+
+          // Clone from git with optional version pinning
           const tmpDir = join(skillsDir, '.tmp-clone');
           if (existsSync(tmpDir)) {
             rmSync(tmpDir, { recursive: true, force: true });
           }
 
-          const cloneResult = spawnSync('git', ['clone', '--depth', '1', source, tmpDir], {
+          const cloneArgs = ['clone', '--depth', '1'];
+          if (ref) {
+            cloneArgs.push('--branch', ref);
+          }
+          cloneArgs.push(url, tmpDir);
+
+          const cloneResult = spawnSync('git', cloneArgs, {
             encoding: 'utf-8',
             timeout: 30_000,
           });
@@ -242,7 +332,23 @@ export function registerSkill(program: Command): void {
           cpSync(tmpDir, targetDir, { recursive: true });
           rmSync(tmpDir, { recursive: true, force: true });
 
+          // Compute checksum and save source meta (non-fatal)
+          let checksum: string | undefined;
+          try {
+            checksum = computeDirectoryHash(targetDir);
+            saveSourceMeta(targetDir, {
+              source,
+              type: 'git',
+              installedAt: new Date().toISOString(),
+              checksum,
+            });
+          } catch {
+            // checksum is optional — skip on failure
+          }
+
           print(`Skill "${manifestData.name}" installed from git.`);
+          if (ref) print(`  Version: ${ref}`);
+          if (checksum) print(`  Checksum (SHA-256): ${checksum}`);
         } else {
           // Install from local path
           const sourcePath = resolve(source);
@@ -278,10 +384,99 @@ export function registerSkill(program: Command): void {
             rmSync(targetDir, { recursive: true, force: true });
           }
 
-          cpSync(sourcePath, targetDir, { recursive: true });
+          // Exclude node_modules on local install
+          cpSyncExcludeNodeModules(sourcePath, targetDir);
+
+          // Compute checksum and save source meta (non-fatal)
+          let checksum: string | undefined;
+          try {
+            checksum = computeDirectoryHash(targetDir);
+            saveSourceMeta(targetDir, {
+              source: sourcePath,
+              type: 'local',
+              installedAt: new Date().toISOString(),
+              checksum,
+            });
+          } catch {
+            // checksum is optional — skip on failure
+          }
 
           print(`Skill "${manifestData.name}" installed from ${sourcePath}.`);
+          if (checksum) print(`  Checksum (SHA-256): ${checksum}`);
         }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── skill update ──────────────────────────────────────────────
+  skillCmd
+    .command('update <name>')
+    .description('Update an installed skill from its original source')
+    .action(async (name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const skillDir = join(getSkillsDir(root), name);
+
+        if (!existsSync(skillDir)) {
+          throw ErrorRegistry.createError('DECKENT_E023', { message: `Skill "${name}" not found.` });
+        }
+
+        const meta = loadSourceMeta(skillDir);
+        if (!meta) {
+          throw new Error(`No source metadata found for skill "${name}". Cannot update — was it installed via "skill install"?`);
+        }
+
+        print(`Updating skill "${name}" from ${meta.source}...`);
+
+        // Re-install with --force by invoking install logic
+        const skillsDir = getSkillsDir(root);
+
+        if (meta.type === 'git') {
+          const { url, ref } = parseGitSource(meta.source);
+          const tmpDir = join(skillsDir, '.tmp-clone');
+          if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true, force: true });
+
+          const cloneArgs = ['clone', '--depth', '1'];
+          if (ref) cloneArgs.push('--branch', ref);
+          cloneArgs.push(url, tmpDir);
+
+          const cloneResult = spawnSync('git', cloneArgs, { encoding: 'utf-8', timeout: 30_000 });
+          if (cloneResult.status !== 0) {
+            throw new Error(`Git clone failed: ${cloneResult.stderr || 'unknown error'}`);
+          }
+
+          const manifestPath = join(tmpDir, 'manifest.json');
+          if (!existsSync(manifestPath)) {
+            rmSync(tmpDir, { recursive: true, force: true });
+            throw new Error('No manifest.json in cloned repository');
+          }
+
+          const dotGitDir = join(tmpDir, '.git');
+          if (existsSync(dotGitDir)) rmSync(dotGitDir, { recursive: true, force: true });
+
+          rmSync(skillDir, { recursive: true, force: true });
+          cpSync(tmpDir, skillDir, { recursive: true });
+          rmSync(tmpDir, { recursive: true, force: true });
+        } else {
+          const sourcePath = meta.source;
+          if (!existsSync(sourcePath)) {
+            throw new Error(`Source path no longer exists: ${sourcePath}`);
+          }
+          rmSync(skillDir, { recursive: true, force: true });
+          cpSyncExcludeNodeModules(sourcePath, skillDir);
+        }
+
+        const newChecksum = computeDirectoryHash(skillDir);
+        saveSourceMeta(skillDir, {
+          ...meta,
+          installedAt: new Date().toISOString(),
+          checksum: newChecksum,
+        });
+
+        print(`Skill "${name}" updated successfully.`);
+        print(`  Checksum (SHA-256): ${newChecksum}`);
       } catch (error) {
         printError(error);
         process.exitCode = 1;
@@ -355,7 +550,8 @@ export function registerSkill(program: Command): void {
   skillCmd
     .command('info <name>')
     .description('Show skill details')
-    .action(async (name: string) => {
+    .option('--stats', 'Show usage statistics')
+    .action(async (name: string, opts: { stats?: boolean }) => {
       try {
         const root = resolveProjectRoot();
         const skillDir = join(getSkillsDir(root), name);
@@ -372,6 +568,25 @@ export function registerSkill(program: Command): void {
         print(`  Priority: ${manifest.priority}`);
         if (manifest.triggers && manifest.triggers.length > 0) {
           print(`  Triggers: ${manifest.triggers.join(', ')}`);
+        }
+
+        if (opts.stats && manifest.stats) {
+          print('');
+          print('  Usage Statistics:');
+          print(`    Total uses:      ${manifest.stats.totalUses}`);
+          print(`    Success rate:    ${Math.round(manifest.stats.successRate * 100)}%`);
+          print(`    Avg coverage:    ${manifest.stats.avgCoverage}%`);
+          print(`    Last sprint:     ${manifest.stats.lastUsedInSprint || 'never'}`);
+        }
+
+        const meta = loadSourceMeta(skillDir);
+        if (meta) {
+          print('');
+          print(`  Source: ${meta.source} (${meta.type})`);
+          print(`  Installed: ${meta.installedAt}`);
+          if (meta.checksum) {
+            print(`  Checksum: ${meta.checksum}`);
+          }
         }
 
         const skillMdPath = join(skillDir, 'SKILL.md');

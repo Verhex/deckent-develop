@@ -5,9 +5,43 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { getMessage } from '../helpers/messages.js';
-import { TaskStatus } from '../../core/task-types.js';
+import { TaskStatus, getProviderForModel } from '../../core/task-types.js';
 import { buildWorkerPrompt } from '../../orchestra/task-builder.js';
 import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
+import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
+
+/**
+ * Spawn a worker using the appropriate backend based on the task's provider.
+ * Claude models use tmux, Codex/Gemini models use subprocess backend.
+ */
+export function spawnWorkerMultiProvider(
+  taskId: string,
+  model: string,
+  prompt: string,
+  root: string,
+  opts: { autoApprove?: boolean },
+): { backend: string } {
+  const provider = getProviderForModel(model as import('../../core/types.js').ModelType);
+
+  if (provider === 'claude') {
+    ensureSession();
+    spawnWorker(taskId, model as import('../../core/types.js').ModelType, prompt, root, {
+      autoApprove: opts.autoApprove ?? false,
+    });
+    return { backend: 'tmux' };
+  }
+
+  // Codex/Gemini → subprocess backend
+  const backend = SpawnBackendFactory.create({
+    backend: 'subprocess',
+    projectDir: root,
+  });
+  backend.spawn(taskId, model as import('../../core/types.js').ModelType, prompt, {
+    autoApprove: opts.autoApprove ?? false,
+    projectDir: root,
+  });
+  return { backend: 'subprocess' };
+}
 
 export function registerSpawn(program: Command): void {
   program
@@ -36,19 +70,18 @@ export function registerSpawn(program: Command): void {
           return;
         }
 
-        ensureSession();
-
         // Build rich prompt
         const agentPrompt = resolveAgentPrompt(root, task);
         const skillPrompts = resolveSkillPrompts(root, task);
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
 
-        spawnWorker(taskId, task.model, prompt, root, {
-          // autoApprove is a CLI permission flag — never derived from haiku_allowed (model config)
+        // Spawn via appropriate backend based on model's provider
+        const { backend } = spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
           autoApprove: opts.autoApprove ?? false,
         });
 
         print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));
+        print(`  Backend: ${backend}`);
 
         // Show scope info
         if (task.scope.directories.length > 0) {

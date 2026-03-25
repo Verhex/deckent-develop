@@ -18,6 +18,8 @@ export function registerDoctorTool(server: McpServer): void {
     },
     async ({ includeProfile }) => {
       const root = process.cwd();
+
+      try {
       const result = runDoctorChecks(root);
 
       const response: Record<string, unknown> = { ...result };
@@ -60,6 +62,13 @@ export function registerDoctorTool(server: McpServer): void {
           text: JSON.stringify(wrapResponse(enriched, summary)),
         }],
       };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Health check failed: ${message}` }) }],
+          isError: true,
+        };
+      }
     },
   );
 }

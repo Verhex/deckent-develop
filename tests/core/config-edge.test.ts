@@ -161,13 +161,13 @@ describe('validateConfig', () => {
     const config = makeValidConfig();
     (config as unknown as Record<string, unknown>).mode = 'super_plan';
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
-    expect(() => validateConfig(config)).toThrow(/Invalid mode/);
+    expect(() => validateConfig(config)).toThrow(/Invalid value.*mode/);
   });
 
   it('throws for invalid language', () => {
     const config = makeValidConfig();
     config.language = 'de';
-    expect(() => validateConfig(config)).toThrow(/Invalid language/);
+    expect(() => validateConfig(config)).toThrow(/Invalid value.*language/);
   });
 
   it('throws when a mode config is missing', () => {

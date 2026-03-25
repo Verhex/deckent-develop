@@ -4,6 +4,10 @@ import { registerDirectivesResource } from './directives.js';
 import { registerMemoryResource } from './memory.js';
 import { registerDebtResource } from './debt.js';
 import { registerConfigResource } from './config.js';
+import { registerRetroResource } from './retro.js';
+import { registerUsageResource } from './usage.js';
+import { registerTasksResource } from './tasks.js';
+import { registerAgentsResource } from './agents.js';
 
 export function registerResources(server: McpServer): void {
   registerDashboardResource(server);
@@ -11,4 +15,8 @@ export function registerResources(server: McpServer): void {
   registerMemoryResource(server);
   registerDebtResource(server);
   registerConfigResource(server);
+  registerRetroResource(server);
+  registerUsageResource(server);
+  registerTasksResource(server);
+  registerAgentsResource(server);
 }

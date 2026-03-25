@@ -26,7 +26,7 @@ describe('Blueprint file existence', () => {
   it('AGENTS.md contains Architecture section', () => {
     const content = readFileSync(join(ROOT, 'AGENTS.md'), 'utf-8');
     expect(content).toContain('## Architecture');
-    expect(content).toContain('brain_planning');
+    expect(content).toContain('orchestra/');
   });
 
   it('.contracts/api-surface.md contains task format', () => {

@@ -28,6 +28,7 @@ export function registerRetroTool(server: McpServer): void {
       const root = process.cwd();
       const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
 
+      try {
       if (!existsSync(retroPath)) {
         const noRetroData = { content: null };
         const summary = formatRetroResponse(noRetroData as RetroData);
@@ -45,6 +46,13 @@ export function registerRetroTool(server: McpServer): void {
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enriched, summary)) }],
       };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Failed to read retrospective: ${message}` }) }],
+          isError: true,
+        };
+      }
     },
   );
 }

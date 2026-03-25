@@ -278,6 +278,15 @@ import {
   resolveDefaultUsageCli,
   routeSprintTasks,
   finalizeSprint,
+  writeSprintState,
+  readSprintState,
+  clearSprintState,
+  detectOrphanWorkers,
+  buildSpawnRetryHint,
+} from '../../src/orchestra/sprint-controller.js';
+
+import type {
+  SprintState,
 } from '../../src/orchestra/sprint-controller.js';
 
 import type {
@@ -1986,5 +1995,204 @@ describe('routeSprintTasks — Router + Connector integration', () => {
       'utf-8',
     );
     expect(source).toContain('export function routeSprintTasks(');
+  });
+});
+
+// ─── cleanupDraftTasks Tests ───────────────────────────────────────
+
+describe('cleanupDraftTasks', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('removes DRAFT task files from .tasks/', async () => {
+    const { existsSync, readdirSync, readFileSync, unlinkSync } = await import('node:fs');
+    const { cleanupDraftTasks } = await import('../../src/orchestra/sprint-controller.js');
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-001-001.json' as any,
+      'task-001-002.json' as any,
+    ]);
+    vi.mocked(readFileSync)
+      .mockReturnValueOnce(JSON.stringify({ status: 'DRAFT' }))
+      .mockReturnValueOnce(JSON.stringify({ status: 'PENDING' }));
+
+    cleanupDraftTasks('/root');
+
+    expect(unlinkSync).toHaveBeenCalledTimes(1);
+    expect(unlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-001-001.json'));
+  });
+
+  it('does nothing when .tasks/ does not exist', async () => {
+    const { existsSync, readdirSync } = await import('node:fs');
+    const { cleanupDraftTasks } = await import('../../src/orchestra/sprint-controller.js');
+
+    vi.mocked(existsSync).mockReturnValue(false);
+    cleanupDraftTasks('/root');
+    expect(readdirSync).not.toHaveBeenCalled();
+  });
+
+  it('ignores malformed task files', async () => {
+    const { existsSync, readdirSync, readFileSync, unlinkSync } = await import('node:fs');
+    const { cleanupDraftTasks } = await import('../../src/orchestra/sprint-controller.js');
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['task-bad.json' as any]);
+    vi.mocked(readFileSync).mockReturnValue('not json');
+
+    cleanupDraftTasks('/root');
+    expect(unlinkSync).not.toHaveBeenCalled();
+  });
+});
+
+// ═══ Task 056-006: Sprint State Persistence ══════════════════════════
+
+describe('writeSprintState', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('writes sprint state to .deckent/sprint-state.json', () => {
+    const sprint = makeSprint({ id: 'sprint-042', phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE });
+    sprint.startedAt = '2026-03-25T10:00:00.000Z';
+
+    writeSprintState('/proj', sprint);
+
+    expect(mockedMkdirSync).toHaveBeenCalledWith(expect.stringContaining('.deckent'), { recursive: true });
+    expect(mockedWriteFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('sprint-state.json'),
+      expect.stringContaining('"sprintId": "sprint-042"'),
+      'utf-8',
+    );
+  });
+
+  it('includes all task IDs in state', () => {
+    const tasks = [makeTask({ id: '042-001' }), makeTask({ id: '042-002' })];
+    const sprint = makeSprint({ id: 'sprint-042', tasks });
+
+    writeSprintState('/proj', sprint);
+
+    const written = mockedWriteFileSync.mock.calls[0]?.[1] as string;
+    const parsed = JSON.parse(written);
+    expect(parsed.taskIds).toEqual(['042-001', '042-002']);
+  });
+
+  it('does not throw when write fails', () => {
+    mockedWriteFileSync.mockImplementation(() => { throw new Error('disk full'); });
+    const sprint = makeSprint();
+    expect(() => writeSprintState('/proj', sprint)).not.toThrow();
+  });
+});
+
+describe('readSprintState', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('returns parsed state when file exists', () => {
+    const state: SprintState = {
+      sprintId: 'sprint-042',
+      phase: SprintPhase.EXECUTE,
+      status: 'ACTIVE',
+      startedAt: '2026-03-25T10:00:00.000Z',
+      updatedAt: '2026-03-25T10:05:00.000Z',
+      taskIds: ['042-001'],
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(state));
+
+    const result = readSprintState('/proj');
+    expect(result).toEqual(state);
+  });
+
+  it('returns null when file does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const result = readSprintState('/proj');
+    expect(result).toBeNull();
+  });
+});
+
+describe('clearSprintState', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('removes sprint state file when it exists', () => {
+    mockedExistsSync.mockReturnValue(true);
+    clearSprintState('/proj');
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('sprint-state.json'));
+  });
+
+  it('does nothing when file does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+    clearSprintState('/proj');
+    expect(mockedUnlinkSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('detectOrphanWorkers', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('returns all workers as orphans when no sprint state exists', () => {
+    mockedListWorkers.mockReturnValue(['w-001-001', 'w-001-002']);
+    mockedExistsSync.mockReturnValue(false);
+    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const orphans = detectOrphanWorkers('/proj');
+    expect(orphans).toEqual(['w-001-001', 'w-001-002']);
+  });
+
+  it('filters out workers belonging to current sprint', () => {
+    mockedListWorkers.mockReturnValue(['w-042-001', 'w-042-002', 'w-old-001']);
+    const state: SprintState = {
+      sprintId: 'sprint-042',
+      phase: SprintPhase.EXECUTE,
+      status: 'ACTIVE',
+      startedAt: '2026-03-25T10:00:00.000Z',
+      updatedAt: '2026-03-25T10:05:00.000Z',
+      taskIds: ['042-001', '042-002'],
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(state));
+
+    const orphans = detectOrphanWorkers('/proj');
+    expect(orphans).toEqual(['w-old-001']);
+  });
+
+  it('returns empty array when no workers exist', () => {
+    mockedListWorkers.mockReturnValue([]);
+    const result = detectOrphanWorkers('/proj');
+    expect(result).toEqual([]);
+  });
+});
+
+describe('buildSpawnRetryHint', () => {
+  it('suggests model downgrade on rate limit errors', () => {
+    const sprint = makeSprint();
+    const hint = buildSpawnRetryHint(new Error('rate limit exceeded (429)'), sprint);
+    expect(hint).toContain('Rate limit');
+  });
+
+  it('suggests tmux check on tmux errors', () => {
+    const sprint = makeSprint();
+    const hint = buildSpawnRetryHint(new Error('tmux session not found'), sprint);
+    expect(hint).toContain('tmux');
+  });
+
+  it('warns about high task count', () => {
+    const tasks = Array.from({ length: 8 }, (_, i) => makeTask({ id: `001-00${i}` }));
+    const sprint = makeSprint({ tasks });
+    const hint = buildSpawnRetryHint(new Error('unknown'), sprint);
+    expect(hint).toContain('High task count');
+  });
+
+  it('provides generic hint for unknown errors', () => {
+    const sprint = makeSprint();
+    const hint = buildSpawnRetryHint(new Error('something weird'), sprint);
+    expect(hint).toContain('Unexpected spawn error');
+  });
+});
+
+// ═══ Task 056-006: waitForResults timeout passthrough ═══════════════
+
+describe('waitForResults timeout', () => {
+  it('RunSprintOptions includes timeoutMs field', () => {
+    const opts: RunSprintOptions = { timeoutMs: 60_000 };
+    expect(opts.timeoutMs).toBe(60_000);
   });
 });

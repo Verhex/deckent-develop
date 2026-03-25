@@ -20,8 +20,9 @@ import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 import { detectEnvironment } from '../../core/environment.js';
-import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS } from '../../core/deck-file.js';
+import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS, isDeckFileCommitted } from '../../core/deck-file.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+import { accessSync, constants as fsConstants } from 'node:fs';
 
 interface DoctorCheck {
   name: string;
@@ -120,30 +121,49 @@ function checkGit(): DoctorCheck {
   };
 }
 
-function checkTmux(): DoctorCheck {
+export function checkTmux(providerNames?: string[]): DoctorCheck {
+  // tmux is required when claude provider is used (subprocess providers don't need tmux)
+  const needsTmux = !providerNames || providerNames.includes('claude') || providerNames.length === 0;
+  const required = needsTmux;
   const result = spawnSync('tmux', ['-V'], { encoding: 'utf-8' });
   if (result.status !== 0) {
     const entry = ErrorRegistry.get('DECKENT_E001');
+    if (!required) {
+      return { name: 'tmux', passed: false, message: 'not found — not required when using Codex/Gemini providers', required: false };
+    }
     return { name: 'tmux', passed: false, message: `not found — ${entry?.suggestion ?? 'Install tmux'}`, required: true };
   }
   return {
     name: 'tmux',
     passed: true,
     message: result.stdout.trim(),
-    required: true,
+    required,
   };
 }
 
-function checkClaude(): DoctorCheck {
+export function checkClaude(checkAuth = false): DoctorCheck {
   const result = spawnSync('claude', ['--version'], { encoding: 'utf-8' });
   if (result.status !== 0) {
     const entry = ErrorRegistry.get('DECKENT_E002');
     return { name: 'Claude CLI', passed: false, message: `not found — ${entry?.suggestion ?? 'Install Claude CLI'}`, required: true };
   }
+  const version = result.stdout.trim();
+  if (checkAuth) {
+    // Attempt auth check: `claude config get` returns non-zero if not logged in
+    const authResult = spawnSync('claude', ['config', 'get', 'account'], { encoding: 'utf-8' });
+    if (authResult.status !== 0 || (!authResult.stdout?.trim() && !authResult.stderr?.trim())) {
+      return {
+        name: 'Claude CLI',
+        passed: false,
+        message: `v${version} — not authenticated. Run: claude login`,
+        required: true,
+      };
+    }
+  }
   return {
     name: 'Claude CLI',
     passed: true,
-    message: `v${result.stdout.trim()}`,
+    message: `v${version}`,
     required: true,
   };
 }
@@ -237,7 +257,7 @@ function checkStaleLocks(root: string): DoctorCheck {
       } catch { /* skip malformed */ }
     }
     if (staleCount > 0) {
-      return { name: 'Locks', passed: false, message: `${staleCount} stale lock(s)`, required: false };
+      return { name: 'Locks', passed: false, message: `${staleCount} stale lock(s) — run \`deckent cleanup\` to remove stale locks`, required: false };
     }
     return { name: 'Locks', passed: true, message: `${lockFiles.length} active lock(s)`, required: false };
   } catch {
@@ -491,14 +511,10 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   // --- System Health ---
   lines.push('System Health:');
 
-  // Memory usage with percentage and warning
-  const memWarning = memPct >= 80 ? ' [WARNING: >80%]' : '';
-  lines.push(`  Memory: ${brainLines}/${brainBudget} lines (${memPct}%)${memWarning}`);
-
-  // Open debt count
-  const openDebtCount = countOpenDebtItems(input.projectRoot ?? process.cwd());
+  // Open debt count (use already-computed debtItems to avoid double-read)
+  const openDebtCount = debtItems.total;
   if (openDebtCount > 0) {
-    lines.push(`  Debt: ${openDebtCount} open item(s)`);
+    lines.push(`  Debt: ${openDebtCount} open item(s)${debtItems.critical > 0 ? ` (${debtItems.critical} critical)` : ''}`);
   } else {
     lines.push('  Debt: 0 open items');
   }
@@ -679,12 +695,49 @@ export function formatSystemProfile(profile: SystemProfile, subscription?: strin
   return lines.join('\n');
 }
 
-export function runDoctorChecks(root: string): DoctorResult {
+/**
+ * Check write permissions for critical directories (.tasks/, .brain/).
+ */
+export function checkWritePermissions(root: string): DoctorCheck {
+  const dirsToCheck = ['.tasks', '.brain'];
+  const failures: string[] = [];
+  for (const dir of dirsToCheck) {
+    const dirPath = join(root, dir);
+    if (!existsSync(dirPath)) continue;
+    try {
+      accessSync(dirPath, fsConstants.W_OK);
+    } catch {
+      failures.push(dir);
+    }
+  }
+  if (failures.length > 0) {
+    return { name: 'Write Permissions', passed: false, message: `No write access to: ${failures.join(', ')}`, required: true };
+  }
+  return { name: 'Write Permissions', passed: true, message: 'Write access OK (.tasks/, .brain/)', required: true };
+}
+
+/**
+ * Check if .deck file is committed to git (security risk).
+ */
+export function checkDeckSecurity(root: string): DoctorCheck {
+  const deckPath = join(root, '.deck');
+  if (!existsSync(deckPath)) {
+    return { name: '.deck Security', passed: true, message: '.deck file not found', required: false };
+  }
+  const isCommitted = isDeckFileCommitted(root);
+  if (isCommitted) {
+    return { name: '.deck Security', passed: false, message: '.deck file is tracked by git — secrets may be exposed! Add .deck to .gitignore', required: false };
+  }
+  return { name: '.deck Security', passed: true, message: '.deck file exists and is NOT tracked by git (safe)', required: false };
+}
+
+export function runDoctorChecks(root: string, providerNames?: string[]): DoctorResult {
   const checks: DoctorCheck[] = [
     checkPlatform(),
-    checkNode(), checkGit(), checkTmux(), checkClaude(),
+    checkNode(), checkGit(), checkTmux(providerNames), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
+    checkDeckSecurity(root), checkWritePermissions(root),
   ];
   return {
     ok: checks.filter(c => c.required).every(c => c.passed),
@@ -707,8 +760,9 @@ export function registerDoctor(program: Command): void {
         root = process.cwd();
       }
       const lang = getLangFromConfig(root);
-      const result = runDoctorChecks(root);
       const providers = await detectAvailableProviders();
+      const activeProviderNames = providers.filter(p => p.available).map(p => p.name);
+      const result = runDoctorChecks(root, activeProviderNames);
 
       if (opts.json) {
         const jsonOutput: Record<string, unknown> = {

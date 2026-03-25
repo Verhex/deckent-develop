@@ -155,11 +155,11 @@ export function validateConfig(config: DeckentConfig): string[] {
   const maxWorkersWarnings: string[] = [];
 
   if (!VALID_MODES.includes(config.mode)) {
-    errors.push(`Invalid mode "${config.mode}". Must be one of: ${VALID_MODES.join(', ')}`);
+    errors.push(`Invalid value '${config.mode}' for field 'mode'. Valid options: ${VALID_MODES.join(', ')} (aliases: performance, balanced, economic, unlimited)`);
   }
 
   if (config.language !== undefined && !(SUPPORTED_LANGUAGES as readonly string[]).includes(config.language)) {
-    errors.push(`Invalid language "${config.language}". Must be one of: ${SUPPORTED_LANGUAGES.join(', ')}`);
+    errors.push(`Invalid value '${config.language}' for field 'language'. Valid options: ${SUPPORTED_LANGUAGES.join(', ')}`);
   }
 
   for (const modeName of VALID_MODES) {
@@ -463,6 +463,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   }
 
   const projectConfigPath = join(root, PROJECT_CONFIG_PATH);
+
   const projectConfig = await readJsonFile<Partial<DeckentConfig>>(projectConfigPath);
   if (projectConfig) {
     config = deepMerge(config, projectConfig);
@@ -471,7 +472,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   // Resolve alias before validation so 'performance' → 'max_plan' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
-  // ─── Env var overrides for provider config ─────────────────────────
+  // ─── Env var overrides ─────────────────────────────────────────────
   const envBrainProvider = process.env['DECKENT_BRAIN_PROVIDER'];
   if (envBrainProvider) {
     config.brain_provider = envBrainProvider as ProviderName;
@@ -479,6 +480,14 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   const envWorkerProvider = process.env['DECKENT_WORKER_PROVIDER'];
   if (envWorkerProvider) {
     config.worker_provider = envWorkerProvider as ProviderName;
+  }
+  const envMode = process.env['DECKENT_MODE'];
+  if (envMode) {
+    config.mode = resolveMode(envMode) as PlanMode;
+  }
+  const envLanguage = process.env['DECKENT_LANGUAGE'];
+  if (envLanguage) {
+    config.language = envLanguage;
   }
 
   validateConfig(config);

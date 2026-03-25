@@ -1,6 +1,6 @@
 // ─── Sprint Reporting ──────────────────────────────────────────────
 // Extracted from brain.ts — retrospective, sprint log, metrics, doc updates
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync } from 'node:fs';
 import { execSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
@@ -496,8 +496,22 @@ export function writeRetrospective(
 
   // Truncate to max lines
   const retroLines = retroContent.split('\n');
+  const retroPath = join(brainPath, RETRO_FILE);
+
+  // (E) Archive existing RETRO.md before overwriting
+  if (existsSync(retroPath)) {
+    try {
+      const archiveDir = join(brainPath, 'archive');
+      mkdirSync(archiveDir, { recursive: true });
+      const archivePath = join(archiveDir, `retro-${sprint.id}.md`);
+      if (!existsSync(archivePath)) {
+        copyFileSync(retroPath, archivePath);
+      }
+    } catch { /* non-fatal */ }
+  }
+
   writeFileSync(
-    join(brainPath, RETRO_FILE),
+    retroPath,
     retroLines.slice(0, RETRO_MAX_LINES).join('\n'),
     'utf-8',
   );
@@ -509,7 +523,10 @@ export function writeRetrospective(
   for (const task of sprint.tasks) {
     const ev = evaluations.get(task.id);
     if (ev === TaskEvaluation.NO_GO || ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
-      learnings.push(`- ${task.title}: ${ev}`);
+      // (D) Include result.notes for richer learnings
+      const result = results?.find(r => r.taskId === task.id);
+      const notes = result?.notes ? ` — ${result.notes.slice(0, 120)}` : '';
+      learnings.push(`- ${task.title}: ${ev}${notes}`);
     }
     if (learnings.length >= 11) break; // header + max 10
   }
@@ -533,9 +550,23 @@ export function writeRetrospective(
  * @param metrics - Calculated sprint metrics
  * @param evaluations - Optional map of task ID to evaluation result
  */
-export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: SprintMetrics, evaluations?: Map<string, TaskEvaluation>): void {
+export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: SprintMetrics, evaluations?: Map<string, TaskEvaluation>, results?: TaskResult[]): void {
   const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
   mkdirSync(sprintsPath, { recursive: true });
+
+  // Collect agent/skill info from tasks
+  const agentSet = new Set<string>();
+  const skillSet = new Set<string>();
+  let totalFilesChanged = 0;
+  for (const task of sprint.tasks) {
+    if (task.assignedAgent && task.assignedAgent !== 'generic') agentSet.add(task.assignedAgent);
+    for (const s of task.assignedSkills ?? []) skillSet.add(s);
+    const result = results?.find(r => r.taskId === task.id);
+    if (result?.filesChanged) totalFilesChanged += result.filesChanged.length;
+  }
+
+  const agentsStr = agentSet.size > 0 ? [...agentSet].join(', ') : '-';
+  const skillsStr = skillSet.size > 0 ? [...skillSet].join(', ') : '-';
 
   const lines: string[] = [
     `# ${sprint.id}`, '',
@@ -547,13 +578,18 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
     `| Tech Debt | ${metrics.techDebtTasks} |`,
     `| No-Go | ${metrics.noGoTasks} |`,
     `| Coverage | ${metrics.coveragePercent.toFixed(1)}% |`,
-    `| Duration | ${metrics.durationMs}ms |`, '',
+    `| Duration | ${metrics.durationMs}ms |`,
+    `| Files Changed | ${totalFilesChanged || '-'} |`, '',
+    '## Agents',
+    `Agents: ${agentsStr}`,
+    `Skills: ${skillsStr}`, '',
     '## Tasks',
   ];
   for (const task of sprint.tasks) {
     const evalResult = evaluations?.get(task.id);
     const statusStr = evalResult ?? task.status;
-    lines.push(`- ${task.id}: ${task.title} (${statusStr})`);
+    const agentStr = task.assignedAgent && task.assignedAgent !== 'generic' ? ` [${task.assignedAgent}]` : '';
+    lines.push(`- ${task.id}: ${task.title} (${statusStr})${agentStr}`);
   }
   writeFileSync(
     join(sprintsPath, `${sprint.id}.md`),

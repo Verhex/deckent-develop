@@ -1,6 +1,9 @@
 import type { Command } from 'commander';
 import { loadConfig } from '../../core/config.js';
-import { readContext, checkUsage, adjustSprintSize, planSprint, confirmDraftTasks } from '../../orchestra/brain.js';
+import {
+  readContext, checkUsage, checkUsageWithProvider, getDefaultProvider,
+  adjustSprintSize, planSprint, confirmDraftTasks, cleanupDraftTasks,
+} from '../../orchestra/brain.js';
 import type { BrainPlanningMode } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
@@ -13,22 +16,41 @@ export function registerPlan(program: Command): void {
     .description('Plan a sprint without executing it')
     .option('--no-confirm', 'Skip confirmation, auto-approve plan')
     .option('--structured', 'Force structured parsing (skip AI)')
-    .action(async (opts: { confirm?: boolean; structured?: boolean }) => {
+    .option('--dry-run', 'Show plan without writing task files to disk')
+    .action(async (opts: { confirm?: boolean; structured?: boolean; dryRun?: boolean }) => {
       const root = resolveProjectRoot();
 
       try {
         const config = await loadConfig(root);
         const lang = config.language;
         const context = readContext(root);
-        const usage = checkUsage(config);
+
+        // A) Use async provider-based usage check when available, fall back to sync
+        let usage;
+        const provider = getDefaultProvider();
+        if (provider) {
+          try {
+            usage = await checkUsageWithProvider(provider);
+          } catch {
+            usage = checkUsage(config);
+          }
+        } else {
+          usage = checkUsage(config);
+        }
+
         const recommendation = adjustSprintSize(config, usage);
+
+        // C) Clean up existing DRAFT tasks before planning (idempotency)
+        cleanupDraftTasks(root);
 
         const planMode: BrainPlanningMode | undefined = opts.structured ? 'structured' : undefined;
         const asDraft = opts.confirm !== false;
+        const dryRun = opts.dryRun === true;
 
         const sprint = await planSprint(root, config, context, recommendation, {
           mode: planMode,
           asDraft,
+          dryRun,
         });
 
         print(getMessage('plan.sprint_planned', lang, {
@@ -52,6 +74,11 @@ export function registerPlan(program: Command): void {
             size: recommendation.size,
             reason: recommendation.reason,
           }));
+        }
+
+        if (dryRun) {
+          print('[dry-run] No task files written to disk.');
+          return;
         }
 
         // Approval flow for DRAFT tasks

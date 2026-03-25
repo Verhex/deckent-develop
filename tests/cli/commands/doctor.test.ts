@@ -7,6 +7,8 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
+  accessSync: vi.fn(),
+  constants: { W_OK: 2 },
 }));
 
 vi.mock('node:os', () => ({
@@ -62,6 +64,7 @@ vi.mock('../../../src/core/environment.js', () => ({
 vi.mock('../../../src/core/deck-file.js', () => ({
   loadDeckSecrets: vi.fn().mockReturnValue({}),
   validateDeckFile: vi.fn().mockReturnValue({ valid: true, warnings: [], errors: [] }),
+  isDeckFileCommitted: vi.fn().mockReturnValue(false),
   KNOWN_DECK_KEYS: [
     'DECKENT_CLAUDE_API_KEY', 'DECKENT_OPENAI_API_KEY', 'DECKENT_GOOGLE_API_KEY',
     'DECKENT_SMTP_HOST', 'DECKENT_SMTP_USER', 'DECKENT_SMTP_PASS',
@@ -83,7 +86,7 @@ vi.mock('../../../src/core/constants.js', () => ({
   BRAIN_TOTAL_LINE_BUDGET: 600,
 }));
 
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, accessSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { platform } from 'node:os';
 import { print, formatDoctorResult } from '../../../src/cli/helpers/output.js';
@@ -97,12 +100,13 @@ import {
   getMemoryHealthLabel, getProviderSummary, getReadinessLabel,
   getDeckFileStatus, formatProviderHealthSection,
   getProviderInstallHint, buildConnectorHealthResults, formatConnectorHealthLines,
+  checkTmux, checkClaude, checkDeckSecurity, checkWritePermissions,
 } from '../../../src/cli/commands/doctor.js';
 import type { HumanDoctorInput } from '../../../src/cli/commands/doctor.js';
 import type { HealthCheckResult } from '../../../src/orchestra/connector.js';
 import type { DetectedProvider } from '../../../src/core/provider.js';
 import { detectEnvironment } from '../../../src/core/environment.js';
-import { loadDeckSecrets, validateDeckFile } from '../../../src/core/deck-file.js';
+import { loadDeckSecrets, validateDeckFile, isDeckFileCommitted } from '../../../src/core/deck-file.js';
 
 // ─── Helper ──────────────────────────────────────────────────────────
 
@@ -622,8 +626,8 @@ describe('i18n integration', () => {
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     const passedMsg = calls.find(c => String(c).includes('checks passed'));
     expect(passedMsg).toBeDefined();
-    // runDoctorChecks returns 11 checks total (including platform check)
-    expect(String(passedMsg)).toMatch(/\/11/);
+    // runDoctorChecks returns 13 checks total (including platform check, .deck security, write permissions)
+    expect(String(passedMsg)).toMatch(/\/13/);
   });
 
   it('uses tr language when config has language=tr in legacy mode', async () => {
@@ -1840,5 +1844,254 @@ describe('formatHumanDoctor with connectorHealthResults', () => {
     };
     const output = formatHumanDoctor(input);
     expect(output).toContain('[PASS] Environment — tmux detected');
+  });
+});
+
+// ─── Sprint 056-009: New improvements ──────────────────────────────
+
+describe('checkTmux - multi-provider fix (A)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+  });
+
+  it('tmux not found is required=true when only claude provider', () => {
+    const check = checkTmux(['claude']);
+    expect(check.required).toBe(true);
+    expect(check.passed).toBe(false);
+  });
+
+  it('tmux not found is required=false when codex provider used', () => {
+    const check = checkTmux(['codex']);
+    expect(check.required).toBe(false);
+    expect(check.message).toContain('not required');
+  });
+
+  it('tmux not found is required=false when gemini provider used', () => {
+    const check = checkTmux(['gemini']);
+    expect(check.required).toBe(false);
+  });
+
+  it('tmux found is required=true when only claude (default)', () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'tmux 3.3', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+    const check = checkTmux(['claude']);
+    expect(check.required).toBe(true);
+    expect(check.passed).toBe(true);
+  });
+
+  it('tmux not found is required=true when no provider names given (default)', () => {
+    const check = checkTmux();
+    expect(check.required).toBe(true);
+  });
+
+  it('tmux not found is required=true when mixed but claude included', () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+    const check = checkTmux(['claude', 'codex']);
+    // When claude is present, tmux is still required
+    expect(check.required).toBe(true);
+  });
+});
+
+describe('checkClaude auth check (C)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns passed=false when auth check fails', () => {
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce({ status: 0, stdout: '2.1.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>)
+      .mockReturnValueOnce({ status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+    const check = checkClaude(true);
+    expect(check.passed).toBe(false);
+    expect(check.message).toContain('not authenticated');
+    expect(check.message).toContain('claude login');
+  });
+
+  it('returns passed=true when auth check passes', () => {
+    vi.mocked(spawnSync)
+      .mockReturnValueOnce({ status: 0, stdout: '2.1.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>)
+      .mockReturnValueOnce({ status: 0, stdout: 'user@example.com', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+    const check = checkClaude(true);
+    expect(check.passed).toBe(true);
+  });
+
+  it('does not run auth check when checkAuth=false (default)', () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: '2.1.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+    const check = checkClaude(false);
+    // Only one spawnSync call (version check)
+    expect(vi.mocked(spawnSync)).toHaveBeenCalledTimes(1);
+    expect(check.passed).toBe(true);
+  });
+});
+
+describe('checkStaleLocks cleanup hint (D)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('stale lock message includes cleanup hint', () => {
+    const staleTime = new Date(Date.now() - 600000).toISOString();
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['task-001.lock'] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ acquiredAt: staleTime, ownerWorkerId: 'w-001', taskId: '001', filePath: 'x' }));
+    const result = runDoctorChecks('/mock/root');
+    const lockCheck = result.checks.find(c => c.name === 'Locks');
+    expect(lockCheck?.message).toContain('deckent cleanup');
+  });
+});
+
+describe('checkWritePermissions (E)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(existsSync).mockReturnValue(true);
+  });
+
+  it('returns passed=true when directories are writable', () => {
+    vi.mocked(accessSync).mockReturnValue(undefined);
+    const check = checkWritePermissions('/mock/root');
+    expect(check.passed).toBe(true);
+    expect(check.name).toBe('Write Permissions');
+  });
+
+  it('returns passed=false when .tasks/ is not writable', () => {
+    vi.mocked(accessSync).mockImplementation((p: unknown) => {
+      if (String(p).includes('.tasks')) throw new Error('EACCES');
+    });
+    const check = checkWritePermissions('/mock/root');
+    expect(check.passed).toBe(false);
+    expect(check.message).toContain('.tasks');
+  });
+
+  it('returns passed=true when directories do not exist', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const check = checkWritePermissions('/mock/root');
+    expect(check.passed).toBe(true);
+  });
+
+  it('is a required check', () => {
+    vi.mocked(accessSync).mockReturnValue(undefined);
+    const check = checkWritePermissions('/mock/root');
+    expect(check.required).toBe(true);
+  });
+});
+
+describe('checkDeckSecurity (B)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns passed=true when .deck file does not exist', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const check = checkDeckSecurity('/mock/root');
+    expect(check.passed).toBe(true);
+    expect(check.message).toContain('not found');
+  });
+
+  it('returns passed=false when .deck is tracked by git', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(isDeckFileCommitted).mockReturnValue(true);
+    const check = checkDeckSecurity('/mock/root');
+    expect(check.passed).toBe(false);
+    expect(check.message).toContain('tracked by git');
+    expect(check.message).toContain('.gitignore');
+  });
+
+  it('returns passed=true when .deck exists but not tracked', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(isDeckFileCommitted).mockReturnValue(false);
+    const check = checkDeckSecurity('/mock/root');
+    expect(check.passed).toBe(true);
+    expect(check.message).toContain('NOT tracked by git');
+  });
+
+  it('is not a required check', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const check = checkDeckSecurity('/mock/root');
+    expect(check.required).toBe(false);
+  });
+});
+
+describe('System Health memory deduplication (F)', () => {
+  function makeCheck(name: string, passed: boolean, message: string, required = false) {
+    return { name, passed, message, required };
+  }
+
+  it('System Health section does not repeat memory line from Your Project', () => {
+    const input = {
+      result: {
+        ok: true,
+        checks: [
+          makeCheck('Platform', true, 'Linux'),
+          makeCheck('Node.js', true, 'v22', true),
+          makeCheck('git', true, 'v2.40', true),
+          makeCheck('tmux', true, 'tmux 3.3', true),
+          makeCheck('Claude CLI', true, 'v2', true),
+        ],
+      },
+      providers: [],
+      brainLines: 200,
+      brainBudget: 600,
+      lastSprintId: null,
+      debtItems: { total: 0, critical: 0 },
+    };
+    const output = formatHumanDoctor(input);
+    // Memory line should appear only once (in Your Project, not System Health)
+    const memoryOccurrences = (output.match(/Memory:/g) ?? []).length;
+    expect(memoryOccurrences).toBe(1);
+  });
+
+  it('System Health uses debtItems.total without re-reading file', () => {
+    // This test verifies countOpenDebtItems is NOT called from formatHumanDoctor
+    // The formatHumanDoctor should use debtItems passed in, not re-compute
+    const input = {
+      result: { ok: true, checks: [] },
+      providers: [],
+      brainLines: 100,
+      brainBudget: 600,
+      lastSprintId: null,
+      debtItems: { total: 7, critical: 2 },
+    };
+    const output = formatHumanDoctor(input);
+    expect(output).toContain('Debt: 7 open item(s)');
+    expect(output).toContain('2 critical');
+  });
+});
+
+describe('runDoctorChecks - includes new checks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
+    vi.mocked(countBrainLines).mockReturnValue(50);
+    vi.mocked(readFileSync).mockReturnValue('# Directives content' as unknown as ReturnType<typeof readFileSync>);
+    vi.mocked(accessSync).mockReturnValue(undefined);
+    vi.mocked(isDeckFileCommitted).mockReturnValue(false);
+  });
+
+  it('includes .deck Security check', () => {
+    const result = runDoctorChecks('/mock/root');
+    const check = result.checks.find(c => c.name === '.deck Security');
+    expect(check).toBeDefined();
+  });
+
+  it('includes Write Permissions check', () => {
+    const result = runDoctorChecks('/mock/root');
+    const check = result.checks.find(c => c.name === 'Write Permissions');
+    expect(check).toBeDefined();
+  });
+
+  it('passes providerNames to checkTmux — tmux not required for non-claude', () => {
+    vi.mocked(spawnSync).mockImplementation((cmd: string) => {
+      if (cmd === 'tmux') return { status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>;
+      return { status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>;
+    });
+    // Pass only codex providers → tmux not required
+    const result = runDoctorChecks('/mock/root', ['codex']);
+    const tmuxCheck = result.checks.find(c => c.name === 'tmux');
+    expect(tmuxCheck?.required).toBe(false);
+    // ok should still be true since tmux not required
+    expect(result.ok).toBe(true);
   });
 });

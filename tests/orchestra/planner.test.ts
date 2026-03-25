@@ -608,3 +608,126 @@ describe('planner.ts provider decoupling — zero hardcoded claude', () => {
     expect(result.command).not.toBe('claude');
   });
 });
+
+// ═══ buildPriorityContextBlock ════════════════════════════════════════
+
+import { buildPriorityContextBlock } from '../../src/orchestra/planner.js';
+
+describe('buildPriorityContextBlock', () => {
+  it('returns all sections joined when within limit', () => {
+    const sections = [
+      { text: 'DIRECTIVES:\nDo X', priority: 1 },
+      { text: 'MEMORY:\nRemember Y', priority: 2 },
+    ];
+    const result = buildPriorityContextBlock(sections, 100);
+    expect(result).toContain('DIRECTIVES');
+    expect(result).toContain('MEMORY');
+  });
+
+  it('preserves higher-priority sections when truncating', () => {
+    const directives = Array.from({ length: 50 }, (_, i) => `directive line ${i}`).join('\n');
+    const memory = Array.from({ length: 50 }, (_, i) => `memory line ${i}`).join('\n');
+    const patterns = Array.from({ length: 50 }, (_, i) => `pattern line ${i}`).join('\n');
+    const sections = [
+      { text: `DIRECTIVES:\n${directives}`, priority: 1 },
+      { text: `MEMORY:\n${memory}`, priority: 2 },
+      { text: `PATTERNS:\n${patterns}`, priority: 4 },
+    ];
+    const result = buildPriorityContextBlock(sections, 60);
+    // DIRECTIVES (priority 1) must be preserved over PATTERNS (priority 4)
+    expect(result).toContain('DIRECTIVES');
+    expect(result).toContain('directive line');
+  });
+
+  it('drops lowest priority sections first when over limit', () => {
+    const sections = [
+      { text: 'DIRECTIVES:\nKeep this', priority: 1 },
+      { text: 'FILE TREE:\nMaybe drop this', priority: 8 },
+    ];
+    const result = buildPriorityContextBlock(sections, 5);
+    expect(result).toContain('DIRECTIVES');
+    // FILE TREE has lower priority and may be dropped
+  });
+
+  it('skips empty text sections', () => {
+    const sections = [
+      { text: '', priority: 1 },
+      { text: 'MEMORY:\nContent', priority: 2 },
+    ];
+    const result = buildPriorityContextBlock(sections, 100);
+    expect(result).toBe('MEMORY:\nContent');
+    expect(result).not.toContain('\n\n\n');
+  });
+});
+
+// ═══ buildPlanPrompt i18n ═════════════════════════════════════════════
+
+describe('buildPlanPrompt i18n', () => {
+  it('uses Turkish by default (no language param)', () => {
+    const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test-project');
+    expect(prompt).toContain('TÜM görevleri');
+  });
+
+  it('uses Turkish when language=tr', () => {
+    const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test-project', undefined, 'tr');
+    expect(prompt).toContain('KURALLAR');
+    expect(prompt).toContain('ÇIKTI FORMAT');
+  });
+
+  it('uses English when language=en', () => {
+    const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test-project', undefined, 'en');
+    expect(prompt).toContain('RULES:');
+    expect(prompt).toContain('OUTPUT FORMAT');
+    expect(prompt).toContain('Plan ALL tasks');
+  });
+
+  it('English prompt still includes context block', () => {
+    const prompt = buildPlanPrompt(
+      makeContext({ directives: 'Build something great' }),
+      makeRecommendation(),
+      'test-project',
+      undefined,
+      'en',
+    );
+    expect(prompt).toContain('Build something great');
+  });
+
+  it('zero-config uses Turkish by default', () => {
+    const prompt = buildPlanPrompt(
+      makeContext(), makeRecommendation(), 'test-project',
+      'Add dark mode', 'tr',
+    );
+    expect(prompt).toContain('ZERO-CONFIG MODE');
+    expect(prompt).toContain('Kullanıcı');
+  });
+
+  it('zero-config uses English when language=en', () => {
+    const prompt = buildPlanPrompt(
+      makeContext(), makeRecommendation(), 'test-project',
+      'Add dark mode', 'en',
+    );
+    expect(prompt).toContain('ZERO-CONFIG MODE');
+    expect(prompt).toContain('User started sprint');
+  });
+});
+
+// ═══ buildZeroConfigPlanPrompt i18n ══════════════════════════════════
+
+describe('buildZeroConfigPlanPrompt i18n', () => {
+  it('uses Turkish by default', () => {
+    const prompt = buildZeroConfigPlanPrompt('Add feature', 'my-app');
+    expect(prompt).toContain('KULLANICI TALEBİ');
+  });
+
+  it('uses English when language=en', () => {
+    const prompt = buildZeroConfigPlanPrompt('Add feature', 'my-app', [], 'en');
+    expect(prompt).toContain('USER REQUEST');
+    expect(prompt).toContain('OUTPUT FORMAT');
+  });
+
+  it('English prompt still contains description', () => {
+    const prompt = buildZeroConfigPlanPrompt('Add dark mode', 'my-app', [], 'en');
+    expect(prompt).toContain('Add dark mode');
+    expect(prompt).toContain('my-app');
+  });
+});

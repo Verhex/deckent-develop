@@ -23,6 +23,14 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
+vi.mock('../../../src/cli/helpers/prompt.js', () => ({
+  promptSelect: vi.fn().mockResolvedValue('approved'),
+}));
+
+vi.mock('../../../src/orchestra/tmux.js', () => ({
+  killWorker: vi.fn(),
+}));
+
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { registerReview, loadReviewState, saveReviewState } from '../../../src/cli/commands/review.js';

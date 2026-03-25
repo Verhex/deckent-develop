@@ -33,11 +33,13 @@ export function registerSetDirectivesTool(server: McpServer): void {
       title: 'Set Directives',
       description: 'Write DIRECTIVES.md content. Claude should format natural language goals into "## Görev N:" or "## Task N:" blocks that the brain engine can parse.',
       inputSchema: z.object({
-        content: z.string().describe('Formatted DIRECTIVES.md content with ## Görev/Task N: blocks'),
+        content: z.string().min(1, 'Content cannot be empty').describe('Formatted DIRECTIVES.md content with ## Görev/Task N: blocks'),
       }),
     },
     async ({ content }) => {
       const root = process.cwd();
+
+      try {
       writeFileSync(join(root, DIRECTIVES_FILE), content, 'utf-8');
 
       // Count tasks by matching ## Görev or ## Task headers
@@ -53,6 +55,13 @@ export function registerSetDirectivesTool(server: McpServer): void {
           text: JSON.stringify(response),
         }],
       };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Failed to write directives: ${message}` }) }],
+          isError: true,
+        };
+      }
     },
   );
 }

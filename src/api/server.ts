@@ -1,13 +1,14 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
-import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { randomBytes, createHash, timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR,
   PROJECT_CONFIG_PATH, MEMORY_FILE, DEBT_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
 import { readJsonSafe } from '../core/utils.js';
+import { deepMerge } from '../core/config.js';
 import { watchDashboard } from './watcher.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
@@ -28,6 +29,41 @@ const MIME_TYPES: Record<string, string> = {
 
 const DEFAULT_PORT = 3100;
 const LOCALHOST_ONLY = '127.0.0.1';
+const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+
+// ─── Rate Limiter ────────────────────────────────────────────────
+
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+export class RateLimiter {
+  private readonly windowMs: number;
+  private readonly maxRequests: number;
+  private readonly store = new Map<string, RateLimitEntry>();
+
+  constructor(maxRequests = 100, windowMs = 60_000) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+  }
+
+  check(ip: string): boolean {
+    const now = Date.now();
+    const entry = this.store.get(ip);
+    if (!entry || now >= entry.resetAt) {
+      this.store.set(ip, { count: 1, resetAt: now + this.windowMs });
+      return true;
+    }
+    entry.count++;
+    return entry.count <= this.maxRequests;
+  }
+
+  /** Exported for testing — resets all entries */
+  reset(): void {
+    this.store.clear();
+  }
+}
 
 // ─── Auth ───────────────────────────────────────────────────────
 
@@ -76,11 +112,18 @@ interface ActiveJob {
   error?: string;
 }
 
-let activeJob: ActiveJob | null = null;
+const activeJobs = new Map<string, ActiveJob>();
 
-/** Exported for testing — resets activeJob state */
+/** Exported for testing — resets all job state */
 export function _resetActiveJob(): void {
-  activeJob = null;
+  activeJobs.clear();
+}
+
+function getRunningJob(): ActiveJob | undefined {
+  for (const job of activeJobs.values()) {
+    if (job.status === 'running') return job;
+  }
+  return undefined;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -98,11 +141,24 @@ function sendError(res: ServerResponse, status: number, message: string): void {
   sendJson(res, { error: message }, status);
 }
 
-export function parseBody(req: IncomingMessage): Promise<unknown> {
+export function parseBody(req: IncomingMessage, maxSize = MAX_BODY_SIZE): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    let totalSize = 0;
+    let rejected = false;
+    req.on('data', (chunk: Buffer) => {
+      if (rejected) return;
+      totalSize += chunk.length;
+      if (totalSize > maxSize) {
+        rejected = true;
+        reject(new Error('Payload too large'));
+        req.resume(); // drain remaining data
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
+      if (rejected) return;
       const raw = Buffer.concat(chunks).toString('utf-8');
       if (!raw) { resolve({}); return; }
       try {
@@ -200,9 +256,22 @@ async function handleRequest(
   staticDir?: string,
   initWatcher?: () => void,
   apiToken?: string | null,
+  rateLimiter?: RateLimiter,
 ): Promise<void> {
-  const url = req.url ?? '/';
+  // Normalize /api/v1/... → /api/... for backward compat
+  const rawUrl = req.url ?? '/';
+  const url = rawUrl.startsWith('/api/v1/') ? '/api/' + rawUrl.slice('/api/v1/'.length) : rawUrl;
   const method = req.method ?? 'GET';
+
+  // Rate limiting
+  if (rateLimiter && url.startsWith('/api/')) {
+    const ip = req.socket.remoteAddress ?? '127.0.0.1';
+    if (!rateLimiter.check(ip)) {
+      sendError(res, 429, 'Too Many Requests');
+      return;
+    }
+  }
+
   const origin = req.headers['origin'] ?? `http://localhost:${DEFAULT_PORT}`;
   const allowedOrigin = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')
     ? origin
@@ -285,11 +354,12 @@ async function handleRequest(
     // GET /api/job/:jobId
     if (url.startsWith('/api/job/')) {
       const jobId = url.slice('/api/job/'.length);
-      if (!activeJob || activeJob.id !== jobId) {
+      const job = activeJobs.get(jobId);
+      if (!job) {
         sendError(res, 404, 'Job not found');
         return;
       }
-      sendJson(res, activeJob);
+      sendJson(res, job);
       return;
     }
 
@@ -318,7 +388,7 @@ async function handleRequest(
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': allowedOrigin,
       });
-      res.write('\n');
+      res.write('retry: 3000\n\n');
       sseClients.add(res);
       req.on('close', () => { sseClients.delete(res); });
       if (initWatcher) initWatcher();
@@ -370,8 +440,13 @@ async function handleRequest(
     let body: unknown;
     try {
       body = await parseBody(req);
-    } catch {
-      sendError(res, 400, 'Invalid JSON body');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Invalid JSON body';
+      if (msg === 'Payload too large') {
+        sendError(res, 413, 'Payload too large');
+      } else {
+        sendError(res, 400, 'Invalid JSON body');
+      }
       return;
     }
 
@@ -381,29 +456,26 @@ async function handleRequest(
         sendError(res, 400, parsed.error.message);
         return;
       }
-      if (activeJob && activeJob.status === 'running') {
+      if (getRunningJob()) {
         sendError(res, 409, 'Sprint already running');
         return;
       }
       const b = parsed.data;
       const jobId = `job-${Date.now()}`;
-      activeJob = { id: jobId, status: 'running' };
+      const job: ActiveJob = { id: jobId, status: 'running' };
+      activeJobs.set(jobId, job);
       sendJson(res, { jobId, status: 'started' }, 202);
 
       // Run sprint in background
       loadConfig(projectRoot)
         .then((config) => runSprint(projectRoot, config, { autoApprove: b.autoApprove }))
         .then((result) => {
-          if (activeJob && activeJob.id === jobId) {
-            activeJob.status = 'completed';
-            activeJob.result = result;
-          }
+          const j = activeJobs.get(jobId);
+          if (j) { j.status = 'completed'; j.result = result; }
         })
         .catch((err: unknown) => {
-          if (activeJob && activeJob.id === jobId) {
-            activeJob.status = 'failed';
-            activeJob.error = err instanceof Error ? err.message : String(err);
-          }
+          const j = activeJobs.get(jobId);
+          if (j) { j.status = 'failed'; j.error = err instanceof Error ? err.message : String(err); }
         });
       return;
     }
@@ -472,7 +544,7 @@ async function handleRequest(
       const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
       try {
         const existing: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
-        const merged = { ...existing, ...parsed.data };
+        const merged = deepMerge(existing, parsed.data as Partial<Record<string, unknown>>);
         // Validate merged config before writing
         try {
           validatePartialConfig(merged as Partial<import('../core/config-types.js').DeckentConfig>);
@@ -513,6 +585,10 @@ export interface HttpServerOptions {
   apiToken?: string;
   /** Bind address. Defaults to 127.0.0.1 (localhost-only). */
   host?: string;
+  /** Auto-generate a token if none provided. Defaults to false. */
+  autoGenerateToken?: boolean;
+  /** Max requests per minute per IP. Defaults to 100. 0 disables rate limiting. */
+  rateLimit?: number;
 }
 
 export function createHttpServer(projectRoot: string, port?: number, staticDir?: string, apiToken?: string): HttpApi;
@@ -528,16 +604,27 @@ export function createHttpServer(
   let resolvedToken: string | undefined;
   let host: string;
 
+  let autoGenerateToken = false;
+  let rateLimitMax = 100;
+
   if (typeof portOrOpts === 'object' && portOrOpts !== null) {
     listenPort = portOrOpts.port ?? DEFAULT_PORT;
     resolvedStaticDir = portOrOpts.staticDir;
     resolvedToken = portOrOpts.apiToken;
     host = portOrOpts.host ?? LOCALHOST_ONLY;
+    autoGenerateToken = portOrOpts.autoGenerateToken ?? false;
+    rateLimitMax = portOrOpts.rateLimit ?? 100;
   } else {
     listenPort = portOrOpts ?? DEFAULT_PORT;
     resolvedStaticDir = staticDir;
     resolvedToken = apiToken;
     host = LOCALHOST_ONLY;
+  }
+
+  // Auto-generate token if requested and none provided
+  if (!resolvedToken && autoGenerateToken) {
+    resolvedToken = randomUUID();
+    process.stderr.write(`[deckent:info] Auto-generated API token: ${resolvedToken}\n`);
   }
 
   // Warn once at startup if no auth token is configured
@@ -546,6 +633,8 @@ export function createHttpServer(
       '[deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_token to enable auth.\n',
     );
   }
+
+  const rateLimiter = rateLimitMax > 0 ? new RateLimiter(rateLimitMax) : undefined;
 
   const dashPath = join(projectRoot, DASHBOARD_FILE);
   const sseClients = new Set<ServerResponse>();
@@ -575,7 +664,7 @@ export function createHttpServer(
   }
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-    handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, resolvedToken).catch((err: unknown) => {
+    handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, resolvedToken, rateLimiter).catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });
   });

@@ -68,11 +68,12 @@ describe('history command (isolated)', () => {
     vi.mocked(readdirSync).mockReturnValue(['sprint-001.md', 'sprint-002.md', 'notes.txt', '.gitkeep'] as any);
     vi.mocked(readFileSync).mockReturnValue('# sprint-001\n| Metric | Value |\n|---|---|\n| Total Tasks | 3 |\n| Completed | 3 |\n| No-Go | 0 |\n| Coverage | 90% |\n| Duration | 1000ms |');
     await runCommand(['history']);
-    // readFileSync called only for sprint-*.md files
-    expect(readFileSync).toHaveBeenCalledTimes(2);
+    // readFileSync called for sprint-*.md files + usage files (try/catch handles parse error)
+    const mdCalls = vi.mocked(readFileSync).mock.calls.filter((c) => String(c[0]).endsWith('.md'));
+    expect(mdCalls).toHaveLength(2);
   });
 
-  it('sorts sprint files alphabetically', async () => {
+  it('sorts sprint files numerically', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['sprint-003.md', 'sprint-001.md', 'sprint-002.md'] as any);
     const calls: string[] = [];
@@ -81,10 +82,11 @@ describe('history command (isolated)', () => {
       return '# sprint\n| Metric | Value |\n|---|---|\n| Total Tasks | 1 |\n| Completed | 1 |\n| No-Go | 0 |\n| Coverage | 90% |\n| Duration | 1000ms |';
     });
     await runCommand(['history']);
-    // Files should be sorted
-    expect(calls[0]).toContain('sprint-001.md');
-    expect(calls[1]).toContain('sprint-002.md');
-    expect(calls[2]).toContain('sprint-003.md');
+    // Only md reads should be sorted numerically
+    const mdCalls = calls.filter((c) => c.endsWith('.md'));
+    expect(mdCalls[0]).toContain('sprint-001.md');
+    expect(mdCalls[1]).toContain('sprint-002.md');
+    expect(mdCalls[2]).toContain('sprint-003.md');
   });
 });
 

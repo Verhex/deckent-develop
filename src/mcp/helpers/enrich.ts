@@ -27,6 +27,18 @@ const SUMMARIES: Record<string, (response: Record<string, unknown>, lang: string
     lang === 'tr' ? 'Senkronizasyon tamamlandı.' : 'Synchronization completed.',
   analyze: (_r, lang) =>
     lang === 'tr' ? 'Proje analizi tamamlandı.' : 'Project analysis completed.',
+  config: (_r, lang) =>
+    lang === 'tr' ? 'Yapılandırma işlemi tamamlandı.' : 'Configuration operation completed.',
+  usage: (_r, lang) =>
+    lang === 'tr' ? 'Kullanım istatistikleri alındı.' : 'Usage statistics retrieved.',
+  review: (_r, lang) =>
+    lang === 'tr' ? 'Sprint incelemesi tamamlandı.' : 'Sprint review completed.',
+  run: (_r, lang) =>
+    lang === 'tr' ? 'Görev başlatıldı.' : 'Task started.',
+  kill: (_r, lang) =>
+    lang === 'tr' ? 'Worker durduruldu.' : 'Worker stopped.',
+  cleanup: (_r, lang) =>
+    lang === 'tr' ? 'Sprint temizliği tamamlandı.' : 'Sprint cleanup completed.',
 };
 
 const HINTS: Record<string, (response: Record<string, unknown>) => string[]> = {
@@ -40,6 +52,12 @@ const HINTS: Record<string, (response: Record<string, unknown>) => string[]> = {
   history: () => ['Trendi takip edin'],
   sync: () => ['`deckent status` ile durumu kontrol edin'],
   analyze: () => ['Önerileri uygulamak için config\'i güncelleyin'],
+  config: () => ['`deckent status` ile durumu kontrol edin'],
+  usage: () => ['`deckent status` ile mevcut sprint durumunu izleyin'],
+  review: () => ['Onaylanan görevleri commit edin', '`deckent retro` ile retrospektif okuyun'],
+  run: () => ['`deckent status` ile task durumunu izleyin'],
+  kill: () => ['`deckent cleanup` ile lock dosyalarını temizleyin'],
+  cleanup: () => ['`deckent status` ile yeni sprint başlatın'],
 };
 
 export function generateSummary(

@@ -49,6 +49,7 @@ export function parseSprintNumber(filename: string): number {
 
 /**
  * Parse a sprint log markdown file into structured data.
+ * (F/G) Uses tolerant regex for header and table formats.
  */
 export function parseSprintLog(content: string): SprintSummary {
   const summary: SprintSummary = {
@@ -62,32 +63,58 @@ export function parseSprintLog(content: string): SprintSummary {
     tasks: [],
   };
 
-  // Parse sprint number from heading: # sprint-042
-  const headingMatch = content.match(/^#\s+sprint-(\d+)/m);
+  // (G) Tolerant heading: "# sprint-042", "# Sprint 042", "# Sprint-042", "## sprint-042" etc.
+  const headingMatch = content.match(/^#{1,3}\s+(?:Sprint[-\s]?)?(\d+)/im);
   if (headingMatch?.[1]) {
     summary.sprintNumber = parseInt(headingMatch[1], 10);
   }
 
-  // Parse metrics table — each uses optional chaining for capture group
-  const totalMatch = content.match(/\|\s*Total Tasks\s*\|\s*(\d+)\s*\|/);
+  // (F) Tolerant metrics table — allow extra whitespace, case-insensitive
+  const totalMatch = content.match(/\|\s*Total\s+Tasks?\s*\|\s*(\d+)\s*\|/i);
   if (totalMatch?.[1]) summary.totalTasks = parseInt(totalMatch[1], 10);
 
-  const completedMatch = content.match(/\|\s*Completed\s*\|\s*(\d+)\s*\|/);
-  if (completedMatch?.[1]) summary.completed = parseInt(completedMatch[1], 10);
+  // Also handle "Tasks completed: X/Y" format from sprint-reporter
+  const tasksCompletedMatch = content.match(/\|\s*Tasks\s+completed\s*\|\s*(\d+)\s*\/\s*(\d+)\s*\|/i);
+  if (tasksCompletedMatch) {
+    summary.completed = parseInt(tasksCompletedMatch[1] ?? '0', 10);
+    if (summary.totalTasks === 0) {
+      summary.totalTasks = parseInt(tasksCompletedMatch[2] ?? '0', 10);
+    }
+  } else {
+    const completedMatch = content.match(/\|\s*Completed\s*\|\s*(\d+)\s*\|/i);
+    if (completedMatch?.[1]) summary.completed = parseInt(completedMatch[1], 10);
+  }
 
-  const debtMatch = content.match(/\|\s*Tech Debt\s*\|\s*(\d+)\s*\|/);
+  const debtMatch = content.match(/\|\s*Tech\s+Debt\s*\|\s*(\d+)\s*\|/i);
   if (debtMatch?.[1]) summary.techDebt = parseInt(debtMatch[1], 10);
 
-  const nogoMatch = content.match(/\|\s*No-Go\s*\|\s*(\d+)\s*\|/);
+  const nogoMatch = content.match(/\|\s*No[-\s]?Go\s*\|\s*(\d+)\s*\|/i);
   if (nogoMatch?.[1]) summary.noGo = parseInt(nogoMatch[1], 10);
 
-  const durationMatch = content.match(/\|\s*Duration\s*\|\s*(\d+)ms\s*\|/);
-  if (durationMatch?.[1]) summary.durationMs = parseInt(durationMatch[1], 10);
+  // Also parse NO_GO rate format: "| NO_GO rate | 0% (0/5) |"
+  const noGoRateMatch = content.match(/\|\s*NO_GO\s+rate\s*\|[^|]*\((\d+)\/\d+\)\s*\|/i);
+  if (noGoRateMatch?.[1] && summary.noGo === 0) {
+    summary.noGo = parseInt(noGoRateMatch[1], 10);
+  }
 
-  // Parse tasks section
-  const taskLines = content.match(/^- .+$/gm);
+  // (F) Duration: allow "ms" suffix or "5m 3s" format
+  const durationMsMatch = content.match(/\|\s*Duration\s*\|\s*(\d+)\s*ms\s*\|/i);
+  if (durationMsMatch?.[1]) {
+    summary.durationMs = parseInt(durationMsMatch[1], 10);
+  } else {
+    // Try "Sprint time | 5m 3s |" format → convert to ms
+    const sprintTimeMatch = content.match(/\|\s*Sprint\s+time\s*\|\s*(\d+)m\s+(\d+)s\s*\|/i);
+    if (sprintTimeMatch) {
+      const mins = parseInt(sprintTimeMatch[1] ?? '0', 10);
+      const secs = parseInt(sprintTimeMatch[2] ?? '0', 10);
+      summary.durationMs = (mins * 60 + secs) * 1000;
+    }
+  }
+
+  // Parse tasks section — bullet list items
+  const taskLines = content.match(/^[-*]\s+.+$/gm);
   if (taskLines) {
-    summary.tasks = taskLines.map((line) => line.replace(/^- /, ''));
+    summary.tasks = taskLines.map((line) => line.replace(/^[-*]\s+/, ''));
   }
 
   return summary;
@@ -100,7 +127,8 @@ export function parseSprintLog(content: string): SprintSummary {
 export function parseRetroLearnings(content: string): RetroLearnings {
   const result: RetroLearnings = { items: [] };
 
-  const learningsMatch = content.match(/## Learnings\n([\s\S]*?)(?=\n##|\n*$)/);
+  // (F) Tolerant: allow extra whitespace around "Learnings" heading
+  const learningsMatch = content.match(/##\s+Learnings\s*\r?\n([\s\S]*?)(?=\r?\n##|\r?\n*$)/i);
   if (!learningsMatch?.[1]) return result;
 
   const lines = learningsMatch[1]
@@ -144,7 +172,8 @@ export function extractGoalFromDirectives(root: string): string | null {
  * Extract goal from sprint log content (first non-empty line after heading).
  */
 export function extractGoalFromSprintLog(content: string): string | null {
-  const match = content.match(/^#\s+(?:Sprint\s+)?sprint-\d+[^\n]*\n+([^\n#]+)/m);
+  // (F) Tolerant: handle "# sprint-042", "# Sprint 042", "## Sprint-042" etc.
+  const match = content.match(/^#{1,3}\s+(?:Sprint[-\s]?)?\d+[^\n]*\r?\n+([^\n#|]+)/im);
   const line = match?.[1]?.trim();
   if (!line || line.length === 0) return null;
   // Skip table lines (starting with |) — not a goal

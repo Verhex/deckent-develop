@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -64,7 +67,15 @@ import { isSessionActive, setupWatchWindow } from '../../../src/orchestra/tmux.j
 import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
 import { print, printError, formatSprintSummary } from '../../../src/cli/helpers/output.js';
 import { prepareZeroConfig, cleanupZeroConfig } from '../../../src/cli/commands/quick-start.js';
-import { registerStart } from '../../../src/cli/commands/start.js';
+import {
+  registerStart,
+  readProviderCache,
+  writeProviderCache,
+  isProviderCacheFresh,
+  applySandbox,
+  restoreSandbox,
+  watchSubprocessLogs,
+} from '../../../src/cli/commands/start.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -306,12 +317,13 @@ describe('start command (isolated)', () => {
       expect(setupWatchWindow).not.toHaveBeenCalled();
     });
 
-    it('prints note when tmux session is not active', async () => {
+    it('prints note when tmux session is not active (uses subprocess log watch)', async () => {
       vi.mocked(isSessionActive).mockReturnValue(false);
 
       await runCommand(['start', '--watch']);
 
-      expect(print).toHaveBeenCalledWith(expect.stringContaining('--watch requires'));
+      // When no tmux session, falls back to subprocess log watching
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('subprocess worker logs'));
     });
   });
 
@@ -374,11 +386,12 @@ describe('start command (isolated)', () => {
       expect(process.exitCode).toBe(1);
     });
 
-    it('handles sandbox-mode and returns early with print', async () => {
+    it('handles sandbox-mode: prints sandbox message and continues sprint', async () => {
       await runCommand(['start', '--sandbox-mode']);
 
-      expect(print).toHaveBeenCalledWith(expect.stringContaining('Sandbox mode'));
-      expect(runSprint).not.toHaveBeenCalled();
+      expect(print).toHaveBeenCalledWith(expect.stringContaining('andbox'));
+      // sandbox mode now runs the sprint (git stash + restore, not an early return)
+      expect(runSprint).toHaveBeenCalled();
     });
 
     it('prints formatted sprint summary on successful run', async () => {
@@ -498,5 +511,143 @@ describe('start command (isolated)', () => {
 
       expect(cleanupZeroConfig).toHaveBeenCalled();
     });
+  });
+});
+
+// ─── Provider Cache Tests ─────────────────────────────────────────
+
+describe('Provider Cache', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deckent-cache-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('readProviderCache returns null when no cache file exists', () => {
+    const result = readProviderCache(tmpDir);
+    expect(result).toBeNull();
+  });
+
+  it('writeProviderCache creates cache file with correct content', () => {
+    const mockBootstrap = {
+      registered: ['claude', 'codex'] as any[],
+      skipped: [],
+      defaultProvider: 'claude' as any,
+      connector: {} as any,
+    };
+    writeProviderCache(tmpDir, mockBootstrap, 'claude||');
+    const cacheFile = path.join(tmpDir, '.deckent', 'provider-cache.json');
+    expect(fs.existsSync(cacheFile)).toBe(true);
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    expect(cache.registered).toEqual(['claude', 'codex']);
+    expect(cache.defaultProvider).toBe('claude');
+    expect(cache.configHash).toBe('claude||');
+    expect(cache.cachedAt).toBeDefined();
+  });
+
+  it('readProviderCache returns parsed cache after write', () => {
+    const mockBootstrap = {
+      registered: ['claude'] as any[],
+      skipped: [],
+      defaultProvider: 'claude' as any,
+      connector: {} as any,
+    };
+    writeProviderCache(tmpDir, mockBootstrap, 'claude||');
+    const result = readProviderCache(tmpDir);
+    expect(result).not.toBeNull();
+    expect(result!.registered).toEqual(['claude']);
+    expect(result!.configHash).toBe('claude||');
+  });
+
+  it('isProviderCacheFresh returns false when configHash differs', () => {
+    const cache = {
+      registered: ['claude'],
+      defaultProvider: 'claude',
+      cachedAt: new Date().toISOString(),
+      configHash: 'claude||',
+    };
+    expect(isProviderCacheFresh(cache, 'codex||')).toBe(false);
+  });
+
+  it('isProviderCacheFresh returns true for recent cache with matching hash', () => {
+    const cache = {
+      registered: ['claude'],
+      defaultProvider: 'claude',
+      cachedAt: new Date().toISOString(),
+      configHash: 'claude||',
+    };
+    expect(isProviderCacheFresh(cache, 'claude||')).toBe(true);
+  });
+
+  it('isProviderCacheFresh returns false for expired cache', () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const cache = {
+      registered: ['claude'],
+      defaultProvider: 'claude',
+      cachedAt: twoHoursAgo,
+      configHash: 'claude||',
+    };
+    expect(isProviderCacheFresh(cache, 'claude||')).toBe(false);
+  });
+});
+
+// ─── Sandbox Mode Tests ───────────────────────────────────────────
+
+describe('Sandbox Mode', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deckent-sandbox-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('applySandbox returns applied:false in non-git directory', () => {
+    const result = applySandbox(tmpDir);
+    // In a non-git directory, git stash should fail
+    expect(result.applied).toBe(false);
+    expect(result.stashRef).toBeNull();
+  });
+
+  it('restoreSandbox is a no-op when applied is false', () => {
+    // Should not throw
+    expect(() => restoreSandbox(tmpDir, { stashRef: null, applied: false })).not.toThrow();
+  });
+});
+
+// ─── Watch Subprocess Logs Tests ─────────────────────────────────
+
+describe('watchSubprocessLogs', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deckent-watch-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns a cleanup function', () => {
+    const cleanup = watchSubprocessLogs(tmpDir, 10000);
+    expect(typeof cleanup).toBe('function');
+    cleanup();
+  });
+
+  it('cleanup function cancels the interval without throwing', () => {
+    const cleanup = watchSubprocessLogs(tmpDir, 10000);
+    expect(() => cleanup()).not.toThrow();
+  });
+
+  it('handles missing .tasks directory gracefully', () => {
+    // tmpDir has no .tasks subdirectory — should not throw
+    const cleanup = watchSubprocessLogs(tmpDir, 10000);
+    cleanup();
   });
 });

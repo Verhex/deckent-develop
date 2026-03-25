@@ -60,6 +60,26 @@ export function selectSkills(
       }
     }
 
+    // 3b. Match task scope directories -> skill category/triggers (+2)
+    if (task.scope?.directories) {
+      for (const dir of task.scope.directories) {
+        const dirLower = dir.toLowerCase();
+        // Domain-specific directory matching
+        if (dirLower.includes('test') && (skill.category === 'domain' || skill.triggers.some(t => t.toLowerCase().includes('test')))) {
+          score += 2;
+        }
+        if (dirLower.includes('api') && skill.triggers.some(t => t.toLowerCase().includes('api') || t.toLowerCase().includes('rest'))) {
+          score += 2;
+        }
+        if ((dirLower.includes('doc') || dirLower.includes('readme')) && skill.triggers.some(t => t.toLowerCase().includes('doc'))) {
+          score += 2;
+        }
+        if (dirLower.includes('security') && skill.triggers.some(t => t.toLowerCase().includes('security') || t.toLowerCase().includes('owasp'))) {
+          score += 2;
+        }
+      }
+    }
+
     // 4. Agent expertise bonus (+1 per expertise/trigger overlap)
     if (agent?.expertise) {
       for (const exp of agent.expertise) {

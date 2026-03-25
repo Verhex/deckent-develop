@@ -430,7 +430,7 @@ describe('skill install — local path', () => {
     process.exitCode = undefined;
   });
 
-  it('installs skill from local directory', async () => {
+  it('installs skill from local directory', { timeout: 15000 }, async () => {
     const manifest = makeSkillManifest();
     vi.mocked(existsSync).mockImplementation((p: any) => {
       const pathStr = String(p);

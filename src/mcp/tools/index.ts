@@ -9,6 +9,12 @@ import { registerRetroTool } from './retro.js';
 import { registerHistoryTool } from './history.js';
 import { registerAnalyzeTool } from './analyze.js';
 import { registerSyncTool } from './sync.js';
+import { registerConfigTool } from './config.js';
+import { registerUsageTool } from './usage.js';
+import { registerReviewTool } from './review.js';
+import { registerRunTool } from './run.js';
+import { registerKillTool } from './kill.js';
+import { registerCleanupTool } from './cleanup.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -21,4 +27,10 @@ export function registerTools(server: McpServer): void {
   registerHistoryTool(server);
   registerAnalyzeTool(server);
   registerSyncTool(server);
+  registerConfigTool(server);
+  registerUsageTool(server);
+  registerReviewTool(server);
+  registerRunTool(server);
+  registerKillTool(server);
+  registerCleanupTool(server);
 }

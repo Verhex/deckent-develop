@@ -10,10 +10,42 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
 
+// ─── Registry Cache ───────────────────────────────────────────────────────────
+
+interface CacheEntry {
+  data: unknown;
+  expiresAt: number;
+}
+
+const registryCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function getCached<T>(key: string): T | null {
+  const entry = registryCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    registryCache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+export function setCache(key: string, data: unknown): void {
+  registryCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+export function clearRegistryCache(): void {
+  registryCache.clear();
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function validateSemver(version: string): boolean {
-  return /^\d+\.\d+\.\d+/.test(version);
+/**
+ * Strict semver validation: major.minor.patch with optional pre-release and build metadata.
+ * Rejects loose patterns like "1.0" or "v1.0.0".
+ */
+export function validateSemver(version: string): boolean {
+  return /^\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/.test(version);
 }
 
 function validateManifestForPublish(manifest: Record<string, unknown>): string[] {

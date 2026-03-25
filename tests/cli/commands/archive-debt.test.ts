@@ -8,6 +8,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   appendFileSync: vi.fn(),
+  statSync: vi.fn().mockReturnValue({ size: 0 }),
 }));
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, TaskResult } from '../../core/types.js';
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../core/types.js';
-import { TASKS_DIR } from '../../core/constants.js';
+import { TASKS_DIR, BRAIN_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
 import { evaluateResult } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
@@ -12,10 +12,12 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { readJsonSafe } from '../../core/utils.js';
+import { loadReviewState } from './review.js';
 
 /**
  * Build a Sprint object and evaluations from .tasks/ directory contents.
  * Reads task JSON files and .result files, evaluates each result.
+ * Integrates review state: rejected tasks are evaluated as NO_GO.
  */
 function buildSprintFromTasks(root: string): {
   sprintId: string;
@@ -49,8 +51,24 @@ function buildSprintFromTasks(root: string): {
     if (result) results.push(result);
   }
 
+  // Load review state to integrate rejected tasks
+  const reviewState = loadReviewState(root, sprintId);
+  const rejectedTaskIds = new Set<string>();
+  if (reviewState) {
+    for (const review of reviewState.reviews) {
+      if (review.decision === 'rejected') {
+        rejectedTaskIds.add(review.taskId);
+      }
+    }
+  }
+
   // Evaluate each task
   for (const task of tasks) {
+    // Review-rejected tasks → NO_GO regardless of result
+    if (rejectedTaskIds.has(task.id)) {
+      evaluations.set(task.id, TaskEvaluation.NO_GO);
+      continue;
+    }
     const result = results.find(r => r.taskId === task.id);
     if (result) {
       const evaluation = evaluateResult(result, task);
@@ -64,13 +82,35 @@ function buildSprintFromTasks(root: string): {
   return { sprintId, tasks, results, evaluations };
 }
 
+/** Check if a sprint has already been finalized by checking sprint log */
+function isSprintAlreadyFinalized(root: string, sprintId: string): boolean {
+  const sprintLogPath = join(root, BRAIN_DIR, 'sprints', `${sprintId}.md`);
+  return existsSync(sprintLogPath);
+}
+
+/** Detect tasks that are still in-progress */
+export function detectIncompleteTasks(tasks: Task[]): Task[] {
+  const activeStatuses = new Set(['EXECUTING', 'CLAIMED', 'TESTING', 'DOCUMENTING']);
+  return tasks.filter(t => activeStatuses.has(t.status));
+}
+
+/** Detect mixed sprint IDs */
+export function detectMixedSprints(tasks: Task[]): string[] {
+  const ids = new Set<string>();
+  for (const t of tasks) {
+    if (t.sprintId) ids.add(t.sprintId);
+  }
+  return [...ids];
+}
+
 export function registerFinalize(program: Command): void {
   program
     .command('finalize')
     .description('Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay')
     .option('--skip-decay', 'Skip memory/debt decay phase')
     .option('--skip-hooks', 'Skip plugin afterSprint hooks')
-    .action(async (opts: { skipDecay?: boolean; skipHooks?: boolean }) => {
+    .option('--force', 'Force finalize even if tasks are still in-progress or already finalized')
+    .action(async (opts: { skipDecay?: boolean; skipHooks?: boolean; force?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
 
@@ -79,6 +119,28 @@ export function registerFinalize(program: Command): void {
 
         if (tasks.length === 0) {
           print(getMessage('finalize.no_tasks', lang));
+          return;
+        }
+
+        // (G) Mixed sprint detection
+        const sprintIds = detectMixedSprints(tasks);
+        if (sprintIds.length > 1) {
+          print(`Warning: Mixed sprint IDs detected: ${sprintIds.join(', ')}. Proceeding with ${sprintId}.`);
+        }
+
+        // (F) Completion guard — reject if tasks still in-progress
+        const incomplete = detectIncompleteTasks(tasks);
+        if (incomplete.length > 0 && !opts.force) {
+          const ids = incomplete.map(t => t.id).join(', ');
+          print(`Cannot finalize: ${incomplete.length} task(s) still in-progress (${ids}). Use --force to override.`);
+          return;
+        } else if (incomplete.length > 0) {
+          print(`Warning: Forcing finalize with ${incomplete.length} in-progress task(s).`);
+        }
+
+        // (H) Duplicate finalize protection
+        if (isSprintAlreadyFinalized(root, sprintId) && !opts.force) {
+          print(`Sprint ${sprintId} has already been finalized. Use --force to re-finalize.`);
           return;
         }
 

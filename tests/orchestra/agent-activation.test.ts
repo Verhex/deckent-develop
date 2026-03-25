@@ -135,19 +135,48 @@ describe('Agent Activation', () => {
       expect(result).toContain('testing');
     });
 
-    it('prefers PROMPT.md over systemPrompt in agent.json', () => {
+    it('combines systemPrompt + expertise + PROMPT.md when all exist', () => {
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'From agent.json'));
       const promptDir = path.join(tmpDir, '.deckent', 'agents', 'test-agent');
       fs.writeFileSync(path.join(promptDir, 'PROMPT.md'), 'From PROMPT.md', 'utf-8');
       const task = makeTask({ assignedAgent: 'test-agent' });
       const result = resolveAgentPrompt(tmpDir, task);
-      expect(result).toBe('From PROMPT.md');
+      expect(result).toContain('From agent.json');
+      expect(result).toContain('Expertise:');
+      expect(result).toContain('From PROMPT.md');
     });
 
     it('returns undefined for generic agent', () => {
       const task = makeTask({ assignedAgent: 'generic' });
       const result = resolveAgentPrompt(tmpDir, task);
       expect(result).toBeUndefined();
+    });
+  });
+
+  // ─── B2) forceModel does NOT bypass agent selection ─────────────────────
+
+  describe('forceModel agent bypass removed', () => {
+    it('resolveAgentPrompt works when task has forceModel and assignedAgent', () => {
+      writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'Specialized prompt'));
+      const task = makeTask({ assignedAgent: 'test-agent', forceModel: 'opus' } as Partial<Task>);
+      const result = resolveAgentPrompt(tmpDir, task);
+      expect(result).toContain('Specialized prompt');
+    });
+
+    it('resolveAgentPrompt returns undefined only for generic, not for forceModel tasks', () => {
+      writeAgentJson(tmpDir, 'bug-fixer', makeAgentDef('bug-fixer', 'Fix bugs'));
+      const task = makeTask({ assignedAgent: 'bug-fixer', forceModel: 'sonnet' } as Partial<Task>);
+      const result = resolveAgentPrompt(tmpDir, task);
+      expect(result).toBeDefined();
+      expect(result).toContain('Fix bugs');
+    });
+
+    it('agent prompt includes expertise even with forceModel', () => {
+      writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'Agent prompt'));
+      const task = makeTask({ assignedAgent: 'test-agent', forceModel: 'haiku' } as Partial<Task>);
+      const result = resolveAgentPrompt(tmpDir, task);
+      expect(result).toContain('Expertise:');
+      expect(result).toContain('testing');
     });
   });
 

@@ -9,6 +9,7 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
+  watch: vi.fn().mockReturnValue({ close: vi.fn() }),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -16,9 +17,12 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   printError: vi.fn(),
   formatDashboard: vi.fn().mockReturnValue('Dashboard Output'),
   formatHumanStatus: vi.fn().mockReturnValue('Human Status Output'),
+  formatStandaloneStatus: vi.fn().mockReturnValue('Standalone Status Output'),
   formatTable: vi.fn().mockImplementation((headers: string[], rows: string[][]) => {
     return [headers.join(' | '), ...rows.map((r) => r.join(' | '))].join('\n');
   }),
+  isNoColor: vi.fn().mockReturnValue(false),
+  stripAnsi: vi.fn((s: string) => s),
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({

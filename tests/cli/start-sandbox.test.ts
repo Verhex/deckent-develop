@@ -145,21 +145,24 @@ describe('start --sandbox-mode', () => {
     expect(loadConfig).toHaveBeenCalled();
   });
 
-  it('sandbox mode prints not-implemented message', async () => {
+  it('sandbox mode prints sandbox context message', async () => {
     await runCommand('--sandbox-mode');
-    expect(getMessage).toHaveBeenCalledWith('start.sandbox_not_implemented', 'en');
-    expect(print).toHaveBeenCalledWith('[msg:start.sandbox_not_implemented]');
+    // Sandbox mode now prints a stash-related message and continues the sprint
+    expect(print).toHaveBeenCalledWith(expect.stringMatching(/[Ss]andbox|stash/));
   });
 
-  it('sandbox mode does NOT call runSprint', async () => {
+  it('sandbox mode DOES call runSprint (git stash + restore mechanism)', async () => {
     await runCommand('--sandbox-mode');
-    expect(runSprint).not.toHaveBeenCalled();
+    expect(runSprint).toHaveBeenCalled();
   });
 
-  it('sandbox mode returns early before doctor checks', async () => {
+  it('sandbox mode passes sandboxMode:true to runSprint', async () => {
     await runCommand('--sandbox-mode');
-    expect(runSprint).not.toHaveBeenCalled();
-    // Doctor checks should not matter for sandbox exit
+    expect(runSprint).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ sandboxMode: true }),
+    );
   });
 
   it('without --sandbox-mode, sprint runs normally', async () => {
@@ -183,26 +186,31 @@ describe('start --sandbox-mode', () => {
     );
   });
 
-  it('sandbox + auto-approve still returns early', async () => {
+  it('sandbox + auto-approve: both flags work together', async () => {
     await runCommand('--sandbox-mode', '--auto-approve');
-    expect(runSprint).not.toHaveBeenCalled();
-    expect(print).toHaveBeenCalledWith('[msg:start.sandbox_not_implemented]');
+    expect(runSprint).toHaveBeenCalled();
+    const optsArg = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(optsArg?.sandboxMode).toBe(true);
+    expect(optsArg?.autoApprove).toBe(true);
   });
 
-  it('sandbox + dry-run: sandbox takes priority', async () => {
+  it('sandbox + dry-run: planSprint used (dry-run takes priority over sandbox)', async () => {
     await runCommand('--sandbox-mode', '--dry-run');
+    // dry-run mode shows the plan without calling runSprint, regardless of sandbox
     expect(runSprint).not.toHaveBeenCalled();
   });
 
   it('sandbox mode loads config to get language', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig({ language: 'tr' }) as any);
     await runCommand('--sandbox-mode');
-    expect(getMessage).toHaveBeenCalledWith('start.sandbox_not_implemented', 'tr');
+    // Config is still loaded in sandbox mode
+    expect(loadConfig).toHaveBeenCalled();
   });
 
   it('multiple flags can coexist: --sandbox-mode --force --watch', async () => {
     await runCommand('--sandbox-mode', '--force', '--watch');
-    expect(runSprint).not.toHaveBeenCalled();
+    // With --force, doctor checks skipped; sandbox mode runs sprint
+    expect(runSprint).toHaveBeenCalled();
   });
 
   it('without --sandbox-mode and --force, sprint completes', async () => {

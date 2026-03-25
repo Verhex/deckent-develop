@@ -8,6 +8,7 @@ import { getSystemProfile } from '../../core/system-profile.js';
 import { DECKENT_DIR, DECKENT_VERSION } from '../../core/constants.js';
 import { runWizard } from '../helpers/wizard.js';
 import type { WizardStep } from '../helpers/wizard.js';
+import { detectProjectStack } from '../../core/stack-detector.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -29,12 +30,16 @@ export function detectProjectInfo(root: string): {
   hasTsConfig: boolean;
   hasGitIgnore: boolean;
   language: string;
+  framework: string;
+  testFramework: string;
 } {
   let name = 'unknown';
   let hasPackageJson = false;
   let hasTsConfig = false;
   const hasGitIgnore = existsSync(join(root, '.gitignore'));
   let language = 'unknown';
+  let framework = '';
+  let testFramework = '';
 
   const pkgPath = join(root, 'package.json');
   if (existsSync(pkgPath)) {
@@ -54,7 +59,17 @@ export function detectProjectInfo(root: string): {
     language = 'JavaScript';
   }
 
-  return { name, hasPackageJson, hasTsConfig, hasGitIgnore, language };
+  // Use richer stack detection if available
+  try {
+    const stack = detectProjectStack(root);
+    if (stack.language) language = stack.language;
+    if (stack.framework) framework = stack.framework;
+    if (stack.testFramework) testFramework = stack.testFramework;
+  } catch {
+    // fall through with basic detection
+  }
+
+  return { name, hasPackageJson, hasTsConfig, hasGitIgnore, language, framework, testFramework };
 }
 
 export function buildOnboardSteps(projectName: string): WizardStep[] {
@@ -77,6 +92,7 @@ export function buildOnboardSteps(projectName: string): WizardStep[] {
         { label: 'max_plan (Max subscription, opus model)', value: 'max_plan' },
         { label: 'pro_plan (Pro subscription, sonnet model)', value: 'pro_plan' },
         { label: 'max5x_plan (Max 5x, high throughput)', value: 'max5x_plan' },
+        { label: 'api (API key, pay-per-use)', value: 'api' },
       ],
       default: 'max_plan',
     },
@@ -89,7 +105,7 @@ export function buildOnboardSteps(projectName: string): WizardStep[] {
   ];
 }
 
-export async function runOnboard(root: string, opts: { nonInteractive?: boolean }): Promise<void> {
+export async function runOnboard(root: string, opts: { nonInteractive?: boolean; force?: boolean }): Promise<void> {
   // 1. Welcome message
   print('');
   print('=== Welcome to deckent ===');
@@ -110,27 +126,43 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean 
   print(`Recommended workers: ${profile.recommendedMaxWorkers}`);
   print('');
 
-  // 4. Project analysis
+  // 4. Project analysis (richer stack detection)
   const project = detectProjectInfo(root);
   print(`Project: ${project.name}`);
   print(`Language: ${project.language}`);
+  if (project.framework) print(`Framework: ${project.framework}`);
+  if (project.testFramework) print(`Test framework: ${project.testFramework}`);
   print(`package.json: ${project.hasPackageJson ? 'found' : 'not found'}`);
   print(`tsconfig.json: ${project.hasTsConfig ? 'found' : 'not found'}`);
   print('');
 
-  // 5. Config recommendation
+  // 5. Already initialized check
   const alreadyInitialized = existsSync(join(root, DECKENT_DIR));
-  if (alreadyInitialized) {
-    print('Workspace: .deckent/ already exists');
+  if (alreadyInitialized && !opts.force) {
+    print('Workspace: .deckent/ already exists (use --force to re-run onboarding)');
+  } else if (alreadyInitialized && opts.force) {
+    print('Workspace: .deckent/ already exists — force re-init requested');
   }
 
   // 6. Wizard steps
   const steps = buildOnboardSteps(project.name);
   const answers = await runWizard(steps, { nonInteractive: opts.nonInteractive });
 
-  // 7. Run deckent init if requested
-  if (answers['runInit'] === true && !alreadyInitialized) {
-    const initResult = spawnSync('npx', ['deckent', 'init', '--force'], {
+  // 7. Run deckent init if requested, passing language and mode as args
+  const shouldInit = answers['runInit'] === true && (!alreadyInitialized || opts.force);
+  if (shouldInit) {
+    const language = String(answers['language'] ?? 'en');
+    const mode = String(answers['mode'] ?? 'max_plan');
+
+    const initArgs = ['deckent', 'init', '--force'];
+    if (language && language !== 'en') {
+      initArgs.push('--language', language);
+    }
+    if (mode) {
+      initArgs.push('--mode', mode);
+    }
+
+    const initResult = spawnSync('npx', initArgs, {
       cwd: root,
       encoding: 'utf-8',
       stdio: 'inherit',
@@ -141,7 +173,7 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean 
     } else {
       print('Initialization skipped (run manually: deckent init).');
     }
-  } else if (alreadyInitialized) {
+  } else if (alreadyInitialized && !opts.force) {
     print('Skipped init: workspace already exists.');
   }
 
@@ -158,7 +190,8 @@ export function registerOnboard(program: Command): void {
     .command('onboard')
     .description('Run the onboarding wizard')
     .option('--non-interactive', 'Skip interactive prompts, use defaults')
-    .action(async (opts: { nonInteractive?: boolean }) => {
+    .option('--force', 'Re-run onboarding even if already initialized')
+    .action(async (opts: { nonInteractive?: boolean; force?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -167,6 +200,6 @@ export function registerOnboard(program: Command): void {
       }
       // Auto-detect non-interactive if stdin is not a TTY
       const isNonInteractive = opts.nonInteractive || !process.stdin.isTTY;
-      await runOnboard(root, { nonInteractive: isNonInteractive });
+      await runOnboard(root, { nonInteractive: isNonInteractive, force: opts.force });
     });
 }

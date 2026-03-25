@@ -60,6 +60,7 @@ vi.mock('../../src/core/config.js', () => ({
       api: { max_workers: 10, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true, usage_thresholds: { '5hr': 1.0, weekly: 1.0 }, budget_per_sprint: 5.0, requires: 'ANTHROPIC_API_KEY', brain_planning: 'auto' },
     },
   })),
+  deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),
   validatePartialConfig: vi.fn(),
   ConfigValidationError: class ConfigValidationError extends Error {
     errors: string[];

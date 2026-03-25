@@ -63,7 +63,6 @@ describe('CLI: deckent sync', () => {
 
     await program.parseAsync(['node', 'deckent', 'sync']);
 
-    expect(ensureDeckentImport).toHaveBeenCalledTimes(2);
     expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'));
     expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
   });

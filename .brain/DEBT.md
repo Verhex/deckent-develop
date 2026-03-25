@@ -50,3 +50,25 @@
 | debt-055-008 | Tech debt from 055-008: Added agent delete, edit, and info subcommands. Delete r | 055-008 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.300Z |
 | debt-055-009 | Tech debt from 055-009: Added skill enable, disable, delete, info subcommands. E | 055-009 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.301Z |
 | debt-055-010 | Tech debt from 055-010: Added --sprint <id> flag, --json flag, goal extraction ( | 055-010 | sprint-055 | NORMAL | 0 | true | sprint-055 | 2026-03-25T10:53:58.302Z |
+| debt-056-001 | Tech debt from 056-001: A) sprint-log.ts: targetFile 'docs/archive/SPRINT-LOG.md | 056-001 | sprint-056 | NORMAL | 0 | true | sprint-056 | 2026-03-25T12:14:42.539Z |
+| debt-056-002 | Tech debt from 056-002: A) Replaced Object.assign with deepMerge for config merg | 056-002 | sprint-056 | NORMAL | 0 | true | sprint-056 | 2026-03-25T12:14:42.550Z |
+| debt-056-003 | Tech debt from 056-003: Implemented all 6 UX improvements: A) detectSystemLangua | 056-003 | sprint-056 | NORMAL | 0 | true | sprint-056 | 2026-03-25T12:14:42.551Z |
+| debt-056-004 | Tech debt from 056-004: A) plan.ts now uses async checkUsageWithProvider() when | 056-004 | sprint-056 | NORMAL | 0 | true | sprint-056 | 2026-03-25T12:14:42.552Z |
+| debt-056-005 | Tech debt from 056-005: A) Structured parser: Added parseBulletOrNumberedTasks() | 056-005 | sprint-056 | NORMAL | 0 | true | sprint-056 | 2026-03-25T12:14:42.554Z |
+| debt-056-006 | Tech debt from 056-006: Implemented all 4 sub-tasks: (A) --timeout flag in start | 056-006 | sprint-056 | NORMAL | 0 | true | sprint-056 | 2026-03-25T12:14:42.555Z |
+| debt-056-007 | Tech debt from 056-007: A) Provider Bootstrap Cache: readProviderCache/writeProv | 056-007 | sprint-056 | NORMAL | 0 | true | sprint-056 | 2026-03-25T12:14:42.557Z |
+| debt-057-002 | Tech debt from 057-002: All 8 doctor improvements were already implemented in do | 057-002 | sprint-057 | NORMAL | 0 | true | sprint-057 | 2026-03-25T13:25:18.757Z |
+| debt-057-004 | Tech debt from 057-004: All 7 cleanup+decay improvements already implemented in | 057-004 | sprint-057 | NORMAL | 0 | true | sprint-057 | 2026-03-25T13:25:18.759Z |
+| debt-057-010 | Tech debt from 057-010: run.ts: added --timeout, --keep, --auto-approve, --verbo | 057-010 | sprint-057 | NORMAL | 0 | true | sprint-057 | 2026-03-25T13:25:18.762Z |
+| debt-057-011 | Tech debt from 057-011: Implemented all 12 improvements: (A) sync adds GEMINI.md | 057-011 | sprint-057 | NORMAL | 0 | true | sprint-057 | 2026-03-25T13:25:18.763Z |
+| debt-057-012-fix | Tech debt from 057-012-fix: All agent/skill/plugin/marketplace/archive-debt impr | 057-012-fix | sprint-057 | CRITICAL | 3 | false | - | 2026-03-25T13:35:23.208Z |
+| debt-059-001 | Tech debt from 059-001: cli-deep-analysis.md güncellendi. Sprint 056-058 değişik | 059-001 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.248Z |
+| debt-059-005 | Tech debt from 059-005: Created .deckent/workspace/WORKER-GUIDE.md with heartbea | 059-005 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.251Z |
+| debt-059-006 | Tech debt from 059-006: Multi-provider support added: (A) spawn.ts exports spawn | 059-006 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.252Z |
+| debt-059-007 | Tech debt from 059-007: A) doctor tmux conditional was already implemented in ch | 059-007 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.253Z |
+| debt-059-009 | Tech debt from 059-009: Added 4 new MCP resources: deckent://retro (RETRO.md con | 059-009 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.256Z |
+| debt-059-010 | Tech debt from 059-010: A) Enriched responses: Added summaries/hints for 6 new t | 059-010 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.257Z |
+| debt-059-011 | Tech debt from 059-011: All three sub-tasks (A, B, C) were already implemented i | 059-011 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.257Z |
+| debt-059-012 | Tech debt from 059-012: Sync genişletildi: (A) GEMINI.md sync — syncGeminiAdapte | 059-012 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.258Z |
+| debt-059-013 | Tech debt from 059-013: A) sprint-log.ts targetFile was already 'docs/SPRINT-LOG | 059-013 | sprint-059 | NORMAL | 0 | true | sprint-059 | 2026-03-25T17:19:33.259Z |
+| debt-059-008-fix | Tech debt from 059-008-fix: All 6 MCP tools (config, usage, review, run, kill, c | 059-008-fix | sprint-059 | NORMAL | 1 | false | - | 2026-03-25T17:20:39.182Z |

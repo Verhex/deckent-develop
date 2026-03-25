@@ -248,4 +248,121 @@ describe('UsageTracker', () => {
     expect(usage.totalCalls).toBe(2);
     expect(usage.totalTokens).toBe(600);
   });
+
+  // ─── Provider Breakdown ─────────────────────────────────────────────────
+
+  it('getSprintUsage includes providerBreakdown', () => {
+    tracker.recordCall('opus', 1000, 'task-001', 'sprint-001');
+    tracker.recordCall('sonnet', 500, 'task-002', 'sprint-001');
+    const usage = tracker.getSprintUsage('sprint-001');
+    expect(usage.providerBreakdown).toBeDefined();
+    expect(usage.providerBreakdown!.length).toBeGreaterThan(0);
+    const claude = usage.providerBreakdown!.find(p => p.provider === 'claude');
+    expect(claude).toBeDefined();
+    expect(claude!.calls).toBe(2);
+  });
+
+  it('recordCall stores provider field in entry', () => {
+    tracker.recordCall('opus', 1000, 'task-001', 'sprint-001');
+    const usage = tracker.getSprintUsage('sprint-001');
+    expect(usage.entries[0]!.provider).toBe('claude');
+  });
+
+  // ─── Task Breakdown ─────────────────────────────────────────────────────
+
+  it('getSprintUsage includes taskBreakdown sorted by tokens desc', () => {
+    tracker.recordCall('opus', 1000, 'task-001', 'sprint-001');
+    tracker.recordCall('sonnet', 500, 'task-001', 'sprint-001');
+    tracker.recordCall('haiku', 100, 'task-002', 'sprint-001');
+    const usage = tracker.getSprintUsage('sprint-001');
+    expect(usage.taskBreakdown).toBeDefined();
+    expect(usage.taskBreakdown!.length).toBe(2);
+    expect(usage.taskBreakdown![0]!.taskId).toBe('task-001');
+    expect(usage.taskBreakdown![0]!.tokens).toBe(1500);
+    expect(usage.taskBreakdown![1]!.taskId).toBe('task-002');
+  });
+
+  // ─── JSONL append-only safety ───────────────────────────────────────────
+
+  it('recordCall creates JSONL file alongside JSON', () => {
+    tracker.recordCall('opus', 1000, 'task-001', 'sprint-001');
+    expect(existsSync(join(tmpRoot, '.deckent', 'usage', 'sprint-001.jsonl'))).toBe(true);
+    expect(existsSync(join(tmpRoot, '.deckent', 'usage', 'sprint-001.json'))).toBe(true);
+  });
+
+  it('recordCallAppendOnly creates JSONL without JSON', () => {
+    tracker.recordCallAppendOnly('opus', 1000, 'task-001', 'sprint-001');
+    expect(existsSync(join(tmpRoot, '.deckent', 'usage', 'sprint-001.jsonl'))).toBe(true);
+    expect(existsSync(join(tmpRoot, '.deckent', 'usage', 'sprint-001.json'))).toBe(false);
+  });
+
+  // ─── Numeric sort ──────────────────────────────────────────────────────
+
+  it('listSprints returns numeric sorted order', () => {
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-010');
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-002');
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-100');
+    const sprints = tracker.listSprints();
+    expect(sprints).toEqual(['sprint-002', 'sprint-010', 'sprint-100']);
+  });
+
+  // ─── Filtered sprints ──────────────────────────────────────────────────
+
+  it('listSprintsFiltered with --last returns last N sprints', () => {
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-001');
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-002');
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-003');
+    const filtered = tracker.listSprintsFiltered({ last: 2 });
+    expect(filtered).toEqual(['sprint-002', 'sprint-003']);
+  });
+
+  it('listSprintsFiltered with --since filters by date', () => {
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-001');
+    // The timestamp is auto-generated as now, so filtering with future date returns empty
+    const filtered = tracker.listSprintsFiltered({ since: '2099-01-01' });
+    expect(filtered).toEqual([]);
+  });
+
+  it('listSprintsFiltered with --since includes recent sprints', () => {
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-001');
+    const filtered = tracker.listSprintsFiltered({ since: '2020-01-01' });
+    expect(filtered).toEqual(['sprint-001']);
+  });
+
+  // ─── Archive ───────────────────────────────────────────────────────────
+
+  it('archiveOldSprints moves old files to archive directory', () => {
+    for (let i = 1; i <= 5; i++) {
+      tracker.recordCall('opus', 100, 'task-001', `sprint-${String(i).padStart(3, '0')}`);
+    }
+    const result = tracker.archiveOldSprints(3);
+    expect(result.archived).toEqual(['sprint-001', 'sprint-002']);
+    expect(result.kept).toEqual(['sprint-003', 'sprint-004', 'sprint-005']);
+    expect(existsSync(join(tmpRoot, '.deckent', 'usage', 'archive', 'sprint-001.json'))).toBe(true);
+  });
+
+  it('archiveOldSprints does nothing when under retention limit', () => {
+    tracker.recordCall('opus', 100, 'task-001', 'sprint-001');
+    const result = tracker.archiveOldSprints(5);
+    expect(result.archived).toEqual([]);
+    expect(result.kept).toEqual(['sprint-001']);
+  });
+
+  // ─── Sprint comparison ─────────────────────────────────────────────────
+
+  it('getSprintComparison returns trend data', () => {
+    tracker.recordCall('opus', 1000, 'task-001', 'sprint-001');
+    tracker.recordCall('opus', 2000, 'task-002', 'sprint-002');
+    const { sprints, trend } = tracker.getSprintComparison(5);
+    expect(sprints).toHaveLength(2);
+    expect(trend.tokensDelta).toBe(1000);
+    expect(trend.callsDelta).toBe(0);
+  });
+
+  it('getSprintComparison returns zero deltas for single sprint', () => {
+    tracker.recordCall('opus', 1000, 'task-001', 'sprint-001');
+    const { trend } = tracker.getSprintComparison(5);
+    expect(trend.tokensDelta).toBe(0);
+    expect(trend.callsDelta).toBe(0);
+  });
 });

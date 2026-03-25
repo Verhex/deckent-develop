@@ -10,6 +10,7 @@ import { ALL_MODELS } from '../core/types.js';
 import { BRAIN_PLAN_TIMEOUT_MS, BRAIN_PLAN_MAX_CONTEXT_LINES } from '../core/constants.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry, ProviderError } from '../core/provider.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 const MODEL_ENUM_VALUES = ALL_MODELS as unknown as [string, ...string[]];
@@ -40,65 +41,162 @@ const PlannerResultSchema = z.object({
   reasoning: z.string(),
 });
 
+// ─── Context Priority Section ─────────────────────────────────────
+
+interface PrioritySection {
+  text: string;
+  priority: number; // 1 = highest, larger = lower priority
+}
+
+/**
+ * Build context block from sections with priority-based truncation.
+ * When total lines exceed maxLines, lowest-priority sections are trimmed first.
+ * Priority order: DIRECTIVES(1) > MEMORY(2) > DEBT(3) > PATTERNS(4) > others(5+)
+ * @internal
+ */
+export function buildPriorityContextBlock(
+  sections: PrioritySection[],
+  maxLines: number,
+): string {
+  // Total lines without any truncation
+  const totalLines = sections.reduce((sum, s) => sum + (s.text ? s.text.split('\n').length + 1 : 0), 0);
+
+  if (totalLines <= maxLines) {
+    // No truncation needed — join all non-empty sections in order
+    return sections.filter(s => s.text).map(s => s.text).join('\n\n');
+  }
+
+  // Need to truncate: allocate lines proportionally, protecting higher priority sections
+  // Sort by priority (ascending = higher importance first)
+  const sorted = sections.map((s, i) => ({ ...s, origIndex: i })).sort((a, b) => a.priority - b.priority);
+
+  const included = new Set<number>();
+  let linesUsed = 0;
+
+  for (const section of sorted) {
+    if (!section.text) continue;
+    const sectionLines = section.text.split('\n').length + 1; // +1 for separator
+    if (linesUsed + sectionLines <= maxLines) {
+      included.add(section.origIndex);
+      linesUsed += sectionLines;
+    } else if (linesUsed < maxLines) {
+      // Partially include this section
+      included.add(section.origIndex);
+      break;
+    } else {
+      break; // no more room
+    }
+  }
+
+  // Reconstruct in original order, truncating partial sections
+  const resultParts: string[] = [];
+  let remainingLines = maxLines;
+
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i]!;
+    if (!section.text || !included.has(i)) continue;
+    const sectionLineArr = section.text.split('\n');
+    if (sectionLineArr.length <= remainingLines) {
+      resultParts.push(section.text);
+      remainingLines -= sectionLineArr.length + 1;
+    } else {
+      // Partial inclusion
+      resultParts.push(sectionLineArr.slice(0, remainingLines).join('\n'));
+      break;
+    }
+  }
+
+  return resultParts.join('\n\n');
+}
+
 // ─── buildPlanPrompt ──────────────────────────────────────────────
 
 /**
  * @internal Used only within orchestra/ — builds the AI planner prompt.
  * Not part of the public API surface.
+ * @param language - Prompt language: 'tr' (default) or 'en'
  */
 export function buildPlanPrompt(
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
   projectName: string,
   zeroConfigDescription?: string,
+  language: string = 'tr',
 ): string {
-  const sections: string[] = [];
-
-  sections.push(`Project: ${projectName}`);
-
-  if (zeroConfigDescription) {
-    sections.push(
-      `ZERO-CONFIG MODE:\nKullanıcı tek satır doğal dil ile sprint başlattı: "${zeroConfigDescription}"\n` +
-      `Bu açıklamayı 3-5 bağımsız göreve böl. Her görev kendi başına tamamlanabilmeli.\n` +
-      `Örnek: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`,
-    );
-  }
-
-  if (context.directives) {
-    sections.push(`DIRECTIVES:\n${context.directives}`);
-  }
-  if (context.memory) {
-    sections.push(`MEMORY:\n${context.memory}`);
-  }
-  if (context.retro) {
-    sections.push(`RETRO:\n${context.retro}`);
-  }
+  const isEn = language === 'en';
 
   const criticalDebt = context.debt.filter(d => d.priority === 'CRITICAL' && !d.resolved);
-  if (criticalDebt.length > 0) {
-    sections.push(`CRITICAL DEBT:\n${criticalDebt.map(d => `- ${d.id}: ${d.description}`).join('\n')}`);
-  }
-
-  if (context.patterns) {
-    sections.push(`PATTERNS:\n${context.patterns}`);
-  }
-  if (context.decisions) {
-    sections.push(`DECISIONS:\n${context.decisions}`);
-  }
-  if (context.projectIdentity) {
-    sections.push(`PROJECT IDENTITY:\n${context.projectIdentity}`);
-  }
+  const critDebtText = criticalDebt.length > 0
+    ? `CRITICAL DEBT:\n${criticalDebt.map(d => `- ${d.id}: ${d.description}`).join('\n')}`
+    : '';
 
   const fileTree = context.projectState.fileTree.slice(0, 100);
-  if (fileTree.length > 0) {
-    sections.push(`FILE TREE (first ${fileTree.length}):\n${fileTree.join('\n')}`);
+  const fileTreeText = fileTree.length > 0
+    ? `FILE TREE (first ${fileTree.length}):\n${fileTree.join('\n')}`
+    : '';
+
+  let zeroConfigText = '';
+  if (zeroConfigDescription) {
+    zeroConfigText = isEn
+      ? `ZERO-CONFIG MODE:\nUser started sprint with: "${zeroConfigDescription}"\nSplit into 3-5 independent tasks. Each must be completable on its own.\nExample: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`
+      : `ZERO-CONFIG MODE:\nKullanıcı tek satır doğal dil ile sprint başlattı: "${zeroConfigDescription}"\nBu açıklamayı 3-5 bağımsız göreve böl. Her görev kendi başına tamamlanabilmeli.\nÖrnek: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`;
   }
 
-  // Truncate total context
-  let contextBlock = sections.join('\n\n');
-  const contextLines = contextBlock.split('\n');
-  if (contextLines.length > BRAIN_PLAN_MAX_CONTEXT_LINES) {
-    contextBlock = contextLines.slice(0, BRAIN_PLAN_MAX_CONTEXT_LINES).join('\n');
+  // Sections with priority: DIRECTIVES(1) > MEMORY(2) > DEBT(3) > PATTERNS(4) > others(5+)
+  const prioritySections: PrioritySection[] = [
+    { text: zeroConfigText, priority: 0 },
+    { text: context.directives ? `DIRECTIVES:\n${context.directives}` : '', priority: 1 },
+    { text: context.memory ? `MEMORY:\n${context.memory}` : '', priority: 2 },
+    { text: critDebtText, priority: 3 },
+    { text: context.patterns ? `PATTERNS:\n${context.patterns}` : '', priority: 4 },
+    { text: context.retro ? `RETRO:\n${context.retro}` : '', priority: 5 },
+    { text: context.decisions ? `DECISIONS:\n${context.decisions}` : '', priority: 6 },
+    { text: context.projectIdentity ? `PROJECT IDENTITY:\n${context.projectIdentity}` : '', priority: 7 },
+    { text: fileTreeText, priority: 8 },
+  ];
+
+  const contextBlock = buildPriorityContextBlock(
+    [{ text: `Project: ${projectName}`, priority: 0 }, ...prioritySections],
+    BRAIN_PLAN_MAX_CONTEXT_LINES,
+  );
+
+  if (isEn) {
+    return `You are a software project orchestrator. Analyze the given directives and create a structured task plan.
+
+RULES:
+- Plan ALL tasks from the directives as task JSON — do not limit the task count
+- max_workers (${recommendation.maxWorkers}) is only the concurrent execution limit, not the task count cap
+- Each task must be independently executable (parallel execution)
+- Specify dependencies in the dependencies array if any exist
+- Define scope (directories + filesWrite) for each task
+- Write GO/NO-GO criteria for each task
+
+MODEL SELECTION CRITERIA (CHOOSE THE RIGHT MODEL FOR EACH TASK):
+- **opus**: Complex architecture changes, tasks touching multiple modules, new patterns/abstractions, cross-cutting concerns, large features requiring test + implementation together
+- **sonnet**: Standard CRUD operations, single file/module changes, adding new files following existing patterns, template/config updates, documentation, simple API endpoints, UI components (following existing patterns)
+- **haiku**: Trivial tasks only — rename, typo fix, file copy, .gitignore line addition, placeholder file creation, single-line config change
+- Explain the model selection in the "reason" field (why this model, how complex)
+
+CONTEXT:
+${contextBlock}
+
+OUTPUT FORMAT (JSON ONLY, nothing else):
+{
+  "tasks": [
+    {
+      "title": "...",
+      "description": "...",
+      "model": "sonnet|opus|haiku",
+      "effort": "low|normal|high",
+      "priority": "CRITICAL|HIGH|NORMAL|LOW",
+      "reason": "Why this model/effort",
+      "scope": { "directories": [...], "filesRead": [...], "filesWrite": [...] },
+      "dependencies": [],
+      "goNogo": { "goCriteria": "...", "noGoCriteria": "...", "techDebtAcceptable": "..." }
+    }
+  ],
+  "reasoning": "Plan rationale"
+}`;
   }
 
   return `Sen bir yazılım proje orkestratörüsün. Verilen directive'leri analiz et ve yapılandırılmış görev planı oluştur.
@@ -156,9 +254,13 @@ export function parsePlannerResponse(raw: string): PlannerResult | null {
 
     const parsed = JSON.parse(cleaned) as unknown;
     const result = PlannerResultSchema.safeParse(parsed);
-    if (!result.success) return null;
+    if (!result.success) {
+      debugLog('parsePlannerResponse:validation', result.error);
+      return null;
+    }
     return result.data as PlannerResult;
-  } catch {
+  } catch (e) {
+    debugLog('parsePlannerResponse:parse', e);
     return null;
   }
 }
@@ -247,10 +349,59 @@ export function buildZeroConfigPlanPrompt(
   description: string,
   projectName: string,
   fileTree: string[] = [],
+  language: string = 'tr',
 ): string {
   const treeSection = fileTree.length > 0
     ? `\nFILE TREE (first ${Math.min(fileTree.length, 50)}):\n${fileTree.slice(0, 50).join('\n')}`
     : '';
+
+  const isEn = language === 'en';
+
+  if (isEn) {
+    return `You are a software project orchestrator. A user requested a feature in natural language.
+Split this request into ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} independent, parallel-executable tasks.
+
+PROJECT: ${projectName}
+USER REQUEST: "${description}"${treeSection}
+
+TASK SPLITTING RULES:
+- Each task must be independently executable (parallel execution possible)
+- Specify dependencies if any (e.g., UI depends on backend API)
+- Create exactly ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} tasks (no more, no less)
+- Define scope (directories + filesWrite) for each task
+- Write GO/NO-GO criteria for each task
+- The last task MUST be an integration/test task
+
+EXAMPLE SPLIT:
+"Add login page with Google OAuth" →
+1. Auth API endpoints (backend, POST /auth/login, /auth/google-callback)
+2. Google OAuth integration (oauth2 client setup, token exchange)
+3. Login page UI (React component, form, redirect logic)
+4. Integration tests (E2E auth flow, token validation tests)
+
+MODEL SELECTION:
+- **opus**: Complex architecture, multiple modules, new patterns/abstractions
+- **sonnet**: Standard implementation, single module, follows existing patterns
+- **haiku**: Trivial tasks only — rename, typo fix, placeholder creation
+
+OUTPUT FORMAT (JSON ONLY, nothing else):
+{
+  "tasks": [
+    {
+      "title": "...",
+      "description": "...",
+      "model": "sonnet|opus|haiku",
+      "effort": "low|normal|high",
+      "priority": "CRITICAL|HIGH|NORMAL|LOW",
+      "reason": "Why this model/effort",
+      "scope": { "directories": [...], "filesRead": [...], "filesWrite": [...] },
+      "dependencies": [],
+      "goNogo": { "goCriteria": "...", "noGoCriteria": "...", "techDebtAcceptable": "..." }
+    }
+  ],
+  "reasoning": "Why you split it this way"
+}`;
+  }
 
   return `Sen bir yazılım proje orkestratörüsün. Kullanıcı tek satır doğal dil ile bir özellik talep etti.
 Bu talebi ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} bağımsız, paralel çalışabilir göreve böl.

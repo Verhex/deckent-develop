@@ -11,6 +11,9 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
+  accessSync: vi.fn(),
+  constants: { W_OK: 2, R_OK: 4, F_OK: 0 },
+  unlinkSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -28,6 +31,9 @@ vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn().mockResolvedValue({ language: 'en' }),
   validatePartialConfig: vi.fn(),
   readAuthMode: vi.fn().mockResolvedValue('subscription'),
+  deepMerge: vi.fn().mockImplementation((base: Record<string, unknown>, override: Record<string, unknown>) => {
+    return { ...base, ...override };
+  }),
   ConfigValidationError: class ConfigValidationError extends Error {
     errors: string[];
     constructor(errors: string[]) {
@@ -48,11 +54,14 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
   checkUsage: vi.fn(),
+  checkUsageWithProvider: vi.fn(),
+  getDefaultProvider: vi.fn().mockReturnValue(null),
   adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   cleanup: vi.fn(),
   runDecay: vi.fn(),
   confirmDraftTasks: vi.fn(),
+  cleanupDraftTasks: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
     constructor(msg: string, phase?: string) {
@@ -543,8 +552,8 @@ describe('history command', () => {
     const out = stdout();
     expect(out).toContain('Sprint');
     expect(out).toContain('Tasks');
-    expect(out).toContain('Completed');
-    expect(out).toContain('No-Go Rate');
+    expect(out).toContain('Done');
+    expect(out).toContain('No-Go%');
     expect(out).toContain('Coverage');
     expect(out).toContain('Duration');
     expect(out).toContain('sprint-001');
@@ -1039,13 +1048,13 @@ describe('start command', () => {
     expect(stdout()).toContain('Dry-run complete');
   });
 
-  it('--watch without active tmux session skips watch setup', async () => {
+  it('--watch without active tmux session falls back to subprocess watching', async () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig());
     vi.mocked(runSprint).mockResolvedValue(makeSprint());
     vi.mocked(isSessionActive).mockReturnValue(false);
     await runCommand(registerStart, ['start', '--watch', '--force']);
     expect(setupWatchWindow).not.toHaveBeenCalled();
-    expect(stdout()).toContain('--watch requires an active tmux session');
+    expect(stdout()).toContain('No tmux session');
     expect(runSprint).toHaveBeenCalled();
   });
 });

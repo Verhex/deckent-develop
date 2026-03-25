@@ -1,0 +1,116 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "057-001",
+    "timestamp": "2026-03-25T12:55:13.827Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "057-002",
+    "timestamp": "2026-03-25T12:55:13.848Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "057-003",
+    "timestamp": "2026-03-25T12:55:13.877Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "057-004",
+    "timestamp": "2026-03-25T12:55:13.916Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "057-001",
+    "timestamp": "2026-03-25T13:25:18.756Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "057-002",
+    "timestamp": "2026-03-25T13:25:18.758Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "057-003",
+    "timestamp": "2026-03-25T13:25:18.758Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "057-004",
+    "timestamp": "2026-03-25T13:25:18.759Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "057-005",
+    "timestamp": "2026-03-25T13:25:18.760Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "057-006",
+    "timestamp": "2026-03-25T13:25:18.760Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "057-007",
+    "timestamp": "2026-03-25T13:25:18.760Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "057-008",
+    "timestamp": "2026-03-25T13:25:18.761Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "057-009",
+    "timestamp": "2026-03-25T13:25:18.761Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "057-010",
+    "timestamp": "2026-03-25T13:25:18.762Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "057-011",
+    "timestamp": "2026-03-25T13:25:18.763Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 1000,
+    "taskId": "057-012",
+    "timestamp": "2026-03-25T13:25:18.763Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 1000,
+    "taskId": "057-013",
+    "timestamp": "2026-03-25T13:25:18.764Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "057-012-fix",
+    "timestamp": "2026-03-25T13:25:18.790Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "057-013-fix",
+    "timestamp": "2026-03-25T13:25:18.810Z"
+  }
+]

@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
+import { ALL_MODELS } from '../../core/types.js';
+import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -16,9 +19,15 @@ export interface AgentConfig {
   description: string;
   uses: number;
   successRate: number;
+  systemPrompt?: string;
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Constants ──────────────────────────────────────────────────────
+
+const VALID_MODELS = ALL_MODELS as readonly string[];
+const VALID_TRIGGER_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9\-_.*]+$/;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -30,6 +39,22 @@ function getAgentsDir(root: string): string {
 
 function isValidAgentName(name: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(name) && name.length <= 64;
+}
+
+/**
+ * Validate trigger keywords — must be non-empty alphanumeric strings
+ * with optional hyphens, underscores, dots, and wildcards.
+ */
+export function validateTriggers(triggers: string[]): string[] {
+  const errors: string[] = [];
+  for (const trigger of triggers) {
+    if (!trigger || trigger.trim().length === 0) {
+      errors.push(`Empty trigger keyword`);
+    } else if (!VALID_TRIGGER_PATTERN.test(trigger.trim())) {
+      errors.push(`Invalid trigger "${trigger}": use alphanumeric chars, hyphens, underscores, dots, or wildcards`);
+    }
+  }
+  return errors;
 }
 
 export function loadAgentConfig(agentDir: string): AgentConfig {
@@ -72,12 +97,12 @@ export function saveAgentConfig(root: string, agent: AgentConfig): void {
   );
 }
 
-function createDefaultAgent(name: string): AgentConfig {
+function createDefaultAgent(name: string, model = 'sonnet'): AgentConfig {
   return {
     name,
     type: 'custom',
     enabled: true,
-    model: 'sonnet',
+    model,
     triggers: [],
     description: `Custom agent: ${name}`,
     uses: 0,
@@ -85,6 +110,15 @@ function createDefaultAgent(name: string): AgentConfig {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Load systemPrompt from PROMPT.md if present.
+ */
+function loadSystemPromptFromFile(agentDir: string): string | undefined {
+  const promptPath = join(agentDir, 'PROMPT.md');
+  if (!existsSync(promptPath)) return undefined;
+  return readFileSync(promptPath, 'utf-8');
 }
 
 const PROMPT_TEMPLATE = `# Agent: {name}
@@ -100,6 +134,62 @@ Describe what this agent specializes in.
 ## Triggers
 Keywords or patterns that should route tasks to this agent.
 `;
+
+// ─── Sprint Stats Helpers ────────────────────────────────────────────
+
+interface AgentSprintStat {
+  sprint: string;
+  tasks: number;
+  success: number;
+  successRate: number;
+}
+
+function loadAgentSprintStats(root: string, agentName: string): AgentSprintStat[] {
+  const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
+  if (!existsSync(sprintsDir)) return [];
+
+  const files = readdirSync(sprintsDir).filter(f => f.endsWith('.md'));
+  // Numeric sort
+  files.sort((a, b) => {
+    const na = parseInt(a.replace(/\D/g, ''), 10) || 0;
+    const nb = parseInt(b.replace(/\D/g, ''), 10) || 0;
+    return na - nb;
+  });
+
+  const stats: AgentSprintStat[] = [];
+  for (const file of files) {
+    const content = readFileSync(join(sprintsDir, file), 'utf-8');
+    // Look for agent mentions in sprint log
+    const agentMentionRegex = new RegExp(agentName, 'gi');
+    const mentions = (content.match(agentMentionRegex) ?? []).length;
+    if (mentions === 0) continue;
+
+    // Try to find task counts associated with this agent
+    const taskLineRegex = /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*(GO|NO_GO|GO_WITH_TECH_DEBT)\s*\|/g;
+    let tasks = 0;
+    let success = 0;
+    let match: RegExpExecArray | null;
+    while ((match = taskLineRegex.exec(content)) !== null) {
+      tasks++;
+      if (match[3] !== 'NO_GO') success++;
+    }
+
+    if (tasks === 0) {
+      // Fallback: count agent name mentions as a proxy
+      tasks = mentions;
+      success = mentions;
+    }
+
+    const sprintName = file.replace('.md', '');
+    stats.push({
+      sprint: sprintName,
+      tasks,
+      success,
+      successRate: tasks > 0 ? Math.round((success / tasks) * 100) : 0,
+    });
+  }
+  return stats;
+}
 
 // ─── Registration ───────────────────────────────────────────────────
 
@@ -146,7 +236,8 @@ export function registerAgent(program: Command): void {
   agentCmd
     .command('create <name>')
     .description('Create a custom agent')
-    .action(async (name: string) => {
+    .option('--model <model>', `Model to use (${VALID_MODELS.join('|')})`, 'sonnet')
+    .action(async (name: string, opts: { model?: string }) => {
       try {
         const root = resolveProjectRoot();
 
@@ -156,25 +247,72 @@ export function registerAgent(program: Command): void {
           });
         }
 
+        const model = opts.model ?? 'sonnet';
+        if (!VALID_MODELS.includes(model)) {
+          throw new Error(`Invalid model "${model}". Valid options: ${VALID_MODELS.join(', ')}`);
+        }
+
         const agentDir = join(getAgentsDir(root), name);
         if (existsSync(join(agentDir, 'agent.json'))) {
           throw ErrorRegistry.createError('DECKENT_E033', { message: `Agent "${name}" already exists.` });
         }
 
-        const agent = createDefaultAgent(name);
+        const promptContent = PROMPT_TEMPLATE.replace('{name}', name);
+        const agent = createDefaultAgent(name, model);
+        // Auto-fill systemPrompt from PROMPT.md template
+        agent.systemPrompt = promptContent;
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(
           join(agentDir, 'agent.json'),
           JSON.stringify(agent, null, 2) + '\n',
         );
-        writeFileSync(
-          join(agentDir, 'PROMPT.md'),
-          PROMPT_TEMPLATE.replace('{name}', name),
-        );
+        writeFileSync(join(agentDir, 'PROMPT.md'), promptContent);
 
         print(`Agent "${name}" created at ${agentDir}`);
         print('  - agent.json');
         print('  - PROMPT.md');
+        print(`  Model: ${model}`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── agent stats ────────────────────────────────────────────────
+  agentCmd
+    .command('stats <name>')
+    .description('Show sprint-by-sprint performance for an agent')
+    .option('--json', 'Output as JSON')
+    .action(async (name: string, opts: { json?: boolean }) => {
+      try {
+        const root = resolveProjectRoot();
+        const agentDir = join(getAgentsDir(root), name);
+
+        if (!existsSync(join(agentDir, 'agent.json'))) {
+          throw ErrorRegistry.createError('DECKENT_E031', { message: `Agent "${name}" not found.` });
+        }
+
+        const agent = loadAgentConfig(agentDir);
+        const sprintStats = loadAgentSprintStats(root, name);
+
+        if (opts.json) {
+          print(JSON.stringify({ agent: { name, uses: agent.uses, successRate: agent.successRate }, sprints: sprintStats }, null, 2));
+          return;
+        }
+
+        print(`Agent: ${name}`);
+        print(`  Total uses: ${agent.uses}`);
+        print(`  Overall success rate: ${Math.round(agent.successRate)}%`);
+        print('');
+
+        if (sprintStats.length === 0) {
+          print('No sprint history found for this agent.');
+          return;
+        }
+
+        const headers = ['Sprint', 'Tasks', 'Success', 'Rate'];
+        const rows = sprintStats.map(s => [s.sprint, String(s.tasks), String(s.success), `${s.successRate}%`]);
+        print(formatTable(headers, rows));
       } catch (error) {
         printError(error);
         process.exitCode = 1;
@@ -248,7 +386,8 @@ export function registerAgent(program: Command): void {
     .option('--description <desc>', 'Update description')
     .option('--enable', 'Enable the agent')
     .option('--disable', 'Disable the agent')
-    .action(async (name: string, opts: { model?: string; description?: string; enable?: boolean; disable?: boolean }) => {
+    .option('--sync-prompt', 'Re-sync systemPrompt from PROMPT.md')
+    .action(async (name: string, opts: { model?: string; description?: string; enable?: boolean; disable?: boolean; syncPrompt?: boolean }) => {
       try {
         const root = resolveProjectRoot();
         const agentDir = join(getAgentsDir(root), name);
@@ -256,6 +395,9 @@ export function registerAgent(program: Command): void {
 
         const updates: string[] = [];
         if (opts.model) {
+          if (!VALID_MODELS.includes(opts.model)) {
+            throw new Error(`Invalid model "${opts.model}". Valid options: ${VALID_MODELS.join(', ')}`);
+          }
           agent.model = opts.model;
           updates.push(`model=${opts.model}`);
         }
@@ -270,6 +412,15 @@ export function registerAgent(program: Command): void {
         if (opts.disable) {
           agent.enabled = false;
           updates.push('enabled=false');
+        }
+        if (opts.syncPrompt) {
+          const prompt = loadSystemPromptFromFile(agentDir);
+          if (prompt) {
+            agent.systemPrompt = prompt;
+            updates.push('systemPrompt=<synced from PROMPT.md>');
+          } else {
+            print(`No PROMPT.md found for agent "${name}".`);
+          }
         }
 
         if (updates.length === 0) {
@@ -322,3 +473,6 @@ export function registerAgent(program: Command): void {
       }
     });
 }
+
+// ─── Exported helpers (for testing) ────────────────────────────────
+export { createHash };

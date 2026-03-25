@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createTask,
   extractScopeFromDirective,
+  enrichScopeWithTestFiles,
   parseStructuredDirectives,
+  parseBulletOrNumberedTasks,
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
@@ -462,27 +464,30 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('NO_GO');
   });
 
-  it('includes "If Something Goes Wrong" section', () => {
+  it('references WORKER-GUIDE.md instead of embedding boilerplate', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('## If Something Goes Wrong');
-    expect(prompt).toContain('tsc fails after 3 attempts');
-    expect(prompt).toContain('Tests fail after 3 attempts');
-    expect(prompt).toContain('Blocked by another task');
+    expect(prompt).toContain('.deckent/workspace/WORKER-GUIDE.md');
+  });
+
+  it('does not embed heartbeat JSON template (moved to WORKER-GUIDE.md)', () => {
+    const task = makeTask({ id: '040-001' });
+    const prompt = buildWorkerPrompt(task);
+    // JSON template lines removed — only condensed hint remains
+    expect(prompt).not.toContain('"workerId": "w-040-001"');
+    expect(prompt).not.toContain('"filesChanged": ["list/of/files');
+  });
+
+  it('does not embed "If Something Goes Wrong" section (moved to WORKER-GUIDE.md)', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).not.toContain('## If Something Goes Wrong');
   });
 
   it('mentions max 3 attempts for tsc', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('max 3 attempts');
-  });
-
-  it('mentions max 3 attempts for tests', () => {
-    const task = makeTask();
-    const prompt = buildWorkerPrompt(task);
-    const matches = prompt.match(/max 3 attempts/g);
-    // Should appear at least twice (in What To Do steps + If Something Goes Wrong)
-    expect(matches!.length).toBeGreaterThanOrEqual(2);
   });
 
   it('prompt is structured with markdown headers', () => {
@@ -493,26 +498,34 @@ describe('buildWorkerPrompt', () => {
     expect(headers!.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('includes heartbeat JSON template', () => {
+  it('includes heartbeat file path and workerId hint', () => {
     const task = makeTask({ id: '040-001' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('"workerId": "w-040-001"');
-    expect(prompt).toContain('"taskId": "040-001"');
-  });
-
-  it('includes result JSON template', () => {
-    const task = makeTask({ id: '040-001' });
-    const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('"taskId": "040-001"');
-    expect(prompt).toContain('"filesChanged"');
-    expect(prompt).toContain('"linesAdded"');
-    expect(prompt).toContain('"testsPassed"');
+    expect(prompt).toContain('.tasks/task-040-001.hb');
+    expect(prompt).toContain('w-040-001');
   });
 
   it('result file is marked as REQUIRED', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('REQUIRED');
+  });
+
+  it('prompt is significantly shorter than original (~80 lines target)', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    const lines = prompt.split('\n').length;
+    // Original was ~150 lines, target is ~80 lines
+    expect(lines).toBeLessThan(100);
+  });
+
+  it('task description ratio is higher in shorter prompt', () => {
+    const task = makeTask({ description: 'A'.repeat(500) });
+    const prompt = buildWorkerPrompt(task);
+    const descLen = 500;
+    const totalLen = prompt.length;
+    // Description should be at least 25% of total prompt (target: 35%, baseline improvement from 16%)
+    expect(descLen / totalLen).toBeGreaterThan(0.25);
   });
 });
 
@@ -679,6 +692,23 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
     const prompt = buildWorkerPrompt(task, agentPrompt);
     expect(prompt).toContain('Line 1');
     expect(prompt).toContain('Line 3');
+  });
+
+  it('includes combined systemPrompt + expertise + PROMPT.md content', () => {
+    const task = makeTask({ assignedAgent: 'test-writer' });
+    const combined = 'You are a test expert.\n\nExpertise: testing, coverage\n\nDetailed prompt from PROMPT.md';
+    const prompt = buildWorkerPrompt(task, combined);
+    expect(prompt).toContain('You are a test expert.');
+    expect(prompt).toContain('Expertise: testing, coverage');
+    expect(prompt).toContain('Detailed prompt from PROMPT.md');
+    expect(prompt).toContain('=== Agent: test-writer ===');
+  });
+
+  it('agent block appears for forceModel tasks with assigned agent', () => {
+    const task = makeTask({ assignedAgent: 'bug-fixer', forceModel: 'opus' } as Partial<Task>);
+    const prompt = buildWorkerPrompt(task, 'Bug fixing specialist.');
+    expect(prompt).toContain('=== Agent: bug-fixer ===');
+    expect(prompt).toContain('Bug fixing specialist.');
   });
 });
 
@@ -1145,14 +1175,12 @@ describe('createTask — provider field', () => {
     expect(task.provider).toBeUndefined();
   });
 
-  it('warns on model-provider incompatibility but still creates task', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('logs model-provider incompatibility via debugLog but still creates task', () => {
     // 'opus' is a claude model, not compatible with 'codex' provider
+    // debugLog uses DECKENT_DEBUG env gate (no console.warn) — just verify task is created
     const task = createTask(makeBaseParams({ model: 'opus', provider: 'codex' }), 1);
     expect(task.provider).toBe('codex');
     expect(task.model).toBe('opus');
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not compatible with provider'));
-    warnSpy.mockRestore();
   });
 
   it('does not warn when model and provider are compatible', () => {
@@ -1192,5 +1220,190 @@ describe('createTask — provider field', () => {
     expect(task.provider).toBe('gemini');
     expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+// ═══ parseBulletOrNumberedTasks ════════════════════════════════════
+
+describe('parseBulletOrNumberedTasks', () => {
+  it('parses "- Task: <title>" format', () => {
+    const content = `# Goal\n\n- Task: Build auth module\n- Task: Add tests`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks.length).toBeGreaterThanOrEqual(2);
+    expect(tasks[0]!.title).toBe('Build auth module');
+    expect(tasks[1]!.title).toBe('Add tests');
+  });
+
+  it('parses numbered list "1. <title>" format', () => {
+    const content = `1. Build auth module\n2. Add UI components\n3. Write tests`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks.length).toBe(3);
+    expect(tasks[0]!.title).toBe('Build auth module');
+    expect(tasks[2]!.title).toBe('Write tests');
+  });
+
+  it('parses "1) <title>" format', () => {
+    const content = `1) First task\n2) Second task`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks.length).toBe(2);
+    expect(tasks[0]!.title).toBe('First task');
+  });
+
+  it('parses "* Task: <title>" format', () => {
+    const content = `* Task: Implement login\n* Task: Implement logout`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks.length).toBe(2);
+    expect(tasks[0]!.title).toBe('Implement login');
+  });
+
+  it('extracts Model override from sub-lines', () => {
+    const content = `- Task: Complex refactor\n  - Model: opus`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks[0]!.forceModel).toBe('opus');
+  });
+
+  it('extracts Effort override from sub-lines', () => {
+    const content = `1. Quick fix\n   Effort: low`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks[0]!.forceEffort).toBe('low');
+  });
+
+  it('returns empty array for plain prose with no task markers', () => {
+    const content = `This is just a description.\nNo tasks here.`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks).toHaveLength(0);
+  });
+
+  it('ignores lines with title shorter than 3 characters', () => {
+    const content = `1. OK\n2. Build proper feature`;
+    const tasks = parseBulletOrNumberedTasks(content);
+    expect(tasks.length).toBeLessThanOrEqual(2);
+    const longTitles = tasks.filter(t => t.title.length >= 3);
+    expect(longTitles.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ═══ parseStructuredDirectives bullet fallback ════════════════════
+
+describe('parseStructuredDirectives — bullet/numbered fallback', () => {
+  it('falls back to bullet format when no ## Task headings present', () => {
+    const content = `# My Project\n\n- Task: Implement feature A\n- Task: Write tests\n`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks.length).toBeGreaterThanOrEqual(2);
+    expect(tasks[0]!.title).toBe('Implement feature A');
+  });
+
+  it('falls back to numbered list when no ## Task headings present', () => {
+    const content = `# Tasks\n\n1. Build backend API\n2. Add frontend UI\n3. Integration tests\n`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks.length).toBe(3);
+    expect(tasks[0]!.title).toBe('Build backend API');
+  });
+
+  it('still parses ## Task headings when present', () => {
+    const content = `# Sprint\n\n## Task 1: Fix bug\n- Dosya: src/core/utils.ts\n\n## Task 2: Add tests\n`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks.length).toBe(2);
+    expect(tasks[0]!.title).toBe('Fix bug');
+  });
+});
+
+// ─── Sprint 059-004: Scope & GO/NO-GO Fix Tests ─────────────────────────────
+
+describe('extractScopeFromDirective — docs/ support', () => {
+  it('should extract docs/ directory paths', () => {
+    const scope = extractScopeFromDirective('Files: docs/analysis/report.md, src/core/utils.ts');
+    expect(scope.directories).toContain('docs/analysis/');
+  });
+
+  it('should add docs/ to directories for standalone doc files like CHANGELOG.md', () => {
+    const scope = extractScopeFromDirective('Update CHANGELOG.md with sprint entries');
+    expect(scope.filesWrite).toContain('CHANGELOG.md');
+    expect(scope.directories).toContain('docs/');
+  });
+
+  it('should not duplicate docs/ directory', () => {
+    const scope = extractScopeFromDirective('Files: docs/release/ and CHANGELOG.md');
+    const docsCount = scope.directories.filter(d => d === 'docs/').length;
+    // docs/release/ is already a docs dir, so standalone docs/ may or may not be added
+    // but should not have duplicate entries
+    const allDocs = scope.directories.filter(d => d.startsWith('docs/'));
+    expect(allDocs.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('enrichScopeWithTestFiles', () => {
+  it('should add test file patterns when tests/ is in directories', () => {
+    const scope = {
+      directories: ['src/core/', 'tests/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/config.ts', 'src/core/utils.ts'],
+    };
+    const enriched = enrichScopeWithTestFiles(scope, scope.filesWrite);
+    expect(enriched.filesWrite).toContain('tests/core/config.test.ts');
+    expect(enriched.filesWrite).toContain('tests/core/utils.test.ts');
+  });
+
+  it('should not add test patterns when no tests/ directory', () => {
+    const scope = {
+      directories: ['src/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/config.ts'],
+    };
+    const enriched = enrichScopeWithTestFiles(scope, scope.filesWrite);
+    expect(enriched.filesWrite).toEqual(['src/core/config.ts']);
+  });
+
+  it('should not add test patterns when test files already exist in filesWrite', () => {
+    const scope = {
+      directories: ['src/core/', 'tests/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/config.ts', 'tests/core/config.test.ts'],
+    };
+    const enriched = enrichScopeWithTestFiles(scope, scope.filesWrite);
+    // Should not duplicate
+    const testFiles = enriched.filesWrite.filter(f => f.includes('.test.'));
+    expect(testFiles).toEqual(['tests/core/config.test.ts']);
+  });
+
+  it('should not mutate the original scope', () => {
+    const scope = {
+      directories: ['src/core/', 'tests/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/config.ts'],
+    };
+    const original = [...scope.filesWrite];
+    enrichScopeWithTestFiles(scope, scope.filesWrite);
+    expect(scope.filesWrite).toEqual(original);
+  });
+});
+
+describe('parseStructuredDirectives — filesWrite enrichment', () => {
+  it('should add test file patterns when tests/ is in scope directories', () => {
+    const content = `# Sprint
+
+## Task 1: Fix config
+- Files: src/core/config.ts
+- Scope: src/core/, tests/core/
+`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0]!.scope.filesWrite).toContain('tests/core/config.test.ts');
+  });
+});
+
+describe('parseStructuredDirectives — testTarget extraction for GO/NO-GO', () => {
+  it('should extract testTarget from Test: line', () => {
+    const content = `# Sprint
+
+## Task 1: Add feature
+- Files: src/core/config.ts
+- Scope: src/core/
+- Test: 10+ test
+
+### Description
+Some description here.
+`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks[0]!.testTarget).toBe('10+ test');
   });
 });

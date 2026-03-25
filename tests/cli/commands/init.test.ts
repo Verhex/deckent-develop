@@ -47,6 +47,22 @@ vi.mock('../../../src/core/utils.js', () => ({
   ensureDeckentImport: vi.fn(),
 }));
 
+vi.mock('../../../src/core/config.js', () => ({
+  deepMerge: vi.fn().mockImplementation((base: Record<string, unknown>, override: Record<string, unknown>) => {
+    const result = { ...base };
+    for (const key of Object.keys(override)) {
+      const baseVal = result[key];
+      const overrideVal = override[key];
+      if (baseVal && typeof baseVal === 'object' && !Array.isArray(baseVal) && overrideVal && typeof overrideVal === 'object' && !Array.isArray(overrideVal)) {
+        result[key] = { ...baseVal as Record<string, unknown>, ...overrideVal as Record<string, unknown> };
+      } else {
+        result[key] = overrideVal;
+      }
+    }
+    return result;
+  }),
+}));
+
 vi.mock('../../../src/cli/helpers/splash.js', () => ({
   showSplash: vi.fn().mockReturnValue('KRAKEN SPLASH'),
 }));
@@ -57,8 +73,13 @@ vi.mock('../../../src/core/environment.js', () => ({
 
 vi.mock('../../../src/core/deck-file.js', () => ({
   createDeckTemplate: vi.fn(),
+  ensureDeckGitignore: vi.fn(),
 }));
 
+
+vi.mock('../../../src/core/config.js', () => ({
+  deepMerge: vi.fn().mockImplementation((a: Record<string, unknown>, b: Record<string, unknown>) => ({ ...a, ...b })),
+}));
 vi.mock('../../../src/cli/commands/doctor.js', () => ({
   runDoctorChecks: vi.fn().mockReturnValue({ ok: true, checks: [] }),
 }));
@@ -131,7 +152,8 @@ import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
 import { detectAvailableProviders } from '../../../src/core/provider.js';
 import { showSplash } from '../../../src/cli/helpers/splash.js';
 import { detectEnvironment } from '../../../src/core/environment.js';
-import { createDeckTemplate } from '../../../src/core/deck-file.js';
+import { createDeckTemplate, ensureDeckGitignore } from '../../../src/core/deck-file.js';
+import { deepMerge } from '../../../src/core/config.js';
 import { generateCodexConfig } from '../../../src/cli/helpers/codex-config.js';
 import { generateGeminiConfig } from '../../../src/cli/helpers/gemini-config.js';
 import { generateCursorConfig } from '../../../src/cli/helpers/cursor-config.js';
@@ -164,7 +186,7 @@ const _providerMocks = { detectAvailableProviders, detectIDEEnvironment, getMCPG
 void _providerMocks;
 const _envMocks = { generateCodexConfig, generateGeminiConfig, generateCursorConfig, generateAgentsMd, generateGeminiMd, generateCursorRules, detectFullStack };
 void _envMocks;
-const _doctorMocks = { runDoctorChecks };
+const _doctorMocks = { runDoctorChecks, ensureDeckGitignore, deepMerge };
 void _doctorMocks;
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -1498,7 +1520,8 @@ describe('human-friendly init output', () => {
 
     it('gracefully handles detectFullStack failure', async () => {
       vi.mocked(existsSync).mockReturnValue(false);
-      vi.mocked(detectFullStack).mockImplementationOnce(() => { throw new Error('stack detection fail'); });
+      // Use mockImplementation (not Once) since detectFullStack is now called multiple times
+      vi.mocked(detectFullStack).mockImplementation(() => { throw new Error('stack detection fail'); });
       await runCommand(['init', '--auto', '--env', 'codex']);
       // Should still complete with fallback info
       expect(generateAgentsMd).toHaveBeenCalledWith(expect.objectContaining({
@@ -1527,6 +1550,573 @@ describe('human-friendly init output', () => {
       await runCommand(['init', '--auto']);
       // Should still complete
       expect(mkdirSync).toHaveBeenCalled();
+    });
+  });
+  // ─── Task 056-003: New UX features ──────────────────────────────────
+
+  describe('detectSystemLanguage', () => {
+    it('returns "tr" when LANG=tr_TR.UTF-8', async () => {
+      const { detectSystemLanguage } = await import('../../../src/cli/commands/init.js');
+      const origLang = process.env['LANG'];
+      process.env['LANG'] = 'tr_TR.UTF-8';
+      const lang = detectSystemLanguage();
+      expect(lang).toBe('tr');
+      if (origLang === undefined) delete process.env['LANG'];
+      else process.env['LANG'] = origLang;
+    });
+
+    it('returns "en" when LANG=en_US.UTF-8', async () => {
+      const { detectSystemLanguage } = await import('../../../src/cli/commands/init.js');
+      const origLang = process.env['LANG'];
+      process.env['LANG'] = 'en_US.UTF-8';
+      const lang = detectSystemLanguage();
+      expect(lang).toBe('en');
+      if (origLang === undefined) delete process.env['LANG'];
+      else process.env['LANG'] = origLang;
+    });
+
+    it('falls back to "en" when no LANG env and Intl unavailable', async () => {
+      const { detectSystemLanguage } = await import('../../../src/cli/commands/init.js');
+      const origLang = process.env['LANG'];
+      const origLCAll = process.env['LC_ALL'];
+      const origLanguage = process.env['LANGUAGE'];
+      delete process.env['LANG'];
+      delete process.env['LC_ALL'];
+      delete process.env['LANGUAGE'];
+      const lang = detectSystemLanguage();
+      expect(typeof lang).toBe('string');
+      expect(lang.length).toBeGreaterThanOrEqual(2);
+      if (origLang !== undefined) process.env['LANG'] = origLang;
+      if (origLCAll !== undefined) process.env['LC_ALL'] = origLCAll;
+      if (origLanguage !== undefined) process.env['LANGUAGE'] = origLanguage;
+    });
+  });
+
+  describe('formatRecommendations', () => {
+    it('returns empty string for empty reasons', async () => {
+      const { formatRecommendations } = await import('../../../src/cli/commands/init.js');
+      expect(formatRecommendations([])).toBe('');
+    });
+
+    it('formats reasons with arrow prefix', async () => {
+      const { formatRecommendations } = await import('../../../src/cli/commands/init.js');
+      const result = formatRecommendations(['reason one', 'reason two']);
+      expect(result).toContain('→ reason one');
+      expect(result).toContain('→ reason two');
+      expect(result).toContain('Recommendation reasons:');
+    });
+  });
+
+  describe('--auto language detection', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectFullStack).mockReturnValue({
+        language: 'typescript', framework: 'express', buildTool: 'tsc', testFramework: 'vitest',
+        commands: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
+      });
+      vi.mocked(generateSetupRecommendation).mockReturnValue({
+        mode: 'max_plan', maxWorkers: 4, brainModel: 'opus', defaultModel: 'sonnet',
+        planning: 'ai', reasons: ['test reason'],
+      } as any);
+      vi.mocked(getSystemProfile).mockReturnValue({ cpus: 8, ram: 16 } as any);
+      vi.mocked(detectSubscription).mockReturnValue({ detected: 'max', plan: 'max' } as any);
+      vi.mocked(analyzeProject).mockReturnValue({ language: 'typescript', framework: 'none' } as any);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude', worker_provider: 'claude', selectedProviders: ['claude'] },
+        steps: [],
+      } as any);
+      vi.mocked(getMCPGuidance).mockReturnValue(['MCP guidance line']);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+      vi.mocked(readFileSync).mockReturnValue('{}');
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+    });
+
+    it('detects language from system locale in --auto mode', async () => {
+      const origLang = process.env['LANG'];
+      process.env['LANG'] = 'tr_TR.UTF-8';
+      vi.mocked(generateSetupRecommendation).mockReturnValue({
+        mode: 'max_plan',
+        maxWorkers: 4,
+        brainModel: 'opus',
+        defaultModel: 'sonnet',
+        planning: 'ai',
+        reasons: ['test reason'],
+      } as any);
+      await runCommand(['init', '--auto']);
+      // Language should be detected from LANG env
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCall = writeCalls.find(c => String(c[0]).includes('config.json'));
+      if (configCall) {
+        const written = JSON.parse(String(configCall[1]));
+        expect(written.language).toBe('tr');
+      }
+      if (origLang === undefined) delete process.env['LANG'];
+      else process.env['LANG'] = origLang;
+    });
+  });
+
+  describe('recommendation display in --auto mode', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectFullStack).mockReturnValue({
+        language: 'typescript', framework: 'express', buildTool: 'tsc', testFramework: 'vitest',
+        commands: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
+      });
+      vi.mocked(generateSetupRecommendation).mockReturnValue({
+        mode: 'max_plan', maxWorkers: 4, brainModel: 'opus', defaultModel: 'sonnet',
+        planning: 'ai', reasons: ['test reason'],
+      } as any);
+      vi.mocked(getSystemProfile).mockReturnValue({ cpus: 8, ram: 16 } as any);
+      vi.mocked(detectSubscription).mockReturnValue({ detected: 'max', plan: 'max' } as any);
+      vi.mocked(analyzeProject).mockReturnValue({ language: 'typescript', framework: 'none' } as any);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude', worker_provider: 'claude', selectedProviders: ['claude'] },
+        steps: [],
+      } as any);
+      vi.mocked(getMCPGuidance).mockReturnValue(['MCP guidance line']);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+      vi.mocked(readFileSync).mockReturnValue('{}');
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+    });
+
+    it('shows recommendation reasons after auto-detect', async () => {
+      vi.mocked(generateSetupRecommendation).mockReturnValue({
+        mode: 'max_plan',
+        maxWorkers: 4,
+        brainModel: 'opus',
+        defaultModel: 'sonnet',
+        planning: 'ai',
+        reasons: ['Detected Max subscription', 'Multi-core system'],
+      } as any);
+      await runCommand(['init', '--auto']);
+      const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      const hasRecommendation = printCalls.some(msg => msg.includes('Recommendation reasons') || msg.includes('Detected Max'));
+      expect(hasRecommendation).toBe(true);
+    });
+
+    it('does not show recommendations when reasons array is empty', async () => {
+      vi.mocked(generateSetupRecommendation).mockReturnValue({
+        mode: 'max_plan',
+        maxWorkers: 4,
+        brainModel: 'opus',
+        defaultModel: 'sonnet',
+        planning: 'ai',
+        reasons: [],
+      } as any);
+      await runCommand(['init', '--auto']);
+      const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      const hasRecommendation = printCalls.some(msg => msg.includes('Recommendation reasons:'));
+      expect(hasRecommendation).toBe(false);
+    });
+  });
+
+  describe('DECKENT.md dynamic build/test commands', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectFullStack).mockReturnValue({
+        language: 'typescript',
+        framework: 'express',
+        buildTool: 'tsc',
+        testFramework: 'vitest',
+        commands: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
+      });
+      vi.mocked(generateSetupRecommendation).mockReturnValue({
+        mode: 'max_plan', maxWorkers: 4, brainModel: 'opus', defaultModel: 'sonnet',
+        planning: 'ai', reasons: ['test reason'],
+      } as any);
+      vi.mocked(getSystemProfile).mockReturnValue({ cpus: 8, ram: 16 } as any);
+      vi.mocked(detectSubscription).mockReturnValue({ detected: 'max', plan: 'max' } as any);
+      vi.mocked(analyzeProject).mockReturnValue({ language: 'typescript', framework: 'none' } as any);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude', worker_provider: 'claude', selectedProviders: ['claude'] },
+        steps: [],
+      } as any);
+      vi.mocked(getMCPGuidance).mockReturnValue(['MCP guidance line']);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+      vi.mocked(readFileSync).mockReturnValue('{}');
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+    });
+
+    it('uses commands from detectFullStack in DECKENT.md', async () => {
+      vi.mocked(detectFullStack).mockReturnValue({
+        language: 'python',
+        framework: 'flask',
+        buildTool: 'pip',
+        testFramework: 'pytest',
+        commands: { build: 'pip install .', test: 'pytest', lint: 'flake8' },
+      });
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const deckentCall = writeCalls.find(c => String(c[0]).includes('DECKENT.md'));
+      expect(deckentCall).toBeDefined();
+      const content = String(deckentCall![1]);
+      expect(content).toContain('Build: pip install .');
+      expect(content).toContain('Test: pytest');
+      expect(content).toContain('Lint: flake8');
+    });
+
+    it('falls back to tsc defaults when detectFullStack throws', async () => {
+      vi.mocked(detectFullStack).mockImplementation(() => { throw new Error('fail'); });
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const deckentCall = writeCalls.find(c => String(c[0]).includes('DECKENT.md'));
+      expect(deckentCall).toBeDefined();
+      const content = String(deckentCall![1]);
+      expect(content).toContain('Build: tsc');
+      expect(content).toContain('Test: npx vitest run');
+    });
+  });
+
+  describe('--upgrade flag', () => {
+    it('registers --upgrade flag', () => {
+      const program = new Command();
+      registerInit(program);
+      const cmd = program.commands.find(c => c.name() === 'init');
+      expect(cmd!.options.some(o => o.long === '--upgrade')).toBe(true);
+    });
+
+    it('overwrites DECKENT.md when --upgrade is passed', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ mode: 'pro_plan', language: 'en', projectName: 'old' }));
+      await runCommand(['init', '--auto', '--upgrade']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const deckentCall = writeCalls.find(c => String(c[0]).includes('DECKENT.md'));
+      // With --upgrade, should write even though file exists
+      expect(deckentCall).toBeDefined();
+    });
+  });
+
+  describe('--env conflict warning', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectFullStack).mockReturnValue({
+        language: 'typescript', framework: 'express', buildTool: 'tsc', testFramework: 'vitest',
+        commands: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
+      });
+      vi.mocked(generateSetupRecommendation).mockReturnValue({
+        mode: 'max_plan', maxWorkers: 4, brainModel: 'opus', defaultModel: 'sonnet',
+        planning: 'ai', reasons: ['test reason'],
+      } as any);
+      vi.mocked(getSystemProfile).mockReturnValue({ cpus: 8, ram: 16 } as any);
+      vi.mocked(detectSubscription).mockReturnValue({ detected: 'max', plan: 'max' } as any);
+      vi.mocked(analyzeProject).mockReturnValue({ language: 'typescript', framework: 'none' } as any);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude', worker_provider: 'claude', selectedProviders: ['claude'] },
+        steps: [],
+      } as any);
+      vi.mocked(getMCPGuidance).mockReturnValue(['MCP guidance line']);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+      vi.mocked(readFileSync).mockReturnValue('{}');
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+    });
+
+    it('warns when env file already exists without --upgrade', async () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('AGENTS.md'));
+      await runCommand(['init', '--auto', '--env', 'codex']);
+      const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--upgrade'));
+      expect(hasWarning).toBe(true);
+    });
+
+    it('does not warn when --upgrade is passed', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ mode: 'pro_plan' }));
+      await runCommand(['init', '--auto', '--env', 'codex', '--upgrade']);
+      const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--upgrade'));
+      expect(hasWarning).toBe(false);
+    });
+  });
+
+  describe('--repair flag', () => {
+    it('registers --repair flag', () => {
+      const program = new Command();
+      registerInit(program);
+      const cmd = program.commands.find(c => c.name() === 'init');
+      expect(cmd!.options.some(o => o.long === '--repair')).toBe(true);
+    });
+  });
+
+  describe('error recovery messaging', () => {
+    it('shows retry hint when init fails', async () => {
+      vi.mocked(detectAvailableProviders).mockRejectedValueOnce(new Error('network error'));
+      await runCommand(['init', '--auto']);
+      const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      const hasRetryHint = printCalls.some(msg => msg.includes('--upgrade'));
+      expect(hasRetryHint).toBe(true);
+    });
+  });
+
+  // ─── Task 056-002: deepMerge, .deck security, provider fallback, analyzeProject dedup ──
+
+  describe('deepMerge config (056-002-A)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude' as any, worker_provider: 'claude' as any, selectedProviders: ['claude'] as any[] },
+        steps: [],
+      });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(getMCPGuidance).mockReturnValue(['Terminal mode']);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+    });
+
+    it('uses deepMerge instead of shallow Object.assign for config merge', async () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('config.json'));
+      vi.mocked(readFileSync).mockImplementation((p) => {
+        if (String(p).includes('config.json')) {
+          return JSON.stringify({ mode: 'old', skill_routing: { auto: true, custom: 'keep' } });
+        }
+        return '';
+      });
+      await runCommand(['init', '--auto']);
+      expect(deepMerge).toHaveBeenCalled();
+    });
+
+    it('preserves nested fields during config merge', async () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('config.json'));
+      vi.mocked(readFileSync).mockImplementation((p) => {
+        if (String(p).includes('config.json')) {
+          return JSON.stringify({ mode: 'old', skill_routing: { auto: true, custom: 'keep' } });
+        }
+        return '';
+      });
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasNestedPreserved = configCalls.some(c => {
+        const content = JSON.parse(String(c[1]));
+        return content.skill_routing?.custom === 'keep';
+      });
+      expect(hasNestedPreserved).toBe(true);
+    });
+  });
+
+  describe('.deck gitignore security (056-002-B)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude' as any, worker_provider: 'claude' as any, selectedProviders: ['claude'] as any[] },
+        steps: [],
+      });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(getMCPGuidance).mockReturnValue(['Terminal mode']);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+    });
+
+    it('calls ensureDeckGitignore after createDeckTemplate', async () => {
+      await runCommand(['init', '--auto']);
+      expect(ensureDeckGitignore).toHaveBeenCalledWith('/mock/root');
+    });
+
+    it('ensureDeckGitignore is called when createDeckTemplate succeeds', async () => {
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      await runCommand(['init', '--auto']);
+      expect(createDeckTemplate).toHaveBeenCalled();
+      expect(ensureDeckGitignore).toHaveBeenCalled();
+    });
+
+    it('skips ensureDeckGitignore if createDeckTemplate throws', async () => {
+      vi.mocked(createDeckTemplate).mockImplementationOnce(() => { throw new Error('fail'); });
+      await runCommand(['init', '--auto']);
+      expect(ensureDeckGitignore).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deepMerge provider config (056-002-A2)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude' as any, worker_provider: 'claude' as any, selectedProviders: ['claude'] as any[] },
+        steps: [],
+      });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(getMCPGuidance).mockReturnValue(['Terminal mode']);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+    });
+
+    it('uses deepMerge for provider config merge with existing config', async () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).includes('config.json'));
+      vi.mocked(readFileSync).mockImplementation((p) => {
+        if (String(p).includes('config.json')) {
+          return JSON.stringify({ mode: 'max_plan', modes: { max_plan: { workers: 8 } } });
+        }
+        return '';
+      });
+      await runCommand(['init', '--auto']);
+      // deepMerge should be called for both initial config merge and provider config merge
+      expect(deepMerge).toHaveBeenCalledTimes(2);
+    });
+
+    it('writes fresh config when no existing config exists', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      expect(configCalls.length).toBeGreaterThanOrEqual(1);
+      const firstConfig = JSON.parse(String(configCalls[0]![1]));
+      expect(firstConfig).toHaveProperty('mode');
+    });
+  });
+
+  describe('provider wizard --auto fallback (056-002-C)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(getMCPGuidance).mockReturnValue(['Terminal mode']);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+    });
+
+    it('assigns fallback_provider when multiple providers available in --auto mode', async () => {
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: null,
+        steps: [],
+      });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, models: ['opus', 'sonnet', 'haiku'] },
+        { name: 'codex', available: true, models: ['gpt-4.1'] },
+      ] as any);
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasFallback = configCalls.some(c => {
+        const content = JSON.parse(String(c[1]));
+        return content.fallback_provider === 'codex';
+      });
+      expect(hasFallback).toBe(true);
+    });
+
+    it('does not set fallback_provider when only one provider in --auto mode', async () => {
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: null,
+        steps: [],
+      });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, models: ['opus', 'sonnet', 'haiku'] },
+        { name: 'codex', available: false, models: [] },
+      ] as any);
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      const configCalls = writeCalls.filter(c => String(c[0]).includes('config.json'));
+      const hasFallback = configCalls.some(c => {
+        const content = JSON.parse(String(c[1]));
+        return content.fallback_provider !== undefined;
+      });
+      expect(hasFallback).toBe(false);
+    });
+  });
+
+  describe('analyzeProject dedup (056-002-D)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+      vi.mocked(detectEnvironment).mockReturnValue('shell');
+      vi.mocked(showSplash).mockReturnValue('KRAKEN SPLASH');
+      vi.mocked(createDeckTemplate).mockImplementation(() => {});
+      vi.mocked(ensureDeckGitignore).mockImplementation(() => {});
+      vi.mocked(runDoctorChecks).mockReturnValue({ ok: true, checks: [] });
+      vi.mocked(buildProviderWizardSteps).mockReturnValue({
+        autoConfig: { brain_provider: 'claude' as any, worker_provider: 'claude' as any, selectedProviders: ['claude'] as any[] },
+        steps: [],
+      });
+      vi.mocked(detectAvailableProviders).mockResolvedValue([
+        { name: 'claude', available: true, version: '1.0.0', authMethod: 'session', models: ['opus', 'sonnet', 'haiku'] },
+      ] as any);
+      vi.mocked(formatProviderAuthGuidance).mockReturnValue([]);
+      vi.mocked(getMCPGuidance).mockReturnValue(['Terminal mode']);
+      vi.mocked(detectIDEEnvironment).mockReturnValue('terminal');
+    });
+
+    it('reuses detectedAnalysis for PROJECT-IDENTITY.md in --auto mode', async () => {
+      await runCommand(['init', '--auto']);
+      // analyzeProject should be called only once (at the top of --auto mode)
+      expect(analyzeProject).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call analyzeProject in interactive mode', async () => {
+      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+      vi.mocked(promptText).mockResolvedValue('my-project');
+      await runCommand(['init']);
+      expect(analyzeProject).not.toHaveBeenCalled();
     });
   });
 });

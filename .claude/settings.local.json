@@ -75,7 +75,18 @@
       "Bash(find . -name *.test.ts -newer .brain/RETRO.md -not -path */node_modules/*)",
       "Bash(find . -name *.ts -newer .brain/RETRO.md -not -path */node_modules/* -not -path */dist/* -not -name *.test.ts -not -name *.bench.ts)",
       "Bash(find . -name *.test.ts -not -path */node_modules/* -not -path */dist/*)",
-      "Bash(for f:*)"
+      "Bash(for f:*)",
+      "Bash(xargs -I {} basename {} .ts)",
+      "Bash(sort -t'|' -k2 -rn)",
+      "Bash(find /home/alperen/deckent-dev -type f \\\\\\(-iname *changelog* -o -iname *sprint-log* \\\\\\))",
+      "Bash(tmux capture-pane:*)",
+      "Bash(tmux kill-window:*)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(sed \"s/## Task 8:/## Task 1:/; s/## Task 9:/## Task 2:/; s/## Task 10:/## Task 3:/; s/## Task 11:/## Task 4:/; s/## Task 12:/## Task 5:/; s/## Task 13:/## Task 6:/; s/## Task 14:/## Task 7:/; s/## Task 15:/## Task 8:/; s/## Task 16:/## Task 9:/; s/## Task 17:/## Task 10:/; s/## Task 18:/## Task 11:/; s/## Task 19:/## Task 12:/; s/## Task 20:/## Task 13:/\")",
+      "Read(//tmp/**)",
+      "Bash(for w:*)",
+      "Bash(do python3:*)",
+      "Bash(find /home/alperen/deckent-dev/src/providers -type f -name *.ts)"
     ]
   },
   "outputStyle": "default"

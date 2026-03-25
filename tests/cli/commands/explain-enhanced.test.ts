@@ -252,7 +252,7 @@ describe('explain enhanced', () => {
 
   describe('extractGoalFromSprintLog', () => {
     it('should extract first line after sprint heading', () => {
-      const content = '# Sprint sprint-042\nThis is the goal line\n\n## Tasks';
+      const content = '# Sprint 042\nThis is the goal line\n\n## Tasks';
       const goal = extractGoalFromSprintLog(content);
       expect(goal).toBe('This is the goal line');
     });

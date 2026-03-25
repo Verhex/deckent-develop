@@ -12,9 +12,12 @@ vi.mock('../../../src/core/config.js', () => ({
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn(),
   checkUsage: vi.fn(),
+  checkUsageWithProvider: vi.fn(),
+  getDefaultProvider: vi.fn(),
   adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   confirmDraftTasks: vi.fn(),
+  cleanupDraftTasks: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -34,7 +37,10 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 }));
 
 import { loadConfig } from '../../../src/core/config.js';
-import { readContext, checkUsage, adjustSprintSize, planSprint, confirmDraftTasks } from '../../../src/orchestra/brain.js';
+import {
+  readContext, checkUsage, checkUsageWithProvider, getDefaultProvider,
+  adjustSprintSize, planSprint, confirmDraftTasks, cleanupDraftTasks,
+} from '../../../src/orchestra/brain.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { promptConfirm } from '../../../src/cli/helpers/prompt.js';
 import { registerPlan } from '../../../src/cli/commands/plan.js';
@@ -84,6 +90,7 @@ function setupMocks(): void {
     projectState: { gitStatus: '', fileTree: [] },
   });
   vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
+  vi.mocked(getDefaultProvider).mockReturnValue(null);
   vi.mocked(adjustSprintSize).mockReturnValue({
     size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
   });
@@ -209,5 +216,74 @@ describe('plan command (isolated)', () => {
     await runCommand(['plan', '--no-confirm']);
     expect(printError).toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
+  });
+
+  // ─── A) Async usage check ─────────────────────────────────────────
+
+  it('uses async checkUsageWithProvider when provider is available', async () => {
+    setupMocks();
+    const fakeProvider = { checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: '' }) };
+    vi.mocked(getDefaultProvider).mockReturnValue(fakeProvider as any);
+    vi.mocked(checkUsageWithProvider).mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: '' });
+    await runCommand(['plan', '--no-confirm']);
+    expect(checkUsageWithProvider).toHaveBeenCalledWith(fakeProvider);
+    expect(checkUsage).not.toHaveBeenCalled();
+  });
+
+  it('falls back to sync checkUsage when async fails', async () => {
+    setupMocks();
+    const fakeProvider = { checkUsage: vi.fn() };
+    vi.mocked(getDefaultProvider).mockReturnValue(fakeProvider as any);
+    vi.mocked(checkUsageWithProvider).mockRejectedValue(new Error('provider error'));
+    await runCommand(['plan', '--no-confirm']);
+    expect(checkUsage).toHaveBeenCalled();
+  });
+
+  it('uses sync checkUsage when no provider available', async () => {
+    setupMocks();
+    vi.mocked(getDefaultProvider).mockReturnValue(null);
+    await runCommand(['plan', '--no-confirm']);
+    expect(checkUsage).toHaveBeenCalled();
+    expect(checkUsageWithProvider).not.toHaveBeenCalled();
+  });
+
+  // ─── B) --dry-run ────────────────────────────────────────────────
+
+  it('--dry-run passes dryRun option to planSprint', async () => {
+    setupMocks();
+    await runCommand(['plan', '--dry-run', '--no-confirm']);
+    expect(planSprint).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ dryRun: true }),
+    );
+  });
+
+  it('--dry-run prints dry-run message and skips confirmation', async () => {
+    setupMocks();
+    await runCommand(['plan', '--dry-run']);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('[dry-run]'));
+    expect(promptConfirm).not.toHaveBeenCalled();
+    expect(confirmDraftTasks).not.toHaveBeenCalled();
+  });
+
+  // ─── C) cleanupDraftTasks idempotency ─────────────────────────────
+
+  it('calls cleanupDraftTasks before planning', async () => {
+    setupMocks();
+    await runCommand(['plan', '--no-confirm']);
+    expect(cleanupDraftTasks).toHaveBeenCalledWith('/mock/root');
+    // cleanupDraftTasks should be called before planSprint
+    const cleanupOrder = vi.mocked(cleanupDraftTasks).mock.invocationCallOrder[0];
+    const planOrder = vi.mocked(planSprint).mock.invocationCallOrder[0];
+    expect(cleanupOrder).toBeLessThan(planOrder!);
+  });
+
+  // ─── D) Registers --dry-run option ────────────────────────────────
+
+  it('registers --dry-run option on the command', () => {
+    const program = new Command();
+    registerPlan(program);
+    const cmd = program.commands.find(c => c.name() === 'plan');
+    expect(cmd!.options.some(o => o.long === '--dry-run')).toBe(true);
   });
 });

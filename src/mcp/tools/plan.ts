@@ -47,6 +47,8 @@ export function registerPlanTool(server: McpServer): void {
     },
     async (input: { dryRun?: boolean; mode?: 'ai' | 'structured' | 'auto' }) => {
       const root = process.cwd();
+
+      try {
       const config = await loadConfig(root);
       const context = readContext(root);
       const usage = checkUsage(config);
@@ -91,6 +93,13 @@ export function registerPlanTool(server: McpServer): void {
           text: JSON.stringify(wrapResponse(enrichedPlan, summary)),
         }],
       };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Failed to plan sprint: ${message}` }) }],
+          isError: true,
+        };
+      }
     },
   );
 }

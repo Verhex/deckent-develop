@@ -618,3 +618,145 @@ describe('Edge cases', () => {
     expect(result.archivedSprints).toEqual([]);
   });
 });
+
+// ─── F) Tolerant sprint number regex ────────────────────────────────
+
+describe('runDecay: tolerant sprint number regex (F)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('matches "## Sprint 1-5 Özet" format for memory trimming', () => {
+    // Sprint number formats that were previously broken
+    vi.mocked(countBrainLines)
+      .mockReturnValueOnce(700)  // linesBefore > budget, trigger decay
+      .mockReturnValueOnce(700)  // still over budget, trigger memory trim
+      .mockReturnValue(400);     // after trim
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as any);
+    const memoryContent = [
+      '## Sprint 1-5 Özet',
+      '- sleepSync → async geçişi',
+      '## Sprint sprint-010 Learnings',
+      '- Recent learning here',
+    ].join('\n');
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('MEMORY')) return memoryContent;
+      throw new Error('ENOENT');
+    });
+    // Should not throw — tolerant regex should match "Sprint 1-5"
+    expect(() => runDecay('/root', 'sprint-015', { force: true })).not.toThrow();
+  });
+
+  it('matches "## Sprint sprint-NNN Learnings" format', () => {
+    vi.mocked(countBrainLines)
+      .mockReturnValueOnce(700)
+      .mockReturnValueOnce(700)
+      .mockReturnValue(400);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as any);
+    const memoryContent = [
+      '## Sprint sprint-001 Learnings',
+      '- Old learning',
+      '## Sprint sprint-010 Learnings',
+      '- Recent learning',
+    ].join('\n');
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('MEMORY')) return memoryContent;
+      throw new Error('ENOENT');
+    });
+    expect(() => runDecay('/root', 'sprint-015', { force: true })).not.toThrow();
+  });
+});
+
+// ─── E) Smart truncation preserves headers ───────────────────────────
+
+describe('runDecay: smart truncation preserves sprint headers (E)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not truncate to bare 50 lines — preserves section context', () => {
+    // Over budget even after all other decay steps
+    vi.mocked(countBrainLines).mockReturnValue(900);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as any);
+
+    // Memory content with many sections
+    const sections = Array.from({ length: 10 }, (_, i) =>
+      `## Sprint ${i + 1} Özet\n- Learning item ${i + 1}\n- Another item ${i + 1}`,
+    );
+    const memoryContent = sections.join('\n');
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('MEMORY')) return memoryContent;
+      throw new Error('ENOENT');
+    });
+
+    runDecay('/root', 'sprint-015', { force: true });
+
+    const memWriteCalls = vi.mocked(writeFileSync).mock.calls.filter(c =>
+      (c[0] as string).includes('MEMORY'),
+    );
+    expect(memWriteCalls.length).toBeGreaterThan(0);
+    const written = memWriteCalls[memWriteCalls.length - 1]![1] as string;
+    // Should preserve at least one ## header
+    expect(written).toMatch(/^##/m);
+  });
+});
+
+// ─── G) Archive .gitignore fix ───────────────────────────────────────
+
+describe('runDecay: archive directory git tracking (G)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('writes .gitignore negation file in archive directory when archiving sprints', () => {
+    vi.mocked(countBrainLines).mockReturnValue(700);
+    vi.mocked(existsSync).mockImplementation((p: any) => {
+      // sprints dir exists, archive .gitignore does NOT exist yet
+      if (String(p).includes('archive') && String(p).includes('.gitignore')) return false;
+      return true;
+    });
+    vi.mocked(readdirSync).mockReturnValue([
+      'sprint-001.md', 'sprint-002.md', 'sprint-003.md',
+    ] as any);
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('sprint-')) return '# Sprint content';
+      throw new Error('ENOENT');
+    });
+
+    runDecay('/root', 'sprint-005');
+
+    const gitignoreWrite = vi.mocked(writeFileSync).mock.calls.find(c =>
+      (c[0] as string).includes('archive') && (c[0] as string).includes('.gitignore'),
+    );
+    expect(gitignoreWrite).toBeDefined();
+    // Content should include negation to allow files
+    expect(gitignoreWrite![1] as string).toContain('!*');
+  });
+
+  it('does not overwrite .gitignore if it already exists', () => {
+    vi.mocked(countBrainLines).mockReturnValue(700);
+    vi.mocked(existsSync).mockImplementation((p: any) => {
+      // archive .gitignore already exists
+      if (String(p).includes('archive') && String(p).includes('.gitignore')) return true;
+      return true;
+    });
+    vi.mocked(readdirSync).mockReturnValue([
+      'sprint-001.md', 'sprint-002.md', 'sprint-003.md',
+    ] as any);
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('sprint-')) return '# Sprint content';
+      throw new Error('ENOENT');
+    });
+
+    runDecay('/root', 'sprint-005');
+
+    const gitignoreWrites = vi.mocked(writeFileSync).mock.calls.filter(c =>
+      (c[0] as string).includes('archive') && (c[0] as string).includes('.gitignore'),
+    );
+    // Should NOT write .gitignore again since it already exists
+    expect(gitignoreWrites).toHaveLength(0);
+  });
+});

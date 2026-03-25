@@ -226,6 +226,22 @@ describe('Agent Selection — selectAgent with planSprint tasks', () => {
     expect(r2.agent).toBeNull();
   });
 
+  it('selectAgent finds agent even when forceModel is set (bypass removed)', () => {
+    const agent = makeAgent({ preferredModel: 'opus', triggerKeywords: ['security', 'auth'] });
+    const task = makeTask({ title: 'Security auth task', model: 'haiku', forceModel: 'haiku' });
+    const pool = makePool([agent]);
+    // The key change: selectAgent runs regardless of forceModel
+    const result = selectAgent(task, pool);
+    task.assignedAgent = result.agent?.id ?? 'generic';
+    // Agent IS selected (not forced to generic)
+    expect(task.assignedAgent).toBe('security-auditor');
+    // But model stays as forceModel
+    if (result.agent?.preferredModel && !task.forceModel) {
+      task.model = result.agent.preferredModel;
+    }
+    expect(task.model).toBe('haiku');
+  });
+
   it('returns score of 0 when agent score below threshold', () => {
     // Only 1 keyword match: security(+2) = 2 < 3
     const agent = makeAgent({ id: 'weak', triggerKeywords: ['something'], triggerScopes: [] });

@@ -1276,3 +1276,94 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 054-004: docs/ Reorganization + .claude/rules/ Update (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 57 — sprint-057
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 2410s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 11 |
+| Tech Debt | 4 |
+| No-Go | 2 |
+| Coverage | 61.1% |
+| Duration | 2409512ms |
+
+### Tasks
+
+- 057-001: status Overhaul — Standalone, ETA, NO_COLOR, fs.watch, Verbose (DONE)
+- 057-002: doctor Improvements — tmux Conditional, .deck Check, Auth, Hints (GO_WITH_TECH_DEBT)
+- 057-003: retro+explain Quality — Dil, Trend, Agent/Skill Perf, Learnings (DONE)
+- 057-004: cleanup+decay Overhaul — Auto Decay, Combo, Lock Guard, Archive (GO_WITH_TECH_DEBT)
+- 057-005: usage Overhaul — Real Tokens, Race Condition, Live Usage, Filters (DONE)
+- 057-006: history Overhaul — --json, --last, Agent/Skill, Dead Code, Format (DONE)
+- 057-007: config Quality — list/keys, autoMigrate, Validation, Comment, Env Var (DONE)
+- 057-008: review+finalize Overhaul — Interactive, Retry, Guard, Duplicate (DONE)
+- 057-009: serve Security — Rate Limit, Body Size, DeepMerge, Auth, Versioning (DONE)
+- 057-010: run+test+web Flags — Timeout, Keep, Sandbox, CI, MIME (GO_WITH_TECH_DEBT)
+- 057-011: sync+onboard+upgrade Polish (GO_WITH_TECH_DEBT)
+- 057-012: agent+skill+plugin+marketplace+archive-debt Completeness (NO_GO)
+- 057-013: dashboard+attach+watch+cross-cutting (NO_GO)
+
+---
+## Sprint 58 — sprint-058
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 297s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 96.0% |
+| Duration | 296800ms |
+
+### Tasks
+
+- 058-001: agent+skill+plugin+marketplace+archive-debt Completeness (DONE)
+- 058-002: dashboard+attach+watch+cross-cutting (DONE)
+
+---
+## Sprint 59 — sprint-059
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 1868s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 12 |
+| Tech Debt | 9 |
+| No-Go | 1 |
+| Coverage | 24.0% |
+| Duration | 1867765ms |
+
+### Tasks
+
+- 059-001: cli-deep-analysis.md Full [DONE] Marking + Doğrulama (GO_WITH_TECH_DEBT)
+- 059-002: Agent Activation Fix — forceModel Agent Bypass Kaldır (DONE)
+- 059-003: Skill Selection Fix — Task-Specific Seçim + Truncation (DONE)
+- 059-004: Scope & GO/NO-GO Fix — filesWrite + Criteria Enrichment (DONE)
+- 059-005: Prompt Boilerplate Azaltma + Worker Guide (GO_WITH_TECH_DEBT)
+- 059-006: spawn+kill+run Multi-Provider Desteği (GO_WITH_TECH_DEBT)
+- 059-007: doctor+watch Provider-Aware Fix (GO_WITH_TECH_DEBT)
+- 059-008: MCP Tools Expansion (+6 tools) (NO_GO)
+- 059-009: MCP Resources Expansion (+4 resources) (GO_WITH_TECH_DEBT)
+- 059-010: MCP Tool Quality — Enrichment + Error Handling (GO_WITH_TECH_DEBT)
+- 059-011: Format Tutarlılığı + Dead Code Temizliği (GO_WITH_TECH_DEBT)
+- 059-012: Sync Genişleme (Gemini/Cursor/Codex Adapters) (GO_WITH_TECH_DEBT)
+- 059-013: Doc Updater Fix + CHANGELOG Konsolidasyonu (GO_WITH_TECH_DEBT)
+
+---

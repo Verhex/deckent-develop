@@ -135,6 +135,8 @@ export interface RunSprintOptions {
   testMode?: boolean;
   skipCleanup?: boolean;
   timeoutMs?: number;
+  /** Fix phase timeout in milliseconds (default: 10 minutes) */
+  fixPhaseTimeoutMs?: number;
   /** Optional SpawnBackend override -- defaults to SpawnBackendFactory.create() */
   spawnBackend?: SpawnBackend;
   /** Optional ProviderAdapter override -- used for usage checking */
@@ -235,6 +237,102 @@ function safeDashboardUpdate(
 }
 
 const PAUSE_STATE_FILE = '.deckent/pause-state.json';
+const SPRINT_STATE_FILE = '.deckent/sprint-state.json';
+
+// ─── Sprint State Persistence ────────────────────────────────────
+
+export interface SprintState {
+  sprintId: string;
+  phase: SprintPhase;
+  status: string;
+  startedAt: string;
+  updatedAt: string;
+  taskIds: string[];
+}
+
+/**
+ * Persist current sprint phase state to disk for crash recovery.
+ * Non-fatal: errors are silently ignored.
+ */
+export function writeSprintState(projectRoot: string, sprint: Sprint): void {
+  try {
+    const statePath = join(projectRoot, SPRINT_STATE_FILE);
+    const state: SprintState = {
+      sprintId: sprint.id,
+      phase: sprint.phase,
+      status: sprint.status,
+      startedAt: sprint.startedAt ?? now(),
+      updatedAt: now(),
+      taskIds: sprint.tasks.map(t => t.id),
+    };
+    mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
+    writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * Read persisted sprint state from disk. Returns null if no state file exists.
+ */
+export function readSprintState(projectRoot: string): SprintState | null {
+  const statePath = join(projectRoot, SPRINT_STATE_FILE);
+  return readJsonSafe<SprintState>(statePath) ?? null;
+}
+
+/**
+ * Remove sprint state file after sprint completion.
+ */
+export function clearSprintState(projectRoot: string): void {
+  try {
+    const statePath = join(projectRoot, SPRINT_STATE_FILE);
+    if (existsSync(statePath)) unlinkSync(statePath);
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * Detect orphan tmux windows from a previous crashed sprint.
+ * Returns list of orphaned worker IDs that have tmux windows but no active sprint.
+ */
+export function detectOrphanWorkers(projectRoot: string): string[] {
+  try {
+    const workers = listWorkers();
+    const state = readSprintState(projectRoot);
+    if (!state) {
+      // No sprint state — any existing workers are orphans
+      return workers;
+    }
+    // Workers not in the current sprint's task list are orphans
+    const validWorkers = new Set(state.taskIds.map(id => `w-${id}`));
+    return workers.filter(w => !validWorkers.has(w));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Build a retry recommendation message after spawn failure.
+ * Suggests model downgrade or scope simplification based on error analysis.
+ */
+export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  const hints: string[] = [];
+
+  if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
+    hints.push('Rate limit hit — consider downgrading task models (opus→sonnet, sonnet→haiku)');
+  }
+  if (msg.includes('timeout') || msg.includes('ETIMEDOUT')) {
+    hints.push('Connection timeout — check network or provider availability');
+  }
+  if (msg.includes('tmux') || msg.includes('session')) {
+    hints.push('tmux session error — run `deckent doctor` to verify tmux setup');
+  }
+  if (sprint.tasks.length > 6) {
+    hints.push(`High task count (${sprint.tasks.length}) — consider reducing max_workers or splitting the sprint`);
+  }
+  if (hints.length === 0) {
+    hints.push('Unexpected spawn error — check provider credentials and system resources');
+  }
+  return hints.join('; ');
+}
 
 // ═══ Exported Functions ════════════════════════════════════════════
 
@@ -406,7 +504,7 @@ export async function planSprint(
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
-  options?: { mode?: BrainPlanningMode; asDraft?: boolean; usage?: UsageMetrics },
+  options?: { mode?: BrainPlanningMode; asDraft?: boolean; usage?: UsageMetrics; dryRun?: boolean },
 ): Promise<Sprint> {
   const sprintId = getNextSprintId(projectRoot);
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
@@ -501,7 +599,7 @@ export async function planSprint(
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
     const structuredTasks = parseStructuredDirectives(context.directives);
-    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort }> =
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string }> =
       structuredTasks.length > 0
         ? structuredTasks
         : context.directives
@@ -531,7 +629,11 @@ export async function planSprint(
           : `Directive (model: ${resolvedModel} -- resolved from scope/complexity/plan/usage)`,
         scope: src.scope,
         dependencies: [],
-        goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor issues' },
+        goNogo: {
+          goCriteria: src.testTarget ? `${src.testTarget}; Tests pass` : 'Tests pass',
+          noGoCriteria: 'Build fails',
+          techDebtAcceptable: 'Minor issues',
+        },
         sprintId,
         initialStatus,
         forceModel: src.forceModel,
@@ -549,19 +651,26 @@ export async function planSprint(
     );
   }
 
+  // D) Safeguard: warn if AI planner produced >2x the directive task count
+  const directiveTaskCountForGuard = parseStructuredDirectives(context.directives).length;
+  if (directiveTaskCountForGuard > 0 && tasks.length > directiveTaskCountForGuard * 2) {
+    console.error(
+      `[Brain] Warning: ${tasks.length} tasks planned but directives only contain ${directiveTaskCountForGuard} tasks (>2x). ` +
+      `Review the plan for excessive task generation.`,
+    );
+  }
+
   // Agent selection (non-fatal -- if pool fails, continue with generic workers)
   try {
     const agentPool = new AgentPoolManager(projectRoot);
     const pool = agentPool.loadAgents();
     for (const task of tasks) {
-      if (!task.forceModel) {
-        const result = selectAgent(task, pool);
-        task.assignedAgent = result.agent?.id ?? 'generic';
-        if (result.agent?.preferredModel && !task.forceModel) {
-          task.model = result.agent.preferredModel;
-        }
-      } else {
-        task.assignedAgent = 'generic';
+      // Agent selection runs regardless of forceModel — agent expertise is independent of model choice
+      const result = selectAgent(task, pool);
+      task.assignedAgent = result.agent?.id ?? 'generic';
+      // Only apply agent's preferredModel when no forceModel override exists
+      if (result.agent?.preferredModel && !task.forceModel) {
+        task.model = result.agent.preferredModel;
       }
     }
   } catch { /* agent pool failure is non-fatal */ }
@@ -585,11 +694,13 @@ export async function planSprint(
     }
   } catch { /* skill selection failure is non-fatal */ }
 
-  // Write task files
-  const tasksPath = join(projectRoot, TASKS_DIR);
-  mkdirSync(tasksPath, { recursive: true });
-  for (const task of tasks) {
-    writeFileSync(join(tasksPath, `task-${task.id}.json`), JSON.stringify(task, null, 2), 'utf-8');
+  // Write task files (skip in dry-run mode)
+  if (!options?.dryRun) {
+    const tasksPath = join(projectRoot, TASKS_DIR);
+    mkdirSync(tasksPath, { recursive: true });
+    for (const task of tasks) {
+      writeFileSync(join(tasksPath, `task-${task.id}.json`), JSON.stringify(task, null, 2), 'utf-8');
+    }
   }
 
   return {
@@ -624,23 +735,54 @@ export function confirmDraftTasks(projectRoot: string, sprint: Sprint): void {
 }
 
 /**
- * Resolve the PROMPT.md content for a task's assigned agent.
- * Returns undefined if the agent is 'generic' or the file cannot be read.
+ * Remove existing DRAFT task files from .tasks/ directory.
+ * Called before planning to ensure idempotency — re-running `deckent plan`
+ * cleans up stale drafts from a previous plan.
+ * @param projectRoot - Project root directory
+ */
+export function cleanupDraftTasks(projectRoot: string): void {
+  const tasksPath = join(projectRoot, TASKS_DIR);
+  if (!existsSync(tasksPath)) return;
+  const files = readdirSync(tasksPath).filter(f => f.startsWith('task-') && f.endsWith('.json'));
+  for (const file of files) {
+    const filePath = join(tasksPath, file);
+    try {
+      const raw = readFileSync(filePath, 'utf-8');
+      const task = JSON.parse(raw);
+      if (task.status === TaskStatus.DRAFT) {
+        unlinkSync(filePath);
+      }
+    } catch {
+      // Ignore malformed task files
+    }
+  }
+}
+
+/**
+ * Resolve the agent prompt for a task's assigned agent.
+ * Combines PROMPT.md (if exists) with systemPrompt + expertise from agent.json.
+ * Returns undefined if the agent is 'generic' or no prompt material can be found.
  */
 export function resolveAgentPrompt(projectRoot: string, task: Task): string | undefined {
   const agentId = task.assignedAgent;
   if (!agentId || agentId === 'generic') return undefined;
-  // Try persistent agents first, then temp agents
-  const paths = [
+
+  // Try to load PROMPT.md
+  let promptMd: string | undefined;
+  const promptPaths = [
     join(projectRoot, '.deckent', 'agents', agentId, 'PROMPT.md'),
     join(projectRoot, TASKS_DIR, 'agents', agentId, 'PROMPT.md'),
   ];
-  for (const p of paths) {
+  for (const p of promptPaths) {
     try {
-      return readFileSync(p, 'utf-8');
+      promptMd = readFileSync(p, 'utf-8');
+      break;
     } catch { /* not found, try next */ }
   }
-  // Fall back to systemPrompt + expertise from agent.json
+
+  // Load systemPrompt + expertise from agent.json
+  let systemPrompt: string | undefined;
+  let expertise = '';
   const agentJsonPaths = [
     join(projectRoot, '.deckent', 'agents', agentId, 'agent.json'),
     join(projectRoot, TASKS_DIR, 'agents', agentId, 'agent.json'),
@@ -648,14 +790,19 @@ export function resolveAgentPrompt(projectRoot: string, task: Task): string | un
   for (const p of agentJsonPaths) {
     try {
       const raw = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
-      const systemPrompt = raw['systemPrompt'] as string | undefined;
-      if (systemPrompt) {
-        const expertise = Array.isArray(raw['expertise']) ? (raw['expertise'] as string[]).join(', ') : '';
-        return expertise ? `${systemPrompt}\n\nExpertise: ${expertise}` : systemPrompt;
-      }
+      systemPrompt = raw['systemPrompt'] as string | undefined;
+      expertise = Array.isArray(raw['expertise']) ? (raw['expertise'] as string[]).join(', ') : '';
+      break;
     } catch { /* not found, try next */ }
   }
-  return undefined;
+
+  // Combine: PROMPT.md + systemPrompt + expertise
+  const parts: string[] = [];
+  if (systemPrompt) parts.push(systemPrompt);
+  if (expertise) parts.push(`Expertise: ${expertise}`);
+  if (promptMd) parts.push(promptMd);
+
+  return parts.length > 0 ? parts.join('\n\n') : undefined;
 }
 
 /**
@@ -1312,6 +1459,7 @@ export async function runSprint(
   let metrics: SprintMetrics | undefined;
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let taskQueue: Task[] = [];
+  let lastUsage: UsageMetrics = { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() };
   const usageTracker = new UsageTracker(projectRoot);
 
   // Use provided SpawnBackend, or create one from config.spawn_backend via SpawnBackendFactory.
@@ -1340,6 +1488,7 @@ export async function runSprint(
     const usage = activeProvider
       ? await checkUsageWithProvider(activeProvider)
       : checkUsage(config);
+    lastUsage = usage;
     const recommendation = adjustSprintSize(config, usage);
     sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
@@ -1401,13 +1550,18 @@ export async function runSprint(
     resetDashboard(projectRoot, sprint.id, sprint.tasks.length);
   } catch { /* dashboard reset failed -- non-fatal */ }
 
-  // Phase 2: SPAWN (1 retry)
+  // Persist sprint state for crash recovery
+  writeSprintState(projectRoot, sprint);
+
+  // Phase 2: SPAWN (1 retry with diagnostic hints)
   let spawnAttempts = 0;
   while (spawnAttempts < 2) {
     try {
       sprint.phase = SprintPhase.SPAWN;
+      writeSprintState(projectRoot, sprint);
       taskQueue = spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
       sprint.status = SprintStatus.ACTIVE;
+      writeSprintState(projectRoot, sprint);
       try {
         scanInterval = startScanLoop(projectRoot, sprint.id, undefined, (scanResult) => {
           writeScanToDashboard(projectRoot, {
@@ -1421,8 +1575,9 @@ export async function runSprint(
       if (spawnAttempts >= 2) {
         if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
         try { cleanup(projectRoot, sprint); } catch { /* best effort */ }
+        const hint = buildSpawnRetryHint(err, sprint);
         throw new BrainError(
-          `Spawn phase failed after retry: ${err instanceof Error ? err.message : String(err)}`,
+          `Spawn phase failed after retry: ${err instanceof Error ? err.message : String(err)}. Hint: ${hint}`,
           SprintPhase.SPAWN,
         );
       }
@@ -1432,7 +1587,8 @@ export async function runSprint(
   // Phase 3: EXECUTE
   try {
     sprint.phase = SprintPhase.EXECUTE;
-    results = await waitForResults(projectRoot, sprint, undefined, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend });
+    writeSprintState(projectRoot, sprint);
+    results = await waitForResults(projectRoot, sprint, opts?.timeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend });
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -1537,7 +1693,8 @@ export async function runSprint(
     if (fixTasks.length > 0) {
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
       spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
-      const fixResults = await waitForResults(projectRoot, fixSprint, 10 * 60 * 1000, undefined, { spawnBackend });
+      const fixPhaseTimeout = opts?.fixPhaseTimeoutMs ?? 10 * 60 * 1000;
+      const fixResults = await waitForResults(projectRoot, fixSprint, fixPhaseTimeout, undefined, { spawnBackend });
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
@@ -1588,6 +1745,9 @@ export async function runSprint(
   sprint.phase = SprintPhase.COMPLETE;
   sprint.completedAt = now();
 
+  // Clear sprint state file after successful completion
+  clearSprintState(projectRoot);
+
   // Sprint usage report
   try {
     const sprintUsage = usageTracker.getSprintUsage(sprint.id);
@@ -1602,7 +1762,7 @@ export async function runSprint(
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
     agents: [],
     progress: { done: sprint.tasks.length, active: 0, blocked: 0, total: sprint.tasks.length },
-    usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
+    usage: lastUsage,
     alerts: [],
     updatedAt: now(),
   });

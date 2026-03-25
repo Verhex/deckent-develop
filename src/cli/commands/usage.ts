@@ -1,23 +1,22 @@
 import type { Command } from 'commander';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { UsageTracker } from '../../core/usage-tracker.js';
-import type { ModelBreakdown, SprintUsage, TotalUsage } from '../../core/usage-tracker.js';
+import { UsageTracker, DEFAULT_TOKEN_COSTS } from '../../core/usage-tracker.js';
+import type { ModelBreakdown, SprintUsage, TotalUsage, ProviderBreakdown, TaskUsage } from '../../core/usage-tracker.js';
 import { readAuthMode } from '../../core/config.js';
 
-// Cost estimates per 1K tokens (in USD) — rough API mode estimates
-const TOKEN_COST_PER_1K: Record<string, number> = {
-  opus: 0.015,
-  sonnet: 0.003,
-  haiku: 0.00025,
-};
+// Cost estimates per 1K tokens (in USD) — defaults, overridable via config
+function getTokenCosts(overrides?: Record<string, number>): Record<string, number> {
+  return { ...DEFAULT_TOKEN_COSTS, ...overrides };
+}
 
-function estimateCost(model: string, tokens: number): number {
-  const rate = TOKEN_COST_PER_1K[model] ?? 0;
+function estimateCost(model: string, tokens: number, costs?: Record<string, number>): number {
+  const costMap = costs ?? DEFAULT_TOKEN_COSTS;
+  const rate = costMap[model] ?? 0;
   return (tokens / 1000) * rate;
 }
 
-function formatModelTable(breakdown: ModelBreakdown[], isApiMode: boolean): string {
+function formatModelTable(breakdown: ModelBreakdown[], isApiMode: boolean, costs?: Record<string, number>): string {
   const headers = isApiMode
     ? ['Model', 'Calls', 'Tokens', 'Est. Cost (USD)']
     : ['Model', 'Calls', 'Tokens'];
@@ -25,7 +24,7 @@ function formatModelTable(breakdown: ModelBreakdown[], isApiMode: boolean): stri
   const rows = breakdown.map((b) => {
     const base = [b.model, String(b.calls), String(b.tokens)];
     if (isApiMode) {
-      base.push(`$${estimateCost(b.model, b.tokens).toFixed(4)}`);
+      base.push(`$${estimateCost(b.model, b.tokens, costs).toFixed(4)}`);
     }
     return base;
   });
@@ -33,14 +32,37 @@ function formatModelTable(breakdown: ModelBreakdown[], isApiMode: boolean): stri
   return formatTable(headers, rows);
 }
 
-function formatSprintTable(sprints: SprintUsage[], isApiMode: boolean): string {
+function formatProviderTable(breakdown: ProviderBreakdown[], isApiMode: boolean): string {
+  const headers = isApiMode
+    ? ['Provider', 'Calls', 'Tokens', 'Est. Cost (USD)']
+    : ['Provider', 'Calls', 'Tokens'];
+
+  const rows = breakdown.map((b) => {
+    const base = [b.provider, String(b.calls), String(b.tokens)];
+    if (isApiMode) {
+      base.push('—');
+    }
+    return base;
+  });
+
+  return formatTable(headers, rows);
+}
+
+function formatTaskTable(tasks: TaskUsage[]): string {
+  const headers = ['Task', 'Calls', 'Tokens'];
+  const top = tasks.slice(0, 10);
+  const rows = top.map((t) => [t.taskId, String(t.calls), String(t.tokens)]);
+  return formatTable(headers, rows);
+}
+
+function formatSprintTable(sprints: SprintUsage[], isApiMode: boolean, costs?: Record<string, number>): string {
   const headers = isApiMode
     ? ['Sprint', 'Calls', 'Tokens', 'Est. Cost (USD)']
     : ['Sprint', 'Calls', 'Tokens'];
 
   const rows = sprints.map((s) => {
     const totalCost = s.modelBreakdown.reduce(
-      (sum, b) => sum + estimateCost(b.model, b.tokens),
+      (sum, b) => sum + estimateCost(b.model, b.tokens, costs),
       0,
     );
     const base = [s.sprintId, String(s.totalCalls), String(s.totalTokens)];
@@ -53,11 +75,25 @@ function formatSprintTable(sprints: SprintUsage[], isApiMode: boolean): string {
   return formatTable(headers, rows);
 }
 
+function formatTrendLine(sprints: SprintUsage[]): string {
+  if (sprints.length < 2) return '';
+  const first = sprints[0]!;
+  const last = sprints[sprints.length - 1]!;
+  const tokensDelta = last.totalTokens - first.totalTokens;
+  const callsDelta = last.totalCalls - first.totalCalls;
+  const arrow = (n: number) => n > 0 ? '↑' : n < 0 ? '↓' : '→';
+  return `Trend: Tokens ${arrow(tokensDelta)}${Math.abs(tokensDelta)} | Calls ${arrow(callsDelta)}${Math.abs(callsDelta)}`;
+}
+
 export interface UsageCommandOptions {
   json?: boolean;
   sprint?: string;
   projectRoot?: string;
   isApiMode?: boolean;
+  since?: string;
+  last?: number;
+  verbose?: boolean;
+  costOverrides?: Record<string, number>;
 }
 
 export function buildUsageOutput(
@@ -65,6 +101,7 @@ export function buildUsageOutput(
   opts: UsageCommandOptions = {},
 ): { text: string; data: unknown } {
   const isApiMode = opts.isApiMode ?? false;
+  const costs = getTokenCosts(opts.costOverrides);
 
   if (opts.sprint) {
     const sprintUsage = tracker.getSprintUsage(opts.sprint);
@@ -74,7 +111,7 @@ export function buildUsageOutput(
       return { text, data: sprintUsage };
     }
 
-    const table = formatModelTable(sprintUsage.modelBreakdown, isApiMode);
+    const table = formatModelTable(sprintUsage.modelBreakdown, isApiMode, costs);
     const lines = [
       `Sprint: ${sprintUsage.sprintId}`,
       `Total Calls: ${sprintUsage.totalCalls} | Total Tokens: ${sprintUsage.totalTokens}`,
@@ -83,8 +120,28 @@ export function buildUsageOutput(
       table,
     ];
 
+    // Provider breakdown
+    if (sprintUsage.providerBreakdown && sprintUsage.providerBreakdown.length > 0) {
+      lines.push('', 'Provider Breakdown:', formatProviderTable(sprintUsage.providerBreakdown, isApiMode));
+    }
+
+    // Task breakdown (verbose or always in JSON)
+    if (opts.verbose && sprintUsage.taskBreakdown && sprintUsage.taskBreakdown.length > 0) {
+      lines.push('', 'Top Tasks by Token Usage:', formatTaskTable(sprintUsage.taskBreakdown));
+    }
+
+    // Rate limit info for subscription mode
+    if (!isApiMode) {
+      lines.push('', 'Mode: Subscription — rate limit based, no cost estimate.');
+    }
+
     return { text: lines.join('\n'), data: sprintUsage };
   }
+
+  // Filtered sprint list
+  const filteredSprints = (opts.since || opts.last)
+    ? tracker.listSprintsFiltered({ since: opts.since, last: opts.last })
+    : null;
 
   const total: TotalUsage = tracker.getTotalUsage();
 
@@ -96,11 +153,11 @@ export function buildUsageOutput(
     return { text, data: total };
   }
 
-  const sprints = tracker.listSprints();
-  const sprintUsages = sprints.map((id) => tracker.getSprintUsage(id));
+  const sprintIds = filteredSprints ?? tracker.listSprints();
+  const sprintUsages = sprintIds.map((id) => tracker.getSprintUsage(id));
 
-  const modelTable = formatModelTable(total.modelBreakdown, isApiMode);
-  const sprintTable = formatSprintTable(sprintUsages, isApiMode);
+  const modelTable = formatModelTable(total.modelBreakdown, isApiMode, costs);
+  const sprintTable = formatSprintTable(sprintUsages, isApiMode, costs);
 
   const lines = [
     `Total Sprints: ${total.sprintCount} | Total Calls: ${total.totalCalls} | Total Tokens: ${total.totalTokens}`,
@@ -112,6 +169,17 @@ export function buildUsageOutput(
     sprintTable,
   ];
 
+  // Trend analysis
+  if (sprintUsages.length >= 2) {
+    const trendLine = formatTrendLine(sprintUsages);
+    if (trendLine) lines.push('', trendLine);
+  }
+
+  // Rate limit info for subscription mode
+  if (!isApiMode) {
+    lines.push('', 'Mode: Subscription — rate limit based, no cost estimate.');
+  }
+
   return { text: lines.join('\n'), data: { total, sprints: sprintUsages } };
 }
 
@@ -121,6 +189,9 @@ export function registerUsage(program: Command): void {
     .description('Show usage metrics')
     .option('--json', 'Output as JSON')
     .option('--sprint <id>', 'Filter by sprint ID')
+    .option('--since <date>', 'Show sprints since date (ISO format)')
+    .option('--last <n>', 'Show last N sprints', parseInt)
+    .option('--verbose', 'Show detailed breakdown including task-level usage')
     .action(async (opts: UsageCommandOptions) => {
       try {
         const root = resolveProjectRoot();

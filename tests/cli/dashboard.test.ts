@@ -305,7 +305,7 @@ describe('registerDashboard', () => {
     registerDashboard(program);
     const cmd = program.commands.find((c) => c.name() === 'dashboard');
     expect(cmd).toBeDefined();
-    expect(cmd!.description()).toBe('Show terminal dashboard with auto-refresh');
+    expect(cmd!.description()).toBe('Show terminal dashboard with auto-refresh (see also: deckent status)');
   });
 
   it('prints no-sprint message when dashboard file not found', async () => {

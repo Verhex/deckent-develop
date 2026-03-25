@@ -9,7 +9,7 @@ import { analyzeProject } from '../../core/analyzer.js';
 import { showSplash } from '../helpers/splash.js';
 import { detectEnvironment } from '../../core/environment.js';
 import type { DetectedEnv } from '../../core/environment.js';
-import { createDeckTemplate } from '../../core/deck-file.js';
+import { createDeckTemplate, ensureDeckGitignore } from '../../core/deck-file.js';
 import { generateCodexConfig } from '../helpers/codex-config.js';
 import { generateGeminiConfig } from '../helpers/gemini-config.js';
 import { generateCursorConfig } from '../helpers/cursor-config.js';
@@ -40,6 +40,7 @@ import {
 } from '../../core/constants.js';
 import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { ensureDeckentImport } from '../../core/utils.js';
+import { deepMerge } from '../../core/config.js';
 import { promptText, promptSelect } from '../helpers/prompt.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -184,6 +185,40 @@ export type EnvName = 'codex' | 'cursor' | 'gemini' | 'vscode' | 'shell';
 const ALL_ENV_NAMES: EnvName[] = ['codex', 'cursor', 'gemini', 'vscode', 'shell'];
 
 /**
+ * Detect system locale from environment variables or Intl API.
+ * Returns a 2-letter language code (e.g. 'en', 'tr').
+ */
+export function detectSystemLanguage(): string {
+  // Try LANG env var first (e.g. "tr_TR.UTF-8")
+  const langEnv = process.env['LANG'] ?? process.env['LANGUAGE'] ?? process.env['LC_ALL'] ?? process.env['LC_MESSAGES'];
+  if (langEnv) {
+    const match = /^([a-z]{2})/i.exec(langEnv);
+    if (match) return match[1]!.toLowerCase();
+  }
+  // Try Intl API
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    const parts = locale.split('-');
+    if (parts[0]) return parts[0].toLowerCase();
+  } catch {
+    // Intl not available
+  }
+  return 'en';
+}
+
+/**
+ * Format recommendation reasons for display after auto-detect.
+ */
+export function formatRecommendations(reasons: string[]): string {
+  if (reasons.length === 0) return '';
+  const lines = ['', 'Recommendation reasons:'];
+  for (const reason of reasons) {
+    lines.push(`  → ${reason}`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Apply multi-environment config for a single environment name.
  * Creates environment-specific files using stack-aware templates.
  */
@@ -213,8 +248,20 @@ export function registerInit(program: Command): void {
     .option('--claude-code', 'Configure for Claude Code environment (default)')
     .option('--env <envs>', 'Comma-separated environments to configure (codex,cursor,gemini,vscode,shell)')
     .option('--all-envs', 'Configure ALL environment configs')
-    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean }) => {
+    .option('--upgrade', 'Update existing files while preserving user customizations (merge strategy)')
+    .option('--repair', 'Show which init steps failed and how to fix them')
+    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; repair?: boolean }) => {
       const root = resolveProjectRoot();
+
+      // Track step failures for error recovery
+      const failedSteps: Array<{ step: string; error: string }> = [];
+
+      // Helper: write file (respecting --upgrade flag)
+      const writeFile = (filePath: string, content: string): void => {
+        if (options.upgrade || !existsSync(filePath)) {
+          writeFileSync(filePath, content);
+        }
+      };
 
       try {
         let mode: PlanMode;
@@ -246,8 +293,13 @@ export function registerInit(program: Command): void {
           );
 
           mode = recommendation.mode;
-          language = 'en';
+          // A) Detect language from system locale instead of hardcoding 'en'
+          language = detectSystemLanguage();
           projectName = dirName;
+
+          // B) Show recommendation reasons
+          const recommendationDisplay = formatRecommendations(recommendation.reasons);
+          if (recommendationDisplay) print(recommendationDisplay);
         } else {
           // Interactive mode (default or --manual)
           mode = await promptSelect<PlanMode>('Select your Claude plan:', [
@@ -282,8 +334,8 @@ export function registerInit(program: Command): void {
         if (existsSync(configPath)) {
           try {
             const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
-            Object.assign(existing, newConfig);
-            writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
+            const merged = deepMerge(existing, newConfig);
+            writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
           } catch {
             writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
           }
@@ -291,7 +343,17 @@ export function registerInit(program: Command): void {
           writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
         }
 
-        // 6. DECKENT.md (single source of truth — writeIfNotExists)
+        // 6. DECKENT.md — C) Use dynamic build/test commands from detectFullStack
+        let buildCmd = 'tsc';
+        let testCmd = 'npx vitest run';
+        let lintCmd = 'tsc --noEmit';
+        try {
+          const stackForDeckent = detectFullStack(root);
+          if (stackForDeckent.commands.build) buildCmd = stackForDeckent.commands.build;
+          if (stackForDeckent.commands.test) testCmd = stackForDeckent.commands.test;
+          if (stackForDeckent.commands.lint) lintCmd = stackForDeckent.commands.lint;
+        } catch { /* fallback to defaults above */ }
+
         const deckentContent = `# ${projectName} — Deckent Orchestrated
 
 ## Identity
@@ -315,9 +377,9 @@ When acting as Auditor: @.claude/rules/auditor.md
 When acting as Worker: @.claude/rules/worker-default.md
 
 ## Environment
-Build: tsc
-Test: npx vitest run
-Lint: tsc --noEmit
+Build: ${buildCmd}
+Test: ${testCmd}
+Lint: ${lintCmd}
 
 ## Boot
 @.deckent/workspace/BOOT.md
@@ -378,6 +440,21 @@ globs: ["**/*"]
             ? options.env.split(',').map(e => e.trim()).filter(e => ALL_ENV_NAMES.includes(e as EnvName)) as EnvName[]
             : [];
 
+        // E) Warn if env files already exist (conflict detection)
+        if (requestedEnvs.length > 0) {
+          const envFileMap: Record<string, string> = {
+            codex: join(root, 'AGENTS.md'),
+            gemini: join(root, 'GEMINI.md'),
+            cursor: join(root, '.cursor', 'rules', 'deckent.mdc'),
+          };
+          for (const env of requestedEnvs) {
+            const envFile = envFileMap[env];
+            if (envFile && existsSync(envFile) && !options.upgrade) {
+              print(`  Warning: ${envFile} already exists. Use --upgrade to overwrite.`);
+            }
+          }
+        }
+
         if (requestedEnvs.length > 0) {
           // Detect full stack for stack-aware templates
           let stackResult: FullStackResult;
@@ -418,21 +495,22 @@ globs: ["**/*"]
           }
         }
 
-        // 7d. Create .deck template
+        // 7d. Create .deck template + ensure .gitignore safety
         try {
           createDeckTemplate(root);
+          ensureDeckGitignore(root);
         } catch { /* non-fatal */ }
 
         // 8. Claude rules (blueprint-quality templates with frontmatter)
-        writeIfNotExists(
+        writeFile(
           join(root, CLAUDE_RULES_DIR, 'brain.md'),
           `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 200 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 600 lines\n- Sprint is NEVER left incomplete\n`,
         );
-        writeIfNotExists(
+        writeFile(
           join(root, CLAUDE_RULES_DIR, 'auditor.md'),
           `---\npaths: [".dashboard", ".brain/PATTERNS.md"]\n---\n# Auditor Rules\n- NEVER write source code\n- Scan every 30 seconds\n- Read all heartbeat files → detect stale agents (>2min = alert)\n- Run git diff --stat → detect boundary violations\n- Check .locks/ → detect stale locks (>5min)\n- Detect circular dependencies / deadlocks\n- Overwrite .dashboard on every scan (never append)\n- Append new patterns to PATTERNS.md (never overwrite)\n- Write alerts for critical issues\n`,
         );
-        writeIfNotExists(
+        writeFile(
           join(root, CLAUDE_RULES_DIR, 'worker-default.md'),
           `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run tests before marking done (npx vitest run)\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`,
         );
@@ -452,7 +530,7 @@ globs: ["**/*"]
 
         // 10a. PROJECT-IDENTITY.md (permanent memory — never decayed)
         try {
-          const analysis = options.auto ? analyzeProject(root) : undefined;
+          const analysis = options.auto ? detectedAnalysis ?? analyzeProject(root) : undefined;
           writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
             projectName,
             sprintId: 'sprint-000',
@@ -566,12 +644,16 @@ globs: ["**/*"]
             print(`\n  Auto-configured: ${autoConfig.selectedProviders[0]} (only available provider)`);
           }
         } else if (options.auto) {
-          // --auto mode with multiple providers: use first available as brain + worker
-          const firstAvailable = providers.find(p => p.available)!.name;
+          // --auto mode with multiple providers: use first available as brain + worker, second as fallback
+          const availableProviders = providers.filter(p => p.available);
+          const firstAvailable = availableProviders[0]!.name;
           providerConfig = {
             brain_provider: firstAvailable,
             worker_provider: firstAvailable,
           };
+          if (availableProviders.length > 1) {
+            providerConfig.fallback_provider = availableProviders[1]!.name;
+          }
         } else {
           // Interactive: run provider wizard
           print('');
@@ -590,8 +672,8 @@ globs: ["**/*"]
         }
         try {
           const existing = JSON.parse(readFileSync(providerConfigPath, 'utf-8')) as Record<string, unknown>;
-          Object.assign(existing, providerMerge);
-          writeFileSync(providerConfigPath, JSON.stringify(existing, null, 2) + '\n');
+          const merged = deepMerge(existing, providerMerge);
+          writeFileSync(providerConfigPath, JSON.stringify(merged, null, 2) + '\n');
         } catch {
           // Config file not readable yet — write fresh with provider fields
           const freshConfig: Record<string, unknown> = { mode, language, projectName, ...providerMerge };
@@ -629,8 +711,24 @@ globs: ["**/*"]
 
         // Human-friendly next steps (replaces old getMessage-based output)
         print(formatNextSteps(language));
+        // F) --repair: show which steps failed and how to fix them
+        if (options.repair && failedSteps.length > 0) {
+          print('\n  Failed steps:');
+          for (const step of failedSteps) {
+            print(`  ✗ ${step.step}: ${step.error}`);
+          }
+          print('\n  To retry: deckent init --upgrade');
+        }
       } catch (error) {
+        // F) Error recovery — show which step failed with context
         printError(error);
+        print(`\n  Init failed. To retry after fixing the issue: deckent init --upgrade`);
+        if (failedSteps.length > 0) {
+          print('  Previously failed steps:');
+          for (const step of failedSteps) {
+            print(`  ✗ ${step.step}: ${step.error}`);
+          }
+        }
         process.exitCode = 1;
       }
     });

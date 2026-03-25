@@ -112,3 +112,33 @@
 - Agent Delete + Edit Komutları (P2): GO_WITH_TECH_DEBT
 - Skill Enable/Disable + Delete Komutları (P2): GO_WITH_TECH_DEBT
 - Explain --sprint Flag + Goal Bilgisi + Dil Desteği (P2): GO_WITH_TECH_DEBT
+## Sprint sprint-056 Learnings
+- Doc Updater Referans Fix + CHANGELOG Konsolidasyonu: GO_WITH_TECH_DEBT
+- init Bug Fix — deepMerge + .deck Security + Provider Wizard: GO_WITH_TECH_DEBT
+- init UX — Auto Lang, Recommendation, Re-init, Error Recovery: GO_WITH_TECH_DEBT
+- plan Core — Async Usage, Dry-Run, Idempotency, Safeguard: GO_WITH_TECH_DEBT
+- plan Quality — Parser, i18n, Context Priority, Error Logging: GO_WITH_TECH_DEBT
+- start Core — Wait Timeout, Spawn Retry, Zero-Config, Phase Persistence: GO_WITH_TECH_DEBT
+- start Quality — Provider Cache, Dashboard Usage, Cleanup Finally, --watch Alt: GO_WITH_TECH_DEBT
+- status Overhaul — Standalone, ETA, NO_COLOR, fs.watch, Verbose: NO_GO
+- doctor Improvements — tmux Conditional, .deck Check, Auth, Hints: NO_GO
+- retro+explain Quality — Dil, Trend, Agent/Skill Perf, Learnings: NO_GO
+## Sprint sprint-057 Learnings
+- doctor Improvements — tmux Conditional, .deck Check, Auth, Hints: GO_WITH_TECH_DEBT
+- cleanup+decay Overhaul — Auto Decay, Combo, Lock Guard, Archive: GO_WITH_TECH_DEBT
+- run+test+web Flags — Timeout, Keep, Sandbox, CI, MIME: GO_WITH_TECH_DEBT
+- sync+onboard+upgrade Polish: GO_WITH_TECH_DEBT
+- agent+skill+plugin+marketplace+archive-debt Completeness: NO_GO
+- dashboard+attach+watch+cross-cutting: NO_GO
+## Sprint sprint-058 Learnings
+## Sprint sprint-059 Learnings
+- cli-deep-analysis.md Full [DONE] Marking + Doğrulama: GO_WITH_TECH_DEBT — cli-deep-analysis.md güncellendi. Sprint 056-058 değişikliklerini doğrulayarak ~51 yeni [DONE] işareti eklendi (Sprint 0
+- Prompt Boilerplate Azaltma + Worker Guide: GO_WITH_TECH_DEBT — Created .deckent/workspace/WORKER-GUIDE.md with heartbeat format, result format, and error handling rules. Shortened bui
+- spawn+kill+run Multi-Provider Desteği: GO_WITH_TECH_DEBT — Multi-provider support added: (A) spawn.ts exports spawnWorkerMultiProvider() that routes claude→tmux, codex/gemini→subp
+- doctor+watch Provider-Aware Fix: GO_WITH_TECH_DEBT — A) doctor tmux conditional was already implemented in checkTmux(providerNames) — tmux required=false when only codex/gem
+- MCP Tools Expansion (+6 tools): NO_GO
+- MCP Resources Expansion (+4 resources): GO_WITH_TECH_DEBT — Added 4 new MCP resources: deckent://retro (RETRO.md content), deckent://usage (sprint usage JSON), deckent://tasks (act
+- MCP Tool Quality — Enrichment + Error Handling: GO_WITH_TECH_DEBT — A) Enriched responses: Added summaries/hints for 6 new tools (config, usage, review, run, kill, cleanup) to enrich.ts. A
+- Format Tutarlılığı + Dead Code Temizliği: GO_WITH_TECH_DEBT — All three sub-tasks (A, B, C) were already implemented in the codebase: A) Sprint log header names (Total Tasks, Complet
+- Sync Genişleme (Gemini/Cursor/Codex Adapters): GO_WITH_TECH_DEBT — Sync genişletildi: (A) GEMINI.md sync — syncGeminiAdapter() ayrı fonksiyon olarak çıkarıldı, (B) .cursor/rules sync — sy
+- Doc Updater Fix + CHANGELOG Konsolidasyonu: GO_WITH_TECH_DEBT — A) sprint-log.ts targetFile was already 'docs/SPRINT-LOG.md' (consistent, no fix needed). B) Root CHANGELOG.md already r

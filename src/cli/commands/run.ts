@@ -1,19 +1,24 @@
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, createReadStream } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import type { ModelType, TaskResult } from '../../core/types.js';
+import type { ModelType, TaskResult, Task } from '../../core/types.js';
 import { TaskStatus, ALL_MODELS } from '../../core/types.js';
 import { TASKS_DIR } from '../../core/constants.js';
-import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { buildWorkerPrompt } from '../../orchestra/brain.js';
+import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { spawnWorkerMultiProvider } from './spawn.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
 export interface RunCommandOpts {
   model?: string;
   scope?: string;
+  timeout?: string;
+  keep?: boolean;
+  autoApprove?: boolean;
+  verbose?: boolean;
 }
 
 export interface SingleTaskResult {
@@ -106,6 +111,47 @@ export async function waitForRunResult(
   return null;
 }
 
+/**
+ * Stream worker log file to stdout until the result file appears or timeout.
+ */
+export async function streamWorkerLog(
+  projectRoot: string,
+  taskId: string,
+  timeoutMs: number,
+): Promise<void> {
+  const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+  const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+  const pollInterval = 500;
+  const startTime = Date.now();
+
+  // Wait for log file to appear (up to min(10s, timeoutMs/2))
+  const logWaitMax = Math.min(10_000, Math.floor(timeoutMs / 2));
+  let waited = 0;
+  while (!existsSync(logPath) && waited < logWaitMax) {
+    await sleep(500);
+    waited += 500;
+  }
+
+  if (!existsSync(logPath)) return;
+
+  let offset = 0;
+  while (Date.now() - startTime < timeoutMs) {
+    if (existsSync(logPath)) {
+      const stream = createReadStream(logPath, { start: offset, encoding: 'utf-8' });
+      await new Promise<void>((resolve) => {
+        stream.on('data', (chunk) => {
+          process.stdout.write(chunk as string);
+          offset += Buffer.byteLength(chunk as string, 'utf-8');
+        });
+        stream.on('end', resolve);
+        stream.on('error', resolve);
+      });
+    }
+    if (existsSync(resultPath)) break;
+    await sleep(pollInterval);
+  }
+}
+
 // ─── Command Registration ────────────────────────────────────────────
 
 export function registerRun(program: Command): void {
@@ -114,13 +160,27 @@ export function registerRun(program: Command): void {
     .description('Run a single one-shot task without a sprint cycle')
     .option('--model <model>', 'Model to use (default: sonnet). Options: opus, sonnet, haiku, gpt-4.1, o3, o4-mini, gemini-2.5-pro, gemini-2.5-flash', 'sonnet')
     .option('--scope <dir>', 'Worker scope directory (default: ./)', './')
+    .option('--timeout <ms>', 'Maximum wait time in milliseconds (default: 300000)', '300000')
+    .option('--keep', 'Keep task files after completion (skip cleanup)')
+    .option('--auto-approve', 'Pass auto-approve flag to the worker')
+    .option('--verbose', 'Stream worker log output to stdout in real-time')
     .action(async (description: string, opts: RunCommandOpts) => {
       const root = resolveProjectRoot();
       const model = (opts.model ?? 'sonnet') as ModelType;
       const scopeDir = opts.scope ?? './';
+      const timeoutMs = opts.timeout ? parseInt(opts.timeout, 10) : 300_000;
+      const keepFiles = opts.keep ?? false;
+      const autoApprove = opts.autoApprove ?? false;
+      const verbose = opts.verbose ?? false;
 
       if (!(ALL_MODELS as readonly string[]).includes(model)) {
         printError(new Error(`Invalid model: ${model}. Must be one of: ${ALL_MODELS.join(', ')}`));
+        process.exitCode = 1;
+        return;
+      }
+
+      if (isNaN(timeoutMs) || timeoutMs <= 0) {
+        printError(new Error(`Invalid timeout value: ${opts.timeout}`));
         process.exitCode = 1;
         return;
       }
@@ -135,22 +195,32 @@ export function registerRun(program: Command): void {
 
       print(`Running task ${taskId} (model: ${model}, scope: ${scopeDir})`);
       print(`Description: ${description}`);
+      if (timeoutMs !== 300_000) print(`Timeout: ${timeoutMs}ms`);
 
       try {
-        // Spawn worker
-        ensureSession();
-        const prompt = buildWorkerPrompt(task);
-        spawnWorker(taskId, model, prompt, root, { autoApprove: false });
-        print(`Worker spawned in tmux window w-${taskId}`);
+        // Resolve agent and skill prompts if available (task may have assignedAgent/assignedSkills)
+        const agentPrompt = resolveAgentPrompt(root, task as Task);
+        const skillPrompts = resolveSkillPrompts(root, task as Task);
+
+        // Spawn worker via appropriate backend based on model's provider
+        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
+        const { backend } = spawnWorkerMultiProvider(taskId, model, prompt, root, { autoApprove });
+        print(`Worker spawned via ${backend} (w-${taskId})`);
+
+        // Stream logs or wait for result
+        if (verbose) {
+          print('--- Worker output ---');
+          await streamWorkerLog(root, taskId, timeoutMs);
+          print('--- End of worker output ---');
+        }
 
         // Wait for result
-        const timeoutMs = 5 * 60 * 1000; // 5 minutes
         print('Waiting for result...');
         const result = await waitForRunResult(root, taskId, timeoutMs);
 
         if (!result) {
           print('Task timed out without producing a result.');
-          cleanupRunTask(root, taskId);
+          if (!keepFiles) cleanupRunTask(root, taskId);
           process.exitCode = 1;
           return;
         }
@@ -164,8 +234,12 @@ export function registerRun(program: Command): void {
         }
         print(`Tests passed: ${result.testsPassed ? 'yes' : 'no'}`);
 
-        // Cleanup
-        cleanupRunTask(root, taskId);
+        // Cleanup (unless --keep)
+        if (!keepFiles) {
+          cleanupRunTask(root, taskId);
+        } else {
+          print(`Task files preserved (--keep): task-${taskId}.*`);
+        }
 
         // Exit code
         if (assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT') {
@@ -174,9 +248,10 @@ export function registerRun(program: Command): void {
           process.exitCode = 1;
         }
       } catch (error) {
-        cleanupRunTask(root, taskId);
+        if (!keepFiles) cleanupRunTask(root, taskId);
         printError(error);
         process.exitCode = 1;
       }
     });
 }
+

@@ -64,6 +64,7 @@ export {
   adjustSprintSize,
   planSprint,
   confirmDraftTasks,
+  cleanupDraftTasks,
   buildWorkerPrompt,
   cleanup,
   runSprint,

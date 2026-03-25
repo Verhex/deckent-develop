@@ -1,4 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
+// ─── Project Analyzer ────────────────────────────────────────────────────────
+// L) This module covers ProjectAnalysis (framework, language, ci, fileCount,
+//    authorCount, size, methodology). stack-detector.ts is the canonical source
+//    for language/framework/testFramework/buildTool in the stack detection flow.
+//    analyzer.ts is kept as a standalone module for CLI 'analyze' command output.
+import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type {
@@ -10,8 +15,19 @@ import type {
   DetectedCI,
   ProjectSize,
   MethodologyRecommendation,
-} from './types.js';
+} from './config-types.js';
 import { readJsonSafe } from './utils.js';
+
+// N) In-memory cache for analyzeProject results (key: projectRoot)
+const _analyzeCache = new Map<string, { result: ProjectAnalysis; mtime: number }>();
+
+function getConfigMtime(root: string): number {
+  try {
+    return statSync(join(root, 'package.json')).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
 
 function readPackageJson(root: string): { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } | null {
   const pkgPath = join(root, 'package.json');
@@ -55,7 +71,6 @@ function detectTestFramework(root: string): DetectedTestFramework {
     if (devDeps['jest']) return 'jest';
     if (devDeps['mocha']) return 'mocha';
   }
-  // Check for pytest in pyproject.toml
   const pyprojectPath = join(root, 'pyproject.toml');
   if (existsSync(pyprojectPath)) {
     try {
@@ -85,10 +100,36 @@ function detectCI(root: string): DetectedCI {
   return 'unknown';
 }
 
+/** M) Get file count: try git first, fall back to fs-based walk. */
 function getFileCount(root: string): number {
   const result = spawnSync('git', ['ls-files'], { cwd: root, encoding: 'utf-8' });
-  if (result.status !== 0) return 0;
-  return result.stdout.split('\n').filter(l => l.length > 0).length;
+  if (result.status === 0 && result.stdout) {
+    const count = result.stdout.split('\n').filter(l => l.length > 0).length;
+    if (count > 0) return count;
+  }
+  // M) Fallback: count files recursively via fs (skip node_modules, .git, dist)
+  return countFilesFs(root, 0);
+}
+
+function countFilesFs(dir: string, depth: number): number {
+  if (depth > 10) return 0;
+  const skipDirs = new Set(['node_modules', '.git', 'dist', 'build', '.deckent', 'coverage']);
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    let count = 0;
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!skipDirs.has(entry.name)) {
+          count += countFilesFs(join(dir, entry.name), depth + 1);
+        }
+      } else {
+        count++;
+      }
+    }
+    return count;
+  } catch {
+    return 0;
+  }
 }
 
 function getAuthorCount(root: string): number {
@@ -112,6 +153,11 @@ function recommendMethodology(size: ProjectSize, authorCount: number, fileCount:
   return 'sprint';
 }
 
+/**
+ * Analyze the project at the given root directory.
+ *
+ * M) Falls back to fs-based file counting when git is not available.
+ */
 export function analyzeProject(root: string): ProjectAnalysis {
   const framework = detectFramework(root);
   const language = detectLanguage(root);
@@ -134,4 +180,26 @@ export function analyzeProject(root: string): ProjectAnalysis {
     size,
     methodology,
   };
+}
+
+/**
+ * N) Cached version of analyzeProject. Results are stored in memory
+ * keyed by projectRoot and invalidated when package.json mtime changes.
+ * Prefer this for CLI commands that may be called repeatedly.
+ */
+export function analyzeProjectCached(root: string): ProjectAnalysis {
+  const mtime = getConfigMtime(root);
+  const cached = _analyzeCache.get(root);
+  if (cached && cached.mtime === mtime) {
+    return cached.result;
+  }
+
+  const result = analyzeProject(root);
+  _analyzeCache.set(root, { result, mtime });
+  return result;
+}
+
+/** Clear the analysis cache (useful for tests). */
+export function clearAnalyzeCache(): void {
+  _analyzeCache.clear();
 }

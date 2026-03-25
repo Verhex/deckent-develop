@@ -128,7 +128,7 @@ describe('detectProjectInfo', () => {
     });
     const info = detectProjectInfo('/tmp/test');
     expect(info.hasTsConfig).toBe(true);
-    expect(info.language).toBe('TypeScript');
+    expect(info.language).toBe('typescript');
   });
 
   it('returns unknown when no package.json', () => {

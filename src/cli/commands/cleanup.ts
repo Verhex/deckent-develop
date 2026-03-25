@@ -2,8 +2,9 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
-import { SprintStatus, SprintPhase } from '../../core/types.js';
-import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
+import { SprintStatus, SprintPhase, TaskStatus } from '../../core/types.js';
+import { TASKS_DIR, LOCKS_DIR, BRAIN_TOTAL_LINE_BUDGET } from '../../core/constants.js';
+import { countBrainLines } from '../../core/utils.js';
 import { cleanup, runDecay } from '../../orchestra/brain.js';
 import { destroy } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
@@ -45,6 +46,7 @@ export function registerCleanup(program: Command): void {
       }
 
       try {
+        // B) --decay + normal cleanup combo: run decay first, then continue to normal cleanup
         if (opts.decay) {
           const result = runDecay(root, 'sprint-cleanup', { force: true });
           print(getMessage('cleanup.decay_complete', lang, {
@@ -62,7 +64,7 @@ export function registerCleanup(program: Command): void {
               patterns: String(result.removedPatternCount),
             }));
           }
-          return;
+          // NOTE: intentionally fall through to normal cleanup (no early return)
         }
 
         const tasks: Task[] = [];
@@ -78,6 +80,13 @@ export function registerCleanup(program: Command): void {
               // skip malformed task files
             }
           }
+        }
+
+        // C) Active lock guard: warn if any tasks are still EXECUTING
+        const executingTasks = tasks.filter(t => t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED);
+        if (executingTasks.length > 0) {
+          const ids = executingTasks.map(t => t.id).join(', ');
+          print(`Warning: ${executingTasks.length} task(s) are still active (${ids}). Their locks will be released.`);
         }
 
         const sprint: Sprint = {
@@ -97,7 +106,16 @@ export function registerCleanup(program: Command): void {
           // session may not exist
         }
 
-        print(getMessage('cleanup.complete', lang, { count: String(tasks.length) }));
+        // Only print cleanup.complete when not in decay mode (decay already showed its own summary)
+        if (!opts.decay) {
+          print(getMessage('cleanup.complete', lang, { count: String(tasks.length) }));
+        }
+
+        // A) Budget warning: check .brain/ size after cleanup
+        const brainLines = countBrainLines(root);
+        if (brainLines > BRAIN_TOTAL_LINE_BUDGET) {
+          print(`\nWarning: .brain/ has ${brainLines} lines (budget: ${BRAIN_TOTAL_LINE_BUDGET}). Run \`deckent cleanup --decay\` to reduce memory.`);
+        }
       } catch (error) {
         printError(error);
         process.exitCode = 1;

@@ -7,6 +7,7 @@ import type {
 } from '../core/types.js';
 import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
 import { calculateModelScore } from './model-selector.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 // ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
@@ -132,9 +133,12 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     const allowedModels = PROVIDER_MODEL_MAP[provider];
     if (!allowedModels || !(allowedModels as readonly string[]).includes(params.model)) {
       // Log warning but keep provider as-is — task 6's model equivalence will handle later
-      console.warn(
-        `[task-builder] Model "${params.model}" is not compatible with provider "${provider}". ` +
-        `Allowed models for ${provider}: ${(allowedModels ?? []).join(', ')}`,
+      debugLog(
+        'createTask:model-provider-mismatch',
+        new Error(
+          `Model "${params.model}" is not compatible with provider "${provider}". ` +
+          `Allowed models for ${provider}: ${(allowedModels ?? []).join(', ')}`,
+        ),
       );
     }
   }
@@ -171,11 +175,23 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const directories: string[] = [];
   const filesWrite: string[] = [];
 
-  // Match directory-like paths: src/..., tests/...
-  const dirMatches = line.match(/\b(src\/[\w/.-]*|tests\/[\w/.-]*)\//g);
+  // Match directory-like paths: src/..., tests/..., docs/...
+  const dirMatches = line.match(/\b(src\/[\w/.-]*|tests\/[\w/.-]*|docs\/[\w/.-]*)\//g);
   if (dirMatches) {
     for (const d of dirMatches) {
       if (!directories.includes(d)) directories.push(d);
+    }
+  }
+
+  // Match standalone doc references like CHANGELOG.md, docs/foo.md
+  const docFileMatches = line.match(/\b(docs\/[\w/.-]+\.(?:md|ts|js)|(?:CHANGELOG|README|SPRINT-LOG)\.md)\b/g);
+  if (docFileMatches) {
+    for (const f of docFileMatches) {
+      // If it's a standalone doc file (not under docs/), add docs/ to directories
+      if (!f.startsWith('docs/') && !directories.some(d => d.startsWith('docs/'))) {
+        directories.push('docs/');
+      }
+      if (!filesWrite.includes(f)) filesWrite.push(f);
     }
   }
 
@@ -191,9 +207,35 @@ export function extractScopeFromDirective(line: string): TaskScope {
 }
 
 /**
+ * Enrich a task scope by adding test file patterns to filesWrite
+ * when tests/ is present in directories but no test files are in filesWrite.
+ * Also ensures docs/ directory is included when doc files are in filesWrite.
+ */
+export function enrichScopeWithTestFiles(scope: TaskScope, filesWriteSource: string[]): TaskScope {
+  const directories = [...scope.directories];
+  const filesWrite = [...scope.filesWrite];
+
+  // A) If tests/ is in directories but no test files in filesWrite, add test patterns
+  const hasTestDir = directories.some(d => d.startsWith('tests/'));
+  const hasTestFiles = filesWrite.some(f => f.startsWith('tests/') || f.includes('.test.'));
+  if (hasTestDir && !hasTestFiles) {
+    // Derive test file patterns from source filesWrite entries
+    for (const f of filesWriteSource) {
+      if (f.startsWith('src/') && f.endsWith('.ts')) {
+        const testPath = f.replace(/^src\//, 'tests/').replace(/\.ts$/, '.test.ts');
+        if (!filesWrite.includes(testPath)) filesWrite.push(testPath);
+      }
+    }
+  }
+
+  return { directories, filesRead: scope.filesRead, filesWrite };
+}
+
+/**
  * Parse a DIRECTIVES.md document into structured task definitions.
  * Splits on "## Task N:" or "## Gorev N:" headings and extracts title, scope,
  * test targets, and optional Model/Effort overrides from each section.
+ * Falls back to bullet/numbered list parsing if no heading-based sections found.
  * @param content - Raw DIRECTIVES.md content
  * @returns Array of parsed directive tasks; empty if no structured sections found
  */
@@ -202,7 +244,10 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
   const blockSplit = content.split(/^##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:/m);
   const blocks = blockSplit.slice(1); // skip content before first heading
 
-  if (blocks.length === 0) return []; // no structured sections → fallback
+  if (blocks.length === 0) {
+    // Fallback: try bullet list or numbered list format
+    return parseBulletOrNumberedTasks(content);
+  }
 
   const tasks: ParsedDirectiveTask[] = [];
   for (const block of blocks) {
@@ -258,8 +303,106 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     // safe: validProviders.includes() confirms the string is a valid ProviderName before assignment
     const parsedProvider = (rawProvider && validProviders.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
-    tasks.push({ title, description: block.trim(), scope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort });
+    const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
+    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort });
   }
+  return tasks;
+}
+
+/**
+ * Parse bullet list or numbered list task format as fallback.
+ * Supports formats:
+ *   - "- Task: My task title"
+ *   - "* Task: My task title"
+ *   - "1. My task title"
+ *   - "1) My task title"
+ * Extracts Model/Effort/Provider overrides from indented sub-lines.
+ * @param content - Raw directive content
+ * @returns Array of parsed directive tasks
+ */
+export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask[] {
+  const tasks: ParsedDirectiveTask[] = [];
+  const lines = content.split('\n');
+
+  // Match "- Task: <title>", "* Task: <title>", "1. <title>", or "1) <title>"
+  const taskLineRegex = /^(?:[-*]\s+Task:\s*|[-*]\s+\d+[.)]\s*|\d+[.)]\s+)(.+)/;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    const match = taskLineRegex.exec(line);
+    if (match) {
+      const title = match[1]!.trim();
+      if (title.length >= 3) {
+        // Collect indented sub-lines for model/effort/scope hints
+        const subLines: string[] = [];
+        let j = i + 1;
+        while (j < lines.length) {
+          const subLine = lines[j]!;
+          // Continue collecting if indented or starts with special chars
+          if (/^\s+/.test(subLine) || /^[\s]*[-*]\s+(?:Model|Effort|Provider|Scope|Files|Test):/.test(subLine)) {
+            subLines.push(subLine);
+            j++;
+          } else {
+            break;
+          }
+        }
+
+        const allLines = [line, ...subLines];
+
+        // Extract scope from all lines
+        const scopeLines = allLines.filter(l =>
+          l.includes('Dosya:') || l.includes('Kapsam:') || l.includes('Scope:') || l.includes('Files:') ||
+          /\bsrc\/|tests\//.test(l),
+        );
+        const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
+          const extracted = extractScopeFromDirective(scopeLine);
+          return {
+            directories: [...acc.directories, ...extracted.directories.filter(d => !acc.directories.includes(d))],
+            filesRead: [],
+            filesWrite: [...acc.filesWrite, ...extracted.filesWrite.filter(f => !acc.filesWrite.includes(f))],
+          };
+        }, { directories: [], filesRead: [], filesWrite: [] });
+
+        // Extract Model override
+        const modelLine = allLines.find(l => /Model:\s*/i.test(l));
+        const rawModel = modelLine ? modelLine.replace(/.*Model:\s*/i, '').trim().toLowerCase() : undefined;
+        const parsedForceModel = (rawModel && (ALL_MODELS as readonly string[]).includes(rawModel) ? rawModel : undefined) as ModelType | undefined;
+
+        // Extract Effort override
+        const effortLine = allLines.find(l => /Effort:\s*/i.test(l));
+        const rawEffort = effortLine ? effortLine.replace(/.*Effort:\s*/i, '').trim().toLowerCase() : undefined;
+        const validEfforts = ['low', 'normal', 'high'];
+        const parsedForceEffort = (rawEffort && validEfforts.includes(rawEffort) ? rawEffort : undefined) as TaskEffort | undefined;
+
+        // Extract Provider override
+        const providerLine = allLines.find(l => /Provider:\s*/i.test(l));
+        const rawProvider = providerLine ? providerLine.replace(/.*Provider:\s*/i, '').trim().toLowerCase() : undefined;
+        const validProviders = Object.keys(PROVIDER_MODEL_MAP);
+        const parsedProvider = (rawProvider && validProviders.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
+
+        // Extract test target
+        const testLine = allLines.find(l => /Test:\s*/i.test(l));
+        const testTarget = testLine ? testLine.replace(/.*Test:\s*/i, '').trim() : undefined;
+
+        const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
+        tasks.push({
+          title,
+          description: allLines.join('\n').trim(),
+          scope: enrichedScope,
+          testTarget,
+          provider: parsedProvider,
+          forceModel: parsedForceModel,
+          forceEffort: parsedForceEffort,
+        });
+
+        i = j;
+        continue;
+      }
+    }
+    i++;
+  }
+
   return tasks;
 }
 
@@ -311,6 +454,37 @@ export function resolveWorkerEffort(task: Task): 'max' | 'high' | 'medium' | 'lo
 }
 
 /**
+ * Truncate content at a paragraph or section boundary instead of mid-sentence.
+ * Looks for the last double-newline, heading, or sentence-ending punctuation before maxLen.
+ */
+export function truncateAtParagraph(content: string, maxLen: number): string {
+  if (content.length <= maxLen) return content;
+
+  const slice = content.slice(0, maxLen);
+
+  // Try to find last paragraph break (double newline)
+  const lastParagraph = slice.lastIndexOf('\n\n');
+  if (lastParagraph > maxLen * 0.5) return slice.slice(0, lastParagraph).trimEnd();
+
+  // Try last heading boundary (markdown heading)
+  const lastHeading = slice.lastIndexOf('\n#');
+  if (lastHeading > maxLen * 0.5) return slice.slice(0, lastHeading).trimEnd();
+
+  // Try last single newline (line boundary)
+  const lastNewline = slice.lastIndexOf('\n');
+  if (lastNewline > maxLen * 0.7) return slice.slice(0, lastNewline).trimEnd();
+
+  // Fallback: cut at last sentence-ending punctuation
+  const lastSentence = Math.max(
+    slice.lastIndexOf('. '),
+    slice.lastIndexOf('.\n'),
+  );
+  if (lastSentence > maxLen * 0.5) return slice.slice(0, lastSentence + 1).trimEnd();
+
+  return slice;
+}
+
+/**
  * Build the full prompt string that will be sent to a worker agent.
  * Includes agent context block (if assigned), skill context block (if skills assigned),
  * task details, scope instructions, heartbeat format, and result file format.
@@ -332,16 +506,17 @@ export function buildWorkerPrompt(
     : '';
 
   // Skill context block: appended after agent block when skills are assigned
-  const SKILL_SECTION_MAX = 4000;
-  const SKILL_DEFAULT_MAX = 1500;
+  // Dynamic budget based on task effort: high→2000, normal→1500, low→1000 per skill
+  const effortBudgetMap: Record<string, number> = { high: 2000, max: 2000, medium: 1500, normal: 1500, low: 1000 };
+  const SKILL_PER_ITEM_MAX = effortBudgetMap[effort] ?? 1500;
+  const SKILL_SECTION_MAX = Math.round(SKILL_PER_ITEM_MAX * 2.67);
   let skillBlock = '';
   if (skillPrompts && skillPrompts.length > 0) {
     const header = '=== Skills ===';
     const parts: string[] = [header];
     let totalLen = header.length;
     for (const sp of skillPrompts) {
-      const maxChars = SKILL_DEFAULT_MAX;
-      const truncated = sp.content.slice(0, maxChars);
+      const truncated = truncateAtParagraph(sp.content, SKILL_PER_ITEM_MAX);
       const entry = `--- ${sp.name} ---\n${truncated}`;
       if (totalLen + entry.length + 1 > SKILL_SECTION_MAX) break;
       parts.push(entry);
@@ -360,30 +535,8 @@ export function buildWorkerPrompt(
     ? task.scope.filesWrite.map(f => `  - ${f}`).join('\n')
     : '  - (determined by your task scope)';
 
-  // ─── Result file JSON template ─────────────────────────────────────
-  const resultTemplate = `{
-  "taskId": "${task.id}",
-  "filesChanged": ["list/of/files/you/created/or/modified"],
-  "linesAdded": 0,
-  "linesRemoved": 0,
-  "testsPassed": true,
-  "coverage": 0,
-  "selfAssessment": "DONE",
-  "notes": "Brief summary of what was done"
-}`;
-
-  // ─── Heartbeat JSON template ───────────────────────────────────────
-  const heartbeatTemplate = `{
-  "workerId": "w-${task.id}",
-  "taskId": "${task.id}",
-  "status": "EXECUTING",
-  "currentAction": "Starting task",
-  "timestamp": "<use new Date().toISOString() — UTC ISO 8601, e.g. 2026-01-01T00:00:00.000Z>",
-  "filesChangedCount": 0,
-  "sequence": 0
-}`;
-
   return `${agentBlock}${skillBlock}You are a Deckent worker agent.
+See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.
 
 ## Your Task
 ${task.id}: ${task.title} — ${task.description}
@@ -408,31 +561,10 @@ ${scopeFiles}
 DO NOT touch files outside your scope — the auditor will flag violations.
 
 ## Heartbeat
-Create .tasks/task-${task.id}.hb BEFORE starting work:
-
-${heartbeatTemplate}
-
-IMPORTANT: The timestamp field MUST be a valid UTC ISO 8601 string produced by new Date().toISOString(). Never use locale date strings, relative times, or placeholder text.
-
-Update this file periodically as you work:
-- Change status to CODING, TESTING, DOCUMENTING as appropriate
-- Update currentAction with what you're doing
-- Increment sequence on each update
-- Update filesChangedCount as you modify files
-- Always refresh the timestamp using new Date().toISOString() on each update
+Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id}", status "EXECUTING".
+Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).
 
 ## Result File
-Write to: .tasks/task-${task.id}.result
-Format:
-
-${resultTemplate}
-
-selfAssessment must be one of: "DONE", "GO_WITH_TECH_DEBT", "NO_GO"
-The result file is REQUIRED — without it your work cannot be evaluated.
-
-## If Something Goes Wrong
-- tsc fails after 3 attempts → write NO_GO result with error details
-- Tests fail after 3 attempts → write NO_GO result with failing test names
-- Blocked by another task → write NO_GO result explaining the dependency
-- Unsure about scope → err on the side of caution, do NOT touch files outside your scope`;
+Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
+The result file is REQUIRED — without it your work cannot be evaluated.`;
 }

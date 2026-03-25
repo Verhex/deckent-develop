@@ -70,19 +70,35 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
 
 /**
  * Determine which fields are missing from an existing config relative to defaults.
- * Only top-level keys are compared (not nested mode configs).
- * Returns a list of missing top-level field names.
+ * Checks top-level keys and also mode-level keys within the `modes` object.
+ * Returns a list of missing top-level field names (and `modes.<mode>.<field>` paths).
  */
 export function getMissingFields(existing: Record<string, unknown>): string[] {
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;
   const missing: string[] = [];
 
   for (const key of Object.keys(defaults)) {
-    // Skip `modes` — it's complex and managed separately
-    if (key === 'modes') continue;
     // Skip fields whose default is undefined — they're truly optional and
     // won't appear in JSON (JSON.stringify omits undefined values).
     if (defaults[key] === undefined) continue;
+
+    if (key === 'modes') {
+      // Check mode-level fields within each mode
+      const defaultModes = defaults['modes'] as Record<string, Record<string, unknown>>;
+      const existingModes = (existing['modes'] ?? {}) as Record<string, Record<string, unknown>>;
+      for (const modeName of Object.keys(defaultModes)) {
+        const defaultMode = defaultModes[modeName] ?? {};
+        const existingMode = existingModes[modeName] ?? {};
+        for (const modeKey of Object.keys(defaultMode)) {
+          if (defaultMode[modeKey] === undefined) continue;
+          if (!(modeKey in existingMode)) {
+            missing.push(`modes.${modeName}.${modeKey}`);
+          }
+        }
+      }
+      continue;
+    }
+
     if (!(key in existing)) {
       missing.push(key);
     }
@@ -156,8 +172,9 @@ export function migrateConfig(
     };
   }
 
-  // Create backup before modifying
-  const backupPath = `${configPath}.bak`;
+  // Create timestamped backup before modifying
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = `${configPath}.bak.${timestamp}`;
   copyFileSync(configPath, backupPath);
 
   // Merge: existing values preserved, only missing fields added from defaults
@@ -165,9 +182,14 @@ export function migrateConfig(
   const merged = { ...existing };
 
   for (const field of missingFields) {
-    const defaultValue = defaults[field];
-    // Write undefined as null in JSON (so users can see the field exists)
-    merged[field] = defaultValue === undefined ? null : defaultValue;
+    if (field.startsWith('modes.')) {
+      // Nested mode field: modes.<modeName>.<fieldName>
+      setNestedValue(merged, field, getNestedValue(defaults, field));
+    } else {
+      const defaultValue = defaults[field];
+      // Write undefined as null in JSON (so users can see the field exists)
+      merged[field] = defaultValue === undefined ? null : defaultValue;
+    }
   }
 
   writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
@@ -194,8 +216,12 @@ export function migrateConfigInMemory(
   const merged = { ...existing };
 
   for (const field of missingFields) {
-    const defaultValue = defaults[field];
-    merged[field] = defaultValue === undefined ? null : defaultValue;
+    if (field.startsWith('modes.')) {
+      setNestedValue(merged, field, getNestedValue(defaults, field));
+    } else {
+      const defaultValue = defaults[field];
+      merged[field] = defaultValue === undefined ? null : defaultValue;
+    }
   }
 
   return {

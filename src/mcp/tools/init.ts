@@ -67,6 +67,8 @@ export function registerInitTool(server: McpServer): void {
     },
     async ({ projectName, mode, language }) => {
       const root = process.cwd();
+
+      try {
       const created: string[] = [];
 
       // Directories
@@ -243,6 +245,13 @@ Lint: tsc --noEmit
           text: JSON.stringify(enriched),
         }],
       };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Initialization failed: ${message}` }) }],
+          isError: true,
+        };
+      }
     },
   );
 }

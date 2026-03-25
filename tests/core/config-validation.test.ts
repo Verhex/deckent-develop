@@ -46,7 +46,7 @@ describe('validateConfig', () => {
       validateConfig(config);
     } catch (e) {
       const err = e as ConfigValidationError;
-      expect(err.errors).toContainEqual(expect.stringContaining('Invalid mode'));
+      expect(err.errors).toContainEqual(expect.stringContaining('Invalid value'));
       expect(err.errors).toContainEqual(expect.stringContaining('invalid_mode'));
     }
   });
@@ -60,7 +60,7 @@ describe('validateConfig', () => {
       validateConfig(config);
     } catch (e) {
       const err = e as ConfigValidationError;
-      expect(err.errors).toContainEqual(expect.stringContaining('Invalid language'));
+      expect(err.errors).toContainEqual(expect.stringContaining('Invalid value'));
     }
   });
 

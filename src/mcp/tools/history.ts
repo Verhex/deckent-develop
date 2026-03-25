@@ -32,13 +32,14 @@ export function registerHistoryTool(server: McpServer): void {
       title: 'Sprint History',
       description: 'Read sprint history logs from .brain/sprints/. Returns the last N sprint logs.',
       inputSchema: z.object({
-        last: z.number().optional().default(5).describe('Number of recent sprints to return (default: 5)'),
+        last: z.number().min(1).max(50).optional().default(5).describe('Number of recent sprints to return (default: 5, max: 50)'),
       }),
     },
     async ({ last }) => {
       const root = process.cwd();
       const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
 
+      try {
       if (!existsSync(sprintsDir)) {
         const emptyData = { sprints: [], trend: 'insufficient_data' };
         const summary = formatHistoryResponse(emptyData as HistoryData);
@@ -65,6 +66,13 @@ export function registerHistoryTool(server: McpServer): void {
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enriched, summary)) }],
       };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Failed to read sprint history: ${message}` }) }],
+          isError: true,
+        };
+      }
     },
   );
 }

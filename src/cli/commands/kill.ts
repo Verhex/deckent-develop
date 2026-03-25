@@ -7,6 +7,9 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { getMessage } from '../helpers/messages.js';
 import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
+import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
+import { getProviderForModel } from '../../core/task-types.js';
+import type { ModelType } from '../../core/types.js';
 
 /** Find the task JSON file matching a taskId (handles sprint prefix patterns). */
 function findTaskFile(root: string, taskId: string): string | null {
@@ -82,8 +85,48 @@ function cleanPromptFiles(root: string, taskId: string, lang: string): void {
   }
 }
 
+/**
+ * Detect the provider for a task by reading its JSON file and checking the model.
+ * Returns 'claude' as default if task file cannot be read.
+ */
+function detectTaskProvider(root: string, taskId: string): string {
+  const taskFile = findTaskFile(root, taskId);
+  if (!taskFile) return 'claude';
+  try {
+    const data = JSON.parse(readFileSync(taskFile, 'utf-8'));
+    if (data.provider) return data.provider;
+    if (data.model) {
+      try {
+        return getProviderForModel(data.model as ModelType);
+      } catch { /* unknown model */ }
+    }
+  } catch { /* unreadable */ }
+  return 'claude';
+}
+
 /** Kill a single worker and clean up its resources. */
 function killSingle(root: string, taskId: string, lang: string): boolean {
+  const provider = detectTaskProvider(root, taskId);
+
+  // For non-claude providers, try subprocess kill first
+  if (provider !== 'claude') {
+    try {
+      const backend = SpawnBackendFactory.create({
+        backend: 'subprocess',
+        projectDir: root,
+      });
+      backend.kill(taskId);
+      print(getMessage('kill.worker_killed', lang, { taskId }));
+      updateTaskStatus(root, taskId, lang);
+      releaseLocks(root, taskId, lang);
+      cleanPromptFiles(root, taskId, lang);
+      return true;
+    } catch {
+      // Subprocess kill failed, fall through to tmux attempt
+    }
+  }
+
+  // Try tmux kill (default for claude or fallback)
   try {
     killWorker(taskId);
     print(getMessage('kill.worker_killed', lang, { taskId }));
@@ -93,6 +136,21 @@ function killSingle(root: string, taskId: string, lang: string): boolean {
     return true;
   } catch (error) {
     if (error instanceof TmuxError) {
+      // Last resort: try subprocess kill if we haven't already
+      if (provider === 'claude') {
+        try {
+          const backend = SpawnBackendFactory.create({
+            backend: 'subprocess',
+            projectDir: root,
+          });
+          backend.kill(taskId);
+          print(getMessage('kill.worker_killed', lang, { taskId }));
+          updateTaskStatus(root, taskId, lang);
+          releaseLocks(root, taskId, lang);
+          cleanPromptFiles(root, taskId, lang);
+          return true;
+        } catch { /* subprocess also failed */ }
+      }
       printError(new Error(getMessage('kill.worker_not_found', lang, { taskId })));
       process.exitCode = 1;
       return false;

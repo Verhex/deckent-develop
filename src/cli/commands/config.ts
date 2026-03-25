@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
-import { loadConfig, validatePartialConfig, ConfigValidationError, deepMerge } from '../../core/config.js';
+import { loadConfig, validatePartialConfig, ConfigValidationError, deepMerge, CONFIG_METADATA, listConfigByCategory } from '../../core/config.js';
 import { migrateConfig, setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -39,6 +39,7 @@ export function exportConfig(configPath: string, outputFile?: string): void {
 
 /**
  * Import config from a JSON file, merging over existing config.
+ * Supports JSON with comments (strips them before parsing).
  */
 export function importConfig(importPath: string, configPath: string): void {
   if (!existsSync(importPath)) {
@@ -47,7 +48,7 @@ export function importConfig(importPath: string, configPath: string): void {
   const raw = readFileSync(importPath, 'utf-8');
   let importData: Record<string, unknown>;
   try {
-    importData = JSON.parse(raw) as Record<string, unknown>;
+    importData = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
   } catch {
     throw ErrorRegistry.createError('DECKENT_E022', { message: 'Invalid JSON in import file: ' + importPath });
   }
@@ -70,10 +71,34 @@ export function registerConfig(program: Command): void {
   const cmd = program
     .command('config')
     .description('Show or modify project configuration')
-    .action(async () => {
+    .option('--raw', 'Show raw project config without merging defaults')
+    .action(async (opts: { raw?: boolean }) => {
       try {
-        const config = await loadConfig(resolveProjectRoot());
-        print(JSON.stringify(config, null, 2));
+        const root = resolveProjectRoot();
+        const configPath = join(root, PROJECT_CONFIG_PATH);
+        if (opts.raw) {
+          if (!existsSync(configPath)) {
+            print('{}');
+            return;
+          }
+          const raw = readFileSync(configPath, 'utf-8');
+          print(raw.trim());
+        } else {
+          // Auto-migrate project config before loading
+          if (existsSync(configPath)) {
+            try {
+              const rawConfig = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+              const { needsMigration: checkNeeds, migrateConfig: runMigrate } = await import('../../core/config-migration.js');
+              if (checkNeeds(rawConfig)) {
+                runMigrate(configPath, { dryRun: false });
+              }
+            } catch {
+              // Auto-migration failure is non-fatal
+            }
+          }
+          const config = await loadConfig(root);
+          print(JSON.stringify(config, null, 2));
+        }
       } catch (error) {
         printError(error);
         process.exitCode = 1;
@@ -173,6 +198,34 @@ export function registerConfig(program: Command): void {
           printError(error);
         }
         process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('list')
+    .description('List all config parameters grouped by category')
+    .action(() => {
+      const grouped = listConfigByCategory();
+      const categories = Object.keys(grouped).sort();
+      for (const category of categories) {
+        print(`\n${category}:`);
+        const keys = grouped[category] ?? [];
+        for (const key of keys) {
+          const meta = CONFIG_METADATA[key];
+          if (!meta) continue;
+          const defVal = meta.default === undefined ? '' : meta.default === null ? ' (default: null)' : ` (default: ${JSON.stringify(meta.default)})`;
+          print(`  ${key}${defVal} — ${meta.description}`);
+        }
+      }
+    });
+
+  cmd
+    .command('keys')
+    .description('List all config parameter keys')
+    .action(() => {
+      const keys = Object.keys(CONFIG_METADATA).sort();
+      for (const key of keys) {
+        print(key);
       }
     });
 

@@ -1,9 +1,9 @@
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
-import { print, printError, formatDashboard, formatTable, formatHumanStatus } from '../helpers/output.js';
+import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 
@@ -12,6 +12,7 @@ interface StatusOpts {
   json?: boolean;
   verbose?: boolean;
   raw?: boolean;
+  noColor?: boolean;
 }
 
 interface SprintMeta {
@@ -20,31 +21,43 @@ interface SprintMeta {
 }
 
 function readSprintMeta(root: string, _sprintId: string): SprintMeta {
+  const result: SprintMeta = {};
+
+  // Extract title from DIRECTIVES.md — tolerant regex
   try {
     const directivesPath = join(root, 'DIRECTIVES.md');
     if (existsSync(directivesPath)) {
       const content = readFileSync(directivesPath, 'utf-8');
-      // Extract title from first heading: # DIRECTIVES — Sprint 040 (Title)
-      const titleMatch = content.match(/^#\s+DIRECTIVES\s*—\s*Sprint\s+\d+\s*\(([^)]+)\)/m);
-      const title = titleMatch?.[1];
-      return { title };
+      // Match various formats:
+      // # DIRECTIVES — Sprint 040 (Title)
+      // # DIRECTIVES — Sprint 040: Title
+      // # DIRECTIVES: Sprint 040 — Title
+      // # Sprint 040 — Title
+      const titleMatch = content.match(
+        /^#\s+(?:DIRECTIVES\s*[—:\-]\s*)?Sprint\s+\d+\s*[—:(]\s*([^)\n]+)/m,
+      );
+      if (titleMatch?.[1]) {
+        result.title = titleMatch[1].replace(/\)\s*$/, '').trim();
+      }
     }
   } catch {
     // ignore
   }
 
-  // Try reading sprint config for startedAt
+  // Read startedAt from config
   try {
     const configPath = join(root, '.deckent', 'config.json');
     if (existsSync(configPath)) {
       const cfg = JSON.parse(readFileSync(configPath, 'utf-8')) as { sprint_started_at?: string };
-      return { startedAt: cfg.sprint_started_at };
+      if (cfg.sprint_started_at) {
+        result.startedAt = cfg.sprint_started_at;
+      }
     }
   } catch {
     // ignore
   }
 
-  return {};
+  return result;
 }
 
 function readDashboard(dashPath: string): DashboardState | null {
@@ -88,6 +101,16 @@ export function loadTaskFiles(root: string): Task[] {
     }
   }
   return tasks;
+}
+
+/**
+ * Detect sprint ID from task files when no dashboard is available.
+ */
+function detectSprintId(tasks: Task[]): string | undefined {
+  for (const t of tasks) {
+    if (t.sprintId) return t.sprintId;
+  }
+  return undefined;
 }
 
 export function formatAgentAssignments(tasks: Task[], verbose: boolean): string {
@@ -153,6 +176,11 @@ export function formatSkillAssignments(tasks: Task[], verbose: boolean): string 
   return lines.join('\n');
 }
 
+/** Output helper that respects NO_COLOR */
+function output(message: string): void {
+  print(isNoColor() ? stripAnsi(message) : message);
+}
+
 export function registerStatus(program: Command): void {
   program
     .command('status')
@@ -161,12 +189,30 @@ export function registerStatus(program: Command): void {
     .option('--json', 'Output raw JSON instead of formatted dashboard')
     .option('--raw', 'Show legacy raw dashboard (box format)')
     .option('--verbose', 'Show detailed agent and skill assignment info')
+    .option('--no-color', 'Disable colored output')
     .action((opts: StatusOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const lang = getLangFromRoot(root);
 
+      // (A) Standalone mode: if no dashboard, try task files
       if (!existsSync(dashPath)) {
+        const tasks = loadTaskFiles(root);
+        if (tasks.length > 0) {
+          const sprintId = detectSprintId(tasks);
+          if (opts.json) {
+            const standaloneData = {
+              standalone: true,
+              sprintId,
+              tasks: tasks.map(t => ({ id: t.id, title: t.title, status: t.status, model: t.model })),
+              ...(opts.verbose ? { agents: tasks.map(t => ({ taskId: t.id, agent: t.assignedAgent ?? 'generic', skills: t.assignedSkills ?? [] })) } : {}),
+            };
+            output(JSON.stringify(standaloneData, null, 2));
+          } else {
+            output(formatStandaloneStatus(tasks, sprintId));
+          }
+          return;
+        }
         print(getMessage('status.no_active_sprint', lang));
         return;
       }
@@ -177,24 +223,46 @@ export function registerStatus(program: Command): void {
           if (state) {
             process.stdout.write('\x1Bc'); // clear screen
             if (opts.json) {
-              print(JSON.stringify(state, null, 2));
+              const jsonData = opts.verbose
+                ? { ...state, _verbose: { agents: loadTaskFiles(root).map(t => ({ id: t.id, agent: t.assignedAgent, skills: t.assignedSkills })) } }
+                : state;
+              output(JSON.stringify(jsonData, null, 2));
             } else if (opts.raw) {
-              print(formatDashboard(state));
+              output(formatDashboard(state));
             } else {
               const tasks = loadTaskFiles(root);
               const meta = readSprintMeta(root, state.sprint.id);
-              print(formatHumanStatus({
+              output(formatHumanStatus({
                 dashboard: state,
                 tasks,
                 sprintTitle: meta.title,
                 sprintStartedAt: meta.startedAt,
+                projectRoot: root,
+                verbose: opts.verbose,
               }));
             }
           }
         };
         render();
-        const timer = setInterval(render, 2000);
-        const cleanup = (): void => { clearInterval(timer); process.exit(0); };
+
+        // (D) Use fs.watch when available, fallback to setInterval
+        let cleanup: () => void;
+        try {
+          const watcher = watch(dashPath, { persistent: true }, () => {
+            render();
+          });
+          // Also set a fallback interval for resilience
+          const timer = setInterval(render, 5000);
+          cleanup = (): void => {
+            watcher.close();
+            clearInterval(timer);
+            process.exit(0);
+          };
+        } catch {
+          // Fallback to polling if fs.watch fails
+          const timer = setInterval(render, 2000);
+          cleanup = (): void => { clearInterval(timer); process.exit(0); };
+        }
         process.on('SIGINT', cleanup);
         process.on('SIGTERM', cleanup);
         return;
@@ -204,28 +272,35 @@ export function registerStatus(program: Command): void {
         const rawData = readFileSync(dashPath, 'utf-8');
         const state = JSON.parse(rawData) as DashboardState;
         if (opts.json) {
-          print(JSON.stringify(state, null, 2));
+          // (E) --json + --verbose: include agent/skill info
+          const tasks = loadTaskFiles(root);
+          const jsonData = opts.verbose
+            ? { ...state, _verbose: { agents: tasks.map(t => ({ id: t.id, agent: t.assignedAgent ?? 'generic', skills: t.assignedSkills ?? [] })) } }
+            : state;
+          output(JSON.stringify(jsonData, null, 2));
         } else if (opts.raw) {
-          print(formatDashboard(state));
+          output(formatDashboard(state));
           // Show agent and skill assignments in raw mode
           const tasks = loadTaskFiles(root);
           if (tasks.length > 0) {
-            print(formatAgentAssignments(tasks, !!opts.verbose));
-            print(formatSkillAssignments(tasks, !!opts.verbose));
+            output(formatAgentAssignments(tasks, !!opts.verbose));
+            output(formatSkillAssignments(tasks, !!opts.verbose));
           }
         } else {
           // Human-friendly output (default)
           const tasks = loadTaskFiles(root);
           const meta = readSprintMeta(root, state.sprint.id);
-          print(formatHumanStatus({
+          output(formatHumanStatus({
             dashboard: state,
             tasks,
             sprintTitle: meta.title,
             sprintStartedAt: meta.startedAt,
+            projectRoot: root,
+            verbose: opts.verbose,
           }));
           if (opts.verbose) {
-            print(formatAgentAssignments(tasks, true));
-            print(formatSkillAssignments(tasks, true));
+            output(formatAgentAssignments(tasks, true));
+            output(formatSkillAssignments(tasks, true));
           }
         }
       } catch (error) {

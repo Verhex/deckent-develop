@@ -124,16 +124,14 @@ describe('history command agent/skill display', () => {
     expect(print).toHaveBeenCalledWith('No matching sprint history found.');
   });
 
-  it('loads learning data to enrich history when filtering', async () => {
-    vi.mocked(existsSync).mockImplementation((p: any) => {
-      if (String(p).includes('learning')) return true;
-      return true;
-    });
+  it('uses agent/skill info from sprint log content when filtering', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['sprint-025.md'] as any);
+    // Sprint log contains agent/skill info in Agents:/Skills: fields
     vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('learning'))
-        return JSON.stringify({ agents: ['ml-expert'], skills: ['tensorflow'] });
-      return '# sprint-025\n| Total Tasks | 3 |';
+      if (String(p).endsWith('.md'))
+        return '# sprint-025\n| Total Tasks | 3 |\nAgents: ml-expert\nSkills: tensorflow';
+      return '{}'; // usage file fallback
     });
     await runCommand(['history', '--agent', 'ml-expert']);
     const calls = vi.mocked(print).mock.calls.map((c) => c[0]);

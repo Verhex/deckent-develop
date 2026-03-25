@@ -1,619 +1,296 @@
-# DIRECTIVES — Sprint 055: CLI Bug Fix & DRY Refactoring (Deep Analysis Recovery)
+# DIRECTIVES — Sprint 059: CLI + MCP Beta Readiness (Final Polish)
 
-## Goal: cli-deep-analysis.md'deki ~180 öneriden en kritik 10 tanesini uygula. 2 P0 bug fix (retro parse bozuk, kill task status güncellenmiyor), DRY ihlallerini temizle (readLanguage 4x, readJsonSafe 6x duplicate), config/spawn fonksiyonel eksikleri tamamla, CRUD komutları ekle. %100 başarı hedefi — tüm task'lar GO olmalı.
+## Goal: Beta'yı engelleyen 4 kritik blokajı çöz: (1) Prompt Engine fix — agent activation, skill selection, scope, boilerplate azaltma, (2) Multi-provider CLI fix — spawn/kill/run/doctor/watch Codex/Gemini desteği, (3) MCP expansion — 6 yeni tool + 4 yeni resource, (4) Format tutarlılığı + dead code + sync genişleme + doc updater fix. cli-deep-analysis.md'deki Sprint 056-058 değişikliklerini [DONE] olarak işaretle. Beta readiness %64 → %90+ hedef.
 
 ---
 
-## Task 1: Retro Parse/Write Format Uyumsuzluğu Fix + --compare Bug (P0 KRİTİK)
-- Model: opus
+## Task 1: cli-deep-analysis.md Full [DONE] Marking + Doğrulama
+- Model: sonnet
 - Effort: high
-- Files: src/cli/commands/retro.ts, src/orchestra/sprint-reporter.ts
-- Scope: src/cli/commands/, src/orchestra/, tests/cli/commands/, tests/orchestra/
-- Dependencies: yok (ilk çalışacak, Task 6 buna bağlı)
+- Files: docs/analysis/cli-deep-analysis.md
+- Scope: docs/analysis/
 
 ### Description
-**KRİTİK BUG:** `writeRetrospective()` ve `parseRetroToRichSummary()` arasında format uyumsuzluğu var. Retro komutu çalıştırıldığında tüm metrik değerler 0 dönüyor çünkü regex'ler eşleşmiyor.
+Sprint 056-058'de yapılan ~130 CLI iyileştirmesi kod tabanında doğrulandı ama cli-deep-analysis.md'de [DONE] olarak işaretlenmemiş. Tüm doğrulanmış önerileri işaretle.
 
-**A) Parse/Write Format Uyumsuzluğu:**
+Her komut bölümündeki "Geliştirme Önerileri" listesini tara. Sprint 056-058'de yapılan her değişiklik için:
+1. Kaynak kodda grep ile doğrula (fonksiyon/flag/import mevcut mu)
+2. Mevcutsa `[DONE]` prefix'i ekle ve `*Sprint 05X: kısa açıklama*` notu koy
+3. Mevcut değilse açık bırak
 
-Yazma formatı (`sprint-reporter.ts` satır 255-281):
-```
-| What | Value |
-|------|-------|
-| Tasks completed | 5/8 |
-| NO_GO rate | 25% (2/8) |
-| Sprint time | 3m 38s |
-| Coverage | 85.2% |
-```
+Özellikle şu komutlar için Sprint 056-058 değişikliklerini işaretle:
+- init (deepMerge, .deck security, provider wizard, auto lang, recommendation, re-init, error recovery)
+- plan (async checkUsage, --dry-run, idempotency, safeguard, parser, i18n, context priority)
+- start (wait timeout, spawn retry, zero-config, phase persistence, provider cache, sandbox)
+- status (standalone, ETA, NO_COLOR, fs.watch, --json+verbose, budget check, alert, stale uyarı)
+- doctor (tmux conditional, .deck check, auth, stale lock hint, disk/permission, memory info, error registry)
+- retro (i18n, --trend, agent/skill perf parse, learnings kalite, arşivleme, regex fix)
+- cleanup (budget uyarısı, --decay combo, lock guard, çift geçiş fix, truncation, sprint parse, archive fix)
+- usage (token tahmin, race condition, canlı usage, --since/--last, trend, task-level, provider, temizlik, fiyat, subscription)
+- history (--json, --last, agent/skill writeSprintLog, dead code, numeric sort, archive, usage, format tutarlılık)
+- config (list/keys, autoMigrate, validation mesaj, JSON comment import, env var, --raw, modes migration, backup)
+- review+finalize (interactive, retry→respawn, entegrasyon, state kalıcılık, completion guard, mixed sprint, duplicate, --approve-all)
+- serve (rate limit, body size, deepMerge, auth token, API versioning, CORS dynamic, SSE reconnect, multi-sprint job)
+- run+test+web (--timeout, --keep, --auto-approve, agent/skill inject, --verbose, --directives, --sandbox, --model, CI format, MIME, build check, --dev proxy)
+- sync+onboard+upgrade (Gemini/Cursor adapter, git date, memory limit, --json, --dry-run, wizard→init, api mode, detectStack, --force, semver, rollback, install strategy, --canary/--beta)
+- agent+skill+plugin+marketplace+archive-debt (stats, trigger, systemPrompt, model seçimi, checksum, version pin, update, --stats, node_modules, remove, update, entrypoint, conflict, cache, semver, --dry-run, --before, rotation, parse tutarlılık)
+- dashboard+attach+watch (status duplikasyon, fs.watch, terminal adapt, agent/skill info, usage, --list, nested tmux, cleanup temizle, follow hata, re-attach, split ratio, analyzer merge/cache/git fallback, decay parse)
 
-Okuma formatı (`retro.ts` satır 19-26) — bunlar yazma formatıyla EŞLEŞMIYOR:
-- `| Total Tasks |` → yazılan: `| Tasks completed | X/Y |` (X/Y formatı, total ayrı değil)
-- `| Completed |` → yazılan: `| Tasks completed | X/Y |` (completed ayrı değil)
-- `| No-Go |` → yazılan: `| NO_GO rate | Z% (A/B) |` (format tamamen farklı)
-- `| Tech Debt |` → yazılmıyor (hiç yok)
-- `| Coverage |` → yazılan: `| Coverage | X% |` (BU TEK EŞLEŞEN)
-- `| Duration |` → yazılan: `| Sprint time | Xs |` (isim farklı)
+Sonunda istatistik tablosunu güncelle: toplam çözülen / kalan sayısı.
 
-**Çözüm:** `retro.ts`'deki `parseRetroToRichSummary()` fonksiyonunun regex'lerini sprint-reporter.ts'in GERÇEK yazma formatına eşleştir:
-
-1. `| Tasks completed | X/Y |` formatından: totalTasks=Y, completed=X parse et
-   - Regex: `/\|\s*Tasks completed\s*\|\s*(\d+)\s*\/\s*(\d+)\s*\|/i` → group1=completed, group2=total
-2. `| NO_GO rate | Z% (A/B) |` formatından: noGo=A parse et
-   - Regex: `/\|\s*NO_GO rate\s*\|[^|]*\((\d+)\/\d+\)\s*\|/i` → group1=noGo
-3. `| Sprint time | ... |` formatından duration parse et
-   - Regex: `/\|\s*Sprint time\s*\|\s*(.+?)\s*\|/i`
-4. Tech Debt: sprint-reporter.ts `| GO_WITH_TECH_DEBT |` yazmıyor, ayrı satır yok. Sprint log'dan gelmeli veya calculateMetrics'ten. Şimdilik 0 kalabilir, fallback olarak `GO_WITH_TECH_DEBT` string count yap content içinde.
-5. Mevcut `| Coverage |` regex'i zaten çalışıyor, dokunma.
-6. Mevcut fallback regex'leri (fbTotal, fbCoverage, fbDuration) koru — non-table formatlar için.
-
-**B) `--compare` Kendisiyle Karşılaştırma Bugu:**
-`loadPreviousRetro()` fonksiyonu (satır 79-90) `files.at(-1)` kullanıyor. Bu son sprint logu = mevcut sprint'in kendisi. Delta her zaman 0 çıkıyor.
-
-**Çözüm:**
-1. `files.at(-1)` yerine `files.at(-2)` kullan (sondan bir önceki sprint)
-2. `files.length < 2` ise `null` dön (karşılaştırma için en az 2 sprint lazım)
-3. Edge case: mevcut sprint'in ID'sini al, son dosya mevcut sprint ise `at(-2)`, değilse `at(-1)` kullan
-
-**Test:** tests/cli/commands/retro-parse-fix.test.ts — 10+ test:
-- writeRetrospective mock çıktısını parseRetroToRichSummary ile parse et → completed, totalTasks, noGo doğru
-- `| Tasks completed | 5/8 |` → completed=5, totalTasks=8
-- `| Tasks completed | 0/3 |` → completed=0, totalTasks=3
-- `| NO_GO rate | 25% (2/8) |` → noGo=2
-- `| NO_GO rate | 0% (0/5) |` → noGo=0
-- `| Sprint time | 3m 38s |` → duration="3m 38s"
-- `| Coverage | 85.2% |` → coverage="85.2%"
-- loadPreviousRetro: 3+ dosyada sondan ikincisini dönmeli
-- loadPreviousRetro: tek dosyada null dönmeli
-- loadPreviousRetro: 0 dosyada null dönmeli
-- --compare gerçek delta hesaplamalı (previous != current)
-- Boş RETRO.md'de tüm değerler 0/default
-- Mevcut fallback regex'ler çalışmalı
-
-IMPORTANT: sprint-reporter.ts'in yazma formatını DEĞİŞTİRME — sadece retro.ts'deki okuma regex'lerini düzelt. Mevcut test dosyaları retro.test.ts ve retro-rich.test.ts'ye DOKUNMA, sadece yeni test dosyası ekle.
+**Test:** Bu task test gerektirmez — dokümantasyon güncellemesi.
 
 ---
 
-## Task 2: Kill Komutu Task Status + Lock Temizliği + --all Flag (P0 KRİTİK)
+## Task 2: Agent Activation Fix — forceModel Agent Bypass Kaldır
 - Model: opus
 - Effort: high
-- Files: src/cli/commands/kill.ts
-- Scope: src/cli/commands/, .tasks/, .locks/, tests/cli/commands/
-- Dependencies: yok
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/task-builder.ts, src/core/agent-pool.ts
+- Scope: src/orchestra/, src/core/, tests/orchestra/
 
 ### Description
-**KRİTİK BUG:** `deckent kill <taskId>` worker'ı öldürüyor ama task dosyası EXECUTING kalıyor ve lock'lar serbest bırakılmıyor. Bu Brain'in "hâlâ çalışıyor" sanmasına ve diğer worker'ların kilitli dosyalara erişememesine yol açıyor.
+**P0 KRİTİK** — 8 tanımlı agent var ama hiçbiri kullanılmıyor. Kök neden: sprint-controller.ts'te `forceModel` varsa `assignedAgent = 'generic'` atanıyor.
 
-Mevcut kill.ts (29 satır) sadece `killWorker(taskId)` çağırıyor. 4 iyileştirme:
+**A) forceModel → Agent Bypass Kaldır:**
+sprint-controller.ts'teki agent seçim logic'ini değiştir: forceModel olsa bile selectAgent çalışsın, sadece model override'ı korunsun. Agent seçimi model'den bağımsız olmalı.
 
-**A) Task Status Güncelleme:**
-Kill başarılı olduktan sonra:
-1. `.tasks/` dizininden task dosyasını bul: `task-{taskId}.json` veya `task-*-{taskId}.json` pattern (sprint ID prefix olabilir)
-2. JSON oku, `status` alanını `'PAUSED'` olarak güncelle (NO_GO değil — kullanıcı kasıtlı durdurdu)
-3. Dosyayı geri yaz
-4. Task bulunamazsa sadece uyarı ver, hata fırlatma (tmux kill zaten başarılı)
+**B) Agent systemPrompt'larını Yaz:**
+`.deckent/agents/*/agent.json` dosyalarındaki `systemPrompt` alanlarını zenginleştir. 8 agent için domain-specific prompt (100-200 kelime): security-auditor (OWASP), test-writer (edge cases, coverage), doc-writer (clear docs), bug-fixer (root cause), code-reviewer (bugs, perf), refactorer (structure), api-builder (RESTful), performance-analyzer (bottlenecks).
 
-Import'lar: `readFileSync`, `writeFileSync`, `existsSync`, `readdirSync` from 'node:fs', `join` from 'node:path'
-Sabitler: `TASKS_DIR` from '../../core/constants.js'
+**C) resolveAgentPrompt Güncelle:**
+task-builder.ts buildWorkerPrompt'ta agent block oluşturulurken systemPrompt'u da dahil et. PROMPT.md + systemPrompt birleştir.
 
-**B) Lock Temizliği:**
-Kill başarılı olduktan sonra:
-1. `.locks/` dizinini tara (yoksa atla)
-2. Her lock dosyasını oku (JSON)
-3. `ownerWorkerId` değeri `w-{taskId}` olan lock dosyalarını sil (`unlinkSync`)
-4. Silinen lock sayısını log'la
+**D) Agent Stats Güncelleme:**
+Sprint sonrası updateAgentStats(): totalUses++, successRate hesapla.
 
-Sabitler: `LOCKS_DIR` from '../../core/constants.js'
-
-**C) `--all` Flag:**
-`deckent kill --all` tüm aktif worker'ları öldürsün:
-1. `--all` option ekle
-2. `.tasks/` dizininden status=`EXECUTING` veya status=`CLAIMED` olan task'ları bul
-3. Her biri için: killWorker + status update + lock cleanup
-4. `tmux list-windows` ile de cross-check yap (orphan window'lar için)
-5. Toplam öldürülen worker sayısını göster
-
-**D) Prompt Dosyası Temizliği:**
-Kill sonrası `.tasks/.prompt-*.txt` dosyalarını temizle. taskId'yi içeren prompt dosyalarını bul ve sil.
-
-**Test:** tests/cli/commands/kill-enhanced.test.ts — 12+ test:
-- Kill sonrası task status PAUSED olmalı
-- Kill sonrası worker'a ait lock'lar silinmeli
-- Kill sonrası başka worker'ların lock'ları DURMALI
-- Task dosyası bulunamazsa sadece uyarı (hata değil)
-- Lock dizini yoksa hata vermemeli
-- --all EXECUTING task'ları durdurmali
-- --all CLAIMED task'ları da dahil etmeli
-- --all boş task dizininde hata vermemeli
-- --all sonrası tüm aktif task'lar PAUSED olmalı
-- Prompt dosyaları temizlenmeli
-- Olmayan taskId'de TmuxError mesajı
-- kill + lock cleanup idempotent olmalı (2 kez çalıştırılabilir)
-
-IMPORTANT: `src/orchestra/tmux.ts`'ye DOKUNMA. Tüm yeni kod kill.ts içinde olacak. Lock okuma/silme için doğrudan fs operasyonları kullan (releaseLock fonksiyonu yerine — worker ID format farkı olabilir). getMessage() ile i18n mesajlarını koru.
+**Test:** 12+ test
 
 ---
 
-## Task 3: readLanguage + readJsonSafe Tam DRY Temizliği (P1)
-- Model: opus
-- Effort: max
-- Files: src/cli/helpers/config-reader.ts (yeni), src/cli/commands/cleanup.ts, src/cli/commands/doctor.ts, src/cli/commands/finalize.ts, src/cli/commands/status.ts, src/cli/commands/run.ts, src/monitor/auditor.ts, src/orchestra/sprint-controller.ts, src/orchestra/debt-manager.ts
-- Scope: src/cli/, src/monitor/, src/orchestra/, src/core/, tests/
-- Dependencies: yok (Task 6 ve Task 7 buna bağlı)
-
-### Description
-Projede 2 fonksiyon çok sayıda dosyada duplicate olarak tanımlanmış. Bu DRY ihlali bakım maliyetini artırıyor ve bug fix'lerin tek noktada yapılmasını engelliyor.
-
-**A) readLanguage() → getLangFromConfig() Helper (4 kopya → 1):**
-
-Duplicate konumları:
-- `src/cli/commands/cleanup.ts:13` — `function readLanguage(root: string): string`
-- `src/cli/commands/doctor.ts:32` — `function readLanguage(root: string): string`
-- `src/cli/commands/finalize.ts:14` — `function readLanguage(root: string): string`
-- `src/cli/commands/status.ts:63` — `export function getLangFromRoot(root: string): string`
-
-Hepsi aynı pattern: `.deckent/config.json` oku → JSON parse → `language` field → fallback 'en'
-
-**Çözüm:**
-1. `src/cli/helpers/config-reader.ts` dosyası oluştur
-2. `export function getLangFromConfig(root: string): string` fonksiyonu yaz
-3. cleanup.ts, doctor.ts, finalize.ts'deki yerel `readLanguage()` fonksiyonlarını SİL
-4. Bu dosyalara `import { getLangFromConfig } from '../helpers/config-reader.js'` ekle
-5. Fonksiyon çağrılarını `readLanguage(root)` → `getLangFromConfig(root)` olarak güncelle
-6. status.ts'deki `getLangFromRoot` fonksiyonunu da `getLangFromConfig`'e yönlendir:
-   - Ya fonksiyonu sil + import ekle
-   - Ya da `export { getLangFromConfig as getLangFromRoot } from '../helpers/config-reader.js'` re-export yap (backward compat)
-   - status.ts'i import eden dosya varsa kontrol et (api/server.ts?)
-
-**B) readJsonSafe() Duplicate Temizliği (5 kopya → 0, canonical: core/utils.ts):**
-
-Canonical kaynak: `src/core/utils.ts:45` — `export function readJsonSafe<T>(filePath: string): T | null`
-
-Duplicate konumları (hepsi aynı implementasyon):
-- `src/cli/commands/finalize.ts:27` — `function readJsonSafe<T>(...)`
-- `src/cli/commands/run.ts:37` — `function readJsonSafe<T>(...)`
-- `src/monitor/auditor.ts:29` — `function readJsonSafe<T>(...)`
-- `src/orchestra/sprint-controller.ts:196` — `function readJsonSafe<T>(...)`
-- `src/orchestra/debt-manager.ts:28` — `function readJsonSafe<T>(...)`
-
-**Çözüm:**
-Her dosya için:
-1. Yerel `readJsonSafe` fonksiyon tanımını SİL
-2. `import { readJsonSafe } from '../../core/utils.js'` ekle (path dosyaya göre değişir)
-   - finalize.ts, run.ts: `'../../core/utils.js'`
-   - auditor.ts: `'../core/utils.js'`
-   - sprint-controller.ts: `'../core/utils.js'`
-   - debt-manager.ts: `'../core/utils.js'`
-3. Fonksiyon imzası aynı olduğu için çağrı noktaları değişmez
-
-**DİKKAT — Zincir İşlem Kuralı:**
-- Bu task cleanup.ts, doctor.ts, finalize.ts'ye dokunuyor
-- Task 6 (--json flag) doctor.ts ve retro.ts'ye dokunuyor
-- Task 7 (--dry-run) cleanup.ts'ye dokunuyor
-- **Task 3 MUTLAKA Task 6 ve Task 7'den ÖNCE tamamlanmalı**
-
-**Test:** tests/cli/helpers/config-reader.test.ts — 8+ test:
-- getLangFromConfig: config varsa dil dönmeli
-- getLangFromConfig: config yoksa 'en' dönmeli
-- getLangFromConfig: bozuk JSON'da 'en' dönmeli
-- getLangFromConfig: language alanı yoksa 'en' dönmeli
-- readJsonSafe import: finalize.ts, run.ts, auditor.ts, sprint-controller.ts, debt-manager.ts'de yerel tanım OLMAMALI
-- tsc --noEmit ile tüm import'lar doğrulanmalı
-- Mevcut testlerin tümü geçmeli (regresyon kontrolü)
-
-IMPORTANT: Bu task ÇOK SAYIDA dosyaya dokunuyor. Her dosyada SADECE readLanguage/readJsonSafe değişikliği yap. Başka hiçbir şeye dokunma. Her değişiklikten sonra `tsc --noEmit` ile derleme kontrolü yap.
-
----
-
-## Task 4: Config Set Nested Key + Import DeepMerge + Config Get (P1)
+## Task 3: Skill Selection Fix — Task-Specific Seçim + Truncation
 - Model: opus
 - Effort: high
-- Files: src/cli/commands/config.ts, src/core/config-migration.ts, src/core/config.ts
-- Scope: src/cli/commands/, src/core/, tests/cli/commands/
-- Dependencies: yok
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/task-builder.ts
+- Scope: src/orchestra/, tests/orchestra/
 
 ### Description
-Config komutunda 2 fonksiyonel eksik var. Mevcut altyapı zaten hazır ama bağlanmamış.
+**P0 KRİTİK** — Her prompt'a aynı 3 skill inject ediliyor. Skill'ler cümle ortasında truncate ediliyor.
 
-**A) `config set` Nested Key Desteği:**
+**A) Task-Specific Skill Seçimi:**
+selectSkills() fonksiyonunu iyileştir. Task scope + title + description'a göre farklı skill seti seç. Mevcut score mekanizmasını iyileştir, generic fallback'i azalt.
 
-Mevcut durum (`config.ts:104-105`):
-```typescript
-// Simple top-level keys only
-(existing as Record<string, unknown>)[key] = parsed;
-```
+**B) Skill Truncation Fix:**
+task-builder.ts'te skill content truncation'ı paragraf/bölüm sınırında yap (cümle ortasında kesme).
 
-`setNestedValue` fonksiyonu `src/core/config-migration.ts:57`'de tanımlı ve satır 208'de export ediliyor:
-```typescript
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void
-```
+**C) Skill Budget Dinamik:**
+Task effort'una göre skill budget ayarla: high → 2000, normal → 1500, low → 1000.
 
-**Çözüm:**
-1. `import { setNestedValue } from '../../core/config-migration.js'` ekle
-2. Key'de `.` varsa `setNestedValue(existing, key, parsed)` kullan
-3. Key'de `.` yoksa mevcut davranışı koru (top-level set)
-4. Print mesajını güncelle: nested key'de tam path göster
-
-Örnek: `deckent config set modes.max_plan.max_workers 8`
-
-**B) `config import` Deep Merge:**
-
-Mevcut durum (`config.ts:65`):
-```typescript
-const merged = { ...existing, ...importData };  // SHALLOW — nested objeler eziliyor
-```
-
-`deepMerge` fonksiyonu `src/core/config.ts:124`'te export ediliyor:
-```typescript
-export function deepMerge<T>(base: T, override: Partial<T>): T
-```
-
-**Çözüm:**
-1. `import { loadConfig, validatePartialConfig, ConfigValidationError, deepMerge } from '../../core/config.js'` — mevcut import'a `deepMerge` ekle
-2. Satır 65'i değiştir: `const merged = deepMerge(existing, importData) as Record<string, unknown>;`
-
-**C) `config get <key>` Alt Komutu:**
-
-`getNestedValue` fonksiyonu `src/core/config-migration.ts:44`'te tanımlı ve satır 208'de export ediliyor.
-
-**Çözüm:**
-1. `cmd.command('get <key>')` alt komutu ekle
-2. `import { setNestedValue, getNestedValue } from '../../core/config-migration.js'` — import'a ekle
-3. `loadConfig(root)` ile resolved config al
-4. `getNestedValue(config, key)` ile değeri al
-5. undefined ise "Key not found: {key}" hata mesajı
-6. Değeri `JSON.stringify(value, null, 2)` ile göster
-
-**Test:** tests/cli/commands/config-nested.test.ts — 12+ test:
-- `config set language tr` — top-level key hâlâ çalışmalı
-- `config set modes.max_plan.max_workers 8` — nested key setlenmeli
-- `config set modes.pro_plan.brain_model sonnet` — 2 seviye nested
-- Nested set sonrası diğer nested değerler korunmalı
-- `config import` deep merge nested objeleri korumalı
-- `config import` top-level alanları override etmeli
-- `config import` mevcut nested objeyi nested importla genişletmeli
-- `config get language` — string değer dönmeli
-- `config get modes.max_plan` — obje dönmeli
-- `config get modes.max_plan.max_workers` — number dönmeli
-- `config get nonexistent.key` — hata mesajı
-- Validation: geçersiz value'da hata
-
-IMPORTANT: Mevcut `config set`, `config export`, `config import`, `config migrate` davranışlarını BOZMA. Sadece nested key desteği + deep merge + get komutu ekle. `loadConfig` fonksiyonuna DOKUNMA.
+**Test:** 10+ test
 
 ---
 
-## Task 5: Spawn Komutu Prompt Zenginleştirme + Status Kontrolü (P1)
+## Task 4: Scope & GO/NO-GO Fix — filesWrite + Criteria Enrichment
 - Model: opus
 - Effort: high
-- Files: src/cli/commands/spawn.ts
+- Files: src/orchestra/task-builder.ts, src/orchestra/sprint-controller.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+**A) filesWrite Test Dosyası Ekleme:**
+Task scope.directories'de `tests/` varsa, filesWrite'a da test pattern ekle.
+
+**B) GO/NO-GO Criteria DIRECTIVES'ten Al:**
+DIRECTIVES.md'deki task'larda `Test:` satırı var (ör: "10+ test"). Bunu goNogo.goCriteria'ya taşı.
+
+**C) Scope Directories'e docs/ Dahil Et:**
+DIRECTIVES'te scope alanında `docs/` veya `CHANGELOG.md` varsa task JSON directories'e aktar.
+
+**Test:** 8+ test
+
+---
+
+## Task 5: Prompt Boilerplate Azaltma + Worker Guide
+- Model: sonnet
+- Effort: high
+- Files: src/orchestra/task-builder.ts, .deckent/workspace/WORKER-GUIDE.md
+- Scope: src/orchestra/, .deckent/, tests/orchestra/
+
+### Description
+**A) Worker Guide Dosyası:**
+`.deckent/workspace/WORKER-GUIDE.md` oluştur/güncelle. Heartbeat format, result format, error handling kurallarını buraya taşı.
+
+**B) buildWorkerPrompt Kısalt:**
+Heartbeat JSON template, result JSON template, "If Something Goes Wrong" bölümünü prompt'tan kaldır. Yerine tek satır referans koy.
+
+**C) Prompt Boyutu Hedefi:**
+Mevcut ~150 satır / ~6.5KB → Hedef: ~80 satır / ~3.5KB. Task description oranı %16 → %35.
+
+**Test:** 5+ test
+
+---
+
+## Task 6: spawn+kill+run Multi-Provider Desteği
+- Model: opus
+- Effort: high
+- Files: src/cli/commands/spawn.ts, src/cli/commands/kill.ts, src/cli/commands/run.ts
 - Scope: src/cli/commands/, src/orchestra/, tests/cli/commands/
-- Dependencies: yok
 
 ### Description
-`deckent spawn <taskId>` çok basit bir prompt kullanıyor: `"You are a Worker agent. Read your task file..."`. Oysa `spawnWorkers()` (sprint-controller.ts) zengin prompt oluşturuyor: agent systemPrompt + skill SKILL.md + task detayları + scope bilgisi.
+**P0 KRİTİK** — 3 komut sadece tmux (Claude) ile çalışıyor. Codex/Gemini subprocess worker'lar yönetilemiyor.
 
-Mevcut spawn.ts'in prompt'u (`src/cli/commands/spawn.ts:22` civarı):
-```typescript
-const prompt = `You are a Worker agent. Read your task file at .tasks/task-${taskId}.json and execute it.`;
-```
+**A) spawn Multi-Provider:**
+Task'ın provider'ına göre spawn yöntemini seç: claude → tmux (mevcut), codex/gemini → ProviderAdapter.spawn() veya SpawnBackend. `getProviderForModel()` ile provider tespit et.
 
-**A) Zengin Prompt Oluşturma:**
-1. `buildWorkerPrompt` fonksiyonunu import et: `import { buildWorkerPrompt } from '../../orchestra/brain.js'`
-   - VEYA doğrudan `sprint-controller.ts`'den: kontrol et hangisi export ediyor
-2. Task dosyasını oku (zaten `readTask` ile okunuyor)
-3. Agent context: `resolveAgentPrompt(root, task)` import et — task'a atanmış agent'ın PROMPT.md'sini okur
-4. Skill context: `resolveSkillPrompts(root, task)` import et — task'a atanmış skill'lerin SKILL.md'lerini okur
-5. `buildWorkerPrompt(task, agentPrompt, skillPrompts)` ile zengin prompt oluştur
-6. Eğer buildWorkerPrompt import edilemiyorsa (circular dependency riski), basit bir lokal builder yaz:
-   - Task bilgisi (title, description, scope, goNogo)
-   - Agent PROMPT.md içeriği (varsa)
-   - Skill SKILL.md içerikleri (varsa, max 3)
-   - Worker rules referansı
+**B) kill Multi-Provider:**
+Subprocess worker'lar için: PID-based kill (task JSON'da pid kaydedilmeli) veya adapter.kill(). tmux worker yoksa subprocess approach dene.
 
-**B) Task Status Kontrolü:**
-1. Spawn öncesi task status'u kontrol et
-2. `DONE` veya `NO_GO` ise uyarı ver: "Task already {status}. Use --force to respawn."
-3. `--force` flag ekle (DONE/NO_GO task'ları tekrar spawn etmek için)
-4. `EXECUTING` ise uyarı ver: "Task already running. Kill first with `deckent kill {taskId}`."
+**C) run Multi-Provider:**
+Provider routing: `--model` flag'inden provider tespit et, uygun backend ile spawn et.
 
-**C) `--auto-approve` Flag:**
-1. Mevcut hardcode `autoApprove: false` yerine CLI flag ekle
-2. `--auto-approve` verilirse `spawnWorker` çağrısında `autoApprove: true` geç
-
-**D) Scope Bilgisi Gösterimi:**
-Spawn sonrası task'ın scope'unu göster: hangi dizinlere erişim var, hangi dosyaları yazabilir.
-
-**Test:** tests/cli/commands/spawn-enhanced.test.ts — 10+ test:
-- Spawn zenginleştirilmiş prompt kullanmalı (basit tek satır DEĞİL)
-- Agent atanmış task'ta agent context inject edilmeli
-- Skill atanmış task'ta skill context inject edilmeli
-- DONE status'lu task'ta uyarı mesajı
-- --force ile DONE task respawn edilebilmeli
-- EXECUTING task'ta "already running" mesajı
-- --auto-approve flag'i geçerli olmalı
-- Task dosyası bulunamazsa anlamlı hata
-- Scope bilgisi gösterilmeli
-- Prompt minimum 100 karakter uzunluğunda olmalı (zengin prompt testi)
-
-IMPORTANT: `sprint-controller.ts`'deki `spawnWorkers()` fonksiyonunu ÇAĞIRMA — bu tüm sprint spawn eder. Sadece prompt builder fonksiyonlarını import et. Circular dependency olursa lokal builder yaz.
+**Test:** 10+ test
 
 ---
 
-## Task 6: Doctor --json + Retro --json Flag'leri (P2)
-- Model: opus
-- Effort: medium
-- Files: src/cli/commands/doctor.ts, src/cli/commands/retro.ts
+## Task 7: doctor+watch Provider-Aware Fix
+- Model: sonnet
+- Effort: high
+- Files: src/cli/commands/doctor.ts, src/cli/commands/watch.ts
 - Scope: src/cli/commands/, tests/cli/commands/
-- Dependencies: Task 1 (retro.ts), Task 3 (doctor.ts — readLanguage DRY)
 
 ### Description
-CI/CD entegrasyonu ve programmatic kullanım için `--json` flag'leri eksik.
+**A) doctor tmux Conditional:**
+tmux check'i sadece claude provider kullanılıyorsa required olsun. Config'den `brain_provider` ve `worker_provider` oku, sadece claude ise tmux zorunlu.
 
-**A) Doctor --json:**
-`runDoctorChecks()` zaten `DoctorResult` objesi dönüyor. Sadece CLI tarafında JSON serialize etmek yeterli.
+**B) watch Subprocess Log Viewer:**
+tmux split pane yerine subprocess worker log dosyasını tail et. Log dosyası yolu: `.tasks/task-{id}.log`.
 
-**Çözüm:**
-1. `--json` option ekle: `.option('--json', 'Output results as JSON')`
-2. `--json` varsa:
-   ```typescript
-   const result = runDoctorChecks(root);
-   const providers = await detectAvailableProviders();
-   print(JSON.stringify({ ok: result.ok, checks: result.checks, providers }, null, 2));
-   return;
-   ```
-3. Human-readable çıktıya DOKUNMA — `--json` sadece alternatif format
-
-**B) Retro --json:**
-`parseRetroToRichSummary()` zaten `RichSprintSummary` dönüyor (Task 1'de fix edilmiş hali).
-
-**Çözüm:**
-1. `--json` option ekle: `.option('--json', 'Output results as JSON')`
-2. `--json` varsa:
-   ```typescript
-   const summary = parseRetroToRichSummary(content);
-   const output: Record<string, unknown> = { ...summary };
-   delete output.raw;  // raw markdown'u JSON'dan çıkar
-   if (opts.compare) {
-     const prevContent = loadPreviousRetro(root);
-     if (prevContent) {
-       const prevSummary = parseRetroToRichSummary(prevContent);
-       output.delta = { ... };  // computeRetroDelta verilerini JSON'a ekle
-     }
-   }
-   print(JSON.stringify(output, null, 2));
-   return;
-   ```
-3. `--raw --json` birlikte verilirse `--json` öncelikli
-
-**DİKKAT:** Bu task retro.ts'ye dokunuyor. Task 1 MUTLAKA önce tamamlanmış olmalı (parse fix). Aynı şekilde doctor.ts'ye dokunuyor, Task 3 önce tamamlanmış olmalı (readLanguage DRY).
-
-**Test:** tests/cli/commands/doctor-json.test.ts (5+ test), tests/cli/commands/retro-json.test.ts (5+ test):
-- Doctor --json geçerli JSON dönmeli
-- Doctor --json `ok` boolean field içermeli
-- Doctor --json `checks` array içermeli
-- Doctor --json `providers` array içermeli
-- Doctor --json --profile ek bilgi eklemeli
-- Retro --json geçerli JSON dönmeli
-- Retro --json raw field İÇERMEMELİ
-- Retro --json --compare delta obje içermeli
-- Retro --raw --json → JSON öncelikli
-
-IMPORTANT: Task 1 ve Task 3'ün tamamlanmasını BEKLEMELİ. retro.ts'deki parse fix'e bağımlı. doctor.ts'deki readLanguage kaldırılmış olmalı.
+**Test:** 8+ test
 
 ---
 
-## Task 7: Cleanup --dry-run Flag'i (P2)
+## Task 8: MCP Tools Expansion (+6 tools)
 - Model: opus
-- Effort: medium
-- Files: src/cli/commands/cleanup.ts
+- Effort: high
+- Files: src/mcp/tools/config.ts (new), src/mcp/tools/usage.ts (new), src/mcp/tools/review.ts (new), src/mcp/tools/run.ts (new), src/mcp/tools/kill.ts (new), src/mcp/tools/cleanup.ts (new), src/mcp/tools/index.ts
+- Scope: src/mcp/, tests/mcp/
+
+### Description
+6 yeni MCP tool ekle. Her tool mevcut CLI komutunun fonksiyonalitesini MCP'ye taşır:
+
+**A) deckent_config:** Config read (default: resolved config), config set (key+value), config get (key). Input: { action: 'read'|'set'|'get', key?, value? }
+**B) deckent_usage:** Mevcut sprint usage bilgisi. Input: { sprintId? }. Output: token/call/cost tablo.
+**C) deckent_review:** Sprint review başlat. Input: { auto?: boolean }. Output: review decisions.
+**D) deckent_run:** Tek seferlik task çalıştır. Input: { description, model?, scope? }. Output: jobId + result.
+**E) deckent_kill:** Worker durdur. Input: { taskId? , all?: boolean }. Output: killed count.
+**F) deckent_cleanup:** Sprint temizliği. Input: { decay?: boolean, dryRun?: boolean }. Output: cleaned files.
+
+Tüm tool'ları `src/mcp/tools/index.ts`'de register et. Enriched response pattern kullan.
+
+**Test:** 12+ test
+
+---
+
+## Task 9: MCP Resources Expansion (+4 resources)
+- Model: sonnet
+- Effort: high
+- Files: src/mcp/resources/retro.ts (new), src/mcp/resources/usage.ts (new), src/mcp/resources/tasks.ts (new), src/mcp/resources/agents.ts (new), src/mcp/resources/index.ts
+- Scope: src/mcp/, tests/mcp/
+
+### Description
+4 yeni MCP resource ekle:
+
+**A) deckent://retro:** RETRO.md içeriğini döndür.
+**B) deckent://usage:** Mevcut sprint usage JSON'ı.
+**C) deckent://tasks:** Aktif task listesi (.tasks/*.json).
+**D) deckent://agents:** Agent pool listesi (.deckent/agents/).
+
+Tüm resource'ları index.ts'de register et.
+
+**Test:** 8+ test
+
+---
+
+## Task 10: MCP Tool Quality — Enrichment + Error Handling
+- Model: sonnet
+- Effort: high
+- Files: src/mcp/helpers/enrich.ts, src/mcp/helpers/format.ts, src/mcp/tools/*.ts
+- Scope: src/mcp/, tests/mcp/
+
+### Description
+Mevcut + yeni tüm MCP tool'ların kalitesini artır:
+
+**A) Enriched Response:** Her tool response'una `_enriched: { summary, hints[], timestamp }` ekle (mevcut pattern'i yeni tool'lara uygula).
+**B) Error Handling:** Tüm tool'larda tutarlı try/catch + anlamlı hata mesajları.
+**C) Input Validation:** Zod schema ile input validation (mevcut tool'larda eksik olanları ekle).
+
+**Test:** 6+ test
+
+---
+
+## Task 11: Format Tutarlılığı + Dead Code Temizliği
+- Model: sonnet
+- Effort: high
+- Files: src/orchestra/sprint-reporter.ts, src/cli/commands/history.ts, src/cli/commands/archive-debt.ts, src/orchestra/debt-manager.ts
+- Scope: src/orchestra/, src/cli/commands/, tests/
+
+### Description
+**A) Sprint Log Header Tutarlılığı:**
+sprint-reporter.ts writeSprintLog ve history.ts parseSprintLog arasındaki header naming tutarlı olsun.
+
+**B) loadLearningData Dead Code:**
+history.ts'deki `loadLearningData()` — `.brain/learning/` hiçbir yerde oluşturulmuyor. Fonksiyonu sil.
+
+**C) parseDebtTable Birleştirme:**
+archive-debt.ts ve debt-manager.ts'de ayrı parser var. core/utils.ts'deki `parseDebtTable` canonical olsun, archive-debt bunu import etsin.
+
+**Test:** 6+ test
+
+---
+
+## Task 12: Sync Genişleme (Gemini/Cursor/Codex Adapters)
+- Model: sonnet
+- Effort: high
+- Files: src/cli/commands/sync.ts
 - Scope: src/cli/commands/, tests/cli/commands/
-- Dependencies: Task 3 (cleanup.ts — readLanguage DRY)
 
 ### Description
-`deckent cleanup` geri dönüşü olmayan silme yapıyor (task dosyaları, lock'lar, prompt dosyaları, tmux session). Preview mekanizması yok.
+Sync sadece CLAUDE.md ve AGENTS.md güncelliyor. Diğer provider adapter dosyalarını da dahil et:
 
-**Çözüm:**
-1. `--dry-run` option ekle
-2. Dry-run modda: silinecek dosyaları listele ama hiçbir şeyi SİLME
-3. CLI tarafında preview yapılacak (cleanup() fonksiyonuna dokunamayız — sprint-controller.ts'de)
+**A) GEMINI.md Sync:** DECKENT.md referansını GEMINI.md'ye de ensure et (ensureDeckentImport pattern).
+**B) .cursor/rules/ Sync:** .cursor/rules/ dizinindeki dosyaları DECKENT.md referansıyla güncelle.
+**C) Codex Config Sync:** .codex/ dizini varsa AGENTS.md benzeri sync yap.
+**D) Provider-Specific Config Mapping:** Her provider'ın config formatına uygun sync yapısı.
 
-**İmplementasyon:**
-```typescript
-if (opts.dryRun) {
-  // Task dosyalarını say
-  const taskFiles = readdirSync(tasksDir).filter(f => f.match(/\.(json|plan|hb|result|paused|log)$/));
-  // Lock dosyalarını say
-  const lockFiles = existsSync(locksDir) ? readdirSync(locksDir) : [];
-  // Prompt dosyalarını say
-  const promptFiles = readdirSync(tasksDir).filter(f => f.startsWith('.prompt-'));
-
-  print(`[dry-run] Would delete:`);
-  print(`  ${taskFiles.length} task file(s)`);
-  print(`  ${lockFiles.length} lock file(s)`);
-  print(`  ${promptFiles.length} prompt file(s)`);
-  print(`  tmux session: deckent-orchestra`);
-  print(`\nRun without --dry-run to execute.`);
-  return;
-}
-```
-
-4. Dosya isimlerini de göster (verbose):
-   - Task dosyaları: `task-sprint-055-001.json`, `task-sprint-055-001.plan` vs.
-   - Lock dosyaları: `src__cli__commands__config_ts.lock` vs.
-
-**DİKKAT:** Bu task cleanup.ts'ye dokunuyor. Task 3 önce tamamlanmış olmalı (readLanguage DRY).
-
-**Test:** tests/cli/commands/cleanup-dryrun.test.ts — 6+ test:
-- --dry-run dosya listesi göstermeli
-- --dry-run hiçbir dosya SİLMEMELİ
-- --dry-run task dosya sayısı doğru olmalı
-- --dry-run lock dosya sayısı doğru olmalı
-- Boş dizinlerde hata vermemeli
-- --dry-run sonrası dosyalar hâlâ mevcut olmalı
-
-IMPORTANT: Task 3'ün tamamlanmasını BEKLEMELİ. cleanup.ts'deki readLanguage kaldırılmış olmalı. Mevcut cleanup davranışına DOKUNMA.
+**Test:** 8+ test
 
 ---
 
-## Task 8: Agent Delete + Edit Komutları (P2)
-- Model: opus
-- Effort: medium
-- Files: src/cli/commands/agent.ts
-- Scope: src/cli/commands/, .deckent/agents/, tests/cli/commands/
-- Dependencies: yok
+## Task 13: Doc Updater Fix + CHANGELOG Konsolidasyonu
+- Model: sonnet
+- Effort: high
+- Files: src/orchestra/doc-updaters/sprint-log.ts, src/orchestra/doc-updaters/changelog.ts, CHANGELOG.md, docs/release/changelog.md, docs/SPRINT-LOG.md
+- Scope: src/orchestra/doc-updaters/, docs/, tests/orchestra/doc-updaters/
 
 ### Description
-Agent CRUD'da delete ve edit eksik. Kullanıcı agent silmek için dizini elle silmek zorunda.
+**A) sprint-log.ts Path Fix:**
+targetFile satırı `docs/archive/SPRINT-LOG.md` diyor ama gerçek write `docs/SPRINT-LOG.md` yapıyor. Tutarlı hale getir.
 
-**A) `agent delete <name>`:**
-1. Alt komut ekle: `agentCmd.command('delete <name>')`
-2. Agent dizinini kontrol et: `.deckent/agents/{name}/` var mı
-3. Yoksa: "Agent '{name}' not found" hata mesajı
-4. Varsa: dizini recursive sil (`rmSync(dir, { recursive: true, force: true })`)
-5. Başarılı mesaj: "Agent '{name}' deleted."
+**B) Root CHANGELOG.md Konsolidasyonu:**
+Root CHANGELOG.md stale. Canonical dosya docs/release/changelog.md. Root dosyayı referansa çevir.
 
-**B) `agent edit <name>`:**
-1. Alt komut ekle: `agentCmd.command('edit <name>')`
-2. `--model <model>` option: agent.json'daki model alanını güncelle
-3. `--description <desc>` option: description alanını güncelle
-4. `--enable` / `--disable` option: enabled alanını güncelle (mevcut enable/disable komutlarının alternatifi)
-5. Agent.json'u oku → güncelle → yaz
-6. Değişen alanları göster: "Updated: model=opus, description=..."
-7. Hiçbir option verilmezse: mevcut agent bilgisini göster (info gibi)
+**C) Sprint 055-058 CHANGELOG Entry:**
+docs/release/changelog.md'ye Sprint 055-058 entry'lerini ekle.
 
-**C) `agent info <name>` iyileştirmesi:**
-Mevcut `list` agent bilgilerini gösteriyor ama tek agent detayı yok.
-1. `agentCmd.command('info <name>')` alt komut ekle
-2. Agent.json + PROMPT.md içeriğini göster
-3. Stats: uses, successRate, son kullanım tarihi
-
-**Test:** tests/cli/commands/agent-crud.test.ts — 8+ test:
-- agent delete mevcut agent'ı silmeli
-- agent delete sonrası dizin OLMAMALI
-- agent delete olmayan agent'ta hata mesajı
-- agent edit --model agent.json'u güncellemeli
-- agent edit --description agent.json'u güncellemeli
-- agent edit olmayan agent'ta hata
-- agent info agent bilgilerini göstermeli
-- agent info PROMPT.md içeriğini dahil etmeli
-
-IMPORTANT: Mevcut `agent list`, `agent create`, `agent enable`, `agent disable` komutlarına DOKUNMA. Sadece yeni alt komutlar ekle.
-
----
-
-## Task 9: Skill Enable/Disable + Delete Komutları (P2)
-- Model: opus
-- Effort: medium
-- Files: src/cli/commands/skill.ts
-- Scope: src/cli/commands/, .deckent/skills/, tests/cli/commands/
-- Dependencies: yok
-
-### Description
-Agent'ta enable/disable var ama skill'de yok. Skill delete de eksik.
-
-**A) `skill enable <name>`:**
-1. Alt komut ekle
-2. `.deckent/skills/{name}/manifest.json` oku
-3. `enabled: true` yap, dosyayı yaz
-4. "Skill '{name}' enabled."
-
-**B) `skill disable <name>`:**
-1. Alt komut ekle
-2. manifest.json'da `enabled: false` yap
-3. "Skill '{name}' disabled."
-
-**C) `skill delete <name>`:**
-1. Alt komut ekle
-2. `.deckent/skills/{name}/` dizinini kontrol et
-3. Recursive sil
-4. "Skill '{name}' deleted."
-
-**D) `skill info <name>`:**
-1. Alt komut ekle
-2. manifest.json detaylarını göster: id, name, version, category, enabled, triggers, priority
-3. SKILL.md varsa ilk 10 satırı göster
-
-**Test:** tests/cli/commands/skill-crud.test.ts — 8+ test:
-- skill enable manifest.json enabled=true yapmalı
-- skill disable manifest.json enabled=false yapmalı
-- skill delete dizini silmeli
-- skill delete olmayan skill'de hata
-- skill info manifest bilgilerini göstermeli
-- skill enable/disable olmayan skill'de hata
-- Mevcut manifest alanları korunmalı (sadece enabled değişmeli)
-- skill info SKILL.md snippet göstermeli
-
-IMPORTANT: Mevcut `skill list`, `skill create`, `skill install` komutlarına DOKUNMA. Sadece yeni alt komutlar ekle. `skill-marketplace` alt komutuna DOKUNMA.
-
----
-
-## Task 10: Explain --sprint Flag + Goal Bilgisi + Dil Desteği (P2)
-- Model: opus
-- Effort: medium
-- Files: src/cli/commands/explain.ts
-- Scope: src/cli/commands/, tests/cli/commands/
-- Dependencies: yok
-
-### Description
-Explain komutu sadece son sprint'i gösteriyor ve goal her zaman "No goal recorded" diyor.
-
-**A) `--sprint <id>` Flag:**
-1. Option ekle: `--sprint <id>`
-2. Verilmezse: mevcut davranış (son sprint)
-3. Verilirse: `.brain/sprints/sprint-{id}.md` dosyasını oku
-4. Dosya yoksa: "Sprint {id} not found" hata mesajı
-
-**B) Goal Bilgisi:**
-Mevcut durum: `buildExplainOutput` her zaman "No goal recorded" yazıyor.
-
-**Çözüm:**
-1. DIRECTIVES.md'den goal extraction: ilk `## Goal:` satırını al
-2. Sprint log'dan goal extraction: `# Sprint sprint-NNN` sonrası ilk satır
-3. Fallback chain: DIRECTIVES.md goal → sprint log goal → "No goal recorded"
-
-**C) `--json` Flag:**
-1. Option ekle
-2. JSON formatında çıktı (sprintId, goal, metrics, learnings)
-
-**D) Dil Desteği:**
-1. `getLangFromConfig(root)` ile dil al (Task 3'te oluşturulan helper)
-2. Türkçe çıktı desteği (veya en azından getMessage() kullanımı)
-3. "What happened" → "Ne oldu", "Key learnings" → "Temel öğrenmeler" vs.
-
-**Test:** tests/cli/commands/explain-enhanced.test.ts — 8+ test:
-- --sprint belirli sprint'i göstermeli
-- --sprint olmayan ID'de hata mesajı
-- Default: son sprint
-- Goal DIRECTIVES.md'den gelmeli ("No goal recorded" DEĞİL)
-- Goal yoksa fallback mesaj
-- --json geçerli JSON dönmeli
-- Boş sprint log'da graceful handling
-- Dil desteği: Türkçe config'te Türkçe çıktı
-
-IMPORTANT: Mevcut explain davranışını BOZMA. --sprint ve --json sadece ek özellikler. parseSprintLog fonksiyonuna DOKUNMA (gelecek sprint'te DRY temizliği yapılacak).
+**Test:** 5+ test
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
 - All new tests MUST pass
-- Existing tests: 0 regression (10,500+ test geçmeli)
-- Her task test VE implementasyon birlikte yazmalı — sadece test yazmak KABUL EDİLMEZ
-- Task 1 ve 2 P0 öncelikli — bunlar bitmeden diğer task'lara geçİLMEMELİ
-- Task 3 bitmeden Task 6 ve Task 7'ye başlanmamalı (aynı dosya zinciri)
-- Tüm task'lar %100 GO hedefli — GO_WITH_TECH_DEBT kabul edilebilir ama NO_GO KABUL EDİLMEZ
-
-## Bağımlılık Grafiği
-```
-Task 1 (retro P0) ──────────┐
-Task 2 (kill P0)             │
-Task 3 (DRY) ───────────┐   ├──→ Task 6 (doctor+retro --json)
-Task 4 (config)          ├──→ Task 7 (cleanup --dry-run)
-Task 5 (spawn)           │
-Task 8 (agent CRUD)      │
-Task 9 (skill CRUD)      │
-Task 10 (explain)        │
-```
-
-Task 1-5, 8-10: paralel çalışabilir
-Task 6: Task 1 + Task 3'e bağımlı
-Task 7: Task 3'e bağımlı
+- Existing tests: 0 regression (11,000+ test geçmeli)
+- Her task test VE implementasyon birlikte yazmalı
+- MCP: 16 tool + 9 resource çalışır durumda olmalı
+- Multi-provider: doctor Codex/Gemini kurulumda PASS vermeli
+- Prompt engine: Worker prompt'unda agent systemPrompt + task-specific skills görülmeli
+- %100 GO hedefli — NO_GO KABUL EDİLMEZ

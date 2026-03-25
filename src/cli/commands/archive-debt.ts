@@ -1,64 +1,28 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { BRAIN_DIR, DEBT_FILE, ARCHIVE_DIR, DEBT_TABLE_HEADER } from '../../core/constants.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { parseDebtTable, generateDebtTable } from '../../core/utils.js';
+import type { DebtItem } from '../../core/types.js';
 
-interface DebtRow {
-  id: string;
-  description: string;
-  task: string;
-  sprint: string;
-  priority: string;
-  open: string;
-  resolved: string;
-  fixedIn: string;
-  created: string;
-}
+// ─── Rotation Config ────────────────────────────────────────────────
 
-function parseDebtRows(content: string): DebtRow[] {
-  const lines = content.split('\n');
-  const rows: DebtRow[] = [];
-  let headerFound = false;
+const DEFAULT_MAX_ARCHIVE_SIZE_BYTES = 1_000_000; // 1MB
 
-  for (const line of lines) {
-    if (line.includes('| ID |')) { headerFound = true; continue; }
-    if (!headerFound) continue;
-    if (line.startsWith('|---') || line.startsWith('| ---')) continue;
-    if (!line.startsWith('|')) continue;
-
-    const cols = line.split('|').slice(1, -1).map(c => c.trim());
-    if (cols.length < 9) continue;
-
-    rows.push({
-      id: cols[0] ?? '',
-      description: cols[1] ?? '',
-      task: cols[2] ?? '',
-      sprint: cols[3] ?? '',
-      priority: cols[4] ?? '',
-      open: cols[5] ?? '',
-      resolved: cols[6] ?? '',
-      fixedIn: cols[7] ?? '',
-      created: cols[8] ?? '',
-    });
-  }
-  return rows;
-}
-
-function formatDebtTable(rows: DebtRow[]): string {
-  const separator = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
-  const lines = rows.map(r =>
-    `| ${r.id} | ${r.description} | ${r.task} | ${r.sprint} | ${r.priority} | ${r.open} | ${r.resolved} | ${r.fixedIn} | ${r.created} |`,
-  );
-  return [DEBT_TABLE_HEADER, separator, ...lines].join('\n');
+function formatDebtRow(r: DebtItem): string {
+  return `| ${r.id} | ${r.description} | ${r.originTaskId} | ${r.originSprintId} | ${r.priority} | ${r.sprintsOpen} | ${r.resolved} | ${r.resolvedInSprintId ?? '-'} | ${r.createdAt} |`;
 }
 
 export function registerArchiveDebt(program: Command): void {
   program
     .command('archive-debt')
     .description('Archive resolved debt items from .brain/DEBT.md')
-    .action(() => {
+    .option('--dry-run', 'Preview what would be archived without making changes')
+    .option('--before <sprint>', 'Only archive items from sprints before this sprint ID (e.g. sprint-050)')
+    .option('--max-archive-size <bytes>', 'Max archive file size in bytes before rotation', String(DEFAULT_MAX_ARCHIVE_SIZE_BYTES))
+    .action((opts: { dryRun?: boolean; before?: string; maxArchiveSize?: string }) => {
       const root = resolveProjectRoot();
       const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
 
@@ -68,35 +32,106 @@ export function registerArchiveDebt(program: Command): void {
       }
 
       const content = readFileSync(debtPath, 'utf-8');
-      const rows = parseDebtRows(content);
+      // P) Use shared parseDebtTable from utils.ts
+      const rows = parseDebtTable(content);
 
-      const resolved = rows.filter(r => r.resolved === 'true');
-      const unresolved = rows.filter(r => r.resolved !== 'true');
+      let resolved = rows.filter(r => r.resolved === true);
+      const unresolved = rows.filter(r => r.resolved !== true);
+
+      // O) --before filter: only archive items from sprints before the given sprint
+      if (opts.before) {
+        const beforeSprint = opts.before;
+        const beforeNum = parseInt(beforeSprint.replace(/\D/g, ''), 10);
+
+        if (!isNaN(beforeNum)) {
+          const filteredResolved: DebtItem[] = [];
+          const keptResolved: DebtItem[] = [];
+
+          for (const item of resolved) {
+            const itemSprintNum = parseInt(item.originSprintId.replace(/\D/g, ''), 10);
+            if (!isNaN(itemSprintNum) && itemSprintNum < beforeNum) {
+              filteredResolved.push(item);
+            } else {
+              keptResolved.push(item);
+            }
+          }
+
+          if (opts.dryRun) {
+            print(`[dry-run] Would archive ${filteredResolved.length} resolved item(s) from sprints before ${beforeSprint}.`);
+            print(`[dry-run] ${keptResolved.length} resolved item(s) would remain (sprint >= ${beforeSprint}).`);
+            print(`[dry-run] ${unresolved.length} unresolved item(s) untouched.`);
+            if (filteredResolved.length > 0) {
+              print('\nItems that would be archived:');
+              for (const item of filteredResolved) {
+                print(`  - ${item.id}: ${item.description} (sprint: ${item.originSprintId})`);
+              }
+            }
+            return;
+          }
+
+          resolved = filteredResolved;
+          // Keep the newer resolved items in the debt file
+          unresolved.push(...keptResolved);
+        }
+      } else if (opts.dryRun) {
+        print(`[dry-run] Would archive ${resolved.length} resolved item(s).`);
+        print(`[dry-run] ${unresolved.length} unresolved item(s) would remain.`);
+        if (resolved.length > 0) {
+          print('\nItems that would be archived:');
+          for (const item of resolved) {
+            print(`  - ${item.id}: ${item.description} (sprint: ${item.originSprintId})`);
+          }
+        }
+        return;
+      }
 
       if (resolved.length === 0) {
         print('No resolved debt items to archive.');
         return;
       }
 
-      // Write unresolved items back to DEBT.md
-      writeFileSync(debtPath, formatDebtTable(unresolved), 'utf-8');
+      // Write unresolved items back to DEBT.md using shared generateDebtTable
+      writeFileSync(debtPath, generateDebtTable(unresolved), 'utf-8');
 
       // Append resolved items to archive
       const archiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR);
-      const archivePath = join(archiveDir, 'DEBT-ARCHIVE.md');
       mkdirSync(archiveDir, { recursive: true });
 
-      const archiveContent = resolved.map(r =>
-        `| ${r.id} | ${r.description} | ${r.task} | ${r.sprint} | ${r.priority} | ${r.open} | ${r.resolved} | ${r.fixedIn} | ${r.created} |`,
-      ).join('\n') + '\n';
+      // O) Rotation: check archive file size
+      const maxSize = parseInt(opts.maxArchiveSize ?? String(DEFAULT_MAX_ARCHIVE_SIZE_BYTES), 10);
+      const archivePath = getRotatedArchivePath(archiveDir, maxSize);
+
+      const separator = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
+      const archiveContent = resolved.map(r => formatDebtRow(r)).join('\n') + '\n';
 
       if (!existsSync(archivePath)) {
-        const separator = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
         writeFileSync(archivePath, [DEBT_TABLE_HEADER, separator, ''].join('\n'), 'utf-8');
       }
 
       appendFileSync(archivePath, archiveContent, 'utf-8');
 
       print(`Archived ${resolved.length} resolved debt items. ${unresolved.length} items remaining.`);
+      print(`  Archive: ${archivePath}`);
     });
+}
+
+/**
+ * Get the current archive file path, rotating if it exceeds maxSize.
+ * Creates numbered archive files: DEBT-ARCHIVE.md, DEBT-ARCHIVE-2.md, etc.
+ */
+function getRotatedArchivePath(archiveDir: string, maxSizeBytes: number): string {
+  let index = 1;
+  let archivePath = join(archiveDir, 'DEBT-ARCHIVE.md');
+
+  while (existsSync(archivePath)) {
+    const size = statSync(archivePath).size;
+    if (size < maxSizeBytes) {
+      return archivePath;
+    }
+    // File too large, try next rotation
+    index++;
+    archivePath = join(archiveDir, `DEBT-ARCHIVE-${index}.md`);
+  }
+
+  return archivePath;
 }

@@ -19,6 +19,7 @@ export {
   adjustSprintSize,
   planSprint,
   confirmDraftTasks,
+  cleanupDraftTasks,
   spawnWorkers,
   waitForResults,
   evaluateResult,

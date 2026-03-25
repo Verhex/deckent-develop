@@ -66,6 +66,22 @@ describe('sprintLogUpdater', () => {
     expect(sprintLogUpdater.internal).toBe(false);
   });
 
+  it('targetFile matches actual write path (docs/SPRINT-LOG.md)', () => {
+    expect(sprintLogUpdater.targetFile).toBe('docs/SPRINT-LOG.md');
+  });
+
+  it('writes to docs/SPRINT-LOG.md (not docs/archive/SPRINT-LOG.md)', () => {
+    sprintLogUpdater.run(makeCtx());
+    const writtenPath = String(mockedWriteFileSync.mock.calls[0][0]);
+    expect(writtenPath).toContain('docs/SPRINT-LOG.md');
+    expect(writtenPath).not.toContain('docs/archive');
+  });
+
+  it('result.file matches targetFile', () => {
+    const result = sprintLogUpdater.run(makeCtx());
+    expect(result.file).toBe(sprintLogUpdater.targetFile);
+  });
+
   it('shouldRun returns true by default', () => {
     expect(sprintLogUpdater.shouldRun(makeCtx())).toBe(true);
   });

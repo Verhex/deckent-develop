@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeFileSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, unlinkSync, readdirSync } from 'node:fs';
 import {
   migrateConfig,
   migrateConfigInMemory,
@@ -21,6 +21,33 @@ function writeTmp(name: string, content: unknown): string {
 function cleanupTmp(...paths: string[]): void {
   for (const p of paths) {
     if (existsSync(p)) unlinkSync(p);
+    // Also clean up any timestamp backups (config.json.bak.<timestamp>)
+    const dir = p.includes('/') ? p.split('/').slice(0, -1).join('/') : '.';
+    const base = p.split('/').pop() ?? p;
+    try {
+      const entries = readdirSync(dir);
+      for (const entry of entries) {
+        if (entry.startsWith(base + '.bak.')) {
+          const full = dir + '/' + entry;
+          if (existsSync(full)) unlinkSync(full);
+        }
+      }
+    } catch {
+      // Ignore errors during cleanup
+    }
+  }
+}
+
+/** Find the first .bak.* file for a given config path */
+function findBackupPath(p: string): string | null {
+  const dir = p.includes('/') ? p.split('/').slice(0, -1).join('/') : '.';
+  const base = p.split('/').pop() ?? p;
+  try {
+    const entries = readdirSync(dir);
+    const bak = entries.find(e => e.startsWith(base + '.bak.'));
+    return bak ? dir + '/' + bak : null;
+  } catch {
+    return null;
   }
 }
 
@@ -151,16 +178,17 @@ describe('migrateConfig', () => {
   it('adds missing fields and creates backup for minimal config', () => {
     const minimal = { mode: 'max_plan', modes: {} };
     const p = writeTmp('minimal-config.json', minimal);
-    const bakPath = p + '.bak';
     try {
       const result = migrateConfig(p);
       expect(result.migrated).toBe(true);
       expect(result.addedFields.length).toBeGreaterThan(0);
-      expect(result.backupPath).toBe(bakPath);
-      expect(existsSync(bakPath)).toBe(true);
+      // Backup path should be timestamped
+      expect(result.backupPath).toBeTruthy();
+      expect(result.backupPath).toMatch(/\.bak\.\d{4}-\d{2}-\d{2}/);
+      expect(existsSync(result.backupPath!)).toBe(true);
 
       // Verify backup contains original content
-      const backup = JSON.parse(readFileSync(bakPath, 'utf-8')) as Record<string, unknown>;
+      const backup = JSON.parse(readFileSync(result.backupPath!, 'utf-8')) as Record<string, unknown>;
       expect(backup).toEqual(minimal);
 
       // Verify migrated file has new fields
@@ -170,14 +198,13 @@ describe('migrateConfig', () => {
       // Original fields preserved
       expect(migrated['mode']).toBe('max_plan');
     } finally {
-      cleanupTmp(p, bakPath);
+      cleanupTmp(p);
     }
   });
 
   it('preserves existing custom values during migration', () => {
     const existing = { mode: 'pro_plan', modes: {}, memory_budget: 800 };
     const p = writeTmp('custom-config.json', existing);
-    const bakPath = p + '.bak';
     try {
       const result = migrateConfig(p);
       expect(result.migrated).toBe(true);
@@ -188,34 +215,32 @@ describe('migrateConfig', () => {
       // New fields added
       expect(migrated['scan_interval']).toBe(30);
     } finally {
-      cleanupTmp(p, bakPath);
+      cleanupTmp(p);
     }
   });
 
   it('dry-run does not modify the file or create backup', () => {
     const minimal = { mode: 'max_plan', modes: {} };
     const p = writeTmp('dryrun-config.json', minimal);
-    const bakPath = p + '.bak';
     try {
       const result = migrateConfig(p, { dryRun: true });
       expect(result.migrated).toBe(true);
       expect(result.addedFields.length).toBeGreaterThan(0);
-      // No backup created
-      expect(existsSync(bakPath)).toBe(false);
+      // No backup created in dry-run
+      expect(findBackupPath(p)).toBeNull();
       // File unchanged
       const content = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
       expect(content).toEqual(minimal);
       // backupPath null for dry-run
       expect(result.backupPath).toBeNull();
     } finally {
-      cleanupTmp(p, bakPath);
+      cleanupTmp(p);
     }
   });
 
   it('adds rollback_policy and fix_phase_enabled for sprint config', () => {
     const existing = { mode: 'max_plan', modes: {} };
     const p = writeTmp('sprint-config.json', existing);
-    const bakPath = p + '.bak';
     try {
       migrateConfig(p);
       const migrated = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
@@ -223,7 +248,35 @@ describe('migrateConfig', () => {
       expect(migrated['fix_phase_enabled']).toBe(true);
       expect(migrated['max_fix_retries']).toBe(2);
     } finally {
-      cleanupTmp(p, bakPath);
+      cleanupTmp(p);
+    }
+  });
+
+  it('detects and adds missing mode-level fields (G: modes migration)', () => {
+    // Config with modes that are missing some fields
+    const existing = {
+      mode: 'max_plan',
+      modes: {
+        max_plan: { max_workers: 8, brain_model: 'opus', default_model: 'opus', haiku_allowed: true },
+        // Missing brain_planning field
+      },
+    };
+    const missingFields = getMissingFields(existing as Record<string, unknown>);
+    // Should detect missing mode fields
+    const modeFields = missingFields.filter(f => f.startsWith('modes.'));
+    expect(modeFields.length).toBeGreaterThan(0);
+  });
+
+  it('timestamp backup has valid ISO 8601 date format (H: backup naming)', () => {
+    const existing = { mode: 'max_plan', modes: {} };
+    const p = writeTmp('ts-backup-test.json', existing);
+    try {
+      const result = migrateConfig(p);
+      expect(result.backupPath).toBeTruthy();
+      // Pattern: config.json.bak.2026-03-25T10-00-00-000Z (colons replaced with dashes)
+      expect(result.backupPath).toMatch(/\.bak\.\d{4}-\d{2}-\d{2}T/);
+    } finally {
+      cleanupTmp(p);
     }
   });
 });

@@ -25,6 +25,9 @@ vi.mock('../../src/core/config.js', () => ({
   loadConfig: vi.fn(async () => ({
     activeModeConfig: { brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, max_workers: 4 },
   })),
+  deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),
+  validatePartialConfig: vi.fn(),
+  ConfigValidationError: class extends Error { name = 'ConfigValidationError'; errors: string[] = []; },
 }));
 
 vi.mock('../../src/agents/worker.js', () => ({

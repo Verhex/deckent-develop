@@ -6,7 +6,7 @@ export const sprintLogUpdater: DocUpdater = {
   name: 'sprint-log',
   tier: 1,
   internal: false,
-  targetFile: 'docs/archive/SPRINT-LOG.md',
+  targetFile: 'docs/SPRINT-LOG.md',
 
   shouldRun(ctx: DocUpdateContext): boolean {
     return ctx.config.auto_docs?.tier1 !== false;

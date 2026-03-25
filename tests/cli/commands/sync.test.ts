@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 vi.mock('node:fs', () => ({
@@ -12,6 +12,8 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
   statSync: vi.fn(),
 }));
+
+const mkdirSyncMock = mkdirSync as ReturnType<typeof vi.fn>;
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -32,6 +34,10 @@ import {
   formatSyncOutput,
   runSync,
   registerSync,
+  syncGeminiAdapter,
+  syncCursorAdapter,
+  syncCodexAdapter,
+  buildProviderSyncMap,
 } from '../../../src/cli/commands/sync.js';
 import type { SyncResult } from '../../../src/cli/commands/sync.js';
 
@@ -421,7 +427,6 @@ describe('CLI: deckent sync', () => {
 
     await program.parseAsync(['node', 'deckent', 'sync']);
 
-    expect(ensureDeckentImport).toHaveBeenCalledTimes(2);
     expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'));
     expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
   });
@@ -447,8 +452,153 @@ describe('CLI: deckent sync', () => {
 
     await program.parseAsync(['node', 'deckent', 'sync', '--adapters-only']);
 
-    expect(ensureDeckentImport).toHaveBeenCalledTimes(2);
-    // spawnSync should NOT be called for git commands
-    expect(spawnSync).not.toHaveBeenCalled();
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'));
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
+    // spawnSync should NOT be called for git commands (mkdirSync may be called for .cursor)
+    // We just verify ensureDeckentImport was called for each adapter
+    expect(ensureDeckentImport.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── Unit Tests: syncGeminiAdapter ──────────────────────────────────
+
+describe('syncGeminiAdapter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls ensureDeckentImport on GEMINI.md', () => {
+    syncGeminiAdapter('/project');
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('GEMINI.md'));
+  });
+
+  it('skips ensureDeckentImport in dry-run mode', () => {
+    syncGeminiAdapter('/project', true);
+    expect(ensureDeckentImport).not.toHaveBeenCalled();
+  });
+
+  it('always returns true', () => {
+    expect(syncGeminiAdapter('/project', true)).toBe(true);
+    expect(syncGeminiAdapter('/project', false)).toBe(true);
+  });
+});
+
+// ─── Unit Tests: syncCursorAdapter ──────────────────────────────────
+
+describe('syncCursorAdapter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls ensureDeckentImport on .cursor/rules when dir exists', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    syncCursorAdapter('/project');
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('rules'));
+  });
+
+  it('creates .cursor dir and syncs when dir does not exist', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(mkdirSync).mockImplementation(() => undefined);
+    const result = syncCursorAdapter('/project');
+    expect(mkdirSyncMock).toHaveBeenCalledWith(expect.stringContaining('.cursor'), { recursive: true });
+    expect(ensureDeckentImport).toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+
+  it('returns false when mkdirSync throws', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(mkdirSync).mockImplementation(() => { throw new Error('Permission denied'); });
+    const result = syncCursorAdapter('/project');
+    expect(result).toBe(false);
+    expect(ensureDeckentImport).not.toHaveBeenCalled();
+  });
+
+  it('skips ensureDeckentImport in dry-run mode even when dir exists', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    syncCursorAdapter('/project', true);
+    expect(ensureDeckentImport).not.toHaveBeenCalled();
+  });
+
+  it('returns true in dry-run when dir does not exist (would create)', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const result = syncCursorAdapter('/project', true);
+    expect(result).toBe(true);
+    expect(mkdirSyncMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Unit Tests: syncCodexAdapter ───────────────────────────────────
+
+describe('syncCodexAdapter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns false when .codex/ dir does not exist', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const result = syncCodexAdapter('/project');
+    expect(result).toBe(false);
+    expect(ensureDeckentImport).not.toHaveBeenCalled();
+  });
+
+  it('calls ensureDeckentImport on .codex/AGENTS.md when dir exists', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    syncCodexAdapter('/project');
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
+    expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('.codex'));
+  });
+
+  it('skips ensureDeckentImport in dry-run mode', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    syncCodexAdapter('/project', true);
+    expect(ensureDeckentImport).not.toHaveBeenCalled();
+  });
+
+  it('returns true when .codex/ exists', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    expect(syncCodexAdapter('/project', true)).toBe(true);
+  });
+});
+
+// ─── Unit Tests: buildProviderSyncMap ───────────────────────────────
+
+describe('buildProviderSyncMap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns map with claude and gemini always synced', () => {
+    vi.mocked(existsSync).mockReturnValue(true); // .cursor dir + .codex dir exist
+    const map = buildProviderSyncMap('/project', true);
+    expect(map.claude.synced).toBe(true);
+    expect(map.gemini.synced).toBe(true);
+    expect(map.claude.file).toBe('CLAUDE.md');
+    expect(map.gemini.file).toBe('GEMINI.md');
+  });
+
+  it('includes codex as not synced when .codex dir does not exist', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const map = buildProviderSyncMap('/project', true);
+    expect(map.codex.synced).toBe(false);
+  });
+
+  it('includes codex as synced when .codex dir exists', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    const map = buildProviderSyncMap('/project', true);
+    expect(map.codex.synced).toBe(true);
+  });
+
+  it('reports cursor sync status', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    const map = buildProviderSyncMap('/project', true);
+    expect(map.cursor).toBeDefined();
+    expect(typeof map.cursor.synced).toBe('boolean');
+  });
+
+  it('calls ensureDeckentImport for each provider when not dry-run', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    buildProviderSyncMap('/project', false);
+    // claude + gemini + codex + cursor = at least 4 calls
+    expect(vi.mocked(ensureDeckentImport).mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -322,13 +322,12 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
     expect(prompt).toContain('REQUIRED');
   });
 
-  it('includes the JSON schema for the result file', () => {
+  it('references result file fields in condensed format', () => {
     const prompt = buildWorkerPrompt(makeTask());
-    // Required JSON fields must appear
-    expect(prompt).toContain('"taskId"');
-    expect(prompt).toContain('"testsPassed"');
-    expect(prompt).toContain('"coverage"');
-    expect(prompt).toContain('"selfAssessment"');
+    // Result file fields referenced in condensed hint
+    expect(prompt).toContain('taskId');
+    expect(prompt).toContain('testsPassed');
+    expect(prompt).toContain('selfAssessment');
   });
 
   it('lists valid selfAssessment values in the prompt', () => {

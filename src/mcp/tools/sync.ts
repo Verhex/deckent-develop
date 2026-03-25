@@ -22,19 +22,27 @@ export function registerSyncTool(server: McpServer): void {
         };
       }
 
-      const synced: string[] = [];
-      ensureDeckentImport(join(root, CLAUDE_FILE));
-      synced.push(CLAUDE_FILE);
+      try {
+        const synced: string[] = [];
+        ensureDeckentImport(join(root, CLAUDE_FILE));
+        synced.push(CLAUDE_FILE);
 
-      ensureDeckentImport(join(root, AGENTS_FILE));
-      synced.push(AGENTS_FILE);
+        ensureDeckentImport(join(root, AGENTS_FILE));
+        synced.push(AGENTS_FILE);
 
-      const changeCount = synced.length;
-      const enriched = enrichResponse('sync', { success: true, synced, changeCount });
+        const changeCount = synced.length;
+        const enriched = enrichResponse('sync', { success: true, synced, changeCount });
 
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
-      };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Sync failed: ${message}` }) }],
+          isError: true,
+        };
+      }
     },
   );
 }

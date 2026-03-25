@@ -8,9 +8,10 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   appendFileSync: vi.fn(),
+  statSync: vi.fn(),
 }));
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, statSync } from 'node:fs';
 import { registerArchiveDebt } from '../../src/cli/commands/archive-debt.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -18,6 +19,7 @@ const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockExistsSync = vi.mocked(existsSync);
 const mockMkdirSync = vi.mocked(mkdirSync);
 const mockAppendFileSync = vi.mocked(appendFileSync);
+const mockStatSync = vi.mocked(statSync);
 
 function buildDebtContent(rows: string[]): string {
   const separator = '|----|-------------|------|--------|----------|------|----------|----------|---------|';
@@ -57,6 +59,8 @@ describe('archive-debt command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     captureOutput();
+    // Default statSync mock — archive file is small enough (under 1MB rotation limit)
+    mockStatSync.mockReturnValue({ size: 100 } as ReturnType<typeof statSync>);
   });
 
   afterEach(() => {

@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint59] - 2026-03-25
+
+
+### Changed
+
+- cli-deep-analysis.md Full [DONE] Marking + Doğrulama (completed with tech debt)
+- Prompt Boilerplate Azaltma + Worker Guide (completed with tech debt)
+- spawn+kill+run Multi-Provider Desteği (completed with tech debt)
+- doctor+watch Provider-Aware Fix (completed with tech debt)
+- MCP Resources Expansion (+4 resources) (completed with tech debt)
+- MCP Tool Quality — Enrichment + Error Handling (completed with tech debt)
+- Format Tutarlılığı + Dead Code Temizliği (completed with tech debt)
+- Sync Genişleme (Gemini/Cursor/Codex Adapters) (completed with tech debt)
+- Doc Updater Fix + CHANGELOG Konsolidasyonu (completed with tech debt)
+
+### Fixed
+
+- Agent Activation Fix — forceModel Agent Bypass Kaldır
+- Skill Selection Fix — Task-Specific Seçim + Truncation
+- Scope & GO/NO-GO Fix — filesWrite + Criteria Enrichment
+
+
+_Tasks: 13 total, 12 done, 9 tech debt, 1 no-go_
+
+## [0.2.0-beta.1-sprint58] - 2026-03-25
+
+### Added
+
+- agent+skill+plugin+marketplace+archive-debt Completeness
+- dashboard+attach+watch+cross-cutting
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [0.2.0-beta.1-sprint57] - 2026-03-25
+
+### Added
+
+- status Overhaul — Standalone, ETA, NO_COLOR, fs.watch, Verbose
+- retro+explain Quality — Dil, Trend, Agent/Skill Perf, Learnings
+- usage Overhaul — Real Tokens, Race Condition, Live Usage, Filters
+- history Overhaul — --json, --last, Agent/Skill, Dead Code, Format
+- config Quality — list/keys, autoMigrate, Validation, Comment, Env Var
+- review+finalize Overhaul — Interactive, Retry, Guard, Duplicate
+- serve Security — Rate Limit, Body Size, DeepMerge, Auth, Versioning
+
+### Changed
+
+- doctor Improvements — tmux Conditional, .deck Check, Auth, Hints (completed with tech debt)
+- cleanup+decay Overhaul — Auto Decay, Combo, Lock Guard, Archive (completed with tech debt)
+- run+test+web Flags — Timeout, Keep, Sandbox, CI, MIME (completed with tech debt)
+- sync+onboard+upgrade Polish (completed with tech debt)
+
+
+_Tasks: 13 total, 11 done, 4 tech debt, 2 no-go_
+
 ## [0.2.0-beta.1-sprint54] - 2026-03-25
 
 ### Changed

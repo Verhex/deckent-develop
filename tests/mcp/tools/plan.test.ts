@@ -365,7 +365,7 @@ describe('registerPlanTool', () => {
   // ── Error handling ─────────────────────────────────────────────────────────
 
   describe('error handling', () => {
-    it('propagates error when planSprint throws (e.g. missing directives)', async () => {
+    it('returns isError when planSprint throws (e.g. missing directives)', async () => {
       const server = makeServer();
       registerPlanTool(server as any);
 
@@ -377,19 +377,25 @@ describe('registerPlanTool', () => {
         throw new Error('DIRECTIVES.md missing or empty');
       });
 
-      await expect(server.callTool('deckent_plan', {})).rejects.toThrow('DIRECTIVES.md missing or empty');
+      const result = await server.callTool('deckent_plan', {});
+      expect(result.isError).toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.error).toContain('DIRECTIVES.md missing or empty');
     });
 
-    it('propagates error when loadConfig fails', async () => {
+    it('returns isError when loadConfig fails', async () => {
       const server = makeServer();
       registerPlanTool(server as any);
 
       mockLoadConfig.mockRejectedValue(new Error('Config file not found'));
 
-      await expect(server.callTool('deckent_plan', {})).rejects.toThrow('Config file not found');
+      const result = await server.callTool('deckent_plan', {});
+      expect(result.isError).toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.error).toContain('Config file not found');
     });
 
-    it('propagates error when adjustSprintSize throws (usage limit)', async () => {
+    it('returns isError when adjustSprintSize throws (usage limit)', async () => {
       const server = makeServer();
       registerPlanTool(server as any);
 
@@ -400,7 +406,10 @@ describe('registerPlanTool', () => {
         throw new Error('Usage limit exceeded');
       });
 
-      await expect(server.callTool('deckent_plan', {})).rejects.toThrow('Usage limit exceeded');
+      const result = await server.callTool('deckent_plan', {});
+      expect(result.isError).toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.error).toContain('Usage limit exceeded');
     });
   });
 

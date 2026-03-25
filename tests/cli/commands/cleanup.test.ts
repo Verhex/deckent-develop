@@ -13,6 +13,10 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
 }));
 
+vi.mock('../../../src/core/utils.js', () => ({
+  countBrainLines: vi.fn().mockReturnValue(100),
+}));
+
 vi.mock('../../../src/orchestra/brain.js', () => ({
   cleanup: vi.fn(),
   runDecay: vi.fn(),
@@ -35,6 +39,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { cleanup, runDecay } from '../../../src/orchestra/brain.js';
 import { destroy } from '../../../src/orchestra/tmux.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
+import { countBrainLines } from '../../../src/core/utils.js';
 import { registerCleanup } from '../../../src/cli/commands/cleanup.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -163,6 +168,68 @@ describe('cleanup command (isolated)', () => {
     await runCommand(['cleanup']);
     expect(print).toHaveBeenCalledWith(expect.stringContaining('Cleanup complete'));
     expect(process.exitCode).toBeUndefined();
+  });
+
+  // A) Budget warning after cleanup
+  it('shows budget warning when .brain/ exceeds budget after cleanup', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    vi.mocked(countBrainLines).mockReturnValue(700); // over 600 budget
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('deckent cleanup --decay'))).toBe(true);
+  });
+
+  it('does not show budget warning when .brain/ is within budget', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    vi.mocked(countBrainLines).mockReturnValue(400); // under 600 budget
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('deckent cleanup --decay'))).toBe(false);
+  });
+
+  // B) --decay + normal cleanup combo
+  it('--decay also runs normal cleanup (no early return)', async () => {
+    vi.mocked(runDecay).mockReturnValue({
+      linesBefore: 400, linesAfter: 250,
+      archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0,
+    });
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    await runCommand(['cleanup', '--decay']);
+    // Both decay and normal cleanup should have run
+    expect(runDecay).toHaveBeenCalled();
+    expect(cleanup).toHaveBeenCalled();
+    expect(destroy).toHaveBeenCalled();
+  });
+
+  // C) Active lock guard: warn about EXECUTING tasks
+  it('warns when EXECUTING tasks are present', async () => {
+    const executingTask = makeTask({ id: '001-001', status: 'EXECUTING' as any });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(executingTask));
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).toLowerCase().includes('active') || String(c).toLowerCase().includes('warning'))).toBe(true);
+  });
+
+  it('warns when CLAIMED tasks are present', async () => {
+    const claimedTask = makeTask({ id: '001-002', status: 'CLAIMED' as any });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue(['task-002.json'] as any);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(claimedTask));
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(destroy).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).toLowerCase().includes('active') || String(c).toLowerCase().includes('warning'))).toBe(true);
   });
 });
 
