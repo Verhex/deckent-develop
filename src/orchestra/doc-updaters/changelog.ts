@@ -16,7 +16,7 @@ export const changelogUpdater: DocUpdater = {
   name: 'changelog',
   tier: 1,
   internal: false,
-  targetFile: 'docs/release/changelog.md',
+  targetFile: 'docs/CHANGELOG.md',
 
   shouldRun(ctx: DocUpdateContext): boolean {
     return ctx.config.auto_docs?.tier1 !== false;

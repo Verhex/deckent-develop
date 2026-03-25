@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-const CHANGELOG_PATH = join(__dirname, '../../docs/release/changelog.md');
+const CHANGELOG_PATH = join(__dirname, '../../docs/CHANGELOG.md');
 
 function readChangelog(): string {
   return readFileSync(CHANGELOG_PATH, 'utf-8');

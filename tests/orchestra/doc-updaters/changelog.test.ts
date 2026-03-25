@@ -60,6 +60,16 @@ describe('changelogUpdater', () => {
     expect(changelogUpdater.internal).toBe(false);
   });
 
+  it('targetFile is docs/CHANGELOG.md', () => {
+    expect(changelogUpdater.targetFile).toBe('docs/CHANGELOG.md');
+  });
+
+  it('writes to docs/CHANGELOG.md path', () => {
+    changelogUpdater.run(makeCtx());
+    const writtenPath = String(mockedWriteFileSync.mock.calls[0][0]);
+    expect(writtenPath).toContain('docs/CHANGELOG.md');
+  });
+
   it('shouldRun returns true by default', () => {
     expect(changelogUpdater.shouldRun(makeCtx())).toBe(true);
   });
