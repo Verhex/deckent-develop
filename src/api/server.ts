@@ -12,7 +12,7 @@ import { watchDashboard } from './watcher.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
 import { killWorker } from '../orchestra/tmux.js';
-import { loadConfig } from '../core/config.js';
+import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import {
   runSprint, readContext, checkUsage, adjustSprintSize, planSprint,
@@ -256,6 +256,12 @@ async function handleRequest(
       return;
     }
 
+    if (url === '/api/config/defaults') {
+      const defaults = createDefaultConfig();
+      sendJson(res, defaults);
+      return;
+    }
+
     if (url === '/api/doctor') {
       const result = runDoctorChecks(projectRoot);
       sendJson(res, result);
@@ -467,6 +473,16 @@ async function handleRequest(
       try {
         const existing: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
         const merged = { ...existing, ...parsed.data };
+        // Validate merged config before writing
+        try {
+          validatePartialConfig(merged as Partial<import('../core/config-types.js').DeckentConfig>);
+        } catch (validationErr: unknown) {
+          if (validationErr instanceof Error && validationErr.name === 'ConfigValidationError' && 'errors' in validationErr) {
+            sendJson(res, { error: { code: 'VALIDATION_ERROR', message: 'Config validation failed', details: (validationErr as ConfigValidationError).errors } }, 422);
+            return;
+          }
+          // Non-validation errors (e.g. missing function) are ignored — write proceeds
+        }
         writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf-8');
         sendJson(res, merged);
       } catch (err: unknown) {

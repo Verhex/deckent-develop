@@ -1,0 +1,327 @@
+import { useState, useEffect, useCallback } from "react";
+import { Save, RotateCcw, Info } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Select } from "../components/ui/select";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Separator } from "../components/ui/separator";
+import { fetchJson, postJson } from "../lib/api";
+
+// ─── Config Metadata ─────────────────────────────────────────────
+
+type FieldType = "select" | "number" | "boolean" | "text";
+
+interface ConfigFieldMeta {
+  key: string;
+  label: string;
+  description: string;
+  type: FieldType;
+  category: string;
+  defaultValue: unknown;
+  options?: string[];
+}
+
+const CONFIG_FIELDS: ConfigFieldMeta[] = [
+  // ─── Provider ───────────────────────────────────────────────
+  { key: "brain_provider", label: "Brain Provider", description: "AI provider for Brain planning", type: "select", category: "Provider", defaultValue: "claude", options: ["claude", "codex", "gemini"] },
+  { key: "worker_provider", label: "Worker Provider", description: "Default AI provider for workers", type: "select", category: "Provider", defaultValue: "claude", options: ["claude", "codex", "gemini"] },
+  { key: "fallback_provider", label: "Fallback Provider", description: "Fallback when primary provider is unavailable", type: "select", category: "Provider", defaultValue: null, options: ["claude", "codex", "gemini"] },
+  { key: "cost_optimization", label: "Cost Optimization", description: "Auto-select cheapest capable provider", type: "boolean", category: "Provider", defaultValue: false },
+  { key: "claude_backend", label: "Claude Backend", description: "Claude execution backend", type: "select", category: "Provider", defaultValue: "tmux", options: ["tmux", "subprocess", "mcp"] },
+  { key: "auth_mode", label: "Auth Mode", description: "Authentication mode", type: "select", category: "Provider", defaultValue: "subscription", options: ["subscription", "api", "hybrid"] },
+
+  // ─── Sprint ─────────────────────────────────────────────────
+  { key: "mode", label: "Plan Mode", description: "Active plan mode determining resource allocation", type: "select", category: "Sprint", defaultValue: "max_plan", options: ["max_plan", "max5x_plan", "pro_plan", "api"] },
+  { key: "spawn_backend", label: "Spawn Backend", description: "Worker spawn backend", type: "select", category: "Sprint", defaultValue: "auto", options: ["tmux", "subprocess", "auto"] },
+
+  // ─── Output ─────────────────────────────────────────────────
+  { key: "output_splash", label: "Show Splash", description: "Show kraken splash on init/version", type: "boolean", category: "Output", defaultValue: true },
+  { key: "output_mode", label: "Output Mode", description: "Output verbosity level", type: "select", category: "Output", defaultValue: "normal", options: ["quiet", "normal", "verbose"] },
+  { key: "output_theme", label: "Output Theme", description: "Output display theme", type: "select", category: "Output", defaultValue: "default", options: ["default", "minimal", "rich"] },
+
+  // ─── Search ─────────────────────────────────────────────────
+  { key: "search_enabled", label: "Search Enabled", description: "Enable online search for documentation", type: "boolean", category: "Search", defaultValue: true },
+  { key: "search_provider", label: "Search Provider", description: "Documentation search provider", type: "select", category: "Search", defaultValue: "context7", options: ["context7", "web", "none"] },
+  { key: "search_cache_ttl", label: "Search Cache TTL", description: "Search cache TTL in seconds", type: "number", category: "Search", defaultValue: 3600 },
+
+  // ─── Notifications ──────────────────────────────────────────
+  { key: "notify_on_complete", label: "Notify on Complete", description: "Send notification when sprint completes", type: "boolean", category: "Notifications", defaultValue: false },
+  { key: "notify_channel", label: "Notify Channel", description: "Notification delivery channel", type: "select", category: "Notifications", defaultValue: null, options: ["slack", "discord", "email", "webhook"] },
+  { key: "notify_url", label: "Notify URL", description: "Webhook URL for notifications", type: "text", category: "Notifications", defaultValue: null },
+
+  // ─── Telemetry ──────────────────────────────────────────────
+  { key: "telemetry_enabled", label: "Telemetry Enabled", description: "Enable usage telemetry", type: "boolean", category: "Telemetry", defaultValue: false },
+  { key: "telemetry_anonymous", label: "Anonymous Telemetry", description: "Keep telemetry anonymous", type: "boolean", category: "Telemetry", defaultValue: true },
+
+  // ─── Environment ────────────────────────────────────────────
+  { key: "detected_env", label: "Detected Environment", description: "Auto-detected IDE/environment", type: "select", category: "Environment", defaultValue: null, options: ["vscode", "codex", "gemini", "cursor", "tmux", "shell"] },
+  { key: "multi_ide_mode", label: "Multi-IDE Mode", description: "Enable multi-IDE support", type: "boolean", category: "Environment", defaultValue: false },
+
+  // ─── Skill Routing ──────────────────────────────────────────
+  { key: "skill_routing.design", label: "Design Skill Route", description: "Provider for design-related skills", type: "select", category: "Skill Routing", defaultValue: null, options: ["claude", "codex", "gemini"] },
+  { key: "skill_routing.testing", label: "Testing Skill Route", description: "Provider for testing-related skills", type: "select", category: "Skill Routing", defaultValue: null, options: ["claude", "codex", "gemini"] },
+  { key: "skill_routing.docs", label: "Docs Skill Route", description: "Provider for documentation skills", type: "select", category: "Skill Routing", defaultValue: null, options: ["claude", "codex", "gemini"] },
+  { key: "skill_routing.default", label: "Default Skill Route", description: "Default provider for skills", type: "select", category: "Skill Routing", defaultValue: "claude", options: ["claude", "codex", "gemini"] },
+];
+
+const CATEGORIES = [
+  "Provider", "Sprint", "Output", "Search",
+  "Notifications", "Telemetry", "Environment", "Skill Routing",
+] as const;
+
+// ─── Helpers ──────────────────────────────────────────────────────
+
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  const parts = path.split(".");
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current === null || current === undefined || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
+  const result = { ...obj };
+  const parts = path.split(".");
+  if (parts.length === 1) {
+    result[parts[0]!] = value;
+    return result;
+  }
+  const parent = parts[0]!;
+  const rest = parts.slice(1).join(".");
+  const existing = (result[parent] as Record<string, unknown>) ?? {};
+  result[parent] = setNestedValue({ ...existing }, rest, value);
+  return result;
+}
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function parseFieldValue(value: string, type: FieldType): unknown {
+  if (value === "" || value === "null") return null;
+  if (type === "boolean") return value === "true";
+  if (type === "number") return Number(value);
+  return value;
+}
+
+// ─── Component ────────────────────────────────────────────────────
+
+export default function ConfigPage() {
+  const [config, setConfig] = useState<Record<string, unknown>>({});
+  const [defaults, setDefaults] = useState<Record<string, unknown>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+
+  const loadData = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      fetchJson<Record<string, unknown>>("/api/config"),
+      fetchJson<Record<string, unknown>>("/api/config/defaults"),
+    ])
+      .then(([cfg, defs]) => {
+        setConfig(cfg);
+        setDefaults(defs);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  function handleChange(field: ConfigFieldMeta, rawValue: string) {
+    const value = parseFieldValue(rawValue, field.type);
+    setConfig((prev) => setNestedValue(prev, field.key, value));
+    setDirty((prev) => new Set(prev).add(field.key));
+    setSaveMsg(null);
+  }
+
+  function handleResetField(field: ConfigFieldMeta) {
+    const defaultVal = getNestedValue(defaults, field.key) ?? field.defaultValue;
+    setConfig((prev) => setNestedValue(prev, field.key, defaultVal));
+    setDirty((prev) => new Set(prev).add(field.key));
+    setSaveMsg(null);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const result = await postJson<Record<string, unknown>>("/api/config", config);
+      setConfig(result);
+      setDirty(new Set());
+      setSaveMsg({ type: "success", text: "Configuration saved successfully." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Save failed";
+      setSaveMsg({ type: "error", text: msg });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function isModified(key: string): boolean {
+    return dirty.has(key);
+  }
+
+  function isDefault(field: ConfigFieldMeta): boolean {
+    const current = getNestedValue(config, field.key);
+    const def = getNestedValue(defaults, field.key) ?? field.defaultValue;
+    return current === def;
+  }
+
+  if (loading) {
+    return <p className="text-muted-foreground p-4">Loading configuration...</p>;
+  }
+
+  if (error) {
+    return <p className="text-red-400 p-4">Error: {error}</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Configuration</h1>
+        <Button onClick={handleSave} disabled={saving || dirty.size === 0} className="gap-2">
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+
+      {saveMsg && (
+        <div
+          className={`rounded-md px-3 py-2 text-sm ${
+            saveMsg.type === "success"
+              ? "bg-green-900/30 text-green-400"
+              : "bg-red-900/30 text-red-400"
+          }`}
+          data-testid="save-message"
+        >
+          {saveMsg.text}
+        </div>
+      )}
+
+      {CATEGORIES.map((category) => {
+        const fields = CONFIG_FIELDS.filter((f) => f.category === category);
+        if (fields.length === 0) return null;
+
+        return (
+          <Card key={category} data-testid={`config-category-${category.toLowerCase().replace(/\s+/g, "-")}`}>
+            <CardHeader>
+              <CardTitle>{category}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {fields.map((field) => {
+                  const currentValue = getNestedValue(config, field.key);
+                  const modified = isModified(field.key);
+                  const isDefault_ = isDefault(field);
+
+                  return (
+                    <div key={field.key} className="space-y-1.5" data-testid={`config-field-${field.key}`}>
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor={`config-${field.key}`} className="text-sm">
+                          {field.label}
+                          {modified && <span className="ml-1 text-yellow-400 text-xs">*</span>}
+                        </Label>
+                        <span className="group relative cursor-help" title={field.description}>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {field.type === "select" && (
+                          <Select
+                            id={`config-${field.key}`}
+                            value={formatValue(currentValue)}
+                            onChange={(e) => handleChange(field, e.target.value)}
+                          >
+                            <option value="">— none —</option>
+                            {field.options?.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </Select>
+                        )}
+
+                        {field.type === "boolean" && (
+                          <Select
+                            id={`config-${field.key}`}
+                            value={currentValue === true ? "true" : currentValue === false ? "false" : ""}
+                            onChange={(e) => handleChange(field, e.target.value)}
+                          >
+                            <option value="">— none —</option>
+                            <option value="true">true</option>
+                            <option value="false">false</option>
+                          </Select>
+                        )}
+
+                        {field.type === "number" && (
+                          <Input
+                            id={`config-${field.key}`}
+                            type="number"
+                            value={currentValue !== null && currentValue !== undefined ? String(currentValue) : ""}
+                            onChange={(e) => handleChange(field, e.target.value)}
+                          />
+                        )}
+
+                        {field.type === "text" && (
+                          <Input
+                            id={`config-${field.key}`}
+                            type="text"
+                            value={formatValue(currentValue)}
+                            onChange={(e) => handleChange(field, e.target.value)}
+                            placeholder={field.description}
+                          />
+                        )}
+
+                        {!isDefault_ && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 gap-1 text-xs"
+                            onClick={() => handleResetField(field)}
+                            title={`Reset to default: ${formatValue(field.defaultValue) || "null"}`}
+                            data-testid={`reset-${field.key}`}
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            Reset
+                          </Button>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        {field.description}
+                        {!isDefault_ && (
+                          <span className="ml-1 text-zinc-500">
+                            (default: {formatValue(field.defaultValue) || "null"})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      <Separator />
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving || dirty.size === 0} className="gap-2">
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+    </div>
+  );
+}

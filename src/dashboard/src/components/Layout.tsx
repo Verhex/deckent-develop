@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, Settings, History, Brain, Menu } from "lucide-react";
+import { LayoutDashboard, Settings, History, Brain, Menu, SlidersHorizontal } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
@@ -13,6 +13,7 @@ const navItems = [
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/history", label: "History", icon: History },
   { to: "/memory", label: "Memory", icon: Brain },
+  { to: "/config", label: "Config", icon: SlidersHorizontal },
 ] as const;
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

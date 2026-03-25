@@ -16,12 +16,18 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent.length).toBeGreaterThan(0);
   });
 
-  it('should have correct trigger event', () => {
+  it('should have release:published trigger event', () => {
     expect(workflowContent).toContain('release:');
     expect(workflowContent).toContain('published');
   });
 
-  it('should have permissions set correctly', () => {
+  it('should have tag-based push trigger (v*)', () => {
+    expect(workflowContent).toContain('push:');
+    expect(workflowContent).toContain('tags:');
+    expect(workflowContent).toContain("- 'v*'");
+  });
+
+  it('should have OIDC permissions set correctly for provenance', () => {
     expect(workflowContent).toContain('contents: read');
     expect(workflowContent).toContain('id-token: write');
   });
@@ -42,8 +48,20 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('npx vitest run');
   });
 
-  it('should have publish step with provenance', () => {
-    expect(workflowContent).toContain('npm publish --provenance');
+  it('should have dry-run step before actual publish', () => {
+    expect(workflowContent).toContain('--dry-run');
+    const dryRunIndex = workflowContent.indexOf('--dry-run');
+    const publishProvenanceIndex = workflowContent.indexOf('npm publish --provenance');
+    expect(dryRunIndex).toBeGreaterThan(0);
+    expect(dryRunIndex).toBeLessThan(publishProvenanceIndex);
+  });
+
+  it('should have dry-run step with --access public', () => {
+    expect(workflowContent).toContain('npm publish --dry-run --access public');
+  });
+
+  it('should have publish step with provenance and --access public', () => {
+    expect(workflowContent).toContain('npm publish --provenance --access public');
   });
 
   it('should have NODE_AUTH_TOKEN environment variable', () => {
@@ -70,5 +88,46 @@ describe('.github/workflows/publish.yml', () => {
 
   it('should have cache enabled for npm', () => {
     expect(workflowContent).toContain('cache: npm');
+  });
+
+  it('should have type check step', () => {
+    expect(workflowContent).toContain('npm run lint');
+  });
+
+  it('should have NODE_AUTH_TOKEN on both dry-run and publish steps', () => {
+    const nodeAuthCount = (workflowContent.match(/NODE_AUTH_TOKEN/g) || []).length;
+    expect(nodeAuthCount).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('.github/workflows/release.yml', () => {
+  let releaseContent: string;
+
+  try {
+    releaseContent = readFileSync(resolve('.github/workflows/release.yml'), 'utf-8');
+  } catch (e) {
+    releaseContent = '';
+  }
+
+  it('should exist', () => {
+    expect(releaseContent.length).toBeGreaterThan(0);
+  });
+
+  it('should have tag-based push trigger (v*)', () => {
+    expect(releaseContent).toContain('push:');
+    expect(releaseContent).toContain('tags:');
+    expect(releaseContent).toContain("- 'v*'");
+  });
+
+  it('should have contents: write for GitHub Release creation', () => {
+    expect(releaseContent).toContain('contents: write');
+  });
+
+  it('should have id-token: write for OIDC provenance', () => {
+    expect(releaseContent).toContain('id-token: write');
+  });
+
+  it('should publish with provenance and access public', () => {
+    expect(releaseContent).toContain('npm publish --provenance --access public');
   });
 });

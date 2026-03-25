@@ -29,7 +29,7 @@ Build the orchestration runtime — Brain, Auditor, Workers, Sprint lifecycle.
 
 Use Deckent to build Deckent. Validate the sprint loop on real development work.
 
-- [x] Run 5+ consecutive sprints on Deckent's own codebase (38 sprints completed)
+- [x] Run 5+ consecutive sprints on Deckent's own codebase (49 sprints completed)
 - [x] Brain learns from its own retros and improves plans
 - [x] Auditor catches real boundary violations and pattern regressions
 - [x] Tech debt escalation triggers automatically (2 sprint → HIGH, 3 sprint → CRITICAL)
@@ -66,14 +66,20 @@ Make Deckent provider-agnostic and cross-platform ready.
 
 ---
 
-## Phase 4: Distribution — npm publish, Landing Page, Docs Site (May 2026)
+## Phase 4: Distribution — npm publish, Landing Page, Docs Site (April 2026)
 
-- [ ] `npm install -g deckent` works globally
+Sprint 051-058 ile planlanan:
+- [ ] `npm install -g deckent` works globally (Sprint 051)
 - [ ] Landing page at deckent.agency
-- [ ] Documentation site (VitePress or Starlight)
+- [ ] Documentation site — VitePress (Sprint 052)
+- [ ] SWE-bench benchmark (Sprint 053)
+- [ ] GitHub Issue Mode — `deckent do --issue 42` (Sprint 054)
+- [ ] Epic→Multi-Sprint decomposition (Sprint 055)
+- [ ] Continuous Watch Mode — `deckent watch --act` (Sprint 056)
+- [ ] Community infrastructure — Discussions, Discord, CONTRIBUTING (Sprint 057)
+- [ ] Git Auto-Workflow — branch-per-sprint, auto-commit, PR (Sprint 058)
 - [ ] Public GitHub repo (deckent) — clean, documented, installable
 - [ ] Private dev repo (deckent-dev) — full artifacts, .brain/ history
-- [ ] `deckent publish` sync script between repos
 
 ---
 
@@ -90,5 +96,6 @@ Make Deckent provider-agnostic and cross-platform ready.
 
 ---
 
-*Current status: Sprint 038 completed — 8555+ tests passing*
+*Current status: Sprint 049 completed — 10,390+ tests passing*
+*Sprint 050 active — Container Readiness & Process Lifecycle*
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Sections 12, 19*

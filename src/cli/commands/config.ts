@@ -4,6 +4,7 @@ import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../core/config.js';
+import { migrateConfig } from '../../core/config-migration.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
@@ -148,6 +149,44 @@ export function registerConfig(program: Command): void {
         } else {
           printError(error);
         }
+        process.exitCode = 1;
+      }
+    });
+
+  cmd
+    .command('migrate')
+    .description('Migrate config.json to the latest full format (adds missing fields with defaults)')
+    .option('--dry-run', 'Show what would be changed without modifying files')
+    .action((opts: { dryRun?: boolean }) => {
+      const root = resolveProjectRoot();
+      const configPath = join(root, PROJECT_CONFIG_PATH);
+      try {
+        const result = migrateConfig(configPath, { dryRun: opts.dryRun });
+        if (result.error) {
+          printError(new Error(result.error));
+          process.exitCode = 1;
+          return;
+        }
+        if (!result.migrated) {
+          print('Config is already up to date — no migration needed.');
+          return;
+        }
+        if (opts.dryRun) {
+          print(`[dry-run] Would add ${result.addedFields.length} missing field(s):`);
+          for (const field of result.addedFields) {
+            print(`  + ${field}`);
+          }
+        } else {
+          print(`Migration complete. Added ${result.addedFields.length} field(s):`);
+          for (const field of result.addedFields) {
+            print(`  + ${field}`);
+          }
+          if (result.backupPath) {
+            print(`Backup saved to: ${result.backupPath}`);
+          }
+        }
+      } catch (error) {
+        printError(error);
         process.exitCode = 1;
       }
     });

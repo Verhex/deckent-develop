@@ -1144,3 +1144,58 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 048-008: RELEASE-NOTES-BETA.md Final Update (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 50 — sprint-050
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 750s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 749716ms |
+
+### Tasks
+
+- 050-001: npm Publish Dry Run & Fix (GO_WITH_TECH_DEBT)
+- 050-002: README.md Overhaul (GO_WITH_TECH_DEBT)
+- 050-003: bin Entry Validation (GO_WITH_TECH_DEBT)
+- 050-004: CHANGELOG.md Update (GO_WITH_TECH_DEBT)
+- 050-005: npm Publish Pipeline Validation (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 51 — sprint-051
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 1647s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 7 |
+| No-Go | 0 |
+| Coverage | 16.0% |
+| Duration | 1646913ms |
+
+### Tasks
+
+- 051-001: Full Config Expansion (GO_WITH_TECH_DEBT)
+- 051-002: Config Documentation (Inline Comments) (GO_WITH_TECH_DEBT)
+- 051-003: Dashboard Config Editor (GO_WITH_TECH_DEBT)
+- 051-004: VitePress Setup (GO_WITH_TECH_DEBT)
+- 051-005: Getting Started Guide (DONE)
+- 051-006: CLI Reference (Auto-Generated) (GO_WITH_TECH_DEBT)
+- 051-007: Config Migration Helper (GO_WITH_TECH_DEBT)
+- 051-008: Deploy Configuration (GO_WITH_TECH_DEBT)
+
+---

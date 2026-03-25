@@ -284,6 +284,63 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Memory config validation ──────────────────────────────────────
+  if (config.memory_budget !== undefined) {
+    if (typeof config.memory_budget !== 'number' || config.memory_budget < 100 || config.memory_budget > 10000) {
+      errors.push('memory_budget must be a number between 100 and 10000');
+    }
+  }
+
+  if (config.decay_after_sprints !== undefined) {
+    if (typeof config.decay_after_sprints !== 'number' || config.decay_after_sprints < 1 || config.decay_after_sprints > 100) {
+      errors.push('decay_after_sprints must be a number between 1 and 100');
+    }
+  }
+
+  if (config.patterns_enabled !== undefined && typeof config.patterns_enabled !== 'boolean') {
+    errors.push('patterns_enabled must be a boolean');
+  }
+
+  if (config.project_identity_enabled !== undefined && typeof config.project_identity_enabled !== 'boolean') {
+    errors.push('project_identity_enabled must be a boolean');
+  }
+
+  // ─── Auditor config validation ─────────────────────────────────────
+  if (config.scan_interval !== undefined) {
+    if (typeof config.scan_interval !== 'number' || config.scan_interval < 5 || config.scan_interval > 600) {
+      errors.push('scan_interval must be a number between 5 and 600');
+    }
+  }
+
+  if (config.heartbeat_timeout !== undefined) {
+    if (typeof config.heartbeat_timeout !== 'number' || config.heartbeat_timeout < 30 || config.heartbeat_timeout > 600) {
+      errors.push('heartbeat_timeout must be a number between 30 and 600');
+    }
+  }
+
+  if (config.boundary_enforcement !== undefined && typeof config.boundary_enforcement !== 'boolean') {
+    errors.push('boundary_enforcement must be a boolean');
+  }
+
+  // ─── Sprint config validation ──────────────────────────────────────
+  if (config.fix_phase_enabled !== undefined && typeof config.fix_phase_enabled !== 'boolean') {
+    errors.push('fix_phase_enabled must be a boolean');
+  }
+
+  if (config.max_fix_retries !== undefined) {
+    if (typeof config.max_fix_retries !== 'number' || config.max_fix_retries < 0 || config.max_fix_retries > 10) {
+      errors.push('max_fix_retries must be a number between 0 and 10');
+    }
+  }
+
+  // ─── Rollback config validation ────────────────────────────────────
+  if (config.rollback_policy !== undefined) {
+    const validPolicies = ['never', 'on_failure', 'always'] as const;
+    if (!(validPolicies as readonly string[]).includes(config.rollback_policy)) {
+      errors.push(`Invalid rollback_policy "${config.rollback_policy}". Must be one of: ${validPolicies.join(', ')}`);
+    }
+  }
+
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }
@@ -327,14 +384,26 @@ export function createDefaultConfig(): DeckentConfig {
   return {
     mode: DEFAULT_MODE,
     modes: structuredClone(DEFAULT_MODES),
+    // Provider
     brain_provider: 'claude',
     worker_provider: 'claude',
+    fallback_provider: undefined,
+    provider_overrides: undefined,
     cost_optimization: false,
     claude_backend: 'tmux',
-    // Output & Display
-    output_splash: true,
-    output_mode: 'normal',
-    output_theme: 'default',
+    auth_mode: 'subscription',
+    // Sprint
+    fix_phase_enabled: true,
+    max_fix_retries: 2,
+    // Memory
+    memory_budget: 600,
+    decay_after_sprints: 5,
+    patterns_enabled: true,
+    project_identity_enabled: true,
+    // Auditor
+    scan_interval: 30,
+    heartbeat_timeout: 120,
+    boundary_enforcement: true,
     // Skill-Based Provider Routing
     skill_routing: undefined,
     // Search & Documentation
@@ -351,8 +420,12 @@ export function createDefaultConfig(): DeckentConfig {
     // Environment Detection
     detected_env: null,
     multi_ide_mode: false,
-    // Auth
-    auth_mode: 'subscription',
+    // Output & Display
+    output_splash: true,
+    output_mode: 'normal',
+    output_theme: 'default',
+    // Rollback
+    rollback_policy: 'never',
   };
 }
 
@@ -435,6 +508,20 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
     fallback_provider: config.fallback_provider,
+    // Memory
+    memory_budget: config.memory_budget,
+    decay_after_sprints: config.decay_after_sprints,
+    patterns_enabled: config.patterns_enabled,
+    project_identity_enabled: config.project_identity_enabled,
+    // Auditor
+    scan_interval: config.scan_interval,
+    heartbeat_timeout: config.heartbeat_timeout,
+    boundary_enforcement: config.boundary_enforcement,
+    // Sprint
+    fix_phase_enabled: config.fix_phase_enabled,
+    max_fix_retries: config.max_fix_retries,
+    // Rollback
+    rollback_policy: config.rollback_policy,
   };
 }
 
@@ -504,6 +591,373 @@ export async function saveGlobalConfig(
   await writeFile(cfgPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
 
+// ─── Config Metadata ─────────────────────────────────────────────────
+
+/** Metadata descriptor for a single config parameter. */
+export interface ConfigMetadataEntry {
+  description: string;
+  type: string;
+  default: unknown;
+  options?: string[];
+  category: string;
+  required?: boolean;
+}
+
+/**
+ * Metadata for every top-level DeckentConfig key.
+ * Consumed by `getConfigHelp`, `listConfigByCategory`, and `generateConfigReference`.
+ */
+export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
+  mode: {
+    description: 'Active plan mode — controls worker count, model tier, and usage thresholds.',
+    type: "'max_plan' | 'max5x_plan' | 'pro_plan' | 'api'",
+    default: 'max5x_plan',
+    options: ['max_plan', 'max5x_plan', 'pro_plan', 'api', 'performance', 'balanced', 'economic', 'unlimited'],
+    category: 'Sprint',
+    required: true,
+  },
+  modes: {
+    description: 'Per-mode configuration overrides (worker count, model, thresholds, budget).',
+    type: 'Record<PlanMode, PlanModeConfig>',
+    default: null,
+    category: 'Sprint',
+  },
+  spawn_backend: {
+    description: "Worker spawn mechanism: 'tmux' (interactive), 'subprocess' (headless), 'auto'.",
+    type: "'tmux' | 'subprocess' | 'auto'",
+    default: undefined,
+    options: ['tmux', 'subprocess', 'auto'],
+    category: 'Sprint',
+  },
+  brain_provider: {
+    description: 'AI provider used for the Brain orchestrator (planning and evaluation).',
+    type: "'claude' | 'codex' | 'gemini'",
+    default: 'claude',
+    options: ['claude', 'codex', 'gemini'],
+    category: 'Provider',
+  },
+  worker_provider: {
+    description: 'Default AI provider for worker agents executing tasks.',
+    type: "'claude' | 'codex' | 'gemini'",
+    default: 'claude',
+    options: ['claude', 'codex', 'gemini'],
+    category: 'Provider',
+  },
+  fallback_provider: {
+    description: 'Provider to use when the primary provider is unavailable.',
+    type: "'claude' | 'codex' | 'gemini' | undefined",
+    default: undefined,
+    options: ['claude', 'codex', 'gemini'],
+    category: 'Provider',
+  },
+  provider_overrides: {
+    description: 'Per-task-type provider overrides, keyed by task type.',
+    type: 'Record<string, ProviderName> | undefined',
+    default: undefined,
+    category: 'Provider',
+  },
+  cost_optimization: {
+    description: 'Automatically select the cheapest capable provider for each task.',
+    type: 'boolean',
+    default: false,
+    options: ['true', 'false'],
+    category: 'Provider',
+  },
+  claude_backend: {
+    description: "Claude execution backend: 'tmux' (default), 'subprocess' (headless/CI), 'mcp' (future).",
+    type: "'tmux' | 'subprocess' | 'mcp'",
+    default: 'tmux',
+    options: ['tmux', 'subprocess', 'mcp'],
+    category: 'Provider',
+  },
+  auth_mode: {
+    description: "Auth mode: 'subscription' (Claude.ai plan), 'api' (ANTHROPIC_API_KEY), 'hybrid'.",
+    type: "'subscription' | 'api' | 'hybrid'",
+    default: 'subscription',
+    options: ['subscription', 'api', 'hybrid'],
+    category: 'Provider',
+  },
+  api_keys: {
+    description: 'Optional API key overrides (prefer environment variables).',
+    type: 'Record<string, string> | undefined',
+    default: undefined,
+    category: 'Provider',
+  },
+  skills: {
+    description: 'Skill system: enabled flag, max skills per task, auto-detection, preferred skills.',
+    type: 'SkillConfig | undefined',
+    default: undefined,
+    category: 'Skills',
+  },
+  skill_routing: {
+    description: 'Route specific skill types (design, testing, docs) to dedicated providers.',
+    type: '{ design?: string; testing?: string; docs?: string; default?: string } | undefined',
+    default: undefined,
+    category: 'Skills',
+  },
+  search_enabled: {
+    description: 'Enable online documentation search during task execution.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
+    category: 'Search',
+  },
+  search_provider: {
+    description: "Documentation search provider: 'context7' (curated), 'web' (general), 'none'.",
+    type: "'context7' | 'web' | 'none'",
+    default: 'context7',
+    options: ['context7', 'web', 'none'],
+    category: 'Search',
+  },
+  search_cache_ttl: {
+    description: 'How long to cache search results in seconds (default: 3600; 0 = no cache).',
+    type: 'number',
+    default: 3600,
+    category: 'Search',
+  },
+  notify_on_complete: {
+    description: 'Send a notification when a sprint finishes.',
+    type: 'boolean',
+    default: false,
+    options: ['true', 'false'],
+    category: 'Notifications',
+  },
+  notify_channel: {
+    description: 'Notification delivery channel.',
+    type: "'slack' | 'discord' | 'email' | 'webhook' | null",
+    default: null,
+    options: ['slack', 'discord', 'email', 'webhook'],
+    category: 'Notifications',
+  },
+  notify_url: {
+    description: 'Webhook URL for slack/discord/webhook notification channels.',
+    type: 'string | null',
+    default: null,
+    category: 'Notifications',
+  },
+  telemetry_enabled: {
+    description: 'Send anonymous usage telemetry to help improve Deckent.',
+    type: 'boolean',
+    default: false,
+    options: ['true', 'false'],
+    category: 'Telemetry',
+  },
+  telemetry_anonymous: {
+    description: 'Strip all identifying information before sending telemetry data.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
+    category: 'Telemetry',
+  },
+  detected_env: {
+    description: 'Auto-detected IDE/shell environment (set automatically on first run).',
+    type: "'vscode' | 'codex' | 'gemini' | 'cursor' | 'tmux' | 'shell' | null",
+    default: null,
+    options: ['vscode', 'codex', 'gemini', 'cursor', 'tmux', 'shell'],
+    category: 'Environment',
+  },
+  multi_ide_mode: {
+    description: 'Enable multi-IDE mode for projects open in multiple editors simultaneously.',
+    type: 'boolean',
+    default: false,
+    options: ['true', 'false'],
+    category: 'Environment',
+  },
+  output_splash: {
+    description: 'Show the Deckent ASCII splash screen on init and version commands.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
+    category: 'Output',
+  },
+  output_mode: {
+    description: "Output verbosity: 'quiet' (minimal), 'normal' (default), 'verbose' (extra detail).",
+    type: "'quiet' | 'normal' | 'verbose'",
+    default: 'normal',
+    options: ['quiet', 'normal', 'verbose'],
+    category: 'Output',
+  },
+  output_theme: {
+    description: "Visual theme: 'default', 'minimal' (no color), 'rich' (extra formatting).",
+    type: "'default' | 'minimal' | 'rich'",
+    default: 'default',
+    options: ['default', 'minimal', 'rich'],
+    category: 'Output',
+  },
+  language: {
+    description: 'Primary programming language of the project for context-aware planning.',
+    type: 'string | undefined',
+    default: undefined,
+    category: 'Project',
+  },
+  projectName: {
+    description: 'Display name for the project, used in sprint logs and notifications.',
+    type: 'string | undefined',
+    default: undefined,
+    category: 'Project',
+  },
+  version: {
+    description: 'Pinned Deckent version for reproducible runs (defaults to installed version).',
+    type: 'string | undefined',
+    default: undefined,
+    category: 'Project',
+  },
+  auto_docs: {
+    description: 'Auto-doc tiers: tier1 (CHANGELOG/SPRINT-LOG), tier2 (README), tier3 (BLUEPRINT).',
+    type: 'AutoDocsConfig | undefined',
+    default: { tier1: true, tier2: false, tier3: false },
+    category: 'Project',
+  },
+  auto_clean_locks: {
+    description: 'Automatically remove stale lock files (>5 min old) during auditor scans.',
+    type: 'boolean | undefined',
+    default: false,
+    options: ['true', 'false'],
+    category: 'Advanced',
+  },
+  // ─── Memory ─────────────────────────────────────────────────────────
+  memory_budget: {
+    description: 'Maximum total lines across all files in .brain/ directory.',
+    type: 'number',
+    default: 600,
+    category: 'Memory',
+  },
+  decay_after_sprints: {
+    description: 'Decay memory entries older than this many sprints.',
+    type: 'number',
+    default: 5,
+    category: 'Memory',
+  },
+  patterns_enabled: {
+    description: 'Enable automatic pattern detection and recording in PATTERNS.md.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
+    category: 'Memory',
+  },
+  project_identity_enabled: {
+    description: 'Enable PROJECT-IDENTITY.md updates after each sprint.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
+    category: 'Memory',
+  },
+  // ─── Auditor ────────────────────────────────────────────────────────
+  scan_interval: {
+    description: 'Auditor scan interval in seconds.',
+    type: 'number',
+    default: 30,
+    category: 'Auditor',
+  },
+  heartbeat_timeout: {
+    description: 'Seconds before a worker heartbeat is considered stale.',
+    type: 'number',
+    default: 120,
+    category: 'Auditor',
+  },
+  boundary_enforcement: {
+    description: 'Enforce worker scope boundaries via git diff checks.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
+    category: 'Auditor',
+  },
+  // ─── Sprint ─────────────────────────────────────────────────────────
+  fix_phase_enabled: {
+    description: 'Enable a fix phase after initial task execution for failed tasks.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
+    category: 'Sprint',
+  },
+  max_fix_retries: {
+    description: 'Maximum number of fix retries per task during the fix phase.',
+    type: 'number',
+    default: 2,
+    category: 'Sprint',
+  },
+  // ─── Rollback ───────────────────────────────────────────────────────
+  rollback_policy: {
+    description: "Rollback policy: 'never' (default), 'on_failure' (revert failed tasks), 'always'.",
+    type: "'never' | 'on_failure' | 'always'",
+    default: 'never',
+    options: ['never', 'on_failure', 'always'],
+    category: 'Sprint',
+  },
+} as const;
+
+/**
+ * Return metadata for a single config key.
+ * Returns undefined when the key is unknown.
+ */
+export function getConfigHelp(key: string): ConfigMetadataEntry | undefined {
+  return CONFIG_METADATA[key];
+}
+
+/**
+ * Return all config keys grouped by category, keys sorted alphabetically within each group.
+ */
+export function listConfigByCategory(): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  for (const [key, entry] of Object.entries(CONFIG_METADATA)) {
+    const cat = entry.category;
+    if (!result[cat]) result[cat] = [];
+    result[cat].push(key);
+  }
+  for (const cat of Object.keys(result)) {
+    result[cat]?.sort();
+  }
+  return result;
+}
+
+/**
+ * Generate markdown content for CONFIG-REFERENCE.md from CONFIG_METADATA.
+ */
+export function generateConfigReference(): string {
+  const grouped = listConfigByCategory();
+  const categories = Object.keys(grouped).sort();
+
+  const lines: string[] = [
+    '# Deckent Config Reference',
+    '',
+    '> Auto-generated from `CONFIG_METADATA`. Do not edit manually.',
+    '',
+    '## Table of Contents',
+    '',
+  ];
+
+  for (const cat of categories) {
+    lines.push(`- [${cat}](#${cat.toLowerCase()})`);
+  }
+  lines.push('');
+
+  for (const cat of categories) {
+    lines.push(`## ${cat}`, '');
+    const keys = grouped[cat];
+    if (!keys) continue;
+    for (const key of keys) {
+      const meta = CONFIG_METADATA[key];
+      if (!meta) continue;
+      lines.push(`### \`${key}\``, '');
+      lines.push(`**Description:** ${meta.description}`, '');
+      lines.push(`**Type:** \`${meta.type}\``);
+      const defVal =
+        meta.default === undefined
+          ? '*(not set)*'
+          : meta.default === null
+            ? '`null`'
+            : `\`${JSON.stringify(meta.default)}\``;
+      lines.push(`**Default:** ${defVal}`);
+      if (meta.options && meta.options.length > 0) {
+        lines.push(`**Options:** ${meta.options.map((o) => `\`${o}\``).join(', ')}`);
+      }
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}
+
 /**
  * Merge global + project partial configs over defaults into a ResolvedConfig.
  * Both parameters may be null.
@@ -540,3 +994,4 @@ export function mergeConfigs(
     skills: config.skills,
   };
 }
+

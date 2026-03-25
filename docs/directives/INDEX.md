@@ -18,3 +18,17 @@
 | 040 | 13 | Worker Feedback Loop + Human-Friendly Output |
 | 041 | 6 | Human-Friendly Output Completion |
 | 042 | 8 | Stabilization — Beta Ready |
+| 043-047 | — | (Sprint history in .brain/sprints/) |
+| 048 | 8 | Blueprint Compliance & Final Polish |
+| 049 | 8 | Sprint 050 DIRECTIVES (Container Readiness) — executed as sprint-049 |
+| 050 | 8 | Container Readiness & Process Lifecycle |
+| 051 | 5 | npm Publish + README Overhaul |
+| 052 | 5 | Documentation Site (VitePress) |
+| 053 | 4 | SWE-bench Benchmark |
+| 054 | 4 | GitHub Issue Mode (`deckent do`) |
+| 055 | 4 | Epic→Multi-Sprint Decomposition |
+| 056 | 4 | Continuous Watch Mode |
+| 057 | 5 | Community Infrastructure |
+| 058 | 4 | Git Auto-Workflow |
+
+*Son güncelleme: 2026-03-25*

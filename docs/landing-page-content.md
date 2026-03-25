@@ -110,17 +110,20 @@ Works with tmux backend (default) or subprocess backend for environments without
 
 ## Comparison
 
-| Feature | deckent | Cursor | Devin | Aider |
-|---------|---------|--------|-------|-------|
-| Multi-agent parallel | Yes (up to 10) | No | Yes | No |
-| Sprint lifecycle | Yes | No | Partial | No |
-| Task planning from goals | Yes | No | Yes | No |
-| Quality auditor | Yes | No | No | No |
-| Cross-sprint memory | Yes | No | Partial | No |
-| GO/NO-GO evaluation | Yes | No | No | No |
-| Open source | Yes (MIT) | No | No | Yes |
-| Web dashboard | Yes | Built-in | Built-in | No |
-| MCP integration | Yes | N/A | N/A | N/A |
+| Feature | deckent | OpenClaw | OpenHands | Devin |
+|---------|---------|----------|-----------|-------|
+| Multi-agent parallel | Yes (up to 10) | Supervisor-worker | 1 agent | 1 agent |
+| Sprint lifecycle (10-phase) | Yes | No | No | No |
+| Quality gates (GO/NO-GO) | Yes | No | No | No |
+| Self-learning with decay | Yes (native) | Limited (3rd party) | No | Partial |
+| Multi-provider (Claude+Codex+Gemini) | Yes | Multiple | Partial | No |
+| Skill ecosystem | 10 built-in | **13K+ (ClawHub)** | Agent registry | N/A |
+| SWE-bench score | Not tested | Not tested | **66.4%** | 13.86% |
+| Community | New | **331K+ stars** | 65K stars | Proprietary |
+| Open source | MIT | MIT | Apache-2.0 | No |
+| Price | **Free** | **Free** | **Free** | $20-500/mo |
+
+> **Deckent vs rakipler:** Sprint lifecycle, quality gates ve native learning sistemi Deckent'e özgü. Skill ekosistemi ve community'de OpenClaw lider. SWE-bench'te OpenHands lider.
 
 ---
 

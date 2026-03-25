@@ -3,6 +3,9 @@ name: Publish to npm
 on:
   release:
     types: [published]
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -40,7 +43,12 @@ jobs:
           npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
         timeout-minutes: 15
 
+      - name: Dry run publish (validate package)
+        run: npm publish --dry-run --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish to npm
-        run: npm publish --provenance
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

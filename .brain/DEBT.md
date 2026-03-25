@@ -23,3 +23,15 @@
 | debt-048-006 | Tech debt from 048-006: Coverage fallback chain validated and enhanced. Modified | 048-006 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.862Z |
 | debt-048-007 | Tech debt from 048-007: Blueprint §24 sprint history updated with sprints 039-04 | 048-007 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.863Z |
 | debt-048-008 | Tech debt from 048-008: Updated RELEASE-NOTES-BETA.md with Sprint 047 results: t | 048-008 | sprint-048 | NORMAL | 0 | true | sprint-048 | 2026-03-24T17:00:10.863Z |
+| debt-050-001 | Tech debt from 050-001: npm pack --dry-run analyzed: package is 2.7 MB unpacked | 050-001 | sprint-050 | NORMAL | 0 | true | sprint-050 | 2026-03-25T06:22:58.871Z |
+| debt-050-002 | Tech debt from 050-002: README.md completely rewritten. 508 lines, 18+ sections. | 050-002 | sprint-050 | NORMAL | 0 | true | sprint-050 | 2026-03-25T06:22:58.874Z |
+| debt-050-003 | Tech debt from 050-003: Enhanced src/cli/entry.ts with Node >=18 runtime guard, | 050-003 | sprint-050 | NORMAL | 0 | true | sprint-050 | 2026-03-25T06:22:58.875Z |
+| debt-050-004 | Tech debt from 050-004: Added sprint 043, 044, 045 entries (previously missing b | 050-004 | sprint-050 | NORMAL | 0 | true | sprint-050 | 2026-03-25T06:22:58.879Z |
+| debt-050-005 | Tech debt from 050-005: publish.yml updated: (1) added push/tags/v* trigger alon | 050-005 | sprint-050 | NORMAL | 0 | true | sprint-050 | 2026-03-25T06:22:58.879Z |
+| debt-051-001 | Tech debt from 051-001: Full Config Expansion tamamlandı. DeckentConfig'e 11 yen | 051-001 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.106Z |
+| debt-051-002 | Tech debt from 051-002: Added CONFIG_METADATA (37 entries across 10 categories: | 051-002 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.109Z |
+| debt-051-003 | Tech debt from 051-003: Dashboard Config Editor implemented with: (1) ConfigPage | 051-003 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.110Z |
+| debt-051-004 | Tech debt from 051-004: VitePress site scaffolding complete. docs/package.json h | 051-004 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.111Z |
+| debt-051-006 | Tech debt from 051-006: Created scripts/generate-cli-docs.ts with static CLI met | 051-006 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.114Z |
+| debt-051-007 | Tech debt from 051-007: Created src/core/config-migration.ts with migrateConfig( | 051-007 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.115Z |
+| debt-051-008 | Tech debt from 051-008: Created GitHub Pages deployment workflow (.github/workfl | 051-008 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.116Z |

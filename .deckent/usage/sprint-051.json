@@ -1,0 +1,74 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "051-001",
+    "timestamp": "2026-03-25T06:37:16.361Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "051-002",
+    "timestamp": "2026-03-25T06:37:16.392Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "051-003",
+    "timestamp": "2026-03-25T06:37:16.417Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "051-004",
+    "timestamp": "2026-03-25T06:37:16.443Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "051-001",
+    "timestamp": "2026-03-25T07:04:43.108Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "051-002",
+    "timestamp": "2026-03-25T07:04:43.109Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "051-003",
+    "timestamp": "2026-03-25T07:04:43.110Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "051-004",
+    "timestamp": "2026-03-25T07:04:43.111Z"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "051-005",
+    "timestamp": "2026-03-25T07:04:43.111Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "051-006",
+    "timestamp": "2026-03-25T07:04:43.114Z"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "051-007",
+    "timestamp": "2026-03-25T07:04:43.115Z"
+  },
+  {
+    "model": "haiku",
+    "tokenEstimate": 2000,
+    "taskId": "051-008",
+    "timestamp": "2026-03-25T07:04:43.116Z"
+  }
+]

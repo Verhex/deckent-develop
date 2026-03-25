@@ -80,3 +80,17 @@
 - Coverage Metric Preservation: GO_WITH_TECH_DEBT
 - Blueprint Section Numbers Update: GO_WITH_TECH_DEBT
 - RELEASE-NOTES-BETA.md Final Update: GO_WITH_TECH_DEBT
+## Sprint sprint-050 Learnings
+- npm Publish Dry Run & Fix: GO_WITH_TECH_DEBT
+- README.md Overhaul: GO_WITH_TECH_DEBT
+- bin Entry Validation: GO_WITH_TECH_DEBT
+- CHANGELOG.md Update: GO_WITH_TECH_DEBT
+- npm Publish Pipeline Validation: GO_WITH_TECH_DEBT
+## Sprint sprint-051 Learnings
+- Full Config Expansion: GO_WITH_TECH_DEBT
+- Config Documentation (Inline Comments): GO_WITH_TECH_DEBT
+- Dashboard Config Editor: GO_WITH_TECH_DEBT
+- VitePress Setup: GO_WITH_TECH_DEBT
+- CLI Reference (Auto-Generated): GO_WITH_TECH_DEBT
+- Config Migration Helper: GO_WITH_TECH_DEBT
+- Deploy Configuration: GO_WITH_TECH_DEBT

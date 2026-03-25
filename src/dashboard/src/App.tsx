@@ -5,6 +5,7 @@ import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
 import HistoryPage from "./pages/HistoryPage";
 import MemoryPage from "./pages/MemoryPage";
+import ConfigPage from "./pages/ConfigPage";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/memory" element={<MemoryPage />} />
+            <Route path="/config" element={<ConfigPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

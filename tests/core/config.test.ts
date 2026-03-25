@@ -809,3 +809,202 @@ describe('extended config validation', () => {
     }
   });
 });
+
+// ─── New Config Fields (Sprint 052) ──────────────────────────────────
+
+import { CONFIG_METADATA, listConfigByCategory } from '../../src/core/config.js';
+
+describe('memory config defaults', () => {
+  it('default config has memory_budget=600', () => {
+    const config = getDefaultConfig();
+    expect(config.memory_budget).toBe(600);
+  });
+
+  it('default config has decay_after_sprints=5', () => {
+    const config = getDefaultConfig();
+    expect(config.decay_after_sprints).toBe(5);
+  });
+
+  it('default config has patterns_enabled=true', () => {
+    const config = getDefaultConfig();
+    expect(config.patterns_enabled).toBe(true);
+  });
+
+  it('default config has project_identity_enabled=true', () => {
+    const config = getDefaultConfig();
+    expect(config.project_identity_enabled).toBe(true);
+  });
+});
+
+describe('auditor config defaults', () => {
+  it('default config has scan_interval=30', () => {
+    const config = getDefaultConfig();
+    expect(config.scan_interval).toBe(30);
+  });
+
+  it('default config has heartbeat_timeout=120', () => {
+    const config = getDefaultConfig();
+    expect(config.heartbeat_timeout).toBe(120);
+  });
+
+  it('default config has boundary_enforcement=true', () => {
+    const config = getDefaultConfig();
+    expect(config.boundary_enforcement).toBe(true);
+  });
+});
+
+describe('sprint config defaults', () => {
+  it('default config has fix_phase_enabled=true', () => {
+    const config = getDefaultConfig();
+    expect(config.fix_phase_enabled).toBe(true);
+  });
+
+  it('default config has max_fix_retries=2', () => {
+    const config = getDefaultConfig();
+    expect(config.max_fix_retries).toBe(2);
+  });
+});
+
+describe('rollback config defaults', () => {
+  it('default config has rollback_policy=never', () => {
+    const config = getDefaultConfig();
+    expect(config.rollback_policy).toBe('never');
+  });
+});
+
+describe('new config validation', () => {
+  it('rejects memory_budget below 100', () => {
+    expect(() => validatePartialConfig({ memory_budget: 50 } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects memory_budget above 10000', () => {
+    expect(() => validatePartialConfig({ memory_budget: 20000 } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('accepts valid memory_budget=1000', () => {
+    expect(() => validatePartialConfig({ memory_budget: 1000 } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('rejects decay_after_sprints=0', () => {
+    expect(() => validatePartialConfig({ decay_after_sprints: 0 } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects non-boolean patterns_enabled', () => {
+    expect(() => validatePartialConfig({ patterns_enabled: 'yes' as unknown as boolean } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects scan_interval below 5', () => {
+    expect(() => validatePartialConfig({ scan_interval: 2 } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects heartbeat_timeout below 30', () => {
+    expect(() => validatePartialConfig({ heartbeat_timeout: 10 } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects non-boolean boundary_enforcement', () => {
+    expect(() => validatePartialConfig({ boundary_enforcement: 1 as unknown as boolean } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects non-boolean fix_phase_enabled', () => {
+    expect(() => validatePartialConfig({ fix_phase_enabled: 'true' as unknown as boolean } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects max_fix_retries above 10', () => {
+    expect(() => validatePartialConfig({ max_fix_retries: 15 } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('rejects invalid rollback_policy', () => {
+    expect(() => validatePartialConfig({ rollback_policy: 'maybe' as 'never' } as Partial<import('../../src/core/types.js').DeckentConfig>)).toThrow(ConfigValidationError);
+  });
+
+  it('accepts rollback_policy=on_failure', () => {
+    expect(() => validatePartialConfig({ rollback_policy: 'on_failure' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+
+  it('accepts rollback_policy=always', () => {
+    expect(() => validatePartialConfig({ rollback_policy: 'always' } as Partial<import('../../src/core/types.js').DeckentConfig>)).not.toThrow();
+  });
+});
+
+describe('CONFIG_METADATA', () => {
+  it('has entries for all new config fields', () => {
+    const newFields = [
+      'memory_budget', 'decay_after_sprints', 'patterns_enabled', 'project_identity_enabled',
+      'scan_interval', 'heartbeat_timeout', 'boundary_enforcement',
+      'fix_phase_enabled', 'max_fix_retries', 'rollback_policy',
+    ];
+    for (const field of newFields) {
+      expect(CONFIG_METADATA[field]).toBeDefined();
+      expect(CONFIG_METADATA[field].description).toBeTruthy();
+      expect(CONFIG_METADATA[field].category).toBeTruthy();
+    }
+  });
+
+  it('has at least 30 entries', () => {
+    expect(Object.keys(CONFIG_METADATA).length).toBeGreaterThanOrEqual(30);
+  });
+
+  it('every entry has description, type, default, category', () => {
+    for (const [key, meta] of Object.entries(CONFIG_METADATA)) {
+      expect(meta.description, `${key} missing description`).toBeTruthy();
+      expect(meta.type, `${key} missing type`).toBeTruthy();
+      expect(meta.category, `${key} missing category`).toBeTruthy();
+      expect('default' in meta, `${key} missing default`).toBe(true);
+    }
+  });
+});
+
+describe('listConfigByCategory', () => {
+  it('returns grouped config by category', () => {
+    const grouped = listConfigByCategory();
+    expect(grouped['Provider']).toBeDefined();
+    expect(grouped['Memory']).toBeDefined();
+    expect(grouped['Auditor']).toBeDefined();
+    expect(grouped['Sprint']).toBeDefined();
+  });
+
+  it('Provider category has brain_provider entry', () => {
+    const grouped = listConfigByCategory();
+    expect(grouped['Provider']).toContain('brain_provider');
+  });
+
+  it('Memory category has memory_budget entry', () => {
+    const grouped = listConfigByCategory();
+    expect(grouped['Memory']).toContain('memory_budget');
+  });
+
+  it('Auditor category has scan_interval entry', () => {
+    const grouped = listConfigByCategory();
+    expect(grouped['Auditor']).toContain('scan_interval');
+  });
+
+  it('Sprint category has fix_phase_enabled and rollback_policy', () => {
+    const grouped = listConfigByCategory();
+    expect(grouped['Sprint']).toContain('fix_phase_enabled');
+    expect(grouped['Sprint']).toContain('rollback_policy');
+  });
+});
+
+describe('loadConfig resolves new fields', () => {
+  it('resolved config includes memory_budget from defaults', async () => {
+    const config = await loadConfig('/test/project');
+    expect(config.memory_budget).toBe(600);
+  });
+
+  it('resolved config includes fix_phase_enabled from defaults', async () => {
+    const config = await loadConfig('/test/project');
+    expect(config.fix_phase_enabled).toBe(true);
+  });
+
+  it('resolved config includes rollback_policy from defaults', async () => {
+    const config = await loadConfig('/test/project');
+    expect(config.rollback_policy).toBe('never');
+  });
+
+  it('project config overrides memory_budget', async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ memory_budget: 800 }));
+    const config = await loadConfig('/test/project');
+    expect(config.memory_budget).toBe(800);
+  });
+});

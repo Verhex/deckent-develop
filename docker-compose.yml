@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  deckent:
+    build: .
+    image: deckent:latest
+    volumes:
+      - ./.deckent:/workspace/.deckent
+      - ./.brain:/workspace/.brain
+    environment:
+      - DECKENT_API_PORT=3100
+    ports:
+      - "3100:3100"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

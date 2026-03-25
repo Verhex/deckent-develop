@@ -25,6 +25,7 @@
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "validate:publish": "npx tsx scripts/validate-publish.ts",
+    "docs:generate-cli": "npx tsx scripts/generate-cli-docs.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint51] - 2026-03-25
+
+### Added
+
+- Getting Started Guide
+
+### Changed
+
+- Full Config Expansion (completed with tech debt)
+- Config Documentation (Inline Comments) (completed with tech debt)
+- Dashboard Config Editor (completed with tech debt)
+- VitePress Setup (completed with tech debt)
+- CLI Reference (Auto-Generated) (completed with tech debt)
+- Config Migration Helper (completed with tech debt)
+- Deploy Configuration (completed with tech debt)
+
+
+_Tasks: 8 total, 8 done, 7 tech debt, 0 no-go_
+
+## [0.2.0-beta.1-sprint50] - 2026-03-25
+
+
+### Changed
+
+- npm Publish Dry Run & Fix (completed with tech debt)
+- README.md Overhaul (completed with tech debt)
+- bin Entry Validation (completed with tech debt)
+- CHANGELOG.md Update (completed with tech debt)
+- npm Publish Pipeline Validation (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 5 tech debt, 0 no-go_
+
 ## [0.2.0-beta.1-sprint48] - 2026-03-24
 
 ### Added

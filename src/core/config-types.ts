@@ -124,6 +124,34 @@ export interface DeckentConfig {
   // ─── Auth ──────────────────────────────────────────────────────────
   /** Auth mode (default: 'subscription') */
   auth_mode?: 'subscription' | 'api' | 'hybrid';
+
+  // ─── Memory ─────────────────────────────────────────────────────────
+  /** Max lines in .brain/ directory (default: 600) */
+  memory_budget?: number;
+  /** Decay entries older than N sprints (default: 5) */
+  decay_after_sprints?: number;
+  /** Enable pattern detection (default: true) */
+  patterns_enabled?: boolean;
+  /** Enable PROJECT-IDENTITY.md updates (default: true) */
+  project_identity_enabled?: boolean;
+
+  // ─── Auditor ────────────────────────────────────────────────────────
+  /** Auditor scan interval in seconds (default: 30) */
+  scan_interval?: number;
+  /** Heartbeat timeout in seconds — stale after this (default: 120) */
+  heartbeat_timeout?: number;
+  /** Enforce worker scope boundaries (default: true) */
+  boundary_enforcement?: boolean;
+
+  // ─── Sprint ─────────────────────────────────────────────────────────
+  /** Enable fix phase after initial execution (default: true) */
+  fix_phase_enabled?: boolean;
+  /** Max retries during fix phase (default: 2) */
+  max_fix_retries?: number;
+
+  // ─── Rollback ───────────────────────────────────────────────────────
+  /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
+  rollback_policy?: 'never' | 'on_failure' | 'always';
 }
 
 export interface ResolvedConfig {
@@ -145,6 +173,43 @@ export interface ResolvedConfig {
   worker_provider?: ProviderName;
   /** Fallback when primary provider unavailable */
   fallback_provider?: ProviderName;
+  // Memory
+  memory_budget?: number;
+  decay_after_sprints?: number;
+  patterns_enabled?: boolean;
+  project_identity_enabled?: boolean;
+  // Auditor
+  scan_interval?: number;
+  heartbeat_timeout?: number;
+  boundary_enforcement?: boolean;
+  // Sprint
+  fix_phase_enabled?: boolean;
+  max_fix_retries?: number;
+  // Rollback
+  rollback_policy?: 'never' | 'on_failure' | 'always';
+}
+
+// ─── Config Metadata ──────────────────────────────────────────────
+export type ConfigCategory =
+  | 'provider'
+  | 'sprint'
+  | 'memory'
+  | 'auditor'
+  | 'skill_routing'
+  | 'search'
+  | 'notifications'
+  | 'telemetry'
+  | 'environment'
+  | 'output'
+  | 'rollback'
+  | 'auto_docs';
+
+export interface ConfigFieldMeta {
+  description: string;
+  type: string;
+  default: unknown;
+  category: ConfigCategory;
+  options?: readonly string[];
 }
 
 // ─── Auto Docs Config ─────────────────────────────────────────────

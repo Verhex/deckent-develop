@@ -51,11 +51,12 @@ describe('docs/landing-page-content.md', () => {
     expect(content).toContain('Provider Agnostic');
   });
 
-  it('contains Comparison vs Alternatives section', () => {
+  it('contains Comparison section with competitors', () => {
     expect(content).toContain('## Comparison');
-    expect(content).toContain('Cursor');
+    // Actual competitors in the comparison table
+    expect(content).toContain('OpenClaw');
+    expect(content).toContain('OpenHands');
     expect(content).toContain('Devin');
-    expect(content).toContain('Aider');
   });
 
   it('contains Pricing section (free, open source)', () => {
