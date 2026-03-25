@@ -27,9 +27,42 @@ Each task is stored as `.tasks/task-{id}.json`:
   },
   "status": "DRAFT | PENDING | CLAIMED | EXECUTING | TESTING | DOCUMENTING | DONE | NO_GO | PAUSED",
   "sprintId": "sprint-NNN",
-  "createdAt": "ISO 8601"
+  "createdAt": "ISO 8601",
+  "assignedAgent": "string (agent id or 'generic')",
+  "assignedSkills": ["string[] (skill ids)"],
+  "provider": "claude | codex | gemini",
+  "forceModel": "opus | sonnet | haiku (optional — set when DIRECTIVES specifies model)",
+  "forceEffort": "low | normal | high (optional — set when DIRECTIVES specifies effort)"
 }
 ```
+
+## Result File Format
+
+Each completed task writes `.tasks/task-{id}.result`:
+```json
+{
+  "taskId": "001-001",
+  "filesChanged": ["src/file.ts", "tests/file.test.ts"],
+  "linesAdded": 120,
+  "linesRemoved": 30,
+  "testsPassed": true,
+  "coverage": 95.2,
+  "selfAssessment": "DONE | GO_WITH_TECH_DEBT | NO_GO",
+  "notes": "Brief summary of what was done"
+}
+```
+
+## Sprint Phases
+
+Sprint lifecycle follows these phases in order:
+1. **PLAN** — Brain reads DIRECTIVES, plans tasks, writes task JSON files
+2. **SPAWN** — Workers spawned via tmux or subprocess, auditor scan loop starts
+3. **EXECUTE** — Workers execute tasks, write heartbeats (.hb files)
+4. **EVALUATE** — Brain waits for results, evaluates (GO/NO-GO/TECH_DEBT)
+5. **FIX** — Failed tasks retried (optional, configurable timeout)
+6. **RETRO** — Retrospective written to RETRO.md
+7. **DECAY** — Memory trimmed if .brain/ exceeds budget
+8. **CLEANUP** — Task files archived, locks released, sprint complete
 
 ## Worker Scope Rules
 
@@ -39,11 +72,12 @@ Each task is stored as `.tasks/task-{id}.json`:
 
 ## .brain/ File Formats
 
-- `MEMORY.md`: Markdown, max 200 lines, sprint learnings
+- `MEMORY.md`: Markdown, max 600 lines total budget, sprint learnings
 - `DEBT.md`: Markdown table format (pipe-delimited)
-- `PATTERNS.md`: JSON array of PatternEntry objects
+- `PATTERNS.md`: JSON object `{ active: PatternEntry[], resolved: PatternEntry[] }`
 - `RETRO.md`: Markdown, max 100 lines, overwritten each sprint
 - `DECISIONS.md`: Markdown, architecture decision records
+- `PROJECT-IDENTITY.md`: Permanent project memory, never decayed
 - `sprints/sprint-NNN.md`: Markdown sprint log, max 80 lines
 
 ## Lock File Format
@@ -60,7 +94,7 @@ Lock files in `.locks/`: `{filepath-with-__-separators}.lock`
 
 ## Module Import Rules (ADR-008)
 
-- Brain is the ONLY module that imports from tmux, auditor, worker
+- Brain (sprint-controller) is the ONLY module that imports from tmux, auditor, worker
 - Planner imports ONLY from core/ (types, constants) — never from brain
 - Auditor reads task files from disk (no brain import)
 - Worker reads task files from disk (no brain import)

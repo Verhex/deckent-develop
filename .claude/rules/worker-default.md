@@ -14,3 +14,19 @@ paths: ["src/**", "tests/**"]
   - test results, coverage
   - self_assessment: DONE | GO_WITH_TECH_DEBT | NO_GO
   - notes for Brain
+
+## Skill Context
+- If skill prompts are provided in your prompt, follow their guidelines
+- Skill content is domain-specific expertise — apply it to your task
+- Do not ignore skill instructions even if they seem overly detailed
+
+## Verify Loop
+- Run `tsc --noEmit` after code changes — fix errors (max 3 attempts)
+- Run `npx vitest run` after code changes — fix failures (max 3 attempts)
+- If both fail after 3 attempts → write NO_GO result with error details
+- If blocked by another task → write NO_GO result explaining the dependency
+
+## Agent Context
+- If an agent prompt is provided, it defines your specialization
+- Follow agent-specific guidelines for your domain (security, testing, docs, etc.)
+- Agent expertise supplements but does not override task instructions

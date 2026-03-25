@@ -12,3 +12,18 @@ paths: [".dashboard", ".brain/PATTERNS.md"]
 - Overwrite `.dashboard` on every scan (never append)
 - Append new patterns to `PATTERNS.md` (never overwrite)
 - Write alerts for critical issues
+
+## Agent & Skill Monitoring
+- Track which agents and skills are assigned to active tasks
+- Flag agent assignment failures in alerts
+- Monitor agent utilization rate (assigned vs generic)
+
+## Provider Health
+- Check provider availability during scan
+- Flag provider failures or timeouts in dashboard alerts
+- Track mixed-provider sprint status (Claude + Codex/Gemini)
+
+## Sprint Phase Tracking
+- Track current sprint phase in dashboard
+- Alert if phase duration exceeds expected thresholds
+- Detect orphan workers from previous sprints
