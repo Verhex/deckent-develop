@@ -25,6 +25,71 @@ function readFileSafe(filePath: string): string {
   }
 }
 
+/**
+ * E) Smart memory trim: preserve sprint section headers but trim detail lines
+ * from older sections. Keeps section headers intact to preserve learning history,
+ * only removes verbose detail lines when absolutely necessary.
+ */
+function smartTrimMemory(content: string, targetLines = 80): string {
+  const lines = content.split('\n');
+  if (lines.length <= targetLines) return content;
+
+  // Parse content into sections (by ## headers)
+  type Section = { header: string; lines: string[] };
+  const sections: Section[] = [];
+  let currentSection: Section | null = null;
+
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      if (currentSection) sections.push(currentSection);
+      currentSection = { header: line, lines: [] };
+    } else if (currentSection) {
+      currentSection.lines.push(line);
+    } else {
+      // Lines before any header (preamble)
+      if (sections.length === 0) {
+        sections.push({ header: '', lines: [line] });
+      } else {
+        sections[0]!.lines.push(line);
+      }
+    }
+  }
+  if (currentSection) sections.push(currentSection);
+
+  // First pass: try to fit within target by trimming older sections' details
+  // Keep the last 3 sections fully, trim earlier ones to header only
+  const recentCount = 3;
+  const oldSections = sections.slice(0, Math.max(0, sections.length - recentCount));
+  const recentSections = sections.slice(Math.max(0, sections.length - recentCount));
+
+  const result: string[] = [];
+  // Old sections: keep header + first summary line only
+  for (const sec of oldSections) {
+    if (sec.header) result.push(sec.header);
+    // Keep first non-empty content line as a brief summary
+    const firstContent = sec.lines.find(l => l.trim().length > 0);
+    if (firstContent) result.push(firstContent);
+  }
+  // Recent sections: keep in full
+  for (const sec of recentSections) {
+    if (sec.header) result.push(sec.header);
+    result.push(...sec.lines);
+  }
+
+  // If still over target, trim trailing empty lines and fall back to last targetLines
+  const trimmed = result.join('\n').replace(/\n{3,}/g, '\n\n');
+  const trimmedLines = trimmed.split('\n');
+  if (trimmedLines.length > targetLines) {
+    // Last resort: keep last targetLines but try to start at a section boundary
+    const lastPortion = trimmedLines.slice(trimmedLines.length - targetLines);
+    // Find the first ## header in lastPortion to start cleanly
+    const firstHeader = lastPortion.findIndex(l => l.startsWith('## '));
+    if (firstHeader > 0) return lastPortion.slice(firstHeader).join('\n');
+    return lastPortion.join('\n');
+  }
+  return trimmed;
+}
+
 
 function now(): string {
   return new Date().toISOString();
@@ -254,8 +319,12 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   // 1. Remove resolved patterns
   const patternsPath = join(brainPath, PATTERNS_FILE);
   if (existsSync(patternsPath)) {
-    const patterns = readJsonSafe<PatternEntry[]>(patternsPath);
-    if (patterns) {
+    const raw = readJsonSafe<PatternEntry[] | { active?: PatternEntry[]; resolved?: PatternEntry[] }>(patternsPath);
+    if (raw) {
+      // Support both formats: plain array or { active, resolved } object
+      const patterns = Array.isArray(raw)
+        ? raw
+        : [...(raw.active ?? []), ...(raw.resolved ?? [])];
       const resolved = patterns.filter(p => p.resolved);
       removedPatternCount = resolved.length;
       const active = patterns.filter(p => !p.resolved);
@@ -282,6 +351,12 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
     const toArchive = sprintFiles.slice(0, Math.max(0, sprintFiles.length - 2));
     if (toArchive.length > 0) {
       mkdirSync(archivePath, { recursive: true });
+      // G) Ensure archive is tracked by git: write a .gitkeep so git tracks the directory
+      // and a local .gitignore negation to override any parent .gitignore that excludes it
+      const archiveGitignorePath = join(archivePath, '.gitignore');
+      if (!existsSync(archiveGitignorePath)) {
+        writeFileSync(archiveGitignorePath, '# This file ensures the archive directory is tracked by git\n!*\n', 'utf-8');
+      }
       for (const file of toArchive) {
         const content = readFileSync(join(sprintsPath, file), 'utf-8');
         writeFileSync(join(archivePath, file), content, 'utf-8');
@@ -301,7 +376,8 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
     let currentSectionOld = false;
 
     for (const line of lines) {
-      const sectionMatch = line.match(/^## Sprint sprint-(\d+)/);
+      // F) More tolerant regex: matches "## Sprint sprint-NNN", "## Sprint NNN", "## Sprint N-M Özet", etc.
+      const sectionMatch = line.match(/^## Sprint (?:sprint-)?(\d+)/i);
       if (sectionMatch?.[1]) {
         const sectionNum = parseInt(sectionMatch[1], 10);
         currentSectionOld = (currentNum - sectionNum) >= MEMORY_DECAY_SPRINTS;
@@ -311,13 +387,12 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
     writeFileSync(memoryPath, kept.join('\n'), 'utf-8');
   }
 
-  // 5. Last resort — truncate MEMORY.md to 50 lines
+  // 5. Last resort — smart truncation: preserve sprint headers, trim detail content
   if (countBrainLines(projectRoot) > BRAIN_TOTAL_LINE_BUDGET) {
     const memContent = readFileSafe(join(brainPath, MEMORY_FILE));
-    const memLines = memContent.split('\n');
-    if (memLines.length > 50) {
-      writeFileSync(join(brainPath, MEMORY_FILE), memLines.slice(memLines.length - 50).join('\n'), 'utf-8');
-    }
+    // E) Improved truncation: keep headers + recent content, trim old section details
+    const trimmedContent = smartTrimMemory(memContent);
+    writeFileSync(join(brainPath, MEMORY_FILE), trimmedContent, 'utf-8');
   }
 
   const linesAfter = countBrainLines(projectRoot);

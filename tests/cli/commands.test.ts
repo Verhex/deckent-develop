@@ -931,9 +931,14 @@ describe('start command', () => {
     expect(optsArg?.autoApprove).toBe(true);
   });
 
-  it('handles --sandbox-mode stub', async () => {
+  it('handles --sandbox-mode: runs sprint with sandbox context', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
     await runCommand(registerStart, ['start', '--sandbox-mode']);
-    expect(stdout()).toContain('Sandbox mode not yet implemented');
+    // Sandbox mode now runs the sprint with git stash/restore mechanism
+    expect(runSprint).toHaveBeenCalled();
+    const optsArg = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(optsArg?.sandboxMode).toBe(true);
   });
 
   it('passes sandboxMode=undefined to runSprint when not set', async () => {
@@ -945,9 +950,12 @@ describe('start command', () => {
     expect(optsArg?.sandboxMode).toBeFalsy();
   });
 
-  it('does not call runSprint when --sandbox-mode given', async () => {
+  it('sandbox-mode passes sandboxMode:true to runSprint', async () => {
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
+    vi.mocked(runSprint).mockResolvedValue(makeSprint());
     await runCommand(registerStart, ['start', '--sandbox-mode']);
-    expect(runSprint).not.toHaveBeenCalled();
+    const optsArg = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(optsArg?.sandboxMode).toBe(true);
   });
 
   it('handles BrainError', async () => {
