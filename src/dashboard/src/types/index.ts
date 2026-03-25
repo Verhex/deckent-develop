@@ -47,5 +47,50 @@ export interface DeckentConfig {
   mode?: string;
   language?: string;
   projectName?: string;
+  version?: string;
   modes?: Record<string, { brain_model?: string; default_model?: string; max_workers?: number }>;
+  // Provider
+  brain_provider?: string;
+  worker_provider?: string;
+  fallback_provider?: string | null;
+  cost_optimization?: boolean;
+  claude_backend?: string;
+  auth_mode?: string;
+  spawn_backend?: string;
+  // Memory
+  memory_budget?: number;
+  decay_after_sprints?: number;
+  patterns_enabled?: boolean;
+  project_identity_enabled?: boolean;
+  // Auditor
+  scan_interval?: number;
+  heartbeat_timeout?: number;
+  boundary_enforcement?: boolean;
+  // Sprint
+  fix_phase_enabled?: boolean;
+  max_fix_retries?: number;
+  // Rollback
+  rollback_policy?: string;
+  // Output
+  output_splash?: boolean;
+  output_mode?: string;
+  output_theme?: string;
+  // Search
+  search_enabled?: boolean;
+  search_provider?: string;
+  search_cache_ttl?: number;
+  // Notifications
+  notify_on_complete?: boolean;
+  notify_channel?: string | null;
+  notify_url?: string | null;
+  // Telemetry
+  telemetry_enabled?: boolean;
+  telemetry_anonymous?: boolean;
+  // Environment
+  detected_env?: string | null;
+  multi_ide_mode?: boolean;
+  // Skill Routing
+  skill_routing?: Record<string, string>;
+  // Advanced
+  auto_clean_locks?: boolean;
 }

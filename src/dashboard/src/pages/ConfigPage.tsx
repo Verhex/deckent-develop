@@ -34,6 +34,19 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   // ─── Sprint ─────────────────────────────────────────────────
   { key: "mode", label: "Plan Mode", description: "Active plan mode determining resource allocation", type: "select", category: "Sprint", defaultValue: "max_plan", options: ["max_plan", "max5x_plan", "pro_plan", "api"] },
   { key: "spawn_backend", label: "Spawn Backend", description: "Worker spawn backend", type: "select", category: "Sprint", defaultValue: "auto", options: ["tmux", "subprocess", "auto"] },
+  { key: "fix_phase_enabled", label: "Fix Phase Enabled", description: "Enable automatic fix phase after evaluation", type: "boolean", category: "Sprint", defaultValue: true },
+  { key: "max_fix_retries", label: "Max Fix Retries", description: "Maximum number of fix retries per task", type: "number", category: "Sprint", defaultValue: 2 },
+
+  // ─── Memory ───────────────────────────────────────────────
+  { key: "memory_budget", label: "Memory Budget", description: "Maximum lines for .brain/ memory files", type: "number", category: "Memory", defaultValue: 600 },
+  { key: "decay_after_sprints", label: "Decay After Sprints", description: "Number of sprints before memory decay", type: "number", category: "Memory", defaultValue: 5 },
+  { key: "patterns_enabled", label: "Patterns Enabled", description: "Enable pattern detection and storage", type: "boolean", category: "Memory", defaultValue: true },
+  { key: "project_identity_enabled", label: "Project Identity Enabled", description: "Enable project identity tracking", type: "boolean", category: "Memory", defaultValue: true },
+
+  // ─── Auditor ──────────────────────────────────────────────
+  { key: "scan_interval", label: "Scan Interval", description: "Auditor scan interval in seconds", type: "number", category: "Auditor", defaultValue: 30 },
+  { key: "heartbeat_timeout", label: "Heartbeat Timeout", description: "Worker heartbeat timeout in seconds", type: "number", category: "Auditor", defaultValue: 120 },
+  { key: "boundary_enforcement", label: "Boundary Enforcement", description: "Enable scope boundary enforcement", type: "boolean", category: "Auditor", defaultValue: true },
 
   // ─── Output ─────────────────────────────────────────────────
   { key: "output_splash", label: "Show Splash", description: "Show kraken splash on init/version", type: "boolean", category: "Output", defaultValue: true },
@@ -63,11 +76,23 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   { key: "skill_routing.testing", label: "Testing Skill Route", description: "Provider for testing-related skills", type: "select", category: "Skill Routing", defaultValue: null, options: ["claude", "codex", "gemini"] },
   { key: "skill_routing.docs", label: "Docs Skill Route", description: "Provider for documentation skills", type: "select", category: "Skill Routing", defaultValue: null, options: ["claude", "codex", "gemini"] },
   { key: "skill_routing.default", label: "Default Skill Route", description: "Default provider for skills", type: "select", category: "Skill Routing", defaultValue: "claude", options: ["claude", "codex", "gemini"] },
+
+  // ─── Rollback ─────────────────────────────────────────────
+  { key: "rollback_policy", label: "Rollback Policy", description: "When to rollback failed changes", type: "select", category: "Rollback", defaultValue: "never", options: ["never", "on_failure", "always"] },
+
+  // ─── Project ──────────────────────────────────────────────
+  { key: "language", label: "Language", description: "Project programming language", type: "text", category: "Project", defaultValue: null },
+  { key: "projectName", label: "Project Name", description: "Project display name", type: "text", category: "Project", defaultValue: null },
+  { key: "version", label: "Version", description: "Project version", type: "text", category: "Project", defaultValue: null },
+
+  // ─── Advanced ─────────────────────────────────────────────
+  { key: "auto_clean_locks", label: "Auto Clean Locks", description: "Automatically clean stale lock files", type: "boolean", category: "Advanced", defaultValue: false },
 ];
 
 const CATEGORIES = [
-  "Provider", "Sprint", "Output", "Search",
+  "Provider", "Sprint", "Memory", "Auditor", "Output", "Search",
   "Notifications", "Telemetry", "Environment", "Skill Routing",
+  "Rollback", "Project", "Advanced",
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────

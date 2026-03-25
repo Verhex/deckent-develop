@@ -9,7 +9,7 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./tests/dashboard/setup.ts'],
-    include: ['tests/dashboard/**/*.test.tsx'],
+    include: ['tests/dashboard/**/*.test.tsx', 'tests/dashboard/**/*.test.ts'],
   },
   resolve: {
     alias: {

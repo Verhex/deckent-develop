@@ -42,6 +42,17 @@ vi.mock('../../src/core/config.js', () => ({
     detected_env: null,
     multi_ide_mode: false,
     auth_mode: 'subscription',
+    memory_budget: 600,
+    decay_after_sprints: 5,
+    patterns_enabled: true,
+    project_identity_enabled: true,
+    scan_interval: 30,
+    heartbeat_timeout: 120,
+    boundary_enforcement: true,
+    fix_phase_enabled: true,
+    max_fix_retries: 2,
+    rollback_policy: 'never',
+    auto_clean_locks: false,
     modes: {
       max_plan: { max_workers: 8, brain_model: 'opus', default_model: 'opus', haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 }, brain_planning: 'auto' },
       max5x_plan: { max_workers: 5, brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, usage_thresholds: { '5hr': 0.7, weekly: 0.5 }, brain_planning: 'auto' },
@@ -247,5 +258,51 @@ describe('API — Config Editor endpoints', () => {
     expect(data).toHaveProperty('multi_ide_mode');
     // Auth
     expect(data).toHaveProperty('auth_mode');
+  });
+
+  it('GET /api/config/defaults includes memory_budget field', async () => {
+    const res = await request(api, '/api/config/defaults');
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty('memory_budget');
+    expect(data.memory_budget).toBe(600);
+  });
+
+  it('GET /api/config/defaults includes scan_interval field', async () => {
+    const res = await request(api, '/api/config/defaults');
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty('scan_interval');
+    expect(data.scan_interval).toBe(30);
+  });
+
+  it('GET /api/config/defaults includes rollback_policy field', async () => {
+    const res = await request(api, '/api/config/defaults');
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty('rollback_policy');
+    expect(data.rollback_policy).toBe('never');
+  });
+
+  it('GET /api/config/defaults includes fix_phase_enabled field', async () => {
+    const res = await request(api, '/api/config/defaults');
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty('fix_phase_enabled');
+    expect(data.fix_phase_enabled).toBe(true);
+  });
+
+  it('GET /api/config/defaults includes expanded memory and auditor fields', async () => {
+    const res = await request(api, '/api/config/defaults');
+    const data = JSON.parse(res.body);
+    expect(data.decay_after_sprints).toBe(5);
+    expect(data.patterns_enabled).toBe(true);
+    expect(data.project_identity_enabled).toBe(true);
+    expect(data.heartbeat_timeout).toBe(120);
+    expect(data.boundary_enforcement).toBe(true);
+  });
+
+  it('GET /api/config/defaults includes advanced fields', async () => {
+    const res = await request(api, '/api/config/defaults');
+    const data = JSON.parse(res.body);
+    expect(data).toHaveProperty('auto_clean_locks');
+    expect(data.auto_clean_locks).toBe(false);
+    expect(data.max_fix_retries).toBe(2);
   });
 });

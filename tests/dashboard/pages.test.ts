@@ -107,10 +107,10 @@ describe("dashboard/pages — MemoryPage", () => {
     expect(content).toContain(">Debt<");
   });
 
-  it("renders memory content in pre block with whitespace-pre-wrap", () => {
+  it("renders memory content using SimpleMarkdown component", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("<pre");
-    expect(content).toContain("whitespace-pre-wrap");
+    expect(content).toContain("SimpleMarkdown");
+    expect(content).toContain("memoryData.content");
   });
 
   it("imports DebtTable and parseDebtMarkdown", () => {

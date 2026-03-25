@@ -160,6 +160,104 @@ describe("dashboard page — NewSprintModal.tsx", () => {
   });
 });
 
+describe("dashboard page — ConfigPage.tsx", () => {
+  const filePath = join(DASHBOARD_DIR, "src/pages/ConfigPage.tsx");
+
+  it("file exists", () => {
+    expect(existsSync(filePath)).toBe(true);
+  });
+
+  it("has Memory category fields in CONFIG_FIELDS", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain('"Memory"');
+    expect(content).toContain('memory_budget');
+    expect(content).toContain('decay_after_sprints');
+    expect(content).toContain('patterns_enabled');
+    expect(content).toContain('project_identity_enabled');
+  });
+
+  it("has Auditor category fields in CONFIG_FIELDS", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain('"Auditor"');
+    expect(content).toContain('scan_interval');
+    expect(content).toContain('heartbeat_timeout');
+    expect(content).toContain('boundary_enforcement');
+  });
+
+  it("has Rollback category fields in CONFIG_FIELDS", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain('"Rollback"');
+    expect(content).toContain('rollback_policy');
+  });
+
+  it("has Project category fields in CONFIG_FIELDS", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain('"Project"');
+    expect(content).toContain('"language"');
+    expect(content).toContain('"projectName"');
+    expect(content).toContain('"version"');
+  });
+
+  it("has Advanced category fields in CONFIG_FIELDS", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain('"Advanced"');
+    expect(content).toContain('auto_clean_locks');
+  });
+
+  it("has Sprint fix_phase_enabled and max_fix_retries fields", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain('fix_phase_enabled');
+    expect(content).toContain('max_fix_retries');
+  });
+
+  it("CATEGORIES array has 13 categories", () => {
+    const content = readFileSync(filePath, "utf-8");
+    const categoriesMatch = content.match(/const CATEGORIES\s*=\s*\[([\s\S]*?)\]\s*as\s*const/);
+    expect(categoriesMatch).not.toBeNull();
+    const categoriesBlock = categoriesMatch![1];
+    // Count quoted strings
+    const categories = categoriesBlock.match(/"[^"]+"/g);
+    expect(categories).not.toBeNull();
+    expect(categories!.length).toBe(13);
+  });
+
+  it("CATEGORIES includes all required category names", () => {
+    const content = readFileSync(filePath, "utf-8");
+    const required = ["Provider", "Sprint", "Memory", "Auditor", "Output", "Search",
+      "Notifications", "Telemetry", "Environment", "Skill Routing", "Rollback", "Project", "Advanced"];
+    for (const cat of required) {
+      expect(content).toContain(`"${cat}"`);
+    }
+  });
+});
+
+describe("dashboard page — DashboardPage.tsx usage metrics", () => {
+  const filePath = join(DASHBOARD_DIR, "src/pages/DashboardPage.tsx");
+
+  it("renders usage card with fiveHourPercent", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain("fiveHourPercent");
+    expect(content).toContain("5hr Usage");
+  });
+
+  it("renders usage card with weeklyPercent", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain("weeklyPercent");
+    expect(content).toContain("Weekly Usage");
+  });
+
+  it("has usage progress bars", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain("usage-5hr-bar");
+    expect(content).toContain("usage-weekly-bar");
+  });
+
+  it("has usage card with data-testid", () => {
+    const content = readFileSync(filePath, "utf-8");
+    expect(content).toContain("usage-card");
+  });
+});
+
 describe("dashboard page — UI components", () => {
   it("badge.tsx exists with variants", () => {
     const filePath = join(DASHBOARD_DIR, "src/components/ui/badge.tsx");

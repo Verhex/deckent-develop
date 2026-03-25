@@ -3,7 +3,7 @@
   "language": "tr",
   "projectName": "deckent",
   "brain_planning": "structured",
-  "last_sprint_id": "sprint-051",
+  "last_sprint_id": "sprint-052",
   "spawn_backend": "tmux",
   "modes": {
     "max_plan": {
@@ -12,5 +12,33 @@
       "haiku_allowed": false,
       "max_workers": 4
     }
-  }
+  },
+  "brain_provider": "claude",
+  "worker_provider": "claude",
+  "cost_optimization": false,
+  "claude_backend": "tmux",
+  "auth_mode": "subscription",
+  "fix_phase_enabled": true,
+  "max_fix_retries": 2,
+  "memory_budget": 600,
+  "decay_after_sprints": 5,
+  "patterns_enabled": true,
+  "project_identity_enabled": true,
+  "scan_interval": 30,
+  "heartbeat_timeout": 120,
+  "boundary_enforcement": true,
+  "search_enabled": true,
+  "search_provider": "context7",
+  "search_cache_ttl": 3600,
+  "notify_on_complete": false,
+  "notify_channel": null,
+  "notify_url": null,
+  "telemetry_enabled": false,
+  "telemetry_anonymous": true,
+  "detected_env": null,
+  "multi_ide_mode": false,
+  "output_splash": true,
+  "output_mode": "normal",
+  "output_theme": "default",
+  "rollback_policy": "never"
 }

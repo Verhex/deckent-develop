@@ -35,3 +35,4 @@
 | debt-051-006 | Tech debt from 051-006: Created scripts/generate-cli-docs.ts with static CLI met | 051-006 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.114Z |
 | debt-051-007 | Tech debt from 051-007: Created src/core/config-migration.ts with migrateConfig( | 051-007 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.115Z |
 | debt-051-008 | Tech debt from 051-008: Created GitHub Pages deployment workflow (.github/workfl | 051-008 | sprint-051 | NORMAL | 0 | true | sprint-051 | 2026-03-25T07:04:43.116Z |
+| debt-052-001 | Tech debt from 052-001: Dashboard full expansion tamamlandı: (A) ConfigPage.tsx | 052-001 | sprint-052 | NORMAL | 0 | true | sprint-052 | 2026-03-25T08:11:25.348Z |

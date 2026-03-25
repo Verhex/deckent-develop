@@ -184,6 +184,43 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Usage Card */}
+      {state?.usage && (
+        <Card className="border-zinc-800 bg-zinc-900" data-testid="usage-card">
+          <CardHeader>
+            <CardTitle className="text-zinc-100">Usage</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-zinc-400">5hr Usage</span>
+                <span className="text-zinc-100">{state.usage.fiveHourPercent}%</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-zinc-700">
+                <div
+                  className="h-2 rounded-full bg-blue-500"
+                  style={{ width: `${Math.min(100, state.usage.fiveHourPercent)}%` }}
+                  data-testid="usage-5hr-bar"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-zinc-400">Weekly Usage</span>
+                <span className="text-zinc-100">{state.usage.weeklyPercent}%</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-zinc-700">
+                <div
+                  className="h-2 rounded-full bg-green-500"
+                  style={{ width: `${Math.min(100, state.usage.weeklyPercent)}%` }}
+                  data-testid="usage-weekly-bar"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Progress Section */}
       {total > 0 && (
         <Card className="border-zinc-800 bg-zinc-900">
