@@ -243,6 +243,10 @@ describe('Barrel exports form a minimal public surface', () => {
     'TmuxError',
     // Doc Updater API
     'registerUpdater', 'runAllUpdaters',
+    // Routing Engine v2
+    'OutcomeTracker', 'assessQuality', 'assessSkillRelevance',
+    'RuleEvolver', 'PromotionPipeline', 'MidSprintAdapter',
+    'generateProjectConventionsSkill', 'generateDataDrivenSkills',
   ];
 
   it('exports exactly the expected public functions (no extra runtime symbols)', () => {

@@ -18,6 +18,7 @@ export interface RoutingOutcome {
   skillIds: string[];
   evaluation: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   coverage: number;
+  qualityScore?: number; // 0-100 from QualityAssessor
   routingVersion: 'v1' | 'v2';
 }
 
@@ -152,6 +153,15 @@ export class OutcomeTracker {
    */
   getLearnings(): Readonly<LearningsData> {
     return this.learnings;
+  }
+
+  /**
+   * Save evolved rules to learnings data.
+   */
+  saveEvolvedRules(rules: unknown[]): void {
+    (this.learnings as any).evolvedRules = rules;
+    this.learnings.updatedAt = new Date().toISOString();
+    this.saveLearnings();
   }
 
   // ─── Internal ───────────────────────────────────────────────────────────

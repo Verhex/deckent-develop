@@ -95,3 +95,13 @@ export type {
   DocUpdateContext,
   DocUpdateResult,
 } from './doc-updaters/index.js';
+
+// ─── Routing Engine v2 (public: learning, quality, routing) ──────────
+export { OutcomeTracker } from './outcome-tracker.js';
+export type { RoutingOutcome, LearningsData, SynergyEntry } from './outcome-tracker.js';
+export { assessQuality, assessSkillRelevance } from './quality-assessor.js';
+export type { QualityScore } from './quality-assessor.js';
+export { RuleEvolver } from './rule-evolver.js';
+export { PromotionPipeline } from './promotion-pipeline.js';
+export { MidSprintAdapter } from './mid-sprint-adapter.js';
+export { generateProjectConventionsSkill, generateDataDrivenSkills } from './temp-skill-generator.js';

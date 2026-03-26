@@ -696,6 +696,33 @@ export async function planSprint(
       const skillPoolV2 = new SkillPoolManager(projectRoot);
       const skillsV2 = skillPoolV2.loadSkills();
 
+      // Load learning bonuses from previous sprints
+      let learningData: import('../core/routing-types.js').LearningBonus[] = [];
+      try {
+        const { OutcomeTracker } = await import('./outcome-tracker.js');
+        const tracker = new OutcomeTracker(projectRoot);
+        // Pre-calculate bonuses using a dummy DNA — bonuses are entity-level, not task-specific
+        // Each task will get fresh bonuses from classifyIntent in routeTaskV2
+        const { classifyIntent } = await import('../core/intent-classifier.js');
+        if (tasks.length > 0) {
+          const sampleDNA = classifyIntent(tasks[0]!);
+          learningData = tracker.calculateBonuses(sampleDNA);
+          debugLog('planSprint:learning-bonuses', `Loaded ${learningData.length} learning bonuses from previous sprints`);
+        }
+      } catch {
+        debugLog('planSprint:learning-bonuses', 'No learning data available (first sprint or missing learnings.json)');
+      }
+
+      // Generate project conventions temp skill
+      try {
+        const { generateProjectConventionsSkill } = await import('./temp-skill-generator.js');
+        if (projectStackV2) {
+          const conventionsSkill = generateProjectConventionsSkill(projectStackV2);
+          skillsV2.set(conventionsSkill.id, conventionsSkill);
+          debugLog('planSprint:temp-skill', `Generated project-conventions skill for ${projectStackV2.language}`);
+        }
+      } catch { /* non-fatal */ }
+
       for (const task of tasks) {
         try {
           const overrides: UserOverride[] = [];
@@ -713,6 +740,7 @@ export async function planSprint(
           const decision = routeTaskV2(task, pool, skillsV2, {
             projectStack: projectStackV2,
             overrides,
+            learningData,
             config: config.routing_config,
           });
 
@@ -1513,30 +1541,45 @@ export async function finalizeSprint(
     } catch { /* afterSprint hook failure is non-fatal */ }
   }
 
-  // 8b. Update agent stats
-  try {
-    const poolManager = new AgentPoolManager(projectRoot);
-    for (const task of sprint.tasks) {
-      const agentId = task.assignedAgent;
-      if (!agentId) continue;
-      const evaluation = evaluations.get(task.id);
-      if (!evaluation) continue;
-      const taskResult = results.find(r => r.taskId === task.id);
-      const coverage = taskResult?.coverage ?? 0;
-      poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
-    }
-  } catch { /* non-fatal: agent stats update failure */ }
+  // 8b. Update agent/skill stats
+  const routingVersion = (opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined;
 
-  // 8c. Record routing outcomes for v2 learning engine
-  try {
-    const routingVersion = (opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined;
-    if (routingVersion === 'v2') {
+  if (routingVersion !== 'v2') {
+    // V1: Write stats directly to agent.json manifests (legacy behavior)
+    try {
+      const poolManager = new AgentPoolManager(projectRoot);
+      for (const task of sprint.tasks) {
+        const agentId = task.assignedAgent;
+        if (!agentId) continue;
+        const evaluation = evaluations.get(task.id);
+        if (!evaluation) continue;
+        const taskResult = results.find(r => r.taskId === task.id);
+        const coverage = taskResult?.coverage ?? 0;
+        poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
+      }
+    } catch { /* non-fatal */ }
+  } else {
+    // V2: Record outcomes to learnings.json (single source of truth)
+    // Agent.json manifests are NOT touched — stats live in learnings.json only
+    try {
       const { OutcomeTracker } = await import('./outcome-tracker.js');
+      const { assessQuality } = await import('./quality-assessor.js');
       const tracker = new OutcomeTracker(projectRoot);
+
       for (const task of sprint.tasks) {
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
         const taskResult = results.find(r => r.taskId === task.id);
+
+        // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
+        let qualityScore: number | undefined;
+        if (taskResult) {
+          try {
+            const quality = assessQuality(task, taskResult, evaluation as unknown as string);
+            qualityScore = quality.overall;
+          } catch { /* non-fatal */ }
+        }
+
         tracker.recordOutcome({
           taskId: task.id,
           sprintId: sprint.id,
@@ -1545,12 +1588,41 @@ export async function finalizeSprint(
           skillIds: task.assignedSkills ?? [],
           evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
           coverage: taskResult?.coverage ?? 0,
+          qualityScore,
           routingVersion: 'v2',
         });
       }
-      debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes`);
+      debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
+
+      // 8d. Evolve routing rules from accumulated data
+      try {
+        const { RuleEvolver } = await import('./rule-evolver.js');
+        const evolver = new RuleEvolver(tracker);
+        const evolution = evolver.evolveRules();
+        if (evolution.newRules.length > 0) {
+          debugLog('finalizeSprint:rule-evolution', `${evolution.newRules.length} new rules evolved`);
+          // Persist evolved rules in learnings
+          tracker.saveEvolvedRules(evolution.newRules);
+        }
+      } catch { /* non-fatal: rule evolution failure */ }
+
+      // 8e. Evaluate promotions/demotions
+      try {
+        const { PromotionPipeline } = await import('./promotion-pipeline.js');
+        const pipeline = new PromotionPipeline(projectRoot);
+        const promotions = pipeline.evaluatePromotions(tracker);
+        const demotions = pipeline.evaluateDemotions(tracker);
+        for (const p of promotions.filter(r => r.action === 'promote')) {
+          debugLog('finalizeSprint:promotion', `${p.entityType} '${p.entityId}': ${p.reason}`);
+        }
+        for (const d of demotions.filter(r => r.action === 'demote')) {
+          debugLog('finalizeSprint:demotion', `${d.entityType} '${d.entityId}': ${d.reason}`);
+        }
+      } catch { /* non-fatal: promotion/demotion failure */ }
+    } catch (err) {
+      debugLog('finalizeSprint:v2-learning', `V2 learning pipeline failed: ${err}`);
     }
-  } catch { /* non-fatal: routing outcome recording failure */ }
+  }
 
   // 9. Update project docs
   if (opts?.config) {
@@ -1612,6 +1684,7 @@ export async function runSprint(
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let taskQueue: Task[] = [];
   let lastUsage: UsageMetrics = { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() };
+  const routingVersionForFix = config.routing_engine ?? 'v1';
   const usageTracker = new UsageTracker(projectRoot);
 
   // Use provided SpawnBackend, or create one from config.spawn_backend via SpawnBackendFactory.
@@ -1883,6 +1956,36 @@ export async function runSprint(
     }
 
     if (fixTasks.length > 0) {
+      // V2: Reroute fix tasks with MidSprintAdapter (exclude failed agent/skills)
+      if (routingVersionForFix === 'v2') {
+        try {
+          const { MidSprintAdapter } = await import('./mid-sprint-adapter.js');
+          const fixAgentPool = new AgentPoolManager(projectRoot);
+          const fixPool = fixAgentPool.loadAgents();
+          const fixSkillPool = new SkillPoolManager(projectRoot);
+          const fixSkills = fixSkillPool.loadSkills();
+          const { OutcomeTracker } = await import('./outcome-tracker.js');
+          const fixTracker = new OutcomeTracker(projectRoot);
+          const fixStack = detectProjectStack(projectRoot);
+          const adapter = new MidSprintAdapter(fixPool, fixSkills, fixTracker, fixStack);
+
+          for (const fixTask of fixTasks) {
+            if (fixTask.fixForTaskId) {
+              // Find the original failed task's result
+              const originalResult = results.find(r => r.taskId === fixTask.fixForTaskId);
+              if (originalResult) {
+                const rerouteResult = adapter.shouldReroute(fixTask, originalResult);
+                if (rerouteResult.should && rerouteResult.newDecision) {
+                  adapter.applyReroute(fixTask, rerouteResult.newDecision);
+                  // Persist rerouted task
+                  writeFileSync(join(tasksPath, `task-${fixTask.id}.json`), JSON.stringify(fixTask, null, 2), 'utf-8');
+                }
+              }
+            }
+          }
+        } catch { /* non-fatal: mid-sprint adapter failure */ }
+      }
+
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
       spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
