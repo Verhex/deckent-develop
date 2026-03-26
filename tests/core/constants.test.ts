@@ -110,25 +110,25 @@ describe('Memory limits', () => {
     }
   });
 
-  it('MEMORY_MAX_LINES === 200 (Sprint 037 increase)', () => {
-    expect(MEMORY_MAX_LINES).toBe(200);
+  it('MEMORY_MAX_LINES === 300 (Sprint 067 increase)', () => {
+    expect(MEMORY_MAX_LINES).toBe(300);
   });
 
-  it('RETRO_MAX_LINES === 100 (Sprint 037 increase)', () => {
-    expect(RETRO_MAX_LINES).toBe(100);
+  it('RETRO_MAX_LINES === 120 (Sprint 067 increase)', () => {
+    expect(RETRO_MAX_LINES).toBe(120);
   });
 
-  it('SPRINT_LOG_MAX_LINES === 80 (Sprint 037 increase)', () => {
-    expect(SPRINT_LOG_MAX_LINES).toBe(80);
+  it('SPRINT_LOG_MAX_LINES === 100 (Sprint 067 increase)', () => {
+    expect(SPRINT_LOG_MAX_LINES).toBe(100);
   });
 
-  it('BRAIN_TOTAL_LINE_BUDGET === 600 (Sprint 037 increase)', () => {
-    expect(BRAIN_TOTAL_LINE_BUDGET).toBe(600);
+  it('BRAIN_TOTAL_LINE_BUDGET === 900 (Sprint 067 increase)', () => {
+    expect(BRAIN_TOTAL_LINE_BUDGET).toBe(900);
   });
 
-  it('MEMORY_DECAY_SPRINTS === 5, PATTERN_DECAY_SPRINTS === 8 (Sprint 037 increase)', () => {
-    expect(MEMORY_DECAY_SPRINTS).toBe(5);
-    expect(PATTERN_DECAY_SPRINTS).toBe(8);
+  it('MEMORY_DECAY_SPRINTS === 8, PATTERN_DECAY_SPRINTS === 12 (Sprint 067 increase)', () => {
+    expect(MEMORY_DECAY_SPRINTS).toBe(8);
+    expect(PATTERN_DECAY_SPRINTS).toBe(12);
   });
 
   it('BRAIN_TOTAL_LINE_BUDGET >= sum of individual limits', () => {

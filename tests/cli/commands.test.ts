@@ -295,9 +295,9 @@ describe('doctor command', () => {
 
   it('reports brain budget over limit', async () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
-    vi.mocked(countBrainLines).mockReturnValue(650);
+    vi.mocked(countBrainLines).mockReturnValue(950);
     await runCommand(registerDoctor, ['doctor']);
-    expect(stdout()).toContain('650/600');
+    expect(stdout()).toContain('950/900');
     expect(stdout()).toContain('OVER BUDGET');
   });
 

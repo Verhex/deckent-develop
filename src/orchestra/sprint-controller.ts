@@ -623,7 +623,7 @@ export async function planSprint(
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
     const structuredTasks = parseStructuredDirectives(context.directives);
-    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string }> =
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[] }> =
       structuredTasks.length > 0
         ? structuredTasks
         : context.directives
@@ -653,15 +653,15 @@ export async function planSprint(
           : `Directive (model: ${resolvedModel} -- resolved from scope/complexity/plan/usage)`,
         scope: src.scope,
         dependencies: [],
-        goNogo: {
-          goCriteria: src.testTarget ? `${src.testTarget}; Tests pass` : 'Tests pass',
-          noGoCriteria: 'Build fails',
-          techDebtAcceptable: 'Minor issues',
-        },
+        goNogo: extractGoNogoCriteria(src.description, src.testTarget),
         sprintId,
         initialStatus,
         forceModel: src.forceModel,
         forceEffort: src.forceEffort,
+        forceAgent: src.forceAgent,
+        forceSkills: src.forceSkills,
+        excludeAgent: src.excludeAgent,
+        excludeSkills: src.excludeSkills,
       }, seq++));
     }
   }
@@ -685,6 +685,10 @@ export async function planSprint(
   }
 
   // ─── Routing: V2 (intent-based) or V1 (keyword-based) ─────────────────────
+  // V1 and V2 are mutually exclusive: if-else ensures no parallel execution.
+  // V2 mode: uses routeTaskV2 (intent-based 3-layer engine)
+  // V1 mode: uses selectAgent + selectSkills (legacy keyword-based)
+  // No code duplication or redundant calculation in V2 mode.
   const routingVersion = config.routing_engine ?? 'v1';
 
   if (routingVersion === 'v2') {
@@ -1372,6 +1376,52 @@ export function isStaleTaskFile(filePath: string, maxAgeMs: number = 86_400_000)
 }
 
 /**
+ * Extract task-specific GO/NOGO criteria from DIRECTIVES description.
+ * Parses "Kanıt:", "Proof:", "Doğrulama:", "Verify:" lines for goCriteria.
+ * Falls back to generic criteria if no specific proof lines found.
+ */
+function extractGoNogoCriteria(
+  description: string,
+  testTarget?: string,
+): { goCriteria: string; noGoCriteria: string; techDebtAcceptable: string } {
+  const lines = description.split('\n');
+  const proofLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match proof/verification patterns
+    if (/^(?:\*\*)?(?:Kanıt|Kan[ıi]t|Proof|Doğrulama|Verify|Verification|Test:)(?:\*\*)?:/i.test(trimmed)) {
+      proofLines.push(trimmed);
+    }
+    // Match inline grep/command verification patterns
+    if (/^\s*[-*]\s*`(?:grep|find|wc|ls|cat|npx)\s/.test(trimmed)) {
+      proofLines.push(trimmed);
+    }
+  }
+
+  const baseCriteria = testTarget ? `${testTarget}; Tests pass` : 'Tests pass; tsc clean';
+
+  if (proofLines.length > 0) {
+    // Use first 3 proof lines as specific criteria (avoid excessive length)
+    const specificCriteria = proofLines
+      .slice(0, 3)
+      .map(l => l.replace(/^\*\*.*?\*\*:\s*/, '').replace(/^[-*]\s*/, ''))
+      .join('; ');
+    return {
+      goCriteria: `${baseCriteria}; ${specificCriteria}`,
+      noGoCriteria: 'Build fails or verification commands fail',
+      techDebtAcceptable: 'Minor issues if all verification commands pass',
+    };
+  }
+
+  return {
+    goCriteria: baseCriteria,
+    noGoCriteria: 'Build fails or tests fail',
+    techDebtAcceptable: 'Minor style issues if tests pass',
+  };
+}
+
+/**
  * Clean up all sprint resources: kill workers, release locks, remove task files
  * (.json, .plan, .hb, .result, .paused, .log), stale files, and lock files.
  * @param projectRoot - Project root directory
@@ -2031,10 +2081,21 @@ export async function runSprint(
   // Phase 8: CLEANUP (skipped when skipCleanup is true)
   if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
   if (!opts?.skipCleanup) {
-    try {
-      cleanup(projectRoot, sprint, spawnBackend);
-    } catch (err) {
-      safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+    const delayMs = (config as unknown as Record<string, unknown>).cleanup_delay_ms as number | undefined;
+    const cleanupDelay = typeof delayMs === 'number' && delayMs > 0 ? delayMs : 0;
+    if (cleanupDelay > 0) {
+      debugLog('[Brain]', `Cleanup delayed ${cleanupDelay}ms — .tasks/ files remain readable`);
+      const _sprint = sprint;
+      const _spawnBackend = spawnBackend;
+      setTimeout(() => {
+        try { cleanup(projectRoot, _sprint, _spawnBackend); } catch { /* non-fatal */ }
+      }, cleanupDelay);
+    } else {
+      try {
+        cleanup(projectRoot, sprint, spawnBackend);
+      } catch (err) {
+        safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 

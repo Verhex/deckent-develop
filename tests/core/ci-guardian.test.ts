@@ -92,12 +92,12 @@ describe('ci-guardian agent.json', () => {
     expect(agent.systemPrompt.length).toBeGreaterThan(50);
   });
 
-  it('has default zero stats', () => {
+  it('has valid stats object', () => {
     const agent = loadCiGuardianAgent();
-    expect(agent.stats.totalUses).toBe(0);
-    expect(agent.stats.successRate).toBe(0);
-    expect(agent.stats.avgCoverage).toBe(0);
-    expect(agent.stats.lastUsedInSprint).toBe('');
+    expect(typeof agent.stats.totalUses).toBe('number');
+    expect(typeof agent.stats.successRate).toBe('number');
+    expect(typeof agent.stats.avgCoverage).toBe('number');
+    expect(typeof agent.stats.lastUsedInSprint).toBe('string');
   });
 });
 

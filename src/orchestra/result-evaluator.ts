@@ -63,6 +63,18 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
     f.includes('.test.') || f.includes('.spec.')
   ) ?? false;
 
+  // Step 3a: Validate task-specific goNogo criteria from DIRECTIVES
+  // If goCriteria contains specific verification patterns, validate notes match
+  if (task.goNogo?.goCriteria && task.goNogo.goCriteria.length > 30) {
+    // Task has specific criteria — check that worker notes address them
+    const notes = result.notes ?? '';
+    const criteria = task.goNogo.goCriteria.toLowerCase();
+    // If criteria mention specific verification but notes are empty → tech debt
+    if (notes.length < 20 && criteria.includes('grep')) {
+      return TaskEvaluation.GO_WITH_TECH_DEBT;
+    }
+  }
+
   // Check: vitest coverage validation (if JSON available)
   if (vitestJsonOutput !== undefined) {
     const coverageCheck = validateWorkerCoverage({

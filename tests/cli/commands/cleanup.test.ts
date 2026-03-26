@@ -176,7 +176,7 @@ describe('cleanup command (isolated)', () => {
   it('shows budget warning when .brain/ exceeds budget after cleanup', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(cleanup).mockImplementation(() => {});
-    vi.mocked(countBrainLines).mockReturnValue(700); // over 600 budget
+    vi.mocked(countBrainLines).mockReturnValue(1000); // over 900 budget
     await runCommand(['cleanup']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('deckent cleanup --decay'))).toBe(true);
@@ -185,7 +185,7 @@ describe('cleanup command (isolated)', () => {
   it('does not show budget warning when .brain/ is within budget', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(cleanup).mockImplementation(() => {});
-    vi.mocked(countBrainLines).mockReturnValue(400); // under 600 budget
+    vi.mocked(countBrainLines).mockReturnValue(400); // under 900 budget
     await runCommand(['cleanup']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('deckent cleanup --decay'))).toBe(false);

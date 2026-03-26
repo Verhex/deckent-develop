@@ -417,7 +417,7 @@ describe('runDecay', () => {
   });
 
   it('returns early (no decay) when below budget and no force', () => {
-    vi.mocked(countBrainLines).mockReturnValue(100); // under 600
+    vi.mocked(countBrainLines).mockReturnValue(100); // under 900
     const result = runDecay('/root', 'sprint-001');
     expect(result.linesBefore).toBe(100);
     expect(result.linesAfter).toBe(100);
@@ -436,14 +436,14 @@ describe('runDecay', () => {
   });
 
   it('runs decay when over budget', () => {
-    vi.mocked(countBrainLines).mockReturnValue(700); // over 600
+    vi.mocked(countBrainLines).mockReturnValue(1000); // over 900
     vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
     const result = runDecay('/root', 'sprint-001');
-    expect(result.linesBefore).toBe(700);
+    expect(result.linesBefore).toBe(1000);
   });
 
   it('removes resolved patterns from PATTERNS.json', () => {
-    vi.mocked(countBrainLines).mockReturnValue(700);
+    vi.mocked(countBrainLines).mockReturnValue(1000);
     // existsSync: true for PATTERNS file, false for sprints dir
     vi.mocked(existsSync).mockImplementation((p: any) =>
       String(p).includes('PATTERNS') ? true : false
@@ -469,7 +469,7 @@ describe('runDecay', () => {
   });
 
   it('archives old sprint logs keeping last 2', () => {
-    vi.mocked(countBrainLines).mockReturnValue(700);
+    vi.mocked(countBrainLines).mockReturnValue(1000);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([
       'sprint-001.md', 'sprint-002.md', 'sprint-003.md', 'sprint-004.md',
@@ -487,7 +487,7 @@ describe('runDecay', () => {
   });
 
   it('removes resolved debt entries old enough', () => {
-    vi.mocked(countBrainLines).mockReturnValue(700);
+    vi.mocked(countBrainLines).mockReturnValue(1000);
     vi.mocked(existsSync).mockReturnValue(false);
     const resolvedItem = makeDebtItem({
       id: 'debt-old',
@@ -678,7 +678,7 @@ describe('runDecay: smart truncation preserves sprint headers (E)', () => {
 
   it('does not truncate to bare 50 lines — preserves section context', () => {
     // Over budget even after all other decay steps
-    vi.mocked(countBrainLines).mockReturnValue(900);
+    vi.mocked(countBrainLines).mockReturnValue(1000);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as any);
 
@@ -712,7 +712,7 @@ describe('runDecay: archive directory git tracking (G)', () => {
   });
 
   it('writes .gitignore negation file in archive directory when archiving sprints', () => {
-    vi.mocked(countBrainLines).mockReturnValue(700);
+    vi.mocked(countBrainLines).mockReturnValue(1000);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       // sprints dir exists, archive .gitignore does NOT exist yet
       if (String(p).includes('archive') && String(p).includes('.gitignore')) return false;
@@ -737,7 +737,7 @@ describe('runDecay: archive directory git tracking (G)', () => {
   });
 
   it('does not overwrite .gitignore if it already exists', () => {
-    vi.mocked(countBrainLines).mockReturnValue(700);
+    vi.mocked(countBrainLines).mockReturnValue(1000);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       // archive .gitignore already exists
       if (String(p).includes('archive') && String(p).includes('.gitignore')) return true;

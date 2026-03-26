@@ -1285,15 +1285,15 @@ describe('writeRetrospective', () => {
     expect(memCall![1]).toContain('Existing');
   });
 
-  it('respects 200-line MEMORY limit', () => {
-    const bigMemory = Array.from({ length: 220 }, (_, i) => `Line ${i}`).join('\n');
+  it('respects 300-line MEMORY limit', () => {
+    const bigMemory = Array.from({ length: 320 }, (_, i) => `Line ${i}`).join('\n');
     mockedReadFileSync.mockReturnValue(bigMemory);
     const evals = new Map([['001-001', TaskEvaluation.NO_GO]]);
 
     writeRetrospective(ROOT, makeSprint(), evals, metrics);
     const memCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('MEMORY'));
     const lines = (memCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(200);
+    expect(lines.length).toBeLessThanOrEqual(300);
   });
 });
 
@@ -1323,14 +1323,14 @@ describe('writeSprintLog', () => {
     expect(mockedMkdirSync).toHaveBeenCalled();
   });
 
-  it('respects 80-line limit', () => {
+  it('respects 100-line limit', () => {
     const manyTasks = Array.from({ length: 200 }, (_, i) => makeTask({ id: `001-${String(i).padStart(3, '0')}` }));
     const sprint = makeSprint({ tasks: manyTasks });
     writeSprintLog(ROOT, sprint, metrics);
 
     const writeCall = mockedWriteFileSync.mock.calls[0];
     const lines = (writeCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(80);
+    expect(lines.length).toBeLessThanOrEqual(100);
   });
 });
 

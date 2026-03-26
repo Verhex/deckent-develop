@@ -156,8 +156,10 @@ export interface DeckentConfig {
   rollback_policy?: 'never' | 'on_failure' | 'always';
 
   // ─── Routing Engine v2 ─────────────────────────────────────────────
-  /** Routing engine version: 'v1' (keyword-based), 'v2' (intent-based). Default: 'v1' */
+  /** Routing engine version: 'v1' (keyword-based), 'v2' (intent-based). Default: 'v2' */
   routing_engine?: 'v1' | 'v2';
+  /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s). Set 0 for immediate. */
+  cleanup_delay_ms?: number;
   /** Routing engine tuning parameters (v2 only) */
   routing_config?: {
     agentMinScore?: number;

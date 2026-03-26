@@ -2,6 +2,15 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 
 import { join } from 'node:path';
 import { JOBS_DIR } from '../../core/constants.js';
 
+export interface TaskSummary {
+  taskId: string;
+  title: string;
+  evaluation: string;
+  agent: string;
+  skills: string[];
+  notes: string;
+}
+
 export interface JobState {
   jobId: string;
   status: 'RUNNING' | 'COMPLETE' | 'FAILED';
@@ -9,6 +18,16 @@ export interface JobState {
   completedAt?: string;
   error?: string;
   sprintId?: string;
+  /** Task-level evaluations and summaries (populated on COMPLETE) */
+  tasks?: TaskSummary[];
+  /** High-level sprint metrics */
+  metrics?: {
+    totalTasks: number;
+    done: number;
+    techDebt: number;
+    noGo: number;
+    duration: string;
+  };
 }
 
 export function writeJobState(projectRoot: string, state: JobState): void {

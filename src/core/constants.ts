@@ -45,13 +45,13 @@ export const LOCK_TIMEOUT_MS = 30_000 as const;
 export const LOCK_STALE_THRESHOLD_MS = 300_000 as const;
 
 // ─── Memory Limits ───────────────────────────────────────────────────
-export const MEMORY_MAX_LINES = 200 as const;
-export const PATTERNS_MAX_LINES = 80 as const;
-export const RETRO_MAX_LINES = 100 as const;
-export const SPRINT_LOG_MAX_LINES = 80 as const;
-export const BRAIN_TOTAL_LINE_BUDGET = 600 as const;
-export const MEMORY_DECAY_SPRINTS = 5 as const;
-export const PATTERN_DECAY_SPRINTS = 8 as const;
+export const MEMORY_MAX_LINES = 300 as const;
+export const PATTERNS_MAX_LINES = 150 as const;
+export const RETRO_MAX_LINES = 120 as const;
+export const SPRINT_LOG_MAX_LINES = 100 as const;
+export const BRAIN_TOTAL_LINE_BUDGET = 900 as const;
+export const MEMORY_DECAY_SPRINTS = 8 as const;
+export const PATTERN_DECAY_SPRINTS = 12 as const;
 
 // ─── Task File Extensions ────────────────────────────────────────────
 export const TASK_FILE_EXTENSIONS = ['.json', '.plan', '.hb', '.result', '.paused', '.log'] as const;

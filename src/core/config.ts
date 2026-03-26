@@ -342,6 +342,14 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Routing Engine validation ──────────────────────────────────────
+  if (config.routing_engine !== undefined) {
+    const validRoutingEngines = ['v1', 'v2'] as const;
+    if (!(validRoutingEngines as readonly string[]).includes(config.routing_engine)) {
+      errors.push(`Invalid value '${config.routing_engine}' for field 'routing_engine'. Valid: ${validRoutingEngines.join(', ')}`);
+    }
+  }
+
   if (errors.length > 0) {
     throw new ConfigValidationError(errors);
   }
@@ -427,6 +435,10 @@ export function createDefaultConfig(): DeckentConfig {
     output_theme: 'default',
     // Rollback
     rollback_policy: 'never',
+    // Routing Engine v2 (default since sprint-067)
+    routing_engine: 'v2',
+    // Cleanup delay: wait before deleting .tasks/ files (ms)
+    cleanup_delay_ms: 180_000,
   };
 }
 

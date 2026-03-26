@@ -72,6 +72,9 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
  * Determine which fields are missing from an existing config relative to defaults.
  * Checks top-level keys and also mode-level keys within the `modes` object.
  * Returns a list of missing top-level field names (and `modes.<mode>.<field>` paths).
+ *
+ * Fields added since sprint-066 that old configs will receive on migration:
+ * - routing_engine: 'v1' (routing engine version, added sprint-066)
  */
 export function getMissingFields(existing: Record<string, unknown>): string[] {
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;

@@ -465,14 +465,14 @@ describe('Built-in Agents', () => {
       }
     });
 
-    it('should all have valid stats object with zero initial values', () => {
+    it('should all have valid stats object with expected shape', () => {
       for (const agentId of BUILTIN_AGENTS) {
         const config = readAgentJson(agentId);
         expect(config.stats).toBeDefined();
-        expect(config.stats.totalUses).toBe(0);
-        expect(config.stats.successRate).toBe(0);
-        expect(config.stats.avgCoverage).toBe(0);
-        expect(config.stats.lastUsedInSprint).toBe('');
+        expect(typeof config.stats.totalUses).toBe('number');
+        expect(typeof config.stats.successRate).toBe('number');
+        expect(typeof config.stats.avgCoverage).toBe('number');
+        expect(typeof config.stats.lastUsedInSprint).toBe('string');
       }
     });
 

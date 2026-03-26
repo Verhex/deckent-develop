@@ -363,3 +363,57 @@ describe('getMissingFields — modes nesting (depth-3)', () => {
     expect(depthThree).toHaveLength(0);
   });
 });
+
+// ─── routing_engine migration ────────────────────────────────────────
+
+describe('routing_engine migration', () => {
+  it('getMissingFields detects missing routing_engine in old config', () => {
+    const oldConfig: Record<string, unknown> = {
+      mode: 'max_plan',
+      modes: {},
+      brain_provider: 'claude',
+      worker_provider: 'claude',
+    };
+    const missing = getMissingFields(oldConfig);
+    expect(missing).toContain('routing_engine');
+  });
+
+  it('migrateConfigInMemory adds routing_engine = v2 for old config without it', () => {
+    const oldConfig: Record<string, unknown> = {
+      mode: 'max_plan',
+      modes: {},
+    };
+    const { config, addedFields } = migrateConfigInMemory(oldConfig);
+    expect(addedFields).toContain('routing_engine');
+    expect(config.routing_engine).toBe('v2');
+  });
+
+  it('migrateConfigInMemory preserves existing routing_engine = v2', () => {
+    const existing: Record<string, unknown> = {
+      ...createDefaultConfig() as unknown as Record<string, unknown>,
+      routing_engine: 'v2',
+    };
+    const { config, addedFields } = migrateConfigInMemory(existing);
+    expect(addedFields).not.toContain('routing_engine');
+    expect(config.routing_engine).toBe('v2');
+  });
+
+  it('createDefaultConfig includes routing_engine = v2', () => {
+    const defaults = createDefaultConfig();
+    expect(defaults.routing_engine).toBe('v2');
+  });
+
+  it('migrateConfig file adds routing_engine to on-disk config', () => {
+    const oldConfig = { mode: 'max_plan', modes: {} };
+    const p = writeTmp('routing-migration-test.json', oldConfig);
+    try {
+      const result = migrateConfig(p);
+      expect(result.migrated).toBe(true);
+      expect(result.addedFields).toContain('routing_engine');
+      const written = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
+      expect(written['routing_engine']).toBe('v2');
+    } finally {
+      cleanupTmp(p);
+    }
+  });
+});
