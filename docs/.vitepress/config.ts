@@ -10,6 +10,9 @@ export default defineConfig({
   // Clean URLs
   cleanUrls: true,
 
+  // Ignore dead links to excluded directories (reference/, development/, architecture/)
+  ignoreDeadLinks: true,
+
   // Head tags
   head: [
     ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
