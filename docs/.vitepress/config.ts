@@ -21,6 +21,9 @@ export default defineConfig({
   // Dark/light theme
   appearance: 'auto',
 
+  // Exclude non-documentation directories from build
+  srcExclude: ['directives/**', 'analysis/**', 'archive/**', 'release/**'],
+
   // Markdown config
   markdown: {
     lineNumbers: true,
