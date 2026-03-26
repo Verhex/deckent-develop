@@ -6,6 +6,11 @@ import type { SkillDefinition, SkillCategory, StackDetectionRule } from '../core
 import { createSkillDefinition } from '../core/skill-types.js';
 import type { ActivationConfig } from '../core/routing-types.js';
 
+// ─── Internal helpers ───────────────────────────────────────────────────────
+
+/** Extends SkillDefinition with the generated SKILL.md content (internal only). */
+type SkillWithContent = SkillDefinition & { _generatedContent?: string };
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface ProjectAnalysisInput {
@@ -92,7 +97,7 @@ export function generateProjectConventionsSkill(
     minScore: 3,
   };
 
-  return createSkillDefinition({
+  const skill = createSkillDefinition({
     id: 'project-conventions',
     name: 'Project Conventions',
     version: '1.0.0',
@@ -110,16 +115,17 @@ export function generateProjectConventionsSkill(
     enabled: true,
     manifestVersion: 2,
     activation,
-    // Content stored separately as SKILL.md — this field carries the generated content
-    _generatedContent: content,
-  } as any);
+  });
+  // Content stored separately as SKILL.md — this field carries the generated content
+  (skill as SkillWithContent)._generatedContent = content;
+  return skill;
 }
 
 /**
  * Get the generated SKILL.md content from a project-conventions skill.
  */
 export function getGeneratedContent(skill: SkillDefinition): string | undefined {
-  return (skill as any)._generatedContent as string | undefined;
+  return (skill as SkillWithContent)._generatedContent;
 }
 
 // ─── Data-Driven Domain Skills ──────────────────────────────────────────────
@@ -198,8 +204,8 @@ export function generateDataDrivenSkills(
       enabled: true,
       manifestVersion: 2,
       activation,
-      _generatedContent: sections.join('\n'),
-    } as any);
+    });
+    (skill as SkillWithContent)._generatedContent = sections.join('\n');
 
     skills.push(skill);
   }

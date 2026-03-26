@@ -2785,3 +2785,105 @@ describe('updateProjectIdentity vitest fallback chain', () => {
     expect(content).toContain('- Total Sprints: 1');
   });
 });
+
+// ─── Task 067-004: worker notes in retro learnings ────────────────────
+
+describe('buildRetroLearnings — worker notes from results', () => {
+  it('includes worker notes (first 150 chars) for NO_GO task', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const results = [makeResult({ taskId: '001', notes: 'tsc failed: cannot find module X — worker exhausted 3 attempts' })];
+    const learnings = buildRetroLearnings(sprint, evals, results);
+    expect(learnings).toContainEqual(expect.stringContaining('tsc failed: cannot find module X'));
+  });
+
+  it('includes worker notes (first 150 chars) for GO_WITH_TECH_DEBT task', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.GO_WITH_TECH_DEBT]]);
+    const results = [makeResult({ taskId: '001', selfAssessment: 'GO_WITH_TECH_DEBT', notes: 'Implemented but coverage only 78%, needs additional edge case tests' })];
+    const learnings = buildRetroLearnings(sprint, evals, results);
+    expect(learnings).toContainEqual(expect.stringContaining('coverage only 78%'));
+  });
+
+  it('truncates worker notes to 150 chars', () => {
+    const longNote = 'a'.repeat(200);
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const results = [makeResult({ taskId: '001', notes: longNote })];
+    const learnings = buildRetroLearnings(sprint, evals, results);
+    const item = learnings.find(l => l.includes('Test Task'));
+    expect(item).toBeDefined();
+    // Notes portion should be at most 150 chars
+    const notesStart = item!.indexOf(' — ');
+    const notesPart = item!.slice(notesStart + 3);
+    expect(notesPart.length).toBeLessThanOrEqual(150);
+  });
+
+  it('falls back to generic message when no notes provided', () => {
+    const sprint = makeSprint();
+    const evals = new Map([['001', TaskEvaluation.NO_GO]]);
+    const learnings = buildRetroLearnings(sprint, evals);
+    expect(learnings).toContainEqual(expect.stringContaining('investigate root cause'));
+  });
+});
+
+describe('writeSprintLog — ## Notes section for all tasks', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('adds ## Notes section when tasks have result notes', () => {
+    const task = makeTask({ id: '001', title: 'My Task' });
+    const sprint = makeSprint({ tasks: [task] });
+    const evals = new Map<string, TaskEvaluation>([['001', TaskEvaluation.DONE]]);
+    const results = [makeResult({ taskId: '001', notes: 'Implemented feature successfully' })];
+    writeSprintLog(tmpDir, sprint, makeMetrics(), evals, results);
+    const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
+    expect(content).toContain('## Notes');
+    expect(content).toContain('001 (My Task): Implemented feature successfully');
+  });
+
+  it('includes notes for DONE tasks, not just NO_GO', () => {
+    const task1 = makeTask({ id: '001', title: 'Done Task' });
+    const task2 = makeTask({ id: '002', title: 'Failed Task' });
+    const sprint = makeSprint({ tasks: [task1, task2] });
+    const evals = new Map<string, TaskEvaluation>([
+      ['001', TaskEvaluation.DONE],
+      ['002', TaskEvaluation.NO_GO],
+    ]);
+    const results = [
+      makeResult({ taskId: '001', notes: 'All tests passed' }),
+      makeResult({ taskId: '002', notes: 'Build failed on step 3' }),
+    ];
+    writeSprintLog(tmpDir, sprint, makeMetrics(), evals, results);
+    const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
+    expect(content).toContain('All tests passed');
+    expect(content).toContain('Build failed on step 3');
+  });
+
+  it('omits ## Notes section when no tasks have notes', () => {
+    const sprint = makeSprint();
+    writeSprintLog(tmpDir, sprint, makeMetrics());
+    const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
+    expect(content).not.toContain('## Notes');
+  });
+
+  it('truncates notes to 150 chars in sprint log', () => {
+    const longNote = 'x'.repeat(200);
+    const task = makeTask({ id: '001', title: 'Long Note Task' });
+    const sprint = makeSprint({ tasks: [task] });
+    const results = [makeResult({ taskId: '001', notes: longNote })];
+    writeSprintLog(tmpDir, sprint, makeMetrics(), undefined, results);
+    const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
+    // The note line should not contain more than 150 x's
+    const match = content.match(/001 \(Long Note Task\): (x+)/);
+    expect(match).toBeTruthy();
+    expect(match![1].length).toBeLessThanOrEqual(150);
+  });
+});

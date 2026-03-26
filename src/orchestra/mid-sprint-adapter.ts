@@ -5,7 +5,7 @@
 import type { Task, TaskResult } from '../core/task-types.js';
 import type { AgentPool } from '../core/agent-types.js';
 import type { SkillDefinition } from '../core/skill-types.js';
-import type { RoutingDecision, UserOverride } from '../core/routing-types.js';
+import type { RoutingDecision, UserOverride, TaskDNA } from '../core/routing-types.js';
 import { routeTaskV2, type RoutingOptions } from '../core/routing-engine.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
 import { debugLog } from '../core/utils.js';
@@ -120,7 +120,7 @@ export class MidSprintAdapter {
       // Get learning bonuses for this task's DNA
       const routingMeta = task.routingMeta;
       const learningData = routingMeta?.taskDNA
-        ? this.outcomeTracker.calculateBonuses(routingMeta.taskDNA as any)
+        ? this.outcomeTracker.calculateBonuses(routingMeta.taskDNA as TaskDNA)
         : [];
 
       const options: RoutingOptions = {

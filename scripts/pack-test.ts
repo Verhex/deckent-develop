@@ -21,10 +21,11 @@ export interface PackCheck {
 /**
  * Parse npm pack --dry-run output into file list.
  */
-export function parsePackOutput(output: string): { files: string[]; totalSize: string } {
+export function parsePackOutput(output: string): { files: string[]; totalSize: string; packageSize: string } {
   const lines = output.split('\n').map(l => l.trim()).filter(Boolean);
   const files: string[] = [];
   let totalSize = '';
+  let packageSize = '';
 
   for (const line of lines) {
     // npm pack --dry-run outputs lines like:
@@ -32,7 +33,8 @@ export function parsePackOutput(output: string): { files: string[]; totalSize: s
     // npm notice 1.2kB  dist/index.js
     // npm notice === Tarball Details ===
     // npm notice total files:   42
-    // npm notice unpacked size: 123.4 kB
+    // npm notice package size: 778.4 kB
+    // npm notice unpacked size: 3.7 MB
 
     // Extract file paths
     const fileMatch = line.match(/npm notice\s+[\d.]+\s*[kKmMgG]?B?\s+(.+)/);
@@ -40,14 +42,20 @@ export function parsePackOutput(output: string): { files: string[]; totalSize: s
       files.push(fileMatch[1].trim());
     }
 
-    // Extract total size
-    const sizeMatch = line.match(/unpacked size:\s+(.+)/);
-    if (sizeMatch && sizeMatch[1]) {
-      totalSize = sizeMatch[1].trim();
+    // Extract unpacked size (kept for backward compat)
+    const unpackedMatch = line.match(/unpacked size:\s+(.+)/);
+    if (unpackedMatch && unpackedMatch[1]) {
+      totalSize = unpackedMatch[1].trim();
+    }
+
+    // Extract compressed package size (used for <500KB target)
+    const pkgSizeMatch = line.match(/package size:\s+(.+)/);
+    if (pkgSizeMatch && pkgSizeMatch[1]) {
+      packageSize = pkgSizeMatch[1].trim();
     }
   }
 
-  return { files, totalSize };
+  return { files, totalSize, packageSize };
 }
 
 /**
@@ -135,6 +143,43 @@ export function parseSizeToBytes(sizeStr: string): number {
 }
 
 /**
+ * Check that source/declaration map files are excluded from the pack.
+ * Map files (.js.map, .d.ts.map) inflate package size without benefiting end users.
+ */
+export function checkMapFiles(files: string[]): PackCheck {
+  const mapFiles = files.filter(f => f.endsWith('.map'));
+  const ok = mapFiles.length === 0;
+  return {
+    name: 'no .map files in package',
+    ok,
+    message: ok
+      ? 'Source/declaration map files correctly excluded'
+      : `MAP FILES FOUND: ${mapFiles.length} .map files in package (${mapFiles.slice(0, 3).join(', ')}${mapFiles.length > 3 ? '...' : ''})`,
+  };
+}
+
+/**
+ * Check compressed package size is under the 500KB target.
+ */
+export function checkCompressedSize(packageSize: string, maxSizeKB: number = 500): PackCheck {
+  if (!packageSize) {
+    return { name: 'compressed package size', ok: true, message: 'Could not determine compressed package size' };
+  }
+
+  const bytes = parseSizeToBytes(packageSize);
+  const maxBytes = maxSizeKB * 1024;
+  const ok = bytes < maxBytes;
+
+  return {
+    name: 'compressed package size',
+    ok,
+    message: ok
+      ? `Compressed size: ${packageSize} (under ${maxSizeKB}KB limit)`
+      : `Compressed size: ${packageSize} exceeds ${maxSizeKB}KB limit`,
+  };
+}
+
+/**
  * Check total package size is under limit.
  */
 export function checkPackageSize(totalSize: string, maxSizeMB: number = 10): PackCheck {
@@ -167,11 +212,13 @@ export function runNpmPackDryRun(projectRoot: string): string {
  */
 export function runPackTest(projectRoot: string): PackTestResult {
   const output = runNpmPackDryRun(projectRoot);
-  const { files, totalSize } = parsePackOutput(output);
+  const { files, totalSize, packageSize } = parsePackOutput(output);
   const checks: PackCheck[] = [];
 
   checks.push(...checkExcludedFiles(files));
   checks.push(...checkRequiredFiles(files));
+  checks.push(checkMapFiles(files));
+  checks.push(checkCompressedSize(packageSize));
   checks.push(checkPackageSize(totalSize));
 
   const ok = checks.every(c => c.ok);

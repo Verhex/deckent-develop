@@ -1,6 +1,6 @@
 import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { JOBS_DIR } from '../../core/constants.js';
+import { JOBS_DIR, TASKS_DIR } from '../../core/constants.js';
 
 export interface TaskSummary {
   taskId: string;
@@ -45,6 +45,37 @@ export function readJobState(projectRoot: string, jobId: string): JobState | nul
   try {
     return JSON.parse(readFileSync(jobPath, 'utf-8')) as JobState;
   } catch { return null; }
+}
+
+/**
+ * Build TaskSummary array from sprint tasks + result files on disk.
+ * Notes are truncated to 200 characters. Falls back gracefully when result
+ * files are missing (e.g., after cleanup).
+ */
+export function buildTaskSummaries(
+  projectRoot: string,
+  tasks: ReadonlyArray<{ id: string; title: string; assignedAgent?: string; assignedSkills?: string[] }>,
+): TaskSummary[] {
+  return tasks.map(task => {
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
+    let evaluation = 'DONE';
+    let notes = '';
+    if (existsSync(resultPath)) {
+      try {
+        const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as { selfAssessment?: string; notes?: string };
+        if (result.selfAssessment) evaluation = result.selfAssessment;
+        notes = (result.notes ?? '').substring(0, 200);
+      } catch { /* skip malformed result file */ }
+    }
+    return {
+      taskId: task.id,
+      title: task.title,
+      evaluation,
+      agent: task.assignedAgent ?? 'generic',
+      skills: task.assignedSkills ?? [],
+      notes,
+    };
+  });
 }
 
 export function readLatestJobState(projectRoot: string): JobState | null {

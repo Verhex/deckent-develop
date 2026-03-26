@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 function buildPackOutput(opts: {
   files?: string[];
   totalSize?: string;
+  packageSize?: string;
 } = {}): string {
   const files = opts.files ?? [
     'dist/index.js',
@@ -28,13 +29,15 @@ function buildPackOutput(opts: {
     'LICENSE',
     'package.json',
   ];
-  const totalSize = opts.totalSize ?? '120.5 kB';
+  const totalSize = opts.totalSize ?? '2.1 MB';
+  const packageSize = opts.packageSize ?? '120.5 kB';
 
   const lines = ['npm notice === Tarball Contents ==='];
   for (const f of files) {
     lines.push(`npm notice 1.2kB  ${f}`);
   }
   lines.push('npm notice === Tarball Details ===');
+  lines.push(`npm notice package size: ${packageSize}`);
   lines.push(`npm notice unpacked size: ${totalSize}`);
   lines.push('npm notice total files:   ' + files.length);
   return lines.join('\n');
@@ -117,15 +120,15 @@ describe('validatePackContents', () => {
     expect(licenseCheck?.ok).toBe(false);
   });
 
-  it('passes when size is under 500KB', () => {
-    const output = buildPackOutput({ totalSize: '250.0 kB' });
+  it('passes when compressed size is under 500KB', () => {
+    const output = buildPackOutput({ packageSize: '250.0 kB' });
     const checks = validatePackContents(output);
     const sizeCheck = checks.find(c => c.name === 'pack size < 500KB');
     expect(sizeCheck?.ok).toBe(true);
   });
 
-  it('fails when size exceeds 500KB', () => {
-    const output = buildPackOutput({ totalSize: '2.5 MB' });
+  it('fails when compressed size exceeds 500KB', () => {
+    const output = buildPackOutput({ packageSize: '778.4 kB' });
     const checks = validatePackContents(output);
     const sizeCheck = checks.find(c => c.name === 'pack size < 500KB');
     expect(sizeCheck?.ok).toBe(false);

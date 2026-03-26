@@ -74,6 +74,7 @@ vi.mock('../../src/mcp/tools/job-runner.js', () => ({
   writeJobState: vi.fn(),
   readJobState: vi.fn(),
   readLatestJobState: vi.fn(),
+  buildTaskSummaries: vi.fn(() => []),
 }));
 
 vi.mock('../../src/core/provider.js', () => ({

@@ -598,8 +598,8 @@ globs: ["**/*"]
           providers: providers.map(p => ({
             name: p.name,
             available: p.available,
-            authMethod: (p as any).authMethod,
-            version: (p as any).version,
+            authMethod: p.authMethod,
+            version: p.version,
           })),
           stack: detectedAnalysis ? {
             language: detectedAnalysis.language,

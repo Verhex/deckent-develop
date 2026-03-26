@@ -90,6 +90,25 @@ export function registerStatusTool(server: McpServer): void {
       const latestJob = readLatestJobState(root);
 
       if (!existsSync(dashPath)) {
+        // Part C: when .tasks/ files are unavailable but job is COMPLETE with task data,
+        // surface completed sprint results from the job file
+        if (latestJob?.status === 'COMPLETE' && latestJob.tasks && latestJob.tasks.length > 0) {
+          const completedData = {
+            active: false,
+            completed: true,
+            message: `Sprint ${latestJob.sprintId ?? ''} completed.`,
+            sprintId: latestJob.sprintId,
+            completedAt: latestJob.completedAt,
+            job: latestJob,
+          };
+          const completedSummary = formatStatusResponse(completedData);
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify(wrapResponse(completedData, completedSummary)),
+            }],
+          };
+        }
         const noSprintData = { active: false, message: 'No active sprint.', job: latestJob };
         const summary = formatStatusResponse(noSprintData);
         return {
@@ -119,9 +138,15 @@ export function registerStatusTool(server: McpServer): void {
 
         const { agentAssignments, skillAssignments } = loadAgentSkillAssignments(root);
 
+        // Part B: when job is COMPLETE expose task summaries as top-level field
+        const completedTasks = latestJob?.status === 'COMPLETE' && latestJob.tasks?.length
+          ? latestJob.tasks
+          : undefined;
+
         const enrichedState = enrichResponse('status', {
           ...state,
           job: latestJob,
+          completedTasks,
           progressBar,
           eta,
           workerSummary,

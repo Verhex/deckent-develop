@@ -11,6 +11,8 @@ import {
   checkRequiredFiles,
   parseSizeToBytes,
   checkPackageSize,
+  checkMapFiles,
+  checkCompressedSize,
   runNpmPackDryRun,
   runPackTest,
 } from '../../scripts/pack-test.js';
@@ -45,10 +47,27 @@ describe('parsePackOutput', () => {
     expect(result.totalSize).toBe('123.4 kB');
   });
 
+  it('extracts compressed package size', () => {
+    const output = [
+      'npm notice package size: 493.7 kB',
+      'npm notice unpacked size: 2.1 MB',
+    ].join('\n');
+    const result = parsePackOutput(output);
+    expect(result.packageSize).toBe('493.7 kB');
+    expect(result.totalSize).toBe('2.1 MB');
+  });
+
+  it('returns empty strings for missing size fields', () => {
+    const result = parsePackOutput('npm notice 1.0kB dist/index.js\n');
+    expect(result.totalSize).toBe('');
+    expect(result.packageSize).toBe('');
+  });
+
   it('returns empty arrays for empty output', () => {
     const result = parsePackOutput('');
     expect(result.files).toEqual([]);
     expect(result.totalSize).toBe('');
+    expect(result.packageSize).toBe('');
   });
 });
 
@@ -159,6 +178,77 @@ describe('checkPackageSize', () => {
     const result = checkPackageSize('');
     expect(result.ok).toBe(true);
     expect(result.message).toContain('Could not determine');
+  });
+});
+
+describe('checkMapFiles', () => {
+  it('returns ok when no .map files present', () => {
+    const files = ['dist/index.js', 'dist/index.d.ts', 'dist/cli/entry.js', 'README.md'];
+    const result = checkMapFiles(files);
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('correctly excluded');
+  });
+
+  it('returns error when .js.map files are present', () => {
+    const files = ['dist/index.js', 'dist/index.js.map', 'dist/cli/entry.js'];
+    const result = checkMapFiles(files);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('MAP FILES FOUND');
+    expect(result.message).toContain('1 .map');
+  });
+
+  it('returns error when .d.ts.map files are present', () => {
+    const files = [
+      'dist/index.d.ts',
+      'dist/index.d.ts.map',
+      'dist/core/types.d.ts',
+      'dist/core/types.d.ts.map',
+    ];
+    const result = checkMapFiles(files);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('2 .map');
+  });
+
+  it('truncates long map file list in message', () => {
+    const files = [
+      'dist/a.js.map', 'dist/b.js.map', 'dist/c.js.map',
+      'dist/d.js.map', 'dist/e.js.map',
+    ];
+    const result = checkMapFiles(files);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('...');
+  });
+});
+
+describe('checkCompressedSize', () => {
+  it('returns ok when compressed size is under 500KB', () => {
+    const result = checkCompressedSize('493.7 kB');
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('under 500KB');
+  });
+
+  it('returns error when compressed size exceeds 500KB', () => {
+    const result = checkCompressedSize('778.4 kB');
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('exceeds 500KB');
+  });
+
+  it('returns ok for empty size string', () => {
+    const result = checkCompressedSize('');
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('Could not determine');
+  });
+
+  it('supports custom maxSizeKB threshold', () => {
+    const result = checkCompressedSize('300 kB', 250);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('exceeds 250KB');
+  });
+
+  it('returns ok when exactly at the threshold boundary', () => {
+    // 499 kB should pass
+    const result = checkCompressedSize('499 kB', 500);
+    expect(result.ok).toBe(true);
   });
 });
 

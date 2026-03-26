@@ -395,13 +395,15 @@ export function buildRetroLearnings(
 ): string[] {
   const items: string[] = [];
 
-  // NO_GO and tech debt tasks generate learnings
+  // NO_GO and tech debt tasks generate learnings — include worker notes when available
   for (const task of sprint.tasks) {
     const ev = evaluations.get(task.id);
+    const result = results?.find(r => r.taskId === task.id);
+    const notesSuffix = result?.notes ? ` — ${result.notes.slice(0, 150)}` : '';
     if (ev === TaskEvaluation.NO_GO) {
-      items.push(`${task.title}: failed — investigate root cause`);
+      items.push(`${task.title}: failed${notesSuffix || ' — investigate root cause'}`);
     } else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) {
-      items.push(`${task.title}: completed with tech debt — schedule cleanup`);
+      items.push(`${task.title}: completed with tech debt${notesSuffix || ' — schedule cleanup'}`);
     }
     if (items.length >= 10) break;
   }
@@ -604,17 +606,16 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
     lines.push(`| ${task.id}: ${task.title} | ${agentStr} | ${skillsStr} | ${statusStr} |`);
   }
 
-  // Add ## Errors section for NO_GO tasks that have result notes
-  const noGoTasksWithNotes = sprint.tasks.filter(task => {
-    const ev = evaluations?.get(task.id);
+  // Add ## Notes section for all tasks that have result notes
+  const tasksWithNotes = sprint.tasks.filter(task => {
     const result = results?.find(r => r.taskId === task.id);
-    return ev === TaskEvaluation.NO_GO && result?.notes;
+    return result?.notes;
   });
-  if (noGoTasksWithNotes.length > 0) {
-    lines.push('', '## Errors');
-    for (const task of noGoTasksWithNotes) {
+  if (tasksWithNotes.length > 0) {
+    lines.push('', '## Notes');
+    for (const task of tasksWithNotes) {
       const result = results?.find(r => r.taskId === task.id);
-      const notes = (result?.notes ?? '').slice(0, 200);
+      const notes = (result?.notes ?? '').slice(0, 150);
       lines.push(`- ${task.id} (${task.title}): ${notes}`);
     }
   }

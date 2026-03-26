@@ -1,18 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   isNoColor,
   stripAnsi,
   color,
-  formatHumanStatus,
   formatStandaloneStatus,
   estimateRemaining,
-  formatElapsed,
   formatAgentLabel,
   formatSkillsLabel,
   formatDoctorResult,
 } from '../../../src/cli/helpers/output.js';
-import { AgentStatus, SprintPhase, SprintStatus } from '../../../src/core/types.js';
-import type { DashboardState, Task } from '../../../src/core/types.js';
+import { AlertLevel, SprintPhase, SprintStatus, TaskStatus } from '../../../src/core/types.js';
+import type { DashboardState, Task, ModelType, TaskEffort, TaskPriority } from '../../../src/core/types.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -33,14 +31,14 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     id: '001',
     title: 'Test Task',
     description: '',
-    model: 'sonnet' as any,
-    effort: 'normal' as any,
-    priority: 'NORMAL' as any,
+    model: 'sonnet' as ModelType,
+    effort: 'normal' as TaskEffort,
+    priority: 'NORMAL' as TaskPriority,
     reason: '',
     scope: { directories: [], filesRead: [], filesWrite: [] },
     dependencies: [],
     goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
-    status: 'DONE' as any,
+    status: TaskStatus.DONE,
     sprintId: 'sprint-001',
     createdAt: new Date().toISOString(),
     ...overrides,
@@ -125,8 +123,8 @@ describe('NO_COLOR support', () => {
 describe('formatStandaloneStatus', () => {
   it('renders standalone status from tasks', () => {
     const tasks = [
-      makeTask({ id: '001', title: 'First', status: 'DONE' as any }),
-      makeTask({ id: '002', title: 'Second', status: 'EXECUTING' as any }),
+      makeTask({ id: '001', title: 'First', status: TaskStatus.DONE }),
+      makeTask({ id: '002', title: 'Second', status: TaskStatus.EXECUTING }),
     ];
     const result = formatStandaloneStatus(tasks, 'sprint-001');
     expect(result).toContain('standalone');
@@ -177,110 +175,5 @@ describe('estimateRemaining with weighted average', () => {
   });
 });
 
-// ─── Alert Detail (H) ──────────────────────────────────────────────
-
-describe('formatHumanStatus alert detail', () => {
-  it('shows alert messages in output', () => {
-    const dash = makeDashboard({
-      alerts: [
-        { level: 'WARNING' as any, message: 'stale heartbeat on w-001', timestamp: '' },
-        { level: 'CRITICAL' as any, message: 'boundary violation detected', timestamp: '' },
-      ],
-    });
-    const result = formatHumanStatus({ dashboard: dash, tasks: [] });
-    expect(result).toContain('Alerts (2)');
-    expect(result).toContain('stale heartbeat on w-001');
-    expect(result).toContain('boundary violation detected');
-    expect(result).toContain('[!]');
-    expect(result).toContain('[!!]');
-  });
-
-  it('truncates alerts after 10', () => {
-    const alerts = Array.from({ length: 15 }, (_, i) => ({
-      level: 'WARNING' as any,
-      message: `alert-${i}`,
-      timestamp: '',
-    }));
-    const dash = makeDashboard({ alerts });
-    const result = formatHumanStatus({ dashboard: dash, tasks: [] });
-    expect(result).toContain('Alerts (15)');
-    expect(result).toContain('alert-0');
-    expect(result).toContain('alert-9');
-    expect(result).not.toContain('alert-10');
-    expect(result).toContain('... and 5 more');
-  });
-});
-
-// ─── Budget Check (G) ──────────────────────────────────────────────
-
-describe('formatHumanStatus budget check', () => {
-  it('shows budget OK when under limit', () => {
-    vi.mock('../../../src/core/utils.js', () => ({
-      countBrainLines: vi.fn().mockReturnValue(100),
-    }));
-    const result = formatHumanStatus({
-      dashboard: makeDashboard(),
-      tasks: [],
-      projectRoot: '/test',
-    });
-    expect(result).toContain('Budget:');
-    expect(result).toContain('100/600');
-    expect(result).toContain('OK');
-  });
-});
-
-// ─── Stale Warning (J) ─────────────────────────────────────────────
-
-describe('formatHumanStatus stale warning', () => {
-  it('shows stale warning when dashboard is old', () => {
-    const oldTime = new Date(Date.now() - 120_000).toISOString(); // 2 min ago
-    const dash = makeDashboard({ updatedAt: oldTime });
-    const result = formatHumanStatus({
-      dashboard: dash,
-      tasks: [],
-      nowMs: Date.now(),
-    });
-    expect(result).toContain('Warning: Dashboard data is');
-    expect(result).toContain('may be stale');
-  });
-
-  it('does not show stale warning when dashboard is fresh', () => {
-    const recentTime = new Date().toISOString();
-    const dash = makeDashboard({ updatedAt: recentTime });
-    const result = formatHumanStatus({
-      dashboard: dash,
-      tasks: [],
-      nowMs: Date.now(),
-    });
-    expect(result).not.toContain('may be stale');
-  });
-});
-
-// ─── Verbose Mode ──────────────────────────────────────────────────
-
-describe('formatHumanStatus verbose', () => {
-  it('shows agent/skill assignments in verbose mode', () => {
-    const tasks = [
-      makeTask({ id: '001', title: 'T1', assignedAgent: 'test-agent', assignedSkills: ['skill-a'] }),
-      makeTask({ id: '002', title: 'T2' }),
-    ];
-    const result = formatHumanStatus({
-      dashboard: makeDashboard(),
-      tasks,
-      verbose: true,
-    });
-    expect(result).toContain('Agent/Skill Assignments');
-    expect(result).toContain('agent=test-agent');
-    expect(result).toContain('skills=skill-a');
-    expect(result).toContain('agent=generic');
-  });
-
-  it('does not show agent/skill in non-verbose mode', () => {
-    const tasks = [makeTask({ assignedAgent: 'test-agent' })];
-    const result = formatHumanStatus({
-      dashboard: makeDashboard(),
-      tasks,
-    });
-    expect(result).not.toContain('Agent/Skill Assignments');
-  });
-});
+// ─── Alert Detail, Budget Check, Stale Warning, Verbose Mode ──────
+// Covered by output.test.ts (formatHumanStatus — alert detail / budget check / stale dashboard warning)

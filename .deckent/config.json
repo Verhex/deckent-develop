@@ -3,7 +3,7 @@
   "language": "tr",
   "projectName": "deckent",
   "brain_planning": "structured",
-  "last_sprint_id": "sprint-065",
+  "last_sprint_id": "sprint-067",
   "spawn_backend": "tmux",
   "modes": {
     "max_plan": {
@@ -80,5 +80,7 @@
   "output_splash": true,
   "output_mode": "normal",
   "output_theme": "default",
-  "rollback_policy": "never"
+  "rollback_policy": "never",
+  "routing_engine": "v2",
+  "cleanup_delay_ms": 180000
 }

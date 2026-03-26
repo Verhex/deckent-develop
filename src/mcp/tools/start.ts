@@ -3,9 +3,15 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { runSprint, BrainError } from '../../orchestra/brain.js';
-import { writeJobState } from './job-runner.js';
+import { writeJobState, buildTaskSummaries } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
+
+function formatJobDuration(ms: number): string {
+  const mins = Math.floor(ms / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
 
 export function registerStartTool(server: McpServer): void {
   server.registerTool(
@@ -33,12 +39,23 @@ export function registerStartTool(server: McpServer): void {
 
         // Fire and forget — don't await. Sprint runs in background.
         runSprint(root, config, { autoApprove, connector: bootstrap?.connector }).then(sprint => {
+          const tasks = buildTaskSummaries(root, sprint.tasks);
+          const sm = sprint.metrics;
+          const metrics = sm ? {
+            totalTasks: sm.totalTasks,
+            done: sm.completedTasks,
+            techDebt: sm.techDebtTasks,
+            noGo: sm.noGoTasks,
+            duration: formatJobDuration(sm.durationMs),
+          } : undefined;
           writeJobState(root, {
             jobId,
             status: 'COMPLETE',
             startedAt,
             completedAt: new Date().toISOString(),
             sprintId: sprint.id,
+            tasks,
+            metrics,
           });
         }).catch(err => {
           const message = err instanceof BrainError

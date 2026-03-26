@@ -130,3 +130,9 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - Manifest v2 Batch Update — 20 Dosya: GO_WITH_TECH_DEBT — Tüm 9 agent.json ve 11 skill manifest.json dosyasına manifestVersion:2 ve activation kuralları eklendi. Kanıt: for loop 
 - MCP Dokumantasyon Tutarlilik — 16 Tool + 9 Resource: GO_WITH_TECH_DEBT — Updated all 12 documentation files: '10 tools' → '16 tools', '5 resources' → '9 resources'. README.md MCP Tools table ex
 - Housekeeping — gitignore + IDENTITY Sayilari: GO_WITH_TECH_DEBT — A) .gitignore: Added .deckent/usage/ line under .deckent section. Removed 33 tracked files from git index with git rm --
+## Sprint sprint-067 Learnings
+- Fix debt: Tech debt from 064-004-fix: Added 11 targeted tests to tests/cli/helpers/output.: GO_WITH_TECH_DEBT — Fixed debt-064-004-fix: (1) Replaced all `as never` casts in output.test.ts with AlertLevel enum (6 occurrences). (2) Re
+- npm Paket Boyutu Optimizasyonu — 768KB → <500KB: NO_GO
+- Retro Detay Zenginlestirme — Worker Notes Aktarimi: GO_WITH_TECH_DEBT — A) buildRetroLearnings() now includes result.notes (first 150 chars) for NO_GO/GO_WITH_TECH_DEBT tasks; falls back to ge
+- any Kullanimi Temizligi — 10 Adet, 7 Dosya: GO_WITH_TECH_DEBT — 5 dosyada 6 'as any' kullanımı temizlendi. spawn.ts ve task-builder.ts'deki eşleşmeler yorum satırı olduğu için dokunulm
+- V2 Routing Dogrulama — Audit + IDENTITY Guncelleme: GO_WITH_TECH_DEBT — A) Audit raporu güncellendi: tüm P1/P2/P3 maddelerine [DONE sprint-066] veya [DONE sprint-067] etiketi eklendi. grep -c 

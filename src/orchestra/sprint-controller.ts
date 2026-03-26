@@ -88,7 +88,7 @@ import type { WorkerChannel } from '../agents/worker-ipc.js';
 import { AgentPoolManager } from '../core/agent-pool.js';
 import { selectAgent } from '../core/agent-selector.js';
 import { routeTaskV2 } from '../core/routing-engine.js';
-import type { UserOverride } from '../core/routing-types.js';
+import type { UserOverride, TaskDNA } from '../core/routing-types.js';
 
 // ─── Rollback ─────────────────────────────────────────────────────
 import {
@@ -1059,6 +1059,16 @@ export function spawnWorkers(
       });
     }
 
+    // Update task status to EXECUTING and persist to disk
+    task.status = TaskStatus.EXECUTING;
+    try {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+        JSON.stringify(task, null, 2),
+        'utf-8',
+      );
+    } catch { /* non-fatal: task file may not exist in test/dry-run context */ }
+
     // Record spawn call in usage tracker
     if (spawnOpts?.usageTracker) {
       spawnOpts.usageTracker.recordCall(model, 5_000, task.id, sprint.id);
@@ -1633,7 +1643,7 @@ export async function finalizeSprint(
         tracker.recordOutcome({
           taskId: task.id,
           sprintId: sprint.id,
-          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as any,
+          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
           agentId: task.assignedAgent ?? null,
           skillIds: task.assignedSkills ?? [],
           evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',

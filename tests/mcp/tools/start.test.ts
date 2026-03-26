@@ -22,6 +22,7 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
 
 vi.mock('../../../src/mcp/tools/job-runner.js', () => ({
   writeJobState: vi.fn(),
+  buildTaskSummaries: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/core/provider.js', () => ({

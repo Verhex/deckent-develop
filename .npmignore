@@ -45,6 +45,13 @@ scripts/
 .env
 .env.*
 
+# Source maps and declaration maps (not needed in published package)
+dist/**/*.map
+
+# IDE extensions (distributed separately, not needed in npm package)
+dist/extensions/vscode/
+
 # Misc
 *.tgz
 .tmp-script-tests/
+*.tsbuildinfo

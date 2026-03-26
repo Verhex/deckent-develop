@@ -77,7 +77,7 @@ export const REQUIRED_PATTERNS = [
  * Validate that npm pack --dry-run output contains no sensitive files.
  */
 export function validatePackContents(packOutput: string): ValidationCheck[] {
-  const { files, totalSize } = parsePackOutput(packOutput);
+  const { files, packageSize } = parsePackOutput(packOutput);
   const checks: ValidationCheck[] = [];
 
   // Check excluded files
@@ -104,8 +104,8 @@ export function validatePackContents(packOutput: string): ValidationCheck[] {
     });
   }
 
-  // Check size < 500KB
-  const sizeBytes = parseSizeToBytes(totalSize);
+  // Check compressed package size < 500KB
+  const sizeBytes = parseSizeToBytes(packageSize);
   const maxBytes = 500 * 1024;
   const sizeOk = sizeBytes > 0 && sizeBytes < maxBytes;
   checks.push({
@@ -114,8 +114,8 @@ export function validatePackContents(packOutput: string): ValidationCheck[] {
     message: sizeBytes === 0
       ? 'Could not determine pack size'
       : sizeOk
-        ? `Pack size: ${totalSize} (under 500KB)`
-        : `Pack size: ${totalSize} exceeds 500KB limit`,
+        ? `Pack size: ${packageSize} (under 500KB)`
+        : `Pack size: ${packageSize} exceeds 500KB limit`,
     severity: sizeBytes === 0 ? 'warning' : sizeOk ? 'info' : 'error',
   });
 

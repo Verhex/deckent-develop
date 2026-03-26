@@ -44,6 +44,7 @@ export interface LearningsData {
   agentPerformance: Record<string, EntityPerformance>;
   skillPerformance: Record<string, EntityPerformance>;
   synergyMatrix: SynergyEntry[];
+  evolvedRules?: unknown[];
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -159,7 +160,7 @@ export class OutcomeTracker {
    * Save evolved rules to learnings data.
    */
   saveEvolvedRules(rules: unknown[]): void {
-    (this.learnings as any).evolvedRules = rules;
+    this.learnings.evolvedRules = rules;
     this.learnings.updatedAt = new Date().toISOString();
     this.saveLearnings();
   }

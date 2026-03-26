@@ -2199,3 +2199,40 @@ describe('waitForResults timeout', () => {
     expect(opts.timeoutMs).toBe(60_000);
   });
 });
+
+// ═══ Task 067-004: spawnWorkers sets task status to EXECUTING ════════
+
+describe('spawnWorkers — task status update to EXECUTING', () => {
+  const mockBackend = { name: 'test', spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedListWorkers.mockReturnValue([] as unknown as ReturnType<typeof listWorkers>);
+  });
+
+  it('updates task.status to EXECUTING after spawning via SpawnBackend', () => {
+    const task = makeTask({ id: '001-001', model: 'sonnet', status: TaskStatus.PENDING });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
+
+    expect(task.status).toBe(TaskStatus.EXECUTING);
+  });
+
+  it('writes task JSON with EXECUTING status to disk after spawn', () => {
+    const task = makeTask({ id: '001-001', model: 'sonnet', status: TaskStatus.PENDING });
+    const sprint = makeSprint({ tasks: [task] });
+    const config = makeConfig();
+
+    spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
+
+    const writeCalls = mockedWriteFileSync.mock.calls;
+    const taskWriteCall = writeCalls.find(call =>
+      typeof call[0] === 'string' && call[0].includes('task-001-001.json'),
+    );
+    expect(taskWriteCall).toBeDefined();
+    const written = JSON.parse(taskWriteCall![1] as string) as { status: string };
+    expect(written.status).toBe(TaskStatus.EXECUTING);
+  });
+});

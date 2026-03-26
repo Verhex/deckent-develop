@@ -11,7 +11,7 @@ import {
   formatHumanStatus,
 } from '../../../src/cli/helpers/output.js';
 import type { HumanStatusInput } from '../../../src/cli/helpers/output.js';
-import { AgentStatus, SprintPhase, SprintStatus } from '../../../src/core/types.js';
+import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from '../../../src/core/types.js';
 import type { DashboardState, DoctorResult, Sprint, AgentRole, Task } from '../../../src/core/types.js';
 import { countBrainLines } from '../../../src/core/utils.js';
 
@@ -232,7 +232,7 @@ describe('formatDashboard', () => {
 
   it('renders alert count', () => {
     const state = makeDashboard({ alerts: [
-      { level: 'WARNING' as never, message: 'test alert', timestamp: new Date().toISOString() }
+      { level: AlertLevel.WARNING, message: 'test alert', timestamp: new Date().toISOString() }
     ]});
     const result = formatDashboard(state);
     expect(result).toContain('Alerts: 1');
@@ -427,7 +427,7 @@ describe('formatSprintSummary', () => {
   });
 
   it('shows task count when no metrics', () => {
-    const sprint = makeSprint({ tasks: [{} as never, {} as never], metrics: undefined });
+    const sprint = makeSprint({ tasks: [{} as unknown as Task, {} as unknown as Task], metrics: undefined });
     const result = formatSprintSummary(sprint);
     expect(result).toContain('2 tasks');
   });
@@ -647,7 +647,7 @@ describe('formatHumanStatus — alert detail', () => {
   it('shows CRITICAL alert with [!!] prefix and message text', () => {
     const input = makeHumanStatusInput({
       dashboard: makeDashboard({
-        alerts: [{ level: 'CRITICAL' as never, message: 'critical issue detected', timestamp: new Date().toISOString() }],
+        alerts: [{ level: AlertLevel.CRITICAL, message: 'critical issue detected', timestamp: new Date().toISOString() }],
       }),
     });
     const result = formatHumanStatus(input);
@@ -658,7 +658,7 @@ describe('formatHumanStatus — alert detail', () => {
   it('shows WARNING alert with [!] prefix and message text', () => {
     const input = makeHumanStatusInput({
       dashboard: makeDashboard({
-        alerts: [{ level: 'WARNING' as never, message: 'stale heartbeat warning', timestamp: new Date().toISOString() }],
+        alerts: [{ level: AlertLevel.WARNING, message: 'stale heartbeat warning', timestamp: new Date().toISOString() }],
       }),
     });
     const result = formatHumanStatus(input);
@@ -669,7 +669,7 @@ describe('formatHumanStatus — alert detail', () => {
   it('shows INFO alert with [i] prefix and message text', () => {
     const input = makeHumanStatusInput({
       dashboard: makeDashboard({
-        alerts: [{ level: 'INFO' as never, message: 'sprint phase changed', timestamp: new Date().toISOString() }],
+        alerts: [{ level: AlertLevel.INFO, message: 'sprint phase changed', timestamp: new Date().toISOString() }],
       }),
     });
     const result = formatHumanStatus(input);
@@ -679,7 +679,7 @@ describe('formatHumanStatus — alert detail', () => {
 
   it('truncates alert list at 10 with overflow count message', () => {
     const alerts = Array.from({ length: 12 }, (_, i) => ({
-      level: 'WARNING' as never,
+      level: AlertLevel.WARNING,
       message: `alert-message-${i}`,
       timestamp: new Date().toISOString(),
     }));
@@ -692,7 +692,7 @@ describe('formatHumanStatus — alert detail', () => {
 
   it('shows all alert messages when 10 or fewer alerts', () => {
     const alerts = Array.from({ length: 3 }, (_, i) => ({
-      level: 'WARNING' as never,
+      level: AlertLevel.WARNING,
       message: `msg-${i}`,
       timestamp: new Date().toISOString(),
     }));
