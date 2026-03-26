@@ -79,7 +79,7 @@ describe('docs.yml build job', () => {
   });
 
   it('installs docs dependencies', () => {
-    expect(content).toContain('npm ci --prefix docs');
+    expect(content).toContain('npm install --prefix docs');
   });
 
   it('runs type check', () => {
@@ -87,7 +87,7 @@ describe('docs.yml build job', () => {
   });
 
   it('builds documentation', () => {
-    expect(content).toContain('npm run docs:build --prefix docs');
+    expect(content).toContain('vitepress build');
   });
 
   it('creates CNAME file for custom domain', () => {
