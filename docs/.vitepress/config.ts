@@ -21,13 +21,17 @@ export default defineConfig({
   // Dark/light theme
   appearance: 'auto',
 
-  // Exclude internal project files and technical docs with TypeScript/placeholder syntax from build
-  // These contain <N>, <T>, <Record>, <PENDING> etc. that VitePress Vue parser treats as components
+  // Exclude directories containing TypeScript generics, placeholder syntax (<N>, <T>, <Record>)
+  // that VitePress Vue compiler treats as unclosed HTML elements.
+  // Only guide/ and index.md are built as user-facing docs.
   srcExclude: [
     'directives/**',
     'analysis/**',
     'archive/**',
     'release/**',
+    'development/**',
+    'architecture/**',
+    'reference/**',
     'SPRINT-LOG.md',
     'CHANGELOG.md',
   ],

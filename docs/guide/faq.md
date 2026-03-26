@@ -106,7 +106,7 @@ deckent session (main tmux session)
 1. **Process Isolation** — Each worker runs in a separate shell session with its own environment and working directory
 2. **Parallel Execution** — Multiple workers run simultaneously without blocking each other
 3. **Live Monitoring** — You can attach to the session with `deckent attach` and see all agents working in real-time
-4. **Independent Cleanup** — Killing a worker (via `deckent kill <id>`) doesn't affect others
+4. **Independent Cleanup** — Killing a worker (via `deckent kill {id}`) doesn't affect others
 5. **Session Persistence** — If your terminal closes, the tmux session continues running; reconnect with `deckent attach`
 
 ### Installation
@@ -227,7 +227,7 @@ Yes, with caveats:
 
 ```bash
 deckent pause       # Pause the current sprint (workers continue briefly)
-deckent kill <id>   # Kill a specific worker immediately
+deckent kill {id}   # Kill a specific worker immediately
 deckent cleanup     # End the sprint and clean up (archive files)
 ```
 
@@ -330,7 +330,7 @@ To share your plugin with others:
 1. Create a git repository: `my-deckent-plugin`
 2. Push to GitHub (or another public repo)
 3. Document in README.md
-4. Others install with: `deckent plugin install <repo-url>`
+4. Others install with: `deckent plugin install {repo-url}`
 
 ---
 

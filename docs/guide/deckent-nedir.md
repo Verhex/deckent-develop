@@ -96,23 +96,23 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 | `deckent plan` | src/cli/commands/plan.ts | `--no-confirm`, `--structured` | Tam | Sprint planla (çalıştırma), görev tablosu göster, onay iste |
 | `deckent start` | src/cli/commands/start.ts | `--auto-approve`, `--dry-run`, `--force`, `--watch`, `--sandbox-mode` | Tam | Sprint başlat: plan → spawn → çalıştır. `--dry-run` spawn atlar, `--sandbox-mode` stub |
 | `deckent status` | src/cli/commands/status.ts | `--watch`, `--json` | Tam | Dashboard durumu göster. `--watch` 2s yenileme, `--json` ham JSON |
-| `deckent test` | src/cli/commands/test-run.ts | `--keep`, `--timeout <ms>` | Tam | Test sprint'i: retro/memory/decay atlanır. `--keep` cleanup atlar |
+| `deckent test` | src/cli/commands/test-run.ts | `--keep`, `--timeout {ms}` | Tam | Test sprint'i: retro/memory/decay atlanır. `--keep` cleanup atlar |
 
 ### Worker & Süreç Yönetimi (4 komut)
 
 | Komut | Dosya | Flag'ler | Durum | Açıklama |
 |-------|-------|----------|-------|----------|
-| `deckent spawn <taskId>` | src/cli/commands/spawn.ts | — | Tam | Tek bir görev için worker spawn et |
-| `deckent kill <taskId>` | src/cli/commands/kill.ts | — | Tam | Çalışan worker'ı sonlandır (tmux kill-window) |
+| `deckent spawn {taskId}` | src/cli/commands/spawn.ts | — | Tam | Tek bir görev için worker spawn et |
+| `deckent kill {taskId}` | src/cli/commands/kill.ts | — | Tam | Çalışan worker'ı sonlandır (tmux kill-window) |
 | `deckent attach` | src/cli/commands/attach.ts | — | Tam | tmux orkestra oturumuna bağlan |
-| `deckent run <description>` | src/cli/commands/run.ts | `--model`, `--scope <dir>` | Tam | Tek seferlik görev: sprint döngüsü olmadan çalıştır (5dk timeout) |
+| `deckent run {description}` | src/cli/commands/run.ts | `--model`, `--scope {dir}` | Tam | Tek seferlik görev: sprint döngüsü olmadan çalıştır (5dk timeout) |
 
 ### İzleme & Dashboard (3 komut)
 
 | Komut | Dosya | Flag'ler | Durum | Açıklama |
 |-------|-------|----------|-------|----------|
-| `deckent dashboard` | src/cli/commands/dashboard.ts | `--interval <ms>` | Tam | Terminal dashboard: worker'lar, progress bar, alert'ler, Unicode border |
-| `deckent watch` | src/cli/commands/watch.ts | `--follow <taskId>` | Tam | tmux split view: dashboard + worker pane'leri |
+| `deckent dashboard` | src/cli/commands/dashboard.ts | `--interval {ms}` | Tam | Terminal dashboard: worker'lar, progress bar, alert'ler, Unicode border |
+| `deckent watch` | src/cli/commands/watch.ts | `--follow {taskId}` | Tam | tmux split view: dashboard + worker pane'leri |
 | `deckent doctor` | src/cli/commands/doctor.ts | `--profile` | Tam | Sistem sağlığı: 10 kontrol (Node, git, tmux, Claude CLI, workspace, brain, debt, lock). `--profile` CPU/RAM/worker önerisi |
 
 ### Analiz & Geçmiş (3 komut)
@@ -136,7 +136,7 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 
 | Komut | Dosya | Flag'ler | Durum | Açıklama |
 |-------|-------|----------|-------|----------|
-| `deckent serve` | src/cli/commands/serve.ts | `--port <number>` | Tam | HTTP API sunucusu başlat (varsayılan port 3100, SSE desteği) |
+| `deckent serve` | src/cli/commands/serve.ts | `--port {number}` | Tam | HTTP API sunucusu başlat (varsayılan port 3100, SSE desteği) |
 | `deckent web` | src/cli/commands/web.ts | `--port`, `--dev` | Tam | Web dashboard başlat (frontend + backend). `--dev` Vite dev server |
 
 ### Plugin Sistemi (1 komut, 4 alt komut)
@@ -144,9 +144,9 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 | Komut | Dosya | Flag'ler | Durum | Açıklama |
 |-------|-------|----------|-------|----------|
 | `deckent plugin list` | src/cli/commands/plugin.ts | — | Tam | Yüklü plugin'leri listele |
-| `deckent plugin info <dir>` | src/cli/commands/plugin.ts | — | Tam | Plugin detayları göster |
-| `deckent plugin create <name>` | src/cli/commands/plugin.ts | — | Tam | Plugin scaffold oluştur (manifest.json, SKILL.md, README.md) |
-| `deckent plugin install <name>` | src/cli/commands/plugin.ts | — | **Stub** | Henüz uygulanmadı |
+| `deckent plugin info {dir}` | src/cli/commands/plugin.ts | — | Tam | Plugin detayları göster |
+| `deckent plugin create {name}` | src/cli/commands/plugin.ts | — | Tam | Plugin scaffold oluştur (manifest.json, SKILL.md, README.md) |
+| `deckent plugin install {name}` | src/cli/commands/plugin.ts | — | **Stub** | Henüz uygulanmadı |
 
 ### Stub Komutlar (1 komut)
 
@@ -238,7 +238,7 @@ tr/en lokalizasyon destekli.
 | `POST /api/plan` | `{directive?, mode?}` | Sprint plan objesi | Sprint planla |
 | `POST /api/kill/:workerId` | — | `{success: true}` | Worker sonlandır |
 | `POST /api/set-directives` | `{content: string}` | `{success, taskCount}` | DIRECTIVES.md güncelle |
-| `POST /api/config` | `Record<string, unknown>` | Güncel config | Config güncelle (merge) |
+| `POST /api/config` | `Record{string, unknown}` | Güncel config | Config güncelle (merge) |
 
 ### HTTP Durum Kodları
 
@@ -285,7 +285,7 @@ tr/en lokalizasyon destekli.
 | Hook | İşlev |
 |------|-------|
 | `useSSE(url)` | EventSource bağlantısı, 3s otomatik yeniden bağlanma |
-| `useApi<T>(url)` | Fetch + loading/error/refetch state yönetimi |
+| `useApi{T}(url)` | Fetch + loading/error/refetch state yönetimi |
 
 ### SSE Akışı
 
