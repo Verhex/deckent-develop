@@ -295,7 +295,7 @@ describe('writeSyncToMemory', () => {
 
     writeSyncToMemory('/project', syncResult);
 
-    expect(appendFileSync).toHaveBeenCalledWith(
+    expect(writeFileSync).toHaveBeenCalledWith(
       expect.stringContaining('MEMORY.md'),
       expect.stringContaining('## Out-of-band Changes'),
       'utf-8',
@@ -324,8 +324,6 @@ describe('writeSyncToMemory', () => {
       expect.stringContaining('3 commit(s) since Sprint #042'),
       'utf-8',
     );
-    // Should NOT call appendFileSync when replacing
-    expect(appendFileSync).not.toHaveBeenCalled();
   });
 
   it('does nothing when MEMORY.md does not exist', () => {

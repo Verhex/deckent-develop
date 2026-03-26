@@ -1858,7 +1858,7 @@ describe('human-friendly init output', () => {
       vi.mocked(existsSync).mockImplementation((p) => String(p).includes('AGENTS.md'));
       await runCommand(['init', '--auto', '--env', 'codex']);
       const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
-      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--upgrade'));
+      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--force'));
       expect(hasWarning).toBe(true);
     });
 
@@ -1867,7 +1867,7 @@ describe('human-friendly init output', () => {
       vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ mode: 'pro_plan' }));
       await runCommand(['init', '--auto', '--env', 'codex', '--upgrade']);
       const printCalls = vi.mocked(print).mock.calls.map(c => String(c[0]));
-      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--upgrade'));
+      const hasWarning = printCalls.some(msg => msg.includes('already exists') && msg.includes('--force'));
       expect(hasWarning).toBe(false);
     });
   });

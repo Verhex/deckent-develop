@@ -544,7 +544,7 @@ describe('skill install — git URL', () => {
     expect(spawnSync).toHaveBeenCalledWith(
       'git',
       expect.arrayContaining(['clone']),
-      expect.objectContaining({ timeout: 30_000 }),
+      expect.objectContaining({ timeout: 60_000 }),
     );
     expect(cpSync).toHaveBeenCalled();
     expect(print).toHaveBeenCalledWith(expect.stringContaining('installed from git'));
