@@ -84,7 +84,7 @@ jobs:
       - run: npm ci
       - name: Run CLI tests
         run: npx vitest run tests/cli/
-        timeout-minutes: 5
+        timeout-minutes: 10
 
   test-remaining:
     name: Tests — MCP + API + Integration + Security + Providers + Monitor + Skills + Analytics

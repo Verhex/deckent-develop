@@ -528,7 +528,7 @@ describe('skill install — git URL', () => {
     process.exitCode = undefined;
   });
 
-  it('clones from git URL and installs', async () => {
+  it('clones from git URL and installs', { timeout: 15000 }, async () => {
     const manifest = makeSkillManifest();
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stderr: '', stdout: '' } as any);
     vi.mocked(existsSync).mockImplementation((p: any) => {

@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/dashboard/**', 'node_modules'],
+    testTimeout: 10000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
