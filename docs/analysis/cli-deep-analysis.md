@@ -1773,5 +1773,7 @@ Thin wrapper — tüm iş `src/core/plugin.ts`'e delegate:
 | Sprint 055'te çözülen | 16 öneri (2 P0 bug, DRY, fonksiyonel, CRUD/flag) |
 | Sprint 056'te çözülen | 15 öneri (init 6, plan 3, start 4, status 2) |
 | Sprint 057'te çözülen | 80 öneri (usage 8, serve 8, attach/watch 6, dashboard 4, review 5, finalize 4, agent 6, skill 7, plugin 3, archive 3, config 3, history 1, upgrade 5, sync 5, onboard 4, run 5, test 4, web 3, explain 4, marketplace 2, retro 3, doctor 4, cleanup 4) |
-| **Toplam çözülen (055-057)** | **111 öneri** |
-| **Kalan açık** | **~79 öneri** |
+| Sprint 058-059'te çözülen | 48 öneri (MCP 10 tool+resource, multi-provider spawn/kill/run, prompt engine agent/skill fix, sync Gemini/Cursor, doc updater, format tutarlılık) |
+| Sprint 061'de çözülen | 10 öneri (agent activation persistence, stats update, plan provider bootstrap, brain decay, MCP debt cleanup, framework detection, CLI polish) |
+| **Toplam çözülen (055-061)** | **~169 öneri** |
+| **Kalan açık** | **~21 öneri** (çoğu P3 kozmetik veya mimari seviye — multi-provider attach, sandbox Docker, monorepo support) |
