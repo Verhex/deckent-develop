@@ -21,12 +21,30 @@ export default defineConfig({
   // Dark/light theme
   appearance: 'auto',
 
-  // Exclude non-documentation directories from build
-  srcExclude: ['directives/**', 'analysis/**', 'archive/**', 'release/**'],
+  // Exclude internal project files and technical docs with TypeScript/placeholder syntax from build
+  // These contain <N>, <T>, <Record>, <PENDING> etc. that VitePress Vue parser treats as components
+  srcExclude: [
+    'directives/**',
+    'analysis/**',
+    'archive/**',
+    'release/**',
+    'SPRINT-LOG.md',
+    'CHANGELOG.md',
+  ],
 
   // Markdown config
   markdown: {
     lineNumbers: true,
+  },
+
+  // Disable Vue component resolution for custom HTML-like tags in markdown
+  // Prevents <N>, <ISO>, <DRAFT>, <Record>, etc. from being treated as Vue components
+  vue: {
+    template: {
+      compilerOptions: {
+        isCustomElement: (tag: string) => /^[A-Z]/.test(tag),
+      },
+    },
   },
 
   // Theme config

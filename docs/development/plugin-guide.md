@@ -194,8 +194,8 @@ Describe the expected output structure:
 
 ```
 Result Summary:
-  Items processed: <N>
-  Status: <OK | ERROR>
+  Items processed: `<N>`
+  Status: `<OK | ERROR>`
   Details: <description>
 ```
 
@@ -602,16 +602,16 @@ Check for outdated npm dependencies and report findings. Do not update packages 
 
 ```
 Dependency Check Results:
-  Total packages checked: <N>
-  Up to date: <N>
-  Outdated: <N>
+  Total packages checked: `<N>`
+  Up to date: `<N>`
+  Outdated: `<N>`
 
 Outdated Packages:
   [HIGH - Major] <package>: <current> → <latest>
   [LOW - Minor]  <package>: <current> → <latest>
   [LOW - Patch]  <package>: <current> → <latest>
 
-Recommendation: <UP_TO_DATE | UPDATES_AVAILABLE | ACTION_REQUIRED>
+Recommendation: `<UP_TO_DATE | UPDATES_AVAILABLE | ACTION_REQUIRED>`
 Notes: <any relevant context>
 ```
 
