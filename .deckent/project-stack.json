@@ -1,6 +1,6 @@
 {
   "language": "typescript",
-  "framework": "unknown",
+  "framework": "react",
   "dependencies": [
     "@modelcontextprotocol/sdk",
     "commander",
@@ -11,9 +11,34 @@
     "@vitest/coverage-v8",
     "happy-dom",
     "typescript",
-    "vitest"
+    "vitest",
+    "vitepress",
+    "tsx",
+    "deckent",
+    "react",
+    "react-dom",
+    "react-router-dom",
+    "recharts",
+    "lucide-react",
+    "class-variance-authority",
+    "clsx",
+    "tailwind-merge",
+    "@types/react",
+    "@types/react-dom",
+    "vite",
+    "@vitejs/plugin-react",
+    "tailwindcss",
+    "@tailwindcss/vite"
   ],
-  "buildTool": "tsc",
+  "buildTool": "vite",
   "testFramework": "vitest",
-  "detectedAt": "2026-03-26T06:32:33.426Z"
+  "detectedAt": "2026-03-26T12:45:43.295Z",
+  "detectedLanguages": [
+    "typescript"
+  ],
+  "subProjects": [
+    "docs",
+    "examples/quickstart",
+    "src/dashboard"
+  ]
 }

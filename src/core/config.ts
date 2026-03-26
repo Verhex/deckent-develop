@@ -10,6 +10,7 @@ import {
   SUPPORTED_LANGUAGES,
 } from './constants.js';
 import { readJsonSafeAsync } from './utils.js';
+import { needsMigration, migrateConfig } from './config-migration.js';
 import type {
   AutoDocsConfig,
   DeckentConfig,
@@ -181,11 +182,11 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
 
     if (!(VALID_MODELS as readonly string[]).includes(mc.brain_model)) {
-      errors.push(`${prefix}.brain_model must be one of: ${VALID_MODELS.join(', ')}`);
+      errors.push(`Invalid value '${mc.brain_model}' for field '${prefix}.brain_model'. Valid: ${VALID_MODELS.join(', ')}`);
     }
 
     if (!(VALID_MODELS as readonly string[]).includes(mc.default_model)) {
-      errors.push(`${prefix}.default_model must be one of: ${VALID_MODELS.join(', ')}`);
+      errors.push(`Invalid value '${mc.default_model}' for field '${prefix}.default_model'. Valid: ${VALID_MODELS.join(', ')}`);
     }
 
     if (typeof mc.haiku_allowed !== 'boolean') {
@@ -204,7 +205,7 @@ export function validateConfig(config: DeckentConfig): string[] {
 
     if (mc.brain_planning !== undefined &&
         !(VALID_BRAIN_PLANNING as readonly string[]).includes(mc.brain_planning)) {
-      errors.push(`${prefix}.brain_planning must be one of: ${VALID_BRAIN_PLANNING.join(', ')}`);
+      errors.push(`Invalid value '${mc.brain_planning}' for field '${prefix}.brain_planning'. Valid: ${VALID_BRAIN_PLANNING.join(', ')}`);
     }
 
     if (modeName === 'api' && mc.budget_per_sprint !== undefined) {
@@ -249,17 +250,17 @@ export function validateConfig(config: DeckentConfig): string[] {
   // ─── Provider config validation ─────────────────────────────────────
   if (config.brain_provider !== undefined &&
       !(VALID_PROVIDERS as readonly string[]).includes(config.brain_provider)) {
-    errors.push(`Invalid brain_provider "${config.brain_provider}". Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+    errors.push(`Invalid value '${config.brain_provider}' for field 'brain_provider'. Valid: ${VALID_PROVIDERS.join(', ')}`);
   }
 
   if (config.worker_provider !== undefined &&
       !(VALID_PROVIDERS as readonly string[]).includes(config.worker_provider)) {
-    errors.push(`Invalid worker_provider "${config.worker_provider}". Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+    errors.push(`Invalid value '${config.worker_provider}' for field 'worker_provider'. Valid: ${VALID_PROVIDERS.join(', ')}`);
   }
 
   if (config.fallback_provider !== undefined &&
       !(VALID_PROVIDERS as readonly string[]).includes(config.fallback_provider)) {
-    errors.push(`Invalid fallback_provider "${config.fallback_provider}". Must be one of: ${VALID_PROVIDERS.join(', ')}`);
+    errors.push(`Invalid value '${config.fallback_provider}' for field 'fallback_provider'. Valid: ${VALID_PROVIDERS.join(', ')}`);
   }
 
   if (config.provider_overrides !== undefined) {
@@ -337,7 +338,7 @@ export function validateConfig(config: DeckentConfig): string[] {
   if (config.rollback_policy !== undefined) {
     const validPolicies = ['never', 'on_failure', 'always'] as const;
     if (!(validPolicies as readonly string[]).includes(config.rollback_policy)) {
-      errors.push(`Invalid rollback_policy "${config.rollback_policy}". Must be one of: ${validPolicies.join(', ')}`);
+      errors.push(`Invalid value '${config.rollback_policy}' for field 'rollback_policy'. Valid: ${validPolicies.join(', ')}`);
     }
   }
 
@@ -467,6 +468,15 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   const projectConfig = await readJsonFile<Partial<DeckentConfig>>(projectConfigPath);
   if (projectConfig) {
     config = deepMerge(config, projectConfig);
+
+    // Auto-migrate: if the project config file is missing fields, update it on disk (non-fatal)
+    if (existsSync(projectConfigPath) && needsMigration(projectConfig as Record<string, unknown>)) {
+      try {
+        migrateConfig(projectConfigPath);
+      } catch {
+        // Non-fatal: migration failure should not block config load
+      }
+    }
   }
 
   // Resolve alias before validation so 'performance' → 'max_plan' etc.

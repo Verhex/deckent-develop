@@ -122,9 +122,10 @@ export function parseSprintLog(content: string): SprintSummary {
 
 /**
  * Parse the learnings section from RETRO.md.
- * Extracts items under the "## Learnings" heading, max 3 items.
+ * Extracts items under the "## Learnings" heading.
+ * @param maxItems - Maximum items to return (default 3, pass Infinity for all)
  */
-export function parseRetroLearnings(content: string): RetroLearnings {
+export function parseRetroLearnings(content: string, maxItems = 3): RetroLearnings {
   const result: RetroLearnings = { items: [] };
 
   // (F) Tolerant: allow extra whitespace around "Learnings" heading
@@ -137,7 +138,7 @@ export function parseRetroLearnings(content: string): RetroLearnings {
     .filter((l) => l.startsWith('- '))
     .map((l) => l.replace(/^- /, ''));
 
-  result.items = lines.slice(0, 3);
+  result.items = maxItems === Infinity ? lines : lines.slice(0, maxItems);
   return result;
 }
 
@@ -191,6 +192,8 @@ const EXPLAIN_LABELS: Record<string, Record<string, string>> = {
   tasksDebt: { en: 'tasks completed with tech debt', tr: 'görev teknik borçla tamamlandı' },
   duration: { en: 'Duration', tr: 'Süre' },
   keyLearnings: { en: 'Key learnings:', tr: 'Temel öğrenmeler:' },
+  allLearnings: { en: 'All learnings:', tr: 'Tüm öğrenmeler:' },
+  taskDetails: { en: 'Task details:', tr: 'Görev detayları:' },
   next: {
     en: 'Next: Run `deckent start` to continue, or `deckent plan` to see next sprint',
     tr: 'Sonraki: Devam etmek için `deckent start`, planlamak için `deckent plan` çalıştırın',
@@ -206,8 +209,9 @@ function label(key: string, lang: string): string {
 
 /**
  * Build the human-readable explain output string.
+ * J) When verbose=true, shows ALL learnings and task details.
  */
-export function buildExplainOutput(summary: SprintSummary, learnings: RetroLearnings, lang = 'en'): string {
+export function buildExplainOutput(summary: SprintSummary, learnings: RetroLearnings, lang = 'en', verbose = false): string {
   const lines: string[] = [];
 
   lines.push(`Sprint #${summary.sprintNumber} ${label('summary', lang)}`);
@@ -228,9 +232,19 @@ export function buildExplainOutput(summary: SprintSummary, learnings: RetroLearn
 
   if (learnings.items.length > 0) {
     lines.push('');
-    lines.push(label('keyLearnings', lang));
+    // J) verbose: show "All learnings:" with all items; default: "Key learnings:" with max 3
+    lines.push(verbose ? label('allLearnings', lang) : label('keyLearnings', lang));
     for (const item of learnings.items) {
       lines.push(`  \u2022 ${item}`);
+    }
+  }
+
+  // J) verbose: show task details
+  if (verbose && summary.tasks.length > 0) {
+    lines.push('');
+    lines.push(label('taskDetails', lang));
+    for (const task of summary.tasks) {
+      lines.push(`  \u2022 ${task}`);
     }
   }
 
@@ -250,7 +264,8 @@ export function registerExplain(program: Command): void {
     .description('Explain what the last sprint did in human-friendly language')
     .option('--sprint <id>', 'Show a specific sprint by ID (e.g. 042)')
     .option('--json', 'Output results as JSON')
-    .action((opts: { sprint?: string; json?: boolean }) => {
+    .option('--verbose', 'Show all learnings and full task details (default shows max 3 learnings)')
+    .action((opts: { sprint?: string; json?: boolean; verbose?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
 
@@ -295,13 +310,16 @@ export function registerExplain(program: Command): void {
         }
       }
 
+      const verbose = opts.verbose ?? false;
+
       // Read RETRO.md for learnings
+      // J) verbose: load ALL learnings (no limit); default: max 3
       let learnings: RetroLearnings = { items: [] };
       const retroPath = join(root, '.brain', 'RETRO.md');
       if (existsSync(retroPath)) {
         try {
           const retroContent = readFileSync(retroPath, 'utf-8');
-          learnings = parseRetroLearnings(retroContent);
+          learnings = parseRetroLearnings(retroContent, verbose ? Infinity : 3);
         } catch {
           // skip learnings if unreadable
         }
@@ -319,11 +337,13 @@ export function registerExplain(program: Command): void {
             durationMs: summary.durationMs,
           },
           learnings: learnings.items,
+          // J) include tasks when verbose mode used in JSON output
+          ...(verbose ? { tasks: summary.tasks } : {}),
         };
         print(JSON.stringify(output, null, 2));
         return;
       }
 
-      print(buildExplainOutput(summary, learnings, lang));
+      print(buildExplainOutput(summary, learnings, lang, verbose));
     });
 }

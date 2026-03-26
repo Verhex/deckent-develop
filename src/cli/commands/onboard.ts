@@ -24,6 +24,32 @@ export function detectClaudeCli(): { available: boolean; version: string } {
   return { available: false, version: '' };
 }
 
+export interface ProviderStatus {
+  codex: { available: boolean; reason: string };
+  gemini: { available: boolean; reason: string };
+}
+
+/**
+ * Detect whether Codex (OpenAI) and Gemini providers are available.
+ * Codex: OPENAI_API_KEY env var present.
+ * Gemini: GOOGLE_API_KEY env var present.
+ */
+export function detectProviders(): ProviderStatus {
+  const openaiKey = process.env['OPENAI_API_KEY'];
+  const googleKey = process.env['GOOGLE_API_KEY'];
+
+  return {
+    codex: {
+      available: !!openaiKey,
+      reason: openaiKey ? 'OPENAI_API_KEY detected' : 'OPENAI_API_KEY not set',
+    },
+    gemini: {
+      available: !!googleKey,
+      reason: googleKey ? 'GOOGLE_API_KEY detected' : 'GOOGLE_API_KEY not set',
+    },
+  };
+}
+
 export function detectProjectInfo(root: string): {
   name: string;
   hasPackageJson: boolean;
@@ -120,13 +146,19 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean;
     print('Claude CLI: not found — install with: npm install -g @anthropic-ai/claude-code');
   }
 
-  // 3. System profile
+  // 3. Provider detection
+  const providers = detectProviders();
+  print(`Codex (OpenAI): ${providers.codex.available ? 'available' : 'not available'} — ${providers.codex.reason}`);
+  print(`Gemini (Google): ${providers.gemini.available ? 'available' : 'not available'} — ${providers.gemini.reason}`);
+  print('');
+
+  // 4. System profile
   const profile = getSystemProfile();
   print(`System: ${profile.cpuCores} CPU cores, ${(profile.totalMemMB / 1024).toFixed(1)} GB RAM`);
   print(`Recommended workers: ${profile.recommendedMaxWorkers}`);
   print('');
 
-  // 4. Project analysis (richer stack detection)
+  // 5. Project analysis (richer stack detection)
   const project = detectProjectInfo(root);
   print(`Project: ${project.name}`);
   print(`Language: ${project.language}`);
@@ -136,7 +168,7 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean;
   print(`tsconfig.json: ${project.hasTsConfig ? 'found' : 'not found'}`);
   print('');
 
-  // 5. Already initialized check
+  // 6. Already initialized check
   const alreadyInitialized = existsSync(join(root, DECKENT_DIR));
   if (alreadyInitialized && !opts.force) {
     print('Workspace: .deckent/ already exists (use --force to re-run onboarding)');
@@ -144,11 +176,11 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean;
     print('Workspace: .deckent/ already exists — force re-init requested');
   }
 
-  // 6. Wizard steps
+  // 7. Wizard steps
   const steps = buildOnboardSteps(project.name);
   const answers = await runWizard(steps, { nonInteractive: opts.nonInteractive });
 
-  // 7. Run deckent init if requested, passing language and mode as args
+  // 8. Run deckent init if requested, passing language and mode as args
   const shouldInit = answers['runInit'] === true && (!alreadyInitialized || opts.force);
   if (shouldInit) {
     const language = String(answers['language'] ?? 'en');
@@ -177,7 +209,7 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean;
     print('Skipped init: workspace already exists.');
   }
 
-  // 8. Ready message
+  // 9. Ready message
   print('');
   print('Ready! Next steps:');
   print('  1. Edit DIRECTIVES.md with your sprint goals');

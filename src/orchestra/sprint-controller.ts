@@ -403,13 +403,14 @@ export function resolveDefaultUsageCli(): string | undefined {
  * @returns Current usage metrics with percentage values
  */
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
-  const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
+  // status: 'unknown' indicates measurement failed — callers should skip throttling
+  const UNKNOWN_DEFAULT = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now(), status: 'unknown' as const };
   try {
     // Determine CLI binary from provider registry; skip usage check if none available
     const cliBinary = resolveDefaultUsageCli();
-    if (!cliBinary) return SAFE_DEFAULT;
+    if (!cliBinary) return UNKNOWN_DEFAULT;
     const result = spawnSync(cliBinary, ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000 });
-    if (result.status !== 0 || !result.stdout) return SAFE_DEFAULT;
+    if (result.status !== 0 || !result.stdout) return UNKNOWN_DEFAULT;
 
     const output = result.stdout;
     const fiveHrMatch = output.match(/5[- ]?h(?:r|our(?:ly)?)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
@@ -417,11 +418,13 @@ export function checkUsage(_config: ResolvedConfig): UsageMetrics {
     const weeklyMatch = output.match(/week(?:ly)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
       ?? output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*week/i);
 
-    const fiveHourPercent = fiveHrMatch?.[1] ? parseFloat(fiveHrMatch[1]) : SAFE_DEFAULT.fiveHourPercent;
-    const weeklyPercent = weeklyMatch?.[1] ? parseFloat(weeklyMatch[1]) : SAFE_DEFAULT.weeklyPercent;
-    return { fiveHourPercent, weeklyPercent, measuredAt: now() };
+    const fiveHourPercent = fiveHrMatch?.[1] ? parseFloat(fiveHrMatch[1]) : UNKNOWN_DEFAULT.fiveHourPercent;
+    const weeklyPercent = weeklyMatch?.[1] ? parseFloat(weeklyMatch[1]) : UNKNOWN_DEFAULT.weeklyPercent;
+    // status: 'ok' indicates successful measurement — throttling should apply normally
+    const okResult = { fiveHourPercent, weeklyPercent, measuredAt: now(), status: 'ok' as const };
+    return okResult;
   } catch {
-    return SAFE_DEFAULT;
+    return UNKNOWN_DEFAULT;
   }
 }
 
@@ -456,6 +459,18 @@ export function getDefaultProvider(): ProviderAdapter | null {
  * @returns Sprint size recommendation with worker count and model constraint
  */
 export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics, systemProfile?: SystemProfile): SprintSizeRecommendation {
+  // Skip throttling when usage measurement failed (status unknown)
+  const usageStatus = (usage as unknown as Record<string, unknown>).status;
+  if (usageStatus === 'unknown') {
+    const fullWorkers = resolveMaxWorkersNumeric(config, systemProfile);
+    return {
+      size: 'full',
+      maxWorkers: fullWorkers,
+      modelConstraint: null,
+      reason: 'Usage status unknown — skipping throttling',
+    };
+  }
+
   const thresholds = config.activeModeConfig.usage_thresholds;
   const fiveHrExceeded = usage.fiveHourPercent / 100 >= thresholds['5hr'];
   const weeklyExceeded = usage.weeklyPercent / 100 >= thresholds.weekly;
@@ -580,6 +595,13 @@ export async function planSprint(
         );
         plannerResult = null;
         usedMode = 'fallback';
+      } else if (planMode === 'auto' && directiveTaskCount > 0 && plannerResult.tasks.length > directiveTaskCount * 2) {
+        console.error(
+          `[Brain] AI planner returned ${plannerResult.tasks.length} tasks (>2x of ${directiveTaskCount}). ` +
+          `Falling back to structured mode.`,
+        );
+        plannerResult = null;
+        usedMode = 'fallback';
       } else {
         usedMode = 'ai';
         for (const pt of plannerResult.tasks) {
@@ -665,20 +687,26 @@ export async function planSprint(
     const agentPool = new AgentPoolManager(projectRoot);
     const pool = agentPool.loadAgents();
     for (const task of tasks) {
-      // Agent selection runs regardless of forceModel — agent expertise is independent of model choice
-      const result = selectAgent(task, pool);
-      task.assignedAgent = result.agent?.id ?? 'generic';
-      // Only apply agent's preferredModel when no forceModel override exists
-      if (result.agent?.preferredModel && !task.forceModel) {
-        task.model = result.agent.preferredModel;
+      try {
+        // Agent selection runs regardless of forceModel — agent expertise is independent of model choice
+        const result = selectAgent(task, pool);
+        task.assignedAgent = result.agent?.id ?? 'generic';
+        // Only apply agent's preferredModel when no forceModel override exists
+        if (result.agent?.preferredModel && !task.forceModel) {
+          task.model = result.agent.preferredModel;
+        }
+        // Log agent selection result for debugging persistence
+        debugLog(
+          'planSprint:agent-selection',
+          `Task ${task.id} → agent=${task.assignedAgent}, score=${result.score}, reason=${result.reason}`,
+        );
+      } catch (taskErr) {
+        debugLog('planSprint:agent-selection', `Agent selection failed for task ${task.id}: ${taskErr}`);
       }
-      // Log agent selection result for debugging persistence
-      debugLog(
-        'planSprint:agent-selection',
-        `Task ${task.id} → agent=${task.assignedAgent}, score=${result.score}, reason=${result.reason}`,
-      );
     }
-  } catch { /* agent pool failure is non-fatal */ }
+  } catch (poolErr) {
+    debugLog('planSprint:agent-pool', `Agent pool loading failed: ${poolErr}`);
+  }
 
   // Skill selection (non-fatal -- if skill modules fail, continue without skills)
   try {
@@ -688,21 +716,27 @@ export async function planSprint(
 
     if (skills.size > 0) {
       for (const task of tasks) {
-        const agentInfo = task.assignedAgent && task.assignedAgent !== 'generic'
-          ? { id: task.assignedAgent, expertise: [] as string[] }
-          : undefined;
-        const result = selectSkills(task, projectStack, skills, agentInfo);
-        if (result.skills.length > 0) {
-          task.assignedSkills = result.skills.map(s => s.id);
+        try {
+          const agentInfo = task.assignedAgent && task.assignedAgent !== 'generic'
+            ? { id: task.assignedAgent, expertise: [] as string[] }
+            : undefined;
+          const result = selectSkills(task, projectStack, skills, agentInfo);
+          if (result.skills.length > 0) {
+            task.assignedSkills = result.skills.map(s => s.id);
+          }
+          // Log skill selection result for debugging persistence
+          debugLog(
+            'planSprint:skill-selection',
+            `Task ${task.id} → skills=[${(task.assignedSkills ?? []).join(', ')}]`,
+          );
+        } catch (taskErr) {
+          debugLog('planSprint:skill-selection', `Skill selection failed for task ${task.id}: ${taskErr}`);
         }
-        // Log skill selection result for debugging persistence
-        debugLog(
-          'planSprint:skill-selection',
-          `Task ${task.id} → skills=[${(task.assignedSkills ?? []).join(', ')}]`,
-        );
       }
     }
-  } catch { /* skill selection failure is non-fatal */ }
+  } catch (poolErr) {
+    debugLog('planSprint:skill-pool', `Skill pool loading failed: ${poolErr}`);
+  }
 
   // Write task files (skip in dry-run mode)
   if (!options?.dryRun) {
@@ -1124,7 +1158,9 @@ export async function waitForResults(
             autoApprove: spawnOpts?.autoApprove ?? false,
           });
         }
-      } catch { /* ignore spawn errors -- task will timeout */ }
+      } catch (err) {
+        debugLog('waitForResults:queue-spawn', `Failed to spawn queued task ${nextTask.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   };
 
@@ -1748,7 +1784,9 @@ export async function runSprint(
     if (fixTasks.length > 0) {
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
       spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
-      const fixPhaseTimeout = opts?.fixPhaseTimeoutMs ?? 10 * 60 * 1000;
+      const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
+        ?? opts?.fixPhaseTimeoutMs
+        ?? 600_000;
       const fixResults = await waitForResults(projectRoot, fixSprint, fixPhaseTimeout, undefined, { spawnBackend });
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
@@ -1812,6 +1850,14 @@ export async function runSprint(
       modelBreakdown: sprintUsage.modelBreakdown,
     };
   } catch { /* non-fatal */ }
+
+  // Re-check usage before final dashboard update for accurate end-of-sprint metrics
+  try {
+    const finalUsage = activeProvider
+      ? await checkUsageWithProvider(activeProvider)
+      : checkUsage(config);
+    lastUsage = finalUsage;
+  } catch { /* non-fatal — use last captured usage */ }
 
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },

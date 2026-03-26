@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { BRAIN_DIR, RETRO_FILE, SPRINTS_DIR } from '../../core/constants.js';
@@ -293,6 +293,35 @@ export function formatTrend(entries: SprintTrendEntry[], lang = 'en'): string {
     lines.push(`  ${e.sprintId.padEnd(16)} ${String(e.successRate + '%').padEnd(10)} ${String(e.noGo).padEnd(6)} ${String(e.techDebt).padEnd(6)} ${e.coverage}`);
   }
   return lines.join('\n');
+}
+
+// ─── Archive ──────────────────────────────────────────────────────────────
+
+/**
+ * Archive the current RETRO.md to .brain/archive/retro-{sprintId}.md before overwriting.
+ * Creates the archive directory if it does not exist.
+ * Does NOT overwrite an existing archive for the same sprint.
+ * @param root - Project root directory
+ * @param sprintId - Sprint identifier (e.g. "sprint-063")
+ * @returns The archive file path on success, null if RETRO.md doesn't exist or on error.
+ */
+export function archiveCurrentRetro(root: string, sprintId: string): string | null {
+  const retroPath = join(root, BRAIN_DIR, RETRO_FILE);
+  if (!existsSync(retroPath)) return null;
+  try {
+    const archiveDir = join(root, BRAIN_DIR, 'archive');
+    mkdirSync(archiveDir, { recursive: true });
+    const archiveName = sprintId.startsWith('sprint-')
+      ? `retro-${sprintId}.md`
+      : `retro-sprint-${sprintId}.md`;
+    const archivePath = join(archiveDir, archiveName);
+    if (!existsSync(archivePath)) {
+      copyFileSync(retroPath, archivePath);
+    }
+    return archivePath;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Previous sprint loader ────────────────────────────────────────────────

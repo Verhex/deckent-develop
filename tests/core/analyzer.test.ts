@@ -25,7 +25,7 @@ function mockPkg(deps: Record<string, string> = {}, devDeps: Record<string, stri
 function setupGitMocks(fileCount: number, authors: string[]): void {
   vi.mocked(spawnSync).mockImplementation((cmd, args) => {
     if (cmd === 'git' && args?.[0] === 'ls-files') {
-      const files = Array.from({ length: fileCount }, (_, i) => `file-${i}.ts`).join('\n');
+      const files = Array.from({ length: fileCount }, (_, i) => `file-${i}.dat`).join('\n');
       return { status: 0, stdout: files, stderr: '', pid: 1, output: [], signal: null };
     }
     if (cmd === 'git' && args?.[0] === 'log') {

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
@@ -189,6 +189,45 @@ export function truncateFileList(files: string[]): string {
 }
 
 /**
+ * B) Tolerant MEMORY.md section replacement.
+ * Replaces a named section without depending on brittle regex lookaheads.
+ */
+export function replaceMemorySection(content: string, sectionHeading: string, newSectionContent: string): string {
+  const lines = content.split('\n');
+  // Escape special regex characters in the heading
+  const escapedHeading = sectionHeading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const headingPattern = new RegExp(`^#{1,3}\\s+${escapedHeading}\\s*$`, 'i');
+
+  let sectionStart = -1;
+  let sectionEnd = lines.length;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (headingPattern.test(lines[i] ?? '')) {
+      sectionStart = i;
+      const headingLevel = ((lines[i] ?? '').match(/^(#{1,3})/)?.[1]?.length) ?? 2;
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextMatch = (lines[j] ?? '').match(/^(#{1,3})\s/);
+        if (nextMatch && ((nextMatch[1]?.length) ?? 99) <= headingLevel) {
+          sectionEnd = j;
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  const newLines = newSectionContent.split('\n');
+  if (sectionStart >= 0) {
+    lines.splice(sectionStart, sectionEnd - sectionStart, ...newLines);
+  } else {
+    if (lines[lines.length - 1] !== '') lines.push('');
+    lines.push(...newLines);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+/**
  * Write sync summary to MEMORY.md under ## Out-of-band Changes section.
  */
 export function writeSyncToMemory(root: string, syncResult: SyncResult): void {
@@ -218,14 +257,9 @@ export function writeSyncToMemory(root: string, syncResult: SyncResult): void {
 
   const newSection = sectionLines.join('\n');
 
-  // Replace existing section or append
-  const sectionRegex = /## Out-of-band Changes[\s\S]*?(?=\n## |\n*$)/;
-  if (sectionRegex.test(content)) {
-    const updated = content.replace(sectionRegex, newSection);
-    writeFileSync(memoryPath, updated, 'utf-8');
-  } else {
-    appendFileSync(memoryPath, '\n' + newSection + '\n', 'utf-8');
-  }
+  // B) Use tolerant section replacement instead of fragile regex
+  const updated = replaceMemorySection(content, 'Out-of-band Changes', newSection);
+  writeFileSync(memoryPath, updated, 'utf-8');
 }
 
 /**
@@ -454,9 +488,11 @@ export function registerSync(program: Command): void {
 
         const lastSprint = getLastSprintTimestamp(root);
         if (!lastSprint) {
-          warnings.push('No previous sprint found in .brain/sprints/ — skipping change detection.');
+          // C) Explicit warning when no previous sprint exists
+          const noSprintMsg = 'Warning: No previous sprint found in .brain/sprints/ — run `deckent start` to begin your first sprint.';
+          warnings.push(noSprintMsg);
           if (!opts.json) {
-            print('No previous sprint found in .brain/sprints/ — skipping change detection.');
+            print(noSprintMsg);
           }
           if (opts.json) {
             output.warnings = warnings;

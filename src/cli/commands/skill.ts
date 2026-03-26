@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, cpSync, rmSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
+import { z } from 'zod';
 import type { Command } from 'commander';
 import type { SkillDefinition } from '../../core/skill-types.js';
 import { createSkillDefinition } from '../../core/skill-types.js';
@@ -64,14 +65,28 @@ export function saveSkillManifest(root: string, skill: SkillDefinition): void {
   );
 }
 
+// H) Zod schema for manifest validation — stricter than the old type guard
+const SkillManifestSchema = z.object({
+  id: z.string().min(1, 'id must be a non-empty string'),
+  name: z.string().min(1, 'name must be a non-empty string'),
+  version: z.string().min(1, 'version must be a non-empty string'),
+  description: z.string().optional(),
+  category: z.string().optional(),
+});
+
+/**
+ * H) Validate a skill manifest using Zod for more descriptive error messages.
+ * Returns { valid: boolean, errors: string[] }.
+ */
+export function validateManifestWithZod(data: unknown): { valid: boolean; errors: string[] } {
+  const result = SkillManifestSchema.safeParse(data);
+  if (result.success) return { valid: true, errors: [] };
+  return { valid: false, errors: result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) };
+}
+
 function validateManifest(data: unknown): data is SkillDefinition {
-  if (typeof data !== 'object' || data === null) return false;
-  const obj = data as Record<string, unknown>;
-  return (
-    typeof obj.id === 'string' &&
-    typeof obj.name === 'string' &&
-    typeof obj.version === 'string'
-  );
+  // H) Use Zod for validation
+  return validateManifestWithZod(data).valid;
 }
 
 function isGitUrl(source: string): boolean {
@@ -292,63 +307,74 @@ export function registerSkill(program: Command): void {
           }
           cloneArgs.push(url, tmpDir);
 
+          // H) Increased timeout: 30s → 60s for slow networks
           const cloneResult = spawnSync('git', cloneArgs, {
             encoding: 'utf-8',
-            timeout: 30_000,
+            timeout: 60_000,
           });
 
-          if (cloneResult.status !== 0) {
-            throw ErrorRegistry.createError('DECKENT_E026', { message: `Git clone failed: ${cloneResult.stderr || 'unknown error'}` });
-          }
-
-          const manifestPath = join(tmpDir, 'manifest.json');
-          if (!existsSync(manifestPath)) {
-            rmSync(tmpDir, { recursive: true, force: true });
-            throw ErrorRegistry.createError('DECKENT_E027');
-          }
-
-          const manifestData = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-          if (!validateManifest(manifestData)) {
-            rmSync(tmpDir, { recursive: true, force: true });
-            throw ErrorRegistry.createError('DECKENT_E028');
-          }
-
-          const targetDir = join(skillsDir, manifestData.id);
-          if (existsSync(targetDir) && !opts.force) {
-            rmSync(tmpDir, { recursive: true, force: true });
-            throw ErrorRegistry.createError('DECKENT_E025', { message: `Skill "${manifestData.id}" already exists. Use --force to overwrite.` });
-          }
-
-          if (existsSync(targetDir)) {
-            rmSync(targetDir, { recursive: true, force: true });
-          }
-
-          // Remove .git directory from clone
-          const dotGitDir = join(tmpDir, '.git');
-          if (existsSync(dotGitDir)) {
-            rmSync(dotGitDir, { recursive: true, force: true });
-          }
-
-          cpSync(tmpDir, targetDir, { recursive: true });
-          rmSync(tmpDir, { recursive: true, force: true });
-
-          // Compute checksum and save source meta (non-fatal)
-          let checksum: string | undefined;
+          // H) Ensure tmp dir is always cleaned up via try/finally
+          let gitInstallName = '';
+          let gitInstallRef = ref;
+          let gitInstallChecksum: string | undefined;
           try {
-            checksum = computeDirectoryHash(targetDir);
-            saveSourceMeta(targetDir, {
-              source,
-              type: 'git',
-              installedAt: new Date().toISOString(),
-              checksum,
-            });
-          } catch {
-            // checksum is optional — skip on failure
+            if (cloneResult.status !== 0) {
+              throw ErrorRegistry.createError('DECKENT_E026', { message: `Git clone failed: ${cloneResult.stderr || 'unknown error'}` });
+            }
+
+            const manifestPath = join(tmpDir, 'manifest.json');
+            if (!existsSync(manifestPath)) {
+              throw ErrorRegistry.createError('DECKENT_E027');
+            }
+
+            const manifestData = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+            // H) Use Zod-based validation for better error messages
+            const manifestValidation = validateManifestWithZod(manifestData);
+            if (!manifestValidation.valid) {
+              throw ErrorRegistry.createError('DECKENT_E028', { message: `Invalid manifest: ${manifestValidation.errors.join(', ')}` });
+            }
+
+            const targetDir = join(skillsDir, manifestData.id);
+            if (existsSync(targetDir) && !opts.force) {
+              throw ErrorRegistry.createError('DECKENT_E025', { message: `Skill "${manifestData.id}" already exists. Use --force to overwrite.` });
+            }
+
+            if (existsSync(targetDir)) {
+              rmSync(targetDir, { recursive: true, force: true });
+            }
+
+            // Remove .git directory from clone
+            const dotGitDir = join(tmpDir, '.git');
+            if (existsSync(dotGitDir)) {
+              rmSync(dotGitDir, { recursive: true, force: true });
+            }
+
+            cpSync(tmpDir, targetDir, { recursive: true });
+
+            // Compute checksum and save source meta (non-fatal)
+            try {
+              gitInstallChecksum = computeDirectoryHash(targetDir);
+              saveSourceMeta(targetDir, {
+                source,
+                type: 'git',
+                installedAt: new Date().toISOString(),
+                checksum: gitInstallChecksum,
+              });
+            } catch {
+              // checksum is optional — skip on failure
+            }
+
+            gitInstallName = manifestData.name as string;
+          } finally {
+            // H) Always clean up tmp dir regardless of success or failure
+            if (existsSync(tmpDir)) {
+              try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+            }
           }
 
-          print(`Skill "${manifestData.name}" installed from git.`);
-          if (ref) print(`  Version: ${ref}`);
-          if (checksum) print(`  Checksum (SHA-256): ${checksum}`);
+          print(`Skill "${gitInstallName}" installed from git.`);
+          if (gitInstallRef) print(`  Version: ${gitInstallRef}`);
+          if (gitInstallChecksum) print(`  Checksum (SHA-256): ${gitInstallChecksum}`);
         } else {
           // Install from local path
           const sourcePath = resolve(source);

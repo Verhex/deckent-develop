@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, createReadStream } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, createReadStream, watch as fsWatch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { ModelType, TaskResult, Task } from '../../core/types.js';
@@ -86,29 +86,97 @@ export function cleanupRunTask(projectRoot: string, taskId: string): void {
   }
 }
 
+/**
+ * E) Read the worker heartbeat file. Returns null if file missing or malformed.
+ */
+export function readHeartbeat(projectRoot: string, taskId: string): { sequence: number; status: string; timestamp: string } | null {
+  const hbPath = join(projectRoot, TASKS_DIR, `task-${taskId}.hb`);
+  if (!existsSync(hbPath)) return null;
+  try {
+    const data = readJsonSafe<{ sequence?: number; status?: string; timestamp?: string }>(hbPath);
+    if (!data) return null;
+    return {
+      sequence: data.sequence ?? 0,
+      status: data.status ?? 'UNKNOWN',
+      timestamp: data.timestamp ?? new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * D) Wait for the task result file using fs.watch for instant detection.
+ * Falls back to 5s polling if fs.watch is unavailable.
+ * E) Also monitors the heartbeat to detect stale workers.
+ */
 export async function waitForRunResult(
   projectRoot: string,
   taskId: string,
   timeoutMs: number,
 ): Promise<TaskResult | null> {
   const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-  const pollInterval = 5_000;
-  const startTime = Date.now();
+  const tasksDir = join(projectRoot, TASKS_DIR);
 
   // Check immediately first
   if (existsSync(resultPath)) {
     return readJsonSafe<TaskResult>(resultPath);
   }
 
-  while (Date.now() - startTime < timeoutMs) {
-    const remaining = timeoutMs - (Date.now() - startTime);
-    await sleep(Math.min(pollInterval, remaining));
-    if (existsSync(resultPath)) {
-      return readJsonSafe<TaskResult>(resultPath);
-    }
-  }
+  return new Promise<TaskResult | null>((resolve) => {
+    let watcher: ReturnType<typeof fsWatch> | null = null;
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    let lastHbSeq = -1;
+    let staleCount = 0;
+    const STALE_THRESHOLD = 3;
 
-  return null;
+    const cleanup = (): void => {
+      watcher?.close();
+      if (fallbackTimer !== null) clearInterval(fallbackTimer);
+      if (timeoutTimer !== null) clearTimeout(timeoutTimer);
+      if (heartbeatTimer !== null) clearInterval(heartbeatTimer);
+    };
+
+    const checkResult = (): void => {
+      if (existsSync(resultPath)) {
+        cleanup();
+        resolve(readJsonSafe<TaskResult>(resultPath));
+      }
+    };
+
+    // E) Heartbeat monitoring — detect stale workers
+    const checkHeartbeat = (): void => {
+      const hb = readHeartbeat(projectRoot, taskId);
+      if (!hb) return;
+      if (hb.sequence === lastHbSeq) {
+        staleCount++;
+        if (staleCount >= STALE_THRESHOLD) checkResult();
+      } else {
+        lastHbSeq = hb.sequence;
+        staleCount = 0;
+      }
+    };
+
+    timeoutTimer = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
+    heartbeatTimer = setInterval(checkHeartbeat, 30_000);
+
+    // D) Use fs.watch for instant result detection
+    mkdirSync(tasksDir, { recursive: true });
+    try {
+      watcher = fsWatch(tasksDir, { persistent: false }, (_event, filename) => {
+        if (filename === `task-${taskId}.result`) checkResult();
+      });
+      watcher.on('error', () => {
+        watcher?.close();
+        watcher = null;
+        fallbackTimer = setInterval(checkResult, 5_000);
+      });
+    } catch {
+      fallbackTimer = setInterval(checkResult, 5_000);
+    }
+  });
 }
 
 /**

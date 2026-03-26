@@ -1,5 +1,6 @@
-import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import { loadPlugin, scanPlugins, createPlugin, installPlugin, removePlugin, listPlugins } from '../../core/plugin.js';
 import { print, printError } from '../helpers/output.js';
@@ -73,10 +74,23 @@ export function registerPlugin(program: Command): void {
   cmd
     .command('list')
     .description('List installed plugins')
-    .action(() => {
+    .option('--json', 'Output as JSON')
+    .action((opts: { json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
         const plugins = scanPlugins(root);
+        if (opts.json) {
+          const data = plugins.map(plugin => ({
+            name: plugin.manifest.name,
+            version: plugin.manifest.version,
+            description: plugin.manifest.description,
+            entrypoint: plugin.manifest.entrypoint,
+            dir: plugin.dir,
+            entrypointOk: existsSync(join(plugin.dir, plugin.manifest.entrypoint)),
+          }));
+          print(JSON.stringify(data, null, 2));
+          return;
+        }
         if (plugins.length === 0) {
           print('No plugins installed.');
           return;
@@ -98,10 +112,12 @@ export function registerPlugin(program: Command): void {
   // ─── plugin info ────────────────────────────────────────────────
   cmd
     .command('info <dir>')
-    .description('Show plugin info')
+    .description('Show plugin info (accepts absolute or relative path)')
     .action((dir: string) => {
       try {
-        const plugin = loadPlugin(dir);
+        // Support relative paths: resolve relative to cwd
+        const resolvedDir = resolve(process.cwd(), dir);
+        const plugin = loadPlugin(resolvedDir);
         print(`Name: ${plugin.manifest.name}`);
         print(`Version: ${plugin.manifest.version}`);
         print(`Description: ${plugin.manifest.description}`);
@@ -114,6 +130,80 @@ export function registerPlugin(program: Command): void {
           print(`WARNING: Entrypoint file "${plugin.manifest.entrypoint}" does not exist at ${entrypointPath}`);
         } else {
           print(`Entrypoint: OK`);
+        }
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── plugin test ────────────────────────────────────────────────
+  cmd
+    .command('test <name>')
+    .description('Test a plugin: validate manifest and entrypoint, run hooks if available')
+    .action((name: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const pluginsDir = join(root, '.deckent', 'plugins');
+        const pluginDir = join(pluginsDir, name);
+
+        if (!existsSync(pluginDir)) {
+          print(`Plugin "${name}" not found in ${pluginsDir}.`);
+          process.exitCode = 1;
+          return;
+        }
+
+        const plugin = loadPlugin(pluginDir);
+        let allOk = true;
+
+        // 1. Validate manifest fields
+        const required = ['name', 'version', 'description', 'entrypoint'] as const;
+        for (const field of required) {
+          if (!plugin.manifest[field]) {
+            print(`FAIL: manifest.${field} is missing or empty`);
+            allOk = false;
+          }
+        }
+
+        // 2. Validate entrypoint exists
+        const entrypointPath = join(plugin.dir, plugin.manifest.entrypoint);
+        if (!existsSync(entrypointPath)) {
+          print(`FAIL: entrypoint "${plugin.manifest.entrypoint}" does not exist`);
+          allOk = false;
+        } else {
+          print(`PASS: entrypoint "${plugin.manifest.entrypoint}" exists`);
+        }
+
+        // 3. If plugin has a test script in package.json, run it
+        const pkgPath = join(pluginDir, 'package.json');
+        if (existsSync(pkgPath)) {
+          try {
+            const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { scripts?: Record<string, string> };
+            if (pkg.scripts?.['test']) {
+              print(`Running plugin test script...`);
+              const result = spawnSync('npm', ['test'], {
+                cwd: pluginDir,
+                encoding: 'utf-8',
+                stdio: 'inherit',
+                timeout: 30_000,
+              });
+              if (result.status !== 0) {
+                print(`FAIL: plugin test script failed`);
+                allOk = false;
+              } else {
+                print(`PASS: plugin test script succeeded`);
+              }
+            }
+          } catch {
+            // Non-fatal: package.json parse failure
+          }
+        }
+
+        if (allOk) {
+          print(`Plugin "${name}" validation: PASSED`);
+        } else {
+          print(`Plugin "${name}" validation: FAILED`);
+          process.exitCode = 1;
         }
       } catch (error) {
         printError(error);

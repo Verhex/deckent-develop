@@ -322,6 +322,7 @@ export function callBrainPlanner(
   model: ModelType,
   projectName: string,
   adapter?: ProviderAdapter,
+  timeout?: number,
 ): PlannerResult | null {
   const prompt = buildPlanPrompt(context, recommendation, projectName);
   const resolved = resolveAdapter(adapter);
@@ -329,7 +330,7 @@ export function callBrainPlanner(
 
   const result = spawnSync(command, args, {
     encoding: 'utf-8',
-    timeout: BRAIN_PLAN_TIMEOUT_MS,
+    timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS,
   });
 
   if (result.status !== 0 || !result.stdout) return null;
@@ -464,6 +465,7 @@ export function callZeroConfigPlanner(
   projectName: string,
   fileTree: string[] = [],
   adapter?: ProviderAdapter,
+  timeout?: number,
 ): PlannerResult | null {
   const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree);
   const resolved = resolveAdapter(adapter);
@@ -471,7 +473,7 @@ export function callZeroConfigPlanner(
 
   const result = spawnSync(command, args, {
     encoding: 'utf-8',
-    timeout: BRAIN_PLAN_TIMEOUT_MS,
+    timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS,
   });
 
   if (result.status !== 0 || !result.stdout) return null;

@@ -8,6 +8,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 interface DashboardOpts {
   interval?: string;
   noColor?: boolean;
+  json?: boolean;
 }
 
 function padRight(str: string, len: number): string {
@@ -150,13 +151,26 @@ export function readDashboardFile(dashPath: string): DashboardState | null {
 export function registerDashboard(program: Command): void {
   program
     .command('dashboard')
-    .description('Show terminal dashboard with auto-refresh (see also: deckent status)')
+    .description('Show terminal dashboard with auto-refresh (see also: deckent status --watch)')
     .option('--interval <ms>', 'Refresh interval in milliseconds (used as fallback when fs.watch unavailable)', '2000')
     .option('--no-color', 'Disable ANSI colors (also respects NO_COLOR env var)')
+    .option('--json', 'Output dashboard state as raw JSON and exit (shared format with deckent status --raw)')
     .action((opts: DashboardOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const noColor = isNoColor(opts.noColor);
+
+      // A) --json: output raw dashboard JSON (same as status --raw) and exit
+      if (opts.json) {
+        const state = readDashboardFile(dashPath);
+        if (!state) {
+          process.stdout.write(JSON.stringify({ error: 'No active sprint. Run deckent start first.' }) + '\n');
+          process.exitCode = 1;
+          return;
+        }
+        process.stdout.write(JSON.stringify(state, null, 2) + '\n');
+        return;
+      }
 
       const render = (): void => {
         const state = readDashboardFile(dashPath);

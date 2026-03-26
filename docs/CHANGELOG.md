@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint65] - 2026-03-26
+
+### Added
+
+- history Trend + retro Archive
+
+### Changed
+
+- plan — AI Planner Timeout Configurable (completed with tech debt)
+- config — autoMigrateOnLoad + Modes Nesting (completed with tech debt)
+- cleanup — Çift Geçiş, Sahte Sprint, destroy Session, .gitignore (completed with tech debt)
+- spawn — Scope Enforcement + Multi-Provider (completed with tech debt)
+- analyze — Wrapper Birleştirme + Monorepo (completed with tech debt)
+- Dokümantasyon — CHANGELOG/SPRINT-LOG Restore + cli-deep-analysis Final (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 6 tech debt, 0 no-go_
+
+## [0.2.0-beta.1-sprint64] - 2026-03-26
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 14 total, 0 done, 0 tech debt, 14 no-go_
+
 ## [0.2.0-beta.1-sprint62] - 2026-03-26
 
 ### Added
@@ -119,6 +146,45 @@ _Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
 
 
 _Tasks: 13 total, 11 done, 4 tech debt, 2 no-go_
+
+## [0.2.0-beta.1-sprint56] - 2026-03-25
+
+### Added
+
+- init UX — Auto Lang, Recommendation, Re-init, Error Recovery
+
+### Changed
+
+- Doc Updater Referans Fix + CHANGELOG Konsolidasyonu (completed with tech debt)
+- init Bug Fix — deepMerge + .deck Security + Provider Wizard (completed with tech debt)
+- plan Core — Async Usage, Dry-Run, Idempotency, Safeguard (completed with tech debt)
+- plan Quality — Parser, i18n, Context Priority, Error Logging (completed with tech debt)
+- start Core — Wait Timeout, Spawn Retry, Zero-Config, Phase Persistence (completed with tech debt)
+- start Quality — Provider Cache, Dashboard Usage, Cleanup Finally, --watch Alt (completed with tech debt)
+
+
+_Tasks: 20 total, 7 done, 7 tech debt, 13 no-go_
+
+## [0.2.0-beta.1-sprint55] - 2026-03-25
+
+### Fixed
+
+- Retro Parse/Write Format Uyumsuzluğu Fix + --compare Bug (P0 KRİTİK)
+- Kill Komutu Task Status + Lock Temizliği + --all Flag (P0 KRİTİK)
+
+### Changed
+
+- readLanguage + readJsonSafe Tam DRY Temizliği (completed with tech debt)
+- Config Set Nested Key + Import DeepMerge + Config Get (completed with tech debt)
+- Spawn Komutu Prompt Zenginleştirme + Status Kontrolü (completed with tech debt)
+- Doctor --json + Retro --json Flag'leri (completed with tech debt)
+- Cleanup --dry-run Flag'i (completed with tech debt)
+- Agent Delete + Edit Komutları (completed with tech debt)
+- Skill Enable/Disable + Delete Komutları (completed with tech debt)
+- Explain --sprint Flag + Goal Bilgisi + Dil Desteği (completed with tech debt)
+
+
+_Tasks: 10 total, 10 done, 10 tech debt, 0 no-go_
 
 ## [0.2.0-beta.1-sprint54] - 2026-03-25
 

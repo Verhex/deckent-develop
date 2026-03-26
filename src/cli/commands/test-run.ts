@@ -22,6 +22,7 @@ interface TestCommandOpts {
   sandbox?: boolean;
   model?: string;
   reporter?: string;
+  minCoverage?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 300_000; // 5 minutes
@@ -91,6 +92,7 @@ export function registerTestRun(program: Command): void {
     .option('--sandbox', 'Stash working tree changes before running, restore after (git stash)')
     .option('--model <model>', 'Force all tasks to use a specific model')
     .option('--reporter <format>', 'Output format: default, junit, tap', 'default')
+    .option('--min-coverage <percent>', 'Fail if coverage falls below this percentage (0-100)')
     .action(async (opts: TestCommandOpts) => {
       const root = resolveProjectRoot();
       const reporter = (opts.reporter ?? 'default') as TestReporter;
@@ -108,6 +110,18 @@ export function registerTestRun(program: Command): void {
         printError(new Error(`Invalid model: ${opts.model}. Must be one of: ${ALL_MODELS.join(', ')}`));
         process.exitCode = 1;
         return;
+      }
+
+      // F) Validate --min-coverage flag
+      let minCoverageThreshold: number | null = null;
+      if (opts.minCoverage !== undefined) {
+        const parsed = parseFloat(opts.minCoverage);
+        if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+          printError(new Error(`Invalid --min-coverage value: ${opts.minCoverage}. Must be a number between 0 and 100.`));
+          process.exitCode = 1;
+          return;
+        }
+        minCoverageThreshold = parsed;
       }
 
       try {
@@ -229,6 +243,16 @@ export function registerTestRun(program: Command): void {
 
         if (opts.keep) {
           print('--keep flag active: task files preserved.');
+        }
+
+        // F) --min-coverage check
+        if (minCoverageThreshold !== null) {
+          const coverage = sprint.metrics?.coveragePercent ?? 0;
+          if (coverage < minCoverageThreshold) {
+            print(`Coverage ${coverage.toFixed(1)}% is below minimum threshold of ${minCoverageThreshold}%`);
+            process.exitCode = 1;
+            return;
+          }
         }
 
         if (hasNoGo) {

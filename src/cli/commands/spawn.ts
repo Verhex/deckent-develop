@@ -1,4 +1,5 @@
 import type { Command } from 'commander';
+import type { Task, ModelType, ProviderName } from '../../core/types.js';
 import { readTask } from '../../agents/worker.js';
 import { ensureSession, spawnWorker } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
@@ -11,6 +12,20 @@ import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-
 import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 
 /**
+ * Build a comma-separated allowedTools string from a task's scope.
+ * Returns the standard tool set (Read, Write, Edit, Bash, Glob, Grep) when the
+ * task has any scoped directories or write-files. Returns undefined when the
+ * scope is completely unrestricted (no dirs, no write-files) so the worker
+ * retains full tool access.
+ */
+export function buildAllowedToolsFromScope(task: Task): string | undefined {
+  const hasDirs = task.scope.directories.length > 0;
+  const hasFiles = task.scope.filesWrite.length > 0;
+  if (!hasDirs && !hasFiles) return undefined;
+  return 'Read,Write,Edit,Bash,Glob,Grep';
+}
+
+/**
  * Spawn a worker using the appropriate backend based on the task's provider.
  * Claude models use tmux, Codex/Gemini models use subprocess backend.
  */
@@ -19,16 +34,17 @@ export function spawnWorkerMultiProvider(
   model: string,
   prompt: string,
   root: string,
-  opts: { autoApprove?: boolean },
-): { backend: string } {
-  const provider = getProviderForModel(model as import('../../core/types.js').ModelType);
+  opts: { autoApprove?: boolean; allowedTools?: string },
+): { backend: string; provider: ProviderName } {
+  const provider = getProviderForModel(model as ModelType);
 
   if (provider === 'claude') {
     ensureSession();
-    spawnWorker(taskId, model as import('../../core/types.js').ModelType, prompt, root, {
+    spawnWorker(taskId, model as ModelType, prompt, root, {
       autoApprove: opts.autoApprove ?? false,
+      allowedTools: opts.allowedTools,
     });
-    return { backend: 'tmux' };
+    return { backend: 'tmux', provider };
   }
 
   // Codex/Gemini → subprocess backend
@@ -36,11 +52,12 @@ export function spawnWorkerMultiProvider(
     backend: 'subprocess',
     projectDir: root,
   });
-  backend.spawn(taskId, model as import('../../core/types.js').ModelType, prompt, {
+  backend.spawn(taskId, model as ModelType, prompt, {
     autoApprove: opts.autoApprove ?? false,
     projectDir: root,
+    allowedTools: opts.allowedTools,
   });
-  return { backend: 'subprocess' };
+  return { backend: 'subprocess', provider };
 }
 
 export function registerSpawn(program: Command): void {
@@ -75,13 +92,18 @@ export function registerSpawn(program: Command): void {
         const skillPrompts = resolveSkillPrompts(root, task);
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
 
+        // Derive scope-based allowedTools for boundary enforcement
+        const allowedTools = buildAllowedToolsFromScope(task);
+
         // Spawn via appropriate backend based on model's provider
-        const { backend } = spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
+        const { backend, provider } = spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
           autoApprove: opts.autoApprove ?? false,
+          allowedTools,
         });
 
         print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));
         print(`  Backend: ${backend}`);
+        print(`  Provider: ${provider}`);
 
         // Show scope info
         if (task.scope.directories.length > 0) {

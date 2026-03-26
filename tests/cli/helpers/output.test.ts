@@ -8,9 +8,16 @@ import {
   formatDoctorResult,
   formatSprintSummary,
   formatAgentLabel,
+  formatHumanStatus,
 } from '../../../src/cli/helpers/output.js';
+import type { HumanStatusInput } from '../../../src/cli/helpers/output.js';
 import { AgentStatus, SprintPhase, SprintStatus } from '../../../src/core/types.js';
-import type { DashboardState, DoctorResult, Sprint, AgentRole } from '../../../src/core/types.js';
+import type { DashboardState, DoctorResult, Sprint, AgentRole, Task } from '../../../src/core/types.js';
+import { countBrainLines } from '../../../src/core/utils.js';
+
+vi.mock('../../../src/core/utils.js', () => ({
+  countBrainLines: vi.fn(),
+}));
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -537,5 +544,165 @@ describe('formatDashboard agent column', () => {
     });
     const result = formatDashboard(state);
     expect(result).toContain('\x1b[2m'); // dim
+  });
+});
+
+// ─── formatHumanStatus helpers ───────────────────────────────────────
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: '001',
+    title: 'Test task',
+    description: '',
+    model: 'sonnet',
+    effort: 'normal',
+    priority: 'NORMAL',
+    reason: '',
+    scope: { directories: [], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: 'DONE',
+    ...overrides,
+  } as unknown as Task;
+}
+
+function makeHumanStatusInput(overrides: Partial<HumanStatusInput> = {}): HumanStatusInput {
+  const now = Date.now();
+  return {
+    dashboard: makeDashboard({ updatedAt: new Date(now - 5_000).toISOString() }),
+    tasks: [],
+    nowMs: now,
+    ...overrides,
+  };
+}
+
+// ─── formatHumanStatus — stale dashboard warning (B) ─────────────────
+
+describe('formatHumanStatus — stale dashboard warning', () => {
+  it('shows stale warning when dashboard data is older than 60 seconds', () => {
+    const now = Date.now();
+    const updatedAt = new Date(now - 90_000).toISOString(); // 90 sec ago
+    const input = makeHumanStatusInput({
+      dashboard: makeDashboard({ updatedAt }),
+      nowMs: now,
+    });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('Warning: Dashboard data is');
+    expect(result).toContain('stale');
+  });
+
+  it('does not show stale warning when dashboard data is fresh', () => {
+    const now = Date.now();
+    const updatedAt = new Date(now - 10_000).toISOString(); // 10 sec ago
+    const input = makeHumanStatusInput({
+      dashboard: makeDashboard({ updatedAt }),
+      nowMs: now,
+    });
+    const result = formatHumanStatus(input);
+    expect(result).not.toContain('stale');
+  });
+});
+
+// ─── formatHumanStatus — budget check via countBrainLines (C) ────────
+
+describe('formatHumanStatus — budget check via countBrainLines', () => {
+  beforeEach(() => {
+    vi.mocked(countBrainLines).mockReset();
+  });
+
+  it('shows Budget OK when lines are below warning zone', () => {
+    vi.mocked(countBrainLines).mockReturnValue(300);
+    const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('Budget: 300/600 lines (OK)');
+  });
+
+  it('shows Budget warning percentage when lines exceed 80% of max', () => {
+    vi.mocked(countBrainLines).mockReturnValue(500); // 500 > 480 (600 * 0.8)
+    const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('500/600 lines');
+    expect(result).toMatch(/\d+%/);
+  });
+
+  it('shows Budget OVER with cleanup hint when lines exceed max', () => {
+    vi.mocked(countBrainLines).mockReturnValue(650); // 650 > 600
+    const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('OVER');
+    expect(result).toContain('650/600 lines');
+    expect(result).toContain('deckent cleanup --decay');
+  });
+
+  it('shows no Budget line when projectRoot is not set', () => {
+    const input = makeHumanStatusInput({ projectRoot: undefined });
+    const result = formatHumanStatus(input);
+    expect(result).not.toContain('Budget:');
+  });
+});
+
+// ─── formatHumanStatus — alert detail (D) ────────────────────────────
+
+describe('formatHumanStatus — alert detail', () => {
+  it('shows CRITICAL alert with [!!] prefix and message text', () => {
+    const input = makeHumanStatusInput({
+      dashboard: makeDashboard({
+        alerts: [{ level: 'CRITICAL' as never, message: 'critical issue detected', timestamp: new Date().toISOString() }],
+      }),
+    });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('[!!]');
+    expect(result).toContain('critical issue detected');
+  });
+
+  it('shows WARNING alert with [!] prefix and message text', () => {
+    const input = makeHumanStatusInput({
+      dashboard: makeDashboard({
+        alerts: [{ level: 'WARNING' as never, message: 'stale heartbeat warning', timestamp: new Date().toISOString() }],
+      }),
+    });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('[!]');
+    expect(result).toContain('stale heartbeat warning');
+  });
+
+  it('shows INFO alert with [i] prefix and message text', () => {
+    const input = makeHumanStatusInput({
+      dashboard: makeDashboard({
+        alerts: [{ level: 'INFO' as never, message: 'sprint phase changed', timestamp: new Date().toISOString() }],
+      }),
+    });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('[i]');
+    expect(result).toContain('sprint phase changed');
+  });
+
+  it('truncates alert list at 10 with overflow count message', () => {
+    const alerts = Array.from({ length: 12 }, (_, i) => ({
+      level: 'WARNING' as never,
+      message: `alert-message-${i}`,
+      timestamp: new Date().toISOString(),
+    }));
+    const input = makeHumanStatusInput({
+      dashboard: makeDashboard({ alerts }),
+    });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('... and 2 more');
+  });
+
+  it('shows all alert messages when 10 or fewer alerts', () => {
+    const alerts = Array.from({ length: 3 }, (_, i) => ({
+      level: 'WARNING' as never,
+      message: `msg-${i}`,
+      timestamp: new Date().toISOString(),
+    }));
+    const input = makeHumanStatusInput({
+      dashboard: makeDashboard({ alerts }),
+    });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('msg-0');
+    expect(result).toContain('msg-1');
+    expect(result).toContain('msg-2');
+    expect(result).not.toContain('more');
   });
 });

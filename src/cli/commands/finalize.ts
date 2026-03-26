@@ -18,8 +18,9 @@ import { loadReviewState } from './review.js';
  * Build a Sprint object and evaluations from .tasks/ directory contents.
  * Reads task JSON files and .result files, evaluates each result.
  * Integrates review state: rejected tasks are evaluated as NO_GO.
+ * If sprintFilter is provided, only tasks with that sprintId are included.
  */
-function buildSprintFromTasks(root: string): {
+function buildSprintFromTasks(root: string, sprintFilter?: string): {
   sprintId: string;
   tasks: Task[];
   results: TaskResult[];
@@ -38,11 +39,16 @@ function buildSprintFromTasks(root: string): {
   const taskFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.json'));
   for (const file of taskFiles) {
     const task = readJsonSafe<Task>(join(tasksDir, file));
-    if (task) tasks.push(task);
+    if (task) {
+      // If a sprint filter is provided, only include tasks matching that sprint
+      if (!sprintFilter || task.sprintId === sprintFilter) {
+        tasks.push(task);
+      }
+    }
   }
 
-  // Determine sprint ID from tasks
-  const sprintId = tasks[0]?.sprintId ?? 'sprint-unknown';
+  // Determine sprint ID: use filter if provided, else derive from tasks
+  const sprintId = sprintFilter ?? tasks[0]?.sprintId ?? 'sprint-unknown';
 
   // Read all result files
   const resultFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
@@ -107,15 +113,16 @@ export function registerFinalize(program: Command): void {
   program
     .command('finalize')
     .description('Finalize a sprint: update MEMORY.md, RETRO.md, PROJECT-IDENTITY.md, config, run decay')
+    .option('--sprint <id>', 'Specific sprint ID to finalize (e.g. sprint-063). Defaults to auto-detect from tasks.')
     .option('--skip-decay', 'Skip memory/debt decay phase')
     .option('--skip-hooks', 'Skip plugin afterSprint hooks')
     .option('--force', 'Force finalize even if tasks are still in-progress or already finalized')
-    .action(async (opts: { skipDecay?: boolean; skipHooks?: boolean; force?: boolean }) => {
+    .action(async (opts: { sprint?: string; skipDecay?: boolean; skipHooks?: boolean; force?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
 
       try {
-        const { sprintId, tasks, results, evaluations } = buildSprintFromTasks(root);
+        const { sprintId, tasks, results, evaluations } = buildSprintFromTasks(root, opts.sprint);
 
         if (tasks.length === 0) {
           print(getMessage('finalize.no_tasks', lang));

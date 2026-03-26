@@ -148,6 +148,8 @@ export interface DeckentConfig {
   fix_phase_enabled?: boolean;
   /** Max retries during fix phase (default: 2) */
   max_fix_retries?: number;
+  /** AI planner subprocess timeout in milliseconds (default: 60000) */
+  ai_planner_timeout?: number;
 
   // ─── Rollback ───────────────────────────────────────────────────────
   /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
@@ -185,6 +187,8 @@ export interface ResolvedConfig {
   // Sprint
   fix_phase_enabled?: boolean;
   max_fix_retries?: number;
+  /** AI planner subprocess timeout in milliseconds (default: 60000) */
+  ai_planner_timeout?: number;
   // Rollback
   rollback_policy?: 'never' | 'on_failure' | 'always';
 }
@@ -268,16 +272,26 @@ export type DetectedCI = 'github-actions' | 'gitlab-ci' | 'circleci' | 'unknown'
 export type ProjectSize = 'small' | 'medium' | 'large';
 export type MethodologyRecommendation = 'micro-sprint' | 'sprint' | 'agile' | 'hybrid';
 
+export interface AnalyzerSuggestion {
+  field: string;
+  value: string;
+  reason: string;
+}
+
 export interface ProjectAnalysis {
   framework: DetectedFramework;
   language: DetectedLanguage;
+  detectedLanguages: string[];
   testFramework: DetectedTestFramework;
   buildTool: DetectedBuildTool;
   ci: DetectedCI;
   fileCount: number;
+  locCount: number;
   authorCount: number;
   size: ProjectSize;
   methodology: MethodologyRecommendation;
+  subProjects: string[];
+  configSuggestions: AnalyzerSuggestion[];
 }
 
 // ─── System Profile ─────────────────────────────────────────────────

@@ -1,30 +1,35 @@
-# Sprint sprint-062 Retrospective
+# Sprint sprint-065 Retrospective
 
 ## Summary
-Completed 8/8 tasks in 16 minutes 46s.
+Completed 7/7 tasks in 27 minutes 10s.
 
 ## Highlights
-- 8 tasks completed on first try
+- 7 tasks completed on first try
 - No boundary violations detected
+- NO_GO rate improved from 100% to 0%
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 8/8 |
-| New test files | 15 |
-| Code changes | +2548 / -53 |
-| Sprint time | 16 minutes 46s |
-| NO_GO rate | 0% (0/8) |
-| Coverage | 59.9% |
+| Tasks completed | 7/7 |
+| New test files | 7 |
+| Code changes | +590 / -75 |
+| Sprint time | 27 minutes 10s |
+| NO_GO rate | 0% (0/7) |
+| Coverage | 13.7% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| generic | 8 | 5 | 3 | 0 | 60% |
+| ci-guardian | 6 | 1 | 5 | 0 | 96% |
+| bug-fixer | 1 | 0 | 1 | 0 | 0% |
 
 ## Learnings
-- ci-testing Skill Tanımı + SKILL.md: completed with tech debt — schedule cleanup
-- CI Dashboard Entegrasyonu: completed with tech debt — schedule cleanup
-- GitHub Actions Workflow İyileştirme: completed with tech debt — schedule cleanup
-- Recurring pattern (1777x): stale_heartbeat
+- plan — AI Planner Timeout Configurable: completed with tech debt — schedule cleanup
+- config — autoMigrateOnLoad + Modes Nesting: completed with tech debt — schedule cleanup
+- cleanup — Çift Geçiş, Sahte Sprint, destroy Session, .gitignore: completed with tech debt — schedule cleanup
+- spawn — Scope Enforcement + Multi-Provider: completed with tech debt — schedule cleanup
+- analyze — Wrapper Birleştirme + Monorepo: completed with tech debt — schedule cleanup
+- Dokümantasyon — CHANGELOG/SPRINT-LOG Restore + cli-deep-analysis Final: completed with tech debt — schedule cleanup
+- Recurring pattern (2089x): stale_heartbeat

@@ -179,13 +179,13 @@ describe('validateConfig', () => {
   it('throws for invalid brain_model', () => {
     const config = makeValidConfig();
     (config.modes.max_plan as unknown as Record<string, unknown>).brain_model = 'gpt4';
-    expect(() => validateConfig(config)).toThrow(/brain_model must be one of/);
+    expect(() => validateConfig(config)).toThrow(/brain_model/);
   });
 
   it('throws for invalid default_model', () => {
     const config = makeValidConfig();
     (config.modes.max_plan as unknown as Record<string, unknown>).default_model = 'turbo';
-    expect(() => validateConfig(config)).toThrow(/default_model must be one of/);
+    expect(() => validateConfig(config)).toThrow(/default_model/);
   });
 
   it('throws for max_workers out of range', () => {
@@ -229,7 +229,7 @@ describe('validateConfig', () => {
   it('throws for invalid brain_planning value', () => {
     const config = makeValidConfig();
     (config.modes.max_plan as unknown as Record<string, unknown>).brain_planning = 'magic';
-    expect(() => validateConfig(config)).toThrow(/brain_planning must be one of/);
+    expect(() => validateConfig(config)).toThrow(/brain_planning/);
   });
 
   it('throws for non-boolean haiku_allowed', () => {

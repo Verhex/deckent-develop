@@ -61,28 +61,30 @@ describe('analyzeProject — overhaul', () => {
   });
 
   it('N) returns cached result on second call with same mtime', () => {
-    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'a.ts\n', stderr: '' } as any);
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'a.dat\n', stderr: '' } as any);
     analyzeProjectCached('/mock/root');
     analyzeProjectCached('/mock/root');
-    const lsFilesCalls = vi.mocked(spawnSync).mock.calls.filter(
-      c => (c[1] as string[])?.[0] === 'ls-files'
-    );
-    expect(lsFilesCalls.length).toBe(1);
-  });
-
-  it('N) re-detects after clearAnalyzeCache()', () => {
-    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'a.ts\n', stderr: '' } as any);
-    analyzeProjectCached('/mock/root');
-    clearAnalyzeCache();
-    analyzeProjectCached('/mock/root');
+    // analyzeProject calls git ls-files twice (fileCount + LOC), only on first call
     const lsFilesCalls = vi.mocked(spawnSync).mock.calls.filter(
       c => (c[1] as string[])?.[0] === 'ls-files'
     );
     expect(lsFilesCalls.length).toBe(2);
   });
 
+  it('N) re-detects after clearAnalyzeCache()', () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'a.dat\n', stderr: '' } as any);
+    analyzeProjectCached('/mock/root');
+    clearAnalyzeCache();
+    analyzeProjectCached('/mock/root');
+    // 2 ls-files per analyzeProject call × 2 calls = 4
+    const lsFilesCalls = vi.mocked(spawnSync).mock.calls.filter(
+      c => (c[1] as string[])?.[0] === 'ls-files'
+    );
+    expect(lsFilesCalls.length).toBe(4);
+  });
+
   it('classifies small size for few files', () => {
-    const files = Array.from({ length: 10 }, (_, i) => `f${i}.ts`).join('\n') + '\n';
+    const files = Array.from({ length: 10 }, (_, i) => `f${i}.dat`).join('\n') + '\n';
     vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
       if ((args as string[])[0] === 'ls-files') {
         return { status: 0, stdout: files, stderr: '' } as any;
@@ -93,7 +95,7 @@ describe('analyzeProject — overhaul', () => {
   });
 
   it('classifies medium size for 50-499 files', () => {
-    const files = Array.from({ length: 100 }, (_, i) => `f${i}.ts`).join('\n') + '\n';
+    const files = Array.from({ length: 100 }, (_, i) => `f${i}.dat`).join('\n') + '\n';
     vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
       if ((args as string[])[0] === 'ls-files') {
         return { status: 0, stdout: files, stderr: '' } as any;

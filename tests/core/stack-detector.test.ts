@@ -287,16 +287,16 @@ describe('detectProjectStack', () => {
     expect(stack.dependencies).toContain('vitest');
   });
 
-  it('caps dependencies at 50', () => {
+  it('caps dependencies at 200', () => {
     const deps: Record<string, string> = {};
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 250; i++) {
       deps[`dep-${i}`] = '1.0.0';
     }
     mockFileExistence(['package.json']);
     mockPackageJson(deps);
 
     const stack = detectProjectStack(ROOT);
-    expect(stack.dependencies.length).toBeLessThanOrEqual(50);
+    expect(stack.dependencies.length).toBeLessThanOrEqual(200);
   });
 
   // ─── Cache Behavior ──────────────────────────────────────────────────────
@@ -952,5 +952,128 @@ describe('detectFullStack', () => {
     const result = detectFullStack(ROOT);
     expect(result.framework).toBe('spring');
     expect(result.testFramework).toBe('junit');
+  });
+});
+
+// ─── Monorepo / Sub-project Language Detection ────────────────────────────
+
+describe('monorepo / sub-project language detection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fs.readdirSync).mockReturnValue([]);
+  });
+
+  it('detects React from sub-project package.json at arbitrary sub-directory', () => {
+    // Root has no React dep; a sub-dir 'apps/frontend' has React
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const s = String(p);
+      return s.endsWith('tsconfig.json') || s.endsWith('package.json');
+    });
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s.endsWith('project-stack.json')) throw new Error('ENOENT');
+      if (s.includes('/frontend/package.json')) {
+        return JSON.stringify({ dependencies: { react: '^18.0.0' } });
+      }
+      // Root or intermediate package.json — no React
+      return JSON.stringify({ devDependencies: { typescript: '^5.0.0' } });
+    });
+    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s === ROOT) return [{ name: 'frontend', isDirectory: () => true }] as any;
+      return [];
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.framework).toBe('react');
+    expect(stack.language).toBe('typescript');
+  });
+
+  it('adds rust to detectedLanguages when a sub-project has Cargo.toml', () => {
+    // Root: TypeScript; packages/backend: Rust
+    mockFileExistence(['package.json', 'tsconfig.json', 'packages/backend/Cargo.toml']);
+    mockPackageJson({}, { typescript: '^5.0.0' });
+    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s === ROOT) return [{ name: 'packages', isDirectory: () => true }] as any;
+      if (s.endsWith('/packages')) return [{ name: 'backend', isDirectory: () => true }] as any;
+      return [];
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.detectedLanguages).toContain('rust');
+    expect(stack.detectedLanguages).toContain('typescript');
+  });
+
+  it('adds python to detectedLanguages when a sub-project has pyproject.toml', () => {
+    // Root: TypeScript; services/api: Python
+    mockFileExistence(['package.json', 'tsconfig.json', 'services/api/pyproject.toml']);
+    mockPackageJson({}, { typescript: '^5.0.0' });
+    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s === ROOT) return [{ name: 'services', isDirectory: () => true }] as any;
+      if (s.endsWith('/services')) return [{ name: 'api', isDirectory: () => true }] as any;
+      return [];
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.detectedLanguages).toContain('python');
+    expect(stack.detectedLanguages).toContain('typescript');
+  });
+
+  it('detects multiple sub-project languages in a monorepo layout', () => {
+    // Root: TypeScript; backend: Rust; analytics: Python
+    mockFileExistence([
+      'package.json', 'tsconfig.json',
+      'backend/Cargo.toml',
+      'analytics/pyproject.toml',
+    ]);
+    mockPackageJson({}, { typescript: '^5.0.0' });
+    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s === ROOT) {
+        return [
+          { name: 'backend', isDirectory: () => true },
+          { name: 'analytics', isDirectory: () => true },
+        ] as any;
+      }
+      return [];
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.detectedLanguages).toContain('typescript');
+    expect(stack.detectedLanguages).toContain('rust');
+    expect(stack.detectedLanguages).toContain('python');
+  });
+
+  it('detects Java sub-project (pom.xml) in monorepo', () => {
+    // Root: TypeScript; java-service: Java
+    mockFileExistence(['package.json', 'tsconfig.json', 'java-service/pom.xml']);
+    mockPackageJson({}, { typescript: '^5.0.0' });
+    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s === ROOT) return [{ name: 'java-service', isDirectory: () => true }] as any;
+      return [];
+    });
+
+    const stack = detectProjectStack(ROOT);
+    expect(stack.detectedLanguages).toContain('java');
+    expect(stack.detectedLanguages).toContain('typescript');
+  });
+
+  it('does not add duplicate languages when sub-project matches root language', () => {
+    // Root: TypeScript; sub-project: also TypeScript (via Cargo.toml missing, just package.json)
+    mockFileExistence(['package.json', 'tsconfig.json']);
+    mockPackageJson({}, { typescript: '^5.0.0' });
+    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      const s = String(p);
+      if (s === ROOT) return [{ name: 'packages', isDirectory: () => true }] as any;
+      return [];
+    });
+
+    const stack = detectProjectStack(ROOT);
+    // typescript should appear exactly once in detectedLanguages
+    const tsCount = (stack.detectedLanguages ?? []).filter(l => l === 'typescript').length;
+    expect(tsCount).toBe(1);
   });
 });

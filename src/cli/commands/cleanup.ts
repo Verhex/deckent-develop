@@ -1,16 +1,49 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../core/types.js';
-import { TASKS_DIR, LOCKS_DIR, BRAIN_TOTAL_LINE_BUDGET } from '../../core/constants.js';
+import {
+  TASKS_DIR, LOCKS_DIR, BRAIN_TOTAL_LINE_BUDGET,
+  TMUX_SESSION_NAME, PROJECT_CONFIG_PATH,
+} from '../../core/constants.js';
 import { countBrainLines } from '../../core/utils.js';
 import { cleanup, runDecay } from '../../orchestra/brain.js';
-import { destroy } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+
+/** C) Read project-specific tmux session name from config — avoids killing other projects' sessions. */
+function getProjectSessionName(root: string): string {
+  try {
+    const configPath = join(root, PROJECT_CONFIG_PATH);
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { tmux_session?: string };
+      if (config.tmux_session) return config.tmux_session;
+    }
+  } catch { /* use default */ }
+  return TMUX_SESSION_NAME;
+}
+
+/** D) Ensure .brain/archive/ has a git-track exception in .gitignore. */
+function ensureArchiveGitignore(root: string): void {
+  const gitignorePath = join(root, '.gitignore');
+  if (!existsSync(gitignorePath)) return;
+  try {
+    const content = readFileSync(gitignorePath, 'utf-8');
+    if (content.includes('!.brain/archive/')) return;
+    const lines = content.split('\n');
+    const archiveIdx = lines.findIndex(l => l.trim() === '.brain/archive/');
+    if (archiveIdx !== -1) {
+      lines.splice(archiveIdx + 1, 0, '!.brain/archive/');
+    } else {
+      lines.push('!.brain/archive/');
+    }
+    writeFileSync(gitignorePath, lines.join('\n'), 'utf-8');
+  } catch { /* skip if unreadable/unwritable */ }
+}
 
 export function registerCleanup(program: Command): void {
   program
@@ -25,13 +58,11 @@ export function registerCleanup(program: Command): void {
 
       if (opts.dryRun) {
         const locksDir = join(root, LOCKS_DIR);
-        const taskFiles = existsSync(tasksDir)
-          ? readdirSync(tasksDir).filter(f => /\.(json|plan|hb|result|paused|log)$/.test(f))
-          : [];
-        const promptFiles = existsSync(tasksDir)
-          ? readdirSync(tasksDir).filter(f => f.startsWith('.prompt-'))
-          : [];
-        const lockFiles = existsSync(locksDir) ? readdirSync(locksDir) : [];
+        // A) Single readdirSync pass — eliminates double scan
+        const allTaskFiles = existsSync(tasksDir) ? (readdirSync(tasksDir) as string[]) : [];
+        const taskFiles = allTaskFiles.filter(f => /\.(json|plan|hb|result|paused|log)$/.test(f));
+        const promptFiles = allTaskFiles.filter(f => f.startsWith('.prompt-'));
+        const lockFiles = existsSync(locksDir) ? (readdirSync(locksDir) as string[]) : [];
 
         print('[dry-run] Would delete:');
         for (const f of taskFiles) print(`  task: ${f}`);
@@ -46,7 +77,7 @@ export function registerCleanup(program: Command): void {
       }
 
       try {
-        // B) --decay + normal cleanup combo: run decay first, then continue to normal cleanup
+        // --decay + normal cleanup combo: run decay first, then continue to normal cleanup
         if (opts.decay) {
           const result = runDecay(root, 'sprint-cleanup', { force: true });
           print(getMessage('cleanup.decay_complete', lang, {
@@ -82,16 +113,43 @@ export function registerCleanup(program: Command): void {
           }
         }
 
-        // C) Active lock guard: warn if any tasks are still EXECUTING
+        // Active lock guard: warn if any tasks are still EXECUTING
         const executingTasks = tasks.filter(t => t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED);
         if (executingTasks.length > 0) {
           const ids = executingTasks.map(t => t.id).join(', ');
           print(`Warning: ${executingTasks.length} task(s) are still active (${ids}). Their locks will be released.`);
         }
 
+        // B) Build sprint from real task data — not a synthetic placeholder
+        let sprintId: string | undefined;
+        let sprintNumber = 0;
+
+        // First: check sprint-state.json for active sprint info
+        const sprintStatePath = join(root, '.deckent', 'sprint-state.json');
+        if (existsSync(sprintStatePath)) {
+          try {
+            const state = JSON.parse(readFileSync(sprintStatePath, 'utf-8')) as { sprintId?: string };
+            if (state.sprintId) {
+              sprintId = state.sprintId;
+              const m = state.sprintId.match(/(\d+)$/);
+              if (m?.[1]) sprintNumber = parseInt(m[1], 10);
+            }
+          } catch { /* fall through */ }
+        }
+
+        // Fallback: derive sprint ID from the tasks themselves
+        if (!sprintId && tasks.length > 0) {
+          const taskSprintId = tasks[0]?.sprintId;
+          if (taskSprintId) {
+            sprintId = taskSprintId;
+            const m = taskSprintId.match(/(\d+)$/);
+            if (m?.[1]) sprintNumber = parseInt(m[1], 10);
+          }
+        }
+
         const sprint: Sprint = {
-          id: `cleanup-${Date.now()}`,
-          number: 0,
+          id: sprintId ?? `cleanup-${Date.now()}`,
+          number: sprintNumber,
           status: SprintStatus.COMPLETE,
           phase: SprintPhase.COMPLETE,
           tasks,
@@ -100,18 +158,21 @@ export function registerCleanup(program: Command): void {
 
         cleanup(root, sprint);
 
+        // C) Kill only this project's tmux session — not a hardcoded global name
+        const sessionName = getProjectSessionName(root);
         try {
-          destroy();
-        } catch {
-          // session may not exist
-        }
+          spawnSync('tmux', ['kill-session', '-t', sessionName], { encoding: 'utf-8' });
+        } catch { /* session may not exist */ }
+
+        // D) Ensure .brain/archive/ is git-tracked (not excluded by .gitignore)
+        ensureArchiveGitignore(root);
 
         // Only print cleanup.complete when not in decay mode (decay already showed its own summary)
         if (!opts.decay) {
           print(getMessage('cleanup.complete', lang, { count: String(tasks.length) }));
         }
 
-        // A) Budget warning: check .brain/ size after cleanup
+        // Budget warning: check .brain/ size after cleanup
         const brainLines = countBrainLines(root);
         if (brainLines > BRAIN_TOTAL_LINE_BUDGET) {
           print(`\nWarning: .brain/ has ${brainLines} lines (budget: ${BRAIN_TOTAL_LINE_BUDGET}). Run \`deckent cleanup --decay\` to reduce memory.`);

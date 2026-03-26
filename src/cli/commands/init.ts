@@ -249,8 +249,9 @@ export function registerInit(program: Command): void {
     .option('--env <envs>', 'Comma-separated environments to configure (codex,cursor,gemini,vscode,shell)')
     .option('--all-envs', 'Configure ALL environment configs')
     .option('--upgrade', 'Update existing files while preserving user customizations (merge strategy)')
+    .option('--force', 'Force overwrite of existing env files without warning')
     .option('--repair', 'Show which init steps failed and how to fix them')
-    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; repair?: boolean }) => {
+    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean }) => {
       const root = resolveProjectRoot();
 
       // Track step failures for error recovery
@@ -440,48 +441,52 @@ globs: ["**/*"]
             ? options.env.split(',').map(e => e.trim()).filter(e => ALL_ENV_NAMES.includes(e as EnvName)) as EnvName[]
             : [];
 
-        // E) Warn if env files already exist (conflict detection)
         if (requestedEnvs.length > 0) {
           const envFileMap: Record<string, string> = {
             codex: join(root, 'AGENTS.md'),
             gemini: join(root, 'GEMINI.md'),
             cursor: join(root, '.cursor', 'rules', 'deckent.mdc'),
           };
+
+          // C) Conflict detection: warn and skip if env files exist without --force or --upgrade
+          const envsToApply: EnvName[] = [];
           for (const env of requestedEnvs) {
             const envFile = envFileMap[env];
-            if (envFile && existsSync(envFile) && !options.upgrade) {
-              print(`  Warning: ${envFile} already exists. Use --upgrade to overwrite.`);
+            if (envFile && existsSync(envFile) && !options.upgrade && !options.force) {
+              print(`  Warning: ${envFile} already exists. Overwrite? (use --force)`);
+            } else {
+              envsToApply.push(env);
             }
           }
-        }
 
-        if (requestedEnvs.length > 0) {
-          // Detect full stack for stack-aware templates
-          let stackResult: FullStackResult;
-          try {
-            stackResult = detectFullStack(root);
-          } catch {
-            stackResult = {
-              language: 'unknown',
-              framework: 'unknown',
-              buildTool: 'unknown',
-              testFramework: 'unknown',
-              commands: { build: '', test: '', lint: '' },
+          if (envsToApply.length > 0) {
+            // Detect full stack for stack-aware templates
+            let stackResult: FullStackResult;
+            try {
+              stackResult = detectFullStack(root);
+            } catch {
+              stackResult = {
+                language: 'unknown',
+                framework: 'unknown',
+                buildTool: 'unknown',
+                testFramework: 'unknown',
+                commands: { build: '', test: '', lint: '' },
+              };
+            }
+
+            const projectInfo = {
+              name: projectName,
+              language: stackResult.language,
+              framework: stackResult.framework,
+              commands: stackResult.commands,
             };
+
+            for (const env of envsToApply) {
+              applyEnvConfig(env, root, projectInfo);
+            }
           }
 
-          const projectInfo = {
-            name: projectName,
-            language: stackResult.language,
-            framework: stackResult.framework,
-            commands: stackResult.commands,
-          };
-
-          for (const env of requestedEnvs) {
-            applyEnvConfig(env, root, projectInfo);
-          }
-
-          // Set multi_ide_mode if multiple envs
+          // Set multi_ide_mode if multiple envs requested
           if (requestedEnvs.length > 1) {
             const multiConfigPath = join(root, DECKENT_DIR, 'config.json');
             try {

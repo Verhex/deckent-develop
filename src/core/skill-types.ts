@@ -57,6 +57,8 @@ export interface ProjectStack {
   buildTool: string;
   testFramework: string;
   detectedAt: string;
+  detectedLanguages?: string[];
+  subProjects?: string[];
 }
 
 // ─── Skill Selection Result ─────────────────────────────────────────────────

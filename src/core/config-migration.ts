@@ -93,6 +93,23 @@ export function getMissingFields(existing: Record<string, unknown>): string[] {
           if (defaultMode[modeKey] === undefined) continue;
           if (!(modeKey in existingMode)) {
             missing.push(`modes.${modeName}.${modeKey}`);
+          } else {
+            // Check nested sub-fields for plain objects (e.g. usage_thresholds)
+            const defaultVal = defaultMode[modeKey];
+            const existingVal = existingMode[modeKey];
+            if (
+              typeof defaultVal === 'object' && defaultVal !== null && !Array.isArray(defaultVal) &&
+              typeof existingVal === 'object' && existingVal !== null && !Array.isArray(existingVal)
+            ) {
+              const defaultSubObj = defaultVal as Record<string, unknown>;
+              const existingSubObj = existingVal as Record<string, unknown>;
+              for (const subKey of Object.keys(defaultSubObj)) {
+                if (defaultSubObj[subKey] === undefined) continue;
+                if (!(subKey in existingSubObj)) {
+                  missing.push(`modes.${modeName}.${modeKey}.${subKey}`);
+                }
+              }
+            }
           }
         }
       }

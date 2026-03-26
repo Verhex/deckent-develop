@@ -12,6 +12,7 @@ interface SprintRecord {
   techDebt: string;
   noGo: string;
   noGoRate: string;
+  successRate: string;
   coverage: string;
   duration: string;
   agents: string;
@@ -121,6 +122,11 @@ export function parseSprintLog(content: string): SprintRecord {
     noGoRate = '0%';
   }
 
+  let successRate = '-';
+  if (!isNaN(completed) && !isNaN(totalTasks)) {
+    successRate = totalTasks === 0 ? '0%' : `${Math.round((completed / totalTasks) * 100)}%`;
+  }
+
   const rawDuration = durationMatch?.[1] ?? fallbackDuration?.[1] ?? '-';
 
   const { agents, skills } = parseAgentSkillInfo(content);
@@ -132,6 +138,7 @@ export function parseSprintLog(content: string): SprintRecord {
     techDebt: !isNaN(techDebt) ? String(techDebt) : '-',
     noGo: !isNaN(noGo) ? String(noGo) : '-',
     noGoRate,
+    successRate,
     coverage: coverageMatch?.[1] ?? fallbackCoverage?.[1] ?? '-',
     duration: formatDurationMs(rawDuration),
     agents: agents.length > 0 ? agents.join(', ') : '-',
@@ -192,11 +199,56 @@ function collectSprintFiles(root: string): Array<{ file: string; dir: string }> 
   return collected;
 }
 
+/** Parse a percentage string like "90%" or "90.5%" to its numeric value, or null if not parseable */
+function parsePercentValue(str: string): number | null {
+  const m = str.match(/^(\d+(?:\.\d+)?)%/);
+  return m ? parseFloat(m[1]!) : null;
+}
+
+/**
+ * Build a trend analysis string from the last up-to-5 sprint records.
+ * Returns empty string if fewer than 2 records are provided.
+ * Shows success rate and coverage deltas with directional arrows (↑/↓/→).
+ */
+export function buildTrendAnalysis(records: SprintRecord[]): string {
+  if (records.length < 2) return '';
+
+  const window = records.slice(-5); // use last 5 records (window = 5)
+  const count = window.length;
+  const first = window[0]!;
+  const last = window[count - 1]!;
+
+  const firstSuccess = parsePercentValue(first.successRate ?? '-');
+  const lastSuccess = parsePercentValue(last.successRate ?? '-');
+  const firstCov = parsePercentValue(first.coverage);
+  const lastCov = parsePercentValue(last.coverage);
+
+  const successDelta = firstSuccess !== null && lastSuccess !== null ? lastSuccess - firstSuccess : null;
+  const covDelta = firstCov !== null && lastCov !== null ? lastCov - firstCov : null;
+
+  const lines: string[] = [`--- Trend (last ${count} sprints) ---`];
+
+  if (successDelta !== null) {
+    const arrow = successDelta > 0 ? '↑' : successDelta < 0 ? '↓' : '→';
+    const change = successDelta !== 0 ? ` ${Math.abs(successDelta)}%` : '';
+    lines.push(`  Success Rate: ${arrow}${change} (${firstSuccess}% → ${lastSuccess}%)`);
+  }
+
+  if (covDelta !== null) {
+    const arrow = covDelta > 0 ? '↑' : covDelta < 0 ? '↓' : '→';
+    const change = covDelta !== 0 ? ` ${Math.abs(covDelta).toFixed(1)}%` : '';
+    lines.push(`  Coverage: ${arrow}${change} (${firstCov}% → ${lastCov}%)`);
+  }
+
+  return lines.join('\n');
+}
+
 interface HistoryOpts {
   agent?: string;
   skill?: string;
   json?: boolean;
   last?: string;
+  trend?: boolean;
 }
 
 export function registerHistory(program: Command): void {
@@ -207,6 +259,7 @@ export function registerHistory(program: Command): void {
     .option('--skill <name>', 'Filter by skill name')
     .option('--json', 'Output as JSON')
     .option('--last <n>', 'Show only last N sprints')
+    .option('--trend', 'Show success rate/coverage trend analysis for last 5 sprints')
     .action((opts: HistoryOpts) => {
       const root = resolveProjectRoot();
       const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
@@ -278,8 +331,13 @@ export function registerHistory(program: Command): void {
         return;
       }
 
-      const headers = ['Sprint', 'Tasks', 'Done', 'Debt', 'No-Go', 'No-Go%', 'Coverage', 'Duration', 'Files', 'Tokens', 'Calls', 'Agents', 'Skills'];
-      const rows = records.map((r) => [r.sprint, r.tasks, r.completed, r.techDebt, r.noGo, r.noGoRate, r.coverage, r.duration, r.filesChanged, r.tokens, r.calls, r.agents, r.skills]);
+      const headers = ['Sprint', 'Tasks', 'Done', 'Debt', 'No-Go', 'No-Go%', 'Success%', 'Coverage', 'Duration', 'Files', 'Tokens', 'Calls', 'Agents', 'Skills'];
+      const rows = records.map((r) => [r.sprint, r.tasks, r.completed, r.techDebt, r.noGo, r.noGoRate, r.successRate, r.coverage, r.duration, r.filesChanged, r.tokens, r.calls, r.agents, r.skills]);
       print(formatTable(headers, rows));
+
+      if (opts.trend) {
+        const trend = buildTrendAnalysis(records);
+        if (trend) print(trend);
+      }
     });
 }

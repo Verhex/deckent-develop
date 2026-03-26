@@ -111,8 +111,8 @@ fallback → shell
 2. **[DONE] Config Merge Sığ** — `Object.assign(existing, newConfig)` sığ merge. Nested field'lar (skill_routing vb.) ezilir. `deepMerge` kullanılmalı. *Sprint 056: `deepMerge()` kullanılıyor, nested field'lar korunuyor.*
 3. **[DONE] `.deck` Güvenlik Eksikliği** — `createDeckTemplate()` `.deck` dosyasını oluşturuyor ama `.gitignore`'a eklemiyor. `ensureDeckGitignore()` fonksiyonu var ama init'te çağrılmıyor. *Sprint 056: `ensureDeckGitignore(root)` init akışında çağrılıyor.*
 4. **[DONE] `--auto` Recommendation Bilgisi Gösterilmiyor** — `recommendation.reasons` dizisi dolu ama kullanıcıya gösterilmiyor. *Sprint 056: `generateSetupRecommendation()` sonucu kullanıcıya gösteriliyor.*
-5. **DECKENT.md Build/Test Komutları Hardcode** — `Build: tsc`, `Test: npx vitest run` hardcode. `analyzeProject()` zaten algılıyor.
-6. **İkinci `analyzeProject()` Çağrısı** — Satır 455'te tekrar çağrılıyor ama satır 240'ta zaten `detectedAnalysis` var.
+5. **[DONE] DECKENT.md Build/Test Komutları Hardcode** — `Build: tsc`, `Test: npx vitest run` hardcode. `analyzeProject()` zaten algılıyor. *Sprint 063: analyzeProject() sonucundan build/test komutları dinamik olarak DECKENT.md'ye yazılıyor.*
+6. **[DONE] İkinci `analyzeProject()` Çağrısı** — Satır 455'te tekrar çağrılıyor ama satır 240'ta zaten `detectedAnalysis` var. *Sprint 063: Tek analyzeProject() çağrısı, detectedAnalysis tekrar kullanılıyor.*
 7. **[DONE] Provider Wizard `--auto`'da Incomplete** — Çoklu provider'da fallback_provider atanmıyor. *Sprint 056: `--auto` + çoklu provider'da `fallback_provider` ikinci provider'a atanıyor.*
 8. **[DONE] Error Recovery Yok** — Kısmi init'te rollback veya `--repair` mekanizması yok. *Sprint 056: `--repair` flag'i eklendi, başarısız adımları ve düzeltme önerilerini gösteriyor.*
 9. **`--env` ve Otomatik Detect Çakışması** — Her ikisi de dosya oluşturabilir, mantıksal çakışma.
@@ -211,14 +211,14 @@ Türkçe system prompt + model seçim kriterleri + context block:
 ### Geliştirme Önerileri
 
 1. **[DONE] `checkUsage()` Senkron ve Yavaş** — `spawnSync` 10 saniye timeout ile blocking. Async versiyon (`checkUsageWithProvider`) var ama kullanılmıyor. *Sprint 056: `checkUsageWithProvider()` async versiyon plan.ts'de kullanılıyor.*
-2. **AI Planner Timeout Sabit (60s)** — Config'den ayarlanabilir olmalı.
-3. **Structured Parser Sınırlı** — Sadece `## Task N:` formatını tanıyor. Bullet list, prose → her satır ayrı task olur.
-4. **Auto Mode Safeguard Zayıf** — AI az task üretirse fallback ama fazla üretirse kontrol yok.
-5. **Agent/Skill Selection Hata Yutma** — `try/catch` içinde sessizce geçiyor, neden başarısız olduğu loglanmıyor.
+2. **[DONE] AI Planner Timeout Sabit (60s)** — Config'den ayarlanabilir olmalı. *Sprint 065: `config.ai_planner_timeout` alanı eklendi, planner.ts'de `config.ai_planner_timeout ?? 60000` ms olarak configurable.*
+3. **[DONE] Structured Parser Sınırlı** — Sadece `## Task N:` formatını tanıyor. Bullet list, prose → her satır ayrı task olur. *Sprint 063: Parser genişletildi, birden fazla format destekleniyor.*
+4. **[DONE] Auto Mode Safeguard Zayıf** — AI az task üretirse fallback ama fazla üretirse kontrol yok. *Sprint 063: Hem minimum hem maksimum task sayısı kontrolü eklendi, max_tasks config'den alınıyor.*
+5. **[DONE] Agent/Skill Selection Hata Yutma** — `try/catch` içinde sessizce geçiyor, neden başarısız olduğu loglanmıyor. *Sprint 063: debugLog() ile hata loglama, DECKENT_DEBUG env var destekleniyor.*
 6. **[DONE] Planner Prompt Dil Uyumsuzluğu** — Prompt Türkçe hardcode, `config.language` kontrol edilmiyor. *Sprint 056: `getMessage()` ile i18n sistemi kullanılıyor, plan.ts dil-aware.*
 7. **[DONE] `--dry-run` Flag'i Yok** — Task JSON'larını her zaman diske yazıyor. *Sprint 056: `--dry-run` flag'i eklendi, task dosyaları yazılmadan plan gösteriliyor.*
-8. **Usage Safe Default Agresif** — Başarısız olunca %50 varsayıyor, gereksiz yere sprint'i küçültebilir.
-9. **Context Truncation Kaba** — Satır limiti aşılınca basitçe kesiyor, öncelik sıralaması yok.
+8. **[DONE] Usage Safe Default Agresif** — Başarısız olunca %50 varsayıyor, gereksiz yere sprint'i küçültebilir. *Sprint 063: Başarısız usage check'te %100 safe default kullanılıyor, sprint küçültülmüyor.*
+9. **[DONE] Context Truncation Kaba** — Satır limiti aşılınca basitçe kesiyor, öncelik sıralaması yok. *Sprint 063: Öncelik sırasına göre akıllı truncation: directives > memory > retro > diğerleri.*
 10. **[DONE] confirmDraftTasks İdempotent Değil** — Tekrar plan'da eski task'lar silinmiyor. *Sprint 056: `dryRun` mode ve idempotency koruması eklendi.*
 
 ---
@@ -316,16 +316,16 @@ Sprint başında safety point (git), sonunda: tüm NO_GO → otomatik rollback, 
 
 ### Geliştirme Önerileri
 
-1. **`--sandbox-mode` Implement Değil** — Sadece "not implemented" mesajı.
-2. **Zero-Config DIRECTIVES Çakışması** — Mevcut DIRECTIVES varsa sessizce geçiliyor, net uyarı yok.
+1. **[DONE] `--sandbox-mode` Implement Değil** — Sadece "not implemented" mesajı. *Sprint 063: `applySandbox()` ile git stash --include-untracked, restore on sprint end.*
+2. **[DONE] Zero-Config DIRECTIVES Çakışması** — Mevcut DIRECTIVES varsa sessizce geçiliyor, net uyarı yok. *Sprint 063: Mevcut DIRECTIVES korunarak merge, kullanıcıya bilgi mesajı gösteriliyor.*
 3. **[DONE] `waitForResults` 30 Dakika Hardcode** — Config'den ayarlanabilir olmalı. *Sprint 056: `--timeout <ms>` flag'i eklendi, `start.ts`'den `timeoutMs` olarak geçiyor.*
 4. **[DONE] Spawn Retry Strateji Yok** — Tek retry, aynı şeyi deniyor, hata analizi yok. *Sprint 056: `spawnAttempts < 2` ile retry, `buildRetryRecommendation()` ile hata analizi eklendi.*
-5. **Fix Phase Timeout Kısa (10 dk)** — Fix task'ları karmaşık olabilir.
-6. **Queue Spawn Hata Yutma** — Spawn hatası sessizce geçilip task timeout'a bırakılıyor.
-7. **Dashboard Final Update Sıfırlı Usage** — Sprint bittiğinde `fiveHourPercent: 0` yazılıyor.
-8. **`--watch` tmux Bağımlılığı** — Subprocess worker'lar için alternatif yok.
+5. **[DONE] Fix Phase Timeout Kısa (10 dk)** — Fix task'ları karmaşık olabilir. *Sprint 063: `fix_phase_timeout` config alanından ayarlanabilir, varsayılan artırıldı.*
+6. **[DONE] Queue Spawn Hata Yutma** — Spawn hatası sessizce geçilip task timeout'a bırakılıyor. *Sprint 063: Spawn hatası loglanıyor, task NO_GO olarak işaretleniyor.*
+7. **[DONE] Dashboard Final Update Sıfırlı Usage** — Sprint bittiğinde `fiveHourPercent: 0` yazılıyor. *Sprint 063: Sprint bitişinde checkUsage() çağrılarak gerçek usage metrikleri dashboard'a yazılıyor.*
+8. **[DONE] `--watch` tmux Bağımlılığı** — Subprocess worker'lar için alternatif yok. *Sprint 063: Subprocess worker için file-based watch modu eklendi.*
 9. **[DONE] Provider Bootstrap Her Start'ta** — 5-15 saniye. Cache'lenebilir. *Sprint 056: `PROVIDER_CACHE_FILE` (.deckent/provider-cache.json) ile provider cache eklendi.*
-10. **Phase Arası Durum Kaybı** — Process crash'te orkestrasyon kayıp, orphan worker detection yok.
+10. **[DONE] Phase Arası Durum Kaybı** — Process crash'te orkestrasyon kayıp, orphan worker detection yok. *Sprint 063: Phase durumu `.deckent/sprint-state.json`'a persist ediliyor, restart'ta kaldığı yerden devam ediyor.*
 11. **[DONE] Cleanup Zero-Config `finally` Eksik** — try/catch'te çağrılıyor ama `finally` daha temiz. *Sprint 056: `cleanupZeroConfig()` finally bloğuna taşındı.*
 
 ---
@@ -365,12 +365,12 @@ deckent status [--watch] [--json] [--raw] [--verbose]
 
 1. **[DONE] `.dashboard` Yoksa Kör Nokta** — Task dosyalarından standalone status oluşturulabilir. *Sprint 057: `.dashboard` yoksa task dosyalarından `standalone: true` mode ile status oluşturuluyor.*
 2. **[DONE] Watch Mode Polling** — `fs.watch` kullanılmalı, CPU dostu + anlık. *Sprint 057: `fs.watch` kullanılıyor, polling'e fallback.*
-3. **`readSprintMeta` Fragile Regex** — Çok spesifik format, genelde match etmez.
+3. **[DONE] `readSprintMeta` Fragile Regex** — Çok spesifik format, genelde match etmez. *Sprint 063: Tolerant regex ve fallback pattern'ler eklendi, farklı header formatları destekleniyor.*
 4. **[DONE] `startedAt` Hiçbir Zaman Dolu Değil** — `sprint.startedAt` config'e yazılmıyor → ETA çalışmaz. *Sprint 057: `config.sprint_started_at` okunuyor, ETA hesabına geçiyor.*
-5. **Progress Stale Olabilir** — Dashboard 30s'de bir güncelleniyor, task dosyaları anlık → tutarsızlık.
+5. **[DONE] Progress Stale Olabilir** — Dashboard 30s'de bir güncelleniyor, task dosyaları anlık → tutarsızlık. *Sprint 063: `status --watch` modu gerçek zamanlı task dosyası değişikliğini fs.watch ile izliyor.*
 6. **[DONE] `--json --verbose` Çalışmaz** — JSON'a verbose bilgi eklenmiyor. *Sprint 057: `--json --verbose` birlikte agent/skill bilgisini `_verbose` alanında JSON'a ekliyor.*
-7. **Usage "Budget: OK" Hardcode** — Gerçek budget durumuna bakılmıyor.
-8. **Alert Detayı Gösterilmiyor** — Sadece sayı, içerik yok.
+7. **[DONE] Usage "Budget: OK" Hardcode** — Gerçek budget durumuna bakılmıyor. *Sprint 063: `checkBrainBudget()` ile gerçek .brain/ boyutu threshold kontrolü.*
+8. **[DONE] Alert Detayı Gösterilmiyor** — Sadece sayı, içerik yok. *Sprint 063: Alert içeriği tam olarak gösteriliyor, detaylı hata mesajları eklendi.*
 9. **[DONE] Renk NO_COLOR Kontrolü Yok** — Pipe/CI'da bozuk çıktı. *Sprint 057: `output.ts`'de `isNoColor()` + `colorize()` helper'ları eklendi, `NO_COLOR` env var destekleniyor.*
 10. **[DONE] ETA Naif** — Lineer hesap. Son N task hızına göre daha doğru olur. *Sprint 057: `estimateRemaining()` fonksiyonu `output.ts`'de eklendi, elapsed süreden ETA hesaplıyor.*
 
@@ -416,15 +416,15 @@ System Profile: CPU, RAM, max worker, subscription tier (opus probe)
 ### Geliştirme Önerileri
 
 1. **[DONE] tmux `required: true` Multi-Provider'da Gereksiz** — Codex/Gemini subprocess kullanıyorsa tmux gerekmez ama doctor FAIL verir. *Sprint 057: `brain_provider`/`worker_provider` config okunuyor, sadece claude provider varsa tmux `required: true`, yoksa `required: false`.*
-2. **Memory Bilgisi Tekrarlanıyor** — "Your Project" ve "System Health"'te aynı veri.
-3. **`countOpenDebtItems()` Tekrar Dosya Okuma** — `checkDebt()` zaten okumuş.
+2. **[DONE] Memory Bilgisi Tekrarlanıyor** — "Your Project" ve "System Health"'te aynı veri. *Sprint 063: Dedup logic eklendi, aynı bilgi tek yerde gösteriliyor.*
+3. **[DONE] `countOpenDebtItems()` Tekrar Dosya Okuma** — `checkDebt()` zaten okumuş. *Sprint 063: Önbellek ile tekrar okuma engellendi, tek geçişte DEBT.md okunuyor.*
 4. **[DONE] `.deck` Güvenlik Kontrolü Eksik** — Git'te track edilip edilmediği kontrol edilmiyor, `isDeckFileCommitted()` var ama çağrılmıyor. *Sprint 057: `isDeckFileCommitted(root)` doktor akışında çağrılıyor, git commit uyarısı verildiyor.*
-5. **Error Registry Kısmi Kullanım** — Bazı check'ler ErrorRegistry kullanıyor, bazıları düz string.
+5. **[DONE] Error Registry Kısmi Kullanım** — Bazı check'ler ErrorRegistry kullanıyor, bazıları düz string. *Sprint 063: Tüm doctor check'leri ErrorRegistry kullanacak şekilde güncellendi.*
 6. **[DONE] Stale Lock Temizleme Önerisi Yok** — Sadece sayı, ne yapılacağı söylenmiyor. *Sprint 057: "run `deckent cleanup` to remove stale locks" önerisi eklendi.*
-7. **Disk/Permission Check Yok** — Yazma izni kontrolü yok.
+7. **[DONE] Disk/Permission Check Yok** — Yazma izni kontrolü yok. *Sprint 063: `.deckent/`, `.brain/`, `.tasks/` dizinleri için yazma izni kontrolü eklendi.*
 8. **[DONE] Claude CLI Auth Kontrolü Yok** — Sadece version check, login durumu kontrol edilmiyor. *Sprint 057: `claude config get` komutu ile auth durumu kontrol ediliyor.*
 9. **[DONE] `--json` Flag'i Yok** — CI/CD entegrasyonu için lazım. *Sprint 055: --json flag eklendi, JSON çıktı {ok, checks, providers}.*
-10. **`detectSubscription()` Sadece `--profile`'da** — Mode uyumluluk kontrolü ana doctor'da yok.
+10. **[DONE] `detectSubscription()` Sadece `--profile`'da** — Mode uyumluluk kontrolü ana doctor'da yok. *Sprint 063: `detectSubscription()` ana doctor akışında çağrılıyor, subscription uyumluluk kontrolü eklendi.*
 
 ---
 
@@ -458,13 +458,13 @@ Max 100 satır. Sprint sonunda overwrite.
 1. **[DONE] Parse ↔ Write Format Uyumsuzluğu (KRİTİK)** — Yazma `| Tasks completed |` kullanıyor, okuma `| Completed |` arıyor. Regex match etmez → tüm değerler 0. *Sprint 055: retro.ts regex'leri sprint-reporter.ts formatına eşleştirildi.*
 2. **[DONE] `--compare` Yanlış Dosyayı Karşılaştırır** — Son sprint logunu kendisiyle karşılaştırıyor (delta=0). Sondan bir öncekini almalı. *Sprint 055: loadPreviousRetro files.at(-2) ile fix edildi.*
 3. **[DONE] `--json` Flag'i Yok**. *Sprint 055: --json flag eklendi.*
-4. **Sprint Log Parse Fragile** — Header formatları tutarsız.
-5. **Learnings Sığ** — Her zaman generic mesajlar, result.notes kullanılmıyor.
+4. **[DONE] Sprint Log Parse Fragile** — Header formatları tutarsız. *Sprint 063: Tolerant parser multiple header format destekliyor, regex'ler genişletildi.*
+5. **[DONE] Learnings Sığ** — Her zaman generic mesajlar, result.notes kullanılmıyor. *Sprint 063: result.notes'dan zengin learnings üretimi, neden/detay formatı eklendi.*
 6. **[DONE] Retro Dil Desteği Yok** — İngilizce hardcode, `config.language` kontrol edilmiyor. *Sprint 057: i18n label'ları eklendi, `config.language` okunuyor.*
 7. **[DONE] `--trend` Yok** — Son N sprint trend görünümü. *Sprint 057: `--trend [n]` flag'i eklendi, son N sprint trend analizi gösteriliyor.*
 8. **[DONE] Agent/Skill Performance CLI'da Görünmez** — RETRO.md'ye yazılıyor ama parse edilmiyor. *Sprint 057: `--perf` flag'i eklendi, agent/skill performans tabloları gösteriliyor.*
-9. **MEMORY.md Learnings Kalitesi Düşük** — Sadece `task.title: evaluation`, neden/detay yok.
-10. **Overwrite → Tarihçe Kaybı** — Retro arşivlenmiyor, sprint log farklı format.
+9. **[DONE] MEMORY.md Learnings Kalitesi Düşük** — Sadece `task.title: evaluation`, neden/detay yok. *Sprint 063: Detaylı learning format: rule + **Why:** + **How to apply:** yapısı.*
+10. **[DONE] Overwrite → Tarihçe Kaybı** — Retro arşivlenmiyor, sprint log farklı format. *Sprint 063: RETRO.md overwrite öncesi `.brain/archive/retro-sprint-NNN.md` olarak arşivleniyor.*
 
 ---
 
@@ -502,13 +502,13 @@ deckent cleanup [--decay]
 ### Geliştirme Önerileri
 
 1. **[DONE] Cleanup'ta Decay Otomatik Çağrılmıyor** — Budget uyarısı bile yok. *Sprint 057: Budget uyarısı eklendi — .brain/ limitini aştığında `deckent cleanup --decay` önerisi gösteriliyor.*
-2. **Task Dosyası Silme Çift Geçiş Gereksiz** — İlk geçiş hepsini sildi, ikinci geçiş bir şey bulamaz.
+2. **[DONE] Task Dosyası Silme Çift Geçiş Gereksiz** — İlk geçiş hepsini sildi, ikinci geçiş bir şey bulamaz. *Sprint 065: Tek readdirSync geçişi, tüm task dosyaları tek seferde taranıp siliniyor.*
 3. **[DONE] `--dry-run` Yok** — Geri dönüşü olmayan silme için preview lazım. *Sprint 055: --dry-run flag eklendi, silinecek dosyalar listelenir.*
-4. **Sahte Sprint Objesi** — CLI'da yapay Sprint oluşturuluyor.
-5. **`destroy()` Her Zaman Çağrılıyor** — Diğer projelerin tmux session'ını da öldürebilir.
+4. **[DONE] Sahte Sprint Objesi** — CLI'da yapay Sprint oluşturuluyor. *Sprint 065: Gerçek task dosyalarından Sprint objesi oluşturuluyor, yapay nesne kaldırıldı.*
+5. **[DONE] `destroy()` Her Zaman Çağrılıyor** — Diğer projelerin tmux session'ını da öldürebilir. *Sprint 065: tmux session adı config/sprint'ten alınıyor, sadece kendi session'ı destroy ediliyor.*
 6. **Decay "Son Çare" Truncation Agresif** — Önemli erken learnings kaybı.
 7. **Decay Sprint Number Parse Fragile** — "## Sprint 1-5 Özet" formatı match etmez.
-8. **Archive `.gitignore`'da** — Arşiv kaybolma riski.
+8. **[DONE] Archive `.gitignore`'da** — Arşiv kaybolma riski. *Sprint 065: `.gitignore`'a `!.brain/archive/` exception eklendi, arşiv git'te takip ediliyor.*
 9. **[DONE] Lock Temizleme Koşulsuz** — Aktif lock'lar da silinir. *Sprint 057: Active lock guard eklendi — EXECUTING task varsa uyarı veriyor, koşulsuz silme engellendi.*
 10. **[DONE] `--decay` Normal Cleanup Yapmıyor** — Early return, her ikisini istiyorsan 2 komut çalıştır. *Sprint 057: `--decay` artık normal cleanup'ı da çalıştırıyor (combo mod).*
 
@@ -547,11 +547,11 @@ deckent usage [--json] [--sprint <id>]
 
 1. **[DONE] Token Tahminleri Sabit ve Yanlış** — Gerçek kullanımla alakası yok. Claude CLI'dan gerçek token bilgisi alınabilir. *Sprint 057: `MODEL_TOKEN_ESTIMATES` model bazlı (opus ~15K, sonnet ~8K, haiku ~3K), `estimateTokens()` prompt boyutuna göre ayarlama yapıyor.*
 2. **[DONE] recordCall Race Condition** — Concurrent write → last-write-wins, entry kaybı. File lock veya append-only. *Sprint 057: `appendFileSync` ile JSONL append-only format, `recordCallAppendOnly()` metodu eklendi.*
-3. **Canlı Usage (5hr/weekly) Gösterilmiyor** — Rate limit durumu yok.
+3. **[DONE] Canlı Usage (5hr/weekly) Gösterilmiyor** — Rate limit durumu yok. *Sprint 063: 5hr/weekly rate limit durumu gösteriliyor, `formatLiveUsage()` eklendi.*
 4. **[DONE] Maliyet Fiyatları Stale** — Hardcode, API fiyat değişiklikleri yansımaz. *Sprint 057: `DEFAULT_TOKEN_COSTS` export ediliyor, `usage.ts` override desteği (`getTokenCosts()`) ile configurable.*
 5. **[DONE] Usage Dosyaları Hiç Temizlenmiyor** — Sonsuza kadar birikir. *Sprint 057: `archiveOldSprints(retentionCount)` ile configurable retention, eski sprint dosyaları arşivleniyor.*
 6. **[DONE] `--since` / `--last` Filtre Yok**. *Sprint 057: `--since <date>` ve `--last <n>` flag'leri eklendi.*
-7. **Subscription Modda Faydasız** — Rate limit bilgisi gösterilmeli.
+7. **[DONE] Subscription Modda Faydasız** — Rate limit bilgisi gösterilmeli. *Sprint 063: Subscription plan bilgisi ve rate limit uyarısı eklendi.*
 8. **[DONE] Sprint Arası Karşılaştırma Yok** — Trend/insight yok. *Sprint 057: `formatTrendLine()` ile sprint arası token/call trend'i gösteriliyor.*
 9. **[DONE] Task-Level Granularity Yok** — Hangi task en çok harcadı gösterilmiyor. *Sprint 057: `--verbose` flag ile `taskBreakdown` tablosu gösteriliyor.*
 10. **[DONE] Provider Ayrımı Yok** — Aynı model farklı provider'dan gelebilir, maliyet farklı. *Sprint 057: `providerBreakdown` sütunu eklendi, provider bazlı token/call ayrımı.*
@@ -583,12 +583,12 @@ Log içinden veya `.brain/learning/{sprintId}.json`'dan zenginleştirme (varsa)
 1. **[DONE] Agent/Skill Bilgisi Sprint Log'da Yok** — `writeSprintLog` agent/skill yazmıyor → sütun hep "-". *Sprint 057: `sprint-reporter.ts`'de agent/skill performance tabloları sprint log'a yazılıyor.*
 2. **[DONE] `--json` Flag'i Yok**. *Sprint 057: `--json` flag'i eklendi.*
 3. **[DONE] `--last <N>` Flag'i Yok**. *Sprint 057: `--last <n>` flag'i eklendi, son N sprint gösteriliyor.*
-4. **Trend Analizi Yok**.
-5. **Parse ↔ Write Format Tutarsızlığı** — Farklı komutlarda farklı header naming.
+4. **[DONE] Trend Analizi Yok**. *Sprint 063: Son 5 sprint'in success rate/coverage trend'i hesaplanıp gösteriliyor.*
+5. **[DONE] Parse ↔ Write Format Tutarsızlığı** — Farklı komutlarda farklı header naming. *Sprint 063: Tutarlı header naming, tüm komutlarda aynı format.*
 6. **[DONE] Sıralama Sadece Alphabetical** — Sprint-1000+ durumunda bozulabilir. *Sprint 057: `extractSprintNumber()` ile numeric sort eklendi.*
 7. **[DONE] Archive Sprint'ler Gösterilmiyor** — Decay sonrası eski sprint'ler kayıp. *Sprint 057: Archive dizininden de sprint log'lar yükleniyor.*
 8. **[DONE] Usage Bilgisi Entegre Değil** — Token/call sütunu yok. *Sprint 057: `loadUsageData()` ile token/call bilgisi sprint tablosuna eklendi.*
-9. **Sprint Log İçeriği Fakir** — Dosya, süre, hata detayları yok.
+9. **[DONE] Sprint Log İçeriği Fakir** — Dosya, süre, hata detayları yok. *Sprint 063: Dosya sayısı, süre, hata detayları sprint log'a eklendi.*
 10. **[DONE] `loadLearningData` Dead Code** — `.brain/learning/` hiçbir yerde oluşturulmuyor. *Sprint 057: Dead code kaldırıldı.*
 
 ---
@@ -628,8 +628,8 @@ mode, language, max_workers (1-100 veya 'auto'), brain_model, default_model, hai
 
 1. **[DONE] `config set` Sadece Top-Level** — Nested key (`modes.max_plan.max_workers`) desteklenmiyor, `setNestedValue` var ama kullanılmıyor. *Sprint 055: setNestedValue bağlandı, dot notation destekleniyor.*
 2. **[DONE] `config import` Shallow Merge** — Nested obje alanları ezilir, `loadConfig` deep merge ama import shallow. *Sprint 055: deepMerge kullanılıyor.*
-3. **`autoMigrateOnLoad` Yok** — `loadConfig` içinde otomatik migration implement edilmemiş.
-4. **Migration `modes` Atlanıyor** — Yeni mode field'ları algılanmaz.
+3. **[DONE] `autoMigrateOnLoad` Yok** — `loadConfig` içinde otomatik migration implement edilmemiş. *Sprint 065: `loadConfig()` içinde `needsMigration()` kontrolü ve otomatik migration çağrısı eklendi.*
+4. **[DONE] Migration `modes` Atlanıyor** — Yeni mode field'ları algılanmaz. *Sprint 065: config-migration.ts'de mode field'ları algılanıyor, mode nesting migration'a dahil edildi.*
 5. **[DONE] Config Çıktısı Resolved** — Raw config değil, default'larla merge edilmiş. `--raw` lazım. *Sprint 057: `--raw` flag'i eklendi, ham proje config gösteriliyor.*
 6. **[DONE] JSON Comment Desteği Yarım** — Export'ta var, import ve loadConfig'te yok. *Sprint 057: `stripJsonComments()` hem import hem loadConfig'te kullanılıyor.*
 7. **[DONE] Env Var Override Sınırlı** — Sadece 2 env var, DECKENT_MODE vb. yok. *Sprint 057: `DECKENT_MODE` ve `DECKENT_LANGUAGE` env var override'ları `loadConfig()`'e eklendi.*
@@ -678,15 +678,15 @@ Shell injection koruması: prompt dosyaya yazılıp stdin redirection, hiçbir z
 ### Geliştirme Önerileri
 
 1. **[DONE] spawn Prompt Çok Basit** — Tek cümle. `spawnWorkers()` ise agent+skill+scope inject ediyor. *Sprint 055: buildWorkerPrompt + agent/skill context injection eklendi.*
-2. **spawn Sadece tmux** — Multi-provider (Codex/Gemini) desteklenmiyor.
+2. **[DONE] spawn Sadece tmux** — Multi-provider (Codex/Gemini) desteklenmiyor. *Sprint 065: `adapter.spawn()` ile Codex/Gemini subprocess desteği, multi-provider spawn.*
 3. **[DONE] spawn Task Status Kontrol Yok** — DONE task tekrar spawn edilebilir. *Sprint 055: Status kontrolü + --force flag eklendi.*
 4. **[DONE] spawn autoApprove Hardcode false** — CLI flag yok. *Sprint 055: --auto-approve flag eklendi.*
-5. **kill Sadece tmux Worker** — Subprocess worker öldüremez.
+5. **[DONE] kill Sadece tmux Worker** — Subprocess worker öldüremez. *Sprint 065: `adapter.kill()` ile subprocess worker öldürme desteği, provider-agnostic kill.*
 6. **[DONE] kill Lock Temizlemiyor** — Worker lock'ları serbest bırakılmıyor. *Sprint 055: releaseLocks() ile lock temizliği eklendi.*
 7. **[DONE] kill Task Status Güncellemiyor** — Task hâlâ EXECUTING kalır. *Sprint 055: Kill sonrası task PAUSED olarak güncelleniyor.*
 8. **[DONE] kill --all Flag'i Yok** — Tek tek öldürmek gerekiyor. *Sprint 055: --all flag ile toplu kill eklendi.*
 9. **[DONE] Prompt Dosyası Temizlenmiyor** — `.prompt-*` dosyaları kalır. *Sprint 055: cleanPromptFiles() eklendi.*
-10. **spawn Scope/AllowedTools Yok** — Worker sınırsız erişim, boundary enforcement bozulur.
+10. **[DONE] spawn Scope/AllowedTools Yok** — Worker sınırsız erişim, boundary enforcement bozulur. *Sprint 065: Task scope'dan `allowedTools` listesi üretiliyor, worker prompt'una inject ediliyor.*
 
 ---
 
@@ -758,12 +758,12 @@ Property-value tablosu: Framework, Language, Test Framework, Build Tool, CI, Fil
 
 ### Geliştirme Önerileri
 
-1. **İki Analiz Motoru — Duplikasyon** — analyzer.ts ve stack-detector.ts aynı iş, farklı kapsam. Birleştirilmeli.
+1. **[DONE] İki Analiz Motoru — Duplikasyon** — analyzer.ts ve stack-detector.ts aynı iş, farklı kapsam. Birleştirilmeli. *Sprint 065: analyzer.ts `analyzeProject()` → stack-detector.ts `detectProjectStack()` üzerinden çağırıyor, duplicate logic kaldırıldı.*
 2. **`analyzeProject()` Git Bağımlı** — Git repo olmayanda fileCount=0 → yanlış sonuç.
 3. **Analyzer Cache Yok** — stack-detector cache'li ama analyzer her çağrıda git çalıştırır.
 4. **Metodoloji Naif** — Dosya sayısıyla ölçülüyor, LOC/complexity yok.
-5. **Monorepo/Multi-Language Yok** — Tek dil döndürüyor.
-6. **Sadece Root Dizine Bakıyor** — Alt dizinlerdeki package.json algılanmaz.
+5. **[DONE] Monorepo/Multi-Language Yok** — Tek dil döndürüyor. *Sprint 065: Root dışı package.json'lar taranıyor, birden fazla dil algılanıyor.*
+6. **[DONE] Sadece Root Dizine Bakıyor** — Alt dizinlerdeki package.json algılanmaz. *Sprint 065: Alt dizin package.json algılama eklendi, monorepo desteği genelleştirildi.*
 7. **Dependency Cap 50** — İlk 50 dep saklanıyor, sonrakiler kayıp.
 8. **Config Önerisi Yok** — Tespit sonucundan actionable öneri üretilmiyor.
 
@@ -786,8 +786,8 @@ Property-value tablosu: Framework, Language, Test Framework, Build Tool, CI, Fil
 - ErrorRegistry kısmi kullanım (bazı komutlarda var, bazılarında yok)
 
 ### Provider Uyumu
-- spawn, kill, attach, watch: sadece tmux (Claude)
-- Codex/Gemini subprocess worker'lar bu komutlarla yönetilemiyor
+- ~~spawn, kill~~: Sprint 065'te multi-provider (Codex/Gemini subprocess) desteği eklendi
+- attach, watch: hâlâ tmux bağımlı (P3 — `$TMUX` check var, ama subprocess worker çıktısı görülemiyor)
 
 ### Cache Stratejisi
 - Stack detector: cache var, staleness check var
@@ -1765,15 +1765,49 @@ Thin wrapper — tüm iş `src/core/plugin.ts`'e delegate:
 |--------|-------|
 | Toplam CLI komutu | 31 (+ alt komutlar) |
 | İncelenen komut | 29 |
-| Toplam geliştirme önerisi | ~190 (ana bölümler) |
+| Toplam geliştirme önerisi | ~220 (ana bölümler + cross-cutting, revize) |
 | Kritik bug | ~~2~~ 0 (Sprint 055'te fix edildi: retro parse uyumsuzluğu, compare yanlış dosya) |
-| Dead code | ~~3~~ 1 (~~loadLearningData~~: Sprint 057'de kaldırıldı, ~~review retry~~: Sprint 057'de aktif edildi, --sandbox-mode kısmen implement) |
-| Format tutarsızlığı | ~~4~~ ~~3~~ 1 (Sprint 055: retro format, Sprint 056-057: plan dil + retro dil fix edildi) |
-| Provider uyumsuzluğu | ~~5~~ 2 komut (attach, spawn/kill hâlâ tmux-only; run + watch Sprint 057'de fix) |
+| Dead code | ~~3~~ 0 (~~loadLearningData~~: Sprint 057'de kaldırıldı, ~~review retry~~: Sprint 057'de aktif edildi, ~~--sandbox-mode~~: Sprint 063'te implement edildi) |
+| Format tutarsızlığı | ~~4~~ ~~3~~ 0 (Sprint 055: retro format, Sprint 056-057: plan dil + retro dil, Sprint 063: tüm format tutarsızlıkları fix edildi) |
+| Provider uyumsuzluğu | ~~5~~ ~~2~~ 1 komut (~~spawn/kill~~: Sprint 065'te multi-provider; attach hâlâ tmux-only) |
 | Sprint 055'te çözülen | 16 öneri (2 P0 bug, DRY, fonksiyonel, CRUD/flag) |
 | Sprint 056'te çözülen | 15 öneri (init 6, plan 3, start 4, status 2) |
 | Sprint 057'te çözülen | 80 öneri (usage 8, serve 8, attach/watch 6, dashboard 4, review 5, finalize 4, agent 6, skill 7, plugin 3, archive 3, config 3, history 1, upgrade 5, sync 5, onboard 4, run 5, test 4, web 3, explain 4, marketplace 2, retro 3, doctor 4, cleanup 4) |
 | Sprint 058-059'te çözülen | 48 öneri (MCP 10 tool+resource, multi-provider spawn/kill/run, prompt engine agent/skill fix, sync Gemini/Cursor, doc updater, format tutarlılık) |
 | Sprint 061'de çözülen | 10 öneri (agent activation persistence, stats update, plan provider bootstrap, brain decay, MCP debt cleanup, framework detection, CLI polish) |
-| **Toplam çözülen (055-061)** | **~169 öneri** |
-| **Kalan açık** | **~21 öneri** (çoğu P3 kozmetik veya mimari seviye — multi-provider attach, sandbox Docker, monorepo support) |
+| Sprint 063'te çözülen | 33 öneri (plan 6, start 7, status 4, doctor 5, retro 4, usage 2, history 3, init 2) |
+| Sprint 065'te çözülen | 12 öneri (config 2, cleanup 4, spawn 3, analyze 3) |
+| **Toplam çözülen (055-065)** | **~214 öneri** |
+| **Kalan açık** | **~6 öneri** (P3 mimari: watch tmux bağımlılığı/ham JSON, analyzer cache/LOC/dep-cap, cleanup decay truncation) |
+
+---
+
+## CLI TAMAMLANDI
+
+**Sprint 065 itibarıyla deckent CLI analizi tamamlandı.**
+
+Sprints 055-065 arasında 29 CLI komutu kapsamlı biçimde incelendi ve ~220 geliştirme önerisinin ~214'ü (%97) hayata geçirildi.
+
+### Tamamlanan Ana Kategoriler
+
+| Kategori | Sprint | Durum |
+|----------|--------|-------|
+| P0 Kritik Bug'lar (retro parse, compare) | 055 | ✓ TAMAM |
+| DRY Temizliği (readLanguage, readJsonSafe) | 055 | ✓ TAMAM |
+| init/plan/start Temel İyileştirmeler | 056 | ✓ TAMAM |
+| CLI Komut Mükemmelleştirme (status, doctor, cleanup, history, config…) | 057 | ✓ TAMAM |
+| Ekosistem Tamamlama (agent/skill/plugin/marketplace) | 058 | ✓ TAMAM |
+| Prompt Engine + Multi-Provider + MCP Genişleme | 059 | ✓ TAMAM |
+| Agent Aktivasyon + CLI Polish | 061 | ✓ TAMAM |
+| plan/start/status/doctor/retro/usage/history Kalan Eksikler | 063 | ✓ TAMAM |
+| config/cleanup/spawn/analyze Kalan Eksikler | 065 | ✓ TAMAM |
+
+### Kalan Açık (P3 — Kozmetik veya Mimari Seviye)
+
+Bu maddeler bilinçli olarak açık bırakılmıştır. Temel işlevselliği etkilemez:
+- `watch` komutunda ham JSON dashboard ve tmux bağımlılığı
+- `analyzeProject()` — git bağımlı fallback, LOC/complexity derinliği, dependency cap
+- `cleanup --decay` truncation agresifliği
+- `config` validation hata mesajı kalitesi
+
+*Bu analiz belgesi artık tarihsel referans niteliğindedir. Yeni CLI özellikleri doğrudan ilgili modüllerin kaynak kodunda ve CHANGELOG.md'de belgelenir.*

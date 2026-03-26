@@ -254,10 +254,12 @@ export function registerAgent(program: Command): void {
   // ─── agent create ───────────────────────────────────────────────
   agentCmd
     .command('create <name>')
-    .description('Create a custom agent')
+    .description('Create a custom agent (use --prompt/--description for wizard-style setup)')
     .option('--model <model>', `Model to use (${VALID_MODELS.join('|')})`, 'sonnet')
     .option('--triggers <triggers...>', 'Trigger keywords for task routing')
-    .action(async (name: string, opts: { model?: string; triggers?: string[] }) => {
+    .option('--prompt <text>', 'Set the agent system prompt content directly (written to PROMPT.md)')
+    .option('--description <desc>', 'Set the agent description')
+    .action(async (name: string, opts: { model?: string; triggers?: string[]; prompt?: string; description?: string }) => {
       try {
         const root = resolveProjectRoot();
 
@@ -286,10 +288,14 @@ export function registerAgent(program: Command): void {
           throw ErrorRegistry.createError('DECKENT_E033', { message: `Agent "${name}" already exists.` });
         }
 
-        const promptContent = PROMPT_TEMPLATE.replace('{name}', name);
+        // G) Use --prompt if provided, otherwise fall back to default template
+        const promptContent = opts.prompt ?? PROMPT_TEMPLATE.replace('{name}', name);
         const agent = createDefaultAgent(name, model);
         agent.triggers = triggers;
-        // Auto-fill systemPrompt from PROMPT.md template
+        // G) Apply optional description override
+        if (opts.description) {
+          agent.description = opts.description;
+        }
         agent.systemPrompt = promptContent;
         mkdirSync(agentDir, { recursive: true });
         writeFileSync(
@@ -302,8 +308,14 @@ export function registerAgent(program: Command): void {
         print('  - agent.json');
         print('  - PROMPT.md');
         print(`  Model: ${model}`);
+        if (opts.description) {
+          print(`  Description: ${opts.description}`);
+        }
         if (triggers.length > 0) {
           print(`  Triggers: ${triggers.join(', ')}`);
+        }
+        if (opts.prompt) {
+          print(`  Prompt: (custom, ${promptContent.length} chars)`);
         }
       } catch (error) {
         printError(error);

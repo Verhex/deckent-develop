@@ -185,6 +185,22 @@ function detectFresh(projectRoot: string): ProjectStack {
   const depNames = Object.keys(allDeps);
   dependencies.push(...depNames);
 
+  // F) Scan sub-directory package.json files for additional dependencies
+  const subProjects = scanSubProjectPackageJsons(projectRoot);
+  for (const subPkg of subProjects) {
+    const sp = readJsonSafe<Record<string, unknown>>(subPkg.path) ?? {};
+    const subDeps = {
+      ...(sp['dependencies'] as Record<string, string> | undefined) ?? {},
+      ...(sp['devDependencies'] as Record<string, string> | undefined) ?? {},
+    };
+    for (const dep of Object.keys(subDeps)) {
+      if (!depNames.includes(dep)) {
+        depNames.push(dep);
+        dependencies.push(dep);
+      }
+    }
+  }
+
   // ─── Language detection ──────────────────────────────────────────────────
 
   const tsconfigPath = path.join(projectRoot, 'tsconfig.json');
@@ -226,6 +242,20 @@ function detectFresh(projectRoot: string): ProjectStack {
     language = 'javascript';
   }
 
+  // E) Multi-language detection — collect all detected language markers
+  const detectedLanguages = detectAllLanguages(projectRoot, depNames, {
+    hasPython, hasPomXml, hasBuildGradle, hasCargoToml, hasGoMod,
+    hasCMakeLists, hasMesonBuild, hasMakefile,
+  });
+
+  // G) Merge non-JS language markers found in sub-project directories (monorepo support)
+  const subProjectLangList = scanSubProjectLanguages(projectRoot);
+  for (const lang of subProjectLangList) {
+    if (!detectedLanguages.includes(lang)) {
+      detectedLanguages.push(lang);
+    }
+  }
+
   // ─── Framework detection ─────────────────────────────────────────────────
 
   // JS/TS frameworks (from package.json deps)
@@ -238,16 +268,20 @@ function detectFresh(projectRoot: string): ProjectStack {
   else if (depNames.includes('express')) framework = 'express';
   else if (depNames.includes('fastify')) framework = 'fastify';
 
-  // Check for a React sub-project in src/dashboard/ (monorepo or embedded UI)
+  // G) Sub-project framework detection: when root has no framework, scan sub-projects
+  // This generalizes the pattern: sub-project deps already merged into depNames via
+  // scanSubProjectPackageJsons(), but we also keep an existsSync-based fallback for
+  // the well-known src/dashboard path so tests using direct existsSync mocks continue to work.
   if (framework === 'unknown') {
     const dashboardPkgPath = path.join(projectRoot, 'src', 'dashboard', 'package.json');
     if (fs.existsSync(dashboardPkgPath)) {
       const dashboardPkg = readJsonSafe<{ dependencies?: Record<string, string>; devDependencies?: Record<string, string> }>(dashboardPkgPath);
       if (dashboardPkg) {
         const dashboardDeps = { ...(dashboardPkg.dependencies ?? {}), ...(dashboardPkg.devDependencies ?? {}) };
-        if ('react' in dashboardDeps) {
-          framework = 'react';
-        }
+        if ('react' in dashboardDeps) framework = 'react';
+        else if ('vue' in dashboardDeps) framework = 'vue';
+        else if ('next' in dashboardDeps) framework = 'next';
+        else if ('svelte' in dashboardDeps) framework = 'svelte';
       }
     }
   }
@@ -303,10 +337,12 @@ function detectFresh(projectRoot: string): ProjectStack {
   return {
     language,
     framework,
-    dependencies: depNames.slice(0, 50), // Cap at 50 to keep cache reasonable
+    dependencies: depNames.slice(0, 200), // G) Cap raised from 50 to 200
     buildTool,
     testFramework,
     detectedAt: new Date().toISOString(),
+    detectedLanguages,
+    subProjects: subProjects.map(sp => sp.relativePath),
   };
 }
 
@@ -455,4 +491,124 @@ function detectGoTestFramework(projectRoot: string): string {
     // Readdir failure
   }
   return 'unknown';
+}
+
+// ─── Internal: E) Multi-language detection ──────────────────────────────────
+
+interface LanguageFlags {
+  hasPython: boolean;
+  hasPomXml: boolean;
+  hasBuildGradle: boolean;
+  hasCargoToml: boolean;
+  hasGoMod: boolean;
+  hasCMakeLists: boolean;
+  hasMesonBuild: boolean;
+  hasMakefile: boolean;
+}
+
+function detectAllLanguages(
+  projectRoot: string,
+  depNames: string[],
+  flags: LanguageFlags,
+): string[] {
+  const languages: string[] = [];
+  const tsconfigPath = path.join(projectRoot, 'tsconfig.json');
+  const pkgPath = path.join(projectRoot, 'package.json');
+
+  if (fs.existsSync(tsconfigPath) || depNames.includes('typescript')) languages.push('typescript');
+  else if (fs.existsSync(pkgPath) && depNames.length > 0) languages.push('javascript');
+
+  if (flags.hasPython) languages.push('python');
+  if (flags.hasPomXml || flags.hasBuildGradle) languages.push('java');
+  if (flags.hasCargoToml) languages.push('rust');
+  if (flags.hasGoMod) languages.push('go');
+  if (flags.hasCMakeLists || flags.hasMesonBuild || flags.hasMakefile) {
+    const cLang = detectCOrCpp(projectRoot);
+    if (cLang !== 'unknown') languages.push(cLang);
+  }
+
+  return languages.length > 0 ? languages : ['unknown'];
+}
+
+// ─── Internal: G) Sub-project non-JS language scanner ────────────────────────
+
+const SUB_PROJECT_LANGUAGE_MARKERS: Array<{ file: string; language: string }> = [
+  { file: 'Cargo.toml', language: 'rust' },
+  { file: 'go.mod', language: 'go' },
+  { file: 'pyproject.toml', language: 'python' },
+  { file: 'setup.py', language: 'python' },
+  { file: 'requirements.txt', language: 'python' },
+  { file: 'pom.xml', language: 'java' },
+  { file: 'build.gradle', language: 'java' },
+];
+
+/**
+ * G) Scan sub-directories (up to 2 levels deep) for non-JS language markers.
+ * Used for monorepo detection — e.g. a TypeScript root with a Rust or Python sub-project.
+ */
+function scanSubProjectLanguages(projectRoot: string): string[] {
+  const languages = new Set<string>();
+  const skipDirs = new Set(['node_modules', '.git', 'dist', 'build', '.deckent', 'coverage']);
+
+  function scanDir(dirPath: string, depth: number): void {
+    if (depth > 2) return;
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || skipDirs.has(entry.name)) continue;
+        const subDir = path.join(dirPath, entry.name);
+        for (const marker of SUB_PROJECT_LANGUAGE_MARKERS) {
+          if (fs.existsSync(path.join(subDir, marker.file))) {
+            languages.add(marker.language);
+          }
+        }
+        scanDir(subDir, depth + 1);
+      }
+    } catch {
+      // Dir read failure is non-fatal
+    }
+  }
+
+  scanDir(projectRoot, 0);
+  return Array.from(languages);
+}
+
+// ─── Internal: F) Sub-directory package.json scanner ────────────────────────
+
+interface SubProject {
+  path: string;
+  relativePath: string;
+}
+
+function scanSubProjectPackageJsons(projectRoot: string): SubProject[] {
+  const results: SubProject[] = [];
+  const skipDirs = new Set(['node_modules', '.git', 'dist', 'build', '.deckent', 'coverage']);
+
+  try {
+    const entries = fs.readdirSync(projectRoot, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || skipDirs.has(entry.name)) continue;
+      const subPkgPath = path.join(projectRoot, entry.name, 'package.json');
+      if (fs.existsSync(subPkgPath)) {
+        results.push({ path: subPkgPath, relativePath: entry.name });
+      }
+      // Also check one level deeper (e.g., src/dashboard/package.json)
+      try {
+        const subEntries = fs.readdirSync(path.join(projectRoot, entry.name), { withFileTypes: true });
+        for (const subEntry of subEntries) {
+          if (!subEntry.isDirectory() || skipDirs.has(subEntry.name)) continue;
+          const deepPkgPath = path.join(projectRoot, entry.name, subEntry.name, 'package.json');
+          if (fs.existsSync(deepPkgPath)) {
+            results.push({ path: deepPkgPath, relativePath: `${entry.name}/${subEntry.name}` });
+          }
+        }
+      } catch {
+        // Sub-directory read failure is non-fatal
+      }
+    }
+  } catch {
+    // Root readdir failure — return empty
+  }
+
+  return results;
 }

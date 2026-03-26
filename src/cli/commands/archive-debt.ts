@@ -20,9 +20,10 @@ export function registerArchiveDebt(program: Command): void {
     .command('archive-debt')
     .description('Archive resolved debt items from .brain/DEBT.md')
     .option('--dry-run', 'Preview what would be archived without making changes')
+    .option('--count', 'Show count of items that would be archived and exit')
     .option('--before <sprint>', 'Only archive items from sprints before this sprint ID (e.g. sprint-050)')
     .option('--max-archive-size <bytes>', 'Max archive file size in bytes before rotation', String(DEFAULT_MAX_ARCHIVE_SIZE_BYTES))
-    .action((opts: { dryRun?: boolean; before?: string; maxArchiveSize?: string }) => {
+    .action((opts: { dryRun?: boolean; count?: boolean; before?: string; maxArchiveSize?: string }) => {
       const root = resolveProjectRoot();
       const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
 
@@ -37,6 +38,27 @@ export function registerArchiveDebt(program: Command): void {
 
       let resolved = rows.filter(r => r.resolved === true);
       const unresolved = rows.filter(r => r.resolved !== true);
+
+      // --count: just show how many would be archived and exit
+      if (opts.count) {
+        if (opts.before) {
+          const beforeNum = parseInt(opts.before.replace(/\D/g, ''), 10);
+          if (!isNaN(beforeNum)) {
+            const filteredCount = resolved.filter(item => {
+              const itemNum = parseInt(item.originSprintId.replace(/\D/g, ''), 10);
+              return !isNaN(itemNum) && itemNum < beforeNum;
+            }).length;
+            print(`${filteredCount} resolved item(s) would be archived (from sprints before ${opts.before}).`);
+            print(`${resolved.length - filteredCount} resolved item(s) would remain (sprint >= ${opts.before}).`);
+          } else {
+            print(`${resolved.length} resolved item(s) would be archived.`);
+          }
+        } else {
+          print(`${resolved.length} resolved item(s) would be archived.`);
+          print(`${unresolved.length} unresolved item(s) would remain.`);
+        }
+        return;
+      }
 
       // O) --before filter: only archive items from sprints before the given sprint
       if (opts.before) {

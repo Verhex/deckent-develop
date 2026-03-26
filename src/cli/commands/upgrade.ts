@@ -85,6 +85,39 @@ export function detectInstallStrategy(): InstallStrategy {
   return 'unknown';
 }
 
+// ─── Changelog ──────────────────────────────────────────────────────
+
+/**
+ * Fetch the changelog for deckent from the npm registry.
+ * Uses `npm view deckent changelog` (if published in package.json),
+ * or falls back to `npm view deckent description` for a brief hint.
+ * Returns null if unavailable.
+ */
+export function getChangelog(version?: string): string | null {
+  try {
+    const pkg = version ? `deckent@${version}` : 'deckent';
+    // Try to fetch the changelog field from package.json published metadata
+    const result = spawnSync('npm', ['view', pkg, 'changelog'], {
+      encoding: 'utf-8',
+      timeout: 15_000,
+    });
+    if (result.status === 0 && result.stdout.trim() && result.stdout.trim() !== 'undefined') {
+      return result.stdout.trim();
+    }
+    // Fallback: fetch description as minimal info
+    const descResult = spawnSync('npm', ['view', pkg, 'description'], {
+      encoding: 'utf-8',
+      timeout: 15_000,
+    });
+    if (descResult.status === 0 && descResult.stdout.trim()) {
+      return `Description: ${descResult.stdout.trim()}`;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 // ─── Check Latest Version ───────────────────────────────────────────
 
 /**
@@ -199,9 +232,28 @@ export function rollbackUpgrade(prevVersion: string, strategy: InstallStrategy):
 
 // ─── Main Logic ─────────────────────────────────────────────────────
 
-export function executeUpgrade(opts: { check?: boolean; canary?: boolean; beta?: boolean; rollback?: boolean }): void {
+export function executeUpgrade(opts: { check?: boolean; changelog?: boolean; canary?: boolean; beta?: boolean; rollback?: boolean }): void {
   const current = DECKENT_VERSION;
   print(`Current version: ${current}`);
+
+  // Handle --changelog: show changelog for latest version and exit
+  if (opts.changelog) {
+    const channel: ReleaseChannel = opts.canary ? 'canary' : opts.beta ? 'beta' : 'latest';
+    const latest = checkLatestVersion(channel);
+    if (latest === null) {
+      print('Could not fetch version info. Check your network.');
+      return;
+    }
+    print(`Latest version: ${latest}`);
+    const changelog = getChangelog(latest);
+    if (changelog) {
+      print(`\nChangelog for ${latest}:`);
+      print(changelog);
+    } else {
+      print('No changelog available for this version.');
+    }
+    return;
+  }
 
   // Handle rollback
   if (opts.rollback) {
@@ -244,6 +296,14 @@ export function executeUpgrade(opts: { check?: boolean; canary?: boolean; beta?:
 
   print(`Update available: ${current} -> ${latest}`);
 
+  // Show changelog if available
+  const changelog = getChangelog(latest);
+  if (changelog) {
+    print(`\nChangelog for ${latest}:`);
+    print(changelog);
+    print('');
+  }
+
   if (opts.check) {
     print('Run `deckent upgrade` (without --check) to install the update.');
     return;
@@ -277,10 +337,11 @@ export function registerUpgrade(program: Command): void {
     .command('upgrade')
     .description('Self-update deckent')
     .option('--check', 'Only check for updates, do not install')
+    .option('--changelog', 'Show changelog for the latest version and exit')
     .option('--canary', 'Install from canary channel (pre-release)')
     .option('--beta', 'Install from beta channel (pre-release)')
     .option('--rollback', 'Roll back to the previous version')
-    .action((opts: { check?: boolean; canary?: boolean; beta?: boolean; rollback?: boolean }) => {
+    .action((opts: { check?: boolean; changelog?: boolean; canary?: boolean; beta?: boolean; rollback?: boolean }) => {
       executeUpgrade(opts);
     });
 }

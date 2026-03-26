@@ -1276,6 +1276,80 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 054-004: docs/ Reorganization + .claude/rules/ Update (GO_WITH_TECH_DEBT)
 
 ---
+
+## Sprint 55 — sprint-055
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 1015s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 10 |
+| Tech Debt | 10 |
+| No-Go | 0 |
+| Coverage | 10.6K+ tests |
+| Duration | 1014758ms |
+
+### Tasks
+
+- 055-001: Retro Parse/Write Format Uyumsuzluğu Fix + --compare Bug (P0 KRİTİK) (GO_WITH_TECH_DEBT)
+- 055-002: Kill Komutu Task Status + Lock Temizliği + --all Flag (P0 KRİTİK) (GO_WITH_TECH_DEBT)
+- 055-003: readLanguage + readJsonSafe Tam DRY Temizliği (P1) (GO_WITH_TECH_DEBT)
+- 055-004: Config Set Nested Key + Import DeepMerge + Config Get (P1) (GO_WITH_TECH_DEBT)
+- 055-005: Spawn Komutu Prompt Zenginleştirme + Status Kontrolü (P1) (GO_WITH_TECH_DEBT)
+- 055-006: Doctor --json + Retro --json Flag'leri (P2) (GO_WITH_TECH_DEBT)
+- 055-007: Cleanup --dry-run Flag'i (P2) (GO_WITH_TECH_DEBT)
+- 055-008: Agent Delete + Edit Komutları (P2) (GO_WITH_TECH_DEBT)
+- 055-009: Skill Enable/Disable + Delete Komutları (P2) (GO_WITH_TECH_DEBT)
+- 055-010: Explain --sprint Flag + Goal Bilgisi + Dil Desteği (P2) (GO_WITH_TECH_DEBT)
+
+---
+
+## Sprint 56 — sprint-056
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-25
+**Duration:** 2405s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 7 |
+| Tech Debt | 7 |
+| No-Go | 13 |
+| Coverage | 11.2K+ tests |
+| Duration | 2404678ms |
+
+### Tasks
+
+- 056-001: Doc Updater Referans Fix + CHANGELOG Konsolidasyonu (GO_WITH_TECH_DEBT)
+- 056-002: init Bug Fix — deepMerge + .deck Security + Provider Wizard (GO_WITH_TECH_DEBT)
+- 056-003: init UX — Auto Lang, Recommendation, Re-init, Error Recovery (GO_WITH_TECH_DEBT)
+- 056-004: plan Core — Async Usage, Dry-Run, Idempotency, Safeguard (GO_WITH_TECH_DEBT)
+- 056-005: plan Quality — Parser, i18n, Context Priority, Error Logging (GO_WITH_TECH_DEBT)
+- 056-006: start Core — Wait Timeout, Spawn Retry, Zero-Config, Phase Persistence (GO_WITH_TECH_DEBT)
+- 056-007: start Quality — Provider Cache, Dashboard Usage, Cleanup Finally, --watch Alt (GO_WITH_TECH_DEBT)
+- 056-008: status Overhaul — Standalone, ETA, NO_COLOR, fs.watch, Verbose (NO_GO)
+- 056-009: doctor Improvements — tmux Conditional, .deck Check, Auth, Hints (NO_GO)
+- 056-010: retro+explain Quality — Dil, Trend, Agent/Skill Perf, Learnings (NO_GO)
+- 056-011: cleanup+decay Overhaul — Auto Decay, Combo, Lock Guard, Archive (NO_GO)
+- 056-012: usage Overhaul — Real Tokens, Race Condition, Live Usage, Filters (NO_GO)
+- 056-013: history Overhaul — --json, --last, Agent/Skill, Dead Code, Format (NO_GO)
+- 056-014: config Quality — list/keys, autoMigrate, Validation, Comment, Env Var (NO_GO)
+- 056-015: review+finalize Overhaul — Interactive, Retry, Guard, Duplicate (NO_GO)
+- 056-016: serve Security — Rate Limit, Body Size, DeepMerge, Auth, Versioning (NO_GO)
+- 056-017: run+test+web Flags — Timeout, Keep, Sandbox, CI, MIME (NO_GO)
+- 056-018: sync+onboard+upgrade Polish (NO_GO)
+- 056-019: agent+skill+plugin+marketplace+archive-debt Completeness (NO_GO)
+- 056-020: dashboard+attach+watch+cross-cutting (NO_GO)
+
+---
 ## Sprint 57 — sprint-057
 
 **Status:** RETROSPECTIVE
@@ -1450,5 +1524,68 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 062-006: CI Dashboard Entegrasyonu (GO_WITH_TECH_DEBT)
 - 062-007: GitHub Actions Workflow İyileştirme (GO_WITH_TECH_DEBT)
 - 062-008: CI Learning — Sprint-to-Sprint Öğrenme (DONE)
+
+---
+## Sprint 64 — sprint-064
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-26
+**Duration:** 2552s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 14 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 14 |
+| Coverage | 53.3% |
+| Duration | 2552289ms |
+
+### Tasks
+
+- 064-001: init Kalan — Build/Test Dinamik + Çift Çağrı + --env Çakışma (NO_GO)
+- 064-002: plan Kalan — Timeout, Parser, Safeguard, Logging, Default, Truncation (NO_GO)
+- 064-003: start Kalan — Sandbox, Zero-Config, Fix Timeout, Queue, Usage, Watch, Phase (NO_GO)
+- 064-004: status Kalan — Regex, Stale, Budget, Alert (NO_GO)
+- 064-005: doctor Kalan — Memory Dedup, Debt Cache, ErrorRegistry, Permission, Subscription (NO_GO)
+- 064-006: retro Kalan — Parse Fix, Learnings Kalite, Arşivleme (NO_GO)
+- 064-007: cleanup Kalan — Çift Geçiş, Sahte Sprint, destroy, Decay, Parse, .gitignore (NO_GO)
+- 064-008: usage + history Kalan — Canlı Usage, Subscription, Trend, Format, İçerik (NO_GO)
+- 064-009: config Kalan — autoMigrate, Modes, Validation (NO_GO)
+- 064-010: spawn/kill + attach/watch Kalan — Scope, Subprocess, Multi-Provider, Watch (NO_GO)
+- 064-011: analyze Kalan — Birleştirme, Git Fallback, Cache, LOC, Monorepo, Dep Cap (NO_GO)
+- 064-012: Küçük Komut Kalan — dashboard/sync/run/test/agent/skill/marketplace/explain (NO_GO)
+- 064-013: review/finalize/onboard/upgrade/plugin/archive-debt Kalan (NO_GO)
+- 064-014: Dokümantasyon Restore + cli-deep-analysis Final (NO_GO)
+
+---
+## Sprint 65 — sprint-065
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-26
+**Duration:** 1630s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 6 |
+| No-Go | 0 |
+| Coverage | 13.7% |
+| Duration | 1630087ms |
+
+### Tasks
+
+- 065-001: plan — AI Planner Timeout Configurable (GO_WITH_TECH_DEBT)
+- 065-002: config — autoMigrateOnLoad + Modes Nesting (GO_WITH_TECH_DEBT)
+- 065-003: cleanup — Çift Geçiş, Sahte Sprint, destroy Session, .gitignore (GO_WITH_TECH_DEBT)
+- 065-004: spawn — Scope Enforcement + Multi-Provider (GO_WITH_TECH_DEBT)
+- 065-005: analyze — Wrapper Birleştirme + Monorepo (GO_WITH_TECH_DEBT)
+- 065-006: history Trend + retro Archive (DONE)
+- 065-007: Dokümantasyon — CHANGELOG/SPRINT-LOG Restore + cli-deep-analysis Final (GO_WITH_TECH_DEBT)
 
 ---

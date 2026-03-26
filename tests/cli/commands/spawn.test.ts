@@ -36,11 +36,22 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
   resolveSkillPrompts: vi.fn().mockReturnValue([]),
 }));
 
+vi.mock('../../../src/orchestra/spawn-backend.js', () => ({
+  SpawnBackendFactory: {
+    create: vi.fn().mockReturnValue({
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+    }),
+  },
+}));
+
 import { readTask } from '../../../src/agents/worker.js';
 import { ensureSession, spawnWorker } from '../../../src/orchestra/tmux.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { loadConfig } from '../../../src/core/config.js';
-import { registerSpawn } from '../../../src/cli/commands/spawn.js';
+import { SpawnBackendFactory } from '../../../src/orchestra/spawn-backend.js';
+import { buildAllowedToolsFromScope, spawnWorkerMultiProvider, registerSpawn } from '../../../src/cli/commands/spawn.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -252,5 +263,140 @@ describe('spawn command (isolated)', () => {
     await runCommand(['spawn', '001-001']);
 
     expect(loadConfig).toHaveBeenCalledWith('/mock/root');
+  });
+});
+
+// ─── Scope Enforcement: buildAllowedToolsFromScope ────────────────────────────
+
+describe('buildAllowedToolsFromScope', () => {
+  it('returns standard tool set when task has scope directories', () => {
+    const task = makeTask({
+      scope: { directories: ['src/cli/'], filesRead: [], filesWrite: [] },
+    });
+    const tools = buildAllowedToolsFromScope(task);
+    expect(tools).toBeDefined();
+    expect(tools).toContain('Read');
+    expect(tools).toContain('Write');
+    expect(tools).toContain('Edit');
+    expect(tools).toContain('Bash');
+    expect(tools).toContain('Glob');
+    expect(tools).toContain('Grep');
+  });
+
+  it('returns standard tool set when task has filesWrite', () => {
+    const task = makeTask({
+      scope: { directories: [], filesRead: [], filesWrite: ['src/cli/spawn.ts'] },
+    });
+    const tools = buildAllowedToolsFromScope(task);
+    expect(tools).toBeDefined();
+    expect(tools!.split(',')).toHaveLength(6);
+  });
+
+  it('returns undefined when scope has no directories or filesWrite', () => {
+    const task = makeTask({
+      scope: { directories: [], filesRead: ['some/file.ts'], filesWrite: [] },
+    });
+    const tools = buildAllowedToolsFromScope(task);
+    expect(tools).toBeUndefined();
+  });
+
+  it('returns tools when both directories and filesWrite are present', () => {
+    const task = makeTask({
+      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/foo.ts', 'tests/foo.test.ts'] },
+    });
+    const tools = buildAllowedToolsFromScope(task);
+    expect(tools).toBeDefined();
+    expect(typeof tools).toBe('string');
+  });
+});
+
+// ─── Multi-Provider: spawnWorkerMultiProvider ─────────────────────────────────
+
+describe('spawnWorkerMultiProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ensureSession).mockImplementation(() => {});
+    vi.mocked(spawnWorker).mockImplementation(() => {});
+  });
+
+  it('returns tmux backend and claude provider for Claude models', () => {
+    const result = spawnWorkerMultiProvider('001', 'sonnet', 'prompt', '/root', {});
+    expect(result.backend).toBe('tmux');
+    expect(result.provider).toBe('claude');
+  });
+
+  it('returns subprocess backend and codex provider for OpenAI models', () => {
+    const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
+    const result = spawnWorkerMultiProvider('002', 'gpt-4.1', 'prompt', '/root', {});
+    expect(result.backend).toBe('subprocess');
+    expect(result.provider).toBe('codex');
+    expect(mockBackend.spawn).toHaveBeenCalled();
+  });
+
+  it('returns subprocess backend and gemini provider for Gemini models', () => {
+    const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
+    const result = spawnWorkerMultiProvider('003', 'gemini-2.5-pro', 'prompt', '/root', {});
+    expect(result.backend).toBe('subprocess');
+    expect(result.provider).toBe('gemini');
+  });
+
+  it('passes allowedTools to tmux spawnWorker for Claude models', () => {
+    spawnWorkerMultiProvider('004', 'opus', 'prompt', '/root', {
+      allowedTools: 'Read,Write,Edit,Bash,Glob,Grep',
+    });
+    expect(spawnWorker).toHaveBeenCalledWith(
+      '004', 'opus', 'prompt', '/root',
+      expect.objectContaining({ allowedTools: 'Read,Write,Edit,Bash,Glob,Grep' }),
+    );
+  });
+
+  it('passes allowedTools to subprocess backend for non-Claude models', () => {
+    const mockBackend = { spawn: vi.fn(), kill: vi.fn(), list: vi.fn() };
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue(mockBackend as any);
+    spawnWorkerMultiProvider('005', 'gpt-4.1-mini', 'prompt', '/root', {
+      allowedTools: 'Read,Bash',
+    });
+    expect(mockBackend.spawn).toHaveBeenCalledWith(
+      '005', 'gpt-4.1-mini', 'prompt',
+      expect.objectContaining({ allowedTools: 'Read,Bash' }),
+    );
+  });
+});
+
+// ─── registerSpawn: provider display ─────────────────────────────────────────
+
+describe('spawn command provider display', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+    vi.mocked(loadConfig).mockResolvedValue({ language: 'en' } as any);
+    vi.mocked(ensureSession).mockImplementation(() => {});
+    vi.mocked(spawnWorker).mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it('prints provider name after spawning worker', async () => {
+    vi.mocked(readTask).mockReturnValue(makeTask({ model: 'sonnet' }));
+    await runCommand(['spawn', '001-001']);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('Provider: claude'));
+  });
+
+  it('injects allowedTools into spawn when task has scope', async () => {
+    vi.mocked(readTask).mockReturnValue(makeTask({
+      scope: { directories: ['src/cli/'], filesRead: [], filesWrite: ['src/cli/spawn.ts'] },
+    }));
+    await runCommand(['spawn', '001-001']);
+    expect(spawnWorker).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ allowedTools: 'Read,Write,Edit,Bash,Glob,Grep' }),
+    );
   });
 });

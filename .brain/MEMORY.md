@@ -96,3 +96,33 @@ A) Enriched Response Verification: Tüm 16 MCP tool'da e
 - ci-testing Skill Tanımı + SKILL.md: GO_WITH_TECH_DEBT — A) manifest.json created with all required fields: id=ci-testing, category=workflow, 8 triggers (ci/test/regression/cove
 - CI Dashboard Entegrasyonu: GO_WITH_TECH_DEBT — CI Dashboard entegrasyonu tamamlandı. output.ts: CIBaseline + CIReport interfaces, formatCIStatusLine(), formatCIHealthS
 - GitHub Actions Workflow İyileştirme: GO_WITH_TECH_DEBT — GitHub Actions CI workflow updated with 4 improvements: A) Coverage job added — runs npm run test:coverage after test jo
+## Sprint sprint-064 Learnings
+- init Kalan — Build/Test Dinamik + Çift Çağrı + --env Çakışma: NO_GO — All three init improvements (A/B/C) were already fully implemented in Sprint 063 (GO_WITH_TECH_DEBT).
+
+A) DECKENT.md Bui
+- plan Kalan — Timeout, Parser, Safeguard, Logging, Default, Truncation: NO_GO — 6 plan improvement implemented:
+
+A) AI Planner Timeout Configurable: Added ai_planner_timeout to DeckentConfig and Resol
+- start Kalan — Sandbox, Zero-Config, Fix Timeout, Queue, Usage, Watch, Phase: NO_GO — All 7 start improvements were already implemented and verified:
+
+A) --sandbox-mode: applySandbox() (git stash --include-
+- status Kalan — Regex, Stale, Budget, Alert: NO_GO — All 4 status improvements (A, B, C, D) were already implemented in sprint-063 in status.ts and output.ts. This task adde
+- doctor Kalan — Memory Dedup, Debt Cache, ErrorRegistry, Permission, Subscription: NO_GO — All 5 doctor improvements were already implemented in sprint-063 (GO_WITH_TECH_DEBT). Verification: A) formatHumanDoctor
+- retro Kalan — Parse Fix, Learnings Kalite, Arşivleme: NO_GO — All 3 retro improvements verified complete from sprint-063 work. A) parseRetroToRichSummary: tolerant sprint ID extracti
+- cleanup Kalan — Çift Geçiş, Sahte Sprint, destroy, Decay, Parse, .gitignore: NO_GO — All 6 cleanup improvements implemented and verified:
+
+A) Single readdirSync pass in dry-run: allTaskFiles scanned once, 
+- usage + history Kalan — Canlı Usage, Subscription, Trend, Format, İçerik: NO_GO — All 5 improvements (A-E) were already fully implemented in the codebase from prior sprint work:
+
+A) Live Usage (5hr/week
+- config Kalan — autoMigrate, Modes, Validation: NO_GO
+- spawn/kill + attach/watch Kalan — Scope, Subprocess, Multi-Provider, Watch: NO_GO — All 7 improvements (A-G) were already implemented in prior sprint. This task: (1) Fixed kill --all to use killSingle() i
+## Sprint sprint-065 Learnings
+- plan — AI Planner Timeout Configurable: GO_WITH_TECH_DEBT — A) Added ai_planner_timeout?: number to DeckentConfig and ResolvedConfig in config-types.ts. The planner.ts already supp
+- config — autoMigrateOnLoad + Modes Nesting: GO_WITH_TECH_DEBT — A) autoMigrateOnLoad: Added import for needsMigration/migrateConfig in config.ts. loadConfig() now calls needsMigration(
+- cleanup — Çift Geçiş, Sahte Sprint, destroy Session, .gitignore: GO_WITH_TECH_DEBT — All 4 sub-tasks implemented:
+
+A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles dizisi, filter 
+- spawn — Scope Enforcement + Multi-Provider: GO_WITH_TECH_DEBT — A) buildAllowedToolsFromScope: Added exported function that returns 'Read,Write,Edit,Bash,Glob,Grep' when task has scope
+- analyze — Wrapper Birleştirme + Monorepo: GO_WITH_TECH_DEBT — A) Two Engine Merge: analyzer.ts was already a wrapper around detectProjectStack(). Cleaned up the hardcoded src/dashboa
+- Dokümantasyon — CHANGELOG/SPRINT-LOG Restore + cli-deep-analysis Final: GO_WITH_TECH_DEBT — A) CHANGELOG.md: Sprint 055 (10/10, 0 NO_GO) ve Sprint 056 (7/20, 13 NO_GO) entry'leri git log'dan alınan verilerle ekle

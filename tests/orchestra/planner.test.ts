@@ -582,6 +582,86 @@ describe('buildZeroConfigPlanPrompt', () => {
   });
 });
 
+// ═══ AI Planner Timeout Configurable ════════════════════════════════
+
+describe('callBrainPlanner — configurable timeout', () => {
+  it('uses default BRAIN_PLAN_TIMEOUT_MS when no timeout provided', () => {
+    const adapter = makeMockAdapter();
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter);
+
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ timeout: BRAIN_PLAN_TIMEOUT_MS }),
+    );
+  });
+
+  it('uses custom timeout when provided (config.ai_planner_timeout)', () => {
+    const adapter = makeMockAdapter();
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    const customTimeout = 120_000;
+    callBrainPlanner(makeContext(), makeRecommendation(), 'sonnet', 'test', adapter, customTimeout);
+
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ timeout: customTimeout }),
+    );
+  });
+
+  it('custom timeout overrides the default BRAIN_PLAN_TIMEOUT_MS', () => {
+    const adapter = makeMockAdapter();
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    const shortTimeout = 5_000;
+    callBrainPlanner(makeContext(), makeRecommendation(), 'haiku', 'test', adapter, shortTimeout);
+
+    const callOptions = mockedSpawnSync.mock.calls[0]![2] as { timeout: number };
+    expect(callOptions.timeout).toBe(shortTimeout);
+    expect(callOptions.timeout).not.toBe(BRAIN_PLAN_TIMEOUT_MS);
+  });
+
+  it('callZeroConfigPlanner uses custom timeout when provided', () => {
+    const adapter = makeMockAdapter();
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    const customTimeout = 90_000;
+    callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter, customTimeout);
+
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ timeout: customTimeout }),
+    );
+  });
+
+  it('callZeroConfigPlanner uses default timeout when none provided', () => {
+    const adapter = makeMockAdapter();
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: validPlannerJSON, stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+
+    callZeroConfigPlanner('Add feature', 'sonnet', 'test-project', [], adapter);
+
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ timeout: BRAIN_PLAN_TIMEOUT_MS }),
+    );
+  });
+});
+
 // ═══ Zero hardcoded 'claude' strings verification ═══════════════════
 
 describe('planner.ts provider decoupling — zero hardcoded claude', () => {

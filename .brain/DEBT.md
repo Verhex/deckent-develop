@@ -9,3 +9,9 @@
 | debt-062-002 | Tech debt from 062-002: A) manifest.json created with all required fields: id=ci | 062-002 | sprint-062 | NORMAL | 0 | true | sprint-062 | 2026-03-26T06:50:31.394Z |
 | debt-062-006 | Tech debt from 062-006: CI Dashboard entegrasyonu tamamlandı. output.ts: CIBasel | 062-006 | sprint-062 | NORMAL | 0 | true | sprint-062 | 2026-03-26T06:50:31.396Z |
 | debt-062-007 | Tech debt from 062-007: GitHub Actions CI workflow updated with 4 improvements: | 062-007 | sprint-062 | NORMAL | 0 | true | sprint-062 | 2026-03-26T06:50:31.396Z |
+| debt-064-004-fix | Tech debt from 064-004-fix: Added 11 targeted tests to tests/cli/helpers/output. | 064-004-fix | sprint-064 | HIGH | 2 | false | - | 2026-03-26T11:32:51.300Z |
+| debt-065-001 | Tech debt from 065-001: A) Added ai_planner_timeout?: number to DeckentConfig an | 065-001 | sprint-065 | NORMAL | 0 | true | sprint-065 | 2026-03-26T13:12:30.481Z |
+| debt-065-002 | Tech debt from 065-002: A) autoMigrateOnLoad: Added import for needsMigration/mi | 065-002 | sprint-065 | NORMAL | 0 | true | sprint-065 | 2026-03-26T13:12:34.872Z |
+| debt-065-004 | Tech debt from 065-004: A) buildAllowedToolsFromScope: Added exported function t | 065-004 | sprint-065 | NORMAL | 0 | true | sprint-065 | 2026-03-26T13:12:42.389Z |
+| debt-065-005 | Tech debt from 065-005: A) Two Engine Merge: analyzer.ts was already a wrapper a | 065-005 | sprint-065 | NORMAL | 0 | true | sprint-065 | 2026-03-26T13:12:46.093Z |
+| debt-065-007 | Tech debt from 065-007: A) CHANGELOG.md: Sprint 055 (10/10, 0 NO_GO) ve Sprint 0 | 065-007 | sprint-065 | NORMAL | 0 | true | sprint-065 | 2026-03-26T13:12:53.399Z |

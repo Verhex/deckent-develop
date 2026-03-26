@@ -603,6 +603,22 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
       : '-';
     lines.push(`| ${task.id}: ${task.title} | ${agentStr} | ${skillsStr} | ${statusStr} |`);
   }
+
+  // Add ## Errors section for NO_GO tasks that have result notes
+  const noGoTasksWithNotes = sprint.tasks.filter(task => {
+    const ev = evaluations?.get(task.id);
+    const result = results?.find(r => r.taskId === task.id);
+    return ev === TaskEvaluation.NO_GO && result?.notes;
+  });
+  if (noGoTasksWithNotes.length > 0) {
+    lines.push('', '## Errors');
+    for (const task of noGoTasksWithNotes) {
+      const result = results?.find(r => r.taskId === task.id);
+      const notes = (result?.notes ?? '').slice(0, 200);
+      lines.push(`- ${task.id} (${task.title}): ${notes}`);
+    }
+  }
+
   writeFileSync(
     join(sprintsPath, `${sprint.id}.md`),
     lines.slice(0, SPRINT_LOG_MAX_LINES).join('\n'),
