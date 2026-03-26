@@ -41,15 +41,6 @@ export default defineConfig({
     lineNumbers: true,
   },
 
-  // Disable Vue component resolution for custom HTML-like tags in markdown
-  // Prevents <N>, <ISO>, <DRAFT>, <Record>, etc. from being treated as Vue components
-  vue: {
-    template: {
-      compilerOptions: {
-        isCustomElement: (tag: string) => /^[A-Z]/.test(tag),
-      },
-    },
-  },
 
   // Theme config
   themeConfig: {
