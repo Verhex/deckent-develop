@@ -130,6 +130,8 @@ jobs:
           node-version: '22.x'
           cache: npm
       - run: npm ci
+      - name: Install dashboard dependencies
+        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
       - name: Run dashboard tests
         run: npm run test:dashboard
         timeout-minutes: 5

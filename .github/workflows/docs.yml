@@ -46,7 +46,8 @@ jobs:
         run: npm run lint
 
       - name: Build docs
-        run: npm run docs:build --prefix docs
+        run: npx --prefix docs vitepress build
+        working-directory: docs
 
       - name: Create CNAME file for custom domain
         run: echo "docs.deckent.agency" > docs/.vitepress/dist/CNAME

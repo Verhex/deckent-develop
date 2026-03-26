@@ -31,8 +31,8 @@ describe("dashboard/pages — HistoryPage", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain("Sprint ID");
     expect(content).toContain("Tasks");
-    expect(content).toContain("Completed");
-    expect(content).toContain("No-Go Rate");
+    expect(content).toContain("Done");
+    expect(content).toContain("No-Go");
     expect(content).toContain("Coverage");
     expect(content).toContain("Duration");
   });
