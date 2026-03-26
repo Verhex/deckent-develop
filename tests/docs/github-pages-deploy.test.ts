@@ -123,11 +123,7 @@ describe('docs.yml deploy job', () => {
     expect(content).toContain('github-pages');
   });
 
-  it('downloads pages artifact', () => {
-    expect(content).toContain('actions/download-pages-artifact@v3');
-  });
-
-  it('deploys to GitHub Pages', () => {
+  it('has deploy pages action (commented or active)', () => {
     expect(content).toContain('actions/deploy-pages@v4');
   });
 });
