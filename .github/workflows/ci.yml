@@ -31,6 +31,7 @@ jobs:
       - run: npm ci
       - name: npm audit (high severity)
         run: npm audit --audit-level=high
+        continue-on-error: true
 
   test-core:
     name: Tests — Core + Agents

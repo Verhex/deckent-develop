@@ -1,6 +1,7 @@
 {
   "name": "deckent-docs",
   "version": "0.2.0",
+  "type": "module",
   "private": true,
   "description": "Deckent documentation site — built with VitePress",
   "scripts": {
