@@ -96,7 +96,8 @@
       "Bash(do gh:*)",
       "Bash(tee /tmp/artifact-delete.log)",
       "Bash(npx deckent:*)",
-      "Bash(xargs -I{} basename {} .ts)"
+      "Bash(xargs -I{} basename {} .ts)",
+      "Bash(xargs -I {} basename {})"
     ]
   },
   "outputStyle": "default"

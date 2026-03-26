@@ -4,6 +4,7 @@ import type { Command } from 'commander';
 import type { DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
 import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi } from '../helpers/output.js';
+import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 
@@ -18,6 +19,28 @@ interface StatusOpts {
 interface SprintMeta {
   title?: string;
   startedAt?: string;
+}
+
+function readCIData(root: string, sprintId?: string): { baseline?: CIBaseline; report?: CIReport } {
+  let baseline: CIBaseline | undefined;
+  const baselinePath = join(root, '.deckent', 'ci-baseline.json');
+  if (existsSync(baselinePath)) {
+    try {
+      baseline = JSON.parse(readFileSync(baselinePath, 'utf-8')) as CIBaseline;
+    } catch { /* ignore malformed */ }
+  }
+
+  let report: CIReport | undefined;
+  if (sprintId) {
+    const reportPath = join(root, '.brain', `ci-report-${sprintId}.json`);
+    if (existsSync(reportPath)) {
+      try {
+        report = JSON.parse(readFileSync(reportPath, 'utf-8')) as CIReport;
+      } catch { /* ignore malformed */ }
+    }
+  }
+
+  return { baseline, report };
 }
 
 function readSprintMeta(root: string, _sprintId: string): SprintMeta {
@@ -232,6 +255,7 @@ export function registerStatus(program: Command): void {
             } else {
               const tasks = loadTaskFiles(root);
               const meta = readSprintMeta(root, state.sprint.id);
+              const ci = readCIData(root, state.sprint.id);
               output(formatHumanStatus({
                 dashboard: state,
                 tasks,
@@ -239,6 +263,8 @@ export function registerStatus(program: Command): void {
                 sprintStartedAt: meta.startedAt,
                 projectRoot: root,
                 verbose: opts.verbose,
+                ciBaseline: ci.baseline,
+                ciReport: ci.report,
               }));
             }
           }
@@ -290,6 +316,7 @@ export function registerStatus(program: Command): void {
           // Human-friendly output (default)
           const tasks = loadTaskFiles(root);
           const meta = readSprintMeta(root, state.sprint.id);
+          const ci = readCIData(root, state.sprint.id);
           output(formatHumanStatus({
             dashboard: state,
             tasks,
@@ -297,6 +324,8 @@ export function registerStatus(program: Command): void {
             sprintStartedAt: meta.startedAt,
             projectRoot: root,
             verbose: opts.verbose,
+            ciBaseline: ci.baseline,
+            ciReport: ci.report,
           }));
           if (opts.verbose) {
             output(formatAgentAssignments(tasks, true));

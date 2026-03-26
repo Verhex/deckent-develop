@@ -3,6 +3,30 @@ import { AgentStatus, SprintPhase } from '../../core/types.js';
 import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { countBrainLines } from '../../core/utils.js';
 
+// ─── CI Types ────────────────────────────────────────────────────────
+
+export interface CIBaseline {
+  sprintId: string;
+  baseline: {
+    tscPassed: boolean;
+    testCount: number;
+    testPassed: number;
+    testFailed: number;
+    coverage: number;
+    timestamp: string;
+  };
+}
+
+export interface CIReport {
+  sprintId: string;
+  baseline: { testCount: number; coverage: number };
+  result: { testCount: number; testPassed: number; testFailed: number; coverage: number };
+  delta: { newTests: number; regressions: number; coverageDelta: number };
+  tscPassed: boolean;
+  buildPassed: boolean;
+  timestamp: string;
+}
+
 // ─── NO_COLOR Support ───────────────────────────────────────────────
 
 /**
@@ -228,6 +252,72 @@ export interface HumanStatusInput {
   nowMs?: number;
   projectRoot?: string;
   verbose?: boolean;
+  ciBaseline?: CIBaseline;
+  ciReport?: CIReport;
+}
+
+/**
+ * Format a one-line CI status summary for the status command.
+ * Returns null if no CI data is available.
+ */
+export function formatCIStatusLine(baseline?: CIBaseline, report?: CIReport): string | null {
+  if (report?.delta && report.result) {
+    const tscLabel = report.tscPassed ? 'tsc OK' : 'tsc FAIL';
+    const { newTests, regressions, coverageDelta } = report.delta;
+    const covLabel = coverageDelta >= 0 ? `+${coverageDelta.toFixed(1)}%` : `${coverageDelta.toFixed(1)}%`;
+    return `CI: ${tscLabel} | +${newTests} new tests | ${regressions} regression${regressions !== 1 ? 's' : ''} | coverage ${covLabel}`;
+  }
+  if (baseline?.baseline) {
+    const b = baseline.baseline;
+    const tscLabel = b.tscPassed ? 'tsc OK' : 'tsc FAIL';
+    return `CI: Baseline ${b.testCount} tests, ${b.coverage.toFixed(1)}% coverage | ${tscLabel}`;
+  }
+  return null;
+}
+
+/**
+ * Format the full CI Health section for the doctor command.
+ * Includes last sprint summary and trend if multiple reports available.
+ */
+export function formatCIHealthSection(reports: CIReport[], baseline?: CIBaseline): string[] {
+  const lines: string[] = ['CI Health:'];
+
+  if (reports.length === 0 && !baseline) {
+    lines.push('  No CI data — run a sprint to generate CI reports');
+    return lines;
+  }
+
+  const latest = reports[0];
+
+  if (latest?.result && latest.delta) {
+    const tscIcon = latest.tscPassed ? 'PASS' : 'FAIL';
+    const buildIcon = latest.buildPassed ? 'PASS' : 'FAIL';
+    lines.push(`  tsc --noEmit: ${tscIcon}`);
+    lines.push(`  Build: ${buildIcon}`);
+    lines.push(`  Tests: ${latest.result.testPassed}/${latest.result.testCount} (${latest.delta.regressions} regression${latest.delta.regressions !== 1 ? 's' : ''})`);
+    lines.push(`  New tests: +${latest.delta.newTests}`);
+    const covDelta = latest.delta.coverageDelta;
+    const covSign = covDelta >= 0 ? '+' : '';
+    lines.push(`  Coverage: ${latest.result.coverage.toFixed(1)}% (${covSign}${covDelta.toFixed(1)}%)`);
+    lines.push(`  Sprint: ${latest.sprintId}`);
+  } else if (baseline?.baseline) {
+    const b = baseline.baseline;
+    lines.push(`  Baseline tests: ${b.testCount}`);
+    lines.push(`  Baseline coverage: ${b.coverage.toFixed(1)}%`);
+    lines.push(`  Sprint: ${baseline.sprintId}`);
+  }
+
+  if (reports.length >= 2) {
+    lines.push('  Trend (last 5 sprints):');
+    for (const r of reports.slice(0, 5)) {
+      if (!r.delta) continue;
+      const tscIcon = r.tscPassed ? 'OK' : 'FAIL';
+      const regLabel = r.delta.regressions > 0 ? ` ${r.delta.regressions} regressions` : '';
+      lines.push(`    ${r.sprintId}: tsc=${tscIcon}, +${r.delta.newTests} tests${regLabel}`);
+    }
+  }
+
+  return lines;
 }
 
 /**
@@ -481,6 +571,13 @@ export function formatHumanStatus(input: HumanStatusInput): string {
     if (dashboard.alerts.length > 10) {
       lines.push(`  ... and ${dashboard.alerts.length - 10} more`);
     }
+  }
+
+  // ─── CI Status ────────────────────────────────────
+  const ciLine = formatCIStatusLine(input.ciBaseline, input.ciReport);
+  if (ciLine) {
+    lines.push('');
+    lines.push(ciLine);
   }
 
   // ─── Budget Check (G) ──────────────────────────

@@ -59,6 +59,9 @@ vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn().mockResolvedValue(undefined),
   clearHooks: vi.fn(),
   loadPluginHooks: vi.fn().mockResolvedValue(0),
+  resolveCiGuardianConfig: vi.fn().mockReturnValue({ enabled: false }),
+  runCiRegressionCheck: vi.fn().mockReturnValue({ regressionDetected: false }),
+  runPreSprintValidation: vi.fn().mockReturnValue({ passed: true, baselineSaved: false }),
 }));
 
 vi.mock('../../src/orchestra/result-watcher.js', () => ({

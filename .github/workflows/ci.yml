@@ -19,6 +19,19 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+      - run: npm ci
+      - name: npm audit (high severity)
+        run: npm audit --audit-level=high
+
   test-core:
     name: Tests — Core + Agents
     runs-on: ubuntu-latest
@@ -74,7 +87,7 @@ jobs:
         timeout-minutes: 5
 
   test-remaining:
-    name: Tests — MCP + API + Integration + Security + Providers + Monitor + Docs + Skills + Analytics
+    name: Tests — MCP + API + Integration + Security + Providers + Monitor + Skills + Analytics
     runs-on: ubuntu-latest
     needs: typecheck
     strategy:
@@ -88,8 +101,38 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run remaining tests
-        run: npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
+        run: npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/skills/ tests/analytics/ tests/github/
         timeout-minutes: 10
+
+  test-docs-scripts:
+    name: Tests — Docs + Scripts (isolated)
+    runs-on: ubuntu-latest
+    needs: typecheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+      - run: npm ci
+      - name: Run docs and scripts tests
+        run: npx vitest run tests/docs/ tests/scripts/
+        timeout-minutes: 5
+
+  test-dashboard:
+    name: Tests — Dashboard
+    runs-on: ubuntu-latest
+    needs: typecheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+      - run: npm ci
+      - name: Run dashboard tests
+        run: npm run test:dashboard
+        timeout-minutes: 5
 
   test-windows:
     name: Tests — Windows (allow-failure)
@@ -109,10 +152,31 @@ jobs:
         timeout-minutes: 10
         continue-on-error: true
 
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: [test-core, test-orchestra, test-cli, test-remaining]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+      - run: npm ci
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        timeout-minutes: 20
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [test-core, test-orchestra, test-cli, test-remaining]
+    needs: [test-core, test-orchestra, test-cli, test-remaining, test-dashboard]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

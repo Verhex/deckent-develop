@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint62] - 2026-03-26
+
+### Added
+
+- ci-guardian Agent Tanımı + PROMPT.md
+- beforeSprint Hook — Pre-Sprint CI Validation
+- afterTask Hook — Task-Level Regression Detection
+- afterSprint Hook — Sprint CI Raporu
+- CI Learning — Sprint-to-Sprint Öğrenme
+
+### Changed
+
+- ci-testing Skill Tanımı + SKILL.md (completed with tech debt)
+- CI Dashboard Entegrasyonu (completed with tech debt)
+- GitHub Actions Workflow İyileştirme (completed with tech debt)
+
+
+_Tasks: 8 total, 8 done, 3 tech debt, 0 no-go_
+
 ## [0.2.0-beta.1-sprint61] - 2026-03-26
 
 ### Added

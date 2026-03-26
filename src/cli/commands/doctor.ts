@@ -14,7 +14,8 @@ import {
 import { countBrainLines } from '../../core/utils.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
-import { print, formatDoctorResult } from '../helpers/output.js';
+import { print, formatDoctorResult, formatCIHealthSection } from '../helpers/output.js';
+import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
@@ -322,6 +323,61 @@ export function countOpenDebtItems(root: string): number {
   }
 }
 
+/**
+ * Read CI baseline from .deckent/ci-baseline.json.
+ */
+export function readCIBaseline(root: string): CIBaseline | null {
+  const baselinePath = join(root, '.deckent', 'ci-baseline.json');
+  if (!existsSync(baselinePath)) return null;
+  try {
+    return JSON.parse(readFileSync(baselinePath, 'utf-8')) as CIBaseline;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read latest CI report from .brain/ci-report-sprint-{id}.json.
+ * If sprintId is provided, reads that specific report first.
+ */
+export function readLatestCIReport(root: string, sprintId?: string): CIReport | null {
+  if (sprintId) {
+    const reportPath = join(root, BRAIN_DIR, `ci-report-${sprintId}.json`);
+    if (existsSync(reportPath)) {
+      try {
+        return JSON.parse(readFileSync(reportPath, 'utf-8')) as CIReport;
+      } catch { /* fall through */ }
+    }
+  }
+  const reports = readAllCIReports(root, 1);
+  return reports[0] ?? null;
+}
+
+/**
+ * Read last N CI reports from .brain/ci-report-*.json, sorted newest first.
+ */
+export function readAllCIReports(root: string, count = 5): CIReport[] {
+  const brainPath = join(root, BRAIN_DIR);
+  if (!existsSync(brainPath)) return [];
+  try {
+    const files = readdirSync(brainPath)
+      .filter(f => f.startsWith('ci-report-') && f.endsWith('.json'))
+      .sort()
+      .reverse()
+      .slice(0, count);
+    const reports: CIReport[] = [];
+    for (const f of files) {
+      try {
+        const report = JSON.parse(readFileSync(join(brainPath, f), 'utf-8')) as CIReport;
+        reports.push(report);
+      } catch { /* skip malformed */ }
+    }
+    return reports;
+  } catch {
+    return [];
+  }
+}
+
 export interface HumanDoctorInput {
   result: DoctorResult;
   providers: DetectedProvider[];
@@ -332,6 +388,10 @@ export interface HumanDoctorInput {
   projectRoot?: string;
   /** Optional: health check results from Connector. When provided, replaces formatProviderHealthSection. */
   connectorHealthResults?: HealthCheckResult[];
+  /** Optional: CI baseline from .deckent/ci-baseline.json */
+  ciBaseline?: CIBaseline;
+  /** Optional: CI reports from .brain/ci-report-*.json (newest first) */
+  ciReports?: CIReport[];
 }
 
 /**
@@ -528,6 +588,15 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   }
 
   lines.push('');
+
+  // --- CI Health ---
+  const hasValidCIReports = input.ciReports && input.ciReports.length > 0 && input.ciReports.some(r => r.delta);
+  const hasValidCIBaseline = input.ciBaseline?.baseline !== undefined;
+  if (hasValidCIReports || hasValidCIBaseline) {
+    const ciLines = formatCIHealthSection(input.ciReports ?? [], input.ciBaseline);
+    lines.push(...ciLines);
+    lines.push('');
+  }
 
   // --- Provider Health ---
   if (input.projectRoot) {
@@ -801,6 +870,9 @@ export function registerDoctor(program: Command): void {
         const debtItems = countDebtItems(root);
         const connectorHealthResults = buildConnectorHealthResults(providers);
 
+        const ciBaseline = readCIBaseline(root);
+        const ciReports = readAllCIReports(root, 5);
+
         print(formatHumanDoctor({
           result,
           providers,
@@ -810,6 +882,8 @@ export function registerDoctor(program: Command): void {
           debtItems,
           projectRoot: root,
           connectorHealthResults,
+          ciBaseline: ciBaseline ?? undefined,
+          ciReports,
         }));
       }
 

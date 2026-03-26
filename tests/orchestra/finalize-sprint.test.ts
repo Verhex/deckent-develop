@@ -176,6 +176,9 @@ vi.mock('../../src/core/plugin-hooks.js', () => ({
   runHooks: vi.fn().mockResolvedValue(undefined),
   clearHooks: vi.fn(),
   loadPluginHooks: vi.fn().mockResolvedValue(0),
+  resolveCiGuardianConfig: vi.fn().mockReturnValue({ enabled: false }),
+  runCiRegressionCheck: vi.fn().mockReturnValue({ regressionDetected: false, tscPassed: true, targetedTestsPassed: true, targetedTestFiles: [], alerts: [], testCountDelta: 0 }),
+  runPreSprintValidation: vi.fn().mockReturnValue({ passed: true, tscPassed: true, testsPassed: true, testCount: 0, testPassed: 0, testFailed: 0, coverage: 0, baselineSaved: false }),
 }));
 
 vi.mock('../../src/core/stack-detector.js', () => ({

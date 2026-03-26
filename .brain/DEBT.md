@@ -6,3 +6,6 @@
 | debt-061-006 | Tech debt from 061-006: Task 061-006 (Open Debt Cleanup — debt-059-008-fix) tama | 061-006 | sprint-061 | NORMAL | 0 | true | sprint-061 | 2026-03-26T05:57:41.509Z |
 | debt-061-007 | Tech debt from 061-007: A) React Detection: Added dashboard sub-project check in | 061-007 | sprint-061 | NORMAL | 0 | true | sprint-061 | 2026-03-26T05:57:41.510Z |
 | debt-061-008 | Tech debt from 061-008: A) formatDurationShort added to sprint-reporter.ts — ret | 061-008 | sprint-061 | NORMAL | 0 | true | sprint-061 | 2026-03-26T05:57:41.511Z |
+| debt-062-002 | Tech debt from 062-002: A) manifest.json created with all required fields: id=ci | 062-002 | sprint-062 | NORMAL | 0 | true | sprint-062 | 2026-03-26T06:50:31.394Z |
+| debt-062-006 | Tech debt from 062-006: CI Dashboard entegrasyonu tamamlandı. output.ts: CIBasel | 062-006 | sprint-062 | NORMAL | 0 | true | sprint-062 | 2026-03-26T06:50:31.396Z |
+| debt-062-007 | Tech debt from 062-007: GitHub Actions CI workflow updated with 4 improvements: | 062-007 | sprint-062 | NORMAL | 0 | true | sprint-062 | 2026-03-26T06:50:31.396Z |

@@ -92,3 +92,7 @@
 A) Enriched Response Verification: Tüm 16 MCP tool'da e
 - Framework Detection + Analyzer Fix (P2): GO_WITH_TECH_DEBT — A) React Detection: Added dashboard sub-project check in stack-detector.ts detectFresh(). Checks src/dashboard/package.j
 - Remaining CLI Polish: GO_WITH_TECH_DEBT — A) formatDurationShort added to sprint-reporter.ts — returns '31m 8s' short format. formatDuration unchanged (backward c
+## Sprint sprint-062 Learnings
+- ci-testing Skill Tanımı + SKILL.md: GO_WITH_TECH_DEBT — A) manifest.json created with all required fields: id=ci-testing, category=workflow, 8 triggers (ci/test/regression/cove
+- CI Dashboard Entegrasyonu: GO_WITH_TECH_DEBT — CI Dashboard entegrasyonu tamamlandı. output.ts: CIBaseline + CIReport interfaces, formatCIStatusLine(), formatCIHealthS
+- GitHub Actions Workflow İyileştirme: GO_WITH_TECH_DEBT — GitHub Actions CI workflow updated with 4 improvements: A) Coverage job added — runs npm run test:coverage after test jo

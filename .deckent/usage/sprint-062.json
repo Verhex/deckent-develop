@@ -1,0 +1,86 @@
+[
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "062-001",
+    "timestamp": "2026-03-26T06:33:45.997Z",
+    "provider": "claude"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 5000,
+    "taskId": "062-002",
+    "timestamp": "2026-03-26T06:33:46.016Z",
+    "provider": "claude"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "062-003",
+    "timestamp": "2026-03-26T06:33:46.038Z",
+    "provider": "claude"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 5000,
+    "taskId": "062-004",
+    "timestamp": "2026-03-26T06:33:46.063Z",
+    "provider": "claude"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "062-001",
+    "timestamp": "2026-03-26T06:50:31.387Z",
+    "provider": "claude"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "062-002",
+    "timestamp": "2026-03-26T06:50:31.394Z",
+    "provider": "claude"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "062-003",
+    "timestamp": "2026-03-26T06:50:31.395Z",
+    "provider": "claude"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "062-004",
+    "timestamp": "2026-03-26T06:50:31.395Z",
+    "provider": "claude"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "062-005",
+    "timestamp": "2026-03-26T06:50:31.395Z",
+    "provider": "claude"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "062-006",
+    "timestamp": "2026-03-26T06:50:31.396Z",
+    "provider": "claude"
+  },
+  {
+    "model": "sonnet",
+    "tokenEstimate": 2000,
+    "taskId": "062-007",
+    "timestamp": "2026-03-26T06:50:31.396Z",
+    "provider": "claude"
+  },
+  {
+    "model": "opus",
+    "tokenEstimate": 2000,
+    "taskId": "062-008",
+    "timestamp": "2026-03-26T06:50:31.397Z",
+    "provider": "claude"
+  }
+]

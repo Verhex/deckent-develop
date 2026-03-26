@@ -102,8 +102,8 @@ import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs
 import { validateWorkerCoverage } from './coverage-validator.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
-import { loadPluginHooks, runHooks, clearHooks } from '../core/plugin-hooks.js';
-import type { BeforeSprintContext, AfterTaskContext, AfterSprintContext } from '../core/plugin-hooks.js';
+import { loadPluginHooks, runHooks, clearHooks, runCiRegressionCheck, resolveCiGuardianConfig, runPreSprintValidation } from '../core/plugin-hooks.js';
+import type { BeforeSprintContext, AfterTaskContext, AfterSprintContext, CiRegressionCheckResult, CiValidationResult } from '../core/plugin-hooks.js';
 
 // ─── Rich Output ──────────────────────────────────────────────────
 import { formatRichSprintSummary } from '../cli/helpers/sprint-summary-rich.js';
@@ -1516,6 +1516,15 @@ export async function runSprint(
       } catch { /* splash failure is non-fatal */ }
     }
 
+    // Run pre-sprint CI validation — may block sprint if tsc/tests fail
+    const ciResult: CiValidationResult = runPreSprintValidation(projectRoot, sprint.id);
+    if (!ciResult.passed) {
+      throw new BrainError(
+        ciResult.blockedReason ?? 'CI validation failed — sprint blocked',
+        SprintPhase.PLAN,
+      );
+    }
+
     // Run beforeSprint hooks after planning (non-fatal)
     try {
       await runHooks('beforeSprint', {
@@ -1614,11 +1623,42 @@ export async function runSprint(
     sprint.phase = SprintPhase.EVALUATE;
     const collectedIds = new Set(results.map(r => r.taskId));
 
+    // Resolve CI guardian config once for all tasks
+    const ciGuardianConfig = resolveCiGuardianConfig(projectRoot);
+
     for (const task of sprint.tasks) {
       if (collectedIds.has(task.id)) {
         const result = results.find(r => r.taskId === task.id);
         if (!result) continue; // narrowed: collectedIds contains task.id
-        const evaluation = evaluateResult(result, task);
+        let evaluation = evaluateResult(result, task);
+
+        // CI regression check: run after initial evaluation (non-fatal)
+        let ciCheckResult: CiRegressionCheckResult | undefined;
+        if (ciGuardianConfig.enabled && evaluation !== TaskEvaluation.NO_GO) {
+          try {
+            ciCheckResult = runCiRegressionCheck(projectRoot, result, ciGuardianConfig);
+            if (ciCheckResult.regressionDetected) {
+              // tsc failure + block_on_tsc_fail → downgrade to NO_GO
+              if (!ciCheckResult.tscPassed && ciGuardianConfig.block_on_tsc_fail) {
+                evaluation = TaskEvaluation.NO_GO;
+              }
+              // targeted test failure + block_on_test_fail → downgrade to NO_GO
+              if (!ciCheckResult.targetedTestsPassed && ciGuardianConfig.block_on_test_fail) {
+                evaluation = TaskEvaluation.NO_GO;
+              }
+              // If not downgraded to NO_GO, at least mark as tech debt
+              if (evaluation !== TaskEvaluation.NO_GO && evaluation === TaskEvaluation.DONE) {
+                evaluation = TaskEvaluation.GO_WITH_TECH_DEBT;
+              }
+              // Annotate result with regression info
+              (result as TaskResult & { regressionDetected?: boolean }).regressionDetected = true;
+              (result as TaskResult & { ciAlerts?: string[] }).ciAlerts = ciCheckResult.alerts;
+            }
+          } catch {
+            // CI regression check failure is non-fatal — continue with original evaluation
+          }
+        }
+
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
         // Record evaluation call in usage tracker
