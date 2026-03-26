@@ -117,7 +117,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run docs and scripts tests
-        run: npx vitest run tests/docs/ tests/scripts/
+        run: npx vitest run tests/docs/ tests/scripts/ --pool=forks
         timeout-minutes: 5
 
   test-dashboard:
