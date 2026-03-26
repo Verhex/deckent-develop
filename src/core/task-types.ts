@@ -167,10 +167,24 @@ export interface Task {
   forceModel?: ModelType;
   /** User-specified effort override from DIRECTIVES.md */
   forceEffort?: TaskEffort;
+  /** User-specified agent override from DIRECTIVES.md */
+  forceAgent?: string;
+  /** User-specified skill overrides from DIRECTIVES.md */
+  forceSkills?: string[];
+  /** User-specified agent exclusions from DIRECTIVES.md (prefix: -) */
+  excludeAgent?: string[];
+  /** User-specified skill exclusions from DIRECTIVES.md (prefix: -) */
+  excludeSkills?: string[];
   /** Assigned agent ID (from agent pool) or 'generic' */
   assignedAgent?: string;
   /** Assigned skill IDs (from skill pool) */
   assignedSkills?: string[];
+  /** Routing metadata for debugging and learning */
+  routingMeta?: {
+    taskDNA?: unknown;
+    confidence?: string;
+    routingVersion?: 'v1' | 'v2';
+  };
   createdAt?: string;
   updatedAt?: string;
 }

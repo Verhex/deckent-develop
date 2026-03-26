@@ -154,6 +154,17 @@ export interface DeckentConfig {
   // ─── Rollback ───────────────────────────────────────────────────────
   /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
   rollback_policy?: 'never' | 'on_failure' | 'always';
+
+  // ─── Routing Engine v2 ─────────────────────────────────────────────
+  /** Routing engine version: 'v1' (keyword-based), 'v2' (intent-based). Default: 'v1' */
+  routing_engine?: 'v1' | 'v2';
+  /** Routing engine tuning parameters (v2 only) */
+  routing_config?: {
+    agentMinScore?: number;
+    skillMinScore?: number;
+    confidenceThreshold?: number;
+    maxSkillsDefault?: number;
+  };
 }
 
 export interface ResolvedConfig {
@@ -191,6 +202,14 @@ export interface ResolvedConfig {
   ai_planner_timeout?: number;
   // Rollback
   rollback_policy?: 'never' | 'on_failure' | 'always';
+  // Routing Engine v2
+  routing_engine?: 'v1' | 'v2';
+  routing_config?: {
+    agentMinScore?: number;
+    skillMinScore?: number;
+    confidenceThreshold?: number;
+    maxSkillsDefault?: number;
+  };
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

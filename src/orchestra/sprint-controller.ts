@@ -87,6 +87,8 @@ import type { WorkerChannel } from '../agents/worker-ipc.js';
 // ─── Agent Pool & Selection ──────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
 import { selectAgent } from '../core/agent-selector.js';
+import { routeTaskV2 } from '../core/routing-engine.js';
+import type { UserOverride } from '../core/routing-types.js';
 
 // ─── Rollback ─────────────────────────────────────────────────────
 import {
@@ -682,24 +684,87 @@ export async function planSprint(
     );
   }
 
-  // Agent selection (non-fatal -- if pool fails, continue with generic workers)
+  // ─── Routing: V2 (intent-based) or V1 (keyword-based) ─────────────────────
+  const routingVersion = config.routing_engine ?? 'v1';
+
+  if (routingVersion === 'v2') {
+    // V2: Unified intent-based routing via routeTaskV2
+    try {
+      const agentPool = new AgentPoolManager(projectRoot);
+      const pool = agentPool.loadAgents();
+      const projectStackV2 = detectProjectStack(projectRoot);
+      const skillPoolV2 = new SkillPoolManager(projectRoot);
+      const skillsV2 = skillPoolV2.loadSkills();
+
+      for (const task of tasks) {
+        try {
+          const overrides: UserOverride[] = [];
+          if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
+            overrides.push({
+              source: 'task-directive',
+              forceAgent: task.forceAgent,
+              forceSkills: task.forceSkills,
+              excludeSkills: task.excludeSkills,
+              excludeAgents: task.excludeAgent,
+              priority: 3,
+            });
+          }
+
+          const decision = routeTaskV2(task, pool, skillsV2, {
+            projectStack: projectStackV2,
+            overrides,
+            config: config.routing_config,
+          });
+
+          task.assignedAgent = decision.agentId ?? 'generic';
+          task.assignedSkills = decision.skillIds;
+          task.routingMeta = {
+            taskDNA: decision.taskDNA,
+            confidence: decision.agentConfidence,
+            routingVersion: 'v2',
+          };
+
+          debugLog(
+            'planSprint:routing-v2',
+            `Task ${task.id} → agent=${task.assignedAgent}, skills=[${task.assignedSkills.join(', ')}], ` +
+            `confidence=${decision.agentConfidence}, intent=${decision.taskDNA.intent.primary}`,
+          );
+        } catch (taskErr) {
+          debugLog('planSprint:routing-v2', `V2 routing failed for task ${task.id}: ${taskErr}`);
+        }
+      }
+    } catch (poolErr) {
+      debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
+    }
+  } else {
+
+  // V1: Agent selection (non-fatal -- if pool fails, continue with generic workers)
   try {
     const agentPool = new AgentPoolManager(projectRoot);
     const pool = agentPool.loadAgents();
     for (const task of tasks) {
       try {
-        // Agent selection runs regardless of forceModel — agent expertise is independent of model choice
-        const result = selectAgent(task, pool);
-        task.assignedAgent = result.agent?.id ?? 'generic';
-        // Only apply agent's preferredModel when no forceModel override exists
-        if (result.agent?.preferredModel && !task.forceModel) {
-          task.model = result.agent.preferredModel;
+        // If DIRECTIVES specified Agent: override, use it directly
+        if (task.forceAgent) {
+          task.assignedAgent = task.forceAgent;
+          debugLog(
+            'planSprint:agent-selection',
+            `Task ${task.id} → forceAgent=${task.forceAgent} (DIRECTIVES override)`,
+          );
+        } else {
+          // Agent selection runs regardless of forceModel — agent expertise is independent of model choice
+          const result = selectAgent(task, pool);
+          task.assignedAgent = result.agent?.id ?? 'generic';
+          // Only apply agent's preferredModel when no forceModel override exists
+          if (result.agent?.preferredModel && !task.forceModel) {
+            task.model = result.agent.preferredModel;
+          }
+          // Log agent selection result for debugging persistence
+          debugLog(
+            'planSprint:agent-selection',
+            `Task ${task.id} → agent=${task.assignedAgent}, score=${result.score}, reason=${result.reason}`,
+          );
         }
-        // Log agent selection result for debugging persistence
-        debugLog(
-          'planSprint:agent-selection',
-          `Task ${task.id} → agent=${task.assignedAgent}, score=${result.score}, reason=${result.reason}`,
-        );
       } catch (taskErr) {
         debugLog('planSprint:agent-selection', `Agent selection failed for task ${task.id}: ${taskErr}`);
       }
@@ -717,18 +782,27 @@ export async function planSprint(
     if (skills.size > 0) {
       for (const task of tasks) {
         try {
-          const agentInfo = task.assignedAgent && task.assignedAgent !== 'generic'
-            ? { id: task.assignedAgent, expertise: [] as string[] }
-            : undefined;
-          const result = selectSkills(task, projectStack, skills, agentInfo);
-          if (result.skills.length > 0) {
-            task.assignedSkills = result.skills.map(s => s.id);
+          // If DIRECTIVES specified Skills: override, use it directly (don't let auto-selection overwrite)
+          if (task.forceSkills && task.forceSkills.length > 0) {
+            task.assignedSkills = task.forceSkills;
+            debugLog(
+              'planSprint:skill-selection',
+              `Task ${task.id} → forceSkills=[${task.forceSkills.join(', ')}] (DIRECTIVES override)`,
+            );
+          } else {
+            const agentInfo = task.assignedAgent && task.assignedAgent !== 'generic'
+              ? { id: task.assignedAgent, expertise: [] as string[] }
+              : undefined;
+            const result = selectSkills(task, projectStack, skills, agentInfo);
+            if (result.skills.length > 0) {
+              task.assignedSkills = result.skills.map(s => s.id);
+            }
+            // Log skill selection result for debugging persistence
+            debugLog(
+              'planSprint:skill-selection',
+              `Task ${task.id} → skills=[${(task.assignedSkills ?? []).join(', ')}]`,
+            );
           }
-          // Log skill selection result for debugging persistence
-          debugLog(
-            'planSprint:skill-selection',
-            `Task ${task.id} → skills=[${(task.assignedSkills ?? []).join(', ')}]`,
-          );
         } catch (taskErr) {
           debugLog('planSprint:skill-selection', `Skill selection failed for task ${task.id}: ${taskErr}`);
         }
@@ -737,6 +811,8 @@ export async function planSprint(
   } catch (poolErr) {
     debugLog('planSprint:skill-pool', `Skill pool loading failed: ${poolErr}`);
   }
+
+  } // end V1 else block
 
   // Write task files (skip in dry-run mode)
   if (!options?.dryRun) {
@@ -1450,6 +1526,31 @@ export async function finalizeSprint(
       poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
     }
   } catch { /* non-fatal: agent stats update failure */ }
+
+  // 8c. Record routing outcomes for v2 learning engine
+  try {
+    const routingVersion = (opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined;
+    if (routingVersion === 'v2') {
+      const { OutcomeTracker } = await import('./outcome-tracker.js');
+      const tracker = new OutcomeTracker(projectRoot);
+      for (const task of sprint.tasks) {
+        const evaluation = evaluations.get(task.id);
+        if (!evaluation) continue;
+        const taskResult = results.find(r => r.taskId === task.id);
+        tracker.recordOutcome({
+          taskId: task.id,
+          sprintId: sprint.id,
+          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as any,
+          agentId: task.assignedAgent ?? null,
+          skillIds: task.assignedSkills ?? [],
+          evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+          coverage: taskResult?.coverage ?? 0,
+          routingVersion: 'v2',
+        });
+      }
+      debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes`);
+    }
+  } catch { /* non-fatal: routing outcome recording failure */ }
 
   // 9. Update project docs
   if (opts?.config) {

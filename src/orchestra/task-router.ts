@@ -84,6 +84,8 @@ function inferProviderFromModel(model: ModelType | string): ProviderName | undef
 export function detectTaskType(task: Task): TaskType {
   const dirs = task.scope.directories;
   const allFiles = [...task.scope.filesWrite, ...task.scope.filesRead];
+  const writeFiles = task.scope.filesWrite;
+
   // Design: ui/, components/, .css, .html
   if (
     dirs.some(d => d === 'ui' || d.startsWith('ui/') || d === 'components' || d.startsWith('components/')) ||
@@ -92,11 +94,28 @@ export function detectTaskType(task: Task): TaskType {
     return 'design';
   }
 
-  // Test: tests/, .test., .spec.
-  if (
-    dirs.some(d => d === 'tests' || d.startsWith('tests/') || d === 'test' || d.startsWith('test/')) ||
-    allFiles.some(f => /\.(test|spec)\./i.test(f))
-  ) {
+  // FIX: Check code BEFORE test to prevent misclassification.
+  // A task with both src/ and tests/ in scope should be 'code' if most writes are in src/.
+  const hasSrcDir = dirs.some(d => d === 'src' || d.startsWith('src/'));
+  const hasTestDir = dirs.some(d => d === 'tests' || d.startsWith('tests/') || d === 'test' || d.startsWith('test/'));
+  const hasSrcFiles = allFiles.some(f => /\.(ts|tsx|js|jsx|py|java|go|rs)$/i.test(f));
+  const hasTestFiles = allFiles.some(f => /\.(test|spec)\./i.test(f));
+
+  // If BOTH src and test signals exist, use write ratio to decide
+  if ((hasSrcDir || hasSrcFiles) && (hasTestDir || hasTestFiles)) {
+    const srcWriteCount = writeFiles.filter(f => f.startsWith('src/') || (!f.includes('.test.') && !f.includes('.spec.'))).length;
+    const testWriteCount = writeFiles.filter(f => f.startsWith('tests/') || f.startsWith('test/') || f.includes('.test.') || f.includes('.spec.')).length;
+    // More source writes → code; more test writes → test; equal → code
+    return testWriteCount > srcWriteCount ? 'test' : 'code';
+  }
+
+  // Code: src/, .ts, .py, .java (checked before test)
+  if (hasSrcDir || hasSrcFiles) {
+    return 'code';
+  }
+
+  // Test: tests/, .test., .spec. (only when no src/ signal)
+  if (hasTestDir || hasTestFiles) {
     return 'test';
   }
 
@@ -106,14 +125,6 @@ export function detectTaskType(task: Task): TaskType {
     allFiles.some(f => /\.md$/i.test(f) || /readme/i.test(f))
   ) {
     return 'doc';
-  }
-
-  // Code: src/, .ts, .py, .java
-  if (
-    dirs.some(d => d === 'src' || d.startsWith('src/')) ||
-    allFiles.some(f => /\.(ts|tsx|js|jsx|py|java|go|rs)$/i.test(f))
-  ) {
-    return 'code';
   }
 
   return 'unknown';

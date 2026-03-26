@@ -1,0 +1,177 @@
+// ─── Routing Engine v2 Types ─────────────────────────────────────────────────
+// Task DNA, Activation Rules, Routing Decisions — the foundation of intent-based routing.
+
+// ─── Intent Classification ──────────────────────────────────────────────────
+
+export type IntentType =
+  | 'implementation'
+  | 'bugfix'
+  | 'refactor'
+  | 'testing'
+  | 'documentation'
+  | 'security'
+  | 'devops'
+  | 'config'
+  | 'performance'
+  | 'design'
+  | 'migration'
+  | 'unknown';
+
+export const ALL_INTENT_TYPES: readonly IntentType[] = [
+  'implementation', 'bugfix', 'refactor', 'testing', 'documentation',
+  'security', 'devops', 'config', 'performance', 'design', 'migration', 'unknown',
+] as const;
+
+export type OperationType =
+  | 'create'
+  | 'modify'
+  | 'delete'
+  | 'rename'
+  | 'test'
+  | 'document'
+  | 'configure';
+
+// ─── Task DNA ───────────────────────────────────────────────────────────────
+
+export interface TaskDNA {
+  intent: {
+    primary: IntentType;
+    secondary: IntentType[];
+    confidence: number; // 0.0-1.0
+  };
+  domains: Array<{ name: string; weight: number }>;
+  operations: Array<{ type: OperationType; weight: number }>;
+  complexity: {
+    fileCount: number;
+    moduleCount: number;
+    crossCutting: boolean;
+    estimatedSize: TaskSize;
+  };
+  scope: {
+    writeRatio: Record<string, number>; // dir prefix → proportion of writes
+    primaryWriteTarget: string;
+    testWriteRatio: number; // 0.0-1.0
+  };
+}
+
+export type TaskSize = 'trivial' | 'small' | 'medium' | 'large' | 'epic';
+
+// ─── Activation Rules ───────────────────────────────────────────────────────
+
+export interface ActivationRule {
+  name?: string;
+  when: Record<string, unknown>; // path-based condition on TaskDNA
+  score: number;
+}
+
+export interface ExclusionRule {
+  name?: string;
+  when: Record<string, unknown>;
+  reason?: string;
+}
+
+export interface ActivationConfig {
+  rules: ActivationRule[];
+  exclude: ExclusionRule[];
+  minScore: number;
+}
+
+export interface ActivationResult {
+  score: number;
+  excluded: boolean;
+  matchedRules: string[];
+  excludeReason?: string;
+}
+
+// ─── Confidence ─────────────────────────────────────────────────────────────
+
+export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'uncertain';
+
+// ─── Routing Decision ───────────────────────────────────────────────────────
+
+export interface RoutingDecision {
+  agentId: string | null;
+  agentScore: number;
+  agentConfidence: ConfidenceLevel;
+  skillIds: string[];
+  skillScores: Map<string, number>;
+  skillConfidence: ConfidenceLevel;
+  overrideSource: OverrideSource;
+  taskDNA: TaskDNA;
+  reasoning: string[];
+}
+
+export type OverrideSource = 'none' | 'task-directive' | 'sprint-directive' | 'project-config';
+
+// ─── Skill Budget ───────────────────────────────────────────────────────────
+
+export interface SkillBudget {
+  maxSkills: number;
+  maxTokensTotal: number;
+  perSkillTokenBudget: number;
+  reason: string;
+}
+
+// ─── User Override ──────────────────────────────────────────────────────────
+
+export interface UserOverride {
+  source: OverrideSource;
+  forceAgent?: string;
+  forceSkills?: string[];
+  excludeSkills?: string[];
+  excludeAgents?: string[];
+  priority: number; // higher = wins — task(3) > sprint(2) > project(1)
+}
+
+// ─── Learning ───────────────────────────────────────────────────────────────
+
+export interface LearningBonus {
+  entityId: string;  // agent or skill ID
+  bonus: number;     // positive = good history, negative = bad (capped ±3)
+  source: string;    // sprint ID or 'summary'
+}
+
+// ─── Routing Engine Config ──────────────────────────────────────────────────
+
+export interface RoutingEngineConfig {
+  agentMinScore: number;       // default 5
+  skillMinScore: number;       // default 3
+  maxSkillsDefault: number;    // default 3
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+export function createDefaultTaskDNA(): TaskDNA {
+  return {
+    intent: { primary: 'unknown', secondary: [], confidence: 0 },
+    domains: [],
+    operations: [],
+    complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' },
+    scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 },
+  };
+}
+
+export function createDefaultActivationConfig(minScore = 5): ActivationConfig {
+  return { rules: [], exclude: [], minScore };
+}
+
+export function createDefaultRoutingEngineConfig(): RoutingEngineConfig {
+  return { agentMinScore: 5, skillMinScore: 3, maxSkillsDefault: 3 };
+}
+
+export const LEARNING_BONUS_CAP = 3;
+
+export const SKILL_BUDGET_BY_SIZE: Record<TaskSize, number> = {
+  trivial: 0,
+  small: 1,
+  medium: 2,
+  large: 3,
+  epic: 3,
+};
+
+export const DEFAULT_TOKEN_BUDGET_PER_SKILL = 1500;
+export const DEFAULT_TOKEN_BUDGET_TOTAL = 4500;
+
+export function isValidIntentType(value: string): value is IntentType {
+  return (ALL_INTENT_TYPES as readonly string[]).includes(value);
+}

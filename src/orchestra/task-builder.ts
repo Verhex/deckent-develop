@@ -98,6 +98,10 @@ export interface CreateTaskParams {
   provider?: ProviderName;
   forceModel?: ModelType;
   forceEffort?: TaskEffort;
+  forceAgent?: string;
+  forceSkills?: string[];
+  excludeAgent?: string[];
+  excludeSkills?: string[];
 }
 
 export interface ParsedDirectiveTask {
@@ -108,9 +112,51 @@ export interface ParsedDirectiveTask {
   provider?: ProviderName;
   forceModel?: ModelType;
   forceEffort?: TaskEffort;
+  forceAgent?: string;
+  forceSkills?: string[];
+  excludeAgent?: string[];
+  excludeSkills?: string[];
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
+
+/**
+ * Parse a Skills: directive line into force/exclude lists.
+ * Supports: "Skills: typescript-expert, -ci-testing, testing-expert"
+ * - prefix means exclude, no prefix means include (force).
+ * "Skills: none" → forceSkills=[], excludeSkills=[] (explicitly no skills)
+ * "Skills: auto" → undefined (let auto-selection run)
+ */
+export function parseSkillsDirective(line: string | undefined): {
+  forceSkills: string[] | undefined;
+  excludeSkills: string[] | undefined;
+} {
+  if (!line) return { forceSkills: undefined, excludeSkills: undefined };
+
+  const value = line.replace(/.*Skills:\s*/i, '').trim();
+  if (!value) return { forceSkills: undefined, excludeSkills: undefined };
+
+  const lower = value.toLowerCase();
+  if (lower === 'none') return { forceSkills: [], excludeSkills: undefined };
+  if (lower === 'auto') return { forceSkills: undefined, excludeSkills: undefined };
+
+  const parts = value.split(',').map(s => s.trim()).filter(Boolean);
+  const include: string[] = [];
+  const exclude: string[] = [];
+
+  for (const part of parts) {
+    if (part.startsWith('-')) {
+      exclude.push(part.slice(1).trim());
+    } else if (part.toLowerCase() !== 'auto') {
+      include.push(part);
+    }
+  }
+
+  return {
+    forceSkills: include.length > 0 ? include : undefined,
+    excludeSkills: exclude.length > 0 ? exclude : undefined,
+  };
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -161,8 +207,12 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     provider,
     forceModel: params.forceModel,
     forceEffort: params.forceEffort,
-    assignedAgent: 'generic',
-    assignedSkills: [],
+    forceAgent: params.forceAgent,
+    forceSkills: params.forceSkills,
+    excludeAgent: params.excludeAgent,
+    excludeSkills: params.excludeSkills,
+    assignedAgent: params.forceAgent ?? 'generic',
+    assignedSkills: params.forceSkills ?? [],
     createdAt: now(),
   };
 }
@@ -305,8 +355,21 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     // safe: validProviders.includes() confirms the string is a valid ProviderName before assignment
     const parsedProvider = (rawProvider && validProviders.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
+    // Extract optional Agent: override (e.g., "Agent: security-auditor" or "Agent: none")
+    const agentLine = lines.find(l => /^[\s-]*Agent:\s*/i.test(l.trim()));
+    const rawAgent = agentLine
+      ? agentLine.trim().replace(/^-\s+/, '').replace(/^Agent:\s*/i, '').trim()
+      : undefined;
+    const forceAgent = rawAgent
+      ? (rawAgent.toLowerCase() === 'none' ? 'generic' : rawAgent.toLowerCase() === 'auto' ? undefined : rawAgent)
+      : undefined;
+
+    // Extract optional Skills: override (e.g., "Skills: typescript-expert, -ci-testing")
+    const skillsLine = lines.find(l => /^[\s-]*Skills:\s*/i.test(l.trim()));
+    const { forceSkills, excludeSkills } = parseSkillsDirective(skillsLine);
+
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort });
+    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills });
   }
   return tasks;
 }
@@ -387,6 +450,17 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         const testLine = allLines.find(l => /Test:\s*/i.test(l));
         const testTarget = testLine ? testLine.replace(/.*Test:\s*/i, '').trim() : undefined;
 
+        // Extract Agent override
+        const agentLineBullet = allLines.find(l => /Agent:\s*/i.test(l));
+        const rawAgentBullet = agentLineBullet ? agentLineBullet.replace(/.*Agent:\s*/i, '').trim() : undefined;
+        const forceAgentBullet = rawAgentBullet
+          ? (rawAgentBullet.toLowerCase() === 'none' ? 'generic' : rawAgentBullet.toLowerCase() === 'auto' ? undefined : rawAgentBullet)
+          : undefined;
+
+        // Extract Skills override
+        const skillsLineBullet = allLines.find(l => /Skills:\s*/i.test(l));
+        const { forceSkills: forceSkillsBullet, excludeSkills: excludeSkillsBullet } = parseSkillsDirective(skillsLineBullet);
+
         const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
         tasks.push({
           title,
@@ -396,6 +470,9 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           provider: parsedProvider,
           forceModel: parsedForceModel,
           forceEffort: parsedForceEffort,
+          forceAgent: forceAgentBullet,
+          forceSkills: forceSkillsBullet,
+          excludeSkills: excludeSkillsBullet,
         });
 
         i = j;

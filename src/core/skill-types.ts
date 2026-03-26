@@ -1,5 +1,6 @@
 // ─── Skill System Types ─────────────────────────────────────────────────────
 import type { ModelType } from './types.js';
+import type { ActivationConfig } from './routing-types.js';
 
 // ─── Skill Category ─────────────────────────────────────────────────────────
 
@@ -46,6 +47,10 @@ export interface SkillDefinition {
   model?: ModelType;
   enabled: boolean;
   stats: SkillStats;
+  /** Manifest version: 1 (v1 triggers), 2 (v2 activation rules) */
+  manifestVersion?: 1 | 2;
+  /** V2 activation rules — if present, used instead of triggers */
+  activation?: ActivationConfig;
 }
 
 // ─── Project Stack ──────────────────────────────────────────────────────────

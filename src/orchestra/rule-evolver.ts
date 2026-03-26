@@ -1,0 +1,160 @@
+// ─── Rule Evolver ───────────────────────────────────────────────────────────
+// Generates new activation rules from historical outcome data.
+// Rules with confidence >= 0.85 are auto-applied, >= 0.65 are suggested.
+
+import type { ActivationRule, ExclusionRule } from '../core/routing-types.js';
+import type { OutcomeTracker, EntityPerformance } from './outcome-tracker.js';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface EvolvedRule {
+  type: 'activation' | 'exclusion';
+  entityId: string;
+  entityType: 'agent' | 'skill';
+  rule: ActivationRule | ExclusionRule;
+  evidence: string;
+  confidence: number;    // 0.0-1.0
+  status: 'auto-applied' | 'suggested' | 'pending';
+  sampleSize: number;
+}
+
+export interface EvolutionResult {
+  newRules: EvolvedRule[];
+  reasoning: string[];
+}
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const MIN_SAMPLES = 5;
+const AUTO_APPLY_CONFIDENCE = 0.85;
+const SUGGEST_CONFIDENCE = 0.65;
+const HIGH_SUCCESS_THRESHOLD = 0.85;
+const LOW_SUCCESS_THRESHOLD = 0.50;
+const SIGNIFICANT_DELTA = 0.15;
+
+// ─── RuleEvolver ────────────────────────────────────────────────────────────
+
+export class RuleEvolver {
+  private readonly tracker: OutcomeTracker;
+
+  constructor(tracker: OutcomeTracker) {
+    this.tracker = tracker;
+  }
+
+  /**
+   * Analyze outcomes and generate new activation/exclusion rules.
+   */
+  evolveRules(): EvolutionResult {
+    const learnings = this.tracker.getLearnings();
+    const newRules: EvolvedRule[] = [];
+    const reasoning: string[] = [];
+
+    // Evolve agent rules
+    for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
+      const agentRules = this.evolveEntityRules(agentId, 'agent', perf);
+      newRules.push(...agentRules.rules);
+      reasoning.push(...agentRules.reasoning);
+    }
+
+    // Evolve skill rules
+    for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
+      const skillRules = this.evolveEntityRules(skillId, 'skill', perf);
+      newRules.push(...skillRules.rules);
+      reasoning.push(...skillRules.reasoning);
+    }
+
+    // Evolve synergy-based rules
+    const synergyRules = this.evolveSynergyRules();
+    newRules.push(...synergyRules.rules);
+    reasoning.push(...synergyRules.reasoning);
+
+    return { newRules, reasoning };
+  }
+
+  private evolveEntityRules(
+    entityId: string,
+    entityType: 'agent' | 'skill',
+    perf: EntityPerformance,
+  ): { rules: EvolvedRule[]; reasoning: string[] } {
+    const rules: EvolvedRule[] = [];
+    const reasoning: string[] = [];
+
+    if (perf.totalTasks < MIN_SAMPLES) return { rules, reasoning };
+
+    // Check each intent for significant deviations
+    for (const [intent, intentData] of Object.entries(perf.byIntent)) {
+      if (intentData.tasks < MIN_SAMPLES) continue;
+
+      const delta = intentData.successRate - perf.successRate;
+
+      // High success in this intent → new activation rule
+      if (intentData.successRate >= HIGH_SUCCESS_THRESHOLD && delta > SIGNIFICANT_DELTA) {
+        const confidence = Math.min(0.5 + intentData.tasks * 0.04, 0.95);
+        const status = confidence >= AUTO_APPLY_CONFIDENCE ? 'auto-applied' :
+                       confidence >= SUGGEST_CONFIDENCE ? 'suggested' : 'pending';
+
+        rules.push({
+          type: 'activation',
+          entityId,
+          entityType,
+          rule: {
+            name: `evolved-${entityId}-${intent}`,
+            when: { 'intent.primary': intent },
+            score: Math.round(intentData.successRate * 8),
+          } as ActivationRule,
+          evidence: `${intentData.tasks} tasks in '${intent}' intent, ${Math.round(intentData.successRate * 100)}% success (overall: ${Math.round(perf.successRate * 100)}%)`,
+          confidence,
+          status,
+          sampleSize: intentData.tasks,
+        });
+
+        reasoning.push(`${entityType} '${entityId}': strong in '${intent}' (${Math.round(intentData.successRate * 100)}% vs ${Math.round(perf.successRate * 100)}% overall) → new activation rule`);
+      }
+
+      // Low success in this intent → new exclusion rule
+      if (intentData.successRate < LOW_SUCCESS_THRESHOLD && delta < -SIGNIFICANT_DELTA) {
+        const confidence = Math.min(0.5 + intentData.tasks * 0.04, 0.95);
+        const status = confidence >= AUTO_APPLY_CONFIDENCE ? 'auto-applied' :
+                       confidence >= SUGGEST_CONFIDENCE ? 'suggested' : 'pending';
+
+        rules.push({
+          type: 'exclusion',
+          entityId,
+          entityType,
+          rule: {
+            name: `evolved-exclude-${entityId}-${intent}`,
+            when: { 'intent.primary': intent },
+            reason: `Low success rate (${Math.round(intentData.successRate * 100)}%) in '${intent}' tasks`,
+          } as ExclusionRule,
+          evidence: `${intentData.tasks} tasks in '${intent}' intent, ${Math.round(intentData.successRate * 100)}% success`,
+          confidence,
+          status,
+          sampleSize: intentData.tasks,
+        });
+
+        reasoning.push(`${entityType} '${entityId}': weak in '${intent}' (${Math.round(intentData.successRate * 100)}%) → new exclusion rule`);
+      }
+    }
+
+    return { rules, reasoning };
+  }
+
+  private evolveSynergyRules(): { rules: EvolvedRule[]; reasoning: string[] } {
+    const rules: EvolvedRule[] = [];
+    const reasoning: string[] = [];
+
+    for (const entry of this.tracker.getSynergyMatrix()) {
+      if (entry.tasks < MIN_SAMPLES) continue;
+
+      if (entry.verdict === 'synergy') {
+        reasoning.push(`Synergy detected: ${entry.pair} (${Math.round(entry.successRate * 100)}% over ${entry.tasks} tasks)`);
+      }
+
+      if (entry.verdict === 'conflict') {
+        reasoning.push(`Conflict detected: ${entry.pair} (${Math.round(entry.successRate * 100)}% over ${entry.tasks} tasks)`);
+      }
+    }
+
+    return { rules, reasoning };
+  }
+}

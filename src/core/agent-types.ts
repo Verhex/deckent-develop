@@ -1,5 +1,6 @@
 // ─── Agent Pool Types ────────────────────────────────────────────────────────
 import type { ModelType } from './types.js';
+import type { ActivationConfig } from './routing-types.js';
 
 // ─── Agent Stats ─────────────────────────────────────────────────────────────
 
@@ -29,6 +30,10 @@ export interface AgentDefinition {
   enabled: boolean;
   source: 'builtin' | 'user' | 'learned';
   stats: AgentStats;
+  /** Manifest version: 1 (v1 keyword), 2 (v2 activation rules) */
+  manifestVersion?: 1 | 2;
+  /** V2 activation rules — if present, used instead of triggerKeywords/triggerScopes */
+  activation?: ActivationConfig;
 }
 
 // ─── Agent Pool ──────────────────────────────────────────────────────────────
