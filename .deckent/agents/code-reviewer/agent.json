@@ -2,6 +2,12 @@
   "id": "code-reviewer",
   "name": "Code Reviewer",
   "description": "Systematic code review agent. Quality analysis, correctness checks, security review, and improvement suggestions.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "refactor" }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "expertise": [
     "code-review",
     "quality-analysis",

@@ -30,6 +30,7 @@ Thumbs.db
 .deckent/plugins/*
 !.deckent/plugins/.gitkeep
 .deckent/jobs/
+.deckent/usage/
 
 # Dashboard sub-project
 src/dashboard/node_modules

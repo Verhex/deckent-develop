@@ -1,4 +1,11 @@
 // ─── Decision Engine ───────────────────────────────────────────────────────
+// @deprecated This module is NOT used in production sprint execution.
+// V1 routing uses selectAgent + selectSkills directly in sprint-controller.ts (line 770+).
+// V2 routing uses routeTaskV2 from routing-engine.ts (line 690+).
+// DecisionOrchestrator is only used by test suites (tests/orchestra/ and tests/integration/).
+// This module was an early design pattern that was superseded by V1 selectAgent + V2 routeTaskV2.
+// See: sprint-controller.ts line 688-830 for V1/V2 routing logic.
+//
 // Orchestrates the full decision pipeline: analyze -> agent -> skills -> model -> effort -> scope
 import type { Task, TaskEffort } from '../core/types.js';
 import type {

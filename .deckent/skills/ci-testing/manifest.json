@@ -3,6 +3,15 @@
   "name": "CI Testing Expert",
   "version": "1.0.0",
   "description": "CI/CD testing expertise — regression detection, coverage analysis, test strategy",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "intent.primary": "testing" }, "score": 10 },
+      { "when": { "intent.primary": "devops" }, "score": 8 }
+    ],
+    "exclude": [{ "when": { "intent.primary": "implementation" } }],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "workflow",
   "triggers": ["ci", "test", "regression", "coverage", "pipeline", "build", "lint", "actions"],

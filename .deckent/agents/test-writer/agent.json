@@ -2,6 +2,12 @@
   "id": "test-writer",
   "name": "Test Writer",
   "description": "Testing expert for unit, integration, and e2e tests. Vitest patterns, coverage targets, mock strategies.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "testing" }, "score": 10 }],
+    "exclude": [{ "when": { "intent.primary": "documentation" } }],
+    "minScore": 5
+  },
   "expertise": [
     "unit-testing",
     "integration-testing",

@@ -3,6 +3,12 @@
   "name": "Documentation Writer",
   "version": "0.1.0",
   "description": "Technical writing, README structure, changelogs, JSDoc/TSDoc, API documentation",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "documentation" }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "workflow",
   "triggers": ["docs", "readme", "changelog", "guide", "tutorial", "jsdoc", "api-docs"],

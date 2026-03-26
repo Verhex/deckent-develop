@@ -46,7 +46,7 @@ Ajan-agnostik bir yapay zeka orkestrasyon sistemi. Hedeflerinizi doğal dille ta
 **Deckent Ne Değildir:**
 - Başka bir ChatGPT sarmalayıcı değil
 - Basit bir görev çalıştırıcı değil
-- Claude ile sınırlı değil (gelecek: sağlayıcı soyutlama katmanıyla çoklu sağlayıcı)
+- Claude ile sınırlı değil (çoklu sağlayıcı: Claude, OpenAI Codex, Gemini — Sprint 038'den beri aktif)
 
 **Temel İlkeler:**
 1. Yerel-öncelikli — CLI aracı olarak kurulur, MCP ile Claude Code'a entegre olur
@@ -652,23 +652,28 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 
 **Çıkış kriterleri:** 1027+ test, %97+ kapsam, kararlı MCP entegrasyonu, HTTP API, Web Dashboard, AI planlama, DECKENT.md bağımsızlık.
 
-## Aşama 2: Sağlayıcı Soyutlama (Sprint 9-12)
+## Aşama 2: Sağlayıcı Soyutlama (Sprint 9-12) — TAMAMLANDI
 
-- `claude -p` yi sağlayıcı arayüzüne soyutla
-- Sağlayıcı: Claude (native), OpenAI (gelecek), yerel LLM (gelecek)
-- tmux başlatma kalır — sağlayıcı sadece model çağrımını etkiler
+- `claude -p` sağlayıcı arayüzüne soyutlandı (ProviderAdapter interface)
+- Sağlayıcı: Claude (native), OpenAI Codex, Google Gemini — tümü aktif
+- tmux + subprocess backend seçenekleri
 
-## Aşama 3: Çoklu Sağlayıcı (Sprint 13+)
+## Aşama 3: Çoklu Sağlayıcı (Sprint 13-38) — TAMAMLANDI
 
-- Brain Opus'ta (Claude), worker'lar GPT-4o'da (OpenAI) — karıştır eşleştir
-- Maliyet optimizasyonu: pahalı görevler güçlü modellerde, basitler ucuzda
+- Brain Opus'ta (Claude), worker'lar farklı sağlayıcılarda — karıştır eşleştir
+- Maliyet optimizasyonu: tier-based model eşdeğerliği (premium/standard/economy)
+- Provider fallback chain: birincil → ikincil → üçüncül
 
-## Aşama 4: Platform Genişleme (Sprint 20+)
+## Aşama 4: Platform Genişleme (Sprint 039-065) — DEVAM EDİYOR
 
-- Web dashboard (React + WebSocket)
-- VSCode eklentisi (kenar çubuğu, durum çubuğu)
-- Takım modu: paylaşılan sprint'ler, rol tabanlı erişim
-- Bulut modu: uzak orkestrasyon (yerel tmux yok)
+- [x] Web dashboard (React + Vite + Tailwind) — Sprint 011
+- [ ] VSCode eklentisi (kenar çubuğu, durum çubuğu) — stub oluşturuldu
+- [x] npm publish altyapısı — Sprint 051
+- [x] VitePress dokümantasyon sitesi — Sprint 052
+- [x] CI Guardian ajan + ci-testing skill — Sprint 062
+- [x] Routing v2 engine (intent-based 3-layer) — Sprint 063
+- [x] 33+ CLI komutu, 10 MCP aracı, 8+1 ajan, 11 skill
+- [ ] Bulut modu: uzak orkestrasyon
 
 ---
 
@@ -698,6 +703,27 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 21 | 1260 | %97.5 | Parametrik orkestrasyon: sistem profili, subscription, resolveTaskModel, auto workers, test+run CLI |
 | 22 | 1392 | %97.5 | Decay fix, auto setup wizard, MCP enrichment 10/10, CLI hints, doctor --profile |
 | 23 | 1422 | %97.5 | AI planner fallback fix, 12/12 görev (ilk kez), görev kuyruğu dalga mekanizması doğrulandı |
+| 24-25 | 3150 | %97 | Plugin v2 sistemi, i18n çalışma zamanı, +1449 test, OSS altyapısı (CONTRIBUTING, LICENSE, CI) |
+| 26 | 3442 | %97 | Teknik borç temizliği, readJsonSafe migration, entegrasyon testleri |
+| 27 | 3609 | %97 | Sağlayıcı soyutlama, subprocess backend, 13 yeni modül, +14.737 satır |
+| 28 | 4100 | %97 | npm publish hazırlığı, hata kayıt sistemi, TUI wizard, onboard/upgrade |
+| 29 | 5300 | %97 | Ajan havuzu: 8 yerleşik ajan, seçim algoritması, CLI komutları |
+| 30 | 5700 | %97 | Yetenek sistemi: 10 yerleşik yetenek, stack tespiti, yetenek enjeksiyonu |
+| 31 | 6400 | %97 | Brain karar motoru: 6 adımlı pipeline, öğrenme döngüsü, uyarlanır ajan |
+| 32 | 6900 | %97 | UX: ilerleme çubuğu, zengin özet, bildirimler, etkileşimli inceleme |
+| 33 | 7500 | %97 | Entegrasyon testleri, yetenek pazarı, güvenlik sandbox |
+| 35-36 | 8073 | %97.5 | Beta temizlik: brain.ts bölme (1312→58 satır), types.ts bölme, barrel temizlik |
+| 37 | 8073 | %97.5 | Güvenlik sertleştirme, plugin sistemi, AST sandbox, JSDoc |
+| 38 | 8555 | %97.5 | Çoklu sağlayıcı: Claude + Codex + Gemini adaptörleri, tier eşdeğerlik |
+| 039-041 | 8960 | %97.5 | Worker verify döngüsü, insan-dostu çıktı, MCP format |
+| 042-047 | 10127 | %97.5 | Stabilizasyon, MCP-native sağlayıcılar, 10K+ test, çoklu ortam |
+| 048-054 | 10509 | %96.4 | Blueprint cilalama, güvenlik başlıkları, npm publish, config genişleme |
+| 055-059 | 10700 | %96.4 | CLI derin analiz: 158 iyileştirme, init/plan/start/status/doctor/retro |
+| 060-061 | 10900 | %96.4 | CLI/Ajan doğrulama, ajan atama fix, brain bütçe decay |
+| 062 | 11200 | %96.4 | ci-guardian ajan + ci-testing yetenek + CI hook'ları |
+| 063 | 11500 | %96.4 | Routing v2 motoru (intent-based 3 katman) + forceSkills desteği |
+| 064 | 11500 | %96.4 | Doğrulama sprint'i (tüm görevler zaten tamamlanmış) |
+| 065 | 11862 | %96+ | AI planner timeout, autoMigrate, cleanup fix, analyzer birleştirme. 7/7 tamamlandı |
 
 **İlk dogfooding sonucu (Sprint 6):** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Orkestrasyon döngüsü (planla → başlat → yürüt → değerlendir → retro → temizle) uçtan uca tamamlandı.
 
@@ -714,6 +740,22 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 **Parametrik orkestrasyon dönüm noktası (Sprint 21):** Sistem profili tespiti, subscription tespiti, katmanlı model seçimi, otomatik worker sayısı. `deckent test` ve `deckent run` CLI komutları. Planner görev kuyruğu nihayet düzeltildi — tüm görevler max_workers'dan bağımsız planlanıyor. +137 test.
 
 **Tam orkestrasyon dönüm noktası (Sprint 23):** AI planner post-validation fallback — AI directive'deki görev sayısından az döndürürse structured mod'a düşüyor. İlk kez 12/12 görev planlandı ve tamamlandı. Görev kuyruğu dalga mekanizması (8 worker + 4 kuyruk) uçtan uca doğrulandı. Toplam 1422 test.
+
+**Mega sprint dönüm noktası (Sprint 24):** Plugin v2 sistemi (yükle/oluştur/kaldır/hook'lar), i18n çalışma zamanı, tek sprint'te +1449 test. OSS altyapısı: CONTRIBUTING.md, LICENSE, CI pipeline. Test sayısı 1701'den 3150'ye fırladı.
+
+**Ajan havuzu dönüm noktası (Sprint 29):** Dinamik ajan havuzu sistemi. 8 yerleşik ajan (security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer). Brain görev başına en iyi ajanı otomatik seçer.
+
+**Çoklu sağlayıcı dönüm noktası (Sprint 38):** Tam çoklu sağlayıcı altyapısı. 8 model, 3 sağlayıcı (Claude, Codex, Gemini). ProviderAdapter arayüzü, tier-based model eşdeğerliği, sağlayıcı fallback zinciri. Aynı sprint'te birden fazla sağlayıcı kullanılabilir.
+
+**10K test dönüm noktası (Sprint 046):** Test sayısı ilk kez 10.000'i aştı. 32+ CLI komutu. Çoklu ortam runtime.
+
+**CLI derin analiz dönüm noktası (Sprint 055-059):** Tüm 33+ CLI komutunun kapsamlı analizi — 158 iyileştirme fırsatı tespit edildi ve sistematik olarak çözüldü.
+
+**CI Guardian dönüm noktası (Sprint 062):** CI-farkında ajan sistemi. ci-guardian ajan + ci-testing yetenek. Üç yeni hook: beforeSprint, afterTask, afterSprint. Sprint'ten sprint'e CI öğrenme.
+
+**Routing v2 dönüm noktası (Sprint 063):** Intent-based 3 katmanlı yönlendirme motoru. Niyet sınıflandırma → ajan seçimi → yetenek seçimi. forceSkills ve forceModel desteği.
+
+**CLI tamamlanma dönüm noktası (Sprint 065):** Son CLI iyileştirme grubu: AI planner timeout, config autoMigrate, cleanup fix, spawn scope enforcement, analyzer birleştirme. 11.862 test, 469 test dosyası, 247 kaynak dosya, 75.105 satır.
 
 ---
 

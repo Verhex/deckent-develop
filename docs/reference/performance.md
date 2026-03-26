@@ -1,7 +1,7 @@
 # PERFORMANCE — Deckent Performance Tuning Guide
 
 > Reference: CONFIG-REFERENCE.md, ARCHITECTURE.md, SPRINT-LIFECYCLE.md
-> Last updated: Sprint 25 (2026-03-20)
+> Last updated: Sprint 065 (2026-03-26)
 
 ---
 

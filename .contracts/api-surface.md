@@ -10,7 +10,7 @@ Each task is stored as `.tasks/task-{id}.json`:
   "id": "001-001",
   "title": "string",
   "description": "string",
-  "model": "opus | sonnet | haiku",
+  "model": "opus | sonnet | haiku | gpt-5 | gpt-4.1 | gpt-5-mini | gemini-2.5-pro | gemini-2.5-flash",
   "effort": "low | normal | high",
   "priority": "CRITICAL | HIGH | NORMAL | LOW",
   "reason": "string",
@@ -32,7 +32,16 @@ Each task is stored as `.tasks/task-{id}.json`:
   "assignedSkills": ["string[] (skill ids)"],
   "provider": "claude | codex | gemini",
   "forceModel": "opus | sonnet | haiku (optional — set when DIRECTIVES specifies model)",
-  "forceEffort": "low | normal | high (optional — set when DIRECTIVES specifies effort)"
+  "forceEffort": "low | normal | high (optional — set when DIRECTIVES specifies effort)",
+  "forceAgent": "string (optional — agent id override from DIRECTIVES or AI planner)",
+  "forceSkills": ["string[] (optional — skill id overrides from DIRECTIVES or AI planner)"],
+  "excludeAgent": ["string[] (optional — agent ids to exclude from routing, forceSkills still apply)"],
+  "excludeSkills": ["string[] (optional — skill ids to exclude from routing)"],
+  "routingMeta": {
+    "taskDNA": "object (optional — TaskDNA used for v2 routing decisions)",
+    "confidence": "string (optional — routing confidence score)",
+    "routingVersion": "v1 | v2 (optional — routing engine version used)"
+  }
 }
 ```
 

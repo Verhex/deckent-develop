@@ -7,7 +7,7 @@
 
 ## What's New
 
-Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Claude, Codex, Gemini) to execute software engineering tasks in parallel. This beta release marks the first externally testable version after 47 development sprints.
+Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Claude, Codex, Gemini) to execute software engineering tasks in parallel. This beta release marks the first externally testable version after 65 development sprints.
 
 ### Multi-Provider Support
 - **3 AI Providers**: Claude (via tmux/subprocess), OpenAI Codex, and Google Gemini
@@ -39,7 +39,7 @@ Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Cl
 ### Developer Experience
 - **Human-Friendly Output**: Colored CLI status, doctor health check, error messages with suggestions, worker progress logs
 - **Web Dashboard**: React+Vite+Tailwind dashboard with real-time SSE updates at localhost:3100
-- **MCP Integration**: 10 MCP tools + 5 resources for IDE integration (Cursor, Claude Code)
+- **MCP Integration**: 16 MCP tools + 9 resources for IDE integration (Cursor, Claude Code)
 - **Interactive Review**: `deckent review` for per-task approve/reject/retry
 - **Notification System**: Terminal bell, webhook, Discord, and Slack notifications
 - **Provider Health Doctor**: `deckent doctor` now shows per-provider CLI version, auth status, and install hints
@@ -58,26 +58,39 @@ Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Cl
 
 | Metric | Value |
 |--------|-------|
-| Total Sprints | 47 |
-| Test Count | 10,000+ |
-| Code Coverage | ~94% |
-| CLI Commands | 28+ |
-| MCP Tools | 10 |
-| MCP Resources | 5 |
-| Built-in Agents | 8 |
-| Built-in Skills | 10 |
+| Total Sprints | 65 |
+| Test Count | 11,862 |
+| Test Files | 469 |
+| Code Coverage | 96%+ |
+| CLI Commands | 33+ |
+| MCP Tools | 16 |
+| MCP Resources | 9 |
+| Built-in Agents | 8 + ci-guardian |
+| Built-in Skills | 10 + ci-testing |
 | Supported Providers | 3 (Claude, Codex, Gemini) |
 | Supported Platforms | macOS, Linux, WSL2 |
 | Runtime Dependencies | 1 (commander) |
 
-### Sprint NO_GO Trend (Last 4 Sprints)
+### New Since Sprint 048
+
+- **CI Guardian Agent** (Sprint 062): ci-guardian agent + ci-testing skill with beforeSprint/afterTask/afterSprint hooks
+- **Routing v2 Engine** (Sprint 063): Intent-based 3-layer agent/skill selection with learning feedback
+- **forceSkills/forceModel** (Sprint 063): DIRECTIVES can specify skills and model per task
+- **CLI Deep Analysis** (Sprint 055-065): 158 improvement opportunities identified and systematically resolved
+- **Config AutoMigrate** (Sprint 065): loadConfig() auto-runs needsMigration + migrateConfig
+- **AI Planner Timeout** (Sprint 065): Configurable ai_planner_timeout in config
+- **History Trend** (Sprint 065): Last 5 sprint success rate/coverage trend analysis
+- **Retro Archiving** (Sprint 065): RETRO.md auto-archived before overwrite
+
+### Sprint NO_GO Trend (Last 5 Sprints)
 
 | Sprint | NO_GO Rate | Notes |
 |--------|-----------|-------|
-| Sprint 044 | ~94.7% | Complex module integration, many partial results |
-| Sprint 045 | ~0% | All tasks passed after fixes |
-| Sprint 046 | 20% | 2/10 NO_GO (Connector + Gemini adapter) |
-| Sprint 047 | 100% → 0% | All NO_GO in automation; resolved via manual fix |
+| Sprint 061 | 0% | 8/8 tasks done, agent assignment fix |
+| Sprint 062 | 0% | 8/8 tasks done, ci-guardian system |
+| Sprint 063 | 50% | 7/14 done, routing v2 + complex scope |
+| Sprint 064 | 100% | Duplicate work validation (all already done) |
+| Sprint 065 | 0% | 7/7 tasks done, final CLI improvements |
 
 ---
 

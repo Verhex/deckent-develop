@@ -2,6 +2,12 @@
   "id": "bug-fixer",
   "name": "Bug Fixer",
   "description": "Root cause analysis and minimal fix specialist. Regression testing, bisect methodology, no band-aid patches.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "bugfix" }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "expertise": [
     "debugging",
     "root-cause-analysis",

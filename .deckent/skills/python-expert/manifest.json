@@ -3,6 +3,12 @@
   "name": "Python Expert",
   "version": "0.1.0",
   "description": "Python best practices, type hints, async patterns, testing, modern tooling",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "python" } }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "language",
   "triggers": ["python", "pip", "django", "flask", "fastapi", "pytest", "async"],

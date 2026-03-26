@@ -1,4 +1,8 @@
 // ─── Agent Selection Step ──────────────────────────────────────────────────
+// @deprecated This module is part of the abandoned DecisionOrchestrator pipeline.
+// Production code uses selectAgent directly from core/agent-selector.js.
+// See decision-engine.ts deprecation notice.
+//
 // Boosts agent scores based on TaskAnalysis type, then delegates to selectAgent.
 import type { AgentPool, AgentSelectionResult } from '../../core/agent-types.js';
 import type { TaskAnalysis, TaskType } from '../../core/decision-types.js';

@@ -6,8 +6,10 @@ import type {
   PlannerTask, ProviderName,
 } from '../core/types.js';
 import { TaskStatus, ALL_MODELS, PROVIDER_MODEL_MAP } from '../core/types.js';
+import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
+import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 // ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
@@ -227,22 +229,37 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const directories: string[] = [];
   const filesWrite: string[] = [];
 
-  // Match directory-like paths: src/..., tests/..., docs/...
-  const dirMatches = line.match(/\b(src\/[\w/.-]*|tests\/[\w/.-]*|docs\/[\w/.-]*)\//g);
+  // Match directory-like paths: src/, tests/, docs/, .deckent/, .brain/, .contracts/, .claude/, scripts/
+  const dirMatches = line.match(/\b(src\/[\w/.-]*|tests\/[\w/.-]*|docs\/[\w/.-]*|\.deckent\/[\w/.-]*|\.brain\/[\w/.-]*|\.contracts\/[\w/.-]*|\.claude\/[\w/.-]*|scripts\/[\w/.-]*)\//g);
   if (dirMatches) {
     for (const d of dirMatches) {
       if (!directories.includes(d)) directories.push(d);
     }
   }
 
-  // Match standalone doc references like CHANGELOG.md, docs/foo.md
-  const docFileMatches = line.match(/\b(docs\/[\w/.-]+\.(?:md|ts|js)|(?:CHANGELOG|README|SPRINT-LOG)\.md)\b/g);
+  // Match standalone doc/config references: any root-level .md, .json, .gitignore, etc.
+  const docFileMatches = line.match(/\b(docs\/[\w/.-]+\.(?:md|ts|js)|(?:[\w-]+)\.md)\b/g);
   if (docFileMatches) {
     for (const f of docFileMatches) {
-      // If it's a standalone doc file (not under docs/), add docs/ to directories
       if (!f.startsWith('docs/') && !directories.some(d => d.startsWith('docs/'))) {
         directories.push('docs/');
       }
+      if (!filesWrite.includes(f)) filesWrite.push(f);
+    }
+  }
+
+  // Match dotfile paths: .deckent/..., .brain/..., .contracts/...
+  const dotFileMatches = line.match(/\b(\.deckent\/[\w/.-]+\.(?:json|md|ts|js)|\.brain\/[\w/.-]+\.(?:json|md)|\.contracts\/[\w/.-]+\.(?:md|json)|\.claude\/[\w/.-]+\.(?:json|md))\b/g);
+  if (dotFileMatches) {
+    for (const f of dotFileMatches) {
+      if (!filesWrite.includes(f)) filesWrite.push(f);
+    }
+  }
+
+  // Match root-level config files: .gitignore, .npmignore, tsconfig.json, package.json, etc.
+  const rootConfigMatches = line.match(/\b(\.gitignore|\.npmignore|tsconfig\.json|package\.json|vitest\.config\.ts)\b/g);
+  if (rootConfigMatches) {
+    for (const f of rootConfigMatches) {
       if (!filesWrite.includes(f)) filesWrite.push(f);
     }
   }
@@ -507,11 +524,15 @@ export function plannerTaskToParams(
     effort: pt.effort,
     priority: pt.priority,
     reason: pt.reason,
-    scope: pt.scope,
+    scope: enrichScopeWithTestFiles(pt.scope, pt.scope.filesWrite),
     dependencies: pt.dependencies,
     goNogo: pt.goNogo,
     sprintId,
     initialStatus,
+    forceAgent: pt.forceAgent,
+    forceSkills: pt.forceSkills,
+    excludeAgent: pt.excludeAgent,
+    excludeSkills: pt.excludeSkills,
   };
 }
 
@@ -589,12 +610,21 @@ export function buildWorkerPrompt(
   const effortBudgetMap: Record<string, number> = { high: 2000, max: 2000, medium: 1500, normal: 1500, low: 1000 };
   const SKILL_PER_ITEM_MAX = effortBudgetMap[effort] ?? 1500;
   const SKILL_SECTION_MAX = Math.round(SKILL_PER_ITEM_MAX * 2.67);
+
+  // V2 routing: filter skill prompts to only those relevant to task intent
+  const isV2 = task.routingMeta?.routingVersion === 'v2';
+  const rawDNA = task.routingMeta?.taskDNA;
+  let effectiveSkillPrompts = skillPrompts;
+  if (isV2 && rawDNA && skillPrompts && skillPrompts.length > 1) {
+    effectiveSkillPrompts = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA);
+  }
+
   let skillBlock = '';
-  if (skillPrompts && skillPrompts.length > 0) {
+  if (effectiveSkillPrompts && effectiveSkillPrompts.length > 0) {
     const header = '=== Skills ===';
     const parts: string[] = [header];
     let totalLen = header.length;
-    for (const sp of skillPrompts) {
+    for (const sp of effectiveSkillPrompts) {
       const truncated = truncateAtParagraph(sp.content, SKILL_PER_ITEM_MAX);
       const entry = `--- ${sp.name} ---\n${truncated}`;
       if (totalLen + entry.length + 1 > SKILL_SECTION_MAX) break;

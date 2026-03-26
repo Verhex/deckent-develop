@@ -1,5 +1,7 @@
 # Deckent Test Report — Sprint 060 (Dummy Validation)
 
+> **Not:** Bu rapor Sprint 060'ta (2026-03-25) oluşturulmuştur. Sprint 065 itibarıyla proje 33+ CLI komutu, 11,862 test, 96%+ coverage düzeyindedir.
+
 *Tarih: 2026-03-25*
 *Test Eden: Claude Opus 4.6 (Brain)*
 *Yontem: Tum CLI komutlari, MCP tool/resource, agent/skill pool, sprint lifecycle dogrudan calistirildi ve sonuclari loglandi.*

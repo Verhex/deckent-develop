@@ -1,6 +1,8 @@
 # Agent/Skill Architecture & User Experience — Design Document
 
-> **Version:** Draft v1 | **Date:** 2026-03-21 | **Status:** Proposal
+> **Version:** Draft v1 | **Date:** 2026-03-21 | **Status:** Historical (mostly implemented)
+>
+> **Note:** This was a design proposal from pre-Sprint 029. Most of the proposals in this document have been implemented across Sprints 029-033 (Agent Pool, Skill System, Brain Decision Engine, UX Polish). For the current architecture, see [architecture.md](architecture.md) and [agents.md](agents.md). This document is preserved as historical reference.
 >
 > This document analyzes the current Deckent architecture and proposes extensions for dynamic agent pools, composable skills, intelligent Brain decisions, and polished end-user experience.
 
@@ -592,7 +594,7 @@ if (config.notifications?.discord) sendDiscordWebhook(config.notifications.disco
 | Mode | Current State | Enhancement |
 |------|--------------|-------------|
 | **CLI** | Functional, basic output | Rich formatting, progress bars, agent/skill visibility |
-| **MCP** | 10 tools, enriched responses | Add agent/skill info to status response |
+| **MCP** | 16 tools, enriched responses | Add agent/skill info to status response |
 | **Web Dashboard** | React + Vite, 4 pages | Add agent/skill visualization, diff viewer |
 | **API** | 16 endpoints + SSE | Add agent/skill endpoints, extended sprint detail |
 

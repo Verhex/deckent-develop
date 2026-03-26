@@ -25,8 +25,8 @@
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 10 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync
-- 5 resources: dashboard, directives, memory, debt, config
+- 16 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, usage, review, run, kill, cleanup
+- 9 resources: dashboard, directives, memory, debt, config, retro, usage, tasks, agents
 - Registration: `claude mcp add deckent -- npx deckent mcp`
 
 ## Context

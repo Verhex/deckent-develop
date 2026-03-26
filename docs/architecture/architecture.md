@@ -1,6 +1,6 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** Sprint 038 | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** Sprint 065 | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
 > For the primary system specification, see [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md).
@@ -26,7 +26,7 @@
 
 ## 1. System Overview
 
-Deckent is an **AI agent orchestration CLI** that manages multiple Claude Code agents working in parallel on a single codebase. A human operator writes `DIRECTIVES.md`, and Deckent translates those directives into coordinated agent work via a Brain-Worker-Auditor model.
+Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents (Claude, Codex, Gemini) working in parallel on a single codebase. A human operator writes `DIRECTIVES.md`, and Deckent translates those directives into coordinated agent work via a Brain-Worker-Auditor model. The system uses an intent-based routing v2 engine (Sprint 063) for agent/skill selection with learning feedback.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -1288,6 +1288,38 @@ The React dashboard (`src/dashboard/`) provides 4 pages:
 
 ---
 
+## Routing v2 Engine (Sprint 063)
+
+The routing v2 engine replaced simple keyword matching with an intent-based 3-layer selection system:
+
+```
+Layer 1: Intent Classification
+  Task title + description → intent type (feature, bugfix, refactor, test, docs, security, perf, ci)
+
+Layer 2: Agent Selection
+  Intent → agent mapping with learning feedback from prior sprint evaluations
+
+Layer 3: Skill Selection
+  Agent expertise + project stack → skill combination (max 3 per task)
+```
+
+Key features:
+- **forceSkills**: DIRECTIVES can specify `Skills: typescript-expert, testing-expert` per task
+- **forceModel**: DIRECTIVES can specify `Model: opus` per task
+- **Learning loop**: Agent/skill selection improves based on GO/NO_GO/TECH_DEBT evaluation history
+- **Implementation**: `src/orchestra/task-router.ts`
+
+## CI Guardian Agent (Sprint 062)
+
+The ci-guardian agent is a specialized agent for CI/CD integration:
+
+- **Agent**: `.deckent/agents/ci-guardian/` with PROMPT.md + agent.json
+- **Skill**: `.deckent/skills/ci-testing/` with SKILL.md + manifest.json
+- **Hooks**: beforeSprint (pre-sprint CI validation), afterTask (regression detection), afterSprint (CI report)
+- **Learning**: Sprint-to-sprint CI learning for improvement tracking
+
+---
+
 ## Related Documentation
 
 | Document | Description |
@@ -1305,4 +1337,4 @@ The React dashboard (`src/dashboard/`) provides 4 pages:
 
 ---
 
-*Generated for Sprint 25 — deckent v2.x — March 2026*
+*Last updated: Sprint 065 — deckent v0.2.0-beta.1 — March 2026*

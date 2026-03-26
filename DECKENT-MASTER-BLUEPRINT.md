@@ -1952,6 +1952,24 @@ Full directive: `docs/directives/sprint-034.md`
 | 045 | 9900 | 97.5% | MCP-Native Providers wired: connector+router in sprint lifecycle, Codex/Gemini real CLI adapters, .deck auth, doctor health, rich output, env-aware init, smoke tests |
 | 046 | 10127 | 97.5% | Multi-environment runtime: deckent start lifecycle, vscode extension stub, stack detection expansion, multi-env init wizard, language-agnostic verify. 8/10 done, 10K+ tests |
 | 047 | 10127 | 97.5% | Stabilization sprint: 0/10 (all NO_GO), manual debt resolution, MEMORY decayed, all debt resolved |
+| 048 | 10200 | 96% | Claude MCP Backend + Sandbox Mode + API Integration. 8/8 done, 7 tech debt |
+| 049 | 10200 | 96% | Health endpoints + exit handler + security headers + rate limiting. 8/8 done |
+| 050 | 10300 | 96% | npm publish dry-run + README overhaul + CHANGELOG update. 5/5 done |
+| 051 | 10300 | 96% | Config expansion + VitePress docs site setup + getting started guide. 8/8 done |
+| 052 | 10300 | 96% | Dashboard full expansion. 1/1 done |
+| 053 | 10400 | 96% | Self-healing bootstrap + skill injection. 2/8 done, 6 NO_GO |
+| 054 | 10509 | 96.4% | Agent activation systemPrompt + Brain self-learning config suggestions. 4/4 done |
+| 055 | 10509 | 96.4% | Retro parse fix, kill command, config nested keys, CLI polish. 10/10 done |
+| 056 | 10509 | 96.4% | Major CLI overhaul attempt: init/plan/start/status. 7/20 done, 13 NO_GO — too ambitious scope |
+| 057 | 10509 | 96.4% | status/retro/history complete, config quality. 11/13 done, 2 NO_GO |
+| 058 | 10509 | 96.4% | Agent+skill+plugin+dashboard improvements. 2/2 done, 0 NO_GO — perfect execution |
+| 059 | 10700 | 96.4% | CLI deep analysis + MCP expansion + provider support. 12/13 done, 1 NO_GO |
+| 060 | 10700 | 96.4% | CLI/Agent/Skill/MCP/Sprint validation sweep. 6/6 done |
+| 061 | 10900 | 96.4% | Agent assignment fix, brain budget decay, memory cleanup, CLI polish. 8/8 done |
+| 062 | 11200 | 96.4% | ci-guardian agent + ci-testing skill + CI hooks (beforeSprint/afterTask/afterSprint). 8/8 done |
+| 063 | 11500 | 96.4% | Routing v2 engine (intent-based 3-layer selection) + forceSkills support + CLI deep analysis completion. 7/14 done, 7 NO_GO |
+| 064 | 11500 | 96.4% | Validation sprint: all 14 tasks NO_GO (duplicate of already-implemented S063 work) |
+| 065 | 11862 | 96%+ | AI planner timeout config, autoMigrateOnLoad, cleanup fixes, spawn scope enforcement, analyzer merge. 7/7 done |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -2000,6 +2018,14 @@ Full directive: `docs/directives/sprint-034.md`
 **MCP-Native Providers milestone (Sprint 044-045):** Full provider ecosystem wired into sprint lifecycle. .deck secrets file for API key management. Kraken splash screen added. Environment detection (vscode/codex/gemini/cursor/shell/ci). Task router (TaskRouter) + Connector module integrated into bootstrapProviders flow. Codex CLI (`codex exec --full-auto`) and Gemini CLI (`gemini -p`) upgraded to real command execution. `deckent sync` and `deckent explain` CLI commands added. Rich sprint summary (7 sections) wired into finalizeSprint. 10 MCP tools + 5 resources.
 
 **10K tests milestone (Sprint 046):** Test count exceeded 10,000 for the first time. Multi-environment runtime with deckent start lifecycle improvements. vscode extension stub, stack detection expansion (10+ stacks), multi-IDE lock files, multi-env init wizard, language-agnostic verify flow. 32+ CLI commands. 8/10 tasks done.
+
+**CLI deep analysis milestone (Sprint 055-059):** Comprehensive deep analysis of all 33+ CLI commands identified 158 improvement opportunities. Sprints 055-059 systematically addressed init, plan, start, status, doctor, retro, history, cleanup, spawn, kill, attach, watch, and config commands. 10,509 tests, 96.4% coverage. cli-deep-analysis.md became the tracking document for CLI completeness.
+
+**CI Guardian milestone (Sprint 062):** CI-aware agent system introduced. ci-guardian agent with PROMPT.md + agent.json, ci-testing skill with manifest.json + SKILL.md. Three new plugin hooks: beforeSprint (pre-sprint CI validation), afterTask (task-level regression detection), afterSprint (sprint CI report). CI learning enables sprint-to-sprint improvement. GitHub Actions workflow enhanced with coverage job.
+
+**Routing v2 milestone (Sprint 063):** Intent-based 3-layer routing engine replaced simple keyword matching. Layer 1: intent classification from task title/description. Layer 2: agent selection via intent→agent mapping with learning feedback. Layer 3: skill selection via agent expertise + project stack. forceSkills and forceModel support added to DIRECTIVES task syntax. 33+ CLI commands confirmed complete.
+
+**CLI completion milestone (Sprint 065):** Final CLI improvements batch: AI planner timeout configurable (`ai_planner_timeout`), config autoMigrateOnLoad, cleanup single-pass fix, spawn scope enforcement + multi-provider, analyzer engine merge, history trend analysis, retro archiving. 7/7 tasks done, 0 NO_GO. Total: 11,862 tests, 469 test files, 247 source files, 75,105 lines.
 
 **Provider Architecture (Sprint 38):**
 ```

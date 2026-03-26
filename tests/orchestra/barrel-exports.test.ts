@@ -247,6 +247,10 @@ describe('Barrel exports form a minimal public surface', () => {
     'OutcomeTracker', 'assessQuality', 'assessSkillRelevance',
     'RuleEvolver', 'PromotionPipeline', 'MidSprintAdapter',
     'generateProjectConventionsSkill', 'generateDataDrivenSkills',
+    // Prompt Token Optimizer (Sprint 066 Task 1)
+    'filterSkillPrompts', 'filterSkillPromptsByDNA', 'computeSkillRelevance',
+    // Ecosystem Intelligence (Sprint 066 Task 1)
+    'analyzeNewSkill', 'persistSkillActivation',
   ];
 
   it('exports exactly the expected public functions (no extra runtime symbols)', () => {

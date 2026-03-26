@@ -1,22 +1,60 @@
 # Project Identity
 
 ## What Is This Project
-- Name: deckent-dev
+- Name: deckent
+- Type: AI agent orchestration CLI
+- Language: TypeScript (ESM)
+- Runtime: Node.js >=18
+- Author: Alperen @ Verhex
 
 ## Architecture
+- **orchestra/** (36 modules): Sprint lifecycle, planning, evaluation, routing
+  - brain.ts → re-export layer, sprint-controller.ts → full lifecycle
+  - planner.ts, task-builder.ts, result-evaluator.ts, task-router.ts
+  - debt-manager.ts, sprint-reporter.ts, tmux.ts, spawn-backend.ts
+- **core/** (42 modules): Types, config, utilities, agent/skill pools
+  - types.ts + domain-types, config.ts (3-layer merge), provider.ts
+  - agent-pool.ts (8 built-in, LRU), skill-pool.ts + skill-registry.ts (AST sandbox)
+- **agents/** (16 modules): Worker execution, prompt engineering
+- **providers/** (5 modules): Claude, Codex, Gemini adapters
+- **api/** (3 modules): HTTP API server, SSE, rate limiting
+- **mcp/**: MCP server — 16 tools + 9 resources, stdio transport
+- **cli/** (33+ commands): Full CLI with helpers, entry point
+- **dashboard/**: React + Vite + Tailwind web dashboard
 
 ## Current State
-- Test Count: 8
-- Coverage: 11.9%
-- Last Sprint: sprint-065
-- Total Sprints: 65
-- Completed Tasks: 99
+- Test Count: 11
+- Coverage: 96.0%
+- Last Sprint: sprint-066
+- Total Sprints: 66
+- Completed Tasks: 106
 - No-Go Rate: 0.0%
 
 ## Active Configuration
+- Build: tsc
+- Test: npx vitest run
+- Lint: tsc --noEmit
+- Providers: Claude (default), Codex, Gemini
+- Planning: ai | structured | auto
+- Agents: 8 built-in + ci-guardian
+- Skills: 10 built-in + ci-testing
 
 ## Key Rules
-- See .brain/DECISIONS.md for architecture decision records
+- See .brain/DECISIONS.md for 21 architecture decision records (ADR-001 through ADR-021)
+- Brain is the ONLY orchestrator — workers never plan
+- Sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
+- Memory budget: 600 lines max in .brain/
 
 ## Module Map
-- (auto-populated after first sprint)
+- orchestra/brain.ts → re-export layer (imports sprint-controller)
+- orchestra/sprint-controller.ts → full sprint lifecycle (8 phases)
+- orchestra/planner.ts → AI task planning (Zod-validated)
+- orchestra/task-router.ts → intent-based routing v2 (3-layer engine)
+- core/config.ts → 3-layer config merge with autoMigrateOnLoad
+- core/agent-pool.ts → AgentPoolManager, LRU eviction
+- core/skill-pool.ts → skill selection, stack detection
+- core/provider.ts → ProviderAdapter interface, multi-provider registry
+- agents/worker.ts → task claim, file locking, heartbeat, verify loop
+- cli/entry.ts → buildProgram() + 33+ commands
+- mcp/index.ts → 16 tools + 9 resources
+- api/server.ts → HTTP API + SSE (16 endpoints)

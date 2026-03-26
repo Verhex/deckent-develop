@@ -250,6 +250,14 @@ export interface PlannerTask {
   scope: TaskScope;
   dependencies: string[];
   goNogo: GoNoGoCriteria;
+  /** User-specified agent override from AI planner output */
+  forceAgent?: string;
+  /** User-specified skill overrides from AI planner output */
+  forceSkills?: string[];
+  /** User-specified agent exclusions from AI planner output */
+  excludeAgent?: string[];
+  /** User-specified skill exclusions from AI planner output */
+  excludeSkills?: string[];
 }
 
 export interface PlannerResult {

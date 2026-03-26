@@ -2,6 +2,12 @@
   "id": "security-auditor",
   "name": "Security Auditor",
   "description": "Security-focused code analysis. OWASP compliance, vulnerability detection, threat modeling.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "security" }, "score": 10 }],
+    "exclude": [{ "when": { "intent.primary": "documentation" } }],
+    "minScore": 5
+  },
   "expertise": [
     "security",
     "authentication",

@@ -1,4 +1,4 @@
-> **ARCHIVED:** This audit was performed pre-Sprint 036 (project is now at Sprint 065). The data in this document is historical. brain.ts has since been split into focused sub-modules, test count has grown from 7,177 to 11,862, and significant architectural changes have been made. For current state, see [architecture.md](../architecture/architecture.md) and [health-check.md](../reference/health-check.md). A copy of this file is preserved in `docs/archive/full-audit-pre036.md`.
+> **Note:** This audit was performed pre-Sprint 036. brain.ts has since been split into focused sub-modules. See ARCHITECTURE.md for current structure.
 
 # DECKENT PRE-BETA TAM KAPSAM DENETİM RAPORU
 

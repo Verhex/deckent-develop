@@ -64,6 +64,12 @@ Manages CI/CD, deployment, and infrastructure tasks: GitHub Actions, Docker, env
 
 Triggers: `ci`, `cd`, `deploy`, `docker`, `github actions`, `pipeline`, `infrastructure`
 
+### ci-guardian (Sprint 062)
+
+A CI-aware agent that integrates with the sprint lifecycle through plugin hooks. Handles pre-sprint CI validation (beforeSprint), task-level regression detection (afterTask), and sprint CI reporting (afterSprint). Works with the ci-testing skill for comprehensive CI integration and sprint-to-sprint learning.
+
+Triggers: `ci`, `test`, `regression`, `coverage`, `pipeline`, `build`, `lint`, `workflow`
+
 ## Creating Custom Agents
 
 Create a new agent using the CLI:

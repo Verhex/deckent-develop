@@ -2,6 +2,12 @@
   "id": "performance-analyzer",
   "name": "Performance Analyzer",
   "description": "Performance profiling and optimization specialist. Big-O analysis, memory leaks, caching strategies, benchmarking.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "performance" }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "expertise": [
     "performance",
     "profiling",

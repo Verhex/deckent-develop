@@ -3,6 +3,12 @@
   "name": "Security Specialist",
   "version": "0.1.0",
   "description": "OWASP Top 10, authentication, input validation, secret management, vulnerability prevention",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "security" }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "domain",
   "triggers": ["security", "auth", "jwt", "encryption", "vulnerability", "owasp", "csrf", "xss", "sql-injection"],

@@ -1,6 +1,6 @@
 # DECKENT TAM DURUM ANALİZİ
 
-> Son güncelleme: 2026-03-22 | Kaynak: Codebase tam tarama | 689 .ts dosya, ~96.428 satır kod, 8.555+ test
+> Son güncelleme: 2026-03-26 (Sprint 065) | Kaynak: Codebase tam tarama | 247 .ts kaynak dosya, 75.105 satır kod, 11.862 test, 469 test dosyası
 
 ---
 

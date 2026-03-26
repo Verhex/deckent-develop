@@ -1,7 +1,7 @@
 # Deckent Troubleshooting Guide
 
 *Reference: DECKENT-MASTER-BLUEPRINT.md §3.4, §5, §10, §16, §21*
-*Last updated: Sprint 18 (2026-03-18)*
+*Last updated: Sprint 065 (2026-03-26)*
 
 ---
 

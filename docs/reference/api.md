@@ -1556,7 +1556,7 @@ Factory function for `Alert` objects. Stamps the current ISO timestamp automatic
 function createServer(): McpServer
 ```
 
-Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 10 tools and 5 resources.
+Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 16 tools and 9 resources.
 
 **Example:**
 ```ts

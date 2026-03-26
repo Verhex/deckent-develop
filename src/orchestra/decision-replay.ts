@@ -1,4 +1,10 @@
 // ─── Decision Replay ───────────────────────────────────────────────────────
+// @deprecated This module is NOT used in production sprint execution.
+// Re-run decisions and compare results for diagnostic purposes.
+// Only used by test suites (tests/orchestra/decision-replay.test.ts and others).
+// Since DecisionOrchestrator is not instantiated in sprint-controller, this replay mechanism is test-only.
+// See decision-engine.ts deprecation notice.
+//
 // Re-run decisions and compare results for diagnostic purposes.
 import type { Task } from '../core/types.js';
 import type { DecisionResult, DecisionLogEntry } from '../core/decision-types.js';

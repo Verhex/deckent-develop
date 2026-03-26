@@ -3,6 +3,12 @@
   "name": "Performance Optimizer",
   "version": "0.1.0",
   "description": "Profiling, caching, Big-O analysis, memory optimization, lazy loading, bundle optimization",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "performance" }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "domain",
   "triggers": ["performance", "optimize", "cache", "memory", "latency", "bottleneck", "profiling", "lazy-load", "bundle"],

@@ -105,3 +105,9 @@ export { RuleEvolver } from './rule-evolver.js';
 export { PromotionPipeline } from './promotion-pipeline.js';
 export { MidSprintAdapter } from './mid-sprint-adapter.js';
 export { generateProjectConventionsSkill, generateDataDrivenSkills } from './temp-skill-generator.js';
+
+// ─── Prompt Token Optimizer (public: V2 skill prompt filtering) ───────
+export { filterSkillPrompts, filterSkillPromptsByDNA, computeSkillRelevance } from './prompt-token-optimizer.js';
+
+// ─── Ecosystem Intelligence (public: auto-generate activation rules) ──
+export { analyzeNewSkill, persistSkillActivation } from './ecosystem-intelligence.js';

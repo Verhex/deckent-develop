@@ -149,7 +149,7 @@ Each ADR follows the format:
 | Decay | **Never decayed** |
 | Ownership | Brain writes; agents read |
 
-### Current ADRs (Sprint 17)
+### Current ADRs (Sprint 065 — 21 ADRs total)
 | ID | Subject |
 |---|---|
 | ADR-001 | TypeScript + ESM |
@@ -280,4 +280,4 @@ Accessible via Claude Code: use `deckent_status` MCP tool or read resource direc
 
 ---
 
-*Generated for Sprint 18 — deckent v2.1 — March 2026*
+*Last updated: Sprint 065 — deckent v0.2.0-beta.1 — March 2026*

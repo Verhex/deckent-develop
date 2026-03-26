@@ -1,4 +1,8 @@
 // ─── Scope Merge Step ──────────────────────────────────────────────────────
+// @deprecated This module is part of the abandoned DecisionOrchestrator pipeline.
+// Production code uses enrichScopeWithTestFiles directly from task-builder.ts.
+// See decision-engine.ts deprecation notice.
+//
 // Merges task scope with agent triggerScopes and skill contexts.
 // Security boundary: agent/skills CANNOT expand filesWrite -- only task defines write access.
 import type { TaskScope } from '../../core/types.js';

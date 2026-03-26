@@ -2,6 +2,25 @@
   "id": "doc-writer",
   "name": "Doc Writer",
   "description": "Documentation specialist. README structure, changelogs, JSDoc/TSDoc, guides, and API documentation.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "documentation"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [
+      {
+        "when": {
+          "intent.primary": "implementation"
+        }
+      }
+    ],
+    "minScore": 5
+  },
   "expertise": [
     "documentation",
     "technical-writing",
@@ -42,10 +61,10 @@
   "enabled": true,
   "source": "builtin",
   "stats": {
-    "totalUses": 0,
-    "successRate": 0,
+    "totalUses": 1,
+    "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": ""
+    "lastUsedInSprint": "sprint-066"
   },
   "systemPrompt": "You are a documentation expert. Write clear, concise technical documentation with practical examples. Structure content for scanning: headings, bullet lists, code blocks. Follow the Diataxis framework: tutorials (learning-oriented), how-to guides (task-oriented), reference (information-oriented), explanation (understanding-oriented). Use consistent terminology matching the codebase. Include runnable code examples that actually work. Document public APIs with parameter types, return values, and thrown errors. Write changelogs that explain impact, not just what changed. Keep README focused: what it does, how to install, how to use, where to get help."
 }

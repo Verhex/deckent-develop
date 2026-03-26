@@ -1486,3 +1486,66 @@ describe('createTask — assignedAgent/assignedSkills defaults', () => {
     expect(task3.assignedSkills).toEqual([]);
   });
 });
+
+// ─── plannerTaskToParams — PlannerTask override fields pass-through ──────────
+
+describe('plannerTaskToParams — override fields pass-through', () => {
+  it('passes forceAgent from PlannerTask to CreateTaskParams', () => {
+    const pt = makePlannerTask({ forceAgent: 'security-auditor' });
+    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    expect(params.forceAgent).toBe('security-auditor');
+  });
+
+  it('passes forceSkills from PlannerTask to CreateTaskParams', () => {
+    const pt = makePlannerTask({ forceSkills: ['typescript-expert', 'testing-expert'] });
+    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    expect(params.forceSkills).toEqual(['typescript-expert', 'testing-expert']);
+  });
+
+  it('passes excludeAgent from PlannerTask to CreateTaskParams', () => {
+    const pt = makePlannerTask({ excludeAgent: ['doc-writer', 'refactorer'] });
+    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    expect(params.excludeAgent).toEqual(['doc-writer', 'refactorer']);
+  });
+
+  it('passes excludeSkills from PlannerTask to CreateTaskParams', () => {
+    const pt = makePlannerTask({ excludeSkills: ['ci-testing'] });
+    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    expect(params.excludeSkills).toEqual(['ci-testing']);
+  });
+
+  it('override fields are undefined when not set in PlannerTask', () => {
+    const pt = makePlannerTask();
+    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    expect(params.forceAgent).toBeUndefined();
+    expect(params.forceSkills).toBeUndefined();
+    expect(params.excludeAgent).toBeUndefined();
+    expect(params.excludeSkills).toBeUndefined();
+  });
+
+  it('applies enrichScopeWithTestFiles to scope when tests/ directory is present', () => {
+    const pt = makePlannerTask({
+      scope: {
+        directories: ['src/core/', 'tests/core/'],
+        filesRead: [],
+        filesWrite: ['src/core/config.ts'],
+      },
+    });
+    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    // enrichScopeWithTestFiles should add tests/core/config.test.ts
+    expect(params.scope.filesWrite).toContain('tests/core/config.test.ts');
+  });
+
+  it('scope unchanged when no tests/ directory in PlannerTask', () => {
+    const pt = makePlannerTask({
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/brain.ts'],
+      },
+    });
+    const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
+    expect(params.scope.filesWrite).toEqual(['src/orchestra/brain.ts']);
+    expect(params.scope.directories).toEqual(['src/orchestra/']);
+  });
+});

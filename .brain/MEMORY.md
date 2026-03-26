@@ -126,3 +126,7 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - spawn — Scope Enforcement + Multi-Provider: GO_WITH_TECH_DEBT — A) buildAllowedToolsFromScope: Added exported function that returns 'Read,Write,Edit,Bash,Glob,Grep' when task has scope
 - analyze — Wrapper Birleştirme + Monorepo: GO_WITH_TECH_DEBT — A) Two Engine Merge: analyzer.ts was already a wrapper around detectProjectStack(). Cleaned up the hardcoded src/dashboa
 - Dokümantasyon — CHANGELOG/SPRINT-LOG Restore + cli-deep-analysis Final: GO_WITH_TECH_DEBT — A) CHANGELOG.md: Sprint 055 (10/10, 0 NO_GO) ve Sprint 056 (7/20, 13 NO_GO) entry'leri git log'dan alınan verilerle ekle
+## Sprint sprint-066 Learnings
+- Manifest v2 Batch Update — 20 Dosya: GO_WITH_TECH_DEBT — Tüm 9 agent.json ve 11 skill manifest.json dosyasına manifestVersion:2 ve activation kuralları eklendi. Kanıt: for loop 
+- MCP Dokumantasyon Tutarlilik — 16 Tool + 9 Resource: GO_WITH_TECH_DEBT — Updated all 12 documentation files: '10 tools' → '16 tools', '5 resources' → '9 resources'. README.md MCP Tools table ex
+- Housekeeping — gitignore + IDENTITY Sayilari: GO_WITH_TECH_DEBT — A) .gitignore: Added .deckent/usage/ line under .deckent section. Removed 33 tracked files from git index with git rm --

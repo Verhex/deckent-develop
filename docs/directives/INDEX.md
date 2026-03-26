@@ -30,5 +30,12 @@
 | 056 | 4 | Continuous Watch Mode |
 | 057 | 5 | Community Infrastructure |
 | 058 | 4 | Git Auto-Workflow |
+| 059 | 13 | CLI Deep Analysis + MCP Expansion |
+| 060 | 6 | CLI/Agent/Skill/MCP Validation Sweep |
+| 061 | 8 | Agent Assignment Fix + Brain Budget Decay + CLI Polish |
+| 062 | 8 | ci-guardian Agent + ci-testing Skill + CI Hooks |
+| 063 | 14 | Routing v2 Engine + forceSkills + CLI Deep Analysis Completion |
+| 064 | 14 | Kalan Eksikler Doğrulama (tümü NO_GO — zaten tamamlanmış) |
+| 065 | 7 | CLI Kalan Eksikler: planner timeout, autoMigrate, cleanup, spawn, analyze |
 
-*Son güncelleme: 2026-03-25*
+*Son güncelleme: 2026-03-26 (Sprint 065)*

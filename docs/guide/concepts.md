@@ -9,7 +9,7 @@
 A **sprint** is one cycle of planning, executing, and evaluating work. Each sprint has a unique ID (e.g., `sprint-001`) and follows a fixed lifecycle:
 
 ```
-PLAN → SPAWN → EXECUTE → EVALUATE → RETRO → DECAY
+PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 ```
 
 1. **PLAN** -- Brain reads your `DIRECTIVES.md` and creates task files

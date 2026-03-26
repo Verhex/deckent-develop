@@ -10,6 +10,7 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { registerSkillMarketplace } from './skill-marketplace.js';
 import { ErrorRegistry } from '../../core/errors.js';
+import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -364,6 +365,14 @@ export function registerSkill(program: Command): void {
               // checksum is optional — skip on failure
             }
 
+            // Auto-generate V2 activation rules for intent-based routing
+            try {
+              const activation = analyzeNewSkill(targetDir);
+              persistSkillActivation(targetDir, activation);
+            } catch {
+              // Non-fatal: activation rule generation is best-effort
+            }
+
             gitInstallName = manifestData.name as string;
           } finally {
             // H) Always clean up tmp dir regardless of success or failure
@@ -425,6 +434,14 @@ export function registerSkill(program: Command): void {
             });
           } catch {
             // checksum is optional — skip on failure
+          }
+
+          // Auto-generate V2 activation rules for intent-based routing
+          try {
+            const activation = analyzeNewSkill(targetDir);
+            persistSkillActivation(targetDir, activation);
+          } catch {
+            // Non-fatal: activation rule generation is best-effort
           }
 
           print(`Skill "${manifestData.name}" installed from ${sourcePath}.`);

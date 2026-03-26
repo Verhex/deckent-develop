@@ -2,6 +2,12 @@
   "id": "api-builder",
   "name": "API Builder",
   "description": "REST API development specialist. Endpoint design, HTTP conventions, validation, error responses, OpenAPI.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "api" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "expertise": [
     "rest-api",
     "http",

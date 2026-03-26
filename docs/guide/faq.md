@@ -1,6 +1,6 @@
 # Deckent — Frequently Asked Questions (FAQ)
 
-> **Last Updated:** Sprint 042 | **Language:** English
+> **Last Updated:** Sprint 065 | **Language:** English
 
 This FAQ addresses the most common questions about Deckent, its capabilities, requirements, and workflow.
 
@@ -132,8 +132,8 @@ Deckent provides an **MCP (Model Context Protocol) server** that integrates dire
 ```
 Claude Code (IDE) ─── MCP stdio transport ───> deckent-mcp server
                                                       ↓
-                                          src/mcp/tools/ (10 tools)
-                                          src/mcp/resources/ (5 resources)
+                                          src/mcp/tools/ (16 tools)
+                                          src/mcp/resources/ (9 resources)
                                                       ↓
                                           Deckent Core Engine
 ```

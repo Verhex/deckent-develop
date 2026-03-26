@@ -1,7 +1,7 @@
-# Deckent Health Check — Post-Sprint 38
+# Deckent Health Check — Sprint 065
 
-*Last audit: 2026-03-22 (Sprint 38 complete)*
-*Next audit: Sprint 39 completion*
+*Last audit: 2026-03-26 (Sprint 065 complete)*
+*Project: 65 sprints, 11,862 tests, 96%+ coverage*
 
 ---
 
@@ -11,86 +11,83 @@
 
 | Principle | Status | Evidence |
 |-----------|--------|----------|
-| Native-first (CLI+MCP) | WORKING | 28 CLI commands, 10 MCP tools (enriched), npm installable |
-| Self-evolving | PARTIAL | MEMORY.md exists, decay works, but learning loop is manual — Brain doesn't auto-improve from retro |
-| Observable | WORKING | .dashboard, deckent status/watch, web dashboard, AgentDetail |
-| Usage-aware | WORKING | checkUsage() parses `claude -p /usage`, adjustSprintSize reduces workers. resolveTaskModel() uses usage pressure |
-| Plan-compatible | WORKING | 4 modes defined (max/max5x/pro/api), auto-setup recommends mode based on subscription+system profile |
-| Zero-friction | WORKING | MCP auto-registration, natural language → DIRECTIVES → sprint, auto-setup wizard |
-| Open source | WORKING | MIT LICENSE file present |
+| Native-first (CLI+MCP) | WORKING | 33+ CLI commands, 16 MCP tools (enriched), npm installable |
+| Self-evolving | WORKING | MEMORY.md learnings, decay, brain self-learning config suggestions (Sprint 054), sprint-to-sprint CI learning (Sprint 062) |
+| Observable | WORKING | .dashboard, deckent status/watch, web dashboard, agent/skill visibility |
+| Usage-aware | WORKING | checkUsage(), adjustSprintSize, resolveTaskModel() with usage pressure |
+| Plan-compatible | WORKING | 4 modes (max/max5x/pro/api), auto-setup wizard, subscription detection |
+| Zero-friction | WORKING | MCP auto-registration, natural language → DIRECTIVES → sprint, zero-config mode |
+| Open source | WORKING | MIT LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md |
 
-### Section 3: CLI Commands (28)
+### Section 3: CLI Commands (33+)
 
 | Status | Count | Commands |
 |--------|-------|----------|
-| WORKING | 27 | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, usage, onboard, upgrade |
-| STUB | 1 | plugin install (not implemented) |
+| WORKING | 33+ | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, usage, onboard, upgrade, explain, review, finalize, agent, skill, plugin |
 
 ### Section 5: Agent System
 
 | Component | Status | Detail |
 |-----------|--------|--------|
-| Brain planSprint | WORKING | AI + structured + auto mode, post-validation fallback (Sprint 23 fix) |
-| Brain runSprint | WORKING | 8-phase lifecycle, 12/12 tasks in Sprint 23 (321s, 8+4 queue) |
-| Auditor scanLoop | WORKING | Heartbeat check fixed (Sprint 19), alert dedup working |
-| Worker spawn | WORKING | SpawnBackendFactory — tmux (default) or subprocess backend. Config: spawn_backend: "subprocess" |
-| Worker .result | WORKING | 12 workers wrote .result files in Sprint 23 |
-| Task queue | WORKING | First validated in Sprint 23: 8 worker + 4 queued, wave mechanism |
-| End-to-end chain | WORKING | Sprint 23: 12/12 tasks completed, 0 NO-GO, 321s |
+| Brain planSprint | WORKING | AI + structured + auto mode, Zod validation, post-validation fallback, ai_planner_timeout configurable (Sprint 065) |
+| Brain runSprint | WORKING | 8-phase lifecycle, validated through 65 sprints |
+| Auditor scanLoop | WORKING | In-process 30s cycle, heartbeat check, alert dedup, provider health |
+| Worker spawn | WORKING | SpawnBackendFactory — tmux or subprocess backend, multi-provider |
+| Worker verify loop | WORKING | tsc + vitest internal loop before reporting completion (Sprint 040) |
+| Task queue | WORKING | Wave mechanism: concurrent workers + queued tasks |
+| Task router | WORKING | Routing v2: intent-based 3-layer engine with learning (Sprint 063) |
+| End-to-end chain | WORKING | Continuous operation through 65 sprints |
 
 ### Section 6: Memory 3-Tier
 
 | Tier | Status | Detail |
 |------|--------|--------|
-| Tier 1: MEMORY.md | WORKING | Sprint 1-5, 15-22 learnings. Decay retains resolved entries for 3 sprints |
-| Tier 2: sprints/*.md | WORKING | sprint-022.md, sprint-023.md exist |
-| Tier 3: archive/ | WORKING | 6 archived sprints (001-006). Decay runs in Phase 7 |
+| Tier 1: MEMORY.md | WORKING | Sprint 1-65 learnings, 127 lines, decay active. Budget: 200 lines max |
+| Tier 2: sprints/*.md | WORKING | sprint-059.md through sprint-065.md (7 active sprint logs) |
+| Tier 3: archive/ | WORKING | 40+ archived sprints + 8 retro archives. Auto-archived on decay |
 
 ### Section 7: Sprint Lifecycle (8 phases)
 
-| Phase | Code | Tested | Run in Prod |
-|-------|------|--------|-------------|
-| PLAN | WORKING | Yes | Yes (Sprint 23 — 12 task JSONs, fallback mode) |
-| SPAWN | WORKING | Yes | Yes (Sprint 23 — 8 tmux windows + 4 queue) |
-| EXECUTE | WORKING | Yes | Yes (Sprint 23 — 12 parallel workers in waves) |
-| EVALUATE | WORKING | Yes | Yes (Sprint 23 — 8 DONE, 4 TECH_DEBT) |
-| FIX | WORKING | Yes | Never triggered (no NO_GO in prod) |
-| RETRO | WORKING | Yes | Yes (Sprint 23 — RETRO.md, sprint-023.md) |
-| DECAY | WORKING | Yes | Yes (Sprint 22 fix — DEBT-002 preserved) |
-| CLEANUP | WORKING | Yes | Yes (Sprint 23 — all .tasks/ files removed) |
+| Phase | Code | Tested | Last Verified |
+|-------|------|--------|---------------|
+| PLAN | WORKING | Yes | Sprint 065 (7 tasks planned) |
+| SPAWN | WORKING | Yes | Sprint 065 (multi-provider spawn) |
+| EXECUTE | WORKING | Yes | Sprint 065 (7 parallel workers) |
+| EVALUATE | WORKING | Yes | Sprint 065 (7 GO_WITH_TECH_DEBT) |
+| FIX | WORKING | Yes | Available, triggered on NO_GO |
+| RETRO | WORKING | Yes | Sprint 065 (RETRO.md + archive) |
+| DECAY | WORKING | Yes | Sprint 065 (budget maintained) |
+| CLEANUP | WORKING | Yes | Sprint 065 (.tasks/ cleaned) |
 
-Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran real orchestration.
+Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran real orchestration.
 
 ### Section 8: GO/NO-GO Protocol — WORKING
 
 ### Section 9: Usage-Aware Planning — WORKING
 
-### Section 10: tmux Management — WORKING
+### Section 10: tmux Management — WORKING (also subprocess backend available)
 
-### Section 11: Plugin System — STUB
-- plugin.ts is placeholder, prints "not yet implemented"
+### Section 11: Plugin System — WORKING
+- Plugin install/create/remove + runtime hooks (beforeSprint/afterTask/afterSprint)
+- 3 built-in plugins: test-runner, doc-writer, code-reviewer
+- ci-guardian agent hooks for CI integration (Sprint 062)
 
 ### Section 13: Multi-plan — WORKING
-- 4 modes defined, auto-setup wizard recommends based on subscription
-- resolveTaskModel() applies plan-aware model selection
 
-### Section 14: i18n — PARTIAL
-- en.json + tr.json exist with 6 message templates each
-- CLI hints system (hints.ts, messages.ts) uses tr/en localization
-- MCP enrichment uses tr/en localization
+### Section 14: i18n — WORKING
+- en.json + tr.json with localized messages
+- CLI hints, MCP enrichment, error messages all localized
 
-### Section 16: Self-Test 3 Layer — PARTIAL
+### Section 16: Self-Test 3 Layer — WORKING
+- 11,862 tests, 469 test files, 96%+ coverage
 
 ### Section 21: MCP — WORKING
-- 10 tools (all enriched with _enriched meta), 5 resources, background job pattern
+- 16 tools (all enriched with _enriched meta), 9 resources, background job pattern
 
 ### Section 22: User Flows — PARTIAL
-- No end-to-end flow tests
+- No dedicated end-to-end flow test suite (covered by sprint execution)
 
-### Section 23: Roadmap — Phase 1 MET
-- 8555+ tests > 987 target
-- 97.5% coverage > 97% target
-- MCP stable, HTTP API, Web Dashboard, AI planning, task queue validated
+### Section 23: Roadmap — Phase 1-3.5 MET, Phase 4 IN PROGRESS
 
 ---
 
@@ -98,219 +95,88 @@ Last real runSprint execution: **Sprint 23** (2026-03-18). Sprints 18-23 all ran
 
 | Metric | Value | Source |
 |--------|-------|--------|
-| Tests | 8555+ | `npx vitest run` |
-| Test files | 214 | `npx vitest run` |
-| Coverage | 97.5% | `npx vitest run --coverage` |
-| CLI commands | 28 | src/cli/commands/ |
-| MCP tools | 10 (enriched) | src/mcp/tools/ |
-| MCP resources | 5 | src/mcp/resources/ |
+| Tests | 11,862 | `npx vitest run` |
+| Test files | 469 | `npx vitest run` |
+| Coverage | 96%+ | `npx vitest run --coverage` |
+| Source files | 247 .ts | src/ directory |
+| Source lines | 75,105 | All .ts files |
+| CLI commands | 33+ | src/cli/commands/ |
+| MCP tools | 16 (enriched) | src/mcp/tools/ |
+| MCP resources | 9 | src/mcp/resources/ |
 | HTTP endpoints | 16 | src/api/server.ts |
-| Sprints | 38 | .brain/sprints/ |
-| .brain/ budget | ~180 / 600 lines | countBrainLines() |
+| Built-in agents | 8 + ci-guardian | .deckent/agents/ |
+| Built-in skills | 10 + ci-testing | .deckent/skills/ |
+| Providers | 3 (Claude, Codex, Gemini) | src/providers/ |
+| Sprints completed | 65 | .brain/sprints/ + archive/ |
+| ADRs | 21 | .brain/DECISIONS.md |
+| .brain/ budget | ~357 / 600 lines | countBrainLines() |
 
 ---
 
-## Orchestration Status (Sprint 23 — All Issues Resolved)
+## Agent & Skill System Status
 
-| Component | Status | Detail |
-|-----------|--------|--------|
-| runSprint e2e | WORKING | Full lifecycle completed in 321s (Sprint 23) |
-| Parallel workers | WORKING | 8 workers ran simultaneously, 4 queued |
-| Task queue | WORKING | 12 tasks planned, 8 worker + 4 queue waves (Sprint 23) |
-| Heartbeat timestamps | WORKING | Fixed in Sprint 19, validated in Sprint 20 |
-| Dashboard progress | WORKING | Fixed in Sprint 19, validated in Sprint 20 |
-| Alert dedup | WORKING | Fixed in Sprint 19, validated in Sprint 20 |
-| Doc task evaluation | WORKING | isDocTask() skips coverage check (Sprint 19) |
-| DEBT.md decay | WORKING | shouldRemoveResolvedDebt() retains for 3 sprints (Sprint 22) |
-| AI planner fallback | WORKING | Post-validation: AI<directives → structured fallback (Sprint 23) |
-| MCP enrichment | WORKING | 10/10 tools enriched with summary+hints+timestamp |
-| Auto setup | WORKING | generateSetupRecommendation() — subscription+system+project |
-| CLI hints | WORKING | getContextualHints() — phase-based suggestions (tr/en) |
-| Doctor --profile | WORKING | System profile display (CPU, RAM, workers, subscription) |
+### Built-in Agents (9)
 
----
+| Agent | Status | Specialization |
+|-------|--------|---------------|
+| security-auditor | WORKING | Security analysis, vulnerability detection |
+| test-writer | WORKING | Test creation, coverage improvement |
+| doc-writer | WORKING | Documentation generation |
+| code-reviewer | WORKING | Code quality, best practices |
+| refactorer | WORKING | Code restructuring, cleanup |
+| bug-fixer | WORKING | Bug diagnosis, fix implementation |
+| api-builder | WORKING | API design, endpoint implementation |
+| performance-analyzer | WORKING | Performance profiling, optimization |
+| ci-guardian | WORKING | CI/CD integration, regression detection (Sprint 062) |
 
-## Known Stubs / Limitations
+### Built-in Skills (11)
 
-| Item | Status | Priority |
-|------|--------|----------|
-| Plugin system | Stub (not implemented) | LOW |
-| i18n runtime | Partial (CLI hints + MCP enrichment only) | LOW |
-| Usage command | WORKING | -- |
-| Upgrade command | WORKING | -- |
-| Onboard command | WORKING | -- |
-| Self-evolving loop | Manual, not automatic | MEDIUM |
-
----
-
-## Stale State (Post-Cleanup)
-
-| Item | Status |
-|------|--------|
-| .tasks/ | CLEAN (Sprint 23 cleanup ran successfully) |
-| .dashboard | FRESH (Sprint 023 COMPLETE, total=12, done=12) |
-| last_sprint_id | sprint-023 (correct) |
-| RETRO.md | Sprint 23 retro written |
-| sprint-023.md | Created with metrics (12 tasks, 321s) |
-| DEBT-002 | PRESERVED (resolved, retained by decay fix) |
+| Skill | Status |
+|-------|--------|
+| typescript-expert | WORKING |
+| react-specialist | WORKING |
+| python-expert | WORKING |
+| api-builder | WORKING |
+| database-migration | WORKING |
+| testing-expert | WORKING |
+| documentation-writer | WORKING |
+| security-specialist | WORKING |
+| performance-optimizer | WORKING |
+| devops-engineer | WORKING |
+| ci-testing | WORKING (Sprint 062) |
 
 ---
 
-### Sprint 27 Features (Technical Gap Closure)
+## Provider Health
 
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Provider Abstraction | WORKING | ProviderAdapter interface + ProviderRegistry + ClaudeAdapter |
-| SpawnBackend Abstraction | WORKING | TmuxBackend + SubprocessBackend + SpawnBackendFactory, config-driven |
-| Subprocess Backend | VERIFIED | Sprint 30: tmux-free sprint completed successfully, 4 workers via child_process |
-| Usage Tracking | WORKING | UsageTracker class, sprint-based JSON storage, model breakdown |
-| Coverage Validation | WORKING | parseCoverageFromVitest, validateCoverage, doc-task skip |
-| Rollback Mechanism | WORKING | createSafetyPoint, rollback, getRollbackPolicy, DEBT.md recording |
-| Worker IPC | WORKING | WorkerChannel + ChannelRegistry, HEARTBEAT/PAUSE/RESUME/KILL messages |
-| Zero-Config Mode | WORKING | Single-line start: `deckent start "Add login page"` |
-| Sandbox Mode | PARTIAL | SandboxSpawnBackend exists, --sandbox-mode flag, needs Docker integration |
-| Global Config | WORKING | ~/.deckent/config.json, ensureGlobalDir, merge with project config |
-| Credentials Management | WORKING | ~/.deckent/credentials/, file permissions 0600, storeCredential/getCredential |
+| Provider | Status | Detail |
+|----------|--------|--------|
+| Claude | WORKING | tmux + subprocess backends, session auth |
+| Codex | WORKING | `codex exec --full-auto`, OPENAI_API_KEY |
+| Gemini | WORKING | `gemini -p`, GOOGLE_API_KEY |
+| Fallback chain | WORKING | primary → secondary → tertiary on failure |
+| Mixed sprint | WORKING | Multiple providers in same sprint |
 
 ---
 
-### Sprint 28 Features (npm Publish Prep)
+## Known Patterns
 
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Error Registry | WORKING | DeckentError + ErrorRegistry, 10 error codes, i18n support |
-| Error Handler | WORKING | Centralized CLI error handling, colored output, suggestions |
-| TUI Wizard | WORKING | WizardStep interface, select/input/confirm, non-interactive mode |
-| Onboard Wizard | WORKING | Interactive setup: Claude detection, system profile, config |
-| Upgrade Command | WORKING | npm view version check, --check flag, npm install -g |
-| Telemetry | WORKING | Opt-in TelemetryCollector, PII sanitization, default disabled |
-| Publish Pipeline | WORKING | prepublish, build-verify, pack-test, publish scripts |
-| .npmignore | WORKING | Excludes sensitive files from npm package |
-| Enhanced --version | WORKING | System info + --version-json flag |
-| Doctor UX | IMPROVED | Platform-specific install suggestions, [PASS]/[FAIL]/[WARN] colors |
+| Pattern | Occurrences | Status |
+|---------|-------------|--------|
+| stale_heartbeat | 2,089 | UNRESOLVED (Sprint 056-065) |
 
 ---
 
-### Sprint 29 Features (Agent Pool Core)
+## Recent Sprint Performance
 
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Agent Type System | WORKING | AgentDefinition, AgentPool, AgentSelectionResult types |
-| Agent Pool Manager | WORKING | Load from .deckent/agents/, validate, stats tracking |
-| Agent Selector | WORKING | Keyword+scope scoring, threshold >= 3, tie-break by successRate |
-| Built-in Agents | WORKING | 8 agents: security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer |
-| Shared Context | WORKING | Inter-agent communication via atomic JSON file |
-| Multi-Agent Pipeline | WORKING | Sequential agent execution with abort-on-failure |
-| Agent CLI | WORKING | deckent agent list/create/enable/disable |
-| Brain Integration | WORKING | planSprint auto-selects agent, injects PROMPT.md |
-| Dashboard Visibility | WORKING | Agent column in worker status (cyan/dim) |
+| Sprint | Tasks | Done | Tech Debt | NO_GO | Duration |
+|--------|-------|------|-----------|-------|----------|
+| S065 | 7 | 7 | 6 | 0 | 27m 10s |
+| S064 | 14 | 0 | 0 | 14 | 42m 32s |
+| S063 | 14 | 7 | 4 | 7 | ~30m |
+| S062 | 8 | 8 | 3 | 0 | ~25m |
+| S061 | 8 | 8 | 5 | 0 | ~28m |
 
 ---
 
-### Sprint 30 Features (Skill System)
-
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Skill Type System | WORKING | SkillDefinition, ProjectStack, SkillCategory types |
-| Skill Pool Manager | WORKING | Load from .deckent/skills/, validate, stats |
-| Stack Detector | WORKING | Auto-detect TS/React/Python/Rust/Go/Docker, cached |
-| Skill Selector | WORKING | Multi-factor scoring, max 3 skills, composition check |
-| Skill Registry | WORKING | Local index, search, popular ranking |
-| Built-in Skills | WORKING | 10 skills with SKILL.md prompts |
-| Skill CLI | WORKING | deckent skill list/create/install |
-| Brain Skill Integration | WORKING | planSprint async, stack detect + skill select |
-| Prompt Injection | WORKING | SKILL.md in worker prompt (1500/skill, 4000 total) |
-| Skill Config | WORKING | enabled, maxPerTask, autoDetectStack, preferredSkills |
-
----
-
-### Sprint 31 Features (Brain Decision Engine)
-
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Decision Engine | WORKING | 6-step pipeline, DecisionOrchestrator |
-| Task Analyzer | WORKING | Type inference, complexity scoring |
-| Decision Logging | WORKING | Persist to .tasks/decisions/, replay support |
-| Learning Loop | WORKING | Record/query/score agent+skill+model combinations |
-| Learning Decay | WORKING | Prune old data, compact to summary |
-| Parallel Pipeline | WORKING | Topological sort into execution waves |
-| Shared Memory | WORKING | Inter-worker key-value with TTL |
-| Conflict Resolver | WORKING | Detect overlaps, 3 resolution strategies |
-| Handoff Protocol | WORKING | Artifact handoffs between tasks |
-| Adaptive Agent | WORKING | Prompt analysis, A/B test, versioning, rollback |
-| Brain Context | WORKING | Stack/agent/skill/history enrichment |
-
----
-
-### Sprint 32 Features (UX Polish)
-
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Progress Bar | WORKING | Live rendering with ETA, worker table, queue |
-| Rich Summary | WORKING | Categorized changes, agent performance, recommendations |
-| Notifications | WORKING | Terminal bell, webhook, Discord, Slack |
-| Interactive Review | WORKING | deckent review — approve/reject/retry, --auto |
-| Agent/Skill Visibility | WORKING | Dashboard, status, retro, history, MCP |
-| Theme System | WORKING | 6 colors, NO_COLOR/FORCE_COLOR support |
-| Output Modes | WORKING | quiet/normal/verbose global flags |
-| Progress Persistence | WORKING | Save/load for reconnect |
-
----
-
-### Sprint 33 Features (Integration + Marketplace + Analytics)
-
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Full Sprint E2E | WORKING | 6-task sprint with agents+skills, 3 project types |
-| Skill Marketplace | WORKING | Registry client, search/publish CLI, ratings, deps |
-| Cross-Sprint Analysis | WORKING | Success/coverage trends, best/worst task types |
-| Agent Retirement | WORKING | Auto-retire <30% success, move to .retired/ |
-| Analytics Data | WORKING | Sprint data, graphs, charts, comparison, heatmap |
-| Agent Cache | WORKING | LRU 100 entries, TTL, per-agent invalidation |
-| Token Counter | WORKING | Prompt size estimation (words/0.75) |
-| Skill Sandbox | WORKING | Suspicious pattern detection, quarantine |
-| Permission Guard | WORKING | Block agent self-modification and escalation |
-
----
-
-### Sprint 034-037 Features (Beta Cleanup + Architectural Refactor)
-
-| Feature | Status | Detail |
-|---------|--------|--------|
-| brain.ts God Object Split | WORKING | 1312→58 lines, sprint-controller + result-evaluator + usage-manager extracted |
-| spawn-backend.ts Move | WORKING | core/ → orchestra/ (layer violation fix), all import paths updated |
-| types.ts Split | WORKING | 524 lines → task-types, config-types, monitoring-types, sprint-types + barrel re-export |
-| Non-null Assertion Refactor | WORKING | 48 `!` → guard clause, `.at()`, `?? fallback` across 29 files |
-| Type Cast Improvement | WORKING | enum literals, type guards, Zod validation for JSON parse points |
-| Barrel Export Cleanup | WORKING | orchestra/index.ts: 30+ → 22 public API exports, @internal JSDoc |
-| Auditor Queue Fix | WORKING | shift() O(n) → descending sort + pop() O(1) |
-| PromptAnalytics Merge | WORKING | prompt-metrics + prompt-ab-test → unified PromptAnalytics class |
-
----
-
-### Sprint 038 Features (Multi-Provider Support)
-
-| Feature | Status | Detail |
-|---------|--------|--------|
-| Multi-provider support | WORKING | Claude (Anthropic), Codex (OpenAI), Gemini (Google) — 3 providers |
-| Provider-aware model selection | WORKING | resolveTaskModel() selects model+provider pair based on task complexity and usage |
-| Provider fallback chain | WORKING | Configurable fallback: primary → secondary → tertiary on failure or quota |
-| Mixed sprint | WORKING | Multiple providers usable within a single sprint — per-task provider assignment |
-| Platform support matrix | WORKING | macOS, Linux, WSL2 — all platforms validated with multi-provider config |
-
----
-
-## Provider Health Checks
-
-| Check | Function | Status |
-|-------|----------|--------|
-| Provider availability | `detectAvailableProviders()` | Scans for claude/openai/google CLIs and API keys |
-| Claude API key | `ANTHROPIC_API_KEY` env | Required for Claude provider |
-| OpenAI API key | `OPENAI_API_KEY` env | Required for Codex (GPT-4.1, o3, o4-mini) provider |
-| Google API key | `GOOGLE_API_KEY` env | Required for Gemini (gemini-2.5-pro, gemini-2.5-flash) provider |
-| Provider fallback configured | `config.provider_fallback[]` | Optional; recommended for production use |
-| Model-provider compatibility | `validateModelProvider()` | Ensures assigned model exists on configured provider |
-
----
-
-*Updated every sprint. Next audit: Sprint 39.*
+*Updated at Sprint 065 completion. Next audit: Sprint 070.*

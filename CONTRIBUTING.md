@@ -115,8 +115,8 @@ deckent/
 │   │   └── watcher.ts      --Dashboard file watcher
 │   ├── mcp/                --Model Context Protocol server
 │   │   ├── server.ts       --MCP server entry: createServer()
-│   │   ├── tools/          --10 MCP tool handlers
-│   │   └── resources/      --5 MCP resource handlers
+│   │   ├── tools/          --16 MCP tool handlers
+│   │   └── resources/      --9 MCP resource handlers
 │   └── dashboard/          --Web Dashboard (React+Vite+Tailwind, 4 pages)
 ├── tests/                  --Test files mirroring src/ structure
 │   ├── core/
@@ -147,7 +147,7 @@ deckent/
 | `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state, alert dedup |
 | `src/api` | HTTP API (16 endpoints + SSE), dashboard file watcher |
 | `src/cli` | CLI commands (28 commands), interactive prompts, display helpers, contextual hints, auto setup wizard |
-| `src/mcp` | MCP server with 10 tools (enriched responses) and 5 resources for IDE/host integration |
+| `src/mcp` | MCP server with 16 tools (enriched responses) and 9 resources for IDE/host integration |
 | `src/dashboard` | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui components |
 
 ---
@@ -721,7 +721,7 @@ Deckent exposes its API to IDE hosts (Claude, Cursor, etc.) through the Model Co
 ```
 src/mcp/
 ├── server.ts          --MCP server entry point
-├── tools/             --Tool implementations (10 tools)
+├── tools/             --Tool implementations (16 tools)
 │   ├── directives.ts
 │   ├── plan.ts
 │   ├── start.ts
@@ -731,13 +731,23 @@ src/mcp/
 │   ├── retro.ts
 │   ├── history.ts
 │   ├── sync.ts
-│   └── analyze.ts
-├── resources/         --Resource implementations (5 resources)
+│   ├── analyze.ts
+│   ├── config.ts
+│   ├── usage.ts
+│   ├── review.ts
+│   ├── run.ts
+│   ├── kill.ts
+│   └── cleanup.ts
+├── resources/         --Resource implementations (9 resources)
 │   ├── directives.ts
 │   ├── brain-memory.ts
 │   ├── debt.ts
 │   ├── decisions.ts
-│   └── patterns.ts
+│   ├── patterns.ts
+│   ├── retro.ts
+│   ├── usage.ts
+│   ├── tasks.ts
+│   └── agents.ts
 └── helpers/
     └── enrich.ts      --Response enrichment utilities
 ```

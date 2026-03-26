@@ -3,6 +3,12 @@
   "name": "TypeScript Expert",
   "version": "0.1.0",
   "description": "TypeScript best practices, strict typing, utility types, error handling patterns",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "typescript" } }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "language",
   "triggers": ["typescript", "type", "interface", "generic", "enum", "decorator", "module", "tsconfig"],

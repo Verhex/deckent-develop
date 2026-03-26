@@ -83,7 +83,7 @@ Deckent follows a three-step cycle:
 - **Provider Fallback Chain** -- Primary provider fails? Automatic fallback to alternative provider with model equivalence mapping
 - **Usage-Aware Planning** -- Automatically adjusts sprint size based on your Claude plan usage (5-hour and weekly thresholds)
 - **Plugin System** -- Extend Deckent with custom hooks, commands, and patterns
-- **MCP Integration** -- 10 MCP tools + 5 resources for seamless Claude Code IDE integration
+- **MCP Integration** -- 16 MCP tools + 9 resources for seamless Claude Code IDE integration
 - **Web Dashboard** -- React + Vite + Tailwind dashboard with real-time SSE updates
 - **Internationalization** -- English and Turkish language support built in
 
@@ -101,7 +101,7 @@ Deckent follows a three-step cycle:
 | GO/NO-GO evaluation per task | Yes | No | No | No | No |
 | Usage-aware auto-throttling | Yes | N/A | N/A | N/A | No |
 | Open source | Yes (MIT) | No | No | Yes | Partial |
-| MCP integration | Yes (10 tools) | N/A | N/A | N/A | N/A |
+| MCP integration | Yes (16 tools) | N/A | N/A | N/A | N/A |
 | Web dashboard | Yes | Built-in | Built-in | No | No |
 | Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
 | Works offline (local models) | Planned | Yes | No | Yes | No |
@@ -290,7 +290,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Or let `deckent init` auto-register it.
 
-### MCP Tools (10)
+### MCP Tools (16)
 
 | Tool | Description |
 |------|-------------|
@@ -304,8 +304,14 @@ Or let `deckent init` auto-register it.
 | `deckent_history` | View sprint history |
 | `deckent_analyze_project` | Analyze project stack |
 | `deckent_sync` | Sync adapter files |
+| `deckent_config` | Show or update configuration |
+| `deckent_usage` | Show current plan usage |
+| `deckent_review` | Review last sprint results |
+| `deckent_run` | Run an arbitrary command in project context |
+| `deckent_kill` | Kill a specific worker |
+| `deckent_cleanup` | Archive sprint files and clean up workers |
 
-### MCP Resources (5)
+### MCP Resources (9)
 
 | Resource URI | Contents |
 |--------------|---------|
@@ -314,6 +320,10 @@ Or let `deckent init` auto-register it.
 | `deckent://memory` | Learned patterns from past sprints |
 | `deckent://debt` | Technical debt items |
 | `deckent://config` | Project configuration |
+| `deckent://retro` | Last sprint retrospective |
+| `deckent://usage` | Current plan usage metrics |
+| `deckent://tasks` | Active task list and statuses |
+| `deckent://agents` | Agent pool and performance stats |
 
 ---
 

@@ -3,6 +3,12 @@
   "name": "Testing Expert",
   "version": "0.1.0",
   "description": "Test pyramid, mocking strategies, coverage, CI integration, vitest/jest patterns",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "testing" }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "workflow",
   "triggers": ["test", "coverage", "spec", "mock", "stub", "fixture", "assertion", "e2e", "integration"],

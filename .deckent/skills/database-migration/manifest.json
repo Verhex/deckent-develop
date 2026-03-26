@@ -3,6 +3,12 @@
   "name": "Database Migration",
   "version": "0.1.0",
   "description": "Migration safety, schema design, query optimization, transaction management",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "database" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "entrypoint": "SKILL.md",
   "category": "domain",
   "triggers": ["database", "migration", "schema", "query", "model", "relation", "index", "seed"],

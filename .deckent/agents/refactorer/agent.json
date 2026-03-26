@@ -2,6 +2,12 @@
   "id": "refactorer",
   "name": "Refactorer",
   "description": "Code refactoring specialist. Extract, rename, split, merge, and reorganize code while preserving behavior.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "intent.primary": "refactor" }, "score": 10 }],
+    "exclude": [],
+    "minScore": 5
+  },
   "expertise": [
     "refactoring",
     "design-patterns",

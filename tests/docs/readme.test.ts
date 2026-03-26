@@ -91,8 +91,8 @@ describe('README.md', () => {
 
   it('contains MCP Integration section', () => {
     expect(content).toContain('## MCP Integration');
-    expect(content).toContain('MCP Tools (10)');
-    expect(content).toContain('MCP Resources (5)');
+    expect(content).toContain('MCP Tools (16)');
+    expect(content).toContain('MCP Resources (9)');
   });
 
   it('contains Configuration section', () => {
