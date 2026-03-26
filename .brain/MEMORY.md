@@ -72,73 +72,23 @@
 - bootstrapProviders(): single startup point, detect + register + set default
 - Platform: describe.skipIf(isWindows) for tmux/scripts tests, cross-platform helpers
 
-## Sprint sprint-048 Learnings
-- Claude MCP Backend Stub Completion: GO_WITH_TECH_DEBT
-- Sandbox Mode Graceful Handling: GO_WITH_TECH_DEBT
-- API Mode Usage Integration: GO_WITH_TECH_DEBT
-- Subprocess Worker Log Enhancement: GO_WITH_TECH_DEBT
-- Coverage Metric Preservation: GO_WITH_TECH_DEBT
-- Blueprint Section Numbers Update: GO_WITH_TECH_DEBT
-- RELEASE-NOTES-BETA.md Final Update: GO_WITH_TECH_DEBT
-## Sprint sprint-050 Learnings
-- npm Publish Dry Run & Fix: GO_WITH_TECH_DEBT
-- README.md Overhaul: GO_WITH_TECH_DEBT
-- bin Entry Validation: GO_WITH_TECH_DEBT
-- CHANGELOG.md Update: GO_WITH_TECH_DEBT
-- npm Publish Pipeline Validation: GO_WITH_TECH_DEBT
-## Sprint sprint-051 Learnings
-- Full Config Expansion: GO_WITH_TECH_DEBT
-- Config Documentation (Inline Comments): GO_WITH_TECH_DEBT
-- Dashboard Config Editor: GO_WITH_TECH_DEBT
-- VitePress Setup: GO_WITH_TECH_DEBT
-- CLI Reference (Auto-Generated): GO_WITH_TECH_DEBT
-- Config Migration Helper: GO_WITH_TECH_DEBT
-- Deploy Configuration: GO_WITH_TECH_DEBT
-## Sprint sprint-052 Learnings
-- Dashboard Full Expansion: GO_WITH_TECH_DEBT
-## Sprint sprint-054 Learnings
-- Agent Activation — systemPrompt + Worker Injection: GO_WITH_TECH_DEBT
-- Brain Self-Learning — Config Suggestions + Pattern Detection: GO_WITH_TECH_DEBT
-- Rich Sprint Output + README Update: GO_WITH_TECH_DEBT
-- docs/ Reorganization + .claude/rules/ Update: GO_WITH_TECH_DEBT
-## Sprint sprint-055 Learnings
-- Retro Parse/Write Format Uyumsuzluğu Fix + --compare Bug (P0 KRİTİK): GO_WITH_TECH_DEBT
-- Kill Komutu Task Status + Lock Temizliği + --all Flag (P0 KRİTİK): GO_WITH_TECH_DEBT
-- readLanguage + readJsonSafe Tam DRY Temizliği (P1): GO_WITH_TECH_DEBT
-- Config Set Nested Key + Import DeepMerge + Config Get (P1): GO_WITH_TECH_DEBT
-- Spawn Komutu Prompt Zenginleştirme + Status Kontrolü (P1): GO_WITH_TECH_DEBT
-- Doctor --json + Retro --json Flag'leri (P2): GO_WITH_TECH_DEBT
-- Cleanup --dry-run Flag'i (P2): GO_WITH_TECH_DEBT
-- Agent Delete + Edit Komutları (P2): GO_WITH_TECH_DEBT
-- Skill Enable/Disable + Delete Komutları (P2): GO_WITH_TECH_DEBT
-- Explain --sprint Flag + Goal Bilgisi + Dil Desteği (P2): GO_WITH_TECH_DEBT
-## Sprint sprint-056 Learnings
-- Doc Updater Referans Fix + CHANGELOG Konsolidasyonu: GO_WITH_TECH_DEBT
-- init Bug Fix — deepMerge + .deck Security + Provider Wizard: GO_WITH_TECH_DEBT
-- init UX — Auto Lang, Recommendation, Re-init, Error Recovery: GO_WITH_TECH_DEBT
-- plan Core — Async Usage, Dry-Run, Idempotency, Safeguard: GO_WITH_TECH_DEBT
-- plan Quality — Parser, i18n, Context Priority, Error Logging: GO_WITH_TECH_DEBT
-- start Core — Wait Timeout, Spawn Retry, Zero-Config, Phase Persistence: GO_WITH_TECH_DEBT
-- start Quality — Provider Cache, Dashboard Usage, Cleanup Finally, --watch Alt: GO_WITH_TECH_DEBT
-- status Overhaul — Standalone, ETA, NO_COLOR, fs.watch, Verbose: NO_GO
-- doctor Improvements — tmux Conditional, .deck Check, Auth, Hints: NO_GO
-- retro+explain Quality — Dil, Trend, Agent/Skill Perf, Learnings: NO_GO
-## Sprint sprint-057 Learnings
-- doctor Improvements — tmux Conditional, .deck Check, Auth, Hints: GO_WITH_TECH_DEBT
-- cleanup+decay Overhaul — Auto Decay, Combo, Lock Guard, Archive: GO_WITH_TECH_DEBT
-- run+test+web Flags — Timeout, Keep, Sandbox, CI, MIME: GO_WITH_TECH_DEBT
-- sync+onboard+upgrade Polish: GO_WITH_TECH_DEBT
-- agent+skill+plugin+marketplace+archive-debt Completeness: NO_GO
-- dashboard+attach+watch+cross-cutting: NO_GO
-## Sprint sprint-058 Learnings
-## Sprint sprint-059 Learnings
-- cli-deep-analysis.md Full [DONE] Marking + Doğrulama: GO_WITH_TECH_DEBT — cli-deep-analysis.md güncellendi. Sprint 056-058 değişikliklerini doğrulayarak ~51 yeni [DONE] işareti eklendi (Sprint 0
-- Prompt Boilerplate Azaltma + Worker Guide: GO_WITH_TECH_DEBT — Created .deckent/workspace/WORKER-GUIDE.md with heartbeat format, result format, and error handling rules. Shortened bui
-- spawn+kill+run Multi-Provider Desteği: GO_WITH_TECH_DEBT — Multi-provider support added: (A) spawn.ts exports spawnWorkerMultiProvider() that routes claude→tmux, codex/gemini→subp
-- doctor+watch Provider-Aware Fix: GO_WITH_TECH_DEBT — A) doctor tmux conditional was already implemented in checkTmux(providerNames) — tmux required=false when only codex/gem
-- MCP Tools Expansion (+6 tools): NO_GO
-- MCP Resources Expansion (+4 resources): GO_WITH_TECH_DEBT — Added 4 new MCP resources: deckent://retro (RETRO.md content), deckent://usage (sprint usage JSON), deckent://tasks (act
-- MCP Tool Quality — Enrichment + Error Handling: GO_WITH_TECH_DEBT — A) Enriched responses: Added summaries/hints for 6 new tools (config, usage, review, run, kill, cleanup) to enrich.ts. A
-- Format Tutarlılığı + Dead Code Temizliği: GO_WITH_TECH_DEBT — All three sub-tasks (A, B, C) were already implemented in the codebase: A) Sprint log header names (Total Tasks, Complet
-- Sync Genişleme (Gemini/Cursor/Codex Adapters): GO_WITH_TECH_DEBT — Sync genişletildi: (A) GEMINI.md sync — syncGeminiAdapter() ayrı fonksiyon olarak çıkarıldı, (B) .cursor/rules sync — sy
-- Doc Updater Fix + CHANGELOG Konsolidasyonu: GO_WITH_TECH_DEBT — A) sprint-log.ts targetFile was already 'docs/SPRINT-LOG.md' (consistent, no fix needed). B) Root CHANGELOG.md already r
+## Sprint 048-060 Summary
+- Sprint 048: GO_WITH_TECH_DEBT (7 tasks)
+- Sprint 050: GO_WITH_TECH_DEBT (5 tasks)
+- Sprint 051: GO_WITH_TECH_DEBT (7 tasks)
+- Sprint 052: GO_WITH_TECH_DEBT (1 task)
+- Sprint 054: GO_WITH_TECH_DEBT (4 tasks)
+- Sprint 055: GO_WITH_TECH_DEBT (10 tasks)
+- Sprint 056: GO_WITH_TECH_DEBT (8 tasks, 2 NO_GO)
+- Sprint 057: GO_WITH_TECH_DEBT (4 tasks, 2 NO_GO)
+- Sprint 058: GO_WITH_TECH_DEBT (0 tasks)
+- Sprint 059: GO_WITH_TECH_DEBT (9 tasks, 1 NO_GO)
+- Sprint 060: GO_WITH_TECH_DEBT (5 tasks)
+## Sprint sprint-061 Learnings
+- Agent List Display Fix + History Agent Column (P1): GO_WITH_TECH_DEBT — A) agent.ts: AgentConfig interface updated (uses/successRate optional + stats sub-object added). getAgentUses() and getA
+- Brain Budget Decay + Memory Temizliği (P0): GO_WITH_TECH_DEBT — A) MEMORY.md: Sprint 048-060 learnings compressed from 76 lines to 13 lines (single-line format per sprint). B) DEBT.md:
+- Open Debt Cleanup (debt-059-008-fix) (P1): GO_WITH_TECH_DEBT — Task 061-006 (Open Debt Cleanup — debt-059-008-fix) tamamlandı.
+
+A) Enriched Response Verification: Tüm 16 MCP tool'da e
+- Framework Detection + Analyzer Fix (P2): GO_WITH_TECH_DEBT — A) React Detection: Added dashboard sub-project check in stack-detector.ts detectFresh(). Checks src/dashboard/package.j
+- Remaining CLI Polish: GO_WITH_TECH_DEBT — A) formatDurationShort added to sprint-reporter.ts — returns '31m 8s' short format. formatDuration unchanged (backward c

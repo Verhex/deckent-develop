@@ -12,16 +12,23 @@ import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 
 export interface AgentConfig {
   name: string;
-  type: 'built-in' | 'custom';
+  type?: 'built-in' | 'custom';
   enabled: boolean;
-  model: string;
-  triggers: string[];
-  description: string;
-  uses: number;
-  successRate: number;
+  model?: string;
+  triggers?: string[];
+  description?: string;
+  uses?: number;
+  successRate?: number;
+  /** Built-in agent stats sub-object (agent-pool format) */
+  stats?: {
+    totalUses?: number;
+    successRate?: number;
+    avgCoverage?: number;
+    lastUsedInSprint?: string;
+  };
   systemPrompt?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -35,6 +42,18 @@ const AGENTS_DIR = '.deckent/agents';
 
 function getAgentsDir(root: string): string {
   return join(root, AGENTS_DIR);
+}
+
+/** Safely read agent uses from stats.totalUses or direct uses field */
+export function getAgentUses(a: AgentConfig): number {
+  const val = a.stats?.totalUses ?? a.uses ?? 0;
+  return isNaN(val) ? 0 : val;
+}
+
+/** Safely read agent success rate, returns 0 if NaN */
+export function getAgentSuccessRate(a: AgentConfig): number {
+  const rate = a.stats?.successRate ?? a.successRate ?? 0;
+  return isNaN(rate) ? 0 : Math.round(rate);
 }
 
 function isValidAgentName(name: string): boolean {
@@ -219,11 +238,11 @@ export function registerAgent(program: Command): void {
         const headers = ['Name', 'Type', 'Status', 'Uses', 'Success', 'Model'];
         const rows = agents.map((a) => [
           a.name,
-          a.type,
+          a.type ?? 'custom',
           a.enabled ? 'enabled' : 'disabled',
-          String(a.uses),
-          `${Math.round(a.successRate)}%`,
-          a.model,
+          String(getAgentUses(a)),
+          `${getAgentSuccessRate(a)}%`,
+          a.model ?? '-',
         ]);
         print(formatTable(headers, rows));
       } catch (error) {
@@ -237,7 +256,8 @@ export function registerAgent(program: Command): void {
     .command('create <name>')
     .description('Create a custom agent')
     .option('--model <model>', `Model to use (${VALID_MODELS.join('|')})`, 'sonnet')
-    .action(async (name: string, opts: { model?: string }) => {
+    .option('--triggers <triggers...>', 'Trigger keywords for task routing')
+    .action(async (name: string, opts: { model?: string; triggers?: string[] }) => {
       try {
         const root = resolveProjectRoot();
 
@@ -252,6 +272,15 @@ export function registerAgent(program: Command): void {
           throw new Error(`Invalid model "${model}". Valid options: ${VALID_MODELS.join(', ')}`);
         }
 
+        // Validate triggers if provided
+        const triggers = opts.triggers ?? [];
+        if (triggers.length > 0) {
+          const triggerErrors = validateTriggers(triggers);
+          if (triggerErrors.length > 0) {
+            throw new Error(`Invalid triggers:\n  ${triggerErrors.join('\n  ')}`);
+          }
+        }
+
         const agentDir = join(getAgentsDir(root), name);
         if (existsSync(join(agentDir, 'agent.json'))) {
           throw ErrorRegistry.createError('DECKENT_E033', { message: `Agent "${name}" already exists.` });
@@ -259,6 +288,7 @@ export function registerAgent(program: Command): void {
 
         const promptContent = PROMPT_TEMPLATE.replace('{name}', name);
         const agent = createDefaultAgent(name, model);
+        agent.triggers = triggers;
         // Auto-fill systemPrompt from PROMPT.md template
         agent.systemPrompt = promptContent;
         mkdirSync(agentDir, { recursive: true });
@@ -272,6 +302,9 @@ export function registerAgent(program: Command): void {
         print('  - agent.json');
         print('  - PROMPT.md');
         print(`  Model: ${model}`);
+        if (triggers.length > 0) {
+          print(`  Triggers: ${triggers.join(', ')}`);
+        }
       } catch (error) {
         printError(error);
         process.exitCode = 1;
@@ -296,13 +329,15 @@ export function registerAgent(program: Command): void {
         const sprintStats = loadAgentSprintStats(root, name);
 
         if (opts.json) {
-          print(JSON.stringify({ agent: { name, uses: agent.uses, successRate: agent.successRate }, sprints: sprintStats }, null, 2));
+          const uses = getAgentUses(agent);
+          const successRate = getAgentSuccessRate(agent);
+          print(JSON.stringify({ agent: { name, uses, successRate }, sprints: sprintStats }, null, 2));
           return;
         }
 
         print(`Agent: ${name}`);
-        print(`  Total uses: ${agent.uses}`);
-        print(`  Overall success rate: ${Math.round(agent.successRate)}%`);
+        print(`  Total uses: ${getAgentUses(agent)}`);
+        print(`  Overall success rate: ${getAgentSuccessRate(agent)}%`);
         print('');
 
         if (sprintStats.length === 0) {
@@ -386,14 +421,23 @@ export function registerAgent(program: Command): void {
     .option('--description <desc>', 'Update description')
     .option('--enable', 'Enable the agent')
     .option('--disable', 'Disable the agent')
+    .option('--triggers <triggers...>', 'Update trigger keywords')
     .option('--sync-prompt', 'Re-sync systemPrompt from PROMPT.md')
-    .action(async (name: string, opts: { model?: string; description?: string; enable?: boolean; disable?: boolean; syncPrompt?: boolean }) => {
+    .action(async (name: string, opts: { model?: string; description?: string; enable?: boolean; disable?: boolean; triggers?: string[]; syncPrompt?: boolean }) => {
       try {
         const root = resolveProjectRoot();
         const agentDir = join(getAgentsDir(root), name);
         const agent = loadAgentConfig(agentDir);
 
         const updates: string[] = [];
+        if (opts.triggers) {
+          const triggerErrors = validateTriggers(opts.triggers);
+          if (triggerErrors.length > 0) {
+            throw new Error(`Invalid triggers:\n  ${triggerErrors.join('\n  ')}`);
+          }
+          agent.triggers = opts.triggers;
+          updates.push(`triggers=[${opts.triggers.join(', ')}]`);
+        }
         if (opts.model) {
           if (!VALID_MODELS.includes(opts.model)) {
             throw new Error(`Invalid model "${opts.model}". Valid options: ${VALID_MODELS.join(', ')}`);
@@ -429,7 +473,7 @@ export function registerAgent(program: Command): void {
           print(`  Model: ${agent.model}`);
           print(`  Enabled: ${agent.enabled}`);
           print(`  Description: ${agent.description}`);
-          print(`  Uses: ${agent.uses}, Success: ${Math.round(agent.successRate)}%`);
+          print(`  Uses: ${getAgentUses(agent)}, Success: ${getAgentSuccessRate(agent)}%`);
           return;
         }
 
@@ -457,8 +501,8 @@ export function registerAgent(program: Command): void {
         print(`  Model: ${agent.model}`);
         print(`  Enabled: ${agent.enabled}`);
         print(`  Description: ${agent.description}`);
-        print(`  Uses: ${agent.uses}`);
-        print(`  Success Rate: ${Math.round(agent.successRate)}%`);
+        print(`  Uses: ${getAgentUses(agent)}`);
+        print(`  Success Rate: ${getAgentSuccessRate(agent)}%`);
         print(`  Created: ${agent.createdAt}`);
         print(`  Updated: ${agent.updatedAt}`);
 

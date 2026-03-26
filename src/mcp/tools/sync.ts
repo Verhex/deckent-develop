@@ -17,7 +17,7 @@ export function registerSyncTool(server: McpServer): void {
 
       if (!existsSync(join(root, DECKENT_FILE))) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'DECKENT.md not found. Run deckent init first.' }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, success: false, message: 'DECKENT.md not found. Run deckent init first.' }) }],
           isError: true,
         };
       }
@@ -39,7 +39,7 @@ export function registerSyncTool(server: McpServer): void {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Sync failed: ${message}` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Sync failed: ${message}` }) }],
           isError: true,
         };
       }

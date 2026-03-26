@@ -304,7 +304,8 @@ describe('registerStartTool', () => {
       const parsed = JSON.parse(result.content[0]!.text);
 
       expect(parsed.success).toBe(false);
-      expect(parsed.error).toContain('config not found');
+      expect(parsed.error).toBe(true);
+      expect(parsed.message).toContain('config not found');
       expect(result.isError).toBe(true);
     });
 
@@ -317,7 +318,8 @@ describe('registerStartTool', () => {
       const parsed = JSON.parse(result.content[0]!.text);
 
       expect(parsed.success).toBe(false);
-      expect(parsed.error).toContain('SPAWN');
+      expect(parsed.error).toBe(true);
+      expect(parsed.message).toContain('SPAWN');
       expect(result.isError).toBe(true);
     });
 

@@ -93,7 +93,7 @@ export function registerKillTool(server: McpServer): void {
       try {
         if (!taskId && !all) {
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Provide taskId or set all=true' }) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'Provide taskId or set all=true' }) }],
             isError: true,
           };
         }
@@ -114,7 +114,7 @@ export function registerKillTool(server: McpServer): void {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
           isError: true,
         };
       }

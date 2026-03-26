@@ -380,7 +380,8 @@ describe('registerPlanTool', () => {
       const result = await server.callTool('deckent_plan', {});
       expect(result.isError).toBe(true);
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain('DIRECTIVES.md missing or empty');
+      expect(parsed.error).toBe(true);
+      expect(parsed.message).toContain('DIRECTIVES.md missing or empty');
     });
 
     it('returns isError when loadConfig fails', async () => {
@@ -392,7 +393,8 @@ describe('registerPlanTool', () => {
       const result = await server.callTool('deckent_plan', {});
       expect(result.isError).toBe(true);
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain('Config file not found');
+      expect(parsed.error).toBe(true);
+      expect(parsed.message).toContain('Config file not found');
     });
 
     it('returns isError when adjustSprintSize throws (usage limit)', async () => {
@@ -409,7 +411,8 @@ describe('registerPlanTool', () => {
       const result = await server.callTool('deckent_plan', {});
       expect(result.isError).toBe(true);
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toContain('Usage limit exceeded');
+      expect(parsed.error).toBe(true);
+      expect(parsed.message).toContain('Usage limit exceeded');
     });
   });
 

@@ -5,6 +5,11 @@ import { spawnSync } from 'node:child_process';
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
+  statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
+  readdirSync: vi.fn().mockReturnValue([]),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -99,7 +104,11 @@ describe('analyzeProject', () => {
     });
 
     it('returns unknown when no framework found', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      // Use specific mock — broad true would trigger dashboard React detection
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ lodash: '4.0.0' }));
 
       const result = analyzeProject('/test');

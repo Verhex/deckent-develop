@@ -132,7 +132,8 @@ describe('MCP Tool Quality — Error Handling', () => {
     const result = await mock.tools.get('deckent_analyze_project')!.handler({});
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.error).toContain('file not found');
+    expect(parsed.error).toBe(true);
+    expect(parsed.message).toContain('file not found');
   });
 
   it('deckent_history returns isError on readdirSync failure', async () => {
@@ -146,7 +147,8 @@ describe('MCP Tool Quality — Error Handling', () => {
     const result = await mock.tools.get('deckent_history')!.handler({ last: 5 });
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.error).toContain('permission denied');
+    expect(parsed.error).toBe(true);
+    expect(parsed.message).toContain('permission denied');
   });
 
   it('deckent_retro returns isError on readFileSync failure', async () => {
@@ -160,7 +162,8 @@ describe('MCP Tool Quality — Error Handling', () => {
     const result = await mock.tools.get('deckent_retro')!.handler({});
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.error).toContain('disk error');
+    expect(parsed.error).toBe(true);
+    expect(parsed.message).toContain('disk error');
   });
 
   it('deckent_set_directives returns isError on writeFileSync failure', async () => {
@@ -173,7 +176,8 @@ describe('MCP Tool Quality — Error Handling', () => {
     const result = await mock.tools.get('deckent_set_directives')!.handler({ content: '## Task 1: test\n' });
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.error).toContain('no space left');
+    expect(parsed.error).toBe(true);
+    expect(parsed.message).toContain('no space left');
   });
 
   it('deckent_plan returns isError on planSprint failure', async () => {
@@ -192,7 +196,8 @@ describe('MCP Tool Quality — Error Handling', () => {
     const result = await mock.tools.get('deckent_plan')!.handler({});
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.error).toContain('directives missing');
+    expect(parsed.error).toBe(true);
+    expect(parsed.message).toContain('directives missing');
   });
 
   it('deckent_sync returns isError on ensureDeckentImport failure', async () => {
@@ -207,7 +212,8 @@ describe('MCP Tool Quality — Error Handling', () => {
     const result = await mock.tools.get('deckent_sync')!.handler({});
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.error).toContain('write failed');
+    expect(parsed.error).toBe(true);
+    expect(parsed.message).toContain('write failed');
   });
 });
 
@@ -269,7 +275,8 @@ describe('MCP Tool Quality — Input Validation Improvements', () => {
     const result = await mock.tools.get('deckent_kill')!.handler({ all: false });
     expect(result.isError).toBe(true);
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.error).toContain('taskId');
+    expect(parsed.error).toBe(true);
+    expect(parsed.message).toContain('taskId');
   });
 
   it('deckent_review returns enriched response with reviews array', async () => {

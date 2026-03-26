@@ -96,7 +96,7 @@ export function registerPlanTool(server: McpServer): void {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Failed to plan sprint: ${message}` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Failed to plan sprint: ${message}` }) }],
           isError: true,
         };
       }

@@ -1367,3 +1367,59 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 059-013: Doc Updater Fix + CHANGELOG Konsolidasyonu (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 60 — sprint-060
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-26
+**Duration:** 697s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | 16.0% |
+| Duration | 696894ms |
+
+### Tasks
+
+- 060-001: Fix debt: Tech debt from 057-012-fix: All agent/skill/plugin/marketplace/archive-debt impr (DONE)
+- 060-002: CLI Komut + Flag Doğrulama (GO_WITH_TECH_DEBT)
+- 060-003: Agent Pool + Skill Pool Doğrulama (GO_WITH_TECH_DEBT)
+- 060-004: MCP Tool + Resource Doğrulama (GO_WITH_TECH_DEBT)
+- 060-005: Sprint Lifecycle + Format Tutarlılık Doğrulama (GO_WITH_TECH_DEBT)
+- 060-006: Doctor + Config + Provider Doğrulama (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 61 — sprint-061
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-26
+**Duration:** 1658s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | 36.0% |
+| Duration | 1658254ms |
+
+### Tasks
+
+- 061-001: Agent Assignment Persistence Fix (P0 CRITICAL) (DONE)
+- 061-002: Agent Stats Update Fix (P0 CRITICAL) (DONE)
+- 061-003: Agent List Display Fix + History Agent Column (P1) (GO_WITH_TECH_DEBT)
+- 061-004: Plan Standalone Provider Bootstrap (P0) (DONE)
+- 061-005: Brain Budget Decay + Memory Temizliği (P0) (GO_WITH_TECH_DEBT)
+- 061-006: Open Debt Cleanup (debt-059-008-fix) (P1) (GO_WITH_TECH_DEBT)
+- 061-007: Framework Detection + Analyzer Fix (P2) (GO_WITH_TECH_DEBT)
+- 061-008: Remaining CLI Polish (GO_WITH_TECH_DEBT)
+
+---

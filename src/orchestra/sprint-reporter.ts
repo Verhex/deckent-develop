@@ -107,7 +107,8 @@ export function buildAgentPerformance(
       avgCoverage: data.coverageCount > 0 ? Math.round(data.coverageSum / data.coverageCount) : 0,
     });
   }
-  return rows.sort((a, b) => b.tasks - a.tasks);
+  // Sort by tasks count descending; alphabetical tiebreak for deterministic ordering
+  return rows.sort((a, b) => b.tasks - a.tasks || a.agent.localeCompare(b.agent));
 }
 
 /**
@@ -584,12 +585,17 @@ export function writeSprintLog(projectRoot: string, sprint: Sprint, metrics: Spr
     `Agents: ${agentsStr}`,
     `Skills: ${skillsStr}`, '',
     '## Tasks',
+    '| Task | Agent | Skills | Status |',
+    '|------|-------|--------|--------|',
   ];
   for (const task of sprint.tasks) {
     const evalResult = evaluations?.get(task.id);
     const statusStr = evalResult ?? task.status;
-    const agentStr = task.assignedAgent && task.assignedAgent !== 'generic' ? ` [${task.assignedAgent}]` : '';
-    lines.push(`- ${task.id}: ${task.title} (${statusStr})${agentStr}`);
+    const agentStr = task.assignedAgent ?? 'generic';
+    const skillsStr = (task.assignedSkills ?? []).length > 0
+      ? (task.assignedSkills ?? []).join(', ')
+      : '-';
+    lines.push(`| ${task.id}: ${task.title} | ${agentStr} | ${skillsStr} | ${statusStr} |`);
   }
   writeFileSync(
     join(sprintsPath, `${sprint.id}.md`),
@@ -1240,6 +1246,24 @@ export function formatDuration(ms: number | undefined): string {
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   return `${hours}h ${remainingMinutes}m total`;
+}
+
+/**
+ * Format milliseconds into a compact short duration string.
+ * Examples: 45000 → "45s", 1874000 → "31m 14s", 5400000 → "1h 30m"
+ */
+export function formatDurationShort(ms: number | undefined): string {
+  if (ms === undefined || ms <= 0) return '';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 /** Build "What went well" items from sprint data. */

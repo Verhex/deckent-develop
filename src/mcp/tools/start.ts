@@ -78,7 +78,7 @@ export function registerStartTool(server: McpServer): void {
           ? `Sprint failed at phase ${error.phase ?? 'unknown'}: ${error.message}`
           : error instanceof Error ? error.message : String(error);
 
-        const errData = { success: false, error: message };
+        const errData = { error: true, success: false, message };
         const errSummary = formatErrorResponse({ message });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(errData, errSummary)) }],

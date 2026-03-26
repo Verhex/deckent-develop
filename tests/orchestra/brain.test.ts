@@ -1925,8 +1925,8 @@ describe('writeSprintLog with evaluations (2B)', () => {
     const written = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('sprint-001.md'));
     expect(written).toBeDefined();
     const content = String(written![1]);
-    expect(content).toContain('001-001: Setup (DONE)');
-    expect(content).toContain('001-002: Test (GO_WITH_TECH_DEBT)');
+    expect(content).toContain('| 001-001: Setup | generic | - | DONE |');
+    expect(content).toContain('| 001-002: Test | generic | - | GO_WITH_TECH_DEBT |');
     // Should NOT contain PENDING (the task.status)
     expect(content).not.toContain('PENDING');
   });
@@ -1952,7 +1952,7 @@ describe('writeSprintLog with evaluations (2B)', () => {
     const written = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('sprint-002.md'));
     expect(written).toBeDefined();
     const content = String(written![1]);
-    expect(content).toContain('002-001: Build (DONE)');
+    expect(content).toContain('| 002-001: Build | generic | - | DONE |');
   });
 });
 

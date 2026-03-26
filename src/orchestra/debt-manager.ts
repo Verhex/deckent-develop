@@ -12,7 +12,7 @@ import {
   BRAIN_TOTAL_LINE_BUDGET, MEMORY_DECAY_SPRINTS,
   DEBT_HIGH_PRIORITY_SPRINTS, DEBT_CRITICAL_SPRINTS,
 } from '../core/constants.js';
-import { countBrainLines, parseDebtTable, generateDebtTable, shouldRemoveResolvedDebt, readJsonSafe } from '../core/utils.js';
+import { countBrainLines, parseDebtTable, generateDebtTable, readJsonSafe } from '../core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
@@ -287,6 +287,48 @@ export function resolveDebt(projectRoot: string, debtId: string, resolvedInSprin
   return true;
 }
 
+// ═══ Archive ═══════════════════════════════════════════════════════
+
+/**
+ * Archive all resolved debt items to .brain/archive/DEBT-ARCHIVE.md.
+ * Moves resolved records out of DEBT.md into a separate archive file,
+ * keeping only open (unresolved) items in the active debt table.
+ * @param projectRoot - Project root directory
+ * @returns Number of items archived
+ */
+export function archiveResolvedDebt(projectRoot: string): number {
+  const brainPath = join(projectRoot, BRAIN_DIR);
+  const debtPath = join(brainPath, DEBT_FILE);
+  const content = readFileSafe(debtPath);
+  if (!content) return 0;
+
+  const items = parseDebtTable(content);
+  const resolvedItems = items.filter(d => d.resolved);
+  const openItems = items.filter(d => !d.resolved);
+
+  if (resolvedItems.length === 0) return 0;
+
+  const archiveDirPath = join(brainPath, ARCHIVE_DIR);
+  mkdirSync(archiveDirPath, { recursive: true });
+
+  const archivePath = join(archiveDirPath, 'DEBT-ARCHIVE.md');
+  let allArchived = resolvedItems;
+  if (existsSync(archivePath)) {
+    const archiveContent = readFileSafe(archivePath);
+    const existingItems = parseDebtTable(archiveContent);
+    // Merge without duplicates (by id)
+    const existingIds = new Set(existingItems.map(i => i.id));
+    const newItems = resolvedItems.filter(i => !existingIds.has(i.id));
+    allArchived = [...existingItems, ...newItems];
+  }
+  writeFileSync(archivePath, generateDebtTable(allArchived), 'utf-8');
+
+  // Update DEBT.md with only open items
+  writeFileSync(debtPath, generateDebtTable(openItems), 'utf-8');
+
+  return resolvedItems.length;
+}
+
 // ═══ Decay ═════════════════════════════════════════════════════════
 
 export interface RunDecayOptions {
@@ -332,16 +374,8 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
     }
   }
 
-  // 2. Remove resolved debt (with retention window — keep entries resolved < 3 sprints ago)
-  const debtPath = join(brainPath, DEBT_FILE);
-  const debtContent = readFileSafe(debtPath);
-  if (debtContent) {
-    const items = parseDebtTable(debtContent);
-    const toRemove = items.filter(d => shouldRemoveResolvedDebt(d, sprintId, 3));
-    removedDebtCount = toRemove.length;
-    const keptItems = items.filter(d => !shouldRemoveResolvedDebt(d, sprintId, 3));
-    writeFileSync(debtPath, generateDebtTable(keptItems), 'utf-8');
-  }
+  // 2. Archive resolved debt to .brain/archive/DEBT-ARCHIVE.md
+  removedDebtCount = archiveResolvedDebt(projectRoot);
 
   // 3. Archive old sprint logs (keep last 2)
   const sprintsPath = join(brainPath, SPRINTS_DIR);

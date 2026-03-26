@@ -126,6 +126,36 @@ describe('agent improvements', () => {
     it('accepts mixed valid triggers and returns no errors', () => {
       expect(validateTriggers(['go', 'rust', 'python_3', 'react.js'])).toEqual([]);
     });
+
+    it('enforces validation during agent create --triggers', async () => {
+      await run(['agent', 'create', 'trigger-bad-agent', '--triggers', 'has spaces']);
+      expect(process.exitCode).toBe(1);
+      expect(output.some(o => o.toLowerCase().includes('invalid'))).toBe(true);
+    });
+
+    it('saves valid triggers during agent create --triggers', async () => {
+      await run(['agent', 'create', 'trigger-good-agent', '--triggers', 'typescript', 'react']);
+      const config = JSON.parse(readFileSync(
+        join(testRoot, '.deckent/agents/trigger-good-agent/agent.json'), 'utf-8',
+      ));
+      expect(config.triggers).toEqual(['typescript', 'react']);
+    });
+
+    it('enforces validation during agent edit --triggers', async () => {
+      makeAgent('trigger-edit-bad');
+      await run(['agent', 'edit', 'trigger-edit-bad', '--triggers', '']);
+      expect(process.exitCode).toBe(1);
+      expect(output.some(o => o.toLowerCase().includes('invalid') || o.toLowerCase().includes('empty'))).toBe(true);
+    });
+
+    it('saves valid triggers during agent edit --triggers', async () => {
+      makeAgent('trigger-edit-good');
+      await run(['agent', 'edit', 'trigger-edit-good', '--triggers', 'api', 'security']);
+      const config = JSON.parse(readFileSync(
+        join(testRoot, '.deckent/agents/trigger-edit-good/agent.json'), 'utf-8',
+      ));
+      expect(config.triggers).toEqual(['api', 'security']);
+    });
   });
 
   // ─── C) systemPrompt auto-fill ──────────────────────────────────────────

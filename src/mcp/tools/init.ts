@@ -248,7 +248,7 @@ Lint: tsc --noEmit
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: `Initialization failed: ${message}` }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Initialization failed: ${message}` }) }],
           isError: true,
         };
       }

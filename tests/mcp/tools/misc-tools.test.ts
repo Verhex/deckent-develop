@@ -290,7 +290,8 @@ describe('registerSyncTool', () => {
       const parsed = parseToolResult(result);
 
       expect(parsed.success).toBe(false);
-      expect(parsed.error).toContain('DECKENT.md not found');
+      expect(parsed.error).toBe(true);
+      expect(parsed.message).toContain('DECKENT.md not found');
     });
 
     it('sets isError flag when DECKENT.md not found', async () => {

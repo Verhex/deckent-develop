@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import {
   readContext, checkUsage, checkUsageWithProvider, getDefaultProvider,
   adjustSprintSize, planSprint, confirmDraftTasks, cleanupDraftTasks,
@@ -25,7 +26,29 @@ export function registerPlan(program: Command): void {
         const lang = config.language;
         const context = readContext(root);
 
-        // A) Use async provider-based usage check when available, fall back to sync
+        // Provider bootstrap — follows start.ts pattern
+        // For --dry-run, providers are optional (structured parse suffices)
+        let planMode: BrainPlanningMode | undefined = opts.structured ? 'structured' : undefined;
+        const dryRun = opts.dryRun === true;
+
+        if (dryRun) {
+          // --dry-run: force structured mode, no provider needed
+          if (!planMode) {
+            planMode = 'structured';
+          }
+        } else {
+          try {
+            await bootstrapProviders(config);
+          } catch {
+            // Provider bootstrap failed (no API key, etc.) — fall back to structured mode
+            if (!planMode) {
+              print('[warn] Provider bootstrap failed — falling back to structured mode.');
+              planMode = 'structured';
+            }
+          }
+        }
+
+        // Use async provider-based usage check when available, fall back to sync
         let usage;
         const provider = getDefaultProvider();
         if (provider) {
@@ -40,12 +63,10 @@ export function registerPlan(program: Command): void {
 
         const recommendation = adjustSprintSize(config, usage);
 
-        // C) Clean up existing DRAFT tasks before planning (idempotency)
+        // Clean up existing DRAFT tasks before planning (idempotency)
         cleanupDraftTasks(root);
 
-        const planMode: BrainPlanningMode | undefined = opts.structured ? 'structured' : undefined;
         const asDraft = opts.confirm !== false;
-        const dryRun = opts.dryRun === true;
 
         const sprint = await planSprint(root, config, context, recommendation, {
           mode: planMode,

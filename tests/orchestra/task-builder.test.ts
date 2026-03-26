@@ -1407,3 +1407,82 @@ Some description here.
     expect(tasks[0]!.testTarget).toBe('10+ test');
   });
 });
+
+// ─── createTask — assignedAgent/assignedSkills defaults (Sprint 061) ───────
+
+describe('createTask — assignedAgent/assignedSkills defaults', () => {
+  it('initializes assignedAgent to "generic" by default', () => {
+    const task = createTask(makeBaseParams(), 1);
+    expect(task.assignedAgent).toBe('generic');
+  });
+
+  it('initializes assignedSkills to empty array by default', () => {
+    const task = createTask(makeBaseParams(), 1);
+    expect(task.assignedSkills).toEqual([]);
+  });
+
+  it('assignedAgent persists through JSON.stringify/parse', () => {
+    const task = createTask(makeBaseParams(), 1);
+    const serialized = JSON.stringify(task);
+    const parsed = JSON.parse(serialized);
+    expect(parsed.assignedAgent).toBe('generic');
+  });
+
+  it('assignedSkills persists through JSON.stringify/parse', () => {
+    const task = createTask(makeBaseParams(), 1);
+    const serialized = JSON.stringify(task);
+    const parsed = JSON.parse(serialized);
+    expect(parsed.assignedSkills).toEqual([]);
+  });
+
+  it('assignedAgent can be overwritten after creation', () => {
+    const task = createTask(makeBaseParams(), 1);
+    expect(task.assignedAgent).toBe('generic');
+    task.assignedAgent = 'security-auditor';
+    expect(task.assignedAgent).toBe('security-auditor');
+  });
+
+  it('assignedSkills can be populated after creation', () => {
+    const task = createTask(makeBaseParams(), 1);
+    expect(task.assignedSkills).toEqual([]);
+    task.assignedSkills = ['typescript-expert', 'testing-expert'];
+    expect(task.assignedSkills).toHaveLength(2);
+    expect(task.assignedSkills).toContain('typescript-expert');
+  });
+
+  it('assignedAgent field exists in JSON keys', () => {
+    const task = createTask(makeBaseParams(), 1);
+    const json = JSON.stringify(task, null, 2);
+    expect(json).toContain('"assignedAgent"');
+  });
+
+  it('assignedSkills field exists in JSON keys', () => {
+    const task = createTask(makeBaseParams(), 1);
+    const json = JSON.stringify(task, null, 2);
+    expect(json).toContain('"assignedSkills"');
+  });
+
+  it('assignedAgent survives mutation + re-serialization', () => {
+    const task = createTask(makeBaseParams(), 1);
+    task.assignedAgent = 'bug-fixer';
+    task.assignedSkills = ['testing-expert'];
+    const roundTripped = JSON.parse(JSON.stringify(task));
+    expect(roundTripped.assignedAgent).toBe('bug-fixer');
+    expect(roundTripped.assignedSkills).toEqual(['testing-expert']);
+  });
+
+  it('all created tasks have assignedAgent regardless of params', () => {
+    const params1 = makeBaseParams({ model: 'opus', effort: 'high', priority: 'CRITICAL' });
+    const params2 = makeBaseParams({ model: 'haiku', effort: 'low', priority: 'LOW' });
+    const params3 = makeBaseParams({ forceModel: 'opus', forceEffort: 'high' });
+    const task1 = createTask(params1, 1);
+    const task2 = createTask(params2, 2);
+    const task3 = createTask(params3, 3);
+    expect(task1.assignedAgent).toBe('generic');
+    expect(task2.assignedAgent).toBe('generic');
+    expect(task3.assignedAgent).toBe('generic');
+    expect(task1.assignedSkills).toEqual([]);
+    expect(task2.assignedSkills).toEqual([]);
+    expect(task3.assignedSkills).toEqual([]);
+  });
+});

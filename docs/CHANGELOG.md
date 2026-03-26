@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint61] - 2026-03-26
+
+### Added
+
+- Plan Standalone Provider Bootstrap (P0)
+
+### Changed
+
+- Agent List Display Fix + History Agent Column (P1) (completed with tech debt)
+- Brain Budget Decay + Memory Temizliği (P0) (completed with tech debt)
+- Open Debt Cleanup (debt-059-008-fix) (P1) (completed with tech debt)
+- Framework Detection + Analyzer Fix (P2) (completed with tech debt)
+- Remaining CLI Polish (completed with tech debt)
+
+### Fixed
+
+- Agent Assignment Persistence Fix (P0 CRITICAL)
+- Agent Stats Update Fix (P0 CRITICAL)
+
+
+_Tasks: 8 total, 8 done, 5 tech debt, 0 no-go_
+
+## [0.2.0-beta.1-sprint60] - 2026-03-26
+
+
+### Changed
+
+- CLI Komut + Flag Doğrulama (completed with tech debt)
+- Agent Pool + Skill Pool Doğrulama (completed with tech debt)
+- MCP Tool + Resource Doğrulama (completed with tech debt)
+- Sprint Lifecycle + Format Tutarlılık Doğrulama (completed with tech debt)
+- Doctor + Config + Provider Doğrulama (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 057-012-fix: All agent/skill/plugin/marketplace/archive-debt impr
+
+
+_Tasks: 6 total, 6 done, 5 tech debt, 0 no-go_
+
 ## [0.2.0-beta.1-sprint59] - 2026-03-25
 
 

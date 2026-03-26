@@ -143,7 +143,7 @@ export function registerStatusTool(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enrichedState, summary)) }],
         };
       } catch {
-        const errData = { active: false, message: 'Cannot parse dashboard file.', job: latestJob };
+        const errData = { error: true, active: false, message: 'Cannot parse dashboard file.', job: latestJob };
         const summary = formatStatusResponse(errData);
         return {
           content: [{

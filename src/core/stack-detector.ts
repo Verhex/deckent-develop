@@ -238,6 +238,20 @@ function detectFresh(projectRoot: string): ProjectStack {
   else if (depNames.includes('express')) framework = 'express';
   else if (depNames.includes('fastify')) framework = 'fastify';
 
+  // Check for a React sub-project in src/dashboard/ (monorepo or embedded UI)
+  if (framework === 'unknown') {
+    const dashboardPkgPath = path.join(projectRoot, 'src', 'dashboard', 'package.json');
+    if (fs.existsSync(dashboardPkgPath)) {
+      const dashboardPkg = readJsonSafe<{ dependencies?: Record<string, string>; devDependencies?: Record<string, string> }>(dashboardPkgPath);
+      if (dashboardPkg) {
+        const dashboardDeps = { ...(dashboardPkg.dependencies ?? {}), ...(dashboardPkg.devDependencies ?? {}) };
+        if ('react' in dashboardDeps) {
+          framework = 'react';
+        }
+      }
+    }
+  }
+
   // Python frameworks
   if (language === 'python' && framework === 'unknown') {
     framework = detectPythonFramework(projectRoot);

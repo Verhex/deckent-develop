@@ -488,11 +488,11 @@ describe('config readJsonSafeAsync migration', () => {
 // ─── analyzer.ts migration ───────────────────────────────────────────────────
 
 describe('analyzer readJsonSafe migration', () => {
-  it('source file imports readJsonSafe', async () => {
+  it('source file delegates to detectProjectStack (no inline JSON.parse)', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/analyzer.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
-    // readPackageJson should use readJsonSafe — no inline JSON.parse(readFileSync(...))
+    // analyzer.ts delegates stack detection to detectProjectStack() — no inline JSON.parse
+    expect(source).toContain("import { detectProjectStack } from './stack-detector.js'");
     expect(source).not.toMatch(/JSON\.parse\(readFileSync\(/);
   });
 

@@ -56,6 +56,41 @@ export function parseAgentSkillInfo(content: string): { agents: string[]; skills
     }
   }
 
+  // Parse agent column from task table formats:
+  //   3-col: | Task | Agent | Status |
+  //   4-col: | Task | Agent | Skills | Status |
+  const STATUS_VALUES = /^(GO|NO_GO|GO_WITH_TECH_DEBT|DONE|PENDING|CLAIMED|EXECUTING|TESTING|DOCUMENTING|PAUSED)$/;
+  const HEADER_OR_SEPARATOR = /^(Task|Agent|Skills?|Status|-+)$/i;
+  for (const line of content.split('\n')) {
+    const cols = line.split('|').map((c) => c.trim()).filter(Boolean);
+    // Determine which column holds the status (3rd or 4th)
+    const statusCol = cols.length >= 4 && STATUS_VALUES.test(cols[3] ?? '')
+      ? 3
+      : cols.length >= 3 && STATUS_VALUES.test(cols[2] ?? '')
+        ? 2
+        : -1;
+    if (statusCol < 0) continue;
+
+    // Agent is always column index 1
+    const agentName = cols[1] ?? '';
+    if (agentName && !HEADER_OR_SEPARATOR.test(agentName) && agentName !== 'generic' && !agents.includes(agentName)) {
+      agents.push(agentName);
+    }
+
+    // For 4-col format, extract skills from column index 2
+    if (statusCol === 3) {
+      const rawSkills = cols[2] ?? '';
+      if (rawSkills && !HEADER_OR_SEPARATOR.test(rawSkills)) {
+        for (const part of rawSkills.split(/[,;]+/)) {
+          const trimmed = part.trim();
+          if (trimmed && trimmed !== '-' && !skills.includes(trimmed)) {
+            skills.push(trimmed);
+          }
+        }
+      }
+    }
+  }
+
   return { agents, skills };
 }
 
@@ -232,7 +267,14 @@ export function registerHistory(program: Command): void {
       }
 
       if (opts.json) {
-        print(JSON.stringify(records, null, 2));
+        // Serialize tasks/completed/noGo as numbers (not strings) for JSON output
+        const jsonRecords = records.map((r) => ({
+          ...r,
+          tasks: typeof r.tasks === 'string' && r.tasks !== '-' ? parseInt(r.tasks, 10) : r.tasks,
+          completed: typeof r.completed === 'string' && r.completed !== '-' ? parseInt(r.completed, 10) : r.completed,
+          noGo: typeof r.noGo === 'string' && r.noGo !== '-' ? parseInt(r.noGo, 10) : r.noGo,
+        }));
+        print(JSON.stringify(jsonRecords, null, 2));
         return;
       }
 

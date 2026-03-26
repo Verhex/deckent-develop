@@ -1,9 +1,10 @@
 // ─── Project Analyzer ────────────────────────────────────────────────────────
 // L) This module covers ProjectAnalysis (framework, language, ci, fileCount,
-//    authorCount, size, methodology). stack-detector.ts is the canonical source
-//    for language/framework/testFramework/buildTool in the stack detection flow.
-//    analyzer.ts is kept as a standalone module for CLI 'analyze' command output.
-import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs';
+//    authorCount, size, methodology). Stack detection (language/framework/
+//    testFramework/buildTool) is delegated to stack-detector.ts via
+//    detectProjectStack(). analyzer.ts adds CI detection, git-based file/author
+//    counts, size classification, and methodology recommendation.
+import { existsSync, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type {
@@ -16,7 +17,7 @@ import type {
   ProjectSize,
   MethodologyRecommendation,
 } from './config-types.js';
-import { readJsonSafe } from './utils.js';
+import { detectProjectStack } from './stack-detector.js';
 
 // N) In-memory cache for analyzeProject results (key: projectRoot)
 const _analyzeCache = new Map<string, { result: ProjectAnalysis; mtime: number }>();
@@ -29,68 +30,15 @@ function getConfigMtime(root: string): number {
   }
 }
 
-function readPackageJson(root: string): { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } | null {
-  const pkgPath = join(root, 'package.json');
-  return readJsonSafe<{ dependencies?: Record<string, string>; devDependencies?: Record<string, string> }>(pkgPath);
-}
-
-function detectFramework(root: string): DetectedFramework {
-  const pkg = readPackageJson(root);
-  if (!pkg) return 'unknown';
-  const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-  if (allDeps['next']) return 'next';
-  if (allDeps['@nestjs/core']) return 'nest';
-  if (allDeps['@angular/core']) return 'angular';
-  if (allDeps['svelte']) return 'svelte';
-  if (allDeps['vue']) return 'vue';
-  if (allDeps['react']) return 'react';
-  if (allDeps['express']) return 'express';
-  return 'unknown';
-}
-
-function detectLanguage(root: string): DetectedLanguage {
+/**
+ * Check if multiple language ecosystems coexist (TypeScript + Rust or Python).
+ * Returns 'mixed' when two or more language markers are present simultaneously.
+ */
+function detectMixedLanguage(root: string): boolean {
   const hasTs = existsSync(join(root, 'tsconfig.json'));
   const hasRust = existsSync(join(root, 'Cargo.toml'));
   const hasPython = existsSync(join(root, 'pyproject.toml')) || existsSync(join(root, 'setup.py'));
-  const hasPkg = existsSync(join(root, 'package.json'));
-
-  const count = [hasTs, hasRust, hasPython].filter(Boolean).length;
-  if (count > 1) return 'mixed';
-  if (hasTs) return 'typescript';
-  if (hasRust) return 'rust';
-  if (hasPython) return 'python';
-  if (hasPkg) return 'javascript';
-  return 'unknown';
-}
-
-function detectTestFramework(root: string): DetectedTestFramework {
-  const pkg = readPackageJson(root);
-  if (pkg) {
-    const devDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-    if (devDeps['vitest']) return 'vitest';
-    if (devDeps['jest']) return 'jest';
-    if (devDeps['mocha']) return 'mocha';
-  }
-  const pyprojectPath = join(root, 'pyproject.toml');
-  if (existsSync(pyprojectPath)) {
-    try {
-      const content = readFileSync(pyprojectPath, 'utf-8');
-      if (content.includes('pytest')) return 'pytest';
-    } catch { /* skip */ }
-  }
-  return 'unknown';
-}
-
-function detectBuildTool(root: string): DetectedBuildTool {
-  const pkg = readPackageJson(root);
-  if (!pkg) return 'unknown';
-  const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-  if (allDeps['turbo']) return 'turbo';
-  if (allDeps['vite']) return 'vite';
-  if (allDeps['webpack']) return 'webpack';
-  if (allDeps['esbuild']) return 'esbuild';
-  if (existsSync(join(root, 'tsconfig.json'))) return 'tsc';
-  return 'unknown';
+  return [hasTs, hasRust, hasPython].filter(Boolean).length > 1;
 }
 
 function detectCI(root: string): DetectedCI {
@@ -156,13 +104,16 @@ function recommendMethodology(size: ProjectSize, authorCount: number, fileCount:
 /**
  * Analyze the project at the given root directory.
  *
+ * Delegates language/framework/testFramework/buildTool detection to
+ * detectProjectStack() (stack-detector.ts), then appends CI detection,
+ * git-based file/author counts, size classification, and methodology.
+ *
  * M) Falls back to fs-based file counting when git is not available.
  */
 export function analyzeProject(root: string): ProjectAnalysis {
-  const framework = detectFramework(root);
-  const language = detectLanguage(root);
-  const testFramework = detectTestFramework(root);
-  const buildTool = detectBuildTool(root);
+  const stack = detectProjectStack(root);
+  // 'mixed' language is unique to analyzer — stack-detector returns primary language
+  const language: DetectedLanguage = detectMixedLanguage(root) ? 'mixed' : (stack.language as DetectedLanguage);
   const ci = detectCI(root);
   const fileCount = getFileCount(root);
   const authorCount = getAuthorCount(root);
@@ -170,10 +121,10 @@ export function analyzeProject(root: string): ProjectAnalysis {
   const methodology = recommendMethodology(size, authorCount, fileCount);
 
   return {
-    framework,
+    framework: stack.framework as DetectedFramework,
     language,
-    testFramework,
-    buildTool,
+    testFramework: stack.testFramework as DetectedTestFramework,
+    buildTool: stack.buildTool as DetectedBuildTool,
     ci,
     fileCount,
     authorCount,

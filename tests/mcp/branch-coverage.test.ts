@@ -361,7 +361,8 @@ describe('MCP Branch Coverage', () => {
       const data = parsed.data ?? parsed;
 
       expect(data.success).toBe(false);
-      expect(data.error).toBe('string error');
+      expect(data.error).toBe(true);
+      expect(data.message).toBe('string error');
       expect(result.isError).toBe(true);
     });
   });

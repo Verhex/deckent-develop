@@ -161,6 +161,8 @@ export function createTask(params: CreateTaskParams, sequence: number): Task {
     provider,
     forceModel: params.forceModel,
     forceEffort: params.forceEffort,
+    assignedAgent: 'generic',
+    assignedSkills: [],
     createdAt: now(),
   };
 }

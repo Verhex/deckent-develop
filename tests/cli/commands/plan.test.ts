@@ -9,6 +9,16 @@ vi.mock('../../../src/core/config.js', () => ({
   loadConfig: vi.fn(),
 }));
 
+vi.mock('../../../src/core/provider.js', () => ({
+  bootstrapProviders: vi.fn().mockResolvedValue({
+    connector: {},
+    registered: ['claude'],
+    skipped: [],
+    defaultProvider: 'claude',
+    providerEnvOverrides: {},
+  }),
+}));
+
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn(),
   checkUsage: vi.fn(),
@@ -37,6 +47,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 }));
 
 import { loadConfig } from '../../../src/core/config.js';
+import { bootstrapProviders } from '../../../src/core/provider.js';
 import {
   readContext, checkUsage, checkUsageWithProvider, getDefaultProvider,
   adjustSprintSize, planSprint, confirmDraftTasks, cleanupDraftTasks,
@@ -285,5 +296,82 @@ describe('plan command (isolated)', () => {
     registerPlan(program);
     const cmd = program.commands.find(c => c.name() === 'plan');
     expect(cmd!.options.some(o => o.long === '--dry-run')).toBe(true);
+  });
+
+  // ─── E) Provider bootstrap ─────────────────────────────────────────
+
+  it('calls bootstrapProviders before planning', async () => {
+    setupMocks();
+    await runCommand(['plan', '--no-confirm']);
+    expect(bootstrapProviders).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'max_plan',
+      language: 'en',
+    }));
+    // bootstrapProviders should be called before planSprint
+    const bootstrapOrder = vi.mocked(bootstrapProviders).mock.invocationCallOrder[0];
+    const planOrder = vi.mocked(planSprint).mock.invocationCallOrder[0];
+    expect(bootstrapOrder).toBeLessThan(planOrder!);
+  });
+
+  it('falls back to structured mode when bootstrapProviders fails', async () => {
+    setupMocks();
+    vi.mocked(bootstrapProviders).mockRejectedValue(new Error('No API key'));
+    await runCommand(['plan', '--no-confirm']);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('[warn]'));
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('structured'));
+    expect(planSprint).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ mode: 'structured' }),
+    );
+  });
+
+  it('does not override --structured flag when bootstrap fails', async () => {
+    setupMocks();
+    vi.mocked(bootstrapProviders).mockRejectedValue(new Error('No API key'));
+    await runCommand(['plan', '--structured', '--no-confirm']);
+    expect(planSprint).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ mode: 'structured' }),
+    );
+    // Should NOT print fallback warning because --structured was already set
+    const printCalls = vi.mocked(print).mock.calls.map(c => c[0]);
+    const warnCalls = printCalls.filter(msg => typeof msg === 'string' && msg.includes('[warn]'));
+    expect(warnCalls).toHaveLength(0);
+  });
+
+  it('--dry-run uses structured mode without calling bootstrapProviders', async () => {
+    setupMocks();
+    await runCommand(['plan', '--dry-run', '--no-confirm']);
+    expect(bootstrapProviders).not.toHaveBeenCalled();
+    expect(planSprint).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ mode: 'structured', dryRun: true }),
+    );
+  });
+
+  it('--dry-run + --structured skips bootstrap and uses structured', async () => {
+    setupMocks();
+    await runCommand(['plan', '--dry-run', '--structured', '--no-confirm']);
+    expect(bootstrapProviders).not.toHaveBeenCalled();
+    expect(planSprint).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ mode: 'structured', dryRun: true }),
+    );
+  });
+
+  it('successful bootstrap does not force structured mode', async () => {
+    setupMocks();
+    vi.mocked(bootstrapProviders).mockResolvedValue({
+      connector: {} as any,
+      registered: ['claude'],
+      skipped: [],
+      defaultProvider: 'claude',
+      providerEnvOverrides: {},
+    });
+    await runCommand(['plan', '--no-confirm']);
+    expect(planSprint).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), expect.anything(), expect.anything(),
+      expect.objectContaining({ mode: undefined }),
+    );
   });
 });

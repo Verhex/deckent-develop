@@ -35,7 +35,7 @@ import {
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { getNextSprintId, parseDebtTable, updateLastSprintId, readJsonSafe } from '../core/utils.js';
+import { getNextSprintId, parseDebtTable, updateLastSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 
 // ─── Core — config ────────────────────────────────────────────────
 import { resolveEffectiveWorkers } from '../core/config.js';
@@ -672,6 +672,11 @@ export async function planSprint(
       if (result.agent?.preferredModel && !task.forceModel) {
         task.model = result.agent.preferredModel;
       }
+      // Log agent selection result for debugging persistence
+      debugLog(
+        'planSprint:agent-selection',
+        `Task ${task.id} → agent=${task.assignedAgent}, score=${result.score}, reason=${result.reason}`,
+      );
     }
   } catch { /* agent pool failure is non-fatal */ }
 
@@ -690,6 +695,11 @@ export async function planSprint(
         if (result.skills.length > 0) {
           task.assignedSkills = result.skills.map(s => s.id);
         }
+        // Log skill selection result for debugging persistence
+        debugLog(
+          'planSprint:skill-selection',
+          `Task ${task.id} → skills=[${(task.assignedSkills ?? []).join(', ')}]`,
+        );
       }
     }
   } catch { /* skill selection failure is non-fatal */ }
@@ -699,6 +709,11 @@ export async function planSprint(
     const tasksPath = join(projectRoot, TASKS_DIR);
     mkdirSync(tasksPath, { recursive: true });
     for (const task of tasks) {
+      // Verify agent/skill assignment persisted before write
+      debugLog(
+        'planSprint:task-write',
+        `Writing ${task.id}: assignedAgent=${task.assignedAgent ?? 'undefined'}, assignedSkills=[${(task.assignedSkills ?? []).join(', ')}]`,
+      );
       writeFileSync(join(tasksPath, `task-${task.id}.json`), JSON.stringify(task, null, 2), 'utf-8');
     }
   }
@@ -1391,7 +1406,7 @@ export async function finalizeSprint(
     const poolManager = new AgentPoolManager(projectRoot);
     for (const task of sprint.tasks) {
       const agentId = task.assignedAgent;
-      if (!agentId || agentId === 'generic') continue;
+      if (!agentId) continue;
       const evaluation = evaluations.get(task.id);
       if (!evaluation) continue;
       const taskResult = results.find(r => r.taskId === task.id);

@@ -6,7 +6,9 @@ import { AgentPoolManager } from '../../src/core/agent-pool.js';
 import type { AgentDefinition } from '../../src/core/agent-types.js';
 import { createDefaultStats } from '../../src/core/agent-types.js';
 import { resolveAgentPrompt } from '../../src/orchestra/sprint-controller.js';
-import type { Task } from '../../src/core/types.js';
+import { createTask } from '../../src/orchestra/task-builder.js';
+import { selectAgent } from '../../src/core/agent-selector.js';
+import type { Task, CreateTaskParams } from '../../src/core/types.js';
 import { TaskStatus } from '../../src/core/types.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
@@ -218,6 +220,188 @@ describe('Agent Activation', () => {
       pool.updateAgentStats('stat-agent', 'GO_WITH_TECH_DEBT', 50, 'sprint-054');
       const agent = pool.getAgent('stat-agent');
       expect(agent?.stats.successRate).toBe(1);
+    });
+  });
+
+  // ─── D) Agent Assignment Persistence (Sprint 061) ───────────────────────
+
+  describe('createTask — assignedAgent/assignedSkills defaults', () => {
+    function makeCreateParams(overrides: Partial<CreateTaskParams> = {}): CreateTaskParams {
+      return {
+        title: 'Test Task',
+        description: 'A test task description',
+        model: 'sonnet',
+        effort: 'normal',
+        priority: 'NORMAL',
+        reason: 'Testing purposes',
+        scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/foo.ts'] },
+        dependencies: [],
+        goNogo: { goCriteria: 'tests pass', noGoCriteria: 'tests fail', techDebtAcceptable: 'minor' },
+        sprintId: 'sprint-061',
+        ...overrides,
+      };
+    }
+
+    it('createTask initializes assignedAgent to generic', () => {
+      const task = createTask(makeCreateParams(), 1);
+      expect(task.assignedAgent).toBe('generic');
+    });
+
+    it('createTask initializes assignedSkills to empty array', () => {
+      const task = createTask(makeCreateParams(), 1);
+      expect(task.assignedSkills).toEqual([]);
+    });
+
+    it('assignedAgent persists in JSON serialization', () => {
+      const task = createTask(makeCreateParams(), 1);
+      const json = JSON.parse(JSON.stringify(task));
+      expect(json.assignedAgent).toBe('generic');
+      expect(json.assignedSkills).toEqual([]);
+    });
+
+    it('assignedAgent can be mutated and re-serialized', () => {
+      const task = createTask(makeCreateParams(), 1);
+      task.assignedAgent = 'security-auditor';
+      task.assignedSkills = ['typescript-expert'];
+      const json = JSON.parse(JSON.stringify(task));
+      expect(json.assignedAgent).toBe('security-auditor');
+      expect(json.assignedSkills).toEqual(['typescript-expert']);
+    });
+  });
+
+  // ─── E) End-to-End: selectAgent → createTask → JSON persistence ────────
+
+  describe('Agent Assignment End-to-End Persistence', () => {
+    function makeSecurityAgent(): Record<string, unknown> {
+      return {
+        id: 'security-auditor',
+        name: 'Security Auditor',
+        description: 'Security vulnerability detection agent',
+        systemPrompt: 'You are a security specialist focused on vulnerability detection.',
+        expertise: ['security', 'vulnerability', 'audit'],
+        allowedTools: ['Read', 'Grep'],
+        deniedTools: [],
+        preferredModel: 'opus',
+        effortMultiplier: 1.5,
+        triggerKeywords: ['security', 'vulnerability', 'audit', 'auth', 'xss', 'injection'],
+        triggerScopes: ['src/auth/', 'src/api/', 'src/middleware/'],
+        triggerFilePatterns: ['**/auth*.ts', '**/security*.ts'],
+        persistent: true,
+        enabled: true,
+        source: 'builtin',
+        stats: { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' },
+      };
+    }
+
+    it('selectAgent matches security task to security-auditor', () => {
+      writeAgentJson(tmpDir, 'security-auditor', makeSecurityAgent());
+      const pool = new AgentPoolManager(tmpDir);
+      const agents = pool.loadAgents();
+
+      const task = {
+        title: 'Fix security vulnerability in auth module',
+        description: 'Patch XSS injection vulnerability in the authentication flow',
+        scope: { directories: ['src/auth/'], filesWrite: ['src/auth/handler.ts'] },
+      };
+
+      const result = selectAgent(task, agents);
+      expect(result.agent).not.toBeNull();
+      expect(result.agent!.id).toBe('security-auditor');
+      expect(result.score).toBeGreaterThanOrEqual(3);
+    });
+
+    it('createTask + selectAgent → task JSON has correct assignedAgent', () => {
+      writeAgentJson(tmpDir, 'security-auditor', makeSecurityAgent());
+      const pool = new AgentPoolManager(tmpDir);
+      const agents = pool.loadAgents();
+
+      const task = createTask({
+        title: 'Fix security vulnerability in auth module',
+        description: 'Patch XSS injection vulnerability in the authentication flow',
+        model: 'sonnet',
+        effort: 'high',
+        priority: 'CRITICAL',
+        reason: 'Security fix',
+        scope: { directories: ['src/auth/'], filesRead: [], filesWrite: ['src/auth/handler.ts'] },
+        dependencies: [],
+        goNogo: { goCriteria: 'No XSS', noGoCriteria: 'XSS present', techDebtAcceptable: 'none' },
+        sprintId: 'sprint-061',
+      }, 1);
+
+      // Default is generic
+      expect(task.assignedAgent).toBe('generic');
+
+      // After selectAgent, assign result to task
+      const result = selectAgent(task, agents);
+      task.assignedAgent = result.agent?.id ?? 'generic';
+      expect(task.assignedAgent).toBe('security-auditor');
+
+      // Verify persistence through JSON round-trip
+      const serialized = JSON.stringify(task, null, 2);
+      const deserialized = JSON.parse(serialized);
+      expect(deserialized.assignedAgent).toBe('security-auditor');
+    });
+
+    it('createTask + selectAgent → write to disk → read back', () => {
+      writeAgentJson(tmpDir, 'security-auditor', makeSecurityAgent());
+      const pool = new AgentPoolManager(tmpDir);
+      const agents = pool.loadAgents();
+
+      const task = createTask({
+        title: 'Audit security headers',
+        description: 'Check and fix security headers for XSS and CSRF protection',
+        model: 'opus',
+        effort: 'high',
+        priority: 'CRITICAL',
+        reason: 'Security audit',
+        scope: { directories: ['src/auth/'], filesRead: [], filesWrite: ['src/auth/headers.ts'] },
+        dependencies: [],
+        goNogo: { goCriteria: 'Headers secure', noGoCriteria: 'Vulnerable', techDebtAcceptable: 'minor' },
+        sprintId: 'sprint-061',
+      }, 2);
+
+      // Select and assign agent
+      const result = selectAgent(task, agents);
+      task.assignedAgent = result.agent?.id ?? 'generic';
+      task.assignedSkills = ['typescript-expert', 'security-specialist'];
+
+      // Write to disk
+      const tasksDir = path.join(tmpDir, '.tasks');
+      fs.mkdirSync(tasksDir, { recursive: true });
+      const taskFile = path.join(tasksDir, `task-${task.id}.json`);
+      fs.writeFileSync(taskFile, JSON.stringify(task, null, 2), 'utf-8');
+
+      // Read back and verify
+      const readBack = JSON.parse(fs.readFileSync(taskFile, 'utf-8'));
+      expect(readBack.assignedAgent).toBe('security-auditor');
+      expect(readBack.assignedSkills).toEqual(['typescript-expert', 'security-specialist']);
+    });
+
+    it('non-matching task remains generic after selectAgent', () => {
+      writeAgentJson(tmpDir, 'security-auditor', makeSecurityAgent());
+      const pool = new AgentPoolManager(tmpDir);
+      const agents = pool.loadAgents();
+
+      const task = createTask({
+        title: 'Add logging to config loader',
+        description: 'Simple logging enhancement for configuration module',
+        model: 'sonnet',
+        effort: 'normal',
+        priority: 'NORMAL',
+        reason: 'Debugging',
+        scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts'] },
+        dependencies: [],
+        goNogo: { goCriteria: 'Logs work', noGoCriteria: 'Logs fail', techDebtAcceptable: 'minor' },
+        sprintId: 'sprint-061',
+      }, 3);
+
+      const result = selectAgent(task, agents);
+      task.assignedAgent = result.agent?.id ?? 'generic';
+      expect(task.assignedAgent).toBe('generic');
+
+      // Verify generic persists through serialization
+      const json = JSON.parse(JSON.stringify(task));
+      expect(json.assignedAgent).toBe('generic');
     });
   });
 });

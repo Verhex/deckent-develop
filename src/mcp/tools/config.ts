@@ -35,7 +35,7 @@ export function registerConfigTool(server: McpServer): void {
         if (action === 'get') {
           if (!key) {
             return {
-              content: [{ type: 'text' as const, text: JSON.stringify({ error: 'key is required for action=get' }) }],
+              content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'key is required for action=get' }) }],
               isError: true,
             };
           }
@@ -50,13 +50,13 @@ export function registerConfigTool(server: McpServer): void {
         // action === 'set'
         if (!key) {
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'key is required for action=set' }) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'key is required for action=set' }) }],
             isError: true,
           };
         }
         if (value === undefined) {
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'value is required for action=set' }) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'value is required for action=set' }) }],
             isError: true,
           };
         }
@@ -77,7 +77,7 @@ export function registerConfigTool(server: McpServer): void {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
           isError: true,
         };
       }

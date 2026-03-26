@@ -417,8 +417,8 @@ describe('writeSprintLog', () => {
     writeSprintLog(tmpDir, sprint, makeMetrics(), evals);
     const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
     expect(content).toContain('## Tasks');
-    expect(content).toContain('- 001: Task One (DONE)');
-    expect(content).toContain('- 002: Task Two (NO_GO)');
+    expect(content).toContain('| 001: Task One | generic | - | DONE |');
+    expect(content).toContain('| 002: Task Two | generic | - | NO_GO |');
   });
 
   it('uses task.status when evaluations map not provided', () => {
@@ -426,7 +426,7 @@ describe('writeSprintLog', () => {
     const sprint = makeSprint({ tasks: [task] });
     writeSprintLog(tmpDir, sprint, makeMetrics()); // no evals
     const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
-    expect(content).toContain('- 001: Solo Task (DONE)');
+    expect(content).toContain('| 001: Solo Task | generic | - | DONE |');
   });
 
   it('truncates output to SPRINT_LOG_MAX_LINES (80 lines)', () => {

@@ -86,7 +86,17 @@
       "Read(//tmp/**)",
       "Bash(for w:*)",
       "Bash(do python3:*)",
-      "Bash(find /home/alperen/deckent-dev/src/providers -type f -name *.ts)"
+      "Bash(find /home/alperen/deckent-dev/src/providers -type f -name *.ts)",
+      "Bash(__NEW_LINE_ac1ab352e5883808__ echo:*)",
+      "Bash(head -3 grep -n \"list\\\\|--list\" /home/alperen/deckent-dev/src/cli/commands/attach.ts)",
+      "Bash(head -3 grep -n \"cleanup\\\\|sprintId\" /home/alperen/deckent-dev/src/cli/commands/watch.ts)",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "Bash(sort -t'|' -k4)",
+      "Bash(do gh:*)",
+      "Bash(tee /tmp/artifact-delete.log)",
+      "Bash(npx deckent:*)",
+      "Bash(xargs -I{} basename {} .ts)"
     ]
   },
   "outputStyle": "default"
