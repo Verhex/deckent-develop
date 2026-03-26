@@ -18,9 +18,10 @@ export function registerStartTool(server: McpServer): void {
     'deckent_start',
     {
       title: 'Start Sprint',
-      description: 'Start a sprint in the background (plan → spawn → execute → evaluate → retro → cleanup). Returns immediately with a jobId. Use deckent_status to track progress.',
+      description: 'Start a full sprint in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Returns immediately with a jobId — the sprint continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker actions (--dangerously-skip-permissions)'),
+        autoApprove: z.boolean().optional().default(false).describe('Auto-approve all worker tool calls with --dangerously-skip-permissions. Use only in trusted environments — skips Claude permission prompts for file writes, shell commands, etc.'),
       }),
     },
     async ({ autoApprove }) => {

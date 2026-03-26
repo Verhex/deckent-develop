@@ -18,8 +18,8 @@
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- 8 built-in agents: security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer
-- 10 built-in skills: typescript-expert, testing-expert, documentation-writer, etc.
+- 9 built-in agents: security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian
+- 11 built-in skills: typescript-expert, testing-expert, documentation-writer, etc.
 - Agent pool: .deckent/agents/*/agent.json — LRU eviction (max 50 temp, 5 sprint age)
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
 - Task routing: task-router.ts assigns agent + skills + provider per task
@@ -46,3 +46,311 @@ Lint: tsc --noEmit
 
 ## Boot
 @.deckent/workspace/BOOT.md
+
+---
+
+## Workflow Guide — Is Akisi Rehberi
+
+Deckent ile tipik bir sprint akisi asagidaki adimlari izler:
+
+1. **`deckent_init`** — Projeyi baslat. `.deckent/`, `.brain/`, `.tasks/` dizinlerini olusturur. CLAUDE.md, DECKENT.md, DIRECTIVES.md referanslarini ekler. Her ortamda (Claude Code, Cursor, VS Code) bir kez calistirilir.
+
+2. **`deckent_set_directives`** — Sprint hedeflerini yaz. DIRECTIVES.md dosyasini gunceller. Asagidaki DIRECTIVES Format Rehberini kullanarak task'lari tanimla.
+
+3. **`deckent_plan`** — Sprint planla. DIRECTIVES.md'yi okur, task JSON dosyalarini `.tasks/` altinda olusturur. `mode: 'ai'` ile yapay zeka tabanli planlama, `mode: 'structured'` ile kural tabanli planlama.
+
+4. **`deckent_start`** — Sprinti baslat. Worker'lari tmux veya subprocess olarak spawn eder, Auditor scan dongusu baslar. `--dry-run` ile task listesini goruntule, spawn etme.
+
+5. **`deckent_status`** — Ilerlemeyi izle. Aktif worker'lar, tamamlanan task'lar, alertler ve coverage bilgisini gosterir. `--watch` ile canli izleme, `--json` ile ham JSON ciktisi.
+
+6. **`deckent_review`** — Sprint sonucunu degerlendir. GO / NO_GO / GO_WITH_TECH_DEBT karari verir. Hangi task'larin basarisiz oldugunu ve tech debt birakilip birakilmayacagini gosterir.
+
+7. **`deckent_retro`** — Retrospektif oku. RETRO.md ozetini, ogrenimleri ve bir sonraki sprint icin onerileri gosterir.
+
+8. **`deckent_cleanup`** — Sprinti temizle. Task dosyalarini arsivler, kilitleri serbest birakir, tmux sessionlarini kapatir.
+
+---
+
+## DIRECTIVES Format Guide — DIRECTIVES Format Rehberi
+
+DIRECTIVES.md dosyasi sprint hedeflerini tanimlar. Her task asagidaki formati izlemelidir:
+
+```markdown
+# DIRECTIVES — Sprint NNN: Sprint Basligi
+
+## Goal: Sprint amacini bir paragrafta acikla.
+
+---
+
+## Task 1: Task Basligi
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/config.ts, src/core/types.ts
+- Scope: src/core/
+
+### Description
+Task'in ne yapacagini detayli acikla. Hangi degisiklikler yapilacak,
+hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
+
+**Kanit:** `grep "yeniOzellik" src/core/config.ts` → eklendi
+
+**Test:** 3+ test (temel davranis, edge case, hata durumu)
+
+---
+
+## Task 2: Diger Task
+- Model: haiku
+- Effort: low
+- Skills: documentation-writer
+- Files: README.md, docs/guide.md
+- Scope: docs/
+
+### Description
+...
+```
+
+### Alan Aciklamalari
+
+| Alan | Gecerli Degerler | Aciklama |
+|------|-----------------|----------|
+| Model | opus, sonnet, haiku | Kullanilacak AI modeli |
+| Effort | low, normal, high | Tahmini is yuku |
+| Skills | skill-id listesi | Uzmanlik alani (virgul ile ayir) |
+| Files | dosya yollari | Degistirilecek dosyalar |
+| Scope | dizin yollari | Izin verilen dizinler |
+| Kanit | shell komutu | Tamamlanma kaniti |
+| Test | test sayisi + aciklama | Beklenen testler |
+
+---
+
+## Sprint Lifecycle — Sprint Yasam Dongusu
+
+Bir sprint 8 fazdan olusur:
+
+```
+PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
+```
+
+| Faz | Aciklama | Sorumlu |
+|-----|----------|---------|
+| **PLAN** | Brain DIRECTIVES'i okur, task JSON'larini olusturur | Brain |
+| **SPAWN** | Worker'lar tmux/subprocess ile baslatilir, Auditor baslar | Brain |
+| **EXECUTE** | Worker'lar task'lari uygular, heartbeat dosyalari yazar | Workers |
+| **EVALUATE** | Brain sonuclari degerlendirir: GO / NO_GO / GO_WITH_TECH_DEBT | Brain |
+| **FIX** | Basarisiz task'lar yeniden denenir (yapilandirilabilir timeout) | Brain + Workers |
+| **RETRO** | Retrospektif yazilir: RETRO.md, sprint log guncellenir | Brain |
+| **DECAY** | .brain/ bellek butcesi asildiysa eski satirlar temizlenir | Brain |
+| **CLEANUP** | Task dosyalari arsivlenir, kilitler serbest, session'lar kapatilir | Brain |
+
+---
+
+## MCP Tool Reference — MCP Arac Referansi
+
+| Tool | Aciklama | ReadOnly | Destructive |
+|------|----------|----------|-------------|
+| `deckent_init` | Projeyi baslat, dizinleri olustur, ortam adapter'larini kur | Hayir | Hayir |
+| `deckent_set_directives` | DIRECTIVES.md'yi guncelle, sprint hedeflerini tanimla | Hayir | Hayir |
+| `deckent_plan` | DIRECTIVES'i oku, task JSON'larini olustur | Hayir | Hayir |
+| `deckent_start` | Sprint'i baslat, worker'lari spawn et | Hayir | Hayir |
+| `deckent_status` | Aktif sprint durumunu goster (worker'lar, alertler, ilerleme) | Evet | Hayir |
+| `deckent_doctor` | Codebase sagligini kontrol et, sorunlari tespit et | Evet | Hayir |
+| `deckent_retro` | Son sprint retrospektifini goster | Evet | Hayir |
+| `deckent_history` | Sprint gecmisini listele | Evet | Hayir |
+| `deckent_analyze_project` | Proje stack'ini, bagimlilikları, sagligi analiz et | Evet | Hayir |
+| `deckent_sync` | Konfigurasyon ve manifest'leri senkronize et | Hayir | Hayir |
+| `deckent_config` | Konfigurasyon oku veya guncelle | Hayir | Hayir |
+| `deckent_usage` | AI token ve maliyet kullanim istatistiklerini goster | Evet | Hayir |
+| `deckent_review` | Sprint sonucunu degerlendir: GO / NO_GO / GO_WITH_TECH_DEBT | Evet | Hayir |
+| `deckent_run` | Tek bir task'i arka planda calistir | Hayir | Hayir |
+| `deckent_kill` | Aktif sprint'i veya belirli worker'lari durdur | Hayir | **Evet** |
+| `deckent_cleanup` | Task dosyalarini arsivle, sprint'i temizle | Hayir | **Evet** |
+
+### Parametre Ornekleri
+
+```typescript
+// deckent_init
+{ root: "/path/to/project", projectName: "my-app" }
+
+// deckent_set_directives
+{ content: "# DIRECTIVES — Sprint 001\n## Task 1: ...", root: "/path/to/project" }
+
+// deckent_plan
+{ mode: "ai", root: "/path/to/project" }
+// mode: "ai" → AI tabanli planlama (GPT/Claude)
+// mode: "structured" → Kural tabanli, deterministik
+// mode: "auto" → Proje boyutuna gore otomatik sec
+
+// deckent_start
+{ sprintId: "sprint-001", dryRun: false, root: "/path/to/project" }
+
+// deckent_status
+{ watch: false, json: false, root: "/path/to/project" }
+
+// deckent_config
+{ action: "read", root: "/path/to/project" }
+{ action: "set", key: "max_workers", value: "4", root: "/path/to/project" }
+
+// deckent_kill
+{ target: "all", root: "/path/to/project" }
+{ target: "worker", workerId: "w-001-003", root: "/path/to/project" }
+```
+
+---
+
+## MCP Resource Reference — MCP Kaynak Referansi
+
+| Resource | URI | Icerik | Aciklama |
+|----------|-----|--------|----------|
+| dashboard | `deckent://dashboard` | JSON | Aktif sprint durumu: worker'lar, fazlar, alertler, metrikler |
+| directives | `deckent://directives` | Markdown | Mevcut DIRECTIVES.md icerigi |
+| memory | `deckent://memory` | Markdown | Brain bellek ozeti: ogrenim, kararlar, desenler |
+| debt | `deckent://debt` | Markdown | Teknik borc tablosu: acik ve cozulmus maddeler |
+| config | `deckent://config` | JSON | Guncellenmis proje konfigurasyonu |
+| retro | `deckent://retro` | Markdown | Son sprint retrospektif raporu |
+| usage | `deckent://usage` | JSON | Token kullanimi, maliyet, provider istatistikleri |
+| tasks | `deckent://tasks` | JSON | Mevcut sprint task listesi ve durumlari |
+| agents | `deckent://agents` | JSON | Kayitli agent havuzu, istatistikler, kullanim oranlari |
+
+---
+
+## Parameter Reference — Parametre Referansi
+
+### Model
+
+| Deger | Provider | Tier | Kullanim |
+|-------|----------|------|---------|
+| `opus` | Claude | Premium | Karmasik mimari, kritik karar, multi-file refactor |
+| `sonnet` | Claude | Standard | Genel gelistirme, bug fix, test yazimi |
+| `haiku` | Claude | Economy | Dokumantasyon, basit degisiklik, format duzenlemesi |
+| `gpt-5` | Codex | Premium | opus esdegeri (OPENAI_API_KEY gerekli) |
+| `gpt-4.1` | Codex | Standard | sonnet esdegeri |
+| `gpt-5-mini` | Codex | Economy | haiku esdegeri |
+| `gemini-2.5-pro` | Gemini | Premium | opus esdegeri (GOOGLE_API_KEY gerekli) |
+| `gemini-2.5-flash` | Gemini | Standard | sonnet esdegeri |
+
+### Effort
+
+| Deger | Aciklama | Ornek |
+|-------|----------|-------|
+| `low` | <1 saat, minimal degisiklik | Yorum guncelleme, kucuk duzeltme |
+| `normal` | 1-3 saat, orta kapsamli | Yeni fonksiyon, test ekleme |
+| `high` | 3+ saat, buyuk degisiklik | Yeni modul, mimari degisiklik, refactor |
+
+### Planning Mode
+
+| Deger | Aciklama |
+|-------|----------|
+| `ai` | AI tabanli planlama — DIRECTIVES'i yorumlar, akilli task bolunumu |
+| `structured` | Kural tabanli — deterministik, hizli, AI API kullanmaz |
+| `auto` | Proje boyutuna gore otomatik: kucuk→structured, buyuk→ai |
+
+### Provider
+
+| Deger | Backend | Konfigürasyon |
+|-------|---------|---------------|
+| `claude` | Claude Code (tmux) | Varsayilan, oturum kimlik dogrulamasi |
+| `codex` | OpenAI Codex | `OPENAI_API_KEY` env var gerekli |
+| `gemini` | Google Gemini | `GOOGLE_API_KEY` env var gerekli |
+
+---
+
+## Error Resolution Guide — Hata Cozum Rehberi
+
+### Sprint Takildi / Dondu
+
+```bash
+# 1. Aktif worker'lari durdur
+deckent kill --all
+
+# 2. Task dosyalarini temizle
+deckent cleanup
+
+# 3. Codebase sagligini kontrol et
+deckent doctor
+
+# 4. Gerekirse yeniden baslat
+deckent start
+```
+
+### MCP Araciligi ile:
+```
+deckent_kill  → { target: "all" }
+deckent_cleanup → { root: "." }
+deckent_doctor → { root: "." }
+```
+
+### Konfigurasyon Sorunu
+
+```bash
+# Mevcut konfigurasyon'u oku
+deckent config read
+
+# Belirli bir degeri guncelle
+deckent config set max_workers 4
+deckent config set brain_provider claude
+deckent config set routing_engine v2
+```
+
+### Build Hatasi (tsc --noEmit)
+
+1. Hata mesajini oku — hangi dosya, hangi satir
+2. Ilgili tipleri kontrol et (`src/core/*-types.ts`)
+3. Import yollarini dogrula (`.js` uzantisi gerekli — ESM)
+4. `tsc --noEmit` tekrar calistir
+
+### Test Basarisizligi
+
+1. Basarisiz test'in dosyasini tespit et
+2. `npx vitest run path/to/failing.test.ts` ile izole calistir
+3. Mock'larin guncellenmis export'lari icerip icermedigini kontrol et
+4. `npx vitest run` — tam suite calistir
+
+### Worker .result Birakmadi (False NO_GO)
+
+- Worker tmux session'inda calisiyor olabilir: `tmux ls` ile kontrol et
+- `.tasks/task-NNN.hb` heartbeat dosyasini kontrol et — son timestamp
+- `deckent status` ile worker durumunu gozlemle
+- Gerekirse: `deckent kill --worker w-NNN-NNN`
+
+### MCP Server Eski Kod Calistiriyor
+
+```bash
+# Build et
+tsc
+
+# MCP server'i yeniden baslat (long-lived process cache'i temizler)
+# Claude Code'da: /mcp restart veya Claude'u yeniden baslat
+```
+
+---
+
+## Built-in Agents
+
+| Agent | Uzmanlik | Aktivasyon |
+|-------|----------|------------|
+| `security-auditor` | Guvenlilk aciklari, OWASP top 10, auth | security/auth/vuln anahtar kelimeleri |
+| `test-writer` | Unit test, integration test, coverage | test/spec/coverage anahtar kelimeleri |
+| `doc-writer` | README, JSDoc, API docs, CHANGELOG | docs/readme/comment anahtar kelimeleri |
+| `bug-fixer` | Hata ayiklama, regression, hotfix | fix/bug/error/crash anahtar kelimeleri |
+| `code-reviewer` | Kod kalitesi, best practices, PR review | review/quality/refactor anahtar kelimeleri |
+| `refactorer` | Yeniden yapilandirma, temizlik, modernizasyon | refactor/cleanup/migrate anahtar kelimeleri |
+| `api-builder` | REST API, OpenAPI, endpoint tasarimi | api/endpoint/route/schema anahtar kelimeleri |
+| `performance-analyzer` | Profiling, optimizasyon, benchmark | perf/slow/optimize anahtar kelimeleri |
+| `ci-guardian` | CI/CD saglik, test regresyon, build | ci/pipeline/test anahtar kelimeleri |
+
+## Built-in Skills
+
+| Skill | Aciklama |
+|-------|----------|
+| `typescript-expert` | TypeScript tip sistemi, ESM, generics, decorators |
+| `testing-expert` | Vitest/Jest, mock'lama, coverage, test stratejisi |
+| `documentation-writer` | Markdown, JSDoc, API docs, changelog |
+| `security-expert` | Guvenlik patternleri, input validasyon, kriptografi |
+| `performance-expert` | Async optimizasyon, memory, profiling |
+| `api-designer` | REST tasarimi, OpenAPI spec, versiyonlama |
+| `refactoring-expert` | SOLID prensipler, design patterns, clean code |
+| `ci-cd-expert` | GitHub Actions, Docker, deployment pipeline |
+| `database-expert` | Query optimizasyon, migration, ORM |
+| `frontend-expert` | React, Vite, Tailwind, component mimari |
+| `ci-testing` | CI ortaminda test yurutme, regresyon algilama |

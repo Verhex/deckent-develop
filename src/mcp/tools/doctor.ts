@@ -11,9 +11,10 @@ export function registerDoctorTool(server: McpServer): void {
     'deckent_doctor',
     {
       title: 'Health Check',
-      description: 'Run Deckent health checks: Node.js, git, tmux, Claude CLI, workspace, brain budget, debt, locks.',
+      description: 'Run Deckent health checks and diagnose environment issues. Checks: Node.js version, git availability, tmux installation, Claude CLI auth, workspace directories (.deckent/, .brain/, .tasks/), brain memory budget, tech debt level, stale lock files. Returns a healthScore (0-100) and per-check pass/fail status with recommendations. Use when a sprint fails unexpectedly or before starting a new sprint. If issues found: fix them, then re-run doctor until healthScore reaches 100.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        includeProfile: z.boolean().optional().default(false).describe('Include system profile information (CPU, RAM, recommended workers, subscription)'),
+        includeProfile: z.boolean().optional().default(false).describe('Also include system profile: CPU core count, total/free RAM, recommended max workers, and detected Claude subscription tier'),
       }),
     },
     async ({ includeProfile }) => {

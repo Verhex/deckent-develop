@@ -218,6 +218,117 @@ export function formatRecommendations(reasons: string[]): string {
   return lines.join('\n');
 }
 
+// ─── IDE Adapter Helpers ──────────────────────────────────────────────
+
+/**
+ * Generate content for .cursor/rules/deckent.md adapter.
+ * Starts with @DECKENT.md reference (single-source principle, ADR-013).
+ */
+export function generateCursorDeckentMd(): string {
+  return `@DECKENT.md
+
+# Deckent — Cursor Integration
+
+This project uses Deckent for AI agent orchestration.
+
+## Workflow
+1. \`deckent init\` — Initialize project
+2. \`deckent set-directives\` — Set sprint goals in DIRECTIVES.md
+3. \`deckent plan\` — Plan sprint tasks (mode: ai/structured/auto)
+4. \`deckent start\` — Launch workers
+5. \`deckent status\` — Monitor progress
+6. \`deckent review\` — Evaluate results (GO/NO_GO/GO_WITH_TECH_DEBT)
+7. \`deckent retro\` — Sprint retrospective
+8. \`deckent cleanup\` — Archive and clean
+
+## Rules
+- Follow DIRECTIVES.md for sprint goals
+- Respect file scope boundaries
+- Run tests before reporting completion
+- Brain is the ONLY orchestrator — workers never plan
+`;
+}
+
+/**
+ * Generate content for .vscode/mcp.json MCP registration.
+ * Registers deckent MCP server so VS Code AI tools can discover it.
+ */
+export function generateVscodeMcpJson(): string {
+  return JSON.stringify(
+    {
+      servers: {
+        deckent: {
+          command: 'npx',
+          args: ['deckent', 'mcp'],
+          env: {},
+        },
+      },
+    },
+    null,
+    2,
+  ) + '\n';
+}
+
+export interface IdeAdapterResult {
+  path: string;
+  action: 'created' | 'exists' | 'skipped';
+}
+
+/**
+ * Auto-detect IDE directories and create Deckent adapter files.
+ * Called automatically during `deckent init`.
+ *
+ * Detection rules:
+ * - .cursor/ exists (or --all-envs) → create .cursor/rules/deckent.md
+ * - .vscode/ exists (or --all-envs) → create .vscode/mcp.json if missing
+ * - codex.md missing → ensure AGENTS.md has @DECKENT.md reference
+ *
+ * All adapters start with @DECKENT.md (single-source principle, ADR-013).
+ */
+export function applyIdeAdapters(
+  root: string,
+  opts: { force?: boolean; allEnvs?: boolean } = {},
+): IdeAdapterResult[] {
+  const results: IdeAdapterResult[] = [];
+
+  // 1. Cursor: .cursor/ dir exists OR --all-envs flag
+  const cursorDir = join(root, '.cursor');
+  if (opts.allEnvs || existsSync(cursorDir)) {
+    const rulesDir = join(cursorDir, 'rules');
+    const adapterPath = join(rulesDir, 'deckent.md');
+    if (!existsSync(adapterPath) || opts.force) {
+      mkdirSync(rulesDir, { recursive: true });
+      writeFileSync(adapterPath, generateCursorDeckentMd());
+      results.push({ path: adapterPath, action: 'created' });
+    } else {
+      results.push({ path: adapterPath, action: 'exists' });
+    }
+  }
+
+  // 2. VS Code: .vscode/ dir exists OR --all-envs flag
+  const vscodeDir = join(root, '.vscode');
+  if (opts.allEnvs || existsSync(vscodeDir)) {
+    const mcpPath = join(vscodeDir, 'mcp.json');
+    if (!existsSync(mcpPath) || opts.force) {
+      mkdirSync(vscodeDir, { recursive: true });
+      writeFileSync(mcpPath, generateVscodeMcpJson());
+      results.push({ path: mcpPath, action: 'created' });
+    } else {
+      results.push({ path: mcpPath, action: 'exists' });
+    }
+  }
+
+  // 3. Codex: if codex.md is absent, ensure AGENTS.md has @DECKENT.md reference
+  const codexMdPath = join(root, 'codex.md');
+  if (!existsSync(codexMdPath)) {
+    const agentsPath = join(root, AGENTS_FILE);
+    ensureDeckentImport(agentsPath);
+    results.push({ path: agentsPath, action: 'created' });
+  }
+
+  return results;
+}
+
 /**
  * Apply multi-environment config for a single environment name.
  * Creates environment-specific files using stack-aware templates.
@@ -433,6 +544,22 @@ globs: ["**/*"]
 `);
           }
         }
+
+        // 7b2. IDE adapter auto-detection (directory-based)
+        // Detects .cursor/ / .vscode/ directories and creates adapter files.
+        // Independent of --env flag: runs for every init.
+        try {
+          const ideResults = applyIdeAdapters(root, { force: options.force, allEnvs: options.allEnvs });
+          for (const r of ideResults) {
+            if (r.action === 'created') {
+              if (r.path.includes('.cursor')) {
+                print('  Created .cursor/rules/deckent.md for Cursor integration');
+              } else if (r.path.includes('.vscode')) {
+                print('  Created .vscode/mcp.json for VS Code MCP registration');
+              }
+            }
+          }
+        } catch { /* non-fatal — IDE adapters are best-effort */ }
 
         // 7c. Multi-environment config (--env / --all-envs flags)
         const requestedEnvs: EnvName[] = options.allEnvs

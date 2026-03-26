@@ -40,10 +40,11 @@ export function registerCleanupTool(server: McpServer): void {
     'deckent_cleanup',
     {
       title: 'Sprint Cleanup',
-      description: 'Clean up sprint artifacts: task files, locks, and optionally run memory decay.',
+      description: 'Remove sprint artifacts and optionally trim memory budget. Deletes all task files (.json, .plan, .hb, .result, .paused, .log) from .tasks/ and all lock files from .locks/. With decay=true, also runs memory decay on .brain/ files if they exceed the line budget (trims MEMORY.md, RETRO.md, sprint logs). Use dryRun=true first to preview what would be deleted. Typically run after a sprint completes (deckent_review) or before starting a fresh sprint after kill.',
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
-        decay: z.boolean().optional().default(false).describe('Also run memory decay on .brain/ files'),
-        dryRun: z.boolean().optional().default(false).describe('Preview what would be deleted without actually deleting'),
+        decay: z.boolean().optional().default(false).describe('Also run memory decay on .brain/ files if they exceed the configured line budget (default: 900 lines). Trims old sprint logs and compresses MEMORY.md.'),
+        dryRun: z.boolean().optional().default(false).describe('Preview mode: show what would be deleted (file counts, brain line count, decay decision) without actually deleting anything. Recommended before first cleanup.'),
       }),
     },
     async ({ decay, dryRun }) => {

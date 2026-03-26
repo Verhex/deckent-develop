@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint68] - 2026-03-26
+
+### Added
+
+- DECKENT.md AI-Native Rehber Genisletme
+- deckent init Multi-Ortam Adapter
+- V2 Routing E2E Dogrulama Testi
+
+### Changed
+
+- MCP Server Instructions — AI System Prompt Injection (completed with tech debt)
+- Tool Descriptions + Annotations Zenginlestirme (completed with tech debt)
+- deckent_help Tool — Runtime Capabilities + State (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 3 tech debt, 0 no-go_
+
+## [0.2.0-beta.1-sprint67] - 2026-03-26
+
+### Added
+
+- Job State Sprint Sonuçları — finalizeSprint → job file
+
+### Changed
+
+- Fix debt: Tech debt from 064-004-fix: Added 11 targeted tests to tests/cli/helpers/output. (completed with tech debt)
+- Retro Detay Zenginlestirme — Worker Notes Aktarimi (completed with tech debt)
+- any Kullanimi Temizligi — 10 Adet, 7 Dosya (completed with tech debt)
+- V2 Routing Dogrulama — Audit + IDENTITY Guncelleme (completed with tech debt)
+
+
+_Tasks: 6 total, 5 done, 4 tech debt, 1 no-go_
+
 ## [0.2.0-beta.1-sprint66] - 2026-03-26
 
 ### Added

@@ -81,7 +81,8 @@ export function registerStatusTool(server: McpServer): void {
     'deckent_status',
     {
       title: 'Sprint Status',
-      description: 'Get the current sprint dashboard status. Returns agent states, progress, usage metrics, alerts, and background job state.',
+      description: 'Get the current sprint dashboard status. Returns: agents (active worker list with task assignments), progress (done/total counts + progress bar + ETA), alerts (stale workers, boundary violations, lock issues), job (background job state: RUNNING/COMPLETE/FAILED + sprintId + metrics), agentAssignments (which agent handles which tasks), skillAssignments (which skills are active). Call repeatedly to poll progress. No prerequisite — safe to call anytime.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => {
       const root = process.cwd();

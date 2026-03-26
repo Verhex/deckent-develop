@@ -31,9 +31,22 @@ export function registerSetDirectivesTool(server: McpServer): void {
     'deckent_set_directives',
     {
       title: 'Set Directives',
-      description: 'Write DIRECTIVES.md content. Claude should format natural language goals into "## Görev N:" or "## Task N:" blocks that the brain engine can parse.',
+      description: `Write DIRECTIVES.md content. The brain engine parses "## Task N:" or "## Görev N:" blocks to create sprint tasks. Each block should include: Model (opus/sonnet/haiku), Effort (low/normal/high), Skills (e.g. typescript-expert), Files, Scope (directory list), and Description. Example format:
+
+## Task 1: Add authentication middleware
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/middleware/auth.ts
+- Scope: src/middleware/
+
+### Description
+Implement JWT-based authentication middleware...
+
+Prerequisite: deckent_init must have been run. Overwrites DIRECTIVES.md each call. Run deckent_plan after to preview tasks.`,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        content: z.string().min(1, 'Content cannot be empty').describe('Formatted DIRECTIVES.md content with ## Görev/Task N: blocks'),
+        content: z.string().describe('Formatted DIRECTIVES.md content with ## Task N: or ## Görev N: blocks. Each block needs Model, Effort, Skills, Files, Scope, and Description sub-sections.'),
       }),
     },
     async ({ content }) => {

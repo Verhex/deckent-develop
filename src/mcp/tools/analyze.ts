@@ -18,7 +18,7 @@ export function registerAnalyzeTool(server: McpServer): void {
     'deckent_analyze_project',
     {
       title: 'Analyze Project',
-      description: 'Analyze project stack, size, and methodology recommendation.',
+      description: 'Analyze the current project to detect: language (TypeScript/JavaScript/Python/Go/Rust/etc.), framework (React/Express/FastAPI/etc.), test framework (vitest/jest/pytest/etc.), build tool (tsc/webpack/vite/etc.), CI system (GitHub Actions/GitLab CI/etc.), project size (small/medium/large based on file count), and methodology recommendation. Returns config suggestions (e.g. recommended plan mode, worker count). Useful before init to pick the right configuration, or to verify stack detection. Does not modify any files.',
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => {

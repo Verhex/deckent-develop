@@ -10,9 +10,10 @@ export function registerUsageTool(server: McpServer): void {
     'deckent_usage',
     {
       title: 'Usage Stats',
-      description: 'Get sprint usage statistics: token counts, API calls, cost estimates, model breakdown.',
+      description: 'Get Claude API usage statistics for a sprint. Returns: token counts (input/output), API call count, estimated cost in USD, model breakdown (opus/sonnet/haiku distribution), and cumulative totals across all sprints. Use to monitor budget consumption, identify expensive tasks, or plan future sprint sizes. Defaults to the current sprint if no sprintId provided.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        sprintId: z.string().optional().describe('Sprint ID (e.g. "sprint-059"). Defaults to current sprint.'),
+        sprintId: z.string().optional().describe('Sprint ID to query (e.g. "sprint-067"). Omit to use the current/most recent sprint.'),
       }),
     },
     async ({ sprintId }) => {

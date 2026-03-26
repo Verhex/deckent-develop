@@ -81,10 +81,11 @@ export function registerKillTool(server: McpServer): void {
     'deckent_kill',
     {
       title: 'Kill Worker',
-      description: 'Stop a running worker by task ID, or kill all active workers. Sets task status to PAUSED and cleans up locks.',
+      description: 'Stop one or all running workers. Sets task status to PAUSED, removes heartbeat files, and releases any file locks owned by the task. Use when a worker is stuck (stale heartbeat), consuming too many resources, or needs to be restarted. After killing, run deckent_cleanup to remove task artifacts, then deckent_start to restart.',
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
-        taskId: z.string().optional().describe('Task ID to kill (e.g. "059-001")'),
-        all: z.boolean().optional().default(false).describe('Kill all active workers'),
+        taskId: z.string().optional().describe('Specific task ID to kill (e.g. "059-001"). The worker for this task is stopped and its locks released.'),
+        all: z.boolean().optional().default(false).describe('Kill ALL active workers (status EXECUTING, CLAIMED, or TESTING). Use when sprint is stuck and needs a full restart.'),
       }),
     },
     async ({ taskId, all }) => {

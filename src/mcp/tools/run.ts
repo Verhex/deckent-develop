@@ -15,11 +15,12 @@ export function registerRunTool(server: McpServer): void {
     'deckent_run',
     {
       title: 'Run Task',
-      description: 'Run a single one-off task. Creates a task JSON and spawns a worker. Returns jobId for tracking.',
+      description: 'Run a single one-off task outside of a full sprint. Creates a task JSON file and spawns a Claude worker immediately. Returns a jobId for tracking. Use when you need a quick isolated task without the full sprint lifecycle overhead (no PLAN/EVALUATE/RETRO phases). Use deckent_status to monitor the spawned worker. Example: fix a specific bug, write a single test file, update a doc.',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        description: z.string().describe('Task description — what the worker should do'),
-        model: z.enum(['opus', 'sonnet', 'haiku']).optional().default('sonnet').describe('Model to use'),
-        scope: z.string().optional().describe('Comma-separated directory scope (e.g. "src/,tests/")'),
+        description: z.string().describe('Clear description of what the worker should do. Be specific: include file paths, expected outcome, and any constraints.'),
+        model: z.enum(['opus', 'sonnet', 'haiku']).optional().default('sonnet').describe('Claude model: opus (most capable, highest cost), sonnet (balanced, recommended), haiku (fastest, lowest cost)'),
+        scope: z.string().optional().describe('Comma-separated directory paths the worker may modify (e.g. "src/,tests/"). Defaults to "src/" if omitted.'),
       }),
     },
     async ({ description, model, scope }) => {

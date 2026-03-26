@@ -1,35 +1,31 @@
-# Sprint sprint-067 Retrospective
+# Sprint sprint-068 Retrospective
 
 ## Summary
-Completed 5/6 tasks in 42 minutes 30s.
+Completed 6/6 tasks in 17 minutes 14s.
 
 ## Highlights
-- 5 tasks completed on first try
+- 6 tasks completed on first try
 - No boundary violations detected
-
-## Issues
-- Task 067-002 (npm Paket Boyutu Optimizasyonu — 768KB → <500KB) failed
+- NO_GO rate improved from 17% to 0%
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 5/6 |
-| New test files | 7 |
-| Code changes | +235 / -119 |
-| Sprint time | 42 minutes 30s |
-| NO_GO rate | 17% (1/6) |
-| Coverage | 19.2% |
+| Tasks completed | 6/6 |
+| New test files | 6 |
+| Code changes | +1339 / -54 |
+| Sprint time | 17 minutes 14s |
+| NO_GO rate | 0% (0/6) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| ci-guardian | 5 | 1 | 3 | 1 | 96% |
+| test-writer | 4 | 2 | 2 | 0 | 96% |
+| ci-guardian | 1 | 1 | 0 | 0 | 0% |
 | generic | 1 | 0 | 1 | 0 | 0% |
 
 ## Learnings
-- Fix debt: Tech debt from 064-004-fix: Added 11 targeted tests to tests/cli/helpers/output.: completed with tech debt — schedule cleanup
-- npm Paket Boyutu Optimizasyonu — 768KB → <500KB: failed — investigate root cause
-- Retro Detay Zenginlestirme — Worker Notes Aktarimi: completed with tech debt — schedule cleanup
-- any Kullanimi Temizligi — 10 Adet, 7 Dosya: completed with tech debt — schedule cleanup
-- V2 Routing Dogrulama — Audit + IDENTITY Guncelleme: completed with tech debt — schedule cleanup
+- MCP Server Instructions — AI System Prompt Injection: completed with tech debt — Added DECKENT_MCP_INSTRUCTIONS constant exported from server.ts and passed it as options.instructions to McpServer constructor (second parameter, per 
+- Tool Descriptions + Annotations Zenginlestirme: completed with tech debt — All 16 MCP tools enriched with: (1) detailed descriptions (80+ chars, explains what/when/prerequisite), (2) annotations { readOnlyHint, destructiveHin
+- deckent_help Tool — Runtime Capabilities + State: completed with tech debt — Implemented deckent_help MCP tool. Detects project state (initialized, hasDirectives, sprintActive, lastSprint, routingEngine, agentCount, skillCount)

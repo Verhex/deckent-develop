@@ -15,6 +15,7 @@ import { registerReviewTool } from './review.js';
 import { registerRunTool } from './run.js';
 import { registerKillTool } from './kill.js';
 import { registerCleanupTool } from './cleanup.js';
+import { registerHelpTool } from './help.js'; // deckent_help
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -33,4 +34,5 @@ export function registerTools(server: McpServer): void {
   registerRunTool(server);
   registerKillTool(server);
   registerCleanupTool(server);
+  registerHelpTool(server);
 }

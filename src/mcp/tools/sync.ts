@@ -10,7 +10,8 @@ export function registerSyncTool(server: McpServer): void {
     'deckent_sync',
     {
       title: 'Sync Deckent',
-      description: 'Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference. Additive — never overwrites existing content.',
+      description: 'Sync AI adapter files (CLAUDE.md, AGENTS.md) to ensure they import DECKENT.md as the single source of truth. Additive only — prepends the @DECKENT.md reference if missing, never overwrites existing content. Use when CLAUDE.md or AGENTS.md loses its Deckent reference (e.g. after a manual edit or merge conflict). Requires DECKENT.md to exist (run deckent_init first).',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
     async () => {
       const root = process.cwd();

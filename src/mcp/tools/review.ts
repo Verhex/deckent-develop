@@ -56,9 +56,10 @@ export function registerReviewTool(server: McpServer): void {
     'deckent_review',
     {
       title: 'Sprint Review',
-      description: 'Review sprint task results. Returns task statuses, self-assessments, and review decisions.',
+      description: 'Review sprint task results and make GO/NO_GO/GO_WITH_TECH_DEBT decisions. For each task returns: selfAssessment (worker\'s own evaluation: DONE/GO_WITH_TECH_DEBT/NO_GO), testsPassed (boolean), filesChanged (list), notes (worker summary), and decision (approved/rejected/pending). GO = task complete, all tests pass. NO_GO = task failed, needs rework. GO_WITH_TECH_DEBT = task done but with known issues to fix later. Use auto=true to approve all DONE+testsPassed tasks automatically.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        auto: z.boolean().optional().default(false).describe('Auto-approve tasks that pass (DONE + tests passed)'),
+        auto: z.boolean().optional().default(false).describe('Auto-approve tasks where selfAssessment=DONE and testsPassed=true. Rejected tasks (NO_GO) are never auto-approved.'),
       }),
     },
     async ({ auto }) => {

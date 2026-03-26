@@ -61,7 +61,7 @@ vi.mock('../../src/agents/worker.js', () => ({
   releaseAllLocks: vi.fn(),
 }));
 
-import { createServer } from '../../src/mcp/server.js';
+import { createServer, DECKENT_MCP_INSTRUCTIONS } from '../../src/mcp/server.js';
 
 describe('MCP Server', () => {
   it('creates a server instance', () => {
@@ -73,5 +73,96 @@ describe('MCP Server', () => {
     const server = createServer();
     // The server is created — if it didn't throw, tools and resources registered fine
     expect(server).toBeTruthy();
+  });
+});
+
+describe('DECKENT_MCP_INSTRUCTIONS', () => {
+  it('instructions is a non-empty string', () => {
+    expect(typeof DECKENT_MCP_INSTRUCTIONS).toBe('string');
+    expect(DECKENT_MCP_INSTRUCTIONS.length).toBeGreaterThan(200);
+  });
+
+  it('instructions contains all 16 tool names', () => {
+    const tools = [
+      'deckent_init',
+      'deckent_set_directives',
+      'deckent_plan',
+      'deckent_start',
+      'deckent_status',
+      'deckent_review',
+      'deckent_retro',
+      'deckent_history',
+      'deckent_doctor',
+      'deckent_analyze_project',
+      'deckent_sync',
+      'deckent_config',
+      'deckent_usage',
+      'deckent_run',
+      'deckent_kill',
+      'deckent_cleanup',
+    ];
+    for (const tool of tools) {
+      expect(DECKENT_MCP_INSTRUCTIONS).toContain(tool);
+    }
+  });
+
+  it('instructions contains sprint lifecycle phases', () => {
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('PLAN');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('SPAWN');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('EXECUTE');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('EVALUATE');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('FIX');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('RETRO');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('DECAY');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('CLEANUP');
+  });
+
+  it('instructions contains workflow steps in order', () => {
+    const initPos = DECKENT_MCP_INSTRUCTIONS.indexOf('init');
+    const planPos = DECKENT_MCP_INSTRUCTIONS.indexOf('plan');
+    const startPos = DECKENT_MCP_INSTRUCTIONS.indexOf('start');
+    const statusPos = DECKENT_MCP_INSTRUCTIONS.indexOf('status');
+    expect(initPos).toBeLessThan(planPos);
+    expect(planPos).toBeLessThan(startPos);
+    expect(startPos).toBeLessThan(statusPos);
+  });
+
+  it('instructions contains DIRECTIVES format example', () => {
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('## Task');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('Model:');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('Effort:');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('Skills:');
+  });
+
+  it('instructions contains parameter reference', () => {
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('opus');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('sonnet');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('haiku');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('ai');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('structured');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('auto');
+  });
+
+  it('instructions contains error recovery guidance', () => {
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('kill');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('cleanup');
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('doctor');
+  });
+
+  it('instructions contains all 9 resources', () => {
+    const resources = [
+      'deckent://dashboard',
+      'deckent://directives',
+      'deckent://memory',
+      'deckent://debt',
+      'deckent://config',
+      'deckent://retro',
+      'deckent://usage',
+      'deckent://tasks',
+      'deckent://agents',
+    ];
+    for (const resource of resources) {
+      expect(DECKENT_MCP_INSTRUCTIONS).toContain(resource);
+    }
   });
 });

@@ -22,7 +22,8 @@ export function registerRetroTool(server: McpServer): void {
     'deckent_retro',
     {
       title: 'Sprint Retrospective',
-      description: 'Read the latest sprint retrospective from .brain/RETRO.md.',
+      description: 'Read the latest sprint retrospective from .brain/RETRO.md. Returns: full retrospective content (sprint ID, task outcomes, GO/NO_GO decisions, learnings, agent performance notes), plus up to 5 extracted highlights (bullet points). Use after a sprint completes to understand what went well, what failed, and what tech debt was created. The retro is overwritten after each sprint — use deckent_history for older sprints.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => {
       const root = process.cwd();

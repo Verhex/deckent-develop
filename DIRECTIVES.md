@@ -1,119 +1,191 @@
-# DIRECTIVES — Sprint 067: Post-Audit Kalan İşler + Dogfooding Fix'leri
+# DIRECTIVES — Sprint 068: AI-Native Discoverability System
 
-## Goal: Audit'ten kalan tek P1 (paket boyutu), sprint-066 izlemesinden doğan 3 fix (job sonuç, retro detay, task status), kod kalitesi iyileştirmeleri (any temizliği). V2 routing ilk gerçek sprint'i — agent/skill atamalarını doğrula.
+## Goal: Deckent'i kurulum sonrasi HER AI ortaminda (Claude, Cursor, Codex, VS Code) otomatik kesfedilebilir yap. MCP Server Instructions, zengin tool aciklamalari, deckent_help tool, DECKENT.md rehber, multi-ortam adapter. V2 routing ilk gercek sprint'i.
 
 ---
 
-## Task 1: npm Paket Boyutu Optimizasyonu — 768KB → <500KB
+## Task 1: MCP Server Instructions — AI System Prompt Injection
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: .npmignore, package.json, tsconfig.json
-- Scope: .npmignore, package.json, tsconfig.json
+- Files: src/mcp/server.ts
+- Scope: src/mcp/
 
 ### Description
-**A) .npmignore Optimizasyonu:** `npm pack --dry-run` ile paket icerigi analiz et. Gereksiz dosyalari tespit et: `*.map`, `*.d.ts.map`, `dist/**/*.test.*`, `dist/dashboard/` (dashboard ayri deploy ediliyorsa). `.npmignore`'a ekle.
+MCP SDK'nin `instructions` ozelligini kullan. McpServer constructor'a `instructions` string'i ekle. Bu metin MCP client baslatildiginda AI'nin system prompt'una otomatik enjekte edilir — TUM client'larda calisir (Claude Code, Cursor, Codex, VS Code, JetBrains).
 
-**B) Paket Boyut Kontrolu:** `npm pack` ile paket olustur, boyutu olc. Hedef: <500KB. `du -sh *.tgz` ile dogrula.
+Icerik:
+- Deckent nedir (1 cumle)
+- Is akisi: init → set_directives → plan → start → status → review → retro → cleanup
+- Her tool'un 1 satirlik aciklamasi (16 tool + 9 resource)
+- DIRECTIVES formati ornegi (## Task N: Title + Model/Effort/Skills/Files/Scope/Description)
+- Sik kullanilan parametre degerleri (model: opus/sonnet/haiku, mode: ai/structured/auto)
+- Hata durumunda ne yapilir (kill → cleanup → doctor)
+- Sprint yasam dongusu: PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP
 
-**C) Build Artifact Temizligi:** `tsconfig.json` `declarationMap` false ise zaten map uretilmiyor — kontrol et. `sourceMap` prod build'de kapatilabilir mi degerlendir.
+McpServer constructor'da: `{ name: 'deckent', version: DECKENT_VERSION, instructions: INSTRUCTIONS_TEXT }`
 
-**Kanit:**
-- `npm pack --dry-run 2>&1 | tail -5` → boyut <500KB
-- `wc -l .npmignore` → yeni satirlar eklenmis
+**Kanit:** `grep "instructions" src/mcp/server.ts` → instructions alani var
 
-**Test:** 2+ test (paket boyut ve icerik kontrolu)
+**Test:** 3+ test (instructions icerigi, format, uzunluk)
 
 ---
 
-## Task 2: Job State Sprint Sonuçları — finalizeSprint → job file
+## Task 2: Tool Descriptions + Annotations Zenginlestirme
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/mcp/tools/init.ts, src/mcp/tools/directives.ts, src/mcp/tools/plan.ts, src/mcp/tools/start.ts, src/mcp/tools/status.ts, src/mcp/tools/doctor.ts, src/mcp/tools/retro.ts, src/mcp/tools/history.ts, src/mcp/tools/analyze.ts, src/mcp/tools/sync.ts, src/mcp/tools/config.ts, src/mcp/tools/usage.ts, src/mcp/tools/review.ts, src/mcp/tools/run.ts, src/mcp/tools/kill.ts, src/mcp/tools/cleanup.ts
+- Scope: src/mcp/tools/, tests/mcp/
+
+### Description
+16 MCP tool'un her birinin description'ini zenginlestir. MCP SDK v2 standartlarina uygun:
+
+**Her tool icin:**
+- Mevcut kisa description → detayli aciklama (ne yapar + ne zaman kullanilir + prerequisite + ornek)
+- `annotations` ekle: `readOnlyHint: true/false`, `destructiveHint: true/false`, `idempotentHint: true/false`
+- inputSchema alanlarinda `.describe()` ile parametre aciklamalari
+
+**Oncelikli zenginlestirmeler:**
+- `set_directives`: DIRECTIVES formati ornegi icermeli — `## Task N: Title` + alt basliklar
+- `plan`: ai/structured/auto farklarini acikla
+- `status`: Response alanlarini acikla (agents, alerts, progress, job)
+- `review`: GO/NO_GO/GO_WITH_TECH_DEBT acikla
+- `analyze_project`: Ne analiz ettigini detayli acikla
+- `retro`: Ne dondurdugunu acikla
+
+**Annotations ornekleri:**
+- init: `{ readOnlyHint: false, destructiveHint: false, idempotentHint: true }`
+- status: `{ readOnlyHint: true, destructiveHint: false }`
+- kill: `{ readOnlyHint: false, destructiveHint: true }`
+- cleanup: `{ readOnlyHint: false, destructiveHint: true }`
+
+**Kanit:** `grep -c "annotations\|readOnlyHint" src/mcp/tools/*.ts` → 16 dosyada annotations var
+
+**Test:** 4+ test (annotation varligi, description uzunlugu)
+
+---
+
+## Task 3: deckent_help Tool — Runtime Capabilities + State
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert, testing-expert
-- Files: src/orchestra/sprint-controller.ts, src/mcp/tools/job-runner.ts
-- Scope: src/orchestra/, src/mcp/tools/, tests/orchestra/, tests/mcp/
+- Files: src/mcp/tools/help.ts, src/mcp/tools/index.ts
+- Scope: src/mcp/tools/, tests/mcp/
 
 ### Description
-**A) finalizeSprint() → writeJobState enrichment:** Sprint tamamlandiginda `writeJobState()` cagirisina `tasks` ve `metrics` alanlarini ekle. Her task icin: taskId, title, evaluation (DONE/GO_WITH_TECH_DEBT/NO_GO), assignedAgent, assignedSkills, worker notes (ilk 200 karakter). Job dosyasina yazilsin.
+Yeni MCP tool: `deckent_help`. AI agent'lar calisma zamaninda Deckent'in tum yeteneklerini, mevcut proje durumunu ve sonraki adim onerisini sorgulayabilir.
 
-**B) MCP status tool'da sonuc gosterimi:** `deckent_status` tool'u sprint COMPLETE oldugunda job dosyasindan task sonuclarini da dondurmeli.
+**Dondurdugu JSON:**
+```json
+{
+  "version": "0.68.0",
+  "state": {
+    "initialized": true/false,
+    "hasDirectives": true/false,
+    "sprintActive": true/false,
+    "lastSprint": "sprint-067",
+    "routingEngine": "v2",
+    "agentCount": 9,
+    "skillCount": 11
+  },
+  "nextAction": "Durum bazli onerilen sonraki adim",
+  "workflows": {
+    "sprint": ["init", "set_directives", "plan", "start", "status", "review", "cleanup"],
+    "debug": ["doctor", "status", "kill", "cleanup"],
+    "config": ["config read", "config set key value", "sync"]
+  },
+  "tools": [{ "name": "deckent_init", "description": "...", "readOnly": false }],
+  "resources": [{ "name": "dashboard", "uri": "deckent://dashboard", "description": "..." }]
+}
+```
 
-**C) Terminal output icin job dosyasindaki sonuclari kullan:** Sprint bittikten sonra `deckent status` calistirildiginda cleanup_delay icinde .tasks/ dosyalari okunamazsa bile job dosyasindan sonuclari gosterebilmeli.
+`nextAction` mantigi:
+- initialized=false → "deckent_init ile projeyi baslatin"
+- hasDirectives=false → "deckent_set_directives ile sprint hedeflerini yazin"
+- sprintActive=true → "deckent_status ile ilerlemeyi izleyin"
+- sprintActive=false && lastSprint → "deckent_retro ile son sprint'i okuyun veya yeni DIRECTIVES yazin"
 
-**Kanit:**
-- `cat .deckent/jobs/sprint-*.json | grep -c "tasks"` → en az 1 (son sprint)
-- Job dosyasinda `metrics.totalTasks`, `metrics.done` alanlari var
+index.ts'e register et.
 
-**Test:** 4+ test
+**Kanit:** `grep "deckent_help" src/mcp/tools/index.ts` → register var
+
+**Test:** 5+ test (state detection, nextAction logic, tool/resource listing)
 
 ---
 
-## Task 3: Retro Detay Zenginlestirme — Worker Notes Aktarimi
+## Task 4: DECKENT.md AI-Native Rehber Genisletme
 - Model: sonnet
 - Effort: high
-- Skills: typescript-expert, testing-expert
-- Files: src/orchestra/sprint-reporter.ts, src/orchestra/sprint-controller.ts
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-**A) writeRetrospective() → worker notes:** Retro yazarken her task'in .result dosyasindan `notes` alanini oku. Retro'daki "Learnings" bolumune task basina ilk 150 karakter notu ekle.
-
-**B) Sprint log'a da notes aktar:** `.brain/sprints/sprint-NNN.md` dosyasina her task icin kisa not ekle.
-
-**C) Task status PENDING → EXECUTING guncelleme:** `sprint-controller.ts` worker spawn edildiginde task JSON'daki `status` alanini `EXECUTING` olarak guncelle. Su an PENDING kaliyor.
-
-**Kanit:**
-- `grep "notes\|Notes" .brain/RETRO.md` → task notlari gorunuyor
-- Spawn sonrasi `cat .tasks/task-*.json | grep '"status"'` → EXECUTING
-
-**Test:** 4+ test
-
----
-
-## Task 4: any Kullanimi Temizligi — 10 Adet, 7 Dosya
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/init.ts, src/cli/commands/spawn.ts, src/orchestra/temp-skill-generator.ts, src/orchestra/outcome-tracker.ts, src/orchestra/mid-sprint-adapter.ts, src/orchestra/sprint-controller.ts, src/orchestra/task-builder.ts
-- Scope: src/cli/commands/, src/orchestra/
-
-### Description
-audit'te tespit edilen 10 `any` kullanimini `unknown` veya uygun tip ile degistir:
-- init.ts (2 adet)
-- spawn.ts (1 adet)
-- temp-skill-generator.ts (3 adet)
-- outcome-tracker.ts (1 adet)
-- mid-sprint-adapter.ts (1 adet)
-- sprint-controller.ts (1 adet)
-- task-builder.ts (1 adet)
-
-Her biri icin: `grep -n ": any\|as any" <dosya>` ile bul, uygun tip ile degistir, `tsc --noEmit` ile dogrula.
-
-**Kanit:** `grep -rn ": any\|as any" src/ --include="*.ts" | grep -v "node_modules\|test" | wc -l` → 0 (veya sadece kasitli olanlar)
-
-**Test:** tsc --noEmit temiz yeterli, ek test gerekmez.
-
----
-
-## Task 5: V2 Routing Dogrulama — Audit + IDENTITY Guncelleme
-- Model: sonnet
-- Effort: normal
 - Skills: documentation-writer
-- Files: docs/analysis/full-audit-sprint065.md, .deckent/workspace/IDENTITY.md, .brain/PROJECT-IDENTITY.md
-- Scope: docs/, .deckent/workspace/, .brain/
+- Files: DECKENT.md
+- Scope: DECKENT.md
 
 ### Description
-**A) Audit Raporu Guncelle:** `docs/analysis/full-audit-sprint065.md` dosyasindaki tum P1/P2/P3 maddelerini sprint 066-067'de cozulmus olarak isaretle. Her maddeye `[DONE sprint-066]` veya `[DONE sprint-067]` etiketi ekle.
+DECKENT.md'yi hem insan hem AI tarafindan tam anlasilir sekilde yeniden yaz. Bu dosya `deckent init` sonrasi tum ortamlarda (CLAUDE.md, AGENTS.md, .cursor/rules) referans alinan TEK kaynak.
 
-**B) IDENTITY.md Guncelle:** Test sayisi (11,918), sprint sayisi (67+), modul sayilari guncelle.
+**Eklenecek bolumler:**
 
-**C) PROJECT-IDENTITY.md Guncelle:** Sprint 067 learnings, routing_engine: v2 default bilgisini ekle.
+A) **MCP Tool Referansi** — Tablo: Tool | Aciklama | Parametreler | ReadOnly | Ornek
+B) **MCP Resource Referansi** — Tablo: Resource | URI | Icerik Tipi | Aciklama
+C) **Is Akisi Rehberi** — Numarali adimlar: init → set_directives → plan → start → status → review → cleanup
+D) **DIRECTIVES Format Rehberi** — Ornek DIRECTIVES ile aciklama: ## Task N, Model, Effort, Skills, Files, Scope, Description
+E) **Sprint Yasam Dongusu** — 8 faz: PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP
+F) **Parametre Referansi** — Model (opus/sonnet/haiku), Effort (low/normal/high), Mode (ai/structured/auto), Provider (claude/codex/gemini)
+G) **Hata Cozum Rehberi** — Sprint takildi: kill → cleanup → doctor. Config sorunu: config read → config set
 
-**Kanit:**
-- `grep -c "DONE sprint-06" docs/analysis/full-audit-sprint065.md` → 10+
-- `grep "11,9" .deckent/workspace/IDENTITY.md` → var
+**Kanit:** `wc -l DECKENT.md` → oncekinden uzun + `grep "## MCP Tool\|## Workflow\|## DIRECTIVES" DECKENT.md`
 
 **Test:** Bu task test gerektirmez — dokumantasyon.
+
+---
+
+## Task 5: deckent init Multi-Ortam Adapter
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert, testing-expert
+- Files: src/cli/commands/init.ts
+- Scope: src/cli/commands/, tests/cli/commands/
+
+### Description
+`deckent init` calistiginda proje dizinindeki IDE/ortam klasorlerini algilayip uygun adapter dosyalari olusturur.
+
+**Ortam algilama + adapter:**
+- `.cursor/` varsa → `.cursor/rules/deckent.md` olustur (DECKENT.md referansi + Deckent workflow rehberi)
+- `.vscode/` varsa → `.vscode/mcp.json` kontrol et, yoksa MCP kayit rehberi yaz
+- `codex.md` kontrol: yoksa AGENTS.md'ye Codex-uyumlu referans ekle
+- Tum adapter'lar `@DECKENT.md` referansi ile baslasın — tek kaynak prensibi (ADR-013)
+
+**--all-envs flag:** Tum ortam adapter'larini zorla olustur (dizin yoksa olustur).
+
+Mevcut Claude Code adapter mantigi (ensureDeckentImport) korunsun, yeni ortamlar ayni pattern'i kullansin.
+
+**Kanit:** `ls .cursor/rules/deckent.md` → dosya var (cursor ortaminda)
+
+**Test:** 4+ test (ortam algilama, adapter icerik, --all-envs)
+
+---
+
+## Task 6: V2 Routing E2E Dogrulama Testi
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert, testing-expert
+- Files: tests/orchestra/routing-v2-e2e.test.ts, tests/core/config.test.ts
+- Scope: tests/orchestra/, tests/core/
+
+### Description
+V2 routing engine'in uctan uca dogru calistigini dogrulayan testler:
+
+A) `loadConfig()` → `routing_engine: 'v2'` dondurmeli (config.json'daki deger ResolvedConfig'e aktarilmali)
+B) V2 modda `routeTaskV2()` cagrilmali, `routingMeta` populated olmali
+C) ci-guardian, `intent.primary: 'implementation'` olan task'lardan excluded olmali
+D) DIRECTIVES `Skills: typescript-expert` → task.forceSkills: ['typescript-expert'] olarak aktarilmali
+E) `extractGoNogoCriteria()` Kanit/Proof satirlarini goCriteria'ya aktarmali
+F) `extractScopeFromDirective()` .deckent/ ve root dosyalari tanimali
+
+**Kanit:** `npx vitest run tests/orchestra/routing-v2-e2e.test.ts` → tum testler gecmeli
+
+**Test:** 10+ test (yukaridaki 6 senaryo + edge case'ler)
 
 ---
 
@@ -121,5 +193,6 @@ Her biri icin: `grep -n ": any\|as any" <dosya>` ile bul, uygun tip ile degistir
 - tsc --noEmit MUST pass
 - All new tests MUST pass
 - Existing tests: 0 regression
-- V2 routing aktif — agent/skill atamalari dogru olmali
+- V2 routing AKTIF — agent/skill atamalari intent-based olmali
+- MCP instructions TUM client'larda gorunmeli
 - %100 GO hedefli — NO_GO KABUL EDİLMEZ

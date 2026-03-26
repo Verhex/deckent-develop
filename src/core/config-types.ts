@@ -212,6 +212,8 @@ export interface ResolvedConfig {
     confidenceThreshold?: number;
     maxSkillsDefault?: number;
   };
+  /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s) */
+  cleanup_delay_ms?: number;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

@@ -1617,3 +1617,57 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 066-007: V1+V2 Paralel Dogrulama + decision-engine Analizi (DONE)
 
 ---
+## Sprint 67 — sprint-067
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-26
+**Duration:** 2550s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 5 |
+| Tech Debt | 4 |
+| No-Go | 1 |
+| Coverage | 19.2% |
+| Duration | 2549712ms |
+
+### Tasks
+
+- 067-001: Fix debt: Tech debt from 064-004-fix: Added 11 targeted tests to tests/cli/helpers/output. (GO_WITH_TECH_DEBT)
+- 067-002: npm Paket Boyutu Optimizasyonu — 768KB → <500KB (NO_GO)
+- 067-003: Job State Sprint Sonuçları — finalizeSprint → job file (DONE)
+- 067-004: Retro Detay Zenginlestirme — Worker Notes Aktarimi (GO_WITH_TECH_DEBT)
+- 067-005: any Kullanimi Temizligi — 10 Adet, 7 Dosya (GO_WITH_TECH_DEBT)
+- 067-006: V2 Routing Dogrulama — Audit + IDENTITY Guncelleme (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 68 — sprint-068
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-26
+**Duration:** 1034s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1033527ms |
+
+### Tasks
+
+- 068-001: MCP Server Instructions — AI System Prompt Injection (GO_WITH_TECH_DEBT)
+- 068-002: Tool Descriptions + Annotations Zenginlestirme (GO_WITH_TECH_DEBT)
+- 068-003: deckent_help Tool — Runtime Capabilities + State (GO_WITH_TECH_DEBT)
+- 068-004: DECKENT.md AI-Native Rehber Genisletme (DONE)
+- 068-005: deckent init Multi-Ortam Adapter (DONE)
+- 068-006: V2 Routing E2E Dogrulama Testi (DONE)
+
+---

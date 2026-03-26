@@ -1,0 +1,371 @@
+[
+  {
+    "taskId": "068-001",
+    "sprintId": "sprint-068",
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing",
+          "documentation",
+          "security"
+        ],
+        "confidence": 0.56
+      },
+      "domains": [
+        {
+          "name": "mcp",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.17
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        },
+        {
+          "type": "configure",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 1
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0
+      }
+    },
+    "agentId": "generic",
+    "skillIds": [
+      "typescript-expert"
+    ],
+    "evaluation": "GO_WITH_TECH_DEBT",
+    "coverage": 0,
+    "qualityScore": 50,
+    "routingVersion": "v2"
+  },
+  {
+    "taskId": "068-002",
+    "sprintId": "sprint-068",
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "mcp",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "configure",
+          "weight": 0.33
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 32,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "agentId": "test-writer",
+    "skillIds": [
+      "typescript-expert"
+    ],
+    "evaluation": "GO_WITH_TECH_DEBT",
+    "coverage": 0,
+    "qualityScore": 60,
+    "routingVersion": "v2"
+  },
+  {
+    "taskId": "068-003",
+    "sprintId": "sprint-068",
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.92
+      },
+      "domains": [
+        {
+          "name": "mcp",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "configure",
+          "weight": 0.33
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "agentId": "test-writer",
+    "skillIds": [
+      "typescript-expert",
+      "testing-expert"
+    ],
+    "evaluation": "GO_WITH_TECH_DEBT",
+    "coverage": 0,
+    "qualityScore": 60,
+    "routingVersion": "v2"
+  },
+  {
+    "taskId": "068-004",
+    "sprintId": "sprint-068",
+    "taskDNA": {
+      "intent": {
+        "primary": "devops",
+        "secondary": [
+          "testing",
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.67
+      },
+      "domains": [],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "configure",
+          "weight": 0.29
+        },
+        {
+          "type": "modify",
+          "weight": 0.14
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 0,
+        "moduleCount": 0,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {},
+        "primaryWriteTarget": "",
+        "testWriteRatio": 0
+      }
+    },
+    "agentId": "ci-guardian",
+    "skillIds": [
+      "documentation-writer"
+    ],
+    "evaluation": "DONE",
+    "coverage": 0,
+    "qualityScore": 55,
+    "routingVersion": "v2"
+  },
+  {
+    "taskId": "068-005",
+    "sprintId": "sprint-068",
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.72
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "configure",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "agentId": "test-writer",
+    "skillIds": [
+      "typescript-expert",
+      "testing-expert"
+    ],
+    "evaluation": "DONE",
+    "coverage": 96,
+    "qualityScore": 99,
+    "routingVersion": "v2"
+  },
+  {
+    "taskId": "068-006",
+    "sprintId": "sprint-068",
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.5
+        },
+        {
+          "name": "core",
+          "weight": 0.5
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.6
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 1
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 1
+      }
+    },
+    "agentId": "test-writer",
+    "skillIds": [
+      "typescript-expert",
+      "testing-expert"
+    ],
+    "evaluation": "DONE",
+    "coverage": 96,
+    "qualityScore": 99,
+    "routingVersion": "v2"
+  }
+]

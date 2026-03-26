@@ -58,11 +58,12 @@ export function registerInitTool(server: McpServer): void {
     'deckent_init',
     {
       title: 'Initialize Deckent',
-      description: 'Initialize a Deckent project in the current directory. Creates .deckent/, .brain/, .tasks/, .locks/, .claude/rules/ and config files.',
+      description: 'Initialize a Deckent project in the current directory. Creates all required directories (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) and configuration files (config.json, DECKENT.md, DIRECTIVES.md, brain files). Safe to re-run — existing config fields are preserved via merge, and files are only written if missing. After init, run deckent_set_directives → deckent_plan → deckent_start.',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        projectName: z.string().describe('Project name'),
-        mode: z.enum(['max_plan', 'max5x_plan', 'pro_plan', 'api']).optional().default('max_plan').describe('Claude plan mode'),
-        language: z.enum(['en', 'tr']).optional().default('en').describe('Language for agent prompts'),
+        projectName: z.string().describe('Project name used in DECKENT.md header and PROJECT-IDENTITY.md'),
+        mode: z.enum(['max_plan', 'max5x_plan', 'pro_plan', 'api']).optional().default('max_plan').describe('Claude subscription plan mode: max_plan (Claude Max), max5x_plan (5x Max), pro_plan (Pro), api (API key)'),
+        language: z.enum(['en', 'tr']).optional().default('en').describe('Language for agent prompt templates (en=English, tr=Turkish)'),
       }),
     },
     async ({ projectName, mode, language }) => {

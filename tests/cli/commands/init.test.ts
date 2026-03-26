@@ -147,7 +147,7 @@ import { getSystemProfile } from '../../../src/core/system-profile.js';
 import { detectSubscription } from '../../../src/core/subscription.js';
 import { analyzeProject } from '../../../src/core/analyzer.js';
 import { ensureDeckentImport } from '../../../src/core/utils.js';
-import { registerInit } from '../../../src/cli/commands/init.js';
+import { registerInit, applyIdeAdapters, generateCursorDeckentMd, generateVscodeMcpJson } from '../../../src/cli/commands/init.js';
 import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
 import { detectAvailableProviders } from '../../../src/core/provider.js';
 import { showSplash } from '../../../src/cli/helpers/splash.js';
@@ -482,9 +482,11 @@ describe('init command (isolated)', () => {
       );
     });
 
-    it('calls ensureDeckentImport exactly twice (AGENTS.md + CLAUDE.md)', async () => {
+    it('calls ensureDeckentImport for AGENTS.md and CLAUDE.md', async () => {
       await runCommand(['init', '--auto']);
-      expect(ensureDeckentImport).toHaveBeenCalledTimes(2);
+      // Called at least twice: AGENTS.md + CLAUDE.md (applyIdeAdapters may add extra call for AGENTS.md)
+      expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
+      expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'));
     });
 
     it('writes AGENTS.md with DECKENT.md reference when it does not exist', async () => {
@@ -2117,6 +2119,153 @@ describe('human-friendly init output', () => {
       vi.mocked(promptText).mockResolvedValue('my-project');
       await runCommand(['init']);
       expect(analyzeProject).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── IDE Adapter: generateCursorDeckentMd ─────────────────────────
+
+  describe('generateCursorDeckentMd', () => {
+    it('starts with @DECKENT.md reference (single-source principle)', () => {
+      const content = generateCursorDeckentMd();
+      expect(content.trimStart()).toMatch(/^@DECKENT\.md/);
+    });
+
+    it('contains workflow steps', () => {
+      const content = generateCursorDeckentMd();
+      expect(content).toContain('deckent init');
+      expect(content).toContain('deckent plan');
+      expect(content).toContain('deckent start');
+    });
+
+    it('mentions GO/NO_GO review', () => {
+      const content = generateCursorDeckentMd();
+      expect(content).toContain('GO/NO_GO');
+    });
+  });
+
+  // ─── IDE Adapter: generateVscodeMcpJson ───────────────────────────
+
+  describe('generateVscodeMcpJson', () => {
+    it('is valid JSON', () => {
+      const content = generateVscodeMcpJson();
+      expect(() => JSON.parse(content)).not.toThrow();
+    });
+
+    it('registers deckent server with npx command', () => {
+      const parsed = JSON.parse(generateVscodeMcpJson()) as Record<string, unknown>;
+      const servers = parsed['servers'] as Record<string, unknown>;
+      expect(servers).toHaveProperty('deckent');
+      const deckent = servers['deckent'] as Record<string, unknown>;
+      expect(deckent['command']).toBe('npx');
+      expect(deckent['args']).toContain('deckent');
+      expect(deckent['args']).toContain('mcp');
+    });
+  });
+
+  // ─── IDE Adapter: applyIdeAdapters ───────────────────────────────
+
+  describe('applyIdeAdapters', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(existsSync).mockReturnValue(false);
+    });
+
+    it('creates .cursor/rules/deckent.md when .cursor/ dir exists', () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('.cursor'));
+      const results = applyIdeAdapters('/mock/root');
+      expect(results.some(r => r.path.includes('.cursor') && r.path.endsWith('deckent.md') && r.action === 'created')).toBe(true);
+      expect(mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('.cursor'),
+        expect.objectContaining({ recursive: true }),
+      );
+      expect(writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('deckent.md'),
+        expect.stringContaining('@DECKENT.md'),
+      );
+    });
+
+    it('creates .vscode/mcp.json when .vscode/ dir exists', () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('.vscode'));
+      const results = applyIdeAdapters('/mock/root');
+      expect(results.some(r => r.path.includes('.vscode') && r.path.endsWith('mcp.json') && r.action === 'created')).toBe(true);
+      expect(writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('mcp.json'),
+        expect.stringContaining('deckent'),
+      );
+    });
+
+    it('calls ensureDeckentImport for AGENTS.md when codex.md is absent', () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      applyIdeAdapters('/mock/root');
+      expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
+    });
+
+    it('skips ensureDeckentImport when codex.md exists', () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('codex.md'));
+      applyIdeAdapters('/mock/root');
+      expect(ensureDeckentImport).not.toHaveBeenCalled();
+    });
+
+    it('--all-envs creates cursor adapter even without .cursor/ dir', () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      const results = applyIdeAdapters('/mock/root', { allEnvs: true });
+      expect(results.some(r => r.path.includes('.cursor') && r.action === 'created')).toBe(true);
+    });
+
+    it('--all-envs creates vscode adapter even without .vscode/ dir', () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      const results = applyIdeAdapters('/mock/root', { allEnvs: true });
+      expect(results.some(r => r.path.includes('.vscode') && r.action === 'created')).toBe(true);
+    });
+
+    it('returns exists action when .cursor/rules/deckent.md already exists', () => {
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const ps = String(p);
+        return ps.endsWith('.cursor') || ps.endsWith('deckent.md');
+      });
+      const results = applyIdeAdapters('/mock/root');
+      const cursorResult = results.find(r => r.path.includes('.cursor'));
+      expect(cursorResult?.action).toBe('exists');
+    });
+
+    it('--force overwrites existing .cursor/rules/deckent.md', () => {
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const ps = String(p);
+        return ps.endsWith('.cursor') || ps.endsWith('deckent.md');
+      });
+      const results = applyIdeAdapters('/mock/root', { force: true });
+      const cursorResult = results.find(r => r.path.includes('.cursor'));
+      expect(cursorResult?.action).toBe('created');
+      expect(writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('deckent.md'),
+        expect.any(String),
+      );
+    });
+  });
+
+  // ─── IDE Adapter: init integration ────────────────────────────────
+
+  describe('init IDE adapter integration', () => {
+    it('prints cursor adapter message when .cursor/ dir detected during init', async () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('.cursor'));
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('cursor') || c.includes('.cursor'))).toBe(true);
+    });
+
+    it('prints vscode adapter message when .vscode/ dir detected during init', async () => {
+      vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('.vscode'));
+      await runCommand(['init', '--auto']);
+      const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('vscode') || c.includes('.vscode'))).toBe(true);
+    });
+
+    it('--all-envs flag creates all IDE adapters', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      await runCommand(['init', '--auto', '--all-envs']);
+      const writeCalls = vi.mocked(writeFileSync).mock.calls;
+      expect(writeCalls.some(c => String(c[0]).includes('deckent.md') && String(c[0]).includes('.cursor'))).toBe(true);
+      expect(writeCalls.some(c => String(c[0]).includes('mcp.json') && String(c[0]).includes('.vscode'))).toBe(true);
     });
   });
 });

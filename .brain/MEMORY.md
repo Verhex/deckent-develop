@@ -136,3 +136,7 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - Retro Detay Zenginlestirme — Worker Notes Aktarimi: GO_WITH_TECH_DEBT — A) buildRetroLearnings() now includes result.notes (first 150 chars) for NO_GO/GO_WITH_TECH_DEBT tasks; falls back to ge
 - any Kullanimi Temizligi — 10 Adet, 7 Dosya: GO_WITH_TECH_DEBT — 5 dosyada 6 'as any' kullanımı temizlendi. spawn.ts ve task-builder.ts'deki eşleşmeler yorum satırı olduğu için dokunulm
 - V2 Routing Dogrulama — Audit + IDENTITY Guncelleme: GO_WITH_TECH_DEBT — A) Audit raporu güncellendi: tüm P1/P2/P3 maddelerine [DONE sprint-066] veya [DONE sprint-067] etiketi eklendi. grep -c 
+## Sprint sprint-068 Learnings
+- MCP Server Instructions — AI System Prompt Injection: GO_WITH_TECH_DEBT — Added DECKENT_MCP_INSTRUCTIONS constant exported from server.ts and passed it as options.instructions to McpServer const
+- Tool Descriptions + Annotations Zenginlestirme: GO_WITH_TECH_DEBT — All 16 MCP tools enriched with: (1) detailed descriptions (80+ chars, explains what/when/prerequisite), (2) annotations 
+- deckent_help Tool — Runtime Capabilities + State: GO_WITH_TECH_DEBT — Implemented deckent_help MCP tool. Detects project state (initialized, hasDirectives, sprintActive, lastSprint, routingE

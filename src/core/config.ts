@@ -553,6 +553,13 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     max_fix_retries: config.max_fix_retries,
     // Rollback
     rollback_policy: config.rollback_policy,
+    // Routing Engine v2
+    routing_engine: config.routing_engine,
+    routing_config: config.routing_config,
+    // Cleanup delay
+    cleanup_delay_ms: config.cleanup_delay_ms,
+    // AI planner timeout
+    ai_planner_timeout: config.ai_planner_timeout,
   };
 }
 

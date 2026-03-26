@@ -30,9 +30,10 @@ export function registerHistoryTool(server: McpServer): void {
     'deckent_history',
     {
       title: 'Sprint History',
-      description: 'Read sprint history logs from .brain/sprints/. Returns the last N sprint logs.',
+      description: 'Read archived sprint log files from .brain/sprints/. Returns the last N sprint markdown logs sorted by sprint ID, plus a trend analysis (improving/declining/stable) based on task completion rates across sprints. Use to understand long-term project health, compare sprint performance, or review past decisions. Each sprint log contains task outcomes, model usage, and learning notes.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        last: z.number().min(1).max(50).optional().default(5).describe('Number of recent sprints to return (default: 5, max: 50)'),
+        last: z.number().min(1).max(50).optional().default(5).describe('Number of most recent sprints to return (1-50, default: 5). Sprints are sorted by sprint ID ascending.'),
       }),
     },
     async ({ last }) => {

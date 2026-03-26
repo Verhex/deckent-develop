@@ -39,10 +39,11 @@ export function registerPlanTool(server: McpServer): void {
     'deckent_plan',
     {
       title: 'Plan Sprint',
-      description: 'Plan a sprint based on current DIRECTIVES.md. Returns task list and recommendation without executing.',
+      description: 'Preview a sprint plan based on current DIRECTIVES.md. Reads DIRECTIVES.md, analyzes task blocks, and returns a proposed task list with model assignments, wave breakdown, and risk assessment — without executing anything. Use this to validate your directives before running deckent_start. Prerequisite: deckent_init + deckent_set_directives must have been run.',
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        dryRun: z.boolean().optional().default(true).describe('Always dry-run for plan tool'),
-        mode: z.enum(['ai', 'structured', 'auto']).optional().describe('Planning mode: ai, structured, or auto'),
+        dryRun: z.boolean().optional().default(true).describe('Always dry-run for plan tool — tasks are never written to disk'),
+        mode: z.enum(['ai', 'structured', 'auto']).optional().describe('Planning mode: "ai" uses Claude to interpret directives creatively (requires API access), "structured" parses DIRECTIVES.md task blocks directly (deterministic, no AI call), "auto" picks ai if available else falls back to structured'),
       }),
     },
     async (input: { dryRun?: boolean; mode?: 'ai' | 'structured' | 'auto' }) => {
