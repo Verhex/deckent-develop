@@ -176,6 +176,54 @@ function resolveCommandKey(language: string, buildTool: string): string {
   return language;
 }
 
+// ─── Source file counting for mixed-language projects ──────────────────────
+
+const LANG_EXTENSIONS: Record<string, string[]> = {
+  typescript: ['.ts', '.tsx'],
+  javascript: ['.js', '.jsx', '.mjs'],
+  python: ['.py'],
+  go: ['.go'],
+  rust: ['.rs'],
+  csharp: ['.cs'],
+  java: ['.java'],
+  kotlin: ['.kt', '.kts'],
+  swift: ['.swift'],
+  ruby: ['.rb'],
+  php: ['.php'],
+  dart: ['.dart'],
+};
+
+function countSourceFiles(projectRoot: string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  const skipDirs = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.deckent', '.brain', '__pycache__', '.venv', 'venv', '.next']);
+
+  function walk(dir: string, depth: number): void {
+    if (depth > 4) return; // max 4 levels deep for performance
+    let entries: string[];
+    try { entries = fs.readdirSync(dir); } catch { return; }
+    for (const entry of entries) {
+      if (skipDirs.has(entry)) continue;
+      const full = path.join(dir, entry);
+      let stat: fs.Stats;
+      try { stat = fs.statSync(full); } catch { continue; }
+      if (stat.isDirectory()) {
+        walk(full, depth + 1);
+      } else {
+        const ext = path.extname(entry).toLowerCase();
+        for (const [lang, exts] of Object.entries(LANG_EXTENSIONS)) {
+          if (exts.includes(ext)) {
+            counts[lang] = (counts[lang] ?? 0) + 1;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  walk(projectRoot, 0);
+  return counts;
+}
+
 // ─── Internal: fresh detection ─────────────────────────────────────────────
 
 function detectFresh(projectRoot: string): ProjectStack {
@@ -235,9 +283,26 @@ function detectFresh(projectRoot: string): ProjectStack {
   const kotlinDir = path.join(projectRoot, 'src', 'main', 'kotlin');
   const hasKotlin = hasBuildGradle && fs.existsSync(kotlinDir);
 
-  if (fs.existsSync(tsconfigPath) || depNames.includes('typescript')) {
+  // ─── File-count weighted language detection for mixed projects ────────
+  // When multiple language markers exist, count source files to determine primary
+  const hasTS = fs.existsSync(tsconfigPath) || depNames.includes('typescript');
+  const hasJS = fs.existsSync(pkgPath) && depNames.length > 0;
+  const isMultiLang = (hasTS || hasJS) && (hasPython || hasGoMod || hasCargoToml || hasCsproj || hasGemfile || hasComposer || hasPubspec);
+
+  if (isMultiLang) {
+    // Mixed project: count source files to determine primary language
+    const counts = countSourceFiles(projectRoot);
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (sorted.length > 0 && (sorted[0]?.[1] ?? 0) > 0) {
+      language = sorted[0]?.[0] ?? 'unknown';
+    } else if (hasTS) {
+      language = 'typescript';
+    } else if (hasJS) {
+      language = 'javascript';
+    }
+  } else if (hasTS) {
     language = 'typescript';
-  } else if (fs.existsSync(pkgPath) && depNames.length > 0) {
+  } else if (hasJS && !hasPython) {
     language = 'javascript';
   } else if (hasPython) {
     language = 'python';
@@ -258,10 +323,8 @@ function detectFresh(projectRoot: string): ProjectStack {
   } else if (hasPubspec) {
     language = hasPubspec && fs.existsSync(path.join(projectRoot, 'lib')) ? 'flutter' : 'dart';
   } else if (hasCMakeLists || hasMesonBuild) {
-    // C/C++ detection: check for .cpp/.cc/.cxx files to distinguish C vs C++
     language = detectCOrCpp(projectRoot);
   } else if (hasMakefile) {
-    // Makefile alone — could be C/C++; check for source files
     const cLang = detectCOrCpp(projectRoot);
     if (cLang !== 'unknown') {
       language = cLang;
