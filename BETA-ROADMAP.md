@@ -1,40 +1,54 @@
 # Deckent Beta Readiness Roadmap
 
-**Son güncelleme:** 2026-03-27 | **Sprint:** 070 | **Test:** 12,160 | **Durum:** Closed Beta — Dogfooding aktif
+**Son güncelleme:** 2026-03-27 | **Sprint:** 071 | **Test:** 12,160 | **Durum:** Closed Beta — Dogfooding aktif
 
 ---
 
 ## Genel Bakış
 
-70 sprint, 12,160+ test, 250+ TypeScript modülü. Windows dogfooding tamamlandı — init→plan→start→status→cleanup zinciri çalışıyor.
+71 sprint, 12,160+ test, 250+ TypeScript modülü. Windows dogfooding tamamlandı — init→plan→start→status→cleanup zinciri çalışıyor. İlk gerçek sprint Vizetron'da başarıyla tamamlandı.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
-**Mevcut Durum:** Mono Closed Beta — Vizetron (Python/FastAPI) projesinde dogfooding yapıldı, 17 bug bulundu, 15'i düzeltildi.
+**Mevcut Durum:** Mono Closed Beta v0.2.0-beta.3 — Vizetron (Python/FastAPI) projesinde 2 sprint tamamlandı, 26 bug bulundu, 22'si düzeltildi.
 
 ---
 
 ## Dogfooding Bug Tracker
 
-### Düzeltilen Bug'lar (Sprint 070)
+### Sprint 070 — Init UX Overhaul (15 fix)
 
-| Bug | Açıklama | Root Cause | Fix | Dosya |
-|-----|----------|-----------|-----|-------|
-| BUG-3 | Claude CLI spawn ENOENT (Windows) | `spawn('claude')` Windows'ta `.cmd` wrapper çözemez | `shell: process.platform === 'win32'` — 7 dosyada | subprocess.ts, claude.ts, doctor.ts, subscription.ts, usage-manager.ts, onboard.ts |
-| BUG-4 | Worker rules hardcoded `tsc --noEmit` | Init template sabit TypeScript komutları yazıyordu | `detectFullStack()` sonucunu worker rules'a aktar | init.ts |
-| BUG-6 | Stack detection `Language: unknown` | `analyzeProject()` sadece `--auto` modda çalışıyordu | Stack detection HER ZAMAN çalıştır | init.ts |
-| BUG-7 | Doctor FAIL+OK çelişkisi | Optional provider'lar FAIL olarak gösteriliyordu | FAIL → SKIP etiketi (optional provider'lar için) | doctor.ts |
-| BUG-8 | Framework `next` (fastapi olmalı) | JS framework detection dil kontrolü yapmıyordu | Python/Go/Rust projede JS framework algılama atla | stack-detector.ts |
-| BUG-9 | IDENTITY.md dosyası eksik | `.deckent/workspace/IDENTITY.md` hiç oluşturulmuyordu | Init'te workspace IDENTITY.md oluştur | init.ts |
-| BUG-10 | DECKENT.md `Build: tsc` (Python projede) | `commands.build = ""` falsy → default `tsc` kalıyordu | `!== undefined` kontrolü + `echo "no build step"` | init.ts |
-| BUG-11 | DIRECTIVES.md boş placeholder | Kullanıcı ne yazacağını bilmiyordu | Stack-aware örnek task formatı + TR/EN şablon | init.ts |
-| BUG-12 | Worker rules hardcoded `npx vitest run` | Test komutu stack'e göre değişmiyordu | `detectFullStack().commands.test` kullan | init.ts |
-| BUG-13 | Brain rules yanlış limitler | `max 200 lines`, `exceeds 600 lines` eski değerler | 200→300, 600→900 güncellendi | init.ts |
-| BUG-14 | TempAgent oluşturulmuyor | "mixed" dil projede hiçbir template eşleşmiyordu | `detectedLanguages` ile genişletilmiş eşleşme | temp-skill-generator.ts, stack-detector.ts |
-| BUG-15 | BOOT.md kullanıcı ipucu yok | Sadece teknik iç süreç yazıyordu | Kullanıcı-dostu açıklama + ipuçları (TR/EN) | init.ts |
-| BUG-16 | `ps: unknown option -- o` (Windows) | POSIX `ps` komutu Windows'ta yok | `process.platform !== 'win32'` guard | wizard.ts |
+| Bug | Açıklama | Fix |
+|-----|----------|-----|
+| BUG-3 | Claude CLI spawn ENOENT (Windows) | `shell: process.platform === 'win32'` — 7 dosyada |
+| BUG-4 | Worker rules hardcoded `tsc --noEmit` | `detectFullStack()` sonucunu worker rules'a aktar |
+| BUG-6 | Stack detection `Language: unknown` | Stack detection HER ZAMAN çalıştır |
+| BUG-7 | Doctor FAIL+OK çelişkisi | FAIL → SKIP etiketi (optional provider'lar) |
+| BUG-8 | Framework `next` (fastapi olmalı) | Python/Go/Rust projede JS framework algılama atla |
+| BUG-9 | IDENTITY.md dosyası eksik | Init'te workspace IDENTITY.md oluştur |
+| BUG-10 | DECKENT.md `Build: tsc` (Python projede) | `!== undefined` kontrolü + `echo "no build step"` |
+| BUG-11 | DIRECTIVES.md boş placeholder | Stack-aware örnek task formatı + TR/EN şablon |
+| BUG-12 | Worker rules hardcoded `npx vitest run` | `detectFullStack().commands.test` kullan |
+| BUG-13 | Brain rules yanlış limitler | 200→300, 600→900 |
+| BUG-14 | TempAgent oluşturulmuyor | `detectedLanguages` ile genişletilmiş eşleşme |
+| BUG-15 | BOOT.md kullanıcı ipucu yok | Kullanıcı-dostu açıklama + ipuçları (TR/EN) |
+| BUG-16 | `ps: unknown option -- o` (Windows) | `process.platform !== 'win32'` guard |
+| BUG-18 | MCP binary adı tutarsız | Dokümantasyon: `deckent-mcp` ayrı binary |
 
-### Yeni Özellikler (Sprint 070)
+### Sprint 071 — Dogfooding Bug Fixes (7 fix + upgrade)
+
+| Bug | Açıklama | Fix |
+|-----|----------|-----|
+| BUG-19 | UTF-8 encoding Windows | LANG + PYTHONIOENCODING env vars subprocess'e eklendi |
+| BUG-21 | Doctor healthScore=0 tüm check passed | `c.ok` → `c.passed` field mismatch düzeltildi |
+| BUG-22 | Review "No tasks found" sprint sonrası | `loadTaskResults()` archive/ fallback eklendi |
+| BUG-23 | Heartbeat 28x stale, sequence=1 | setInterval 15s periyodik heartbeat update |
+| BUG-24 | Worker .result dosyası yazmıyor | Fallback .result on child exit |
+| BUG-25 | Scope parser Files/Scope ignorluyor | Explicit `Files:` / `Scope:` label parsing |
+| BUG-26 | Task log boş (Windows) | closeSync(logFd) child exit handler'a taşındı |
+| — | Versiyon bump + upgrade --local | `deckent upgrade --local <path.tgz>` beta workflow |
+
+### Sprint 070 — Yeni Özellikler
 
 | Özellik | Açıklama |
 |---------|----------|
@@ -48,25 +62,25 @@
 | Worker prompt stack-aware | Hardcoded `tsc`/`vitest` yerine DECKENT.md referansı |
 | allowedTools genişletme | `Edit`, `Glob`, `Grep` worker tool'larına eklendi |
 
-### Devam Eden Bug'lar
+### Bilinen Açık Bug'lar
 
 | Bug | Açıklama | Önem | Not |
 |-----|----------|------|-----|
-| BUG-17 | Worker `.result` dosyası yazmıyor | Medium | Worker çalışıp bitiyor ama result/hb güncellemiyor. İzin veya prompt sorunu olabilir |
-| BUG-18 | MCP komutu `deckent mcp` değil `deckent-mcp` | Low | Dokümantasyon tutarsızlığı — binary adı düzeltilmeli |
+| BUG-17 | Worker .result yazmıyor (orijinal) | Low | BUG-24 fallback ile kısmen çözüldü |
+| BUG-20 | İzin dialogu worker'ı yavaşlatıyor | Low | `--dangerously-skip-permissions` ile bypass edilebilir |
 
 ---
 
-## P0 — npm Paketleme + Dogfooding
+## P0 — npm Paketleme + Dogfooding — TAMAMLANDI ✅
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
 | 1 | npm publish test | **DONE** | 518KB, 479 dosya, local install çalışıyor |
-| 2 | `deckent init` gerçek proje testi | **DONE** | Windows'ta Vizetron (Python/FastAPI) projesinde test edildi |
-| 3 | `deckent doctor` dış ortam | **DONE** | WSL2 + Windows test edildi, SKIP/OK/FAIL etiketleri düzeltildi |
-| 4 | Shebang + bin entry | **DONE** | `#!/usr/bin/env node`, `deckent` + `deckent-mcp` çalışıyor |
-| 5 | İlk sprint UX | **DONE** | DIRECTIVES rehberi, quick-start docs, workflow guide, stack-aware templates |
-| 6 | Windows native desteği | **DONE** | subprocess backend, tmux skip, CLI shell:true, ps guard, spawn fix |
+| 2 | `deckent init` gerçek proje testi | **DONE** | Windows'ta Vizetron (Python/FastAPI) test edildi |
+| 3 | `deckent doctor` dış ortam | **DONE** | WSL2 + Windows, SKIP/OK/FAIL, healthScore fix |
+| 4 | Shebang + bin entry | **DONE** | `deckent` + `deckent-mcp` çalışıyor |
+| 5 | İlk sprint UX | **DONE** | Vizetron'da sprint-002 başarıyla tamamlandı |
+| 6 | Windows native desteği | **DONE** | 7 dosyada shell:true, heartbeat periodic, log capture |
 
 ## P1 — Provider & Tier Generalizasyonu
 
@@ -83,11 +97,11 @@
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
-| 13 | README.md eski veriler | **KISMEN** | Badge güncellendi (12100+), özellikler hala eksik |
+| 13 | README.md eski veriler | **KISMEN** | Badge güncellendi, özellikler hala eksik |
 | 14 | Dil tutarsızlığı | **YAPILACAK** | Bazı docs İngilizce başlıyor Türkçe devam ediyor |
-| 15 | TR+EN çift dil | **KISMEN** | .deckent/docs/ TR/EN desteği eklendi, ana docs hala tek dil |
-| 16 | CHANGELOG.md boş | **YAPILACAK** | 80 byte — 70 sprint'lik geçmiş yok |
-| 17 | Config referans eksik | **DONE** | .deckent/docs/config-reference.md init'te oluşturuluyor |
+| 15 | TR+EN çift dil | **KISMEN** | .deckent/docs/ TR/EN desteği eklendi |
+| 16 | CHANGELOG.md boş | **YAPILACAK** | 71 sprint'lik geçmiş yok |
+| 17 | Config referans eksik | **DONE** | .deckent/docs/config-reference.md |
 | 18 | VISION.md eksik | **YAPILACAK** | Proje vizyonu ve yol haritası |
 | 19 | docs/ link kontrolü | **YAPILACAK** | Linklenen dokümanlar var mı? |
 
@@ -98,14 +112,14 @@
 | 20 | Dashboard veri doğruluğu | **YAPILACAK** | Doğru veri görüntülemiyor |
 | 21 | Dashboard config arayüzü | **YAPILACAK** | Tüm config ayarları dashboard'dan seçilebilmeli |
 | 22 | Dashboard gerçek test | **YAPILACAK** | React dashboard gerçek sprint ile hiç test edilmedi |
-| 23 | Config.json karmaşıklığı | **KISMEN** | config-reference.md oluşturuluyor, dashboard'dan seçim hala eksik |
-| 24 | İlk kullanım deneyimi | **DONE** | quick-start.md, directives-guide.md, DECKENT.md workflow rehberi |
+| 23 | Config.json karmaşıklığı | **KISMEN** | config-reference.md var, dashboard'dan seçim eksik |
+| 24 | İlk kullanım deneyimi | **DONE** | quick-start.md, directives-guide.md, workflow rehberi |
 
 ## P4 — Platform & Altyapı
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
-| 25 | Windows native | **DONE** | subprocess backend, tmux skip, CLI shell:true, ps guard, spawn ENOENT fix |
+| 25 | Windows native | **DONE** | Tam destek: spawn, heartbeat, log, encoding, ps guard |
 | 26 | Node >= 18 neden? | **YAPILACAK** | OpenClaw Node 22+, ES2022+ feature check |
 | 27 | Docker/Sandbox | **YAPILACAK** | Var mı? Çalışıyor mu? |
 | 28 | CI/CD billing | **YAPILACAK** | Public repo ile çözülür |
@@ -115,9 +129,9 @@
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
-| 30 | .gitignore runtime state | **DONE** | .brain/, .deckent/routing/, config.json gitignore'a alındı |
+| 30 | .gitignore runtime state | **DONE** | |
 | 31 | God objects | **YAPILACAK** | sprint-controller 2300+ satır |
-| 32 | V2 routing test-writer bias | **KISMEN** | Exclude kuralı yazıldı, sonraki sprint test edilecek |
+| 32 | V2 routing test-writer bias | **KISMEN** | Exclude kuralı yazıldı |
 
 ## P6 — Kullanıcı Deneyimi İyileştirmeleri
 
@@ -126,7 +140,7 @@
 | 33 | Error messages kullanıcı-dostu değil | **YAPILACAK** | Teknik kodlar → anlaşılır mesajlar |
 | 34 | `deckent explain` MCP'de yok | **YAPILACAK** | CLI-only rehberlik aracı |
 | 35 | Telemetry/analytics | **YAPILACAK** | Opt-in kullanım analitikleri |
-| 36 | `deckent upgrade` test | **YAPILACAK** | npm update mekanizması |
+| 36 | `deckent upgrade` test | **DONE** | `--local` flag eklendi, beta workflow |
 | 37 | Skill marketplace backend | **YAPILACAK** | CLI komutu var ama backend yok |
 | 38 | Plugin system e2e test | **YAPILACAK** | Gerçek plugin ile test edilmedi |
 | 39 | Rate limiting production | **YAPILACAK** | 100 req/60s yeterli mi? |
@@ -136,27 +150,28 @@
 
 ## Faz Planı
 
-### Faz 1: "Kendin Kullan" — TAMAMLANDI
-npm pack → local install → kendi projelerinde kullan → feedback topla
+### Faz 1: "Kendin Kullan" — TAMAMLANDI ✅
+### Faz 1.5: "Init UX + Onboarding" — TAMAMLANDI ✅ (Sprint 070-071)
 
-### Faz 1.5: "Init UX + Onboarding" — TAMAMLANDI (Sprint 070)
+### Faz 2: "Genel Kullanılabilirlik" — AKTİF
 
-**Bulgular (Vizetron dogfooding):**
-- DIRECTIVES.md boş şablon → ✅ Stack-aware örnek task formatı
-- IDENTITY.md "Language: unknown" → ✅ Stack detection her zaman çalışıyor
-- DECKENT.md sadece teknik rules → ✅ Workflow + DIRECTIVES Format + Providers
-- BOOT.md iç süreç → ✅ Kullanıcı-dostu açıklama + ipuçları
-- Skills hiç kurulmuyor → ✅ TempSkill + TempAgent init'te oluşturuluyor
-- .deckent/ altında rehber yok → ✅ .deckent/docs/ (quick-start, directives-guide, config-reference)
-- Worker rules hardcoded → ✅ Stack-aware lint/test komutları
-- Windows spawn ENOENT → ✅ shell:true tüm claude spawn'larda
-- Brain budget değerleri eski → ✅ 200→300, 600→900
+**Sprint 072 Planı:**
+- [ ] P1-7: Plan tier'ları genel → performance/balanced/economic
+- [ ] P1-8: Init wizard → genel provider seçimi (Claude/Codex/Gemini)
+- [ ] P1-9: Model isimleri doğrulama + güncel model listesi
+- [ ] P2-16: CHANGELOG.md — Sprint 066-071 entries
+- [ ] P2-13: README.md güncel özellikler, test sayısı, Windows desteği
+- [ ] P5-31: sprint-controller.ts god object → modüler split başlangıcı
 
-### Faz 2: "Genel Kullanılabilirlik" — SIRADA
-Provider/tier generalizasyonu, config dokümantasyonu, model güncelliği
+**Sprint 073+ Planı:**
+- [ ] P1-10: Multi-provider test — Claude + Codex aynı sprint
+- [ ] P1-12: Codex/Gemini CLI binary doğrulama
+- [ ] P2-18: VISION.md yazımı
+- [ ] P3-20..22: Dashboard gerçek test
+- [ ] P4-29: .detect-secrets kurulumu
 
 ### Faz 3: "Dokümantasyon"
-TR+EN çift dil, CHANGELOG, VISION, link audit, config dashboard
+TR+EN çift dil, VISION, link audit, config dashboard
 
 ### Faz 4: "Public Repo"
 .detect-secrets, VerhexIO/deckent'e taşıma, CI/CD, npm publish
@@ -165,11 +180,12 @@ TR+EN çift dil, CHANGELOG, VISION, link audit, config dashboard
 
 ## Tamamlanan Sprintler
 
-| Sprint | Task | DONE | Süre | Öne Çıkan |
-|--------|------|------|------|-----------|
-| 066 | 7/7 | 7 | 15min | Phantom modüller, manifest v2, MCP docs, heartbeat fix |
-| 067 | 6/6 | 6 | 20min | Paket 494KB, job enrichment, retro notes, any cleanup |
-| 068 | 6/6 | 6 | 17min | AI-native discoverability, loadConfig fix, V2 routing |
-| 069 | 6/6 | 6 | 40min | Skill stats, agent precision, dynamic budget, tempAgent |
-| 070 | 8/8 | 8 | — | Init UX overhaul, 15 bug fix, Windows dogfooding |
-| **Toplam** | **33/33** | **33** | — | 12,160 test, 0 regression |
+| Sprint | Task | DONE | Öne Çıkan |
+|--------|------|------|-----------|
+| 066 | 7/7 | 7 | Phantom modüller, manifest v2, MCP docs |
+| 067 | 6/6 | 6 | Paket 494KB, retro notes, any cleanup |
+| 068 | 6/6 | 6 | AI-native discoverability, V2 routing |
+| 069 | 6/6 | 6 | Skill stats, agent precision, tempAgent |
+| 070 | 8/8 | 8 | Init UX overhaul, 15 bug fix, Windows dogfooding |
+| 071 | 7/7 | 7 | BUG-19..26 fix, heartbeat periodic, upgrade --local |
+| **Toplam** | **40/40** | **40** | 12,160 test, 0 regression, v0.2.0-beta.3 |

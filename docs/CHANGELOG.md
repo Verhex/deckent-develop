@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.3] - 2026-03-27
+
+### Added
+
+- `deckent upgrade --local <path.tgz>` — closed beta development workflow
+- `.deckent/workspace/IDENTITY.md` — stack detection sonuçlarıyla proje kimliği
+- `.deckent/docs/` — quick-start.md, directives-guide.md, config-reference.md (TR/EN)
+- TempSkill + TempAgent init sırasında otomatik oluşturma
+- DECKENT.md Workflow Guide + DIRECTIVES Format + Providers bölümleri
+- Subprocess heartbeat periodic update (setInterval 15s)
+- Fallback .result file on worker exit
+- Review archive/ fallback — cleanup sonrası task'lar hala erişilebilir
+- Scope parser explicit `Files:` / `Scope:` label parsing
+
+### Fixed
+
+- **BUG-3**: Claude CLI spawn ENOENT on Windows — `shell: true` 7 dosyada
+- **BUG-4,12**: Worker rules hardcoded tsc/vitest → stack-aware komutlar
+- **BUG-6**: Stack detection sadece --auto'da çalışıyordu → her zaman çalışır
+- **BUG-7**: Doctor FAIL+OK çelişkisi → optional provider'lar SKIP olarak gösterilir
+- **BUG-8**: Python projede framework `next` algılanıyordu → dil guard eklendi
+- **BUG-9**: IDENTITY.md dangling reference → workspace IDENTITY.md oluşturuluyor
+- **BUG-10**: DECKENT.md `Build: tsc` Python projede → empty string falsy fix
+- **BUG-11**: DIRECTIVES.md boş placeholder → stack-aware örnek task şablonu
+- **BUG-13**: Brain rules yanlış limitler → 200→300, 600→900
+- **BUG-14**: TempAgent "mixed" dilde oluşturulmuyor → detectedLanguages eşleşme
+- **BUG-15**: BOOT.md kullanıcı ipucu yok → TR/EN kullanıcı-dostu
+- **BUG-16**: `ps -o` Windows'ta hata → platform guard
+- **BUG-19**: UTF-8 encoding Windows → LANG + PYTHONIOENCODING env vars
+- **BUG-21**: Doctor healthScore=0 tüm check passed → `c.ok` → `c.passed`
+- **BUG-22**: Review "No tasks found" → archive/ fallback
+- **BUG-23**: Heartbeat 28x stale → periodic update
+- **BUG-24**: Worker .result yazmıyor → fallback on exit
+- **BUG-25**: Scope parser Files/Scope ignorluyor → explicit parsing
+- **BUG-26**: Task log boş Windows → closeSync child exit handler
+
+### Changed
+
+- Version bump: 0.2.0-beta.1 → 0.2.0-beta.3
+- Worker prompt: hardcoded `tsc --noEmit`/`npx vitest run` kaldırıldı → DECKENT.md referansı
+- allowedTools: `Edit`, `Glob`, `Grep` worker tool'larına eklendi
+- FullStackResult: `detectedLanguages` field eklendi
+
+_Sprint 070: 8 tasks, 8 done, 15 bug fix. Sprint 071: 8 tasks, 8 done, 7 bug fix. 0 regression._
+
+---
+
 ## [0.2.0-beta.1-sprint69] - 2026-03-27
 
 ### Added

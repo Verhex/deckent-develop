@@ -1698,3 +1698,96 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 069-006: Scope Parser Root Dosya Fix + forceSkills V2 Entegrasyonu (NO_GO)
 
 ---
+
+## Sprint 070 — Init UX Overhaul + Windows Dogfooding
+
+**Status:** COMPLETE
+**Date:** 2026-03-27
+**Version:** 0.2.0-beta.2
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | — (manual implementation) |
+
+### Tasks
+
+- 070-001: IDENTITY.md dangling reference fix + stack detection zorunlu (DONE)
+- 070-002: DIRECTIVES.md stack-aware zengin şablon TR/EN (DONE)
+- 070-003: DECKENT.md Workflow + DIRECTIVES Format + Providers rehberi (DONE)
+- 070-004: Worker rules stack-aware + brain.md budget 200→300, 600→900 (DONE)
+- 070-005: TempSkill + TempAgent init'te oluşturma (DONE)
+- 070-006: .deckent/docs/ quick-start, directives-guide, config-reference (DONE)
+- 070-007: BOOT.md kullanıcı-dostu güncelleme TR/EN (DONE)
+- 070-008: BUG-3 Claude CLI spawn ENOENT Windows — shell:true 7 dosyada (DONE)
+
+### Bug Fixes
+
+- BUG-3: Claude CLI spawn ENOENT (Windows) — shell:true
+- BUG-4: Worker rules hardcoded tsc --noEmit → stack-aware
+- BUG-6: Stack detection Language: unknown → her zaman çalıştır
+- BUG-7: Doctor FAIL+OK çelişkisi → SKIP etiketi
+- BUG-8: Framework next (fastapi olmalı) → dil guard
+- BUG-9: IDENTITY.md eksik → workspace IDENTITY.md oluştur
+- BUG-10: DECKENT.md Build: tsc → empty string falsy fix
+- BUG-11: DIRECTIVES.md boş placeholder → stack-aware şablon
+- BUG-12: Worker rules hardcoded vitest → detectFullStack
+- BUG-13: Brain rules yanlış limitler → 300/900
+- BUG-14: TempAgent oluşturulmuyor → detectedLanguages eşleşme
+- BUG-15: BOOT.md ipucu yok → kullanıcı-dostu TR/EN
+- BUG-16: ps -o Windows → platform guard
+- BUG-18: MCP binary adı → deckent-mcp dokümantasyon
+
+### Notes
+
+İlk gerçek Windows dogfooding — Vizetron (Python/FastAPI) projesinde. 15 bug bulundu ve düzeltildi.
+
+---
+
+## Sprint 071 — Dogfooding Bug Fixes + Upgrade
+
+**Status:** COMPLETE
+**Date:** 2026-03-27
+**Version:** 0.2.0-beta.3
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | — (manual implementation) |
+
+### Tasks
+
+- 071-001: BUG-21 Doctor healthScore=0 fix — c.ok→c.passed (DONE)
+- 071-002: BUG-22 Review archive fallback (DONE)
+- 071-003: BUG-23 Subprocess heartbeat periyodik update setInterval 15s (DONE)
+- 071-004: BUG-25 Scope parser explicit Files/Scope label parsing (DONE)
+- 071-005: BUG-26 Windows log FD closeSync → child exit handler (DONE)
+- 071-006: BUG-19 UTF-8 encoding env vars (DONE)
+- 071-007: BUG-24 Worker fallback .result on exit (DONE)
+- 071-008: Version bump beta.3 + deckent upgrade --local (DONE)
+
+### Bug Fixes
+
+- BUG-19: UTF-8 encoding — LANG + PYTHONIOENCODING env
+- BUG-21: Doctor healthScore c.ok→c.passed field mismatch
+- BUG-22: Review No tasks found → archive/ fallback
+- BUG-23: Heartbeat 28x stale → setInterval 15s periodic
+- BUG-24: Worker .result yok → fallback on exit
+- BUG-25: Scope parser Files/Scope ignored → explicit parsing
+- BUG-26: Task log boş → closeSync child exit handler
+
+### Notes
+
+Vizetron sprint-002 başarıyla tamamlandı (PROJECT_ANALYSIS.md, 242 satır). 7 yeni bug düzeltildi. `deckent upgrade --local` eklendi.
+
+---

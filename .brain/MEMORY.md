@@ -145,3 +145,15 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - Skill Secim Butcesi — Dinamik maxTokens + Priority: GO_WITH_TECH_DEBT — A) SkillBudget interface genişletildi: maxTokensPerSkill + totalSkillTokenBudget eklendi (routing-types.ts). SKILL_TOKEN
 - TempAgent Mekanizmasi — Proje-Bazli Dinamik Agent: NO_GO
 - Scope Parser Root Dosya Fix + forceSkills V2 Entegrasyonu: NO_GO
+## Sprint 070-071 Learnings (Windows Dogfooding)
+- Windows spawn: shell:true HER spawn/spawnSync çağrısında gerekli — .cmd wrapper çözümleme
+- Subprocess heartbeat: Claude CLI heartbeat güncellemez, backend setInterval(15s) ile periyodik update gerekli
+- Empty string falsy: `if (value)` boş string için false — `!== undefined` kullanılmalı (Python build="" gibi)
+- Stack detection: JS framework detection dil guard'ı gerekli — sub-project deps yanlış framework verebilir
+- Review timing: cleanup task dosyalarını siler, review archive/ fallback olmalı
+- Doctor MCP tool: `c.ok` vs `c.passed` field mismatch — DoctorCheck interface'i `passed` kullanır
+- Scope parser: explicit `Files:` / `Scope:` label parsing gerekli, sadece regex yetmez
+- Log capture Windows: closeSync(logFd) spawn sonrası değil child exit handler'da olmalı
+- UTF-8 Windows: LANG + PYTHONIOENCODING env vars subprocess'e set edilmeli
+- TempAgent mixed-lang: `detectedLanguages` ile genişletilmiş eşleşme, sadece primary language yetmez
+- Upgrade --local: `deckent upgrade --local <path.tgz>` beta development workflow
