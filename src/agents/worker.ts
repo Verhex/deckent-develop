@@ -94,9 +94,11 @@ export function getVerifyCommands(projectRoot: string): { build: string; test: s
     ? `c_${stack.buildTool}`
     : stack.language;
   const commands = STACK_COMMANDS[key];
-  return commands
-    ? { build: commands.build, test: commands.test }
-    : { build: 'npx tsc', test: 'npx vitest run' };
+  if (commands) {
+    return { build: commands.build, test: commands.test };
+  }
+  // Unknown stack: use detected commands from full stack detection, or empty (skip verification)
+  return { build: stack.commands.build || '', test: stack.commands.test || '' };
 }
 
 // ─── Progress Calculation ───────────────────────────────────────────

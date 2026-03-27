@@ -122,10 +122,10 @@ function checkGit(): DoctorCheck {
   };
 }
 
-export function checkTmux(providerNames?: string[]): DoctorCheck {
-  // tmux is NOT required on Windows (subprocess backend) or when using non-Claude providers
-  if (platform() === 'win32') {
-    return { name: 'tmux', passed: true, message: 'not required on Windows (subprocess backend)', required: false };
+export function checkTmux(providerNames?: string[], spawnBackend?: string): DoctorCheck {
+  // tmux is NOT required on Windows or when using subprocess backend
+  if (platform() === 'win32' || spawnBackend === 'subprocess') {
+    return { name: 'tmux', passed: true, message: 'not required (subprocess backend)', required: false };
   }
   const needsTmux = !providerNames || providerNames.includes('claude') || providerNames.length === 0;
   const required = needsTmux;
@@ -803,10 +803,10 @@ export function checkDeckSecurity(root: string): DoctorCheck {
   return { name: '.deck Security', passed: true, message: '.deck file exists and is NOT tracked by git (safe)', required: false };
 }
 
-export function runDoctorChecks(root: string, providerNames?: string[]): DoctorResult {
+export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string): DoctorResult {
   const checks: DoctorCheck[] = [
     checkPlatform(),
-    checkNode(), checkGit(), checkTmux(providerNames), checkClaude(),
+    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
     checkDeckSecurity(root), checkWritePermissions(root),

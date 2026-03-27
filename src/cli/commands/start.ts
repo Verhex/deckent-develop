@@ -216,7 +216,8 @@ export function registerStart(program: Command): void {
 
         // Pre-flight doctor check (unless --force)
         if (!opts.force) {
-          const doctorResult = runDoctorChecks(root);
+          const spawnBackend = (config as unknown as Record<string, unknown>).spawn_backend as string | undefined;
+          const doctorResult = runDoctorChecks(root, undefined, spawnBackend);
           const requiredFailed = doctorResult.checks.filter(c => c.required && !c.passed);
           if (requiredFailed.length > 0) {
             if (sandboxState) restoreSandbox(root, sandboxState);
