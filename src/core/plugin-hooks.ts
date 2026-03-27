@@ -288,15 +288,33 @@ export function findTargetedTestFiles(filesChanged: string[], projectRoot: strin
 }
 
 /**
- * Run tsc --noEmit and return pass/fail + output.
+ * Run build check (tsc --noEmit for TypeScript, stack-detected command for others).
+ * Skips if no build command detected for the project stack.
  * @internal Exported for testing
  */
 export function runTscCheck(projectRoot: string): { passed: boolean; output: string } {
-  const result = spawnSync('npx', ['tsc', '--noEmit'], {
+  // Use stack-detected build command instead of hardcoded tsc
+  let buildCmd = 'npx tsc --noEmit';
+  try {
+    const { detectFullStack } = require('../core/stack-detector.js') as { detectFullStack: (root: string) => { commands: { build: string } } };
+    const stack = detectFullStack(projectRoot);
+    if (stack.commands.build) {
+      buildCmd = stack.commands.build === 'npx tsc' ? 'npx tsc --noEmit' : stack.commands.build;
+    } else {
+      // No build command detected — skip check (non-compiled language)
+      return { passed: true, output: 'No build command detected — skipped' };
+    }
+  } catch {
+    // Stack detection failed — try tsc as fallback
+  }
+
+  const isWindows = process.platform === 'win32';
+  const [cmd, ...args] = buildCmd.split(' ');
+  const result = spawnSync(cmd ?? 'echo', args, {
     cwd: projectRoot,
     timeout: 120_000,
     encoding: 'utf-8',
-    shell: true,
+    shell: isWindows,
   });
   const output = ((result.stdout ?? '') + (result.stderr ?? '')).trim();
   return { passed: result.status === 0, output };
