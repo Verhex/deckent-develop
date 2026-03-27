@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import type { Task, TaskResult, Sprint, ResolvedConfig } from './types.js';
 import { scanPlugins } from './plugin.js';
 import type { Plugin } from './plugin.js';
+import { detectFullStack } from './stack-detector.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -294,19 +295,16 @@ export function findTargetedTestFiles(filesChanged: string[], projectRoot: strin
  */
 export function runTscCheck(projectRoot: string): { passed: boolean; output: string } {
   // Use stack-detected build command instead of hardcoded tsc
-  let buildCmd = 'npx tsc --noEmit';
-  try {
-    const { detectFullStack } = require('../core/stack-detector.js') as { detectFullStack: (root: string) => { commands: { build: string } } };
-    const stack = detectFullStack(projectRoot);
-    if (stack.commands.build) {
-      buildCmd = stack.commands.build === 'npx tsc' ? 'npx tsc --noEmit' : stack.commands.build;
-    } else {
-      // No build command detected — skip check (non-compiled language)
-      return { passed: true, output: 'No build command detected — skipped' };
-    }
-  } catch {
-    // Stack detection failed — try tsc as fallback
+  const stack = detectFullStack(projectRoot);
+  const rawBuild = stack.commands.build;
+
+  // No build command → interpreted language (Python, Ruby, PHP) → skip
+  if (!rawBuild) {
+    return { passed: true, output: `No build step for ${stack.language} — skipped` };
   }
+
+  // TypeScript: add --noEmit to avoid generating output files
+  const buildCmd = rawBuild === 'npx tsc' ? 'npx tsc --noEmit' : rawBuild;
 
   const isWindows = process.platform === 'win32';
   const [cmd, ...args] = buildCmd.split(' ');
