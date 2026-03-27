@@ -1424,7 +1424,7 @@ describe('spawnWorkers — provider routing', () => {
     spawnWorkers('/tmp/test', sprint, config);
 
     const spawnCall = mockCodexAdapter.spawn.mock.calls[0];
-    expect(spawnCall[3].allowedTools).toBe('Read,Write(.tasks/,src/test/,src/test/file.ts),Bash');
+    expect(spawnCall[3].allowedTools).toBe('Read,Write(.tasks/,src/test/,src/test/file.ts),Edit(.tasks/,src/test/,src/test/file.ts),Bash,Glob,Grep');
   });
 
   it('passes autoApprove option to non-Claude adapter', () => {
@@ -1586,10 +1586,12 @@ describe('Task Router wiring in sprint-controller', () => {
       new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
       'utf-8',
     );
-    // routeTask call should appear after planSprint and before spawnWorkers
-    const planIdx = source.indexOf('planSprint(projectRoot');
+    // After sprint-phases extraction: planSprint is called via runPlanPhase,
+    // routeSprintTasks and runSpawnPhase remain in runSprint within sprint-controller.ts.
+    // Verify the order: runPlanPhase → routeSprintTasks → runSpawnPhase
+    const planIdx = source.indexOf('runPlanPhase(');
     const routeIdx = source.indexOf('routeSprintTasks(sprint.tasks, config, availableProviders)');
-    const spawnIdx = source.indexOf('spawnWorkers(projectRoot, sprint, config');
+    const spawnIdx = source.indexOf('runSpawnPhase(');
     expect(planIdx).toBeGreaterThan(-1);
     expect(routeIdx).toBeGreaterThan(-1);
     expect(spawnIdx).toBeGreaterThan(-1);

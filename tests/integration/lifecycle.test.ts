@@ -182,9 +182,10 @@ describe('Config integration', () => {
   it('loads and merges project config', async () => {
     writeFileSync(
       join(root, PROJECT_CONFIG_PATH),
-      JSON.stringify({ mode: 'pro_plan', language: 'tr' }),
+      JSON.stringify({ mode: 'economic', language: 'tr' }),
     );
     const config = await loadConfig(root);
+    // 'economic' is an alias → resolved to 'pro_plan' by loadConfig
     expect(config.mode).toBe('pro_plan');
     expect(config.language).toBe('tr');
     expect(config.activeModeConfig.max_workers).toBe(3);
@@ -851,7 +852,7 @@ describe('Init wizard integration', () => {
   });
 
   it('init writes valid config with selected mode', async () => {
-    mockPrompts(['3', '2', 'my-app']); // pro_plan, tr, name
+    mockPrompts(['3', '2', 'my-app']); // economic (was pro_plan), tr, name
 
     const { Command } = await import('commander');
     const { registerInit } = await import('../../src/cli/commands/init.js');
@@ -863,7 +864,7 @@ describe('Init wizard integration', () => {
     const configPath = join(root, DECKENT_DIR, 'config.json');
     expect(existsSync(configPath)).toBe(true);
     const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-    expect(config.mode).toBe('pro_plan');
+    expect(config.mode).toBe('economic');
     expect(config.language).toBe('tr');
     expect(config.projectName).toBe('my-app');
   });

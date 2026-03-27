@@ -202,10 +202,11 @@ describe('SubprocessSpawnBackend', () => {
       expect(stderr).toBe(3); // log fd
     });
 
-    it('should close log fd after spawn', () => {
+    it('should defer log fd close to child exit handler (not immediate)', () => {
       setupMockChild();
       backend.spawn('task-001', 'opus', 'test');
-      expect(mockCloseSync).toHaveBeenCalledWith(3);
+      // BUG-26 fix: closeSync deferred to child exit — not called immediately after spawn
+      expect(mockCloseSync).not.toHaveBeenCalled();
     });
 
     it('should create tasks dir if it does not exist', () => {

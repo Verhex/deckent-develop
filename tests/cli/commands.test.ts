@@ -1275,7 +1275,7 @@ describe('init command', () => {
     );
     expect(configCalls.length).toBeGreaterThan(0);
     const configContent = JSON.parse(String(configCalls[0]?.[1]));
-    expect(configContent.mode).toBe('pro_plan');
+    expect(configContent.mode).toBe('economic');
     expect(configContent.language).toBe('tr');
   });
 
@@ -1630,7 +1630,7 @@ describe('init command', () => {
     expect(configCalls.length).toBeGreaterThan(0);
     const config = JSON.parse(String(configCalls[0]?.[1]));
     expect(config.customField).toBe('keep-me');
-    expect(config.mode).toBe('max_plan'); // updated
+    expect(config.mode).toBe('performance'); // updated from max_plan
   });
 
   it('does not add .deckent/ to .gitignore', async () => {
