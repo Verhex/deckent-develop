@@ -1,21 +1,38 @@
 node_modules/
 dist/
 coverage/
+*.tgz
 
-# Deckent runtime
-.tasks/*.hb
-.tasks/*.log
-.tasks/*.signal
-.tasks/*.output
+# Deckent runtime state
+.tasks/
 .locks/
 .dashboard
 
-# Archives
+# Brain runtime (DECISIONS.md + PROJECT-IDENTITY.md are tracked)
+.brain/MEMORY.md
+.brain/RETRO.md
+.brain/DEBT.md
+.brain/PATTERNS.md
+.brain/sprints/
 .brain/archive/
+
+# Deckent runtime config & state
+.deckent/routing/
+.deckent/config.json
+.deckent/config.json.bak.*
+.deckent/ci-baseline.json
+.deckent/safety-point.json
+.deckent/project-stack.json
+.deckent/sprint-state.json
+.deckent/plugins/*
+!.deckent/plugins/.gitkeep
+.deckent/jobs/
+.deckent/usage/
 
 # Environment
 .env
 .env.*
+.deck
 
 # OS
 .DS_Store
@@ -26,11 +43,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-# .deckent/ is tracked (config, workspace, i18n); plugins and jobs are ignored
-.deckent/plugins/*
-!.deckent/plugins/.gitkeep
-.deckent/jobs/
-.deckent/usage/
 
 # Dashboard sub-project
 src/dashboard/node_modules
