@@ -52,8 +52,8 @@ export function checkPlatform(): DoctorCheck {
   if (currentPlatform === 'win32') {
     return {
       name: 'Platform',
-      passed: false,
-      message: 'Native Windows is UNSUPPORTED — deckent requires tmux and POSIX paths. Install WSL2 (Ubuntu) and run from inside WSL2.',
+      passed: true,
+      message: 'Windows (subprocess mode) — tmux features unavailable, using subprocess backend. For full features, use WSL2.',
       required: false,
     };
   }

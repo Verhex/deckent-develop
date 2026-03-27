@@ -1,5 +1,6 @@
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { platform } from 'node:os';
 import type { Command } from 'commander';
 import type { PlanMode } from '../../core/types.js';
 import { generateSetupRecommendation } from '../auto-setup.js';
@@ -443,6 +444,10 @@ export function registerInit(program: Command): void {
         // 5. Config (merge — preserve existing fields)
         const configPath = join(root, DECKENT_DIR, 'config.json');
         const newConfig: Record<string, unknown> = { mode, language, projectName };
+        // Windows: auto-set subprocess backend (tmux unavailable)
+        if (platform() === 'win32') {
+          newConfig.spawn_backend = 'subprocess';
+        }
         if (existsSync(configPath)) {
           try {
             const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
