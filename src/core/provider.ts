@@ -234,7 +234,9 @@ export interface DetectedProvider {
  */
 export function detectCliVersion(cmd: string, args: string[] = ['--version']): string | undefined {
   try {
-    const result = spawnSync(cmd, args, { encoding: 'utf-8', timeout: 5000 });
+    // Windows: spawnSync needs shell:true to find .cmd/.ps1 wrappers in PATH
+    const isWindows = process.platform === 'win32';
+    const result = spawnSync(cmd, args, { encoding: 'utf-8', timeout: 5000, shell: isWindows });
     if (result.status === 0 && result.stdout) {
       return result.stdout.trim();
     }

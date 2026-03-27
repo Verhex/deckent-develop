@@ -123,7 +123,10 @@ function checkGit(): DoctorCheck {
 }
 
 export function checkTmux(providerNames?: string[]): DoctorCheck {
-  // tmux is required when claude provider is used (subprocess providers don't need tmux)
+  // tmux is NOT required on Windows (subprocess backend) or when using non-Claude providers
+  if (platform() === 'win32') {
+    return { name: 'tmux', passed: true, message: 'not required on Windows (subprocess backend)', required: false };
+  }
   const needsTmux = !providerNames || providerNames.includes('claude') || providerNames.length === 0;
   const required = needsTmux;
   const result = spawnSync('tmux', ['-V'], { encoding: 'utf-8' });
