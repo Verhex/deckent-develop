@@ -332,6 +332,29 @@ export function executeUpgrade(opts: { check?: boolean; changelog?: boolean; can
 
 // ─── Command Registration ───────────────────────────────────────────
 
+/**
+ * Upgrade from a local .tgz file — for closed beta development workflow.
+ * Detects install strategy and runs `npm install <path>` accordingly.
+ */
+export function upgradeFromLocal(tgzPath: string): boolean {
+  const strategy = detectInstallStrategy();
+  const isWindows = process.platform === 'win32';
+  try {
+    const args = strategy === 'global'
+      ? ['install', '-g', tgzPath]
+      : ['install', tgzPath];
+    const result = spawnSync('npm', args, {
+      encoding: 'utf-8',
+      timeout: 60_000,
+      stdio: 'inherit',
+      shell: isWindows,
+    });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
 export function registerUpgrade(program: Command): void {
   program
     .command('upgrade')
@@ -341,7 +364,23 @@ export function registerUpgrade(program: Command): void {
     .option('--canary', 'Install from canary channel (pre-release)')
     .option('--beta', 'Install from beta channel (pre-release)')
     .option('--rollback', 'Roll back to the previous version')
-    .action((opts: { check?: boolean; changelog?: boolean; canary?: boolean; beta?: boolean; rollback?: boolean }) => {
+    .option('--local <path>', 'Install from a local .tgz file (beta development)')
+    .action((opts: { check?: boolean; changelog?: boolean; canary?: boolean; beta?: boolean; rollback?: boolean; local?: string }) => {
+      if (opts.local) {
+        const current = DECKENT_VERSION;
+        print(`Current version: ${current}`);
+        print(`Installing from local: ${opts.local}`);
+        saveVersionForRollback(current);
+        const success = upgradeFromLocal(opts.local);
+        if (success) {
+          print('Successfully upgraded from local package.');
+          print('Run `deckent upgrade --rollback` to revert if needed.');
+        } else {
+          printError(new Error(`Local upgrade failed. Try: npm install ${opts.local}`));
+          process.exitCode = 1;
+        }
+        return;
+      }
       executeUpgrade(opts);
     });
 }
