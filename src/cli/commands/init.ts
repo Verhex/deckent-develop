@@ -441,6 +441,15 @@ export function registerInit(program: Command): void {
         ensureDir(join(root, PLUGINS_DIR));
         ensureDir(join(root, I18N_DIR));
 
+        // 4b. Clear stale caches on re-init (project-stack, ci-baseline)
+        const staleCaches = ['project-stack.json', 'ci-baseline.json', 'safety-point.json'];
+        for (const cache of staleCaches) {
+          const cachePath = join(root, DECKENT_DIR, cache);
+          if (existsSync(cachePath)) {
+            try { writeFileSync(cachePath, '{}'); } catch { /* non-fatal */ }
+          }
+        }
+
         // 5. Config (merge — preserve existing fields)
         const configPath = join(root, DECKENT_DIR, 'config.json');
         const newConfig: Record<string, unknown> = { mode, language, projectName };
