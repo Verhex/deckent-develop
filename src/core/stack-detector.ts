@@ -26,14 +26,25 @@ const CACHE_CHECK_FILES = [
 // ─── STACK_COMMANDS ─────────────────────────────────────────────────────────
 
 export const STACK_COMMANDS: Record<string, { build: string; test: string; lint: string }> = {
+  // Compiled languages
   typescript: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
-  python: { build: 'python -m py_compile', test: 'pytest', lint: 'ruff check' },
-  java_maven: { build: 'mvn compile', test: 'mvn test', lint: '' },
-  java_gradle: { build: 'gradle build', test: 'gradle test', lint: '' },
-  c_cmake: { build: 'cmake --build build', test: 'ctest --test-dir build', lint: '' },
-  c_make: { build: 'make', test: 'make test', lint: '' },
   go: { build: 'go build ./...', test: 'go test ./...', lint: 'golangci-lint run' },
   rust: { build: 'cargo build', test: 'cargo test', lint: 'cargo clippy' },
+  java_maven: { build: 'mvn compile', test: 'mvn test', lint: '' },
+  java_gradle: { build: 'gradle build', test: 'gradle test', lint: '' },
+  kotlin_maven: { build: 'mvn compile', test: 'mvn test', lint: 'ktlint' },
+  kotlin_gradle: { build: 'gradle build', test: 'gradle test', lint: 'ktlint' },
+  csharp: { build: 'dotnet build', test: 'dotnet test', lint: 'dotnet format --verify-no-changes' },
+  swift: { build: 'swift build', test: 'swift test', lint: 'swiftlint' },
+  c_cmake: { build: 'cmake --build build', test: 'ctest --test-dir build', lint: '' },
+  c_make: { build: 'make', test: 'make test', lint: '' },
+  // Interpreted languages (no build step)
+  javascript: { build: '', test: 'npx vitest run', lint: 'npx eslint' },
+  python: { build: '', test: 'pytest', lint: 'ruff check' },
+  ruby: { build: '', test: 'bundle exec rspec', lint: 'rubocop' },
+  php: { build: '', test: 'vendor/bin/phpunit', lint: 'vendor/bin/phpstan analyse' },
+  dart: { build: 'dart compile exe', test: 'dart test', lint: 'dart analyze' },
+  flutter: { build: 'flutter build', test: 'flutter test', lint: 'flutter analyze' },
 };
 
 // ─── FullStackResult ────────────────────────────────────────────────────────
@@ -216,6 +227,13 @@ function detectFresh(projectRoot: string): ProjectStack {
   const hasRequirementsTxt = fs.existsSync(path.join(projectRoot, 'requirements.txt'));
   const hasPipfile = fs.existsSync(path.join(projectRoot, 'Pipfile'));
   const hasPython = hasPyprojectToml || hasSetupPy || hasRequirementsTxt || hasPipfile;
+  const hasCsproj = fs.readdirSync(projectRoot).some(f => f.endsWith('.csproj') || f.endsWith('.sln'));
+  const hasSwiftPackage = fs.existsSync(path.join(projectRoot, 'Package.swift'));
+  const hasGemfile = fs.existsSync(path.join(projectRoot, 'Gemfile'));
+  const hasComposer = fs.existsSync(path.join(projectRoot, 'composer.json'));
+  const hasPubspec = fs.existsSync(path.join(projectRoot, 'pubspec.yaml'));
+  const kotlinDir = path.join(projectRoot, 'src', 'main', 'kotlin');
+  const hasKotlin = hasBuildGradle && fs.existsSync(kotlinDir);
 
   if (fs.existsSync(tsconfigPath) || depNames.includes('typescript')) {
     language = 'typescript';
@@ -224,11 +242,21 @@ function detectFresh(projectRoot: string): ProjectStack {
   } else if (hasPython) {
     language = 'python';
   } else if (hasPomXml || hasBuildGradle) {
-    language = 'java';
+    language = hasKotlin ? 'kotlin' : 'java';
   } else if (hasCargoToml) {
     language = 'rust';
   } else if (hasGoMod) {
     language = 'go';
+  } else if (hasCsproj) {
+    language = 'csharp';
+  } else if (hasSwiftPackage) {
+    language = 'swift';
+  } else if (hasGemfile) {
+    language = 'ruby';
+  } else if (hasComposer) {
+    language = 'php';
+  } else if (hasPubspec) {
+    language = hasPubspec && fs.existsSync(path.join(projectRoot, 'lib')) ? 'flutter' : 'dart';
   } else if (hasCMakeLists || hasMesonBuild) {
     // C/C++ detection: check for .cpp/.cc/.cxx files to distinguish C vs C++
     language = detectCOrCpp(projectRoot);
