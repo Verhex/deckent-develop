@@ -339,9 +339,14 @@ export function generateTempAgents(stack: ProjectStack): AgentDefinition[] {
 
   const agents: AgentDefinition[] = [];
 
+  // For "mixed" language projects, check detectedLanguages for broader matching
+  const detectedLangs = (stack.detectedLanguages ?? []).map(d => d.toLowerCase());
+
   for (const tpl of AGENT_TEMPLATES) {
-    // Language filter
-    if (tpl.language !== '*' && !lang.includes(tpl.language)) continue;
+    // Language filter — "mixed" matches if any detectedLanguage includes the template language
+    if (tpl.language !== '*' && !lang.includes(tpl.language)) {
+      if (lang !== 'mixed' || !detectedLangs.some(dl => dl.includes(tpl.language))) continue;
+    }
     // Framework filter
     if (tpl.framework !== '*' && tpl.framework !== 'none') {
       const fwMatch = fw.includes(tpl.framework) || deps.some((d) => d.includes(tpl.framework));

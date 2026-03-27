@@ -166,6 +166,7 @@ export class ClaudeAdapter implements ProviderAdapter {
       const result = spawnSync('claude', ['-p', '/usage'], {
         encoding: 'utf-8',
         timeout: 10_000,
+        shell: process.platform === 'win32',
       });
       if (result.status !== 0 || !result.stdout) {
         return { ...SAFE_USAGE_DEFAULT, measuredAt: new Date().toISOString() };
@@ -206,6 +207,7 @@ export class ClaudeAdapter implements ProviderAdapter {
       const result = spawnSync('claude', ['--version'], {
         encoding: 'utf-8',
         timeout: 5_000,
+        shell: process.platform === 'win32',
       });
       return result.status === 0;
     } catch {

@@ -17,6 +17,8 @@ import { generateCursorConfig } from '../helpers/cursor-config.js';
 import { generateAgentsMd, generateGeminiMd, generateCursorRules } from '../helpers/agent-templates.js';
 import { detectFullStack } from '../../core/stack-detector.js';
 import type { FullStackResult } from '../../core/stack-detector.js';
+import { generateProjectConventionsSkill, getGeneratedContent, generateTempAgents } from '../../orchestra/temp-skill-generator.js';
+import type { ProjectStack } from '../../core/skill-types.js';
 import {
   DECKENT_DIR,
   BRAIN_DIR,
@@ -469,47 +471,34 @@ export function registerInit(program: Command): void {
           writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
         }
 
-        // 6. DECKENT.md — C) Use dynamic build/test commands from detectFullStack
+        // 6. Stack detection — ALWAYS run (not just --auto)
         let buildCmd = 'tsc';
         let testCmd = 'npx vitest run';
         let lintCmd = 'tsc --noEmit';
+        let stackResult: FullStackResult = {
+          language: 'unknown',
+          framework: 'unknown',
+          buildTool: 'unknown',
+          testFramework: 'unknown',
+          commands: { build: '', test: '', lint: '' },
+        };
         try {
-          const stackForDeckent = detectFullStack(root);
-          if (stackForDeckent.commands.build) buildCmd = stackForDeckent.commands.build;
-          if (stackForDeckent.commands.test) testCmd = stackForDeckent.commands.test;
-          if (stackForDeckent.commands.lint) lintCmd = stackForDeckent.commands.lint;
+          stackResult = detectFullStack(root);
+          // Empty string is valid (e.g. Python has no build step) — use explicit check
+          if (stackResult.commands.build !== undefined) buildCmd = stackResult.commands.build || 'echo "no build step"';
+          if (stackResult.commands.test) testCmd = stackResult.commands.test;
+          if (stackResult.commands.lint) lintCmd = stackResult.commands.lint;
         } catch { /* fallback to defaults above */ }
+        // Also run analyzeProject if not already done (--auto sets detectedAnalysis)
+        if (!detectedAnalysis) {
+          try {
+            detectedAnalysis = analyzeProject(root);
+          } catch { /* non-fatal */ }
+        }
 
-        const deckentContent = `# ${projectName} — Deckent Orchestrated
-
-## Identity
-@.deckent/workspace/IDENTITY.md
-
-## Rules
-- Brain is the ONLY orchestrator — workers never plan
-- Workers stay within assigned scope (directories + filesWrite)
-- Auditor never writes source code
-- Sprint is NEVER left incomplete
-- Memory budget: 600 lines max in .brain/
-
-## Context
-@DIRECTIVES.md
-@.brain/MEMORY.md
-@.contracts/api-surface.md
-
-## Agent Roles
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
-
-## Environment
-Build: ${buildCmd}
-Test: ${testCmd}
-Lint: ${lintCmd}
-
-## Boot
-@.deckent/workspace/BOOT.md
-`;
+        const deckentContent = language === 'tr'
+          ? generateDeckentContentTR(projectName, buildCmd, testCmd, lintCmd)
+          : generateDeckentContentEN(projectName, buildCmd, testCmd, lintCmd);
         writeIfNotExists(join(root, DECKENT_FILE), deckentContent);
 
         // 7. Agent files — additive injection, never overwrite
@@ -650,7 +639,7 @@ globs: ["**/*"]
         // 8. Claude rules (blueprint-quality templates with frontmatter)
         writeFile(
           join(root, CLAUDE_RULES_DIR, 'brain.md'),
-          `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 200 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 600 lines\n- Sprint is NEVER left incomplete\n`,
+          `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 300 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 900 lines\n- Sprint is NEVER left incomplete\n`,
         );
         writeFile(
           join(root, CLAUDE_RULES_DIR, 'auditor.md'),
@@ -658,14 +647,14 @@ globs: ["**/*"]
         );
         writeFile(
           join(root, CLAUDE_RULES_DIR, 'worker-default.md'),
-          `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run tests before marking done (npx vitest run)\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`,
+          `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run lint before marking done (${lintCmd})\n- Run tests before marking done (${testCmd})\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`,
         );
 
-        // 9. DIRECTIVES.md
-        writeIfNotExists(
-          join(root, DIRECTIVES_FILE),
-          `# Directives\n\nDescribe your project goals and architecture here.\nBrain reads this before every sprint.\n`,
-        );
+        // 9. DIRECTIVES.md — stack-aware template with example task format
+        const directivesContent = language === 'tr'
+          ? generateDirectivesTemplateTR(stackResult, projectName)
+          : generateDirectivesTemplateEN(stackResult, projectName);
+        writeIfNotExists(join(root, DIRECTIVES_FILE), directivesContent);
 
         // 10. Brain files
         writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
@@ -675,17 +664,20 @@ globs: ["**/*"]
         writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
 
         // 10a. PROJECT-IDENTITY.md (permanent memory — never decayed)
+        const identityLanguage = detectedAnalysis?.language ?? stackResult.language ?? 'unknown';
+        const identityFramework = detectedAnalysis?.framework ?? stackResult.framework ?? 'unknown';
+        const identityTestFramework = detectedAnalysis?.testFramework ?? stackResult.testFramework ?? 'unknown';
+        const identityBuildTool = detectedAnalysis?.buildTool ?? stackResult.buildTool ?? 'unknown';
         try {
-          const analysis = options.auto ? detectedAnalysis ?? analyzeProject(root) : undefined;
           writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
             projectName,
             sprintId: 'sprint-000',
             totalSprints: 0,
             mode,
-            language: analysis?.language ?? 'unknown',
-            framework: analysis?.framework ?? 'unknown',
-            testFramework: analysis?.testFramework ?? 'unknown',
-            buildTool: analysis?.buildTool ?? 'unknown',
+            language: identityLanguage,
+            framework: identityFramework,
+            testFramework: identityTestFramework,
+            buildTool: identityBuildTool,
           }));
         } catch {
           // Non-fatal — create minimal identity
@@ -697,9 +689,86 @@ globs: ["**/*"]
           }));
         }
 
+        // 10a2. Workspace IDENTITY.md — referenced by DECKENT.md (@.deckent/workspace/IDENTITY.md)
+        const runtimeName = identityLanguage.toLowerCase().includes('typescript') || identityLanguage.toLowerCase().includes('javascript')
+          ? 'Node.js' : identityLanguage.toLowerCase().includes('python')
+          ? 'Python' : identityLanguage.toLowerCase().includes('go')
+          ? 'Go' : identityLanguage.toLowerCase().includes('rust')
+          ? 'Rust' : identityLanguage.toLowerCase().includes('java')
+          ? 'Java' : identityLanguage.toLowerCase().includes('c#') || identityLanguage.toLowerCase().includes('csharp')
+          ? '.NET' : identityLanguage !== 'unknown' ? identityLanguage : 'unknown';
+        const identityContent = `# Project Identity
+Name: ${projectName}
+Language: ${identityLanguage !== 'unknown' ? identityLanguage : '(not detected — update manually)'}
+Framework: ${identityFramework !== 'unknown' && identityFramework !== 'none' ? identityFramework : '(not detected)'}
+Test: ${identityTestFramework !== 'unknown' ? identityTestFramework : '(not detected)'}
+Build: ${identityBuildTool !== 'unknown' ? identityBuildTool : '(not detected)'}
+Runtime: ${runtimeName !== 'unknown' ? runtimeName : '(not detected)'}
+Platform: ${platform() === 'win32' ? 'Windows' : platform() === 'darwin' ? 'macOS' : 'Linux'}
+`;
+        writeIfNotExists(join(root, WORKSPACE_DIR, 'IDENTITY.md'), identityContent);
+
+        // 10a3. TempSkill + TempAgent — project-specific skills/agents from stack detection
+        if (identityLanguage !== 'unknown') {
+          try {
+            // Read dependencies from package.json / requirements.txt
+            let deps: string[] = [];
+            try {
+              const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'));
+              deps = Object.keys(pkg.dependencies ?? {}).concat(Object.keys(pkg.devDependencies ?? {}));
+            } catch {
+              try {
+                const reqTxt = readFileSync(join(root, 'requirements.txt'), 'utf-8');
+                deps = reqTxt.split('\n').filter(l => l.trim() && !l.startsWith('#')).map(l => l.split('==')[0]!.split('>=')[0]!.trim());
+              } catch { /* no deps file found */ }
+            }
+
+            const projectStack: ProjectStack = {
+              language: identityLanguage,
+              framework: identityFramework,
+              dependencies: deps,
+              buildTool: identityBuildTool,
+              testFramework: identityTestFramework,
+              detectedAt: new Date().toISOString(),
+              detectedLanguages: stackResult.detectedLanguages,
+            };
+
+            // Generate project-conventions skill
+            const conventionsSkill = generateProjectConventionsSkill({
+              language: identityLanguage,
+              framework: identityFramework,
+              testFramework: identityTestFramework,
+              buildTool: identityBuildTool,
+              dependencies: deps,
+            });
+            const skillDir = join(root, DECKENT_DIR, 'skills', conventionsSkill.id);
+            ensureDir(skillDir);
+            writeIfNotExists(join(skillDir, 'manifest.json'), JSON.stringify(conventionsSkill, null, 2) + '\n');
+            const skillContent = getGeneratedContent(conventionsSkill);
+            if (skillContent) {
+              writeIfNotExists(join(skillDir, 'SKILL.md'), skillContent);
+            }
+
+            // Generate temp agents based on stack
+            const tempAgents = generateTempAgents(projectStack);
+            for (const agent of tempAgents) {
+              const agentDir = join(root, DECKENT_DIR, 'agents', agent.id);
+              ensureDir(agentDir);
+              writeIfNotExists(join(agentDir, 'agent.json'), JSON.stringify(agent, null, 2) + '\n');
+            }
+          } catch { /* non-fatal — temp skills/agents are best-effort */ }
+        }
+
         // 10b. Workspace: TOOLS.md + BOOT.md
         writeIfNotExists(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));
-        writeIfNotExists(join(root, WORKSPACE_DIR, 'BOOT.md'), `# Boot Sequence\n\n1. Brain reads DIRECTIVES.md\n2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS)\n3. Brain plans sprint\n4. Workers spawned, auditor scan loop starts\n5. Workers execute tasks, write heartbeats\n6. Brain waits for results, evaluates\n7. Sprint complete\n`);
+        writeIfNotExists(join(root, WORKSPACE_DIR, 'BOOT.md'), generateBootContent(language));
+
+        // 10b2. .deckent/docs/ — user guides
+        const docsDir = join(root, DECKENT_DIR, 'docs');
+        ensureDir(docsDir);
+        writeIfNotExists(join(docsDir, 'quick-start.md'), generateQuickStartDoc(language));
+        writeIfNotExists(join(docsDir, 'directives-guide.md'), generateDirectivesGuideDoc(language));
+        writeIfNotExists(join(docsDir, 'config-reference.md'), generateConfigReferenceDoc(language));
 
         // 10c. i18n
         const enMessages = {
@@ -878,4 +947,563 @@ globs: ["**/*"]
         process.exitCode = 1;
       }
     });
+}
+
+// ─── DIRECTIVES.md Templates ─────────────────────────────────────────
+
+function getExampleSkill(stack: FullStackResult): string {
+  const lang = stack.language?.toLowerCase() ?? '';
+  if (lang.includes('typescript') || lang.includes('javascript')) return 'typescript-expert';
+  if (lang.includes('python')) return 'testing-expert';
+  if (lang.includes('go') || lang.includes('rust')) return 'testing-expert';
+  return 'testing-expert';
+}
+
+function getExampleFiles(stack: FullStackResult): string {
+  const lang = stack.language?.toLowerCase() ?? '';
+  if (lang.includes('typescript') || lang.includes('javascript')) return 'src/index.ts, src/utils.ts';
+  if (lang.includes('python')) return 'src/main.py, src/utils.py';
+  if (lang.includes('go')) return 'cmd/main.go, internal/handler.go';
+  if (lang.includes('rust')) return 'src/main.rs, src/lib.rs';
+  return 'src/';
+}
+
+function generateDirectivesTemplateTR(stack: FullStackResult, projectName: string): string {
+  const testCmd = stack.commands.test || 'npm test';
+  const skill = getExampleSkill(stack);
+  const files = getExampleFiles(stack);
+  return `# DIRECTIVES — Sprint 001: ${projectName} İlk Sprint
+
+## Goal: Projenizin ilk sprint hedefini buraya yazın. Örnek: "Kullanıcı authentication sistemi ekle" veya "API endpoint'lerini oluştur"
+
+---
+
+## Task 1: Örnek — Bu task'ı düzenleyin veya silin
+- Model: sonnet
+- Effort: normal
+- Skills: ${skill}
+- Files: ${files}
+- Scope: src/
+
+### Description
+Bu örnek task'tır. Kendi hedefinize göre düzenleyin.
+
+Her task şunları içermelidir:
+- **Model:** opus (karmaşık), sonnet (genel), haiku (basit)
+- **Effort:** low (<1 saat), normal (1-3 saat), high (3+ saat)
+- **Skills:** Uzmanlık alanı (typescript-expert, testing-expert, vb.)
+- **Files:** Değiştirilecek dosyalar
+- **Scope:** İzin verilen dizinler
+
+**Kanıt:** \`${testCmd}\` → tüm testler geçmeli
+
+**Test:** 3+ test (temel davranış, edge case, hata durumu)
+
+---
+
+<!-- DIRECTIVES.md Kullanım Rehberi:
+     1. Bu dosyayı düzenleyin — sprint hedefinizi ve task'larınızı yazın
+     2. deckent plan — task'ları planlar
+     3. deckent start — sprint'i başlatır
+     Detaylı format rehberi: .deckent/docs/directives-guide.md -->
+`;
+}
+
+function generateDirectivesTemplateEN(stack: FullStackResult, projectName: string): string {
+  const testCmd = stack.commands.test || 'npm test';
+  const skill = getExampleSkill(stack);
+  const files = getExampleFiles(stack);
+  return `# DIRECTIVES — Sprint 001: ${projectName} First Sprint
+
+## Goal: Write your first sprint goal here. Example: "Add user authentication" or "Create API endpoints"
+
+---
+
+## Task 1: Example — Edit or delete this task
+- Model: sonnet
+- Effort: normal
+- Skills: ${skill}
+- Files: ${files}
+- Scope: src/
+
+### Description
+This is an example task. Edit it to match your goals.
+
+Each task should include:
+- **Model:** opus (complex), sonnet (general), haiku (simple)
+- **Effort:** low (<1 hour), normal (1-3 hours), high (3+ hours)
+- **Skills:** Expertise area (typescript-expert, testing-expert, etc.)
+- **Files:** Files to be modified
+- **Scope:** Allowed directories
+
+**Proof:** \`${testCmd}\` → all tests should pass
+
+**Test:** 3+ tests (basic behavior, edge case, error handling)
+
+---
+
+<!-- DIRECTIVES.md Usage Guide:
+     1. Edit this file — write your sprint goal and tasks
+     2. deckent plan — plans the tasks
+     3. deckent start — starts the sprint
+     Detailed format guide: .deckent/docs/directives-guide.md -->
+`;
+}
+
+// ─── DECKENT.md Templates ────────────────────────────────────────────
+
+function generateDeckentContentTR(projectName: string, buildCmd: string, testCmd: string, lintCmd: string): string {
+  return `# ${projectName} — Deckent Orchestrated
+
+## Identity
+@.deckent/workspace/IDENTITY.md
+
+## Rules
+- Brain is the ONLY orchestrator — workers never plan
+- Workers stay within assigned scope (directories + filesWrite)
+- Auditor never writes source code
+- Sprint is NEVER left incomplete
+- Memory budget: 900 lines max in .brain/
+
+## Workflow
+1. \`deckent init\` — Projeyi başlat
+2. \`deckent set-directives\` — Sprint hedeflerini yaz (DIRECTIVES.md)
+3. \`deckent plan\` — Task'ları planla (mode: ai/structured/auto)
+4. \`deckent start\` — Worker'ları başlat
+5. \`deckent status\` — İlerlemeyi izle
+6. \`deckent review\` — Sonuçları değerlendir (GO/NO_GO/GO_WITH_TECH_DEBT)
+7. \`deckent retro\` — Retrospektif oku
+8. \`deckent cleanup\` — Temizle
+
+## DIRECTIVES Format
+Her task şu yapıda olmalı:
+\`\`\`
+## Task N: Başlık
+- Model: opus/sonnet/haiku
+- Effort: low/normal/high
+- Skills: typescript-expert, testing-expert, vb.
+- Files: değişecek dosyalar
+- Scope: izin verilen dizinler
+### Description
+Detaylı açıklama...
+\`\`\`
+Detaylı rehber: .deckent/docs/directives-guide.md
+
+## Providers
+- Claude (varsayılan), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
+- Model eşdeğerleri: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash
+
+## Context
+@DIRECTIVES.md
+@.brain/MEMORY.md
+@.contracts/api-surface.md
+
+## Agent Roles
+When acting as Brain: @.claude/rules/brain.md
+When acting as Auditor: @.claude/rules/auditor.md
+When acting as Worker: @.claude/rules/worker-default.md
+
+## Environment
+Build: ${buildCmd}
+Test: ${testCmd}
+Lint: ${lintCmd}
+
+## Boot
+@.deckent/workspace/BOOT.md
+`;
+}
+
+function generateDeckentContentEN(projectName: string, buildCmd: string, testCmd: string, lintCmd: string): string {
+  return `# ${projectName} — Deckent Orchestrated
+
+## Identity
+@.deckent/workspace/IDENTITY.md
+
+## Rules
+- Brain is the ONLY orchestrator — workers never plan
+- Workers stay within assigned scope (directories + filesWrite)
+- Auditor never writes source code
+- Sprint is NEVER left incomplete
+- Memory budget: 900 lines max in .brain/
+
+## Workflow
+1. \`deckent init\` — Initialize project
+2. \`deckent set-directives\` — Write sprint goals (DIRECTIVES.md)
+3. \`deckent plan\` — Plan tasks (mode: ai/structured/auto)
+4. \`deckent start\` — Launch workers
+5. \`deckent status\` — Monitor progress
+6. \`deckent review\` — Evaluate results (GO/NO_GO/GO_WITH_TECH_DEBT)
+7. \`deckent retro\` — Read retrospective
+8. \`deckent cleanup\` — Clean up
+
+## DIRECTIVES Format
+Each task should follow this structure:
+\`\`\`
+## Task N: Title
+- Model: opus/sonnet/haiku
+- Effort: low/normal/high
+- Skills: typescript-expert, testing-expert, etc.
+- Files: files to modify
+- Scope: allowed directories
+### Description
+Detailed description...
+\`\`\`
+Detailed guide: .deckent/docs/directives-guide.md
+
+## Providers
+- Claude (default), Codex (OPENAI_API_KEY), Gemini (GOOGLE_API_KEY)
+- Model equivalence: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash
+
+## Context
+@DIRECTIVES.md
+@.brain/MEMORY.md
+@.contracts/api-surface.md
+
+## Agent Roles
+When acting as Brain: @.claude/rules/brain.md
+When acting as Auditor: @.claude/rules/auditor.md
+When acting as Worker: @.claude/rules/worker-default.md
+
+## Environment
+Build: ${buildCmd}
+Test: ${testCmd}
+Lint: ${lintCmd}
+
+## Boot
+@.deckent/workspace/BOOT.md
+`;
+}
+
+// ─── Docs Templates ──────────────────────────────────────────────────
+
+function generateQuickStartDoc(lang: string): string {
+  if (lang === 'tr') {
+    return `# Hızlı Başlangıç — Deckent ile İlk Sprint
+
+## 1. Hedeflerinizi Yazın
+DIRECTIVES.md dosyasını düzenleyin veya CLI ile:
+\`\`\`bash
+deckent set-directives "Authentication sistemi ekle"
+\`\`\`
+
+## 2. Sprint Planlayın
+\`\`\`bash
+deckent plan
+\`\`\`
+Bu komut DIRECTIVES.md'yi okur ve task'ları planlar.
+- \`--mode ai\` — AI ile akıllı planlama
+- \`--mode structured\` — Kural tabanlı, hızlı
+
+## 3. Çalışmaya Başlayın
+\`\`\`bash
+deckent start
+\`\`\`
+Worker'lar otomatik başlar ve task'ları uygular.
+
+## 4. İlerlemeyi İzleyin
+\`\`\`bash
+deckent status --watch
+\`\`\`
+
+## 5. Sonuçları Değerlendirin
+\`\`\`bash
+deckent review    # GO / NO_GO / GO_WITH_TECH_DEBT
+deckent retro     # Retrospektif ve öğrenimler
+deckent cleanup   # Temizlik
+\`\`\`
+
+## Sorun Giderme
+\`\`\`bash
+deckent doctor    # Sağlık kontrolü
+deckent kill --all  # Tüm worker'ları durdur
+deckent cleanup   # Temizle ve yeniden başla
+\`\`\`
+
+## MCP Entegrasyonu
+Claude Code, Cursor veya VS Code'da MCP server olarak kullanabilirsiniz:
+\`\`\`bash
+claude mcp add deckent -- npx deckent mcp
+\`\`\`
+`;
+  }
+  return `# Quick Start — Your First Sprint with Deckent
+
+## 1. Write Your Goals
+Edit DIRECTIVES.md or use the CLI:
+\`\`\`bash
+deckent set-directives "Add authentication system"
+\`\`\`
+
+## 2. Plan the Sprint
+\`\`\`bash
+deckent plan
+\`\`\`
+This reads DIRECTIVES.md and plans tasks.
+- \`--mode ai\` — AI-powered smart planning
+- \`--mode structured\` — Rule-based, fast
+
+## 3. Start Working
+\`\`\`bash
+deckent start
+\`\`\`
+Workers start automatically and execute tasks.
+
+## 4. Monitor Progress
+\`\`\`bash
+deckent status --watch
+\`\`\`
+
+## 5. Evaluate Results
+\`\`\`bash
+deckent review    # GO / NO_GO / GO_WITH_TECH_DEBT
+deckent retro     # Retrospective and learnings
+deckent cleanup   # Clean up
+\`\`\`
+
+## Troubleshooting
+\`\`\`bash
+deckent doctor      # Health check
+deckent kill --all  # Stop all workers
+deckent cleanup     # Clean up and restart
+\`\`\`
+
+## MCP Integration
+Use as MCP server in Claude Code, Cursor, or VS Code:
+\`\`\`bash
+claude mcp add deckent -- npx deckent mcp
+\`\`\`
+`;
+}
+
+function generateDirectivesGuideDoc(lang: string): string {
+  if (lang === 'tr') {
+    return `# DIRECTIVES Format Rehberi
+
+## Temel Yapı
+\`\`\`markdown
+# DIRECTIVES — Sprint NNN: Sprint Başlığı
+
+## Goal: Sprint amacını bir paragrafta açıkla.
+
+## Task 1: Task Başlığı
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/config.ts
+- Scope: src/core/
+
+### Description
+Task'ın ne yapacağını detaylı açıkla.
+
+**Kanıt:** \\\`grep "yeniOzellik" src/core/config.ts\\\` → eklendi
+**Test:** 3+ test
+\`\`\`
+
+## Alan Açıklamaları
+
+| Alan | Değerler | Açıklama |
+|------|----------|----------|
+| Model | opus, sonnet, haiku | AI modeli — opus: karmaşık, sonnet: genel, haiku: basit |
+| Effort | low, normal, high | İş yükü — low: <1 saat, normal: 1-3 saat, high: 3+ saat |
+| Skills | skill-id listesi | Uzmanlık alanı (virgülle ayır) |
+| Files | dosya yolları | Değiştirilecek dosyalar |
+| Scope | dizin yolları | Worker'ın erişebileceği dizinler |
+| Kanıt | shell komutu | Tamamlanma kanıtı |
+| Test | sayı + açıklama | Beklenen test sayısı ve kapsamı |
+
+## Mevcut Skills
+- typescript-expert, testing-expert, documentation-writer
+- security-expert, performance-expert, api-designer
+- refactoring-expert, ci-cd-expert, database-expert
+- frontend-expert, ci-testing
+
+## İpuçları
+- Her task bağımsız olmalı — birbirine bağımlı task'lar dependencies ile belirtin
+- Scope dar tutun — worker sadece gerekli dizinlere erişsin
+- Kanıt satırı spesifik olmalı — "testler geçmeli" yerine "grep X file → var" yazın
+`;
+  }
+  return `# DIRECTIVES Format Guide
+
+## Basic Structure
+\`\`\`markdown
+# DIRECTIVES — Sprint NNN: Sprint Title
+
+## Goal: Describe the sprint goal in one paragraph.
+
+## Task 1: Task Title
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/config.ts
+- Scope: src/core/
+
+### Description
+Describe what the task will do in detail.
+
+**Proof:** \\\`grep "newFeature" src/core/config.ts\\\` → added
+**Test:** 3+ tests
+\`\`\`
+
+## Field Reference
+
+| Field | Values | Description |
+|-------|--------|-------------|
+| Model | opus, sonnet, haiku | AI model — opus: complex, sonnet: general, haiku: simple |
+| Effort | low, normal, high | Workload — low: <1h, normal: 1-3h, high: 3+h |
+| Skills | skill-id list | Expertise area (comma-separated) |
+| Files | file paths | Files to be modified |
+| Scope | directory paths | Directories the worker can access |
+| Proof | shell command | Completion proof |
+| Test | count + description | Expected test count and scope |
+
+## Available Skills
+- typescript-expert, testing-expert, documentation-writer
+- security-expert, performance-expert, api-designer
+- refactoring-expert, ci-cd-expert, database-expert
+- frontend-expert, ci-testing
+
+## Tips
+- Each task should be independent — use dependencies for related tasks
+- Keep scope narrow — workers should only access necessary directories
+- Proof lines should be specific — use "grep X file → exists" not "tests pass"
+`;
+}
+
+function generateConfigReferenceDoc(lang: string): string {
+  if (lang === 'tr') {
+    return `# Konfigürasyon Referansı
+
+Tüm ayarlar \`.deckent/config.json\` dosyasında.
+CLI ile okuma/yazma: \`deckent config read\` / \`deckent config set key value\`
+
+## Temel Ayarlar
+
+| Ayar | Değerler | Varsayılan | Açıklama |
+|------|----------|-----------|----------|
+| mode | max_plan, max5x_plan, pro_plan, api | max5x_plan | Plan modu |
+| language | en, tr | en | Arayüz dili |
+| projectName | string | dizin adı | Proje adı |
+| max_workers | 1-10 | mode'a göre | Eş zamanlı worker sayısı |
+
+## Provider Ayarları
+
+| Ayar | Değerler | Varsayılan | Açıklama |
+|------|----------|-----------|----------|
+| brain_provider | claude, codex, gemini | claude | Brain provider'ı |
+| worker_provider | claude, codex, gemini | claude | Worker provider'ı |
+| fallback_provider | claude, codex, gemini | - | Yedek provider |
+| spawn_backend | tmux, subprocess | tmux | Worker başlatma (Windows: subprocess) |
+
+## Routing Ayarları
+
+| Ayar | Değerler | Varsayılan | Açıklama |
+|------|----------|-----------|----------|
+| routing_engine | v1, v2 | v2 | Routing motoru |
+| brain_planning | ai, structured, auto | auto | Planlama modu |
+
+## Memory + Decay
+
+| Ayar | Değerler | Varsayılan | Açıklama |
+|------|----------|-----------|----------|
+| memory_budget | sayı | 900 | .brain/ toplam satır bütçesi |
+| decay_after_sprints | sayı | 5 | Kaç sprint sonra decay başlar |
+
+## Sprint Ayarları
+
+| Ayar | Değerler | Varsayılan | Açıklama |
+|------|----------|-----------|----------|
+| fix_phase_enabled | true/false | true | Başarısız task'ları tekrar dene |
+| max_fix_retries | sayı | 2 | Maksimum tekrar deneme |
+| scan_interval | saniye | 30 | Auditor tarama aralığı |
+| heartbeat_timeout | saniye | 120 | Worker heartbeat zaman aşımı |
+| cleanup_delay_ms | ms | 180000 | Cleanup öncesi bekleme |
+`;
+  }
+  return `# Configuration Reference
+
+All settings in \`.deckent/config.json\`.
+CLI read/write: \`deckent config read\` / \`deckent config set key value\`
+
+## Core Settings
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| mode | max_plan, max5x_plan, pro_plan, api | max5x_plan | Plan mode |
+| language | en, tr | en | UI language |
+| projectName | string | dir name | Project name |
+| max_workers | 1-10 | per mode | Concurrent worker count |
+
+## Provider Settings
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| brain_provider | claude, codex, gemini | claude | Brain provider |
+| worker_provider | claude, codex, gemini | claude | Worker provider |
+| fallback_provider | claude, codex, gemini | - | Fallback provider |
+| spawn_backend | tmux, subprocess | tmux | Worker spawn (Windows: subprocess) |
+
+## Routing Settings
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| routing_engine | v1, v2 | v2 | Routing engine |
+| brain_planning | ai, structured, auto | auto | Planning mode |
+
+## Memory + Decay
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| memory_budget | number | 900 | .brain/ total line budget |
+| decay_after_sprints | number | 5 | Sprints before decay |
+
+## Sprint Settings
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| fix_phase_enabled | true/false | true | Retry failed tasks |
+| max_fix_retries | number | 2 | Max retry attempts |
+| scan_interval | seconds | 30 | Auditor scan interval |
+| heartbeat_timeout | seconds | 120 | Worker heartbeat timeout |
+| cleanup_delay_ms | ms | 180000 | Wait before cleanup |
+`;
+}
+
+// ─── BOOT.md Template ────────────────────────────────────────────────
+
+function generateBootContent(lang: string): string {
+  if (lang === 'tr') {
+    return `# Sprint Başlatma Süreci
+
+Bir sprint başlatıldığında (\`deckent start\`) şu adımlar otomatik çalışır:
+
+1. **Plan** — Brain DIRECTIVES.md'yi okur, task'ları planlar
+2. **Spawn** — Worker'lar başlatılır (tmux veya subprocess)
+3. **Execute** — Worker'lar task'ları uygular, heartbeat yazar
+4. **Evaluate** — Brain sonuçları değerlendirir (GO / NO_GO / TECH_DEBT)
+5. **Fix** — Başarısız task'lar yeniden denenir
+6. **Retro** — Retrospektif yazılır (RETRO.md)
+7. **Decay** — Bellek bütçesi kontrol edilir
+8. **Cleanup** — Task dosyaları arşivlenir
+
+> İpucu: \`deckent status --watch\` ile süreci canlı izleyebilirsiniz.
+> Sorun olursa: \`deckent kill --all\` → \`deckent cleanup\` → \`deckent doctor\`
+`;
+  }
+  return `# Sprint Boot Sequence
+
+When a sprint starts (\`deckent start\`), these steps run automatically:
+
+1. **Plan** — Brain reads DIRECTIVES.md, plans tasks
+2. **Spawn** — Workers launched (tmux or subprocess)
+3. **Execute** — Workers implement tasks, write heartbeats
+4. **Evaluate** — Brain evaluates results (GO / NO_GO / TECH_DEBT)
+5. **Fix** — Failed tasks retried
+6. **Retro** — Retrospective written (RETRO.md)
+7. **Decay** — Memory budget checked
+8. **Cleanup** — Task files archived
+
+> Tip: Use \`deckent status --watch\` to monitor in real-time.
+> If stuck: \`deckent kill --all\` → \`deckent cleanup\` → \`deckent doctor\`
+`;
 }

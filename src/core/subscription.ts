@@ -45,6 +45,7 @@ function isClaudeCliAvailable(): boolean {
     const result = spawnSync('claude', ['--version'], {
       encoding: 'utf-8',
       timeout: 5_000,
+      shell: process.platform === 'win32',
     });
     return result.status === 0 && result.error === undefined;
   } catch {

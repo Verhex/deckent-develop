@@ -55,6 +55,7 @@ export interface FullStackResult {
   buildTool: string;
   testFramework: string;
   commands: { build: string; test: string; lint: string };
+  detectedLanguages?: string[];
 }
 
 // ─── detectProjectStack ────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ export function detectFullStack(projectRoot: string): FullStackResult {
     buildTool: stack.buildTool,
     testFramework: stack.testFramework,
     commands,
+    detectedLanguages: stack.detectedLanguages,
   };
 }
 
@@ -371,15 +373,19 @@ function detectFresh(projectRoot: string): ProjectStack {
 
   // ─── Framework detection ─────────────────────────────────────────────────
 
-  // JS/TS frameworks (from package.json deps)
-  if (depNames.includes('next')) framework = 'next';
-  else if (depNames.includes('react')) framework = 'react';
-  else if (depNames.includes('vue')) framework = 'vue';
-  else if (depNames.includes('@angular/core')) framework = 'angular';
-  else if (depNames.includes('svelte')) framework = 'svelte';
-  else if (depNames.includes('@nestjs/core')) framework = 'nest';
-  else if (depNames.includes('express')) framework = 'express';
-  else if (depNames.includes('fastify')) framework = 'fastify';
+  // JS/TS frameworks (from package.json deps) — skip for non-JS/TS primary languages
+  // Prevents Python/Go/Rust projects with sub-project package.json from getting 'next'/'react'
+  const isJsTsPrimary = !['python', 'go', 'rust', 'java', 'c#', 'swift', 'ruby', 'php', 'dart', 'kotlin'].includes(language);
+  if (isJsTsPrimary) {
+    if (depNames.includes('next')) framework = 'next';
+    else if (depNames.includes('react')) framework = 'react';
+    else if (depNames.includes('vue')) framework = 'vue';
+    else if (depNames.includes('@angular/core')) framework = 'angular';
+    else if (depNames.includes('svelte')) framework = 'svelte';
+    else if (depNames.includes('@nestjs/core')) framework = 'nest';
+    else if (depNames.includes('express')) framework = 'express';
+    else if (depNames.includes('fastify')) framework = 'fastify';
+  }
 
   // G) Sub-project framework detection: when root has no framework, scan sub-projects
   // This generalizes the pattern: sub-project deps already merged into depNames via

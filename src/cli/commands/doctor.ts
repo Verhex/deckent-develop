@@ -146,7 +146,8 @@ export function checkTmux(providerNames?: string[], spawnBackend?: string): Doct
 }
 
 export function checkClaude(checkAuth = false): DoctorCheck {
-  const result = spawnSync('claude', ['--version'], { encoding: 'utf-8' });
+  const shellOpt = process.platform === 'win32';
+  const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', shell: shellOpt });
   if (result.status !== 0) {
     const entry = ErrorRegistry.get('DECKENT_E002');
     return { name: 'Claude CLI', passed: false, message: `not found — ${entry?.suggestion ?? 'Install Claude CLI'}`, required: true };
@@ -154,7 +155,7 @@ export function checkClaude(checkAuth = false): DoctorCheck {
   const version = result.stdout.trim();
   if (checkAuth) {
     // Attempt auth check: `claude config get` returns non-zero if not logged in
-    const authResult = spawnSync('claude', ['config', 'get', 'account'], { encoding: 'utf-8' });
+    const authResult = spawnSync('claude', ['config', 'get', 'account'], { encoding: 'utf-8', shell: shellOpt });
     if (authResult.status !== 0 || (!authResult.stdout?.trim() && !authResult.stderr?.trim())) {
       return {
         name: 'Claude CLI',
@@ -523,7 +524,8 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
       lines.push(`  OK ${capitalize(p.name)} CLI${version} \u2014 Ready${authLabel}`);
     } else {
       const hint = getProviderHint(p.name);
-      lines.push(`  FAIL ${capitalize(p.name)} \u2014 Not configured${hint}`);
+      // Use SKIP instead of FAIL for optional providers — avoids "FAIL + OK" confusion
+      lines.push(`  SKIP ${capitalize(p.name)} \u2014 Not configured${hint}`);
     }
   }
 

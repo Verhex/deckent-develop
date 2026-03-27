@@ -677,10 +677,12 @@ ${task.id}: ${task.title} — ${task.description}
 ## What To Do
 1. Read the task scope carefully — understand what files you may touch
 2. Write the code changes described above
-3. Verify: run \`tsc --noEmit\` — fix any errors (max 3 attempts)
-4. Test: run \`npx vitest run\` — fix any failures (max 3 attempts)
+3. Verify: run the project lint command — fix any errors (max 3 attempts)
+4. Test: run the project test command — fix any failures (max 3 attempts)
 5. Document: update relevant docs if your changes affect them
 6. Report: write your result file to .tasks/task-${task.id}.result
+
+Note: Check DECKENT.md "## Environment" section for the correct Build/Test/Lint commands for this project.
 
 ## Scope Rules
 You may ONLY modify files in these directories:

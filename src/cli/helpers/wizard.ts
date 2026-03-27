@@ -163,17 +163,19 @@ export function detectIDEEnvironment(projectRoot?: string): IDEEnvironment {
     return 'claude-code';
   }
 
-  // Check parent process (ppid) for 'claude' in cmdline
-  try {
-    const ppid = process.ppid;
-    if (ppid) {
-      const cmdline = execSync(`ps -p ${ppid} -o comm=`, { encoding: 'utf-8', timeout: 2000 }).trim();
-      if (cmdline.includes('claude')) {
-        return 'claude-code';
+  // Check parent process (ppid) for 'claude' in cmdline — skip on Windows (no POSIX ps)
+  if (process.platform !== 'win32') {
+    try {
+      const ppid = process.ppid;
+      if (ppid) {
+        const cmdline = execSync(`ps -p ${ppid} -o comm=`, { encoding: 'utf-8', timeout: 2000 }).trim();
+        if (cmdline.includes('claude')) {
+          return 'claude-code';
+        }
       }
+    } catch {
+      // ps not available or failed — skip
     }
-  } catch {
-    // ps not available or failed — skip
   }
 
   // Cursor detection: env var or .cursor/ directory

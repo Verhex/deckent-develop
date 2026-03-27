@@ -47,7 +47,7 @@ function resolveMaxWorkersNumeric(config: ResolvedConfig, systemProfile?: System
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
   const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
   try {
-    const result = spawnSync('claude', ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000 });
+    const result = spawnSync('claude', ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000, shell: process.platform === 'win32' });
     if (result.status !== 0 || !result.stdout) return SAFE_DEFAULT;
 
     const output = result.stdout;

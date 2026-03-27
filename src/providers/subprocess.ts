@@ -139,6 +139,8 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
       env: { ...process.env },
+      // Windows: shell:true needed to resolve .cmd/.ps1 wrappers (e.g. claude.cmd)
+      shell: process.platform === 'win32',
     };
 
     const child = spawn(this.providerConfig.cliCommand, args, spawnOpts);
@@ -209,6 +211,7 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       const child = spawn(this.providerConfig.cliCommand, ['--version'], {
         stdio: 'pipe',
         timeout: 5_000,
+        shell: process.platform === 'win32',
       });
       child.once('exit', (code) => resolve(code === 0));
       child.once('error', () => resolve(false));

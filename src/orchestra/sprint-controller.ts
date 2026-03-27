@@ -1040,8 +1040,8 @@ export function spawnWorkers(
     const model = task.model;
     const writeTargets = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
     const allowedTools = writeTargets.length > 0
-      ? `Read,Write(${writeTargets.join(',')}),Bash`
-      : 'Read,Write,Bash';
+      ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
+      : 'Read,Write,Edit,Bash,Glob,Grep';
 
     const taskProvider = resolveTaskProvider(task);
 
@@ -1274,8 +1274,8 @@ export async function waitForResults(
       const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
       const writeTargets = ['.tasks/', ...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
       const allowedTools = writeTargets.length > 0
-        ? `Read,Write(${writeTargets.join(',')}),Bash`
-        : 'Read,Write,Bash';
+        ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
+        : 'Read,Write,Edit,Bash,Glob,Grep';
       try {
         if (queueBackend) {
           queueBackend.spawn(nextTask.id, nextTask.model, prompt, {

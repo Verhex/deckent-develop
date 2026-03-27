@@ -2114,11 +2114,11 @@ describe('human-friendly init output', () => {
       expect(analyzeProject).toHaveBeenCalledTimes(1);
     });
 
-    it('does not call analyzeProject in interactive mode', async () => {
+    it('calls analyzeProject in interactive mode too (stack detection always runs)', async () => {
       vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
       vi.mocked(promptText).mockResolvedValue('my-project');
       await runCommand(['init']);
-      expect(analyzeProject).not.toHaveBeenCalled();
+      expect(analyzeProject).toHaveBeenCalled();
     });
   });
 

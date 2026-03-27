@@ -14,7 +14,7 @@ import { detectProjectStack } from '../../core/stack-detector.js';
 
 export function detectClaudeCli(): { available: boolean; version: string } {
   try {
-    const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', timeout: 5_000 });
+    const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', timeout: 5_000, shell: process.platform === 'win32' });
     if (result.status === 0 && !result.error) {
       return { available: true, version: result.stdout.trim() };
     }
