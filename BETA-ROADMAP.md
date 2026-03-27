@@ -94,6 +94,28 @@
 ### Faz 1: "Kendin Kullan" — AKTIF
 npm pack → local install → kendi projelerinde kullan → feedback topla
 
+### Faz 1.5: "Init UX + Onboarding" — KRİTİK (Windows dogfooding'den)
+
+**Bulgular:**
+- DIRECTIVES.md boş şablon — kullanıcı ne yazacağını bilmiyor
+- IDENTITY.md "Language: unknown" — stack algılama init'te doğru çalışmıyor
+- DECKENT.md sadece teknik rules — kullanıcı rehberi yok
+- BOOT.md iç süreç — kullanıcıya yönelik değil
+- Skills hiç kurulmuyor (tempSkill de yok)
+- Hata mesajları i18n desteği eksik/yetersiz
+- .deckent/ altında kullanıcı rehberi (docs) yok
+- Init sonrası "ne yapmalıyım" rehberi eksik
+
+**Yapılacaklar:**
+- [ ] DIRECTIVES.md şablonu → örnek task formatı + açıklama
+- [ ] IDENTITY.md → init'te stack detection sonucu doğru yazılmalı
+- [ ] .deckent/docs/ → quick-start rehberi, config referans, örnek DIRECTIVES
+- [ ] Init'te tempSkill + tempAgent oluşturulmalı (proje stack'ine göre)
+- [ ] Worker rules'da hardcoded "tsc --noEmit" → stack-aware komut
+- [ ] i18n hata mesajları kontrolü — Türkçe init → Türkçe hatalar
+- [ ] brain.md'de "max 200 lines" → güncel "max 300 lines"
+- [ ] api-surface.md'de "max 600 lines" → güncel "max 900 lines"
+
 ### Faz 2: "Genel Kullanılabilirlik"
 Provider/tier generalizasyonu, config dokümantasyonu, model güncelliği
 
