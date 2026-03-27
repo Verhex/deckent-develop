@@ -26,18 +26,31 @@ function loadTaskResults(root: string, sprintId: string): Array<{ task: TaskData
   const tasksDir = join(root, TASKS_DIR);
   if (!existsSync(tasksDir)) return [];
 
-  const entries = readdirSync(tasksDir).filter(
+  // Look in active tasks first, then fall back to archive
+  let taskDir = tasksDir;
+  let entries = readdirSync(tasksDir).filter(
     (f) => f.startsWith('task-') && f.endsWith('.json'),
   );
+
+  // If no active tasks, check archive directory
+  if (entries.length === 0) {
+    const archiveDir = join(tasksDir, 'archive');
+    if (existsSync(archiveDir)) {
+      entries = readdirSync(archiveDir).filter(
+        (f) => f.startsWith('task-') && f.endsWith('.json'),
+      );
+      taskDir = archiveDir;
+    }
+  }
 
   const results: Array<{ task: TaskData; result: TaskResultData | null }> = [];
 
   for (const entry of entries) {
     try {
-      const task = JSON.parse(readFileSync(join(tasksDir, entry), 'utf-8')) as TaskData;
+      const task = JSON.parse(readFileSync(join(taskDir, entry), 'utf-8')) as TaskData;
       if (task.sprintId && task.sprintId !== sprintId) continue;
 
-      const resultPath = join(tasksDir, entry.replace('.json', '.result'));
+      const resultPath = join(taskDir, entry.replace('.json', '.result'));
       let result: TaskResultData | null = null;
       if (existsSync(resultPath)) {
         result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResultData;

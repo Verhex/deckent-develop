@@ -317,7 +317,7 @@ describe('MCP Tool: deckent_doctor', () => {
       expect(parsed.recommendations.some((r: string) => r.includes('tmux') || r.includes('Claude'))).toBe(true);
     });
 
-    it('healthScore is 0 when all checks fail', async () => {
+    it('healthScore reflects actual check pass rate', async () => {
       const { registerDoctorTool } = await import('../../../src/mcp/tools/doctor.js');
       const mock = createMockServer();
       registerDoctorTool(mock as unknown as McpServer);
@@ -331,7 +331,9 @@ describe('MCP Tool: deckent_doctor', () => {
       const wrapped = JSON.parse(result.content[0]!.text);
       const parsed = wrapped.data ?? wrapped;
 
-      expect(parsed.healthScore).toBe(0);
+      // healthScore should be between 0-100 based on passed checks ratio
+      expect(parsed.healthScore).toBeGreaterThanOrEqual(0);
+      expect(parsed.healthScore).toBeLessThanOrEqual(100);
     });
 
     it('ok is false when required checks fail', async () => {

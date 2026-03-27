@@ -433,8 +433,8 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('## What To Do');
     expect(prompt).toContain('1. Read the task scope carefully');
     expect(prompt).toContain('2. Write the code changes');
-    expect(prompt).toContain('3. Verify: run `tsc --noEmit`');
-    expect(prompt).toContain('4. Test: run `npx vitest run`');
+    expect(prompt).toContain('3. Verify: run the project lint command');
+    expect(prompt).toContain('4. Test: run the project test command');
     expect(prompt).toContain('5. Document:');
     expect(prompt).toContain('6. Report: write your result file');
   });

@@ -138,16 +138,29 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
-      env: { ...process.env },
+      // BUG-19: Set UTF-8 encoding environment for Windows
+      env: {
+        ...process.env,
+        LANG: process.env['LANG'] ?? 'en_US.UTF-8',
+        PYTHONIOENCODING: 'utf-8',
+      },
       // Windows: shell:true needed to resolve .cmd/.ps1 wrappers (e.g. claude.cmd)
       shell: process.platform === 'win32',
     };
 
     const child = spawn(this.providerConfig.cliCommand, args, spawnOpts);
-    closeSync(logFd);
+    // BUG-26: DON'T close logFd here — keep open until child exits
+    // On Windows with shell:true, closing FD before child inherits causes empty logs
 
-    // Write heartbeat
-    this.writeHeartbeat(taskId, dir, 'EXECUTING');
+    // Write initial heartbeat
+    this.writeHeartbeat(taskId, dir, 'EXECUTING', 0);
+
+    // BUG-23: Periodic heartbeat update (every 15 seconds)
+    let hbSequence = 0;
+    const hbInterval = setInterval(() => {
+      hbSequence++;
+      this.writeHeartbeat(taskId, dir, 'EXECUTING', hbSequence);
+    }, 15_000);
 
     const entry: SubprocessWorkerEntry = {
       taskId,
@@ -173,7 +186,33 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     }
 
     // Cleanup on exit
-    child.once('exit', () => {
+    child.once('exit', (code) => {
+      // Stop periodic heartbeat
+      clearInterval(hbInterval);
+
+      // BUG-26: Close log file descriptor now that child is done
+      try { closeSync(logFd); } catch { /* already closed */ }
+
+      // BUG-24: Write fallback result if worker didn't create one
+      const resultPath = join(dir, TASKS_DIR, `task-${taskId}.result`);
+      if (!existsSync(resultPath)) {
+        try {
+          const fallback = {
+            taskId,
+            filesChanged: [] as string[],
+            linesAdded: 0,
+            linesRemoved: 0,
+            testsPassed: code === 0,
+            selfAssessment: code === 0 ? 'GO_WITH_TECH_DEBT' : 'NO_GO',
+            notes: `Subprocess worker exited with code ${code ?? 'unknown'}. No explicit result file written by worker.`,
+          };
+          writeFileSync(resultPath, JSON.stringify(fallback, null, 2), 'utf-8');
+        } catch { /* non-fatal */ }
+      }
+
+      // Write final heartbeat with DONE status
+      this.writeHeartbeat(taskId, dir, code === 0 ? 'DONE' : 'FAILED', hbSequence + 1);
+
       const w = this.workers.get(taskId);
       if (w?.timeoutHandle) clearTimeout(w.timeoutHandle);
       this.workers.delete(taskId);
@@ -245,16 +284,16 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
 
   // ─── Heartbeat ─────────────────────────────────────────────────────
 
-  protected writeHeartbeat(taskId: string, dir: string, status: string): void {
+  protected writeHeartbeat(taskId: string, dir: string, status: string, sequence = 0): void {
     const hbPath = join(dir, TASKS_DIR, `task-${taskId}.hb`);
     const hb = {
       workerId: `subprocess-${taskId}`,
       taskId,
       status,
-      currentAction: 'Subprocess worker running',
+      currentAction: status === 'DONE' ? 'Task completed' : status === 'FAILED' ? 'Task failed' : 'Subprocess worker running',
       timestamp: new Date().toISOString(),
       filesChangedCount: 0,
-      sequence: 0,
+      sequence,
     };
     try {
       writeFileSync(hbPath, JSON.stringify(hb, null, 2), 'utf-8');

@@ -39,15 +39,16 @@ export function registerDoctorTool(server: McpServer): void {
       }
 
       // safe: response.checks comes from runDoctorChecks() which returns DoctorResult with checks array
-      const checks = response.checks as Array<{ ok: boolean; name?: string }> | undefined;
+      // DoctorCheck uses 'passed' field, not 'ok'
+      const checks = response.checks as Array<{ passed: boolean; name?: string; message?: string }> | undefined;
       const totalChecks = checks?.length ?? 0;
-      const passedChecks = checks?.filter((c) => c.ok).length ?? 0;
+      const passedChecks = checks?.filter((c) => c.passed).length ?? 0;
       const healthScore = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
       const recommendations: string[] = [];
       if (checks) {
         for (const check of checks) {
-          if (!check.ok && check.name) {
-            recommendations.push(`Fix: ${check.name}`);
+          if (!check.passed && check.name) {
+            recommendations.push(`Fix: ${check.name}${check.message ? ` — ${check.message}` : ''}`);
           }
         }
       }

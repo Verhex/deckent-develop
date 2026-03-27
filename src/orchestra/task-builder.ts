@@ -229,6 +229,29 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const directories: string[] = [];
   const filesWrite: string[] = [];
 
+  // BUG-25: Explicit Files: and Scope: label parsing (highest priority)
+  const filesLabelMatch = line.match(/(?:^|\n)\s*-?\s*Files?:\s*(.+)/im);
+  if (filesLabelMatch?.[1]) {
+    const files = filesLabelMatch[1].split(',').map(f => f.trim()).filter(Boolean);
+    for (const f of files) {
+      if (f.endsWith('/')) {
+        if (!directories.includes(f)) directories.push(f);
+      } else {
+        if (!filesWrite.includes(f)) filesWrite.push(f);
+      }
+    }
+  }
+
+  const scopeLabelMatch = line.match(/(?:^|\n)\s*-?\s*Scope:\s*(.+)/im);
+  if (scopeLabelMatch?.[1]) {
+    const scopes = scopeLabelMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    for (const s of scopes) {
+      const dir = s.endsWith('/') ? s : s + '/';
+      // './' means project root — valid scope
+      if (!directories.includes(dir)) directories.push(dir);
+    }
+  }
+
   // Match directory-like paths: src/, tests/, docs/, .deckent/, .brain/, .contracts/, .claude/, scripts/
   const dirMatches = line.match(/\b(src\/[\w/.-]*|tests\/[\w/.-]*|docs\/[\w/.-]*|\.deckent\/[\w/.-]*|\.brain\/[\w/.-]*|\.contracts\/[\w/.-]*|\.claude\/[\w/.-]*|scripts\/[\w/.-]*)\//g);
   if (dirMatches) {
