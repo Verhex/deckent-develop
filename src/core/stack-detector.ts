@@ -176,6 +176,22 @@ function resolveCommandKey(language: string, buildTool: string): string {
   return language;
 }
 
+// ─── Config language override ───────────────────────────────────────────────
+
+function readConfigLanguageOverride(projectRoot: string): string | undefined {
+  try {
+    const configPath = path.join(projectRoot, '.deckent', 'config.json');
+    if (!fs.existsSync(configPath)) return undefined;
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    const lang = config['language_override'] as string | undefined;
+    // Only return if it's a known STACK_COMMANDS key
+    if (lang && typeof lang === 'string' && lang in STACK_COMMANDS) return lang;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── Source file counting for mixed-language projects ──────────────────────
 
 const LANG_EXTENSIONS: Record<string, string[]> = {
@@ -275,7 +291,8 @@ function detectFresh(projectRoot: string): ProjectStack {
   const hasRequirementsTxt = fs.existsSync(path.join(projectRoot, 'requirements.txt'));
   const hasPipfile = fs.existsSync(path.join(projectRoot, 'Pipfile'));
   const hasPython = hasPyprojectToml || hasSetupPy || hasRequirementsTxt || hasPipfile;
-  const hasCsproj = fs.readdirSync(projectRoot).some(f => f.endsWith('.csproj') || f.endsWith('.sln'));
+  let hasCsproj = false;
+  try { hasCsproj = fs.readdirSync(projectRoot).some(f => f.endsWith('.csproj') || f.endsWith('.sln')); } catch { /* skip */ }
   const hasSwiftPackage = fs.existsSync(path.join(projectRoot, 'Package.swift'));
   const hasGemfile = fs.existsSync(path.join(projectRoot, 'Gemfile'));
   const hasComposer = fs.existsSync(path.join(projectRoot, 'composer.json'));
@@ -283,54 +300,59 @@ function detectFresh(projectRoot: string): ProjectStack {
   const kotlinDir = path.join(projectRoot, 'src', 'main', 'kotlin');
   const hasKotlin = hasBuildGradle && fs.existsSync(kotlinDir);
 
-  // ─── File-count weighted language detection for mixed projects ────────
-  // When multiple language markers exist, count source files to determine primary
+  // ─── 4-Layer Language Detection ──────────────────────────────────────
+  //
+  // Layer 1: User override (config.language) — always wins
+  // Layer 2: Exclusive framework config (Cargo.toml, go.mod → single-lang)
+  // Layer 3: File-count weighted (when multiple markers → count .py/.ts/.go)
+  // Layer 4: Fallback (insufficient data → "unknown", skip build checks)
+  //
   const hasTS = fs.existsSync(tsconfigPath) || depNames.includes('typescript');
   const hasJS = fs.existsSync(pkgPath) && depNames.length > 0;
-  const isMultiLang = (hasTS || hasJS) && (hasPython || hasGoMod || hasCargoToml || hasCsproj || hasGemfile || hasComposer || hasPubspec);
+  const configLanguage = readConfigLanguageOverride(projectRoot);
 
-  if (isMultiLang) {
-    // Mixed project: count source files to determine primary language
+  // Layer 1: User explicitly set language in config
+  if (configLanguage) {
+    language = configLanguage;
+  }
+  // Layer 2: Exclusive framework configs (these are unambiguous single-lang signals)
+  else if (hasCargoToml) { language = 'rust'; }
+  else if (hasGoMod) { language = 'go'; }
+  else if (hasCsproj) { language = 'csharp'; }
+  else if (hasSwiftPackage) { language = 'swift'; }
+  else if (hasPubspec) { language = fs.existsSync(path.join(projectRoot, 'lib')) ? 'flutter' : 'dart'; }
+  // Layer 3: Ambiguous — multiple markers exist, use file counting
+  else {
     const counts = countSourceFiles(projectRoot);
+    const totalFiles = Object.values(counts).reduce((a, b) => a + b, 0);
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    if (sorted.length > 0 && (sorted[0]?.[1] ?? 0) > 0) {
-      language = sorted[0]?.[0] ?? 'unknown';
-    } else if (hasTS) {
-      language = 'typescript';
-    } else if (hasJS) {
-      language = 'javascript';
+    const topLang = sorted[0]?.[0];
+    const topCount = sorted[0]?.[1] ?? 0;
+    const secondCount = sorted[1]?.[1] ?? 0;
+
+    if (totalFiles < 3) {
+      // Layer 4: Insufficient data — use config file signals only
+      if (hasPython) { language = 'python'; }
+      else if (hasTS) { language = 'typescript'; }
+      else if (hasPomXml || hasBuildGradle) { language = hasKotlin ? 'kotlin' : 'java'; }
+      else if (hasGemfile) { language = 'ruby'; }
+      else if (hasComposer) { language = 'php'; }
+      else if (hasJS) { language = 'javascript'; }
+      else if (hasCMakeLists || hasMesonBuild) { language = detectCOrCpp(projectRoot); }
+      else if (hasMakefile) { const c = detectCOrCpp(projectRoot); if (c !== 'unknown') language = c; }
+      // else: language stays 'unknown' — build checks will be skipped
+    } else if (topLang && topCount > 0) {
+      // Dominant language: top language has >60% of files OR 2x more than second
+      const dominanceRatio = topCount / totalFiles;
+      if (dominanceRatio >= 0.6 || topCount >= secondCount * 2) {
+        language = topLang;
+      } else {
+        // Mixed project — use strongest config signal as tiebreaker
+        if (hasPython && counts['python']) { language = 'python'; }
+        else if (hasTS && counts['typescript']) { language = 'typescript'; }
+        else if (topLang) { language = topLang; }
+      }
     }
-  } else if (hasTS) {
-    language = 'typescript';
-  } else if (hasJS && !hasPython) {
-    language = 'javascript';
-  } else if (hasPython) {
-    language = 'python';
-  } else if (hasPomXml || hasBuildGradle) {
-    language = hasKotlin ? 'kotlin' : 'java';
-  } else if (hasCargoToml) {
-    language = 'rust';
-  } else if (hasGoMod) {
-    language = 'go';
-  } else if (hasCsproj) {
-    language = 'csharp';
-  } else if (hasSwiftPackage) {
-    language = 'swift';
-  } else if (hasGemfile) {
-    language = 'ruby';
-  } else if (hasComposer) {
-    language = 'php';
-  } else if (hasPubspec) {
-    language = hasPubspec && fs.existsSync(path.join(projectRoot, 'lib')) ? 'flutter' : 'dart';
-  } else if (hasCMakeLists || hasMesonBuild) {
-    language = detectCOrCpp(projectRoot);
-  } else if (hasMakefile) {
-    const cLang = detectCOrCpp(projectRoot);
-    if (cLang !== 'unknown') {
-      language = cLang;
-    }
-  } else if (fs.existsSync(pkgPath)) {
-    language = 'javascript';
   }
 
   // E) Multi-language detection — collect all detected language markers
