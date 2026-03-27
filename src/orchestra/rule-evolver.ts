@@ -63,7 +63,7 @@ export class RuleEvolver {
       reasoning.push(...skillRules.reasoning);
     }
 
-    // Evolve synergy-based rules
+    // Evolve synergy-based rules (creates EvolvedRule objects for skill-skill pairs)
     const synergyRules = this.evolveSynergyRules();
     newRules.push(...synergyRules.rules);
     reasoning.push(...synergyRules.reasoning);
@@ -139,22 +139,83 @@ export class RuleEvolver {
     return { rules, reasoning };
   }
 
+  /**
+   * Evolve synergy-based rules for skill pairs.
+   * Skill+skill synergy → activation rules.
+   * Skill+skill conflict → exclusion rules.
+   * Agent+skill pairs are logged but do not produce new rules (they inform routing weight instead).
+   */
   private evolveSynergyRules(): { rules: EvolvedRule[]; reasoning: string[] } {
     const rules: EvolvedRule[] = [];
     const reasoning: string[] = [];
 
     for (const entry of this.tracker.getSynergyMatrix()) {
       if (entry.tasks < MIN_SAMPLES) continue;
+      const parts = entry.pair.split('+') as [string, string];
+      const [partA, partB] = parts;
 
       if (entry.verdict === 'synergy') {
         reasoning.push(`Synergy detected: ${entry.pair} (${Math.round(entry.successRate * 100)}% over ${entry.tasks} tasks)`);
+
+        // Only create rules for skill-skill synergies (not agent+skill)
+        if (!this.isAgentId(partA) && !this.isAgentId(partB)) {
+          const confidence = Math.min(0.5 + entry.tasks * 0.04, 0.95);
+          const status = confidence >= AUTO_APPLY_CONFIDENCE ? 'auto-applied' :
+                         confidence >= SUGGEST_CONFIDENCE ? 'suggested' : 'pending';
+
+          rules.push({
+            type: 'activation',
+            entityId: partA,
+            entityType: 'skill',
+            rule: {
+              name: `synergy-${partA}-with-${partB}`,
+              when: {},
+              score: Math.round(entry.successRate * 5),
+            } as ActivationRule,
+            evidence: `${entry.tasks} co-uses with '${partB}', ${Math.round(entry.successRate * 100)}% success`,
+            confidence,
+            status,
+            sampleSize: entry.tasks,
+          });
+        }
       }
 
       if (entry.verdict === 'conflict') {
         reasoning.push(`Conflict detected: ${entry.pair} (${Math.round(entry.successRate * 100)}% over ${entry.tasks} tasks)`);
+
+        // Only create exclusion rules for skill-skill conflicts
+        if (!this.isAgentId(partA) && !this.isAgentId(partB)) {
+          const confidence = Math.min(0.5 + entry.tasks * 0.04, 0.95);
+          const status = confidence >= AUTO_APPLY_CONFIDENCE ? 'auto-applied' :
+                         confidence >= SUGGEST_CONFIDENCE ? 'suggested' : 'pending';
+
+          rules.push({
+            type: 'exclusion',
+            entityId: partA,
+            entityType: 'skill',
+            rule: {
+              name: `conflict-${partA}-with-${partB}`,
+              when: {},
+              reason: `Conflict with '${partB}' — low success rate (${Math.round(entry.successRate * 100)}%) when co-used`,
+            } as ExclusionRule,
+            evidence: `${entry.tasks} co-uses with '${partB}', ${Math.round(entry.successRate * 100)}% success`,
+            confidence,
+            status,
+            sampleSize: entry.tasks,
+          });
+        }
       }
     }
 
     return { rules, reasoning };
+  }
+
+  /**
+   * Detect if an entity ID belongs to an agent (vs a skill).
+   * Uses the learnings agent performance keys as the source of truth.
+   */
+  private isAgentId(entityId: string): boolean {
+    const learnings = this.tracker.getLearnings();
+    return entityId in learnings.agentPerformance;
   }
 }

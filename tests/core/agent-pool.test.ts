@@ -239,6 +239,80 @@ describe('AgentPoolManager', () => {
     });
   });
 
+  // ─── saveTempAgentToPool ─────────────────────────────────────────────────────
+
+  describe('saveTempAgentToPool', () => {
+    it('saves agent to .deckent/agents/temp-{id}/ directory', () => {
+      const agent = makeAgent({ id: 'temp-react-ts-specialist', name: 'React TS Specialist' });
+      manager.saveTempAgentToPool(agent);
+      expect(fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('temp-react-ts-specialist'),
+        { recursive: true },
+      );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('agent.json'),
+        expect.any(String),
+        'utf8',
+      );
+    });
+
+    it('adds temp- prefix when agent id does not already have it', () => {
+      const agent = makeAgent({ id: 'react-ts-specialist', name: 'React TS Specialist' });
+      manager.saveTempAgentToPool(agent);
+      expect(fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('temp-react-ts-specialist'),
+        { recursive: true },
+      );
+    });
+
+    it('saves to .deckent/agents/ path (not .tasks/agents/)', () => {
+      const agent = makeAgent({ id: 'temp-go-specialist', name: 'Go Specialist' });
+      manager.saveTempAgentToPool(agent);
+      const mkdirCall = vi.mocked(fs.mkdirSync).mock.calls[0]![0] as string;
+      expect(mkdirCall).toContain('.deckent/agents');
+      expect(mkdirCall).not.toContain('.tasks/agents');
+    });
+  });
+
+  // ─── cleanupPersistentTempAgents ─────────────────────────────────────────────
+
+  describe('cleanupPersistentTempAgents', () => {
+    it('returns 0 when .deckent/agents/ does not exist', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const count = manager.cleanupPersistentTempAgents();
+      expect(count).toBe(0);
+    });
+
+    it('removes all directories starting with temp-', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        mockDirEntry('temp-react-ts-specialist'),
+        mockDirEntry('temp-go-specialist'),
+        mockDirEntry('security-auditor'),
+      ] as any);
+
+      manager.cleanupPersistentTempAgents();
+
+      expect(fs.rmSync).toHaveBeenCalledTimes(2);
+      const calls = vi.mocked(fs.rmSync).mock.calls.map((c) => String(c[0]));
+      expect(calls.some((p) => p.includes('temp-react-ts-specialist'))).toBe(true);
+      expect(calls.some((p) => p.includes('temp-go-specialist'))).toBe(true);
+      expect(calls.every((p) => !p.includes('security-auditor'))).toBe(true);
+    });
+
+    it('returns count of removed agents', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        mockDirEntry('temp-a'),
+        mockDirEntry('temp-b'),
+        mockDirEntry('builtin-c'),
+      ] as any);
+
+      const count = manager.cleanupPersistentTempAgents();
+      expect(count).toBe(2);
+    });
+  });
+
   // ─── cleanupTempAgents ───────────────────────────────────────────────────────
 
   describe('cleanupTempAgents', () => {

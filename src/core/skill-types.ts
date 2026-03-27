@@ -25,6 +25,7 @@ export interface PromptInjectionConfig {
 
 export interface SkillStats {
   totalUses: number;
+  successCount: number;    // explicit count of successful uses
   successRate: number;     // 0.0-1.0
   avgCoverage: number;     // 0-100
   lastUsedInSprint: string;
@@ -82,6 +83,7 @@ export interface SkillSelectionResult {
 export function createDefaultSkillStats(): SkillStats {
   return {
     totalUses: 0,
+    successCount: 0,
     successRate: 0,
     avgCoverage: 0,
     lastUsedInSprint: '',

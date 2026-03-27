@@ -228,7 +228,11 @@ vi.mock('../../src/core/skill-selector.js', () => ({
 
 vi.mock('../../src/core/agent-pool.js', () => ({
   AgentPoolManager: vi.fn().mockImplementation(() => ({
-    loadAgents: vi.fn().mockReturnValue([]),
+    loadAgents: vi.fn().mockReturnValue(new Map()),
+    saveTempAgentToPool: vi.fn(),
+    createTempAgent: vi.fn(),
+    cleanupTempAgents: vi.fn(),
+    cleanupPersistentTempAgents: vi.fn().mockReturnValue(0),
   })),
 }));
 
@@ -2234,5 +2238,129 @@ describe('spawnWorkers — task status update to EXECUTING', () => {
     expect(taskWriteCall).toBeDefined();
     const written = JSON.parse(taskWriteCall![1] as string) as { status: string };
     expect(written.status).toBe(TaskStatus.EXECUTING);
+  });
+});
+
+// ═══ Task 069-005: TempAgent mechanism — Sprint-controller integration ══════
+
+import {
+  generateTempAgents,
+  generateProjectConventionsSkill,
+} from '../../src/orchestra/temp-skill-generator.js';
+
+describe('TempAgent mechanism — Sprint-controller integration', () => {
+  it('generateTempAgents produces agents with temp- prefix for TypeScript+React', () => {
+    const agents = generateTempAgents({
+      language: 'TypeScript',
+      framework: 'React',
+      buildTool: 'vite',
+      testFramework: 'vitest',
+      dependencies: ['react', 'typescript'],
+      detectedAt: new Date().toISOString(),
+    });
+    expect(agents.length).toBeGreaterThan(0);
+    for (const agent of agents) {
+      expect(agent.id).toMatch(/^temp-/);
+    }
+  });
+
+  it('generated temp agents have source=learned and enabled=true', () => {
+    const agents = generateTempAgents({
+      language: 'TypeScript',
+      framework: 'React',
+      buildTool: 'vite',
+      testFramework: 'vitest',
+      dependencies: ['react', 'typescript'],
+      detectedAt: new Date().toISOString(),
+    });
+    expect(agents.length).toBeGreaterThan(0);
+    for (const agent of agents) {
+      expect(agent.source).toBe('learned');
+      expect(agent.enabled).toBe(true);
+      expect(agent.manifestVersion).toBe(2);
+    }
+  });
+
+  it('generated temp agents have v2 activation rules', () => {
+    const agents = generateTempAgents({
+      language: 'TypeScript',
+      framework: 'React',
+      buildTool: 'vite',
+      testFramework: 'vitest',
+      dependencies: ['react', 'typescript'],
+      detectedAt: new Date().toISOString(),
+    });
+    for (const agent of agents) {
+      expect(agent.activation).toBeDefined();
+      expect(agent.activation!.rules.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('temp-agent IDs do not collide with built-in agent IDs', () => {
+    const BUILTIN_IDS = [
+      'security-auditor', 'test-writer', 'doc-writer', 'bug-fixer',
+      'code-reviewer', 'refactorer', 'api-builder', 'performance-analyzer', 'ci-guardian',
+    ];
+    const agents = generateTempAgents({
+      language: 'Python',
+      framework: 'fastapi',
+      buildTool: 'pip',
+      testFramework: 'pytest',
+      dependencies: ['fastapi', 'pydantic'],
+      detectedAt: new Date().toISOString(),
+    });
+    for (const agent of agents) {
+      expect(BUILTIN_IDS).not.toContain(agent.id);
+    }
+  });
+
+  it('generateTempAgents returns empty array for unsupported language stacks', () => {
+    const agents = generateTempAgents({
+      language: 'COBOL',
+      framework: 'none',
+      buildTool: 'unknown',
+      testFramework: 'unknown',
+      dependencies: [],
+      detectedAt: new Date().toISOString(),
+    });
+    expect(agents).toHaveLength(0);
+  });
+
+  it('generateTempAgents produces agents with required fields for AgentPoolManager.saveTempAgentToPool', () => {
+    // Verify the generated agent has all fields required by saveTempAgentToPool + validateAgentDefinition
+    const agents = generateTempAgents({
+      language: 'Go',
+      framework: 'none',
+      buildTool: 'go',
+      testFramework: 'go-test',
+      dependencies: ['gin', 'gorm'],
+      detectedAt: new Date().toISOString(),
+    });
+    expect(agents.length).toBeGreaterThan(0);
+    for (const agent of agents) {
+      // Required by AgentPoolManager.validateAgentDefinition
+      expect(typeof agent.id).toBe('string');
+      expect(agent.id.length).toBeGreaterThan(0);
+      expect(typeof agent.name).toBe('string');
+      expect(agent.name.length).toBeGreaterThan(0);
+      // Required for saveTempAgentToPool to prefix correctly
+      expect(agent.id.startsWith('temp-')).toBe(true);
+    }
+  });
+
+  it('generateProjectConventionsSkill paired with generateTempAgents covers full stack context', () => {
+    const stack = {
+      language: 'TypeScript',
+      framework: 'React',
+      buildTool: 'vite',
+      testFramework: 'vitest',
+      dependencies: ['react', 'typescript', 'vitest'],
+      detectedAt: new Date().toISOString(),
+    };
+    const skill = generateProjectConventionsSkill(stack);
+    const agents = generateTempAgents(stack);
+    // Both should be generated for a TypeScript+React project
+    expect(skill.id).toBe('project-conventions');
+    expect(agents.some((a) => a.id === 'temp-react-ts-specialist')).toBe(true);
   });
 });

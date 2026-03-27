@@ -37,6 +37,13 @@ export interface SynergyEntry {
   verdict: 'synergy' | 'neutral' | 'redundant' | 'conflict';
 }
 
+/** Per-sprint, per-skill outcome summary */
+export interface SkillSprintRecord {
+  successCount: number;
+  failCount: number;
+  avgCoverage: number;
+}
+
 export interface LearningsData {
   version: number;
   updatedAt: string;
@@ -45,6 +52,10 @@ export interface LearningsData {
   skillPerformance: Record<string, EntityPerformance>;
   synergyMatrix: SynergyEntry[];
   evolvedRules?: unknown[];
+  /** Ordered list of sprint IDs seen (most recent last) */
+  recentSprints: string[];
+  /** skill ID → sprint ID → per-sprint record */
+  skillSprintHistory: Record<string, Record<string, SkillSprintRecord>>;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -53,6 +64,9 @@ const ROUTING_DIR = '.deckent/routing';
 const OUTCOMES_DIR = '.deckent/routing/outcomes';
 const LEARNINGS_FILE = '.deckent/routing/learnings.json';
 const MIN_SAMPLES_FOR_BONUS = 3;
+const RECENT_SPRINT_WINDOW = 3;
+const SPRINT_RECENCY_SUCCESS_BONUS = 3;
+const SPRINT_RECENCY_FAILURE_PENALTY = -2;
 
 // ─── OutcomeTracker ─────────────────────────────────────────────────────────
 
@@ -81,7 +95,7 @@ export class OutcomeTracker {
       );
     }
 
-    // Update skill performance
+    // Update skill performance and per-sprint history
     for (const skillId of outcome.skillIds) {
       this.updateEntityPerformance(
         this.learnings.skillPerformance,
@@ -89,6 +103,12 @@ export class OutcomeTracker {
         outcome.taskDNA.intent.primary,
         isSuccess,
       );
+      this.updateSkillSprintHistory(skillId, outcome.sprintId, isSuccess, outcome.coverage);
+    }
+
+    // Track sprint order (unique, ordered)
+    if (!this.learnings.recentSprints.includes(outcome.sprintId)) {
+      this.learnings.recentSprints.push(outcome.sprintId);
     }
 
     // Update synergy matrix (agent+skill pairs)
@@ -117,29 +137,85 @@ export class OutcomeTracker {
 
   /**
    * Calculate learning bonuses for routing decisions.
-   * Returns bonuses for agents and skills based on historical performance.
+   * Returns bonuses for agents and skills based on historical performance
+   * and sprint recency (last 3 sprints: success → +3, failure → -2).
    */
   calculateBonuses(taskDNA: TaskDNA): LearningBonus[] {
-    const bonuses: LearningBonus[] = [];
     const intent = taskDNA.intent.primary;
+    const bonusMap = new Map<string, number>();
 
-    // Agent bonuses
+    // Agent bonuses (overall performance)
     for (const [agentId, perf] of Object.entries(this.learnings.agentPerformance)) {
       const bonus = this.computeBonus(perf, intent);
-      if (bonus !== 0) {
-        bonuses.push({ entityId: agentId, bonus, source: 'learnings' });
-      }
+      if (bonus !== 0) bonusMap.set(agentId, (bonusMap.get(agentId) ?? 0) + bonus);
     }
 
-    // Skill bonuses
+    // Skill bonuses (overall performance)
     for (const [skillId, perf] of Object.entries(this.learnings.skillPerformance)) {
       const bonus = this.computeBonus(perf, intent);
-      if (bonus !== 0) {
-        bonuses.push({ entityId: skillId, bonus, source: 'learnings' });
-      }
+      if (bonus !== 0) bonusMap.set(skillId, (bonusMap.get(skillId) ?? 0) + bonus);
+    }
+
+    // Skill sprint recency bonuses (more aggressive: +3/-2 based on last 3 sprints)
+    const recencyBonuses = this.calculateSprintRecencyBonuses();
+    for (const [skillId, recencyBonus] of recencyBonuses) {
+      const combined = (bonusMap.get(skillId) ?? 0) + recencyBonus;
+      bonusMap.set(skillId, Math.max(-LEARNING_BONUS_CAP, Math.min(LEARNING_BONUS_CAP, combined)));
+    }
+
+    // Emit final bonus list
+    const bonuses: LearningBonus[] = [];
+    for (const [entityId, bonus] of bonusMap) {
+      if (bonus !== 0) bonuses.push({ entityId, bonus, source: 'learnings' });
     }
 
     return bonuses;
+  }
+
+  /**
+   * Calculate sprint recency bonuses for skills.
+   * Looks at the last RECENT_SPRINT_WINDOW sprints and applies:
+   * - All successful → +SPRINT_RECENCY_SUCCESS_BONUS (+3)
+   * - All failed     → SPRINT_RECENCY_FAILURE_PENALTY (-2)
+   * - Mostly success (≥75%) → +1
+   * - Mostly failed (<35%)  → -1
+   * - Mixed (35-75%)        → 0 (neutral)
+   */
+  calculateSprintRecencyBonuses(): Map<string, number> {
+    const result = new Map<string, number>();
+    const lastSprints = this.learnings.recentSprints.slice(-RECENT_SPRINT_WINDOW);
+    // Need at least 2 sprints and 3+ total outcomes to compute meaningful recency
+    if (lastSprints.length < 2) return result;
+
+    for (const [skillId, sprintHistory] of Object.entries(this.learnings.skillSprintHistory)) {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const sprintId of lastSprints) {
+        const record = sprintHistory[sprintId];
+        if (!record) continue;
+        successCount += record.successCount;
+        failCount += record.failCount;
+      }
+
+      const total = successCount + failCount;
+      if (total < MIN_SAMPLES_FOR_BONUS) continue;
+
+      const recentSuccessRate = successCount / total;
+
+      if (recentSuccessRate === 1) {
+        result.set(skillId, SPRINT_RECENCY_SUCCESS_BONUS);
+      } else if (recentSuccessRate === 0) {
+        result.set(skillId, SPRINT_RECENCY_FAILURE_PENALTY);
+      } else if (recentSuccessRate >= 0.75) {
+        result.set(skillId, 1);
+      } else if (recentSuccessRate < 0.35) {
+        result.set(skillId, -1);
+      }
+      // Mixed (0.35–0.75) → no bonus
+    }
+
+    return result;
   }
 
   /**
@@ -219,6 +295,28 @@ export class OutcomeTracker {
     intentPerf.successRate = intentSuccesses / intentPerf.tasks;
   }
 
+  private updateSkillSprintHistory(
+    skillId: string,
+    sprintId: string,
+    isSuccess: boolean,
+    coverage: number,
+  ): void {
+    if (!this.learnings.skillSprintHistory[skillId]) {
+      this.learnings.skillSprintHistory[skillId] = {};
+    }
+    const history = this.learnings.skillSprintHistory[skillId]!;
+    if (!history[sprintId]) {
+      history[sprintId] = { successCount: 0, failCount: 0, avgCoverage: 0 };
+    }
+    const record = history[sprintId]!;
+    const prevTotal = record.successCount + record.failCount;
+    if (isSuccess) record.successCount++;
+    else record.failCount++;
+    // Incremental average coverage
+    const newTotal = record.successCount + record.failCount;
+    record.avgCoverage = (record.avgCoverage * prevTotal + coverage) / newTotal;
+  }
+
   private updateSynergy(pair: string, isSuccess: boolean): void {
     let entry = this.learnings.synergyMatrix.find(e => e.pair === pair);
     if (!entry) {
@@ -243,7 +341,16 @@ export class OutcomeTracker {
     try {
       if (existsSync(filePath)) {
         const raw = readFileSync(filePath, 'utf-8');
-        return JSON.parse(raw) as LearningsData;
+        const parsed = JSON.parse(raw) as Partial<LearningsData>;
+        // Backfill fields added in later versions (backward compatibility)
+        return {
+          recentSprints: [],
+          skillSprintHistory: {},
+          ...parsed,
+          agentPerformance: parsed.agentPerformance ?? {},
+          skillPerformance: parsed.skillPerformance ?? {},
+          synergyMatrix: parsed.synergyMatrix ?? [],
+        } as LearningsData;
       }
     } catch (err) {
       debugLog('outcome-tracker:load', err);
@@ -256,6 +363,8 @@ export class OutcomeTracker {
       agentPerformance: {},
       skillPerformance: {},
       synergyMatrix: [],
+      recentSprints: [],
+      skillSprintHistory: {},
     };
   }
 

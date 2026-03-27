@@ -3,6 +3,7 @@ import {
   generateProjectConventionsSkill,
   generateDataDrivenSkills,
   getGeneratedContent,
+  generateTempAgents,
 } from '../../src/orchestra/temp-skill-generator.js';
 
 describe('temp-skill-generator', () => {
@@ -147,6 +148,96 @@ describe('temp-skill-generator', () => {
       expect(content).toContain('sprint-controller.ts');
       expect(content).toContain('commander');
       expect(content).toContain('87%');
+    });
+  });
+
+  // ─── generateTempAgents ──────────────────────────────────────────────────────
+
+  describe('generateTempAgents', () => {
+    const baseStack = {
+      language: 'TypeScript',
+      framework: 'React',
+      buildTool: 'vite',
+      testFramework: 'vitest',
+      dependencies: ['react', 'typescript', '@vitejs/plugin-react'],
+      detectedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    it('generates react-ts-specialist for TypeScript+React stack', () => {
+      const agents = generateTempAgents(baseStack);
+      const ids = agents.map((a) => a.id);
+      expect(ids).toContain('temp-react-ts-specialist');
+    });
+
+    it('generated agent has source=learned and enabled=true', () => {
+      const agents = generateTempAgents(baseStack);
+      const agent = agents.find((a) => a.id === 'temp-react-ts-specialist');
+      expect(agent).toBeDefined();
+      expect(agent!.source).toBe('learned');
+      expect(agent!.enabled).toBe(true);
+    });
+
+    it('generated agent has v2 activation rules', () => {
+      const agents = generateTempAgents(baseStack);
+      const agent = agents.find((a) => a.id === 'temp-react-ts-specialist');
+      expect(agent!.manifestVersion).toBe(2);
+      expect(agent!.activation).toBeDefined();
+      expect(agent!.activation!.rules.length).toBeGreaterThan(0);
+    });
+
+    it('does not generate react-ts-specialist for Python stack', () => {
+      const pythonStack = {
+        ...baseStack,
+        language: 'Python',
+        framework: 'fastapi',
+        dependencies: ['fastapi', 'pydantic'],
+      };
+      const agents = generateTempAgents(pythonStack);
+      const ids = agents.map((a) => a.id);
+      expect(ids).not.toContain('temp-react-ts-specialist');
+    });
+
+    it('generates python-api-specialist for Python+FastAPI stack', () => {
+      const pythonApiStack = {
+        ...baseStack,
+        language: 'Python',
+        framework: 'fastapi',
+        dependencies: ['fastapi', 'pydantic', 'uvicorn'],
+      };
+      const agents = generateTempAgents(pythonApiStack);
+      const ids = agents.map((a) => a.id);
+      expect(ids).toContain('temp-python-api-specialist');
+    });
+
+    it('generates go-specialist for Go stack', () => {
+      const goStack = {
+        ...baseStack,
+        language: 'Go',
+        framework: 'none',
+        dependencies: ['gin', 'gorm'],
+      };
+      const agents = generateTempAgents(goStack);
+      const ids = agents.map((a) => a.id);
+      expect(ids).toContain('temp-go-specialist');
+    });
+
+    it('returns empty array for unknown/unsupported stack', () => {
+      const unknownStack = {
+        ...baseStack,
+        language: 'COBOL',
+        framework: 'none',
+        dependencies: [],
+      };
+      const agents = generateTempAgents(unknownStack);
+      expect(agents).toHaveLength(0);
+    });
+
+    it('all generated agent IDs start with temp-', () => {
+      const agents = generateTempAgents(baseStack);
+      expect(agents.length).toBeGreaterThan(0);
+      for (const agent of agents) {
+        expect(agent.id).toMatch(/^temp-/);
+      }
     });
   });
 });

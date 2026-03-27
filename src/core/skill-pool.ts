@@ -162,8 +162,10 @@ export class SkillPoolManager {
 
     // Recalculate success rate (DONE and GO_WITH_TECH_DEBT count as success)
     const wasSuccess = evaluation === 'DONE' || evaluation === 'GO_WITH_TECH_DEBT';
-    const prevSuccessCount = Math.round(stats.successRate * prevTotal);
+    // Use explicit successCount if available, else derive from legacy successRate
+    const prevSuccessCount = stats.successCount ?? Math.round(stats.successRate * prevTotal);
     const newSuccessCount = prevSuccessCount + (wasSuccess ? 1 : 0);
+    stats.successCount = newSuccessCount;
     stats.successRate = stats.totalUses > 0 ? newSuccessCount / stats.totalUses : 0;
 
     // Recalculate average coverage

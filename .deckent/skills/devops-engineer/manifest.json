@@ -1,21 +1,59 @@
 {
   "id": "devops-engineer",
   "name": "DevOps Engineer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Docker, CI/CD, GitHub Actions, infrastructure, deployment, monitoring",
   "manifestVersion": 2,
   "activation": {
-    "rules": [{ "when": { "intent.primary": "devops" }, "score": 10 }],
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "devops"
+        },
+        "score": 10
+      }
+    ],
     "exclude": [],
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
   "category": "tool",
-  "triggers": ["docker", "ci", "deploy", "pipeline", "infrastructure", "kubernetes", "terraform", "nginx"],
-  "stackDetection": { "files": ["Dockerfile", "docker-compose.yml", ".github/workflows/"], "dependencies": [], "commands": [] },
-  "composableWith": ["typescript-expert", "python-expert", "security-specialist", "performance-optimizer"],
+  "triggers": [
+    "docker",
+    "ci",
+    "deploy",
+    "pipeline",
+    "infrastructure",
+    "kubernetes",
+    "terraform",
+    "nginx"
+  ],
+  "stackDetection": {
+    "files": [
+      "Dockerfile",
+      "docker-compose.yml",
+      ".github/workflows/"
+    ],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "python-expert",
+    "security-specialist",
+    "performance-optimizer"
+  ],
   "priority": 10,
-  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
   "enabled": true,
-  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
 }

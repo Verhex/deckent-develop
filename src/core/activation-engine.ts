@@ -37,6 +37,14 @@ export function evaluateActivation(
     if (result.matched) {
       totalScore += result.score;
       matchedRules.push(rule.name ?? `rule(score=${rule.score})`);
+    } else {
+      // Secondary intent matching — rules that check intent.primary also check secondary intents
+      // but at 50% score to reflect lower confidence of secondary classification
+      const secondaryScore = evaluateRuleViaSecondary(taskDNA, rule);
+      if (secondaryScore > 0) {
+        totalScore += secondaryScore;
+        matchedRules.push(`${rule.name ?? `rule`}(via-secondary)`);
+      }
     }
   }
 
@@ -48,6 +56,20 @@ export function evaluateActivation(
 }
 
 // ─── Rule Evaluation ────────────────────────────────────────────────────────
+
+/**
+ * Check if an activation rule matches via secondary intents at 50% score.
+ * Only applies when the rule checks `intent.primary` for an exact string value
+ * and that value appears in the task's secondary intents (not as primary).
+ * Returns half the rule score if matched, 0 otherwise.
+ */
+export function evaluateRuleViaSecondary(taskDNA: TaskDNA, rule: ActivationRule): number {
+  const primaryCond = rule.when['intent.primary'];
+  if (typeof primaryCond === 'string' && (taskDNA.intent.secondary as string[]).includes(primaryCond)) {
+    return Math.floor(rule.score * 0.5);
+  }
+  return 0;
+}
 
 /**
  * Evaluate a single activation rule against TaskDNA.

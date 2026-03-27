@@ -19,9 +19,16 @@ describe('createDefaultSkillStats', () => {
   it('returns a SkillStats with all fields zeroed', () => {
     const stats = createDefaultSkillStats();
     expect(stats.totalUses).toBe(0);
+    expect(stats.successCount).toBe(0);
     expect(stats.successRate).toBe(0);
     expect(stats.avgCoverage).toBe(0);
     expect(stats.lastUsedInSprint).toBe('');
+  });
+
+  it('includes successCount field', () => {
+    const stats = createDefaultSkillStats();
+    expect(Object.prototype.hasOwnProperty.call(stats, 'successCount')).toBe(true);
+    expect(stats.successCount).toBe(0);
   });
 
   it('returns a new object on every call (no shared reference)', () => {
@@ -144,6 +151,7 @@ describe('createSkillDefinition', () => {
   it('allows overriding stats', () => {
     const customStats: SkillStats = {
       totalUses: 20,
+      successCount: 18,
       successRate: 0.95,
       avgCoverage: 88,
       lastUsedInSprint: 'sprint-005',

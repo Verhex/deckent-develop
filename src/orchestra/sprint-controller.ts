@@ -727,6 +727,19 @@ export async function planSprint(
         }
       } catch { /* non-fatal */ }
 
+      // Generate and persist project-specific temp agents (V2 only)
+      try {
+        const { generateTempAgents } = await import('./temp-skill-generator.js');
+        if (projectStackV2) {
+          const tempAgents = generateTempAgents(projectStackV2);
+          for (const tempAgent of tempAgents) {
+            agentPool.saveTempAgentToPool(tempAgent);
+            pool.set(tempAgent.id.startsWith('temp-') ? tempAgent.id : `temp-${tempAgent.id}`, tempAgent);
+            debugLog('planSprint:temp-agent', `Generated temp agent: ${tempAgent.id} for ${projectStackV2.language}/${projectStackV2.framework}`);
+          }
+        }
+      } catch { /* non-fatal */ }
+
       for (const task of tasks) {
         try {
           const overrides: UserOverride[] = [];

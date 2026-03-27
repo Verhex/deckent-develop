@@ -297,7 +297,7 @@ describe('intent-classifier', () => {
   });
 
   describe('detectSecondaryIntents', () => {
-    it('detects testing as secondary when primary is implementation', () => {
+    it('detects testing as secondary when primary is implementation and test scope exists', () => {
       const secondary = detectSecondaryIntents(
         'implement feature with tests',
         { directories: ['src/', 'tests/'], filesRead: [], filesWrite: [] },
@@ -322,6 +322,53 @@ describe('intent-classifier', () => {
         'implementation',
       );
       expect(secondary).toContain('security');
+    });
+
+    it('does NOT add testing as secondary from keyword alone — no scope signal (B fix)', () => {
+      // DIRECTIVES description like "Test: 10+ tests" should not trigger secondary testing
+      // when there are no test files/dirs in scope
+      const secondary = detectSecondaryIntents(
+        'implement new feature. test: 10+ tests required',
+        { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts'] },
+        'implementation',
+      );
+      expect(secondary).not.toContain('testing');
+    });
+
+    it('adds testing as secondary when filesWrite contains test files (B fix)', () => {
+      const secondary = detectSecondaryIntents(
+        'implement new feature',
+        { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts', 'tests/core/config.test.ts'] },
+        'implementation',
+      );
+      expect(secondary).toContain('testing');
+    });
+
+    it('adds testing as secondary based on significant testWriteRatio (B fix)', () => {
+      // Passed scopeAnalysis with testWriteRatio >= 0.2
+      const scopeAnalysis = {
+        writeRatio: { 'src/': 0.5, 'tests/': 0.5 },
+        primaryWriteTarget: 'src/',
+        testWriteRatio: 0.5,
+      };
+      const secondary = detectSecondaryIntents(
+        'implement feature',
+        { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/a.ts', 'tests/core/a.test.ts'] },
+        'implementation',
+        scopeAnalysis,
+      );
+      expect(secondary).toContain('testing');
+    });
+
+    it('does NOT add testing as secondary from keyword + no test scope for pure src tasks', () => {
+      // Sprint-068 bug: DIRECTIVES description mentions "test" → test-writer assigned
+      // This verifies the fix: tasks with ALL writes in src/ should not get testing secondary
+      const secondary = detectSecondaryIntents(
+        'implement sprint controller. add tests',  // "test" keyword present
+        { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/sprint-controller.ts'] },
+        'implementation',
+      );
+      expect(secondary).not.toContain('testing');
     });
   });
 });

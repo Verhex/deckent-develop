@@ -91,9 +91,41 @@ export class PromotionPipeline {
 
   /**
    * Execute a promotion — move from temp to permanent location.
+   *
+   * For agents this searches in two locations (in priority order):
+   *  1. `.tasks/agents/` — sprint-scoped temp agents
+   *  2. `.deckent/agents/temp-{id}/` — persistent temp agents from pool
+   *
+   * On promotion the directory is renamed (persistent) or copied (sprint-scoped)
+   * to `.deckent/agents/{id}/` and the `source` field is updated to 'user'.
    */
   promote(entityId: string, entityType: 'agent' | 'skill'): boolean {
     try {
+      // For agents, also check persistent temp pool (.deckent/agents/temp-{id}/)
+      if (entityType === 'agent') {
+        const persistentTempDir = join(this.projectRoot, '.deckent', 'agents', `temp-${entityId}`);
+        const permDir = join(this.projectRoot, '.deckent', 'agents', entityId);
+
+        if (existsSync(persistentTempDir)) {
+          // Read, update source, write to new location
+          const manifestFile = join(persistentTempDir, 'agent.json');
+          if (existsSync(manifestFile)) {
+            mkdirSync(permDir, { recursive: true });
+            cpSync(persistentTempDir, permDir, { recursive: true });
+            // Update source field in the promoted copy
+            try {
+              const raw = JSON.parse(readFileSync(join(permDir, 'agent.json'), 'utf-8'));
+              raw.source = 'user';
+              raw.id = entityId;
+              raw._promotedAt = new Date().toISOString();
+              writeFileSync(join(permDir, 'agent.json'), JSON.stringify(raw, null, 2), 'utf-8');
+            } catch { /* non-fatal — manifest update failed */ }
+            debugLog('promotion-pipeline:promote', `agent '${entityId}' promoted from persistent temp pool`);
+            return true;
+          }
+        }
+      }
+
       const tempDir = entityType === 'agent'
         ? join(this.projectRoot, '.tasks', 'agents')
         : join(this.projectRoot, '.tasks', 'skills');

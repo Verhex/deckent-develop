@@ -321,6 +321,60 @@ describe('SkillPoolManager', () => {
       expect(written.stats.lastUsedInSprint).toBe('sprint-010');
     });
 
+    it('sets successCount to 1 on first DONE evaluation', () => {
+      const skill = makeSkill({ id: 'sc-test', name: 'SC Test' });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('sc-test')] as any);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(skill));
+
+      manager.updateSkillStats('sc-test', 'DONE', 90, 'sprint-020');
+
+      const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string);
+      expect(written.stats.successCount).toBe(1);
+    });
+
+    it('does not increment successCount on NO_GO evaluation', () => {
+      const skill = makeSkill({ id: 'sc-nogo', name: 'SC NoGo' });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('sc-nogo')] as any);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(skill));
+
+      manager.updateSkillStats('sc-nogo', 'NO_GO', 10, 'sprint-021');
+
+      const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string);
+      expect(written.stats.successCount).toBe(0);
+    });
+
+    it('increments successCount for GO_WITH_TECH_DEBT', () => {
+      const skill = makeSkill({ id: 'sc-debt', name: 'SC Debt' });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('sc-debt')] as any);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(skill));
+
+      manager.updateSkillStats('sc-debt', 'GO_WITH_TECH_DEBT', 75, 'sprint-022');
+
+      const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string);
+      expect(written.stats.successCount).toBe(1);
+    });
+
+    it('accumulates successCount across multiple uses', () => {
+      // Skill already has 2 uses, 1 success
+      const skill = makeSkill({
+        id: 'sc-accum', name: 'SC Accum',
+        stats: { totalUses: 2, successCount: 1, successRate: 0.5, avgCoverage: 70, lastUsedInSprint: 'sprint-019' },
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('sc-accum')] as any);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(skill));
+
+      manager.updateSkillStats('sc-accum', 'DONE', 90, 'sprint-023');
+
+      const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string);
+      expect(written.stats.totalUses).toBe(3);
+      expect(written.stats.successCount).toBe(2);
+      expect(written.stats.successRate).toBeCloseTo(2 / 3);
+    });
+
     it('counts GO_WITH_TECH_DEBT as success', () => {
       const skill = makeSkill({ id: 'debt-test', name: 'Debt Test' });
       vi.mocked(fs.existsSync).mockReturnValue(true);

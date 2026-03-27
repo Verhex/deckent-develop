@@ -171,6 +171,30 @@ describe('extractScopeFromDirective', () => {
     const scope = extractScopeFromDirective('src/core/utils.ts');
     expect(scope.filesRead).toEqual([]);
   });
+
+  it('adds root-level DECKENT.md to filesWrite without adding docs/ directory', () => {
+    const scope = extractScopeFromDirective('Files: DECKENT.md, src/core/config.ts');
+    expect(scope.filesWrite).toContain('DECKENT.md');
+    expect(scope.directories).not.toContain('docs/');
+  });
+
+  it('adds .gitignore to filesWrite', () => {
+    const scope = extractScopeFromDirective('Files: DECKENT.md, .gitignore');
+    expect(scope.filesWrite).toContain('.gitignore');
+    expect(scope.filesWrite).toContain('DECKENT.md');
+  });
+
+  it('adds CONTRIBUTING.md to filesWrite without docs/ directory', () => {
+    const scope = extractScopeFromDirective('Files: CONTRIBUTING.md, README.md');
+    expect(scope.filesWrite).toContain('CONTRIBUTING.md');
+    expect(scope.directories).not.toContain('docs/');
+  });
+
+  it('still adds docs/ directory for files inside docs/', () => {
+    const scope = extractScopeFromDirective('Files: docs/guide.md, docs/api.md');
+    expect(scope.filesWrite).toContain('docs/guide.md');
+    expect(scope.directories).toContain('docs/');
+  });
 });
 
 // ─── parseStructuredDirectives ─────────────────────────────────────────────
@@ -1316,10 +1340,11 @@ describe('extractScopeFromDirective — docs/ support', () => {
     expect(scope.directories).toContain('docs/analysis/');
   });
 
-  it('should add docs/ to directories for standalone doc files like CHANGELOG.md', () => {
+  it('should add standalone doc files like CHANGELOG.md to filesWrite', () => {
     const scope = extractScopeFromDirective('Update CHANGELOG.md with sprint entries');
     expect(scope.filesWrite).toContain('CHANGELOG.md');
-    expect(scope.directories).toContain('docs/');
+    // Standalone root-level .md files do NOT force docs/ into directories
+    expect(scope.directories).not.toContain('docs/');
   });
 
   it('should not duplicate docs/ directory', () => {
@@ -1329,6 +1354,45 @@ describe('extractScopeFromDirective — docs/ support', () => {
     // but should not have duplicate entries
     const allDocs = scope.directories.filter(d => d.startsWith('docs/'));
     expect(allDocs.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ─── Sprint 069-006: Standalone root file support ──────────────────────────
+
+describe('extractScopeFromDirective — standalone root files', () => {
+  it('adds DECKENT.md to filesWrite', () => {
+    const scope = extractScopeFromDirective('Files: DECKENT.md, .gitignore');
+    expect(scope.filesWrite).toContain('DECKENT.md');
+  });
+
+  it('adds .gitignore to filesWrite', () => {
+    const scope = extractScopeFromDirective('Files: DECKENT.md, .gitignore');
+    expect(scope.filesWrite).toContain('.gitignore');
+  });
+
+  it('adds docker-compose.yml to filesWrite', () => {
+    const scope = extractScopeFromDirective('Files: docker-compose.yml, .env');
+    expect(scope.filesWrite).toContain('docker-compose.yml');
+  });
+
+  it('adds .github/workflows yaml files via directory path', () => {
+    const scope = extractScopeFromDirective('Files: config.yaml, setup.yml');
+    expect(scope.filesWrite).toContain('config.yaml');
+    expect(scope.filesWrite).toContain('setup.yml');
+  });
+
+  it('does not add src/core/config.ts as standalone "config.ts" when path-prefixed version already present', () => {
+    const scope = extractScopeFromDirective('Files: src/core/config.ts');
+    // Should contain the full path, NOT a duplicate standalone entry
+    expect(scope.filesWrite).toContain('src/core/config.ts');
+    const standaloneCount = scope.filesWrite.filter(f => f === 'config.ts').length;
+    expect(standaloneCount).toBe(0);
+  });
+
+  it('does not duplicate DECKENT.md when both blocks match', () => {
+    const scope = extractScopeFromDirective('Files: DECKENT.md');
+    const count = scope.filesWrite.filter(f => f === 'DECKENT.md').length;
+    expect(count).toBe(1);
   });
 });
 
@@ -1547,5 +1611,73 @@ describe('plannerTaskToParams — override fields pass-through', () => {
     const params = plannerTaskToParams(pt, 'sprint-066', 'sonnet');
     expect(params.scope.filesWrite).toEqual(['src/orchestra/brain.ts']);
     expect(params.scope.directories).toEqual(['src/orchestra/']);
+  });
+});
+
+// ─── buildWorkerPrompt — effort-based skill token budget ─────────────────────
+
+describe('buildWorkerPrompt — effort maxTokens budget', () => {
+  it('high effort task allows longer skill prompts (2500 token budget)', () => {
+    const task = makeTask({
+      effort: 'high',
+      forceEffort: 'high',
+      assignedSkills: ['typescript-expert'],
+    });
+    const longSkillContent = 'A'.repeat(2500);
+    const prompt = buildWorkerPrompt(task, undefined, [
+      { name: 'typescript-expert', content: longSkillContent },
+    ]);
+    // High effort should allow up to 2500 chars per skill (not truncated to 2000)
+    expect(prompt).toContain('typescript-expert');
+    const skillSectionMatch = prompt.match(/=== Skills ===([\s\S]*?)(?=You are a Deckent)/);
+    expect(skillSectionMatch).not.toBeNull();
+    // Should contain more content than low-effort would allow
+    const skillSection = skillSectionMatch![1] ?? '';
+    expect(skillSection.length).toBeGreaterThan(1000);
+  });
+
+  it('low effort task uses smaller skill token budget (1000 per skill)', () => {
+    const task = makeTask({
+      effort: 'low',
+      forceEffort: 'low',
+      assignedSkills: ['typescript-expert'],
+    });
+    const longSkillContent = 'A'.repeat(2000);
+    const prompt = buildWorkerPrompt(task, undefined, [
+      { name: 'typescript-expert', content: longSkillContent },
+    ]);
+    // Low effort truncates at ~1000 chars per skill
+    expect(prompt).toContain('typescript-expert');
+    const skillSectionMatch = prompt.match(/--- typescript-expert ---\n([\s\S]*?)(?=\n\nYou are|$)/);
+    if (skillSectionMatch) {
+      const skillContent = skillSectionMatch[1] ?? '';
+      // Should be truncated to ~1000 chars, not the full 2000
+      expect(skillContent.length).toBeLessThanOrEqual(1100);
+    }
+  });
+
+  it('normal effort uses 1500 token budget (unchanged from default)', () => {
+    const task = makeTask({
+      effort: 'normal',
+      assignedSkills: ['testing-expert'],
+    });
+    const content1500 = 'B'.repeat(1500);
+    const prompt = buildWorkerPrompt(task, undefined, [
+      { name: 'testing-expert', content: content1500 },
+    ]);
+    expect(prompt).toContain('testing-expert');
+  });
+
+  it('high effort includes more skill context than low effort for same content', () => {
+    const sharedContent = 'X'.repeat(2000);
+
+    const highTask = makeTask({ effort: 'high', forceEffort: 'high', assignedSkills: ['ts-skill'] });
+    const lowTask = makeTask({ effort: 'low', forceEffort: 'low', assignedSkills: ['ts-skill'] });
+
+    const highPrompt = buildWorkerPrompt(highTask, undefined, [{ name: 'ts-skill', content: sharedContent }]);
+    const lowPrompt = buildWorkerPrompt(lowTask, undefined, [{ name: 'ts-skill', content: sharedContent }]);
+
+    // High effort prompt should contain more skill content
+    expect(highPrompt.length).toBeGreaterThan(lowPrompt.length);
   });
 });

@@ -1,31 +1,35 @@
-# Sprint sprint-068 Retrospective
+# Sprint sprint-069 Retrospective
 
 ## Summary
-Completed 6/6 tasks in 17 minutes 14s.
+Completed 4/6 tasks in 40 minutes 13s.
 
 ## Highlights
-- 6 tasks completed on first try
+- 4 tasks completed on first try
 - No boundary violations detected
-- NO_GO rate improved from 17% to 0%
+
+## Issues
+- Task 069-005 (TempAgent Mekanizmasi — Proje-Bazli Dinamik Agent) failed
+- Task 069-006 (Scope Parser Root Dosya Fix + forceSkills V2 Entegrasyonu) failed
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 6/6 |
-| New test files | 6 |
-| Code changes | +1339 / -54 |
-| Sprint time | 17 minutes 14s |
-| NO_GO rate | 0% (0/6) |
+| Tasks completed | 4/6 |
+| New test files | 10 |
+| Code changes | +575 / -75 |
+| Sprint time | 40 minutes 13s |
+| NO_GO rate | 33% (2/6) |
+| Coverage | 48.0% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| test-writer | 4 | 2 | 2 | 0 | 96% |
-| ci-guardian | 1 | 1 | 0 | 0 | 0% |
-| generic | 1 | 0 | 1 | 0 | 0% |
+| test-writer | 6 | 2 | 2 | 2 | 96% |
 
 ## Learnings
-- MCP Server Instructions — AI System Prompt Injection: completed with tech debt — Added DECKENT_MCP_INSTRUCTIONS constant exported from server.ts and passed it as options.instructions to McpServer constructor (second parameter, per 
-- Tool Descriptions + Annotations Zenginlestirme: completed with tech debt — All 16 MCP tools enriched with: (1) detailed descriptions (80+ chars, explains what/when/prerequisite), (2) annotations { readOnlyHint, destructiveHin
-- deckent_help Tool — Runtime Capabilities + State: completed with tech debt — Implemented deckent_help MCP tool. Detects project state (initialized, hasDirectives, sprintActive, lastSprint, routingEngine, agentCount, skillCount)
+- Agent Secim Hassasiyeti — test-writer Exclude + Intent Weights: completed with tech debt — A) test-writer agent.json: Added exclude for intent.primary=implementation (with name+reason), renamed doc exclude to include name+reason, added test-
+- Skill Secim Butcesi — Dinamik maxTokens + Priority: completed with tech debt — A) SkillBudget interface genişletildi: maxTokensPerSkill + totalSkillTokenBudget eklendi (routing-types.ts). SKILL_TOKEN_BUDGET_BY_EFFORT sabiti eklen
+- TempAgent Mekanizmasi — Proje-Bazli Dinamik Agent: failed — investigate root cause
+- Scope Parser Root Dosya Fix + forceSkills V2 Entegrasyonu: failed — investigate root cause
+- Recurring pattern (33x): stale_heartbeat

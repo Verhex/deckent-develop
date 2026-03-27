@@ -241,7 +241,9 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const docFileMatches = line.match(/\b(docs\/[\w/.-]+\.(?:md|ts|js)|(?:[\w-]+)\.md)\b/g);
   if (docFileMatches) {
     for (const f of docFileMatches) {
-      if (!f.startsWith('docs/') && !directories.some(d => d.startsWith('docs/'))) {
+      // Only add docs/ directory when the file is actually inside docs/
+      // Standalone .md files (DECKENT.md, CONTRIBUTING.md) should NOT trigger docs/ directory
+      if (f.startsWith('docs/') && !directories.some(d => d.startsWith('docs/'))) {
         directories.push('docs/');
       }
       if (!filesWrite.includes(f)) filesWrite.push(f);
@@ -256,10 +258,19 @@ export function extractScopeFromDirective(line: string): TaskScope {
     }
   }
 
-  // Match root-level config files: .gitignore, .npmignore, tsconfig.json, package.json, etc.
-  const rootConfigMatches = line.match(/\b(\.gitignore|\.npmignore|tsconfig\.json|package\.json|vitest\.config\.ts)\b/g);
+  // Match root-level config files: tsconfig.json, package.json, vitest.config.ts, etc.
+  const rootConfigMatches = line.match(/\b(tsconfig\.json|package\.json|vitest\.config\.ts)\b/g);
   if (rootConfigMatches) {
     for (const f of rootConfigMatches) {
+      if (!filesWrite.includes(f)) filesWrite.push(f);
+    }
+  }
+
+  // Match standalone dotfiles at root: .gitignore, .npmignore, .env, .npmrc, etc.
+  // \b cannot precede a leading dot, so use negative lookbehind instead.
+  const rootDotfileMatches = line.match(/(?<![/\w])(\.[\w-]+)(?!\w)/g);
+  if (rootDotfileMatches) {
+    for (const f of rootDotfileMatches) {
       if (!filesWrite.includes(f)) filesWrite.push(f);
     }
   }
@@ -269,6 +280,17 @@ export function extractScopeFromDirective(line: string): TaskScope {
   if (fileMatches) {
     for (const f of fileMatches) {
       if (!filesWrite.includes(f)) filesWrite.push(f);
+    }
+  }
+
+  // Match standalone root-level files (no directory prefix): DECKENT.md, docker-compose.yml, tsconfig.yaml, etc.
+  // Covers yaml/yml and other file types not matched by the blocks above.
+  const standaloneMatches = line.match(/\b([\w.-]+\.(?:md|json|ts|js|yaml|yml))\b/g);
+  if (standaloneMatches) {
+    for (const f of standaloneMatches) {
+      // Skip if already present or if a directory-prefixed version exists in filesWrite
+      const alreadyCovered = filesWrite.some(existing => existing === f || existing.endsWith('/' + f));
+      if (!alreadyCovered) filesWrite.push(f);
     }
   }
 
@@ -606,9 +628,9 @@ export function buildWorkerPrompt(
     : '';
 
   // Skill context block: appended after agent block when skills are assigned
-  // Dynamic budget based on task effort: high→2000, normal→1500, low→1000 per skill
-  const effortBudgetMap: Record<string, number> = { high: 2000, max: 2000, medium: 1500, normal: 1500, low: 1000 };
-  const SKILL_PER_ITEM_MAX = effortBudgetMap[effort] ?? 1500;
+  // effort → maxTokens budget per skill: low=1000, normal=1500, high=2500
+  const effortMaxTokensMap: Record<string, number> = { high: 2500, max: 2500, medium: 1500, normal: 1500, low: 1000 };
+  const SKILL_PER_ITEM_MAX = effortMaxTokensMap[effort] ?? 1500;
   const SKILL_SECTION_MAX = Math.round(SKILL_PER_ITEM_MAX * 2.67);
 
   // V2 routing: filter skill prompts to only those relevant to task intent

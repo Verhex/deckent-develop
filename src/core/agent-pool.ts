@@ -190,6 +190,46 @@ export class AgentPoolManager {
   // ─── Temp Agents ─────────────────────────────────────────────────────────────
 
   /**
+   * Save a temporary agent to the persistent agent pool (.deckent/agents/temp-{id}/).
+   * These agents are discoverable by `ls .deckent/agents/` and survive across sprints
+   * until explicitly removed or evicted. Idempotent: re-saves on each call.
+   */
+  saveTempAgentToPool(agent: AgentDefinition): void {
+    const dirName = agent.id.startsWith('temp-') ? agent.id : `temp-${agent.id}`;
+    const agentDir = path.join(this.projectRoot, AGENTS_DIR, dirName);
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(agentDir, AGENT_FILENAME),
+      JSON.stringify({ ...agent, id: dirName }, null, 2) + '\n',
+      'utf8',
+    );
+  }
+
+  /**
+   * Remove all temp agents (id starts with "temp-") from .deckent/agents/.
+   * Returns the number of agents removed.
+   */
+  cleanupPersistentTempAgents(): number {
+    const persistentDir = path.join(this.projectRoot, AGENTS_DIR);
+    if (!fs.existsSync(persistentDir)) return 0;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(persistentDir, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+    let removed = 0;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('temp-')) {
+        fs.rmSync(path.join(persistentDir, entry.name), { recursive: true, force: true });
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  /**
    * Create a temporary agent scoped to a sprint.
    * Stored in .tasks/agents/{sprintId}-{id}/agent.json.
    */

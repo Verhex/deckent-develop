@@ -1671,3 +1671,30 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - 068-006: V2 Routing E2E Dogrulama Testi (DONE)
 
 ---
+## Sprint 69 — sprint-069
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-27
+**Duration:** 2413s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 2 |
+| Coverage | 48.0% |
+| Duration | 2412549ms |
+
+### Tasks
+
+- 069-001: Skill Stats Tracking — uses/successRate/avgCoverage (DONE)
+- 069-002: Agent Secim Hassasiyeti — test-writer Exclude + Intent Weights (GO_WITH_TECH_DEBT)
+- 069-003: Skill Secim Butcesi — Dinamik maxTokens + Priority (GO_WITH_TECH_DEBT)
+- 069-004: Outcome-Based Ogrenme Guclendirme — Agent/Skill Bonus (DONE)
+- 069-005: TempAgent Mekanizmasi — Proje-Bazli Dinamik Agent (NO_GO)
+- 069-006: Scope Parser Root Dosya Fix + forceSkills V2 Entegrasyonu (NO_GO)
+
+---

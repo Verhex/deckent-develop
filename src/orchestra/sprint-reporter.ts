@@ -142,6 +142,7 @@ export interface SkillPerformanceRow {
   done: number;
   debt: number;
   noGo: number;
+  avgCoverage: number;
 }
 
 /**
@@ -152,16 +153,17 @@ export function buildSkillPerformance(
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
   skillMap?: Map<string, string[]>,
+  results?: TaskResult[],
 ): SkillPerformanceRow[] {
   if (!skillMap || skillMap.size === 0) return [];
 
-  const skillData = new Map<string, { tasks: number; done: number; debt: number; noGo: number }>();
+  const skillData = new Map<string, { tasks: number; done: number; debt: number; noGo: number; coverageSum: number; coverageCount: number }>();
 
   for (const task of sprint.tasks) {
     const skillIds = skillMap.get(task.id) ?? task.assignedSkills ?? [];
     for (const skillId of skillIds) {
       if (!skillData.has(skillId)) {
-        skillData.set(skillId, { tasks: 0, done: 0, debt: 0, noGo: 0 });
+        skillData.set(skillId, { tasks: 0, done: 0, debt: 0, noGo: 0, coverageSum: 0, coverageCount: 0 });
       }
       const data = skillData.get(skillId); // narrowed: set() called above
       if (!data) continue;
@@ -171,12 +173,25 @@ export function buildSkillPerformance(
       if (ev === TaskEvaluation.DONE) data.done += 1;
       else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) data.debt += 1;
       else if (ev === TaskEvaluation.NO_GO) data.noGo += 1;
+
+      const result = results?.find(r => r.taskId === task.id);
+      if (result && typeof result.coverage === 'number') {
+        data.coverageSum += result.coverage;
+        data.coverageCount += 1;
+      }
     }
   }
 
   const rows: SkillPerformanceRow[] = [];
   for (const [skill, data] of skillData) {
-    rows.push({ skill, tasks: data.tasks, done: data.done, debt: data.debt, noGo: data.noGo });
+    rows.push({
+      skill,
+      tasks: data.tasks,
+      done: data.done,
+      debt: data.debt,
+      noGo: data.noGo,
+      avgCoverage: data.coverageCount > 0 ? Math.round(data.coverageSum / data.coverageCount) : 0,
+    });
   }
   return rows.sort((a, b) => b.tasks - a.tasks);
 }
@@ -189,11 +204,11 @@ export function formatSkillPerformanceTable(rows: SkillPerformanceRow[]): string
   const lines: string[] = [
     '',
     '## Skill Performance',
-    '| Skill | Tasks | Done | Debt | NoGo |',
-    '|-------|-------|------|------|------|',
+    '| Skill | Tasks | Done | Debt | NoGo | Avg Coverage |',
+    '|-------|-------|------|------|------|-------------|',
   ];
   for (const row of rows) {
-    lines.push(`| ${row.skill} | ${row.tasks} | ${row.done} | ${row.debt} | ${row.noGo} |`);
+    lines.push(`| ${row.skill} | ${row.tasks} | ${row.done} | ${row.debt} | ${row.noGo} | ${row.avgCoverage}% |`);
   }
   return lines;
 }
@@ -470,7 +485,7 @@ export function writeRetrospective(
 
   let skillRows: SkillPerformanceRow[] = [];
   try {
-    skillRows = buildSkillPerformance(sprint, evaluations, skillMap);
+    skillRows = buildSkillPerformance(sprint, evaluations, skillMap, results);
   } catch { /* non-fatal */ }
 
   // Read previous sprint metrics for comparison

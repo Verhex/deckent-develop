@@ -118,4 +118,159 @@ describe('RuleEvolver', () => {
     const result = evolver.evolveRules();
     expect(result.reasoning.some(r => r.includes('Synergy'))).toBe(true);
   });
+
+  describe('evolveSynergyRules (skill-skill pairs)', () => {
+    it('creates activation EvolvedRule for synergistic skill pairs', () => {
+      const dna = createDefaultTaskDNA();
+      // 5 tasks where skill-a and skill-b always succeed together
+      for (let i = 0; i < 5; i++) {
+        tracker.recordOutcome({
+          taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
+          agentId: null, skillIds: ['skill-a', 'skill-b'], evaluation: 'DONE',
+          coverage: 95, routingVersion: 'v2',
+        });
+      }
+
+      const result = evolver.evolveRules();
+      const synergyRule = result.newRules.find(r =>
+        r.type === 'activation' && r.entityType === 'skill' &&
+        r.rule.name?.includes('synergy-skill-a-with-skill-b'),
+      );
+      expect(synergyRule).toBeDefined();
+      expect(synergyRule!.sampleSize).toBe(5);
+    });
+
+    it('creates exclusion EvolvedRule for conflicting skill pairs', () => {
+      const dna = createDefaultTaskDNA();
+      // 5 tasks where skill-x and skill-y always fail together
+      for (let i = 0; i < 5; i++) {
+        tracker.recordOutcome({
+          taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
+          agentId: null, skillIds: ['skill-x', 'skill-y'], evaluation: 'NO_GO',
+          coverage: 0, routingVersion: 'v2',
+        });
+      }
+
+      const result = evolver.evolveRules();
+      const conflictRule = result.newRules.find(r =>
+        r.type === 'exclusion' && r.entityType === 'skill' &&
+        r.rule.name?.includes('conflict-skill-x-with-skill-y'),
+      );
+      expect(conflictRule).toBeDefined();
+    });
+
+    it('does not create skill-skill rules for agent+skill synergy pairs', () => {
+      const dna = createDefaultTaskDNA();
+      // Agent + skill synergy — should NOT create a skill EvolvedRule
+      for (let i = 0; i < 5; i++) {
+        tracker.recordOutcome({
+          taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
+          agentId: 'test-agent', skillIds: ['skill-a'], evaluation: 'DONE',
+          coverage: 90, routingVersion: 'v2',
+        });
+      }
+
+      const result = evolver.evolveRules();
+      // Agent+skill synergy rules should not produce EvolvedRule objects
+      const agentSkillRules = result.newRules.filter(r =>
+        r.rule.name?.includes('synergy-test-agent-with-skill-a') ||
+        r.rule.name?.includes('synergy-skill-a-with-test-agent'),
+      );
+      expect(agentSkillRules).toHaveLength(0);
+    });
+
+    it('sets correct confidence and status based on sample size', () => {
+      const dna = createDefaultTaskDNA();
+      // 10 tasks → higher confidence
+      for (let i = 0; i < 10; i++) {
+        tracker.recordOutcome({
+          taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
+          agentId: null, skillIds: ['skill-p', 'skill-q'], evaluation: 'DONE',
+          coverage: 90, routingVersion: 'v2',
+        });
+      }
+
+      const result = evolver.evolveRules();
+      const rule = result.newRules.find(r => r.rule.name?.includes('synergy-skill-p-with-skill-q'));
+      expect(rule).toBeDefined();
+      expect(rule!.confidence).toBeGreaterThan(0.65);
+      expect(['auto-applied', 'suggested']).toContain(rule!.status);
+    });
+
+    it('detects conflict in reasoning for failing pairs', () => {
+      const dna = createDefaultTaskDNA();
+      for (let i = 0; i < 5; i++) {
+        tracker.recordOutcome({
+          taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
+          agentId: null, skillIds: ['skill-m', 'skill-n'], evaluation: 'NO_GO',
+          coverage: 0, routingVersion: 'v2',
+        });
+      }
+
+      const result = evolver.evolveRules();
+      expect(result.reasoning.some(r => r.includes('Conflict'))).toBe(true);
+    });
+  });
+
+  describe('skill rule evolution', () => {
+    it('generates activation rule for high-performing skill+intent', () => {
+      const secDna = createDefaultTaskDNA();
+      secDna.intent.primary = 'security';
+      const implDna = createDefaultTaskDNA();
+      implDna.intent.primary = 'implementation';
+
+      // 6 successful security tasks for the skill
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome({
+          taskId: `sec-${i}`, sprintId: 'sprint-001', taskDNA: secDna,
+          agentId: null, skillIds: ['security-expert'], evaluation: 'DONE',
+          coverage: 90, routingVersion: 'v2',
+        });
+      }
+      // 5 failed implementation tasks
+      for (let i = 0; i < 5; i++) {
+        tracker.recordOutcome({
+          taskId: `impl-${i}`, sprintId: 'sprint-001', taskDNA: implDna,
+          agentId: null, skillIds: ['security-expert'], evaluation: 'NO_GO',
+          coverage: 0, routingVersion: 'v2',
+        });
+      }
+
+      const result = evolver.evolveRules();
+      const activationRule = result.newRules.find(r =>
+        r.entityId === 'security-expert' && r.entityType === 'skill' && r.type === 'activation',
+      );
+      expect(activationRule).toBeDefined();
+    });
+
+    it('generates exclusion rule for low-performing skill+intent', () => {
+      const implDna = createDefaultTaskDNA();
+      implDna.intent.primary = 'implementation';
+      const testDna = createDefaultTaskDNA();
+      testDna.intent.primary = 'testing';
+
+      // 6 successful testing tasks
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome({
+          taskId: `test-${i}`, sprintId: 'sprint-001', taskDNA: testDna,
+          agentId: null, skillIds: ['doc-writer'], evaluation: 'DONE',
+          coverage: 80, routingVersion: 'v2',
+        });
+      }
+      // 6 failed implementation tasks
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome({
+          taskId: `impl-${i}`, sprintId: 'sprint-001', taskDNA: implDna,
+          agentId: null, skillIds: ['doc-writer'], evaluation: 'NO_GO',
+          coverage: 0, routingVersion: 'v2',
+        });
+      }
+
+      const result = evolver.evolveRules();
+      const exclusionRule = result.newRules.find(r =>
+        r.entityId === 'doc-writer' && r.entityType === 'skill' && r.type === 'exclusion',
+      );
+      expect(exclusionRule).toBeDefined();
+    });
+  });
 });

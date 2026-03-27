@@ -10,7 +10,7 @@ import { createAgentDefinition, createDefaultStats } from '../../src/core/agent-
 import type { SkillDefinition } from '../../src/core/skill-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { ActivationConfig, UserOverride, TaskDNA } from '../../src/core/routing-types.js';
-import { createDefaultTaskDNA } from '../../src/core/routing-types.js';
+import { createDefaultTaskDNA, SKILL_TOKEN_BUDGET_BY_EFFORT } from '../../src/core/routing-types.js';
 
 // ─── Test Helpers ───────────────────────────────────────────────────────────
 
@@ -439,5 +439,461 @@ describe('routing-engine', () => {
       // TaskDNA should classify as implementation, not testing
       expect(decision.taskDNA.intent.primary).toBe('implementation');
     });
+  });
+
+  describe('calculateSkillBudget — dynamic maxTokens by effort', () => {
+    it('low effort → maxTokensPerSkill=1000', () => {
+      const dna = createDefaultTaskDNA();
+      dna.complexity.estimatedSize = 'medium';
+      dna.domains = [{ name: 'core', weight: 0.5 }, { name: 'cli', weight: 0.5 }];
+      dna.operations = [{ type: 'modify', weight: 0.7 }, { type: 'test', weight: 0.3 }];
+      const budget = calculateSkillBudget(dna, undefined, 'low');
+      expect(budget.maxTokensPerSkill).toBe(SKILL_TOKEN_BUDGET_BY_EFFORT['low']);
+      expect(budget.maxTokensPerSkill).toBe(1000);
+    });
+
+    it('normal effort → maxTokensPerSkill=1500', () => {
+      const dna = createDefaultTaskDNA();
+      dna.complexity.estimatedSize = 'medium';
+      dna.domains = [{ name: 'core', weight: 0.5 }, { name: 'cli', weight: 0.5 }];
+      dna.operations = [{ type: 'modify', weight: 0.7 }, { type: 'test', weight: 0.3 }];
+      const budget = calculateSkillBudget(dna, undefined, 'normal');
+      expect(budget.maxTokensPerSkill).toBe(SKILL_TOKEN_BUDGET_BY_EFFORT['normal']);
+      expect(budget.maxTokensPerSkill).toBe(1500);
+    });
+
+    it('high effort → maxTokensPerSkill=2500', () => {
+      const dna = createDefaultTaskDNA();
+      dna.complexity.estimatedSize = 'large';
+      dna.domains = [{ name: 'core', weight: 0.5 }, { name: 'cli', weight: 0.5 }];
+      dna.operations = [{ type: 'modify', weight: 0.7 }, { type: 'test', weight: 0.3 }];
+      const budget = calculateSkillBudget(dna, undefined, 'high');
+      expect(budget.maxTokensPerSkill).toBe(SKILL_TOKEN_BUDGET_BY_EFFORT['high']);
+      expect(budget.maxTokensPerSkill).toBe(2500);
+    });
+
+    it('no effort → falls back to default 1500', () => {
+      const dna = createDefaultTaskDNA();
+      dna.complexity.estimatedSize = 'medium';
+      const budget = calculateSkillBudget(dna);
+      expect(budget.maxTokensPerSkill).toBe(1500);
+    });
+
+    it('totalSkillTokenBudget is proportional to maxSkills × maxTokensPerSkill', () => {
+      const dna = createDefaultTaskDNA();
+      dna.complexity.estimatedSize = 'large';
+      dna.domains = [{ name: 'a', weight: 0.5 }, { name: 'b', weight: 0.5 }];
+      dna.operations = [{ type: 'modify', weight: 0.7 }, { type: 'test', weight: 0.3 }];
+      const budget = calculateSkillBudget(dna, undefined, 'high');
+      expect(budget.totalSkillTokenBudget).toBe(budget.maxSkills * budget.maxTokensPerSkill);
+      expect(budget.maxTokensPerSkill).toBe(2500);
+    });
+
+    it('reason includes effort level', () => {
+      const dna = createDefaultTaskDNA();
+      dna.complexity.estimatedSize = 'medium';
+      const budget = calculateSkillBudget(dna, undefined, 'high');
+      expect(budget.reason).toContain('effort=high');
+    });
+  });
+
+  describe('intent-based skill priority', () => {
+    function makeTestingSkill(): SkillDefinition {
+      return makeSkill('testing-expert', {
+        activation: {
+          rules: [{ when: { 'intent.primary': 'testing' }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+    }
+
+    function makeDocSkill(): SkillDefinition {
+      return makeSkill('documentation-writer', {
+        activation: {
+          rules: [{ when: { 'intent.primary': 'documentation' }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+    }
+
+    function makeTsSkill(): SkillDefinition {
+      return makeSkill('typescript-expert', {
+        activation: {
+          rules: [{ when: { 'intent.primary': 'implementation' }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+    }
+
+    it('testing intent boosts testing-expert over generic skill', () => {
+      const testingSkill = makeTestingSkill();
+      const genericSkill = makeSkill('generic-skill', {
+        activation: {
+          rules: [{ when: { 'intent.primary': 'testing' }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+
+      // Broad scope to ensure maxSkills > 0 (not trivial)
+      const decision = routeTaskV2(
+        {
+          title: 'Write unit tests for auth module',
+          description: 'Add comprehensive tests for authentication and authorization flows',
+          scope: {
+            directories: ['tests/core/', 'tests/orchestra/'],
+            filesRead: [],
+            filesWrite: ['tests/core/auth.test.ts', 'tests/orchestra/worker.test.ts', 'tests/core/session.test.ts'],
+          },
+        },
+        makePool(),
+        makeSkillPool(genericSkill, testingSkill),
+      );
+
+      expect(decision.skillIds).toContain('testing-expert');
+      // testing-expert should rank higher than generic-skill due to intent bonus
+      const testingIdx = decision.skillIds.indexOf('testing-expert');
+      const genericIdx = decision.skillIds.indexOf('generic-skill');
+      if (genericIdx !== -1) {
+        expect(testingIdx).toBeLessThan(genericIdx);
+      }
+    });
+
+    it('documentation intent boosts documentation-writer', () => {
+      const docSkill = makeDocSkill();
+      const tsSkill = makeTsSkill();
+
+      // Broad scope to ensure maxSkills > 0
+      const decision = routeTaskV2(
+        {
+          title: 'Write API documentation for all endpoints',
+          description: 'Create comprehensive documentation for all REST endpoints',
+          scope: {
+            directories: ['docs/', 'src/api/'],
+            filesRead: [],
+            filesWrite: ['docs/api.md', 'docs/endpoints.md', 'docs/getting-started.md'],
+          },
+        },
+        makePool(),
+        makeSkillPool(docSkill, tsSkill),
+      );
+
+      // documentation-writer should be selected (intent bonus on top of activation)
+      expect(decision.skillIds).toContain('documentation-writer');
+    });
+
+    it('implementation + typescript intent boosts typescript-expert with typescript stack', () => {
+      const tsSkill = makeTsSkill();
+      const genericSkill = makeSkill('generic-skill', {
+        activation: {
+          rules: [{ when: { 'intent.primary': 'implementation' }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+
+      // Broad scope to ensure maxSkills > 0
+      const decision = routeTaskV2(
+        {
+          title: 'Implement config module and CLI commands',
+          description: 'Add configuration loading functionality with CLI integration across components',
+          scope: {
+            directories: ['src/core/', 'src/cli/'],
+            filesRead: [],
+            filesWrite: ['src/core/config.ts', 'src/core/loader.ts', 'src/cli/config-cmd.ts'],
+          },
+        },
+        makePool(),
+        makeSkillPool(genericSkill, tsSkill),
+        {
+          projectStack: { language: 'typescript', framework: 'vitest', dependencies: ['typescript'] },
+        },
+      );
+
+      expect(decision.skillIds).toContain('typescript-expert');
+      const tsIdx = decision.skillIds.indexOf('typescript-expert');
+      const genericIdx = decision.skillIds.indexOf('generic-skill');
+      if (genericIdx !== -1) {
+        expect(tsIdx).toBeLessThan(genericIdx);
+      }
+    });
+
+    it('routeTaskV2 passes effort to calculateSkillBudget via options', () => {
+      const tsSkill = makeTsSkill();
+
+      const decision = routeTaskV2(
+        {
+          title: 'High effort implementation task',
+          description: 'Complex refactor of core module',
+          scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/core/main.ts'] },
+        },
+        makePool(),
+        makeSkillPool(tsSkill),
+        {
+          effort: 'high',
+          projectStack: { language: 'typescript', framework: 'node', dependencies: [] },
+        },
+      );
+
+      // With high effort, skill budget should use 2500 token budget (included in reasoning)
+      expect(decision.reasoning.some(r => r.includes('effort=high'))).toBe(true);
+    });
+  });
+
+  describe('skill learning bonus integration', () => {
+    it('positive skill learning bonus (+3) boosts skill above competing skill', () => {
+      const skillA = makeSkill('skill-a', {
+        activation: {
+          rules: [{ when: { 'intent.primary': 'implementation' }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+      const skillB = makeSkill('skill-b', {
+        activation: {
+          rules: [{ when: { 'intent.primary': 'implementation' }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+
+      // Skill A gets +3 bonus (recent sprint success), skill B gets none
+      const decision = routeTaskV2(
+        {
+          title: 'Implement new feature',
+          description: 'Build config loader',
+          scope: {
+            directories: ['src/core/'],
+            filesRead: [],
+            filesWrite: ['src/core/config.ts', 'src/core/loader.ts'],
+          },
+        },
+        makePool(),
+        makeSkillPool(skillA, skillB),
+        {
+          learningData: [
+            { entityId: 'skill-a', bonus: 3, source: 'sprint-recency' },
+          ],
+        },
+      );
+
+      // skill-a should score higher due to learning bonus
+      const skillAScore = decision.skillScores.get('skill-a') ?? 0;
+      const skillBScore = decision.skillScores.get('skill-b') ?? 0;
+      if (decision.skillIds.includes('skill-a') && decision.skillIds.includes('skill-b')) {
+        expect(skillAScore).toBeGreaterThan(skillBScore);
+      }
+    });
+
+    it('negative skill learning bonus (-2) penalizes skill selection', () => {
+      const penalizedSkill = makeSkill('bad-skill', {
+        activation: {
+          rules: [{ when: { 'intent.primary': { $not: 'unknown' } }, score: 4 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+
+      const goodSkill = makeSkill('good-skill', {
+        activation: {
+          rules: [{ when: { 'intent.primary': { $not: 'unknown' } }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+
+      const decision = routeTaskV2(
+        {
+          title: 'Fix bug in config',
+          description: 'Resolve crash on startup',
+          scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/core/config.ts'] },
+        },
+        makePool(),
+        makeSkillPool(penalizedSkill, goodSkill),
+        {
+          learningData: [
+            { entityId: 'bad-skill', bonus: -2, source: 'sprint-recency' },
+          ],
+        },
+      );
+
+      // penalizedSkill (raw 4 - 2 = 2) should score below goodSkill (raw 5)
+      const penalizedScore = decision.skillScores.get('bad-skill') ?? 0;
+      const goodScore = decision.skillScores.get('good-skill') ?? 0;
+      expect(goodScore).toBeGreaterThanOrEqual(penalizedScore);
+    });
+
+    it('skill learning bonus is logged in reasoning when non-zero', () => {
+      const bonusSkill = makeSkill('bonus-skill', {
+        activation: {
+          rules: [{ when: { 'intent.primary': { $not: 'unknown' } }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+
+      const decision = routeTaskV2(
+        {
+          title: 'Implement feature',
+          description: 'Build new module',
+          scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/core/mod.ts'] },
+        },
+        makePool(),
+        makeSkillPool(bonusSkill),
+        {
+          learningData: [
+            { entityId: 'bonus-skill', bonus: 3, source: 'sprint-recency' },
+          ],
+        },
+      );
+
+      expect(decision.reasoning.some(r =>
+        r.includes('bonus-skill') && r.includes('learning bonus'),
+      )).toBe(true);
+    });
+
+    it('skill learning bonus caps at ±3 (LEARNING_BONUS_CAP)', () => {
+      const overBonusSkill = makeSkill('over-bonus-skill', {
+        activation: {
+          rules: [{ when: { 'intent.primary': { $not: 'unknown' } }, score: 5 }],
+          exclude: [],
+          minScore: 3,
+        },
+      });
+
+      const decision = routeTaskV2(
+        {
+          title: 'Implement feature',
+          description: 'Build new module',
+          scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/core/mod.ts'] },
+        },
+        makePool(),
+        makeSkillPool(overBonusSkill),
+        {
+          learningData: [
+            { entityId: 'over-bonus-skill', bonus: 10, source: 'sprint-recency' }, // exceeds cap
+          ],
+        },
+      );
+
+      // Score should be rawScore + 3 (capped), not rawScore + 10
+      const score = decision.skillScores.get('over-bonus-skill') ?? 0;
+      // base activation score is 5, cap is 3 → max total from learning alone is 5+3=8
+      expect(score).toBeLessThanOrEqual(12); // 5 (activation) + 3 (cap) + 3 (intent bonus max) + 3 (stack)
+    });
+  });
+});
+
+// ─── Sprint 069-006: forceSkills V2 UserOverride integration ─────────────────
+
+describe('routeTaskV2 — forceSkills UserOverride integration', () => {
+  it('uses forceSkills from override, ignoring activation rules', () => {
+    const tsSkill = makeSkill('typescript-expert');
+    const testSkill = makeSkill('testing-expert');
+    const decision = routeTaskV2(
+      { title: 'Update docs', description: 'Write documentation', scope: { directories: ['docs/'], filesRead: [], filesWrite: ['README.md'] } },
+      makePool(),
+      makeSkillPool(tsSkill, testSkill),
+      { overrides: [{ source: 'task-directive', forceSkills: ['typescript-expert'], priority: 3 }] },
+    );
+    expect(decision.skillIds).toEqual(['typescript-expert']);
+  });
+
+  it('reflects forceSkills with high skill confidence', () => {
+    const skill = makeSkill('security-expert');
+    const decision = routeTaskV2(
+      { title: 'Config update', description: 'Minor config fix', scope: { directories: [], filesRead: [], filesWrite: [] } },
+      makePool(),
+      makeSkillPool(skill),
+      { overrides: [{ source: 'task-directive', forceSkills: ['security-expert'], priority: 3 }] },
+    );
+    expect(decision.skillIds).toContain('security-expert');
+    expect(decision.skillConfidence).toBe('high');
+  });
+
+  it('forceSkills empty array results in no skills assigned', () => {
+    const skill = makeSkill('typescript-expert', {
+      activation: { rules: [{ when: { 'intent.primary': 'implementation' }, score: 10 }], exclude: [], minScore: 5 },
+    });
+    const decision = routeTaskV2(
+      { title: 'Implement feature', description: 'Add new functionality', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/feature.ts'] } },
+      makePool(),
+      makeSkillPool(skill),
+      { overrides: [{ source: 'task-directive', forceSkills: [], priority: 3 }] },
+    );
+    // empty forceSkills = explicit "no skills" override
+    expect(decision.skillIds).toEqual([]);
+  });
+
+  it('forceSkills override wins over activation-based selection', () => {
+    const tsSkill = makeSkill('typescript-expert', {
+      activation: { rules: [{ when: { 'intent.primary': 'implementation' }, score: 10 }], exclude: [], minScore: 5 },
+    });
+    const docSkill = makeSkill('documentation-writer');
+    const decision = routeTaskV2(
+      { title: 'Implement feature', description: 'Build new TypeScript module', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/feature.ts'] } },
+      makePool(),
+      makeSkillPool(tsSkill, docSkill),
+      { overrides: [{ source: 'task-directive', forceSkills: ['documentation-writer'], priority: 3 }] },
+    );
+    // Despite implementation intent matching typescript-expert, the override wins
+    expect(decision.skillIds).toEqual(['documentation-writer']);
+    expect(decision.skillIds).not.toContain('typescript-expert');
+  });
+
+  it('reasoning includes forced skills message when override applied', () => {
+    const skill = makeSkill('testing-expert');
+    const decision = routeTaskV2(
+      { title: 'Write tests', description: 'Add unit tests', scope: { directories: ['tests/'], filesRead: [], filesWrite: ['tests/foo.test.ts'] } },
+      makePool(),
+      makeSkillPool(skill),
+      { overrides: [{ source: 'task-directive', forceSkills: ['testing-expert'], priority: 3 }] },
+    );
+    expect(decision.reasoning.some(r => r.includes('forced') || r.includes('override'))).toBe(true);
+  });
+
+  it('empty forceSkills override (Skills: none) clears skills and skips auto-selection', () => {
+    // Skills: none → forceSkills=[] → no skills should be assigned
+    const tsSkill = makeSkill('typescript-expert', {
+      activation: {
+        rules: [{ when: { 'intent.primary': { $not: 'unknown' } }, score: 10 }],
+        exclude: [],
+        minScore: 3,
+      },
+    });
+
+    const decision = routeTaskV2(
+      {
+        title: 'Simple fix',
+        description: 'Small patch with no skill needed',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/fix.ts'] },
+      },
+      makePool(),
+      makeSkillPool(tsSkill),
+      { overrides: [{ source: 'task-directive', forceSkills: [], priority: 3 }] },
+    );
+
+    expect(decision.skillIds).toEqual([]);
+    expect(decision.reasoning.some(r => r.includes('none') || r.includes('cleared'))).toBe(true);
+  });
+
+  it('forceSkills works even when forced skill is not in skill pool', () => {
+    // DIRECTIVES specifies a skill that doesn't exist in the pool — still honored
+    const decision = routeTaskV2(
+      {
+        title: 'Implement feature',
+        description: 'Add new command',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/cmd.ts'] },
+      },
+      makePool(),
+      makeSkillPool(), // empty pool
+      { overrides: [{ source: 'task-directive', forceSkills: ['typescript-expert', 'testing-expert'], priority: 3 }] },
+    );
+
+    expect(decision.skillIds).toContain('typescript-expert');
+    expect(decision.skillIds).toContain('testing-expert');
   });
 });

@@ -109,6 +109,10 @@ export interface SkillBudget {
   maxSkills: number;
   maxTokensTotal: number;
   perSkillTokenBudget: number;
+  /** Dynamic per-skill token limit based on task effort level */
+  maxTokensPerSkill: number;
+  /** Total token budget across all skills for this task */
+  totalSkillTokenBudget: number;
   reason: string;
 }
 
@@ -171,6 +175,13 @@ export const SKILL_BUDGET_BY_SIZE: Record<TaskSize, number> = {
 
 export const DEFAULT_TOKEN_BUDGET_PER_SKILL = 1500;
 export const DEFAULT_TOKEN_BUDGET_TOTAL = 4500;
+
+/** Token budget per skill based on effort level: low=1000, normal=1500, high=2500 */
+export const SKILL_TOKEN_BUDGET_BY_EFFORT: Record<string, number> = {
+  low: 1000,
+  normal: 1500,
+  high: 2500,
+};
 
 export function isValidIntentType(value: string): value is IntentType {
   return (ALL_INTENT_TYPES as readonly string[]).includes(value);

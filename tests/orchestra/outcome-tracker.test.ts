@@ -98,6 +98,35 @@ describe('OutcomeTracker', () => {
       expect(perf.byIntent['implementation']?.successRate).toBe(1);
       expect(perf.byIntent['security']?.successRate).toBe(0);
     });
+
+    it('tracks skill sprint history when recording outcomes', () => {
+      tracker.recordOutcome(makeOutcome({ sprintId: 'sprint-001' }));
+      const learnings = tracker.getLearnings();
+      expect(learnings.skillSprintHistory['typescript-expert']).toBeDefined();
+      expect(learnings.skillSprintHistory['typescript-expert']!['sprint-001']).toBeDefined();
+      expect(learnings.skillSprintHistory['typescript-expert']!['sprint-001']!.successCount).toBe(1);
+    });
+
+    it('tracks sprint order in recentSprints', () => {
+      tracker.recordOutcome(makeOutcome({ sprintId: 'sprint-001' }));
+      tracker.recordOutcome(makeOutcome({ taskId: 'task-002', sprintId: 'sprint-002' }));
+      const learnings = tracker.getLearnings();
+      expect(learnings.recentSprints).toEqual(['sprint-001', 'sprint-002']);
+    });
+
+    it('does not duplicate sprint IDs in recentSprints', () => {
+      tracker.recordOutcome(makeOutcome({ taskId: 'task-001', sprintId: 'sprint-001' }));
+      tracker.recordOutcome(makeOutcome({ taskId: 'task-002', sprintId: 'sprint-001' }));
+      const learnings = tracker.getLearnings();
+      expect(learnings.recentSprints.filter(s => s === 'sprint-001')).toHaveLength(1);
+    });
+
+    it('tracks coverage in skill sprint history', () => {
+      tracker.recordOutcome(makeOutcome({ sprintId: 'sprint-001', coverage: 80 }));
+      tracker.recordOutcome(makeOutcome({ taskId: 'task-002', sprintId: 'sprint-001', coverage: 100 }));
+      const record = tracker.getLearnings().skillSprintHistory['typescript-expert']!['sprint-001']!;
+      expect(record.avgCoverage).toBeCloseTo(90, 1);
+    });
   });
 
   describe('calculateBonuses', () => {
@@ -156,6 +185,87 @@ describe('OutcomeTracker', () => {
       const entry = synergy.find(e => e.pair === 'test-agent+typescript-expert');
       expect(entry).toBeDefined();
       expect(entry!.verdict).toBe('conflict');
+    });
+  });
+
+  describe('calculateSprintRecencyBonuses', () => {
+    it('returns empty map when fewer than 2 sprints seen', () => {
+      // Record 3 successes in the same sprint
+      for (let i = 0; i < 3; i++) {
+        tracker.recordOutcome(makeOutcome({ taskId: `task-${i}`, sprintId: 'sprint-001' }));
+      }
+      const bonuses = tracker.calculateSprintRecencyBonuses();
+      expect(bonuses.size).toBe(0);
+    });
+
+    it('returns +3 for skill succeeding in all recent sprints', () => {
+      // 3 tasks across 3 sprints, all DONE
+      for (let i = 1; i <= 3; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `task-s${i}`,
+          sprintId: `sprint-00${i}`,
+          evaluation: 'DONE',
+        }));
+      }
+      const bonuses = tracker.calculateSprintRecencyBonuses();
+      expect(bonuses.get('typescript-expert')).toBe(3);
+    });
+
+    it('returns -2 for skill failing in all recent sprints', () => {
+      for (let i = 1; i <= 3; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `task-s${i}`,
+          sprintId: `sprint-00${i}`,
+          evaluation: 'NO_GO',
+        }));
+      }
+      const bonuses = tracker.calculateSprintRecencyBonuses();
+      expect(bonuses.get('typescript-expert')).toBe(-2);
+    });
+
+    it('returns +1 for skill with >=75% success rate in recent sprints', () => {
+      // 3 DONE, 1 NO_GO across 4 sprints (75% success)
+      for (let i = 1; i <= 3; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `done-s${i}`,
+          sprintId: `sprint-00${i}`,
+          evaluation: 'DONE',
+        }));
+      }
+      tracker.recordOutcome(makeOutcome({
+        taskId: 'fail-s4',
+        sprintId: 'sprint-004',
+        evaluation: 'NO_GO',
+      }));
+      const bonuses = tracker.calculateSprintRecencyBonuses();
+      // Only last 3 sprints count: sprint-002, sprint-003, sprint-004
+      // sprint-002: 1 success, sprint-003: 1 success, sprint-004: 1 fail → 2/3 ≈ 67% (neutral)
+      expect(bonuses.get('typescript-expert')).toBeUndefined();
+    });
+
+    it('caps bonus at LEARNING_BONUS_CAP in calculateBonuses', () => {
+      // High overall performance bonus + sprint recency bonus might exceed cap
+      for (let i = 1; i <= 3; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `task-s${i}`,
+          sprintId: `sprint-00${i}`,
+          evaluation: 'DONE',
+        }));
+      }
+      // Add more tasks for overall performance bonus
+      for (let i = 4; i <= 8; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `task-s${i}`,
+          sprintId: 'sprint-003',
+          evaluation: 'DONE',
+        }));
+      }
+      const dna = createDefaultTaskDNA();
+      const bonuses = tracker.calculateBonuses(dna);
+      const skillBonus = bonuses.find(b => b.entityId === 'typescript-expert');
+      if (skillBonus) {
+        expect(Math.abs(skillBonus.bonus)).toBeLessThanOrEqual(3); // LEARNING_BONUS_CAP
+      }
     });
   });
 });

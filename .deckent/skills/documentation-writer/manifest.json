@@ -1,21 +1,56 @@
 {
   "id": "documentation-writer",
   "name": "Documentation Writer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Technical writing, README structure, changelogs, JSDoc/TSDoc, API documentation",
   "manifestVersion": 2,
   "activation": {
-    "rules": [{ "when": { "intent.primary": "documentation" }, "score": 10 }],
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "documentation"
+        },
+        "score": 10
+      }
+    ],
     "exclude": [],
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
   "category": "workflow",
-  "triggers": ["docs", "readme", "changelog", "guide", "tutorial", "jsdoc", "api-docs"],
-  "stackDetection": { "files": ["docs/", "README.md"], "dependencies": [], "commands": [] },
-  "composableWith": ["typescript-expert", "python-expert", "api-builder"],
+  "triggers": [
+    "docs",
+    "readme",
+    "changelog",
+    "guide",
+    "tutorial",
+    "jsdoc",
+    "api-docs"
+  ],
+  "stackDetection": {
+    "files": [
+      "docs/",
+      "README.md"
+    ],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "python-expert",
+    "api-builder"
+  ],
   "priority": 10,
-  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
   "enabled": true,
-  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
 }

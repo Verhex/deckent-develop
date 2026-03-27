@@ -1,21 +1,65 @@
 {
   "id": "database-migration",
   "name": "Database Migration",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Migration safety, schema design, query optimization, transaction management",
   "manifestVersion": 2,
   "activation": {
-    "rules": [{ "when": { "domains": { "$contains": "database" } }, "score": 8 }],
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "database"
+          }
+        },
+        "score": 8
+      }
+    ],
     "exclude": [],
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
   "category": "domain",
-  "triggers": ["database", "migration", "schema", "query", "model", "relation", "index", "seed"],
-  "stackDetection": { "files": [], "dependencies": ["prisma", "typeorm", "knex", "drizzle", "sequelize"], "commands": [] },
-  "composableWith": ["typescript-expert", "python-expert", "testing-expert", "api-builder", "security-specialist", "performance-optimizer"],
+  "triggers": [
+    "database",
+    "migration",
+    "schema",
+    "query",
+    "model",
+    "relation",
+    "index",
+    "seed"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [
+      "prisma",
+      "typeorm",
+      "knex",
+      "drizzle",
+      "sequelize"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "python-expert",
+    "testing-expert",
+    "api-builder",
+    "security-specialist",
+    "performance-optimizer"
+  ],
   "priority": 10,
-  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
   "enabled": true,
-  "stats": { "totalUses": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": "" }
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
 }

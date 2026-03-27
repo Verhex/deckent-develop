@@ -192,11 +192,14 @@ export function detectSecondaryIntents(
   const analysis = scopeAnalysis ?? analyzeWriteScope(scope);
   const secondary: IntentType[] = [];
 
-  // If task description mentions tests but primary isn't testing
+  // If task has actual test work (scope signal or significant writes) but primary isn't testing.
+  // Intentionally excludes keyword-only matches: "Test: 10+ tests" in DIRECTIVES descriptions
+  // should NOT trigger test-writer for implementation tasks.
   if (primary !== 'testing') {
-    const hasTestKeywords = INTENT_KEYWORDS.testing.some(kw => text.includes(kw));
-    const hasTestScope = scope.directories.some(d => d.includes('test'));
-    if (hasTestKeywords || hasTestScope || analysis.testWriteRatio > 0) {
+    const hasTestScope = scope.directories.some(d => d.includes('test')) ||
+      scope.filesWrite.some(f => f.includes('.test.') || f.includes('.spec.') || f.startsWith('tests/') || f.startsWith('test/'));
+    const hasSignificantTestWork = analysis.testWriteRatio >= 0.2;
+    if (hasSignificantTestWork || hasTestScope) {
       secondary.push('testing');
     }
   }

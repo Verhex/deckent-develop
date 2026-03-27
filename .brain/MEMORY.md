@@ -140,3 +140,8 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - MCP Server Instructions — AI System Prompt Injection: GO_WITH_TECH_DEBT — Added DECKENT_MCP_INSTRUCTIONS constant exported from server.ts and passed it as options.instructions to McpServer const
 - Tool Descriptions + Annotations Zenginlestirme: GO_WITH_TECH_DEBT — All 16 MCP tools enriched with: (1) detailed descriptions (80+ chars, explains what/when/prerequisite), (2) annotations 
 - deckent_help Tool — Runtime Capabilities + State: GO_WITH_TECH_DEBT — Implemented deckent_help MCP tool. Detects project state (initialized, hasDirectives, sprintActive, lastSprint, routingE
+## Sprint sprint-069 Learnings
+- Agent Secim Hassasiyeti — test-writer Exclude + Intent Weights: GO_WITH_TECH_DEBT — A) test-writer agent.json: Added exclude for intent.primary=implementation (with name+reason), renamed doc exclude to in
+- Skill Secim Butcesi — Dinamik maxTokens + Priority: GO_WITH_TECH_DEBT — A) SkillBudget interface genişletildi: maxTokensPerSkill + totalSkillTokenBudget eklendi (routing-types.ts). SKILL_TOKEN
+- TempAgent Mekanizmasi — Proje-Bazli Dinamik Agent: NO_GO
+- Scope Parser Root Dosya Fix + forceSkills V2 Entegrasyonu: NO_GO

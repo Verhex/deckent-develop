@@ -22,6 +22,7 @@ import {
   LEARNING_BONUS_CAP,
   DEFAULT_TOKEN_BUDGET_PER_SKILL,
   DEFAULT_TOKEN_BUDGET_TOTAL,
+  SKILL_TOKEN_BUDGET_BY_EFFORT,
 } from './routing-types.js';
 import { classifyIntent } from './intent-classifier.js';
 import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivation } from './activation-engine.js';
@@ -34,6 +35,8 @@ export interface RoutingOptions {
   overrides?: UserOverride[];
   learningData?: LearningBonus[];
   config?: Partial<RoutingEngineConfig>;
+  /** Task effort level for dynamic skill token budget calculation */
+  effort?: 'low' | 'normal' | 'high';
 }
 
 interface ScoredCandidate {
@@ -89,8 +92,8 @@ export function routeTaskV2(
     reasoning.push(...agentResult.reasoning);
   }
 
-  // Step 4: Calculate skill budget
-  const skillBudget = calculateSkillBudget(taskDNA, cfg);
+  // Step 4: Calculate skill budget (effort-aware token allocation)
+  const skillBudget = calculateSkillBudget(taskDNA, cfg, options?.effort);
   reasoning.push(`Skill budget: max ${skillBudget.maxSkills} (${skillBudget.reason})`);
 
   // Step 5: Select skills
@@ -98,11 +101,16 @@ export function routeTaskV2(
   const skillScores = new Map<string, number>();
   let skillConfidence: ConfidenceLevel = 'uncertain';
 
-  if (resolved.forceSkills && resolved.forceSkills.length > 0) {
+  if (resolved.forceSkills !== undefined) {
+    // forceSkills=[] means "Skills: none" (explicit no-skills directive), respect it
     skillIds = resolved.forceSkills;
     for (const id of skillIds) skillScores.set(id, 100);
-    skillConfidence = 'high';
-    reasoning.push(`Skills forced by override: [${skillIds.join(', ')}]`);
+    skillConfidence = skillIds.length > 0 ? 'high' : 'uncertain';
+    reasoning.push(
+      skillIds.length > 0
+        ? `Skills forced by override: [${skillIds.join(', ')}]`
+        : 'Skills cleared by override (none)',
+    );
   } else {
     const skillResult = selectBestSkills(
       taskDNA, skillPool, cfg, learningData,
@@ -242,15 +250,24 @@ function selectBestSkills(
       }
     }
 
-    // Apply learning bonus
-    const bonus = getLearningBonus(id, learningData);
-    const finalScore = result.score + stackBonus + bonus;
+    // Intent-based priority bonus: boost skills aligned with task's primary intent
+    const intentBonus = getIntentPriorityBonus(id, taskDNA, projectStack);
+    if (intentBonus > 0) {
+      reasoning.push(`Skill '${id}' intent-priority bonus: +${intentBonus} (intent=${taskDNA.intent.primary})`);
+    }
+
+    // Apply learning bonus (sprint recency: +3 for recent success, -2 for recent failure)
+    const skillBonus = getLearningBonus(id, learningData);
+    if (skillBonus !== 0) {
+      reasoning.push(`Skill '${id}' learning bonus: ${skillBonus > 0 ? '+' : ''}${skillBonus} (sprint recency)`);
+    }
+    const finalScore = result.score + stackBonus + intentBonus + skillBonus;
 
     if (finalScore >= cfg.skillMinScore) {
       candidates.push({
         id,
         rawScore: result.score + stackBonus,
-        learningBonus: bonus,
+        learningBonus: skillBonus,
         finalScore,
         matchedRules: result.matchedRules,
       });
@@ -307,10 +324,12 @@ function selectBestSkills(
 
 /**
  * Calculate how many skills a task should receive based on its complexity.
+ * Token budgets are dynamically adjusted by effort level: low=1000, normal=1500, high=2500.
  */
 export function calculateSkillBudget(
   taskDNA: TaskDNA,
   config?: Partial<RoutingEngineConfig>,
+  effort?: string,
 ): SkillBudget {
   const maxDefault = config?.maxSkillsDefault ?? 3;
   let maxSkills = SKILL_BUDGET_BY_SIZE[taskDNA.complexity.estimatedSize] ?? 2;
@@ -328,13 +347,17 @@ export function calculateSkillBudget(
   // Hard cap
   maxSkills = Math.min(maxSkills, maxDefault);
 
-  const maxTokensTotal = maxSkills * DEFAULT_TOKEN_BUDGET_PER_SKILL;
+  // Dynamic per-skill token budget based on effort level
+  const maxTokensPerSkill = (effort !== undefined ? SKILL_TOKEN_BUDGET_BY_EFFORT[effort] : undefined) ?? DEFAULT_TOKEN_BUDGET_PER_SKILL;
+  const totalSkillTokenBudget = Math.min(maxSkills * maxTokensPerSkill, DEFAULT_TOKEN_BUDGET_TOTAL * 2);
 
   return {
     maxSkills,
-    maxTokensTotal: Math.min(maxTokensTotal, DEFAULT_TOKEN_BUDGET_TOTAL),
+    maxTokensTotal: Math.min(maxSkills * DEFAULT_TOKEN_BUDGET_PER_SKILL, DEFAULT_TOKEN_BUDGET_TOTAL),
     perSkillTokenBudget: DEFAULT_TOKEN_BUDGET_PER_SKILL,
-    reason: `${taskDNA.complexity.estimatedSize} task, ${taskDNA.complexity.moduleCount} module(s)`,
+    maxTokensPerSkill,
+    totalSkillTokenBudget,
+    reason: `${taskDNA.complexity.estimatedSize} task, ${taskDNA.complexity.moduleCount} module(s), effort=${effort ?? 'normal'}`,
   };
 }
 
@@ -436,4 +459,32 @@ function getLearningBonus(entityId: string, learningData: LearningBonus[]): numb
   if (!entry) return 0;
   // Cap bonus to prevent runaway effects
   return Math.max(-LEARNING_BONUS_CAP, Math.min(LEARNING_BONUS_CAP, entry.bonus));
+}
+
+/**
+ * Intent-based priority bonus for skill selection.
+ * Boosts skills that align with the task's primary intent:
+ * - testing → testing-expert +2
+ * - documentation → documentation-writer +2
+ * - implementation + typescript → typescript-expert +2
+ */
+function getIntentPriorityBonus(
+  skillId: string,
+  taskDNA: TaskDNA,
+  projectStack: { language: string; framework: string; dependencies: string[] } | null,
+): number {
+  const primary = taskDNA.intent.primary;
+
+  if (primary === 'testing' && skillId === 'testing-expert') return 2;
+  if (primary === 'documentation' && skillId === 'documentation-writer') return 2;
+
+  if (primary === 'implementation' && skillId === 'typescript-expert') {
+    // Boost typescript-expert when TypeScript is the project language or detected in domains
+    const isTypeScript =
+      projectStack?.language?.toLowerCase() === 'typescript' ||
+      taskDNA.domains.some(d => d.name.toLowerCase().includes('typescript'));
+    if (isTypeScript) return 2;
+  }
+
+  return 0;
 }

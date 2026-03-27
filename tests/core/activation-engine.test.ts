@@ -3,6 +3,7 @@ import {
   evaluateActivation,
   evaluateRule,
   evaluateExclusion,
+  evaluateRuleViaSecondary,
   migrateV1AgentToActivation,
   migrateV1SkillToActivation,
 } from '../../src/core/activation-engine.js';
@@ -248,6 +249,103 @@ describe('activation-engine', () => {
 
       const stackRule = config.rules.find(r => r.name === 'v1-stack-deps');
       expect(stackRule).toBeDefined();
+    });
+  });
+
+  describe('evaluateRuleViaSecondary (C)', () => {
+    it('returns 50% score when rule matches via secondary intent', () => {
+      const dna: TaskDNA = {
+        intent: { primary: 'implementation', secondary: ['testing'], confidence: 0.85 },
+        domains: [],
+        operations: [],
+        complexity: { fileCount: 2, moduleCount: 1, crossCutting: false, estimatedSize: 'small' },
+        scope: { writeRatio: { 'src/': 1 }, primaryWriteTarget: 'src/', testWriteRatio: 0 },
+      };
+      const score = evaluateRuleViaSecondary(dna, { name: 'testing-primary', when: { 'intent.primary': 'testing' }, score: 10 });
+      expect(score).toBe(5);
+    });
+
+    it('returns 0 when value not in secondary intents', () => {
+      const dna: TaskDNA = {
+        intent: { primary: 'implementation', secondary: ['documentation'], confidence: 0.8 },
+        domains: [],
+        operations: [],
+        complexity: { fileCount: 1, moduleCount: 1, crossCutting: false, estimatedSize: 'trivial' },
+        scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 },
+      };
+      const score = evaluateRuleViaSecondary(dna, { when: { 'intent.primary': 'testing' }, score: 10 });
+      expect(score).toBe(0);
+    });
+
+    it('returns 0 for non-string primary conditions', () => {
+      const dna: TaskDNA = {
+        intent: { primary: 'bugfix', secondary: ['testing'], confidence: 0.75 },
+        domains: [],
+        operations: [],
+        complexity: { fileCount: 1, moduleCount: 1, crossCutting: false, estimatedSize: 'trivial' },
+        scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 },
+      };
+      const score = evaluateRuleViaSecondary(dna, { when: { 'intent.primary': { $not: 'unknown' } }, score: 5 });
+      expect(score).toBe(0);
+    });
+
+    it('returns 0 when intent already matches primary (no double-counting)', () => {
+      const dna: TaskDNA = {
+        intent: { primary: 'testing', secondary: ['bugfix'], confidence: 0.9 },
+        domains: [],
+        operations: [],
+        complexity: { fileCount: 2, moduleCount: 1, crossCutting: false, estimatedSize: 'small' },
+        scope: { writeRatio: { 'tests/': 1 }, primaryWriteTarget: 'tests/', testWriteRatio: 1 },
+      };
+      // testing is NOT in secondary, it's primary — so secondary check returns 0
+      const score = evaluateRuleViaSecondary(dna, { when: { 'intent.primary': 'testing' }, score: 10 });
+      expect(score).toBe(0);
+    });
+
+    it('evaluateActivation scores via secondary when exclude does not match', () => {
+      const config: ActivationConfig = {
+        rules: [
+          { name: 'testing-primary', when: { 'intent.primary': 'testing' }, score: 10 },
+        ],
+        exclude: [
+          { name: 'not-implementation', when: { 'intent.primary': 'implementation' } },
+        ],
+        minScore: 3,
+      };
+      // primary=bugfix, secondary=[testing] — should score at 5 (50% of 10) since not excluded
+      const dna: TaskDNA = {
+        intent: { primary: 'bugfix', secondary: ['testing'], confidence: 0.8 },
+        domains: [],
+        operations: [],
+        complexity: { fileCount: 3, moduleCount: 2, crossCutting: true, estimatedSize: 'medium' },
+        scope: { writeRatio: { 'src/': 0.7, 'tests/': 0.3 }, primaryWriteTarget: 'src/', testWriteRatio: 0.3 },
+      };
+      const result = evaluateActivation(dna, config);
+      expect(result.excluded).toBe(false);
+      expect(result.score).toBe(5);
+      expect(result.matchedRules).toContain('testing-primary(via-secondary)');
+    });
+
+    it('evaluateActivation excludes before secondary scoring for implementation intent', () => {
+      const config: ActivationConfig = {
+        rules: [
+          { name: 'testing-primary', when: { 'intent.primary': 'testing' }, score: 10 },
+        ],
+        exclude: [
+          { name: 'not-implementation', when: { 'intent.primary': 'implementation' }, reason: 'test-writer skip impl' },
+        ],
+        minScore: 5,
+      };
+      const dna: TaskDNA = {
+        intent: { primary: 'implementation', secondary: ['testing'], confidence: 0.9 },
+        domains: [],
+        operations: [],
+        complexity: { fileCount: 1, moduleCount: 1, crossCutting: false, estimatedSize: 'trivial' },
+        scope: { writeRatio: { 'src/': 1 }, primaryWriteTarget: 'src/', testWriteRatio: 0 },
+      };
+      const result = evaluateActivation(dna, config);
+      expect(result.excluded).toBe(true);
+      expect(result.score).toBe(0);
     });
   });
 });

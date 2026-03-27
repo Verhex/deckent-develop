@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.1-sprint69] - 2026-03-27
+
+### Added
+
+- Skill Stats Tracking — uses/successRate/avgCoverage
+- Outcome-Based Ogrenme Guclendirme — Agent/Skill Bonus
+
+### Changed
+
+- Agent Secim Hassasiyeti — test-writer Exclude + Intent Weights (completed with tech debt)
+- Skill Secim Butcesi — Dinamik maxTokens + Priority (completed with tech debt)
+
+
+_Tasks: 6 total, 4 done, 2 tech debt, 2 no-go_
+
 ## [0.2.0-beta.1-sprint68] - 2026-03-26
 
 ### Added

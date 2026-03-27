@@ -195,26 +195,26 @@ describe('formatSkillPerformanceTable', () => {
   });
 
   it('returns markdown table with correct headers', () => {
-    const rows = [{ skill: 'test-skill', tasks: 3, done: 2, debt: 1, noGo: 0 }];
+    const rows = [{ skill: 'test-skill', tasks: 3, done: 2, debt: 1, noGo: 0, avgCoverage: 85 }];
     const lines = formatSkillPerformanceTable(rows);
     expect(lines).toContain('## Skill Performance');
-    expect(lines).toContain('| Skill | Tasks | Done | Debt | NoGo |');
-    expect(lines).toContain('|-------|-------|------|------|------|');
+    expect(lines).toContain('| Skill | Tasks | Done | Debt | NoGo | Avg Coverage |');
+    expect(lines).toContain('|-------|-------|------|------|------|-------------|');
   });
 
-  it('includes data rows', () => {
+  it('includes data rows with avgCoverage', () => {
     const rows = [
-      { skill: 'typescript-expert', tasks: 4, done: 3, debt: 1, noGo: 0 },
+      { skill: 'typescript-expert', tasks: 4, done: 3, debt: 1, noGo: 0, avgCoverage: 92 },
     ];
     const lines = formatSkillPerformanceTable(rows);
     const dataLine = lines.find(l => l.includes('typescript-expert'));
-    expect(dataLine).toBe('| typescript-expert | 4 | 3 | 1 | 0 |');
+    expect(dataLine).toBe('| typescript-expert | 4 | 3 | 1 | 0 | 92% |');
   });
 
   it('handles multiple rows', () => {
     const rows = [
-      { skill: 'skill-a', tasks: 5, done: 4, debt: 0, noGo: 1 },
-      { skill: 'skill-b', tasks: 2, done: 2, debt: 0, noGo: 0 },
+      { skill: 'skill-a', tasks: 5, done: 4, debt: 0, noGo: 1, avgCoverage: 80 },
+      { skill: 'skill-b', tasks: 2, done: 2, debt: 0, noGo: 0, avgCoverage: 90 },
     ];
     const lines = formatSkillPerformanceTable(rows);
     expect(lines.filter(l => l.startsWith('| skill-'))).toHaveLength(2);
@@ -310,6 +310,6 @@ describe('writeRetrospective — skillMap parameter', () => {
     writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, undefined, skillMap);
 
     const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
-    expect(retro).toContain('| super-skill | 3 | 1 | 1 | 1 |');
+    expect(retro).toContain('| super-skill | 3 | 1 | 1 | 1 | 0% |');
   });
 });

@@ -32,6 +32,8 @@ import {
   readPreviousTestCount,
   autoResolveDebt,
   autoDraftDecisions,
+  buildSkillPerformance,
+  formatSkillPerformanceTable,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
@@ -1115,7 +1117,7 @@ describe('formatHumanRetro', () => {
     const sprint = makeSprint({ id: 'sprint-040' });
     const evals = new Map([['001', TaskEvaluation.DONE]]);
     const metrics = makeMetrics();
-    const skillRows = [{ skill: 'test-writer', tasks: 5, done: 4, debt: 1, noGo: 0 }];
+    const skillRows = [{ skill: 'test-writer', tasks: 5, done: 4, debt: 1, noGo: 0, avgCoverage: 85 }];
     const output = formatHumanRetro({ sprint, evaluations: evals, metrics, skillRows });
     expect(output).toContain('## Skill Performance');
     expect(output).toContain('test-writer');
@@ -2885,5 +2887,132 @@ describe('writeSprintLog — ## Notes section for all tasks', () => {
     const match = content.match(/001 \(Long Note Task\): (x+)/);
     expect(match).toBeTruthy();
     expect(match![1].length).toBeLessThanOrEqual(150);
+  });
+});
+
+// ─── buildSkillPerformance ────────────────────────────────────────────────────
+
+describe('buildSkillPerformance', () => {
+  it('returns empty array when skillMap is undefined', () => {
+    const sprint = makeSprint();
+    const evals = new Map<string, TaskEvaluation>();
+    expect(buildSkillPerformance(sprint, evals, undefined)).toEqual([]);
+  });
+
+  it('returns empty array when skillMap is empty', () => {
+    const sprint = makeSprint();
+    const evals = new Map<string, TaskEvaluation>();
+    expect(buildSkillPerformance(sprint, evals, new Map())).toEqual([]);
+  });
+
+  it('counts tasks and done/debt/noGo per skill', () => {
+    const task1 = makeTask({ id: '001', assignedSkills: ['typescript-expert'] });
+    const task2 = makeTask({ id: '002', assignedSkills: ['typescript-expert', 'testing-expert'] });
+    const sprint = makeSprint({ tasks: [task1, task2] });
+    const evals = new Map([
+      ['001', TaskEvaluation.DONE],
+      ['002', TaskEvaluation.GO_WITH_TECH_DEBT],
+    ]);
+    const skillMap = new Map([
+      ['001', ['typescript-expert']],
+      ['002', ['typescript-expert', 'testing-expert']],
+    ]);
+
+    const rows = buildSkillPerformance(sprint, evals, skillMap);
+    const tsRow = rows.find(r => r.skill === 'typescript-expert');
+    const testRow = rows.find(r => r.skill === 'testing-expert');
+
+    expect(tsRow).toBeDefined();
+    expect(tsRow!.tasks).toBe(2);
+    expect(tsRow!.done).toBe(1);
+    expect(tsRow!.debt).toBe(1);
+    expect(tsRow!.noGo).toBe(0);
+
+    expect(testRow).toBeDefined();
+    expect(testRow!.tasks).toBe(1);
+    expect(testRow!.debt).toBe(1);
+  });
+
+  it('calculates avgCoverage from results', () => {
+    const task1 = makeTask({ id: '001', assignedSkills: ['typescript-expert'] });
+    const task2 = makeTask({ id: '002', assignedSkills: ['typescript-expert'] });
+    const sprint = makeSprint({ tasks: [task1, task2] });
+    const evals = new Map([
+      ['001', TaskEvaluation.DONE],
+      ['002', TaskEvaluation.DONE],
+    ]);
+    const skillMap = new Map([
+      ['001', ['typescript-expert']],
+      ['002', ['typescript-expert']],
+    ]);
+    const results = [
+      makeResult({ taskId: '001', coverage: 80 }),
+      makeResult({ taskId: '002', coverage: 100 }),
+    ];
+
+    const rows = buildSkillPerformance(sprint, evals, skillMap, results);
+    const tsRow = rows.find(r => r.skill === 'typescript-expert');
+    expect(tsRow).toBeDefined();
+    expect(tsRow!.avgCoverage).toBe(90); // (80+100)/2 = 90
+  });
+
+  it('sets avgCoverage to 0 when no results provided', () => {
+    const task1 = makeTask({ id: '001', assignedSkills: ['typescript-expert'] });
+    const sprint = makeSprint({ tasks: [task1] });
+    const evals = new Map([['001', TaskEvaluation.DONE]]);
+    const skillMap = new Map([['001', ['typescript-expert']]]);
+
+    const rows = buildSkillPerformance(sprint, evals, skillMap);
+    expect(rows[0]!.avgCoverage).toBe(0);
+  });
+
+  it('sorts rows by task count descending', () => {
+    const task1 = makeTask({ id: '001', assignedSkills: ['low-skill'] });
+    const task2 = makeTask({ id: '002', assignedSkills: ['high-skill'] });
+    const task3 = makeTask({ id: '003', assignedSkills: ['high-skill'] });
+    const sprint = makeSprint({ tasks: [task1, task2, task3] });
+    const evals = new Map([
+      ['001', TaskEvaluation.DONE],
+      ['002', TaskEvaluation.DONE],
+      ['003', TaskEvaluation.DONE],
+    ]);
+    const skillMap = new Map([
+      ['001', ['low-skill']],
+      ['002', ['high-skill']],
+      ['003', ['high-skill']],
+    ]);
+
+    const rows = buildSkillPerformance(sprint, evals, skillMap);
+    expect(rows[0]!.skill).toBe('high-skill');
+    expect(rows[1]!.skill).toBe('low-skill');
+  });
+});
+
+// ─── formatSkillPerformanceTable ──────────────────────────────────────────────
+
+describe('formatSkillPerformanceTable', () => {
+  it('returns empty array for empty rows', () => {
+    expect(formatSkillPerformanceTable([])).toEqual([]);
+  });
+
+  it('includes ## Skill Performance header', () => {
+    const rows = [{ skill: 'typescript-expert', tasks: 3, done: 2, debt: 1, noGo: 0, avgCoverage: 87 }];
+    const lines = formatSkillPerformanceTable(rows);
+    expect(lines).toContain('## Skill Performance');
+  });
+
+  it('renders avgCoverage in the table', () => {
+    const rows = [{ skill: 'typescript-expert', tasks: 3, done: 2, debt: 1, noGo: 0, avgCoverage: 87 }];
+    const lines = formatSkillPerformanceTable(rows);
+    const dataLine = lines.find(l => l.includes('typescript-expert'));
+    expect(dataLine).toBeDefined();
+    expect(dataLine).toContain('87%');
+  });
+
+  it('renders column headers with Avg Coverage', () => {
+    const rows = [{ skill: 'ts', tasks: 1, done: 1, debt: 0, noGo: 0, avgCoverage: 90 }];
+    const lines = formatSkillPerformanceTable(rows);
+    const header = lines.find(l => l.includes('Avg Coverage'));
+    expect(header).toBeDefined();
   });
 });
