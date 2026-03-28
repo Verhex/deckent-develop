@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-beta.3-sprint70] - 2026-03-27
+
+### Added
+
+- Model İsimleri Güncelliği + Doğrulama
+
+### Changed
+
+- Plan Tier Generalizasyonu — Claude-Specific → Genel (completed with tech debt)
+- Init Wizard Genel Provider Seçimi (completed with tech debt)
+- README.md Güncel Özellikler (completed with tech debt)
+- sprint-controller.ts God Object Split — Faz 1 (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 4 tech debt, 0 no-go_
+
 ## [0.2.0-beta.3] - 2026-03-27
 
 ### Added

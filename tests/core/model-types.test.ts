@@ -3,12 +3,14 @@ import {
   PROVIDER_MODEL_MAP,
   CLAUDE_MODELS,
   ALL_MODELS,
+  MODEL_API_IDS,
   getProviderForModel,
   isClaudeModel,
   isOpenAIModel,
   isGeminiModel,
   getModelTier,
   isValidModel,
+  resolveApiModelId,
   UnknownModelError,
 } from '../../src/core/task-types.js';
 import type {
@@ -319,5 +321,83 @@ describe('Re-export from types.ts barrel', () => {
   it('PROVIDER_MODEL_MAP is accessible from types.ts', async () => {
     const types = await import('../../src/core/types.js');
     expect(types.PROVIDER_MODEL_MAP).toBe(PROVIDER_MODEL_MAP);
+  });
+});
+
+// ─── MODEL_API_IDS ──────────────────────────────────────────────────────────
+
+describe('MODEL_API_IDS', () => {
+  it('maps Claude aliases to actual API model IDs', () => {
+    expect(MODEL_API_IDS['opus']).toBe('claude-opus-4-6');
+    expect(MODEL_API_IDS['sonnet']).toBe('claude-sonnet-4-6');
+    expect(MODEL_API_IDS['haiku']).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('maps OpenAI models to their API IDs', () => {
+    expect(MODEL_API_IDS['gpt-5']).toBe('gpt-5');
+    expect(MODEL_API_IDS['gpt-4.1']).toBe('gpt-4.1');
+    expect(MODEL_API_IDS['gpt-4.1-mini']).toBe('gpt-4.1-mini');
+    expect(MODEL_API_IDS['gpt-5-mini']).toBe('gpt-5-mini');
+    expect(MODEL_API_IDS['o3']).toBe('o3');
+    expect(MODEL_API_IDS['o4-mini']).toBe('o4-mini');
+  });
+
+  it('maps Gemini models to their API IDs', () => {
+    expect(MODEL_API_IDS['gemini-2.5-pro']).toBe('gemini-2.5-pro');
+    expect(MODEL_API_IDS['gemini-2.5-flash']).toBe('gemini-2.5-flash');
+    expect(MODEL_API_IDS['gemini-2.0-flash']).toBe('gemini-2.0-flash');
+  });
+
+  it('has an entry for every model in ALL_MODELS', () => {
+    for (const m of ALL_MODELS) {
+      expect(MODEL_API_IDS[m]).toBeDefined();
+      expect(typeof MODEL_API_IDS[m]).toBe('string');
+    }
+  });
+});
+
+// ─── resolveApiModelId ──────────────────────────────────────────────────────
+
+describe('resolveApiModelId', () => {
+  it('resolves Claude aliases to full API model IDs', () => {
+    expect(resolveApiModelId('opus')).toBe('claude-opus-4-6');
+    expect(resolveApiModelId('sonnet')).toBe('claude-sonnet-4-6');
+    expect(resolveApiModelId('haiku')).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('resolves OpenAI models (alias = API ID)', () => {
+    expect(resolveApiModelId('gpt-5')).toBe('gpt-5');
+    expect(resolveApiModelId('gpt-4.1')).toBe('gpt-4.1');
+    expect(resolveApiModelId('o3')).toBe('o3');
+  });
+
+  it('resolves Gemini models (alias = API ID)', () => {
+    expect(resolveApiModelId('gemini-2.5-pro')).toBe('gemini-2.5-pro');
+    expect(resolveApiModelId('gemini-2.5-flash')).toBe('gemini-2.5-flash');
+  });
+
+  it('throws UnknownModelError for invalid model', () => {
+    expect(() => resolveApiModelId('invalid' as ModelType)).toThrow(UnknownModelError);
+  });
+});
+
+// ─── Tier consistency ──────────────────────────────────────────────────────
+
+describe('Tier equivalence consistency', () => {
+  it('each tier has exactly one model per provider', () => {
+    const tiers = [
+      { tier: 2, claude: 'opus', codex: 'gpt-5', gemini: 'gemini-2.5-pro' },
+      { tier: 1, claude: 'sonnet', codex: 'gpt-4.1', gemini: 'gemini-2.5-flash' },
+      { tier: 0, claude: 'haiku', codex: 'gpt-5-mini', gemini: 'gemini-2.0-flash' },
+    ];
+    for (const { tier, claude, codex, gemini } of tiers) {
+      expect(getModelTier(claude as ModelType)).toBe(tier);
+      expect(getModelTier(codex as ModelType)).toBe(tier);
+      expect(getModelTier(gemini as ModelType)).toBe(tier);
+    }
+  });
+
+  it('all 12 models have corresponding API IDs', () => {
+    expect(Object.keys(MODEL_API_IDS)).toHaveLength(12);
   });
 });

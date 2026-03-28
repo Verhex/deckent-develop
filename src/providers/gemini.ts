@@ -22,6 +22,16 @@ import { TASKS_DIR } from '../core/constants.js';
 
 const GEMINI_MODELS: readonly GeminiModel[] = [...PROVIDER_MODEL_MAP.gemini] as GeminiModel[];
 
+/**
+ * Tier-based model mapping for Gemini CLI.
+ * Used by getModelForTier() to select appropriate models.
+ */
+export const GEMINI_TIER_MODELS = {
+  premium: 'gemini-2.5-pro' as GeminiModel,
+  standard: 'gemini-2.5-flash' as GeminiModel,
+  economy: 'gemini-2.0-flash' as GeminiModel,
+} as const;
+
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /** Auth header name per official Google AI docs (used by REST API fallback) */
@@ -283,6 +293,15 @@ export class GeminiAdapter implements ProviderAdapter {
       return { valid: false, reason: 'API key does not match expected Google AI format (AIza...)' };
     }
     return { valid: true, reason: 'API key format looks valid' };
+  }
+
+  // ─── getModelForTier() ─────────────────────────────────────────────
+
+  /**
+   * Get the recommended Gemini model for a given capability tier.
+   */
+  getModelForTier(tier: 'premium' | 'standard' | 'economy'): GeminiModel {
+    return GEMINI_TIER_MODELS[tier];
   }
 
   // ─── Internal helpers ──────────────────────────────────────────────

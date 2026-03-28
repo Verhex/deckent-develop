@@ -31,7 +31,7 @@ export interface PlanModeConfig {
 
 export type BrainPlanningMode = 'ai' | 'structured' | 'auto';
 
-export type PlanMode = 'max_plan' | 'max5x_plan' | 'pro_plan' | 'api';
+export type PlanMode = 'performance' | 'balanced' | 'economic' | 'api' | 'max_plan' | 'max5x_plan' | 'pro_plan';
 
 export interface SkillConfig {
   enabled: boolean;
@@ -42,7 +42,7 @@ export interface SkillConfig {
 
 export interface DeckentConfig {
   mode: PlanMode;
-  modes: Record<PlanMode, PlanModeConfig>;
+  modes: Record<string, PlanModeConfig>;
   language?: string;
   projectName?: string;
   version?: string;
@@ -172,7 +172,7 @@ export interface DeckentConfig {
 export interface ResolvedConfig {
   mode: PlanMode;
   activeModeConfig: PlanModeConfig;
-  modes: Record<PlanMode, PlanModeConfig>;
+  modes: Record<string, PlanModeConfig>;
   language: string;
   projectName: string;
   projectRoot: string;

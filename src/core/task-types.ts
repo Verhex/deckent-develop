@@ -35,6 +35,43 @@ export const ALL_MODELS: readonly ModelType[] = [
   'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash',
 ] as const;
 
+/**
+ * Mapping from internal model aliases to actual provider API model IDs.
+ * Used for documentation, validation, and direct API calls.
+ * Updated: 2026-03-27 (Claude 4.5/4.6, GPT-5, Gemini 2.5)
+ */
+export const MODEL_API_IDS: Record<ModelType, string> = {
+  // Claude (Anthropic)
+  opus: 'claude-opus-4-6',
+  sonnet: 'claude-sonnet-4-6',
+  haiku: 'claude-haiku-4-5-20251001',
+  // OpenAI / Codex
+  'gpt-5': 'gpt-5',
+  'gpt-5-mini': 'gpt-5-mini',
+  'gpt-4.1': 'gpt-4.1',
+  'gpt-4.1-mini': 'gpt-4.1-mini',
+  o3: 'o3',
+  'o4-mini': 'o4-mini',
+  // Google Gemini
+  'gemini-2.5-pro': 'gemini-2.5-pro',
+  'gemini-2.5-flash': 'gemini-2.5-flash',
+  'gemini-2.0-flash': 'gemini-2.0-flash',
+} as const;
+
+/**
+ * Resolve the actual provider API model ID from an internal alias.
+ * For Claude, this maps e.g. 'opus' → 'claude-opus-4-6'.
+ * For OpenAI/Gemini, the alias and API ID are typically the same.
+ * @throws {UnknownModelError} if model is not recognized
+ */
+export function resolveApiModelId(model: ModelType): string {
+  const apiId = MODEL_API_IDS[model];
+  if (!apiId) {
+    throw new UnknownModelError(model);
+  }
+  return apiId;
+}
+
 /** Error thrown when a model is not recognized */
 export class UnknownModelError extends TypeError {
   constructor(model: string) {

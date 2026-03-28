@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12100%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-69%2B-teal)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12160%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-71%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.2.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -82,10 +82,16 @@ Deckent follows a three-step cycle:
 - **Multi-Provider Support** -- Works with Claude (default), OpenAI Codex, and Google Gemini. Configure per-role (brain, worker) or per-task
 - **Provider Fallback Chain** -- Primary provider fails? Automatic fallback to alternative provider with model equivalence mapping
 - **Usage-Aware Planning** -- Automatically adjusts sprint size based on your Claude plan usage (5-hour and weekly thresholds)
+- **Stack-Aware Init** -- Detects your project stack (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin, TypeScript) and configures build/test commands automatically
+- **TempAgent and TempSkill** -- Auto-generates project-specific agents and skills based on your codebase conventions
+- **Built-in Docs** -- `.deckent/docs/` ships with quick-start, directives-guide, and config-reference guides
+- **Native Windows Support** -- Full subprocess backend with `shell:true`, periodic heartbeat updates, and UTF-8 handling
 - **Plugin System** -- Extend Deckent with custom hooks, commands, and patterns
-- **MCP Integration** -- 16 MCP tools + 9 resources for seamless Claude Code IDE integration
+- **MCP Integration** -- 17 MCP tools + 9 resources for seamless Claude Code IDE integration
 - **Web Dashboard** -- React + Vite + Tailwind dashboard with real-time SSE updates
 - **Internationalization** -- English and Turkish language support built in
+- **Review Archive Fallback** -- Sprint review works even after cleanup by reading from archive
+- **Beta Upgrade Workflow** -- `deckent upgrade --local <path.tgz>` for local beta installations
 
 ---
 
@@ -101,7 +107,7 @@ Deckent follows a three-step cycle:
 | GO/NO-GO evaluation per task | Yes | No | No | No | No |
 | Usage-aware auto-throttling | Yes | N/A | N/A | N/A | No |
 | Open source | Yes (MIT) | No | No | Yes | Partial |
-| MCP integration | Yes (16 tools) | N/A | N/A | N/A | N/A |
+| MCP integration | Yes (17 tools) | N/A | N/A | N/A | N/A |
 | Web dashboard | Yes | Built-in | Built-in | No | No |
 | Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
 | Works offline (local models) | Planned | Yes | No | Yes | No |
@@ -114,10 +120,10 @@ Deckent follows a three-step cycle:
 |----------|--------|-------|
 | Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch) | **FULL** | Primary development platform |
 | macOS (12+) | **FULL** | All features supported |
-| Windows via WSL2 | **FULL** | Recommended Windows setup — use Ubuntu/Debian WSL2 |
-| Native Windows (cmd / PowerShell) | **UNSUPPORTED** | tmux unavailable, path issues. Use WSL2 instead |
+| Windows via WSL2 | **FULL** | Recommended Windows setup -- use Ubuntu/Debian WSL2 |
+| Native Windows (cmd / PowerShell) | **FULL** | Subprocess backend with `shell:true`, periodic heartbeat, UTF-8 support |
 
-> **Windows users:** Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu, then run deckent inside the WSL2 terminal. Do not use native Windows cmd or PowerShell. Running `deckent doctor` on native Windows will show a platform warning.
+> **Windows users:** Native Windows is fully supported via the subprocess backend. WSL2 remains an option for tmux-based workflows. Running `deckent doctor` verifies platform compatibility.
 
 ---
 
@@ -132,7 +138,7 @@ Deckent follows a three-step cycle:
 | OpenAI Codex CLI | any (optional) | `codex --version` |
 | Google Gemini API | any (optional) | `GOOGLE_API_KEY` env var |
 
-**Claude Subscription:** Pro ($20/mo), Max 5x ($100/mo), Max 20x ($200/mo), or API key (pay-as-you-go)
+**Claude Subscription:** Pro, Max 5x, Max 20x, or API key (pay-as-you-go). Other providers (Codex, Gemini) work with their respective API keys.
 
 **Supported OS:** macOS, Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch), Windows via WSL2
 
@@ -167,12 +173,13 @@ Output:
 ```
   Welcome to Deckent!
 
-  ? Select your Claude plan:
-    > Max 20x ($200/mo) -- up to 8 workers, Opus for Brain
-      Max 5x ($100/mo)  -- up to 5 workers, Sonnet for Brain
-      Pro ($20/mo)      -- up to 3 workers, Sonnet only
-      API (pay-as-you-go) -- up to 10 workers, any model
+  ? Select your plan:
+    > Performance -- 8 workers, premium model brain
+      Balanced    -- 5 workers, standard model brain
+      Economic    -- 3 workers, standard model only
+      API (pay-as-you-go) -- 10 workers, any model
 
+  Detected stack: TypeScript + Vitest + React
   ? Project name: my-project
 
   Next: Edit DIRECTIVES.md with your first goals, then run `deckent start`
@@ -263,7 +270,7 @@ Output:
 | `deckent dashboard` | Terminal TUI dashboard |
 | `deckent serve` | Start HTTP API server |
 | `deckent web` | Web dashboard + API server (localhost:3100) |
-| `deckent upgrade` | Self-update Deckent |
+| `deckent upgrade` | Self-update Deckent (`--local <path.tgz>` for beta installs) |
 | `deckent sync` | Sync adapter files with DECKENT.md |
 | `deckent watch` | Live tmux split view |
 | `deckent test` | Run project tests |
@@ -290,7 +297,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Or let `deckent init` auto-register it.
 
-### MCP Tools (16)
+### MCP Tools (17)
 
 | Tool | Description |
 |------|-------------|
@@ -310,6 +317,7 @@ Or let `deckent init` auto-register it.
 | `deckent_run` | Run an arbitrary command in project context |
 | `deckent_kill` | Kill a specific worker |
 | `deckent_cleanup` | Archive sprint files and clean up workers |
+| `deckent_help` | Runtime capabilities, state info, and workflow guidance |
 
 ### MCP Resources (9)
 
@@ -335,27 +343,42 @@ Configuration lives in `.deckent/config.json` (project) and `~/.deckent/config.j
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `mode` | string | `"max_plan"` | Plan mode: `max_plan`, `max5x_plan`, `pro_plan`, `api` |
+| `mode` | string | `"performance"` | Plan tier: `performance`, `balanced`, `economic`, `api` |
 | `language` | string | `"en"` | Output language: `en`, `tr` |
 | `projectName` | string | `"deckent-project"` | Project name for dashboard and logs |
 | `brain_planning` | string | `"auto"` | Planning mode: `ai`, `structured`, `auto` |
+| `brain_provider` | string | `"claude"` | Provider for Brain: `claude`, `codex`, `gemini` |
+| `worker_provider` | string | `"claude"` | Provider for workers: `claude`, `codex`, `gemini` |
+| `fallback_provider` | string | -- | Fallback provider on failure |
 | `modes.<mode>.max_workers` | number | varies | Maximum parallel workers |
 | `modes.<mode>.brain_model` | string | varies | Model used by Brain for planning |
 | `modes.<mode>.default_model` | string | varies | Default model for workers |
 | `modes.<mode>.haiku_allowed` | boolean | varies | Whether Brain can assign haiku |
 
-### Plan Modes
+### Plan Tiers
 
-| Mode | Subscription | Max Workers | Brain Model | Default Model |
-|------|-------------|-------------|-------------|---------------|
-| `max_plan` | Max 20x ($200/mo) | 8 | opus | opus |
-| `max5x_plan` | Max 5x ($100/mo) | 5 | sonnet | opus |
-| `pro_plan` | Pro ($20/mo) | 3 | sonnet | sonnet |
-| `api` | API key | 10 | opus | sonnet |
+| Tier | Max Workers | Brain Model | Default Model |
+|------|-------------|-------------|---------------|
+| `performance` | 8 | opus | opus |
+| `balanced` | 5 | sonnet | opus |
+| `economic` | 3 | sonnet | sonnet |
+| `api` | 10 | opus | sonnet |
 
-**Mode Aliases:** You can also use `performance`, `balanced`, `economic`, or `unlimited` as friendly aliases for the canonical mode names.
+**Legacy aliases:** `max_plan`, `max5x_plan`, `pro_plan` are still accepted and auto-migrated to the new tier names.
 
-**Multi-Provider:** Configure `brain_provider`, `worker_provider`, and `fallback_provider` to use Claude, Codex, or Gemini. See [docs/reference/multi-provider.md](docs/reference/multi-provider.md).
+### Multi-Provider Support
+
+Deckent works with three AI providers. Configure per-role or per-task:
+
+| Provider | Models | Env Var |
+|----------|--------|---------|
+| Claude (default) | opus, sonnet, haiku | Session auth or `ANTHROPIC_API_KEY` |
+| Codex (OpenAI) | gpt-5, gpt-4.1, gpt-5-mini | `OPENAI_API_KEY` |
+| Gemini (Google) | gemini-2.5-pro, gemini-2.5-flash | `GOOGLE_API_KEY` |
+
+Model equivalence across providers: opus = gpt-5 = gemini-2.5-pro (premium), sonnet = gpt-4.1 = gemini-2.5-flash (standard), haiku = gpt-5-mini (economy).
+
+See [docs/reference/multi-provider.md](docs/reference/multi-provider.md) for the full guide.
 
 See [docs/reference/config-reference.md](docs/reference/config-reference.md) for the full reference.
 
@@ -394,6 +417,9 @@ my-project/
   .deckent/
     config.json          # Runtime config
     workspace/           # Identity, tools, boot sequence
+    docs/                # Built-in guides (quick-start, directives, config)
+    agents/              # Agent pool (built-in + temp agents)
+    skills/              # Skill registry (built-in + temp skills)
     plugins/             # Installed plugins
     i18n/                # Language files
   .brain/

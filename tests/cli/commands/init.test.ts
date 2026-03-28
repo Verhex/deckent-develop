@@ -672,7 +672,7 @@ describe('init command (isolated)', () => {
       vi.mocked(promptText).mockResolvedValue('my-project');
       await runCommand(['init']);
       expect(promptSelect).toHaveBeenCalledWith(
-        expect.stringContaining('Claude plan'),
+        expect.stringContaining('Select your plan'),
         expect.any(Array),
       );
     });

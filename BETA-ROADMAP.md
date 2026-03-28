@@ -1,6 +1,6 @@
 # Deckent Beta Readiness Roadmap
 
-**Son güncelleme:** 2026-03-27 | **Sprint:** 071 | **Test:** 12,160 | **Durum:** Closed Beta — Dogfooding aktif
+**Son güncelleme:** 2026-03-28 | **Sprint:** 072 | **Test:** 12,180+ | **Durum:** Closed Beta — Dogfooding aktif
 
 ---
 
@@ -86,9 +86,9 @@
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
-| 7 | Plan tier'ları Claude-specific | **YAPILACAK** | max_plan/max5x_plan/pro_plan → performance/balanced/economic |
-| 8 | Claude subscription bağımlılığı | **YAPILACAK** | Init wizard "Select your Claude plan" → genel provider seçimi |
-| 9 | Model isimleri güncelliği | **YAPILACAK** | opus/sonnet/haiku, gpt-5/gpt-4.1, gemini-2.5-pro doğruluğu |
+| 7 | Plan tier'ları Claude-specific | **DONE** | performance/balanced/economic + backward compat (Sprint 072) |
+| 8 | Claude subscription bağımlılığı | **DONE** | Init wizard provider-agnostic, $ kaldırıldı (Sprint 072) |
+| 9 | Model isimleri güncelliği | **DONE** | MODEL_API_IDS + resolveApiModelId() (Sprint 072) |
 | 10 | Multi-provider aynı anda test | **YAPILACAK** | Claude + Codex + Gemini aynı sprint'te hiç test edilmedi |
 | 11 | API + Subscription birlikte | **YAPILACAK** | API key ile subscription aynı anda çalışıyor mu? |
 | 12 | Codex/Gemini CLI binary check | **YAPILACAK** | Gerçek CLI binary'leri doğrulama |
@@ -130,7 +130,7 @@
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
 | 30 | .gitignore runtime state | **DONE** | |
-| 31 | God objects | **YAPILACAK** | sprint-controller 2300+ satır |
+| 31 | God objects | **KISMEN** | sprint-phases.ts extract edildi (Sprint 072), daha fazla split gerekli |
 | 32 | V2 routing test-writer bias | **KISMEN** | Exclude kuralı yazıldı |
 
 ## P6 — Kullanıcı Deneyimi İyileştirmeleri
@@ -155,20 +155,28 @@
 
 ### Faz 2: "Genel Kullanılabilirlik" — AKTİF
 
-**Sprint 072 Planı:**
-- [ ] P1-7: Plan tier'ları genel → performance/balanced/economic
-- [ ] P1-8: Init wizard → genel provider seçimi (Claude/Codex/Gemini)
-- [ ] P1-9: Model isimleri doğrulama + güncel model listesi
-- [ ] P2-16: CHANGELOG.md — Sprint 066-071 entries
-- [ ] P2-13: README.md güncel özellikler, test sayısı, Windows desteği
-- [ ] P5-31: sprint-controller.ts god object → modüler split başlangıcı
+**Sprint 072 — TAMAMLANDI (2026-03-27):**
+- [x] P1-7: Plan tier'ları → performance/balanced/economic + backward compat
+- [x] P1-8: Init wizard → genel provider seçimi, $ kaldırıldı
+- [x] P1-9: MODEL_API_IDS mapping + resolveApiModelId()
+- [x] P2-13: README.md → 12,160+ test, 71+ sprint, Windows full, 17 MCP tools
+- [x] P5-31: sprint-controller.ts → 7 phase fonksiyonu sprint-phases.ts'ye extract
 
-**Sprint 073+ Planı:**
-- [ ] P1-10: Multi-provider test — Claude + Codex aynı sprint
+**Sprint 073 Planı (1 Nisan 2026):**
+- [ ] P1-10: Multi-provider test — Claude + Codex aynı sprint (Vizetron'da)
+- [ ] P1-11: API key + Subscription birlikte çalışma testi
 - [ ] P1-12: Codex/Gemini CLI binary doğrulama
-- [ ] P2-18: VISION.md yazımı
-- [ ] P3-20..22: Dashboard gerçek test
+- [ ] P2-14: Dil tutarsızlığı — docs İngilizce/Türkçe karışık → tek dil veya çift dil
+- [ ] P2-18: VISION.md yazımı — proje vizyonu, rakip analizi, yol haritası
+- [ ] Vizetron dogfooding Sprint 3+ — yeni bug'lar varsa düzelt
+
+**Sprint 074+ Planı:**
+- [ ] P3-20..22: Dashboard gerçek sprint ile test
 - [ ] P4-29: .detect-secrets kurulumu
+- [ ] P6-33: Error messages kullanıcı-dostu
+- [ ] P6-40: Graceful shutdown (Ctrl+C → state tutarlılığı)
+- [ ] Windows Codex CLI dogfooding
+- [ ] Windows Cursor + Gemini dogfooding
 
 ### Faz 3: "Dokümantasyon"
 TR+EN çift dil, VISION, link audit, config dashboard
@@ -188,4 +196,5 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | 069 | 6/6 | 6 | Skill stats, agent precision, tempAgent |
 | 070 | 8/8 | 8 | Init UX overhaul, 15 bug fix, Windows dogfooding |
 | 071 | 7/7 | 7 | BUG-19..26 fix, heartbeat periodic, upgrade --local |
-| **Toplam** | **40/40** | **40** | 12,160 test, 0 regression, v0.2.0-beta.3 |
+| 072 | 5/5 | 5 | Tier generalizasyonu, model API IDs, god object split, README |
+| **Toplam** | **45/45** | **45** | 12,180+ test, 0 regression, v0.2.0-beta.3 |

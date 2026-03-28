@@ -157,3 +157,8 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - UTF-8 Windows: LANG + PYTHONIOENCODING env vars subprocess'e set edilmeli
 - TempAgent mixed-lang: `detectedLanguages` ile genişletilmiş eşleşme, sadece primary language yetmez
 - Upgrade --local: `deckent upgrade --local <path.tgz>` beta development workflow
+## Sprint sprint-070 Learnings
+- Plan Tier Generalizasyonu — Claude-Specific → Genel: GO_WITH_TECH_DEBT — Plan tier generalization completed. A) PlanMode type updated to include both new user-friendly names (performance, balan
+- Init Wizard Genel Provider Seçimi: GO_WITH_TECH_DEBT — Init wizard updated: 'Select your Claude plan' → 'Select your plan' with new provider-agnostic tier names (performance/b
+- README.md Güncel Özellikler: GO_WITH_TECH_DEBT — README.md updated: A) Tests 12,160+, B) Sprints 71+, C) Native Windows FULL support (subprocess backend, shell:true, UTF
+- sprint-controller.ts God Object Split — Faz 1: GO_WITH_TECH_DEBT — Extracted 7 sprint phase functions from runSprint() into sprint-phases.ts: runPlanPhase, runSpawnPhase, runEvaluatePhase

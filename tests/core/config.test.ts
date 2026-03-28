@@ -11,7 +11,7 @@ import {
   resolveMode,
   VALID_PROVIDERS,
 } from '../../src/core/config.js';
-import type { SystemProfile } from '../../src/core/types.js';
+import type { SystemProfile, PlanMode } from '../../src/core/types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
 
 // Mock fs modules
@@ -1109,5 +1109,60 @@ describe('routing_engine config — V2 default and propagation', () => {
 
     const config = await loadConfig('/test/project');
     expect(config.cleanup_delay_ms).toBe(0);
+  });
+});
+
+// ─── Sprint 072: Plan Tier Generalization ──────────────────────────
+
+describe('Plan tier generalization (sprint-072)', () => {
+  it('PlanMode type accepts new user-friendly tier names', () => {
+    const modes: PlanMode[] = ['performance', 'balanced', 'economic', 'api'];
+    expect(modes).toHaveLength(4);
+    // Verify all are valid PlanMode strings
+    for (const m of modes) {
+      expect(typeof m).toBe('string');
+    }
+  });
+
+  it('PlanMode type also accepts legacy tier names (backward compat)', () => {
+    const legacyModes: PlanMode[] = ['max_plan', 'max5x_plan', 'pro_plan'];
+    expect(legacyModes).toHaveLength(3);
+  });
+
+  it('new tier aliases resolve to canonical internal names', () => {
+    expect(resolveMode('performance')).toBe('max_plan');
+    expect(resolveMode('balanced')).toBe('max5x_plan');
+    expect(resolveMode('economic')).toBe('pro_plan');
+  });
+
+  it('loadConfig migrates alias tier to canonical name', async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'performance' }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('max_plan');
+    expect(config.activeModeConfig.max_workers).toBe(8);
+    expect(config.activeModeConfig.brain_model).toBe('opus');
+  });
+
+  it('DEFAULT_MODES contains all 4 canonical tiers', () => {
+    const modes = getDefaultModes();
+    expect(modes['max_plan']).toBeDefined();
+    expect(modes['max5x_plan']).toBeDefined();
+    expect(modes['pro_plan']).toBeDefined();
+    expect(modes['api']).toBeDefined();
+  });
+
+  it('config merge preserves tier settings with new alias as mode', async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({
+      mode: 'economic',
+      modes: { pro_plan: { max_workers: 4 } },
+    }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.mode).toBe('pro_plan');
+    expect(config.activeModeConfig.max_workers).toBe(4);
+    expect(config.activeModeConfig.brain_model).toBe('sonnet'); // preserved from default
   });
 });

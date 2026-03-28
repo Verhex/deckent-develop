@@ -41,6 +41,7 @@ export const MODE_ALIASES: Readonly<Record<string, PlanMode>> = {
   balanced: 'max5x_plan',
   economic: 'pro_plan',
   unlimited: 'api',
+  // Reverse aliases: old names also resolve to themselves (noop, handled by ?? fallback)
 } as const;
 
 /**
@@ -60,7 +61,7 @@ const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 /** All valid provider names */
 export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MODEL_MAP) as ProviderName[];
 
-export const DEFAULT_MODES: Record<PlanMode, PlanModeConfig> = {
+export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
   max_plan: {
     max_workers: 8,
     brain_model: 'opus',
@@ -454,7 +455,7 @@ export function getDefaultConfig(): DeckentConfig {
  * Get a deep clone of the default mode definitions for all plan modes.
  * @returns A record mapping each PlanMode to its default PlanModeConfig
  */
-export function getDefaultModes(): Record<PlanMode, PlanModeConfig> {
+export function getDefaultModes(): Record<string, PlanModeConfig> {
   return structuredClone(DEFAULT_MODES);
 }
 
@@ -514,7 +515,8 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
 
   validateConfig(config);
 
-  const activeModeConfig = config.modes[config.mode];
+  // Mode is validated above — activeModeConfig is guaranteed to exist
+  const activeModeConfig = (config.modes[config.mode] ?? config.modes['max_plan']) as PlanModeConfig;
 
   if (config.mode === 'api' && activeModeConfig.requires) {
     const envVar = activeModeConfig.requires;
@@ -1018,7 +1020,7 @@ export function mergeConfigs(
 
   validateConfig(config);
 
-  const activeModeConfig = config.modes[config.mode];
+  const activeModeConfig = (config.modes[config.mode] ?? config.modes['max_plan']) as PlanModeConfig;
 
   return {
     mode: config.mode,

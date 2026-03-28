@@ -417,10 +417,10 @@ export function registerInit(program: Command): void {
           if (recommendationDisplay) print(recommendationDisplay);
         } else {
           // Interactive mode (default or --manual)
-          mode = await promptSelect<PlanMode>('Select your Claude plan:', [
-            { label: 'Max ($200/mo) — 8 workers, Opus brain', value: 'max_plan' },
-            { label: 'Max 5x ($100/mo) — 5 workers, Sonnet brain', value: 'max5x_plan' },
-            { label: 'Pro ($20/mo) — 3 workers, Sonnet only', value: 'pro_plan' },
+          mode = await promptSelect<PlanMode>('Select your plan:', [
+            { label: 'Performance — 8 workers, premium model brain', value: 'performance' },
+            { label: 'Balanced — 5 workers, standard model brain', value: 'balanced' },
+            { label: 'Economic — 3 workers, standard model only', value: 'economic' },
             { label: 'API (pay-as-you-go) — 10 workers, any model', value: 'api' },
           ]);
 
@@ -1381,7 +1381,7 @@ CLI ile okuma/yazma: \`deckent config read\` / \`deckent config set key value\`
 
 | Ayar | Değerler | Varsayılan | Açıklama |
 |------|----------|-----------|----------|
-| mode | max_plan, max5x_plan, pro_plan, api | max5x_plan | Plan modu |
+| mode | performance, balanced, economic, api | balanced | Plan modu |
 | language | en, tr | en | Arayüz dili |
 | projectName | string | dizin adı | Proje adı |
 | max_workers | 1-10 | mode'a göre | Eş zamanlı worker sayısı |
@@ -1429,7 +1429,7 @@ CLI read/write: \`deckent config read\` / \`deckent config set key value\`
 
 | Setting | Values | Default | Description |
 |---------|--------|---------|-------------|
-| mode | max_plan, max5x_plan, pro_plan, api | max5x_plan | Plan mode |
+| mode | performance, balanced, economic, api | balanced | Plan mode |
 | language | en, tr | en | UI language |
 | projectName | string | dir name | Project name |
 | max_workers | 1-10 | per mode | Concurrent worker count |
