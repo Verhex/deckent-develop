@@ -891,7 +891,7 @@ describe('formatHumanDoctor', () => {
 
   it('shows failed provider with hint', () => {
     const output = formatHumanDoctor(baseInput);
-    expect(output).toContain('FAIL Gemini — Not configured (set GOOGLE_API_KEY to enable)');
+    expect(output).toContain('SKIP Gemini — Not configured (set GOOGLE_API_KEY to enable)');
   });
 
   it('shows memory percentage and health', () => {
@@ -988,7 +988,7 @@ describe('formatHumanDoctor', () => {
       ],
     };
     const output = formatHumanDoctor(input);
-    expect(output).toContain('FAIL Codex — Not configured (set OPENAI_API_KEY to enable)');
+    expect(output).toContain('SKIP Codex — Not configured (set OPENAI_API_KEY to enable)');
   });
 
   it('shows all providers as OK when all available', () => {
@@ -1350,7 +1350,7 @@ describe('formatHumanDoctor enhancements', () => {
       ],
     };
     const output = formatHumanDoctor(input);
-    expect(output).toContain('FAIL Claude — Not configured (install Claude CLI');
+    expect(output).toContain('SKIP Claude — Not configured (install Claude CLI');
   });
 
   it('shows claude provider tip when claude is unavailable', () => {
@@ -1852,6 +1852,7 @@ describe('formatHumanDoctor with connectorHealthResults', () => {
 describe('checkTmux - multi-provider fix (A)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
   });
 

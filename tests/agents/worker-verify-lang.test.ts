@@ -138,15 +138,15 @@ describe('getVerifyCommands', () => {
     expect(cmds.test).toBe('ctest --test-dir build');
   });
 
-  it('falls back to tsc + vitest for unknown stack', () => {
+  it('falls back to empty strings for unknown stack', () => {
     mockDetectFullStack.mockReturnValue(makeStack({
       language: 'unknown',
       buildTool: 'unknown',
       commands: { build: '', test: '', lint: '' },
     }));
     const cmds = getVerifyCommands('/project');
-    expect(cmds.build).toBe('npx tsc');
-    expect(cmds.test).toBe('npx vitest run');
+    expect(cmds.build).toBe('');
+    expect(cmds.test).toBe('');
   });
 
   it('returns make commands for C/Make projects', () => {

@@ -164,3 +164,29 @@
 - Yeni özellik ekleme maliyeti artar (2 wrapper) ama tutarlılık garantilenir
 - MCP tool sayısı 16'dan 25+'a çıkacak (bazı CLI komutları birleştirilebilir)
 - README, CONTRIBUTING ve docs güncellenirken her iki taraf da sayılmalı
+
+## ADR-023: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072)
+
+**Context:** Plan tier isimleri Claude'a özgüydü: `max_plan`, `max5x_plan`, `pro_plan`. Bu isimler Codex ve Gemini kullanıcıları için anlamsızdı. Provider-agnostic bir CLI olarak Deckent, belirli bir sağlayıcıya atıfta bulunmamalı.
+
+**Decision:** Tier isimleri genelleştirildi:
+- `max_plan` → `performance` (en yüksek kalite, en yüksek maliyet)
+- `max5x_plan` → `balanced` (kalite/maliyet dengesi)
+- `pro_plan` → `economic` (düşük maliyet, temel görevler)
+- `unlimited` korundu (sınırsız kullanım planları için)
+
+Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". Eski isimler geriye dönük uyumluluk için config migration'da alias olarak tanındı.
+
+**Consequence:** Yeni kullanıcılar provider-agnostic terminoloji görür. Mevcut config'ler autoMigrateOnLoad ile otomatik güncellenir. Tüm belgeler yeni tier isimlerini kullanır. DECKENT.md ve CLAUDE.md provider.ts model equivalence tablosunu güncellenmiş tier isimleriyle gösterir.
+
+## ADR-024: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072)
+
+**Context:** `sprint-controller.ts` 1300+ satıra büyüdü ve 8 sprint fazının tamamını içeriyordu. Bu durum bakım güçlüğü, yüksek cognitive load ve bağımsız test yazımını zorlaştırıyordu. Sprint 036'daki brain.ts split'inin ardından sprint-controller da god object haline geldi.
+
+**Decision:** Sprint fazları `sprint-phases.ts` adlı yeni dosyaya çıkarıldı. `runSprint()` içindeki 7 faz fonksiyonu extract edildi:
+- `runPlanPhase`, `runSpawnPhase`, `runEvaluatePhase`, `runFixPhase`
+- `runRetroPhase`, `runDecayPhase`, `runCleanupPhase`
+
+`sprint-controller.ts` orchestration mantığını korur, fazları import eder. Backward compatibility sprint-controller re-export layer üzerinden sağlandı.
+
+**Consequence:** Her faz bağımsız olarak test edilebilir. `sprint-controller.ts` boyutu önemli ölçüde azaldı. Yeni faz eklemek veya mevcut fazı değiştirmek tek dosyayı etkiler. orchestra/ modül sayısı 36'dan 37'ye çıktı.

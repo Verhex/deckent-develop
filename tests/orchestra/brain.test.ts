@@ -202,6 +202,7 @@ beforeEach(() => {
   mockedGetNextSprintId.mockReturnValue('sprint-001');
   mockedCountBrainLines.mockReturnValue(100);
   mockedCallBrainPlanner.mockReturnValue(null);
+  mockedStatSync.mockReturnValue({ mtimeMs: Date.now(), isDirectory: () => false, isFile: () => true, size: 0 } as never);
 });
 
 // ═══ Tests ═══════════════════════════════════════════════════════════
@@ -535,13 +536,13 @@ describe('buildWorkerPrompt', () => {
   it('includes vitest run instruction', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('npx vitest run');
+    expect(prompt).toContain('run the project test command');
   });
 
   it('includes tsc verify instruction', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('tsc --noEmit');
+    expect(prompt).toContain('run the project lint command');
   });
 
   it('references WORKER-GUIDE.md for error handling instructions', () => {

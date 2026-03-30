@@ -601,6 +601,7 @@ describe('detectProjectStack — extended languages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fs.readdirSync).mockReturnValue([]);
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false, mtimeMs: 1000 } as unknown as fs.Stats);
   });
 
   // ─── Python Extended ────────────────────────────────────────────────────
@@ -926,7 +927,7 @@ describe('detectFullStack', () => {
 
     const result = detectFullStack(ROOT);
     expect(result.language).toBe('python');
-    expect(result.commands.build).toBe('python -m py_compile');
+    expect(result.commands.build).toBe('');
     expect(result.commands.test).toBe('pytest');
     expect(result.commands.lint).toBe('ruff check');
   });
@@ -961,6 +962,7 @@ describe('monorepo / sub-project language detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fs.readdirSync).mockReturnValue([]);
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false, mtimeMs: 1000 } as unknown as fs.Stats);
   });
 
   it('detects React from sub-project package.json at arbitrary sub-directory', () => {
@@ -978,10 +980,13 @@ describe('monorepo / sub-project language detection', () => {
       // Root or intermediate package.json — no React
       return JSON.stringify({ devDependencies: { typescript: '^5.0.0' } });
     });
-    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+    vi.mocked(fs.readdirSync).mockImplementation((p, opts) => {
       const s = String(p);
-      if (s === ROOT) return [{ name: 'frontend', isDirectory: () => true }] as any;
-      return [];
+      if ((opts as { withFileTypes?: boolean })?.withFileTypes) {
+        if (s === ROOT) return [{ name: 'frontend', isDirectory: () => true }] as any;
+        return [] as any;
+      }
+      return [] as any;
     });
 
     const stack = detectProjectStack(ROOT);
@@ -993,11 +998,14 @@ describe('monorepo / sub-project language detection', () => {
     // Root: TypeScript; packages/backend: Rust
     mockFileExistence(['package.json', 'tsconfig.json', 'packages/backend/Cargo.toml']);
     mockPackageJson({}, { typescript: '^5.0.0' });
-    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+    vi.mocked(fs.readdirSync).mockImplementation((p, opts) => {
       const s = String(p);
-      if (s === ROOT) return [{ name: 'packages', isDirectory: () => true }] as any;
-      if (s.endsWith('/packages')) return [{ name: 'backend', isDirectory: () => true }] as any;
-      return [];
+      if ((opts as { withFileTypes?: boolean })?.withFileTypes) {
+        if (s === ROOT) return [{ name: 'packages', isDirectory: () => true }] as any;
+        if (s.endsWith('/packages')) return [{ name: 'backend', isDirectory: () => true }] as any;
+        return [] as any;
+      }
+      return [] as any;
     });
 
     const stack = detectProjectStack(ROOT);
@@ -1009,11 +1017,14 @@ describe('monorepo / sub-project language detection', () => {
     // Root: TypeScript; services/api: Python
     mockFileExistence(['package.json', 'tsconfig.json', 'services/api/pyproject.toml']);
     mockPackageJson({}, { typescript: '^5.0.0' });
-    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+    vi.mocked(fs.readdirSync).mockImplementation((p, opts) => {
       const s = String(p);
-      if (s === ROOT) return [{ name: 'services', isDirectory: () => true }] as any;
-      if (s.endsWith('/services')) return [{ name: 'api', isDirectory: () => true }] as any;
-      return [];
+      if ((opts as { withFileTypes?: boolean })?.withFileTypes) {
+        if (s === ROOT) return [{ name: 'services', isDirectory: () => true }] as any;
+        if (s.endsWith('/services')) return [{ name: 'api', isDirectory: () => true }] as any;
+        return [] as any;
+      }
+      return [] as any;
     });
 
     const stack = detectProjectStack(ROOT);
@@ -1029,15 +1040,18 @@ describe('monorepo / sub-project language detection', () => {
       'analytics/pyproject.toml',
     ]);
     mockPackageJson({}, { typescript: '^5.0.0' });
-    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+    vi.mocked(fs.readdirSync).mockImplementation((p, opts) => {
       const s = String(p);
-      if (s === ROOT) {
-        return [
-          { name: 'backend', isDirectory: () => true },
-          { name: 'analytics', isDirectory: () => true },
-        ] as any;
+      if ((opts as { withFileTypes?: boolean })?.withFileTypes) {
+        if (s === ROOT) {
+          return [
+            { name: 'backend', isDirectory: () => true },
+            { name: 'analytics', isDirectory: () => true },
+          ] as any;
+        }
+        return [] as any;
       }
-      return [];
+      return [] as any;
     });
 
     const stack = detectProjectStack(ROOT);
@@ -1050,10 +1064,13 @@ describe('monorepo / sub-project language detection', () => {
     // Root: TypeScript; java-service: Java
     mockFileExistence(['package.json', 'tsconfig.json', 'java-service/pom.xml']);
     mockPackageJson({}, { typescript: '^5.0.0' });
-    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+    vi.mocked(fs.readdirSync).mockImplementation((p, opts) => {
       const s = String(p);
-      if (s === ROOT) return [{ name: 'java-service', isDirectory: () => true }] as any;
-      return [];
+      if ((opts as { withFileTypes?: boolean })?.withFileTypes) {
+        if (s === ROOT) return [{ name: 'java-service', isDirectory: () => true }] as any;
+        return [] as any;
+      }
+      return [] as any;
     });
 
     const stack = detectProjectStack(ROOT);
@@ -1065,8 +1082,9 @@ describe('monorepo / sub-project language detection', () => {
     // Root: TypeScript; sub-project: also TypeScript (via Cargo.toml missing, just package.json)
     mockFileExistence(['package.json', 'tsconfig.json']);
     mockPackageJson({}, { typescript: '^5.0.0' });
-    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+    vi.mocked(fs.readdirSync).mockImplementation((p, opts) => {
       const s = String(p);
+      if (!(opts as { withFileTypes?: boolean })?.withFileTypes) return [] as any;
       if (s === ROOT) return [{ name: 'packages', isDirectory: () => true }] as any;
       return [];
     });

@@ -206,7 +206,7 @@ describe('start command (isolated)', () => {
   describe('pre-flight doctor checks', () => {
     it('runs doctor checks before starting sprint', async () => {
       await runCommand(['start']);
-      expect(runDoctorChecks).toHaveBeenCalledWith('/mock/root');
+      expect(runDoctorChecks).toHaveBeenCalledWith('/mock/root', undefined, undefined);
     });
 
     it('aborts and sets exit code 1 when required doctor check fails', async () => {

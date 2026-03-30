@@ -25,7 +25,7 @@
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 16 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, usage, review, run, kill, cleanup
+- 17 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, usage, review, run, kill, cleanup, help
 - 9 resources: dashboard, directives, memory, debt, config, retro, usage, tasks, agents
 - Registration: `claude mcp add deckent -- npx deckent mcp`
 
@@ -165,6 +165,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 | `deckent_run` | Tek bir task'i arka planda calistir | Hayir | Hayir |
 | `deckent_kill` | Aktif sprint'i veya belirli worker'lari durdur | Hayir | **Evet** |
 | `deckent_cleanup` | Task dosyalarini arsivle, sprint'i temizle | Hayir | **Evet** |
+| `deckent_help` | Runtime yetenekleri, proje durumu ve kullanim rehberi goster | Evet | Hayir |
 
 ### Parametre Ornekleri
 

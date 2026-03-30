@@ -10,9 +10,15 @@
 | debt-068-003 | Tech debt from 068-003: Implemented deckent_help MCP tool. Detects project state | 068-003 | sprint-068 | NORMAL | 0 | true | sprint-068 | 2026-03-26T23:14:38.391Z |
 | debt-069-002 | Tech debt from 069-002: A) test-writer agent.json: Added exclude for intent.prim | 069-002 | sprint-069 | NORMAL | 0 | true | sprint-069 | 2026-03-27T00:00:27.859Z |
 | debt-069-003 | Tech debt from 069-003: A) SkillBudget interface genişletildi: maxTokensPerSkill | 069-003 | sprint-069 | NORMAL | 0 | true | sprint-069 | 2026-03-27T00:00:36.420Z |
-| debt-069-005-fix | Tech debt from 069-005-fix: TempAgent mechanism was already fully implemented in | 069-005-fix | sprint-069 | HIGH | 2 | false | - | 2026-03-27T00:09:03.002Z |
-| debt-069-006-fix | Tech debt from 069-006-fix: A) Fixed extractScopeFromDirective bug: docFileMatch | 069-006-fix | sprint-069 | HIGH | 2 | false | - | 2026-03-27T00:09:03.002Z |
+| debt-069-005-fix | Tech debt from 069-005-fix: TempAgent mechanism was already fully implemented in | 069-005-fix | sprint-069 | CRITICAL | 3 | true | sprint-072 | 2026-03-27T00:09:03.002Z |
+| debt-069-006-fix | Tech debt from 069-006-fix: A) Fixed extractScopeFromDirective bug: docFileMatch | 069-006-fix | sprint-069 | CRITICAL | 0 | true | sprint-072 | 2026-03-27T00:09:03.002Z |
 | debt-070-001 | Tech debt from 070-001: Plan tier generalization completed. A) PlanMode type upd | 070-001 | sprint-070 | NORMAL | 0 | true | sprint-070 | 2026-03-27T14:27:18.768Z |
 | debt-070-002 | Tech debt from 070-002: Init wizard updated: 'Select your Claude plan' → 'Select | 070-002 | sprint-070 | NORMAL | 0 | true | sprint-070 | 2026-03-27T14:27:23.648Z |
 | debt-070-004 | Tech debt from 070-004: README.md updated: A) Tests 12,160+, B) Sprints 71+, C) | 070-004 | sprint-070 | NORMAL | 0 | true | sprint-070 | 2026-03-27T14:27:31.830Z |
 | debt-070-005 | Tech debt from 070-005: Extracted 7 sprint phase functions from runSprint() into | 070-005 | sprint-070 | NORMAL | 0 | true | sprint-070 | 2026-03-27T14:27:36.685Z |
+| debt-071-002 | Tech debt from 071-002: Fixed 16 failing tests (6 in brain.test.ts, 10 in brain- | 071-002 | sprint-071 | NORMAL | 0 | true | sprint-071 | 2026-03-30T09:12:38.261Z |
+| debt-071-005 | Tech debt from 071-005: Fixed 3 test assertions to match updated source behavior | 071-005 | sprint-071 | NORMAL | 0 | true | sprint-071 | 2026-03-30T09:12:48.370Z |
+| debt-072-001 | Tech debt from 072-001: debt-069-005-fix resolved: TempAgent mechanism fully ver | 072-001 | sprint-072 | NORMAL | 0 | true | sprint-072 | 2026-03-30T09:36:56.801Z |
+| debt-072-005 | Tech debt from 072-005: PROJECT-IDENTITY.md: Test sayısı 12,176+ (12,161 passed | 072-005 | sprint-072 | NORMAL | 0 | true | sprint-072 | 2026-03-30T09:37:10.473Z |
+| debt-072-006 | Tech debt from 072-006: 4 numerical inconsistency fixed: (1) orchestra: 42→45 mo | 072-006 | sprint-072 | NORMAL | 0 | true | sprint-072 | 2026-03-30T09:37:13.542Z |
+| debt-072-007 | Tech debt from 072-007: Sprint 072 ve 073 entry'leri docs/SPRINT-LOG.md dosyasın | 072-007 | sprint-072 | NORMAL | 0 | true | sprint-072 | 2026-03-30T09:37:16.591Z |

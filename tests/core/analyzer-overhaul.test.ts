@@ -27,7 +27,7 @@ describe('analyzeProject — overhaul', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearAnalyzeCache();
-    vi.mocked(statSync).mockReturnValue({ mtimeMs: 1000 } as any);
+    vi.mocked(statSync).mockReturnValue({ mtimeMs: 1000, isDirectory: () => false } as any);
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(readdirSync).mockReturnValue([]);
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'a.ts\n', stderr: '' } as any);
@@ -35,10 +35,17 @@ describe('analyzeProject — overhaul', () => {
 
   it('M) falls back to fs count when git ls-files fails', () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '' } as any);
-    vi.mocked(readdirSync).mockReturnValue([
-      { name: 'a.ts', isDirectory: () => false },
-      { name: 'b.ts', isDirectory: () => false },
-    ] as any);
+    // Differentiate: withFileTypes calls return Dirent objects (for countFilesFs),
+    // non-withFileTypes calls return strings (for walk() in countSourceFiles)
+    vi.mocked(readdirSync).mockImplementation((_p, opts) => {
+      if ((opts as { withFileTypes?: boolean })?.withFileTypes) {
+        return [
+          { name: 'a.ts', isDirectory: () => false },
+          { name: 'b.ts', isDirectory: () => false },
+        ] as any;
+      }
+      return ['a.ts', 'b.ts'] as any;
+    });
     const result = analyzeProjectCached('/mock/root');
     expect(result.fileCount).toBeGreaterThanOrEqual(2);
   });

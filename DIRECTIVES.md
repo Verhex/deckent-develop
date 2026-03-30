@@ -1,189 +1,152 @@
-# DIRECTIVES — Sprint 072: Faz 2 — Genel Kullanılabilirlik
+# DIRECTIVES — Sprint 074: Dokümantasyon Taraması + Güncelleme
 
-## Goal: Provider/tier generalizasyonu, init wizard genel provider seçimi, model isimleri güncellemesi, README.md güncel özellikler, sprint-controller god object split başlangıcı. Deckent'i Claude-only olmaktan çıkarıp multi-provider ready hale getir.
-
----
-
-## Task 1: Plan Tier Generalizasyonu — Claude-Specific → Genel
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/core/config-types.ts, src/core/config.ts, src/cli/commands/init.ts
-- Scope: src/core/, src/cli/commands/
-
-### Description
-Mevcut plan tier'ları Claude subscription'a bağlı: `max_plan`, `max5x_plan`, `pro_plan`, `api`. Bunlar kullanıcıya anlamsız — "Max plan ne demek?"
-
-Yeni tier isimleri:
-- `max_plan` → `performance` (8 worker, Opus brain)
-- `max5x_plan` → `balanced` (5 worker, Sonnet brain)
-- `pro_plan` → `economic` (3 worker, Sonnet only)
-- `api` → `api` (değişmez — pay-as-you-go)
-
-Yapılacaklar:
-A) `config-types.ts`'de `PlanMode` tipini güncelle — eski isimleri de kabul et (backward compat):
-```typescript
-type PlanMode = 'performance' | 'balanced' | 'economic' | 'api' | 'max_plan' | 'max5x_plan' | 'pro_plan';
-```
-
-B) `config.ts`'de `loadConfig()` eski tier → yeni tier mapping ekle (migration):
-```typescript
-if (mode === 'max_plan') mode = 'performance';
-if (mode === 'max5x_plan') mode = 'balanced';
-if (mode === 'pro_plan') mode = 'economic';
-```
-
-C) `init.ts` wizard'da yeni isimler göster:
-```
-- Performance ($200/mo) — 8 workers, Opus brain
-- Balanced ($100/mo) — 5 workers, Sonnet brain
-- Economic ($20/mo) — 3 workers, Sonnet only
-- API (pay-as-you-go) — 10 workers, any model
-```
-
-D) Config `modes` objesi içindeki anahtarları da güncelle ama eski config'ler kırılmasın.
-
-**Kanıt:** `grep "performance\|balanced\|economic" src/core/config-types.ts` → yeni tier'lar var
-
-**Test:** 4+ test (yeni tier'lar çalışıyor, eski tier'lar migrate ediliyor, config merge doğru)
+## Goal: Sprint 073 test fix'leri ve Sprint 072 değişikliklerini yansıtacak şekilde tüm dokümantasyonu tara, güncelle ve tutarlı hale getir. doc-writer agent + documentation-writer skill aktif kullanılacak.
 
 ---
 
-## Task 2: Init Wizard Genel Provider Seçimi
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/cli/commands/init.ts, src/cli/helpers/wizard.ts
-- Scope: src/cli/commands/, src/cli/helpers/
-
-### Description
-Init wizard şu anda "Select your Claude plan" diyor — Claude-specific. Genel provider seçimi olmalı.
-
-Yeni wizard akışı:
-1. "Select your plan tier:" → performance/balanced/economic/api (Task 1'deki yeni isimler)
-2. Provider auto-detection sonuçlarını göster (mevcut — zaten çalışıyor)
-3. "Select your Claude plan" ifadesini kaldır — tier seçimi provider-agnostic
-
-`promptSelect` çağrısındaki label'ları güncelle:
-```typescript
-mode = await promptSelect<PlanMode>('Select your plan:', [
-  { label: 'Performance — 8 workers, premium model brain', value: 'performance' },
-  { label: 'Balanced — 5 workers, standard model brain', value: 'balanced' },
-  { label: 'Economic — 3 workers, standard model only', value: 'economic' },
-  { label: 'API (pay-as-you-go) — 10 workers, any model', value: 'api' },
-]);
-```
-
-Dollar amount'ları kaldır (Claude-specific pricing) — sadece özellik bazlı açıklama.
-
-**Kanıt:** `grep "Select your Claude" src/cli/commands/init.ts` → 0 eşleşme
-
-**Test:** 2+ test (yeni wizard options, eski tier backward compat)
-
----
-
-## Task 3: Model İsimleri Güncelliği + Doğrulama
-- Model: opus
-- Effort: high
-- Skills: typescript-expert
-- Files: src/core/task-types.ts, src/core/constants.ts, src/providers/claude.ts, src/providers/codex-adapter.ts, src/providers/gemini-adapter.ts
-- Scope: src/core/, src/providers/
-
-### Description
-Model isimleri kontrol ve güncelleme:
-
-A) Claude: `opus`, `sonnet`, `haiku` — güncel mi? Claude 4.5/4.6 model ID'leri:
-- opus → `claude-opus-4-6`
-- sonnet → `claude-sonnet-4-6`
-- haiku → `claude-haiku-4-5-20251001`
-Model alias'ları doğru mapping yapıyor mu kontrol et.
-
-B) OpenAI/Codex: `gpt-5`, `gpt-4.1`, `gpt-5-mini` — güncel mi?
-Codex adapter'da model mapping kontrol et.
-
-C) Gemini: `gemini-2.5-pro`, `gemini-2.5-flash` — güncel mi?
-Gemini adapter'da model mapping kontrol et.
-
-D) `PROVIDER_MODEL_MAP` sabitindeki tüm model ID'lerini doğrula.
-
-E) DECKENT.md ve docs/'taki model referanslarını güncelle.
-
-**Kanıt:** `grep "PROVIDER_MODEL_MAP" src/core/` → güncel model listesi
-
-**Test:** 3+ test (model validation, alias mapping, tier equivalence)
-
----
-
-## Task 4: README.md Güncel Özellikler
-- Model: opus
-- Effort: high
+## Task 1: README.md Güncellemesi — Test Sayıları + Sprint Bilgisi
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
 - Skills: documentation-writer
 - Files: README.md
 - Scope: README.md
 
 ### Description
-README.md eski veriler içeriyor. Güncellenecekler:
+README.md'deki istatistikleri güncelle:
 
-A) Test sayısı: 12,100+ → 12,160+
-B) Sprint sayısı: 69+ → 71+
-C) Windows desteği: Tam native Windows desteği (subprocess backend, shell:true)
-D) Yeni özellikler:
-- Stack-aware init (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin)
-- TempSkill + TempAgent otomatik oluşturma
-- .deckent/docs/ rehber sistemi (quick-start, directives-guide, config-reference)
-- `deckent upgrade --local` beta workflow
-- Subprocess heartbeat periodic update
-- Review archive fallback
-E) Bug fix özeti: 22 dogfooding bug düzeltildi
-F) Version: v0.2.0-beta.3
-G) Provider bölümü: Claude (default) + Codex + Gemini multi-provider
-H) MCP bölümü: 16 tools + 9 resources (güncel mi kontrol et)
+A) Test sayısı: 12,160+ → 12,176+ (gerçek: 12,161 passed + 15 skipped = 12,176 total)
+B) Sprint sayısı: 71+ → 73+ (sprint-071 + sprint-072 + sprint-073 tamamlandı)
+C) Test dosyası sayısı: 476 test dosyası
+D) Coverage bilgisi varsa güncelle
+E) "Sprint 072: Tier generalizasyonu" ve "Sprint 073: Dogfooding test fix" bilgilerini yansıt
+F) Version hâlâ 0.2.0-beta.3 — değişmedi
 
-README markdown kalitesi yüksek olmalı — badge'ler, tablolar, emoji kullanma.
+Sadece sayısal verileri ve sprint referanslarını güncelle. Yapıyı DEĞİŞTİRME.
 
-**Kanıt:** `head -5 README.md` → güncel versiyon ve test sayısı
+**Kanıt:** `head -20 README.md` → güncel sayılar
 
 **Test:** Bu task test gerektirmez — dokümantasyon.
 
 ---
 
-## Task 5: sprint-controller.ts God Object Split — Faz 1
-- Model: opus
-- Effort: high
-- Skills: typescript-expert, refactoring-expert
-- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-phases.ts
-- Scope: src/orchestra/
+## Task 2: CHANGELOG.md + docs/CHANGELOG.md Güncelleme
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: CHANGELOG.md, docs/CHANGELOG.md
+- Scope: CHANGELOG.md, docs/
 
 ### Description
-`sprint-controller.ts` 2300+ satır — god object. İlk split fazı: Sprint phase'lerini ayrı modüle çıkar.
+Sprint 072 ve 073 değişikliklerini CHANGELOG'a ekle. Keep a Changelog formatı:
 
-Yeni dosya: `src/orchestra/sprint-phases.ts`
+Sprint 072 (zaten kısmen var — kontrol et):
+- Changed: Plan tier generalizasyonu (max_plan→performance, max5x_plan→balanced, pro_plan→economic)
+- Changed: Init wizard genel provider seçimi (Claude-specific kaldırıldı)
+- Changed: Model API ID'leri güncellendi (claude-opus-4-6, claude-sonnet-4-6)
+- Changed: sprint-controller.ts god object split — sprint-phases.ts extract
+- Changed: README.md güncel özellikler
 
-Taşınacak fonksiyonlar (sprint lifecycle):
-- `runPlanPhase()` — PLAN fazı (DIRECTIVES okuma, task planlama)
-- `runSpawnPhase()` — SPAWN fazı (worker başlatma)
-- `runEvaluatePhase()` — EVALUATE fazı (result değerlendirme)
-- `runFixPhase()` — FIX fazı (retry logic)
-- `runRetroPhase()` — RETRO fazı (retrospektif yazma)
-- `runDecayPhase()` — DECAY fazı (memory trimming)
-- `runCleanupPhase()` — CLEANUP fazı (dosya silme)
+Sprint 073:
+- Fixed: 100 test regresyonu düzeltildi (43 fs mock, 16 brain mock, 9 doctor logic, 23 stack/CI, 3 integration)
+- Fixed: 0 fail, 12,161 test passed
 
-sprint-controller.ts'de bu fonksiyonları import edip çağır — `executeSprint()` orchestration layer olarak kalır.
+docs/CHANGELOG.md'de detaylı format, root CHANGELOG.md'de özet.
 
-Re-export pattern: sprint-controller.ts public API değişmez (backward compat).
+**Kanıt:** `grep "sprint-073\|Sprint 073" docs/CHANGELOG.md` → entry var
 
-DİKKAT: Bu büyük bir refactoring. Sadece phase fonksiyonlarını extract et, iç mantığı DEĞİŞTİRME.
+**Test:** Bu task test gerektirmez — dokümantasyon.
 
-**Kanıt:** `wc -l src/orchestra/sprint-controller.ts` → öncekinden kısa + `wc -l src/orchestra/sprint-phases.ts` → yeni dosya var
+---
 
-**Test:** Mevcut testler regression-free geçmeli. Yeni test gerekmez (extract only).
+## Task 3: .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: .brain/PROJECT-IDENTITY.md, .brain/DECISIONS.md
+- Scope: .brain/
+
+### Description
+.brain/ dosyalarını güncelle:
+
+A) PROJECT-IDENTITY.md:
+- Test sayısı: 12,176+ (12,161 passed + 15 skipped)
+- Sprint sayısı: 73+
+- Test dosyası: 476
+- Son sprint: sprint-073 (dogfooding test fix)
+
+B) DECISIONS.md: Sprint 072-073 ile ilgili yeni karar varsa ekle:
+- Tier generalizasyonu kararı (ADR formatında)
+- God object split kararı (sprint-phases.ts)
+
+Sadece sayısal güncellemeler ve yeni ADR'ler. Mevcut içeriği DEĞİŞTİRME.
+
+**Kanıt:** `grep "12,176\|73+" .brain/PROJECT-IDENTITY.md` → güncel
+
+**Test:** Bu task test gerektirmez — dokümantasyon.
+
+---
+
+## Task 4: DECKENT.md + CLAUDE.md Tutarlılık Kontrolü
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: DECKENT.md, CLAUDE.md
+- Scope: DECKENT.md, CLAUDE.md
+
+### Description
+DECKENT.md ve CLAUDE.md'deki referansları kontrol et ve güncelle:
+
+A) Module sayıları doğru mu? (orchestra 42 modules, core 48 modules, vb.)
+- sprint-phases.ts eklendi — orchestra modül sayısı artmış olabilir
+B) Agent sayısı: 9 built-in → doğru mu? (doc-writer, test-writer, security-auditor, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian)
+C) Skill sayısı: 11 built-in → doğru mu?
+D) CLI komut sayısı: 33+ → doğru mu?
+E) MCP tool/resource sayısı: 16 tools + 9 resources → doğru mu?
+F) Test sayısı referansları güncelle
+
+Sadece sayısal tutarsızlıkları düzelt. Yapıyı DEĞİŞTİRME.
+
+**Kanıt:** `grep "modules\|built-in\|tools\|resources" CLAUDE.md` → tutarlı sayılar
+
+**Test:** Bu task test gerektirmez — dokümantasyon.
+
+---
+
+## Task 5: docs/SPRINT-LOG.md Güncelleme
+- Model: haiku
+- Effort: low
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/SPRINT-LOG.md
+- Scope: docs/
+
+### Description
+docs/SPRINT-LOG.md dosyasına Sprint 072 ve 073 entry'lerini ekle:
+
+Sprint 072: Faz 2 — Genel Kullanılabilirlik
+- 5 task, X done, X tech debt, X no-go (git log'dan al)
+- Tier generalizasyonu, init wizard, model IDs, README, god object split
+
+Sprint 073: Dogfooding — Test Regression Fix
+- 5 task, 5 done, 2 tech debt, 0 no-go
+- 100 test fix (43+16+9+23+3), 17m 41s süre
+- Agent: test-writer, Skill: testing-expert
+
+Mevcut format ve stile uy.
+
+**Kanıt:** `grep "Sprint 073\|sprint-073" docs/SPRINT-LOG.md` → entry var
+
+**Test:** Bu task test gerektirmez — dokümantasyon.
 
 ---
 
 ## Quality Rules
-- tsc --noEmit MUST pass
-- All new tests MUST pass
-- Existing tests: 0 regression
-- Backward compat: Eski config tier'ları (`max_plan`, `max5x_plan`, `pro_plan`) çalışmaya devam etmeli
-- Model isimleri tüm provider'larda tutarlı olmalı
-- %100 GO hedefli — NO_GO KABUL EDİLMEZ
+- tsc --noEmit MUST pass (dokümantasyon source'a dokunmamalı)
+- Mevcut testlerde 0 regresyon
+- Tüm sayılar gerçek verilere dayalı olmalı — tahmin YAPMA
+- Keep a Changelog formatına uy
+- %100 GO hedefli

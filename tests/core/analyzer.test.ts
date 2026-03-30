@@ -48,7 +48,10 @@ describe('analyzeProject', () => {
 
   describe('framework detection', () => {
     it('detects next (takes priority over react)', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ next: '14.0.0', react: '18.0.0' }));
 
       const result = analyzeProject('/test');
@@ -56,7 +59,10 @@ describe('analyzeProject', () => {
     });
 
     it('detects react', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ react: '18.0.0' }));
 
       const result = analyzeProject('/test');
@@ -64,7 +70,10 @@ describe('analyzeProject', () => {
     });
 
     it('detects express', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ express: '4.18.0' }));
 
       const result = analyzeProject('/test');
@@ -72,7 +81,10 @@ describe('analyzeProject', () => {
     });
 
     it('detects nest', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ '@nestjs/core': '10.0.0' }));
 
       const result = analyzeProject('/test');
@@ -80,7 +92,10 @@ describe('analyzeProject', () => {
     });
 
     it('detects vue', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ vue: '3.0.0' }));
 
       const result = analyzeProject('/test');
@@ -88,7 +103,10 @@ describe('analyzeProject', () => {
     });
 
     it('detects angular', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ '@angular/core': '17.0.0' }));
 
       const result = analyzeProject('/test');
@@ -96,7 +114,10 @@ describe('analyzeProject', () => {
     });
 
     it('detects svelte', () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.endsWith('package.json') && !s.includes('dashboard');
+      });
       vi.mocked(readFileSync).mockReturnValue(mockPkg({ svelte: '4.0.0' }));
 
       const result = analyzeProject('/test');
@@ -144,7 +165,7 @@ describe('analyzeProject', () => {
 
     it('detects javascript (package.json without tsconfig)', () => {
       vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('package.json'));
-      vi.mocked(readFileSync).mockReturnValue(mockPkg());
+      vi.mocked(readFileSync).mockReturnValue(mockPkg({ 'some-dep': '1.0.0' }));
 
       const result = analyzeProject('/test');
       expect(result.language).toBe('javascript');

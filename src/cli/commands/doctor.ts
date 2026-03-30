@@ -52,8 +52,8 @@ export function checkPlatform(): DoctorCheck {
   if (currentPlatform === 'win32') {
     return {
       name: 'Platform',
-      passed: true,
-      message: 'Windows (subprocess mode) — tmux features unavailable, using subprocess backend. For full features, use WSL2.',
+      passed: false,
+      message: 'Windows UNSUPPORTED for tmux backend — use WSL2 for full features. Subprocess mode only.',
       required: false,
     };
   }

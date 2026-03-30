@@ -8,8 +8,9 @@
 - Author: Alperen @ Verhex
 
 ## Architecture
-- **orchestra/** (36 modules): Sprint lifecycle, planning, evaluation, routing
+- **orchestra/** (37 modules): Sprint lifecycle, planning, evaluation, routing
   - brain.ts → re-export layer, sprint-controller.ts → full lifecycle
+  - sprint-phases.ts → extracted phase functions (Sprint 072 god object split)
   - planner.ts, task-builder.ts, result-evaluator.ts, task-router.ts
   - debt-manager.ts, sprint-reporter.ts, tmux.ts, spawn-backend.ts
 - **core/** (42 modules): Types, config, utilities, agent/skill pools
@@ -23,11 +24,11 @@
 - **dashboard/**: React + Vite + Tailwind web dashboard
 
 ## Current State
-- Test Count: 11
+- Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-070
-- Total Sprints: 70
-- Completed Tasks: 131
+- Last Sprint: sprint-072
+- Total Sprints: 72
+- Completed Tasks: 143
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -37,11 +38,11 @@
 - Providers: Claude (default), Codex, Gemini
 - Planning: ai | structured | auto
 - Routing Engine: **v2** (intent-based, default since sprint-067)
-- Agents: 8 built-in + ci-guardian
-- Skills: 10 built-in + ci-testing
+- Agents: 9 built-in (security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian)
+- Skills: 11 built-in (including ci-testing)
 
 ## Key Rules
-- See .brain/DECISIONS.md for 22 architecture decision records (ADR-001 through ADR-022)
+- See .brain/DECISIONS.md for 24 architecture decision records (ADR-001 through ADR-024)
 - Brain is the ONLY orchestrator — workers never plan
 - Sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - Memory budget: 900 lines max in .brain/ (increased sprint-067)

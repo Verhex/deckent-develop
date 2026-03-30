@@ -190,7 +190,7 @@ vi.mock('../../src/core/provider.js', () => ({
 
 // ─── Imports (after mocks) ───────────────────────────────────────────
 import {
-  readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
+  readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync,
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { runSprint, evaluateResult } from '../../src/orchestra/brain.js';
@@ -205,6 +205,7 @@ const mockedExistsSync = vi.mocked(existsSync);
 const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedSpawnSync = vi.mocked(spawnSync);
+const mockedStatSync = vi.mocked(statSync);
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -316,6 +317,7 @@ function setupFsForRunSprint(tasks: Task[], results: Array<{ taskId: string; sel
 
   mockedWriteFileSync.mockImplementation(() => undefined);
   mockedMkdirSync.mockImplementation(() => undefined);
+  mockedStatSync.mockReturnValue({ mtimeMs: Date.now(), isDirectory: () => false, isFile: () => true, size: 0 } as never);
 
   // Git status returns empty (no changes)
   mockedSpawnSync.mockReturnValue({

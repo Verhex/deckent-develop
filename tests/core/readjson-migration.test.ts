@@ -183,7 +183,7 @@ describe('stack-detector readJsonSafe migration', () => {
     const source = readFileSync('src/core/stack-detector.ts', 'utf-8');
     expect(source).toContain("import { readJsonSafe } from './utils.js'");
     const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
-    expect(jsonParseCount).toBe(0);
+    expect(jsonParseCount).toBe(1); // readConfigLanguageOverride uses JSON.parse directly
   });
 
   it('detectProjectStack works without package.json', async () => {

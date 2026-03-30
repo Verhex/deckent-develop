@@ -219,6 +219,7 @@ function countSourceFiles(projectRoot: string): Record<string, number> {
     if (depth > 4) return; // max 4 levels deep for performance
     let entries: string[];
     try { entries = fs.readdirSync(dir); } catch { return; }
+    if (!Array.isArray(entries)) return;
     for (const entry of entries) {
       if (skipDirs.has(entry)) continue;
       const full = path.join(dir, entry);

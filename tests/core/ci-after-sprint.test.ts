@@ -128,6 +128,8 @@ describe('runAfterSprintCiReport', () => {
 
   beforeEach(() => {
     tmpDir = makeTempDir();
+    // Create tsconfig.json so detectFullStack detects TypeScript and runTscCheck actually calls spawnSync
+    writeFileSync(join(tmpDir, 'tsconfig.json'), '{}', 'utf-8');
     vi.mocked(cp.spawnSync).mockReturnValue(spawnResult({
       stdout: 'Tests  100 passed (100)',
     }));

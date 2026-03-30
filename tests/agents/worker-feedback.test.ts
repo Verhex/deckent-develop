@@ -26,12 +26,19 @@ vi.mock('node:child_process', () => ({
 
 // Mock node:fs (required by worker.ts imports)
 vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
+  readFileSync: vi.fn((filePath: unknown) => {
+    // Return a TypeScript/vitest package.json so stack detector can identify
+    // the project as TypeScript and provide 'npx vitest run' as test command
+    if (typeof filePath === 'string' && filePath.endsWith('package.json')) {
+      return JSON.stringify({ devDependencies: { vitest: '^1.0.0', typescript: '^5.0.0' } });
+    }
+    return '';
+  }),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(() => false),
   unlinkSync: vi.fn(),
   mkdirSync: vi.fn(),
-  readdirSync: vi.fn(),
+  readdirSync: vi.fn(() => []),
   openSync: vi.fn(() => 42),
   closeSync: vi.fn(),
   constants: { O_WRONLY: 1, O_CREAT: 64, O_EXCL: 128 },

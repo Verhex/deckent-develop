@@ -46,6 +46,8 @@ describe('Pre-Sprint CI Validation', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     tmpDir = makeTmpDir();
+    // Create tsconfig.json so detectFullStack detects TypeScript and runTscCheck actually calls spawnSync
+    fs.writeFileSync(path.join(tmpDir, 'tsconfig.json'), '{}', 'utf-8');
   });
 
   afterEach(() => {

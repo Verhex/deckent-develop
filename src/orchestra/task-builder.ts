@@ -260,7 +260,7 @@ export function extractScopeFromDirective(line: string): TaskScope {
     }
   }
 
-  // Match standalone doc/config references: any root-level .md, .json, .gitignore, etc.
+  // Match docs/ files (.md, .ts, .js) and standalone root-level .md files (README.md, DECKENT.md)
   const docFileMatches = line.match(/\b(docs\/[\w/.-]+\.(?:md|ts|js)|(?:[\w-]+)\.md)\b/g);
   if (docFileMatches) {
     for (const f of docFileMatches) {
@@ -291,7 +291,8 @@ export function extractScopeFromDirective(line: string): TaskScope {
 
   // Match standalone dotfiles at root: .gitignore, .npmignore, .env, .npmrc, etc.
   // \b cannot precede a leading dot, so use negative lookbehind instead.
-  const rootDotfileMatches = line.match(/(?<![/\w])(\.[\w-]+)(?!\w)/g);
+  // Negative lookahead includes / to avoid matching directory prefixes (.deckent/, .brain/).
+  const rootDotfileMatches = line.match(/(?<![/\w])(\.[\w-]+)(?![/\w])/g);
   if (rootDotfileMatches) {
     for (const f of rootDotfileMatches) {
       if (!filesWrite.includes(f)) filesWrite.push(f);

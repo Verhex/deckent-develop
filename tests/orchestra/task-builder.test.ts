@@ -1394,6 +1394,29 @@ describe('extractScopeFromDirective — standalone root files', () => {
     const count = scope.filesWrite.filter(f => f === 'DECKENT.md').length;
     expect(count).toBe(1);
   });
+
+  it('does NOT add .deckent as filesWrite when path is .deckent/config.json', () => {
+    const scope = extractScopeFromDirective('Files: .deckent/config.json');
+    expect(scope.filesWrite).not.toContain('.deckent');
+    expect(scope.filesWrite).toContain('.deckent/config.json');
+  });
+
+  it('does NOT add .brain as filesWrite when path is .brain/MEMORY.md', () => {
+    const scope = extractScopeFromDirective('.brain/MEMORY.md');
+    expect(scope.filesWrite).not.toContain('.brain');
+  });
+
+  it('does NOT add .contracts as filesWrite when path is .contracts/api-surface.md', () => {
+    const scope = extractScopeFromDirective('.contracts/api-surface.md');
+    expect(scope.filesWrite).not.toContain('.contracts');
+  });
+
+  it('still matches real standalone dotfiles after directory prefix fix', () => {
+    const scope = extractScopeFromDirective('.gitignore, .npmrc, .deckent/config.json');
+    expect(scope.filesWrite).toContain('.gitignore');
+    expect(scope.filesWrite).toContain('.npmrc');
+    expect(scope.filesWrite).not.toContain('.deckent');
+  });
 });
 
 describe('enrichScopeWithTestFiles', () => {

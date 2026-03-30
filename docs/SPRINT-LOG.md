@@ -1817,3 +1817,119 @@ Vizetron sprint-002 başarıyla tamamlandı (PROJECT_ANALYSIS.md, 242 satır). 7
 - 070-005: sprint-controller.ts God Object Split — Faz 1 (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 71 — sprint-071
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-30
+**Duration:** 1061s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1060816ms |
+
+### Tasks
+
+- 071-001: Worker Feedback Test — fs Mock Fix (43 fail) (DONE)
+- 071-002: Brain Test — statSync Mock Fix (16 fail) (GO_WITH_TECH_DEBT)
+- 071-003: Doctor Command Logic Fix (9 fail) (DONE)
+- 071-004: Stack/CI/Analyzer Detection Fix (23 fail) (DONE)
+- 071-005: Kalan Mock/Integration Fix (3 fail) (GO_WITH_TECH_DEBT)
+
+---
+
+## Sprint 72 — sprint-072
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-28
+**Duration:** 1847s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 4 |
+| Tech Debt | 4 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 1846945ms |
+
+### Tasks
+
+- 072-001: Plan Tier Generalizasyonu — Claude-Specific → Genel (GO_WITH_TECH_DEBT)
+- 072-002: Init Wizard Genel Provider Seçimi (NO_GO)
+- 072-003: Model İsimleri Güncelliği + Doğrulama (DONE)
+- 072-004: README.md Güncel Özellikler (GO_WITH_TECH_DEBT)
+- 072-005: sprint-controller.ts God Object Split — Faz 1 (GO_WITH_TECH_DEBT)
+
+### Notes
+
+Tier generalizasyonu ve model API ID'leri güncellendi. God object split başlatıldı (sprint-phases.ts extract). Init wizard provider seçimi task'ı başarısız oldu.
+
+---
+
+## Sprint 73 — sprint-073
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-29
+**Duration:** 1061s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1060815ms |
+
+### Tasks
+
+- 073-001: Worker Feedback Test — fs Mock Fix (43 fail) (DONE)
+- 073-002: Brain Test — statSync Mock Fix (16 fail) (GO_WITH_TECH_DEBT)
+- 073-003: Doctor Command Logic Fix (9 fail) (DONE)
+- 073-004: Stack/CI/Analyzer Detection Fix (23 fail) (DONE)
+- 073-005: Kalan Mock/Integration Fix (3 fail) (GO_WITH_TECH_DEBT)
+
+### Notes
+
+100 test regresyonu düzeltildi: 43 fs mock, 16 brain mock, 9 doctor logic, 23 stack/CI, 3 integration. 12,161 test passed, 15 skipped (12,176 total). Agent: test-writer, Skill: testing-expert.
+
+---
+## Sprint 72 — sprint-072
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-30
+**Duration:** 449s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 448715ms |
+
+### Tasks
+
+- 072-001: Fix debt: Tech debt from 069-005-fix: TempAgent mechanism was already fully implemented in (GO_WITH_TECH_DEBT)
+- 072-002: Fix debt: Tech debt from 069-006-fix: A) Fixed extractScopeFromDirective bug: docFileMatch (DONE)
+- 072-003: README.md Güncellemesi — Test Sayıları + Sprint Bilgisi (DONE)
+- 072-004: CHANGELOG.md + docs/CHANGELOG.md Güncelleme (DONE)
+- 072-005: .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY (GO_WITH_TECH_DEBT)
+- 072-006: DECKENT.md + CLAUDE.md Tutarlılık Kontrolü (GO_WITH_TECH_DEBT)
+- 072-007: docs/SPRINT-LOG.md Güncelleme (GO_WITH_TECH_DEBT)
+
+---

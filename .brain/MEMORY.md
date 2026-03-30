@@ -162,3 +162,11 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - Init Wizard Genel Provider Seçimi: GO_WITH_TECH_DEBT — Init wizard updated: 'Select your Claude plan' → 'Select your plan' with new provider-agnostic tier names (performance/b
 - README.md Güncel Özellikler: GO_WITH_TECH_DEBT — README.md updated: A) Tests 12,160+, B) Sprints 71+, C) Native Windows FULL support (subprocess backend, shell:true, UTF
 - sprint-controller.ts God Object Split — Faz 1: GO_WITH_TECH_DEBT — Extracted 7 sprint phase functions from runSprint() into sprint-phases.ts: runPlanPhase, runSpawnPhase, runEvaluatePhase
+## Sprint sprint-071 Learnings
+- Brain Test — statSync Mock Fix (16 fail): GO_WITH_TECH_DEBT — Fixed 16 failing tests (6 in brain.test.ts, 10 in brain-rollback.test.ts). Root cause: isStackStale() in stack-detector.
+- Kalan Mock/Integration Fix (3 fail): GO_WITH_TECH_DEBT — Fixed 3 test assertions to match updated source behavior: A) start.test.ts: runDoctorChecks now called with (root, undef
+## Sprint sprint-072 Learnings
+- Fix debt: Tech debt from 069-005-fix: TempAgent mechanism was already fully implemented in: GO_WITH_TECH_DEBT — debt-069-005-fix resolved: TempAgent mechanism fully verified — generateTempAgents() (7 templates), AgentPoolManager (LR
+- .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY: GO_WITH_TECH_DEBT — PROJECT-IDENTITY.md: Test sayısı 12,176+ (12,161 passed + 15 skipped, 476 test files), sprint-073 (son sprint), 73 total
+- DECKENT.md + CLAUDE.md Tutarlılık Kontrolü: GO_WITH_TECH_DEBT — 4 numerical inconsistency fixed: (1) orchestra: 42→45 modules (sprint-phases.ts + usage-manager.ts + sprint-controller.t
+- docs/SPRINT-LOG.md Güncelleme: GO_WITH_TECH_DEBT — Sprint 072 ve 073 entry'leri docs/SPRINT-LOG.md dosyasına eklendi. Sprint 072: 5 task, 4 done, 4 tech debt, 1 no-go. Spr

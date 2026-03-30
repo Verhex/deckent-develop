@@ -5,21 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0-beta.3-sprint70] - 2026-03-27
+## [0.2.0-beta.3-sprint72] - 2026-03-30
 
 ### Added
 
-- Model İsimleri Güncelliği + Doğrulama
+- README.md Güncellemesi — Test Sayıları + Sprint Bilgisi
+- CHANGELOG.md + docs/CHANGELOG.md Güncelleme
 
 ### Changed
 
-- Plan Tier Generalizasyonu — Claude-Specific → Genel (completed with tech debt)
-- Init Wizard Genel Provider Seçimi (completed with tech debt)
-- README.md Güncel Özellikler (completed with tech debt)
-- sprint-controller.ts God Object Split — Faz 1 (completed with tech debt)
+- Fix debt: Tech debt from 069-005-fix: TempAgent mechanism was already fully implemented in (completed with tech debt)
+- .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY (completed with tech debt)
+- DECKENT.md + CLAUDE.md Tutarlılık Kontrolü (completed with tech debt)
+- docs/SPRINT-LOG.md Güncelleme (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 069-006-fix: A) Fixed extractScopeFromDirective bug: docFileMatch
 
 
-_Tasks: 5 total, 5 done, 4 tech debt, 0 no-go_
+_Tasks: 7 total, 7 done, 4 tech debt, 0 no-go_
+
+## [0.2.0-beta.3-sprint73] - 2026-03-30
+
+### Fixed
+
+- **Test Regression Fix**: 100 test regresyonu düzeltildi — 0 fail, 12,161 passed
+  - 43 fs mock düzeltmesi (worker-feedback, verify-lang testleri)
+  - 16 brain mock düzeltmesi (`statSync` mock, `isStackStale()` çağrı zinciri)
+  - 9 doctor logic düzeltmesi (`c.ok` → `c.passed` field mismatch)
+  - 23 stack/CI/analyzer detection düzeltmesi
+  - 3 integration test düzeltmesi (start.test.ts, analyzer-overhaul.test.ts)
+
+### Changed
+
+- Brain Test — statSync Mock Fix (16 fail) (completed with tech debt)
+- Kalan Mock/Integration Fix (3 fail) (completed with tech debt)
+
+_Sprint 073: 5 tasks, 5 done, 2 tech debt, 0 no-go_
+
+---
+
+## [0.2.0-beta.3-sprint72] - 2026-03-28
+
+### Added
+
+- Model API ID güncellemesi: `claude-opus-4-6`, `claude-sonnet-4-6` resmi API ID'leri
+
+### Changed
+
+- **Plan Tier Generalizasyonu**: Claude-specific plan adları provider-agnostic hale getirildi
+  - `max_plan` → `performance`, `max5x_plan` → `balanced`, `pro_plan` → `economic`
+  - Tüm provider'lar (Claude, Codex, Gemini) aynı tier sistemini kullanıyor
+- **Init Wizard**: "Select your Claude plan" → "Select your plan" — provider-agnostic
+  - Yeni tier isimleri: performance/balanced/economic/unlimited
+- **sprint-controller.ts God Object Split**: 7 sprint faz fonksiyonu `sprint-phases.ts`'e taşındı
+  - `runPlanPhase`, `runSpawnPhase`, `runEvaluatePhase` ve diğerleri extract edildi
+  - `sprint-controller.ts` slim hale geldi, maintainability artırıldı
+- **README.md**: Test sayısı, sprint sayısı, Windows destek bilgisi güncellendi
+
+_Sprint 072: 5 tasks, 5 done, 4 tech debt, 0 no-go_
 
 ## [0.2.0-beta.3] - 2026-03-27
 
