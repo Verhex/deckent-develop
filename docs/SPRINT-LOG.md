@@ -1960,3 +1960,29 @@ Tier generalizasyonu ve model API ID'leri güncellendi. God object split başlat
 - 073-005: God Object Split Faz 2 — sprint-controller Utility Extract (DONE)
 
 ---
+## Sprint 74 — sprint-074
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-30
+**Duration:** 663s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 58.4% |
+| Duration | 663378ms |
+
+### Tasks
+
+- 074-001: Stale Heartbeat Root Cause Fix (410x pattern) (GO_WITH_TECH_DEBT)
+- 074-002: Dashboard API Entegrasyon Testi (P3-20,22) (GO_WITH_TECH_DEBT)
+- 074-003: Worker Graceful Shutdown — Sprint State Tutarlılığı (P6-40) (GO_WITH_TECH_DEBT)
+- 074-004: God Object Split Faz 3 — Result Collector Extract (GO_WITH_TECH_DEBT)
+- 074-005: BETA-ROADMAP Güncelleme + Sprint Tablosu (DONE)
+
+---

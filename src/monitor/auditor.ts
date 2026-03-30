@@ -70,6 +70,9 @@ export function scanHeartbeats(projectRoot: string): {
 
     heartbeats.push(hb);
 
+    // Skip stale check for heartbeats with DONE status — worker already completed
+    if (hb.status === AgentStatus.DONE) continue;
+
     const parsedTime = new Date(hb.timestamp).getTime();
     if (isNaN(parsedTime)) continue; // malformed timestamp — skip, do not mark as stale
     const elapsed = currentTime - parsedTime;

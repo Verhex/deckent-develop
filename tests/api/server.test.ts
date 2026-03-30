@@ -27,6 +27,7 @@ vi.mock('../../src/core/config.js', () => ({
   })),
   deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),
   validatePartialConfig: vi.fn(),
+  createDefaultConfig: vi.fn(() => ({ mode: 'balanced', max_workers: 4, brain_model: 'opus' })),
   ConfigValidationError: class extends Error { name = 'ConfigValidationError'; errors: string[] = []; },
 }));
 
@@ -861,6 +862,169 @@ describe('createHttpServer', () => {
         req.end();
       });
       expect(res.status).toBe(400);
+    });
+  });
+
+  // ─── Response Format Validation ─────────────────────────────
+
+  describe('GET /api/status — field structure validation', () => {
+    it('response includes sprint, agents, progress, alerts top-level fields', async () => {
+      mockReadJsonSafe.mockReturnValue(JSON.parse(dashboardJson));
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body).toHaveProperty('sprint');
+      expect(body).toHaveProperty('agents');
+      expect(body).toHaveProperty('progress');
+      expect(body).toHaveProperty('alerts');
+    });
+
+    it('progress sub-field has done, active, blocked, total fields', async () => {
+      mockReadJsonSafe.mockReturnValue(JSON.parse(dashboardJson));
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status');
+      const body = JSON.parse(res.body);
+      expect(body.progress).toHaveProperty('done');
+      expect(body.progress).toHaveProperty('active');
+      expect(body.progress).toHaveProperty('blocked');
+      expect(body.progress).toHaveProperty('total');
+    });
+
+    it('sprint sub-field has id and phase fields', async () => {
+      mockReadJsonSafe.mockReturnValue(JSON.parse(dashboardJson));
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status');
+      const body = JSON.parse(res.body);
+      expect(body.sprint).toHaveProperty('id');
+      expect(body.sprint).toHaveProperty('phase');
+    });
+  });
+
+  describe('GET /api/config — response field validation', () => {
+    it('returns flat config object without extra wrapping', async () => {
+      const configData = { mode: 'balanced', max_workers: 4, brain_model: 'opus' };
+      mockReadJsonSafe.mockReturnValue(configData);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/config');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/json');
+      const body = JSON.parse(res.body);
+      // Config should be a flat object (not wrapped in { data: ... } or { config: ... })
+      expect(body).not.toHaveProperty('data');
+      expect(body).not.toHaveProperty('config');
+      expect(body.mode).toBe('balanced');
+      expect(body.max_workers).toBe(4);
+    });
+  });
+
+  describe('GET /api/config/defaults — response field validation', () => {
+    it('returns defaults config object', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/config/defaults');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/json');
+      const body = JSON.parse(res.body);
+      expect(typeof body).toBe('object');
+      expect(body).not.toBeNull();
+    });
+  });
+
+  describe('GET /api/history — response field validation', () => {
+    it('each sprint entry has id field', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('sprints')) return true;
+        return false;
+      });
+      mockReaddirSync.mockReturnValue(['sprint-001.md', 'sprint-002.md'] as unknown as ReturnType<typeof readdirSync>);
+      mockReadFileSync.mockReturnValue(sprintMd);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/history');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body) as Array<Record<string, unknown>>;
+      expect(Array.isArray(body)).toBe(true);
+      expect(body.length).toBeGreaterThanOrEqual(1);
+      for (const entry of body) {
+        expect(entry).toHaveProperty('id');
+      }
+    });
+  });
+
+  describe('GET /api/memory — response field validation', () => {
+    it('content field is a string, not an object', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('MEMORY.md')) return true;
+        return false;
+      });
+      mockReadFileSync.mockReturnValue('## Sprint Learnings\n- item one\n- item two');
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/memory');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(typeof body.content).toBe('string');
+      expect(body.content).toContain('Sprint Learnings');
+    });
+  });
+
+  describe('GET /api/doctor — response field validation', () => {
+    it('response has boolean ok field and checks array', async () => {
+      mockRunDoctorChecks.mockReturnValue({
+        ok: true,
+        checks: [
+          { name: 'Node', passed: true, message: 'v18.0.0', required: true },
+          { name: 'Config', passed: true, message: 'valid', required: false },
+        ],
+      });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/doctor');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(typeof body.ok).toBe('boolean');
+      expect(Array.isArray(body.checks)).toBe(true);
+    });
+
+    it('each check item has name, passed, message fields', async () => {
+      mockRunDoctorChecks.mockReturnValue({
+        ok: false,
+        checks: [
+          { name: 'Node', passed: true, message: 'v18.0.0', required: true },
+          { name: 'Config', passed: false, message: 'config.json missing', required: false },
+        ],
+      });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/doctor');
+      const body = JSON.parse(res.body);
+      for (const check of body.checks as Array<Record<string, unknown>>) {
+        expect(check).toHaveProperty('name');
+        expect(check).toHaveProperty('passed');
+        expect(check).toHaveProperty('message');
+      }
     });
   });
 

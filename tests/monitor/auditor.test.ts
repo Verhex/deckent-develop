@@ -224,6 +224,25 @@ describe('scanHeartbeats', () => {
     expect(result.staleAgents).toHaveLength(0);
     expect(result.alerts).toHaveLength(0);
   });
+
+  it('skips stale check for heartbeats with DONE status', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+
+    // Heartbeat has DONE status but a very old timestamp — should NOT be flagged as stale
+    const staleTimestamp = new Date(Date.now() - 600_000).toISOString();
+    const hb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'DONE' as never,
+      currentAction: 'Task completed', timestamp: staleTimestamp, filesChangedCount: 5, sequence: 10,
+    };
+
+    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.heartbeats).toHaveLength(1);
+    expect(result.staleAgents).toHaveLength(0);
+    expect(result.alerts).toHaveLength(0);
+  });
 });
 
 describe('checkBoundaryViolations', () => {

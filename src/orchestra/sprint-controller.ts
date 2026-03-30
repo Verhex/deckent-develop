@@ -99,8 +99,15 @@ import { resetDashboard, updateDashboard, detectDeadlocks } from '../monitor/aud
 // ─── Wave 2 — worker ──────────────────────────────────────────────
 import { releaseAllLocks } from '../agents/worker.js';
 
-// ─── Result watcher (fs.watch-based, replaces pure polling) ──────
-import { createResultWatcher } from './result-watcher.js';
+// ─── Result Collector (extracted Phase 3) ────────────────────────
+import {
+  waitForResults as waitForResultsImpl,
+  resolveAgentPrompt,
+  resolveSkillPrompts,
+} from './result-collector.js';
+
+// Re-export for backward compatibility (previously defined in this file)
+export { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 
 // ─── Worker IPC ───────────────────────────────────────────────────
 import { ChannelRegistry } from '../agents/worker-ipc.js';
@@ -175,6 +182,103 @@ export interface RunSprintOptions {
   rollback?: boolean;
   /** Optional Connector instance — when provided, router uses connector.getAvailableProviders() */
   connector?: Connector;
+}
+
+// ═══ Interrupt State ════════════════════════════════════════════════
+
+/** Tracks the currently active sprint for SIGINT/interrupt cleanup. */
+interface ActiveSprintRef {
+  projectRoot: string;
+  sprint: Sprint;
+  spawnBackend?: SpawnBackend;
+}
+
+let _activeSprint: ActiveSprintRef | null = null;
+let _isInterrupted = false;
+
+/** Register the active sprint so SIGINT handler can clean it up. @internal */
+export function setActiveSprint(projectRoot: string, sprint: Sprint, spawnBackend?: SpawnBackend): void {
+  _activeSprint = { projectRoot, sprint, spawnBackend };
+}
+
+/** Clear the active sprint reference (called on sprint completion). @internal */
+export function clearActiveSprint(): void {
+  _activeSprint = null;
+}
+
+/** Reset interrupt flag — for use in tests only. @internal */
+export function resetInterruptState(): void {
+  _isInterrupted = false;
+  _activeSprint = null;
+}
+
+/** Returns true if the sprint was interrupted via SIGINT. */
+export function isInterrupted(): boolean {
+  return _isInterrupted;
+}
+
+/**
+ * Interrupt the active sprint: marks in-progress tasks as INTERRUPTED,
+ * writes ABORTED status to heartbeat files, releases locks, and kills workers.
+ * Called from the SIGINT handler in entry.ts.
+ */
+export function interruptActiveSprint(): void {
+  if (_isInterrupted || !_activeSprint) return;
+  _isInterrupted = true;
+
+  const { projectRoot, sprint, spawnBackend } = _activeSprint;
+  const tasksDir = join(projectRoot, TASKS_DIR);
+
+  const activeStatuses = new Set([
+    TaskStatus.PENDING,
+    TaskStatus.CLAIMED,
+    TaskStatus.EXECUTING,
+    TaskStatus.TESTING,
+    TaskStatus.DOCUMENTING,
+  ]);
+
+  for (const task of sprint.tasks) {
+    if (!activeStatuses.has(task.status)) continue;
+
+    // Mark task file as INTERRUPTED
+    try {
+      const taskPath = join(tasksDir, `task-${task.id}.json`);
+      if (existsSync(taskPath)) {
+        const raw = readFileSync(taskPath, 'utf-8');
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        parsed['status'] = 'INTERRUPTED';
+        writeFileSync(taskPath, JSON.stringify(parsed, null, 2), 'utf-8');
+      }
+    } catch { /* skip — non-fatal */ }
+
+    // Mark heartbeat as ABORTED
+    try {
+      const hbPath = join(tasksDir, `task-${task.id}.hb`);
+      if (existsSync(hbPath)) {
+        const raw = readFileSync(hbPath, 'utf-8');
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        parsed['status'] = 'ABORTED';
+        parsed['timestamp'] = new Date().toISOString();
+        writeFileSync(hbPath, JSON.stringify(parsed, null, 2), 'utf-8');
+      }
+    } catch { /* skip — non-fatal */ }
+
+    // Release locks for assigned workers
+    if (task.assignedWorker) {
+      try { releaseAllLocks(projectRoot, task.assignedWorker); } catch { /* skip */ }
+    }
+  }
+
+  // Kill all active workers
+  try {
+    const workers = spawnBackend ? spawnBackend.list() : listWorkers();
+    for (const taskId of workers) {
+      try {
+        if (spawnBackend) spawnBackend.kill(taskId);
+        else killWorker(taskId);
+      } catch { /* already dead */ }
+    }
+  } catch { /* non-fatal */ }
 }
 
 // ═══ IPC Channel Registry ══════════════════════════════════════════
@@ -801,73 +905,7 @@ export function cleanupDraftTasks(projectRoot: string): void {
   }
 }
 
-/**
- * Resolve the agent prompt for a task's assigned agent.
- * Combines PROMPT.md (if exists) with systemPrompt + expertise from agent.json.
- * Returns undefined if the agent is 'generic' or no prompt material can be found.
- */
-export function resolveAgentPrompt(projectRoot: string, task: Task): string | undefined {
-  const agentId = task.assignedAgent;
-  if (!agentId || agentId === 'generic') return undefined;
-
-  // Try to load PROMPT.md
-  let promptMd: string | undefined;
-  const promptPaths = [
-    join(projectRoot, '.deckent', 'agents', agentId, 'PROMPT.md'),
-    join(projectRoot, TASKS_DIR, 'agents', agentId, 'PROMPT.md'),
-  ];
-  for (const p of promptPaths) {
-    try {
-      promptMd = readFileSync(p, 'utf-8');
-      break;
-    } catch { /* not found, try next */ }
-  }
-
-  // Load systemPrompt + expertise from agent.json
-  let systemPrompt: string | undefined;
-  let expertise = '';
-  const agentJsonPaths = [
-    join(projectRoot, '.deckent', 'agents', agentId, 'agent.json'),
-    join(projectRoot, TASKS_DIR, 'agents', agentId, 'agent.json'),
-  ];
-  for (const p of agentJsonPaths) {
-    try {
-      const raw = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
-      systemPrompt = raw['systemPrompt'] as string | undefined;
-      expertise = Array.isArray(raw['expertise']) ? (raw['expertise'] as string[]).join(', ') : '';
-      break;
-    } catch { /* not found, try next */ }
-  }
-
-  // Combine: PROMPT.md + systemPrompt + expertise
-  const parts: string[] = [];
-  if (systemPrompt) parts.push(systemPrompt);
-  if (expertise) parts.push(`Expertise: ${expertise}`);
-  if (promptMd) parts.push(promptMd);
-
-  return parts.length > 0 ? parts.join('\n\n') : undefined;
-}
-
-/**
- * Resolve SKILL.md content for all skills assigned to a task.
- * Returns an array of { name, content } for each loadable skill.
- */
-export function resolveSkillPrompts(
-  projectRoot: string,
-  task: Task,
-): Array<{ name: string; content: string }> {
-  const skillIds = task.assignedSkills;
-  if (!skillIds || skillIds.length === 0) return [];
-  const results: Array<{ name: string; content: string }> = [];
-  for (const skillId of skillIds) {
-    const skillPath = join(projectRoot, '.deckent', 'skills', skillId, 'SKILL.md');
-    try {
-      const content = readFileSync(skillPath, 'utf-8');
-      results.push({ name: skillId, content });
-    } catch { /* skill not found, skip */ }
-  }
-  return results;
-}
+// resolveAgentPrompt, resolveSkillPrompts: moved to result-collector.ts, re-exported above
 
 /**
  * Spawn worker agents for sprint tasks via the configured backend.
@@ -1013,6 +1051,7 @@ export function routeSprintTasks(
 /**
  * Wait for task result files to appear on disk using fs.watch with fallback polling.
  * Supports queued task execution: as workers finish, queued tasks are spawned.
+ * Delegates to result-collector.ts (extracted Phase 3).
  * @param projectRoot - Project root directory
  * @param sprint - Sprint whose results to wait for
  * @param timeoutMs - Maximum wait time in ms (default: 30 minutes)
@@ -1027,114 +1066,7 @@ export async function waitForResults(
   queue?: Task[],
   spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
 ): Promise<TaskResult[]> {
-  const timeout = timeoutMs ?? 30 * 60 * 1000;
-  const WATCH_FALLBACK_MS = 5_000;
-  const startTime = Date.now();
-  const results: TaskResult[] = [];
-  const taskIds = new Set(sprint.tasks.map(t => t.id));
-  const collected = new Set<string>();
-  const remainingQueue: Task[] = queue ? [...queue] : [];
-
-  const collectResults = (): string[] => {
-    const newlyCollected: string[] = [];
-    for (const taskId of taskIds) {
-      if (collected.has(taskId)) continue;
-      const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-      if (existsSync(resultPath)) {
-        const result = readJsonSafe<TaskResult>(resultPath);
-        if (result) {
-          results.push(result);
-          collected.add(taskId);
-          newlyCollected.push(taskId);
-        }
-      }
-    }
-    return newlyCollected;
-  };
-
-  const queueBackend = spawnOpts?.spawnBackend;
-
-  const processQueue = (completedTaskIds: string[]): void => {
-    for (const taskId of completedTaskIds) {
-      if (remainingQueue.length === 0) break;
-      // Kill completed worker (clean up slot)
-      try {
-        if (queueBackend) queueBackend.kill(taskId);
-        else killWorker(taskId);
-      } catch { /* ignore */ }
-      const nextTask = remainingQueue.shift(); // length > 0 checked above
-      if (!nextTask) break;
-      const queueAgentPrompt = resolveAgentPrompt(projectRoot, nextTask);
-      const queueSkillPrompts = resolveSkillPrompts(projectRoot, nextTask);
-      const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
-      const writeTargets = ['.tasks/', ...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
-      const allowedTools = writeTargets.length > 0
-        ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
-        : 'Read,Write,Edit,Bash,Glob,Grep';
-      try {
-        if (queueBackend) {
-          queueBackend.spawn(nextTask.id, nextTask.model, prompt, {
-            allowedTools,
-            autoApprove: spawnOpts?.autoApprove ?? false,
-            projectDir: projectRoot,
-          });
-        } else {
-          spawnWorker(nextTask.id, nextTask.model, prompt, projectRoot, {
-            allowedTools,
-            autoApprove: spawnOpts?.autoApprove ?? false,
-          });
-        }
-      } catch (err) {
-        debugLog('waitForResults:queue-spawn', `Failed to spawn queued task ${nextTask.id}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-  };
-
-  const initiallyCollected = collectResults();
-  processQueue(initiallyCollected);
-  if (collected.size === taskIds.size) return results;
-
-  // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
-  const ipcWakeup = { resolve: (_: void) => {}, pending: false };
-  let ipcWakeupPromise: Promise<void> | null = null;
-
-  const setupIpcListeners = (): void => {
-    for (const taskId of taskIds) {
-      if (collected.has(taskId)) continue;
-      const channel = _channelRegistry.get(taskId);
-      if (!channel) continue;
-
-      channel.onMessage('HEARTBEAT', () => {
-        if (ipcWakeup.pending) {
-          ipcWakeup.pending = false;
-          ipcWakeup.resolve();
-        }
-      });
-    }
-  };
-
-  const makeIpcWakeupPromise = (): Promise<void> => {
-    ipcWakeup.pending = true;
-    return new Promise<void>(resolve => { ipcWakeup.resolve = resolve; });
-  };
-
-  setupIpcListeners();
-
-  // Use fs.watch with fallback polling (5s instead of 15s)
-  const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS);
-  try {
-    while (Date.now() - startTime < timeout) {
-      ipcWakeupPromise = makeIpcWakeupPromise();
-      // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
-      await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
-      const newlyCollected = collectResults();
-      processQueue(newlyCollected);
-      if (collected.size === taskIds.size) break;
-    }
-  } finally {
-    watcher.close();
-  }
-  return results;
+  return waitForResultsImpl(projectRoot, sprint, timeoutMs, queue, spawnOpts, _channelRegistry);
 }
 
 // isDocTask: moved to sprint-utils.ts, re-exported above
@@ -1506,6 +1438,9 @@ export async function runSprint(
   );
   let lastUsage = initialUsage;
 
+  // Register active sprint for SIGINT interrupt cleanup
+  setActiveSprint(projectRoot, sprint, spawnBackend);
+
   // Phase 1.5: Route tasks to providers via Connector or registry (non-fatal)
   try {
     const connector = opts?.connector;
@@ -1558,6 +1493,9 @@ export async function runSprint(
   sprint.status = SprintStatus.COMPLETE;
   sprint.phase = SprintPhase.COMPLETE;
   sprint.completedAt = now();
+
+  // Clear active sprint reference — sprint completed normally
+  clearActiveSprint();
 
   // Clear sprint state file after successful completion
   clearSprintState(projectRoot);

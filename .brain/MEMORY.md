@@ -175,3 +175,8 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - VISION.md — Proje Vizyonu ve Yol Haritası: GO_WITH_TECH_DEBT — VISION.md oluşturuldu. 7 bölüm: Vizyon, Misyon, Hedef Kullanıcılar, Rakip Analizi (5 rakip tablo), Teknoloji Kararları (
 - docs/ Link Audit — Kırık Link Kontrolü: GO_WITH_TECH_DEBT — Link audit completed for docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/index.md, README.md. Found 4 broken internal links 
 - .detect-secrets Kurulumu — Pre-commit Güvenlik: GO_WITH_TECH_DEBT — A) .pre-commit-config.yaml oluşturuldu — detect-secrets v1.5.0 hook, .secrets.baseline referansı, package-lock.json excl
+## Sprint sprint-074 Learnings
+- Stale Heartbeat Root Cause Fix (410x pattern): GO_WITH_TECH_DEBT — Stale heartbeat root cause fix completed. A) worker.ts: writeResult() now calls finalizeHeartbeat() which writes a DONE 
+- Dashboard API Entegrasyon Testi (P3-20,22): GO_WITH_TECH_DEBT — Added 10 new integration tests across 6 new describe blocks validating field structure of API responses: GET /api/status
+- Worker Graceful Shutdown — Sprint State Tutarlılığı (P6-40): GO_WITH_TECH_DEBT — Implemented Worker Graceful Shutdown (Sprint State Tutarlılığı). A) entry.ts: Extended SIGINT handler to call interruptA
+- God Object Split Faz 3 — Result Collector Extract: GO_WITH_TECH_DEBT — God Object Split Faz 3: result-collector.ts oluşturuldu. waitForResults() (IPC+fs.watch loop, processQueue, collectResul

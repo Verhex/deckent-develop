@@ -314,6 +314,42 @@ export function writeResult(projectRoot: string, result: TaskResult): void {
       : TaskStatus.DONE;
 
   updateTaskStatus(projectRoot, result.taskId, newStatus);
+
+  // Write final heartbeat with DONE status so auditor does not flag as stale
+  finalizeHeartbeat(projectRoot, result.taskId);
+}
+
+/**
+ * Write a final DONE heartbeat for a completed task.
+ * Updates the existing heartbeat file with status DONE and a fresh timestamp,
+ * preventing the auditor from flagging it as stale after task completion.
+ */
+export function finalizeHeartbeat(projectRoot: string, taskId: string): void {
+  const hbPath = heartbeatFilePath(projectRoot, taskId);
+  let workerId = `worker-${taskId}`;
+
+  // Read existing heartbeat to preserve workerId
+  if (existsSync(hbPath)) {
+    try {
+      const existing = JSON.parse(readFileSync(hbPath, 'utf-8')) as Heartbeat;
+      if (existing.workerId) {
+        workerId = existing.workerId;
+      }
+    } catch {
+      // Corrupted heartbeat — use default workerId
+    }
+  }
+
+  const hb = createHeartbeat(
+    workerId,
+    taskId,
+    AgentStatus.DONE,
+    'Task completed',
+    undefined,
+    undefined,
+    undefined,
+  );
+  writeHeartbeat(projectRoot, hb);
 }
 
 export function updateTaskStatus(

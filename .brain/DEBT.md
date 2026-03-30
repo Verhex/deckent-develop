@@ -26,3 +26,7 @@
 | debt-073-002 | Tech debt from 073-002: VISION.md oluşturuldu. 7 bölüm: Vizyon, Misyon, Hedef Ku | 073-002 | sprint-073 | NORMAL | 0 | true | sprint-073 | 2026-03-30T10:54:06.264Z |
 | debt-073-003 | Tech debt from 073-003: Link audit completed for docs/CHANGELOG.md, docs/SPRINT- | 073-003 | sprint-073 | NORMAL | 0 | true | sprint-073 | 2026-03-30T10:54:09.163Z |
 | debt-073-004 | Tech debt from 073-004: A) .pre-commit-config.yaml oluşturuldu — detect-secrets | 073-004 | sprint-073 | NORMAL | 0 | true | sprint-073 | 2026-03-30T10:54:12.067Z |
+| debt-074-001 | Tech debt from 074-001: Stale heartbeat root cause fix completed. A) worker.ts: | 074-001 | sprint-074 | NORMAL | 0 | true | sprint-074 | 2026-03-30T11:29:16.116Z |
+| debt-074-002 | Tech debt from 074-002: Added 10 new integration tests across 6 new describe blo | 074-002 | sprint-074 | NORMAL | 0 | true | sprint-074 | 2026-03-30T11:29:19.267Z |
+| debt-074-003 | Tech debt from 074-003: Implemented Worker Graceful Shutdown (Sprint State Tutar | 074-003 | sprint-074 | NORMAL | 0 | true | sprint-074 | 2026-03-30T11:29:23.566Z |
+| debt-074-004 | Tech debt from 074-004: God Object Split Faz 3: result-collector.ts oluşturuldu. | 074-004 | sprint-074 | NORMAL | 0 | true | sprint-074 | 2026-03-30T11:29:27.846Z |

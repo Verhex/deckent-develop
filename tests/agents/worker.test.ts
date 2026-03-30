@@ -13,6 +13,7 @@ import {
   updateTaskStatus,
   isWithinScope,
   readWorkerLog,
+  finalizeHeartbeat,
   TaskClaimError,
   LockError,
 } from '../../src/agents/worker.js';
@@ -314,8 +315,8 @@ describe('writeResult', () => {
 
     writeResult('/project', result);
 
-    // result file + updateTaskStatus writes task JSON
-    expect(mockedWriteFileSync).toHaveBeenCalledTimes(2);
+    // result file + updateTaskStatus writes task JSON + finalizeHeartbeat writes .hb
+    expect(mockedWriteFileSync).toHaveBeenCalledTimes(3);
   });
 
   it('sets task status to DONE for selfAssessment DONE', () => {
@@ -330,9 +331,9 @@ describe('writeResult', () => {
       coverage: 90, selfAssessment: 'DONE', notes: '',
     });
 
-    // Last writeFileSync call should have DONE status
-    const lastWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 1]!;
-    const writtenTask = JSON.parse(lastWriteCall[1] as string) as Task;
+    // Task status write is second-to-last (last is heartbeat DONE)
+    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 2]!;
+    const writtenTask = JSON.parse(taskWriteCall[1] as string) as Task;
     expect(writtenTask.status).toBe(TaskStatus.DONE);
   });
 
@@ -348,8 +349,9 @@ describe('writeResult', () => {
       coverage: 0, selfAssessment: 'NO_GO', notes: 'Failed',
     });
 
-    const lastWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 1]!;
-    const writtenTask = JSON.parse(lastWriteCall[1] as string) as Task;
+    // Task status write is second-to-last (last is heartbeat DONE)
+    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 2]!;
+    const writtenTask = JSON.parse(taskWriteCall[1] as string) as Task;
     expect(writtenTask.status).toBe(TaskStatus.NO_GO);
   });
 
@@ -365,9 +367,55 @@ describe('writeResult', () => {
       coverage: 85, selfAssessment: 'GO_WITH_TECH_DEBT', notes: 'Minor gaps',
     });
 
-    const lastWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 1]!;
-    const writtenTask = JSON.parse(lastWriteCall[1] as string) as Task;
+    // Task status write is second-to-last (last is heartbeat DONE)
+    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 2]!;
+    const writtenTask = JSON.parse(taskWriteCall[1] as string) as Task;
     expect(writtenTask.status).toBe(TaskStatus.DONE);
+  });
+});
+
+// ─── finalizeHeartbeat ──────────────────────────────────────────────
+
+describe('finalizeHeartbeat', () => {
+  it('writes DONE heartbeat with fresh timestamp', () => {
+    const existingHb = {
+      workerId: 'w-074-001',
+      taskId: '001',
+      status: AgentStatus.EXECUTING,
+      currentAction: 'coding',
+      timestamp: '2026-03-29T00:00:00.000Z',
+      filesChangedCount: 3,
+      sequence: 5,
+      progress: 30,
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingHb) as never);
+
+    finalizeHeartbeat('/project', '001');
+
+    // Should write a heartbeat file
+    const writeCalls = mockedWriteFileSync.mock.calls;
+    expect(writeCalls.length).toBeGreaterThanOrEqual(1);
+
+    const lastCall = writeCalls[writeCalls.length - 1]!;
+    const written = JSON.parse(lastCall[1] as string) as { workerId: string; status: string; taskId: string };
+    expect(written.status).toBe(AgentStatus.DONE);
+    expect(written.workerId).toBe('w-074-001');
+    expect(written.taskId).toBe('001');
+  });
+
+  it('uses default workerId when no existing heartbeat', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    finalizeHeartbeat('/project', '042');
+
+    const writeCalls = mockedWriteFileSync.mock.calls;
+    expect(writeCalls.length).toBeGreaterThanOrEqual(1);
+
+    const lastCall = writeCalls[writeCalls.length - 1]!;
+    const written = JSON.parse(lastCall[1] as string) as { workerId: string; status: string };
+    expect(written.status).toBe(AgentStatus.DONE);
+    expect(written.workerId).toBe('worker-042');
   });
 });
 

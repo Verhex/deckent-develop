@@ -222,6 +222,18 @@ export function destroy(): void {
 }
 
 /**
+ * Kill all deckent tmux sessions. Called on SIGINT for graceful shutdown.
+ * Equivalent to destroy() but named explicitly for SIGINT/interrupt use cases.
+ */
+export function killAllSessions(): void {
+  try {
+    run(['kill-session', '-t', TMUX_SESSION_NAME]);
+  } catch {
+    // Session doesn't exist — silent
+  }
+}
+
+/**
  * @internal Sends keys to a tmux pane. Used only within orchestra/.
  * Not part of the public API surface.
  */

@@ -1,17 +1,17 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Readiness Roadmap
 
-**Son güncelleme:** 2026-03-30 | **Sprint:** 074 | **Test:** 12,180+ | **Durum:** Closed Beta — Dogfooding aktif
+**Son güncelleme:** 2026-03-30 | **Sprint:** 075 | **Test:** 12,200+ | **Durum:** Closed Beta — Dogfooding aktif
 
 ---
 
 ## Genel Bakış
 
-73+ sprint, 12,180+ test, 250+ TypeScript modülü. Windows dogfooding tamamland�� — init→plan→start→status→cleanup zinciri çalışıyor. İlk gerçek sprint Vizetron'da başarıyla tamamlandı. Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor.
+75+ sprint, 12,200+ test, 250+ TypeScript modülü. Windows dogfooding tamamlandı — init→plan→start→status→cleanup zinciri çalışıyor. İlk gerçek sprint Vizetron'da başarıyla tamamlandı. Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dil tutarlılığı (TR/EN) tamamlandı, VISION.md ve link audit bitti.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
-**Mevcut Durum:** Mono Closed Beta v0.2.0-beta.3 — Vizetron (Python/FastAPI) projesinde 2 sprint tamamlandı, 26 bug bulundu, 22'si düzeltildi.
+**Mevcut Durum:** Mono Closed Beta v0.2.0-beta.4 — Vizetron (Python/FastAPI) projesinde 2 sprint tamamlandı, 26 bug bulundu, 22'si düzeltildi. Dokümantasyon ve kod kalitesi iyileştirmeleri Sprint 075 tamamlandı.
 
 ---
 
@@ -99,12 +99,12 @@
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
 | 13 | README.md eski veriler | **DONE** | Badge + sayılar güncellendi (Sprint 074) |
-| 14 | Dil tutarsızlığı | **YAPILACAK** | Bazı docs İngilizce başl��yor Türkçe devam ediyor |
+| 14 | Dil tutarsızlığı | **DONE** | docs/CHANGELOG.md Türkçeleştirildi (Sprint 075) |
 | 15 | TR+EN çift dil | **KISMEN** | .deckent/docs/ TR/EN desteği eklendi |
 | 16 | CHANGELOG.md boş | **DONE** | docs/CHANGELOG.md 1159 satır, Sprint 1-073 (Sprint 074) |
 | 17 | Config referans eksik | **DONE** | .deckent/docs/config-reference.md |
-| 18 | VISION.md eksik | **YAPILACAK** | Proje vizyonu ve yol haritası |
-| 19 | docs/ link kontrolü | **YAPILACAK** | Linklenen dokümanlar var mı? |
+| 18 | VISION.md eksik | **DONE** | VISION.md oluşturuldu — vizyon, rakip analizi, roadmap (Sprint 075) |
+| 19 | docs/ link kontrolü | **DONE** | 4 broken link tespit edildi ve düzeltildi (Sprint 075) |
 
 ## P3 — UX & Dashboard
 
@@ -124,14 +124,14 @@
 | 26 | Node >= 18 neden? | **YAPILACAK** | OpenClaw Node 22+, ES2022+ feature check |
 | 27 | Docker/Sandbox | **YAPILACAK** | Var mı? Çalışıyor mu? |
 | 28 | CI/CD billing | **YAPILACAK** | Public repo ile çözülür |
-| 29 | .detect-secrets | **YAPILACAK** | Secret leak koruması |
+| 29 | .detect-secrets | **DONE** | .pre-commit-config.yaml kuruldu, detect-secrets v1.5.0 (Sprint 075) |
 
 ## P5 — Kod Kalitesi
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
 | 30 | .gitignore runtime state | **DONE** | |
-| 31 | God objects | **KISMEN** | sprint-phases.ts extract edildi (Sprint 072), daha fazla split gerekli |
+| 31 | God objects | **KISMEN** | Faz 1 (Sprint 072), Faz 2 (Sprint 075), Faz 3 (Sprint 076) — hedef <1500 satır |
 | 32 | V2 routing test-writer bias | **KISMEN** | Exclude kuralı yazıldı |
 
 ## P6 — Kullanıcı Deneyimi İyileştirmeleri
@@ -145,7 +145,7 @@
 | 37 | Skill marketplace backend | **YAPILACAK** | CLI komutu var ama backend yok |
 | 38 | Plugin system e2e test | **YAPILACAK** | Gerçek plugin ile test edilmedi |
 | 39 | Rate limiting production | **YAPILACAK** | 100 req/60s yeterli mi? |
-| 40 | Graceful shutdown | **YAPILACAK** | Ctrl+C → state tutarlılığı |
+| 40 | Graceful shutdown | **KISMEN** | SIGINT handler + state cleanup eklendi (Sprint 076) |
 
 ---
 
@@ -175,17 +175,23 @@
 - [x] debt-069-005 (TempAgent) + debt-069-006 (scope parser) kapandı
 - [x] doc-writer agent 5/5 + bug-fixer 2/2, 7m 29s
 
-**Sprint 075 Planı (2026-03-30):**
-- [ ] P2-14: Dil tutarsızlığı — docs İngilizce/Türkçe karışık → tek dil stratejisi
-- [ ] P2-18: VISION.md yazımı — proje vizyonu, rakip analizi, yol haritası
-- [ ] P2-19: docs/ link kontrolü — kırık link audit
-- [ ] P4-29: .detect-secrets kurulumu — pre-commit hook
-- [ ] P5-31: God object split devamı — sprint-controller daha fazla extract
+**Sprint 075 — TAMAMLANDI (2026-03-30) — Dil Tutarlılığı + Vizyonu:**
+- [x] P2-14: docs/CHANGELOG.md Türkçeleştirildi — 300+ EN → TR çevirisi
+- [x] P2-18: VISION.md oluşturuldu — 7 bölüm, rakip analizi (5 tablo), roadmap
+- [x] P2-19: docs/ link audit — 4 broken link tespit ve düzeltildi
+- [x] P4-29: .detect-secrets v1.5.0 kuruldu — .pre-commit-config.yaml
+- [x] P5-31: God object split Faz 2 — sprint-controller.ts → result-collector.ts extract
 
-**Sprint 076+ Planı:**
+**Sprint 076 Planı:**
+- [ ] P3-20: Stale heartbeat root cause fix (auditor alert 410x pattern)
+- [ ] P3-22: Dashboard API entegrasyon testi (5+ endpoint test)
+- [ ] P6-40: Graceful shutdown (SIGINT handler + state cleanup)
+- [ ] P5-31: God object split Faz 3 — result-collector.ts oluşturma
+- [ ] Docs güncelleme (BETA-ROADMAP sprint tablosu)
+
+**Sprint 077+ Planı:**
 - [ ] P1-10..12: Multi-provider test (BLOCKED — API key gerekli)
 - [ ] P3-20..22: Dashboard gerçek sprint ile test
-- [ ] P6-40: Graceful shutdown (Ctrl+C → state tutarlılığı)
 - [ ] Windows Codex CLI dogfooding
 - [ ] Windows Cursor + Gemini dogfooding
 
@@ -210,4 +216,5 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | 072 | 5/5 | 5 | Tier generalizasyonu, model API IDs, god object split, README |
 | 073 | 5/5 | 5 | Self-dogfooding: 100 test regresyonu fix, 0 fail |
 | 074 | 7/7 | 7 | Docs tutarlılık, debt-069 kapanış, CHANGELOG/SPRINT-LOG |
-| **Toplam** | **57/57** | **57** | 12,180+ test, 0 regression, v0.2.0-beta.3 |
+| 075 | 5/5 | 5 | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2 |
+| **Toplam** | **62/62** | **62** | 12,200+ test, 0 regression, v0.2.0-beta.4 |

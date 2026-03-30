@@ -6,6 +6,22 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.2.0-beta.3-sprint74] - 2026-03-30
+
+### Added
+
+- BETA-ROADMAP Güncelleme + Sprint Tablosu
+
+### Changed
+
+- Stale Heartbeat Root Cause Fix (410x pattern) (completed with tech debt)
+- Dashboard API Entegrasyon Testi (P3-20,22) (completed with tech debt)
+- Worker Graceful Shutdown — Sprint State Tutarlılığı (P6-40) (completed with tech debt)
+- God Object Split Faz 3 — Result Collector Extract (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 4 tech debt, 0 no-go_
+
 ## [0.2.0-beta.3-sprint73] - 2026-03-30
 
 ### Added

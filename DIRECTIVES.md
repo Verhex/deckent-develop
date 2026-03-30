@@ -1,195 +1,149 @@
-# DIRECTIVES — Sprint 075: Faz 2 Devam — Docs Tutarlılık + Güvenlik + Refactor
+# DIRECTIVES — Sprint 076: Stabilite + Dashboard + Refactor
 
-## Goal: Dokümantasyon dil tutarlılığı, VISION.md oluşturma, docs link audit, .detect-secrets güvenlik kurulumu ve god object split devamı. Blocker'sız task'lar — hemen başlanabilir.
+## Goal: Stale heartbeat root cause fix, dashboard entegrasyon testi, graceful shutdown, god object split faz 3, roadmap güncelleme. Deckent stabilitesini artır ve dashboard'u doğrula.
 
 ---
 
-## Task 1: Dokümantasyon Dil Stratejisi — TR/EN Tutarlılık
+## Task 1: Stale Heartbeat Root Cause Fix (410x pattern)
 - Model: opus
 - Effort: high
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/index.md, BETA-ROADMAP.md, AGENTS.md
-- Scope: docs/, BETA-ROADMAP.md, AGENTS.md
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/spawn-backend.ts, src/agents/worker.ts
+- Scope: src/orchestra/, src/agents/
 
 ### Description
-Dokümantasyon dosyalarında dil karışıklığı var. Strateji:
-
-**Karar: Türkçe birincil, İngilizce sadece teknik terimler.**
-
-Kurallar:
-- docs/CHANGELOG.md: Section başlıkları İngilizce kalabilir (Added/Changed/Fixed — Keep a Changelog standardı), açıklama metinleri Türkçe
-- docs/SPRINT-LOG.md: Zaten Türkçe — dokunma
-- docs/index.md: İngilizce kalabilir (VitePress public-facing)
-- BETA-ROADMAP.md: Zaten Türkçe — dokunma
-- AGENTS.md: İçeriği kontrol et, Türkçe olmalı
+Auditor her sprint'te yüzlerce kez `stale_heartbeat` alert üretiyor (sprint-069'dan beri, 410x). Kök neden: tmux worker heartbeat dosyasını güncelliyor ama worker bittiğinde heartbeat "DONE" olarak güncellenmediği için auditor hâlâ "stale" diyor.
 
 Yapılacaklar:
-A) docs/CHANGELOG.md'deki karışık satırları düzelt — İngilizce açıklamaları Türkçeye çevir
-B) Dosya başlarına `<!-- Dil: TR | Teknik terimler EN -->` yorum satırı ekle
-C) AGENTS.md'yi kontrol et ve gerekiyorsa Türkçeleştir
+A) Worker task tamamlandığında heartbeat'i `status: "DONE"` olarak güncellesin — sadece çalışırken değil, bitince de. `src/agents/worker.ts` ve `src/orchestra/spawn-backend.ts`'deki child exit handler'ları kontrol et.
+B) Auditor scan logic'inde `status: "DONE"` olan heartbeat'leri stale olarak işaretlemesin. `src/orchestra/sprint-controller.ts`'deki auditor scan fonksiyonunu bul ve guard ekle.
+C) spawn-backend.ts: Child process exit handler'da heartbeat'i "DONE" yap — hem normal exit hem error exit.
+D) sprint-controller.ts: waitForResults'ta heartbeat DONE olanları skip et.
 
-DİKKAT: Keep a Changelog format bozulmasın. Section başlıkları (Added/Changed/Fixed/Removed) İngilizce KALMALI.
+DİKKAT: Heartbeat formatını bozmadan sadece status field'ını güncelle. Mevcut heartbeat okuma logic'ini kırma.
 
-**Kanıt:** `grep -c "^[A-Z].*:" docs/CHANGELOG.md` → sadece section başlıkları İngilizce
+**Kanıt:** `npx vitest run tests/orchestra/ tests/agents/` → 0 fail + yeni testler geçiyor
 
-**Test:** Bu task test gerektirmez — dokümantasyon.
-
----
-
-## Task 2: VISION.md — Proje Vizyonu ve Yol Haritası
-- Model: opus
-- Effort: high
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: VISION.md
-- Scope: VISION.md
-
-### Description
-VISION.md oluştur — projenin vizyonunu, hedeflerini ve stratejisini tanımla.
-
-İçerik yapısı:
-1. **Vizyon** — Deckent ne olmak istiyor? (1 paragraf)
-   - AI agent orkestrasyon CLI — multi-agent sprint'ler ile otonom yazılım geliştirme
-   - İnsan sadece hedef belirler, Deckent planlar-çalıştırır-değerlendirir
-
-2. **Misyon** — Neden varız? (1 paragraf)
-   - Solo AI asistanından multi-agent ekibe geçiş
-   - Brain-Worker-Auditor mimarisi ile kalite garantisi
-
-3. **Hedef Kullanıcılar**
-   - Bireysel geliştiriciler (indie dev, freelancer)
-   - Küçük takımlar (2-10 kişi)
-   - Enterprise (gelecekte)
-
-4. **Rakip Analizi** (tablo formatında)
-   - Devin, OpenClaw/OpenHands, Aider, Cursor, Claude Code solo
-   - Deckent farkı: orkestrasyon, multi-agent, sprint lifecycle, memory/learning
-
-5. **Teknoloji Kararları**
-   - TypeScript + ESM (neden)
-   - Multi-provider (Claude + Codex + Gemini) (neden)
-   - tmux + subprocess backend (neden)
-   - MCP entegrasyonu (neden)
-
-6. **Yol Haritası** (Faz 1-4 BETA-ROADMAP'tan özet)
-
-7. **Değerler** — Açık kaynak, şeffaflık, kalite, otonom ama kontrollü
-
-Dil: Türkçe (teknik terimler İngilizce)
-
-**Kanıt:** `test -f VISION.md && echo "exists"` → exists
-
-**Test:** Bu task test gerektirmez — dokümantasyon.
+**Test:** 2+ yeni test (heartbeat DONE güncelleme, auditor DONE skip)
 
 ---
 
-## Task 3: docs/ Link Audit — Kırık Link Kontrolü
+## Task 2: Dashboard API Entegrasyon Testi (P3-20,22)
 - Model: sonnet
 - Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/index.md, README.md
-- Scope: docs/, README.md
+- Skills: testing-expert
+- Files: tests/api/server.test.ts, src/api/server.ts
+- Scope: tests/api/, src/api/
 
 ### Description
-Tüm Markdown dosyalarındaki linkleri kontrol et:
+Dashboard kodu var, SSE endpoint çalışıyor, ama API endpoint'lerin doğru format dönüp dönmediği doğrulanmamış. Mevcut test dosyasını oku ve eksik endpoint testlerini ekle.
 
-A) İç linkler: `[text](relative/path.md)` — hedef dosya var mı?
-B) Dış linkler: `[text](https://...)` — format doğru mu? (ping etme, sadece URL formatı)
-C) Anchor linkler: `[text](#heading)` — heading var mı?
-D) Kırık linkleri düzelt veya kaldır
-E) docs/archive/ altındaki referansları kontrol et
+Yapılacaklar:
+A) `GET /api/status` — dönen JSON'da sprint, agents, progress, alerts field'ları var mı?
+B) `GET /api/config` — read döngüsü, config.json formatıyla uyumlu mu?
+C) `GET /api/history` — sprint log listesi döndürüyor mu?
+D) `GET /api/memory` — MEMORY.md content string dönüyor mu?
+E) `GET /api/doctor` — health check result formatı doğru mu?
 
-Yaklaşım:
-1. `grep -r "\[.*\](.*)" docs/ README.md` ile tüm linkleri listele
-2. İç linklerin hedeflerini dosya sistemiyle doğrula
-3. Kırık olanları düzelt
+Mevcut tests/api/server.test.ts dosyasını oku, pattern'ı takip et, eksik endpoint testlerini ekle.
 
-**Kanıt:** `grep -r "\[.*\](" docs/ | grep -v "http" | head -20` → tüm iç linkler geçerli
+**Kanıt:** `npx vitest run tests/api/server.test.ts` → yeni testler geçiyor
 
-**Test:** Bu task test gerektirmez — dokümantasyon.
+**Test:** 5+ yeni integration test
 
 ---
 
-## Task 4: .detect-secrets Kurulumu — Pre-commit Güvenlik
+## Task 3: Worker Graceful Shutdown — Sprint State Tutarlılığı (P6-40)
 - Model: sonnet
 - Effort: normal
-- Skills: security-expert, ci-cd-expert
-- Files: .pre-commit-config.yaml, .secrets.baseline
-- Scope: .pre-commit-config.yaml, .secrets.baseline, .gitignore
+- Skills: typescript-expert
+- Files: src/cli/entry.ts, src/orchestra/sprint-controller.ts, src/orchestra/tmux.ts
+- Scope: src/cli/, src/orchestra/
 
 ### Description
-Secret leak koruması ekle:
+HTTP server graceful shutdown var ama sprint çalışırken Ctrl+C basılınca worker state tutarsız kalabiliyor.
 
-A) `.pre-commit-config.yaml` oluştur:
-```yaml
-repos:
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
-    hooks:
-      - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-```
+Yapılacaklar:
+A) entry.ts SIGINT handler'ına sprint cleanup logic ekle: aktif sprint varsa → worker'ları kill et → lock'ları temizle → heartbeat'leri "ABORTED" yap
+B) tmux.ts'de `killAllSessions()` fonksiyonunun SIGINT'te çağrılmasını sağla
+C) sprint-controller.ts'de "interrupted" state tracking ekle
+D) `.tasks/` dosyalarına `status: "INTERRUPTED"` yazma desteği ekle
 
-B) `.secrets.baseline` oluştur — mevcut false positive'leri baseline'a ekle:
-- Test dosyalarındaki mock API key'ler
-- Docs'taki örnek key formatları
+DİKKAT: Mevcut cleanup() ve kill() logic'ini kırma. Sadece SIGINT path'i ekle. process.on('SIGINT') zaten varsa extend et, üzerine yazma.
 
-C) `.gitignore`'a .env ve credential pattern'leri ekle (zaten varsa kontrol et):
-```
-.env
-.env.local
-*.pem
-credentials.json
-```
+**Kanıt:** `grep "SIGINT\|INTERRUPTED\|ABORTED" src/cli/entry.ts src/orchestra/sprint-controller.ts` → yeni logic var
 
-D) Kurulum notunu README.md veya CONTRIBUTING.md'ye ekle (opsiyonel)
-
-DİKKAT: `detect-secrets` Python paketi — pre-commit hook olarak çalışır. Eğer Python yoksa sadece config dosyalarını oluştur, kurulum komutunu dokümante et.
-
-**Kanıt:** `test -f .pre-commit-config.yaml && echo "exists"` → exists
-
-**Test:** Bu task test gerektirmez — altyapı.
+**Test:** 2+ test (SIGINT handler tetikleme, cleanup on interrupt)
 
 ---
 
-## Task 5: God Object Split Faz 2 — sprint-controller Utility Extract
+## Task 4: God Object Split Faz 3 — Result Collector Extract
 - Model: opus
 - Effort: high
 - Skills: typescript-expert, refactoring-expert
-- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-utils.ts
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/result-collector.ts
 - Scope: src/orchestra/
 
 ### Description
-Sprint 072'de sprint-phases.ts extract edildi. Şimdi sprint-controller.ts'den utility fonksiyonlarını çıkar.
+sprint-controller.ts hâlâ 1823 satır. Faz 1'de phase'ler, faz 2'de utility'ler çıkarıldı. Sırada: result collection ve queue management.
 
-Yeni dosya: `src/orchestra/sprint-utils.ts`
+Yeni dosya: `src/orchestra/result-collector.ts`
 
-Taşınabilecek adaylar (sprint-controller.ts'yi oku ve tespit et):
-- Config yükleme/merge yardımcıları
-- Sprint ID üretme/artırma
-- Task dosyası okuma/yazma yardımcıları
-- Log/output formatting fonksiyonları
-- Timeout/retry yardımcıları
+Taşınacak fonksiyonlar (sprint-controller.ts'yi oku ve tespit et):
+- `waitForResults()` — result bekleme loop'u (IPC + fs.watch)
+- `processQueue()` — task queue yönetimi
+- IPC heartbeat listener logic
+- fs.watch result file detection
+- Result timeout/retry mantığı
 
-Yaklaşım:
-1. sprint-controller.ts'yi oku — hangi fonksiyonlar pure utility?
-2. State'e bağımlı olmayanları sprint-utils.ts'ye taşı
-3. sprint-controller.ts'de import edip kullan
-4. Re-export pattern: public API DEĞİŞMEZ
+sprint-controller.ts'de import edip çağır. Public API DEĞİŞMEZ — backward compat.
 
-DİKKAT: Sadece pure utility extract. İş mantığını DEĞİŞTİRME. Mevcut testler regression-free geçmeli.
+Re-export pattern: sprint-controller.ts'den result-collector fonksiyonlarını re-export et.
 
-**Kanıt:** `wc -l src/orchestra/sprint-controller.ts` → öncekinden kısa + `test -f src/orchestra/sprint-utils.ts` → yeni dosya var
+DİKKAT: Büyük refactoring — fonksiyonları extract et, iç mantığı DEĞİŞTİRME. State bağımlılıklarını (config, sprintId vb.) parametre olarak geçir.
 
-**Test:** Mevcut testler regression-free geçmeli. Yeni test gerekmez (extract only).
+**Kanıt:** `wc -l src/orchestra/sprint-controller.ts` → <1500 satır + `test -f src/orchestra/result-collector.ts`
+
+**Test:** Mevcut testler regression-free. Yeni test gerekmez (extract only).
+
+---
+
+## Task 5: BETA-ROADMAP Güncelleme + Sprint Tablosu
+- Model: haiku
+- Effort: low
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: BETA-ROADMAP.md
+- Scope: BETA-ROADMAP.md
+
+### Description
+BETA-ROADMAP'ı Sprint 073-076 sonuçlarıyla güncelle:
+
+A) Durum güncellemeleri:
+- P2-14: DONE (docs/CHANGELOG.md Türkçeleştirildi, Sprint 075)
+- P2-18: DONE (VISION.md oluşturuldu, Sprint 075)
+- P2-19: DONE (link audit + 4 fix, Sprint 075)
+- P4-29: DONE (.detect-secrets, Sprint 075)
+- P5-31: KISMEN → güncel (faz 1+2+3 done, hedef <1500 satır)
+- P6-33: DONE (DeckentError 53 kod)
+- P6-40: DONE veya KISMEN (Sprint 076 sonucuna göre)
+
+B) Tamamlanan Sprintler tablosuna 073, 074, 075 ekle
+
+C) Sprint 076 sonuçlarını faz planına ekle
+
+D) Toplam sayıları güncelle
+
+**Kanıt:** `grep "DONE" BETA-ROADMAP.md | wc -l` → artmış olmalı
+
+**Test:** Bu task test gerektirmez — dokümantasyon.
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
 - npx vitest run → 0 fail, 0 regresyon
-- Dokümantasyon: dil tutarlı, linkler geçerli
-- God object split: public API değişmez, backward compat
+- Stale heartbeat pattern azalmalı
+- sprint-controller.ts <1500 satır hedef
+- Dashboard API testleri geçmeli
 - %100 GO hedefli
