@@ -1,34 +1,28 @@
-# Sprint sprint-074 Retrospective
+# Sprint sprint-075 Retrospective
 
 ## Summary
-Completed 5/5 tasks in 11 minutes 3s.
+Completed 3/3 tasks in 4 minutes 30s.
 
 ## Highlights
-- 5 tasks completed on first try
+- 3 tasks completed on first try
 - No boundary violations detected
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 5/5 |
-| New test files | 4 |
-| Code changes | +592 / -313 |
-| Sprint time | 11 minutes 3s |
-| NO_GO rate | 0% (0/5) |
-| Coverage | 58.4% |
+| Tasks completed | 3/3 |
+| Code changes | +79 / -5 |
+| Sprint time | 4 minutes 30s |
+| NO_GO rate | 0% (0/3) |
+| Coverage | 33.3% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| test-writer | 2 | 0 | 2 | 0 | 96% |
-| doc-writer | 1 | 1 | 0 | 0 | 100% |
-| refactorer | 1 | 0 | 1 | 0 | 96% |
-| temp-react-specialist | 1 | 0 | 1 | 0 | 0% |
+| doc-writer | 3 | 1 | 2 | 0 | 100% |
 
 ## Learnings
-- Stale Heartbeat Root Cause Fix (410x pattern): completed with tech debt — Stale heartbeat root cause fix completed. A) worker.ts: writeResult() now calls finalizeHeartbeat() which writes a DONE status heartbeat with fresh ti
-- Dashboard API Entegrasyon Testi (P3-20,22): completed with tech debt — Added 10 new integration tests across 6 new describe blocks validating field structure of API responses: GET /api/status (sprint/agents/progress/alert
-- Worker Graceful Shutdown — Sprint State Tutarlılığı (P6-40): completed with tech debt — Implemented Worker Graceful Shutdown (Sprint State Tutarlılığı). A) entry.ts: Extended SIGINT handler to call interruptActiveSprint() and killAllSessi
-- God Object Split Faz 3 — Result Collector Extract: completed with tech debt — God Object Split Faz 3: result-collector.ts oluşturuldu. waitForResults() (IPC+fs.watch loop, processQueue, collectResults), resolveAgentPrompt(), res
-- Recurring pattern (474x): stale_heartbeat
+- CHANGELOG + SPRINT-LOG Güncelleme: completed with tech debt — Sprint 076 entries added to all three files. docs/CHANGELOG.md: new [0.2.0-beta.3-sprint76] entry with proper Fixed/Added/Changed sections (stale hear
+- .brain/ Güncelleme — PROJECT-IDENTITY + DECISIONS: completed with tech debt — A) PROJECT-IDENTITY.md güncellendi: test sayısı 12,196 (12,181 passed + 15 skipped), sprint 76+, orchestra 47 modül, core 49 modül, yeni modüller (res
+- Recurring pattern (483x): stale_heartbeat

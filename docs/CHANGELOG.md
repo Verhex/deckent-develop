@@ -6,6 +6,38 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.2.0-beta.3-sprint75] - 2026-03-30
+
+### Added
+
+- CLAUDE.md + DECKENT.md Modül Sayısı Güncelleme
+
+### Changed
+
+- CHANGELOG + SPRINT-LOG Güncelleme (completed with tech debt)
+- .brain/ Güncelleme — PROJECT-IDENTITY + DECISIONS (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
+## [0.2.0-beta.3-sprint76] - 2026-03-30
+
+### Fixed
+
+- **Stale Heartbeat Root Cause**: `finalizeHeartbeat()` worker.ts'e eklendi — writeResult() artık DONE state heartbeat yazıyor; auditor DONE durumundaki worker'ları stale olarak işaretlemiyor (410x pattern giderildi)
+
+### Added
+
+- **Dashboard API Entegrasyon Testleri**: 6 describe block'ta 10 yeni entegrasyon testi — GET /api/status, /api/tasks, /api/alerts, /api/agents, /api/history, /api/metrics endpoint alanları doğrulandı
+- **Graceful Shutdown**: SIGINT → `interruptActiveSprint()` + `killAllSessions()` zinciri; entry.ts genişletildi, sprint state tutarlılığı sağlandı
+
+### Changed
+
+- **God Object Split Faz 3**: `result-collector.ts` extract edildi — `waitForResults()` (IPC+fs.watch loop, processQueue, collectResults) sprint-controller.ts'ten ayrıştırıldı
+- **BETA-ROADMAP**: Sprint tablosu ve yol haritası güncellendi
+
+_Tasks: 5 total, 5 done, 4 tech debt, 0 no-go_
+
 ## [0.2.0-beta.3-sprint74] - 2026-03-30
 
 ### Added

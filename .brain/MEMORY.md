@@ -180,3 +180,6 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - Dashboard API Entegrasyon Testi (P3-20,22): GO_WITH_TECH_DEBT — Added 10 new integration tests across 6 new describe blocks validating field structure of API responses: GET /api/status
 - Worker Graceful Shutdown — Sprint State Tutarlılığı (P6-40): GO_WITH_TECH_DEBT — Implemented Worker Graceful Shutdown (Sprint State Tutarlılığı). A) entry.ts: Extended SIGINT handler to call interruptA
 - God Object Split Faz 3 — Result Collector Extract: GO_WITH_TECH_DEBT — God Object Split Faz 3: result-collector.ts oluşturuldu. waitForResults() (IPC+fs.watch loop, processQueue, collectResul
+## Sprint sprint-075 Learnings
+- CHANGELOG + SPRINT-LOG Güncelleme: GO_WITH_TECH_DEBT — Sprint 076 entries added to all three files. docs/CHANGELOG.md: new [0.2.0-beta.3-sprint76] entry with proper Fixed/Adde
+- .brain/ Güncelleme — PROJECT-IDENTITY + DECISIONS: GO_WITH_TECH_DEBT — A) PROJECT-IDENTITY.md güncellendi: test sayısı 12,196 (12,181 passed + 15 skipped), sprint 76+, orchestra 47 modül, cor

@@ -8,7 +8,7 @@
 @.brain/MEMORY.md
 
 ## Architecture
-- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (45 modules)
+- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (47 modules)
   - brain.ts: orchestrator (re-export layer, imports from sprint-controller)
   - sprint-controller.ts: full sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
   - planner.ts: AI task planning (imports only from core/)
@@ -25,6 +25,8 @@
   - rule-evolver.ts: auto-generate activation rules from outcome data
   - temp-skill-generator.ts: template-based project-conventions skill generation
   - promotion-pipeline.ts: temp→permanent agent/skill promotion, demotion
+  - sprint-utils.ts: shared utilities for sprint phases, task analysis, timing helpers
+  - result-collector.ts: waitForResults, processQueue, collectResults, result aggregation + IPC
 - **core/** — Types, config, utilities, agent/skill pools (49 modules)
   - types.ts + *-types.ts: all type definitions (task, config, sprint, monitoring, routing)
   - config.ts: 3-layer config merge (defaults → global → project)

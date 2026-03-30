@@ -1986,3 +1986,57 @@ Tier generalizasyonu ve model API ID'leri güncellendi. God object split başlat
 - 074-005: BETA-ROADMAP Güncelleme + Sprint Tablosu (DONE)
 
 ---
+## Sprint 76 — sprint-076
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-30
+**Duration:** 663s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 58.4% |
+| Duration | 663378ms |
+
+### Tasks
+
+- 076-001: Stale Heartbeat Root Cause Fix (finalizeHeartbeat + auditor DONE skip) (GO_WITH_TECH_DEBT)
+- 076-002: Dashboard API Entegrasyon Testi — 10 yeni test, 6 describe block (GO_WITH_TECH_DEBT)
+- 076-003: Worker Graceful Shutdown — SIGINT → interruptActiveSprint + killAllSessions (GO_WITH_TECH_DEBT)
+- 076-004: God Object Split Faz 3 — result-collector.ts extract (GO_WITH_TECH_DEBT)
+- 076-005: BETA-ROADMAP Güncelleme + Sprint Tablosu (DONE)
+
+### Notes
+
+Sprint 076: Stale heartbeat 410x pattern giderildi (finalizeHeartbeat). 10 dashboard API entegrasyon testi eklendi. Graceful shutdown zinciri (SIGINT → interruptActiveSprint → killAllSessions) kuruldu. God object split faz 3 tamamlandı: result-collector.ts extract edildi.
+
+---
+## Sprint 75 — sprint-075
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-30
+**Duration:** 270s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 33.3% |
+| Duration | 270322ms |
+
+### Tasks
+
+- 075-001: CHANGELOG + SPRINT-LOG Güncelleme (GO_WITH_TECH_DEBT)
+- 075-002: .brain/ Güncelleme — PROJECT-IDENTITY + DECISIONS (GO_WITH_TECH_DEBT)
+- 075-003: CLAUDE.md + DECKENT.md Modül Sayısı Güncelleme (DONE)
+
+---

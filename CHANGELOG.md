@@ -4,6 +4,12 @@ See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
 ## Latest: v0.2.0-beta.3 (2026-03-30)
 
+### Sprint 076 — Stale Heartbeat Fix + Dashboard API Tests + Graceful Shutdown
+- Stale heartbeat root cause giderildi: `finalizeHeartbeat()` + auditor DONE skip (410x pattern)
+- 10 dashboard API entegrasyon testi eklendi (6 endpoint, 6 describe block)
+- Graceful shutdown: SIGINT → `interruptActiveSprint()` + `killAllSessions()`
+- God object split faz 3: `result-collector.ts` sprint-controller'dan extract edildi
+
 ### Sprint 073 — Test Regression Fix
 - 100 test regresyonu düzeltildi (43 fs mock, 16 brain mock, 9 doctor, 23 stack/CI, 3 integration)
 - 0 fail, 12,161 test passed
