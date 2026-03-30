@@ -3,7 +3,7 @@
   "language": "tr",
   "projectName": "deckent",
   "brain_planning": "structured",
-  "last_sprint_id": "sprint-072",
+  "last_sprint_id": "sprint-073",
   "spawn_backend": "tmux",
   "modes": {
     "max_plan": {

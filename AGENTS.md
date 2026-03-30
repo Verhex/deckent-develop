@@ -1,3 +1,4 @@
+<!-- Dil: TR | Teknik terimler EN -->
 @DECKENT.md
 
 # Project: deckent

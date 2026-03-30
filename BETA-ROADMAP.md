@@ -1,12 +1,13 @@
+<!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Readiness Roadmap
 
-**Son güncelleme:** 2026-03-28 | **Sprint:** 072 | **Test:** 12,180+ | **Durum:** Closed Beta — Dogfooding aktif
+**Son güncelleme:** 2026-03-30 | **Sprint:** 074 | **Test:** 12,180+ | **Durum:** Closed Beta — Dogfooding aktif
 
 ---
 
 ## Genel Bakış
 
-71 sprint, 12,160+ test, 250+ TypeScript modülü. Windows dogfooding tamamlandı — init→plan→start→status→cleanup zinciri çalışıyor. İlk gerçek sprint Vizetron'da başarıyla tamamlandı.
+73+ sprint, 12,180+ test, 250+ TypeScript modülü. Windows dogfooding tamamland�� — init→plan→start→status→cleanup zinciri çalışıyor. İlk gerçek sprint Vizetron'da başarıyla tamamlandı. Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
@@ -97,10 +98,10 @@
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
-| 13 | README.md eski veriler | **KISMEN** | Badge güncellendi, özellikler hala eksik |
-| 14 | Dil tutarsızlığı | **YAPILACAK** | Bazı docs İngilizce başlıyor Türkçe devam ediyor |
+| 13 | README.md eski veriler | **DONE** | Badge + sayılar güncellendi (Sprint 074) |
+| 14 | Dil tutarsızlığı | **YAPILACAK** | Bazı docs İngilizce başl��yor Türkçe devam ediyor |
 | 15 | TR+EN çift dil | **KISMEN** | .deckent/docs/ TR/EN desteği eklendi |
-| 16 | CHANGELOG.md boş | **YAPILACAK** | 71 sprint'lik geçmiş yok |
+| 16 | CHANGELOG.md boş | **DONE** | docs/CHANGELOG.md 1159 satır, Sprint 1-073 (Sprint 074) |
 | 17 | Config referans eksik | **DONE** | .deckent/docs/config-reference.md |
 | 18 | VISION.md eksik | **YAPILACAK** | Proje vizyonu ve yol haritası |
 | 19 | docs/ link kontrolü | **YAPILACAK** | Linklenen dokümanlar var mı? |
@@ -137,7 +138,7 @@
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
-| 33 | Error messages kullanıcı-dostu değil | **YAPILACAK** | Teknik kodlar → anlaşılır mesajlar |
+| 33 | Error messages kullanıcı-dostu değil | **DONE** | DeckentError + suggestion + howToFix (53 error kodu) |
 | 34 | `deckent explain` MCP'de yok | **YAPILACAK** | CLI-only rehberlik aracı |
 | 35 | Telemetry/analytics | **YAPILACAK** | Opt-in kullanım analitikleri |
 | 36 | `deckent upgrade` test | **DONE** | `--local` flag eklendi, beta workflow |
@@ -162,18 +163,28 @@
 - [x] P2-13: README.md → 12,160+ test, 71+ sprint, Windows full, 17 MCP tools
 - [x] P5-31: sprint-controller.ts → 7 phase fonksiyonu sprint-phases.ts'ye extract
 
-**Sprint 073 Planı (1 Nisan 2026):**
-- [ ] P1-10: Multi-provider test — Claude + Codex aynı sprint (Vizetron'da)
-- [ ] P1-11: API key + Subscription birlikte çalışma testi
-- [ ] P1-12: Codex/Gemini CLI binary doğrulama
-- [ ] P2-14: Dil tutarsızlığı — docs İngilizce/Türkçe karışık → tek dil veya çift dil
-- [ ] P2-18: VISION.md yazımı — proje vizyonu, rakip analizi, yol haritası
-- [ ] Vizetron dogfooding Sprint 3+ — yeni bug'lar varsa düzelt
+**Sprint 073 — TAMAMLANDI (2026-03-30) — Self Dogfooding:**
+- [x] 100 test regresyonu düzeltildi (43+16+9+23+3 = 100 fail → 0 fail)
+- [x] test-writer agent 5/5 task DONE, 17m 41s
 
-**Sprint 074+ Planı:**
+**Sprint 074 — TAMAMLANDI (2026-03-30) — Docs + Debt:**
+- [x] P2-13: README.md sayılar güncellendi (12,176+ test, 73+ sprint)
+- [x] P2-16: CHANGELOG + SPRINT-LOG Sprint 072-073 entry'leri
+- [x] .brain/ tutarlılık (PROJECT-IDENTITY, DECISIONS)
+- [x] CLAUDE.md + DECKENT.md modül sayıları düzeltildi (orchestra 45, core 49, MCP 17)
+- [x] debt-069-005 (TempAgent) + debt-069-006 (scope parser) kapandı
+- [x] doc-writer agent 5/5 + bug-fixer 2/2, 7m 29s
+
+**Sprint 075 Planı (2026-03-30):**
+- [ ] P2-14: Dil tutarsızlığı — docs İngilizce/Türkçe karışık → tek dil stratejisi
+- [ ] P2-18: VISION.md yazımı — proje vizyonu, rakip analizi, yol haritası
+- [ ] P2-19: docs/ link kontrolü — kırık link audit
+- [ ] P4-29: .detect-secrets kurulumu — pre-commit hook
+- [ ] P5-31: God object split devamı — sprint-controller daha fazla extract
+
+**Sprint 076+ Planı:**
+- [ ] P1-10..12: Multi-provider test (BLOCKED — API key gerekli)
 - [ ] P3-20..22: Dashboard gerçek sprint ile test
-- [ ] P4-29: .detect-secrets kurulumu
-- [ ] P6-33: Error messages kullanıcı-dostu
 - [ ] P6-40: Graceful shutdown (Ctrl+C → state tutarlılığı)
 - [ ] Windows Codex CLI dogfooding
 - [ ] Windows Cursor + Gemini dogfooding
@@ -197,4 +208,6 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | 070 | 8/8 | 8 | Init UX overhaul, 15 bug fix, Windows dogfooding |
 | 071 | 7/7 | 7 | BUG-19..26 fix, heartbeat periodic, upgrade --local |
 | 072 | 5/5 | 5 | Tier generalizasyonu, model API IDs, god object split, README |
-| **Toplam** | **45/45** | **45** | 12,180+ test, 0 regression, v0.2.0-beta.3 |
+| 073 | 5/5 | 5 | Self-dogfooding: 100 test regresyonu fix, 0 fail |
+| 074 | 7/7 | 7 | Docs tutarlılık, debt-069 kapanış, CHANGELOG/SPRINT-LOG |
+| **Toplam** | **57/57** | **57** | 12,180+ test, 0 regression, v0.2.0-beta.3 |

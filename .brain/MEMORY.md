@@ -170,3 +170,8 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY: GO_WITH_TECH_DEBT — PROJECT-IDENTITY.md: Test sayısı 12,176+ (12,161 passed + 15 skipped, 476 test files), sprint-073 (son sprint), 73 total
 - DECKENT.md + CLAUDE.md Tutarlılık Kontrolü: GO_WITH_TECH_DEBT — 4 numerical inconsistency fixed: (1) orchestra: 42→45 modules (sprint-phases.ts + usage-manager.ts + sprint-controller.t
 - docs/SPRINT-LOG.md Güncelleme: GO_WITH_TECH_DEBT — Sprint 072 ve 073 entry'leri docs/SPRINT-LOG.md dosyasına eklendi. Sprint 072: 5 task, 4 done, 4 tech debt, 1 no-go. Spr
+## Sprint sprint-073 Learnings
+- Dokümantasyon Dil Stratejisi — TR/EN Tutarlılık: GO_WITH_TECH_DEBT — Dokümantasyon dil tutarlılığı tamamlandı. A) docs/CHANGELOG.md: ~300+ İngilizce açıklama satırı Türkçeye çevrildi. Secti
+- VISION.md — Proje Vizyonu ve Yol Haritası: GO_WITH_TECH_DEBT — VISION.md oluşturuldu. 7 bölüm: Vizyon, Misyon, Hedef Kullanıcılar, Rakip Analizi (5 rakip tablo), Teknoloji Kararları (
+- docs/ Link Audit — Kırık Link Kontrolü: GO_WITH_TECH_DEBT — Link audit completed for docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/index.md, README.md. Found 4 broken internal links 
+- .detect-secrets Kurulumu — Pre-commit Güvenlik: GO_WITH_TECH_DEBT — A) .pre-commit-config.yaml oluşturuldu — detect-secrets v1.5.0 hook, .secrets.baseline referansı, package-lock.json excl

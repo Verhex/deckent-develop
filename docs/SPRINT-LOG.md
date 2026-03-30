@@ -1,3 +1,4 @@
+<!-- Dil: TR | Teknik terimler EN -->
 # Sprint Log
 
 ---
@@ -296,7 +297,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - First real `runSprint` execution since Sprint 10
 - 8 documentation files: GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
 - 2 docs not planned (BRAIN-GUIDE, DASHBOARD-GUIDE) — planner treated max_workers as task count limit
-- Observation report: [docs/archive/observations/SPRINT-18-OBSERVATION.md](observations/SPRINT-18-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-18-OBSERVATION.md](archive/observations/SPRINT-18-OBSERVATION.md)
 
 ### Bugs Discovered
 
@@ -334,7 +335,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - inferModelFromDirective fix: opus aşırı atama düzeltildi
 - isDocTask(): doc scope'ları için coverage check atlanıyor
 - updateProjectDocs(): sprint sonrası otomatik doc güncelleme
-- Observation report: [docs/archive/observations/SPRINT-19-OBSERVATION.md](observations/SPRINT-19-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-19-OBSERVATION.md](archive/observations/SPRINT-19-OBSERVATION.md)
 
 ---
 
@@ -361,7 +362,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - Task queue: FAILED (planner still limited by max_workers)
 - Doc task criteria: PARTIAL
 - Model inference: could not validate
-- Observation report: [docs/archive/observations/SPRINT-20-OBSERVATION.md](observations/SPRINT-20-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-20-OBSERVATION.md](archive/observations/SPRINT-20-OBSERVATION.md)
 
 ---
 
@@ -390,7 +391,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 - deckent test + deckent run CLI komutları
 - Planner task queue fix: tüm görevler planlanıyor, spawnWorkers parallelism sınırını uygular
 - DEBT.md decay bug tekrar oluştu (3. kez) — Sprint 22'de kalıcı fix
-- Observation report: [docs/archive/observations/SPRINT-21-OBSERVATION.md](observations/SPRINT-21-OBSERVATION.md)
+- Observation report: [docs/archive/observations/SPRINT-21-OBSERVATION.md](archive/observations/SPRINT-21-OBSERVATION.md)
 
 ---
 
@@ -1931,5 +1932,31 @@ Tier generalizasyonu ve model API ID'leri güncellendi. God object split başlat
 - 072-005: .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY (GO_WITH_TECH_DEBT)
 - 072-006: DECKENT.md + CLAUDE.md Tutarlılık Kontrolü (GO_WITH_TECH_DEBT)
 - 072-007: docs/SPRINT-LOG.md Güncelleme (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 73 — sprint-073
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-03-30
+**Duration:** 1025s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 19.2% |
+| Duration | 1024711ms |
+
+### Tasks
+
+- 073-001: Dokümantasyon Dil Stratejisi — TR/EN Tutarlılık (GO_WITH_TECH_DEBT)
+- 073-002: VISION.md — Proje Vizyonu ve Yol Haritası (GO_WITH_TECH_DEBT)
+- 073-003: docs/ Link Audit — Kırık Link Kontrolü (GO_WITH_TECH_DEBT)
+- 073-004: .detect-secrets Kurulumu — Pre-commit Güvenlik (GO_WITH_TECH_DEBT)
+- 073-005: God Object Split Faz 2 — sprint-controller Utility Extract (DONE)
 
 ---

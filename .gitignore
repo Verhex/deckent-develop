@@ -34,6 +34,11 @@ coverage/
 .env.*
 .deck
 
+# Credentials & secrets
+*.pem
+*.key
+credentials.json
+
 # OS
 .DS_Store
 Thumbs.db

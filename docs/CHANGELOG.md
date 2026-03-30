@@ -1,9 +1,26 @@
 # Changelog
+<!-- Dil: TR | Teknik terimler EN -->
 
-All notable changes to this project will be documented in this file.
+Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
+ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
+
+## [0.2.0-beta.3-sprint73] - 2026-03-30
+
+### Added
+
+- God Object Split Faz 2 — sprint-controller Utility Extract
+
+### Changed
+
+- Dokümantasyon Dil Stratejisi — TR/EN Tutarlılık (completed with tech debt)
+- VISION.md — Proje Vizyonu ve Yol Haritası (completed with tech debt)
+- docs/ Link Audit — Kırık Link Kontrolü (completed with tech debt)
+- .detect-secrets Kurulumu — Pre-commit Güvenlik (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 4 tech debt, 0 no-go_
 
 ## [0.2.0-beta.3-sprint72] - 2026-03-30
 
@@ -14,23 +31,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Fix debt: Tech debt from 069-005-fix: TempAgent mechanism was already fully implemented in (completed with tech debt)
-- .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY (completed with tech debt)
-- DECKENT.md + CLAUDE.md Tutarlılık Kontrolü (completed with tech debt)
-- docs/SPRINT-LOG.md Güncelleme (completed with tech debt)
+- Fix debt: 069-005-fix teknik borcu — TempAgent mekanizması zaten tamamen uygulanmıştı (teknik borçla tamamlandı)
+- .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY (teknik borçla tamamlandı)
+- DECKENT.md + CLAUDE.md Tutarlılık Kontrolü (teknik borçla tamamlandı)
+- docs/SPRINT-LOG.md Güncelleme (teknik borçla tamamlandı)
 
 ### Fixed
 
-- Fix debt: Tech debt from 069-006-fix: A) Fixed extractScopeFromDirective bug: docFileMatch
+- Fix debt: 069-006-fix teknik borcu — extractScopeFromDirective hatası düzeltildi: docFileMatch
 
 
-_Tasks: 7 total, 7 done, 4 tech debt, 0 no-go_
+_Görevler: 7 toplam, 7 tamamlanan, 4 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.3-sprint73] - 2026-03-30
 
 ### Fixed
 
-- **Test Regression Fix**: 100 test regresyonu düzeltildi — 0 fail, 12,161 passed
+- **Test Regresyon Düzeltmesi**: 100 test regresyonu düzeltildi — 0 fail, 12,161 passed
   - 43 fs mock düzeltmesi (worker-feedback, verify-lang testleri)
   - 16 brain mock düzeltmesi (`statSync` mock, `isStackStale()` çağrı zinciri)
   - 9 doctor logic düzeltmesi (`c.ok` → `c.passed` field mismatch)
@@ -39,10 +56,10 @@ _Tasks: 7 total, 7 done, 4 tech debt, 0 no-go_
 
 ### Changed
 
-- Brain Test — statSync Mock Fix (16 fail) (completed with tech debt)
-- Kalan Mock/Integration Fix (3 fail) (completed with tech debt)
+- Brain Test — statSync Mock düzeltmesi (16 fail) (teknik borçla tamamlandı)
+- Kalan Mock/Integration düzeltmesi (3 fail) (teknik borçla tamamlandı)
 
-_Sprint 073: 5 tasks, 5 done, 2 tech debt, 0 no-go_
+_Sprint 073: 5 görev, 5 tamamlanan, 2 teknik borç, 0 no-go_
 
 ---
 
@@ -64,7 +81,7 @@ _Sprint 073: 5 tasks, 5 done, 2 tech debt, 0 no-go_
   - `sprint-controller.ts` slim hale geldi, maintainability artırıldı
 - **README.md**: Test sayısı, sprint sayısı, Windows destek bilgisi güncellendi
 
-_Sprint 072: 5 tasks, 5 done, 4 tech debt, 0 no-go_
+_Sprint 072: 5 görev, 5 tamamlanan, 4 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.3] - 2026-03-27
 
@@ -109,7 +126,7 @@ _Sprint 072: 5 tasks, 5 done, 4 tech debt, 0 no-go_
 - allowedTools: `Edit`, `Glob`, `Grep` worker tool'larına eklendi
 - FullStackResult: `detectedLanguages` field eklendi
 
-_Sprint 070: 8 tasks, 8 done, 15 bug fix. Sprint 071: 8 tasks, 8 done, 7 bug fix. 0 regression._
+_Sprint 070: 8 görev, 8 tamamlanan, 15 hata düzeltme. Sprint 071: 8 görev, 8 tamamlanan, 7 hata düzeltme. 0 regresyon._
 
 ---
 
@@ -117,227 +134,227 @@ _Sprint 070: 8 tasks, 8 done, 15 bug fix. Sprint 071: 8 tasks, 8 done, 7 bug fix
 
 ### Added
 
-- Skill Stats Tracking — uses/successRate/avgCoverage
-- Outcome-Based Ogrenme Guclendirme — Agent/Skill Bonus
+- Skill İstatistik Takibi — uses/successRate/avgCoverage
+- Sonuç Tabanlı Öğrenme Güçlendirme — Agent/Skill Bonus
 
 ### Changed
 
-- Agent Secim Hassasiyeti — test-writer Exclude + Intent Weights (completed with tech debt)
-- Skill Secim Butcesi — Dinamik maxTokens + Priority (completed with tech debt)
+- Agent Seçim Hassasiyeti — test-writer Exclude + Intent Weights (teknik borçla tamamlandı)
+- Skill Seçim Bütçesi — Dinamik maxTokens + Priority (teknik borçla tamamlandı)
 
 
-_Tasks: 6 total, 4 done, 2 tech debt, 2 no-go_
+_Görevler: 6 toplam, 4 tamamlanan, 2 teknik borç, 2 no-go_
 
 ## [0.2.0-beta.1-sprint68] - 2026-03-26
 
 ### Added
 
-- DECKENT.md AI-Native Rehber Genisletme
-- deckent init Multi-Ortam Adapter
-- V2 Routing E2E Dogrulama Testi
+- DECKENT.md AI-Native Rehber Genişletme
+- deckent init Multi-Ortam Adaptörü
+- V2 Routing E2E Doğrulama Testi
 
 ### Changed
 
-- MCP Server Instructions — AI System Prompt Injection (completed with tech debt)
-- Tool Descriptions + Annotations Zenginlestirme (completed with tech debt)
-- deckent_help Tool — Runtime Capabilities + State (completed with tech debt)
+- MCP Sunucu Talimatları — AI Sistem Prompt Enjeksiyonu (teknik borçla tamamlandı)
+- Tool Açıklamaları + Annotations Zenginleştirme (teknik borçla tamamlandı)
+- deckent_help Aracı — Çalışma Zamanı Yetenekleri + Durum (teknik borçla tamamlandı)
 
 
-_Tasks: 6 total, 6 done, 3 tech debt, 0 no-go_
+_Görevler: 6 toplam, 6 tamamlanan, 3 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint67] - 2026-03-26
 
 ### Added
 
-- Job State Sprint Sonuçları — finalizeSprint → job file
+- Job State Sprint Sonuçları — finalizeSprint → iş dosyası
 
 ### Changed
 
-- Fix debt: Tech debt from 064-004-fix: Added 11 targeted tests to tests/cli/helpers/output. (completed with tech debt)
-- Retro Detay Zenginlestirme — Worker Notes Aktarimi (completed with tech debt)
-- any Kullanimi Temizligi — 10 Adet, 7 Dosya (completed with tech debt)
-- V2 Routing Dogrulama — Audit + IDENTITY Guncelleme (completed with tech debt)
+- Fix debt: 064-004-fix teknik borcu — tests/cli/helpers/output'a 11 hedefli test eklendi (teknik borçla tamamlandı)
+- Retro Detay Zenginleştirme — Worker Notes Aktarımı (teknik borçla tamamlandı)
+- any Kullanımı Temizliği — 10 Adet, 7 Dosya (teknik borçla tamamlandı)
+- V2 Routing Doğrulama — Audit + IDENTITY Güncelleme (teknik borçla tamamlandı)
 
 
-_Tasks: 6 total, 5 done, 4 tech debt, 1 no-go_
+_Görevler: 6 toplam, 5 tamamlanan, 4 teknik borç, 1 no-go_
 
 ## [0.2.0-beta.1-sprint66] - 2026-03-26
 
 ### Added
 
 - Phantom Modüller — prompt-token-optimizer + ecosystem-intelligence
-- PlannerTask Interface + enrichScope + api-surface Contract
-- Stale Heartbeat Root Cause + Config routing_engine Validation
-- V1+V2 Paralel Dogrulama + decision-engine Analizi
+- PlannerTask Arayüzü + enrichScope + api-surface Sözleşmesi
+- Stale Heartbeat Kök Neden + Config routing_engine Doğrulama
+- V1+V2 Paralel Doğrulama + decision-engine Analizi
 
 ### Changed
 
-- Manifest v2 Batch Update — 20 Dosya (completed with tech debt)
-- MCP Dokumantasyon Tutarlilik — 16 Tool + 9 Resource (completed with tech debt)
-- Housekeeping — gitignore + IDENTITY Sayilari (completed with tech debt)
+- Manifest v2 Toplu Güncelleme — 20 Dosya (teknik borçla tamamlandı)
+- MCP Dokümantasyon Tutarlılık — 16 Tool + 9 Resource (teknik borçla tamamlandı)
+- Housekeeping — gitignore + IDENTITY Sayıları (teknik borçla tamamlandı)
 
 
-_Tasks: 7 total, 7 done, 3 tech debt, 0 no-go_
+_Görevler: 7 toplam, 7 tamamlanan, 3 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint65] - 2026-03-26
 
 ### Added
 
-- history Trend + retro Archive
+- history Trend + retro Arşivleme
 
 ### Changed
 
-- plan — AI Planner Timeout Configurable (completed with tech debt)
-- config — autoMigrateOnLoad + Modes Nesting (completed with tech debt)
-- cleanup — Çift Geçiş, Sahte Sprint, destroy Session, .gitignore (completed with tech debt)
-- spawn — Scope Enforcement + Multi-Provider (completed with tech debt)
-- analyze — Wrapper Birleştirme + Monorepo (completed with tech debt)
-- Dokümantasyon — CHANGELOG/SPRINT-LOG Restore + cli-deep-analysis Final (completed with tech debt)
+- plan — AI Planner Timeout Yapılandırılabilir (teknik borçla tamamlandı)
+- config — autoMigrateOnLoad + Modes İç İçe Geçme (teknik borçla tamamlandı)
+- cleanup — Çift Geçiş, Sahte Sprint, destroy Session, .gitignore (teknik borçla tamamlandı)
+- spawn — Kapsam Zorlama + Multi-Provider (teknik borçla tamamlandı)
+- analyze — Wrapper Birleştirme + Monorepo (teknik borçla tamamlandı)
+- Dokümantasyon — CHANGELOG/SPRINT-LOG Geri Yükleme + cli-deep-analysis Final (teknik borçla tamamlandı)
 
 
-_Tasks: 7 total, 7 done, 6 tech debt, 0 no-go_
+_Görevler: 7 toplam, 7 tamamlanan, 6 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint64] - 2026-03-26
 
 ### Added
 
-- No completed tasks
+- Tamamlanan görev yok
 
 
-_Tasks: 14 total, 0 done, 0 tech debt, 14 no-go_
+_Görevler: 14 toplam, 0 tamamlanan, 0 teknik borç, 14 no-go_
 
 ## [0.2.0-beta.1-sprint62] - 2026-03-26
 
 ### Added
 
 - ci-guardian Agent Tanımı + PROMPT.md
-- beforeSprint Hook — Pre-Sprint CI Validation
-- afterTask Hook — Task-Level Regression Detection
+- beforeSprint Hook — Sprint Öncesi CI Doğrulama
+- afterTask Hook — Görev Düzeyinde Regresyon Tespiti
 - afterSprint Hook — Sprint CI Raporu
-- CI Learning — Sprint-to-Sprint Öğrenme
+- CI Öğrenme — Sprintler Arası Öğrenme
 
 ### Changed
 
-- ci-testing Skill Tanımı + SKILL.md (completed with tech debt)
-- CI Dashboard Entegrasyonu (completed with tech debt)
-- GitHub Actions Workflow İyileştirme (completed with tech debt)
+- ci-testing Skill Tanımı + SKILL.md (teknik borçla tamamlandı)
+- CI Dashboard Entegrasyonu (teknik borçla tamamlandı)
+- GitHub Actions Workflow İyileştirme (teknik borçla tamamlandı)
 
 
-_Tasks: 8 total, 8 done, 3 tech debt, 0 no-go_
+_Görevler: 8 toplam, 8 tamamlanan, 3 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint61] - 2026-03-26
 
 ### Added
 
-- Plan Standalone Provider Bootstrap (P0)
+- Plan Bağımsız Provider Başlatma (P0)
 
 ### Changed
 
-- Agent List Display Fix + History Agent Column (P1) (completed with tech debt)
-- Brain Budget Decay + Memory Temizliği (P0) (completed with tech debt)
-- Open Debt Cleanup (debt-059-008-fix) (P1) (completed with tech debt)
-- Framework Detection + Analyzer Fix (P2) (completed with tech debt)
-- Remaining CLI Polish (completed with tech debt)
+- Agent Listesi Görüntü Düzeltmesi + History Agent Sütunu (P1) (teknik borçla tamamlandı)
+- Brain Bütçe Decay + Memory Temizliği (P0) (teknik borçla tamamlandı)
+- Açık Borç Temizliği (debt-059-008-fix) (P1) (teknik borçla tamamlandı)
+- Framework Tespiti + Analyzer Düzeltmesi (P2) (teknik borçla tamamlandı)
+- Kalan CLI İyileştirmeleri (teknik borçla tamamlandı)
 
 ### Fixed
 
-- Agent Assignment Persistence Fix (P0 CRITICAL)
-- Agent Stats Update Fix (P0 CRITICAL)
+- Agent Atama Kalıcılık Düzeltmesi (P0 KRİTİK)
+- Agent İstatistik Güncelleme Düzeltmesi (P0 KRİTİK)
 
 
-_Tasks: 8 total, 8 done, 5 tech debt, 0 no-go_
+_Görevler: 8 toplam, 8 tamamlanan, 5 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint60] - 2026-03-26
 
 
 ### Changed
 
-- CLI Komut + Flag Doğrulama (completed with tech debt)
-- Agent Pool + Skill Pool Doğrulama (completed with tech debt)
-- MCP Tool + Resource Doğrulama (completed with tech debt)
-- Sprint Lifecycle + Format Tutarlılık Doğrulama (completed with tech debt)
-- Doctor + Config + Provider Doğrulama (completed with tech debt)
+- CLI Komut + Flag Doğrulama (teknik borçla tamamlandı)
+- Agent Pool + Skill Pool Doğrulama (teknik borçla tamamlandı)
+- MCP Tool + Resource Doğrulama (teknik borçla tamamlandı)
+- Sprint Yaşam Döngüsü + Format Tutarlılık Doğrulama (teknik borçla tamamlandı)
+- Doctor + Config + Provider Doğrulama (teknik borçla tamamlandı)
 
 ### Fixed
 
-- Fix debt: Tech debt from 057-012-fix: All agent/skill/plugin/marketplace/archive-debt impr
+- Fix debt: 057-012-fix teknik borcu — tüm agent/skill/plugin/marketplace/archive-debt iyileştirmeleri
 
 
-_Tasks: 6 total, 6 done, 5 tech debt, 0 no-go_
+_Görevler: 6 toplam, 6 tamamlanan, 5 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint59] - 2026-03-25
 
 
 ### Changed
 
-- cli-deep-analysis.md Full [DONE] Marking + Doğrulama (completed with tech debt)
-- Prompt Boilerplate Azaltma + Worker Guide (completed with tech debt)
-- spawn+kill+run Multi-Provider Desteği (completed with tech debt)
-- doctor+watch Provider-Aware Fix (completed with tech debt)
-- MCP Resources Expansion (+4 resources) (completed with tech debt)
-- MCP Tool Quality — Enrichment + Error Handling (completed with tech debt)
-- Format Tutarlılığı + Dead Code Temizliği (completed with tech debt)
-- Sync Genişleme (Gemini/Cursor/Codex Adapters) (completed with tech debt)
-- Doc Updater Fix + CHANGELOG Konsolidasyonu (completed with tech debt)
+- cli-deep-analysis.md Tam [DONE] İşaretleme + Doğrulama (teknik borçla tamamlandı)
+- Prompt Boilerplate Azaltma + Worker Rehberi (teknik borçla tamamlandı)
+- spawn+kill+run Multi-Provider Desteği (teknik borçla tamamlandı)
+- doctor+watch Provider-Duyarlı Düzeltme (teknik borçla tamamlandı)
+- MCP Kaynakları Genişleme (+4 kaynak) (teknik borçla tamamlandı)
+- MCP Tool Kalitesi — Zenginleştirme + Hata Yönetimi (teknik borçla tamamlandı)
+- Format Tutarlılığı + Ölü Kod Temizliği (teknik borçla tamamlandı)
+- Sync Genişleme (Gemini/Cursor/Codex Adaptörleri) (teknik borçla tamamlandı)
+- Doküman Güncelleyici Düzeltme + CHANGELOG Konsolidasyonu (teknik borçla tamamlandı)
 
 ### Fixed
 
-- Agent Activation Fix — forceModel Agent Bypass Kaldır
-- Skill Selection Fix — Task-Specific Seçim + Truncation
-- Scope & GO/NO-GO Fix — filesWrite + Criteria Enrichment
+- Agent Aktivasyon Düzeltmesi — forceModel Agent Bypass Kaldırıldı
+- Skill Seçim Düzeltmesi — Görev-Bazlı Seçim + Truncation
+- Scope & GO/NO-GO Düzeltmesi — filesWrite + Kriter Zenginleştirme
 
 
-_Tasks: 13 total, 12 done, 9 tech debt, 1 no-go_
+_Görevler: 13 toplam, 12 tamamlanan, 9 teknik borç, 1 no-go_
 
 ## [0.2.0-beta.1-sprint58] - 2026-03-25
 
 ### Added
 
-- agent+skill+plugin+marketplace+archive-debt Completeness
-- dashboard+attach+watch+cross-cutting
+- agent+skill+plugin+marketplace+archive-debt Tamlık Kontrolü
+- dashboard+attach+watch+cross-cutting Bütünleştirme
 
 
-_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+_Görevler: 2 toplam, 2 tamamlanan, 0 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint57] - 2026-03-25
 
 ### Added
 
-- status Overhaul — Standalone, ETA, NO_COLOR, fs.watch, Verbose
-- retro+explain Quality — Dil, Trend, Agent/Skill Perf, Learnings
-- usage Overhaul — Real Tokens, Race Condition, Live Usage, Filters
-- history Overhaul — --json, --last, Agent/Skill, Dead Code, Format
-- config Quality — list/keys, autoMigrate, Validation, Comment, Env Var
-- review+finalize Overhaul — Interactive, Retry, Guard, Duplicate
-- serve Security — Rate Limit, Body Size, DeepMerge, Auth, Versioning
+- status Yenileme — Bağımsız, ETA, NO_COLOR, fs.watch, Verbose
+- retro+explain Kalitesi — Dil, Trend, Agent/Skill Performansı, Öğrenmeler
+- usage Yenileme — Gerçek Token'lar, Race Condition, Canlı Kullanım, Filtreler
+- history Yenileme — --json, --last, Agent/Skill, Ölü Kod, Format
+- config Kalitesi — list/keys, autoMigrate, Doğrulama, Yorum, Env Var
+- review+finalize Yenileme — Etkileşimli, Yeniden Deneme, Guard, Çoklama
+- serve Güvenliği — Rate Limit, Body Size, DeepMerge, Auth, Versiyonlama
 
 ### Changed
 
-- doctor Improvements — tmux Conditional, .deck Check, Auth, Hints (completed with tech debt)
-- cleanup+decay Overhaul — Auto Decay, Combo, Lock Guard, Archive (completed with tech debt)
-- run+test+web Flags — Timeout, Keep, Sandbox, CI, MIME (completed with tech debt)
-- sync+onboard+upgrade Polish (completed with tech debt)
+- doctor İyileştirmeleri — tmux Koşullu, .deck Kontrol, Auth, İpuçları (teknik borçla tamamlandı)
+- cleanup+decay Yenileme — Otomatik Decay, Combo, Lock Guard, Arşiv (teknik borçla tamamlandı)
+- run+test+web Flag'leri — Timeout, Keep, Sandbox, CI, MIME (teknik borçla tamamlandı)
+- sync+onboard+upgrade İyileştirme (teknik borçla tamamlandı)
 
 
-_Tasks: 13 total, 11 done, 4 tech debt, 2 no-go_
+_Görevler: 13 toplam, 11 tamamlanan, 4 teknik borç, 2 no-go_
 
 ## [0.2.0-beta.1-sprint56] - 2026-03-25
 
 ### Added
 
-- init UX — Auto Lang, Recommendation, Re-init, Error Recovery
+- init UX — Otomatik Dil, Öneri, Yeniden Başlatma, Hata Kurtarma
 
 ### Changed
 
-- Doc Updater Referans Fix + CHANGELOG Konsolidasyonu (completed with tech debt)
-- init Bug Fix — deepMerge + .deck Security + Provider Wizard (completed with tech debt)
-- plan Core — Async Usage, Dry-Run, Idempotency, Safeguard (completed with tech debt)
-- plan Quality — Parser, i18n, Context Priority, Error Logging (completed with tech debt)
-- start Core — Wait Timeout, Spawn Retry, Zero-Config, Phase Persistence (completed with tech debt)
-- start Quality — Provider Cache, Dashboard Usage, Cleanup Finally, --watch Alt (completed with tech debt)
+- Doküman Güncelleyici Referans Düzeltmesi + CHANGELOG Konsolidasyonu (teknik borçla tamamlandı)
+- init Hata Düzeltmesi — deepMerge + .deck Güvenlik + Provider Sihirbazı (teknik borçla tamamlandı)
+- plan Çekirdek — Async Kullanım, Dry-Run, Idempotency, Koruma (teknik borçla tamamlandı)
+- plan Kalitesi — Parser, i18n, Bağlam Önceliği, Hata Loglama (teknik borçla tamamlandı)
+- start Çekirdek — Bekleme Timeout, Spawn Yeniden Deneme, Sıfır-Yapılandırma, Faz Kalıcılığı (teknik borçla tamamlandı)
+- start Kalitesi — Provider Cache, Dashboard Kullanımı, Cleanup Finally, --watch Alternatif (teknik borçla tamamlandı)
 
 
-_Tasks: 20 total, 7 done, 7 tech debt, 13 no-go_
+_Görevler: 20 toplam, 7 tamamlanan, 7 teknik borç, 13 no-go_
 
 ## [0.2.0-beta.1-sprint55] - 2026-03-25
 
@@ -348,483 +365,483 @@ _Tasks: 20 total, 7 done, 7 tech debt, 13 no-go_
 
 ### Changed
 
-- readLanguage + readJsonSafe Tam DRY Temizliği (completed with tech debt)
-- Config Set Nested Key + Import DeepMerge + Config Get (completed with tech debt)
-- Spawn Komutu Prompt Zenginleştirme + Status Kontrolü (completed with tech debt)
-- Doctor --json + Retro --json Flag'leri (completed with tech debt)
-- Cleanup --dry-run Flag'i (completed with tech debt)
-- Agent Delete + Edit Komutları (completed with tech debt)
-- Skill Enable/Disable + Delete Komutları (completed with tech debt)
-- Explain --sprint Flag + Goal Bilgisi + Dil Desteği (completed with tech debt)
+- readLanguage + readJsonSafe Tam DRY Temizliği (teknik borçla tamamlandı)
+- Config Set İç İçe Anahtar + Import DeepMerge + Config Get (teknik borçla tamamlandı)
+- Spawn Komutu Prompt Zenginleştirme + Status Kontrolü (teknik borçla tamamlandı)
+- Doctor --json + Retro --json Flag'leri (teknik borçla tamamlandı)
+- Cleanup --dry-run Flag'i (teknik borçla tamamlandı)
+- Agent Delete + Edit Komutları (teknik borçla tamamlandı)
+- Skill Enable/Disable + Delete Komutları (teknik borçla tamamlandı)
+- Explain --sprint Flag + Goal Bilgisi + Dil Desteği (teknik borçla tamamlandı)
 
 
-_Tasks: 10 total, 10 done, 10 tech debt, 0 no-go_
+_Görevler: 10 toplam, 10 tamamlanan, 10 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint54] - 2026-03-25
 
 ### Changed
 
-- Agent Activation — systemPrompt + Worker Injection (completed with tech debt)
-- Brain Self-Learning — Config Suggestions + Pattern Detection (completed with tech debt)
-- Rich Sprint Output + README Update (completed with tech debt)
-- docs/ Reorganization + .claude/rules/ Update (completed with tech debt)
+- Agent Aktivasyonu — systemPrompt + Worker Enjeksiyonu (teknik borçla tamamlandı)
+- Brain Kendi Kendine Öğrenme — Config Önerileri + Desen Tespiti (teknik borçla tamamlandı)
+- Zengin Sprint Çıktısı + README Güncelleme (teknik borçla tamamlandı)
+- docs/ Yeniden Düzenleme + .claude/rules/ Güncelleme (teknik borçla tamamlandı)
 
-_Tasks: 4 total, 4 done, 4 tech debt, 0 no-go_
+_Görevler: 4 toplam, 4 tamamlanan, 4 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint53] - 2026-03-25
 
 ### Added
 
-- Skill Injection — 10 Skill'i Worker'lara Inject Et
+- Skill Enjeksiyonu — 10 Skill'i Worker'lara Enjekte Et
 
 ### Changed
 
-- Self-Healing Bootstrap — Auto-Migration on Startup (completed with tech debt)
+- Kendini İyileştiren Bootstrap — Başlangıçta Otomatik Migration (teknik borçla tamamlandı)
 
 
-_Tasks: 8 total, 2 done, 1 tech debt, 6 no-go_
+_Görevler: 8 toplam, 2 tamamlanan, 1 teknik borç, 6 no-go_
 
 ## [0.2.0-beta.1-sprint52] - 2026-03-25
 
 
 ### Changed
 
-- Dashboard Full Expansion (completed with tech debt)
+- Dashboard Tam Genişleme (teknik borçla tamamlandı)
 
 
-_Tasks: 1 total, 1 done, 1 tech debt, 0 no-go_
+_Görevler: 1 toplam, 1 tamamlanan, 1 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint51] - 2026-03-25
 
 ### Added
 
-- Getting Started Guide
+- Başlangıç Rehberi
 
 ### Changed
 
-- Full Config Expansion (completed with tech debt)
-- Config Documentation (Inline Comments) (completed with tech debt)
-- Dashboard Config Editor (completed with tech debt)
-- VitePress Setup (completed with tech debt)
-- CLI Reference (Auto-Generated) (completed with tech debt)
-- Config Migration Helper (completed with tech debt)
-- Deploy Configuration (completed with tech debt)
+- Tam Config Genişleme (teknik borçla tamamlandı)
+- Config Dokümantasyonu (Satır İçi Yorumlar) (teknik borçla tamamlandı)
+- Dashboard Config Editörü (teknik borçla tamamlandı)
+- VitePress Kurulumu (teknik borçla tamamlandı)
+- CLI Referansı (Otomatik Oluşturulan) (teknik borçla tamamlandı)
+- Config Migration Yardımcısı (teknik borçla tamamlandı)
+- Dağıtım Yapılandırması (teknik borçla tamamlandı)
 
 
-_Tasks: 8 total, 8 done, 7 tech debt, 0 no-go_
+_Görevler: 8 toplam, 8 tamamlanan, 7 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint50] - 2026-03-25
 
 
 ### Changed
 
-- npm Publish Dry Run & Fix (completed with tech debt)
-- README.md Overhaul (completed with tech debt)
-- bin Entry Validation (completed with tech debt)
-- CHANGELOG.md Update (completed with tech debt)
-- npm Publish Pipeline Validation (completed with tech debt)
+- npm Publish Dry Run & Düzeltme (teknik borçla tamamlandı)
+- README.md Yenileme (teknik borçla tamamlandı)
+- bin Giriş Doğrulama (teknik borçla tamamlandı)
+- CHANGELOG.md Güncelleme (teknik borçla tamamlandı)
+- npm Publish Pipeline Doğrulama (teknik borçla tamamlandı)
 
 
-_Tasks: 5 total, 5 done, 5 tech debt, 0 no-go_
+_Görevler: 5 toplam, 5 tamamlanan, 5 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint48] - 2026-03-24
 
 ### Added
 
-- Doc-Only Task Verify Skip
+- Sadece Doküman Görevleri Doğrulama Atla
 
 ### Changed
 
-- Claude MCP Backend Stub Completion (completed with tech debt)
-- Sandbox Mode Graceful Handling (completed with tech debt)
-- API Mode Usage Integration (completed with tech debt)
-- Subprocess Worker Log Enhancement (completed with tech debt)
-- Coverage Metric Preservation (completed with tech debt)
-- Blueprint Section Numbers Update (completed with tech debt)
-- RELEASE-NOTES-BETA.md Final Update (completed with tech debt)
+- Claude MCP Backend Stub Tamamlama (teknik borçla tamamlandı)
+- Sandbox Modu Zarif İşleme (teknik borçla tamamlandı)
+- API Modu Kullanım Entegrasyonu (teknik borçla tamamlandı)
+- Subprocess Worker Log İyileştirme (teknik borçla tamamlandı)
+- Coverage Metrik Koruma (teknik borçla tamamlandı)
+- Blueprint Bölüm Numaraları Güncelleme (teknik borçla tamamlandı)
+- RELEASE-NOTES-BETA.md Son Güncelleme (teknik borçla tamamlandı)
 
 
-_Tasks: 8 total, 8 done, 7 tech debt, 0 no-go_
+_Görevler: 8 toplam, 8 tamamlanan, 7 teknik borç, 0 no-go_
 
 ## [0.2.0-beta.1-sprint47] - 2026-03-24
 
 ### Added
 
-- No completed tasks
+- Tamamlanan görev yok
 
 
-_Tasks: 10 total, 0 done, 0 tech debt, 10 no-go_
+_Görevler: 10 toplam, 0 tamamlanan, 0 teknik borç, 10 no-go_
 
 ## [0.2.0-beta.1-sprint46] - 2026-03-24
 
 ### Added
 
-- Rich Output Integration into finalizeSprint
+- Zengin Çıktı finalizeSprint'e Entegrasyonu
 
 ### Changed
 
-- Router Integration into Sprint Lifecycle (completed with tech debt)
-- Codex Adapter — Real CLI Integration (completed with tech debt)
-- Claude Adapter — MCP Server Mode Option (completed with tech debt)
-- .deck Secret Loading in Provider Auth (completed with tech debt)
-- Provider Health in deckent doctor (completed with tech debt)
-- Environment-Aware deckent init (completed with tech debt)
-- Sprint 044 Module Smoke Tests (completed with tech debt)
+- Router Sprint Yaşam Döngüsüne Entegrasyon (teknik borçla tamamlandı)
+- Codex Adaptörü — Gerçek CLI Entegrasyonu (teknik borçla tamamlandı)
+- Claude Adaptörü — MCP Sunucu Modu Seçeneği (teknik borçla tamamlandı)
+- .deck Secret Yükleme Provider Auth'da (teknik borçla tamamlandı)
+- deckent doctor'da Provider Sağlığı (teknik borçla tamamlandı)
+- Ortam-Duyarlı deckent init (teknik borçla tamamlandı)
+- Sprint 044 Modül Smoke Test'leri (teknik borçla tamamlandı)
 
 
-_Tasks: 10 total, 8 done, 7 tech debt, 2 no-go_
+_Görevler: 10 toplam, 8 tamamlanan, 7 teknik borç, 2 no-go_
 
 ## [0.1.0-sprint42] - 2026-03-23
 
 
 ### Changed
 
-- npm Publish Validation (completed with tech debt)
-- Global Install E2E Test (completed with tech debt)
-- Provider Adapter Smoke Tests (completed with tech debt)
+- npm Publish Doğrulama (teknik borçla tamamlandı)
+- Global Kurulum E2E Testi (teknik borçla tamamlandı)
+- Provider Adaptör Smoke Test'leri (teknik borçla tamamlandı)
 
 
-_Tasks: 8 total, 3 done, 3 tech debt, 5 no-go_
+_Görevler: 8 toplam, 3 tamamlanan, 3 teknik borç, 5 no-go_
 
-## [0.2.0-beta.1] — 2026-03-23 (Stabilization — Beta Ready)
+## [0.2.0-beta.1] — 2026-03-23 (Stabilizasyon — Beta Hazır)
 
 ### Added
-- **CHANGELOG**: Sprint 035-042 entries in semver format
-- **RELEASE-NOTES-BETA.md**: Beta release notes with features, metrics, getting started, known limitations, and roadmap
-- **npm Publish Validation**: `scripts/validate-publish.ts` and `npm run validate:publish` for automated publish checks
-- **E2E Tests**: Global install flow and first-sprint journey tests (`tests/e2e/`)
-- **Provider Smoke Tests**: Adapter smoke tests for Claude, Codex, and Gemini without real API calls
+- **CHANGELOG**: Sprint 035-042 girdileri semver formatında
+- **RELEASE-NOTES-BETA.md**: Özellikler, metrikler, başlangıç rehberi, bilinen sınırlamalar ve yol haritası ile beta sürüm notları
+- **npm Publish Doğrulama**: `scripts/validate-publish.ts` ve `npm run validate:publish` ile otomatik yayın kontrolleri
+- **E2E Test'ler**: Global kurulum akışı ve ilk sprint yolculuğu testleri (`tests/e2e/`)
+- **Provider Smoke Test'leri**: Claude, Codex ve Gemini için gerçek API çağrısı olmadan adaptör smoke testleri
 
 ### Changed
-- Version bumped from 0.1.0 to 0.2.0-beta.1
-- All open tech debt items closed or documented in DECISIONS.md
-- Documentation final review pass (README, QUICKSTART, CONFIG-REFERENCE, CONTRIBUTING)
+- Sürüm 0.1.0'dan 0.2.0-beta.1'e yükseltildi
+- Tüm açık teknik borç maddeleri kapatıldı veya DECISIONS.md'de belgelendi
+- Dokümantasyon son inceleme geçişi (README, QUICKSTART, CONFIG-REFERENCE, CONTRIBUTING)
 
 ### Fixed
-- Test suite stabilized: 0 failures on Linux/WSL
-- All flaky tests resolved (timing, concurrency, platform-specific)
+- Test paketi stabilize edildi: Linux/WSL'de 0 hata
+- Tüm kararsız testler çözüldü (zamanlama, eşzamanlılık, platform-özel)
 
-_Sprint 042: Stabilization — Beta Ready_
+_Sprint 042: Stabilizasyon — Beta Hazır_
 
-## [0.1.0-sprint041] — 2026-03-23 (Human-Friendly Output Complete)
+## [0.1.0-sprint041] — 2026-03-23 (İnsan-Dostu Çıktı Tamamlandı)
 
 ### Added
-- **Dashboard SprintSummary**: Human-friendly SprintSummary component for web dashboard
-- **CLI Doctor Enhancement**: Human-friendly health check output with categorized results
-- **RETRO Enhancement**: Human-readable retrospective format with comparison metrics
-- **Error Messages**: Human-context error messages with suggestions and fix hints
-- **Worker Logs**: Human-readable progress output for worker execution logs
+- **Dashboard SprintSummary**: Web dashboard için insan-dostu SprintSummary bileşeni
+- **CLI Doctor İyileştirme**: Kategorize edilmiş sonuçlarla insan-dostu sağlık kontrolü çıktısı
+- **RETRO İyileştirme**: Karşılaştırma metrikleri ile insan-okunabilir retrospektif formatı
+- **Hata Mesajları**: Öneriler ve düzeltme ipuçları ile bağlam-duyarlı hata mesajları
+- **Worker Log'ları**: Worker çalışma log'ları için insan-okunabilir ilerleme çıktısı
 
 ### Changed
-- MCP tool responses reformatted to human-friendly format (with tech debt)
+- MCP tool yanıtları insan-dostu formata yeniden düzenlendi (teknik borçla)
 
 ### Fixed
-- debugLog() helper function tech debt from Sprint 033 resolved
+- Sprint 033'ten kalan debugLog() yardımcı fonksiyonu teknik borcu çözüldü
 
-_Tasks: 7 total, 7 done, 1 tech debt, 0 no-go | Coverage: 94.3%_
+_Görevler: 7 toplam, 7 tamamlanan, 1 teknik borç, 0 no-go | Coverage: %94.3_
 
-## [0.1.0-sprint040] — 2026-03-23 (Worker Feedback Loop + Human-Friendly Output)
+## [0.1.0-sprint040] — 2026-03-23 (Worker Geri Bildirim Döngüsü + İnsan-Dostu Çıktı)
 
 ### Added
-- **Worker Verify Loop**: Internal tsc and test verification within worker execution
-- **Worker Feedback Metrics**: Worker self-assessment metrics collection
-- **Human-Friendly Sprint Complete**: Colored, categorized sprint completion output
-- **Human-Friendly Init Wizard**: Interactive init wizard with guided setup
+- **Worker Doğrulama Döngüsü**: Worker çalışması içinde dahili tsc ve test doğrulaması
+- **Worker Geri Bildirim Metrikleri**: Worker öz-değerlendirme metrik toplama
+- **İnsan-Dostu Sprint Tamamlanma**: Renkli, kategorize edilmiş sprint tamamlanma çıktısı
+- **İnsan-Dostu Init Sihirbazı**: Rehberli kurulum ile etkileşimli init sihirbazı
 
 ### Changed
-- CLI status output reformatted to human-friendly format (with tech debt)
+- CLI status çıktısı insan-dostu formata yeniden düzenlendi (teknik borçla)
 
 ### Fixed
-- Worker prompt overhaul: human-readable instructions and agent/skill injection fix
+- Worker prompt yenileme: insan-okunabilir talimatlar ve agent/skill enjeksiyon düzeltmesi
 
-_Tasks: 13 total, 7 done, 1 tech debt, 6 no-go | Coverage: 92.1%_
+_Görevler: 13 toplam, 7 tamamlanan, 1 teknik borç, 6 no-go | Coverage: %92.1_
 
-## [0.1.0-sprint039] — 2026-03-22 (Provider Fixes)
-
-### Fixed
-- **Codex Adapter**: Real CLI integration fix for Codex provider adapter
-
-_Tasks: 19 total, 1 done, 0 tech debt, 18 no-go | Coverage: 95.0%_
-
-## [0.1.0-sprint038] — 2026-03-22 (Multi-Provider Infrastructure)
-
-### Added
-- **ModelType Extended**: 8 model variants across 3 providers (Claude, Codex, Gemini)
-- **Codex Adapter**: OpenAI Codex provider adapter with usage tracking
-- **Gemini Adapter**: Google Gemini provider adapter with usage tracking
-- **Provider-Aware Model Selection**: model-selector.ts routes across all 3 providers
-- **spawnWorkers Routing**: Worker spawn routing based on provider/model assignment
-- **Planner Decoupling**: planner.ts decoupled from tmux/subprocess specifics
-- **tmux Decoupling**: tmux.ts platform abstraction layer
-- **Subprocess Decoupling**: subprocess backend abstraction improvements
-- **CLI Entrypoint Fix**: Side-effect-free entrypoint via buildProgram() + entry.ts
-- **Platform Support Matrix**: macOS/Linux/WSL2 support matrix documented
-- **bootstrapProviders()**: Single startup point for provider detection and registration
-
-### Changed
-- ModelType enum extended with Codex and Gemini model variants
-- ProviderRegistry supports dynamic provider registration
-- Config supports per-provider API key and endpoint configuration
-
-_Tasks: 20 total, 20 done, 0 tech debt, 0 no-go — +476 tests (8073 → 8555)_
-
-## [0.1.0-sprint037] — 2026-03-22 (Security, Performance, Plugin System)
-
-### Added
-- **Timing-Safe Auth**: Constant-time comparison for authentication tokens (SHA-256 hash)
-- **Credential Redaction**: Automatic redaction of API keys, Bearer tokens, and URL passwords from logs
-- **Skill Sandbox AST**: TypeScript compiler API second-pass for eval/Function/child_process detection
-- **DIRECTIVES Validation**: Zod schema validation (DirectiveSchema + DirectiveTaskSchema) before task creation
-- **Plugin System**: Full install lifecycle (npm/git/local + rollback), runtime hooks (beforeSprint/afterTask/afterSprint)
-- **PROJECT-IDENTITY.md**: Permanent project identity file, never decayed, updated every sprint
-- **finalizeSprint()**: Dedicated sprint finalization function + `deckent finalize` CLI command
-- **Config Mode Aliases**: performance/balanced/economic/unlimited mapped to canonical mode names
-
-### Changed
-- Memory budget increased from 300 to 600 lines
-- Decay threshold extended from 3 to 5 sprints
-- RETRO max lines increased from 60 to 100
-- Sprint log max lines increased from 50 to 80
-- Agent pool uses LRU eviction (max 50 temp, 5 sprint age) with batch read
-
-_Tasks: 16 total, 16 done, 0 tech debt, 0 no-go — +258 tests (7815 → 8073)_
-
-## [0.1.0-sprint036] — 2026-03-22 (Architectural Cleanup)
-
-### Added
-- **sprint-controller.ts**: Sprint lifecycle management extracted from brain.ts
-- **result-evaluator.ts**: Task result evaluation logic extracted from brain.ts
-- **usage-manager.ts**: Usage tracking and budget management extracted from brain.ts
-- **Type Modules**: types.ts split into task-types, config-types, monitoring-types, sprint-types + barrel
-
-### Changed
-- **brain.ts God Object Split**: 1312 → 58 lines, now a pure re-export layer with backward compatibility
-- **spawn-backend.ts**: Moved from core/ to orchestra/ (layer violation fix)
-- **Non-null Assertions**: 48 `!` operators replaced with guard clauses, `.at()`, and `?? fallback` across 29 files
-- **Type Casts**: Replaced with enum literals (`TaskStatus.DONE`) and type guards
-- **Barrel Cleanup**: orchestra/index.ts reduced from 30+ to 22 public API exports with @internal JSDoc
-- **Auditor Queue**: shift() O(n) replaced with descending sort + pop() O(1)
-- **PromptAnalytics**: prompt-metrics + prompt-ab-test unified into single class
-
-_Tasks: 11 total, 11 done, 0 tech debt, 0 no-go — +315 tests_
-
-## [0.1.0-sprint035] — 2026-03-22 (Beta Cleanup Wave 1+2)
-
-### Added
-- **readJsonSafeAsync()**: Async variant of readJsonSafe for non-blocking JSON file reads
-- **Utility Extraction**: readFileIfExists, listFilesWithExtension, safeMapGet moved to utils.ts
-- **Error Registry Expansion**: Error codes E039-E053 with fix suggestions
-
-### Changed
-- **readJsonSafe Migration**: 13 inline JSON.parse calls replaced with readJsonSafe()
-- **Error Handling Unification**: 11 generic throw statements replaced with DeckentError + ErrorRegistry
-- **Silent Catch Logging**: debugLog() helper with DECKENT_DEBUG env gate across 8 catch blocks
-- **parseBody Type Safety**: 5 Zod schemas (Start/Plan/Directives/Config/Kill) + parseBodyWithSchema()
-- **EventEmitter Fix**: Dedicated _ipcEmitter with setMaxListeners(0), removed process EventEmitter usage
+## [0.1.0-sprint039] — 2026-03-22 (Provider Düzeltmeleri)
 
 ### Fixed
-- **tmux Worker Crash Recovery**: Agent-based subprocess fallback for crashed tmux workers
+- **Codex Adaptörü**: Codex provider adaptörü için gerçek CLI entegrasyon düzeltmesi
 
-_Sprint 035: Beta Cleanup Wave 1+2_
+_Görevler: 19 toplam, 1 tamamlanan, 0 teknik borç, 18 no-go | Coverage: %95.0_
+
+## [0.1.0-sprint038] — 2026-03-22 (Multi-Provider Altyapısı)
+
+### Added
+- **ModelType Genişletme**: 3 provider'da 8 model varyantı (Claude, Codex, Gemini)
+- **Codex Adaptörü**: Kullanım takibi ile OpenAI Codex provider adaptörü
+- **Gemini Adaptörü**: Kullanım takibi ile Google Gemini provider adaptörü
+- **Provider-Duyarlı Model Seçimi**: model-selector.ts 3 provider'da yönlendirme
+- **spawnWorkers Yönlendirme**: Provider/model atamasına göre Worker spawn yönlendirme
+- **Planner Bağımsızlaştırma**: planner.ts tmux/subprocess'ten bağımsızlaştırıldı
+- **tmux Bağımsızlaştırma**: tmux.ts platform soyutlama katmanı
+- **Subprocess Bağımsızlaştırma**: subprocess backend soyutlama iyileştirmeleri
+- **CLI Giriş Noktası Düzeltmesi**: buildProgram() + entry.ts ile yan etkisiz giriş noktası
+- **Platform Destek Matrisi**: macOS/Linux/WSL2 destek matrisi belgelendi
+- **bootstrapProviders()**: Provider tespiti ve kayıt için tek başlangıç noktası
+
+### Changed
+- ModelType enum'u Codex ve Gemini model varyantlarıyla genişletildi
+- ProviderRegistry dinamik provider kaydını destekliyor
+- Config provider başına API anahtarı ve endpoint yapılandırmasını destekliyor
+
+_Görevler: 20 toplam, 20 tamamlanan, 0 teknik borç, 0 no-go — +476 test (8073 → 8555)_
+
+## [0.1.0-sprint037] — 2026-03-22 (Güvenlik, Performans, Plugin Sistemi)
+
+### Added
+- **Zamanlama-Güvenli Auth**: Kimlik doğrulama token'ları için sabit zamanlı karşılaştırma (SHA-256 hash)
+- **Kimlik Bilgisi Maskeleme**: Log'lardan API anahtarları, Bearer token'ları ve URL parolalarının otomatik maskelenmesi
+- **Skill Sandbox AST**: eval/Function/child_process tespiti için TypeScript compiler API ikinci geçiş
+- **DIRECTIVES Doğrulama**: Görev oluşturmadan önce Zod şema doğrulaması (DirectiveSchema + DirectiveTaskSchema)
+- **Plugin Sistemi**: Tam kurulum yaşam döngüsü (npm/git/local + geri alma), çalışma zamanı hook'ları (beforeSprint/afterTask/afterSprint)
+- **PROJECT-IDENTITY.md**: Kalıcı proje kimlik dosyası, asla decay edilmez, her sprint güncellenir
+- **finalizeSprint()**: Ayrılmış sprint sonlandırma fonksiyonu + `deckent finalize` CLI komutu
+- **Config Mod Takma Adları**: performance/balanced/economic/unlimited kanonik mod adlarına eşlendi
+
+### Changed
+- Bellek bütçesi 300'den 600 satıra artırıldı
+- Decay eşiği 3'ten 5 sprint'e uzatıldı
+- RETRO maksimum satır 60'tan 100'e artırıldı
+- Sprint log maksimum satır 50'den 80'e artırıldı
+- Agent havuzu LRU eviction kullanıyor (maks 50 geçici, 5 sprint yaşı) toplu okuma ile
+
+_Görevler: 16 toplam, 16 tamamlanan, 0 teknik borç, 0 no-go — +258 test (7815 → 8073)_
+
+## [0.1.0-sprint036] — 2026-03-22 (Mimari Temizlik)
+
+### Added
+- **sprint-controller.ts**: brain.ts'den çıkarılan sprint yaşam döngüsü yönetimi
+- **result-evaluator.ts**: brain.ts'den çıkarılan görev sonuç değerlendirme mantığı
+- **usage-manager.ts**: brain.ts'den çıkarılan kullanım takibi ve bütçe yönetimi
+- **Tip Modülleri**: types.ts → task-types, config-types, monitoring-types, sprint-types + barrel olarak bölündü
+
+### Changed
+- **brain.ts God Object Split**: 1312 → 58 satır, artık geriye uyumlu saf re-export katmanı
+- **spawn-backend.ts**: core/'dan orchestra/'ya taşındı (katman ihlali düzeltmesi)
+- **Non-null Assertions**: 29 dosyada 48 `!` operatörü guard clause, `.at()` ve `?? fallback` ile değiştirildi
+- **Type Cast'ler**: Enum literal'leri (`TaskStatus.DONE`) ve type guard'lar ile değiştirildi
+- **Barrel Temizlik**: orchestra/index.ts 30+ export'tan 22 public API export'a indirildi, @internal JSDoc ile
+- **Auditor Kuyruk**: shift() O(n) → azalan sıralama + pop() O(1) ile değiştirildi
+- **PromptAnalytics**: prompt-metrics + prompt-ab-test tek sınıfta birleştirildi
+
+_Görevler: 11 toplam, 11 tamamlanan, 0 teknik borç, 0 no-go — +315 test_
+
+## [0.1.0-sprint035] — 2026-03-22 (Beta Temizlik Dalgası 1+2)
+
+### Added
+- **readJsonSafeAsync()**: Bloklamayan JSON dosya okumaları için readJsonSafe'in asenkron varyantı
+- **Yardımcı Fonksiyon Çıkarma**: readFileIfExists, listFilesWithExtension, safeMapGet → utils.ts'ye taşındı
+- **Hata Kayıt Defteri Genişleme**: Düzeltme önerileri ile E039-E053 hata kodları
+
+### Changed
+- **readJsonSafe Göçü**: 13 satır içi JSON.parse çağrısı readJsonSafe() ile değiştirildi
+- **Hata Yönetimi Birleştirme**: 11 genel throw ifadesi DeckentError + ErrorRegistry ile değiştirildi
+- **Sessiz Catch Loglama**: 8 catch bloğunda DECKENT_DEBUG env kapısı ile debugLog() yardımcısı
+- **parseBody Tip Güvenliği**: 5 Zod şeması (Start/Plan/Directives/Config/Kill) + parseBodyWithSchema()
+- **EventEmitter Düzeltme**: setMaxListeners(0) ile ayrılmış _ipcEmitter, process EventEmitter kullanımı kaldırıldı
+
+### Fixed
+- **tmux Worker Çökme Kurtarma**: Çöken tmux worker'ları için agent tabanlı subprocess fallback
+
+_Sprint 035: Beta Temizlik Dalgası 1+2_
 
 ## [0.1.0-sprint33] - 2026-03-22
 
 ### Added
 
-- CHANGELOG Version Format
-- SECURITY.md Location
-- PR Template Deckent-Specific
-- FUNDING.yml Update
-- Utility Function Extraction
+- CHANGELOG Sürüm Formatı
+- SECURITY.md Konumu
+- PR Şablonu Deckent-Özel
+- FUNDING.yml Güncelleme
+- Yardımcı Fonksiyon Çıkarma
 
 ### Changed
 
-- EventEmitter MaxListeners Fix (completed with tech debt)
-- Onboard Test Timeout Fix (completed with tech debt)
-- README Badge Update (completed with tech debt)
-- File Extension Constant Usage (completed with tech debt)
-- Sprint Observation Docs Archive (completed with tech debt)
-- CI Coverage Gate (completed with tech debt)
-- parseBody Type Safety (completed with tech debt)
+- EventEmitter MaxListeners Düzeltmesi (teknik borçla tamamlandı)
+- Onboard Test Timeout Düzeltmesi (teknik borçla tamamlandı)
+- README Badge Güncelleme (teknik borçla tamamlandı)
+- Dosya Uzantısı Sabit Kullanımı (teknik borçla tamamlandı)
+- Sprint Gözlem Dokümanları Arşivleme (teknik borçla tamamlandı)
+- CI Coverage Kapısı (teknik borçla tamamlandı)
+- parseBody Tip Güvenliği (teknik borçla tamamlandı)
 
 ### Fixed
 
-- CI Workflow Test Fix — publish
-- CI Workflow Test Fix — release
+- CI Workflow Test Düzeltmesi — publish
+- CI Workflow Test Düzeltmesi — release
 
 
-_Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
+_Görevler: 17 toplam, 14 tamamlanan, 7 teknik borç, 3 no-go_
 
-## [0.1.0-sprint33] — 2026-03-22 (Integration + Marketplace + Analytics)
-
-### Added
-- **Integration Tests**: Full agent+skill E2E, TypeScript/React project, Python/FastAPI project, monorepo, error recovery
-- **Skill Marketplace**: Registry client (search/detail/publish), CLI search+publish, rating system, dependency resolver, marketplace auth
-- **Adaptive Agent Advanced**: Cross-sprint analyzer, specialization drift detector, agent retirement, prompt evolution log, agent genealogy
-- **Analytics Data**: Sprint analytics, usage graphs, success charts, agent comparison, skill heatmap data
-- **Performance**: Agent selection cache (LRU 100), skill loading cache (500KB), token counter, lazy loader, batch stats
-- **Security**: Skill sandbox (quarantine suspicious skills), permission guard (block agent self-modification)
-- **Documentation**: AGENT-GUIDE.md, MARKETPLACE-GUIDE.md
-
-### Changed
-- package.json: +4 keywords (agents, skills, marketplace, analytics)
-
-## [0.1.0-sprint32] — 2026-03-22 (UX Polish)
+## [0.1.0-sprint33] — 2026-03-22 (Entegrasyon + Marketplace + Analitik)
 
 ### Added
-- **Progress System**: Live progress bar, ETA calculator (weighted average), worker status tracker, queue display, terminal width adaptation
-- **Rich Sprint Summary**: Categorized file changes, agent performance table, recommendation engine (max 5), sprint comparison with delta
-- **Notification System**: Terminal bell, webhook (POST+retry), Discord embeds (color-coded), Slack Block Kit
-- **Interactive Review**: `deckent review` command — approve/reject/retry per task, --auto mode, review reports
-- **Selective Retry**: Queue failed tasks for next sprint, generate retry directives
-- **Theme System**: Consistent colors (success/error/warning/info/muted/accent), NO_COLOR/FORCE_COLOR support
-- **Output Modes**: --quiet (errors only), --verbose (debug), --normal (default)
-- **Progress Persistence**: Save/load progress state for reconnect
+- **Entegrasyon Testleri**: Tam agent+skill E2E, TypeScript/React projesi, Python/FastAPI projesi, monorepo, hata kurtarma
+- **Skill Marketplace**: Kayıt istemcisi (arama/detay/yayın), CLI arama+yayın, derecelendirme sistemi, bağımlılık çözücü, marketplace auth
+- **Gelişmiş Adaptif Agent**: Sprint arası analizci, uzmanlık sapma tespiti, agent emeklilik, prompt evrim logu, agent soy ağacı
+- **Analitik Verisi**: Sprint analitikleri, kullanım grafikleri, başarı çizelgeleri, agent karşılaştırması, skill ısı haritası verisi
+- **Performans**: Agent seçim cache'i (LRU 100), skill yükleme cache'i (500KB), token sayacı, tembel yükleyici, toplu istatistikler
+- **Güvenlik**: Skill sandbox (şüpheli skill'leri karantinaya al), izin koruması (agent kendini değiştirmeyi engelle)
+- **Dokümantasyon**: AGENT-GUIDE.md, MARKETPLACE-GUIDE.md
 
 ### Changed
-- Dashboard: skills column added, agent visibility improved
-- Status command: agent/skill assignment sections, --verbose flag
-- Retro command: rich format default, --raw for original, --compare for delta
-- History command: --agent and --skill filters
-- MCP status: agentAssignments + skillAssignments in response
-- types.ts: notifications config on DeckentConfig
+- package.json: +4 anahtar kelime (agents, skills, marketplace, analytics)
 
-## [0.1.0-sprint31] — 2026-03-22 (Brain Decision Engine)
+## [0.1.0-sprint32] — 2026-03-22 (UX İyileştirme)
 
 ### Added
-- **Decision Engine**: 6-step pipeline (analyze -> agent -> skill -> model -> effort -> scope)
-- **Task Analyzer**: Infers task type (code/test/doc/security/refactor/devops/config), complexity scoring
-- **Decision Logger**: Persist decisions to .tasks/decisions/ for debugging and replay
-- **Decision Replay**: Re-run decisions with same inputs, diff comparison
-- **Learning Loop**: PatternRecorder/PatternReader — record agent+skill+model evaluations per sprint
-- **Combination Scorer**: Score historical combos (success*2 - fail*3 - recency penalty)
-- **Learning Decay**: Remove old learning data, compact to summary
-- **Learning Migration**: Convert PATTERNS.md to learning format, export/import
-- **Parallel Pipeline**: Topological sort into dependency-aware execution waves
-- **Shared Memory**: Key-value inter-worker communication with TTL
-- **Conflict Resolver**: Detect same-file-write/scope-overlap, resolution strategies
-- **Result Merger**: Combine worker results (deduplicate, weighted coverage)
-- **Handoff Protocol**: Artifact handoffs between dependent tasks
-- **Adaptive Agent**: Prompt effectiveness analysis, improvement suggestions
-- **Prompt A/B Testing**: Compare prompt variants (min 4 samples, 50/50 split)
-- **Prompt Versioning**: Max 10 versions with activate/prune
-- **Prompt Rollback**: Auto-rollback bad prompts (<50% success after 3 uses)
-- **Prompt Metrics**: Performance dashboard (trend, best/worst version)
-- **Brain Context**: Stack/agent/skill/history enrichment for planning
-- **Decision Config**: DecisionEngineConfig, LearningConfig, CollaborationConfig
+- **İlerleme Sistemi**: Canlı ilerleme çubuğu, ETA hesaplayıcı (ağırlıklı ortalama), worker durum takipçisi, kuyruk görüntüleme, terminal genişlik adaptasyonu
+- **Zengin Sprint Özeti**: Kategorize dosya değişiklikleri, agent performans tablosu, öneri motoru (maks 5), delta ile sprint karşılaştırması
+- **Bildirim Sistemi**: Terminal zili, webhook (POST+yeniden deneme), Discord embed'leri (renk-kodlu), Slack Block Kit
+- **Etkileşimli İnceleme**: `deckent review` komutu — görev başına onayla/reddet/yeniden dene, --auto modu, inceleme raporları
+- **Seçici Yeniden Deneme**: Başarısız görevleri sonraki sprint'e kuyruğa al, yeniden deneme direktifleri oluştur
+- **Tema Sistemi**: Tutarlı renkler (success/error/warning/info/muted/accent), NO_COLOR/FORCE_COLOR desteği
+- **Çıktı Modları**: --quiet (sadece hatalar), --verbose (debug), --normal (varsayılan)
+- **İlerleme Kalıcılığı**: Yeniden bağlantı için ilerleme durumunu kaydet/yükle
 
 ### Changed
-- types.ts: decision_engine, learning, collaboration config fields on DeckentConfig
+- Dashboard: skills sütunu eklendi, agent görünürlüğü iyileştirildi
+- Status komutu: agent/skill atama bölümleri, --verbose flag'i
+- Retro komutu: zengin format varsayılan, --raw orijinal için, --compare delta için
+- History komutu: --agent ve --skill filtreleri
+- MCP status: yanıtta agentAssignments + skillAssignments
+- types.ts: DeckentConfig üzerinde bildirimler yapılandırması
+
+## [0.1.0-sprint31] — 2026-03-22 (Brain Karar Motoru)
+
+### Added
+- **Karar Motoru**: 6 adımlı pipeline (analiz → agent → skill → model → effort → scope)
+- **Görev Analizci**: Görev tipi çıkarımı (code/test/doc/security/refactor/devops/config), karmaşıklık puanlama
+- **Karar Kaydedici**: Hata ayıklama ve tekrar için kararları .tasks/decisions/'a kaydet
+- **Karar Tekrarı**: Aynı girdilerle kararları yeniden çalıştır, fark karşılaştırması
+- **Öğrenme Döngüsü**: PatternRecorder/PatternReader — sprint başına agent+skill+model değerlendirmelerini kaydet
+- **Kombinasyon Puanlayıcı**: Tarihsel kombinasyonları puanla (başarı*2 - başarısız*3 - güncellik cezası)
+- **Öğrenme Decay**: Eski öğrenme verisini kaldır, özete sıkıştır
+- **Öğrenme Göçü**: PATTERNS.md'yi öğrenme formatına dönüştür, dışa/içe aktar
+- **Paralel Pipeline**: Bağımlılık-duyarlı çalıştırma dalgalarına topolojik sıralama
+- **Paylaşımlı Bellek**: TTL ile worker'lar arası anahtar-değer iletişimi
+- **Çakışma Çözücü**: Aynı dosyaya yazma/kapsam çakışması tespiti, çözüm stratejileri
+- **Sonuç Birleştirici**: Worker sonuçlarını birleştir (tekrar kaldırma, ağırlıklı coverage)
+- **Devir Protokolü**: Bağımlı görevler arasında artifact devri
+- **Adaptif Agent**: Prompt etkinlik analizi, iyileştirme önerileri
+- **Prompt A/B Testi**: Prompt varyantlarını karşılaştır (min 4 örnek, 50/50 bölme)
+- **Prompt Versiyonlama**: Etkinleştir/budama ile maks 10 versiyon
+- **Prompt Geri Alma**: Kötü prompt'ları otomatik geri al (3 kullanım sonrası <%50 başarı)
+- **Prompt Metrikleri**: Performans dashboard'u (trend, en iyi/kötü versiyon)
+- **Brain Bağlamı**: Planlama için stack/agent/skill/history zenginleştirmesi
+- **Karar Yapılandırması**: DecisionEngineConfig, LearningConfig, CollaborationConfig
+
+### Changed
+- types.ts: DeckentConfig üzerinde decision_engine, learning, collaboration yapılandırma alanları
 ## [0.1.0-sprint30] - 2026-03-21
 
 ### Added
 
-- **Fix debt: Tech debt from 027-003: Verification report written to tmp-test/rollback-verify.**: DONE
-- **Fix debt: Tech debt from 027-004: Comprehensive verification report written to tmp-test/ip**: DONE
-- **Subprocess Backend Verification**: GO_WITH_TECH_DEBT
-- **No-Tmux Verification**: GO_WITH_TECH_DEBT
-- **Provider Abstraction Analysis**: GO_WITH_TECH_DEBT
-- **Sprint 27 Feature Summary**: GO_WITH_TECH_DEBT
-- **Tasks**: 6 total, 6 done, 4 tech debt, 0 no-go
-## [0.1.0-sprint30] — 2026-03-22 (Skill System)
+- **Fix debt: 027-003 teknik borcu**: Doğrulama raporu tmp-test/rollback-verify'a yazıldı: DONE
+- **Fix debt: 027-004 teknik borcu**: Kapsamlı doğrulama raporu tmp-test/ip'ye yazıldı: DONE
+- **Subprocess Backend Doğrulama**: GO_WITH_TECH_DEBT
+- **tmux'suz Doğrulama**: GO_WITH_TECH_DEBT
+- **Provider Soyutlama Analizi**: GO_WITH_TECH_DEBT
+- **Sprint 27 Özellik Özeti**: GO_WITH_TECH_DEBT
+- **Görevler**: 6 toplam, 6 tamamlanan, 4 teknik borç, 0 no-go
+## [0.1.0-sprint30] — 2026-03-22 (Skill Sistemi)
 
 ### Added
-- **Skill Type System**: SkillDefinition, ProjectStack, SkillSelectionResult, SkillCategory types
-- **Skill Pool Manager**: Load, save, validate, stats tracking from .deckent/skills/
-- **Stack Detector**: Auto-detect project technology (TypeScript/React/Python/Rust/Go/Docker) with cache
-- **Skill Selector**: Multi-factor scoring (stack+keyword+agent), composition resolver, max 3 skills
-- **Skill Registry**: Local skill index foundation for future marketplace
-- **10 Built-in Skills**: typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer
-- **CLI Commands**: `deckent skill list`, `deckent skill create`, `deckent skill install`
-- **Skill Documentation**: docs/SKILLS.md
+- **Skill Tip Sistemi**: SkillDefinition, ProjectStack, SkillSelectionResult, SkillCategory tipleri
+- **Skill Havuz Yöneticisi**: .deckent/skills/'dan yükleme, kaydetme, doğrulama, istatistik takibi
+- **Stack Dedektör**: Cache ile proje teknolojisi otomatik tespiti (TypeScript/React/Python/Rust/Go/Docker)
+- **Skill Seçici**: Çok faktörlü puanlama (stack+anahtar kelime+agent), kompozisyon çözücü, maks 3 skill
+- **Skill Kayıt Defteri**: Gelecekteki marketplace için yerel skill indeksi temeli
+- **10 Yerleşik Skill**: typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer
+- **CLI Komutları**: `deckent skill list`, `deckent skill create`, `deckent skill install`
+- **Skill Dokümantasyonu**: docs/SKILLS.md
 
 ### Changed
-- brain.ts planSprint (now async): auto-detects project stack, selects skills per task
-- task-builder.ts buildWorkerPrompt: injects SKILL.md content (1500 char/skill, 4000 total cap)
-- model-selector.ts: Layer 4d skill model preference (highest among skills wins)
-- sprint-reporter.ts: skill performance table in RETRO.md
-- config.ts: skills config (enabled, maxPerTask, autoDetectStack, preferredSkills)
-- types.ts: assignedSkills on Task, skillIds on TaskResult, SkillConfig on DeckentConfig
+- brain.ts planSprint (artık async): proje stack'ini otomatik tespit, görev başına skill seçimi
+- task-builder.ts buildWorkerPrompt: SKILL.md içeriğini enjekte eder (1500 karakter/skill, 4000 toplam limit)
+- model-selector.ts: Katman 4d skill model tercihi (skill'ler arasında en yüksek kazanır)
+- sprint-reporter.ts: RETRO.md'de skill performans tablosu
+- config.ts: skills yapılandırması (enabled, maxPerTask, autoDetectStack, preferredSkills)
+- types.ts: Task üzerinde assignedSkills, TaskResult üzerinde skillIds, DeckentConfig üzerinde SkillConfig
 
-## [0.1.0-sprint29] — 2026-03-22 (Agent Pool Core)
+## [0.1.0-sprint29] — 2026-03-22 (Agent Havuzu Çekirdeği)
 
 ### Added
-- **Agent Type System**: AgentDefinition interface, AgentPool, AgentSelectionResult types
-- **Agent Pool Manager**: Load, save, validate, stats tracking, temp agent lifecycle
-- **Agent Selector**: Keyword+scope scoring algorithm, threshold filtering, tie-break by success rate
-- **8 Built-in Agents**: security-auditor (opus), test-writer (sonnet), doc-writer (sonnet), code-reviewer (opus, read-only), refactorer (sonnet), bug-fixer (opus, 1.5x effort), api-builder (sonnet), performance-analyzer (opus)
-- **Shared Context**: Inter-agent communication via .tasks/shared-context.json (atomic writes)
-- **Multi-Agent Pipeline**: Sequential agent execution with shared context propagation
-- **CLI Commands**: `deckent agent list`, `deckent agent create`, `deckent agent enable/disable`
-- **Agent Documentation**: docs/AGENTS.md with 8 sections
+- **Agent Tip Sistemi**: AgentDefinition arayüzü, AgentPool, AgentSelectionResult tipleri
+- **Agent Havuz Yöneticisi**: Yükleme, kaydetme, doğrulama, istatistik takibi, geçici agent yaşam döngüsü
+- **Agent Seçici**: Anahtar kelime+kapsam puanlama algoritması, eşik filtreleme, başarı oranına göre beraberlik çözme
+- **8 Yerleşik Agent**: security-auditor (opus), test-writer (sonnet), doc-writer (sonnet), code-reviewer (opus, salt okunur), refactorer (sonnet), bug-fixer (opus, 1.5x effort), api-builder (sonnet), performance-analyzer (opus)
+- **Paylaşımlı Bağlam**: .tasks/shared-context.json ile agent'lar arası iletişim (atomik yazma)
+- **Çoklu Agent Pipeline**: Paylaşımlı bağlam yayılımı ile sıralı agent çalıştırma
+- **CLI Komutları**: `deckent agent list`, `deckent agent create`, `deckent agent enable/disable`
+- **Agent Dokümantasyonu**: 8 bölümlü docs/AGENTS.md
 
 ### Changed
-- brain.ts planSprint: auto-selects specialized agent per task based on keywords and scope
-- task-builder.ts buildWorkerPrompt: injects agent PROMPT.md before task content (2000 char limit)
-- worker.ts: agent ID included in heartbeat and result files
-- sprint-reporter.ts: agent performance table in RETRO.md
-- Dashboard: agent column with color coding (cyan=specialized, dim=generic)
-- types.ts: assignedAgent on Task, agentId on TaskResult/Heartbeat/AgentInfo
-## [0.1.0-sprint28] — 2026-03-21 (npm Publish Prep)
+- brain.ts planSprint: anahtar kelimeler ve kapsama göre görev başına uzman agent otomatik seçimi
+- task-builder.ts buildWorkerPrompt: görev içeriğinden önce agent PROMPT.md'yi enjekte eder (2000 karakter limiti)
+- worker.ts: heartbeat ve sonuç dosyalarında agent ID dahil
+- sprint-reporter.ts: RETRO.md'de agent performans tablosu
+- Dashboard: renk kodlu agent sütunu (cyan=uzman, dim=genel)
+- types.ts: Task üzerinde assignedAgent, TaskResult/Heartbeat/AgentInfo üzerinde agentId
+## [0.1.0-sprint28] — 2026-03-21 (npm Yayın Hazırlığı)
 
 ### Added
-- **Error Registry**: DeckentError class + ErrorRegistry with 10 error codes and fix suggestions
-- **Telemetry Infrastructure**: TelemetryCollector (opt-in, PII sanitization, GDPR-ready)
-- **TUI Wizard Framework**: WizardStep interface (select/input/confirm) for interactive CLI
-- **Error Handler**: Centralized CLI error handling with colored output and suggestions
-- **Version Info**: Enhanced `--version` with Node.js, OS, tmux, claude status + `--version-json`
-- **Publish Scripts**: prepublish.ts, build-verify.ts, pack-test.ts, publish.ts
-- **.npmignore**: Excludes .brain/, .tasks/, .locks/, tests/, src/ from npm package
-- **SECURITY.md**: Security policy with vulnerability reporting process
-- **RELEASE-CHECKLIST.md**: 11-step release checklist
-- **Landing Page Content**: Marketing content for deckent.agency
+- **Hata Kayıt Defteri**: 10 hata kodu ve düzeltme önerileri ile DeckentError sınıfı + ErrorRegistry
+- **Telemetri Altyapısı**: TelemetryCollector (isteğe bağlı, PII temizleme, GDPR-uyumlu)
+- **TUI Sihirbaz Çatısı**: Etkileşimli CLI için WizardStep arayüzü (select/input/confirm)
+- **Hata İşleyici**: Renkli çıktı ve önerilerle merkezi CLI hata yönetimi
+- **Sürüm Bilgisi**: Node.js, OS, tmux, claude durumu ile geliştirilmiş `--version` + `--version-json`
+- **Yayın Betikleri**: prepublish.ts, build-verify.ts, pack-test.ts, publish.ts
+- **.npmignore**: npm paketinden .brain/, .tasks/, .locks/, tests/, src/ hariç tutar
+- **SECURITY.md**: Güvenlik açığı raporlama süreci ile güvenlik politikası
+- **RELEASE-CHECKLIST.md**: 11 adımlı yayın kontrol listesi
+- **Açılış Sayfası İçeriği**: deckent.agency için pazarlama içeriği
 
 ### Changed
-- **onboard command**: Stub replaced with interactive wizard (Claude detection, system profile, config recommendation)
-- **upgrade command**: Stub replaced with real npm update (version check, --check flag)
-- **README.md**: Complete English rewrite with badges, comparison table, architecture diagram
-- **CONTRIBUTING.md**: English update with dev guides (add CLI command, add MCP tool)
-- **docs/QUICKSTART.md, API.md, CONFIG-REFERENCE.md**: English polish with curl examples
-- **doctor.ts**: Enhanced error messages with platform-specific install suggestions
-- **Changelog updater**: Keep a Changelog format (Added/Changed/Fixed categories)
-- **Doctor output**: Traffic light format [PASS]/[FAIL]/[WARN] with colors
+- **onboard komutu**: Stub yerine etkileşimli sihirbaz (Claude tespiti, sistem profili, yapılandırma önerisi)
+- **upgrade komutu**: Stub yerine gerçek npm güncelleme (sürüm kontrolü, --check flag'i)
+- **README.md**: Badge'ler, karşılaştırma tablosu, mimari diyagramı ile tam yeniden yazım
+- **CONTRIBUTING.md**: Geliştirici rehberleri ile güncelleme (CLI komutu ekle, MCP tool ekle)
+- **docs/QUICKSTART.md, API.md, CONFIG-REFERENCE.md**: curl örnekleri ile iyileştirme
+- **doctor.ts**: Platform-özel kurulum önerileri ile geliştirilmiş hata mesajları
+- **Changelog güncelleyici**: Keep a Changelog formatı (Added/Changed/Fixed kategorileri)
+- **Doctor çıktısı**: Renklerle trafik ışığı formatı [PASS]/[FAIL]/[WARN]
 
 ### Fixed
-- brain.test.ts changelog format expectations updated for Keep a Changelog
-- Doctor test expectations updated for [PASS]/[FAIL] format
-- Onboard test updated for real implementation output
+- brain.test.ts changelog format beklentileri Keep a Changelog için güncellendi
+- Doctor test beklentileri [PASS]/[FAIL] formatı için güncellendi
+- Onboard testi gerçek uygulama çıktısı için güncellendi
 
-## [0.1.0-sprint27] — 2026-03-21 (Technical Gap Closure)
+## [0.1.0-sprint27] — 2026-03-21 (Teknik Boşluk Kapama)
 
 ### Added
-- **Provider Abstraction**: ProviderAdapter interface, ProviderRegistry singleton, ClaudeAdapter
-- **SpawnBackend Abstraction**: TmuxBackend, SubprocessBackend, SpawnBackendFactory (config-driven)
-- **Subprocess Backend**: Workers via child_process.spawn — tmux no longer required
-- **Usage Tracking**: UsageTracker class with sprint-based JSON storage in .deckent/usage/
-- **Coverage Validation**: parseCoverageFromVitest, validateCoverage with 5% threshold
-- **Rollback Mechanism**: Git safety points (deckent-backup-{sprintId}), auto-rollback on all NO_GO
-- **Worker IPC**: WorkerChannel + ChannelRegistry for process.send-based communication
-- **Zero-Config Mode**: `deckent start "description"` — single-line natural language sprint
-- **Sandbox Foundation**: SandboxSpawnBackend with memory limits and scope enforcement
-- **Global Config**: ~/.deckent/config.json with project merge (project takes priority)
-- **Credentials Management**: Secure key storage in ~/.deckent/credentials/ (0600 permissions)
-- 13 new source modules, 167 new tests (3442 → 3609)
+- **Provider Soyutlama**: ProviderAdapter arayüzü, ProviderRegistry singleton, ClaudeAdapter
+- **SpawnBackend Soyutlama**: TmuxBackend, SubprocessBackend, SpawnBackendFactory (yapılandırma-güdümlü)
+- **Subprocess Backend**: child_process.spawn ile worker'lar — tmux artık gerekli değil
+- **Kullanım Takibi**: .deckent/usage/'da sprint tabanlı JSON depolama ile UsageTracker sınıfı
+- **Coverage Doğrulama**: %5 eşik ile parseCoverageFromVitest, validateCoverage
+- **Geri Alma Mekanizması**: Git güvenlik noktaları (deckent-backup-{sprintId}), tüm NO_GO'larda otomatik geri alma
+- **Worker IPC**: process.send tabanlı iletişim için WorkerChannel + ChannelRegistry
+- **Sıfır-Yapılandırma Modu**: `deckent start "açıklama"` — tek satır doğal dil sprint'i
+- **Sandbox Temeli**: Bellek limitleri ve kapsam zorlama ile SandboxSpawnBackend
+- **Global Config**: Proje birleştirmesi ile ~/.deckent/config.json (proje öncelikli)
+- **Kimlik Bilgisi Yönetimi**: ~/.deckent/credentials/'da güvenli anahtar depolama (0600 izinleri)
+- 13 yeni kaynak modül, 167 yeni test (3442 → 3609)
 
 ### Changed
-- brain.ts reads config.spawn_backend and uses SpawnBackendFactory.create()
-- evaluateResult integrates coverage validation (doc tasks skip)
-- spawnWorkers supports SpawnBackend abstraction (backward compatible)
-- tmux is now optional — subprocess backend available for non-tmux environments
+- brain.ts config.spawn_backend'i okur ve SpawnBackendFactory.create() kullanır
+- evaluateResult coverage doğrulamasını entegre eder (doküman görevleri atlar)
+- spawnWorkers SpawnBackend soyutlamasını destekler (geriye uyumlu)
+- tmux artık isteğe bağlı — tmux olmayan ortamlar için subprocess backend mevcut
 
 ### Fixed
-- brain-ipc.test.ts task ID mismatch in channel registration
-- brain-usage.test.ts OOM — removed heavy runSprint integration, kept unit tests
-- ESM require() → direct import in spawn-backend.ts (TmuxBackend + SubprocessBackend)
+- brain-ipc.test.ts kanal kaydında görev ID uyumsuzluğu
+- brain-usage.test.ts OOM — ağır runSprint entegrasyonu kaldırıldı, birim testleri korundu
+- spawn-backend.ts'de ESM require() → doğrudan import (TmuxBackend + SubprocessBackend)
 ## [0.1.0-sprint26] - 2026-03-20
 
 ### Added
 
-- **readJsonSafe Import Migration Tamamlama**: GO_WITH_TECH_DEBT
+- **readJsonSafe Import Göçü Tamamlama**: GO_WITH_TECH_DEBT
 - **package.json files + keywords Tamamlama**: GO_WITH_TECH_DEBT
 - **CODEOWNERS İyileştirme**: DONE
 - **dependabot.yml İyileştirme**: DONE
@@ -834,22 +851,22 @@ _Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
 - **task-builder.test.ts Test Tamamlama**: GO_WITH_TECH_DEBT
 - **CLI init.test.ts Test Tamamlama**: DONE
 - **CLI archive-debt.test.ts Test Tamamlama**: DONE
-- **Tasks**: 35 total, 35 done, 16 tech debt, 0 no-go
+- **Görevler**: 35 toplam, 35 tamamlanan, 16 teknik borç, 0 no-go
 ## [0.1.0-sprint25] - 2026-03-20
 
 ### Added
 
-- **readJsonSafe/readFileSafe Shared Utility**: DONE
-- **result-watcher pendingResolve Timer Fix**: DONE
-- **package.json files Field Düzeltme**: GO_WITH_TECH_DEBT
+- **readJsonSafe/readFileSafe Paylaşımlı Yardımcı**: DONE
+- **result-watcher pendingResolve Zamanlayıcı Düzeltmesi**: DONE
+- **package.json files Alanı Düzeltme**: GO_WITH_TECH_DEBT
 - **CODEOWNERS Dosyası**: GO_WITH_TECH_DEBT
 - **dependabot.yml**: GO_WITH_TECH_DEBT
 - **GitHub Actions Release Workflow**: GO_WITH_TECH_DEBT
-- **Security Issue Template**: GO_WITH_TECH_DEBT
+- **Security Issue Şablonu**: GO_WITH_TECH_DEBT
 - **FUNDING.yml**: GO_WITH_TECH_DEBT
-- **brain.ts readJsonSafe Import Migration**: GO_WITH_TECH_DEBT
-- **debt-manager.ts readJsonSafe Import Migration**: GO_WITH_TECH_DEBT
-- **Tasks**: 97 total, 62 done, 32 tech debt, 35 no-go
+- **brain.ts readJsonSafe Import Göçü**: GO_WITH_TECH_DEBT
+- **debt-manager.ts readJsonSafe Import Göçü**: GO_WITH_TECH_DEBT
+- **Görevler**: 97 toplam, 62 tamamlanan, 32 teknik borç, 35 no-go
 ## [0.1.0-sprint23] - 2026-03-18
 
 ### Fixed
@@ -859,7 +876,7 @@ _Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
 
 ### Added
 
-- 12 task (12 done, 4 tech debt, 0 no-go) — ilk 12-görevli sprint, task queue wave mekanizması doğrulandı
+- 12 task (12 tamamlanan, 4 teknik borç, 0 no-go) — ilk 12-görevli sprint, task queue wave mekanizması doğrulandı
 - 11 doğrulama dokümanı (`tmp-test/`): Sprint 22 özelliklerinin kapsamlı validasyonu
 - +30 test (1392→1422), 55 test dosyası
 - Planning mode: `fallback` (AI yetersiz → structured fallback)
@@ -927,176 +944,176 @@ _Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
 
 ### Added
 
-- **Orchestration smoke test**: First real `runSprint` execution since Sprint 10 — 10 parallel doc tasks planned, 8 executed
-- **8 documentation files** (~135 KB total): GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
-- **Sprint observation report**: `docs/SPRINT-18-OBSERVATION.md` — detailed phase-by-phase orchestration analysis
-- **6 bugs discovered**: planner max_workers task limit, heartbeat timestamp drift, dashboard progress lag, alert dedup missing, doc task coverage criteria, DEBT.md empty table test
-- **End-to-end validation**: PLAN → SPAWN → EXECUTE → EVALUATE → RETRO → CLEANUP completed in 260s with 8 parallel sonnet workers
-- **Test suite**: 1027 tests (0 new — doc-only sprint), 97.5% coverage, 0 regressions
+- **Orkestrasyon smoke testi**: Sprint 10'dan bu yana ilk gerçek `runSprint` çalıştırma — 10 paralel doküman görevi planlandı, 8 çalıştırıldı
+- **8 dokümantasyon dosyası** (~135 KB toplam): GLOSSARY, TROUBLESHOOTING, SECURITY, MCP-GUIDE, MEMORY-SYSTEM, SPRINT-LIFECYCLE, CONFIG-REFERENCE, WORKER-GUIDE
+- **Sprint gözlem raporu**: `docs/SPRINT-18-OBSERVATION.md` — detaylı faz-faz orkestrasyon analizi
+- **6 hata keşfedildi**: planner max_workers görev limiti, heartbeat zaman damgası kayması, dashboard ilerleme gecikmesi, alert tekrar kaldırma eksik, doküman görevi coverage kriteri, DEBT.md boş tablo testi
+- **Uçtan uca doğrulama**: PLAN → SPAWN → EXECUTE → EVALUATE → RETRO → CLEANUP 8 paralel sonnet worker ile 260 saniyede tamamlandı
+- **Test paketi**: 1027 test (0 yeni — sadece doküman sprint'i), %97.5 coverage, 0 regresyon
 
 ## [0.1.0-sprint17] - 2026-03-18
 
 ### Added
 
-- **MCP background jobs**: `deckent_start` returns immediately with `jobId`, sprint runs in background via `child_process.fork()` — no MCP timeout
-- **`.deckent/jobs/{jobId}.json`**: Job state tracking (RUNNING/COMPLETE/FAILED)
-- **`deckent_status`** now includes active job state
-- **cleanup() fix**: Covers all task file extensions (.json, .plan, .hb, .result, .paused, .log), sprint prefix guard, stale file detection (24h)
-- **Sprint ID safety**: `last_sprint_id` in `.deckent/config.json`, max of config vs file scan — never regresses
-- **Dashboard reset**: Fresh `DashboardState` on PLAN phase, sprint ID mismatch triggers reset in auditor
-- **React test infra**: `src/dashboard/vitest.config.ts` (happy-dom), AgentDetail + DashboardPage tests
-- **`test:dashboard`** npm script: `vitest run --config src/dashboard/vitest.config.ts`
-- **Test suite**: 1027 tests (+40 new), 97.5% coverage, 0 regressions
+- **MCP arka plan işleri**: `deckent_start` `jobId` ile hemen döner, sprint `child_process.fork()` ile arka planda çalışır — MCP timeout yok
+- **`.deckent/jobs/{jobId}.json`**: İş durumu takibi (RUNNING/COMPLETE/FAILED)
+- **`deckent_status`** artık aktif iş durumunu içerir
+- **cleanup() düzeltme**: Tüm görev dosya uzantılarını kapsar (.json, .plan, .hb, .result, .paused, .log), sprint ön ek koruması, eski dosya tespiti (24s)
+- **Sprint ID güvenliği**: `.deckent/config.json`'da `last_sprint_id`, config vs dosya tarama maksimumu — asla gerilemez
+- **Dashboard sıfırlama**: PLAN fazında taze `DashboardState`, sprint ID uyumsuzluğu auditor'da sıfırlama tetikler
+- **React test altyapısı**: `src/dashboard/vitest.config.ts` (happy-dom), AgentDetail + DashboardPage testleri
+- **`test:dashboard`** npm betiği: `vitest run --config src/dashboard/vitest.config.ts`
+- **Test paketi**: 1027 test (+40 yeni), %97.5 coverage, 0 regresyon
 
 ## [0.1.0-sprint16] - 2026-03-18
 
 ### Added
 
-- **`deckent watch`** CLI command: Live tmux split view with dashboard and worker panes, `--follow <taskId>` flag
-- **Worker log capture**: tmux pipe-pane captures worker stdout to `.tasks/task-{id}.log`
-- **`deckent start --watch`**: Creates watch window before sprint runs (non-blocking)
-- **`readWorkerLog()`** (`src/agents/worker.ts`): Utility to read worker log files
-- **GET `/api/worker/:taskId/log`**: API endpoint returning task JSON + worker log content
-- **`AgentDetail`** component: React component with 3s polling, displayed in Sheet panel
-- **`inferModelFromDirective()`** (`src/orchestra/brain.ts`): Heuristic model selection for structured planner mode
-- **`setupWatchWindow()`** (`src/orchestra/tmux.ts`): Non-blocking watch layout creation
-- **.brain/ dogfooding**: sprint-015.md log, ADR-013, MEMORY.md Sprint 15 learnings
-- **Test suite**: 987 tests (+20 new), 97.5% coverage, 0 regressions
+- **`deckent watch`** CLI komutu: Dashboard ve worker panelleri ile canlı tmux bölünmüş görünüm, `--follow <taskId>` flag'i
+- **Worker log yakalama**: tmux pipe-pane worker stdout'unu `.tasks/task-{id}.log`'a yakalar
+- **`deckent start --watch`**: Sprint çalışmadan önce izleme penceresi oluşturur (bloklamayan)
+- **`readWorkerLog()`** (`src/agents/worker.ts`): Worker log dosyalarını okuma yardımcısı
+- **GET `/api/worker/:taskId/log`**: Görev JSON + worker log içeriği döndüren API endpoint
+- **`AgentDetail`** bileşeni: 3 saniye yoklama ile React bileşeni, Sheet panelinde gösterilir
+- **`inferModelFromDirective()`** (`src/orchestra/brain.ts`): Yapısal planlayıcı modu için sezgisel model seçimi
+- **`setupWatchWindow()`** (`src/orchestra/tmux.ts`): Bloklamayan izleme düzeni oluşturma
+- **.brain/ dogfooding**: sprint-015.md log, ADR-013, MEMORY.md Sprint 15 öğrenmeleri
+- **Test paketi**: 987 test (+20 yeni), %97.5 coverage, 0 regresyon
 
 ## [0.1.0-sprint15] - 2026-03-18
 
 ### Added
 
-- **DECKENT.md** — Single source of truth for agent configuration (replaces AGENTS.md+CLAUDE.md symlink pattern)
-- **`ensureDeckentImport()`** (`src/core/utils.ts`): Shared utility for additive @DECKENT.md injection — never overwrites existing content
-- **`DECKENT_FILE` constant** (`src/core/constants.ts`)
-- **Init additive injection**: `deckent init` no longer overwrites CLAUDE.md — uses `ensureDeckentImport()` instead
-- **Config merge**: Existing `.deckent/config.json` fields preserved during re-init
-- **Blueprint-quality rule templates**: brain.md (13 rules + frontmatter), auditor.md (9 rules), worker-default.md (9 rules)
-- **`deckent sync`** CLI command: Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference
-- **`deckent_sync`** MCP tool (10th tool): Same functionality via MCP
-- **`deckent://config`** MCP resource (5th resource): Read project configuration via MCP
-- **Self-hosting**: deckent-dev now runs its own `.deckent/` structure (config, workspace, i18n, plugins)
-- **DEBT-002 closed**: checkUsage was resolved in sprint-003, debt entry formalized
-- **Test suite**: 967 tests (+29 new), 97.5% coverage, 0 regressions
+- **DECKENT.md** — Agent yapılandırması için tek doğruluk kaynağı (AGENTS.md+CLAUDE.md symlink kalıbını değiştirir)
+- **`ensureDeckentImport()`** (`src/core/utils.ts`): Eklemeli @DECKENT.md enjeksiyonu için paylaşımlı yardımcı — mevcut içeriği asla üzerine yazmaz
+- **`DECKENT_FILE` sabiti** (`src/core/constants.ts`)
+- **Init eklemeli enjeksiyon**: `deckent init` artık CLAUDE.md'yi üzerine yazmaz — bunun yerine `ensureDeckentImport()` kullanır
+- **Config birleştirme**: Yeniden başlatma sırasında mevcut `.deckent/config.json` alanları korunur
+- **Blueprint-kalitesinde kural şablonları**: brain.md (13 kural + frontmatter), auditor.md (9 kural), worker-default.md (9 kural)
+- **`deckent sync`** CLI komutu: Adaptör dosyalarını (CLAUDE.md, AGENTS.md) DECKENT.md referansı ile senkronize et
+- **`deckent_sync`** MCP aracı (10. araç): MCP üzerinden aynı işlevsellik
+- **`deckent://config`** MCP kaynağı (5. kaynak): MCP üzerinden proje yapılandırmasını oku
+- **Kendi kendini barındırma**: deckent-dev artık kendi `.deckent/` yapısını çalıştırıyor (config, workspace, i18n, plugins)
+- **DEBT-002 kapatıldı**: checkUsage sprint-003'te çözüldü, borç kaydı resmileştirildi
+- **Test paketi**: 967 test (+29 yeni), %97.5 coverage, 0 regresyon
 
 ## [0.1.0-sprint12-13] - 2026-03-18
 
 ### Added
 
-- **Brain AI Planning** (`src/orchestra/planner.ts`): AI task planning with Zod schema validation, 3 planning modes (ai/structured/auto)
-- **BrainPlanningMode**: `'ai' | 'structured' | 'auto'` config field in PlanModeConfig
-- **DRAFT task status**: `confirmDraftTasks()` transitions DRAFT → PENDING before spawning
-- **Auditor in-process**: `startScanLoop()` runs within Brain's `runSprint` (Phase 2.5), not as separate tmux window
-- **`writeScanToDashboard()`**: Merges scan results into dashboard state (alerts, agent statuses)
-- **Worker heartbeat prompt**: `buildWorkerPrompt` includes .hb file creation/update instructions
-- **.deckent/ structure**: TOOLS.md, BOOT.md, plugins/, i18n/ created by init
-- **Test suite**: 938 tests, 97.5% coverage
+- **Brain AI Planlama** (`src/orchestra/planner.ts`): Zod şema doğrulaması ile AI görev planlaması, 3 planlama modu (ai/structured/auto)
+- **BrainPlanningMode**: PlanModeConfig'de `'ai' | 'structured' | 'auto'` yapılandırma alanı
+- **DRAFT görev durumu**: `confirmDraftTasks()` spawn'dan önce DRAFT → PENDING geçişi yapar
+- **Süreç-içi Auditor**: `startScanLoop()` Brain'in `runSprint` içinde çalışır (Faz 2.5), ayrı tmux penceresi değil
+- **`writeScanToDashboard()`**: Tarama sonuçlarını dashboard durumuna birleştirir (alertler, agent durumları)
+- **Worker heartbeat prompt'u**: `buildWorkerPrompt` .hb dosya oluşturma/güncelleme talimatlarını içerir
+- **.deckent/ yapısı**: TOOLS.md, BOOT.md, plugins/, i18n/ init tarafından oluşturulur
+- **Test paketi**: 938 test, %97.5 coverage
 
 ## [0.1.0-sprint11] - 2026-03-18
 
 ### Added
 
-- **Web Dashboard** (`src/dashboard/`): React+Vite+Tailwind, shadcn/ui components
-- **4 pages**: DashboardPage, SettingsPage, HistoryPage, MemoryPage
-- **14 UI components**: button, card, tabs, select, input, label, separator, sheet, scroll-area, badge, table, textarea, dialog, progress
-- **6 main components**: Layout, DebtTable, ThemeProvider, NewSprintModal, SprintChart, SimpleMarkdown
-- **SSE integration**: `useSSE` hook, real-time dashboard updates
-- **`deckent web`**: Launches HTTP API + web dashboard at localhost:3100
-- **Dark/light theme**, mobile responsive with hamburger menu
-- **Test suite**: 852 tests, 97% coverage
+- **Web Dashboard** (`src/dashboard/`): React+Vite+Tailwind, shadcn/ui bileşenleri
+- **4 sayfa**: DashboardPage, SettingsPage, HistoryPage, MemoryPage
+- **14 UI bileşeni**: button, card, tabs, select, input, label, separator, sheet, scroll-area, badge, table, textarea, dialog, progress
+- **6 ana bileşen**: Layout, DebtTable, ThemeProvider, NewSprintModal, SprintChart, SimpleMarkdown
+- **SSE entegrasyonu**: `useSSE` hook, gerçek zamanlı dashboard güncellemeleri
+- **`deckent web`**: localhost:3100'de HTTP API + web dashboard başlatır
+- **Koyu/açık tema**, hamburger menü ile mobil uyumlu
+- **Test paketi**: 852 test, %97 coverage
 
 ## [0.1.0-sprint10] - 2026-03-17
 
 ### Added
 
-- **HTTP API** (`src/api/server.ts`): 15 endpoints + SSE stream
-- **Routes**: GET status/sprint/history/config/doctor/memory/debt/job/events, POST start/plan/kill/set-directives/config
-- **Dashboard watcher** (`src/api/watcher.ts`): File watcher with debounce for SSE
-- **Terminal dashboard** (`deckent dashboard`): Rich TUI with Unicode box-drawing
-- **`deckent serve`**: HTTP API server standalone
-- **Sprint ID refactor**: Consistent format across codebase
-- **Test suite**: 799 tests, 95% coverage
+- **HTTP API** (`src/api/server.ts`): 15 endpoint + SSE akışı
+- **Route'lar**: GET status/sprint/history/config/doctor/memory/debt/job/events, POST start/plan/kill/set-directives/config
+- **Dashboard gözlemcisi** (`src/api/watcher.ts`): SSE için debounce ile dosya gözlemcisi
+- **Terminal dashboard** (`deckent dashboard`): Unicode kutu çizimi ile zengin TUI
+- **`deckent serve`**: Bağımsız HTTP API sunucusu
+- **Sprint ID yeniden düzenleme**: Kod tabanı genelinde tutarlı format
+- **Test paketi**: 799 test, %95 coverage
 
 ## [0.1.0-sprint9] - 2026-03-17
 
 ### Added
 
-- **Analyzer** (`src/core/analyzer.ts`): Project stack, size, methodology detection
-- **9th MCP tool**: `deckent_analyze_project` — analyzes project and returns recommendations
+- **Analizci** (`src/core/analyzer.ts`): Proje stack, boyut, metodoloji tespiti
+- **9. MCP aracı**: `deckent_analyze_project` — projeyi analiz eder ve öneriler döndürür
 - **CI pipeline**: GitHub Actions workflow
-- **Dynamic version**: Reads from package.json at runtime
-- **`deckent archive-debt`**: Archive resolved technical debt
-- **Enriched sprint history**: Metrics in sprint log display
-- **Test suite**: 720 tests, 95% coverage
+- **Dinamik sürüm**: Çalışma zamanında package.json'dan okur
+- **`deckent archive-debt`**: Çözülmüş teknik borçları arşivle
+- **Zenginleştirilmiş sprint geçmişi**: Sprint log görüntülemede metrikler
+- **Test paketi**: 720 test, %95 coverage
 
 ## [0.1.0-sprint8] - 2026-03-17
 
 ### Added
 
-- **CONTRIBUTING.md**: Full contributing guide (setup, standards, testing, PR process)
-- **docs/API.md**: Complete programmatic API reference (1491 lines)
-- **docs/ARCHITECTURE.md**: Condensed architecture overview
-- **docs/ROADMAP.md**: Phase-based roadmap
-- **MCP dogfooding**: Used Deckent's own MCP tools during development
-- **Test suite**: 669 tests, 95% coverage
+- **CONTRIBUTING.md**: Tam katkı rehberi (kurulum, standartlar, test, PR süreci)
+- **docs/API.md**: Kapsamlı programatik API referansı (1491 satır)
+- **docs/ARCHITECTURE.md**: Yoğunlaştırılmış mimari genel bakış
+- **docs/ROADMAP.md**: Faz tabanlı yol haritası
+- **MCP dogfooding**: Geliştirme sırasında Deckent'in kendi MCP araçları kullanıldı
+- **Test paketi**: 669 test, %95 coverage
 
 ## [0.1.0-sprint7] - 2026-03-17
 
 ### Added
 
-- **MCP Server** (`src/mcp/`): 8 tools + 4 resources, stdio transport
-- **Zero-friction integration**: Auto-registration in .claude/settings.json
-- **Test suite**: 669 tests, 95% coverage, 24 new MCP tests
+- **MCP Sunucusu** (`src/mcp/`): 8 araç + 4 kaynak, stdio taşıma
+- **Sürtünmesiz entegrasyon**: .claude/settings.json'da otomatik kayıt
+- **Test paketi**: 669 test, %95 coverage, 24 yeni MCP testi
 
 ## [0.1.0-sprint6] - 2026-03-16
 
 ### Added
 
-- **First dogfooding**: Deckent ran `deckent start` on itself
-- Generated README.md in 86 seconds with 1 worker
-- End-to-end orchestration loop proven
-- **Test suite**: 645 tests, 95% coverage
+- **İlk dogfooding**: Deckent kendi üzerinde `deckent start` çalıştırdı
+- 1 worker ile 86 saniyede README.md oluşturuldu
+- Uçtan uca orkestrasyon döngüsü kanıtlandı
+- **Test paketi**: 645 test, %95 coverage
 
 ## [0.1.0-sprint5] - 2026-03-16
 
 ### Added
 
-- **Memory decay**: Auto-compress .brain/ when >300 lines
-- **Doctor checks**: `runDoctorChecks()` for pre-flight validation
-- **`deckent start --dry-run`**: Plan tasks without spawning workers
-- **`deckent status --watch`**: Auto-refresh every 2 seconds
-- **Barrel excludes**: index.ts files excluded from coverage
-- **Test suite**: 644 tests, 94.83% coverage
+- **Bellek decay**: >300 satır olduğunda .brain/ otomatik sıkıştır
+- **Doctor kontrolleri**: Ön uçuş doğrulaması için `runDoctorChecks()`
+- **`deckent start --dry-run`**: Worker spawn etmeden görevleri planla
+- **`deckent status --watch`**: Her 2 saniyede otomatik yenileme
+- **Barrel hariç tutma**: index.ts dosyaları coverage'dan hariç
+- **Test paketi**: 644 test, %94.83 coverage
 
 ## [0.1.0-sprint4] - 2026-03-16
 
 ### Added
 
-- **Debt resolution lifecycle**: `resolveDebt()`, stale debt cleanup
-- **Test suite**: 617 tests, 93% coverage
+- **Borç çözüm yaşam döngüsü**: `resolveDebt()`, eski borç temizliği
+- **Test paketi**: 617 test, %93 coverage
 
 ## [0.1.0-sprint3] - 2026-03-16
 
 ### Fixed
 
-- **haiku_allowed**: Semantic fix (true = haiku is allowed as downgrade option)
-- **checkUsage regex**: Fixed usage percentage parsing
+- **haiku_allowed**: Semantik düzeltme (true = haiku düşürme seçeneği olarak izinli)
+- **checkUsage regex**: Kullanım yüzdesi ayrıştırma düzeltildi
 
 ### Added
 
-- **Test suite**: 540 tests, 92% coverage
+- **Test paketi**: 540 test, %92 coverage
 
 ## [0.1.0-sprint2] - 2026-03-16
 
 ### Changed
 
-- **Async migration**: `sleepSync(Atomics.wait)` → `async sleep(setTimeout)`
-- Brain now fully async throughout sprint lifecycle
+- **Async göçü**: `sleepSync(Atomics.wait)` → `async sleep(setTimeout)`
+- Brain artık sprint yaşam döngüsü boyunca tamamen async
 
 ### Added
 
-- **Test suite**: 480 tests, 91% coverage
+- **Test paketi**: 480 test, %91 coverage
 
 ## [0.1.0-wave4] - 2026-03-16
 
@@ -1113,9 +1130,9 @@ _Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
 - **Info commands**: `usage`, `history` (sprint log table)
 - **Stub commands**: `plugin install/list`, `upgrade`, `onboard` — "not yet implemented"
 - **Helpers**: `output.ts` (formatDashboard, formatDoctorResult, formatTable, formatProgressBar, formatSprintSummary), `process.ts` (EXIT_CODES, handleCliError, resolveProjectRoot), `prompt.ts` (promptText, promptSelect, promptConfirm)
-- **Runtime dependency**: `commander@^13.0.0` (tek runtime dependency)
-- **Test suite**: 86 new tests, total 297 (all passing)
-- **Coverage**: %92.91 overall; CLI commands %98.33, CLI entry %95.23, CLI helpers %89.47
+- **Çalışma zamanı bağımlılığı**: `commander@^13.0.0` (tek runtime bağımlılık)
+- **Test paketi**: 86 yeni test, toplam 297 (tümü geçiyor)
+- **Coverage**: genel %92.91; CLI komutları %98.33, CLI giriş %95.23, CLI yardımcılar %89.47
 
 ### Changed
 
@@ -1129,10 +1146,10 @@ _Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
 - **Brain Module** (`src/orchestra/brain.ts`): 17 exported fonksiyon + 7 internal helper — tam sprint yaşam döngüsü (8 phase), GO/NO-GO değerlendirme, çapraz bağımlılık çözümü, debt escalation (2→HIGH, 3+→CRITICAL), decay mekanizması (300 satır budget), usage-aware sprint planning. `BrainError` error class. `BrainContext`, `ProjectState`, `SprintSizeRecommendation`, `CreateTaskParams` interfaces.
 - **Sprint Lifecycle**: `runSprint` master orchestrator — PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP. Her phase try/catch ile korunur, sprint asla yarım kalmaz.
 - **DEBT.md Programatic I/O**: `parseDebtTable`/`generateDebtTable` ile markdown tablo formatı korunarak okuma/yazma.
-- **Barrel exports**: `src/orchestra/index.ts` updated with 17 brain function exports + 4 type exports
-- **Constants**: `DEBT_TABLE_HEADER` added to `src/core/constants.ts`
-- **Test suite**: 83 new tests, total 211 (all passing)
-- **Coverage**: brain.ts %93.61 statements, %96.42 functions; overall %91.51
+- **Barrel export'ları**: `src/orchestra/index.ts` 17 brain fonksiyon export'u + 4 tip export'u ile güncellendi
+- **Sabitler**: `DEBT_TABLE_HEADER` `src/core/constants.ts`'ye eklendi
+- **Test paketi**: 83 yeni test, toplam 211 (tümü geçiyor)
+- **Coverage**: brain.ts %93.61 statement, %96.42 fonksiyon; genel %91.51
 
 ## [0.1.0-wave2] - 2026-03-16
 
@@ -1141,10 +1158,10 @@ _Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
 - **tmux Manager** (`src/orchestra/tmux.ts`): 10 fonksiyon — session management, worker spawn/kill, auditor start, attach, send-keys. `SpawnOptions` interface (allowedTools + autoApprove). `TmuxError` error class.
 - **Auditor** (`src/monitor/auditor.ts`): 10 fonksiyon — heartbeat scanning, boundary violation detection (git diff), stale lock detection, Kahn's algorithm deadlock detection, dashboard update, pattern detection. Resilient `readJsonSafe` pattern.
 - **Worker** (`src/agents/worker.ts`): 12 fonksiyon — task read/claim, plan write, file locking (acquire/release/check/releaseAll), heartbeat create/write, result write with status update, scope validation. `TaskClaimError`, `LockError`, `ScopeViolationError` error classes.
-- **Barrel exports**: `src/orchestra/index.ts`, `src/monitor/index.ts`, `src/agents/index.ts`
-- **Root re-exports**: `src/index.ts` updated with 3 new module exports
-- **Test suite**: 80 new tests (19 tmux + 24 auditor + 37 worker), total 128
-- **Coverage**: 90.89% overall (tmux 100%, auditor 95.58%, worker 95.81%)
+- **Barrel export'ları**: `src/orchestra/index.ts`, `src/monitor/index.ts`, `src/agents/index.ts`
+- **Root yeniden export'lar**: `src/index.ts` 3 yeni modül export'u ile güncellendi
+- **Test paketi**: 80 yeni test (19 tmux + 24 auditor + 37 worker), toplam 128
+- **Coverage**: genel %90.89 (tmux %100, auditor %95.58, worker %95.81)
 
 ## [0.1.0-wave1] - 2026-03-16
 
@@ -1153,7 +1170,7 @@ _Tasks: 17 total, 14 done, 7 tech debt, 3 no-go_
 - **Constants** (`src/core/constants.ts`): 50+ constants — paths, timing, memory limits, tmux names, task extensions, tech debt escalation, defaults
 - **Type system** (`src/core/types.ts`): 8 enums (`TaskStatus`, `TaskEvaluation`, `AgentStatus`, `AlertLevel`, `SprintPhase`, `SprintStatus`, `DebtPriority`), 25+ interfaces covering Task, Sprint, Agent, Config, Dashboard, Memory, Lock, Usage, Plugin, and CLI domains
 - **Config loader** (`src/core/config.ts`): 3-layer merge (defaults → global → project), `ConfigValidationError` with detailed error arrays, `deepMerge`, `loadConfig`, `validatePartialConfig`
-- **Barrel exports**: `src/core/index.ts`, `src/index.ts`
-- **Test suite**: 48 tests across 3 files — constants, types (enum membership), config (load/merge/validate)
-- **Coverage**: 91.87% overall (constants 100%, types 100%, config 92.39%)
-- **Project scaffold**: `package.json`, `tsconfig.json` (strict, Node16, ES2022), `vitest.config.ts`, `.gitignore`
+- **Barrel export'ları**: `src/core/index.ts`, `src/index.ts`
+- **Test paketi**: 3 dosyada 48 test — constants, types (enum üyeliği), config (yükleme/birleştirme/doğrulama)
+- **Coverage**: genel %91.87 (constants %100, types %100, config %92.39)
+- **Proje iskeleti**: `package.json`, `tsconfig.json` (strict, Node16, ES2022), `vitest.config.ts`, `.gitignore`

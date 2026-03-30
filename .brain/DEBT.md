@@ -22,3 +22,7 @@
 | debt-072-005 | Tech debt from 072-005: PROJECT-IDENTITY.md: Test sayısı 12,176+ (12,161 passed | 072-005 | sprint-072 | NORMAL | 0 | true | sprint-072 | 2026-03-30T09:37:10.473Z |
 | debt-072-006 | Tech debt from 072-006: 4 numerical inconsistency fixed: (1) orchestra: 42→45 mo | 072-006 | sprint-072 | NORMAL | 0 | true | sprint-072 | 2026-03-30T09:37:13.542Z |
 | debt-072-007 | Tech debt from 072-007: Sprint 072 ve 073 entry'leri docs/SPRINT-LOG.md dosyasın | 072-007 | sprint-072 | NORMAL | 0 | true | sprint-072 | 2026-03-30T09:37:16.591Z |
+| debt-073-001 | Tech debt from 073-001: Dokümantasyon dil tutarlılığı tamamlandı. A) docs/CHANGE | 073-001 | sprint-073 | NORMAL | 0 | true | sprint-073 | 2026-03-30T10:54:03.411Z |
+| debt-073-002 | Tech debt from 073-002: VISION.md oluşturuldu. 7 bölüm: Vizyon, Misyon, Hedef Ku | 073-002 | sprint-073 | NORMAL | 0 | true | sprint-073 | 2026-03-30T10:54:06.264Z |
+| debt-073-003 | Tech debt from 073-003: Link audit completed for docs/CHANGELOG.md, docs/SPRINT- | 073-003 | sprint-073 | NORMAL | 0 | true | sprint-073 | 2026-03-30T10:54:09.163Z |
+| debt-073-004 | Tech debt from 073-004: A) .pre-commit-config.yaml oluşturuldu — detect-secrets | 073-004 | sprint-073 | NORMAL | 0 | true | sprint-073 | 2026-03-30T10:54:12.067Z |

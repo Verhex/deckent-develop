@@ -1,0 +1,353 @@
+// ═══ Sprint Utilities ═══════════════════════════════════════════════
+// Extracted from sprint-controller.ts — pure utility functions with
+// minimal state dependencies. Sprint 075: God Object Split Phase 2.
+
+import {
+  readFileSync, existsSync, writeFileSync,
+  mkdirSync, unlinkSync, statSync,
+} from 'node:fs';
+import { join } from 'node:path';
+
+import {
+  getProviderForModel,
+} from '../core/types.js';
+
+import type {
+  Task, Sprint, SystemProfile, ResolvedConfig,
+  ModelType, ProviderName,
+} from '../core/types.js';
+
+import {
+  TASKS_DIR,
+} from '../core/constants.js';
+
+import { readJsonSafe } from '../core/utils.js';
+import { getSystemProfile } from '../core/system-profile.js';
+
+import type { ProviderAdapter } from '../core/provider.js';
+import { providerRegistry, ProviderError } from '../core/provider.js';
+
+import { listWorkers } from './tmux.js';
+
+
+// ═══ Constants ════════════════════════════════════════════════════════
+
+const PAUSE_STATE_FILE = '.deckent/pause-state.json';
+const SPRINT_STATE_FILE = '.deckent/sprint-state.json';
+
+/** Source code directory prefixes -- anything outside these is treated as a doc task */
+const SOURCE_CODE_PREFIXES = ['src/', 'src\\', 'tests/', 'tests\\', 'lib/', 'lib\\'];
+
+export { PAUSE_STATE_FILE, SPRINT_STATE_FILE };
+
+
+// ═══ Pure Helpers ═════════════════════════════════════════════════════
+
+export function readFileSafe(filePath: string): string {
+  try {
+    return readFileSync(filePath, 'utf-8');
+  } catch {
+    return '';
+  }
+}
+
+export function now(): string {
+  return new Date().toISOString();
+}
+
+
+// ═══ Classification Utilities ═════════════════════════════════════════
+
+export function isSourceCodeDir(dir: string): boolean {
+  const normalized = dir === 'src' || dir === 'tests' || dir === 'lib';
+  return normalized || SOURCE_CODE_PREFIXES.some(p => dir.startsWith(p));
+}
+
+/**
+ * Returns true if the task is doc-only (no source code directories).
+ * Source code scopes: src/, tests/, lib/ -- everything else is a doc task.
+ */
+export function isDocTask(task: Task): boolean {
+  const dirs = task.scope?.directories ?? [];
+  if (dirs.length === 0) return false;
+  return dirs.every(d => !isSourceCodeDir(d));
+}
+
+/**
+ * Returns true if the task file has not been modified within maxAgeMs.
+ * @internal Used only within orchestra/ — not part of the public API surface.
+ */
+export function isStaleTaskFile(filePath: string, maxAgeMs: number = 86_400_000): boolean {
+  try {
+    const stat = statSync(filePath);
+    return Date.now() - stat.mtimeMs > maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check whether a provider uses the local tmux-based spawn mechanism.
+ * Currently only the 'claude' provider uses tmux; all others use their adapter's spawn().
+ * @internal
+ */
+export function isTmuxProvider(providerName: ProviderName): boolean {
+  return providerName === 'claude';
+}
+
+
+// ═══ Config Helpers ══════════════════════════════════════════════════
+
+/** Resolve max_workers to a number, handling 'auto' */
+export function resolveMaxWorkersNumeric(config: ResolvedConfig, systemProfile?: SystemProfile): number {
+  const maxWorkers = config.activeModeConfig.max_workers;
+  if (maxWorkers === 'auto') {
+    const profile = systemProfile ?? getSystemProfile();
+    return profile.recommendedMaxWorkers;
+  }
+  return maxWorkers;
+}
+
+
+// ═══ Provider Utilities ══════════════════════════════════════════════
+
+/**
+ * Resolve the CLI binary from the default provider in the registry.
+ * Returns undefined if no provider is registered.
+ * @internal
+ */
+export function resolveDefaultUsageCli(): string | undefined {
+  try {
+    const defaultAdapter = providerRegistry.getDefault();
+    const cmdStr = defaultAdapter.buildCommand('opus' as ModelType, '/dev/null');
+    const firstToken = cmdStr.split(/\s+/)[0];
+    return firstToken || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Get the default registered ProviderAdapter from the provider registry.
+ * Returns null if none is registered or an error occurs
+ */
+export function getDefaultProvider(): ProviderAdapter | null {
+  try {
+    return providerRegistry.getDefault();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the provider for a task.
+ * Uses task.provider if explicitly set, otherwise infers from model via getProviderForModel().
+ * Falls back to the registry's default provider if the model is unrecognized.
+ * If no default provider is registered, returns 'claude' as the built-in ProviderName.
+ * @internal
+ */
+export function resolveTaskProvider(task: Task): ProviderName {
+  if (task.provider) return task.provider;
+  try {
+    return getProviderForModel(task.model);
+  } catch {
+    // Model unrecognized — try default provider from registry
+    try {
+      return providerRegistry.getDefault().name as ProviderName;
+    } catch {
+      throw new ProviderError(`No providers registered and model '${task.model}' is unrecognized — cannot resolve provider`, 'unknown');
+    }
+  }
+}
+
+/**
+ * Get a ProviderAdapter from the registry for the given provider name.
+ * Returns null if the provider is not registered (logs no error — caller decides).
+ * @internal
+ */
+export function getProviderAdapterForTask(providerName: ProviderName): ProviderAdapter | null {
+  try {
+    return providerRegistry.getProvider(providerName);
+  } catch {
+    return null;
+  }
+}
+
+
+// ═══ Subprocess Worker Log Utilities ═════════════════════════════════
+
+/**
+ * Get the log file path for a subprocess worker.
+ */
+export function getSubprocessWorkerLogPath(projectRoot: string, taskId: string): string {
+  return join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+}
+
+/**
+ * Read the log contents of a subprocess worker.
+ * Returns the log file contents if it exists, or null if the log file is not found.
+ */
+export function readSubprocessWorkerLog(projectRoot: string, taskId: string): string | null {
+  const logPath = getSubprocessWorkerLogPath(projectRoot, taskId);
+  if (!existsSync(logPath)) return null;
+  try {
+    return readFileSync(logPath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether a subprocess worker log file exists.
+ */
+export function hasSubprocessWorkerLog(projectRoot: string, taskId: string): boolean {
+  return existsSync(getSubprocessWorkerLogPath(projectRoot, taskId));
+}
+
+
+// ═══ Sprint State Persistence ════════════════════════════════════════
+
+export interface SprintState {
+  sprintId: string;
+  phase: import('../core/types.js').SprintPhase;
+  status: string;
+  startedAt: string;
+  updatedAt: string;
+  taskIds: string[];
+}
+
+/**
+ * Persist current sprint phase state to disk for crash recovery.
+ * Non-fatal: errors are silently ignored.
+ */
+export function writeSprintState(projectRoot: string, sprint: Sprint): void {
+  try {
+    const statePath = join(projectRoot, SPRINT_STATE_FILE);
+    const state: SprintState = {
+      sprintId: sprint.id,
+      phase: sprint.phase,
+      status: sprint.status,
+      startedAt: sprint.startedAt ?? now(),
+      updatedAt: now(),
+      taskIds: sprint.tasks.map(t => t.id),
+    };
+    mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
+    writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * Read persisted sprint state from disk. Returns null if no state file exists.
+ */
+export function readSprintState(projectRoot: string): SprintState | null {
+  const statePath = join(projectRoot, SPRINT_STATE_FILE);
+  return readJsonSafe<SprintState>(statePath) ?? null;
+}
+
+/**
+ * Remove sprint state file after sprint completion.
+ */
+export function clearSprintState(projectRoot: string): void {
+  try {
+    const statePath = join(projectRoot, SPRINT_STATE_FILE);
+    if (existsSync(statePath)) unlinkSync(statePath);
+  } catch { /* non-fatal */ }
+}
+
+
+// ═══ Orphan / Retry Utilities ════════════════════════════════════════
+
+/**
+ * Detect orphan tmux windows from a previous crashed sprint.
+ * Returns list of orphaned worker IDs that have tmux windows but no active sprint.
+ */
+export function detectOrphanWorkers(projectRoot: string): string[] {
+  try {
+    const workers = listWorkers();
+    const state = readSprintState(projectRoot);
+    if (!state) {
+      // No sprint state — any existing workers are orphans
+      return workers;
+    }
+    // Workers not in the current sprint's task list are orphans
+    const validWorkers = new Set(state.taskIds.map(id => `w-${id}`));
+    return workers.filter(w => !validWorkers.has(w));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Build a retry recommendation message after spawn failure.
+ * Suggests model downgrade or scope simplification based on error analysis.
+ */
+export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  const hints: string[] = [];
+
+  if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
+    hints.push('Rate limit hit — consider downgrading task models (opus→sonnet, sonnet→haiku)');
+  }
+  if (msg.includes('timeout') || msg.includes('ETIMEDOUT')) {
+    hints.push('Connection timeout — check network or provider availability');
+  }
+  if (msg.includes('tmux') || msg.includes('session')) {
+    hints.push('tmux session error — run `deckent doctor` to verify tmux setup');
+  }
+  if (sprint.tasks.length > 6) {
+    hints.push(`High task count (${sprint.tasks.length}) — consider reducing max_workers or splitting the sprint`);
+  }
+  if (hints.length === 0) {
+    hints.push('Unexpected spawn error — check provider credentials and system resources');
+  }
+  return hints.join('; ');
+}
+
+
+// ═══ Directive Parsing Utilities ═════════════════════════════════════
+
+/**
+ * Extract task-specific GO/NOGO criteria from DIRECTIVES description.
+ * Parses "Kanıt:", "Proof:", "Doğrulama:", "Verify:" lines for goCriteria.
+ * Falls back to generic criteria if no specific proof lines found.
+ */
+export function extractGoNogoCriteria(
+  description: string,
+  testTarget?: string,
+): { goCriteria: string; noGoCriteria: string; techDebtAcceptable: string } {
+  const lines = description.split('\n');
+  const proofLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match proof/verification patterns
+    if (/^(?:\*\*)?(?:Kanıt|Kan[ıi]t|Proof|Doğrulama|Verify|Verification|Test:)(?:\*\*)?:/i.test(trimmed)) {
+      proofLines.push(trimmed);
+    }
+    // Match inline grep/command verification patterns
+    if (/^\s*[-*]\s*`(?:grep|find|wc|ls|cat|npx)\s/.test(trimmed)) {
+      proofLines.push(trimmed);
+    }
+  }
+
+  const baseCriteria = testTarget ? `${testTarget}; Tests pass` : 'Tests pass; tsc clean';
+
+  if (proofLines.length > 0) {
+    // Use first 3 proof lines as specific criteria (avoid excessive length)
+    const specificCriteria = proofLines
+      .slice(0, 3)
+      .map(l => l.replace(/^\*\*.*?\*\*:\s*/, '').replace(/^[-*]\s*/, ''))
+      .join('; ');
+    return {
+      goCriteria: `${baseCriteria}; ${specificCriteria}`,
+      noGoCriteria: 'Build fails or verification commands fail',
+      techDebtAcceptable: 'Minor issues if all verification commands pass',
+    };
+  }
+
+  return {
+    goCriteria: baseCriteria,
+    noGoCriteria: 'Build fails or tests fail',
+    techDebtAcceptable: 'Minor style issues if tests pass',
+  };
+}

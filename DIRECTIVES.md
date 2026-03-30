@@ -1,152 +1,195 @@
-# DIRECTIVES — Sprint 074: Dokümantasyon Taraması + Güncelleme
+# DIRECTIVES — Sprint 075: Faz 2 Devam — Docs Tutarlılık + Güvenlik + Refactor
 
-## Goal: Sprint 073 test fix'leri ve Sprint 072 değişikliklerini yansıtacak şekilde tüm dokümantasyonu tara, güncelle ve tutarlı hale getir. doc-writer agent + documentation-writer skill aktif kullanılacak.
+## Goal: Dokümantasyon dil tutarlılığı, VISION.md oluşturma, docs link audit, .detect-secrets güvenlik kurulumu ve god object split devamı. Blocker'sız task'lar — hemen başlanabilir.
 
 ---
 
-## Task 1: README.md Güncellemesi — Test Sayıları + Sprint Bilgisi
+## Task 1: Dokümantasyon Dil Stratejisi — TR/EN Tutarlılık
+- Model: opus
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/index.md, BETA-ROADMAP.md, AGENTS.md
+- Scope: docs/, BETA-ROADMAP.md, AGENTS.md
+
+### Description
+Dokümantasyon dosyalarında dil karışıklığı var. Strateji:
+
+**Karar: Türkçe birincil, İngilizce sadece teknik terimler.**
+
+Kurallar:
+- docs/CHANGELOG.md: Section başlıkları İngilizce kalabilir (Added/Changed/Fixed — Keep a Changelog standardı), açıklama metinleri Türkçe
+- docs/SPRINT-LOG.md: Zaten Türkçe — dokunma
+- docs/index.md: İngilizce kalabilir (VitePress public-facing)
+- BETA-ROADMAP.md: Zaten Türkçe — dokunma
+- AGENTS.md: İçeriği kontrol et, Türkçe olmalı
+
+Yapılacaklar:
+A) docs/CHANGELOG.md'deki karışık satırları düzelt — İngilizce açıklamaları Türkçeye çevir
+B) Dosya başlarına `<!-- Dil: TR | Teknik terimler EN -->` yorum satırı ekle
+C) AGENTS.md'yi kontrol et ve gerekiyorsa Türkçeleştir
+
+DİKKAT: Keep a Changelog format bozulmasın. Section başlıkları (Added/Changed/Fixed/Removed) İngilizce KALMALI.
+
+**Kanıt:** `grep -c "^[A-Z].*:" docs/CHANGELOG.md` → sadece section başlıkları İngilizce
+
+**Test:** Bu task test gerektirmez — dokümantasyon.
+
+---
+
+## Task 2: VISION.md — Proje Vizyonu ve Yol Haritası
+- Model: opus
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: VISION.md
+- Scope: VISION.md
+
+### Description
+VISION.md oluştur — projenin vizyonunu, hedeflerini ve stratejisini tanımla.
+
+İçerik yapısı:
+1. **Vizyon** — Deckent ne olmak istiyor? (1 paragraf)
+   - AI agent orkestrasyon CLI — multi-agent sprint'ler ile otonom yazılım geliştirme
+   - İnsan sadece hedef belirler, Deckent planlar-çalıştırır-değerlendirir
+
+2. **Misyon** — Neden varız? (1 paragraf)
+   - Solo AI asistanından multi-agent ekibe geçiş
+   - Brain-Worker-Auditor mimarisi ile kalite garantisi
+
+3. **Hedef Kullanıcılar**
+   - Bireysel geliştiriciler (indie dev, freelancer)
+   - Küçük takımlar (2-10 kişi)
+   - Enterprise (gelecekte)
+
+4. **Rakip Analizi** (tablo formatında)
+   - Devin, OpenClaw/OpenHands, Aider, Cursor, Claude Code solo
+   - Deckent farkı: orkestrasyon, multi-agent, sprint lifecycle, memory/learning
+
+5. **Teknoloji Kararları**
+   - TypeScript + ESM (neden)
+   - Multi-provider (Claude + Codex + Gemini) (neden)
+   - tmux + subprocess backend (neden)
+   - MCP entegrasyonu (neden)
+
+6. **Yol Haritası** (Faz 1-4 BETA-ROADMAP'tan özet)
+
+7. **Değerler** — Açık kaynak, şeffaflık, kalite, otonom ama kontrollü
+
+Dil: Türkçe (teknik terimler İngilizce)
+
+**Kanıt:** `test -f VISION.md && echo "exists"` → exists
+
+**Test:** Bu task test gerektirmez — dokümantasyon.
+
+---
+
+## Task 3: docs/ Link Audit — Kırık Link Kontrolü
 - Model: sonnet
 - Effort: normal
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: README.md
-- Scope: README.md
+- Files: docs/CHANGELOG.md, docs/SPRINT-LOG.md, docs/index.md, README.md
+- Scope: docs/, README.md
 
 ### Description
-README.md'deki istatistikleri güncelle:
+Tüm Markdown dosyalarındaki linkleri kontrol et:
 
-A) Test sayısı: 12,160+ → 12,176+ (gerçek: 12,161 passed + 15 skipped = 12,176 total)
-B) Sprint sayısı: 71+ → 73+ (sprint-071 + sprint-072 + sprint-073 tamamlandı)
-C) Test dosyası sayısı: 476 test dosyası
-D) Coverage bilgisi varsa güncelle
-E) "Sprint 072: Tier generalizasyonu" ve "Sprint 073: Dogfooding test fix" bilgilerini yansıt
-F) Version hâlâ 0.2.0-beta.3 — değişmedi
+A) İç linkler: `[text](relative/path.md)` — hedef dosya var mı?
+B) Dış linkler: `[text](https://...)` — format doğru mu? (ping etme, sadece URL formatı)
+C) Anchor linkler: `[text](#heading)` — heading var mı?
+D) Kırık linkleri düzelt veya kaldır
+E) docs/archive/ altındaki referansları kontrol et
 
-Sadece sayısal verileri ve sprint referanslarını güncelle. Yapıyı DEĞİŞTİRME.
+Yaklaşım:
+1. `grep -r "\[.*\](.*)" docs/ README.md` ile tüm linkleri listele
+2. İç linklerin hedeflerini dosya sistemiyle doğrula
+3. Kırık olanları düzelt
 
-**Kanıt:** `head -20 README.md` → güncel sayılar
+**Kanıt:** `grep -r "\[.*\](" docs/ | grep -v "http" | head -20` → tüm iç linkler geçerli
 
 **Test:** Bu task test gerektirmez — dokümantasyon.
 
 ---
 
-## Task 2: CHANGELOG.md + docs/CHANGELOG.md Güncelleme
+## Task 4: .detect-secrets Kurulumu — Pre-commit Güvenlik
 - Model: sonnet
 - Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: CHANGELOG.md, docs/CHANGELOG.md
-- Scope: CHANGELOG.md, docs/
+- Skills: security-expert, ci-cd-expert
+- Files: .pre-commit-config.yaml, .secrets.baseline
+- Scope: .pre-commit-config.yaml, .secrets.baseline, .gitignore
 
 ### Description
-Sprint 072 ve 073 değişikliklerini CHANGELOG'a ekle. Keep a Changelog formatı:
+Secret leak koruması ekle:
 
-Sprint 072 (zaten kısmen var — kontrol et):
-- Changed: Plan tier generalizasyonu (max_plan→performance, max5x_plan→balanced, pro_plan→economic)
-- Changed: Init wizard genel provider seçimi (Claude-specific kaldırıldı)
-- Changed: Model API ID'leri güncellendi (claude-opus-4-6, claude-sonnet-4-6)
-- Changed: sprint-controller.ts god object split — sprint-phases.ts extract
-- Changed: README.md güncel özellikler
+A) `.pre-commit-config.yaml` oluştur:
+```yaml
+repos:
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+```
 
-Sprint 073:
-- Fixed: 100 test regresyonu düzeltildi (43 fs mock, 16 brain mock, 9 doctor logic, 23 stack/CI, 3 integration)
-- Fixed: 0 fail, 12,161 test passed
+B) `.secrets.baseline` oluştur — mevcut false positive'leri baseline'a ekle:
+- Test dosyalarındaki mock API key'ler
+- Docs'taki örnek key formatları
 
-docs/CHANGELOG.md'de detaylı format, root CHANGELOG.md'de özet.
+C) `.gitignore`'a .env ve credential pattern'leri ekle (zaten varsa kontrol et):
+```
+.env
+.env.local
+*.pem
+credentials.json
+```
 
-**Kanıt:** `grep "sprint-073\|Sprint 073" docs/CHANGELOG.md` → entry var
+D) Kurulum notunu README.md veya CONTRIBUTING.md'ye ekle (opsiyonel)
 
-**Test:** Bu task test gerektirmez — dokümantasyon.
+DİKKAT: `detect-secrets` Python paketi — pre-commit hook olarak çalışır. Eğer Python yoksa sadece config dosyalarını oluştur, kurulum komutunu dokümante et.
+
+**Kanıt:** `test -f .pre-commit-config.yaml && echo "exists"` → exists
+
+**Test:** Bu task test gerektirmez — altyapı.
 
 ---
 
-## Task 3: .brain/ Dokümantasyon Tutarlılığı — RETRO, MEMORY, PROJECT-IDENTITY
-- Model: sonnet
-- Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: .brain/PROJECT-IDENTITY.md, .brain/DECISIONS.md
-- Scope: .brain/
+## Task 5: God Object Split Faz 2 — sprint-controller Utility Extract
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, refactoring-expert
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-utils.ts
+- Scope: src/orchestra/
 
 ### Description
-.brain/ dosyalarını güncelle:
+Sprint 072'de sprint-phases.ts extract edildi. Şimdi sprint-controller.ts'den utility fonksiyonlarını çıkar.
 
-A) PROJECT-IDENTITY.md:
-- Test sayısı: 12,176+ (12,161 passed + 15 skipped)
-- Sprint sayısı: 73+
-- Test dosyası: 476
-- Son sprint: sprint-073 (dogfooding test fix)
+Yeni dosya: `src/orchestra/sprint-utils.ts`
 
-B) DECISIONS.md: Sprint 072-073 ile ilgili yeni karar varsa ekle:
-- Tier generalizasyonu kararı (ADR formatında)
-- God object split kararı (sprint-phases.ts)
+Taşınabilecek adaylar (sprint-controller.ts'yi oku ve tespit et):
+- Config yükleme/merge yardımcıları
+- Sprint ID üretme/artırma
+- Task dosyası okuma/yazma yardımcıları
+- Log/output formatting fonksiyonları
+- Timeout/retry yardımcıları
 
-Sadece sayısal güncellemeler ve yeni ADR'ler. Mevcut içeriği DEĞİŞTİRME.
+Yaklaşım:
+1. sprint-controller.ts'yi oku — hangi fonksiyonlar pure utility?
+2. State'e bağımlı olmayanları sprint-utils.ts'ye taşı
+3. sprint-controller.ts'de import edip kullan
+4. Re-export pattern: public API DEĞİŞMEZ
 
-**Kanıt:** `grep "12,176\|73+" .brain/PROJECT-IDENTITY.md` → güncel
+DİKKAT: Sadece pure utility extract. İş mantığını DEĞİŞTİRME. Mevcut testler regression-free geçmeli.
 
-**Test:** Bu task test gerektirmez — dokümantasyon.
+**Kanıt:** `wc -l src/orchestra/sprint-controller.ts` → öncekinden kısa + `test -f src/orchestra/sprint-utils.ts` → yeni dosya var
 
----
-
-## Task 4: DECKENT.md + CLAUDE.md Tutarlılık Kontrolü
-- Model: sonnet
-- Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: DECKENT.md, CLAUDE.md
-- Scope: DECKENT.md, CLAUDE.md
-
-### Description
-DECKENT.md ve CLAUDE.md'deki referansları kontrol et ve güncelle:
-
-A) Module sayıları doğru mu? (orchestra 42 modules, core 48 modules, vb.)
-- sprint-phases.ts eklendi — orchestra modül sayısı artmış olabilir
-B) Agent sayısı: 9 built-in → doğru mu? (doc-writer, test-writer, security-auditor, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian)
-C) Skill sayısı: 11 built-in → doğru mu?
-D) CLI komut sayısı: 33+ → doğru mu?
-E) MCP tool/resource sayısı: 16 tools + 9 resources → doğru mu?
-F) Test sayısı referansları güncelle
-
-Sadece sayısal tutarsızlıkları düzelt. Yapıyı DEĞİŞTİRME.
-
-**Kanıt:** `grep "modules\|built-in\|tools\|resources" CLAUDE.md` → tutarlı sayılar
-
-**Test:** Bu task test gerektirmez — dokümantasyon.
-
----
-
-## Task 5: docs/SPRINT-LOG.md Güncelleme
-- Model: haiku
-- Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: docs/SPRINT-LOG.md
-- Scope: docs/
-
-### Description
-docs/SPRINT-LOG.md dosyasına Sprint 072 ve 073 entry'lerini ekle:
-
-Sprint 072: Faz 2 — Genel Kullanılabilirlik
-- 5 task, X done, X tech debt, X no-go (git log'dan al)
-- Tier generalizasyonu, init wizard, model IDs, README, god object split
-
-Sprint 073: Dogfooding — Test Regression Fix
-- 5 task, 5 done, 2 tech debt, 0 no-go
-- 100 test fix (43+16+9+23+3), 17m 41s süre
-- Agent: test-writer, Skill: testing-expert
-
-Mevcut format ve stile uy.
-
-**Kanıt:** `grep "Sprint 073\|sprint-073" docs/SPRINT-LOG.md` → entry var
-
-**Test:** Bu task test gerektirmez — dokümantasyon.
+**Test:** Mevcut testler regression-free geçmeli. Yeni test gerekmez (extract only).
 
 ---
 
 ## Quality Rules
-- tsc --noEmit MUST pass (dokümantasyon source'a dokunmamalı)
-- Mevcut testlerde 0 regresyon
-- Tüm sayılar gerçek verilere dayalı olmalı — tahmin YAPMA
-- Keep a Changelog formatına uy
+- tsc --noEmit MUST pass
+- npx vitest run → 0 fail, 0 regresyon
+- Dokümantasyon: dil tutarlı, linkler geçerli
+- God object split: public API değişmez, backward compat
 - %100 GO hedefli

@@ -1556,8 +1556,9 @@ describe('sprint-controller provider decoupling', () => {
 
   it('resolveTaskProvider tries registry default before hardcoded fallback', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    // resolveTaskProvider was extracted to sprint-utils.ts in Phase 2
     const source = actualFs.readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-utils.ts', import.meta.url),
       'utf-8',
     );
     // Should contain registry.getDefault() call in resolveTaskProvider
