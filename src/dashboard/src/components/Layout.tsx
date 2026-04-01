@@ -5,7 +5,8 @@ import { cn } from "../lib/utils";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
-import { useSSE } from "../hooks/useSSE";
+import { useSSEWithStatus } from "../hooks/useSSE";
+import type { SSEStatus } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
 import type { TranslationKey } from "../i18n/en";
@@ -59,7 +60,13 @@ function LanguageSwitcher() {
   );
 }
 
-function SidebarContent({ onNavigate, sseState }: { onNavigate?: () => void; sseState: DashboardState | null }) {
+const SSE_LABELS: Record<SSEStatus, { label: string; color: string }> = {
+  connected: { label: "Live", color: "bg-green-500" },
+  connecting: { label: "...", color: "bg-yellow-500" },
+  disconnected: { label: "Offline", color: "bg-red-500" },
+};
+
+function SidebarContent({ onNavigate, sseState, sseStatus }: { onNavigate?: () => void; sseState: DashboardState | null; sseStatus: SSEStatus }) {
   const { t } = useTranslation();
   return (
     <>
@@ -86,7 +93,11 @@ function SidebarContent({ onNavigate, sseState }: { onNavigate?: () => void; sse
         )}
       </div>
       <NavLinks onNavigate={onNavigate} />
-      <div className="mt-auto pt-4 border-t border-zinc-800">
+      <div className="mt-auto pt-4 border-t border-zinc-800 space-y-2">
+        <div className="flex items-center gap-2 px-3">
+          <span className={`h-2 w-2 rounded-full ${SSE_LABELS[sseStatus].color}`} />
+          <span className="text-xs text-zinc-500">{SSE_LABELS[sseStatus].label}</span>
+        </div>
         <LanguageSwitcher />
       </div>
     </>
@@ -95,19 +106,19 @@ function SidebarContent({ onNavigate, sseState }: { onNavigate?: () => void; sse
 
 export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const sseState = useSSE("/api/events");
+  const { data: sseState, status: sseStatus } = useSSEWithStatus("/api/events");
 
   return (
     <div className="flex h-screen bg-zinc-950">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex w-[240px] flex-col border-r border-zinc-800 bg-zinc-900 p-4">
-        <SidebarContent sseState={sseState} />
+        <SidebarContent sseState={sseState} sseStatus={sseStatus} />
       </aside>
 
       {/* Mobile sidebar */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-[240px] p-4">
-          <SidebarContent onNavigate={() => setMobileOpen(false)} sseState={sseState} />
+          <SidebarContent onNavigate={() => setMobileOpen(false)} sseState={sseState} sseStatus={sseStatus} />
         </SheetContent>
       </Sheet>
 

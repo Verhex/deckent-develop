@@ -33,13 +33,13 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   { key: "auth_mode", label: "Auth Mode", description: "Authentication mode", type: "select", category: "Provider", defaultValue: "subscription", options: ["subscription", "api", "hybrid"] },
 
   // ─── Sprint ─────────────────────────────────────────────────
-  { key: "mode", label: "Plan Mode", description: "Active plan mode determining resource allocation", type: "select", category: "Sprint", defaultValue: "max_plan", options: ["max_plan", "max5x_plan", "pro_plan", "api"] },
+  { key: "mode", label: "Plan Mode", description: "Active plan tier determining resource allocation", type: "select", category: "Sprint", defaultValue: "performance", options: ["performance", "balanced", "economic", "api", "max_plan", "max5x_plan", "pro_plan"] },
   { key: "spawn_backend", label: "Spawn Backend", description: "Worker spawn backend", type: "select", category: "Sprint", defaultValue: "auto", options: ["tmux", "subprocess", "auto"] },
   { key: "fix_phase_enabled", label: "Fix Phase Enabled", description: "Enable automatic fix phase after evaluation", type: "boolean", category: "Sprint", defaultValue: true },
   { key: "max_fix_retries", label: "Max Fix Retries", description: "Maximum number of fix retries per task", type: "number", category: "Sprint", defaultValue: 2 },
 
   // ─── Memory ───────────────────────────────────────────────
-  { key: "memory_budget", label: "Memory Budget", description: "Maximum lines for .brain/ memory files", type: "number", category: "Memory", defaultValue: 600 },
+  { key: "memory_budget", label: "Memory Budget", description: "Maximum total lines for .brain/ directory (MEMORY + PATTERNS + RETRO + sprint logs)", type: "number", category: "Memory", defaultValue: 900 },
   { key: "decay_after_sprints", label: "Decay After Sprints", description: "Number of sprints before memory decay", type: "number", category: "Memory", defaultValue: 5 },
   { key: "patterns_enabled", label: "Patterns Enabled", description: "Enable pattern detection and storage", type: "boolean", category: "Memory", defaultValue: true },
   { key: "project_identity_enabled", label: "Project Identity Enabled", description: "Enable project identity tracking", type: "boolean", category: "Memory", defaultValue: true },
@@ -82,7 +82,7 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   { key: "rollback_policy", label: "Rollback Policy", description: "When to rollback failed changes", type: "select", category: "Rollback", defaultValue: "never", options: ["never", "on_failure", "always"] },
 
   // ─── Project ──────────────────────────────────────────────
-  { key: "language", label: "Language", description: "Project programming language", type: "text", category: "Project", defaultValue: null },
+  { key: "language", label: "Language", description: "UI and output language (en, tr)", type: "select", category: "Project", defaultValue: "en", options: ["en", "tr"] },
   { key: "projectName", label: "Project Name", description: "Project display name", type: "text", category: "Project", defaultValue: null },
   { key: "version", label: "Version", description: "Project version", type: "text", category: "Project", defaultValue: null },
 
