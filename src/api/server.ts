@@ -351,6 +351,16 @@ async function handleRequest(
       return;
     }
 
+    // GET /api/tasks — list all task JSON files from .tasks/
+    if (url === '/api/tasks') {
+      const tasksDir = join(projectRoot, TASKS_DIR);
+      if (!existsSync(tasksDir)) { sendJson(res, []); return; }
+      const files = readdirSync(tasksDir).filter(f => f.endsWith('.json') && f.startsWith('task-'));
+      const tasks = files.map(f => readJsonSafe(join(tasksDir, f))).filter(Boolean);
+      sendJson(res, tasks);
+      return;
+    }
+
     // GET /api/job/:jobId
     if (url.startsWith('/api/job/')) {
       const jobId = url.slice('/api/job/'.length);

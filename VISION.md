@@ -98,10 +98,10 @@ Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna
 
 | Metrik | Değer |
 |--------|-------|
-| Test sayısı | 12,180+ |
+| Test sayısı | 12,196+ |
 | Coverage | 96%+ |
-| Tamamlanan sprint | 74+ |
-| CLI komut | 33+ |
+| Tamamlanan sprint | 78+ |
+| CLI komut | 32 |
 | MCP tool | 17 |
 | MCP resource | 9 |
 | Built-in agent | 9 |

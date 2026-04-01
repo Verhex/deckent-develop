@@ -364,6 +364,35 @@ describe('createHttpServer', () => {
     });
   });
 
+  describe('GET /api/tasks', () => {
+    it('returns empty array when .tasks/ does not exist', async () => {
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/tasks');
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body)).toEqual([]);
+    });
+
+    it('returns task list when task files exist', async () => {
+      const taskData = { id: '001-001', title: 'Test task', status: 'PENDING' };
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('.tasks')) return true;
+        return false;
+      });
+      mockReaddirSync.mockReturnValue(['task-001-001.json'] as unknown as ReturnType<typeof readdirSync>);
+      mockReadFileSync.mockReturnValue(JSON.stringify(taskData));
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/tasks');
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(Array.isArray(body)).toBe(true);
+    });
+  });
+
   // ─── CORS Preflight ─────────────────────────────────────────
 
   describe('OPTIONS (CORS preflight)', () => {

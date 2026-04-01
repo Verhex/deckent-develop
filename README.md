@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12176%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-73%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.2.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12196%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-78%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.2.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -390,7 +390,7 @@ See [docs/reference/config-reference.md](docs/reference/config-reference.md) for
 deckent web     # Opens at localhost:3100
 ```
 
-React + Vite + Tailwind -- 4 pages (Dashboard, Settings, History, Memory), SSE real-time updates, dark/light theme.
+React + Vite + Tailwind -- 6 pages (Dashboard, Settings, History, Memory, Config, Status), SSE real-time updates, dark/light theme, TR/EN language switcher.
 
 ---
 
