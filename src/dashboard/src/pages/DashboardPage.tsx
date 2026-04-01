@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Activity, AlertTriangle, Info, XOctagon, Skull, Plus } from "lucide-react";
+import { Activity, AlertTriangle, Info, XOctagon, Skull, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -85,6 +85,8 @@ export default function DashboardPage() {
   const [noSprint, setNoSprint] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [isCleanupLoading, setIsCleanupLoading] = useState(false);
+  const [isKillAllLoading, setIsKillAllLoading] = useState(false);
 
   useEffect(() => {
     if (!sseState) {
@@ -102,6 +104,40 @@ export default function DashboardPage() {
   }, [sseState]);
 
   const state = sseState ?? fallbackState;
+
+  const handleCleanup = useCallback(async () => {
+    if (!confirm(t('dashboard.confirm_cleanup'))) return;
+    setIsCleanupLoading(true);
+    try {
+      await postJson('/api/cleanup');
+      if (!sseState) {
+        fetchJson<DashboardState>('/api/status')
+          .then(setFallbackState)
+          .catch(() => {});
+      }
+    } catch {
+      // error handled silently
+    } finally {
+      setIsCleanupLoading(false);
+    }
+  }, [sseState, t]);
+
+  const handleKillAll = useCallback(async () => {
+    if (!confirm(t('dashboard.confirm_kill'))) return;
+    setIsKillAllLoading(true);
+    try {
+      await postJson('/api/kill/all');
+      if (!sseState) {
+        fetchJson<DashboardState>('/api/status')
+          .then(setFallbackState)
+          .catch(() => {});
+      }
+    } catch {
+      // error handled silently
+    } finally {
+      setIsKillAllLoading(false);
+    }
+  }, [sseState, t]);
 
   const handleKill = useCallback(async (agentId: string) => {
     if (!confirm(`Kill worker ${agentId}?`)) return;
@@ -127,14 +163,40 @@ export default function DashboardPage() {
   const total = progress?.total ?? 0;
   const pending = total - done - active - blocked;
 
+  const phase = state?.sprint?.phase;
+  const showKillAll = phase === 'EXECUTE' || phase === 'FIX';
+  const showCleanup = !state || phase === 'COMPLETE';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-zinc-100">{t('dashboard.title')}</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Yeni Sprint
-        </Button>
+        <div className="flex items-center gap-2">
+          {showCleanup && (
+            <Button
+              variant="outline"
+              onClick={handleCleanup}
+              disabled={isCleanupLoading}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t('dashboard.cleanup')}
+            </Button>
+          )}
+          {showKillAll && (
+            <Button
+              variant="destructive"
+              onClick={handleKillAll}
+              disabled={isKillAllLoading}
+            >
+              <XOctagon className="mr-2 h-4 w-4" />
+              {t('dashboard.kill_all')}
+            </Button>
+          )}
+          <Button onClick={() => setModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('dashboard.new_sprint')}
+          </Button>
+        </div>
       </div>
 
       {/* Sprint Status Card */}

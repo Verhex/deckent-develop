@@ -757,8 +757,8 @@ describe('init command (isolated)', () => {
 
     it('prints Turkish next steps when language is tr (interactive mode)', async () => {
       vi.mocked(promptSelect)
-        .mockResolvedValueOnce('max_plan' as any)
-        .mockResolvedValueOnce('tr' as any);
+        .mockResolvedValueOnce('tr' as any)       // Step 1: language first
+        .mockResolvedValueOnce('performance' as any); // Step 2: mode
       vi.mocked(promptText).mockResolvedValue('my-project');
       await runCommand(['init']);
       const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));
@@ -767,8 +767,8 @@ describe('init command (isolated)', () => {
 
     it('prints Turkish zero-config mode when language is tr', async () => {
       vi.mocked(promptSelect)
-        .mockResolvedValueOnce('max_plan' as any)
-        .mockResolvedValueOnce('tr' as any);
+        .mockResolvedValueOnce('tr' as any)       // Step 1: language first
+        .mockResolvedValueOnce('performance' as any); // Step 2: mode
       vi.mocked(promptText).mockResolvedValue('my-project');
       await runCommand(['init']);
       const calls = vi.mocked(print).mock.calls.map(c => String(c[0]));

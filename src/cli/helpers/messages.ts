@@ -208,6 +208,18 @@ const MESSAGES: MessageMap = {
   },
 
   // ─── init command ────────────────────────────────────────────────────
+  'init.select_language': {
+    en: 'Select language:',
+    tr: 'Dil seçin:',
+  },
+  'init.select_plan': {
+    en: 'Select your plan:',
+    tr: 'Planınızı seçin:',
+  },
+  'init.enter_project_name': {
+    en: 'Project name:',
+    tr: 'Proje adı:',
+  },
   'init.auto_detecting': {
     en: 'Auto-detecting system, subscription, and project...',
     tr: 'Sistem, abonelik ve proje otomatik algılanıyor...',

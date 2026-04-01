@@ -49,6 +49,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
     number: 1,
     tasks: [{ id: '001-001', title: 'Test task' }],
   })),
+  cleanup: vi.fn(),
 }));
 
 import { readFileSync, existsSync, readdirSync, writeFileSync, watch } from 'node:fs';
@@ -58,7 +59,7 @@ import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
 import { killWorker } from '../../src/orchestra/tmux.js';
 import { readWorkerLog } from '../../src/agents/worker.js';
 import { readJsonSafe } from '../../src/core/utils.js';
-import { runSprint } from '../../src/orchestra/brain.js';
+import { runSprint, cleanup } from '../../src/orchestra/brain.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
@@ -68,6 +69,7 @@ const mockRunDoctorChecks = vi.mocked(runDoctorChecks);
 const mockKillWorker = vi.mocked(killWorker);
 const mockReadWorkerLog = vi.mocked(readWorkerLog);
 const mockRunSprint = vi.mocked(runSprint);
+const mockCleanup = vi.mocked(cleanup);
 const mockReadJsonSafe = vi.mocked(readJsonSafe);
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -522,6 +524,54 @@ describe('createHttpServer', () => {
       const res = await request(api, '/api/set-directives', 'POST', {});
       expect(res.status).toBe(400);
       expect(JSON.parse(res.body)).toEqual({ error: 'Missing content field' });
+    });
+  });
+
+  describe('POST /api/cleanup', () => {
+    it('returns success with file counts when no active tasks', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && (p.includes('.tasks') || p.includes('.locks'))) return true;
+        return false;
+      });
+      mockReaddirSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('.tasks')) {
+          return ['task-001-001.json', 'task-001-001.hb', 'task-001-001.result'] as unknown as ReturnType<typeof readdirSync>;
+        }
+        if (typeof p === 'string' && p.includes('.locks')) {
+          return ['some.lock'] as unknown as ReturnType<typeof readdirSync>;
+        }
+        return [] as unknown as ReturnType<typeof readdirSync>;
+      });
+      mockReadFileSync.mockReturnValue(JSON.stringify({ id: '001-001', status: 'DONE', sprintId: 'sprint-001' }));
+      mockCleanup.mockImplementation(() => undefined);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/cleanup', 'POST', {});
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(typeof body.removedTasks).toBe('number');
+      expect(typeof body.removedLocks).toBe('number');
+      expect(mockCleanup).toHaveBeenCalled();
+    });
+
+    it('returns 409 when sprint is active (EXECUTING task exists)', async () => {
+      mockExistsSync.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('.tasks')) return true;
+        return false;
+      });
+      mockReaddirSync.mockReturnValue(['task-001-001.json'] as unknown as ReturnType<typeof readdirSync>);
+      mockReadJsonSafe.mockReturnValue({ id: '001-001', status: 'EXECUTING', sprintId: 'sprint-001' });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/cleanup', 'POST', {});
+      expect(res.status).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Cannot cleanup while sprint is active' });
+      expect(mockCleanup).not.toHaveBeenCalled();
     });
   });
 

@@ -46,6 +46,7 @@ import { ensureDeckentImport } from '../../core/utils.js';
 import { deepMerge } from '../../core/config.js';
 import { promptText, promptSelect } from '../helpers/prompt.js';
 import { print, printError } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { detectAvailableProviders } from '../../core/provider.js';
 import {
@@ -417,19 +418,22 @@ export function registerInit(program: Command): void {
           if (recommendationDisplay) print(recommendationDisplay);
         } else {
           // Interactive mode (default or --manual)
-          mode = await promptSelect<PlanMode>('Select your plan:', [
+          // Step 1: Language selection FIRST (bilingual label since language is unknown)
+          language = await promptSelect('Select language / Dil seçin:', [
+            { label: 'English', value: 'en' },
+            { label: 'Türkçe', value: 'tr' },
+          ]);
+
+          // Step 2: Plan selection in selected language
+          mode = await promptSelect<PlanMode>(getMessage('init.select_plan', language), [
             { label: 'Performance — 8 workers, premium model brain', value: 'performance' },
             { label: 'Balanced — 5 workers, standard model brain', value: 'balanced' },
             { label: 'Economic — 3 workers, standard model only', value: 'economic' },
             { label: 'API (pay-as-you-go) — 10 workers, any model', value: 'api' },
           ]);
 
-          language = await promptSelect('Select language:', [
-            { label: 'English', value: 'en' },
-            { label: 'Türkçe', value: 'tr' },
-          ]);
-
-          projectName = await promptText('Project name', dirName);
+          // Step 3: Project name in selected language
+          projectName = await promptText(getMessage('init.enter_project_name', language), dirName);
         }
 
         // 4. Create directories

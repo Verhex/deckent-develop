@@ -2,44 +2,44 @@
 
 # deckent
 
-**Yapay zeka gelistirme ekibiniz, orkestre edilmis.**
+**Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
 
 [![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12196%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-78%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.2.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
-Deckent, dogal dili calisan koda donusturen bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazin; Deckent gorevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuclari teslim eder -- hepsi tek bir sprint icinde.
+Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
 
 <!-- ![demo](docs/assets/demo.gif) -->
 
-## 30 Saniyede Baslangi
+## 30 Saniyede Başlangıç
 
 ```bash
 # Global olarak kur
 npm install -g deckent
 
-# Projende baslat
+# Projende başlat
 cd my-project
 deckent init
 
-# Hedeflerini DIRECTIVES.md'ye yaz, sonra calistir
+# Hedeflerini DIRECTIVES.md'ye yaz, sonra çalıştır
 deckent start
 ```
 
 ---
 
-## Nasil Calisir
+## Nasıl Çalışır
 
-Deckent uc adimli bir dongu izler:
+Deckent üç adımlı bir döngü izler:
 
-1. **Tanimla** -- Ne istedigini `DIRECTIVES.md` dosyasina yaz
-2. **Planla** -- Brain hedeflerini okur ve kapsamli, oncelikli gorevler olusturur
-3. **Calistir** -- Paralel AI worker'lar kodu yazar, test eder ve sonuclari raporlar
+1. **Tanımla** -- Ne istediğini `DIRECTIVES.md` dosyasına yaz
+2. **Planla** -- Brain hedeflerini okur ve kapsamlı, öncelikli görevler oluşturur
+3. **Çalıştır** -- Paralel AI worker'lar kodu yazar, test eder ve sonuçları raporlar
 
 ```
                     DIRECTIVES.md
                          |
                     [ Brain: Plan ]
                     /    |    \
-              Worker1  Worker2  Worker3   (paralel, kapsamli)
+              Worker1  Worker2  Worker3   (paralel, kapsamlı)
                     \    |    /
                     [ Brain: Evaluate ]
                          |
@@ -58,91 +58,91 @@ Deckent uc adimli bir dongu izler:
 |   +----------+     +----------+     +----------+                 |
 |   |  Brain   |---->| Worker 1 |     | Auditor  |                 |
 |   | (planlar,|---->| Worker 2 |     | (tarar,  |                 |
-|   | degerl.) |---->| Worker N |     |  uyarir) |                 |
+|   | değerl.) |---->| Worker N |     |  uyarır) |                 |
 |   +----------+     +----------+     +----------+                 |
 |        |                                   |                     |
 |   .brain/            .tasks/          .dashboard                 |
-|   (bellek,           (task JSON,      (canli durum)              |
-|    borc,              sonuclar,                                  |
+|   (bellek,           (task JSON,      (canlı durum)              |
+|    borç,              sonuçlar,                                  |
 |    desenler)          heartbeat'ler)                             |
 +------------------------------------------------------------------+
 ```
 
-- **Brain** -- Gorevleri planlar, model atar, sonuclari degerlendirir, desenlerden ogrenir
-- **Workers** -- Gorevleri paralel yurutur (tmux veya subprocess ile), her biri plan-kod-test-rapor dongusunu tamamlar
-- **Auditor** -- Heartbeat'leri izler, sinir ihlallerini tespit eder, kaliteyi denetler
+- **Brain** -- Görevleri planlar, model atar, sonuçları değerlendirir, desenlerden öğrenir
+- **Workers** -- Görevleri paralel yürütür (tmux veya subprocess ile), her biri plan-kod-test-rapor döngüsünü tamamlar
+- **Auditor** -- Heartbeat'leri izler, sınır ihlallerini tespit eder, kaliteyi denetler
 
 ---
 
-## Temel Ozellikler
+## Temel Özellikler
 
-- **Sprint Yasam Dongusu** -- Yapilandirilmis PLAN, SPAWN, EXECUTE, EVALUATE, RETRO, DECAY fazlari her sprint'in tamamlanmasini saglar
-- **Coklu Worker Paralel Calistirma** -- Ayni anda 10'a kadar AI worker, her biri izole bir kapsamda calisir
-- **Bellek ve Ogrenme** -- Brain ogrenimleri `.brain/MEMORY.md`'de, desenleri `PATTERNS.md`'de saklar ve her sprint ile gelistirir
-- **Auditor Kalite Kapisi** -- Surekli izleme: stale heartbeat tespiti, sinir ihlali taramasi, Kahn algoritmasi ile kilitlenme tespiti
-- **GO / NO-GO Degerlendirme** -- Her gorev sonucu belirlenmis kriterlere gore degerlendirilir. NO-GO gorevler kaydedilir ve istege bagli olarak yeniden denenir
-- **Coklu Provider Destegi** -- Claude (varsayilan), OpenAI Codex ve Google Gemini ile calisir. Rol bazli (brain, worker) veya gorev bazli yapilandirma
-- **Provider Yedekleme Zinciri** -- Birincil provider basarisiz mi? Model esdegerligi eslesmesiyle otomatik yedek provider'a gecis
-- **Kullanim Duyarli Planlama** -- Claude plan kullaniminiza gore (5 saatlik ve haftalik esikler) sprint boyutunu otomatik ayarlar
-- **Stack Algilayan Baslangic** -- Proje stack'inizi (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin, TypeScript) algilar ve build/test komutlarini otomatik yapilandirir
-- **TempAgent ve TempSkill** -- Kod tabaninizin konvansiyonlarina gore projeye ozel agent ve skill'ler otomatik uretir
-- **Yerlesik Dokumantasyon** -- `.deckent/docs/` ile hizli baslangic, directive rehberi ve yapilandirma referansi gelir
-- **Yerel Windows Destegi** -- `shell:true` ile tam subprocess backend, periyodik heartbeat guncellemeleri ve UTF-8 destegi
-- **Plugin Sistemi** -- Ozel hook'lar, komutlar ve desenlerle Deckent'i genisletin
-- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu icin 17 MCP tool + 9 resource
-- **Web Dashboard** -- Gercek zamanli SSE guncellemeleriyle React + Vite + Tailwind dashboard
-- **Uluslararasilastirma** -- Ingilizce ve Turkce dil destegi yerlesik
-- **Review Arsiv Yedegi** -- Sprint review, cleanup sonrasinda bile arsivden okuyarak calisir
-- **Beta Guncelleme Is Akisi** -- Yerel beta kurulumu icin `deckent upgrade --local <path.tgz>`
+- **Sprint Yaşam Döngüsü** -- Yapılandırılmış PLAN, SPAWN, EXECUTE, EVALUATE, RETRO, DECAY fazları her sprint'in tamamlanmasını sağlar
+- **Çoklu Worker Paralel Çalıştırma** -- Aynı anda 10'a kadar AI worker, her biri izole bir kapsamda çalışır
+- **Bellek ve Öğrenme** -- Brain öğrenimleri `.brain/MEMORY.md`'de, desenleri `PATTERNS.md`'de saklar ve her sprint ile geliştirir
+- **Auditor Kalite Kapısı** -- Sürekli izleme: stale heartbeat tespiti, sınır ihlali taraması, Kahn algoritması ile kilitlenme tespiti
+- **GO / NO-GO Değerlendirme** -- Her görev sonucu belirlenmiş kriterlere göre değerlendirilir. NO-GO görevler kaydedilir ve isteğe bağlı olarak yeniden denenir
+- **Çoklu Provider Desteği** -- Claude (varsayılan), OpenAI Codex ve Google Gemini ile çalışır. Rol bazlı (brain, worker) veya görev bazlı yapılandırma
+- **Provider Yedekleme Zinciri** -- Birincil provider başarısız mı? Model eşdeğerliği eşleşmesiyle otomatik yedek provider'a geçiş
+- **Kullanım Duyarlı Planlama** -- Claude plan kullanımınıza göre (5 saatlik ve haftalık eşikler) sprint boyutunu otomatik ayarlar
+- **Stack Algılayan Başlangıç** -- Proje stack'inizi (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin, TypeScript) algılar ve build/test komutlarını otomatik yapılandırır
+- **TempAgent ve TempSkill** -- Kod tabanınızın konvansiyonlarına göre projeye özel agent ve skill'ler otomatik üretir
+- **Yerleşik Dokümantasyon** -- `.deckent/docs/` ile hızlı başlangıç, directive rehberi ve yapılandırma referansı gelir
+- **Yerel Windows Desteği** -- `shell:true` ile tam subprocess backend, periyodik heartbeat güncellemeleri ve UTF-8 desteği
+- **Plugin Sistemi** -- Özel hook'lar, komutlar ve desenlerle Deckent'i genişletin
+- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 17 MCP tool + 9 resource
+- **Web Dashboard** -- Gerçek zamanlı SSE güncellemeleriyle React + Vite + Tailwind dashboard
+- **Uluslararasılaştırma** -- İngilizce ve Türkçe dil desteği yerleşik
+- **Review Arşiv Yedeği** -- Sprint review, cleanup sonrasında bile arşivden okuyarak çalışır
+- **Beta Güncelleme İş Akışı** -- Yerel beta kurulumu için `deckent upgrade --local <path.tgz>`
 
 ---
 
-## Karsilastirma
+## Karşılaştırma
 
-| Ozellik | deckent | Cursor | Devin | Aider | Claude Code (tek basina) |
+| Özellik | deckent | Cursor | Devin | Aider | Claude Code (tek başına) |
 |---------|---------|--------|-------|-------|--------------------------|
-| Coklu agent paralel calistirma | Evet (10 worker'a kadar) | Hayir | Evet | Hayir | Hayir |
-| Sprint yasam dongusu yonetimi | Evet | Hayir | Kismi | Hayir | Hayir |
-| Hedeflerden otomatik gorev planlama | Evet (AI + structured) | Hayir | Evet | Hayir | Hayir |
-| Sinir denetimli kalite auditor | Evet | Hayir | Hayir | Hayir | Hayir |
-| Sprint'ler arasi bellek ve ogrenme | Evet | Hayir | Kismi | Hayir | Hayir |
-| Gorev bazli GO/NO-GO degerlendirme | Evet | Hayir | Hayir | Hayir | Hayir |
-| Kullanim duyarli otomatik kisitlama | Evet | Yok | Yok | Yok | Hayir |
-| Acik kaynak | Evet (MIT) | Hayir | Hayir | Evet | Kismi |
+| Çoklu agent paralel çalıştırma | Evet (10 worker'a kadar) | Hayır | Evet | Hayır | Hayır |
+| Sprint yaşam döngüsü yönetimi | Evet | Hayır | Kısmi | Hayır | Hayır |
+| Hedeflerden otomatik görev planlama | Evet (AI + structured) | Hayır | Evet | Hayır | Hayır |
+| Sınır denetimli kalite auditor | Evet | Hayır | Hayır | Hayır | Hayır |
+| Sprint'ler arası bellek ve öğrenme | Evet | Hayır | Kısmi | Hayır | Hayır |
+| Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır |
+| Kullanım duyarlı otomatik kısıtlama | Evet | Yok | Yok | Yok | Hayır |
+| Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet | Kısmi |
 | MCP entegrasyonu | Evet (17 tool) | Yok | Yok | Yok | Yok |
-| Web dashboard | Evet | Yerlesik | Yerlesik | Hayir | Hayir |
-| Coklu provider destegi | Evet (Claude, Codex, Gemini) | Hayir | Hayir | Evet | Hayir |
-| Cevrimdisi calisma (yerel modeller) | Planli | Evet | Hayir | Evet | Hayir |
+| Web dashboard | Evet | Yerleşik | Yerleşik | Hayır | Hayır |
+| Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır |
+| Çevrimdışı çalışma (yerel modeller) | Planlı | Evet | Hayır | Evet | Hayır |
 
 ---
 
-## Platform Destegi
+## Platform Desteği
 
 | Platform | Durum | Notlar |
 |----------|-------|--------|
-| Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch) | **TAM** | Birincil gelistirme platformu |
-| macOS (12+) | **TAM** | Tum ozellikler desteklenir |
-| Windows (WSL2 ile) | **TAM** | Onerilen Windows kurulumu -- Ubuntu/Debian WSL2 kullanin |
-| Yerel Windows (cmd / PowerShell) | **TAM** | `shell:true` ile subprocess backend, periyodik heartbeat, UTF-8 destegi |
+| Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch) | **TAM** | Birincil geliştirme platformu |
+| macOS (12+) | **TAM** | Tüm özellikler desteklenir |
+| Windows (WSL2 ile) | **TAM** | Önerilen Windows kurulumu -- Ubuntu/Debian WSL2 kullanın |
+| Yerel Windows (cmd / PowerShell) | **TAM** | `shell:true` ile subprocess backend, periyodik heartbeat, UTF-8 desteği |
 
-> **Windows kullanicilari:** Yerel Windows, subprocess backend ile tam olarak desteklenir. WSL2, tmux tabanli is akislari icin bir secenek olmaya devam eder. `deckent doctor` platform uyumlulugunu dogrular.
+> **Windows kullanıcıları:** Yerel Windows, subprocess backend ile tam olarak desteklenir. WSL2, tmux tabanlı iş akışları için bir seçenek olmaya devam eder. `deckent doctor` platform uyumluluğunu doğrular.
 
 ---
 
 ## Gereksinimler
 
-| Gereksinim | Surum | Kontrol |
+| Gereksinim | Sürüm | Kontrol |
 |------------|-------|---------|
 | Node.js | >= 18 | `node --version` |
 | git | herhangi | `git --version` |
 | Claude Code CLI | herhangi | `claude --version` |
-| tmux | herhangi (istege bagli) | `tmux -V` |
-| OpenAI Codex CLI | herhangi (istege bagli) | `codex --version` |
-| Google Gemini API | herhangi (istege bagli) | `GOOGLE_API_KEY` env var |
+| tmux | herhangi (isteğe bağlı) | `tmux -V` |
+| OpenAI Codex CLI | herhangi (isteğe bağlı) | `codex --version` |
+| Google Gemini API | herhangi (isteğe bağlı) | `GOOGLE_API_KEY` env var |
 
-**Claude Aboneligi:** Pro, Max 5x, Max 20x veya API key (kullandikca ode). Diger provider'lar (Codex, Gemini) kendi API key'leriyle calisir.
+**Claude Aboneliği:** Pro, Max 5x, Max 20x veya API key (kullandıkça öde). Diğer provider'lar (Codex, Gemini) kendi API key'leriyle çalışır.
 
-**Desteklenen Isletim Sistemleri:** macOS, Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch), Windows (WSL2 ile)
+**Desteklenen İşletim Sistemleri:** macOS, Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch), Windows (WSL2 ile)
 
 ---
 
@@ -152,7 +152,7 @@ Deckent uc adimli bir dongu izler:
 npm install -g deckent
 ```
 
-Dogrulama:
+Doğrulama:
 
 ```bash
 deckent --version
@@ -161,16 +161,16 @@ deckent doctor
 
 ---
 
-## CLI Kullanimi
+## CLI Kullanımı
 
-### Proje Baslat
+### Proje Başlat
 
 ```bash
 cd my-project
 deckent init
 ```
 
-Cikti:
+Çıktı:
 
 ```
   Welcome to Deckent!
@@ -187,16 +187,16 @@ Cikti:
   Next: Edit DIRECTIVES.md with your first goals, then run `deckent start`
 ```
 
-### Sprint Baslat
+### Sprint Başlat
 
 ```bash
 # DIRECTIVES.md'ye hedeflerini yaz, sonra:
 deckent start
 
-# Calistirmadan plani onizle:
+# Çalıştırmadan planı önizle:
 deckent start --dry-run
 
-# Tum worker arac izinlerini otomatik onayla:
+# Tüm worker araç izinlerini otomatik onayla:
 deckent start --auto-approve
 ```
 
@@ -208,11 +208,11 @@ deckent status
 # Her 2 saniyede otomatik yenile:
 deckent status --watch
 
-# Makine tarafindan okunabilir cikti:
+# Makine tarafından okunabilir çıktı:
 deckent status --json
 ```
 
-Ornek cikti:
+Örnek çıktı:
 
 ```
 Sprint sprint-001 -- EXECUTE phase
@@ -224,19 +224,19 @@ Sprint sprint-001 -- EXECUTE phase
 Progress: 1/2 done  |  0 failed  |  1 running
 ```
 
-### Calistirmadan Planla
+### Çalıştırmadan Planla
 
 ```bash
 deckent plan
 ```
 
-### Saglik Kontrolu
+### Sağlık Kontrolü
 
 ```bash
 deckent doctor
 ```
 
-Cikti:
+Çıktı:
 
 ```
   node_version   v20.11.0 (>=18 required)     [pass]
@@ -246,153 +246,153 @@ Cikti:
   workspace      .deckent/ found               [pass]
 ```
 
-### Tum Komutlar
+### Tüm Komutlar
 
-| Komut | Aciklama |
+| Komut | Açıklama |
 |-------|----------|
-| `deckent init` | Etkilesimli kurulum sihirbazi |
-| `deckent onboard` | Tam uyarlama (global + proje yapilandirmasi) |
-| `deckent start` | Tam sprint yasam dongusunu calistir |
+| `deckent init` | Etkileşimli kurulum sihirbazı |
+| `deckent onboard` | Tam uyarlama (global + proje yapılandırması) |
+| `deckent start` | Tam sprint yaşam döngüsünü çalıştır |
 | `deckent plan` | Sonraki sprint'i planla (sadece planlama modu) |
-| `deckent status` | Canli dashboard goster |
-| `deckent attach` | tmux oturumuna baglan |
-| `deckent spawn <id>` | Elle bir worker baslat |
+| `deckent status` | Canlı dashboard göster |
+| `deckent attach` | tmux oturumuna bağlan |
+| `deckent spawn <id>` | Elle bir worker başlat |
 | `deckent kill <id>` | Belirli bir worker'i durdur |
-| `deckent retro` | Sprint retrospektifini calistir |
-| `deckent cleanup` | Sprint dosyalarini arsivle ve worker'lari durdur |
-| `deckent doctor` | Sistem sagligini kontrol et |
-| `deckent config` | Yapilandirmayi goster/duzenle |
-| `deckent config set <key> <value>` | Bir yapilandirma degerini ayarla |
-| `deckent usage` | Mevcut plan kullanimini goster |
-| `deckent history` | Sprint gecmisini ve metrikleri goster |
+| `deckent retro` | Sprint retrospektifini çalıştır |
+| `deckent cleanup` | Sprint dosyalarını arşivle ve worker'ları durdur |
+| `deckent doctor` | Sistem sağlığını kontrol et |
+| `deckent config` | Yapılandırmayı göster/düzenle |
+| `deckent config set <key> <value>` | Bir yapılandırma değerini ayarla |
+| `deckent usage` | Mevcut plan kullanımını göster |
+| `deckent history` | Sprint geçmişini ve metrikleri göster |
 | `deckent plugin install <name>` | Bir plugin kur |
 | `deckent plugin list` | Kurulu plugin'leri listele |
 | `deckent analyze` | Proje stack'ini ve boyutunu analiz et |
-| `deckent archive-debt` | Cozulmus teknik borcu arsivle |
+| `deckent archive-debt` | Çözülmüş teknik borcu arşivle |
 | `deckent dashboard` | Terminal TUI dashboard |
-| `deckent serve` | HTTP API sunucusunu baslat |
+| `deckent serve` | HTTP API sunucusunu başlat |
 | `deckent web` | Web dashboard + API sunucusu (localhost:3100) |
-| `deckent upgrade` | Deckent'i guncelle (beta icin `--local <path.tgz>`) |
-| `deckent sync` | Adapter dosyalarini DECKENT.md ile senkronize et |
-| `deckent watch` | Canli tmux bolunmus gorunum |
-| `deckent test` | Proje testlerini calistir |
+| `deckent upgrade` | Deckent'i güncelle (beta için `--local <path.tgz>`) |
+| `deckent sync` | Adapter dosyalarını DECKENT.md ile senkronize et |
+| `deckent watch` | Canlı tmux bölünmüş görünüm |
+| `deckent test` | Proje testlerini çalıştır |
 | `deckent set-directives` | Sprint directive'lerini ayarla |
-| `deckent finalize` | Mevcut sprint'i sonlandir |
-| `deckent run <cmd>` | Rastgele komut calistir |
-| `deckent explain <topic>` | Bir kavram veya komutu acikla |
-| `deckent quick-start` | Yeni projeler icin hizli baslangic sihirbazi |
-| `deckent skill` | Kurulu skill'leri listele veya yonet |
+| `deckent finalize` | Mevcut sprint'i sonlandır |
+| `deckent run <cmd>` | Rastgele komut çalıştır |
+| `deckent explain <topic>` | Bir kavram veya komutu açıkla |
+| `deckent quick-start` | Yeni projeler için hızlı başlangıç sihirbazı |
+| `deckent skill` | Kurulu skill'leri listele veya yönet |
 | `deckent skill-marketplace` | Skill marketplace'i gezin ve kur |
-| `deckent agent` | Agent havuzunu yonet (listele, incele, sifirla) |
-| `deckent review` | Son sprint sonuclarini incele |
-| `deckent config migrate` | Yapilandirmayi en son sema surumune tasi |
+| `deckent agent` | Agent havuzunu yönet (listele, incele, sıfırla) |
+| `deckent review` | Son sprint sonuçlarını incele |
+| `deckent config migrate` | Yapılandırmayı en son şema sürümüne taşı |
 
 ---
 
 ## MCP Entegrasyonu
 
-Deckent, Model Context Protocol uzerinden Claude Code ile entegre olur. Kayit icin:
+Deckent, Model Context Protocol üzerinden Claude Code ile entegre olur. Kayıt için:
 
 ```bash
 claude mcp add deckent -- npx deckent mcp
 ```
 
-Veya `deckent init` otomatik olarak kayit yapsin.
+Veya `deckent init` otomatik olarak kayıt yapsın.
 
 ### MCP Tool'lar (17)
 
-| Tool | Aciklama |
+| Tool | Açıklama |
 |------|----------|
-| `deckent_init` | Proje yapisini baslat |
+| `deckent_init` | Proje yapısını başlat |
 | `deckent_set_directives` | Sprint hedeflerini DIRECTIVES.md'ye yaz |
-| `deckent_plan` | Sprint planini onizle |
-| `deckent_start` | Arka planda sprint baslat |
+| `deckent_plan` | Sprint planını önizle |
+| `deckent_start` | Arka planda sprint başlat |
 | `deckent_status` | Mevcut sprint durumunu getir |
-| `deckent_doctor` | Saglik kontrollerini calistir |
+| `deckent_doctor` | Sağlık kontrollerini çalıştır |
 | `deckent_retro` | Son retrospektifi oku |
-| `deckent_history` | Sprint gecmisini goruntule |
+| `deckent_history` | Sprint geçmişini görüntüle |
 | `deckent_analyze_project` | Proje stack'ini analiz et |
-| `deckent_sync` | Adapter dosyalarini senkronize et |
-| `deckent_config` | Yapilandirmayi goster veya guncelle |
-| `deckent_usage` | Mevcut plan kullanimini goster |
-| `deckent_review` | Son sprint sonuclarini incele |
-| `deckent_run` | Proje baglaminda rastgele komut calistir |
+| `deckent_sync` | Adapter dosyalarını senkronize et |
+| `deckent_config` | Yapılandırmayı göster veya güncelle |
+| `deckent_usage` | Mevcut plan kullanımını göster |
+| `deckent_review` | Son sprint sonuçlarını incele |
+| `deckent_run` | Proje bağlamında rastgele komut çalıştır |
 | `deckent_kill` | Belirli bir worker'i durdur |
-| `deckent_cleanup` | Sprint dosyalarini arsivle ve worker'lari temizle |
-| `deckent_help` | Calisma zamani yetenekleri, durum bilgisi ve is akisi rehberi |
+| `deckent_cleanup` | Sprint dosyalarını arşivle ve worker'ları temizle |
+| `deckent_help` | Çalışma zamanı yetenekleri, durum bilgisi ve iş akışı rehberi |
 
 ### MCP Resource'lar (9)
 
-| Resource URI | Icerik |
+| Resource URI | İçerik |
 |--------------|--------|
-| `deckent://dashboard` | Canli sprint dashboard |
+| `deckent://dashboard` | Canlı sprint dashboard |
 | `deckent://directives` | Mevcut DIRECTIVES.md |
-| `deckent://memory` | Gecmis sprint'lerden ogrenilenler |
-| `deckent://debt` | Teknik borc kalemleri |
-| `deckent://config` | Proje yapilandirmasi |
+| `deckent://memory` | Geçmiş sprint'lerden öğrenilenler |
+| `deckent://debt` | Teknik borç kalemleri |
+| `deckent://config` | Proje yapılandırması |
 | `deckent://retro` | Son sprint retrospektifi |
-| `deckent://usage` | Mevcut plan kullanim metrikleri |
-| `deckent://tasks` | Aktif gorev listesi ve durumlari |
+| `deckent://usage` | Mevcut plan kullanım metrikleri |
+| `deckent://tasks` | Aktif görev listesi ve durumları |
 | `deckent://agents` | Agent havuzu ve performans istatistikleri |
 
 ---
 
-## Yapilandirma
+## Yapılandırma
 
-Yapilandirma `.deckent/config.json` (proje) ve `~/.deckent/config.json` (global) dosyalarinda bulunur. Proje yapilandirmasi global'i gecersiz kilar.
+Yapılandırma `.deckent/config.json` (proje) ve `~/.deckent/config.json` (global) dosyalarında bulunur. Proje yapılandırması global'i geçersiz kılar.
 
-### Temel Secenekler
+### Temel Seçenekler
 
-| Secenek | Tip | Varsayilan | Aciklama |
+| Seçenek | Tip | Varsayılan | Açıklama |
 |---------|-----|-----------|----------|
-| `mode` | string | `"performance"` | Plan katmani: `performance`, `balanced`, `economic`, `api` |
-| `language` | string | `"en"` | Cikti dili: `en`, `tr` |
-| `projectName` | string | `"deckent-project"` | Dashboard ve loglar icin proje adi |
+| `mode` | string | `"performance"` | Plan katmanı: `performance`, `balanced`, `economic`, `api` |
+| `language` | string | `"en"` | Çıktı dili: `en`, `tr` |
+| `projectName` | string | `"deckent-project"` | Dashboard ve loglar için proje adı |
 | `brain_planning` | string | `"auto"` | Planlama modu: `ai`, `structured`, `auto` |
-| `brain_provider` | string | `"claude"` | Brain icin provider: `claude`, `codex`, `gemini` |
-| `worker_provider` | string | `"claude"` | Worker'lar icin provider: `claude`, `codex`, `gemini` |
-| `fallback_provider` | string | -- | Basarisizlikta yedek provider |
-| `modes.<mode>.max_workers` | number | degisken | Maksimum paralel worker sayisi |
-| `modes.<mode>.brain_model` | string | degisken | Brain'in planlama icin kullandigi model |
-| `modes.<mode>.default_model` | string | degisken | Worker'lar icin varsayilan model |
-| `modes.<mode>.haiku_allowed` | boolean | degisken | Brain'in haiku atayip atayamayacagi |
+| `brain_provider` | string | `"claude"` | Brain için provider: `claude`, `codex`, `gemini` |
+| `worker_provider` | string | `"claude"` | Worker'lar için provider: `claude`, `codex`, `gemini` |
+| `fallback_provider` | string | -- | Başarısızlıkta yedek provider |
+| `modes.<mode>.max_workers` | number | değişken | Maksimum paralel worker sayısı |
+| `modes.<mode>.brain_model` | string | değişken | Brain'in planlama için kullandığı model |
+| `modes.<mode>.default_model` | string | değişken | Worker'lar için varsayılan model |
+| `modes.<mode>.haiku_allowed` | boolean | değişken | Brain'in haiku atayıp atayamayacağı |
 
-### Plan Katmanlari
+### Plan Katmanları
 
-| Katman | Maks Worker | Brain Model | Varsayilan Model |
+| Katman | Maks Worker | Brain Model | Varsayılan Model |
 |--------|-------------|-------------|------------------|
 | `performance` | 8 | opus | opus |
 | `balanced` | 5 | sonnet | opus |
 | `economic` | 3 | sonnet | sonnet |
 | `api` | 10 | opus | sonnet |
 
-**Eski takma adlar:** `max_plan`, `max5x_plan`, `pro_plan` hala kabul edilir ve yeni katman adlarina otomatik tasinir.
+**Eski takma adlar:** `max_plan`, `max5x_plan`, `pro_plan` hala kabul edilir ve yeni katman adlarına otomatik taşınır.
 
-### Coklu Provider Destegi
+### Çoklu Provider Desteği
 
-Deckent uc AI provider ile calisir. Rol bazli veya gorev bazli yapilandirilabilir:
+Deckent üç AI provider ile çalışır. Rol bazlı veya görev bazlı yapılandırılabilir:
 
-| Provider | Modeller | Ortam Degiskeni |
+| Provider | Modeller | Ortam Değişkeni |
 |----------|----------|-----------------|
-| Claude (varsayilan) | opus, sonnet, haiku | Oturum dogrulamasi veya `ANTHROPIC_API_KEY` |
+| Claude (varsayılan) | opus, sonnet, haiku | Oturum doğrulaması veya `ANTHROPIC_API_KEY` |
 | Codex (OpenAI) | gpt-5, gpt-4.1, gpt-5-mini | `OPENAI_API_KEY` |
 | Gemini (Google) | gemini-2.5-pro, gemini-2.5-flash | `GOOGLE_API_KEY` |
 
-Provider'lar arasi model esdegerligi: opus = gpt-5 = gemini-2.5-pro (premium), sonnet = gpt-4.1 = gemini-2.5-flash (standard), haiku = gpt-5-mini (economy).
+Provider'lar arası model eşdeğerliği: opus = gpt-5 = gemini-2.5-pro (premium), sonnet = gpt-4.1 = gemini-2.5-flash (standard), haiku = gpt-5-mini (economy).
 
-Tam rehber icin [docs/reference/multi-provider.md](docs/reference/multi-provider.md) dosyasina bakin.
+Tam rehber için [docs/reference/multi-provider.md](docs/reference/multi-provider.md) dosyasına bakın.
 
-Tam yapilandirma referansi icin [docs/reference/config-reference.md](docs/reference/config-reference.md) dosyasina bakin.
+Tam yapılandırma referansı için [docs/reference/config-reference.md](docs/reference/config-reference.md) dosyasına bakın.
 
 ---
 
 ## Web Dashboard
 
 ```bash
-deckent web     # localhost:3100 adresinde acilir
+deckent web     # localhost:3100 adresinde açılır
 ```
 
-React + Vite + Tailwind -- 4 sayfa (Dashboard, Ayarlar, Gecmis, Bellek), SSE gercek zamanli guncellemeler, koyu/acik tema.
+React + Vite + Tailwind -- 4 sayfa (Dashboard, Ayarlar, Geçmiş, Bellek), SSE gerçek zamanlı güncellemeler, koyu/açık tema.
 
 ---
 
@@ -402,55 +402,55 @@ React + Vite + Tailwind -- 4 sayfa (Dashboard, Ayarlar, Gecmis, Bellek), SSE ger
 deckent serve   # Sadece API, localhost:3100
 ```
 
-16 endpoint + SSE akisi. Tam referans icin [docs/reference/api.md](docs/reference/api.md) dosyasina bakin.
+16 endpoint + SSE akışı. Tam referans için [docs/reference/api.md](docs/reference/api.md) dosyasına bakın.
 
 ---
 
-## Calisma Alani Yapisi
+## Çalışma Alanı Yapısı
 
-`deckent init` sonrasinda:
+`deckent init` sonrasında:
 
 ```
 my-project/
-  DECKENT.md             # Tek dogru kaynak (agent yapilandirmasi)
-  DIRECTIVES.md          # Hedefleriniz -- her sprint oncesi duzenleyin
-  CLAUDE.md              # Claude Code adaptoru
-  AGENTS.md              # Genel agent adaptoru
+  DECKENT.md             # Tek doğru kaynak (agent yapılandırması)
+  DIRECTIVES.md          # Hedefleriniz -- her sprint öncesi düzenleyin
+  CLAUDE.md              # Claude Code adaptörü
+  AGENTS.md              # Genel agent adaptörü
   .deckent/
-    config.json          # Calisma zamani yapilandirmasi
-    workspace/           # Kimlik, araclar, baslangic sirasi
-    docs/                # Yerlesik rehberler (hizli baslangic, directive, yapilandirma)
-    agents/              # Agent havuzu (yerlesik + gecici agent'lar)
-    skills/              # Skill kayit defteri (yerlesik + gecici skill'ler)
+    config.json          # Çalışma zamanı yapılandırması
+    workspace/           # Kimlik, araçlar, başlangıç sırası
+    docs/                # Yerleşik rehberler (hızlı başlangıç, directive, yapılandırma)
+    agents/              # Agent havuzu (yerleşik + geçici agent'lar)
+    skills/              # Skill kayıt defteri (yerleşik + geçici skill'ler)
     plugins/             # Kurulu plugin'ler
-    i18n/                # Dil dosyalari
+    i18n/                # Dil dosyaları
   .brain/
-    MEMORY.md            # Ogrenilenler (otomatik guncellenir)
-    DEBT.md              # Teknik borc kaydi
+    MEMORY.md            # Öğrenilenler (otomatik güncellenir)
+    DEBT.md              # Teknik borç kaydı
     PATTERNS.md          # Tespit edilen desenler
     RETRO.md             # Son sprint retrospektifi
     DECISIONS.md         # Mimari kararlar
-    sprints/             # Sprint bazli loglar
-  .tasks/                # Task JSON dosyalari (Brain tarafindan yonetilir)
-  .locks/                # Dosya kilitleri (worker'lar tarafindan yonetilir)
+    sprints/             # Sprint bazlı loglar
+  .tasks/                # Task JSON dosyaları (Brain tarafından yönetilir)
+  .locks/                # Dosya kilitleri (worker'lar tarafından yönetilir)
 ```
 
 ---
 
-## Katkida Bulunma
+## Katkıda Bulunma
 
-Gelistirme ortami kurulumu, test rehberi, kod standartlari ve PR sureci icin [CONTRIBUTING.md](CONTRIBUTING.md) dosyasina bakin.
+Geliştirme ortamı kurulumu, test rehberi, kod standartları ve PR süreci için [CONTRIBUTING.md](CONTRIBUTING.md) dosyasına bakın.
 
 ---
 
-## Dokumantasyon
+## Dokümantasyon
 
-- [Hizli Baslangic Rehberi](docs/guide/quickstart.md)
-- [API Referansi](docs/reference/api.md)
-- [Yapilandirma Referansi](docs/reference/config-reference.md)
-- [Coklu Provider Rehberi](docs/reference/multi-provider.md)
+- [Hızlı Başlangıç Rehberi](docs/guide/quickstart.md)
+- [API Referansı](docs/reference/api.md)
+- [Yapılandırma Referansı](docs/reference/config-reference.md)
+- [Çoklu Provider Rehberi](docs/reference/multi-provider.md)
 - [Mimari](docs/architecture/architecture.md)
-- [Sprint Yasam Dongusu](docs/architecture/sprint-lifecycle.md)
+- [Sprint Yaşam Döngüsü](docs/architecture/sprint-lifecycle.md)
 - [MCP Rehberi](docs/reference/mcp-guide.md)
 - [Plugin Rehberi](docs/development/plugin-guide.md)
 - [Sorun Giderme](docs/development/troubleshooting.md)

@@ -4,9 +4,11 @@ import { join, extname, resolve } from 'node:path';
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
-  DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR,
+  DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
   PROJECT_CONFIG_PATH, MEMORY_FILE, DEBT_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
+import { SprintStatus, SprintPhase, TaskStatus } from '../core/types.js';
+import type { Task, Sprint } from '../core/types.js';
 import { readJsonSafe } from '../core/utils.js';
 import { deepMerge } from '../core/config.js';
 import { watchDashboard } from './watcher.js';
@@ -16,7 +18,7 @@ import { killWorker } from '../orchestra/tmux.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import {
-  runSprint, readContext, checkUsage, adjustSprintSize, planSprint,
+  runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup,
 } from '../orchestra/brain.js';
 
 const MIME_TYPES: Record<string, string> = {
@@ -541,6 +543,60 @@ async function handleRequest(
         sendJson(res, { success: true, taskCount });
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Write failed');
+      }
+      return;
+    }
+
+    if (url === '/api/cleanup') {
+      const tasksDir = join(projectRoot, TASKS_DIR);
+      const locksDir = join(projectRoot, LOCKS_DIR);
+
+      // Collect task JSON files to check for active sprint
+      const tasks: Task[] = [];
+      if (existsSync(tasksDir)) {
+        const jsonFiles = (readdirSync(tasksDir) as string[]).filter(
+          (f) => f.startsWith('task-') && f.endsWith('.json'),
+        );
+        for (const f of jsonFiles) {
+          try {
+            const task = readJsonSafe(join(tasksDir, f)) as Task | null;
+            if (!task) continue;
+            tasks.push(task);
+          } catch { /* skip malformed */ }
+        }
+      }
+
+      // Block cleanup if sprint is actively executing
+      const activeTasks = tasks.filter(
+        (t) => t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED,
+      );
+      if (activeTasks.length > 0) {
+        sendJson(res, { error: 'Cannot cleanup while sprint is active' }, 409);
+        return;
+      }
+
+      // Count files before cleanup for the result payload
+      const taskFileCount = existsSync(tasksDir)
+        ? (readdirSync(tasksDir) as string[]).filter((f) => /\.(json|plan|hb|result|paused|log)$/.test(f)).length
+        : 0;
+      const lockFileCount = existsSync(locksDir)
+        ? (readdirSync(locksDir) as string[]).length
+        : 0;
+
+      const sprint: Sprint = {
+        id: `cleanup-${Date.now()}`,
+        number: 0,
+        status: SprintStatus.COMPLETE,
+        phase: SprintPhase.COMPLETE,
+        tasks,
+        workers: [],
+      };
+
+      try {
+        cleanup(projectRoot, sprint);
+        sendJson(res, { success: true, removedTasks: taskFileCount, removedLocks: lockFileCount });
+      } catch (err: unknown) {
+        sendError(res, 500, err instanceof Error ? err.message : 'Cleanup failed');
       }
       return;
     }

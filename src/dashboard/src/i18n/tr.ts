@@ -37,6 +37,11 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.running': 'çalışıyor',
   'dashboard.queued': 'kuyrukta',
   'dashboard.failed': 'başarısız',
+  'dashboard.new_sprint': 'Yeni Sprint',
+  'dashboard.cleanup': 'Temizle',
+  'dashboard.kill_all': 'Tümünü Durdur',
+  'dashboard.confirm_cleanup': 'Sprint dosyalarını arşivle?',
+  'dashboard.confirm_kill': "Tüm worker'ları durdur?",
 
   // Settings Page
   'settings.title': 'Ayarlar & Sağlık',

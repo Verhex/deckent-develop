@@ -35,6 +35,11 @@ export const en = {
   'dashboard.running': 'running',
   'dashboard.queued': 'queued',
   'dashboard.failed': 'failed',
+  'dashboard.new_sprint': 'New Sprint',
+  'dashboard.cleanup': 'Cleanup',
+  'dashboard.kill_all': 'Kill All',
+  'dashboard.confirm_cleanup': 'Archive sprint files?',
+  'dashboard.confirm_kill': 'Stop all workers?',
 
   // Settings Page
   'settings.title': 'Settings & Health',
