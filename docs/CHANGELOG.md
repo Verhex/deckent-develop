@@ -6,6 +6,34 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.2.0-beta.3-sprint78] - 2026-04-01
+
+### Added
+
+- SprintPhaseTimeline Bileşeni — Faz Görsel Akışı
+
+### Changed
+
+- WorkerCard Bileşeni — Canlı Agent Kart Grid (completed with tech debt)
+- ActivityFeed Bileşeni — Canlı Aktivite Akışı (completed with tech debt)
+- DashboardPage Layout Yeniden Düzenleme (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 3 tech debt, 0 no-go_
+
+## [0.2.0-beta.3-sprint77] - 2026-04-01
+
+### Added
+
+- Init Dil Seçimi İlk Adım
+
+### Changed
+
+- DashboardPage Sprint Kontrol Butonları (completed with tech debt)
+
+
+_Tasks: 4 total, 2 done, 1 tech debt, 2 no-go_
+
 ## [0.2.0-beta.3-sprint76] - 2026-04-01
 
 ### Added

@@ -42,6 +42,7 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.kill_all': 'Tümünü Durdur',
   'dashboard.confirm_cleanup': 'Sprint dosyalarını arşivle?',
   'dashboard.confirm_kill': "Tüm worker'ları durdur?",
+  'dashboard.phase_timeline': 'Sprint Fazları',
 
   // Settings Page
   'settings.title': 'Ayarlar & Sağlık',
@@ -94,6 +95,32 @@ export const tr: Record<TranslationKey, string> = {
   'config.category.rollback': 'Geri Alma',
   'config.category.project': 'Proje',
   'config.category.advanced': 'Gelişmiş',
+
+  // Activity Feed
+  'activity.title': 'Canlı Aktivite',
+  'activity.spawned': 'başlatıldı',
+  'activity.writing': 'yazıyor',
+  'activity.done': 'TAMAMLANDI',
+  'activity.nogo': 'BAŞARISIZ',
+  'activity.stale': 'Eski heartbeat',
+  'activity.phase_changed': 'Faz değişti →',
+  'activity.no_activity': 'Sprint başlatın, aktivite burada görünecek.',
+  'activity.waiting': 'Aktivite bekleniyor...',
+
+  // Worker Card
+  'worker.model': 'Model',
+  'worker.agent': 'Ajan',
+  'worker.skill': 'Beceri',
+  'worker.elapsed': 'Geçen Süre',
+  'worker.heartbeat': 'Son Nabız',
+  'worker.files_changed': 'Değişen dosyalar',
+  'worker.detail': 'Detay',
+  'worker.no_workers': 'Henüz worker yok — sprint başlatın',
+
+  // Welcome Screen
+  'welcome.no_sprint': 'Aktif sprint yok.',
+  'welcome.start_hint': 'Başlamak için Yeni Sprint butonunu kullanın.',
+  'welcome.last_sprint': 'Son sprint',
 
   // Common
   'common.loading': 'Yükleniyor...',

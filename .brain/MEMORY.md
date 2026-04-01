@@ -187,3 +187,11 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - CHANGELOG Sprint 078-080 Entry: GO_WITH_TECH_DEBT — Sprint 078, 079, 080 entry'leri docs/CHANGELOG.md'ye eklendi. Keep a Changelog formatı korundu; section başlıkları İngil
 - PROJECT-IDENTITY Güncelleme: GO_WITH_TECH_DEBT — Updated PROJECT-IDENTITY.md with Sprint 078-080 data: test count 12,198, last sprint sprint-080, total sprints 80, MCP 1
 - HistoryPage Success Rate Trend Bileşeni: GO_WITH_TECH_DEBT — A) SuccessRateTrend component added to SprintChart.tsx — BarChart with color-coded bars (last 10 sprints). B) calcSucces
+## Sprint sprint-077 Learnings
+- README-TR.md Türkçe Karakter Düzeltme: NO_GO
+- DashboardPage Sprint Kontrol Butonları: GO_WITH_TECH_DEBT — DashboardPage sprint control buttons added. A) Cleanup button (Trash2 icon, outline variant): visible when no sprint OR 
+- /api/cleanup Endpoint: NO_GO
+## Sprint sprint-078 Learnings
+- WorkerCard Bileşeni — Canlı Agent Kart Grid: GO_WITH_TECH_DEBT — WorkerCard.tsx bileşeni oluşturuldu: kart grid (grid-cols-1/2/3), durum renkleri (EXECUTING mavi pulse, DONE yeşil, NO_G
+- ActivityFeed Bileşeni — Canlı Aktivite Akışı: GO_WITH_TECH_DEBT — ActivityFeed.tsx created: SSE-driven live activity feed tracking agent spawns/status changes/phase transitions/alerts. M
+- DashboardPage Layout Yeniden Düzenleme: GO_WITH_TECH_DEBT — DashboardPage layout overhaul completed. A) WelcomeScreen component added (🐙 deckent, no_sprint message, New Sprint but

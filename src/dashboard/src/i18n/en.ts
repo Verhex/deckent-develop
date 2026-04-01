@@ -40,6 +40,7 @@ export const en = {
   'dashboard.kill_all': 'Kill All',
   'dashboard.confirm_cleanup': 'Archive sprint files?',
   'dashboard.confirm_kill': 'Stop all workers?',
+  'dashboard.phase_timeline': 'Sprint Phases',
 
   // Settings Page
   'settings.title': 'Settings & Health',
@@ -92,6 +93,32 @@ export const en = {
   'config.category.rollback': 'Rollback',
   'config.category.project': 'Project',
   'config.category.advanced': 'Advanced',
+
+  // Activity Feed
+  'activity.title': 'Live Activity',
+  'activity.spawned': 'spawned',
+  'activity.writing': 'writing',
+  'activity.done': 'DONE',
+  'activity.nogo': 'NO_GO',
+  'activity.stale': 'Stale heartbeat',
+  'activity.phase_changed': 'Phase changed →',
+  'activity.no_activity': 'Start a sprint, activity will appear here.',
+  'activity.waiting': 'Waiting for activity...',
+
+  // Worker Card
+  'worker.model': 'Model',
+  'worker.agent': 'Agent',
+  'worker.skill': 'Skill',
+  'worker.elapsed': 'Elapsed',
+  'worker.heartbeat': 'Heartbeat',
+  'worker.files_changed': 'Files changed',
+  'worker.detail': 'Detail',
+  'worker.no_workers': 'No workers yet — start a sprint',
+
+  // Welcome Screen
+  'welcome.no_sprint': 'No active sprint.',
+  'welcome.start_hint': 'Use the New Sprint button to begin.',
+  'welcome.last_sprint': 'Last sprint',
 
   // Common
   'common.loading': 'Loading...',

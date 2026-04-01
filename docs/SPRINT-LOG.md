@@ -2144,3 +2144,53 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 076-004: HistoryPage Success Rate Trend Bileşeni (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 77 — sprint-077
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-01
+**Duration:** 2034s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 2 |
+| Tech Debt | 1 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 2033560ms |
+
+### Tasks
+
+- 077-001: README-TR.md Türkçe Karakter Düzeltme (NO_GO)
+- 077-002: DashboardPage Sprint Kontrol Butonları (GO_WITH_TECH_DEBT)
+- 077-003: Init Dil Seçimi İlk Adım (DONE)
+- 077-004: /api/cleanup Endpoint (NO_GO)
+
+---
+## Sprint 78 — sprint-078
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-01
+**Duration:** 546s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 546212ms |
+
+### Tasks
+
+- 078-001: WorkerCard Bileşeni — Canlı Agent Kart Grid (GO_WITH_TECH_DEBT)
+- 078-002: SprintPhaseTimeline Bileşeni — Faz Görsel Akışı (DONE)
+- 078-003: ActivityFeed Bileşeni — Canlı Aktivite Akışı (GO_WITH_TECH_DEBT)
+- 078-004: DashboardPage Layout Yeniden Düzenleme (GO_WITH_TECH_DEBT)
+
+---

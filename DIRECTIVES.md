@@ -1,149 +1,227 @@
-# DIRECTIVES — Sprint 082: Dashboard Faz 2 + Init Onboarding + README-TR Fix
+# DIRECTIVES — Sprint 083: Dashboard UX Overhaul Faz A — Worker Kartları + Sprint Timeline + Activity Feed
 
-## Goal: Dashboard'dan sprint yönetimi, init deneyimi iyileştirme, README-TR.md Türkçe karakter düzeltme.
+## Goal: Dashboard'u son kullanıcı dostu, görsel, canlı izlenebilir hale getir. Worker kart grid, sprint faz timeline, canlı aktivite feed. Profesyonel UX.
 
 ---
 
-## Task 1: README-TR.md Türkçe Karakter Düzeltme
-- Model: sonnet
-- Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: README-TR.md
-- Scope: README-TR.md
+## Task 1: WorkerCard Bileşeni — Canlı Agent Kart Grid
+- Model: opus
+- Effort: high
+- Agent: refactorer
+- Skills: frontend-expert, typescript-expert
+- Files: src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/pages/DashboardPage.tsx
+- Scope: src/dashboard/
 
 ### Description
-README-TR.md'deki ASCII Türkçe karakterleri doğru UTF-8 Türkçe karakterlere çevir:
+Mevcut worker tablosunu **kart grid** ile değiştir. Her worker bir kart:
 
-- "Yapay zeka gelistirme ekibiniz" → "Yapay zeka geliştirme ekibiniz"
-- "orkestre edilmis" → "orkestre edilmiş"
-- "dogal dili calisan koda donusturen" → "doğal dili çalışan koda dönüştüren"
-- "Nasil Calisir" → "Nasıl Çalışır"
-- "Temel Ozellikler" → "Temel Özellikler"
-- Tüm "i" → "İ" (büyük harf başında), "ı" eksikleri
-- Tüm ş, ç, ğ, ü, ö, ı, İ eksikliklerini düzelt
-- Dosyanın tamamını tara — hiçbir ASCII Türkçe kalmamalı
+A) `WorkerCard.tsx` bileşeni oluştur:
+```
+┌─────────────────────────────┐
+│  🤖 w-076-001        sonnet │  ← Model badge sağ üst
+│  ─────────────────────────  │
+│  📝 CHANGELOG entry         │  ← Task başlığı
+│  Agent: doc-writer          │  ← Atanan agent
+│  Skill: documentation       │  ← Atanan skill
+│  ─────────────────────────  │
+│  ⏱ 3m 42s    ❤️ 5s ago     │  ← Elapsed + son heartbeat
+│  📁 3 files changed         │  ← Dosya değişiklik sayısı
+│  ─────────────────────────  │
+│  ▌▌▌▌▌▌▌░░░ EXECUTING      │  ← Durum çubuğu + badge
+│                    [Detail] │  ← Detay butonu
+└─────────────────────────────┘
+```
 
-Sadece Türkçe karakter düzeltmesi yap, içerik değiştirme.
+B) Durum renkleri:
+- EXECUTING: mavi pulse animasyon (border-blue-500 + animate-pulse)
+- DONE: yeşil border + ✓ ikonu
+- NO_GO: kırmızı border + ✗ ikonu  
+- PAUSED: sarı border + ⏸ ikonu
+- IDLE: gri border
 
-**Kanıt:** `grep -P "[^a-zA-Z]calis[^m]|gelistir|ozellik|donust|urunl|basla" README-TR.md | wc -l` → 0
+C) Model ikonları:
+- opus: 💎 (premium)
+- sonnet: ⚡ (standard)
+- haiku: 🍃 (lightweight)
 
-**Test:** Bu task test gerektirmez.
+D) Kart grid: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`
+
+E) Tıklanınca mevcut AgentDetail sheet açılsın (onClick → setSelectedAgent)
+
+F) Kart üzerinde canlı `currentAction` gösterimi (SSE'den gelen veri)
+
+G) Boş durum: sprint yokken veya worker yokken "Henüz worker yok — sprint başlatın" mesajı
+
+H) DashboardPage.tsx'teki mevcut worker Table'ı kaldır, yerine WorkerCard grid koy.
+
+I) i18n: useTranslation ile tüm etiketler çift dilli
+
+**Kanıt:** `grep "WorkerCard\|grid-cols" src/dashboard/src/pages/DashboardPage.tsx` → kart grid kullanılıyor
+
+**Test:** `tsc --noEmit` temiz geçmeli.
 
 ---
 
-## Task 2: DashboardPage Sprint Kontrol Butonları
+## Task 2: SprintPhaseTimeline Bileşeni — Faz Görsel Akışı
 - Model: sonnet
-- Effort: high
+- Effort: normal
+- Agent: refactorer
+- Skills: frontend-expert, typescript-expert
+- Files: src/dashboard/src/components/SprintPhaseTimeline.tsx, src/dashboard/src/pages/DashboardPage.tsx
+- Scope: src/dashboard/
+
+### Description
+Sprint'in hangi fazda olduğunu görsel timeline olarak göster:
+
+A) `SprintPhaseTimeline.tsx` bileşeni:
+```
+PLAN ──● SPAWN ──● EXECUTE ──◉ EVALUATE ──○ RETRO ──○ CLEANUP
+ ✓        ✓         ●                                         
+```
+
+B) Fazlar dizisi: PLAN, SPAWN, EXECUTE, EVALUATE, FIX, RETRO, DECAY, CLEANUP
+
+C) Her faz bir daire + etiket:
+- Tamamlanan fazlar: yeşil dolu daire (●) + yeşil çizgi
+- Aktif faz: mavi büyük daire (◉) + pulse animasyon
+- Gelecek fazlar: gri boş daire (○) + gri çizgi
+
+D) Responsive: mobilde yatay scroll veya dikey sıralama
+
+E) DashboardPage'de Sprint Status Card'ın içine ekle — mevcut phase badge'in altına
+
+F) Sprint yokken timeline gizle
+
+G) i18n: faz isimleri çift dilli (opsiyonel — teknik terimler EN kalabilir)
+
+**Kanıt:** `grep "SprintPhaseTimeline\|phase-timeline" src/dashboard/src/pages/DashboardPage.tsx` → bileşen kullanılıyor
+
+**Test:** `tsc --noEmit` temiz geçmeli.
+
+---
+
+## Task 3: ActivityFeed Bileşeni — Canlı Aktivite Akışı
+- Model: sonnet
+- Effort: normal
+- Agent: refactorer
+- Skills: frontend-expert, typescript-expert
+- Files: src/dashboard/src/components/ActivityFeed.tsx, src/dashboard/src/pages/DashboardPage.tsx
+- Scope: src/dashboard/
+
+### Description
+Sprint sırasında ne olduğunu canlı gösteren aktivite akışı:
+
+A) `ActivityFeed.tsx` bileşeni:
+```
+┌─ Live Activity ──────────────────┐
+│  12:15:42  🟢 w-001 spawned      │
+│  12:15:43  🟢 w-002 spawned      │
+│  12:16:10  📝 w-001 writing      │
+│            src/core/config.ts     │
+│  12:17:05  ✅ w-002 DONE         │
+│  12:18:30  ⚠️ Stale heartbeat    │
+│            w-003 (2m ago)         │
+│  12:19:00  ❌ w-003 NO_GO        │
+└──────────────────────────────────┘
+```
+
+B) Feed'i SSE verisinden oluştur:
+- Agent spawn/done olayları (agents dizisindeki durum değişiklikleri)
+- Alert'ler (alerts dizisi)
+- Faz değişiklikleri (sprint.phase)
+- Progress değişiklikleri (done sayısı artınca)
+
+C) Her entry: zaman damgası + ikon + mesaj + opsiyonel detay
+
+D) Maksimum 50 entry tut (eski olanları at)
+
+E) Auto-scroll: yeni entry gelince en alta kaydır
+
+F) DashboardPage'e sağ taraf veya alt bölüm olarak ekle
+
+G) Sprint yokken "Sprint başlatın, aktivite burada görünecek" mesajı
+
+H) i18n: tüm mesajlar çift dilli
+
+**Kanıt:** `grep "ActivityFeed\|activity-feed" src/dashboard/src/pages/DashboardPage.tsx` → bileşen kullanılıyor
+
+**Test:** `tsc --noEmit` temiz geçmeli.
+
+---
+
+## Task 4: DashboardPage Layout Yeniden Düzenleme
+- Model: sonnet
+- Effort: normal
 - Agent: refactorer
 - Skills: frontend-expert, typescript-expert
 - Files: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
 - Scope: src/dashboard/
 
 ### Description
-DashboardPage'e sprint yönetim kontrolleri ekle:
+DashboardPage'in genel layout'unu profesyonel hale getir:
 
-A) "Yeni Sprint" butonu zaten var (NewSprintModal). Ek olarak:
-- **Cleanup** butonu: Aktif sprint yokken veya COMPLETE fazındayken görünsün
-  - POST /api/cleanup çağırsın (mevcut endpoint varsa kullan, yoksa POST body boş)
-  - Onay dialogu göstersin: "Sprint dosyalarını arşivle?"
-- **Kill All** butonu: Sprint EXECUTE fazındayken görünsün (kırmızı, tehlikeli)
-  - POST /api/kill/all çağırsın
-  - Onay dialogu: "Tüm worker'ları durdur?"
-
-B) Butonları header'daki "Yeni Sprint" butonunun yanına ekle — koşullu render:
-- EXECUTE/FIX fazı → Kill All butonu
-- COMPLETE/no sprint → Cleanup butonu
-- Her zaman → Yeni Sprint butonu
-
-C) i18n key'leri ekle:
+A) Yeni layout yapısı (yukarıdan aşağıya):
 ```
-'dashboard.cleanup': 'Cleanup' / 'Temizle'
-'dashboard.kill_all': 'Kill All' / 'Tümünü Durdur'  
-'dashboard.confirm_cleanup': 'Archive sprint files?' / 'Sprint dosyalarını arşivle?'
-'dashboard.confirm_kill': 'Stop all workers?' / 'Tüm worker'ları durdur?'
-'dashboard.new_sprint': 'New Sprint' / 'Yeni Sprint'
+┌─ Header: Sprint Dashboard ── [Cleanup] [Kill All] [New Sprint] ─┐
+│                                                                    │
+│  ┌─ Sprint Status Card ─────────────────────────────────────────┐ │
+│  │  sprint-076  │  EXECUTE  │  4m 32s  │  Usage: 34%           │ │
+│  │  ═══●═══●═══◉═══○═══○═══○  (Phase Timeline)                │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  ┌─ Progress ────────────────────────────────────────────────────┐ │
+│  │  ████████░░ 3/4 done, 1 running                              │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│  ┌─ Workers (2/3 layout) ────┐  ┌─ Activity Feed (1/3) ────────┐ │
+│  │  [Card] [Card] [Card]     │  │  12:15 🟢 w-001 spawned     │ │
+│  │  [Card] [Card]            │  │  12:16 📝 writing config.ts  │ │
+│  │                           │  │  12:17 ✅ w-002 DONE         │ │
+│  └───────────────────────────┘  └──────────────────────────────┘ │
+│                                                                    │
+│  ┌─ Alerts ──────────────────────────────────────────────────────┐ │
+│  │  (mevcut alert section — aynı kalabilir)                      │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-**Kanıt:** `grep "cleanup\|kill_all\|confirm_cleanup" src/dashboard/src/pages/DashboardPage.tsx` → var
+B) Workers + Activity Feed yan yana: `grid grid-cols-1 lg:grid-cols-3` — workers 2/3, feed 1/3
+
+C) Sprint yokken karşılama mesajı:
+```
+┌───────────────────────────────────┐
+│        🐙 deckent                 │
+│                                   │
+│   Henüz aktif sprint yok.         │
+│                                   │
+│   Sprint başlatmak için:          │
+│   [Yeni Sprint] butonu            │
+│                                   │
+│   Son sprint: sprint-076 (4/4 ✓)  │
+└───────────────────────────────────┘
+```
+
+D) Tüm yeni i18n key'lerini en.ts ve tr.ts'e ekle:
+- worker.* (model, agent, skill, elapsed, heartbeat, files_changed, detail, no_workers)
+- activity.* (spawned, writing, done, nogo, stale, phase_changed, no_activity)
+- welcome.* (no_sprint, start_hint, last_sprint)
+
+E) Genel stil iyileştirmeleri:
+- Card'lara subtle shadow (shadow-lg/shadow-zinc-900)
+- Başlıklarda gradient text veya accent renk
+- Geçişlerde transition-all duration-300
+
+**Kanıt:** `grep "grid-cols-3\|WorkerCard\|ActivityFeed\|SprintPhaseTimeline" src/dashboard/src/pages/DashboardPage.tsx` → hepsi entegre
 
 **Test:** `tsc --noEmit` temiz geçmeli.
-
----
-
-## Task 3: Init Dil Seçimi İlk Adım
-- Model: sonnet
-- Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert
-- Files: src/cli/commands/init.ts
-- Scope: src/cli/
-
-### Description
-`deckent init` wizard'ında dil seçimini İLK adım yap:
-
-A) Mevcut init akışını oku. Şu anki sıra muhtemelen:
-1. Plan/tier seçimi
-2. Dil seçimi
-3. Proje adı
-
-Yeni sıra:
-1. **Dil seçimi** (English / Türkçe) — hemen seçilsin
-2. Plan/tier seçimi — seçilen dilde gösterilsin
-3. Proje adı — seçilen dilde sorulsun
-
-B) Dil seçildikten sonra `getMessage()` çağrılarında seçilen dili kullan. Böylece wizard'ın geri kalanı kullanıcının dilinde gösterilir.
-
-C) messages.ts'e init wizard mesajları ekle (eksikse):
-```
-'init.select_language': { en: 'Select language:', tr: 'Dil seçin:' }
-'init.select_plan': { en: 'Select your plan:', tr: 'Planınızı seçin:' }
-'init.enter_project_name': { en: 'Project name:', tr: 'Proje adı:' }
-```
-
-D) Wizard çıktısı seçilen dilde olmalı — "Next steps" yerine "Sonraki adımlar" gibi.
-
-**Kanıt:** `grep "select_language\|Dil seçin" src/cli/commands/init.ts` → dil seçimi ilk adım
-
-**Test:** `tsc --noEmit` temiz geçmeli.
-
----
-
-## Task 4: /api/cleanup Endpoint
-- Model: sonnet
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert
-- Files: src/api/server.ts
-- Scope: src/api/
-
-### Description
-Dashboard'dan cleanup çağırabilmek için POST /api/cleanup endpoint'i ekle:
-
-A) server.ts'e POST /api/cleanup ekle:
-```typescript
-if (method === 'POST' && url === '/api/cleanup') {
-  // cleanup fonksiyonunu import et ve çağır
-  // archiveTasks + releaseLocks + killSessions
-  // Sonuç: { success: true, removedTasks: N, removedLocks: N }
-}
-```
-
-B) Mevcut cleanup fonksiyonunu bul (muhtemelen `src/orchestra/` veya `src/cli/commands/cleanup.ts`'te) ve API'den çağırılabilir hale getir.
-
-C) Auth gerekli (POST endpoint — Bearer token kontrolü).
-
-D) Sprint aktifken cleanup çalışmamalı — hata döndür: `{ error: "Cannot cleanup while sprint is active" }`
-
-**Kanıt:** `grep "api/cleanup" src/api/server.ts` → endpoint var
-
-**Test:** `tsc --noEmit` temiz. En az 2 test: başarılı cleanup, sprint aktifken hata.
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
 - Mevcut testlerde 0 regresyon
-- Dashboard butonları koşullu render — yanlış fazda görünmemeli
-- Init wizard dil seçimi İLK adım olmalı
+- Tüm yeni bileşenler i18n uyumlu (useTranslation)
+- Responsive: mobilde tek sütun, desktop'ta grid
+- Dark theme tutarlılığı korunmalı (zinc-950/900/800)
+- Animasyonlar subtle olmalı — abartısız
 - %100 GO hedefli

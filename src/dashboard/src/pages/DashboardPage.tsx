@@ -1,24 +1,47 @@
 import { useState, useEffect, useCallback } from "react";
-import { Activity, AlertTriangle, Info, XOctagon, Skull, Plus, Trash2 } from "lucide-react";
+import { Activity, AlertTriangle, Info, XOctagon, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table";
+import { WorkerCardGrid } from "../components/WorkerCard";
 import { NewSprintModal } from "../components/NewSprintModal";
 import { AgentDetail } from "../components/AgentDetail";
+import { ActivityFeed } from "../components/ActivityFeed";
+import { SprintPhaseTimeline } from "../components/SprintPhaseTimeline";
 import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSE } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
 import { fetchJson, postJson, ApiError } from "../lib/api";
-import type { DashboardState, AgentInfo, Alert } from "../types";
+import type { DashboardState, Alert } from "../types";
+
+// WelcomeScreen: shown when no active sprint
+interface WelcomeScreenProps {
+  lastSprintId?: string;
+  onNewSprint: () => void;
+}
+function WelcomeScreen({ lastSprintId, onNewSprint }: WelcomeScreenProps) {
+  const { t } = useTranslation();
+  return (
+    <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
+      <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
+        <p className="text-5xl select-none">🐙</p>
+        <h2 className="text-2xl font-bold text-zinc-100">deckent</h2>
+        <p className="text-zinc-400 text-center">{t("welcome.no_sprint")}</p>
+        <p className="text-zinc-500 text-sm text-center">{t("welcome.start_hint")}</p>
+        <Button onClick={onNewSprint} className="mt-2 transition-all duration-300">
+          <Plus className="mr-2 h-4 w-4" />
+          {t("dashboard.new_sprint")}
+        </Button>
+        {lastSprintId && (
+          <p className="text-xs text-zinc-600 mt-1">
+            {t("welcome.last_sprint")}: {lastSprintId}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 const PHASE_COLORS: Record<string, string> = {
   DIRECTIVE: "secondary",
@@ -50,23 +73,6 @@ const ALERT_ICON: Record<string, typeof Info> = {
   error: XOctagon,
   CRITICAL: XOctagon,
 };
-
-const STATUS_VARIANT: Record<string, "info" | "success" | "critical" | "secondary"> = {
-  EXECUTING: "info",
-  DONE: "success",
-  ERROR: "critical",
-  IDLE: "secondary",
-};
-
-function elapsed(startedAt?: string): string {
-  if (!startedAt) return "-";
-  const ms = Date.now() - new Date(startedAt).getTime();
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remSecs = secs % 60;
-  return `${mins}m ${remSecs}s`;
-}
 
 function relativeTime(isoDate: string): string {
   const ms = Date.now() - new Date(isoDate).getTime();
@@ -169,17 +175,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-100">{t('dashboard.title')}</h1>
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-zinc-100 bg-clip-text text-transparent">
+          {t("dashboard.title")}
+        </h1>
         <div className="flex items-center gap-2">
           {showCleanup && (
             <Button
               variant="outline"
               onClick={handleCleanup}
               disabled={isCleanupLoading}
+              className="transition-all duration-300"
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              {t('dashboard.cleanup')}
+              {t("dashboard.cleanup")}
             </Button>
           )}
           {showKillAll && (
@@ -187,37 +197,43 @@ export default function DashboardPage() {
               variant="destructive"
               onClick={handleKillAll}
               disabled={isKillAllLoading}
+              className="transition-all duration-300"
             >
               <XOctagon className="mr-2 h-4 w-4" />
-              {t('dashboard.kill_all')}
+              {t("dashboard.kill_all")}
             </Button>
           )}
-          <Button onClick={() => setModalOpen(true)}>
+          <Button onClick={() => setModalOpen(true)} className="transition-all duration-300">
             <Plus className="mr-2 h-4 w-4" />
-            {t('dashboard.new_sprint')}
+            {t("dashboard.new_sprint")}
           </Button>
         </div>
       </div>
 
+      {/* Welcome Screen: shown when no active sprint */}
+      {noSprint && !state && (
+        <WelcomeScreen onNewSprint={() => setModalOpen(true)} />
+      )}
+
       {/* Sprint Status Card */}
-      <Card className="border-zinc-800 bg-zinc-900">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="flex items-center gap-2 text-zinc-100">
-            <Activity className="h-5 w-5 text-blue-400" />
-            Sprint Status
-          </CardTitle>
-          {state?.sprint?.phase && (
-            <Badge
-              variant={
-                (PHASE_COLORS[state.sprint.phase] as "info" | "warning" | "critical" | "success" | "secondary") ?? "secondary"
-              }
-            >
-              {state.sprint.phase}
-            </Badge>
-          )}
-        </CardHeader>
-        <CardContent>
-          {state ? (
+      {state && (
+        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50 transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2 text-zinc-100">
+              <Activity className="h-5 w-5 text-blue-400" />
+              Sprint Status
+            </CardTitle>
+            {state.sprint?.phase && (
+              <Badge
+                variant={
+                  (PHASE_COLORS[state.sprint.phase] as "info" | "warning" | "critical" | "success" | "secondary") ?? "secondary"
+                }
+              >
+                {state.sprint.phase}
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
               <div>
                 <p className="text-zinc-400">Sprint ID</p>
@@ -226,11 +242,11 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div>
-                <p className="text-zinc-400">{t('dashboard.phase')}</p>
+                <p className="text-zinc-400">{t("dashboard.phase")}</p>
                 <p className="text-zinc-100">{state.sprint.phase}</p>
               </div>
               <div>
-                <p className="text-zinc-400">{t('dashboard.status')}</p>
+                <p className="text-zinc-400">{t("dashboard.status")}</p>
                 <p className="text-zinc-100">{state.sprint.status}</p>
               </div>
               <div>
@@ -240,19 +256,16 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-          ) : noSprint ? (
-            <p className="text-zinc-500">{t('dashboard.no_sprint_hint')}</p>
-          ) : (
-            <p className="text-zinc-500">No sprint data available.</p>
-          )}
-        </CardContent>
-      </Card>
+            <SprintPhaseTimeline currentPhase={state.sprint.phase} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Usage Card */}
       {state?.usage && (
-        <Card className="border-zinc-800 bg-zinc-900" data-testid="usage-card">
+        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50" data-testid="usage-card">
           <CardHeader>
-            <CardTitle className="text-zinc-100">{t('dashboard.usage')}</CardTitle>
+            <CardTitle className="text-zinc-100">{t("dashboard.usage")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -262,7 +275,7 @@ export default function DashboardPage() {
               </div>
               <div className="h-2 w-full rounded-full bg-zinc-700">
                 <div
-                  className="h-2 rounded-full bg-blue-500"
+                  className="h-2 rounded-full bg-blue-500 transition-all duration-300"
                   style={{ width: `${Math.min(100, state.usage.fiveHourPercent)}%` }}
                   data-testid="usage-5hr-bar"
                 />
@@ -275,7 +288,7 @@ export default function DashboardPage() {
               </div>
               <div className="h-2 w-full rounded-full bg-zinc-700">
                 <div
-                  className="h-2 rounded-full bg-green-500"
+                  className="h-2 rounded-full bg-green-500 transition-all duration-300"
                   style={{ width: `${Math.min(100, state.usage.weeklyPercent)}%` }}
                   data-testid="usage-weekly-bar"
                 />
@@ -287,9 +300,9 @@ export default function DashboardPage() {
 
       {/* Progress Section */}
       {total > 0 && (
-        <Card className="border-zinc-800 bg-zinc-900">
+        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
           <CardHeader>
-            <CardTitle className="text-zinc-100">{t('dashboard.progress')}</CardTitle>
+            <CardTitle className="text-zinc-100">{t("dashboard.progress")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Progress
@@ -305,76 +318,35 @@ export default function DashboardPage() {
               ]}
             />
             <p className="text-sm text-zinc-400">
-              {done}/{total} done, {active} active, {Math.max(0, pending)}{" "}
-              pending
+              {done}/{total} {t("dashboard.done")}, {active} {t("dashboard.running")},{" "}
+              {Math.max(0, pending)} {t("dashboard.queued")}
             </p>
           </CardContent>
         </Card>
       )}
 
-      {/* Worker Table */}
-      {agents.length > 0 && (
-        <Card className="border-zinc-800 bg-zinc-900">
-          <CardHeader>
-            <CardTitle className="text-zinc-100">{t('dashboard.agents')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>{t('dashboard.task')}</TableHead>
-                  <TableHead>{t('dashboard.status')}</TableHead>
-                  <TableHead>Last HB</TableHead>
-                  <TableHead>{t('dashboard.elapsed')}</TableHead>
-                  <TableHead className="text-right">{t('dashboard.action')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agents.map((agent: AgentInfo) => (
-                  <TableRow
-                    key={agent.id}
-                    className="cursor-pointer hover:bg-zinc-800/50"
-                    onClick={() => setSelectedAgent(agent.taskId ?? agent.id)}
-                  >
-                    <TableCell className="font-mono">
-                      {agent.id}
-                    </TableCell>
-                    <TableCell>{agent.taskId ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={STATUS_VARIANT[agent.status] ?? "secondary"}
-                      >
-                        {agent.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{agent.lastHeartbeat ? relativeTime(agent.lastHeartbeat) : "—"}</TableCell>
-                    <TableCell>{elapsed(agent.spawnedAt)}</TableCell>
-                    <TableCell className="text-right">
-                      {agent.status === "EXECUTING" && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleKill(agent.id)}
-                        >
-                          <Skull className="mr-1 h-3 w-3" />
-                          Kill
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+      {/* Workers (2/3) + Activity Feed (1/3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Worker Cards — 2/3 */}
+        <div className="lg:col-span-2">
+          <WorkerCardGrid
+            agents={agents}
+            onSelect={(taskId) => setSelectedAgent(taskId)}
+            onKill={handleKill}
+          />
+        </div>
+
+        {/* Activity Feed — 1/3 */}
+        <div className="lg:col-span-1">
+          <ActivityFeed state={state} hasSprint={!!state} />
+        </div>
+      </div>
 
       {/* Alerts Section */}
       {alerts.length > 0 && (
-        <Card className="border-zinc-800 bg-zinc-900">
+        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-zinc-100">{t('dashboard.alerts')}</CardTitle>
+            <CardTitle className="text-zinc-100">{t("dashboard.alerts")}</CardTitle>
             {(state?.violations ?? 0) > 0 && (
               <Badge variant="critical">{state!.violations} violations</Badge>
             )}
@@ -386,7 +358,7 @@ export default function DashboardPage() {
                 return (
                   <li
                     key={i}
-                    className="flex items-start gap-3 rounded-md bg-zinc-800/50 px-3 py-2"
+                    className="flex items-start gap-3 rounded-md bg-zinc-800/50 px-3 py-2 transition-all duration-300"
                   >
                     <Icon className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="flex-1">
