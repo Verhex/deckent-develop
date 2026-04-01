@@ -1,6 +1,7 @@
 import { useApi } from "../hooks/useApi";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import SprintChart, { parseChartData } from "../components/SprintChart";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 interface SprintHistoryRecord {
   id: string;
@@ -15,13 +16,14 @@ interface SprintHistoryRecord {
 }
 
 export default function HistoryPage() {
+  const { t } = useTranslation();
   const { data, loading, error } = useApi<SprintHistoryRecord[]>("/api/history");
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-zinc-100">Sprint History</h1>
+      <h1 className="text-2xl font-bold text-zinc-100">{t('history.title')}</h1>
 
-      {loading && <p className="text-zinc-400">Loading history…</p>}
+      {loading && <p className="text-zinc-400">{t('common.loading')}</p>}
       {error && <p className="text-red-400">Error: {error}</p>}
 
       {data && data.length > 0 && (
@@ -29,7 +31,7 @@ export default function HistoryPage() {
           {/* Trend Chart */}
           <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle className="text-zinc-100">Trend</CardTitle>
+              <CardTitle className="text-zinc-100">{t('history.trend')}</CardTitle>
             </CardHeader>
             <CardContent>
               <SprintChart data={parseChartData(data)} />

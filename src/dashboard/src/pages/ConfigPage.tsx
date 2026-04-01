@@ -7,6 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { fetchJson, postJson } from "../lib/api";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 // ─── Config Metadata ─────────────────────────────────────────────
 
@@ -136,6 +137,7 @@ function parseFieldValue(value: string, type: FieldType): unknown {
 // ─── Component ────────────────────────────────────────────────────
 
 export default function ConfigPage() {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<Record<string, unknown>>({});
   const [defaults, setDefaults] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
@@ -214,10 +216,10 @@ export default function ConfigPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Configuration</h1>
+        <h1 className="text-2xl font-bold">{t('config.title')}</h1>
         <Button onClick={handleSave} disabled={saving || dirty.size === 0} className="gap-2">
           <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? t('config.saving') : t('config.save')}
         </Button>
       </div>
 

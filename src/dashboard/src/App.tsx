@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { LanguageProvider } from "./i18n/LanguageProvider";
 import { Layout } from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -10,17 +11,19 @@ import ConfigPage from "./pages/ConfigPage";
 function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/memory" element={<MemoryPage />} />
-            <Route path="/config" element={<ConfigPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <LanguageProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/memory" element={<MemoryPage />} />
+              <Route path="/config" element={<ConfigPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

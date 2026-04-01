@@ -7,6 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { fetchJson, postJson } from "../lib/api";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 interface ConfigData {
   mode?: string;
@@ -31,6 +32,7 @@ const MODEL_OPTIONS = ["opus", "sonnet", "haiku", "gpt-4.1", "o3", "o4-mini", "g
 const LANGUAGE_OPTIONS = ["en", "tr"] as const;
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -117,7 +119,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
 
       {/* Config Section */}
       <Card>

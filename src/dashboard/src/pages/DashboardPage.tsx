@@ -16,6 +16,7 @@ import { NewSprintModal } from "../components/NewSprintModal";
 import { AgentDetail } from "../components/AgentDetail";
 import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSE } from "../hooks/useSSE";
+import { useTranslation } from "../i18n/LanguageProvider";
 import { fetchJson, postJson, ApiError } from "../lib/api";
 import type { DashboardState, AgentInfo, Alert } from "../types";
 
@@ -78,6 +79,7 @@ function relativeTime(isoDate: string): string {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const sseState = useSSE("/api/events");
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
   const [noSprint, setNoSprint] = useState(false);
@@ -128,7 +130,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zinc-100">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">{t('dashboard.title')}</h1>
         <Button onClick={() => setModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Yeni Sprint
@@ -162,11 +164,11 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div>
-                <p className="text-zinc-400">Phase</p>
+                <p className="text-zinc-400">{t('dashboard.phase')}</p>
                 <p className="text-zinc-100">{state.sprint.phase}</p>
               </div>
               <div>
-                <p className="text-zinc-400">Status</p>
+                <p className="text-zinc-400">{t('dashboard.status')}</p>
                 <p className="text-zinc-100">{state.sprint.status}</p>
               </div>
               <div>
@@ -177,7 +179,7 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : noSprint ? (
-            <p className="text-zinc-500">No active sprint. Run <code className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-300">deckent start</code> first.</p>
+            <p className="text-zinc-500">{t('dashboard.no_sprint_hint')}</p>
           ) : (
             <p className="text-zinc-500">No sprint data available.</p>
           )}
@@ -188,7 +190,7 @@ export default function DashboardPage() {
       {state?.usage && (
         <Card className="border-zinc-800 bg-zinc-900" data-testid="usage-card">
           <CardHeader>
-            <CardTitle className="text-zinc-100">Usage</CardTitle>
+            <CardTitle className="text-zinc-100">{t('dashboard.usage')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -225,7 +227,7 @@ export default function DashboardPage() {
       {total > 0 && (
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader>
-            <CardTitle className="text-zinc-100">Progress</CardTitle>
+            <CardTitle className="text-zinc-100">{t('dashboard.progress')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Progress
@@ -252,18 +254,18 @@ export default function DashboardPage() {
       {agents.length > 0 && (
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader>
-            <CardTitle className="text-zinc-100">Workers</CardTitle>
+            <CardTitle className="text-zinc-100">{t('dashboard.agents')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t('dashboard.task')}</TableHead>
+                  <TableHead>{t('dashboard.status')}</TableHead>
                   <TableHead>Last HB</TableHead>
-                  <TableHead>Elapsed</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead>{t('dashboard.elapsed')}</TableHead>
+                  <TableHead className="text-right">{t('dashboard.action')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -310,7 +312,7 @@ export default function DashboardPage() {
       {alerts.length > 0 && (
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-zinc-100">Alerts</CardTitle>
+            <CardTitle className="text-zinc-100">{t('dashboard.alerts')}</CardTitle>
             {(state?.violations ?? 0) > 0 && (
               <Badge variant="critical">{state!.violations} violations</Badge>
             )}

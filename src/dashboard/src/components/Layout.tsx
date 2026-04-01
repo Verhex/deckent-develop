@@ -1,25 +1,28 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, Settings, History, Brain, Menu, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, Settings, History, Brain, Menu, SlidersHorizontal, Globe } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
 import { useSSE } from "../hooks/useSSE";
+import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
+import type { TranslationKey } from "../i18n/en";
 
-const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/settings", label: "Settings", icon: Settings },
-  { to: "/history", label: "History", icon: History },
-  { to: "/memory", label: "Memory", icon: Brain },
-  { to: "/config", label: "Config", icon: SlidersHorizontal },
-] as const;
+const navItems: ReadonlyArray<{ to: string; labelKey: TranslationKey; icon: typeof LayoutDashboard }> = [
+  { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { to: "/settings", labelKey: "nav.settings", icon: Settings },
+  { to: "/history", labelKey: "nav.history", icon: History },
+  { to: "/memory", labelKey: "nav.memory", icon: Brain },
+  { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
+];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const { t } = useTranslation();
   return (
     <nav className="flex flex-col gap-1">
-      {navItems.map(({ to, label, icon: Icon }) => (
+      {navItems.map(({ to, labelKey, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -35,21 +38,36 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           }
         >
           <Icon className="h-4 w-4" />
-          {label}
+          {t(labelKey)}
         </NavLink>
       ))}
     </nav>
   );
 }
 
+function LanguageSwitcher() {
+  const { lang, setLang } = useTranslation();
+  return (
+    <button
+      onClick={() => setLang(lang === 'en' ? 'tr' : 'en')}
+      className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 transition-colors"
+      title={lang === 'en' ? 'Türkçeye geç' : 'Switch to English'}
+    >
+      <Globe className="h-3.5 w-3.5" />
+      {lang === 'en' ? 'TR' : 'EN'}
+    </button>
+  );
+}
+
 function SidebarContent({ onNavigate, sseState }: { onNavigate?: () => void; sseState: DashboardState | null }) {
+  const { t } = useTranslation();
   return (
     <>
       <div className="mb-4 px-3">
         <h1 className="text-lg font-bold text-zinc-100 tracking-tight">
           deckent
         </h1>
-        <p className="text-xs text-zinc-500">agent orchestration</p>
+        <p className="text-xs text-zinc-500">{t('layout.subtitle')}</p>
       </div>
       {sseState?.sprint && (
         <div className="mb-4 px-3 flex items-center gap-2">
@@ -60,14 +78,17 @@ function SidebarContent({ onNavigate, sseState }: { onNavigate?: () => void; sse
         </div>
       )}
       <div className="mb-4 px-3 flex items-center gap-2">
-        <span className="text-xs text-zinc-400">Auditor:</span>
+        <span className="text-xs text-zinc-400">{t('layout.auditor')}:</span>
         {sseState?.auditorLastScan ? (
-          <Badge variant="success" className="text-[10px]">Active</Badge>
+          <Badge variant="success" className="text-[10px]">{t('layout.active')}</Badge>
         ) : (
-          <Badge variant="secondary" className="text-[10px]">Inactive</Badge>
+          <Badge variant="secondary" className="text-[10px]">{t('layout.inactive')}</Badge>
         )}
       </div>
       <NavLinks onNavigate={onNavigate} />
+      <div className="mt-auto pt-4 border-t border-zinc-800">
+        <LanguageSwitcher />
+      </div>
     </>
   );
 }

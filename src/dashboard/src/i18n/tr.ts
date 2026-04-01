@@ -1,0 +1,102 @@
+import type { TranslationKey } from './en';
+
+export const tr: Record<TranslationKey, string> = {
+  // Navigation
+  'nav.dashboard': 'Dashboard',
+  'nav.settings': 'Ayarlar',
+  'nav.history': 'Geçmiş',
+  'nav.memory': 'Bellek',
+  'nav.config': 'Yapılandırma',
+
+  // Layout
+  'layout.subtitle': 'ajan orkestrasyon',
+  'layout.auditor': 'Denetçi',
+  'layout.active': 'Aktif',
+  'layout.inactive': 'Pasif',
+  'layout.language': 'Dil',
+
+  // Dashboard Page
+  'dashboard.title': 'Sprint Paneli',
+  'dashboard.no_sprint': 'Aktif sprint yok',
+  'dashboard.no_sprint_hint': 'Sprint başlatmak için `deckent start` çalıştırın.',
+  'dashboard.phase': 'Faz',
+  'dashboard.elapsed': 'Geçen Süre',
+  'dashboard.progress': 'İlerleme',
+  'dashboard.tasks': 'Görevler',
+  'dashboard.agents': 'Ajanlar',
+  'dashboard.alerts': 'Uyarılar',
+  'dashboard.no_alerts': 'Aktif uyarı yok.',
+  'dashboard.usage': 'Kullanım',
+  'dashboard.worker': 'Worker',
+  'dashboard.task': 'Görev',
+  'dashboard.model': 'Model',
+  'dashboard.status': 'Durum',
+  'dashboard.action': 'Eylem',
+  'dashboard.kill': 'Durdur',
+  'dashboard.done': 'tamamlandı',
+  'dashboard.running': 'çalışıyor',
+  'dashboard.queued': 'kuyrukta',
+  'dashboard.failed': 'başarısız',
+
+  // Settings Page
+  'settings.title': 'Ayarlar & Sağlık',
+  'settings.doctor': 'Sistem Sağlığı',
+  'settings.run_doctor': 'Kontrol Et',
+  'settings.check': 'Kontrol',
+  'settings.result': 'Sonuç',
+  'settings.details': 'Detay',
+  'settings.passed': 'Geçti',
+  'settings.failed': 'Başarısız',
+  'settings.warning': 'Uyarı',
+  'settings.health_score': 'Sağlık Puanı',
+
+  // History Page
+  'history.title': 'Sprint Geçmişi',
+  'history.no_history': 'Sprint geçmişi bulunamadı.',
+  'history.sprint': 'Sprint',
+  'history.date': 'Tarih',
+  'history.total_tasks': 'Görevler',
+  'history.completed': 'Tamam',
+  'history.nogo_rate': 'NO_GO %',
+  'history.coverage': 'Kapsam',
+  'history.duration': 'Süre',
+  'history.trend': 'Trend',
+
+  // Memory Page
+  'memory.title': 'Brain Belleği',
+  'memory.tab_memory': 'Bellek',
+  'memory.tab_debt': 'Teknik Borç',
+  'memory.no_memory': 'Bellek içeriği bulunamadı.',
+  'memory.no_debt': 'Teknik borç bulunamadı.',
+
+  // Config Page
+  'config.title': 'Yapılandırma',
+  'config.save': 'Kaydet',
+  'config.saving': 'Kaydediliyor...',
+  'config.saved': 'Yapılandırma kaydedildi.',
+  'config.error': 'Yapılandırma kaydedilemedi.',
+  'config.reset': 'Varsayılanlara Sıfırla',
+  'config.category.provider': 'Sağlayıcı',
+  'config.category.sprint': 'Sprint',
+  'config.category.memory': 'Bellek',
+  'config.category.auditor': 'Denetçi',
+  'config.category.output': 'Çıktı',
+  'config.category.search': 'Arama',
+  'config.category.notifications': 'Bildirimler',
+  'config.category.telemetry': 'Telemetri',
+  'config.category.environment': 'Ortam',
+  'config.category.routing': 'Yönlendirme',
+  'config.category.rollback': 'Geri Alma',
+  'config.category.project': 'Proje',
+  'config.category.advanced': 'Gelişmiş',
+
+  // Common
+  'common.loading': 'Yükleniyor...',
+  'common.error': 'Hata',
+  'common.retry': 'Tekrar Dene',
+  'common.close': 'Kapat',
+  'common.cancel': 'İptal',
+  'common.confirm': 'Onayla',
+  'common.yes': 'Evet',
+  'common.no': 'Hayır',
+};

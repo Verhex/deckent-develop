@@ -1,0 +1,102 @@
+export const en = {
+  // Navigation
+  'nav.dashboard': 'Dashboard',
+  'nav.settings': 'Settings',
+  'nav.history': 'History',
+  'nav.memory': 'Memory',
+  'nav.config': 'Config',
+
+  // Layout
+  'layout.subtitle': 'agent orchestration',
+  'layout.auditor': 'Auditor',
+  'layout.active': 'Active',
+  'layout.inactive': 'Inactive',
+  'layout.language': 'Language',
+
+  // Dashboard Page
+  'dashboard.title': 'Sprint Dashboard',
+  'dashboard.no_sprint': 'No active sprint',
+  'dashboard.no_sprint_hint': 'Run `deckent start` to begin a sprint.',
+  'dashboard.phase': 'Phase',
+  'dashboard.elapsed': 'Elapsed',
+  'dashboard.progress': 'Progress',
+  'dashboard.tasks': 'Tasks',
+  'dashboard.agents': 'Agents',
+  'dashboard.alerts': 'Alerts',
+  'dashboard.no_alerts': 'No active alerts.',
+  'dashboard.usage': 'Usage',
+  'dashboard.worker': 'Worker',
+  'dashboard.task': 'Task',
+  'dashboard.model': 'Model',
+  'dashboard.status': 'Status',
+  'dashboard.action': 'Action',
+  'dashboard.kill': 'Kill',
+  'dashboard.done': 'done',
+  'dashboard.running': 'running',
+  'dashboard.queued': 'queued',
+  'dashboard.failed': 'failed',
+
+  // Settings Page
+  'settings.title': 'Settings & Health',
+  'settings.doctor': 'System Health',
+  'settings.run_doctor': 'Run Doctor',
+  'settings.check': 'Check',
+  'settings.result': 'Result',
+  'settings.details': 'Details',
+  'settings.passed': 'Passed',
+  'settings.failed': 'Failed',
+  'settings.warning': 'Warning',
+  'settings.health_score': 'Health Score',
+
+  // History Page
+  'history.title': 'Sprint History',
+  'history.no_history': 'No sprint history found.',
+  'history.sprint': 'Sprint',
+  'history.date': 'Date',
+  'history.total_tasks': 'Tasks',
+  'history.completed': 'Done',
+  'history.nogo_rate': 'NO_GO %',
+  'history.coverage': 'Coverage',
+  'history.duration': 'Duration',
+  'history.trend': 'Trend',
+
+  // Memory Page
+  'memory.title': 'Brain Memory',
+  'memory.tab_memory': 'Memory',
+  'memory.tab_debt': 'Tech Debt',
+  'memory.no_memory': 'No memory content found.',
+  'memory.no_debt': 'No technical debt found.',
+
+  // Config Page
+  'config.title': 'Configuration',
+  'config.save': 'Save',
+  'config.saving': 'Saving...',
+  'config.saved': 'Configuration saved.',
+  'config.error': 'Failed to save configuration.',
+  'config.reset': 'Reset to Defaults',
+  'config.category.provider': 'Provider',
+  'config.category.sprint': 'Sprint',
+  'config.category.memory': 'Memory',
+  'config.category.auditor': 'Auditor',
+  'config.category.output': 'Output',
+  'config.category.search': 'Search',
+  'config.category.notifications': 'Notifications',
+  'config.category.telemetry': 'Telemetry',
+  'config.category.environment': 'Environment',
+  'config.category.routing': 'Routing',
+  'config.category.rollback': 'Rollback',
+  'config.category.project': 'Project',
+  'config.category.advanced': 'Advanced',
+
+  // Common
+  'common.loading': 'Loading...',
+  'common.error': 'Error',
+  'common.retry': 'Retry',
+  'common.close': 'Close',
+  'common.cancel': 'Cancel',
+  'common.confirm': 'Confirm',
+  'common.yes': 'Yes',
+  'common.no': 'No',
+} as const;
+
+export type TranslationKey = keyof typeof en;
