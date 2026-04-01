@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Save, RotateCcw, Info } from "lucide-react";
+import { Save, RotateCcw, Info, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Select } from "../components/ui/select";
@@ -8,6 +8,21 @@ import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { fetchJson, postJson } from "../lib/api";
 import { useTranslation } from "../i18n/LanguageProvider";
+import type { TranslationKey } from "../i18n/en";
+
+// ─── Doctor Types ─────────────────────────────────────────────────
+
+interface DoctorCheck {
+  name: string;
+  passed: boolean;
+  message: string;
+  required: boolean;
+}
+
+interface DoctorData {
+  ok: boolean;
+  checks: DoctorCheck[];
+}
 
 // ─── Config Metadata ─────────────────────────────────────────────
 
@@ -96,6 +111,22 @@ const CATEGORIES = [
   "Rollback", "Project", "Advanced",
 ] as const;
 
+const CATEGORY_KEY_MAP: Record<string, string> = {
+  "Provider": "config.category.provider",
+  "Sprint": "config.category.sprint",
+  "Memory": "config.category.memory",
+  "Auditor": "config.category.auditor",
+  "Output": "config.category.output",
+  "Search": "config.category.search",
+  "Notifications": "config.category.notifications",
+  "Telemetry": "config.category.telemetry",
+  "Environment": "config.category.environment",
+  "Skill Routing": "config.category.routing",
+  "Rollback": "config.category.rollback",
+  "Project": "config.category.project",
+  "Advanced": "config.category.advanced",
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────
 
 function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
@@ -146,6 +177,10 @@ export default function ConfigPage() {
   const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
 
+  const [doctor, setDoctor] = useState<DoctorData | null>(null);
+  const [doctorLoading, setDoctorLoading] = useState(true);
+  const [doctorError, setDoctorError] = useState<string | null>(null);
+
   const loadData = useCallback(() => {
     setLoading(true);
     setError(null);
@@ -163,7 +198,21 @@ export default function ConfigPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const loadDoctor = useCallback(() => {
+    setDoctorLoading(true);
+    setDoctorError(null);
+    fetchJson<DoctorData>("/api/doctor")
+      .then(setDoctor)
+      .catch((err: unknown) => {
+        setDoctorError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setDoctorLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadData();
+    loadDoctor();
+  }, [loadData, loadDoctor]);
 
   function handleChange(field: ConfigFieldMeta, rawValue: string) {
     const value = parseFieldValue(rawValue, field.type);
@@ -186,9 +235,9 @@ export default function ConfigPage() {
       const result = await postJson<Record<string, unknown>>("/api/config", config);
       setConfig(result);
       setDirty(new Set());
-      setSaveMsg({ type: "success", text: "Configuration saved successfully." });
+      setSaveMsg({ type: "success", text: t('config.save_success') });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Save failed";
+      const msg = err instanceof Error ? err.message : t('config.error');
       setSaveMsg({ type: "error", text: msg });
     } finally {
       setSaving(false);
@@ -206,11 +255,11 @@ export default function ConfigPage() {
   }
 
   if (loading) {
-    return <p className="text-muted-foreground p-4">Loading configuration...</p>;
+    return <p className="text-muted-foreground p-4">{t('config.loading')}</p>;
   }
 
   if (error) {
-    return <p className="text-red-400 p-4">Error: {error}</p>;
+    return <p className="text-red-400 p-4">{t('common.error')}: {error}</p>;
   }
 
   return (
@@ -222,6 +271,64 @@ export default function ConfigPage() {
           {saving ? t('config.saving') : t('config.save')}
         </Button>
       </div>
+
+      {/* System Health */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle>{t('settings.doctor')}</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadDoctor}
+            disabled={doctorLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${doctorLoading ? "animate-spin" : ""}`} />
+            {t('settings.run_doctor')}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {doctorLoading && !doctor && (
+            <p className="text-muted-foreground">{t('common.loading')}</p>
+          )}
+          {doctorError && (
+            <p className="text-red-400">{t('common.error')}: {doctorError}</p>
+          )}
+          {doctor && (
+            <div className="space-y-3">
+              <div
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  doctor.ok
+                    ? "bg-green-900/30 text-green-400"
+                    : "bg-red-900/30 text-red-400"
+                }`}
+              >
+                {doctor.ok ? t('config.doctor_ok') : t('config.doctor_fail')}
+              </div>
+              <ul className="space-y-2">
+                {doctor.checks.map((check) => (
+                  <li key={check.name} className="flex items-start gap-2 text-sm">
+                    {check.passed ? (
+                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-400" />
+                    ) : (
+                      <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+                    )}
+                    <div>
+                      <span className="font-medium">{check.name}</span>
+                      {check.required && (
+                        <span className="ml-1 text-xs text-muted-foreground">({t('config.required')})</span>
+                      )}
+                      <p className="text-muted-foreground">{check.message}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       {saveMsg && (
         <div
@@ -243,7 +350,7 @@ export default function ConfigPage() {
         return (
           <Card key={category} data-testid={`config-category-${category.toLowerCase().replace(/\s+/g, "-")}`}>
             <CardHeader>
-              <CardTitle>{category}</CardTitle>
+              <CardTitle>{CATEGORY_KEY_MAP[category] ? t(CATEGORY_KEY_MAP[category] as TranslationKey) : category}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -319,7 +426,7 @@ export default function ConfigPage() {
                             data-testid={`reset-${field.key}`}
                           >
                             <RotateCcw className="h-3 w-3" />
-                            Reset
+                            {t('config.reset_field')}
                           </Button>
                         )}
                       </div>
@@ -346,7 +453,7 @@ export default function ConfigPage() {
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving || dirty.size === 0} className="gap-2">
           <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? t('config.saving') : t('config.save_changes')}
         </Button>
       </div>
     </div>

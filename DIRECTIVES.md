@@ -1,217 +1,139 @@
-# DIRECTIVES — Sprint 083: Dashboard UX Overhaul Faz A — Worker Kartları + Sprint Timeline + Activity Feed
+# DIRECTIVES — Sprint 084: Dashboard Tutarlılık + i18n Tam Kapsam + Config Doğrulama
 
-## Goal: Dashboard'u son kullanıcı dostu, görsel, canlı izlenebilir hale getir. Worker kart grid, sprint faz timeline, canlı aktivite feed. Profesyonel UX.
+## Goal: Settings/Config sayfaları birleştirilsin, TR/EN tam çalışsın, config değişiklikleri doğru dosyaya yazılsın, dashboard işlemleri terminalde görünsün.
 
 ---
 
-## Task 1: WorkerCard Bileşeni — Canlı Agent Kart Grid
-- Model: opus
+## Task 1: Settings + Config Sayfa Birleştirme
+- Model: sonnet
 - Effort: high
 - Agent: refactorer
 - Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/pages/DashboardPage.tsx
+- Files: src/dashboard/src/pages/SettingsPage.tsx, src/dashboard/src/pages/ConfigPage.tsx, src/dashboard/src/App.tsx, src/dashboard/src/components/Layout.tsx
 - Scope: src/dashboard/
 
 ### Description
-Mevcut worker tablosunu **kart grid** ile değiştir. Her worker bir kart:
+SettingsPage ve ConfigPage iki ayrı sayfa olarak çakışıyor — ikisi de config yazıyor. BİRLEŞTİR:
 
-A) `WorkerCard.tsx` bileşeni oluştur:
-```
-┌─────────────────────────────┐
-│  🤖 w-076-001        sonnet │  ← Model badge sağ üst
-│  ─────────────────────────  │
-│  📝 CHANGELOG entry         │  ← Task başlığı
-│  Agent: doc-writer          │  ← Atanan agent
-│  Skill: documentation       │  ← Atanan skill
-│  ─────────────────────────  │
-│  ⏱ 3m 42s    ❤️ 5s ago     │  ← Elapsed + son heartbeat
-│  📁 3 files changed         │  ← Dosya değişiklik sayısı
-│  ─────────────────────────  │
-│  ▌▌▌▌▌▌▌░░░ EXECUTING      │  ← Durum çubuğu + badge
-│                    [Detail] │  ← Detay butonu
-└─────────────────────────────┘
-```
+A) ConfigPage'i ana yapılandırma sayfası yap. İçine ekle:
+- En üstte: Doctor sağlık kontrol bölümü (SettingsPage'den taşı)
+- Ortada: Mevcut ConfigPage alanları (30+ alan, kategoriler halinde)
+- Altta: Save butonu
 
-B) Durum renkleri:
-- EXECUTING: mavi pulse animasyon (border-blue-500 + animate-pulse)
-- DONE: yeşil border + ✓ ikonu
-- NO_GO: kırmızı border + ✗ ikonu  
-- PAUSED: sarı border + ⏸ ikonu
-- IDLE: gri border
+B) SettingsPage'i kaldır veya ConfigPage'e yönlendir:
+- App.tsx'te `/settings` route'unu `/config`'e redirect yap
+- Layout.tsx navItems'dan Settings'i kaldır (veya "Settings" → "Config" olarak birleştir)
+- Sidebar'da tek "Yapılandırma/Config" linki olsun
 
-C) Model ikonları:
-- opus: 💎 (premium)
-- sonnet: ⚡ (standard)
-- haiku: 🍃 (lightweight)
+C) SettingsPage'deki mode/language/model seçicileri ConfigPage'deki alanlarla çakışıyor. ConfigPage'in CONFIG_FIELDS zaten bu alanları içeriyor — SettingsPage'deki ayrı form gereksiz.
 
-D) Kart grid: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`
+D) Doctor bölümünü ConfigPage'in üstüne taşı:
+- "System Health" card'ı + Run Doctor butonu
+- Check sonuçları tablosu (pass/fail/warn)
+- Health score
 
-E) Tıklanınca mevcut AgentDetail sheet açılsın (onClick → setSelectedAgent)
+E) İlk render'da doctor otomatik çalışsın (SettingsPage'deki gibi useEffect ile).
 
-F) Kart üzerinde canlı `currentAction` gösterimi (SSE'den gelen veri)
-
-G) Boş durum: sprint yokken veya worker yokken "Henüz worker yok — sprint başlatın" mesajı
-
-H) DashboardPage.tsx'teki mevcut worker Table'ı kaldır, yerine WorkerCard grid koy.
-
-I) i18n: useTranslation ile tüm etiketler çift dilli
-
-**Kanıt:** `grep "WorkerCard\|grid-cols" src/dashboard/src/pages/DashboardPage.tsx` → kart grid kullanılıyor
+**Kanıt:** `grep "SettingsPage" src/dashboard/src/App.tsx` → yönlendirme var veya kaldırılmış
 
 **Test:** `tsc --noEmit` temiz geçmeli.
 
 ---
 
-## Task 2: SprintPhaseTimeline Bileşeni — Faz Görsel Akışı
+## Task 2: i18n Tam Kapsam — Kalan Hardcoded String'ler
 - Model: sonnet
-- Effort: normal
+- Effort: high
 - Agent: refactorer
 - Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/components/SprintPhaseTimeline.tsx, src/dashboard/src/pages/DashboardPage.tsx
+- Files: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/pages/ConfigPage.tsx, src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/components/SprintPhaseTimeline.tsx, src/dashboard/src/components/ActivityFeed.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/components/AgentDetail.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
 - Scope: src/dashboard/
 
 ### Description
-Sprint'in hangi fazda olduğunu görsel timeline olarak göster:
+Dashboard'daki TÜM hardcoded İngilizce string'leri i18n key'lerine taşı:
 
-A) `SprintPhaseTimeline.tsx` bileşeni:
-```
-PLAN ──● SPAWN ──● EXECUTE ──◉ EVALUATE ──○ RETRO ──○ CLEANUP
- ✓        ✓         ●                                         
-```
+A) Her bileşen ve sayfayı tara. Aşağıdaki kalıpları bul ve `t('key')` ile değiştir:
+- "Sprint Status" → t('dashboard.sprint_status')
+- "Updated" → t('dashboard.updated')
+- "Sprint ID" → t('dashboard.sprint_id')
+- "5hr Usage" / "Weekly Usage" → t('dashboard.usage_5hr') / t('dashboard.usage_weekly')
+- "No sprint data available." → t('dashboard.no_data')
+- "Done:", "Active:", "Pending:" → t('dashboard.done'), t('dashboard.active'), t('dashboard.pending')
+- Tablo header'ları: "ID", "Task", "Last HB", "Elapsed", "Action"
+- WorkerCard: "Agent:", "Skill:", "files changed", "Detail"
+- ActivityFeed: her event mesajı
+- HistoryPage: "All Sprints", tablo header'ları
+- MemoryPage: tab isimleri, empty state mesajları
+- ConfigPage: kategori isimleri, "Save Changes", "Reset", alan açıklamaları
+- NewSprintModal: tüm adım başlıkları ve butonlar
+- AgentDetail: header, alan isimleri
 
-B) Fazlar dizisi: PLAN, SPAWN, EXECUTE, EVALUATE, FIX, RETRO, DECAY, CLEANUP
+B) en.ts'e tüm yeni key'leri ekle (İngilizce değerler)
+C) tr.ts'e tüm yeni key'lerin Türkçe çevirilerini ekle
+D) TranslationKey type'ı otomatik güncellenecek (en.ts'ten derive ediliyor)
 
-C) Her faz bir daire + etiket:
-- Tamamlanan fazlar: yeşil dolu daire (●) + yeşil çizgi
-- Aktif faz: mavi büyük daire (◉) + pulse animasyon
-- Gelecek fazlar: gri boş daire (○) + gri çizgi
+E) LanguageProvider'daki dil değişikliği anında tüm bileşenlere yansımalı (context re-render). Sayfa yenileme GEREKMEMELİ.
 
-D) Responsive: mobilde yatay scroll veya dikey sıralama
-
-E) DashboardPage'de Sprint Status Card'ın içine ekle — mevcut phase badge'in altına
-
-F) Sprint yokken timeline gizle
-
-G) i18n: faz isimleri çift dilli (opsiyonel — teknik terimler EN kalabilir)
-
-**Kanıt:** `grep "SprintPhaseTimeline\|phase-timeline" src/dashboard/src/pages/DashboardPage.tsx` → bileşen kullanılıyor
+**Kanıt:** Dashboard kaynak dosyalarında `grep -r '"[A-Z][a-z]' src/dashboard/src/pages/ src/dashboard/src/components/` → i18n key dışında hardcoded İngilizce string olmamalı (teknik terimler hariç)
 
 **Test:** `tsc --noEmit` temiz geçmeli.
 
 ---
 
-## Task 3: ActivityFeed Bileşeni — Canlı Aktivite Akışı
+## Task 3: Config Yazma Doğrulama + Geri Okuma
 - Model: sonnet
 - Effort: normal
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/components/ActivityFeed.tsx, src/dashboard/src/pages/DashboardPage.tsx
-- Scope: src/dashboard/
+- Agent: test-writer
+- Skills: typescript-expert, testing-expert
+- Files: tests/api/server.test.ts, tests/dashboard/config-integration.test.ts
+- Scope: tests/
 
 ### Description
-Sprint sırasında ne olduğunu canlı gösteren aktivite akışı:
+Dashboard'dan yapılan config değişikliklerinin doğru yazılıp okunduğunu doğrulayan testler:
 
-A) `ActivityFeed.tsx` bileşeni:
-```
-┌─ Live Activity ──────────────────┐
-│  12:15:42  🟢 w-001 spawned      │
-│  12:15:43  🟢 w-002 spawned      │
-│  12:16:10  📝 w-001 writing      │
-│            src/core/config.ts     │
-│  12:17:05  ✅ w-002 DONE         │
-│  12:18:30  ⚠️ Stale heartbeat    │
-│            w-003 (2m ago)         │
-│  12:19:00  ❌ w-003 NO_GO        │
-└──────────────────────────────────┘
-```
+A) API test'lerine ekle (tests/api/server.test.ts):
+- POST /api/config ile `{ mode: "economic" }` gönder → GET /api/config'te `mode: "economic"` dön
+- POST /api/config ile `{ language: "tr" }` gönder → geri oku, `language: "tr"` olmalı
+- POST /api/config ile nested key `{ git: { auto_commit: true } }` → geri oku, nested doğru olmalı
+- POST /api/config ile `{ memory_budget: 900 }` → writeFileSync çağrısında 900 olmalı
+- POST /api/config ile geçersiz değer → 422 dönmeli
+- Mevcut config'i bozmamalı — sadece gönderilen alanlar değişmeli (deepMerge)
 
-B) Feed'i SSE verisinden oluştur:
-- Agent spawn/done olayları (agents dizisindeki durum değişiklikleri)
-- Alert'ler (alerts dizisi)
-- Faz değişiklikleri (sprint.phase)
-- Progress değişiklikleri (done sayısı artınca)
+B) Round-trip testi: POST → GET → değerler eşleşmeli (en az 5 farklı alan)
 
-C) Her entry: zaman damgası + ikon + mesaj + opsiyonel detay
+C) Nested key round-trip: `skill_routing.testing`, `modes.performance.max_workers` gibi
 
-D) Maksimum 50 entry tut (eski olanları at)
+**Kanıt:** `grep "round-trip\|roundtrip\|config.*write.*read\|POST.*GET.*config" tests/api/server.test.ts` → test var
 
-E) Auto-scroll: yeni entry gelince en alta kaydır
-
-F) DashboardPage'e sağ taraf veya alt bölüm olarak ekle
-
-G) Sprint yokken "Sprint başlatın, aktivite burada görünecek" mesajı
-
-H) i18n: tüm mesajlar çift dilli
-
-**Kanıt:** `grep "ActivityFeed\|activity-feed" src/dashboard/src/pages/DashboardPage.tsx` → bileşen kullanılıyor
-
-**Test:** `tsc --noEmit` temiz geçmeli.
+**Test:** Yeni testlerin tamamı geçmeli.
 
 ---
 
-## Task 4: DashboardPage Layout Yeniden Düzenleme
+## Task 4: Dashboard İşlemlerinin Terminal Çıktısı
 - Model: sonnet
 - Effort: normal
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: src/dashboard/
+- Agent: api-builder
+- Skills: typescript-expert
+- Files: src/api/server.ts, src/cli/commands/web.ts
+- Scope: src/api/, src/cli/
 
 ### Description
-DashboardPage'in genel layout'unu profesyonel hale getir:
+Dashboard'dan yapılan işlemler terminalde (deckent web çalıştıran terminal) görünsün:
 
-A) Yeni layout yapısı (yukarıdan aşağıya):
-```
-┌─ Header: Sprint Dashboard ── [Cleanup] [Kill All] [New Sprint] ─┐
-│                                                                    │
-│  ┌─ Sprint Status Card ─────────────────────────────────────────┐ │
-│  │  sprint-076  │  EXECUTE  │  4m 32s  │  Usage: 34%           │ │
-│  │  ═══●═══●═══◉═══○═══○═══○  (Phase Timeline)                │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-│                                                                    │
-│  ┌─ Progress ────────────────────────────────────────────────────┐ │
-│  │  ████████░░ 3/4 done, 1 running                              │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-│                                                                    │
-│  ┌─ Workers (2/3 layout) ────┐  ┌─ Activity Feed (1/3) ────────┐ │
-│  │  [Card] [Card] [Card]     │  │  12:15 🟢 w-001 spawned     │ │
-│  │  [Card] [Card]            │  │  12:16 📝 writing config.ts  │ │
-│  │                           │  │  12:17 ✅ w-002 DONE         │ │
-│  └───────────────────────────┘  └──────────────────────────────┘ │
-│                                                                    │
-│  ┌─ Alerts ──────────────────────────────────────────────────────┐ │
-│  │  (mevcut alert section — aynı kalabilir)                      │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────────┘
-```
+A) server.ts'teki POST handler'larına console.log ekle:
+- POST /api/start → `[deckent] Sprint started via dashboard (jobId: xxx)`
+- POST /api/kill/:id → `[deckent] Worker killed via dashboard: xxx`
+- POST /api/cleanup → `[deckent] Cleanup triggered via dashboard (removed: N tasks, N locks)`
+- POST /api/config → `[deckent] Config updated via dashboard: {changed_keys}`
+- POST /api/set-directives → `[deckent] Directives updated via dashboard (N tasks)`
+- POST /api/plan → `[deckent] Plan requested via dashboard (mode: xxx)`
 
-B) Workers + Activity Feed yan yana: `grid grid-cols-1 lg:grid-cols-3` — workers 2/3, feed 1/3
+B) Format: `[deckent] {action} via dashboard` — tutarlı prefix
 
-C) Sprint yokken karşılama mesajı:
-```
-┌───────────────────────────────────┐
-│        🐙 deckent                 │
-│                                   │
-│   Henüz aktif sprint yok.         │
-│                                   │
-│   Sprint başlatmak için:          │
-│   [Yeni Sprint] butonu            │
-│                                   │
-│   Son sprint: sprint-076 (4/4 ✓)  │
-└───────────────────────────────────┘
-```
+C) Sadece POST işlemlerinde logla (GET'ler sessiz)
 
-D) Tüm yeni i18n key'lerini en.ts ve tr.ts'e ekle:
-- worker.* (model, agent, skill, elapsed, heartbeat, files_changed, detail, no_workers)
-- activity.* (spawned, writing, done, nogo, stale, phase_changed, no_activity)
-- welcome.* (no_sprint, start_hint, last_sprint)
+D) Hassas veri loglama: API key gibi değerler loglanmamalı. Config değişikliğinde sadece key isimleri logla, değerleri değil.
 
-E) Genel stil iyileştirmeleri:
-- Card'lara subtle shadow (shadow-lg/shadow-zinc-900)
-- Başlıklarda gradient text veya accent renk
-- Geçişlerde transition-all duration-300
-
-**Kanıt:** `grep "grid-cols-3\|WorkerCard\|ActivityFeed\|SprintPhaseTimeline" src/dashboard/src/pages/DashboardPage.tsx` → hepsi entegre
+**Kanıt:** `grep "\[deckent\]" src/api/server.ts` → en az 6 log satırı
 
 **Test:** `tsc --noEmit` temiz geçmeli.
 
@@ -220,8 +142,8 @@ E) Genel stil iyileştirmeleri:
 ## Quality Rules
 - tsc --noEmit MUST pass
 - Mevcut testlerde 0 regresyon
-- Tüm yeni bileşenler i18n uyumlu (useTranslation)
-- Responsive: mobilde tek sütun, desktop'ta grid
-- Dark theme tutarlılığı korunmalı (zinc-950/900/800)
-- Animasyonlar subtle olmalı — abartısız
+- Dashboard'da İngilizce seçilince 0 Türkçe görünmeli
+- Dashboard'da Türkçe seçilince 0 İngilizce görünmeli (teknik terimler hariç)
+- Config round-trip: yazılan = okunan
+- Terminal logları tutarlı format: [deckent] prefix
 - %100 GO hedefli

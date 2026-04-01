@@ -120,6 +120,56 @@ export const en = {
   'welcome.start_hint': 'Use the New Sprint button to begin.',
   'welcome.last_sprint': 'Last sprint',
 
+  // Dashboard additional
+  'dashboard.sprint_status': 'Sprint Status',
+  'dashboard.sprint_id': 'Sprint ID',
+  'dashboard.updated': 'Updated',
+  'dashboard.usage_5hr': '5hr Usage',
+  'dashboard.usage_weekly': 'Weekly Usage',
+  'dashboard.active': 'Active',
+  'dashboard.pending': 'Pending',
+  'dashboard.violations': 'violations',
+  'dashboard.confirm_kill_worker': 'Kill worker',
+
+  // History additional
+  'history.all_sprints': 'All Sprints',
+  'history.sprint_id': 'Sprint ID',
+  'history.success_rate': 'Success %',
+  'history.tech_debt': 'Tech Debt',
+  'history.nogo': 'No-Go',
+  'history.success_rate_trend': 'Success Rate Trend',
+  'history.trend_legend': 'Last 10 sprints',
+
+  // Memory additional
+  'memory.technical_debt': 'Technical Debt',
+
+  // Config additional
+  'config.save_changes': 'Save Changes',
+  'config.loading': 'Loading configuration...',
+  'config.reset_field': 'Reset',
+  'config.save_success': 'Configuration saved successfully.',
+  'config.doctor_ok': 'All required checks passed',
+  'config.doctor_fail': 'Some required checks failed',
+  'config.required': 'required',
+
+  // New Sprint Modal
+  'modal.directives_hint': 'Enter sprint directives below. Each "## Task" block defines a task.',
+  'modal.plan_sprint': 'Plan Sprint',
+  'modal.planning': 'Planning sprint...',
+  'modal.review_tasks_parsed': 'task(s) parsed. Sprint',
+  'modal.review_planned_with': 'planned with',
+  'modal.review_tasks_suffix': 'task(s):',
+  'modal.confirm_start': 'Confirm & Start',
+  'modal.starting': 'Starting sprint...',
+  'modal.success': 'Sprint started successfully!',
+  'modal.try_again': 'Try Again',
+
+  // Agent Detail
+  'agent.worker': 'Worker',
+  'agent.scope': 'Scope',
+  'agent.log_output': 'Log Output',
+  'agent.no_log': 'No log output yet.',
+
   // Common
   'common.loading': 'Loading...',
   'common.error': 'Error',

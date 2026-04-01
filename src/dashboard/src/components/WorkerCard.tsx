@@ -2,6 +2,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Skull } from "lucide-react";
 import type { AgentInfo } from "../types";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 const STATUS_BORDER: Record<string, string> = {
   EXECUTING: "border-blue-500 animate-pulse",
@@ -72,6 +73,7 @@ interface WorkerCardProps {
 }
 
 export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
+  const { t } = useTranslation();
   const borderClass = STATUS_BORDER[agent.status] ?? "border-zinc-700";
   const badgeVariant = STATUS_BADGE[agent.status] ?? "secondary";
   const statusIcon = STATUS_ICON[agent.status] ?? "○";
@@ -100,7 +102,7 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
           📝 {agent.taskId ?? "—"}
         </p>
         <p className="text-xs text-zinc-400 mt-1">
-          Agent: <span className="text-zinc-300">{agent.role}</span>
+          {t("worker.agent")}: <span className="text-zinc-300">{agent.role}</span>
         </p>
       </div>
 
@@ -139,7 +141,7 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
               }}
             >
               <Skull className="mr-1 h-3 w-3" />
-              Kill
+              {t("dashboard.kill")}
             </Button>
           )}
           <Button
@@ -151,7 +153,7 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
               onClick();
             }}
           >
-            Detail
+            {t("worker.detail")}
           </Button>
         </div>
       </div>
@@ -166,11 +168,12 @@ interface WorkerCardGridProps {
 }
 
 export function WorkerCardGrid({ agents, onSelect, onKill }: WorkerCardGridProps) {
+  const { t } = useTranslation();
   if (agents.length === 0) {
     return (
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center">
         <p className="text-zinc-500">
-          Henüz worker yok — sprint başlatın
+          {t("worker.no_workers")}
         </p>
       </div>
     );

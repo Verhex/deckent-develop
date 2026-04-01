@@ -6,6 +6,21 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.2.0-beta.3-sprint79] - 2026-04-01
+
+### Added
+
+- Settings + Config Sayfa Birleştirme
+- Dashboard İşlemlerinin Terminal Çıktısı
+
+### Changed
+
+- i18n Tam Kapsam — Kalan Hardcoded String'ler (completed with tech debt)
+- Config Yazma Doğrulama + Geri Okuma (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
+
 ## [0.2.0-beta.3-sprint78] - 2026-04-01
 
 ### Added

@@ -476,6 +476,7 @@ async function handleRequest(
       const jobId = `job-${Date.now()}`;
       const job: ActiveJob = { id: jobId, status: 'running' };
       activeJobs.set(jobId, job);
+      console.log(`[deckent] Sprint started via dashboard (jobId: ${jobId})`);
       sendJson(res, { jobId, status: 'started' }, 202);
 
       // Run sprint in background
@@ -508,6 +509,7 @@ async function handleRequest(
         const plan = await planSprint(projectRoot, config, context, recommendation, {
           mode: b.mode,
         });
+        console.log(`[deckent] Plan requested via dashboard (mode: ${b.mode ?? 'auto'})`);
         sendJson(res, plan);
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Plan failed');
@@ -522,6 +524,7 @@ async function handleRequest(
       if (!WORKER_ID_RE.test(workerId)) { sendError(res, 400, 'Invalid workerId'); return; }
       try {
         killWorker(workerId);
+        console.log(`[deckent] Worker killed via dashboard: ${workerId}`);
         sendJson(res, { success: true });
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Kill failed');
@@ -540,6 +543,7 @@ async function handleRequest(
         const directivesPath = join(projectRoot, DIRECTIVES_FILE);
         writeFileSync(directivesPath, b.content, 'utf-8');
         const taskCount = countTaskBlocks(b.content);
+        console.log(`[deckent] Directives updated via dashboard (${taskCount} tasks)`);
         sendJson(res, { success: true, taskCount });
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Write failed');
@@ -594,6 +598,7 @@ async function handleRequest(
 
       try {
         cleanup(projectRoot, sprint);
+        console.log(`[deckent] Cleanup triggered via dashboard (removed: ${taskFileCount} tasks, ${lockFileCount} locks)`);
         sendJson(res, { success: true, removedTasks: taskFileCount, removedLocks: lockFileCount });
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Cleanup failed');
@@ -622,6 +627,8 @@ async function handleRequest(
           // Non-validation errors (e.g. missing function) are ignored — write proceeds
         }
         writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf-8');
+        const changedKeys = Object.keys(parsed.data as Record<string, unknown>).join(', ');
+        console.log(`[deckent] Config updated via dashboard: ${changedKeys}`);
         sendJson(res, merged);
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Config update failed');

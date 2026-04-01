@@ -70,11 +70,11 @@ export default function HistoryPage() {
           {/* Success Rate Trend */}
           <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle className="text-zinc-100">Success Rate Trend</CardTitle>
+              <CardTitle className="text-zinc-100">{t('history.success_rate_trend')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-zinc-500 mb-3">
-                Last 10 sprints — <span className="text-green-400">■</span> 100%&nbsp;
+                {t('history.trend_legend')} — <span className="text-green-400">■</span> 100%&nbsp;
                 <span className="text-yellow-400">■</span> ≥80%&nbsp;
                 <span className="text-red-400">■</span> &lt;80%
               </p>
@@ -85,22 +85,22 @@ export default function HistoryPage() {
           {/* History Table */}
           <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle className="text-zinc-100">All Sprints</CardTitle>
+              <CardTitle className="text-zinc-100">{t('history.all_sprints')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs uppercase text-zinc-400 border-b border-zinc-700">
                     <tr>
-                      <th className="px-4 py-3">Sprint ID</th>
-                      <th className="px-4 py-3">Tasks</th>
-                      <th className="px-4 py-3">Done</th>
-                      <th className="px-4 py-3">Success %</th>
-                      <th className="px-4 py-3">Tech Debt</th>
-                      <th className="px-4 py-3">No-Go</th>
-                      <th className="px-4 py-3">No-Go %</th>
-                      <th className="px-4 py-3">Coverage</th>
-                      <th className="px-4 py-3">Duration</th>
+                      <th className="px-4 py-3">{t('history.sprint_id')}</th>
+                      <th className="px-4 py-3">{t('history.total_tasks')}</th>
+                      <th className="px-4 py-3">{t('history.completed')}</th>
+                      <th className="px-4 py-3">{t('history.success_rate')}</th>
+                      <th className="px-4 py-3">{t('history.tech_debt')}</th>
+                      <th className="px-4 py-3">{t('history.nogo')}</th>
+                      <th className="px-4 py-3">{t('history.nogo_rate')}</th>
+                      <th className="px-4 py-3">{t('history.coverage')}</th>
+                      <th className="px-4 py-3">{t('history.duration')}</th>
                     </tr>
                   </thead>
                   <tbody>

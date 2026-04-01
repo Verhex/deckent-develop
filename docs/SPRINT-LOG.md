@@ -2194,3 +2194,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 078-004: DashboardPage Layout Yeniden Düzenleme (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 79 — sprint-079
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-01
+**Duration:** 758s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 758327ms |
+
+### Tasks
+
+- 079-001: Settings + Config Sayfa Birleştirme (DONE)
+- 079-002: i18n Tam Kapsam — Kalan Hardcoded String'ler (GO_WITH_TECH_DEBT)
+- 079-003: Config Yazma Doğrulama + Geri Okuma (GO_WITH_TECH_DEBT)
+- 079-004: Dashboard İşlemlerinin Terminal Çıktısı (DONE)
+
+---

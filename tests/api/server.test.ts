@@ -60,6 +60,7 @@ import { killWorker } from '../../src/orchestra/tmux.js';
 import { readWorkerLog } from '../../src/agents/worker.js';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { runSprint, cleanup } from '../../src/orchestra/brain.js';
+import { validatePartialConfig, deepMerge } from '../../src/core/config.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
@@ -71,6 +72,8 @@ const mockReadWorkerLog = vi.mocked(readWorkerLog);
 const mockRunSprint = vi.mocked(runSprint);
 const mockCleanup = vi.mocked(cleanup);
 const mockReadJsonSafe = vi.mocked(readJsonSafe);
+const mockValidatePartialConfig = vi.mocked(validatePartialConfig);
+const mockDeepMerge = vi.mocked(deepMerge);
 
 // ─── Helpers ────────────────────────────────────────────────────
 const PROJECT_ROOT = '/tmp/test-project';
@@ -599,6 +602,273 @@ describe('createHttpServer', () => {
       expect(res.status).toBe(200);
       const body = JSON.parse(res.body);
       expect(body.mode).toBe('balanced');
+    });
+  });
+
+  // ─── Config Round-Trip — POST → GET ─────────────────────────
+
+  describe('Config round-trip — POST → GET', () => {
+    it('mode field: POST economic → GET returns economic', async () => {
+      // config write→read round-trip
+      mockReadJsonSafe.mockReturnValue({ mode: 'balanced', max_workers: 4 });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const postRes = await request(api, '/api/config', 'POST', { mode: 'economic' });
+      expect(postRes.status).toBe(200);
+      expect(JSON.parse(postRes.body).mode).toBe('economic');
+
+      // Simulate disk read-back: capture what writeFileSync received
+      const writtenJson = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      mockReadJsonSafe.mockReturnValue(JSON.parse(writtenJson));
+
+      const getRes = await request(api, '/api/config');
+      expect(getRes.status).toBe(200);
+      expect(JSON.parse(getRes.body).mode).toBe('economic');
+    });
+
+    it('language field: POST tr → GET returns tr', async () => {
+      // POST /api/config → GET /api/config config write/read round-trip
+      mockReadJsonSafe.mockReturnValue({ mode: 'balanced' });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const postRes = await request(api, '/api/config', 'POST', { language: 'tr' });
+      expect(postRes.status).toBe(200);
+      expect(JSON.parse(postRes.body).language).toBe('tr');
+
+      const writtenJson = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      mockReadJsonSafe.mockReturnValue(JSON.parse(writtenJson));
+
+      const getRes = await request(api, '/api/config');
+      expect(getRes.status).toBe(200);
+      expect(JSON.parse(getRes.body).language).toBe('tr');
+    });
+
+    it('nested key: POST { git: { auto_commit: true } } → GET returns git.auto_commit true', async () => {
+      mockReadJsonSafe.mockReturnValue({ mode: 'balanced' });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const postRes = await request(api, '/api/config', 'POST', { git: { auto_commit: true } });
+      expect(postRes.status).toBe(200);
+      const postBody = JSON.parse(postRes.body);
+      expect(postBody.git).toBeDefined();
+      expect(postBody.git.auto_commit).toBe(true);
+
+      const writtenJson = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      mockReadJsonSafe.mockReturnValue(JSON.parse(writtenJson));
+
+      const getRes = await request(api, '/api/config');
+      expect(getRes.status).toBe(200);
+      const getBody = JSON.parse(getRes.body);
+      expect(getBody.git.auto_commit).toBe(true);
+    });
+
+    it('memory_budget 900: writeFileSync called with memory_budget: 900', async () => {
+      mockReadJsonSafe.mockReturnValue({ mode: 'balanced' });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const postRes = await request(api, '/api/config', 'POST', { memory_budget: 900 });
+      expect(postRes.status).toBe(200);
+
+      expect(mockWriteFileSync).toHaveBeenCalled();
+      const writtenJson = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      const writtenConfig = JSON.parse(writtenJson);
+      expect(writtenConfig.memory_budget).toBe(900);
+    });
+
+    it('invalid config → returns 422 with VALIDATION_ERROR code', async () => {
+      // Make validatePartialConfig throw a ConfigValidationError
+      mockValidatePartialConfig.mockImplementationOnce(() => {
+        const err = Object.assign(new Error('Validation failed'), {
+          name: 'ConfigValidationError',
+          errors: ['max_workers must be a positive number'],
+        });
+        throw err;
+      });
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/config', 'POST', { max_workers: -1 });
+      expect(res.status).toBe(422);
+      const body = JSON.parse(res.body);
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toBe('Config validation failed');
+      expect(Array.isArray(body.error.details)).toBe(true);
+    });
+
+    it('deepMerge preserves existing fields — only sent keys change', async () => {
+      const existingConfig = { mode: 'balanced', max_workers: 4, brain_model: 'opus', language: 'en' };
+      mockReadJsonSafe.mockReturnValue(existingConfig);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      // Only send mode — shallow mock spreads base + override
+      const postRes = await request(api, '/api/config', 'POST', { mode: 'economic' });
+      expect(postRes.status).toBe(200);
+      const postBody = JSON.parse(postRes.body);
+      expect(postBody.mode).toBe('economic');
+      expect(postBody.max_workers).toBe(4);       // preserved
+      expect(postBody.brain_model).toBe('opus');  // preserved
+      expect(postBody.language).toBe('en');       // preserved
+    });
+
+    it('round-trip with 5 fields: POST → GET values match', async () => {
+      // POST /api/config → GET /api/config config write/read round-trip for 5 fields
+      const initial = { mode: 'balanced', max_workers: 2, brain_model: 'haiku', language: 'en', memory_budget: 600 };
+      mockReadJsonSafe.mockReturnValue(initial);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const update = { mode: 'performance', max_workers: 8, brain_model: 'opus', language: 'tr', memory_budget: 900 };
+      const postRes = await request(api, '/api/config', 'POST', update);
+      expect(postRes.status).toBe(200);
+      const postBody = JSON.parse(postRes.body);
+
+      // All 5 updated fields present in POST response
+      expect(postBody.mode).toBe('performance');
+      expect(postBody.max_workers).toBe(8);
+      expect(postBody.brain_model).toBe('opus');
+      expect(postBody.language).toBe('tr');
+      expect(postBody.memory_budget).toBe(900);
+
+      // Simulate disk read-back
+      const writtenJson = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      mockReadJsonSafe.mockReturnValue(JSON.parse(writtenJson));
+
+      const getRes = await request(api, '/api/config');
+      expect(getRes.status).toBe(200);
+      const getBody = JSON.parse(getRes.body);
+
+      // GET values must match POST response (round-trip)
+      expect(getBody.mode).toBe('performance');
+      expect(getBody.max_workers).toBe(8);
+      expect(getBody.brain_model).toBe('opus');
+      expect(getBody.language).toBe('tr');
+      expect(getBody.memory_budget).toBe(900);
+    });
+
+    it('nested key round-trip: skill_routing sub-keys merged correctly', async () => {
+      // Override deepMerge mock for this test with a real recursive implementation
+      mockDeepMerge.mockImplementationOnce((base, override) => {
+        function realDeepMerge(
+          b: Record<string, unknown>,
+          o: Record<string, unknown>,
+        ): Record<string, unknown> {
+          const result = { ...b };
+          for (const key of Object.keys(o)) {
+            const bv = b[key];
+            const ov = o[key];
+            if (
+              bv !== null && typeof bv === 'object' && !Array.isArray(bv) &&
+              ov !== null && typeof ov === 'object' && !Array.isArray(ov)
+            ) {
+              result[key] = realDeepMerge(bv as Record<string, unknown>, ov as Record<string, unknown>);
+            } else {
+              result[key] = ov;
+            }
+          }
+          return result;
+        }
+        return realDeepMerge(
+          base as Record<string, unknown>,
+          override as Record<string, unknown>,
+        ) as typeof base;
+      });
+
+      const initial = { mode: 'balanced', skill_routing: { testing: true, security: false, documentation: true } };
+      mockReadJsonSafe.mockReturnValue(initial);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      // Only update security sub-key — testing and documentation should be preserved
+      const postRes = await request(api, '/api/config', 'POST', { skill_routing: { security: true } });
+      expect(postRes.status).toBe(200);
+      const postBody = JSON.parse(postRes.body);
+      expect(postBody.skill_routing.testing).toBe(true);       // preserved
+      expect(postBody.skill_routing.security).toBe(true);      // updated
+      expect(postBody.skill_routing.documentation).toBe(true); // preserved
+
+      // Simulate disk read-back
+      const writtenJson = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      mockReadJsonSafe.mockReturnValue(JSON.parse(writtenJson));
+
+      // GET returns the same merged state
+      const getRes = await request(api, '/api/config');
+      expect(getRes.status).toBe(200);
+      const getBody = JSON.parse(getRes.body);
+      expect(getBody.skill_routing.testing).toBe(true);
+      expect(getBody.skill_routing.security).toBe(true);
+      expect(getBody.skill_routing.documentation).toBe(true);
+    });
+
+    it('nested key round-trip: modes.performance.max_workers preserved', async () => {
+      // Override deepMerge mock with real recursive implementation
+      mockDeepMerge.mockImplementationOnce((base, override) => {
+        function realDeepMerge(
+          b: Record<string, unknown>,
+          o: Record<string, unknown>,
+        ): Record<string, unknown> {
+          const result = { ...b };
+          for (const key of Object.keys(o)) {
+            const bv = b[key];
+            const ov = o[key];
+            if (
+              bv !== null && typeof bv === 'object' && !Array.isArray(bv) &&
+              ov !== null && typeof ov === 'object' && !Array.isArray(ov)
+            ) {
+              result[key] = realDeepMerge(bv as Record<string, unknown>, ov as Record<string, unknown>);
+            } else {
+              result[key] = ov;
+            }
+          }
+          return result;
+        }
+        return realDeepMerge(
+          base as Record<string, unknown>,
+          override as Record<string, unknown>,
+        ) as typeof base;
+      });
+
+      const initial = {
+        mode: 'balanced',
+        modes: { performance: { max_workers: 4, brain_model: 'opus' }, balanced: { max_workers: 2 } },
+      };
+      mockReadJsonSafe.mockReturnValue(initial);
+
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      // Only update max_workers inside performance mode
+      const postRes = await request(api, '/api/config', 'POST', {
+        modes: { performance: { max_workers: 8 } },
+      });
+      expect(postRes.status).toBe(200);
+      const postBody = JSON.parse(postRes.body);
+      expect(postBody.modes.performance.max_workers).toBe(8);             // updated
+      expect(postBody.modes.performance.brain_model).toBe('opus');        // preserved
+      expect(postBody.modes.balanced.max_workers).toBe(2);               // sibling preserved
+
+      // Simulate disk read-back
+      const writtenJson = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      mockReadJsonSafe.mockReturnValue(JSON.parse(writtenJson));
+
+      const getRes = await request(api, '/api/config');
+      expect(getRes.status).toBe(200);
+      const getBody = JSON.parse(getRes.body);
+      expect(getBody.modes.performance.max_workers).toBe(8);
+      expect(getBody.modes.performance.brain_model).toBe('opus');
+      expect(getBody.modes.balanced.max_workers).toBe(2);
     });
   });
 

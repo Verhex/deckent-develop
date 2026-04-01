@@ -146,7 +146,7 @@ export default function DashboardPage() {
   }, [sseState, t]);
 
   const handleKill = useCallback(async (agentId: string) => {
-    if (!confirm(`Kill worker ${agentId}?`)) return;
+    if (!confirm(`${t('dashboard.confirm_kill_worker')} ${agentId}?`)) return;
     try {
       await postJson(`/api/kill/${agentId}`);
       if (!sseState) {
@@ -221,7 +221,7 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2 text-zinc-100">
               <Activity className="h-5 w-5 text-blue-400" />
-              Sprint Status
+              {t("dashboard.sprint_status")}
             </CardTitle>
             {state.sprint?.phase && (
               <Badge
@@ -236,7 +236,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
               <div>
-                <p className="text-zinc-400">Sprint ID</p>
+                <p className="text-zinc-400">{t("dashboard.sprint_id")}</p>
                 <p className="font-mono text-zinc-100">
                   {state.sprint.id ?? "—"}
                 </p>
@@ -250,7 +250,7 @@ export default function DashboardPage() {
                 <p className="text-zinc-100">{state.sprint.status}</p>
               </div>
               <div>
-                <p className="text-zinc-400">Updated</p>
+                <p className="text-zinc-400">{t("dashboard.updated")}</p>
                 <p className="text-zinc-100">
                   {state.updatedAt ? relativeTime(state.updatedAt) : "—"}
                 </p>
@@ -270,7 +270,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-3">
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-zinc-400">5hr Usage</span>
+                <span className="text-zinc-400">{t("dashboard.usage_5hr")}</span>
                 <span className="text-zinc-100">{state.usage.fiveHourPercent}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-zinc-700">
@@ -283,7 +283,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-zinc-400">Weekly Usage</span>
+                <span className="text-zinc-400">{t("dashboard.usage_weekly")}</span>
                 <span className="text-zinc-100">{state.usage.weeklyPercent}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-zinc-700">
@@ -308,12 +308,12 @@ export default function DashboardPage() {
             <Progress
               total={total}
               segments={[
-                { value: done, color: "bg-green-500", label: `Done: ${done}` },
-                { value: active, color: "bg-blue-500", label: `Active: ${active}` },
+                { value: done, color: "bg-green-500", label: `${t('dashboard.done')}: ${done}` },
+                { value: active, color: "bg-blue-500", label: `${t('dashboard.active')}: ${active}` },
                 {
                   value: Math.max(0, pending),
                   color: "bg-zinc-600",
-                  label: `Pending: ${Math.max(0, pending)}`,
+                  label: `${t('dashboard.pending')}: ${Math.max(0, pending)}`,
                 },
               ]}
             />
@@ -348,7 +348,7 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-zinc-100">{t("dashboard.alerts")}</CardTitle>
             {(state?.violations ?? 0) > 0 && (
-              <Badge variant="critical">{state!.violations} violations</Badge>
+              <Badge variant="critical">{state!.violations} {t("dashboard.violations")}</Badge>
             )}
           </CardHeader>
           <CardContent>

@@ -43,14 +43,14 @@ export default function MemoryPage() {
         <TabsContent value="debt">
           <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle className="text-zinc-100">Technical Debt</CardTitle>
+              <CardTitle className="text-zinc-100">{t('memory.technical_debt')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {debtLoading && <p className="text-zinc-400">Loading debt…</p>}
-              {debtError && <p className="text-red-400">Error: {debtError}</p>}
+              {debtLoading && <p className="text-zinc-400">{t('common.loading')}</p>}
+              {debtError && <p className="text-red-400">{t('common.error')}: {debtError}</p>}
               {debtData && <DebtTable rows={parseDebtMarkdown(debtData.content)} />}
               {!debtLoading && !debtError && !debtData && (
-                <p className="text-zinc-500">No debt data found.</p>
+                <p className="text-zinc-500">{t('memory.no_debt')}</p>
               )}
             </CardContent>
           </Card>

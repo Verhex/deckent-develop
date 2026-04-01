@@ -3,7 +3,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { LanguageProvider } from "./i18n/LanguageProvider";
 import { Layout } from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
-import SettingsPage from "./pages/SettingsPage";
+import SettingsPage from "./pages/SettingsPage"; // redirects to /config
 import HistoryPage from "./pages/HistoryPage";
 import MemoryPage from "./pages/MemoryPage";
 import ConfigPage from "./pages/ConfigPage";

@@ -122,6 +122,56 @@ export const tr: Record<TranslationKey, string> = {
   'welcome.start_hint': 'Başlamak için Yeni Sprint butonunu kullanın.',
   'welcome.last_sprint': 'Son sprint',
 
+  // Dashboard additional
+  'dashboard.sprint_status': 'Sprint Durumu',
+  'dashboard.sprint_id': 'Sprint ID',
+  'dashboard.updated': 'Güncellendi',
+  'dashboard.usage_5hr': '5s Kullanım',
+  'dashboard.usage_weekly': 'Haftalık Kullanım',
+  'dashboard.active': 'Aktif',
+  'dashboard.pending': 'Bekliyor',
+  'dashboard.violations': 'ihlal',
+  'dashboard.confirm_kill_worker': "Worker'ı durdur",
+
+  // History additional
+  'history.all_sprints': 'Tüm Sprintler',
+  'history.sprint_id': 'Sprint ID',
+  'history.success_rate': 'Başarı %',
+  'history.tech_debt': 'Teknik Borç',
+  'history.nogo': 'No-Go',
+  'history.success_rate_trend': 'Başarı Trendi',
+  'history.trend_legend': 'Son 10 sprint',
+
+  // Memory additional
+  'memory.technical_debt': 'Teknik Borç',
+
+  // Config additional
+  'config.save_changes': 'Değişiklikleri Kaydet',
+  'config.loading': 'Yapılandırma yükleniyor...',
+  'config.reset_field': 'Sıfırla',
+  'config.save_success': 'Yapılandırma başarıyla kaydedildi.',
+  'config.doctor_ok': 'Tüm zorunlu kontroller geçti',
+  'config.doctor_fail': 'Bazı zorunlu kontroller başarısız oldu',
+  'config.required': 'zorunlu',
+
+  // New Sprint Modal
+  'modal.directives_hint': 'Sprint direktiflerini aşağıya girin. Her "## Task" bloğu bir görevi tanımlar.',
+  'modal.plan_sprint': 'Sprint Planla',
+  'modal.planning': 'Sprint planlanıyor...',
+  'modal.review_tasks_parsed': 'görev ayrıştırıldı. Sprint',
+  'modal.review_planned_with': 'planlandı,',
+  'modal.review_tasks_suffix': 'görev:',
+  'modal.confirm_start': 'Onayla ve Başlat',
+  'modal.starting': 'Sprint başlatılıyor...',
+  'modal.success': 'Sprint başarıyla başlatıldı!',
+  'modal.try_again': 'Tekrar Dene',
+
+  // Agent Detail
+  'agent.worker': 'Worker',
+  'agent.scope': 'Kapsam',
+  'agent.log_output': 'Log Çıktısı',
+  'agent.no_log': 'Henüz log çıktısı yok.',
+
   // Common
   'common.loading': 'Yükleniyor...',
   'common.error': 'Hata',

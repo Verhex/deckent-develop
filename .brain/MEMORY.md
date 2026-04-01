@@ -195,3 +195,6 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - WorkerCard Bileşeni — Canlı Agent Kart Grid: GO_WITH_TECH_DEBT — WorkerCard.tsx bileşeni oluşturuldu: kart grid (grid-cols-1/2/3), durum renkleri (EXECUTING mavi pulse, DONE yeşil, NO_G
 - ActivityFeed Bileşeni — Canlı Aktivite Akışı: GO_WITH_TECH_DEBT — ActivityFeed.tsx created: SSE-driven live activity feed tracking agent spawns/status changes/phase transitions/alerts. M
 - DashboardPage Layout Yeniden Düzenleme: GO_WITH_TECH_DEBT — DashboardPage layout overhaul completed. A) WelcomeScreen component added (🐙 deckent, no_sprint message, New Sprint but
+## Sprint sprint-079 Learnings
+- i18n Tam Kapsam — Kalan Hardcoded String'ler: GO_WITH_TECH_DEBT — i18n tam kapsam tamamlandı. 44 yeni translation key eklendi (en.ts + tr.ts). Değiştirilen string'ler: DashboardPage (Spr
+- Config Yazma Doğrulama + Geri Okuma: GO_WITH_TECH_DEBT — Added Config round-trip test suite (10 tests) to tests/api/server.test.ts: mode/language/nested key/memory_budget/422/de

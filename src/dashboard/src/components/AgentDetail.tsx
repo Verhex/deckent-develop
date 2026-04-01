@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 interface AgentDetailProps {
   taskId: string;
@@ -22,6 +23,7 @@ interface WorkerLogData {
 }
 
 export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps) {
+  const { t } = useTranslation();
   const [data, setData] = useState<WorkerLogData | null>(null);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
     <Card className="h-full border-zinc-800 bg-zinc-900">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-zinc-100">
-          Worker {taskId}
+          {t("agent.worker")} {taskId}
           {data?.task?.model && (
             <Badge variant="outline" className="ml-2">
               {data.task.model}
@@ -76,16 +78,16 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
         )}
         {data?.task?.scope?.directories && data.task.scope.directories.length > 0 && (
           <div className="mb-3">
-            <span className="text-xs font-medium text-zinc-400">Scope: </span>
+            <span className="text-xs font-medium text-zinc-400">{t("agent.scope")}: </span>
             <span className="text-xs text-zinc-300">
               {data.task.scope.directories.join(", ")}
             </span>
           </div>
         )}
-        <div className="text-xs font-medium text-zinc-400 mb-1">Log Output</div>
+        <div className="text-xs font-medium text-zinc-400 mb-1">{t("agent.log_output")}</div>
         <ScrollArea className="h-[300px] rounded border border-zinc-800 bg-zinc-950 p-2">
           <pre className="text-xs whitespace-pre-wrap font-mono text-zinc-300">
-            {data?.log ?? "No log output yet."}
+            {data?.log ?? t("agent.no_log")}
           </pre>
         </ScrollArea>
       </CardContent>

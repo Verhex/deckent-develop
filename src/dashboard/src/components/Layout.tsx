@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, Settings, History, Brain, Menu, SlidersHorizontal, Globe } from "lucide-react";
+import { LayoutDashboard, History, Brain, Menu, SlidersHorizontal, Globe } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Sheet, SheetTrigger, SheetContent } from "./ui/sheet";
 import { ScrollArea } from "./ui/scroll-area";
@@ -13,7 +13,6 @@ import type { TranslationKey } from "../i18n/en";
 
 const navItems: ReadonlyArray<{ to: string; labelKey: TranslationKey; icon: typeof LayoutDashboard }> = [
   { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { to: "/settings", labelKey: "nav.settings", icon: Settings },
   { to: "/history", labelKey: "nav.history", icon: History },
   { to: "/memory", labelKey: "nav.memory", icon: Brain },
   { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },

@@ -9,6 +9,7 @@ import {
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { postJson } from "../lib/api";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 type ModalStep = "directives" | "planning" | "review" | "starting" | "done" | "error";
 
@@ -28,6 +29,7 @@ interface NewSprintModalProps {
 }
 
 export function NewSprintModal({ open, onOpenChange }: NewSprintModalProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<ModalStep>("directives");
   const [directives, setDirectives] = useState("");
   const [taskCount, setTaskCount] = useState(0);
@@ -82,13 +84,13 @@ export function NewSprintModal({ open, onOpenChange }: NewSprintModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Yeni Sprint</DialogTitle>
+          <DialogTitle>{t("dashboard.new_sprint")}</DialogTitle>
         </DialogHeader>
 
         {step === "directives" && (
           <div className="space-y-4">
             <p className="text-sm text-zinc-400">
-              Enter sprint directives below. Each &quot;## Task&quot; block defines a task.
+              {t("modal.directives_hint")}
             </p>
             <Textarea
               value={directives}
@@ -99,10 +101,10 @@ export function NewSprintModal({ open, onOpenChange }: NewSprintModalProps) {
             />
             <DialogFooter>
               <Button variant="ghost" onClick={handleClose}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button onClick={handleSetDirectives} disabled={!directives.trim()}>
-                Plan Sprint
+                {t("modal.plan_sprint")}
               </Button>
             </DialogFooter>
           </div>
@@ -110,43 +112,43 @@ export function NewSprintModal({ open, onOpenChange }: NewSprintModalProps) {
 
         {step === "planning" && (
           <div className="flex items-center justify-center py-8">
-            <p className="text-zinc-400">Planning sprint...</p>
+            <p className="text-zinc-400">{t("modal.planning")}</p>
           </div>
         )}
 
         {step === "review" && plan && (
           <div className="space-y-4">
             <p className="text-sm text-zinc-400">
-              {taskCount} task(s) parsed. Sprint <strong className="text-zinc-100">{plan.id}</strong> planned with {plan.tasks.length} task(s):
+              {taskCount} {t("modal.review_tasks_parsed")} <strong className="text-zinc-100">{plan.id}</strong> {t("modal.review_planned_with")} {plan.tasks.length} {t("modal.review_tasks_suffix")}
             </p>
             <ul className="max-h-48 space-y-1 overflow-auto text-sm">
-              {plan.tasks.map((t) => (
-                <li key={t.id} className="rounded bg-zinc-800 px-3 py-1.5">
-                  <span className="font-mono text-blue-400">{t.id}</span>{" "}
-                  <span className="text-zinc-300">{t.title}</span>
+              {plan.tasks.map((task) => (
+                <li key={task.id} className="rounded bg-zinc-800 px-3 py-1.5">
+                  <span className="font-mono text-blue-400">{task.id}</span>{" "}
+                  <span className="text-zinc-300">{task.title}</span>
                 </li>
               ))}
             </ul>
             <DialogFooter>
               <Button variant="ghost" onClick={handleClose}>
-                Cancel
+                {t("common.cancel")}
               </Button>
-              <Button onClick={handleStart}>Confirm &amp; Start</Button>
+              <Button onClick={handleStart}>{t("modal.confirm_start")}</Button>
             </DialogFooter>
           </div>
         )}
 
         {step === "starting" && (
           <div className="flex items-center justify-center py-8">
-            <p className="text-zinc-400">Starting sprint...</p>
+            <p className="text-zinc-400">{t("modal.starting")}</p>
           </div>
         )}
 
         {step === "done" && (
           <div className="space-y-4">
-            <p className="text-green-400">Sprint started successfully!</p>
+            <p className="text-green-400">{t("modal.success")}</p>
             <DialogFooter>
-              <Button onClick={handleClose}>Close</Button>
+              <Button onClick={handleClose}>{t("common.close")}</Button>
             </DialogFooter>
           </div>
         )}
@@ -156,9 +158,9 @@ export function NewSprintModal({ open, onOpenChange }: NewSprintModalProps) {
             <p className="text-red-400">{error}</p>
             <DialogFooter>
               <Button variant="ghost" onClick={handleClose}>
-                Close
+                {t("common.close")}
               </Button>
-              <Button onClick={() => setStep("directives")}>Try Again</Button>
+              <Button onClick={() => setStep("directives")}>{t("modal.try_again")}</Button>
             </DialogFooter>
           </div>
         )}
