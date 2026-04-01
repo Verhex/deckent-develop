@@ -8,7 +8,7 @@
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
 - Sprint is NEVER left incomplete
-- Memory budget: 600 lines max in .brain/ (MEMORY 200, RETRO 100, sprint log 80 per file)
+- Memory budget: 900 lines max in .brain/ (MEMORY 300, RETRO 120, PATTERNS 150, sprint log 100 per file)
 
 ## Providers
 - Default: Claude (tmux backend, session auth)

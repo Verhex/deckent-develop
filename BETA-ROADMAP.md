@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Readiness Roadmap
 
-**Son güncelleme:** 2026-03-30 | **Sprint:** 075 | **Test:** 12,200+ | **Durum:** Closed Beta — Dogfooding aktif
+**Son güncelleme:** 2026-04-01 | **Sprint:** 078 | **Test:** 12,196+ | **Durum:** Closed Beta — Dogfooding aktif
 
 ---
 
@@ -131,7 +131,7 @@
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
 | 30 | .gitignore runtime state | **DONE** | |
-| 31 | God objects | **KISMEN** | Faz 1 (Sprint 072), Faz 2 (Sprint 075), Faz 3 (Sprint 076) — hedef <1500 satır |
+| 31 | God objects | **DONE** | Faz 1 (Sprint 072), Faz 2 (Sprint 075), Faz 3 (Sprint 076) — result-collector.ts extract tamamlandı |
 | 32 | V2 routing test-writer bias | **KISMEN** | Exclude kuralı yazıldı |
 
 ## P6 — Kullanıcı Deneyimi İyileştirmeleri
@@ -145,7 +145,7 @@
 | 37 | Skill marketplace backend | **YAPILACAK** | CLI komutu var ama backend yok |
 | 38 | Plugin system e2e test | **YAPILACAK** | Gerçek plugin ile test edilmedi |
 | 39 | Rate limiting production | **YAPILACAK** | 100 req/60s yeterli mi? |
-| 40 | Graceful shutdown | **KISMEN** | SIGINT handler + state cleanup eklendi (Sprint 076) |
+| 40 | Graceful shutdown | **DONE** | SIGINT handler + interruptActiveSprint + killAllSessions (Sprint 076) |
 
 ---
 
@@ -182,16 +182,28 @@
 - [x] P4-29: .detect-secrets v1.5.0 kuruldu — .pre-commit-config.yaml
 - [x] P5-31: God object split Faz 2 — sprint-controller.ts → result-collector.ts extract
 
-**Sprint 076 Planı:**
-- [ ] P3-20: Stale heartbeat root cause fix (auditor alert 410x pattern)
-- [ ] P3-22: Dashboard API entegrasyon testi (5+ endpoint test)
-- [ ] P6-40: Graceful shutdown (SIGINT handler + state cleanup)
-- [ ] P5-31: God object split Faz 3 — result-collector.ts oluşturma
-- [ ] Docs güncelleme (BETA-ROADMAP sprint tablosu)
+**Sprint 076 — TAMAMLANDI (2026-03-31):**
+- [x] P3-20: Stale heartbeat root cause fix — finalizeHeartbeat + auditor DONE skip
+- [x] P3-22: Dashboard API entegrasyon testi — 10 yeni test, 6 describe block
+- [x] P6-40: Graceful shutdown — SIGINT → interruptActiveSprint + killAllSessions
+- [x] P5-31: God object split Faz 3 — result-collector.ts extract (233 satır)
 
-**Sprint 077+ Planı:**
+**Sprint 077 — TAMAMLANDI (2026-03-31) — Docs:**
+- [x] CHANGELOG + SPRINT-LOG Sprint 076 entry'leri
+- [x] .brain/ güncelleme (PROJECT-IDENTITY, DECISIONS)
+- [x] CLAUDE.md + DECKENT.md modül sayıları güncellendi
+
+**Sprint 078 — AKTİF (2026-04-01) — Beta Hazırlık:**
+- [ ] Blueprint senkronizasyonu (MCP 17 tools/9 resources, memory 900, CLI 32)
+- [ ] ANA-PLAN-TR tam güncelleme (bölüm 5-17 çeviri dahil)
+- [ ] BETA-ROADMAP Sprint 076-077 DONE işaretleme
+- [ ] Memory budget 600→900 tüm docs'ta düzeltme
+
+**Sprint 079+ Planı:**
+- [ ] i18n entegrasyonu (CLI + Dashboard — TR/EN çift dil)
+- [ ] Dashboard zenginleştirme (task flow, config tooltip, timeline)
+- [ ] Init/onboarding iyileştirme
 - [ ] P1-10..12: Multi-provider test (BLOCKED — API key gerekli)
-- [ ] P3-20..22: Dashboard gerçek sprint ile test
 - [ ] Windows Codex CLI dogfooding
 - [ ] Windows Cursor + Gemini dogfooding
 
@@ -217,4 +229,6 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | 073 | 5/5 | 5 | Self-dogfooding: 100 test regresyonu fix, 0 fail |
 | 074 | 7/7 | 7 | Docs tutarlılık, debt-069 kapanış, CHANGELOG/SPRINT-LOG |
 | 075 | 5/5 | 5 | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2 |
-| **Toplam** | **62/62** | **62** | 12,200+ test, 0 regression, v0.2.0-beta.4 |
+| 076 | 4/4 | 4 | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3 |
+| 077 | 3/3 | 3 | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme |
+| **Toplam** | **69/69** | **69** | 12,196+ test, 0 regression, v0.2.0-beta.4 |

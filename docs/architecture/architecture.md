@@ -70,7 +70,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
 | **Single orchestrator** | Brain is the only module that coordinates the system. Workers never plan. |
 | **Scope isolation** | Every worker operates in a declared file/directory sandbox. |
 | **Observer independence** | Auditor runs in-process but never modifies source code or creates tasks. |
-| **Memory budget** | `.brain/` directory capped at 600 lines; automatic decay maintains the budget. |
+| **Memory budget** | `.brain/` directory capped at 900 lines; automatic decay maintains the budget. |
 | **Import discipline** | Module dependency graph is an explicit security boundary (ADR-008). |
 | **Sprint completeness** | Every sprint always runs to completion — errors never leave a sprint incomplete. |
 
@@ -1139,7 +1139,7 @@ Locks held >5 minutes generate a `WARNING` alert from the Auditor.
 | Concurrent write conflict | File-based lock mutex in `.locks/` |
 | Deadlocked task graph | Kahn's algorithm circular dependency detection |
 | Brain overreach | `--allowedTools` excludes DIRECTIVES and config paths |
-| Memory budget overflow | `runDecay()` triggered at sprint end when >600 lines |
+| Memory budget overflow | `runDecay()` triggered at sprint end when >900 lines |
 | Sprint abandonment | `runSprint()` wraps all phases in try/catch; always reaches COMPLETE |
 
 ### Operating Modes

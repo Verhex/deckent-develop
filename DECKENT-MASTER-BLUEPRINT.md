@@ -90,7 +90,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  10 Tools + 5 Resources                             │
+│  17 Tools + 9 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -223,10 +223,10 @@ $ deckent init
 
   🎛️  Welcome to Deckent!
   
-  ? Select your Claude plan:
-    ❯ Max 20x ($200/mo) — up to 8 workers, Opus for Brain
-      Max 5x ($100/mo) — up to 5 workers, Sonnet for Brain
-      Pro ($20/mo) — up to 3 workers, Sonnet only
+  ? Select your plan:
+    ❯ Performance — up to 8 workers, Opus for Brain
+      Balanced — up to 5 workers, Sonnet for Brain
+      Economic — up to 3 workers, Sonnet only
       API (pay-as-you-go) — up to 10 workers, any model
   
   ? Default language: 
@@ -258,7 +258,8 @@ Required:
 Supported OS:
   macOS (Intel + Apple Silicon)
   Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch)
-  Windows (via WSL2 — native Windows planned)
+  Windows (native — subprocess backend, shell:true, UTF-8)
+  Windows (WSL2 — full tmux support)
 ```
 
 ---
@@ -337,7 +338,7 @@ my-project/
 │   ├── cli/                          # CLI commands (commander.js, 32+ files)
 │   ├── mcp/                          # MCP server integration
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
-│   │   ├── tools/                   # 9 tool handlers
+│   │   ├── tools/                   # 17 tool handlers
 │   │   │   ├── init.ts             # deckent_init
 │   │   │   ├── directives.ts       # deckent_set_directives
 │   │   │   ├── plan.ts             # deckent_plan
@@ -346,11 +347,19 @@ my-project/
 │   │   │   ├── doctor.ts           # deckent_doctor
 │   │   │   ├── retro.ts            # deckent_retro
 │   │   │   ├── history.ts          # deckent_history
-│   │   │   └── analyze.ts          # deckent_analyze_project
-│   │   └── resources/               # 4 resource handlers
+│   │   │   ├── analyze.ts          # deckent_analyze_project
+│   │   │   ├── sync.ts             # deckent_sync
+│   │   │   ├── config.ts           # deckent_config
+│   │   │   ├── usage.ts            # deckent_usage
+│   │   │   ├── review.ts           # deckent_review
+│   │   │   ├── run.ts              # deckent_run
+│   │   │   ├── kill.ts             # deckent_kill
+│   │   │   ├── cleanup.ts          # deckent_cleanup
+│   │   │   └── help.ts             # deckent_help
+│   │   └── resources/               # 9 resource handlers
 │   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
 │       └── src/
-│           ├── pages/               # 4 pages: Dashboard, Settings, History, Memory
+│           ├── pages/               # 6 pages: Dashboard, Settings, History, Memory, Config, Status
 │           ├── components/          # Layout, DebtTable, SprintChart, 14 UI components
 │           ├── hooks/               # useSSE, custom hooks
 │           ├── lib/                 # Utilities
@@ -398,7 +407,7 @@ DECKENT.md structure:
 - Workers stay within assigned scope (directories + filesWrite)
 - Auditor never writes source code
 - Sprint is NEVER left incomplete
-- Memory budget: 600 lines max in .brain/
+- Memory budget: 900 lines max in .brain/
 
 ## Context
 @DIRECTIVES.md
@@ -552,7 +561,7 @@ Worker spawns with that model. No runtime switching — model is fixed for task 
 Inspired by OpenClaw's tiered memory.
 
 ## Tier 1: Always Loaded (MEMORY.md)
-- Max 200 lines
+- Max 300 lines
 - Brain writes after every sprint
 - Loaded into every agent's context via @import in AGENTS.md
 - Contains: learned patterns, key conventions, critical rules
@@ -574,24 +583,24 @@ Inspired by OpenClaw's tiered memory.
 ```
 Every sprint end:
 1. Count total lines in .brain/ (excluding archive/)
-2. If > 600 lines → compress:
+2. If > 900 lines → compress:
    a. MEMORY.md: archive entries unused for 5+ sprints
    b. PATTERNS.md: remove resolved patterns
    c. DEBT.md: remove resolved debts
    d. Move old sprint logs to archive/
-3. Verify total < 600 lines
+3. Verify total < 900 lines
 ```
 
 ## Memory Files
 
 | File | Writer | Reader | Max Lines | Decay |
 |------|--------|--------|-----------|-------|
-| MEMORY.md | Brain | All | 100 | 3 sprints |
+| MEMORY.md | Brain | All | 300 | 5 sprints |
 | DECISIONS.md | Brain | Brain, Auditor | No limit | Never |
 | DEBT.md | Brain | Brain | No limit | On resolve |
-| PATTERNS.md | Auditor | Brain | 80 | 5 sprints |
-| RETRO.md | Brain | Brain | 60 | Overwritten |
-| sprints/*.md | Brain | Brain | 50 each | Auto-archive |
+| PATTERNS.md | Auditor | Brain | 150 | 5 sprints |
+| RETRO.md | Brain | Brain | 120 | Overwritten |
+| sprints/*.md | Brain | Brain | 100 each | Auto-archive |
 
 ---
 
@@ -644,7 +653,7 @@ Phase 6: RETRO (Brain)
   Calculate metrics
   
 Phase 7: DECAY
-  Compress if .brain/ > 600 lines
+  Compress if .brain/ > 900 lines
   Archive old sprint logs
   Clean .tasks/, .locks/
 
@@ -914,24 +923,24 @@ React + Vite + Tailwind, 4 pages, shadcn/ui components, SSE for real-time update
 ```json
 // .deckent/config.json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 8,
       "brain_model": "opus",
       "default_model": "sonnet",
       "haiku_allowed": true,
       "usage_thresholds": { "5hr": 0.8, "weekly": 0.6 }
     },
-    "max5x_plan": {
+    "balanced": {
       "max_workers": 5,
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": true,
       "usage_thresholds": { "5hr": 0.7, "weekly": 0.5 }
     },
-    "pro_plan": {
+    "economic": {
       "max_workers": 3,
       "brain_model": "sonnet",
       "default_model": "sonnet",
@@ -952,7 +961,9 @@ React + Vite + Tailwind, 4 pages, shadcn/ui components, SSE for real-time update
 }
 ```
 
-Config switch: `deckent config set mode pro_plan`
+Config switch: `deckent config set mode economic`
+
+**Mode aliases (backward compatible):** `max_plan` → `performance`, `max5x_plan` → `balanced`, `pro_plan` → `economic`
 
 ---
 
@@ -1089,7 +1100,7 @@ Layer 3: Brain Regression Test (sprint transition)
 - Cross-assignments: {n}
 - Test coverage: {before}% → {after}%
 - Tech debt: {new} new, {resolved} resolved, {total} open
-- Context budget: {used}/600 lines
+- Context budget: {used}/900 lines
 
 ## Learnings
 {from RETRO.md}
@@ -1187,8 +1198,8 @@ Every file in the project, its purpose, who writes it, who reads it:
 | src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
-| src/mcp/tools/*.ts | MCP tool handlers (10) | Developer | MCP server | Permanent |
-| src/mcp/resources/*.ts | MCP resource handlers (5) | Developer | MCP server | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (17) | Developer | MCP server | Permanent |
+| src/mcp/resources/*.ts | MCP resource handlers (9) | Developer | MCP server | Permanent |
 | .deckent/workspace/TOOLS.md | Environment tools/commands | deckent init | Workers | Permanent |
 | .deckent/workspace/BOOT.md | Agent boot sequence | deckent init | All agents | Permanent |
 | .deckent/plugins/ | Installed plugins directory | deckent init | Plugin system | Permanent |
@@ -1363,7 +1374,7 @@ Deckent ran itself for the first time:
 
 - `shouldRemoveResolvedDebt()` + `parseSprintNumber()`: resolved entries retained for 3 sprints (DEBT-002 preserved)
 - Auto Setup Wizard (`auto-setup.ts`): `generateSetupRecommendation()` — subscription + system profile + project size
-- MCP Enrichment (`enrich.ts`): `enrichResponse()` adds `_enriched: { summary, hints, timestamp }` to all 10 tools
+- MCP Enrichment (`enrich.ts`): `enrichResponse()` adds `_enriched: { summary, hints, timestamp }` to all 17 tools
 - CLI Hints (`hints.ts`, `messages.ts`): `getContextualHints()` phase-based suggestions, `getMessage()` localized (tr/en)
 - `doctor --profile`: system profile display (CPU, RAM, workers, subscription)
 - AI planner still returned 8/12 tasks — Sprint 23 post-validation fix needed
@@ -1527,16 +1538,20 @@ Both methods register in `.claude/settings.json`:
 }
 ```
 
-## Tools (10)
+## Tools (17)
 
 ### Lifecycle Tools
 
 | Tool | Input | Maps To | Purpose |
 |------|-------|---------|---------|
 | `deckent_init` | projectName, mode?, language? | init.ts scaffold | Initialize Deckent in a project |
-| `deckent_set_directives` | content: string | writes DIRECTIVES.md | Set sprint goals (Claude formats natural language into ## Gorev/Task blocks) |
-| `deckent_plan` | dryRun?, mode?: 'ai'\|'structured'\|'auto' | readContext → planSprint | Plan sprint, return task list without executing |
-| `deckent_start` | autoApprove?: boolean | runSprint() | Run full sprint lifecycle (may take minutes) |
+| `deckent_set_directives` | content: string | writes DIRECTIVES.md | Set sprint goals |
+| `deckent_plan` | dryRun?, mode?: 'ai'\|'structured'\|'auto' | readContext → planSprint | Plan sprint, return task list |
+| `deckent_start` | autoApprove?: boolean | runSprint() | Run full sprint lifecycle |
+| `deckent_run` | task description, model? | single task execution | Run a single task without full sprint |
+| `deckent_review` | none | evaluateResults() | Evaluate sprint: GO / NO_GO / GO_WITH_TECH_DEBT |
+| `deckent_cleanup` | none | archiveTasks + releaseLocks | Archive task files, release locks |
+| `deckent_kill` | target: 'all' \| workerId | killWorkers() | Kill running sprint or specific worker |
 
 ### Information Tools
 
@@ -1546,20 +1561,18 @@ Both methods register in `.claude/settings.json`:
 | `deckent_doctor` | none | runDoctorChecks() | System health check |
 | `deckent_retro` | none | reads RETRO.md | Latest sprint retrospective |
 | `deckent_history` | last?: number | reads .brain/sprints/ | Sprint history logs |
+| `deckent_usage` | none | reads usage stats | Token and cost usage across sprints |
+| `deckent_help` | none | runtime capabilities | Runtime state, capabilities, and usage guide |
 
-### Analysis Tools
-
-| Tool | Input | Maps To | Purpose |
-|------|-------|---------|---------|
-| `deckent_analyze_project` | none | analyzeProject() | Analyze project stack, size, methodology recommendation |
-
-### Sync Tools
+### Configuration & Sync Tools
 
 | Tool | Input | Maps To | Purpose |
 |------|-------|---------|---------|
+| `deckent_config` | action: 'read'\|'set', key?, value? | loadConfig/setConfig | Read or set configuration values |
 | `deckent_sync` | none | ensureDeckentImport() | Sync CLAUDE.md + AGENTS.md with @DECKENT.md reference |
+| `deckent_analyze_project` | none | analyzeProject() | Analyze project stack, size, methodology |
 
-## Resources (5)
+## Resources (9)
 
 | URI | Content | MIME Type |
 |-----|---------|-----------|
@@ -1568,6 +1581,10 @@ Both methods register in `.claude/settings.json`:
 | `deckent://memory` | Learned patterns (.brain/MEMORY.md) | text/markdown |
 | `deckent://debt` | Tech debt items (parsed table → JSON) | application/json |
 | `deckent://config` | Project config (.deckent/config.json) | application/json |
+| `deckent://retro` | Last sprint retrospective (RETRO.md) | text/markdown |
+| `deckent://usage` | Token and cost usage summary | application/json |
+| `deckent://tasks` | Active task list with status | application/json |
+| `deckent://agents` | Registered agent pool with stats | application/json |
 
 ## Auth Chain
 
@@ -1726,7 +1743,7 @@ $ deckent start "Build REST API for user management"
 - Brain learns from its own retros and improves plans — ✅ Done
 - Auditor catches real boundary violations — ✅ Done
 - Tech debt escalation triggers automatically — ✅ Done
-- Memory decay keeps `.brain/` under 600 lines — ✅ Done
+- Memory decay keeps `.brain/` under 900 lines — ✅ Done
 - Plugin system v2 (install/create/remove/hooks) — ✅ Done (Sprint 24)
 - i18n runtime — ✅ Done (Sprint 24)
 - OSS infrastructure (CONTRIBUTING, LICENSE, CI) — ✅ Done (Sprint 24-26)
@@ -1921,7 +1938,7 @@ Full directive: `docs/directives/sprint-034.md`
 | 11 | 852 | 97% | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui |
 | 12-13 | 938 | 97.5% | Brain AI planning (planner.ts, Zod), Auditor in-process, .deckent structure |
 | 14 | 938 | 97.5% | Auditor live integration, .deckent finalization |
-| 15 | 967 | 97.5% | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 closed, 10 tool 5 resource |
+| 15 | 967 | 97.5% | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 closed |
 | 16 | 987 | 97.5% | deckent watch, worker log capture, start --watch, agent detail view, model inference |
 | 17 | 1027 | 97.5% | MCP background jobs, cleanup fix, sprint ID safety, dashboard reset, React test infra |
 | 18 | 1027 | 97.5% | Orchestration smoke test: 8 docs, first real runSprint since S10, 6 bugs found |
@@ -1970,6 +1987,17 @@ Full directive: `docs/directives/sprint-034.md`
 | 063 | 11500 | 96.4% | Routing v2 engine (intent-based 3-layer selection) + forceSkills support + CLI deep analysis completion. 7/14 done, 7 NO_GO |
 | 064 | 11500 | 96.4% | Validation sprint: all 14 tasks NO_GO (duplicate of already-implemented S063 work) |
 | 065 | 11862 | 96%+ | AI planner timeout config, autoMigrateOnLoad, cleanup fixes, spawn scope enforcement, analyzer merge. 7/7 done |
+| 066 | 11862 | 96%+ | Manifest v2 batch update (20 files), MCP docs 16 tools/9 resources, gitignore cleanup. 7/7 done |
+| 067 | 11862 | 96%+ | Paket 494KB, retro notes, any cleanup, output tests, routing v2 audit. 6/6 done |
+| 068 | 11918 | 96%+ | MCP instructions, tool annotations, deckent_help tool. 6/6 done |
+| 069 | 11918 | 96%+ | Agent selection precision, skill budget, scope parser fix. 6/6 done |
+| 070-071 | 12000 | 96%+ | Windows dogfooding: init UX overhaul, 15+7 bug fixes, heartbeat periodic, upgrade --local. 15/15 done |
+| 072 | 12160 | 96%+ | Tier generalizasyonu (performance/balanced/economic), MODEL_API_IDS, god object split faz 1. 5/5 done |
+| 073 | 12176 | 96%+ | Self-dogfooding: 100 test regresyonu fix (43+16+9+23+3 → 0 fail). 5/5 done |
+| 074 | 12176 | 96%+ | Docs tutarlılık, debt-069 kapanış, CHANGELOG/SPRINT-LOG. 7/7 done |
+| 075 | 12196 | 96%+ | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2. 5/5 done |
+| 076 | 12196 | 96%+ | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3. 4/4 done |
+| 077 | 12196 | 96%+ | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme. 3/3 done |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -2026,6 +2054,14 @@ Full directive: `docs/directives/sprint-034.md`
 **Routing v2 milestone (Sprint 063):** Intent-based 3-layer routing engine replaced simple keyword matching. Layer 1: intent classification from task title/description. Layer 2: agent selection via intent→agent mapping with learning feedback. Layer 3: skill selection via agent expertise + project stack. forceSkills and forceModel support added to DIRECTIVES task syntax. 33+ CLI commands confirmed complete.
 
 **CLI completion milestone (Sprint 065):** Final CLI improvements batch: AI planner timeout configurable (`ai_planner_timeout`), config autoMigrateOnLoad, cleanup single-pass fix, spawn scope enforcement + multi-provider, analyzer engine merge, history trend analysis, retro archiving. 7/7 tasks done, 0 NO_GO. Total: 11,862 tests, 469 test files, 247 source files, 75,105 lines.
+
+**MCP completion milestone (Sprint 066-068):** MCP expanded from 10 tools + 5 resources to **17 tools + 9 resources**. All agent/skill manifests migrated to v2 with activation rules. Tool descriptions enriched with annotations (readOnlyHint, destructiveHint, openWorldHint). `deckent_help` tool provides runtime capabilities and project state detection.
+
+**Windows dogfooding milestone (Sprint 070-071):** Deckent ran successfully on native Windows for the first time. 22 bugs found and fixed across 2 sprints. Key fixes: shell:true for all spawn calls, periodic heartbeat via setInterval(15s), UTF-8 encoding env vars, doctor c.ok→c.passed fix, scope parser explicit label parsing. `deckent upgrade --local` enabled beta development workflow.
+
+**Self-dogfooding milestone (Sprint 073):** Deckent used its own sprint system to fix 100 test regressions (43+16+9+23+3 → 0 fail). test-writer agent completed 5/5 tasks in 17m 41s. Proved the orchestration system can reliably fix its own codebase.
+
+**God Object split milestone (Sprint 072-076):** sprint-controller.ts systematically decomposed across 3 phases: Faz 1 (Sprint 072) extracted 7 phase functions to sprint-phases.ts, Faz 2 (Sprint 075) extracted sprint-utils.ts, Faz 3 (Sprint 076) extracted result-collector.ts (233 lines). Brain.ts remains a thin re-export layer.
 
 **Provider Architecture (Sprint 38):**
 ```

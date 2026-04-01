@@ -90,7 +90,7 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SUNUCU (stdio)              │
-│  10 Araç + 5 Kaynak                                 │
+│  17 Araç + 9 Kaynak                                 │
 │  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -116,7 +116,7 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
            │
 ┌──────────▼──────────────────────────────────────────┐
 │              BELLEK SİSTEMİ (.brain/)                 │
-│  Katman 1: MEMORY.md (her zaman yüklü, ~100 satır) │
+│  Katman 1: MEMORY.md (her zaman yüklü, ~300 satır) │
 │  Katman 2: sprint logları (sprint başına, otomatik)  │
 │  Katman 3: derin bilgi (aranabilir arşiv)           │
 └─────────────────────────────────────────────────────┘
@@ -124,7 +124,7 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
 ┌──────────▼──────────────────────────────────────────┐
 │          HTTP API + WEB DASHBOARD                    │
 │  src/api/server.ts — 16 uç nokta + SSE             │
-│  src/dashboard/ — React+Vite+Tailwind (4 sayfa)     │
+│  src/dashboard/ — React+Vite+Tailwind (6 sayfa)     │
 │  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -132,7 +132,10 @@ Sprint + öğrenme döngüsü. Deckent sadece görevleri yürütmez — sprint'l
 **Kimlik Doğrulama Zinciri:**
 ```
 Claude Code → MCP stdio (yerel süreç, ek auth yok)
-  → Çekirdek Motor → tmux → claude -p (Claude Code oturumunu miras alır)
+  → Çekirdek Motor → Sağlayıcı Adaptörü → Spawn Backend → worker süreci
+  → Claude modu: Claude Code oturum kimliğini miras alır
+  → Codex modu: OPENAI_API_KEY ortam değişkeni
+  → Gemini modu: GOOGLE_API_KEY ortam değişkeni
   → API modu: ANTHROPIC_API_KEY ortam değişkeni
 ```
 
@@ -166,6 +169,7 @@ deckent attach            tmux oturumuna bağlan (tüm ajanları gör)
 deckent spawn <id>        Manuel olarak worker başlat
 deckent kill <id>         Belirli bir worker'ı öldür
 deckent retro             Sprint retrospektifini çalıştır
+deckent review            Sprint sonucunu değerlendir (GO/NO_GO/TECH_DEBT)
 deckent cleanup           Sprint dosyalarını arşivle, worker'ları öldür
 deckent doctor            Sistem sağlığını kontrol et (tmux, claude, git, node)
 deckent config            Yapılandırmayı göster/düzenle
@@ -177,13 +181,21 @@ deckent archive-debt      Çözülmüş teknik borcu arşivle
 deckent dashboard         Terminal TUI dashboard (zengin mod)
 deckent serve             HTTP API sunucusu (SSE)
 deckent web               Web dashboard + API sunucusu (localhost:3100)
+deckent run               Tek bir task'ı arka planda çalıştır
+deckent agent             Agent yönetimi (list, info, stats)
+deckent skill             Skill yönetimi (list, info, stats)
 deckent plugin install <n> Yetenek/eklenti kur
 deckent plugin list       Kurulu eklentileri listele
 deckent upgrade           Kendini güncelle
+deckent explain           Kavram veya komut hakkında rehberlik
+deckent finalize          Sprint sonuçlandırma (retro + decay + cleanup)
+deckent quick-start       Hızlı başlangıç (init + plan + start tek komutta)
 deckent mcp               MCP sunucuyu başlat (Claude Code için stdio transport)
-deckent sync             Adaptör dosyalarını DECKENT.md referansıyla senkronize et
-deckent watch            Canlı tmux bölünmüş görünüm: dashboard + worker panelleri
+deckent sync              Adaptör dosyalarını DECKENT.md referansıyla senkronize et
+deckent watch             Canlı tmux bölünmüş görünüm: dashboard + worker panelleri
 ```
+
+**32 CLI komutu** (+ alt komutlar: plugin install/list/create/remove, config set/read)
 
 ## 3.3 Sistem Gereksinimleri
 
@@ -198,7 +210,8 @@ Gerekli:
 Desteklenen İşletim Sistemleri:
   macOS (Intel + Apple Silicon)
   Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch)
-  Windows (WSL2 ile — yerel Windows planlanıyor)
+  Windows (yerel — subprocess backend, shell:true, UTF-8)
+  Windows (WSL2 — tam tmux desteği)
 ```
 
 ---
@@ -247,13 +260,13 @@ my-project/
 │   ├── api/                          # HTTP API + SSE
 │   │   ├── server.ts               # 16 uç nokta + SSE akışı
 │   │   └── watcher.ts              # Dashboard dosya izleyici
-│   ├── cli/                          # CLI komutları (commander.js, 21 dosya)
+│   ├── cli/                          # CLI komutları (commander.js, 32 komut)
 │   ├── mcp/                          # MCP sunucu entegrasyonu
 │   │   ├── server.ts                # Giriş noktası (McpServer + stdio)
-│   │   ├── tools/                   # 10 araç işleyicisi
-│   │   └── resources/               # 5 kaynak işleyicisi
+│   │   ├── tools/                   # 17 araç işleyicisi
+│   │   └── resources/               # 9 kaynak işleyicisi
 │   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
-│       └── src/                     # 4 sayfa, 14 UI bileşeni, SSE
+│       └── src/                     # 6 sayfa, 18 UI bileşeni, SSE
 ├── tests/                             # Birim + entegrasyon testleri
 └── package.json
 ```
@@ -306,8 +319,8 @@ Her dosya, amacı, yazarı ve okuyucusu:
 | src/api/watcher.ts | Dashboard dosya izleyici | Geliştirici | API sunucu | Kalıcı |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Geliştirici | Tarayıcı | Kalıcı |
 | src/mcp/server.ts | MCP sunucu giriş noktası | Geliştirici | Claude Code | Kalıcı |
-| src/mcp/tools/*.ts | MCP araç işleyicileri (10) | Geliştirici | MCP sunucu | Kalıcı |
-| src/mcp/resources/*.ts | MCP kaynak işleyicileri (5) | Geliştirici | MCP sunucu | Kalıcı |
+| src/mcp/tools/*.ts | MCP araç işleyicileri (17) | Geliştirici | MCP sunucu | Kalıcı |
+| src/mcp/resources/*.ts | MCP kaynak işleyicileri (9) | Geliştirici | MCP sunucu | Kalıcı |
 | .deckent/workspace/TOOLS.md | Ortam araçları/komutları | deckent init | Worker'lar | Kalıcı |
 | .deckent/workspace/BOOT.md | Ajan başlatma sırası | deckent init | Tüm ajanlar | Kalıcı |
 | .deckent/plugins/ | Kurulu eklentiler dizini | deckent init | Eklenti sistemi | Kalıcı |
@@ -482,7 +495,7 @@ Deckent ilk kez kendini çalıştırdı:
 
 - `shouldRemoveResolvedDebt()` + `parseSprintNumber()`: resolved entry'ler 3 sprint boyunca korunuyor (DEBT-002 artık korunuyor)
 - Auto Setup Wizard (`auto-setup.ts`): `generateSetupRecommendation()` — subscription + sistem profili + proje boyutu
-- MCP Enrichment (`enrich.ts`): `enrichResponse()` tüm 10 tool'a `_enriched: { summary, hints, timestamp }` ekliyor
+- MCP Enrichment (`enrich.ts`): `enrichResponse()` tüm 17 tool'a `_enriched: { summary, hints, timestamp }` ekliyor
 - CLI Hints (`hints.ts`, `messages.ts`): `getContextualHints()` faz bazlı öneriler, `getMessage()` lokalize mesajlar (tr/en)
 - `doctor --profile`: sistem profili gösterimi (CPU, RAM, worker, subscription)
 - AI planner hala 8/12 döndürüyor — Sprint 23'te post-validation fix
@@ -536,7 +549,7 @@ deckent init
 claude mcp add deckent -- npx deckent mcp
 ```
 
-## Araçlar (10)
+## Araçlar (17)
 
 ### Yaşam Döngüsü Araçları
 
@@ -544,8 +557,12 @@ claude mcp add deckent -- npx deckent mcp
 |------|-------|---------|------|
 | `deckent_init` | projectName, mode?, language? | init.ts iskeleti | Projeye Deckent kur |
 | `deckent_set_directives` | content: string | DIRECTIVES.md yazar | Sprint hedeflerini ayarla |
-| `deckent_plan` | dryRun?: boolean | readContext → planSprint | Sprint planla, görev listesi döndür |
+| `deckent_plan` | dryRun?, mode?: 'ai'\|'structured'\|'auto' | readContext → planSprint | Sprint planla, görev listesi döndür |
 | `deckent_start` | autoApprove?: boolean | runSprint() | Tam sprint yaşam döngüsü çalıştır |
+| `deckent_run` | görev açıklaması, model? | tek görev yürütme | Sprint olmadan tek görev çalıştır |
+| `deckent_review` | yok | evaluateResults() | Sprint sonucu: GO / NO_GO / GO_WITH_TECH_DEBT |
+| `deckent_cleanup` | yok | archiveTasks + releaseLocks | Görev dosyalarını arşivle, kilitleri serbest bırak |
+| `deckent_kill` | target: 'all' \| workerId | killWorkers() | Aktif sprint'i veya worker'ı durdur |
 
 ### Bilgi Araçları
 
@@ -555,10 +572,18 @@ claude mcp add deckent -- npx deckent mcp
 | `deckent_doctor` | yok | runDoctorChecks() | Sistem sağlık kontrolü |
 | `deckent_retro` | yok | RETRO.md okur | Son sprint retrospektifi |
 | `deckent_history` | last?: number | .brain/sprints/ okur | Sprint geçmişi logları |
-| `deckent_analyze_project` | yok | analyzeProject() | Proje yığın/boyut/metodoloji analizi |
-| `deckent_sync` | yok | ensureDeckentImport() | CLAUDE.md + AGENTS.md'yi @DECKENT.md ile senkronize et |
+| `deckent_usage` | yok | kullanım istatistikleri | Token ve maliyet kullanımı |
+| `deckent_help` | yok | çalışma zamanı yetenekleri | Proje durumu ve kullanım rehberi |
 
-## Kaynaklar (5)
+### Yapılandırma ve Senkronizasyon Araçları
+
+| Araç | Girdi | Eşleşme | Amaç |
+|------|-------|---------|------|
+| `deckent_config` | action: 'read'\|'set', key?, value? | loadConfig/setConfig | Yapılandırma oku veya ayarla |
+| `deckent_sync` | yok | ensureDeckentImport() | CLAUDE.md + AGENTS.md senkronizasyonu |
+| `deckent_analyze_project` | yok | analyzeProject() | Proje yığın/boyut/metodoloji analizi |
+
+## Kaynaklar (9)
 
 | URI | İçerik | MIME Tipi |
 |-----|--------|-----------|
@@ -567,6 +592,10 @@ claude mcp add deckent -- npx deckent mcp
 | `deckent://memory` | Öğrenilen kalıplar (.brain/MEMORY.md) | text/markdown |
 | `deckent://debt` | Teknik borç kalemleri (tablo → JSON) | application/json |
 | `deckent://config` | Proje yapılandırması (.deckent/config.json) | application/json |
+| `deckent://retro` | Son sprint retrospektifi (RETRO.md) | text/markdown |
+| `deckent://usage` | Token ve maliyet kullanım özeti | application/json |
+| `deckent://tasks` | Aktif görev listesi ve durumları | application/json |
+| `deckent://agents` | Kayıtlı ajan havuzu ve istatistikleri | application/json |
 
 ## Kritik Tasarım Kararı: deckent_set_directives
 
@@ -586,7 +615,7 @@ En büyük kullanıcı deneyimi sıkıntısı DIRECTIVES.md'yi doğru `## Görev
 ```
 Kullanıcı: "Bu projeye Deckent kur"
 Claude:    → deckent_doctor çağırır (sağlık kontrolü)
-           → deckent_init(projectName: "my-app", mode: "max_plan") çağırır
+           → deckent_init(projectName: "my-app", mode: "performance") çağırır
            → ".deckent/, .brain/, .tasks/ oluşturuldu. MCP sunucu kaydedildi."
 ```
 
@@ -672,7 +701,7 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 - [x] VitePress dokümantasyon sitesi — Sprint 052
 - [x] CI Guardian ajan + ci-testing skill — Sprint 062
 - [x] Routing v2 engine (intent-based 3-layer) — Sprint 063
-- [x] 33+ CLI komutu, 10 MCP aracı, 8+1 ajan, 11 skill
+- [x] 32 CLI komutu, 17 MCP aracı, 9 ajan, 11 skill
 - [ ] Bulut modu: uzak orkestrasyon
 
 ---
@@ -724,6 +753,17 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 | 063 | 11500 | %96.4 | Routing v2 motoru (intent-based 3 katman) + forceSkills desteği |
 | 064 | 11500 | %96.4 | Doğrulama sprint'i (tüm görevler zaten tamamlanmış) |
 | 065 | 11862 | %96+ | AI planner timeout, autoMigrate, cleanup fix, analyzer birleştirme. 7/7 tamamlandı |
+| 066 | 11862 | %96+ | Manifest v2 toplu güncelleme (20 dosya), MCP docs 17 araç/9 kaynak, gitignore. 7/7 |
+| 067 | 11862 | %96+ | Paket 494KB, retro notlar, any temizlik, çıktı testleri, routing v2 audit. 6/6 |
+| 068 | 11918 | %96+ | MCP talimatlar, araç annotations, deckent_help aracı. 6/6 |
+| 069 | 11918 | %96+ | Ajan seçim hassasiyeti, skill bütçesi, scope parser fix. 6/6 |
+| 070-071 | 12000 | %96+ | Windows dogfooding: init UX, 22 bug fix, heartbeat periodic, upgrade --local. 15/15 |
+| 072 | 12160 | %96+ | Tier genelleştirme (performance/balanced/economic), MODEL_API_IDS, god object faz 1. 5/5 |
+| 073 | 12176 | %96+ | Self-dogfooding: 100 test regresyonu fix (0 fail). 5/5 |
+| 074 | 12176 | %96+ | Docs tutarlılık, debt-069 kapanış, CHANGELOG/SPRINT-LOG. 7/7 |
+| 075 | 12196 | %96+ | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2. 5/5 |
+| 076 | 12196 | %96+ | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3. 4/4 |
+| 077 | 12196 | %96+ | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme. 3/3 |
 
 **İlk dogfooding sonucu (Sprint 6):** Deckent `deckent start` komutunu kendi üzerinde çalıştırdı, 86 saniyede 1 worker ile README.md oluşturdu. Orkestrasyon döngüsü (planla → başlat → yürüt → değerlendir → retro → temizle) uçtan uca tamamlandı.
 
@@ -756,6 +796,14 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 **Routing v2 dönüm noktası (Sprint 063):** Intent-based 3 katmanlı yönlendirme motoru. Niyet sınıflandırma → ajan seçimi → yetenek seçimi. forceSkills ve forceModel desteği.
 
 **CLI tamamlanma dönüm noktası (Sprint 065):** Son CLI iyileştirme grubu: AI planner timeout, config autoMigrate, cleanup fix, spawn scope enforcement, analyzer birleştirme. 11.862 test, 469 test dosyası, 247 kaynak dosya, 75.105 satır.
+
+**MCP tamamlanma dönüm noktası (Sprint 066-068):** MCP 10 araç + 5 kaynaktan **17 araç + 9 kaynağa** genişletildi. Tüm ajan/skill manifest'leri v2'ye taşındı. Araç annotations (readOnlyHint, destructiveHint) eklendi. `deckent_help` aracı çalışma zamanı yeteneklerini raporlar.
+
+**Windows dogfooding dönüm noktası (Sprint 070-071):** Deckent ilk kez yerel Windows'ta çalıştı. 22 bug bulundu ve düzeltildi. shell:true, periyodik heartbeat, UTF-8 encoding, scope parser fix. `deckent upgrade --local` beta geliştirme akışı eklendi.
+
+**Self-dogfooding dönüm noktası (Sprint 073):** Deckent kendi sprint sistemiyle 100 test regresyonunu düzeltti (0 fail). test-writer ajanı 5/5 görev, 17dk 41sn. Orkestrasyon sisteminin kendi kod tabanını güvenilir şekilde düzeltebildiğini kanıtladı.
+
+**God Object bölme dönüm noktası (Sprint 072-076):** sprint-controller.ts 3 fazda sistematik olarak ayrıştırıldı: Faz 1 sprint-phases.ts, Faz 2 sprint-utils.ts, Faz 3 result-collector.ts (233 satır). brain.ts ince bir re-export katmanı olarak kaldı.
 
 ---
 

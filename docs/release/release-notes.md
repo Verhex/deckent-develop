@@ -167,7 +167,7 @@ Deckent auto-registers as an MCP server. After `deckent init`, your IDE (Cursor,
 
 ### Scale
 - **Sprint size**: Tested up to 20 parallel tasks. Larger sprints may hit memory or token limits.
-- **Memory budget**: 600 lines in .brain/ — very active projects may need manual decay via `deckent archive-debt`.
+- **Memory budget**: 900 lines in .brain/ — very active projects may need manual decay via `deckent archive-debt`.
 
 ### Beta Limitations
 - **No Windows support** — Linux/macOS/WSL2 only
