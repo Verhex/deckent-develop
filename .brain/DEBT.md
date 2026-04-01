@@ -32,3 +32,6 @@
 | debt-074-004 | Tech debt from 074-004: God Object Split Faz 3: result-collector.ts oluşturuldu. | 074-004 | sprint-074 | NORMAL | 0 | true | sprint-074 | 2026-03-30T11:29:27.846Z |
 | debt-075-001 | Tech debt from 075-001: Sprint 076 entries added to all three files. docs/CHANGE | 075-001 | sprint-075 | NORMAL | 0 | true | sprint-075 | 2026-03-30T11:56:36.727Z |
 | debt-075-002 | Tech debt from 075-002: A) PROJECT-IDENTITY.md güncellendi: test sayısı 12,196 ( | 075-002 | sprint-075 | NORMAL | 0 | true | sprint-075 | 2026-03-30T11:56:39.570Z |
+| debt-076-001 | Tech debt from 076-001: Sprint 078, 079, 080 entry'leri docs/CHANGELOG.md'ye ekl | 076-001 | sprint-076 | NORMAL | 0 | true | sprint-076 | 2026-04-01T10:21:21.804Z |
+| debt-076-003 | Tech debt from 076-003: Updated PROJECT-IDENTITY.md with Sprint 078-080 data: te | 076-003 | sprint-076 | NORMAL | 0 | true | sprint-076 | 2026-04-01T10:21:32.234Z |
+| debt-076-004 | Tech debt from 076-004: A) SuccessRateTrend component added to SprintChart.tsx — | 076-004 | sprint-076 | NORMAL | 0 | true | sprint-076 | 2026-04-01T10:21:35.730Z |

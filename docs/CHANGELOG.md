@@ -6,6 +6,21 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.2.0-beta.3-sprint76] - 2026-04-01
+
+### Added
+
+- SPRINT-LOG Sprint 078-080 Entry
+
+### Changed
+
+- CHANGELOG Sprint 078-080 Entry (completed with tech debt)
+- PROJECT-IDENTITY Güncelleme (completed with tech debt)
+- HistoryPage Success Rate Trend Bileşeni (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 3 tech debt, 0 no-go_
+
 ## [0.2.0-beta.3-sprint75] - 2026-03-30
 
 ### Added
@@ -19,6 +34,60 @@ ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına
 
 
 _Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
+## [0.2.0-beta.3-sprint80] - 2026-04-01
+
+### Added
+
+- **SSE Bağlantı Durumu Göstergesi**: Dashboard'a `connected` / `connecting` / `disconnected` durumlarını gösteren SSE indicator eklendi
+
+### Changed
+
+- **ConfigPage Mode Seçenekleri**: `performance` / `balanced` / `economic` isimlendirmesine güncellendi
+- **SettingsPage Mode Seçenekleri**: ConfigPage ile tutarlı hale getirildi
+
+### Fixed
+
+- **ConfigPage memory_budget Varsayılanı**: Hatalı varsayılan değer 600 → 900 düzeltildi
+- **ConfigPage language Alanı**: `text` input → `select` dropdown olarak değiştirildi
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
+---
+
+## [0.2.0-beta.3-sprint79] - 2026-04-01
+
+### Added
+
+- **Dashboard i18n**: `LanguageProvider`, 90+ TR/EN anahtar ve sidebar dil switcher eklendi
+- **README-TR.md**: README.md'nin tam Türkçe çevirisi (466 satır)
+- **VISION-EN.md**: VISION.md'nin tam İngilizce çevirisi (110 satır)
+- **GET /api/tasks endpoint**: `.tasks/` dizininden aktif görev listesini döndüren yeni API endpoint
+
+### Fixed
+
+- **Blueprint Testleri**: MCP tool sayısı 10→17, resource sayısı 5→9 olarak güncellendi
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
+---
+
+## [0.2.0-beta.3-sprint78] - 2026-04-01
+
+### Changed
+
+- **Blueprint Senkronizasyonu**: MCP 10→17 tools, 5→9 resources, memory budget 600→900 belgelerine yansıtıldı
+- **ANA-PLAN-TR.md**: CLI 21→32, MCP sayıları ve sprint tablosu tam güncellendi
+- **BETA-ROADMAP**: Sprint 076-077 DONE, Sprint 078 AKTİF olarak işaretlendi
+
+### Fixed
+
+- **brain.md Bellek Bütçesi**: MEMORY 200→300, RETRO 100→120, genel budget 600→900 düzeltildi
+- **Dokümantasyon Bellek Bütçesi**: `docs/architecture`, `docs/security`, `docs/release-notes` dosyalarında budget 600→900 olarak güncellendi
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+---
 
 ## [0.2.0-beta.3-sprint76] - 2026-03-30
 

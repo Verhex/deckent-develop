@@ -2040,3 +2040,107 @@ Sprint 076: Stale heartbeat 410x pattern giderildi (finalizeHeartbeat). 10 dashb
 - 075-003: CLAUDE.md + DECKENT.md Modül Sayısı Güncelleme (DONE)
 
 ---
+## Sprint 78 — sprint-078
+
+**Status:** COMPLETE
+**Date:** 2026-04-01
+**Duration:** ~300s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+
+### Tasks
+
+- 078-001: Blueprint Senkronizasyonu — MCP 10→17 tools, 5→9 resources (DONE)
+- 078-002: ANA-PLAN-TR.md Güncelleme — CLI 21→32, MCP sayıları, sprint tablosu (DONE)
+- 078-003: BETA-ROADMAP Sprint 076-077 DONE, Sprint 078 AKTİF (DONE)
+- 078-004: brain.md + docs/ Memory Budget 600→900 (DONE)
+
+### Notes
+
+Sprint 078: Dokümantasyon senkronizasyonu. Blueprint, ANA-PLAN-TR ve BETA-ROADMAP dosyaları gerçek duruma getirildi. Memory budget 600→900 olarak güncellendi (MEMORY 200→300, RETRO 100→120). MCP araç sayıları 10→17, kaynak sayıları 5→9 olarak düzeltildi.
+
+---
+## Sprint 79 — sprint-079
+
+**Status:** COMPLETE
+**Date:** 2026-04-01
+**Duration:** ~400s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+
+### Tasks
+
+- 079-001: Dashboard i18n — LanguageProvider, 90+ TR/EN key, sidebar dil switcher (DONE)
+- 079-002: README-TR.md + VISION-EN.md — TR/EN çift dil dokümantasyon (DONE)
+- 079-003: GET /api/tasks endpoint — .tasks/ dizininden task listesi (DONE)
+
+### Notes
+
+Sprint 079: Dashboard i18n altyapısı kuruldu: LanguageProvider, 90+ anahtar (TR/EN), sidebar dil switcher. README-TR.md (466 satır) ve VISION-EN.md (110 satır) oluşturuldu. GET /api/tasks REST endpoint eklendi. Blueprint testleri 10→17 tools, 5→9 resources olarak güncellendi.
+
+---
+## Sprint 80 — sprint-080
+
+**Status:** COMPLETE
+**Date:** 2026-04-01
+**Duration:** ~350s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+
+### Tasks
+
+- 080-001: SSE Bağlantı Durumu Göstergesi — connected/connecting/disconnected (DONE)
+- 080-002: ConfigPage Mode Seçenekleri — performance/balanced/economic + memory_budget 600→900 (DONE)
+- 080-003: ConfigPage language alanı text→select + SettingsPage mode güncelleme (DONE)
+
+### Notes
+
+Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklendi (connected/connecting/disconnected). ConfigPage mode seçenekleri performance/balanced/economic olarak güncellendi, memory_budget varsayılanı 900'e yükseltildi. Language alanı text→select olarak düzeltildi.
+
+---
+## Sprint 76 — sprint-076
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-01
+**Duration:** 417s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 416572ms |
+
+### Tasks
+
+- 076-001: CHANGELOG Sprint 078-080 Entry (GO_WITH_TECH_DEBT)
+- 076-002: SPRINT-LOG Sprint 078-080 Entry (DONE)
+- 076-003: PROJECT-IDENTITY Güncelleme (GO_WITH_TECH_DEBT)
+- 076-004: HistoryPage Success Rate Trend Bileşeni (GO_WITH_TECH_DEBT)
+
+---

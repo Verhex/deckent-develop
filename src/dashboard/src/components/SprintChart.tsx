@@ -2,6 +2,9 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  BarChart,
+  Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,6 +16,7 @@ export interface SprintChartEntry {
   sprintId: string;
   taskCount: number;
   coverage: number;
+  successRate: number;
 }
 
 interface SprintChartProps {
@@ -24,16 +28,62 @@ function tooltipFormatter(value: number, name: string): [string, string] {
   return [String(value), "Tasks"];
 }
 
+function getSuccessColor(rate: number): string {
+  if (rate >= 100) return "#4ade80"; // green
+  if (rate >= 80) return "#facc15";  // yellow
+  return "#f87171";                  // red
+}
+
 export function parseChartData(
-  history: Array<{ id?: string; sprint?: string; tasks?: string; coverage?: string }>,
+  history: Array<{ id?: string; sprint?: string; tasks?: string; coverage?: string; completed?: string }>,
 ): SprintChartEntry[] {
   return history.map((h) => {
     const id = h.id ?? h.sprint ?? "unknown";
     const taskCount = parseInt(h.tasks ?? "0", 10) || 0;
     const coverageStr = (h.coverage ?? "0").replace("%", "");
     const coverage = parseFloat(coverageStr) || 0;
-    return { sprintId: id, taskCount, coverage };
+    const completed = parseInt(h.completed ?? "0", 10) || 0;
+    const successRate = taskCount > 0 ? Math.round((completed / taskCount) * 100) : 0;
+    return { sprintId: id, taskCount, coverage, successRate };
   });
+}
+
+interface SuccessRateTrendProps {
+  data: SprintChartEntry[];
+}
+
+export function SuccessRateTrend({ data }: SuccessRateTrendProps) {
+  const last10 = data.slice(-10);
+
+  if (last10.length === 0) {
+    return <p className="text-zinc-500">No data available.</p>;
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={last10} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
+        <XAxis dataKey="sprintId" stroke="#a1a1aa" fontSize={11} />
+        <YAxis
+          stroke="#a1a1aa"
+          fontSize={11}
+          domain={[0, 100]}
+          tickFormatter={(v: number) => `${v}%`}
+        />
+        <Tooltip
+          formatter={(value: number) => [`${value}%`, "Success Rate"] as [string, string]}
+          contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46" }}
+          labelStyle={{ color: "#e4e4e7" }}
+          itemStyle={{ color: "#e4e4e7" }}
+        />
+        <Bar dataKey="successRate" name="Success Rate" radius={[4, 4, 0, 0]}>
+          {last10.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={getSuccessColor(entry.successRate)} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
 }
 
 export default function SprintChart({ data }: SprintChartProps) {

@@ -183,3 +183,7 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 ## Sprint sprint-075 Learnings
 - CHANGELOG + SPRINT-LOG Güncelleme: GO_WITH_TECH_DEBT — Sprint 076 entries added to all three files. docs/CHANGELOG.md: new [0.2.0-beta.3-sprint76] entry with proper Fixed/Adde
 - .brain/ Güncelleme — PROJECT-IDENTITY + DECISIONS: GO_WITH_TECH_DEBT — A) PROJECT-IDENTITY.md güncellendi: test sayısı 12,196 (12,181 passed + 15 skipped), sprint 76+, orchestra 47 modül, cor
+## Sprint sprint-076 Learnings
+- CHANGELOG Sprint 078-080 Entry: GO_WITH_TECH_DEBT — Sprint 078, 079, 080 entry'leri docs/CHANGELOG.md'ye eklendi. Keep a Changelog formatı korundu; section başlıkları İngil
+- PROJECT-IDENTITY Güncelleme: GO_WITH_TECH_DEBT — Updated PROJECT-IDENTITY.md with Sprint 078-080 data: test count 12,198, last sprint sprint-080, total sprints 80, MCP 1
+- HistoryPage Success Rate Trend Bileşeni: GO_WITH_TECH_DEBT — A) SuccessRateTrend component added to SprintChart.tsx — BarChart with color-coded bars (last 10 sprints). B) calcSucces

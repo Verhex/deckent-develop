@@ -21,16 +21,17 @@
 - **agents/** (16 modules): Worker execution, prompt engineering
 - **providers/** (5 modules): Claude, Codex, Gemini adapters
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
-- **mcp/**: MCP server — 16 tools + 9 resources, stdio transport
-- **cli/** (33+ commands): Full CLI with helpers, entry point
-- **dashboard/**: React + Vite + Tailwind web dashboard
+- **mcp/**: MCP server — 17 tools + 9 resources, stdio transport
+- **cli/** (32 commands): Full CLI with helpers, entry point
+- **dashboard/**: React + Vite + Tailwind (6 pages, SSE indicator, language switcher)
+  - i18n/LanguageProvider.tsx, i18n/en.ts, i18n/tr.ts (Sprint 079)
 
 ## Current State
 - Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-075
-- Total Sprints: 75
-- Completed Tasks: 156
+- Last Sprint: sprint-076
+- Total Sprints: 76
+- Completed Tasks: 189
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -65,8 +66,8 @@
 - core/provider.ts → ProviderAdapter interface, multi-provider registry
 - agents/worker.ts → task claim, file locking, heartbeat, verify loop
 - cli/entry.ts → buildProgram() + 33+ commands
-- mcp/index.ts → 16 tools + 9 resources
-- api/server.ts → HTTP API + SSE (16 endpoints)
+- mcp/index.ts → 17 tools + 9 resources (Sprint 080)
+- api/server.ts → HTTP API + SSE (17 endpoints: GET /api/status, /api/tasks, etc.)
 
 ## Sprint 067 Learnings
 - V2 routing engine is now the DEFAULT (`config.routing_engine ?? 'v2'`)
@@ -79,3 +80,12 @@
 - cleanup_delay: 180s — task files preserved for post-sprint inspection
 - Scope parser: .deckent/, .brain/, root files now recognized
 - goNogo criteria: extracted from DIRECTIVES Kanıt/Proof lines
+
+## Sprint 078-080 Achievements (Documentation & Dashboard)
+- Sprint 078: Blueprint/ANA-PLAN senkronizasyonu, memory budget 600→900, MCP 16→17 tools
+- Sprint 079: Dashboard i18n (LanguageProvider, 90+ TR/EN keys), /api/tasks endpoint, README-TR.md, VISION-EN.md
+- Sprint 080: SSE connection indicator (connected/connecting/disconnected), ConfigPage improvements, 6-page dashboard with language switcher
+- New modules: i18n/LanguageProvider.tsx, i18n/en.ts, i18n/tr.ts
+- New files: README-TR.md (466 lines), VISION-EN.md (110 lines)
+- Test count: 12,198 (12,182 passed + 15 skipped + 1 fail)
+- All sprints GO or GO_WITH_TECH_DEBT (0 NO_GO rate)
