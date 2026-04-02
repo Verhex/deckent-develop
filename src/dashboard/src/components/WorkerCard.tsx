@@ -5,12 +5,12 @@ import type { AgentInfo } from "../types";
 import { useTranslation } from "../i18n/LanguageProvider";
 
 const STATUS_BORDER: Record<string, string> = {
-  EXECUTING: "border-blue-500 animate-pulse",
-  DONE: "border-green-500",
-  NO_GO: "border-red-500",
-  ERROR: "border-red-500",
-  PAUSED: "border-yellow-500",
-  IDLE: "border-zinc-700",
+  EXECUTING: "border border-l-4 border-blue-500 animate-pulse",
+  DONE: "border-2 border-green-500",
+  NO_GO: "border-2 border-red-500",
+  ERROR: "border-2 border-red-500",
+  PAUSED: "border-2 border-yellow-500",
+  IDLE: "border-2 border-zinc-700",
 };
 
 const STATUS_BADGE: Record<string, "info" | "success" | "critical" | "secondary" | "warning"> = {
@@ -81,7 +81,7 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
 
   return (
     <div
-      className={`rounded-lg border-2 ${borderClass} bg-zinc-900 p-4 cursor-pointer transition-all duration-300 hover:bg-zinc-800/80 shadow-lg shadow-zinc-950/50`}
+      className={`rounded-lg ${borderClass} bg-zinc-900 p-4 cursor-pointer transition-all duration-200 hover:bg-zinc-800/80 hover:scale-[1.02] shadow-lg shadow-zinc-950/50`}
       onClick={onClick}
     >
       {/* Header: Worker ID + Model badge */}

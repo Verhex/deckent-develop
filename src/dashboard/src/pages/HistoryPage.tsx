@@ -1,7 +1,10 @@
 import { useApi } from "../hooks/useApi";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import SprintChart, { parseChartData, SuccessRateTrend } from "../components/SprintChart";
+import { SkeletonCard, SkeletonTable } from "../components/Skeleton";
 import { useTranslation } from "../i18n/LanguageProvider";
+import EmptyState from "../components/EmptyState";
+import { History } from "lucide-react";
 
 interface SprintHistoryRecord {
   id: string;
@@ -52,8 +55,21 @@ export default function HistoryPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-zinc-100">{t('history.title')}</h1>
 
-      {loading && <p className="text-zinc-400">{t('common.loading')}</p>}
-      {error && <p className="text-red-400">Error: {error}</p>}
+      {loading && (
+        <div className="space-y-6" aria-label={t('common.loading')}>
+          <SkeletonCard className="h-48" />
+          <SkeletonCard className="h-32" />
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader>
+              <div className="h-5 w-32 animate-pulse rounded bg-zinc-800" />
+            </CardHeader>
+            <CardContent>
+              <SkeletonTable rows={6} cols={9} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {!loading && error && <p className="text-red-400">Error: {error}</p>}
 
       {data && data.length > 0 && (
         <>
@@ -135,7 +151,11 @@ export default function HistoryPage() {
       {data && data.length === 0 && (
         <Card className="bg-zinc-900 border-zinc-800">
           <CardContent className="pt-6">
-            <p className="text-zinc-500">{t('history.no_history')}</p>
+            <EmptyState
+              icon={History}
+              title={t('history.no_history_title')}
+              description={t('history.no_history_desc')}
+            />
           </CardContent>
         </Card>
       )}

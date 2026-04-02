@@ -1,7 +1,7 @@
-# Sprint sprint-081 Retrospective
+# Sprint sprint-082 Retrospective
 
 ## Summary
-Completed 4/4 tasks in 11 minutes 38s.
+Completed 4/4 tasks in 7 minutes 53s.
 
 ## Highlights
 - 4 tasks completed on first try
@@ -11,21 +11,19 @@ Completed 4/4 tasks in 11 minutes 38s.
 | What | Value |
 |------|-------|
 | Tasks completed | 4/4 |
-| New test files | 1 |
-| Code changes | +169 / -19 |
-| Sprint time | 11 minutes 38s |
+| Code changes | +273 / -68 |
+| Sprint time | 7 minutes 53s |
 | NO_GO rate | 0% (0/4) |
-| Coverage | 49.0% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| doc-writer | 2 | 2 | 0 | 0 | 98% |
-| bug-fixer | 1 | 0 | 1 | 0 | 0% |
-| test-writer | 1 | 0 | 1 | 0 | 0% |
+| refactorer | 4 | 0 | 4 | 0 | 0% |
 
 ## Learnings
-- Usage Manager — Gerçekçi Tahmin + Dashboard Düzeltme: completed with tech debt — A) usage-manager.ts: SAFE_DEFAULT changed to { fiveHourPercent: 0, weeklyPercent: 0 } as required. Added getSprintUsageEstimate(sprintId, root) functi
-- Init Test Mock Düzeltme: completed with tech debt — it.skip kaldırıldı. mockPrompts sırası language-first akışa güncellendi: ['3','2','my-app'] (eski: mode→language) → ['2','3','my-app'] (yeni: language
-- Recurring pattern (840x): stale_heartbeat
+- Skeleton Loading Bileşenleri: completed with tech debt — Created Skeleton.tsx with SkeletonCard, SkeletonTable, SkeletonText components (animate-pulse bg-zinc-800 rounded). Replaced 'Loading...' text with sk
+- AgentDetail Zenginleştirme: completed with tech debt — AgentDetail.tsx zenginleştirildi: (A) büyük font başlık, collapsible description (200 char truncation + show more/less), renkli model/status badge (ma
+- Empty State Bileşenleri: completed with tech debt — EmptyState.tsx bileşeni oluşturuldu: LucideIcon prop, title, description, opsiyonel action butonu. HistoryPage: History ikonu ile EmptyState kullanıyo
+- Dashboard Genel Polish: completed with tech debt — A) Consistent shadow already present on all cards (shadow-lg shadow-zinc-950/50). B) WorkerCard: STATUS_BORDER updated — EXECUTING now uses 'border bo
+- Recurring pattern (860x): stale_heartbeat

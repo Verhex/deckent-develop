@@ -6,6 +6,7 @@ import { Select } from "../components/ui/select";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
+import { SkeletonCard } from "../components/Skeleton";
 import { fetchJson, postJson } from "../lib/api";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslationKey } from "../i18n/en";
@@ -255,7 +256,14 @@ export default function ConfigPage() {
   }
 
   if (loading) {
-    return <p className="text-muted-foreground p-4">{t('config.loading')}</p>;
+    return (
+      <div className="space-y-6 p-4">
+        <div className="h-8 w-48 animate-pulse rounded bg-zinc-800" />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    );
   }
 
   if (error) {

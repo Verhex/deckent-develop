@@ -146,6 +146,14 @@ export const en = {
 
   // Memory additional
   'memory.technical_debt': 'Technical Debt',
+  'memory.no_memory_title': 'No Memory Content',
+  'memory.no_memory_desc': 'Brain memory will appear here once a sprint has completed.',
+  'memory.no_debt_title': 'No Technical Debt',
+  'memory.no_debt_desc': 'Technical debt items will appear here when tasks finish with tech debt.',
+
+  // History empty state
+  'history.no_history_title': 'No Sprint History',
+  'history.no_history_desc': 'Completed sprints will appear here. Run `deckent start` to begin your first sprint.',
 
   // Config additional
   'config.save_changes': 'Save Changes',
@@ -173,6 +181,15 @@ export const en = {
   'agent.scope': 'Scope',
   'agent.log_output': 'Log Output',
   'agent.no_log': 'No log output yet.',
+  'agent.description': 'Description',
+  'agent.files_changed': 'Files',
+  'agent.elapsed': 'Elapsed',
+  'agent.copy_log': 'Copy Log',
+  'agent.copied': 'Copied!',
+  'agent.agent': 'Agent',
+  'agent.skills': 'Skills',
+  'agent.show_more': 'Show more',
+  'agent.show_less': 'Show less',
 
   // Common
   'common.loading': 'Loading...',

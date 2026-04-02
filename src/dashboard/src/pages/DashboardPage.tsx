@@ -9,6 +9,7 @@ import { NewSprintModal } from "../components/NewSprintModal";
 import { AgentDetail } from "../components/AgentDetail";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { SprintPhaseTimeline } from "../components/SprintPhaseTimeline";
+import { SkeletonCard } from "../components/Skeleton";
 import { Sheet, SheetContent } from "../components/ui/sheet";
 import { useSSE } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
@@ -29,7 +30,7 @@ function WelcomeScreen({ lastSprintId, onNewSprint }: WelcomeScreenProps) {
         <h2 className="text-2xl font-bold text-zinc-100">deckent</h2>
         <p className="text-zinc-400 text-center">{t("welcome.no_sprint")}</p>
         <p className="text-zinc-500 text-sm text-center">{t("welcome.start_hint")}</p>
-        <Button onClick={onNewSprint} className="mt-2 transition-all duration-300">
+        <Button onClick={onNewSprint} className="mt-2 transition-all duration-200">
           <Plus className="mr-2 h-4 w-4" />
           {t("dashboard.new_sprint")}
         </Button>
@@ -89,6 +90,7 @@ export default function DashboardPage() {
   const sseState = useSSE("/api/events");
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
   const [noSprint, setNoSprint] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [isCleanupLoading, setIsCleanupLoading] = useState(false);
@@ -105,7 +107,10 @@ export default function DashboardPage() {
           if (err instanceof ApiError && err.status === 404) {
             setNoSprint(true);
           }
-        });
+        })
+        .finally(() => setInitialLoading(false));
+    } else {
+      setInitialLoading(false);
     }
   }, [sseState]);
 
@@ -186,7 +191,7 @@ export default function DashboardPage() {
               variant="outline"
               onClick={handleCleanup}
               disabled={isCleanupLoading}
-              className="transition-all duration-300"
+              className="transition-all duration-200"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               {t("dashboard.cleanup")}
@@ -197,27 +202,39 @@ export default function DashboardPage() {
               variant="destructive"
               onClick={handleKillAll}
               disabled={isKillAllLoading}
-              className="transition-all duration-300"
+              className="transition-all duration-200"
             >
               <XOctagon className="mr-2 h-4 w-4" />
               {t("dashboard.kill_all")}
             </Button>
           )}
-          <Button onClick={() => setModalOpen(true)} className="transition-all duration-300">
+          <Button onClick={() => setModalOpen(true)} className="transition-all duration-200">
             <Plus className="mr-2 h-4 w-4" />
             {t("dashboard.new_sprint")}
           </Button>
         </div>
       </div>
 
+      {/* Skeleton: shown during initial data load */}
+      {initialLoading && !sseState && (
+        <div className="space-y-4">
+          <SkeletonCard className="h-40" />
+          <SkeletonCard className="h-24" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <SkeletonCard className="lg:col-span-2 h-48" />
+            <SkeletonCard className="h-48" />
+          </div>
+        </div>
+      )}
+
       {/* Welcome Screen: shown when no active sprint */}
-      {noSprint && !state && (
+      {!initialLoading && noSprint && !state && (
         <WelcomeScreen onNewSprint={() => setModalOpen(true)} />
       )}
 
       {/* Sprint Status Card */}
       {state && (
-        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50 transition-all duration-300">
+        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50 transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2 text-zinc-100">
               <Activity className="h-5 w-5 text-blue-400" />
@@ -323,7 +340,7 @@ export default function DashboardPage() {
                 return (
                   <li
                     key={i}
-                    className="flex items-start gap-3 rounded-md bg-zinc-800/50 px-3 py-2 transition-all duration-300"
+                    className="flex items-start gap-3 rounded-md bg-zinc-800/50 px-3 py-2 transition-all duration-200"
                   >
                     <Icon className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="flex-1">

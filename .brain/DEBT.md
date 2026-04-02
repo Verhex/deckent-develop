@@ -14,3 +14,7 @@
 | debt-080-005 | Tech debt from 080-005: A) deckent_agent_list MCP tool created (agent-list.ts): | 080-005 | sprint-080 | NORMAL | 0 | true | sprint-080 | 2026-04-02T04:43:10.359Z |
 | debt-081-001 | Tech debt from 081-001: A) usage-manager.ts: SAFE_DEFAULT changed to { fiveHourP | 081-001 | sprint-081 | NORMAL | 0 | true | sprint-081 | 2026-04-02T07:28:48.159Z |
 | debt-081-003 | Tech debt from 081-003: it.skip kaldırıldı. mockPrompts sırası language-first ak | 081-003 | sprint-081 | NORMAL | 0 | true | sprint-081 | 2026-04-02T07:28:56.093Z |
+| debt-082-001 | Tech debt from 082-001: Created Skeleton.tsx with SkeletonCard, SkeletonTable, S | 082-001 | sprint-082 | NORMAL | 0 | true | sprint-082 | 2026-04-02T08:15:12.175Z |
+| debt-082-002 | Tech debt from 082-002: AgentDetail.tsx zenginleştirildi: (A) büyük font başlık, | 082-002 | sprint-082 | NORMAL | 0 | true | sprint-082 | 2026-04-02T08:15:18.467Z |
+| debt-082-003 | Tech debt from 082-003: EmptyState.tsx bileşeni oluşturuldu: LucideIcon prop, ti | 082-003 | sprint-082 | NORMAL | 0 | true | sprint-082 | 2026-04-02T08:15:22.474Z |
+| debt-082-004 | Tech debt from 082-004: A) Consistent shadow already present on all cards (shado | 082-004 | sprint-082 | NORMAL | 0 | true | sprint-082 | 2026-04-02T08:15:26.423Z |

@@ -148,6 +148,14 @@ export const tr: Record<TranslationKey, string> = {
 
   // Memory additional
   'memory.technical_debt': 'Teknik Borç',
+  'memory.no_memory_title': 'Bellek İçeriği Yok',
+  'memory.no_memory_desc': 'Brain belleği, sprint tamamlandıktan sonra burada görünecek.',
+  'memory.no_debt_title': 'Teknik Borç Yok',
+  'memory.no_debt_desc': 'Görevler teknik borçla tamamlandığında burada görünecek.',
+
+  // History empty state
+  'history.no_history_title': 'Sprint Geçmişi Yok',
+  'history.no_history_desc': "Tamamlanan sprintler burada görünecek. İlk sprinti başlatmak için `deckent start` çalıştırın.",
 
   // Config additional
   'config.save_changes': 'Değişiklikleri Kaydet',
@@ -175,6 +183,15 @@ export const tr: Record<TranslationKey, string> = {
   'agent.scope': 'Kapsam',
   'agent.log_output': 'Log Çıktısı',
   'agent.no_log': 'Henüz log çıktısı yok.',
+  'agent.description': 'Açıklama',
+  'agent.files_changed': 'Dosyalar',
+  'agent.elapsed': 'Geçen Süre',
+  'agent.copy_log': 'Log Kopyala',
+  'agent.copied': 'Kopyalandı!',
+  'agent.agent': 'Ajan',
+  'agent.skills': 'Beceriler',
+  'agent.show_more': 'Daha fazla göster',
+  'agent.show_less': 'Daha az göster',
 
   // Common
   'common.loading': 'Yükleniyor...',

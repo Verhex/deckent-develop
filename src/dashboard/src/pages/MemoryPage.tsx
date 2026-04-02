@@ -3,7 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import DebtTable, { parseDebtMarkdown } from "../components/DebtTable";
 import SimpleMarkdown from "../components/SimpleMarkdown";
+import { SkeletonText, SkeletonTable } from "../components/Skeleton";
 import { useTranslation } from "../i18n/LanguageProvider";
+import EmptyState from "../components/EmptyState";
+import { Brain, CheckCircle2 } from "lucide-react";
 
 export default function MemoryPage() {
   const { t } = useTranslation();
@@ -26,7 +29,11 @@ export default function MemoryPage() {
               <CardTitle className="text-zinc-100">{t('memory.title')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {memLoading && <p className="text-zinc-400">{t('common.loading')}</p>}
+              {memLoading && (
+                <div aria-label={t('common.loading')}>
+                  <SkeletonText lines={8} />
+                </div>
+              )}
               {memError && <p className="text-red-400">{t('common.error')}: {memError}</p>}
               {memoryData && (
                 <div className="rounded-md bg-zinc-950 p-4 border border-zinc-800">
@@ -34,7 +41,11 @@ export default function MemoryPage() {
                 </div>
               )}
               {!memLoading && !memError && !memoryData && (
-                <p className="text-zinc-500">{t('memory.no_memory')}</p>
+                <EmptyState
+                  icon={Brain}
+                  title={t('memory.no_memory_title')}
+                  description={t('memory.no_memory_desc')}
+                />
               )}
             </CardContent>
           </Card>
@@ -46,11 +57,19 @@ export default function MemoryPage() {
               <CardTitle className="text-zinc-100">{t('memory.technical_debt')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {debtLoading && <p className="text-zinc-400">{t('common.loading')}</p>}
+              {debtLoading && (
+                <div aria-label={t('common.loading')}>
+                  <SkeletonTable rows={4} cols={5} />
+                </div>
+              )}
               {debtError && <p className="text-red-400">{t('common.error')}: {debtError}</p>}
               {debtData && <DebtTable rows={parseDebtMarkdown(debtData.content)} />}
               {!debtLoading && !debtError && !debtData && (
-                <p className="text-zinc-500">{t('memory.no_debt')}</p>
+                <EmptyState
+                  icon={CheckCircle2}
+                  title={t('memory.no_debt_title')}
+                  description={t('memory.no_debt_desc')}
+                />
               )}
             </CardContent>
           </Card>

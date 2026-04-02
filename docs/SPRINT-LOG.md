@@ -2271,3 +2271,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 081-004: AGENTS.md + Kalan Docs Tutarlılık (DONE)
 
 ---
+## Sprint 82 — sprint-082
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-02
+**Duration:** 473s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 473469ms |
+
+### Tasks
+
+- 082-001: Skeleton Loading Bileşenleri (GO_WITH_TECH_DEBT)
+- 082-002: AgentDetail Zenginleştirme (GO_WITH_TECH_DEBT)
+- 082-003: Empty State Bileşenleri (GO_WITH_TECH_DEBT)
+- 082-004: Dashboard Genel Polish (GO_WITH_TECH_DEBT)
+
+---

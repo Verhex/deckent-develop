@@ -207,3 +207,8 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 ## Sprint sprint-081 Learnings
 - Usage Manager — Gerçekçi Tahmin + Dashboard Düzeltme: GO_WITH_TECH_DEBT — A) usage-manager.ts: SAFE_DEFAULT changed to { fiveHourPercent: 0, weeklyPercent: 0 } as required. Added getSprintUsageE
 - Init Test Mock Düzeltme: GO_WITH_TECH_DEBT — it.skip kaldırıldı. mockPrompts sırası language-first akışa güncellendi: ['3','2','my-app'] (eski: mode→language) → ['2'
+## Sprint sprint-082 Learnings
+- Skeleton Loading Bileşenleri: GO_WITH_TECH_DEBT — Created Skeleton.tsx with SkeletonCard, SkeletonTable, SkeletonText components (animate-pulse bg-zinc-800 rounded). Repl
+- AgentDetail Zenginleştirme: GO_WITH_TECH_DEBT — AgentDetail.tsx zenginleştirildi: (A) büyük font başlık, collapsible description (200 char truncation + show more/less),
+- Empty State Bileşenleri: GO_WITH_TECH_DEBT — EmptyState.tsx bileşeni oluşturuldu: LucideIcon prop, title, description, opsiyonel action butonu. HistoryPage: History 
+- Dashboard Genel Polish: GO_WITH_TECH_DEBT — A) Consistent shadow already present on all cards (shadow-lg shadow-zinc-950/50). B) WorkerCard: STATUS_BORDER updated —

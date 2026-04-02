@@ -6,6 +6,19 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.1-sprint82] - 2026-04-02
+
+
+### Changed
+
+- Skeleton Loading Bileşenleri (completed with tech debt)
+- AgentDetail Zenginleştirme (completed with tech debt)
+- Empty State Bileşenleri (completed with tech debt)
+- Dashboard Genel Polish (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 4 tech debt, 0 no-go_
+
 ## [0.3.0-beta.1-sprint81] - 2026-04-02
 
 ### Added

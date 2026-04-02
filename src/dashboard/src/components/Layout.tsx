@@ -30,7 +30,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
               isActive
                 ? "bg-zinc-800 text-zinc-100 border-l-2 border-blue-500"
                 : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-l-2 border-transparent",
@@ -50,7 +50,7 @@ function LanguageSwitcher() {
   return (
     <button
       onClick={() => setLang(lang === 'en' ? 'tr' : 'en')}
-      className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 transition-colors"
+      className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 transition-all duration-200"
       title={lang === 'en' ? 'Türkçeye geç' : 'Switch to English'}
     >
       <Globe className="h-3.5 w-3.5" />
