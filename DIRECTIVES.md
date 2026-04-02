@@ -1,90 +1,77 @@
-# DIRECTIVES — Sprint 084: Dashboard Faz B — Skeleton Loading + Task Detay + Empty States
+# DIRECTIVES — Sprint 083: Docs Güncelleme + Dashboard Smoke Test Hazırlığı
 
-## Goal: Dashboard'u profesyonel seviyeye çıkar: skeleton loading, zengin task detay, anlamlı boş durumlar, genel polish.
-
----
-
-## Task 1: Skeleton Loading Bileşenleri
-- Model: sonnet
-- Effort: normal
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/components/Skeleton.tsx, src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/pages/ConfigPage.tsx
-- Scope: src/dashboard/
-
-### Description
-Veri yüklenirken skeleton placeholder göster — "Loading..." text yerine:
-
-A) `Skeleton.tsx` bileşeni oluştur:
-- `SkeletonCard`: Kart şeklinde animasyonlu placeholder (animate-pulse)
-- `SkeletonTable`: Tablo satırları placeholder
-- `SkeletonText`: Metin satırı placeholder (farklı genişliklerde)
-- Tailwind: `animate-pulse bg-zinc-800 rounded`
-
-B) Her sayfada `loading` state'i true iken skeleton göster, false olunca gerçek içerik.
-
-**Kanıt:** `grep "Skeleton\|skeleton" src/dashboard/src/pages/DashboardPage.tsx` → kullanılıyor
-
-**Test:** `tsc --noEmit` temiz.
+## Goal: Sprint numarası eşitleme dokümantasyonu, CHANGELOG/SPRINT-LOG catch-up, dashboard build. Hızlı sprint — dashboard izleme testi yapılacak.
 
 ---
 
-## Task 2: AgentDetail Zenginleştirme
+## Task 1: CHANGELOG + SPRINT-LOG Sprint 078-082 Toplu Güncelleme
 - Model: sonnet
 - Effort: normal
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/components/AgentDetail.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: src/dashboard/
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/CHANGELOG.md, docs/SPRINT-LOG.md
+- Scope: docs/
 
 ### Description
-AgentDetail sheet'ini zenginleştir:
+Sprint 078-082 değişikliklerinin tamamını CHANGELOG ve SPRINT-LOG'a ekle.
 
-A) Task başlığı büyük font, description collapsible, model/status badge, agent+skill bilgisi, scope, dosya değişiklikleri, elapsed time
+CHANGELOG: `[0.3.0-beta.1]` entry'si zaten olabilir — yoksa ekle, varsa zenginleştir:
+- Sprint 078: docs catch-up, HistoryPage trend
+- Sprint 079: README-TR fix, dashboard kontrol, init dil-ilk
+- Sprint 080: Dashboard UX Overhaul (WorkerCard, Timeline, ActivityFeed)
+- Sprint 081: Config birleşme, i18n tam kapsam
+- Sprint 082: MCP/CLI parity, usage fix, version bump, Dashboard Faz B
 
-B) Log bölümü: mono font, auto-scroll, copy butonu
+SPRINT-LOG: Her sprint için entry (tarih, task, süre, öne çıkanlar).
 
-C) i18n key'leri: agent.description, agent.scope, agent.files_changed, agent.elapsed, agent.copy_log
+**Kanıt:** `grep "Sprint 082\|sprint-082" docs/CHANGELOG.md docs/SPRINT-LOG.md` → entry var
 
-**Kanıt:** `grep "agent\.scope\|agent\.files_changed" src/dashboard/src/components/AgentDetail.tsx` → var
-
-**Test:** `tsc --noEmit` temiz.
+**Test:** Bu task test gerektirmez.
 
 ---
 
-## Task 3: Empty State Bileşenleri
-- Model: sonnet
-- Effort: normal
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/components/EmptyState.tsx, src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx
-- Scope: src/dashboard/
+## Task 2: PROJECT-IDENTITY + VISION Sayı Güncelleme
+- Model: haiku
+- Effort: low
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: .brain/PROJECT-IDENTITY.md, VISION.md, .deckent/workspace/IDENTITY.md
+- Scope: .brain/, VISION.md, .deckent/
 
 ### Description
-Veri olmadığında anlamlı, görsel empty state göster. `EmptyState.tsx` bileşeni: ikon + başlık + açıklama + opsiyonel aksiyon butonu. Her sayfada kullan. İkonlar lucide-react. i18n çift dilli.
+Tüm sayısal referansları güncel değerlere eşitle:
+- Sprint: 82
+- Test: 12,193+
+- MCP: 19 tools, 9 resources
+- CLI: 33 commands
+- Dashboard: 4 sayfa, 23+ bileşen
+- Version: v0.3.0-beta.1
+- Dashboard bileşenleri: WorkerCard, SprintPhaseTimeline, ActivityFeed, Skeleton, EmptyState, AgentDetail
 
-**Kanıt:** `grep "EmptyState" src/dashboard/src/pages/HistoryPage.tsx` → kullanılıyor
+**Kanıt:** `grep "12,193\|sprint.*82\|19 tools" .brain/PROJECT-IDENTITY.md` → güncel
 
-**Test:** `tsc --noEmit` temiz.
+**Test:** Bu task test gerektirmez.
 
 ---
 
-## Task 4: Dashboard Genel Polish
-- Model: sonnet
-- Effort: normal
+## Task 3: Dashboard Vite Build + dist/ Güncelleme
+- Model: haiku
+- Effort: low
 - Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/components/Layout.tsx
+- Skills: typescript-expert
+- Files: src/dashboard/
 - Scope: src/dashboard/
 
 ### Description
-A) Card'lara tutarlı shadow
-B) WorkerCard: hover scale animasyonu, EXECUTING sol mavi kenar
-C) SprintPhaseTimeline: aktif faz bold
-D) transition-all duration-200 tüm interaktif elemanlarda
-E) Responsive doğrulama
+Dashboard'un son değişikliklerinin Vite build'i:
 
-**Kanıt:** `grep "hover:scale\|transition-transform" src/dashboard/src/components/WorkerCard.tsx` → var
+A) `cd src/dashboard && npx vite build --outDir ../../dist/dashboard`
+B) `chmod +x dist/cli/entry.js dist/mcp/server.js`
+C) Doğrula: `ls dist/dashboard/index.html` → mevcut
+
+NOT: Bu task sadece build komutu çalıştırır. Kaynak kodu değiştirme.
+
+**Kanıt:** `ls dist/dashboard/index.html` → mevcut
 
 **Test:** `tsc --noEmit` temiz.
 
@@ -92,6 +79,6 @@ E) Responsive doğrulama
 
 ## Quality Rules
 - tsc --noEmit MUST pass
-- npm run test:dashboard → 372+ passed
-- npx vitest run → 0 fail
+- Mevcut testlerde 0 regresyon
+- Sprint numarası: 082 (Deckent sayacı = tek kaynak)
 - %100 GO hedefli

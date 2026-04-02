@@ -1,29 +1,29 @@
-# Sprint sprint-082 Retrospective
+# Sprint sprint-083 Retrospective
 
 ## Summary
-Completed 4/4 tasks in 7 minutes 53s.
+Completed 3/3 tasks in 5 minutes 59s.
 
 ## Highlights
-- 4 tasks completed on first try
+- 3 tasks completed on first try
 - No boundary violations detected
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 4/4 |
-| Code changes | +273 / -68 |
-| Sprint time | 7 minutes 53s |
-| NO_GO rate | 0% (0/4) |
+| Tasks completed | 3/3 |
+| Code changes | +18 / -16 |
+| Sprint time | 5 minutes 59s |
+| NO_GO rate | 0% (0/3) |
+| Coverage | 32.0% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| refactorer | 4 | 0 | 4 | 0 | 0% |
+| doc-writer | 2 | 1 | 1 | 0 | 96% |
+| refactorer | 1 | 0 | 1 | 0 | 0% |
 
 ## Learnings
-- Skeleton Loading Bileşenleri: completed with tech debt — Created Skeleton.tsx with SkeletonCard, SkeletonTable, SkeletonText components (animate-pulse bg-zinc-800 rounded). Replaced 'Loading...' text with sk
-- AgentDetail Zenginleştirme: completed with tech debt — AgentDetail.tsx zenginleştirildi: (A) büyük font başlık, collapsible description (200 char truncation + show more/less), renkli model/status badge (ma
-- Empty State Bileşenleri: completed with tech debt — EmptyState.tsx bileşeni oluşturuldu: LucideIcon prop, title, description, opsiyonel action butonu. HistoryPage: History ikonu ile EmptyState kullanıyo
-- Dashboard Genel Polish: completed with tech debt — A) Consistent shadow already present on all cards (shadow-lg shadow-zinc-950/50). B) WorkerCard: STATUS_BORDER updated — EXECUTING now uses 'border bo
+- CHANGELOG + SPRINT-LOG Sprint 078-082 Toplu Güncelleme: completed with tech debt — CHANGELOG [0.3.0-beta.1] entry enriched: (1) Added explicit sprint-082 entry (Dashboard Faz B: Skeleton, AgentDetail, EmptyState, Polish). (2) Fixed i
+- Dashboard Vite Build + dist/ Güncelleme: completed with tech debt — Dashboard Vite build başarılı. A) Vite build komutu çalıştırıldı, dist/dashboard/ dizinine çıktı yazıldı. B) dist/cli/entry.js ve dist/mcp/server.js d
 - Recurring pattern (860x): stale_heartbeat

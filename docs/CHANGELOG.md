@@ -6,6 +6,20 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.1-sprint83] - 2026-04-02
+
+### Added
+
+- PROJECT-IDENTITY + VISION Sayı Güncelleme
+
+### Changed
+
+- CHANGELOG + SPRINT-LOG Sprint 078-082 Toplu Güncelleme (completed with tech debt)
+- Dashboard Vite Build + dist/ Güncelleme (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
 ## [0.3.0-beta.1-sprint82] - 2026-04-02
 
 
@@ -38,21 +52,24 @@ _Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
 
 ### Added
 
-- **Dashboard Overhaul** (Sprint 078): WorkerCard bileşeni ile canlı agent kart grid, SprintPhaseTimeline ile faz görsel akışı, ActivityFeed ile canlı aktivite izleme
-- **i18n Tam Kapsam** (Sprint 079): 44+ yeni çeviri anahtarı, dashboard'da tam TR/EN desteği
-- **MCP/CLI Parity** (Sprint 080-085): 13 yeni parametre (force, auto, env, dryRun, verbose, json, watch, sandbox, timeout, autoApprove, includeProfile, mode, config-key), 2 yeni tool (agent_list, skill_list)
-- **Config Yazma Doğrulama**: Round-trip test suite (10 test) ile config okuma-yazma tutarlılığı
-- **Usage Manager Düzeltme** (Sprint 086): Gerçekçi tahmin sistemi, dashboard'da "Tahmini Kullanım" gösterimi
+- **Dashboard UX Overhaul — Faz A** (sprint-078): WorkerCard bileşeni ile canlı agent kart grid, SprintPhaseTimeline ile faz görsel akışı, ActivityFeed ile canlı aktivite izleme, WelcomeScreen
+- **Dashboard UX Overhaul — Faz B** (sprint-082): Skeleton loading bileşenleri (SkeletonCard, SkeletonTable, SkeletonText), EmptyState bileşeni (icon+action), AgentDetail zenginleştirme (collapsible description, badges, skills section), WorkerCard durum renkleri polish
+- **i18n Tam Kapsam** (sprint-079): 44+ yeni çeviri anahtarı, dashboard'da tam TR/EN desteği
+- **MCP/CLI Parity** (sprint-080): 13 yeni parametre (force, auto, env, dryRun, verbose, json, watch, sandbox, timeout, autoApprove, includeProfile, mode, config-key), 2 yeni tool (agent_list, skill_list)
+- **Config Yazma Doğrulama** (sprint-079): Round-trip test suite (10 test) ile config okuma-yazma tutarlılığı
+- **Usage Manager Düzeltme** (sprint-081): Gerçekçi tahmin sistemi, dashboard'da "Tahmini Kullanım" gösterimi, SAFE_DEFAULT sıfıra düşürüldü
 - **CI Baseline Entegrasyonu**: GitHub Actions CI health monitoring, baseline comparison
 - **Health-Check Test Dinamikleştirme**: Tarih hardcode yerine dinamik yıl-ay
+- **HistoryPage Success Rate Trend** (sprint-076): BarChart ile son 10 sprint başarı oranı görselleştirmesi
 
 ### Changed
 
-- **Dashboard Settings & Config Birleştirme** (Sprint 079): Ayrı iki sayfa yerine tutarlı interface
-- **Terminal Operasyon Logları**: Dashboard işlemleri terminal'de izlenebilir
-- **CLI set-directives Komutu** (Sprint 085): 3 giriş modu (--content, --file, stdin)
-- **Usage Tracking**: Claude CLI programatik API yerine sprint-bazlı tahmin sistemi
+- **Dashboard Settings & Config Birleştirme** (sprint-079): Ayrı iki sayfa yerine tutarlı interface
+- **Terminal Operasyon Logları** (sprint-079): Dashboard işlemleri terminal'de izlenebilir
+- **CLI set-directives Komutu** (sprint-080): 3 giriş modu (--content, --file, stdin)
+- **Usage Tracking** (sprint-081): Claude CLI programatik API yerine sprint-bazlı tahmin sistemi
 - **README Version Badge**: v0.2.0-beta.3 → v0.3.0-beta.1
+- **Init Wizard Dil Seçimi** (sprint-077): Dil seçimi init akışında ilk adım yapıldı
 
 ### Fixed
 
@@ -61,26 +78,30 @@ _Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
 - **ConfigPage language Alanı**: text input → select dropdown
 - **SSE Bağlantı Durumu Göstergesi**: connected/connecting/disconnected states
 - **Blueprint Testi**: MCP 19 tools, 9 resources, memory budget 900
-- **Stale Heartbeat Pattern** (Sprint 076): finalizeHeartbeat() ile worker DONE state'i
+- **Stale Heartbeat Pattern** (sprint-076): finalizeHeartbeat() ile worker DONE state'i
+- **Init Test Mock Düzeltme** (sprint-081): it.skip kaldırıldı, language-first akış
 
 ### Documentation
 
-- **CHANGELOG.md**: Sprint 078-086 tüm değişiklikler belgelendi
+- **CHANGELOG.md**: sprint-076 — sprint-082 tüm değişiklikler belgelendi
 - **VISION.md**: Proje vizyonu, rakip analizi, yol haritası
 - **ADR-022**: CLI/MCP feature parity belgelendirmesi
 - **ADR-024**: Config validation ve round-trip test estratejisi
 - **docs/ Link Audit**: 4 broken link tespit ve düzeltme
 - **README-TR.md**: Tam Türkçe çeviri (466 satır)
 - **VISION-EN.md**: Tam İngilizce VISION çevirisi (110 satır)
+- **AGENTS.md** (sprint-081): Built-in agent havuzu dokümantasyonu
 
 ### Technical Debt Resolved
 
-- God object split Faz 3 (Sprint 076): result-collector.ts extract
+- God object split Faz 3 (sprint-076): result-collector.ts extract
 - TempAgent mechanism fully verified (Sprint 072)
-- Graceful shutdown SIGINT handler (Sprint 076)
+- Graceful shutdown SIGINT handler (sprint-076)
+- README-TR.md UTF-8 Türkçe karakter doğrulaması (sprint-080)
+- POST /api/cleanup endpoint doğrulaması (sprint-080)
 - Security: timingSafeEqual, redactSensitive (Sprint 037)
 
-_Sprints: 078-086, Tasks: 35 total, 34 done, 32 tech debt, 1 no-go_
+_Sprints: sprint-076 — sprint-082, Tasks: 35 total, 34 done, 32 tech debt, 1 no-go_
 
 ## [0.2.0-beta.3-sprint80] - 2026-04-02
 

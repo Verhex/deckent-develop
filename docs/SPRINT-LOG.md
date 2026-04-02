@@ -2296,3 +2296,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 082-004: Dashboard Genel Polish (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 83 — sprint-083
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-02
+**Duration:** 359s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 32.0% |
+| Duration | 359468ms |
+
+### Tasks
+
+- 083-001: CHANGELOG + SPRINT-LOG Sprint 078-082 Toplu Güncelleme (GO_WITH_TECH_DEBT)
+- 083-002: PROJECT-IDENTITY + VISION Sayı Güncelleme (DONE)
+- 083-003: Dashboard Vite Build + dist/ Güncelleme (GO_WITH_TECH_DEBT)
+
+---

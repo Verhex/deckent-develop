@@ -212,3 +212,6 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - AgentDetail Zenginleştirme: GO_WITH_TECH_DEBT — AgentDetail.tsx zenginleştirildi: (A) büyük font başlık, collapsible description (200 char truncation + show more/less),
 - Empty State Bileşenleri: GO_WITH_TECH_DEBT — EmptyState.tsx bileşeni oluşturuldu: LucideIcon prop, title, description, opsiyonel action butonu. HistoryPage: History 
 - Dashboard Genel Polish: GO_WITH_TECH_DEBT — A) Consistent shadow already present on all cards (shadow-lg shadow-zinc-950/50). B) WorkerCard: STATUS_BORDER updated —
+## Sprint sprint-083 Learnings
+- CHANGELOG + SPRINT-LOG Sprint 078-082 Toplu Güncelleme: GO_WITH_TECH_DEBT — CHANGELOG [0.3.0-beta.1] entry enriched: (1) Added explicit sprint-082 entry (Dashboard Faz B: Skeleton, AgentDetail, Em
+- Dashboard Vite Build + dist/ Güncelleme: GO_WITH_TECH_DEBT — Dashboard Vite build başarılı. A) Vite build komutu çalıştırıldı, dist/dashboard/ dizinine çıktı yazıldı. B) dist/cli/en

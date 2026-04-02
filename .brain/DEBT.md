@@ -18,3 +18,5 @@
 | debt-082-002 | Tech debt from 082-002: AgentDetail.tsx zenginleştirildi: (A) büyük font başlık, | 082-002 | sprint-082 | NORMAL | 0 | true | sprint-082 | 2026-04-02T08:15:18.467Z |
 | debt-082-003 | Tech debt from 082-003: EmptyState.tsx bileşeni oluşturuldu: LucideIcon prop, ti | 082-003 | sprint-082 | NORMAL | 0 | true | sprint-082 | 2026-04-02T08:15:22.474Z |
 | debt-082-004 | Tech debt from 082-004: A) Consistent shadow already present on all cards (shado | 082-004 | sprint-082 | NORMAL | 0 | true | sprint-082 | 2026-04-02T08:15:26.423Z |
+| debt-083-001 | Tech debt from 083-001: CHANGELOG [0.3.0-beta.1] entry enriched: (1) Added expli | 083-001 | sprint-083 | NORMAL | 0 | true | sprint-083 | 2026-04-02T08:37:50.741Z |
+| debt-083-003 | Tech debt from 083-003: Dashboard Vite build başarılı. A) Vite build komutu çalı | 083-003 | sprint-083 | NORMAL | 0 | true | sprint-083 | 2026-04-02T08:38:01.464Z |
