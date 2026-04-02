@@ -98,7 +98,9 @@ describe('healthCheckUpdater', () => {
     expect(written).toContain('| Tests | 5 |');
     expect(written).toContain('| Sprints | 20 |');
     expect(written).toContain('Post-Sprint 20');
-    expect(written).toContain('Last audit: 2026-03-');
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-`;
+    expect(written).toContain(`Last audit: ${yearMonth}`);
   });
 
   it('returns skipped_not_found when file missing at run time', () => {
