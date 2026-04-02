@@ -233,6 +233,73 @@ export class OutcomeTracker {
   }
 
   /**
+   * Return the worst-performing agent+skill combinations from the last 5 sprints.
+   * Reads sprint outcome files from .deckent/routing/outcomes/ and aggregates
+   * success/fail rates per (agentId, skillId) pair.
+   *
+   * Format: "- agent:bug-fixer + skill:testing-expert → %30 başarı (10 task)"
+   *
+   * Called by callBrainPlanner() via worstCombinations param to inject GECMIS SONUCLAR
+   * block into the AI planner prompt so the planner avoids historically poor combos.
+   *
+   * @param limit - Max number of lines to return (default 5)
+   */
+  getWorstCombinations(limit: number = 5): string {
+    const last5Sprints = this.learnings.recentSprints.slice(-5);
+    if (last5Sprints.length === 0) return '';
+
+    const combMap = new Map<string, { agentId: string; skillId: string; success: number; fail: number }>();
+
+    for (const sprintId of last5Sprints) {
+      const filePath = join(this.projectRoot, OUTCOMES_DIR, `${sprintId}.json`);
+      let outcomes: RoutingOutcome[] = [];
+      try {
+        if (existsSync(filePath)) {
+          outcomes = JSON.parse(readFileSync(filePath, 'utf-8')) as RoutingOutcome[];
+        }
+      } catch (err) {
+        debugLog('outcome-tracker:getWorstCombinations', err);
+        continue;
+      }
+
+      for (const outcome of outcomes) {
+        if (!outcome.agentId || outcome.agentId === 'generic') continue;
+        const isSuccess = outcome.evaluation !== 'NO_GO';
+
+        for (const skillId of outcome.skillIds) {
+          const key = `${outcome.agentId}+${skillId}`;
+          const existing = combMap.get(key) ?? { agentId: outcome.agentId, skillId, success: 0, fail: 0 };
+          if (isSuccess) existing.success++;
+          else existing.fail++;
+          combMap.set(key, existing);
+        }
+      }
+    }
+
+    if (combMap.size === 0) return '';
+
+    const MIN_COMB_SAMPLES = 3;
+    const sorted = [...combMap.values()]
+      .filter(c => c.success + c.fail >= MIN_COMB_SAMPLES)
+      .sort((a, b) => {
+        const rateA = a.success / (a.success + a.fail);
+        const rateB = b.success / (b.success + b.fail);
+        return rateA - rateB;
+      });
+
+    if (sorted.length === 0) return '';
+
+    return sorted
+      .slice(0, limit)
+      .map(c => {
+        const total = c.success + c.fail;
+        const rate = Math.round((c.success / total) * 100);
+        return `- agent:${c.agentId} + skill:${c.skillId} → %${rate} başarı (${total} task)`;
+      })
+      .join('\n');
+  }
+
+  /**
    * Save evolved rules to learnings data.
    */
   saveEvolvedRules(rules: unknown[]): void {

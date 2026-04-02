@@ -1,33 +1,29 @@
-# Sprint sprint-084 Retrospective
+# Sprint sprint-086 Retrospective
 
 ## Summary
-Completed 4/4 tasks in ~8 minutes. Dashboard UX fix, i18n tam kapsam, canlı veri testleri ve build otomasyonu.
+Completed 4/4 tasks in 25 minutes 4s.
 
 ## Highlights
-- 4 task tamamlandı — sıfır NO_GO, sıfır tech debt → %100 GO
-- 41 yeni dashboard testi eklendi (toplam 413)
-- 79 yeni i18n key ile ConfigPage tam çeviri kapsamına alındı
-- AgentDetail panel genişletildi ve okunabilirlik artırıldı
+- 4 tasks completed on first try
+- No boundary violations detected
 
 ## Metrics
 | What | Value |
 |------|-------|
 | Tasks completed | 4/4 |
-| Code changes | ~600 lines added |
-| Sprint time | ~8 min |
+| Code changes | +172 / -21 |
+| Sprint time | 25 minutes 4s |
 | NO_GO rate | 0% (0/4) |
-| Coverage | 96.0% |
-| Dashboard tests | 413 (372 + 41 yeni) |
+| Coverage | 48.0% |
+
 
 ## Agent Performance
-| Agent | Tasks | Done | Debt | NoGo |
-|-------|-------|------|------|------|
-| refactorer | 2 | 2 | 0 | 0 |
-| test-writer | 1 | 1 | 0 | 0 |
-| refactorer | 1 | 1 | 0 | 0 |
+| Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
+|-------|-------|------|------|------|-------------|
+| refactorer | 3 | 2 | 1 | 0 | 64% |
+| bug-fixer | 1 | 0 | 1 | 0 | 0% |
 
 ## Learnings
-- AgentDetail Penceresi — Okunabilirlik ve Boyut Fix: DONE — Sheet w-[400→600px], sm:w-[500→700px]. Font text-xs→text-sm. Log h-[220→350px]. ScrollArea→overflow-auto div. break-words eklendi.
-- i18n Kalan Hardcoded String'ler — Tam Kapsam: DONE — 79 yeni key (en.ts + tr.ts). fieldT() helper ile runtime çeviri. ConfigPage label/desc/dropdown tamamı i18n.
-- Dashboard Canlı Veri Akışı Doğrulama: DONE — 41 yeni test: SSE hook (11), WorkerCard (11), ActivityFeed (11), SprintPhaseTimeline (8). File-based assertion pattern.
-- Dashboard Build Otomasyonu: DONE — build:dashboard, build:all, postbuild script'leri package.json'a eklendi.
+- Tech Debt Kapatma — routeTaskV2 Cagri Yerleri + Kalan Catch Bloklari: completed with tech debt — A) routeTaskV2 calls updated with sprintId/taskId/projectRoot: sprint-controller.ts planSprint routing-v2 block now passes { sprintId, taskId: task.id
+- Planner'a Gecmis Bilgisi Enjeksiyonu: completed with tech debt — A) outcome-tracker.ts: getWorstCombinations(limit=5) metodu eklendi. Son 5 sprint outcomes dosyalarını okur, agent+skill kombinasyonlarının başarı ora
+- Recurring pattern (915x): stale_heartbeat

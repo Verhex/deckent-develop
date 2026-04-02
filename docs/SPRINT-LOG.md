@@ -2358,3 +2358,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - %100 GO — sıfır tech debt, sıfır NO_GO
 
 ---
+## Sprint 86 — sprint-086
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-02
+**Duration:** 1504s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 48.0% |
+| Duration | 1504236ms |
+
+### Tasks
+
+- 086-001: Tech Debt Kapatma — routeTaskV2 Cagri Yerleri + Kalan Catch Bloklari (GO_WITH_TECH_DEBT)
+- 086-002: Intent Classifier Feedback Loop (DONE)
+- 086-003: Planner'a Gecmis Bilgisi Enjeksiyonu (GO_WITH_TECH_DEBT)
+- 086-004: Coverage Threshold Config + Adaptive Thresholds (DONE)
+
+---

@@ -122,6 +122,7 @@ export function buildPlanPrompt(
   projectName: string,
   zeroConfigDescription?: string,
   language: string = 'tr',
+  worstCombinations?: string,
 ): string {
   const isEn = language === 'en';
 
@@ -160,6 +161,14 @@ export function buildPlanPrompt(
     BRAIN_PLAN_MAX_CONTEXT_LINES,
   );
 
+  // Inject worst combinations from OutcomeTracker.getWorstCombinations() when available
+  // Adds GECMIS SONUCLAR block so the AI planner avoids historically poor agent+skill combos
+  const worstCombinationsSection = worstCombinations
+    ? (isEn
+      ? `\nPAST RESULTS (combinations to avoid):\n${worstCombinations}`
+      : `\nGEÇMİŞ SONUCLAR (kaçınılması gereken kombinasyonlar):\n${worstCombinations}`)
+    : '';
+
   if (isEn) {
     return `You are a software project orchestrator. Analyze the given directives and create a structured task plan.
 
@@ -178,7 +187,7 @@ MODEL SELECTION CRITERIA (CHOOSE THE RIGHT MODEL FOR EACH TASK):
 - Explain the model selection in the "reason" field (why this model, how complex)
 
 CONTEXT:
-${contextBlock}
+${contextBlock}${worstCombinationsSection}
 
 OUTPUT FORMAT (JSON ONLY, nothing else):
 {
@@ -216,7 +225,7 @@ MODEL SEÇİM KRİTERLERİ (HER GÖREV İÇİN DOĞRU MODELİ SEÇ):
 - "reason" alanında model seçimini AÇIKLA (neden bu model, ne kadar karmaşık)
 
 CONTEXT:
-${contextBlock}
+${contextBlock}${worstCombinationsSection}
 
 ÇIKTI FORMAT (SADECE JSON, başka bir şey yazma):
 {
@@ -315,6 +324,9 @@ export function resolveAdapter(adapter?: ProviderAdapter): ProviderAdapter {
  *
  * @param adapter  Optional ProviderAdapter. If omitted, uses ProviderRegistry.getDefault().
  *                 Throws if no provider is available (no silent fallback).
+ * @param worstCombinations  Optional output from OutcomeTracker.getWorstCombinations().
+ *   Injects GECMIS SONUCLAR / past results block into the AI planner prompt so the
+ *   planner avoids historically poor agent+skill combinations.
  */
 export function callBrainPlanner(
   context: BrainContext,
@@ -323,8 +335,9 @@ export function callBrainPlanner(
   projectName: string,
   adapter?: ProviderAdapter,
   timeout?: number,
+  worstCombinations?: string,
 ): PlannerResult | null {
-  const prompt = buildPlanPrompt(context, recommendation, projectName);
+  const prompt = buildPlanPrompt(context, recommendation, projectName, undefined, 'tr', worstCombinations);
   const resolved = resolveAdapter(adapter);
   const { command, args } = buildPlannerSpawnArgs(resolved, prompt, model);
 

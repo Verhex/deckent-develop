@@ -277,6 +277,7 @@ export async function runEvaluatePhase(
   results: TaskResult[],
   evaluations: Map<string, TaskEvaluation>,
   usageTracker: UsageTracker,
+  coverageThreshold = 90,
 ): Promise<void> {
   try {
     sprint.status = SprintStatus.EVALUATING;
@@ -290,7 +291,7 @@ export async function runEvaluatePhase(
       if (collectedIds.has(task.id)) {
         const result = results.find(r => r.taskId === task.id);
         if (!result) continue; // narrowed: collectedIds contains task.id
-        let evaluation = evaluateResult(result, task);
+        let evaluation = evaluateResult(result, task, undefined, coverageThreshold);
 
         // CI regression check: run after initial evaluation (non-fatal)
         let ciCheckResult: CiRegressionCheckResult | undefined;
@@ -480,7 +481,7 @@ export async function runFixPhase(
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
-          const fixEval = evaluateResult(fixResult, fixTask);
+          const fixEval = evaluateResult(fixResult, fixTask, undefined, config.coverage_threshold);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
           if (fixEval === TaskEvaluation.DONE && fixTask.fixForTaskId) {
             resolveDebt(projectRoot, `debt-${fixTask.fixForTaskId}`, sprint.id);

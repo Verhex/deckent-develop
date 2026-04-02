@@ -42,12 +42,12 @@ export function isDocTask(task: Task): boolean {
  * 3. doc task → DONE (skip coverage)
  * 4. vitest JSON coverage mismatch → GO_WITH_TECH_DEBT
  * 5. tests pass + new test files written → DONE
- * 6. tests pass + no new tests + coverage < 90 → GO_WITH_TECH_DEBT
- * 7. coverage >= 90 → DONE
+ * 6. tests pass + no new tests + coverage < coverageThreshold → GO_WITH_TECH_DEBT
+ * 7. coverage >= coverageThreshold → DONE
  * 8. worker hint GO_WITH_TECH_DEBT (fallback only) → GO_WITH_TECH_DEBT
  * 9. default → DONE
  */
-export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string): TaskEvaluation {
+export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
   // Step 1: Hard failures — NO_GO regardless of self-assessment
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
@@ -92,13 +92,13 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
     return TaskEvaluation.DONE;
   }
 
-  // If tests pass but no new tests AND coverage < 90 → TECH_DEBT
-  if (result.testsPassed && !hasNewTests && result.coverage < 90) {
+  // If tests pass but no new tests AND coverage < coverageThreshold → TECH_DEBT
+  if (result.testsPassed && !hasNewTests && result.coverage < coverageThreshold) {
     return TaskEvaluation.GO_WITH_TECH_DEBT;
   }
 
-  // Coverage >= 90 with passing tests → DONE
-  if (result.coverage >= 90) return TaskEvaluation.DONE;
+  // Coverage >= coverageThreshold with passing tests → DONE
+  if (result.coverage >= coverageThreshold) return TaskEvaluation.DONE;
 
   // Default: respect worker hint for edge cases only
   if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {

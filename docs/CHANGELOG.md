@@ -6,6 +6,21 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.2-sprint86] - 2026-04-02
+
+### Added
+
+- Intent Classifier Feedback Loop
+- Coverage Threshold Config + Adaptive Thresholds
+
+### Changed
+
+- Tech Debt Kapatma — routeTaskV2 Cagri Yerleri + Kalan Catch Bloklari (completed with tech debt)
+- Planner'a Gecmis Bilgisi Enjeksiyonu (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
+
 ## [0.3.0-beta.1-sprint84] - 2026-04-02
 
 ### Fixed

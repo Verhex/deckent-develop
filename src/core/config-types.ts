@@ -150,6 +150,9 @@ export interface DeckentConfig {
   max_fix_retries?: number;
   /** AI planner subprocess timeout in milliseconds (default: 60000) */
   ai_planner_timeout?: number;
+  /** Minimum coverage % to pass without tech debt (default: 90).
+   * Adaptive suggestion: if avg coverage < 70 over last 3 sprints, auto-lower to avg. */
+  coverage_threshold?: number;
 
   // ─── Rollback ───────────────────────────────────────────────────────
   /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
@@ -202,6 +205,9 @@ export interface ResolvedConfig {
   max_fix_retries?: number;
   /** AI planner subprocess timeout in milliseconds (default: 60000) */
   ai_planner_timeout?: number;
+  /** Minimum coverage % to pass without tech debt (default: 90).
+   * Adaptive suggestion: if avg coverage < 70 over last 3 sprints, auto-lower to avg. */
+  coverage_threshold: number;
   // Rollback
   rollback_policy?: 'never' | 'on_failure' | 'always';
   // Routing Engine v2

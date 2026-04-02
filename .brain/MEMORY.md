@@ -220,3 +220,6 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - i18n Kalan Hardcoded String'ler — Tam Kapsam: DONE — 79 yeni key (en.ts + tr.ts). ConfigPage fieldT() helper: runtime çeviri, fallback İngilizce. CONFIG_FIELDS label/desc değişmedi (fallback olarak kalıyor). Dropdown "— none —", "true", "false" i18n'e taşındı.
 - Dashboard Canlı Veri Akışı Doğrulama: DONE — tests/dashboard/live-data.test.ts: 41 test. SSE hook (11), WorkerCard (11), ActivityFeed (11), SprintPhaseTimeline (8). File-based assertion pattern (readFileSync + toContain).
 - Dashboard Build Otomasyonu: DONE — package.json: build:dashboard (cd src/dashboard && npx vite build --outDir ../../dist/dashboard), build:all (tsc && npm run build:dashboard), postbuild (npm lifecycle hook).
+## Sprint sprint-086 Learnings
+- Tech Debt Kapatma — routeTaskV2 Cagri Yerleri + Kalan Catch Bloklari: GO_WITH_TECH_DEBT — A) routeTaskV2 calls updated with sprintId/taskId/projectRoot: sprint-controller.ts planSprint routing-v2 block now pass
+- Planner'a Gecmis Bilgisi Enjeksiyonu: GO_WITH_TECH_DEBT — A) outcome-tracker.ts: getWorstCombinations(limit=5) metodu eklendi. Son 5 sprint outcomes dosyalarını okur, agent+skill

@@ -405,6 +405,7 @@ export function createDefaultConfig(): DeckentConfig {
     // Sprint
     fix_phase_enabled: true,
     max_fix_retries: 2,
+    coverage_threshold: 90,
     // Memory
     memory_budget: 600,
     decay_after_sprints: 5,
@@ -553,6 +554,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     // Sprint
     fix_phase_enabled: config.fix_phase_enabled,
     max_fix_retries: config.max_fix_retries,
+    coverage_threshold: config.coverage_threshold ?? 90,
     // Rollback
     rollback_policy: config.rollback_policy,
     // Routing Engine v2
@@ -1032,6 +1034,7 @@ export function mergeConfigs(
     version: config.version ?? DECKENT_VERSION,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     skills: config.skills,
+    coverage_threshold: config.coverage_threshold ?? 90,
   };
 }
 

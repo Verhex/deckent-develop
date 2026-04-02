@@ -1,6 +1,6 @@
 {
   "name": "deckent",
-  "version": "0.3.0-beta.2",
+  "version": "0.3.0-beta.3",
   "description": "AI agent orchestration system — your AI development team, orchestrated.",
   "type": "module",
   "bin": {

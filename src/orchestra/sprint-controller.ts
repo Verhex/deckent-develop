@@ -1079,7 +1079,7 @@ export async function waitForResults(
  * @param vitestJsonOutput - Optional raw vitest JSON for coverage validation
  * @returns The evaluation outcome
  */
-export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string): TaskEvaluation {
+export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
   if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
@@ -1097,7 +1097,7 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
     }
   }
 
-  if (result.coverage < 90) return TaskEvaluation.GO_WITH_TECH_DEBT;
+  if (result.coverage < coverageThreshold) return TaskEvaluation.GO_WITH_TECH_DEBT;
   return TaskEvaluation.DONE;
 }
 
@@ -1476,7 +1476,7 @@ export async function runSprint(
 
   // Phase 4: EVALUATE
   const evaluations = new Map<string, TaskEvaluation>();
-  await runEvaluatePhase(projectRoot, sprint, results, evaluations, usageTracker);
+  await runEvaluatePhase(projectRoot, sprint, results, evaluations, usageTracker, config.coverage_threshold);
 
   // Rollback check: if rollback is enabled and all tasks are NO_GO, trigger rollback
   runRollbackCheck(projectRoot, sprint, evaluations, rollbackEnabled, safetyPoint);
