@@ -63,14 +63,14 @@ describe("parseChartData()", () => {
     ];
     const result = parseChartData(history);
     expect(result).toEqual([
-      { sprintId: "sprint-001", taskCount: 4, coverage: 85 },
-      { sprintId: "sprint-002", taskCount: 6, coverage: 92.5 },
+      { sprintId: "sprint-001", taskCount: 4, coverage: 85, successRate: 0 },
+      { sprintId: "sprint-002", taskCount: 6, coverage: 92.5, successRate: 0 },
     ]);
   });
 
   it("handles missing fields with defaults", () => {
     const result = parseChartData([{}]);
-    expect(result).toEqual([{ sprintId: "unknown", taskCount: 0, coverage: 0 }]);
+    expect(result).toEqual([{ sprintId: "unknown", taskCount: 0, coverage: 0, successRate: 0 }]);
   });
 
   it("handles empty array", () => {
@@ -79,7 +79,7 @@ describe("parseChartData()", () => {
 
   it("handles non-numeric tasks", () => {
     const result = parseChartData([{ id: "s1", tasks: "-", coverage: "N/A" }]);
-    expect(result).toEqual([{ sprintId: "s1", taskCount: 0, coverage: 0 }]);
+    expect(result).toEqual([{ sprintId: "s1", taskCount: 0, coverage: 0, successRate: 0 }]);
   });
 
   it("uses id over sprint for sprintId", () => {

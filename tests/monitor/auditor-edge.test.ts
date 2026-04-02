@@ -326,7 +326,7 @@ describe('checkStaleLocks — edge cases', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReaddirSync.mockReturnValue(['boundary.lock'] as never);
 
-    const justUnder = new Date(Date.now() - 299_999).toISOString();
+    const justUnder = new Date(Date.now() - 290_000).toISOString(); // 10s margin for CI timing
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeLock('src/x.ts', 'w1', justUnder)) as never);
 
     const result = checkStaleLocks('/project');

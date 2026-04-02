@@ -25,22 +25,18 @@ describe("dashboard page — DashboardPage.tsx", () => {
 
   it("displays sprint status card with sprint ID, phase, status, updated", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Sprint ID");
-    expect(content).toContain("Phase");
-    expect(content).toContain("Status");
-    expect(content).toContain("Updated");
+    expect(content).toContain("dashboard.sprint_id");
+    expect(content).toContain("dashboard.phase");
+    expect(content).toContain("dashboard.status");
+    expect(content).toContain("dashboard.updated");
   });
 
-  it("renders worker table with ID, Task, Status, Elapsed, Action columns", () => {
+  it("renders worker cards and agent detail components", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("TableHeader");
-    expect(content).toContain("TableBody");
-    expect(content).toContain("TableHead");
-    expect(content).toContain("TableCell");
-    expect(content).toContain("TableRow");
-    // Column names
-    expect(content).toContain("Elapsed");
-    expect(content).toContain("Action");
+    expect(content).toContain("WorkerCardGrid");
+    expect(content).toContain("AgentDetail");
+    expect(content).toContain("onKill");
+    expect(content).toContain("onSelect");
   });
 
   it("has Kill button with POST /api/kill/:workerId", () => {
@@ -69,9 +65,9 @@ describe("dashboard page — DashboardPage.tsx", () => {
     expect(content).toContain("ALERT_VARIANT");
   });
 
-  it("has Yeni Sprint button that opens modal", () => {
+  it("has new sprint button that opens modal", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Yeni Sprint");
+    expect(content).toContain("dashboard.new_sprint");
     expect(content).toContain("setModalOpen(true)");
     expect(content).toContain("NewSprintModal");
   });
@@ -94,7 +90,7 @@ describe("dashboard page — DashboardPage.tsx", () => {
 
   it("has elapsed time helper function", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("function elapsed");
+    expect(content).toContain("function relativeTime");
   });
 });
 
@@ -136,7 +132,7 @@ describe("dashboard page — NewSprintModal.tsx", () => {
   it("calls POST /api/start on confirm", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain("/api/start");
-    expect(content).toContain("Confirm");
+    expect(content).toContain("modal.confirm_start");
   });
 
   it("shows task count from set-directives response", () => {
@@ -146,7 +142,7 @@ describe("dashboard page — NewSprintModal.tsx", () => {
 
   it("has error handling with try-again", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Try Again");
+    expect(content).toContain("modal.try_again");
     expect(content).toContain("error");
   });
 
@@ -237,13 +233,13 @@ describe("dashboard page — DashboardPage.tsx usage metrics", () => {
   it("renders usage card with fiveHourPercent", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain("fiveHourPercent");
-    expect(content).toContain("5hr Usage");
+    expect(content).toContain("dashboard.usage_5hr");
   });
 
   it("renders usage card with weeklyPercent", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain("weeklyPercent");
-    expect(content).toContain("Weekly Usage");
+    expect(content).toContain("dashboard.usage_weekly");
   });
 
   it("has usage progress bars", () => {

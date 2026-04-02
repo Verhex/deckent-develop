@@ -27,20 +27,20 @@ describe("dashboard/pages — HistoryPage", () => {
     expect(content).toContain("parseChartData");
   });
 
-  it("renders history table columns", () => {
+  it("renders history table columns via i18n keys", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Sprint ID");
-    expect(content).toContain("Tasks");
-    expect(content).toContain("Done");
-    expect(content).toContain("No-Go");
-    expect(content).toContain("Coverage");
-    expect(content).toContain("Duration");
+    expect(content).toContain("history.sprint_id");
+    expect(content).toContain("history.total_tasks");
+    expect(content).toContain("history.completed");
+    expect(content).toContain("history.nogo");
+    expect(content).toContain("history.coverage");
+    expect(content).toContain("history.duration");
   });
 
   it("renders loading state", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain("loading");
-    expect(content).toContain("Loading history");
+    expect(content).toContain("common.loading");
   });
 
   it("renders error state", () => {
@@ -51,7 +51,7 @@ describe("dashboard/pages — HistoryPage", () => {
 
   it("renders empty state", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("No sprint history found");
+    expect(content).toContain("history.no_history");
   });
 
   it("uses Card components", () => {
@@ -103,8 +103,8 @@ describe("dashboard/pages — MemoryPage", () => {
     const content = readFileSync(filePath, "utf-8");
     expect(content).toContain('value="memory"');
     expect(content).toContain('value="debt"');
-    expect(content).toContain(">Memory<");
-    expect(content).toContain(">Debt<");
+    expect(content).toContain("memory.tab_memory");
+    expect(content).toContain("memory.tab_debt");
   });
 
   it("renders memory content using SimpleMarkdown component", () => {
@@ -128,8 +128,9 @@ describe("dashboard/pages — MemoryPage", () => {
 
   it("renders loading states", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("Loading memory");
-    expect(content).toContain("Loading debt");
+    expect(content).toContain("memLoading");
+    expect(content).toContain("debtLoading");
+    expect(content).toContain("common.loading");
   });
 
   it("renders error states", () => {

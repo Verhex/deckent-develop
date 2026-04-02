@@ -1,7 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { LanguageProvider } from "../../src/dashboard/src/i18n/LanguageProvider";
 import { AgentDetail } from "../../src/dashboard/src/components/AgentDetail";
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -46,7 +51,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Worker 001-001/)).toBeTruthy();
@@ -57,7 +62,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("sonnet")).toBeTruthy();
@@ -68,7 +73,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("EXECUTING")).toBeTruthy();
@@ -79,7 +84,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("Implement auth middleware")).toBeTruthy();
@@ -90,7 +95,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("Add JWT auth middleware to API routes")).toBeTruthy();
@@ -101,7 +106,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("src/middleware/, src/routes/")).toBeTruthy();
@@ -112,7 +117,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Building project/)).toBeTruthy();
@@ -128,7 +133,7 @@ describe("AgentDetail component", () => {
     });
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("No log output yet.")).toBeTruthy();
@@ -139,7 +144,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     const closeButton = screen.getByLabelText("Close");
     fireEvent.click(closeButton);
@@ -152,7 +157,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = fetchMock;
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="002-003" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="002-003" onClose={onClose} />);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith("/api/worker/002-003/log");
@@ -184,25 +189,35 @@ describe("AgentDetail component", () => {
     globalThis.fetch = fetchMock;
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
-    // Wait for initial fetch
+    // Wait for initial worker log fetch (LanguageProvider also fetches /api/config on mount)
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("/api/worker/001-001/log");
     });
+
+    const logCallsBefore = fetchMock.mock.calls.filter(
+      (c: string[]) => c[0] === "/api/worker/001-001/log",
+    ).length;
 
     // Advance timers by 3 seconds
     vi.advanceTimersByTime(3000);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const logCalls = fetchMock.mock.calls.filter(
+        (c: string[]) => c[0] === "/api/worker/001-001/log",
+      ).length;
+      expect(logCalls).toBe(logCallsBefore + 1);
     });
 
     // Advance another 3 seconds
     vi.advanceTimersByTime(3000);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const logCalls = fetchMock.mock.calls.filter(
+        (c: string[]) => c[0] === "/api/worker/001-001/log",
+      ).length;
+      expect(logCalls).toBe(logCallsBefore + 2);
     });
   });
 
@@ -236,7 +251,7 @@ describe("AgentDetail component", () => {
     });
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("Basic task")).toBeTruthy();
@@ -260,7 +275,7 @@ describe("AgentDetail component", () => {
     });
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     await waitFor(() => {
       expect(screen.getByText("No scope task")).toBeTruthy();
@@ -274,7 +289,7 @@ describe("AgentDetail component", () => {
     const onClose = vi.fn();
 
     // Should not throw
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     // Should show default state
     await waitFor(() => {
@@ -286,7 +301,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     expect(screen.getByText("Log Output")).toBeTruthy();
   });
@@ -295,7 +310,7 @@ describe("AgentDetail component", () => {
     globalThis.fetch = mockFetchResponse(SAMPLE_LOG_DATA);
     const onClose = vi.fn();
 
-    render(<AgentDetail taskId="001-001" onClose={onClose} />);
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={onClose} />);
 
     const closeButton = screen.getByLabelText("Close");
     expect(closeButton).toBeTruthy();

@@ -40,17 +40,17 @@ describe("dashboard layout + router + navigation", () => {
     it("has all four nav items", () => {
       const content = layout();
       expect(content).toContain('to: "/"');
-      expect(content).toContain('to: "/settings"');
       expect(content).toContain('to: "/history"');
       expect(content).toContain('to: "/memory"');
+      expect(content).toContain('to: "/config"');
     });
 
-    it("has nav labels", () => {
+    it("has nav labels via i18n keys", () => {
       const content = layout();
-      expect(content).toContain('"Dashboard"');
-      expect(content).toContain('"Settings"');
-      expect(content).toContain('"History"');
-      expect(content).toContain('"Memory"');
+      expect(content).toContain('"nav.dashboard"');
+      expect(content).toContain('"nav.history"');
+      expect(content).toContain('"nav.memory"');
+      expect(content).toContain('"nav.config"');
     });
 
     it("has active link styling with bg-zinc-800 and blue border", () => {
@@ -104,7 +104,7 @@ describe("dashboard layout + router + navigation", () => {
     it("uses lucide-react icons for nav items", () => {
       const content = layout();
       expect(content).toContain("LayoutDashboard");
-      expect(content).toContain("Settings");
+      expect(content).toContain("SlidersHorizontal");
       expect(content).toContain("History");
       expect(content).toContain("Brain");
     });
