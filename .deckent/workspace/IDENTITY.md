@@ -6,9 +6,10 @@ Test: vitest
 Build: tsc
 Runtime: Node.js >=18
 Platform: macOS, Linux, WSL2
-Tests: 12,193+
+Tests: 12,239+
+Dashboard Tests: 413
 Coverage: 96%+
-Sprints: 82
+Sprints: 84
 CLI Commands: 33+
 MCP: 19 tools, 9 resources
 Agents: 9 built-in

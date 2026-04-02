@@ -1,6 +1,6 @@
 {
   "name": "deckent",
-  "version": "0.3.0-beta.1",
+  "version": "0.3.0-beta.2",
   "description": "AI agent orchestration system — your AI development team, orchestrated.",
   "type": "module",
   "bin": {
@@ -22,6 +22,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:dashboard": "vitest run --config vitest.dashboard.config.ts",
+    "build:dashboard": "cd src/dashboard && npx vite build --outDir ../../dist/dashboard",
+    "build:all": "tsc && npm run build:dashboard",
+    "postbuild": "npm run build:dashboard",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "validate:publish": "npx tsx scripts/validate-publish.ts",

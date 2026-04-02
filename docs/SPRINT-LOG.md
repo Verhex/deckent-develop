@@ -2320,3 +2320,41 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 083-003: Dashboard Vite Build + dist/ Güncelleme (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 84 — sprint-084
+
+**Status:** COMPLETE
+**Date:** 2026-04-02
+**Duration:** ~480s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 96.0% |
+| Duration | ~480s |
+
+### Tasks
+
+- 084-001: AgentDetail Penceresi — Okunabilirlik ve Boyut Fix (DONE)
+- 084-002: i18n Kalan Hardcoded String'ler — Tam Kapsam (DONE)
+- 084-003: Dashboard Canlı Veri Akışı Doğrulama (DONE)
+- 084-004: Dashboard Build Otomasyonu (DONE)
+
+### Decisions
+- AgentDetail Sheet genişliği 400→600px, sm:500→700px artırıldı
+- ScrollArea kaldırıldı, overflow-auto div ile değiştirildi (scrollbar görünürlüğü)
+- ConfigPage i18n: fieldT() helper pattern ile runtime çeviri (fallback: İngilizce)
+- 79 yeni i18n key eklendi (38 label + 38 desc + 3 dropdown)
+- 41 yeni canlı veri testi (SSE hook, WorkerCard, ActivityFeed, SprintPhaseTimeline)
+- build:dashboard + build:all + postbuild script'leri eklendi
+
+### Notes
+- tsc --noEmit: temiz (0 hata)
+- Dashboard testleri: 14 dosya, 413 test geçti (önceki 372 + 41 yeni)
+- %100 GO — sıfır tech debt, sıfır NO_GO
+
+---

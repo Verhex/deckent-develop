@@ -1,29 +1,33 @@
-# Sprint sprint-083 Retrospective
+# Sprint sprint-084 Retrospective
 
 ## Summary
-Completed 3/3 tasks in 5 minutes 59s.
+Completed 4/4 tasks in ~8 minutes. Dashboard UX fix, i18n tam kapsam, canlı veri testleri ve build otomasyonu.
 
 ## Highlights
-- 3 tasks completed on first try
-- No boundary violations detected
+- 4 task tamamlandı — sıfır NO_GO, sıfır tech debt → %100 GO
+- 41 yeni dashboard testi eklendi (toplam 413)
+- 79 yeni i18n key ile ConfigPage tam çeviri kapsamına alındı
+- AgentDetail panel genişletildi ve okunabilirlik artırıldı
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 3/3 |
-| Code changes | +18 / -16 |
-| Sprint time | 5 minutes 59s |
-| NO_GO rate | 0% (0/3) |
-| Coverage | 32.0% |
-
+| Tasks completed | 4/4 |
+| Code changes | ~600 lines added |
+| Sprint time | ~8 min |
+| NO_GO rate | 0% (0/4) |
+| Coverage | 96.0% |
+| Dashboard tests | 413 (372 + 41 yeni) |
 
 ## Agent Performance
-| Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
-|-------|-------|------|------|------|-------------|
-| doc-writer | 2 | 1 | 1 | 0 | 96% |
-| refactorer | 1 | 0 | 1 | 0 | 0% |
+| Agent | Tasks | Done | Debt | NoGo |
+|-------|-------|------|------|------|
+| refactorer | 2 | 2 | 0 | 0 |
+| test-writer | 1 | 1 | 0 | 0 |
+| refactorer | 1 | 1 | 0 | 0 |
 
 ## Learnings
-- CHANGELOG + SPRINT-LOG Sprint 078-082 Toplu Güncelleme: completed with tech debt — CHANGELOG [0.3.0-beta.1] entry enriched: (1) Added explicit sprint-082 entry (Dashboard Faz B: Skeleton, AgentDetail, EmptyState, Polish). (2) Fixed i
-- Dashboard Vite Build + dist/ Güncelleme: completed with tech debt — Dashboard Vite build başarılı. A) Vite build komutu çalıştırıldı, dist/dashboard/ dizinine çıktı yazıldı. B) dist/cli/entry.js ve dist/mcp/server.js d
-- Recurring pattern (860x): stale_heartbeat
+- AgentDetail Penceresi — Okunabilirlik ve Boyut Fix: DONE — Sheet w-[400→600px], sm:w-[500→700px]. Font text-xs→text-sm. Log h-[220→350px]. ScrollArea→overflow-auto div. break-words eklendi.
+- i18n Kalan Hardcoded String'ler — Tam Kapsam: DONE — 79 yeni key (en.ts + tr.ts). fieldT() helper ile runtime çeviri. ConfigPage label/desc/dropdown tamamı i18n.
+- Dashboard Canlı Veri Akışı Doğrulama: DONE — 41 yeni test: SSE hook (11), WorkerCard (11), ActivityFeed (11), SprintPhaseTimeline (8). File-based assertion pattern.
+- Dashboard Build Otomasyonu: DONE — build:dashboard, build:all, postbuild script'leri package.json'a eklendi.

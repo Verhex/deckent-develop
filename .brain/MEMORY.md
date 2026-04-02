@@ -215,3 +215,8 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 ## Sprint sprint-083 Learnings
 - CHANGELOG + SPRINT-LOG Sprint 078-082 Toplu Güncelleme: GO_WITH_TECH_DEBT — CHANGELOG [0.3.0-beta.1] entry enriched: (1) Added explicit sprint-082 entry (Dashboard Faz B: Skeleton, AgentDetail, Em
 - Dashboard Vite Build + dist/ Güncelleme: GO_WITH_TECH_DEBT — Dashboard Vite build başarılı. A) Vite build komutu çalıştırıldı, dist/dashboard/ dizinine çıktı yazıldı. B) dist/cli/en
+## Sprint sprint-084 Learnings
+- AgentDetail Penceresi — Okunabilirlik ve Boyut Fix: DONE — Sheet w-[400→600px], sm:w-[500→700px]. Font text-xs→text-sm (badge, agent/skill, elapsed, scope, files, desc). CardTitle text-lg font-bold. Log h-[220→350px]. ScrollArea→overflow-auto div. break-words eklendi.
+- i18n Kalan Hardcoded String'ler — Tam Kapsam: DONE — 79 yeni key (en.ts + tr.ts). ConfigPage fieldT() helper: runtime çeviri, fallback İngilizce. CONFIG_FIELDS label/desc değişmedi (fallback olarak kalıyor). Dropdown "— none —", "true", "false" i18n'e taşındı.
+- Dashboard Canlı Veri Akışı Doğrulama: DONE — tests/dashboard/live-data.test.ts: 41 test. SSE hook (11), WorkerCard (11), ActivityFeed (11), SprintPhaseTimeline (8). File-based assertion pattern (readFileSync + toContain).
+- Dashboard Build Otomasyonu: DONE — package.json: build:dashboard (cd src/dashboard && npx vite build --outDir ../../dist/dashboard), build:all (tsc && npm run build:dashboard), postbuild (npm lifecycle hook).

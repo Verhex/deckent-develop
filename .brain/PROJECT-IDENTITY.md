@@ -24,14 +24,16 @@
 - **mcp/**: MCP server — 19 tools + 9 resources, stdio transport
 - **cli/** (33 commands): Full CLI with helpers, entry point
 - **dashboard/**: React + Vite + Tailwind (4 pages, SSE indicator, language switcher)
-  - i18n/LanguageProvider.tsx, i18n/en.ts, i18n/tr.ts (Sprint 079)
+  - i18n/LanguageProvider.tsx, i18n/en.ts (~282 keys), i18n/tr.ts (~282 keys)
+  - ConfigPage i18n tam kapsam (Sprint 084), AgentDetail geniş panel (Sprint 084)
 
 ## Current State
-- Test Count: 12
+- Test Count: 12,239 (12,223 passed + 15 skipped + 1 fail)
+- Dashboard Tests: 413 (14 test files)
 - Coverage: 96.0%
-- Last Sprint: sprint-083
-- Total Sprints: 83
-- Completed Tasks: 216
+- Last Sprint: sprint-084
+- Total Sprints: 84
+- Completed Tasks: 220
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -87,5 +89,12 @@
 - Sprint 080: SSE connection indicator (connected/connecting/disconnected), ConfigPage improvements, 6-page dashboard with language switcher
 - New modules: i18n/LanguageProvider.tsx, i18n/en.ts, i18n/tr.ts
 - New files: README-TR.md (466 lines), VISION-EN.md (110 lines)
-- Test count: 12,198 (12,182 passed + 15 skipped + 1 fail)
+- Test count: 12,239 (12,223 passed + 15 skipped + 1 fail)
+- Dashboard tests: 413 (14 files, 41 yeni live-data testleri Sprint 084)
 - All sprints GO or GO_WITH_TECH_DEBT (0 NO_GO rate)
+
+## Sprint 084 Achievements (Dashboard Fix + i18n + Tests + Build)
+- AgentDetail panel: w-[600px] sm:w-[700px], text-sm, h-[350px] log, break-words
+- ConfigPage i18n: 79 yeni key, fieldT() helper, TR/EN tam geçiş
+- Canlı veri test suite: 41 test (SSE, WorkerCard, ActivityFeed, SprintPhaseTimeline)
+- Build otomasyon: build:dashboard, build:all, postbuild npm scripts

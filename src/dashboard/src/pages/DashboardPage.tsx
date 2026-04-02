@@ -372,7 +372,7 @@ export default function DashboardPage() {
         open={selectedAgent !== null}
         onOpenChange={(open) => { if (!open) setSelectedAgent(null); }}
       >
-        <SheetContent side="right" className="w-[400px] sm:w-[500px]">
+        <SheetContent side="right" className="w-[600px] sm:w-[700px]">
           {selectedAgent && (
             <AgentDetail
               taskId={selectedAgent}

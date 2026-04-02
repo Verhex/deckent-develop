@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ScrollArea } from "./ui/scroll-area";
+
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useTranslation } from "../i18n/LanguageProvider";
@@ -112,21 +112,21 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
       <CardHeader className="flex flex-row items-start justify-between pb-3">
         <div className="flex-1 min-w-0">
           {/* Large title */}
-          <CardTitle className="text-base font-semibold text-zinc-100 leading-tight mb-2">
+          <CardTitle className="text-lg font-bold text-zinc-100 leading-tight mb-2">
             {task?.title ?? `${t("agent.worker")} ${taskId}`}
           </CardTitle>
           {/* Badges row */}
           <div className="flex flex-wrap gap-1.5">
-            <Badge variant="outline" className="text-xs text-zinc-400 border-zinc-700">
+            <Badge variant="outline" className="text-sm text-zinc-400 border-zinc-700">
               {taskId}
             </Badge>
             {task?.model && (
-              <Badge variant="outline" className="text-xs border-zinc-600 text-zinc-300">
+              <Badge variant="outline" className="text-sm border-zinc-600 text-zinc-300">
                 {task.model}
               </Badge>
             )}
             {task?.status && (
-              <Badge className={`text-xs border ${getStatusColor(task.status)}`}>
+              <Badge className={`text-sm border ${getStatusColor(task.status)}`}>
                 {task.status}
               </Badge>
             )}
@@ -144,7 +144,7 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
       <CardContent className="flex-1 overflow-auto space-y-3">
         {/* Agent + Skills row */}
         {(task?.assignedAgent || (task?.assignedSkills && task.assignedSkills.length > 0)) && (
-          <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex flex-wrap gap-3 text-sm">
             {task?.assignedAgent && (
               <div>
                 <span className="text-zinc-500">{t("agent.agent")}: </span>
@@ -162,7 +162,7 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
 
         {/* Elapsed time */}
         {elapsed && (
-          <div className="text-xs">
+          <div className="text-sm">
             <span className="text-zinc-500">{t("agent.elapsed")}: </span>
             <span className="text-zinc-300 font-mono">{elapsed}</span>
           </div>
@@ -170,7 +170,7 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
 
         {/* Scope directories */}
         {task?.scope?.directories && task.scope.directories.length > 0 && (
-          <div className="text-xs">
+          <div className="text-sm">
             <span className="text-zinc-500">{t("agent.scope")}: </span>
             <span className="text-zinc-300">{task.scope.directories.join(", ")}</span>
           </div>
@@ -178,7 +178,7 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
 
         {/* Files changed (filesWrite from scope) */}
         {files.length > 0 && (
-          <div className="text-xs">
+          <div className="text-sm">
             <div className="text-zinc-500 mb-1">{t("agent.files_changed")}:</div>
             <ul className="space-y-0.5">
               {files.map((f) => (
@@ -190,7 +190,7 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
 
         {/* Description collapsible */}
         {description && (
-          <div className="text-xs">
+          <div className="text-sm">
             <div className="text-zinc-500 mb-1">{t("agent.description")}:</div>
             <p className="text-zinc-400 leading-relaxed whitespace-pre-wrap">
               {displayDesc}
@@ -218,14 +218,14 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
               {copied ? t("agent.copied") : t("agent.copy_log")}
             </button>
           </div>
-          <ScrollArea className="h-[220px] rounded border border-zinc-800 bg-zinc-950">
+          <div className="h-[350px] rounded border border-zinc-800 bg-zinc-950 overflow-auto">
             <pre
               ref={logRef}
-              className="text-xs whitespace-pre-wrap font-mono text-zinc-300 p-2 h-full overflow-auto"
+              className="text-xs whitespace-pre-wrap break-words font-mono text-zinc-300 p-2"
             >
               {data?.log ?? t("agent.no_log")}
             </pre>
-          </ScrollArea>
+          </div>
         </div>
       </CardContent>
     </Card>

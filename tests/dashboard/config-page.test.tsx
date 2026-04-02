@@ -55,7 +55,7 @@ describe("dashboard/pages — ConfigPage", () => {
     const content = readFileSync(CONFIG_PAGE_PATH, "utf-8");
     expect(content).toContain("Info");
     expect(content).toContain("field.description");
-    expect(content).toContain("title={field.description}");
+    expect(content).toContain("fieldT(field");
   });
 
   it("renders input types: select, boolean, number, text", () => {

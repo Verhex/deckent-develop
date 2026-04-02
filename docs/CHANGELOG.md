@@ -6,6 +6,22 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.1-sprint84] - 2026-04-02
+
+### Fixed
+
+- AgentDetail penceresi genişletildi (400→600px), font boyutları artırıldı, ScrollArea→overflow-auto
+- Log bölümü yüksekliği 220→350px, break-words eklendi (Türkçe karakter desteği)
+
+### Added
+
+- ConfigPage i18n tam kapsam: 79 yeni çeviri key'i (38 label + 38 description + 3 dropdown)
+- fieldT() helper ile runtime çeviri (fallback: İngilizce)
+- Dashboard canlı veri akışı test suite: 41 yeni test (SSE hook, WorkerCard, ActivityFeed, SprintPhaseTimeline)
+- build:dashboard, build:all, postbuild npm script'leri
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go — %100 GO_
+
 ## [0.3.0-beta.1-sprint83] - 2026-04-02
 
 ### Added

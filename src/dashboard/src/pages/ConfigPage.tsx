@@ -178,6 +178,12 @@ export default function ConfigPage() {
   const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
 
+  const fieldT = (field: ConfigFieldMeta, suffix: 'label' | 'desc') => {
+    const key = `config.field.${field.key.replace(/\./g, '_')}.${suffix}` as TranslationKey;
+    const translated = t(key);
+    return translated === key ? (suffix === 'label' ? field.label : field.description) : translated;
+  };
+
   const [doctor, setDoctor] = useState<DoctorData | null>(null);
   const [doctorLoading, setDoctorLoading] = useState(true);
   const [doctorError, setDoctorError] = useState<string | null>(null);
@@ -371,10 +377,10 @@ export default function ConfigPage() {
                     <div key={field.key} className="space-y-1.5" data-testid={`config-field-${field.key}`}>
                       <div className="flex items-center gap-1.5">
                         <Label htmlFor={`config-${field.key}`} className="text-sm">
-                          {field.label}
+                          {fieldT(field, 'label')}
                           {modified && <span className="ml-1 text-yellow-400 text-xs">*</span>}
                         </Label>
-                        <span className="group relative cursor-help" title={field.description}>
+                        <span className="group relative cursor-help" title={fieldT(field, 'desc')}>
                           <Info className="h-3.5 w-3.5 text-muted-foreground" />
                         </span>
                       </div>
@@ -386,7 +392,7 @@ export default function ConfigPage() {
                             value={formatValue(currentValue)}
                             onChange={(e) => handleChange(field, e.target.value)}
                           >
-                            <option value="">— none —</option>
+                            <option value="">{t('config.none' as TranslationKey)}</option>
                             {field.options?.map((opt) => (
                               <option key={opt} value={opt}>{opt}</option>
                             ))}
@@ -399,9 +405,9 @@ export default function ConfigPage() {
                             value={currentValue === true ? "true" : currentValue === false ? "false" : ""}
                             onChange={(e) => handleChange(field, e.target.value)}
                           >
-                            <option value="">— none —</option>
-                            <option value="true">true</option>
-                            <option value="false">false</option>
+                            <option value="">{t('config.none' as TranslationKey)}</option>
+                            <option value="true">{t('config.true' as TranslationKey)}</option>
+                            <option value="false">{t('config.false' as TranslationKey)}</option>
                           </Select>
                         )}
 
@@ -420,7 +426,7 @@ export default function ConfigPage() {
                             type="text"
                             value={formatValue(currentValue)}
                             onChange={(e) => handleChange(field, e.target.value)}
-                            placeholder={field.description}
+                            placeholder={fieldT(field, 'desc')}
                           />
                         )}
 
@@ -440,7 +446,7 @@ export default function ConfigPage() {
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        {field.description}
+                        {fieldT(field, 'desc')}
                         {!isDefault_ && (
                           <span className="ml-1 text-zinc-500">
                             (default: {formatValue(field.defaultValue) || "null"})

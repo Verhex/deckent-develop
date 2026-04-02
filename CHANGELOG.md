@@ -2,7 +2,14 @@
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
-## Latest: v0.2.0-beta.3 (2026-03-30)
+## Latest: v0.3.0-beta.1-sprint84 (2026-04-02)
+
+### Sprint 084 — Dashboard Fix + i18n Tam Kapsam + Canlı Veri Test + Build Otomasyon
+- AgentDetail penceresi genişletildi (400→600px), font boyutları artırıldı, log 220→350px
+- ConfigPage i18n tam kapsam: 79 yeni çeviri key'i, fieldT() helper ile runtime çeviri
+- 41 yeni dashboard canlı veri testi (SSE hook, WorkerCard, ActivityFeed, SprintPhaseTimeline)
+- build:dashboard, build:all, postbuild npm script'leri eklendi
+- %100 GO — 4/4 task tamamlandı, 0 tech debt, 0 NO_GO
 
 ### Sprint 076 — Stale Heartbeat Fix + Dashboard API Tests + Graceful Shutdown
 - Stale heartbeat root cause giderildi: `finalizeHeartbeat()` + auditor DONE skip (410x pattern)
