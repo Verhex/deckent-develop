@@ -1,173 +1,139 @@
-# DIRECTIVES — Sprint 088: Timeout Reformu + Heartbeat Daemon + Human Checkpoints + Final Polish
+# DIRECTIVES — Sprint 089: Otonom Adaptasyon Faz 2 + Kalan Tech Debt
 
-## Goal: Sprint timeout sorununu köklü çöz (sınırsız çalışma desteği), heartbeat daemon ile proaktif sistem, human checkpoints ile güvenilir otonomi, README/docs final polish. Perfect beta'ya hazırlık.
+## Goal: Faz 2 otonom adaptasyon hedeflerini tamamla — adaptive thresholds, mid-sprint reroute güçlendirme, kalan sessiz catch'ler, checkpoint CLI/MCP entegrasyonu. Self-improving orkestratörü tamamla.
 
 ---
 
-## Task 1: Sprint Timeout Reformu — Sınırsız Çalışma Desteği
+## Task 1: Adaptive Thresholds — NO_GO Rate Bazlı Otomatik Ayar
 - Model: opus
 - Effort: high
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/orchestra/result-collector.ts, src/orchestra/sprint-controller.ts, src/core/config-types.ts, src/core/config.ts
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/result-evaluator.ts, src/core/config.ts, src/core/config-types.ts
 - Scope: src/orchestra/, src/core/
 
 ### Description
-Sprint timeout mekanizmasını yeniden tasarla. Mevcut 30dk hardcoded default çok kısa — kullanıcılar saatlerce çalışan sprintler isteyebilir.
-
-A) config-types.ts'e yeni field:
-- `DeckentConfig.sprint_timeout_minutes?: number` (varsayılan 0 = sınırsız)
-- `ResolvedConfig.sprint_timeout_minutes: number` (varsayılan 0)
-- 0 = sınırsız (timeout yok), pozitif sayı = dakika cinsinden timeout
-
-B) config.ts defaults'a ekle:
-- `sprint_timeout_minutes: 0` (varsayılan sınırsız)
-
-C) result-collector.ts'de `waitForResultsImpl()`:
-- `const timeout = timeoutMs ?? (config.sprint_timeout_minutes ? config.sprint_timeout_minutes * 60000 : 0);`
-- `timeout === 0` → sınırsız bekleme (while döngüsü timeout kontrolünü atla)
-- Sınırsız modda bile her 5dk'da bir "Sprint devam ediyor, X/Y task tamamlandı" debug log yaz
-- Worker heartbeat DONE olduğunda hemen result dosyasını kontrol et (5s polling yerine anında)
-
-D) sprint-controller.ts'de `runSprint()`:
-- `opts.timeoutMs` yerine `config.sprint_timeout_minutes * 60000` kullan (opts override hala çalışsın)
-- Sınırsız modda SIGINT ile graceful shutdown hala çalışmalı
-
-E) MCP start tool'da timeout parametresi:
-- 0 geçilirse sınırsız
-- Geçilmezse config'den oku
-
-**Kanıt:** `grep "sprint_timeout_minutes" src/core/config-types.ts` → 2+ eşleşme
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
-
----
-
-## Task 2: Heartbeat Daemon — Proaktif Görev Sistemi
-- Model: opus
-- Effort: high
-- Agent: api-builder
-- Skills: typescript-expert
-- Files: src/orchestra/heartbeat-daemon.ts, src/cli/commands/heartbeat.ts, src/cli/index.ts
-- Scope: src/orchestra/, src/cli/
-
-### Description
-OpenClaw'dan esinlenerek heartbeat daemon sistemi oluştur. Sistem periyodik olarak proaktif görevler çalıştırsın.
-
-A) `src/orchestra/heartbeat-daemon.ts` yeni dosya oluştur:
-- `HeartbeatDaemon` class'ı:
-  - `constructor(projectRoot: string, intervalMinutes: number = 30)`
-  - `start()`: setInterval ile periyodik kontrol başlat
-  - `stop()`: interval'ı temizle
-  - `runHeartbeat()`: tek bir heartbeat döngüsü çalıştır
-- `runHeartbeat()` içinde:
-  - `.deckent/HEARTBEAT.md` dosyasını oku (yoksa varsayılan oluştur)
-  - Her satır bir kontrol görevi: `- [ ] lint check`, `- [ ] test run`, `- [x] done item` (atla)
-  - Tamamlanmamış görevleri sırayla çalıştır (shell komutu)
-  - Sonuçları `.brain/heartbeat-log.md`'ye append et
-  - Hata varsa `debugLog()` ile logla
-
-B) Varsayılan `.deckent/HEARTBEAT.md` şablonu:
-```markdown
-# Heartbeat Tasks
-- [ ] tsc --noEmit
-- [ ] npx vitest run --reporter=verbose 2>&1 | tail -5
-```
-
-C) `src/cli/commands/heartbeat.ts` CLI komutu:
-- `deckent heartbeat` — tek seferlik heartbeat çalıştır
-- `deckent heartbeat --daemon` — daemon modunda başlat (arka planda)
-- `deckent heartbeat --interval 15` — interval dakika ayarla
-- `deckent heartbeat --stop` — çalışan daemon'u durdur
-
-D) `src/cli/index.ts`'de komutu kaydet
-
-**Kanıt:** `ls src/orchestra/heartbeat-daemon.ts src/cli/commands/heartbeat.ts` → dosyalar var
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
-
----
-
-## Task 3: Human Checkpoints — Sprint Fazlarında Onay Noktaları
-- Model: opus
-- Effort: high
-- Agent: refactorer
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts, src/core/config-types.ts, src/core/config.ts
-- Scope: src/orchestra/, src/core/
-
-### Description
-Sprint lifecycle'a configurable human checkpoint'ler ekle. Cowork modelinden esinlenerek.
+Sprint sonuçlarına göre threshold'ları otomatik ayarlayan mekanizma ekle.
 
 A) config-types.ts'e:
-- `DeckentConfig.human_checkpoints?: string[]` (varsayılan [])
-- Geçerli değerler: `'plan'`, `'evaluate'`, `'fix'`
-- Boş dizi = checkpoint yok (tam otonom)
+- `DeckentConfig.adaptive_thresholds?: boolean` zaten var (varsayılan false)
+- `DeckentConfig.adaptive_config?: { min_samples: number; no_go_threshold: number; coverage_lookback: number }` ekle
+- Varsayılanlar: min_samples=3, no_go_threshold=0.3, coverage_lookback=3
 
-B) sprint-controller.ts'de checkpoint mekanizması:
-- `async function waitForHumanApproval(phase: string, summary: string): Promise<boolean>`
-- `.deckent/checkpoints/` dizinine `checkpoint-{sprintId}-{phase}.json` yaz:
-  ```json
-  { "phase": "plan", "summary": "4 task planlandı...", "status": "pending", "createdAt": "..." }
-  ```
-- Status dosyasını her 5 saniyede kontrol et
-- Status `"approved"` → devam et, `"rejected"` → sprint durdur
-- CLI/MCP/Dashboard'dan approve edilebilir
+B) sprint-controller.ts'de RETRO fazına `applyAdaptiveThresholds()` ekle:
+- Son N sprint'in NO_GO rate'ini hesapla (`.brain/sprints/` dosyalarından)
+- NO_GO rate > %30 → `agent_min_score` değerini 1 düşür (min 1)
+- NO_GO rate < %10 → `agent_min_score` değerini 1 artır (max 10)
+- Coverage ortalaması < %70 → `coverage_threshold` değerini ortalamaya ayarla
+- Değişiklikleri `.deckent/config.json`'a yaz + debugLog ile logla
 
-C) runSprint() içinde checkpoint noktaları:
-- Plan fazından sonra: `if (config.human_checkpoints?.includes('plan'))` → waitForHumanApproval
-- Evaluate fazından sonra: `if (config.human_checkpoints?.includes('evaluate'))` → waitForHumanApproval
-- Fix fazından önce: `if (config.human_checkpoints?.includes('fix'))` → waitForHumanApproval
+C) result-evaluator.ts'de:
+- `getRecentSprintStats(projectRoot: string, lookback: number)` fonksiyonu
+- `.brain/sprints/sprint-NNN.md` dosyalarını parse et
+- Return: `{ avgNoGoRate, avgCoverage, sprintCount }`
 
-D) MCP tool ekleme (basit):
-- Mevcut `deckent_config` tool'u ile `human_checkpoints` ayarlanabilir
-- Checkpoint approve/reject için `.deckent/checkpoints/` dosyasına yazma yeterli
-
-**Kanıt:** `grep "human_checkpoints\|waitForHumanApproval" src/orchestra/sprint-controller.ts` → 3+
+**Kanıt:** `grep "applyAdaptiveThresholds\|getRecentSprintStats" src/orchestra/sprint-controller.ts src/orchestra/result-evaluator.ts` → 2+ eşleşme
 
 **Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
 
 ---
 
-## Task 4: README + IDENTITY + Docs Final Polish
-- Model: sonnet
+## Task 2: Mid-Sprint Reroute Güçlendirme — Max 3 + Config
+- Model: opus
 - Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer, typescript-expert
-- Files: README.md, README-TR.md, .deckent/workspace/IDENTITY.md, .brain/PROJECT-IDENTITY.md
-- Scope: ./, .deckent/, .brain/
+- Agent: refactorer
+- Skills: typescript-expert
+- Files: src/orchestra/mid-sprint-adapter.ts, src/core/config-types.ts, src/core/config.ts
+- Scope: src/orchestra/, src/core/
 
 ### Description
-Perfect beta için tüm kullanıcıya dönük dokümanları güncelleyelim.
+Mid-sprint reroute mekanizmasını güçlendir.
 
-A) README.md güncelle:
-- Badge'lar: tests 12,239+, sprints 87+, version v0.3.0-beta.3
-- Key Features'a ekle: "Heartbeat Daemon", "Human Checkpoints", "Configurable Sprint Timeout"
-- Comparison table'a: "Heartbeat/proactive tasks" satırı
-- CLI commands'a: `deckent heartbeat` komutu
+A) config-types.ts'e:
+- `DeckentConfig.max_reroutes?: number` zaten var (varsayılan 3)
+- `DeckentConfig.reroute_on_tech_debt?: boolean` zaten var (varsayılan false)
+- Doğrula: bu field'lar gerçekten config.ts defaults'ta ve loadConfig'de var mı
 
-B) README-TR.md'yi aynı şekilde güncelle
+B) mid-sprint-adapter.ts'de:
+- `MAX_REROUTES` sabitini `config.max_reroutes` ile değiştir (config parametre olarak al)
+- Reroute tetikleme: NO_GO task'lar + opsiyonel GO_WITH_TECH_DEBT (`config.reroute_on_tech_debt`)
+- Confidence threshold: sadece confidence > 0.7 ise reroute yap
+- Her reroute'ta debugLog ile karar logla
+- Reroute counter'ı task bazlı tut (task.routingMeta.rerouteCount)
 
-C) IDENTITY.md güncellemeleri:
-- Sprint sayısı: 87+
-- Yeni özellikler listesi
-- Test sayısı güncelleme
+C) sprint-controller.ts FIX fazında:
+- `runFixPhase()` fonksiyonuna config geçir
+- mid-sprint-adapter'a config'den max_reroutes ve reroute_on_tech_debt oku
 
-D) PROJECT-IDENTITY.md güncellemeleri:
-- Sprint 087-088 achievements
-- Self-improvement durumu: "Faz 0+1 tamamlandı, Faz 2 devam ediyor"
+**Kanıt:** `grep "max_reroutes\|reroute_on_tech_debt" src/orchestra/mid-sprint-adapter.ts` → 2+
 
-**Kanıt:** `grep "heartbeat\|Heartbeat" README.md` → var
+**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
 
-**Test:** `tsc --noEmit` temiz.
+---
+
+## Task 3: Checkpoint CLI/MCP Entegrasyonu — Approve/Reject Komutları
+- Model: opus
+- Effort: normal
+- Agent: api-builder
+- Skills: typescript-expert
+- Files: src/cli/commands/checkpoint.ts, src/cli/index.ts, src/mcp/tools/checkpoint.ts, src/mcp/index.ts
+- Scope: src/cli/, src/mcp/
+
+### Description
+Human checkpoint'leri CLI ve MCP'den approve/reject edebilmeyi sağla.
+
+A) `src/cli/commands/checkpoint.ts` yeni dosya:
+- `deckent checkpoint list` — bekleyen checkpoint'leri listele (`.deckent/checkpoints/` oku)
+- `deckent checkpoint approve <sprintId> <phase>` — checkpoint status'u "approved" yap
+- `deckent checkpoint reject <sprintId> <phase>` — checkpoint status'u "rejected" yap
+- JSON dosyasını oku, status'u güncelle, geri yaz
+
+B) `src/cli/index.ts`'de komutu kaydet
+
+C) `src/mcp/tools/checkpoint.ts` yeni dosya:
+- `deckent_checkpoint` MCP tool: action='list'|'approve'|'reject', sprintId, phase parametreleri
+- Aynı mantık: `.deckent/checkpoints/` dizinini oku/yaz
+
+D) `src/mcp/index.ts`'de tool'u kaydet
+
+**Kanıt:** `ls src/cli/commands/checkpoint.ts src/mcp/tools/checkpoint.ts` → dosyalar var
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
+
+---
+
+## Task 4: Kalan Sessiz Catch Blokları — Son Dalga
+- Model: sonnet
+- Effort: normal
+- Agent: bug-fixer
+- Skills: typescript-expert
+- Files: src/orchestra/*.ts, src/core/*.ts
+- Scope: src/orchestra/, src/core/
+
+### Description
+Kalan ~20 sessiz catch bloğunu debugLog'a dönüştür.
+
+A) Tüm `catch (e) { }` ve `catch { }` (boş gövdeli) blokları bul:
+- `grep -rn "catch.*{[^}]*}" src/orchestra/ src/core/` ile tara
+- Boş gövdeli veya sadece yorum olan catch blokları hedef
+
+B) Her birini `catch (e) { debugLog('fonksiyonAdi:context', e); }` ile değiştir
+- debugLog import'u yoksa ekle
+
+C) Hedef: 0 sessiz catch bloğu kalmalı
+- Utility fonksiyonları dahil (readJsonSafe, vb hariç — bunlar bilinçli olarak sessiz)
+
+**Kanıt:** `grep -rn "catch.*{[\s]*}" src/orchestra/ src/core/ | wc -l` → 0
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
 - npx vitest run → 0 fail (pre-existing hariç)
-- Sprint timeout 0 = sınırsız çalışmalı
-- Heartbeat daemon CLI'dan başlatılabilmeli
-- Human checkpoint dosya bazlı approve/reject çalışmalı
-- README/docs güncel ve tutarlı
+- Adaptive thresholds configurable ve default off
+- Mid-sprint reroute max 3 deneme, config'den okunur
+- Checkpoint CLI + MCP çalışır
+- 0 sessiz catch bloğu hedef
 - %100 GO hedefli
