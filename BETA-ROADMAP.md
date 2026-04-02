@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Readiness Roadmap
 
-**Son güncelleme:** 2026-04-02 | **Sprint:** 083 (Deckent 081) | **Test:** 12,193+ | **Durum:** Closed Beta — Dogfooding aktif
+**Son güncelleme:** 2026-04-02 | **Sprint:** 082 | **Test:** 12,193+ | **Durum:** Closed Beta — Dogfooding aktif
 
 ---
 
@@ -193,42 +193,26 @@
 - [x] .brain/ güncelleme (PROJECT-IDENTITY, DECISIONS)
 - [x] CLAUDE.md + DECKENT.md modül sayıları güncellendi
 
-**Manuel çalışma (2026-04-01) — Deckent sprint öncesi:**
-- [x] Blueprint senkronizasyonu — MCP 17→19 tools, memory 600→900
-- [x] ANA-PLAN-TR tam güncelleme
-- [x] Dashboard i18n altyapısı (LanguageProvider, 90+ key, dil switcher)
-- [x] README-TR.md + VISION-EN.md oluşturuldu
-- [x] GET /api/tasks endpoint, SSE indicator, config fix
+**Sprint 078 — TAMAMLANDI (2026-04-01), 6m 57s:**
+- [x] Blueprint senkronizasyonu, i18n altyapısı, TR/EN docs, /api/tasks
+- [x] CHANGELOG + SPRINT-LOG catch-up, HistoryPage success rate trend
 
-**Sprint 078 (Deckent sprint-076) — TAMAMLANDI (2026-04-01), 6m 57s:**
-- [x] CHANGELOG + SPRINT-LOG catch-up
-- [x] PROJECT-IDENTITY güncelleme
-- [x] HistoryPage success rate trend chart
+**Sprint 079 — TAMAMLANDI (2026-04-01), ~15m:**
+- [x] README-TR fix, dashboard kontrol butonları, init dil-ilk, /api/cleanup
 
-**Sprint 079 (Deckent sprint-077) — TAMAMLANDI (2026-04-01), ~15m:**
-- [x] README-TR.md UTF-8 karakter düzeltme
-- [x] Dashboard kontrol butonları (Cleanup, Kill All)
-- [x] Init wizard dil seçimi İLK adım
-- [x] POST /api/cleanup endpoint
-
-**Sprint 080 (Deckent sprint-078) — TAMAMLANDI (2026-04-01), 9m 06s:**
+**Sprint 080 — TAMAMLANDI (2026-04-01), 9m 06s:**
 - [x] Dashboard UX Overhaul: WorkerCard, SprintPhaseTimeline, ActivityFeed
 
-**Sprint 081 (Deckent sprint-079) — TAMAMLANDI (2026-04-01), 12m 38s:**
+**Sprint 081 — TAMAMLANDI (2026-04-01), 12m 38s:**
 - [x] Settings+Config birleştirme, i18n tam kapsam (44 key), terminal logları
 
-**Sprint 082 (Deckent sprint-080) — TAMAMLANDI (2026-04-02), 14m 45s:**
-- [x] MCP/CLI parity: 13 parametre, 2 yeni tool (agent_list, skill_list)
-- [x] CLI set-directives komutu, ADR-022 dokümantasyonu
-
-**Sprint 083 (Deckent sprint-081) — TAMAMLANDI (2026-04-02), 11m 37s:**
-- [x] Usage card kaldırma (sahte veri göstermek yerine)
-- [x] Version bump: v0.2.0-beta.3 → v0.3.0-beta.1
-- [x] Init test mock düzeltme, docs cleanup
+**Sprint 082 — TAMAMLANDI (2026-04-02):**
+- [x] MCP/CLI parity: 19 tool, 33 CLI, ADR-022
+- [x] Usage card kaldırma, v0.3.0-beta.1, init test fix
+- [x] Dashboard Faz B: skeleton loading, AgentDetail zenginleştirme, EmptyState, polish
 
 **Sonraki Planlar:**
-- [ ] Dashboard Faz B (task detay, skeleton loader)
-- [ ] Dashboard gerçek sprint ile test (P3-22)
+- [ ] Dashboard gerçek sprint ile test (P3-22) — bir sonraki sprint
 - [ ] P1-10..12: Multi-provider test (BLOCKED — API key gerekli)
 - [ ] Windows Codex CLI dogfooding
 
@@ -256,10 +240,9 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | 075 | 5/5 | 5 | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2 |
 | 076 | 4/4 | 4 | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3 |
 | 077 | 3/3 | 3 | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme |
-| 078 (Deckent 076) | 4/4 | 4 | Docs catch-up, HistoryPage success rate trend |
-| 079 (Deckent 077) | 4/4 | 4 | README-TR fix, dashboard kontrol butonları, init dil-ilk, /api/cleanup |
-| 080 (Deckent 078) | 4/4 | 4 | Dashboard UX Overhaul: WorkerCard, SprintPhaseTimeline, ActivityFeed |
-| 081 (Deckent 079) | 4/4 | 4 | Config/Settings birleşme, i18n tam kapsam (44 key), terminal log |
-| 082 (Deckent 080) | 6/6 | 6 | MCP/CLI parity: 13 parametre, 2 yeni tool, set-directives CLI, ADR-022 |
-| 083 (Deckent 081) | 4/4 | 4 | Usage card kaldırma, v0.3.0-beta.1, init test fix, docs cleanup |
-| **Toplam** | **101/101** | **101** | 12,193+ test, 0 regression, v0.3.0-beta.1 |
+| 078 | 4/4 | 4 | Docs catch-up, HistoryPage success rate trend |
+| 079 | 4/4 | 4 | README-TR fix, dashboard kontrol butonları, init dil-ilk, /api/cleanup |
+| 080 | 4/4 | 4 | Dashboard UX Overhaul: WorkerCard, SprintPhaseTimeline, ActivityFeed |
+| 081 | 4/4 | 4 | Config/Settings birleşme, i18n tam kapsam (44 key), terminal log |
+| 082 | 10/10 | 10 | MCP/CLI parity + usage fix + version bump + Dashboard Faz B (skeleton, AgentDetail, EmptyState) |
+| **Toplam** | **105/105** | **105** | 12,193+ test, 0 regression, v0.3.0-beta.1 |
