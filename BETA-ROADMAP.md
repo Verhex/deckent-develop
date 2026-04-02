@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Readiness Roadmap
 
-**Son güncelleme:** 2026-04-01 | **Sprint:** 078 | **Test:** 12,196+ | **Durum:** Closed Beta — Dogfooding aktif
+**Son güncelleme:** 2026-04-02 | **Sprint:** 080 | **Test:** 12,190+ | **Durum:** Closed Beta — Dogfooding aktif
 
 ---
 
@@ -193,19 +193,36 @@
 - [x] .brain/ güncelleme (PROJECT-IDENTITY, DECISIONS)
 - [x] CLAUDE.md + DECKENT.md modül sayıları güncellendi
 
-**Sprint 078 — AKTİF (2026-04-01) — Beta Hazırlık:**
-- [ ] Blueprint senkronizasyonu (MCP 17 tools/9 resources, memory 900, CLI 32)
-- [ ] ANA-PLAN-TR tam güncelleme (bölüm 5-17 çeviri dahil)
-- [ ] BETA-ROADMAP Sprint 076-077 DONE işaretleme
-- [ ] Memory budget 600→900 tüm docs'ta düzeltme
+**Sprint 078 (Deckent sprint-076) — TAMAMLANDI (2026-04-01):**
+- [x] Blueprint senkronizasyonu — MCP 17 tools/9 resources, memory 900, CLI 32
+- [x] ANA-PLAN-TR tam güncelleme
+- [x] BETA-ROADMAP Sprint 076-077 DONE
+- [x] Memory budget 600→900 tüm docs'ta
+- [x] Dashboard i18n (LanguageProvider, 90+ key, dil switcher)
+- [x] README-TR.md + VISION-EN.md oluşturuldu
+- [x] GET /api/tasks endpoint
+- [x] SSE bağlantı indicator, config mode/memory fix
+- [x] Docs catch-up (CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY)
+- [x] HistoryPage success rate trend chart
 
-**Sprint 079+ Planı:**
-- [ ] i18n entegrasyonu (CLI + Dashboard — TR/EN çift dil)
-- [ ] Dashboard zenginleştirme (task flow, config tooltip, timeline)
-- [ ] Init/onboarding iyileştirme
+**Sprint 079 (Deckent sprint-077) — TAMAMLANDI (2026-04-01):**
+- [x] README-TR.md UTF-8 karakter düzeltme
+- [x] Dashboard kontrol butonları (Cleanup, Kill All)
+- [x] Init wizard dil seçimi İLK adım
+- [x] POST /api/cleanup endpoint
+
+**Sprint 080 (Deckent sprint-078-080) — TAMAMLANDI (2026-04-02):**
+- [x] Dashboard UX Overhaul: WorkerCard grid, SprintPhaseTimeline, ActivityFeed
+- [x] Settings+Config birleştirme, i18n tam kapsam (44 key)
+- [x] Config round-trip testleri (10 test), terminal logları
+- [x] MCP/CLI parity: 13 parametre, 2 yeni tool (agent_list, skill_list)
+- [x] CLI set-directives komutu, ADR-022 dokümantasyonu
+
+**Sonraki Planlar:**
+- [ ] Usage tracking gerçek veri (Claude API rate limit sorgusu)
+- [ ] Dashboard Faz B (task detay, skeleton loader)
 - [ ] P1-10..12: Multi-provider test (BLOCKED — API key gerekli)
 - [ ] Windows Codex CLI dogfooding
-- [ ] Windows Cursor + Gemini dogfooding
 
 ### Faz 3: "Dokümantasyon"
 TR+EN çift dil, VISION, link audit, config dashboard
@@ -231,4 +248,7 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | 075 | 5/5 | 5 | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2 |
 | 076 | 4/4 | 4 | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3 |
 | 077 | 3/3 | 3 | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme |
-| **Toplam** | **69/69** | **69** | 12,196+ test, 0 regression, v0.2.0-beta.4 |
+| 078 | 10/10 | 10 | Blueprint sync, i18n, TR/EN docs, /api/tasks, SSE indicator, docs catch-up |
+| 079 | 4/4 | 4 | README-TR fix, dashboard kontrol, init dil-ilk, /api/cleanup |
+| 080 | 14/14 | 14 | Dashboard overhaul, config birleşme, MCP/CLI parity (19 tool), ADR-022 |
+| **Toplam** | **97/97** | **97** | 12,190+ test, 0 regression, v0.2.0-beta.4 |

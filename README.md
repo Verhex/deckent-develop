@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12196%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-78%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.2.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12190%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-80%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.2.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -87,7 +87,7 @@ Deckent follows a three-step cycle:
 - **Built-in Docs** -- `.deckent/docs/` ships with quick-start, directives-guide, and config-reference guides
 - **Native Windows Support** -- Full subprocess backend with `shell:true`, periodic heartbeat updates, and UTF-8 handling
 - **Plugin System** -- Extend Deckent with custom hooks, commands, and patterns
-- **MCP Integration** -- 17 MCP tools + 9 resources for seamless Claude Code IDE integration
+- **MCP Integration** -- 19 MCP tools + 9 resources for seamless Claude Code IDE integration
 - **Web Dashboard** -- React + Vite + Tailwind dashboard with real-time SSE updates
 - **Internationalization** -- English and Turkish language support built in
 - **Review Archive Fallback** -- Sprint review works even after cleanup by reading from archive
@@ -107,7 +107,7 @@ Deckent follows a three-step cycle:
 | GO/NO-GO evaluation per task | Yes | No | No | No | No |
 | Usage-aware auto-throttling | Yes | N/A | N/A | N/A | No |
 | Open source | Yes (MIT) | No | No | Yes | Partial |
-| MCP integration | Yes (17 tools) | N/A | N/A | N/A | N/A |
+| MCP integration | Yes (19 tools) | N/A | N/A | N/A | N/A |
 | Web dashboard | Yes | Built-in | Built-in | No | No |
 | Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
 | Works offline (local models) | Planned | Yes | No | Yes | No |
@@ -297,7 +297,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Or let `deckent init` auto-register it.
 
-### MCP Tools (17)
+### MCP Tools (19)
 
 | Tool | Description |
 |------|-------------|
@@ -318,6 +318,8 @@ Or let `deckent init` auto-register it.
 | `deckent_kill` | Kill a specific worker |
 | `deckent_cleanup` | Archive sprint files and clean up workers |
 | `deckent_help` | Runtime capabilities, state info, and workflow guidance |
+| `deckent_agent_list` | List registered agents (built-in and temporary) |
+| `deckent_skill_list` | List registered skills with manifest info |
 
 ### MCP Resources (9)
 
