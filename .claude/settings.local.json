@@ -128,7 +128,11 @@
       "Bash(find . -name index.html -path */dashboard/* -not -path */node_modules/*)",
       "Bash(grep -h \"server.registerTool\\(\" /home/alperen/deckent-dev/src/mcp/tools/*.ts -A 1)",
       "Bash(cat:*)",
-      "Bash(grep -h \"registerResource\\(\" /home/alperen/deckent-dev/src/mcp/resources/*.ts)"
+      "Bash(grep -h \"registerResource\\(\" /home/alperen/deckent-dev/src/mcp/resources/*.ts)",
+      "Bash(find /home/alperen/deckent-dev/tests -name *.test.ts)",
+      "Bash(grep -c '\"\": \"\"' /home/alperen/deckent-dev/src/dashboard/src/i18n/en.ts)",
+      "Bash(claude -p '/usage')",
+      "Bash(claude -p 'What is your current usage status? How much of my rate limit have I used?')"
     ]
   },
   "outputStyle": "default"

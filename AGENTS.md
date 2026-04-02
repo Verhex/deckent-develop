@@ -44,7 +44,7 @@
   - adaptive-agent.ts: runtime agent adaptation
 - **providers/** — Claude, Codex, Gemini adapters (5 modules)
 - **api/** — HTTP API server, SSE, rate limiting (3 modules)
-- **mcp/** — MCP server: 17 tools + 9 resources, stdio transport
+- **mcp/** — MCP server: 19 tools + 9 resources, stdio transport
 - **cli/** — 33+ commands, helpers, entry point
 - **dashboard/** — React + Vite + Tailwind web dashboard
 

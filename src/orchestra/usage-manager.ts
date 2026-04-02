@@ -2,8 +2,15 @@
 // Extracted from brain.ts. Handles usage checking, provider-based
 // usage queries, and sprint size adjustment based on quota thresholds.
 // Extended with multi-provider quota tracking and balancing.
+//
+// NOTE: Claude CLI does not expose a programmatic usage API.
+// `claude -p '/usage'` fails with "Unknown skill: usage".
+// Usage tracking is now sprint-based estimation only.
+// See getSprintUsageEstimate() for per-sprint token/cost estimates.
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import type {
   ResolvedConfig,
@@ -37,15 +44,124 @@ function resolveMaxWorkersNumeric(config: ResolvedConfig, systemProfile?: System
   return maxWorkers;
 }
 
+// ─── Sprint Usage Estimation ──────────────────────────────────────────
+
+/** Token cost estimates per operation (approximate values) */
+const TASK_TOKEN_ESTIMATES = {
+  brainPlanning: 2000,
+  workerTask: 5000,
+  auditorScan: 500,
+  evaluation: 1000,
+  retro: 2000,
+} as const;
+
+/** Approximate cost per 1K tokens (Claude Sonnet, USD) */
+const COST_PER_1K_TOKENS = 0.003;
+
+/** Sprint usage estimate result */
+export interface SprintUsageEstimate {
+  estimatedTokens: number;
+  estimatedCost: number;
+  taskCount: number;
+  sprintId: string;
+  isEstimated: true;
+}
+
+/** Entry stored in .deckent/usage/sprint-NNN.json */
+interface SprintUsageEntry {
+  model: string;
+  tokenEstimate: number;
+  taskId: string;
+  timestamp: string;
+  provider: string;
+}
+
 /**
- * Check current API usage by invoking the claude CLI synchronously.
- * Parses 5-hour and weekly usage percentages from the output.
- * Returns safe defaults (50% / 30%) if the CLI call fails.
+ * Get sprint-based token and cost estimate for a given sprint.
+ * Reads .deckent/usage/sprint-NNN.json if it exists, otherwise calculates
+ * a rough estimate based on task count.
+ *
+ * @param sprintId - Sprint ID string (e.g. 'sprint-081')
+ * @param root - Project root path (default: process.cwd())
+ * @returns Sprint usage estimate with token count, cost, and task count
+ */
+export function getSprintUsageEstimate(sprintId: string, root = process.cwd()): SprintUsageEstimate {
+  const usagePath = join(root, '.deckent', 'usage', `${sprintId}.json`);
+  let taskCount = 0;
+  let estimatedTokens = 0;
+
+  try {
+    const raw = readFileSync(usagePath, 'utf-8');
+    const entries: SprintUsageEntry[] = JSON.parse(raw) as SprintUsageEntry[];
+    taskCount = entries.length;
+    estimatedTokens = entries.reduce((sum, e) => sum + (e.tokenEstimate ?? TASK_TOKEN_ESTIMATES.workerTask), 0);
+  } catch {
+    // No usage file — use default per-task estimate (0 tasks = 0 tokens)
+    estimatedTokens = 0;
+  }
+
+  // Add Brain overhead on top of worker tasks
+  const overhead = TASK_TOKEN_ESTIMATES.brainPlanning + TASK_TOKEN_ESTIMATES.evaluation + TASK_TOKEN_ESTIMATES.retro;
+  estimatedTokens += overhead;
+
+  const estimatedCost = (estimatedTokens / 1000) * COST_PER_1K_TOKENS;
+
+  return {
+    estimatedTokens,
+    estimatedCost: Math.round(estimatedCost * 10000) / 10000,
+    taskCount,
+    sprintId,
+    isEstimated: true,
+  };
+}
+
+/**
+ * Save a sprint usage entry to .deckent/usage/sprint-NNN.json.
+ * Appends the entry to the existing file or creates a new one.
+ */
+export function recordSprintUsage(
+  sprintId: string,
+  entry: SprintUsageEntry,
+  root = process.cwd(),
+): void {
+  const usageDir = join(root, '.deckent', 'usage');
+  const usagePath = join(usageDir, `${sprintId}.json`);
+
+  let entries: SprintUsageEntry[] = [];
+  try {
+    const raw = readFileSync(usagePath, 'utf-8');
+    entries = JSON.parse(raw) as SprintUsageEntry[];
+  } catch {
+    // File doesn't exist yet — start fresh
+  }
+
+  entries.push(entry);
+
+  try {
+    mkdirSync(usageDir, { recursive: true });
+    writeFileSync(usagePath, JSON.stringify(entries, null, 2));
+  } catch {
+    // Non-fatal: usage tracking best-effort
+  }
+}
+
+/**
+ * Check current API usage.
+ *
+ * NOTE: Claude CLI programmatic usage API is not available.
+ * `claude -p '/usage'` fails with "Unknown skill: usage".
+ * This function attempts the CLI call for forward compatibility but
+ * returns { fiveHourPercent: 0, weeklyPercent: 0 } as safe defaults
+ * (unknown = 0, not hardcoded 50%) when the call fails.
+ *
+ * For sprint-level token estimates, use getSprintUsageEstimate() instead.
+ *
  * @param _config - Resolved config (reserved for future use)
- * @returns Current usage metrics with percentage values
+ * @returns Current usage metrics; fiveHourPercent/weeklyPercent are 0 when unknown
  */
 export function checkUsage(_config: ResolvedConfig): UsageMetrics {
-  const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now() };
+  // SAFE_DEFAULT: unknown usage = 0 (not a hardcoded estimate)
+  const SAFE_DEFAULT: UsageMetrics = { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() };
   try {
     const result = spawnSync('claude', ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000, shell: process.platform === 'win32' });
     if (result.status !== 0 || !result.stdout) return SAFE_DEFAULT;

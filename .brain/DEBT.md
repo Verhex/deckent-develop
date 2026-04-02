@@ -12,3 +12,5 @@
 | debt-080-003 | Tech debt from 080-003: Added all 13 new parameters across 6 MCP tools: A) decke | 080-003 | sprint-080 | NORMAL | 0 | true | sprint-080 | 2026-04-02T04:43:01.412Z |
 | debt-080-004 | Tech debt from 080-004: CLI set-directives komutu eklendi. Üç giriş modu: --cont | 080-004 | sprint-080 | NORMAL | 0 | true | sprint-080 | 2026-04-02T04:43:06.409Z |
 | debt-080-005 | Tech debt from 080-005: A) deckent_agent_list MCP tool created (agent-list.ts): | 080-005 | sprint-080 | NORMAL | 0 | true | sprint-080 | 2026-04-02T04:43:10.359Z |
+| debt-081-001 | Tech debt from 081-001: A) usage-manager.ts: SAFE_DEFAULT changed to { fiveHourP | 081-001 | sprint-081 | NORMAL | 0 | true | sprint-081 | 2026-04-02T07:28:48.159Z |
+| debt-081-003 | Tech debt from 081-003: it.skip kaldırıldı. mockPrompts sırası language-first ak | 081-003 | sprint-081 | NORMAL | 0 | true | sprint-081 | 2026-04-02T07:28:56.093Z |

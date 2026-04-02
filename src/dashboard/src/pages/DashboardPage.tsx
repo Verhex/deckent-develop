@@ -261,42 +261,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Usage Card */}
-      {state?.usage && (
-        <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50" data-testid="usage-card">
-          <CardHeader>
-            <CardTitle className="text-zinc-100">{t("dashboard.usage")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-zinc-400">{t("dashboard.usage_5hr")}</span>
-                <span className="text-zinc-100">{state.usage.fiveHourPercent}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-zinc-700">
-                <div
-                  className="h-2 rounded-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${Math.min(100, state.usage.fiveHourPercent)}%` }}
-                  data-testid="usage-5hr-bar"
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-zinc-400">{t("dashboard.usage_weekly")}</span>
-                <span className="text-zinc-100">{state.usage.weeklyPercent}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-zinc-700">
-                <div
-                  className="h-2 rounded-full bg-green-500 transition-all duration-300"
-                  style={{ width: `${Math.min(100, state.usage.weeklyPercent)}%` }}
-                  data-testid="usage-weekly-bar"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Usage Card removed — no real token tracking available via Claude CLI */}
 
       {/* Progress Section */}
       {total > 0 && (

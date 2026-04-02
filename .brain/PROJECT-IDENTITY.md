@@ -21,17 +21,17 @@
 - **agents/** (16 modules): Worker execution, prompt engineering
 - **providers/** (5 modules): Claude, Codex, Gemini adapters
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
-- **mcp/**: MCP server — 17 tools + 9 resources, stdio transport
-- **cli/** (32 commands): Full CLI with helpers, entry point
-- **dashboard/**: React + Vite + Tailwind (6 pages, SSE indicator, language switcher)
+- **mcp/**: MCP server — 19 tools + 9 resources, stdio transport
+- **cli/** (33 commands): Full CLI with helpers, entry point
+- **dashboard/**: React + Vite + Tailwind (4 pages, SSE indicator, language switcher)
   - i18n/LanguageProvider.tsx, i18n/en.ts, i18n/tr.ts (Sprint 079)
 
 ## Current State
 - Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-080
-- Total Sprints: 80
-- Completed Tasks: 205
+- Last Sprint: sprint-081
+- Total Sprints: 81
+- Completed Tasks: 209
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -66,7 +66,7 @@
 - core/provider.ts → ProviderAdapter interface, multi-provider registry
 - agents/worker.ts → task claim, file locking, heartbeat, verify loop
 - cli/entry.ts → buildProgram() + 33+ commands
-- mcp/index.ts → 17 tools + 9 resources (Sprint 080)
+- mcp/index.ts → 19 tools + 9 resources (Sprint 086)
 - api/server.ts → HTTP API + SSE (17 endpoints: GET /api/status, /api/tasks, etc.)
 
 ## Sprint 067 Learnings
@@ -82,7 +82,7 @@
 - goNogo criteria: extracted from DIRECTIVES Kanıt/Proof lines
 
 ## Sprint 078-080 Achievements (Documentation & Dashboard)
-- Sprint 078: Blueprint/ANA-PLAN senkronizasyonu, memory budget 600→900, MCP 16→17 tools
+- Sprint 078: Blueprint/ANA-PLAN senkronizasyonu, memory budget 600→900, MCP 17→19 tools
 - Sprint 079: Dashboard i18n (LanguageProvider, 90+ TR/EN keys), /api/tasks endpoint, README-TR.md, VISION-EN.md
 - Sprint 080: SSE connection indicator (connected/connecting/disconnected), ConfigPage improvements, 6-page dashboard with language switcher
 - New modules: i18n/LanguageProvider.tsx, i18n/en.ts, i18n/tr.ts

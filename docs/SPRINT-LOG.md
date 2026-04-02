@@ -2246,3 +2246,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 080-006: ADR-022 Parity Dokümantasyonu (DONE)
 
 ---
+## Sprint 81 — sprint-081
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-02
+**Duration:** 698s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 49.0% |
+| Duration | 697974ms |
+
+### Tasks
+
+- 081-001: Usage Manager — Gerçekçi Tahmin + Dashboard Düzeltme (GO_WITH_TECH_DEBT)
+- 081-002: Package Version Bump + CHANGELOG (DONE)
+- 081-003: Init Test Mock Düzeltme (GO_WITH_TECH_DEBT)
+- 081-004: AGENTS.md + Kalan Docs Tutarlılık (DONE)
+
+---

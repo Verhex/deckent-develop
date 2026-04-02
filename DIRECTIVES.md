@@ -1,157 +1,100 @@
-# DIRECTIVES — Sprint 085: MCP/CLI Parity — Parametre Eşitleme + Eksik Komutlar
+# DIRECTIVES — Sprint 086: Usage Düzeltme + Version Bump + Test/Docs Cleanup
 
-## Goal: ADR-022 uyumu: MCP tool parametrelerini CLI ile eşitle, eksik CLI/MCP komutlarını ekle. Altyapı komutları (attach, web, serve) CLI-only olarak belgelenir.
-
----
-
-## Task 1: MCP Tool Parametre Zenginleştirme — init, start, status, doctor
-- Model: sonnet
-- Effort: high
-- Agent: api-builder
-- Skills: typescript-expert
-- Files: src/mcp/tools/init.ts, src/mcp/tools/start.ts, src/mcp/tools/status.ts, src/mcp/tools/doctor.ts, src/mcp/tools/retro.ts, src/mcp/tools/history.ts
-- Scope: src/mcp/
-
-### Description
-CLI'daki parametreleri MCP tool'larına ekle:
-
-A) `deckent_init` — şu an 0 parametre, CLI'da 9 var. Ekle:
-- `mode?: string` — plan tier (performance/balanced/economic/api)
-- `language?: string` — dil (en/tr)
-- `projectName?: string` — proje adı
-- `force?: boolean` — mevcut yapıyı yeniden oluştur
-- `auto?: boolean` — otomatik algılama modu (wizard atlama)
-
-B) `deckent_start` — şu an sadece `autoApprove`. Ekle:
-- `dryRun?: boolean` — plan göster, spawn etme
-- `force?: boolean` — pre-flight atla
-- `timeout?: number` — sprint max süresi (ms)
-- `sandbox?: boolean` — sandbox modunda çalıştır
-
-C) `deckent_status` — şu an 0 parametre. Ekle:
-- `json?: boolean` — ham JSON çıktı
-- `verbose?: boolean` — detaylı çıktı
-
-D) `deckent_doctor` — şu an 0 parametre. Ekle:
-- `profile?: boolean` — sistem profili göster
-- `json?: boolean` — ham JSON çıktı
-
-E) `deckent_retro` — 0 parametre. Ekle:
-- `sprintId?: string` — belirli sprint'in retrosunu oku
-
-F) `deckent_history` — 0 parametre. Ekle:
-- `last?: number` — son N sprint
-- `json?: boolean` — ham JSON çıktı
-
-Her parametreyi Zod schema'sına ekle ve handler'da kullan. Parametreler opsiyonel — mevcut davranış bozulmamalı.
-
-**Kanıt:** `grep "force\|dryRun\|json\|verbose\|profile" src/mcp/tools/init.ts src/mcp/tools/start.ts src/mcp/tools/status.ts src/mcp/tools/doctor.ts` → parametreler tanımlı
-
-**Test:** `tsc --noEmit` temiz. Mevcut MCP testlerinde 0 regresyon.
+## Goal: Usage dashboard'u gerçekçi hale getir, version bump, kalan test/docs borçlarını temizle. CI yeşil kalmalı.
 
 ---
 
-## Task 2: CLI set-directives Komutu
+## Task 1: Usage Manager — Gerçekçi Tahmin + Dashboard Düzeltme
 - Model: sonnet
 - Effort: normal
-- Agent: api-builder
+- Agent: bug-fixer
 - Skills: typescript-expert
-- Files: src/cli/commands/set-directives.ts, src/cli/index.ts
-- Scope: src/cli/
+- Files: src/orchestra/usage-manager.ts, src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
+- Scope: src/orchestra/, src/dashboard/
 
 ### Description
-MCP'de `deckent_set_directives` var ama CLI'da yok. CLI komutu ekle:
+Usage tracking şu an `claude -p '/usage'` çağırıyor ama bu komut çalışmıyor ("Unknown skill: usage"). Düzelt:
 
-A) `src/cli/commands/set-directives.ts` oluştur:
-```bash
-deckent set-directives --content "# DIRECTIVES — Sprint 086\n..."
-deckent set-directives --file directives-draft.md
-deckent set-directives  # stdin'den oku (pipe desteği)
-```
+A) `usage-manager.ts` — `checkUsage()` fonksiyonunu güncelle:
+- `claude -p '/usage'` çağrısını kaldır (çalışmıyor)
+- Yerine sprint-bazlı usage tahmini koy:
+  - Sprint sırasında kaç task çalıştı, kaç worker spawn edildi
+  - Tahmini token kullanımı: Brain planlama ~2000, worker task ~5000, auditor scan ~500, eval ~1000, retro ~2000
+  - Bu tahminleri `.deckent/usage/` dizinine sprint bazlı kaydet
+- `SAFE_DEFAULT` değerini `{ fiveHourPercent: 0, weeklyPercent: 0 }` yap (bilinmeyen = 0, sabit 50% değil)
+- Yeni fonksiyon: `getSprintUsageEstimate(sprintId): { estimatedTokens, estimatedCost, taskCount }`
 
-B) Parametreler:
-- `--content <string>` — doğrudan içerik
-- `--file <path>` — dosyadan oku
-- Parametre yoksa stdin'den oku (pipe: `cat draft.md | deckent set-directives`)
+B) Dashboard usage card'ını güncelle:
+- "5hr Usage" / "Weekly Usage" yerine "Sprint Token Tahmini" / "Toplam Maliyet Tahmini" göster
+- Eğer gerçek kullanım verisi yoksa "Tahmini gösteriliyor" notu ekle
+- Yeni i18n key'leri: `dashboard.usage_estimated`, `dashboard.usage_tokens`, `dashboard.usage_cost`, `dashboard.usage_note`
 
-C) İçeriği DIRECTIVES.md'ye yaz (mevcut MCP tool ile aynı mantık)
+C) Dokümantasyon notu: Usage tracking şu an tahmini — Claude CLI programatik usage API'si mevcut değil.
 
-D) Başarı mesajı: "DIRECTIVES.md updated ({N} task blocks detected)"
+**Kanıt:** `grep "SAFE_DEFAULT\|fiveHourPercent: 0" src/orchestra/usage-manager.ts` → sabit 50% kaldırılmış
 
-E) `src/cli/index.ts`'e (veya `commands/index.ts`'e) komutu register et
-
-F) messages.ts'e çift dilli mesajlar ekle
-
-**Kanıt:** `grep "set-directives\|setDirectives" src/cli/commands/set-directives.ts` → komut var
-
-**Test:** `tsc --noEmit` temiz.
+**Test:** `tsc --noEmit` temiz. Mevcut usage testlerinde 0 regresyon.
 
 ---
 
-## Task 3: MCP agent_list + skill_list Tool'ları
-- Model: sonnet
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert
-- Files: src/mcp/tools/agent-list.ts, src/mcp/tools/skill-list.ts, src/mcp/tools/index.ts
-- Scope: src/mcp/
-
-### Description
-CLI'da `deckent agent list` ve `deckent skill list` var ama MCP'de yok. Ekle:
-
-A) `deckent_agent_list` MCP tool:
-- Parametre: yok (tümünü listele)
-- Dönüş: agent dizisi — her biri: id, name, type (built-in/temp), uses, successRate
-- `.deckent/agents/` dizininden agent.json dosyalarını oku
-
-B) `deckent_skill_list` MCP tool:
-- Parametre: yok
-- Dönüş: skill dizisi — her biri: id, name, category, triggers
-- `.deckent/skills/` dizininden manifest.json dosyalarını oku
-
-C) `src/mcp/tools/index.ts`'e her iki tool'u register et
-
-D) Tool annotations: readOnlyHint=true, destructiveHint=false
-
-**Kanıt:** `grep "agent_list\|skill_list" src/mcp/tools/index.ts` → register edilmiş
-
-**Test:** `tsc --noEmit` temiz. MCP tool sayısı 17→19.
-
----
-
-## Task 4: ADR-022 Parity Dokümantasyonu
+## Task 2: Package Version Bump + CHANGELOG
 - Model: haiku
 - Effort: low
 - Agent: doc-writer
 - Skills: documentation-writer
-- Files: .brain/DECISIONS.md, DECKENT.md
-- Scope: .brain/, DECKENT.md
+- Files: package.json, src/dashboard/package.json, README.md, BETA-ROADMAP.md, docs/CHANGELOG.md
+- Scope: package.json, src/dashboard/, README.md, BETA-ROADMAP.md, docs/
 
 ### Description
-ADR-022'yi güncelleyerek CLI-only ve MCP-only komutları belgele:
+Version bump:
 
-A) `.brain/DECISIONS.md`'ye ADR-022 güncellemesi:
-```
-## ADR-022: CLI/MCP Feature Parity (Updated Sprint 085)
+A) `package.json` version: `0.2.0-beta.3` → `0.3.0-beta.1`
 
-CLI-only komutlar (altyapı/terminal):
-- attach, spawn, watch — tmux oturum yönetimi
-- dashboard, web, serve — sunucu/UI başlatma
-- upgrade, onboard — kurulum sihirbazları
-- plugin install/list/create — eklenti yönetimi
+B) README.md badge: version badge → `v0.3.0-beta.1`
 
-MCP-only komutlar:
-- (yok — tüm MCP tool'ların CLI karşılığı var)
+C) BETA-ROADMAP.md: tamamlanan sprintler tablosundaki version güncellemesi
 
-Tam parity (19 MCP tool = 19 CLI komutu):
-init, set-directives, plan, start, status, doctor, retro, history,
-analyze, sync, config, usage, review, run, kill, cleanup, help,
-agent-list (yeni), skill-list (yeni)
-```
+D) docs/CHANGELOG.md: Yeni `[0.3.0-beta.1]` entry — Sprint 078-086 tüm değişiklikler (Dashboard overhaul, i18n, MCP/CLI parity, usage fix)
 
-B) DECKENT.md'deki MCP tool sayısını 17→19 güncelle
+**Kanıt:** `grep "0.3.0-beta.1" package.json README.md` → güncel
 
-**Kanıt:** `grep "ADR-022\|19 tools" .brain/DECISIONS.md DECKENT.md` → güncel
+**Test:** Bu task test gerektirmez.
+
+---
+
+## Task 3: Init Test Mock Düzeltme
+- Model: sonnet
+- Effort: normal
+- Agent: test-writer
+- Skills: typescript-expert, testing-expert
+- Files: tests/integration/lifecycle.test.ts
+- Scope: tests/
+
+### Description
+Skipped test'i düzelt — init language-first akışına uygun mock sırası.
+
+it.skip kaldır, mockPrompts sırasını language-first olarak düzelt. Config'de mode ve language doğru yazılmalı.
+
+**Kanıt:** `grep "it.skip" tests/integration/lifecycle.test.ts` → 0
+
+**Test:** Skip kaldırılmış test geçmeli.
+
+---
+
+## Task 4: AGENTS.md + Kalan Docs Tutarlılık
+- Model: haiku
+- Effort: low
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: AGENTS.md, .brain/PROJECT-IDENTITY.md
+- Scope: AGENTS.md, .brain/
+
+### Description
+A) AGENTS.md: MCP tool sayısı 19, resource 9 olmalı
+B) PROJECT-IDENTITY.md: Test 12,192+, sprint 80+, MCP 19 tools, CLI 33, Dashboard 4 sayfa
+C) Kalan docs'ta eski "17 tools" referanslarını düzelt (tarihsel olanlar hariç)
+
+**Kanıt:** `grep "19 tools" AGENTS.md .brain/PROJECT-IDENTITY.md` → güncel
 
 **Test:** Bu task test gerektirmez.
 
@@ -159,8 +102,6 @@ B) DECKENT.md'deki MCP tool sayısını 17→19 güncelle
 
 ## Quality Rules
 - tsc --noEmit MUST pass
-- Mevcut MCP/CLI testlerinde 0 regresyon
-- Yeni parametreler opsiyonel — mevcut davranış bozulmamalı
-- MCP tool sayısı: 17→19
-- CLI komut sayısı: 32→33 (set-directives eklendi)
+- npx vitest run → 0 fail
+- Skip kalan test 0
 - %100 GO hedefli

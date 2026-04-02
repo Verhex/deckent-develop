@@ -104,8 +104,8 @@ describe('usage-manager', () => {
       });
 
       const result = checkUsage(makeConfig());
-      expect(result.fiveHourPercent).toBe(50);
-      expect(result.weeklyPercent).toBe(30);
+      expect(result.fiveHourPercent).toBe(0);
+      expect(result.weeklyPercent).toBe(0);
       expect(result.measuredAt).toBeTruthy();
     });
 
@@ -120,8 +120,8 @@ describe('usage-manager', () => {
       });
 
       const result = checkUsage(makeConfig());
-      expect(result.fiveHourPercent).toBe(50);
-      expect(result.weeklyPercent).toBe(30);
+      expect(result.fiveHourPercent).toBe(0);
+      expect(result.weeklyPercent).toBe(0);
     });
 
     it('parses 5hr and weekly percentages from CLI output', () => {
@@ -145,8 +145,8 @@ describe('usage-manager', () => {
       });
 
       const result = checkUsage(makeConfig());
-      expect(result.fiveHourPercent).toBe(50);
-      expect(result.weeklyPercent).toBe(30);
+      expect(result.fiveHourPercent).toBe(0);
+      expect(result.weeklyPercent).toBe(0);
     });
 
     it('handles alternative output format (percentage before label)', () => {

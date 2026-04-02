@@ -160,7 +160,7 @@
 - [x] P1-7: Plan tier'ları → performance/balanced/economic + backward compat
 - [x] P1-8: Init wizard → genel provider seçimi, $ kaldırıldı
 - [x] P1-9: MODEL_API_IDS mapping + resolveApiModelId()
-- [x] P2-13: README.md → 12,160+ test, 71+ sprint, Windows full, 17 MCP tools
+- [x] P2-13: README.md → 12,192+ test, 86+ sprint, Windows full, 19 MCP tools
 - [x] P5-31: sprint-controller.ts → 7 phase fonksiyonu sprint-phases.ts'ye extract
 
 **Sprint 073 — TAMAMLANDI (2026-03-30) — Self Dogfooding:**
@@ -171,7 +171,7 @@
 - [x] P2-13: README.md sayılar güncellendi (12,176+ test, 73+ sprint)
 - [x] P2-16: CHANGELOG + SPRINT-LOG Sprint 072-073 entry'leri
 - [x] .brain/ tutarlılık (PROJECT-IDENTITY, DECISIONS)
-- [x] CLAUDE.md + DECKENT.md modül sayıları düzeltildi (orchestra 45, core 49, MCP 17)
+- [x] CLAUDE.md + DECKENT.md modül sayıları düzeltildi (orchestra 47, core 49, MCP 19)
 - [x] debt-069-005 (TempAgent) + debt-069-006 (scope parser) kapandı
 - [x] doc-writer agent 5/5 + bug-fixer 2/2, 7m 29s
 
@@ -194,7 +194,7 @@
 - [x] CLAUDE.md + DECKENT.md modül sayıları güncellendi
 
 **Sprint 078 (Deckent sprint-076) — TAMAMLANDI (2026-04-01):**
-- [x] Blueprint senkronizasyonu — MCP 17 tools/9 resources, memory 900, CLI 32
+- [x] Blueprint senkronizasyonu — MCP 19 tools/9 resources, memory 900, CLI 33
 - [x] ANA-PLAN-TR tam güncelleme
 - [x] BETA-ROADMAP Sprint 076-077 DONE
 - [x] Memory budget 600→900 tüm docs'ta
@@ -251,4 +251,10 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | 078 | 10/10 | 10 | Blueprint sync, i18n, TR/EN docs, /api/tasks, SSE indicator, docs catch-up |
 | 079 | 4/4 | 4 | README-TR fix, dashboard kontrol, init dil-ilk, /api/cleanup |
 | 080 | 14/14 | 14 | Dashboard overhaul, config birleşme, MCP/CLI parity (19 tool), ADR-022 |
-| **Toplam** | **97/97** | **97** | 12,190+ test, 0 regression, v0.2.0-beta.4 |
+| 081 | 4/4 | 4 | Usage manager fix, version bump, init test, docs cleanup |
+| 082 | 4/4 | 4 | Health-check test tarih, usage i18n, ADR-024 docs |
+| 083 | 3/3 | 3 | Config default branch, Git history fix |
+| 084 | 3/3 | 3 | Skill.md template, Agent.md template |
+| 085 | 4/4 | 4 | MCP/CLI parity, set-directives CLI, ADR-022 |
+| 086 | 4/4 | 4 | Usage düzeltme, version bump, test/docs cleanup |
+| **Toplam** | **131/131** | **131** | 12,190+ test, 0 regression, v0.3.0-beta.1 |

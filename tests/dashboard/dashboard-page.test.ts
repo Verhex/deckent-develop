@@ -227,32 +227,8 @@ describe("dashboard page — ConfigPage.tsx", () => {
   });
 });
 
-describe("dashboard page — DashboardPage.tsx usage metrics", () => {
-  const filePath = join(DASHBOARD_DIR, "src/pages/DashboardPage.tsx");
-
-  it("renders usage card with fiveHourPercent", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("fiveHourPercent");
-    expect(content).toContain("dashboard.usage_5hr");
-  });
-
-  it("renders usage card with weeklyPercent", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("weeklyPercent");
-    expect(content).toContain("dashboard.usage_weekly");
-  });
-
-  it("has usage progress bars", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("usage-5hr-bar");
-    expect(content).toContain("usage-weekly-bar");
-  });
-
-  it("has usage card with data-testid", () => {
-    const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("usage-card");
-  });
-});
+// Usage card removed — no real token tracking available via Claude CLI
+// Tests removed in Sprint 086
 
 describe("dashboard page — UI components", () => {
   it("badge.tsx exists with variants", () => {

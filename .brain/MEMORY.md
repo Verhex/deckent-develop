@@ -204,3 +204,6 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - MCP Tool Parametre Zenginleştirme — init, start, status, doctor: GO_WITH_TECH_DEBT — Added all 13 new parameters across 6 MCP tools: A) deckent_init: force (overwrite existing files), auto (stack auto-dete
 - CLI set-directives Komutu: GO_WITH_TECH_DEBT — CLI set-directives komutu eklendi. Üç giriş modu: --content (doğrudan içerik), --file (dosyadan oku), stdin (pipe desteğ
 - MCP agent_list + skill_list Tool'ları: GO_WITH_TECH_DEBT — A) deckent_agent_list MCP tool created (agent-list.ts): reads .deckent/agents/*/agent.json, returns id/name/type(built-i
+## Sprint sprint-081 Learnings
+- Usage Manager — Gerçekçi Tahmin + Dashboard Düzeltme: GO_WITH_TECH_DEBT — A) usage-manager.ts: SAFE_DEFAULT changed to { fiveHourPercent: 0, weeklyPercent: 0 } as required. Added getSprintUsageE
+- Init Test Mock Düzeltme: GO_WITH_TECH_DEBT — it.skip kaldırıldı. mockPrompts sırası language-first akışa güncellendi: ['3','2','my-app'] (eski: mode→language) → ['2'

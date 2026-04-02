@@ -6,11 +6,11 @@ Test: vitest
 Build: tsc
 Runtime: Node.js >=18
 Platform: macOS, Linux, WSL2
-Tests: 11,918+
+Tests: 12,192+
 Coverage: 96%+
-Sprints: 67+
+Sprints: 80+
 CLI Commands: 33+
-MCP: 16 tools, 9 resources
+MCP: 19 tools, 9 resources
 Agents: 9 built-in
 Skills: 11 built-in
 Providers: Claude, Codex, Gemini
