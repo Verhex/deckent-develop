@@ -1,143 +1,144 @@
-# DIRECTIVES — Sprint 084: Dashboard Fix + Canlı İzleme Testi
+# DIRECTIVES — Sprint 087: Stabilizasyon + Otonom Adaptasyon
 
-## Goal: Dashboard sorunlarını düzelt, canlı sprint izleme deneyimini test edilebilir hale getir. Kullanıcı geri bildirimine dayalı UX fix'leri.
-
----
-
-## Task 1: AgentDetail Penceresi — Okunabilirlik ve Boyut Fix
-- Model: sonnet
-- Effort: normal
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/AgentDetail.tsx
-- Scope: src/dashboard/
-
-### Description
-AgentDetail sağ panel penceresi dar ve okunaklı değil. Düzelt:
-
-A) DashboardPage.tsx'te Sheet bileşeninin genişliğini artır:
-- Mevcut: muhtemelen `w-[400px]` veya default
-- Yeni: `w-[600px] sm:w-[700px]` — geniş panel
-
-B) AgentDetail.tsx font boyutlarını artır:
-- Task başlığı: `text-base` → `text-lg font-bold`
-- Badge'ler: `text-xs` → `text-sm`
-- Agent/skill satırları: `text-xs` → `text-sm`
-- Log bölümü: `h-[220px]` → `h-[350px]` veya `flex-1` ile tüm kalan alanı kapla
-- Description: `text-xs` → `text-sm`
-
-C) Log bölümünde scrollbar görünür olsun (ScrollArea yerine overflow-auto ile)
-
-D) Karakter encoding: Türkçe karakterler log'da düzgün görünmüyorsa `whitespace-pre-wrap` + `break-words` ekle
-
-**Kanıt:** `grep "w-\[600\|text-lg\|h-\[350" src/dashboard/src/components/AgentDetail.tsx` → güncel boyutlar
-
-**Test:** `tsc --noEmit` temiz.
+## Goal: Tech debt temizligi (kalan catch bloklari, eksik entegrasyonlar) + Adaptive thresholds + Mid-sprint reroute guclendirme. Perfect beta icin saglam temel + sistem kendini ayarlamaya baslasin.
 
 ---
 
-## Task 2: i18n Kalan Hardcoded String'ler — Tam Kapsam
+## Task 1: Kalan Sessiz Catch Bloklari — Son Dalga
 - Model: sonnet
 - Effort: high
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/pages/ConfigPage.tsx, src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/components/SprintPhaseTimeline.tsx, src/dashboard/src/components/ActivityFeed.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: src/dashboard/
+- Agent: bug-fixer
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-phases.ts, src/orchestra/result-collector.ts
+- Scope: src/orchestra/
 
 ### Description
-Dashboard'daki TÜM kalan hardcoded string'leri tara ve i18n'e taşı:
+Sprint 085-086'da 29/49 catch blogu debugLog'a donusturuldu. Kalan ~20 tanesini de tamamla.
 
-A) ConfigPage.tsx — CATEGORIES dizisindeki kategori isimleri i18n'e:
-- "Provider" → t('config.category.provider') (zaten key var mı kontrol et)
-- "Sprint", "Memory", "Auditor", "Output" vb. hepsi
+A) sprint-controller.ts'deki kalan sessiz catch bloklarini bul:
+- `grep -n "catch" src/orchestra/sprint-controller.ts` ile hepsini listele
+- Henuz `debugLog` cagirilmayan catch bloklarini tespit et
+- Her birini `catch (e) { debugLog('sprint-controller', 'fonksiyonAdi', e); }` formatina donustur
 
-B) ConfigPage.tsx — Doctor bölümündeki string'ler:
-- "All required checks passed" → t('settings.all_passed')
-- "Some required checks failed" → t('settings.some_failed')
-- "(required)" → t('settings.required')
+B) sprint-phases.ts'deki sessiz catch bloklarini da tara ve duzelt (varsa)
 
-C) NewSprintModal — tüm adım başlıkları ve butonlar:
-- "Set Directives", "Plan Sprint", "Review", "Start Sprint" → i18n key
+C) result-collector.ts'deki sessiz catch bloklarini da tara ve duzelt (varsa)
 
-D) SprintPhaseTimeline — faz isimleri zaten EN teknik terimler, kalabilir
+D) Hedef: `grep -c "catch {" src/orchestra/sprint-controller.ts` → 0 (hicbir bos catch kalmamali)
 
-E) ActivityFeed — event mesajları (spawned, done, nogo, alert) i18n kontrol
+**Kanit:** `grep -c "debugLog" src/orchestra/sprint-controller.ts` → 40+ (onceki 29 + yeni ~15)
 
-F) WorkerCard — "Agent:", "Skill:", "files", "Detail" → i18n kontrol
-
-G) EN→TR geçişinde SAYFA YENİLEMEDEN tüm metinler değişmeli. `useTranslation()` context re-render'ı doğrula.
-
-**Kanıt:** Dashboard kaynak dosyalarında İngilizce hardcoded string minimal (teknik terimler hariç)
-
-**Test:** `tsc --noEmit` temiz.
+**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
 
 ---
 
-## Task 3: Dashboard Canlı Veri Akışı Doğrulama
+## Task 2: Tech Debt Kapatma — Eksik Entegrasyonlar
 - Model: sonnet
 - Effort: normal
-- Agent: test-writer
-- Skills: typescript-expert, testing-expert
-- Files: tests/dashboard/live-data.test.ts
-- Scope: tests/dashboard/
+- Agent: bug-fixer
+- Skills: typescript-expert
+- Files: src/orchestra/task-router.ts, src/orchestra/sprint-controller.ts, src/orchestra/planner.ts
+- Scope: src/orchestra/
 
 ### Description
-Dashboard'un SSE canlı veri akışını doğrulayan testler:
+Sprint 085-086'dan kalan 3 tech debt'i kapat:
 
-A) SSE hook testi:
-- useSSE bağlandığında `connected` status dönmeli
-- SSE mesajı geldiğinde DashboardState parse edilmeli
-- Bağlantı koptuğunda `disconnected` status + 3s reconnect
+A) task-router.ts: routeTaskV2() cagrisina sprintId/taskId/projectRoot parametreleri gecir:
+- `routeTask()` fonksiyonundaki routeTaskV2() cagrisini bul
+- `options` parametresine `sprintId`, `taskId`, `projectRoot` ekle
+- Boylece task-router uzerinden yapilan routing kararlari da decision trail'e yazilacak
 
-B) WorkerCard render testi:
-- agents dizisi geldiğinde kart sayısı = agent sayısı
-- EXECUTING agent'ta pulse animasyon class'ı var mı
-- DONE agent'ta yeşil border var mı
+B) planner.ts: planSprint() icinden getWorstCombinations() cagir ve callBrainPlanner()'a gecir:
+- planSprint() veya callBrainPlanner() cagrilmadan once OutcomeTracker'dan `getWorstCombinations(5)` al
+- `callBrainPlanner()` cagrisina `worstCombinations` parametresi olarak gecir
+- Boylece AI planner gercekten gecmis basarisizliklari gorecek
 
-C) ActivityFeed testi:
-- Yeni SSE verisi geldiğinde feed'e entry eklenmeli
-- Max 50 entry sınırı çalışmalı
+C) Her iki degisikligin de mevcut testleri bozmadigini dogrula.
 
-D) SprintPhaseTimeline testi:
-- EXECUTE fazında doğru daire mavi pulse olmalı
+**Kanit:** `grep "worstCombinations\|getWorstCombinations" src/orchestra/planner.ts` → 3+, `grep "sprintId\|projectRoot" src/orchestra/task-router.ts` → 2+
 
-**Kanıt:** `ls tests/dashboard/live-data.test.ts` → dosya var
-
-**Test:** `npm run test:dashboard` → yeni testler geçmeli.
+**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
 
 ---
 
-## Task 4: Dashboard Build Otomasyonu
-- Model: haiku
-- Effort: low
+## Task 3: Adaptive Thresholds — NO_GO Rate Bazli Otomatik Ayar
+- Model: sonnet
+- Effort: normal
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: package.json
-- Scope: package.json
+- Files: src/orchestra/sprint-controller.ts, src/core/config-types.ts, src/core/config.ts
+- Scope: src/orchestra/, src/core/
 
 ### Description
-Dashboard build'i her `tsc` sonrası otomatik çalışsın:
+Sprint NO_GO orani yuksekse, routing parametrelerini otomatik ayarla.
 
-A) package.json'a script ekle:
-```json
-"build:dashboard": "cd src/dashboard && npx vite build --outDir ../../dist/dashboard",
-"build:all": "tsc && npm run build:dashboard",
-"postbuild": "npm run build:dashboard"
-```
+A) config-types.ts'e yeni field'lar ekle:
+- `DeckentConfig.adaptive_thresholds?: boolean` (varsayilan false)
+- `DeckentConfig.agent_min_score?: number` (varsayilan 5)
+- `ResolvedConfig.adaptive_thresholds: boolean` (varsayilan false)
+- `ResolvedConfig.agent_min_score: number` (varsayilan 5)
 
-B) Böylece `npm run build:all` ile hem TypeScript hem dashboard build edilir.
+B) config.ts'de defaults'a ekle:
+- `adaptive_thresholds: false`
+- `agent_min_score: 5`
 
-**Kanıt:** `grep "build:dashboard\|build:all" package.json` → script var
+C) sprint-controller.ts'de finalizeSprint() icinde adaptive logic ekle:
+- `if (config.adaptive_thresholds)` kontrolu
+- Son 3 sprintin NO_GO rate'ini hesapla (sprint log dosyalarindan)
+- NO_GO rate > %30 → agent_min_score'u 1 dusur (min 2)
+- NO_GO rate < %10 → agent_min_score'u 1 artir (max 8)
+- Guncellenmis degeri config.json'a yaz
+- RETRO.md'ye: `- Adaptive: agent_min_score X → Y (NO_GO rate: %Z)`
 
-**Test:** `npm run build:all` başarılı çalışmalı.
+D) routing-engine.ts'de agentMinScore'u config'den oku (hardcoded 5 yerine)
+
+**Kanit:** `grep "adaptive_thresholds\|agent_min_score" src/core/config-types.ts` → 4+
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
+
+---
+
+## Task 4: Mid-Sprint Reroute Guclendirme — Max 1 → 3
+- Model: sonnet
+- Effort: normal
+- Agent: refactorer
+- Skills: typescript-expert
+- Files: src/orchestra/mid-sprint-adapter.ts, src/core/config-types.ts, src/core/config.ts
+- Scope: src/orchestra/, src/core/
+
+### Description
+Mid-sprint reroute deneme sayisini 1'den 3'e cikar ve configurable yap.
+
+A) config-types.ts'e yeni field ekle:
+- `DeckentConfig.max_reroutes?: number` (varsayilan 3)
+- `ResolvedConfig.max_reroutes: number` (varsayilan 3)
+
+B) config.ts'de defaults'a ekle:
+- `max_reroutes: 3`
+
+C) mid-sprint-adapter.ts'de hardcoded max reroute limitini config'den oku:
+- Mevcut `MAX_REROUTES = 1` (veya benzer sabit) → `config.max_reroutes ?? 3`
+- Constructor'a config parametresi ekle veya mevcut yapiyi kullan
+- Her reroute denemesinde farkli agent/skill exclude et (mevcut mantik zaten bunu yapiyor)
+- 3. denemede tum alternatifler tukenirse generic fallback
+
+D) GO_WITH_TECH_DEBT sonucunda da reroute secenek olarak ekle:
+- Mevcut: sadece NO_GO → reroute
+- Yeni: GO_WITH_TECH_DEBT && reroute_on_tech_debt config flag'i true ise → reroute dene
+- `DeckentConfig.reroute_on_tech_debt?: boolean` (varsayilan false)
+
+**Kanit:** `grep "max_reroutes\|MAX_REROUTE" src/orchestra/mid-sprint-adapter.ts` → config'den okunuyor
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
-- npm run test:dashboard → 372+ passed + yeni testler
 - npx vitest run → 0 fail
-- Dashboard TR seçilince TÜM etiketler Türkçe (teknik terimler hariç)
-- Dashboard EN seçilince TÜM etiketler İngilizce
-- AgentDetail penceresi geniş ve okunaklı
+- Hicbir bos catch blogu kalmamali (grep "catch {" → 0 veya minimal)
+- Decision trail task-router uzerinden de aktif
+- AI planner gecmis bilgisini prompt'ta goruyor
+- adaptive_thresholds config'de gorunuyor
+- max_reroutes config'de gorunuyor
 - %100 GO hedefli

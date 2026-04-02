@@ -37,6 +37,12 @@ export interface RoutingOptions {
   config?: Partial<RoutingEngineConfig>;
   /** Task effort level for dynamic skill token budget calculation */
   effort?: 'low' | 'normal' | 'high';
+  /** Sprint ID for decision trail persistence */
+  sprintId?: string;
+  /** Task ID for decision trail persistence */
+  taskId?: string;
+  /** Project root for decision trail persistence */
+  projectRoot?: string;
 }
 
 interface ScoredCandidate {

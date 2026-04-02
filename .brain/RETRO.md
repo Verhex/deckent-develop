@@ -1,29 +1,25 @@
-# Sprint sprint-086 Retrospective
+# Sprint sprint-087 Retrospective
 
 ## Summary
-Completed 4/4 tasks in 25 minutes 4s.
+Completed 0/0 tasks in 31 minutes 45s.
 
 ## Highlights
-- 4 tasks completed on first try
+- 1 task completed on first try
 - No boundary violations detected
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 4/4 |
-| Code changes | +172 / -21 |
-| Sprint time | 25 minutes 4s |
-| NO_GO rate | 0% (0/4) |
-| Coverage | 48.0% |
+| Tasks completed | 0/0 |
+| Code changes | +28 / -4 |
+| Sprint time | 31 minutes 45s |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| refactorer | 3 | 2 | 1 | 0 | 64% |
-| bug-fixer | 1 | 0 | 1 | 0 | 0% |
+| bug-fixer | 2 | 0 | 0 | 0 | 0% |
+| refactorer | 2 | 0 | 0 | 0 | 0% |
 
 ## Learnings
-- Tech Debt Kapatma — routeTaskV2 Cagri Yerleri + Kalan Catch Bloklari: completed with tech debt — A) routeTaskV2 calls updated with sprintId/taskId/projectRoot: sprint-controller.ts planSprint routing-v2 block now passes { sprintId, taskId: task.id
-- Planner'a Gecmis Bilgisi Enjeksiyonu: completed with tech debt — A) outcome-tracker.ts: getWorstCombinations(limit=5) metodu eklendi. Son 5 sprint outcomes dosyalarını okur, agent+skill kombinasyonlarının başarı ora
-- Recurring pattern (915x): stale_heartbeat
+- Recurring pattern (1041x): stale_heartbeat

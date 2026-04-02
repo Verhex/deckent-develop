@@ -8,6 +8,7 @@ import type { SkillDefinition } from '../core/skill-types.js';
 import type { RoutingDecision, UserOverride, TaskDNA } from '../core/routing-types.js';
 import { routeTaskV2, type RoutingOptions } from '../core/routing-engine.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
+import type { ResolvedConfig } from '../core/config-types.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -26,27 +27,34 @@ export class MidSprintAdapter {
   private readonly outcomeTracker: OutcomeTracker;
   private readonly projectStack: { language: string; framework: string; dependencies: string[] } | null;
   private readonly rerouteAttempts = new Map<string, number>(); // taskId → attempt count
-  private readonly maxReroutesPerTask = 1;
+  private readonly maxReroutesPerTask: number;
+  private readonly rerouteOnTechDebt: boolean;
 
   constructor(
     agentPool: AgentPool,
     skillPool: Map<string, SkillDefinition>,
     outcomeTracker: OutcomeTracker,
     projectStack?: { language: string; framework: string; dependencies: string[] } | null,
+    config?: Pick<ResolvedConfig, 'max_reroutes' | 'reroute_on_tech_debt'>,
   ) {
     this.agentPool = agentPool;
     this.skillPool = skillPool;
     this.outcomeTracker = outcomeTracker;
     this.projectStack = projectStack ?? null;
+    this.maxReroutesPerTask = config?.max_reroutes ?? 3;
+    this.rerouteOnTechDebt = config?.reroute_on_tech_debt ?? false;
   }
 
   /**
    * Check if rerouting is advisable for a failed task.
    */
   shouldReroute(task: Task, result: TaskResult): RerouteResult {
-    // Only reroute NO_GO tasks
-    if (result.selfAssessment !== 'NO_GO') {
-      return { should: false, reason: 'Task did not fail (not NO_GO)' };
+    // Reroute NO_GO tasks, and optionally GO_WITH_TECH_DEBT tasks
+    if (result.selfAssessment === 'GO_WITH_TECH_DEBT' && !this.rerouteOnTechDebt) {
+      return { should: false, reason: 'Task has tech debt but reroute_on_tech_debt is disabled' };
+    }
+    if (result.selfAssessment !== 'NO_GO' && result.selfAssessment !== 'GO_WITH_TECH_DEBT') {
+      return { should: false, reason: 'Task did not fail (not NO_GO or GO_WITH_TECH_DEBT)' };
     }
 
     // Check reroute attempt limit

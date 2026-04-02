@@ -125,7 +125,7 @@ import type { UserOverride, TaskDNA } from '../core/routing-types.js';
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
 import { runDecay } from './debt-manager.js';
-import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance } from './sprint-reporter.js';
+import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance, readPreviousSprintMetrics } from './sprint-reporter.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
@@ -249,7 +249,7 @@ export function interruptActiveSprint(): void {
         parsed['status'] = 'INTERRUPTED';
         writeFileSync(taskPath, JSON.stringify(parsed, null, 2), 'utf-8');
       }
-    } catch { /* skip — non-fatal */ }
+    } catch (e) { debugLog('interruptActiveSprint:markTaskInterrupted', e); }
 
     // Mark heartbeat as ABORTED
     try {
@@ -261,11 +261,11 @@ export function interruptActiveSprint(): void {
         parsed['timestamp'] = new Date().toISOString();
         writeFileSync(hbPath, JSON.stringify(parsed, null, 2), 'utf-8');
       }
-    } catch { /* skip — non-fatal */ }
+    } catch (e) { debugLog('interruptActiveSprint:markHeartbeatAborted', e); }
 
     // Release locks for assigned workers
     if (task.assignedWorker) {
-      try { releaseAllLocks(projectRoot, task.assignedWorker); } catch { /* skip */ }
+      try { releaseAllLocks(projectRoot, task.assignedWorker); } catch (e) { debugLog('interruptActiveSprint:releaseAllLocks', e); }
     }
   }
 
@@ -276,9 +276,9 @@ export function interruptActiveSprint(): void {
       try {
         if (spawnBackend) spawnBackend.kill(taskId);
         else killWorker(taskId);
-      } catch { /* already dead */ }
+      } catch (e) { debugLog('interruptActiveSprint:killWorker', e); }
     }
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('interruptActiveSprint:listWorkers', e); }
 }
 
 // ═══ IPC Channel Registry ══════════════════════════════════════════
@@ -331,7 +331,7 @@ function safeDashboardUpdate(
       alerts: [{ level: AlertLevel.WARNING, message: errorMessage, timestamp: new Date().toISOString() }],
       updatedAt: new Date().toISOString(),
     });
-  } catch { /* dashboard write failed -- continue */ }
+  } catch (e) { debugLog('safeDashboardUpdate:updateDashboard', e); }
 }
 
 // Sprint state constants and persistence functions are in sprint-utils.ts
@@ -412,7 +412,8 @@ export function checkUsage(_config: ResolvedConfig): UsageMetrics {
     // status: 'ok' indicates successful measurement — throttling should apply normally
     const okResult = { fiveHourPercent, weeklyPercent, measuredAt: now(), status: 'ok' as const };
     return okResult;
-  } catch {
+  } catch (e) {
+    debugLog('checkUsage:spawnSync', e);
     return UNKNOWN_DEFAULT;
   }
 }
@@ -544,7 +545,8 @@ export async function planSprint(
         brainAdapter = providerRegistry.getDefault();
         brainProviderName = brainAdapter.name as ProviderName;
       }
-    } catch {
+    } catch (e) {
+      debugLog('planSprint:resolveProvider', e);
       // No providers registered — planner will throw a clear error via resolveAdapter()
     }
 
@@ -557,12 +559,25 @@ export async function planSprint(
       undefined, brainProviderName,
     );
 
+    // Fetch worst agent+skill combinations from OutcomeTracker to inject into planner prompt
+    let worstCombinations: string | undefined;
+    try {
+      const { OutcomeTracker: OT } = await import('./outcome-tracker.js');
+      const ot = new OT(projectRoot);
+      const worst = ot.getWorstCombinations(5);
+      if (worst) worstCombinations = worst;
+    } catch (e) {
+      debugLog('planSprint:worstCombinations', e);
+    }
+
     plannerResult = callBrainPlanner(
       context,
       recommendation,
       brainModel,
       config.projectName,
       brainAdapter,
+      undefined,
+      worstCombinations,
     );
 
     if (plannerResult) {
@@ -690,8 +705,8 @@ export async function planSprint(
           learningData = tracker.calculateBonuses(sampleDNA);
           debugLog('planSprint:learning-bonuses', `Loaded ${learningData.length} learning bonuses from previous sprints`);
         }
-      } catch {
-        debugLog('planSprint:learning-bonuses', 'No learning data available (first sprint or missing learnings.json)');
+      } catch (e) {
+        debugLog('planSprint:learning-bonuses:No learning data available (first sprint or missing learnings.json)', e);
       }
 
       // Generate project conventions temp skill
@@ -702,7 +717,7 @@ export async function planSprint(
           skillsV2.set(conventionsSkill.id, conventionsSkill);
           debugLog('planSprint:temp-skill', `Generated project-conventions skill for ${projectStackV2.language}`);
         }
-      } catch { /* non-fatal */ }
+      } catch (e) { debugLog('planSprint:generateProjectConventionsSkill', e); }
 
       // Generate and persist project-specific temp agents (V2 only)
       try {
@@ -715,7 +730,7 @@ export async function planSprint(
             debugLog('planSprint:temp-agent', `Generated temp agent: ${tempAgent.id} for ${projectStackV2.language}/${projectStackV2.framework}`);
           }
         }
-      } catch { /* non-fatal */ }
+      } catch (e) { debugLog('planSprint:generateTempAgents', e); }
 
       for (const task of tasks) {
         try {
@@ -735,7 +750,10 @@ export async function planSprint(
             projectStack: projectStackV2,
             overrides,
             learningData,
-            config: config.routing_config,
+            config: { ...config.routing_config, agentMinScore: config.agent_min_score },
+            sprintId,
+            taskId: task.id,
+            projectRoot,
           });
 
           task.assignedAgent = decision.agentId ?? 'generic';
@@ -745,6 +763,23 @@ export async function planSprint(
             confidence: decision.agentConfidence,
             routingVersion: 'v2',
           };
+
+          // Persist decision trail via DecisionLogger so routing decisions are traceable
+          try {
+            const { DecisionLogger } = await import('./decision-logger.js');
+            const decisionLogger = new DecisionLogger(projectRoot);
+            const entries = decision.reasoning.map((r, i) => ({
+              step: i + 1,
+              name: `routing-step-${i + 1}`,
+              input: {} as Record<string, unknown>,
+              output: {} as Record<string, unknown>,
+              durationMs: 0,
+              reasoning: r,
+            }));
+            decisionLogger.log(sprintId, task.id, entries);
+          } catch (logErr) {
+            debugLog('planSprint:decision-trail', logErr);
+          }
 
           debugLog(
             'planSprint:routing-v2',
@@ -899,8 +934,8 @@ export function cleanupDraftTasks(projectRoot: string): void {
       if (task.status === TaskStatus.DRAFT) {
         unlinkSync(filePath);
       }
-    } catch {
-      // Ignore malformed task files
+    } catch (e) {
+      debugLog('cleanupDraftTasks:parseTaskFile', e);
     }
   }
 }
@@ -991,7 +1026,7 @@ export function spawnWorkers(
         JSON.stringify(task, null, 2),
         'utf-8',
       );
-    } catch { /* non-fatal: task file may not exist in test/dry-run context */ }
+    } catch (e) { debugLog('spawnWorkers:writeTaskFile', e); }
 
     // Record spawn call in usage tracker
     if (spawnOpts?.usageTracker) {
@@ -1119,7 +1154,7 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
     try {
       if (spawnBackend) spawnBackend.kill(taskId);
       else killWorker(taskId);
-    } catch { /* already dead */ }
+    } catch (e) { debugLog('cleanup:killWorker', e); }
   }
 
   // Kill workers on non-tmux provider adapters
@@ -1128,21 +1163,21 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
     if (!isTmuxProvider(provider)) {
       const adapter = getProviderAdapterForTask(provider);
       if (adapter) {
-        try { adapter.kill(task.id); } catch { /* already dead */ }
+        try { adapter.kill(task.id); } catch (e) { debugLog('cleanup:adapterKill', e); }
       }
     }
   }
 
   for (const task of sprint.tasks) {
     if (task.assignedWorker) {
-      try { releaseAllLocks(projectRoot, task.assignedWorker); } catch { /* skip */ }
+      try { releaseAllLocks(projectRoot, task.assignedWorker); } catch (e) { debugLog('cleanup:releaseAllLocks', e); }
     }
   }
 
   const tasksDir = join(projectRoot, TASKS_DIR);
   if (existsSync(tasksDir)) {
     for (const file of readdirSync(tasksDir).filter(f => TASK_FILE_EXTENSIONS.some(ext => f.endsWith(ext)))) {
-      try { unlinkSync(join(tasksDir, file)); } catch { /* skip */ }
+      try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTaskFile', e); }
     }
   }
 
@@ -1151,7 +1186,7 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
       if (TASK_FILE_EXTENSIONS.some(ext => file.endsWith(ext))) {
         const fullPath = join(tasksDir, file);
         if (isStaleTaskFile(fullPath)) {
-          try { unlinkSync(fullPath); } catch { /* skip */ }
+          try { unlinkSync(fullPath); } catch (e) { debugLog('cleanup:unlinkStaleTaskFile', e); }
         }
       }
     }
@@ -1161,7 +1196,7 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
   if (existsSync(tasksDir)) {
     for (const file of readdirSync(tasksDir)) {
       if (file.startsWith('.prompt-')) {
-        try { unlinkSync(join(tasksDir, file)); } catch { /* skip */ }
+        try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkPromptFile', e); }
       }
     }
   }
@@ -1169,7 +1204,7 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
   const locksDir = join(projectRoot, LOCKS_DIR);
   if (existsSync(locksDir)) {
     for (const file of readdirSync(locksDir).filter(f => f.endsWith('.lock'))) {
-      try { unlinkSync(join(locksDir, file)); } catch { /* skip */ }
+      try { unlinkSync(join(locksDir, file)); } catch (e) { debugLog('cleanup:unlinkLockFile', e); }
     }
   }
 
@@ -1232,12 +1267,12 @@ export async function finalizeSprint(
   // 2. Write sprint log
   try {
     writeSprintLog(projectRoot, sprint, metrics, evaluations);
-  } catch { /* non-fatal: sprint log write failure */ }
+  } catch (e) { debugLog('finalizeSprint:writeSprintLog', e); }
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
   try {
     writeRetrospective(projectRoot, sprint, evaluations, metrics, opts?.usageTracker, undefined, undefined, results);
-  } catch { /* non-fatal: retro write failure */ }
+  } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
 
   // 5. Update PROJECT-IDENTITY.md
   try {
@@ -1248,20 +1283,20 @@ export async function finalizeSprint(
       if (existsSync(sprintsPath)) {
         totalSprints = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).length;
       }
-    } catch { /* default to 1 */ }
+    } catch (e) { debugLog('finalizeSprint:countSprints', e); }
     updateProjectIdentity(projectRoot, sprint.id, metrics, totalSprints);
-  } catch { /* non-fatal: project identity update failure */ }
+  } catch (e) { debugLog('finalizeSprint:updateProjectIdentity', e); }
 
   // 6. Update last_sprint_id in config
   try {
     updateLastSprintId(projectRoot, sprint.id);
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('finalizeSprint:updateLastSprintId', e); }
 
   // 7. Run decay if over budget
   if (!opts?.skipDecay) {
     try {
       runDecay(projectRoot, sprint.id);
-    } catch { /* non-fatal: decay failure */ }
+    } catch (e) { debugLog('finalizeSprint:runDecay', e); }
   }
 
   // 8. Run afterSprint plugin hooks
@@ -1272,7 +1307,7 @@ export async function finalizeSprint(
         sprint,
         projectRoot,
       } satisfies AfterSprintContext);
-    } catch { /* afterSprint hook failure is non-fatal */ }
+    } catch (e) { debugLog('finalizeSprint:afterSprintHook', e); }
   }
 
   // 8b. Update agent/skill stats
@@ -1291,7 +1326,7 @@ export async function finalizeSprint(
         const coverage = taskResult?.coverage ?? 0;
         poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
       }
-    } catch { /* non-fatal */ }
+    } catch (e) { debugLog('finalizeSprint:updateAgentStats', e); }
   } else {
     // V2: Record outcomes to learnings.json (single source of truth)
     // Agent.json manifests are NOT touched — stats live in learnings.json only
@@ -1311,7 +1346,7 @@ export async function finalizeSprint(
           try {
             const quality = assessQuality(task, taskResult, evaluation as unknown as string);
             qualityScore = quality.overall;
-          } catch { /* non-fatal */ }
+          } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
         }
 
         tracker.recordOutcome({
@@ -1338,7 +1373,7 @@ export async function finalizeSprint(
           // Persist evolved rules in learnings
           tracker.saveEvolvedRules(evolution.newRules);
         }
-      } catch { /* non-fatal: rule evolution failure */ }
+      } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
 
       // 8e. Evaluate promotions/demotions
       try {
@@ -1352,7 +1387,7 @@ export async function finalizeSprint(
         for (const d of demotions.filter(r => r.action === 'demote')) {
           debugLog('finalizeSprint:demotion', `${d.entityType} '${d.entityId}': ${d.reason}`);
         }
-      } catch { /* non-fatal: promotion/demotion failure */ }
+      } catch (e) { debugLog('finalizeSprint:promotionDemotion', e); }
     } catch (err) {
       debugLog('finalizeSprint:v2-learning', `V2 learning pipeline failed: ${err}`);
     }
@@ -1362,7 +1397,7 @@ export async function finalizeSprint(
   if (opts?.config) {
     try {
       updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, opts.config);
-    } catch { /* non-fatal */ }
+    } catch (e) { debugLog('finalizeSprint:updateProjectDocs', e); }
   }
 
   // 10. Rich output (non-fatal — sprint completes even if formatting fails)
@@ -1391,7 +1426,59 @@ export async function finalizeSprint(
       { gitDiff, agentPerf, learnings, outputMode: outputMode as 'quiet' | 'normal' | 'verbose' },
     );
     if (richOutput) console.log(richOutput);
-  } catch { /* Rich output failure is non-fatal */ }
+  } catch (e) { debugLog('finalizeSprint:richOutput', e); }
+
+  // 11. Adaptive thresholds: auto-adjust agent_min_score based on last 3 sprints NO_GO rate
+  if (opts?.config?.adaptive_thresholds) {
+    try {
+      const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+      let totalTasks = 0;
+      let totalNoGo = 0;
+      if (existsSync(sprintsPath)) {
+        const sprintFiles = readdirSync(sprintsPath)
+          .filter(f => f.endsWith('.md') && !f.includes(sprint.id))
+          .sort()
+          .slice(-2); // last 2 previous sprints
+        for (const file of sprintFiles) {
+          const prevMetrics = readPreviousSprintMetrics(projectRoot, file.replace('.md', ''));
+          if (prevMetrics) {
+            totalTasks += prevMetrics.totalTasks;
+            totalNoGo += prevMetrics.noGoTasks;
+          }
+        }
+        // Include current sprint
+        totalTasks += metrics.totalTasks;
+        totalNoGo += metrics.noGoTasks;
+      } else {
+        totalTasks = metrics.totalTasks;
+        totalNoGo = metrics.noGoTasks;
+      }
+      const noGoRate = totalTasks > 0 ? (totalNoGo / totalTasks) * 100 : 0;
+      const currentScore = opts.config.agent_min_score;
+      let newScore = currentScore;
+      if (noGoRate > 30 && currentScore > 2) {
+        newScore = currentScore - 1;
+      } else if (noGoRate < 10 && currentScore < 8) {
+        newScore = currentScore + 1;
+      }
+      if (newScore !== currentScore) {
+        const configPath = join(projectRoot, '.deckent', 'config.json');
+        const rawCfg: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
+        rawCfg['agent_min_score'] = newScore;
+        writeFileSync(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
+        debugLog('finalizeSprint:adaptive', `agent_min_score ${currentScore} => ${newScore} (NO_GO rate: ${noGoRate.toFixed(1)}%)`);
+        // Append adaptive note to RETRO.md
+        try {
+          const retroPath = join(projectRoot, BRAIN_DIR, RETRO_FILE);
+          const retroContent = readFileSafe(retroPath) ?? '';
+          const adaptiveLine = `- Adaptive: agent_min_score ${currentScore} => ${newScore} (NO_GO rate: ${noGoRate.toFixed(1)}%)\n`;
+          writeFileSync(retroPath, retroContent + adaptiveLine);
+        } catch (e) { debugLog('finalizeSprint:retroAppend', e); }
+      }
+    } catch (err) {
+      debugLog('finalizeSprint:adaptive', `Adaptive threshold update failed: ${err}`);
+    }
+  }
 
   return metrics;
 }
@@ -1430,7 +1517,7 @@ export async function runSprint(
   // Load plugin hooks at sprint start (non-fatal)
   try {
     await loadPluginHooks(projectRoot);
-  } catch { /* plugin hook loading failure is non-fatal */ }
+  } catch (e) { debugLog('runSprint:loadPluginHooks', e); }
 
   // Phase 1: PLAN
   const { sprint, lastUsage: initialUsage, safetyPoint } = await runPlanPhase(
@@ -1448,12 +1535,12 @@ export async function runSprint(
       ? connector.getAvailableProviders()
       : providerRegistry.listProviders() as ProviderName[];
     routeSprintTasks(sprint.tasks, config, availableProviders);
-  } catch { /* Router failure is non-fatal — all tasks use brain_provider */ }
+  } catch (e) { /* Router failure is non-fatal — all tasks use brain_provider */ debugLog('runSprint:routeSprintTasks', e); }
 
   // Reset dashboard for new sprint
   try {
     resetDashboard(projectRoot, sprint.id, sprint.tasks.length);
-  } catch { /* dashboard reset failed -- non-fatal */ }
+  } catch (e) { debugLog('runSprint:resetDashboard', e); }
 
   // Persist sprint state for crash recovery
   writeSprintState(projectRoot, sprint);
@@ -1508,7 +1595,7 @@ export async function runSprint(
       totalTokens: sprintUsage.totalTokens,
       modelBreakdown: sprintUsage.modelBreakdown,
     };
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('runSprint:getSprintUsage', e); }
 
   // Re-check usage before final dashboard update for accurate end-of-sprint metrics
   try {
@@ -1516,7 +1603,7 @@ export async function runSprint(
       ? await checkUsageWithProvider(activeProvider)
       : checkUsage(config);
     lastUsage = finalUsage;
-  } catch { /* non-fatal — use last captured usage */ }
+  } catch (e) { debugLog('runSprint:finalUsageCheck', e); }
 
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
@@ -1563,7 +1650,7 @@ export function pauseSprint(
           JSON.stringify(task, null, 2),
           'utf-8',
         );
-      } catch { /* skip */ }
+      } catch (e) { debugLog('pauseSprint:writeTaskFile', e); }
 
       // Write .paused marker with previous status for resume
       try {
@@ -1572,7 +1659,7 @@ export function pauseSprint(
           JSON.stringify({ taskId: task.id, previousStatus: prevStatus, pausedAt: now() }, null, 2),
           'utf-8',
         );
-      } catch { /* skip */ }
+      } catch (e) { debugLog('pauseSprint:writePausedMarker', e); }
 
       pausedTaskIds.push(task.id);
 
@@ -1580,10 +1667,10 @@ export function pauseSprint(
       // For tmux backend (no IPC channel), kill the worker to stop execution.
       const channel = _channelRegistry.get(task.id);
       if (channel) {
-        try { channel.pause(); } catch { /* non-fatal */ }
+        try { channel.pause(); } catch (e) { debugLog('pauseSprint:channelPause', e); }
       } else {
         // No IPC channel -> tmux backend worker -- kill the session to stop execution
-        try { killWorker(task.id); } catch { /* non-fatal */ }
+        try { killWorker(task.id); } catch (e) { debugLog('pauseSprint:killWorker', e); }
       }
     }
   }
@@ -1606,7 +1693,7 @@ export function pauseSprint(
       JSON.stringify(pauseState, null, 2),
       'utf-8',
     );
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('pauseSprint:writePauseState', e); }
 
   // Update dashboard to reflect PAUSED status
   try {
@@ -1623,7 +1710,7 @@ export function pauseSprint(
       alerts: [{ level: AlertLevel.WARNING, message: `Sprint paused: ${reason}`, timestamp: now() }],
       updatedAt: now(),
     });
-  } catch { /* dashboard update failed -- non-fatal */ }
+  } catch (e) { debugLog('pauseSprint:updateDashboard', e); }
 
   return pauseState;
 }
@@ -1655,12 +1742,12 @@ export function resumeSprint(
           JSON.stringify(task, null, 2),
           'utf-8',
         );
-      } catch { /* skip */ }
+      } catch (e) { debugLog('resumeSprint:writeTaskFile', e); }
 
       // Remove .paused marker
       const pausedMarker = join(tasksPath, `task-${task.id}.paused`);
       if (existsSync(pausedMarker)) {
-        try { unlinkSync(pausedMarker); } catch { /* skip */ }
+        try { unlinkSync(pausedMarker); } catch (e) { debugLog('resumeSprint:unlinkPausedMarker', e); }
       }
 
       resumedTaskIds.push(task.id);
@@ -1669,7 +1756,7 @@ export function resumeSprint(
       // Tmux workers were killed on pause and must be re-spawned by the caller.
       const channel = _channelRegistry.get(task.id);
       if (channel) {
-        try { channel.resume(); } catch { /* non-fatal */ }
+        try { channel.resume(); } catch (e) { debugLog('resumeSprint:channelResume', e); }
       }
     }
   }
@@ -1679,7 +1766,7 @@ export function resumeSprint(
   // Remove pause state file
   const pauseStatePath = join(projectRoot, PAUSE_STATE_FILE);
   if (existsSync(pauseStatePath)) {
-    try { unlinkSync(pauseStatePath); } catch { /* skip */ }
+    try { unlinkSync(pauseStatePath); } catch (e) { debugLog('resumeSprint:unlinkPauseState', e); }
   }
 
   // Update dashboard to reflect ACTIVE status
@@ -1697,7 +1784,7 @@ export function resumeSprint(
       alerts: [],
       updatedAt: now(),
     });
-  } catch { /* dashboard update failed -- non-fatal */ }
+  } catch (e) { debugLog('resumeSprint:updateDashboard', e); }
 
   return pauseState;
 }

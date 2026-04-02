@@ -722,6 +722,10 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     version: '0.0.0',
     auto_docs: { tier1: true, tier2: true, tier3: false },
     coverage_threshold: 90,
+    max_reroutes: 3,
+    reroute_on_tech_debt: false,
+    adaptive_thresholds: false,
+    agent_min_score: 5,
   };
   const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
   return runAllUpdaters(ctx);

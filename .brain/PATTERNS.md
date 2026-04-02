@@ -1,9 +1,9 @@
 [
   {
     "pattern": "stale_heartbeat",
-    "occurrences": 915,
+    "occurrences": 1041,
     "firstDetectedInSprint": "sprint-069",
-    "lastDetectedInSprint": "sprint-086",
+    "lastDetectedInSprint": "sprint-087",
     "resolved": false
   }
 ]

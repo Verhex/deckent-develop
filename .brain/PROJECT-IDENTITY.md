@@ -30,8 +30,8 @@
 ## Current State
 - Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-086
-- Total Sprints: 86
+- Last Sprint: sprint-087
+- Total Sprints: 87
 - Completed Tasks: 224
 - No-Go Rate: 0.0%
 

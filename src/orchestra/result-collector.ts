@@ -53,7 +53,7 @@ export function resolveAgentPrompt(projectRoot: string, task: Task): string | un
     try {
       promptMd = readFileSync(p, 'utf-8');
       break;
-    } catch { /* not found, try next */ }
+    } catch (e) { debugLog('resolveAgentPrompt:readFile', e); }
   }
 
   // Load systemPrompt + expertise from agent.json
@@ -69,7 +69,7 @@ export function resolveAgentPrompt(projectRoot: string, task: Task): string | un
       systemPrompt = raw['systemPrompt'] as string | undefined;
       expertise = Array.isArray(raw['expertise']) ? (raw['expertise'] as string[]).join(', ') : '';
       break;
-    } catch { /* not found, try next */ }
+    } catch (e) { debugLog('resolveAgentPrompt:readFile', e); }
   }
 
   // Combine: PROMPT.md + systemPrompt + expertise
@@ -97,7 +97,7 @@ export function resolveSkillPrompts(
     try {
       const content = readFileSync(skillPath, 'utf-8');
       results.push({ name: skillId, content });
-    } catch { /* skill not found, skip */ }
+    } catch (e) { debugLog('resolveSkillPrompts:readSkillFile', e); }
   }
   return results;
 }
@@ -155,7 +155,7 @@ export async function waitForResults(
       try {
         if (queueBackend) queueBackend.kill(taskId);
         else killWorker(taskId);
-      } catch { /* ignore */ }
+      } catch (e) { debugLog('processQueue:killWorker', e); }
       const nextTask = remainingQueue.shift(); // length > 0 checked above
       if (!nextTask) break;
       const queueAgentPrompt = resolveAgentPrompt(projectRoot, nextTask);

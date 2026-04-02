@@ -153,10 +153,20 @@ export interface DeckentConfig {
   /** Minimum coverage % to pass without tech debt (default: 90).
    * Adaptive suggestion: if avg coverage < 70 over last 3 sprints, auto-lower to avg. */
   coverage_threshold?: number;
+  /** Max reroute attempts per task during mid-sprint adapter (default: 3) */
+  max_reroutes?: number;
+  /** Also reroute GO_WITH_TECH_DEBT tasks, not just NO_GO (default: false) */
+  reroute_on_tech_debt?: boolean;
 
   // ─── Rollback ───────────────────────────────────────────────────────
   /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
   rollback_policy?: 'never' | 'on_failure' | 'always';
+
+  // ─── Adaptive Thresholds ────────────────────────────────────────────
+  /** Auto-adjust routing parameters based on sprint NO_GO rate (default: false) */
+  adaptive_thresholds?: boolean;
+  /** Minimum agent score for routing selection (default: 5, range: 2-8) */
+  agent_min_score?: number;
 
   // ─── Routing Engine v2 ─────────────────────────────────────────────
   /** Routing engine version: 'v1' (keyword-based), 'v2' (intent-based). Default: 'v2' */
@@ -208,6 +218,13 @@ export interface ResolvedConfig {
   /** Minimum coverage % to pass without tech debt (default: 90).
    * Adaptive suggestion: if avg coverage < 70 over last 3 sprints, auto-lower to avg. */
   coverage_threshold: number;
+  /** Max reroute attempts per task during mid-sprint adapter (default: 3) */
+  max_reroutes: number;
+  /** Also reroute GO_WITH_TECH_DEBT tasks, not just NO_GO (default: false) */
+  reroute_on_tech_debt: boolean;
+  // Adaptive Thresholds
+  adaptive_thresholds: boolean;
+  agent_min_score: number;
   // Rollback
   rollback_policy?: 'never' | 'on_failure' | 'always';
   // Routing Engine v2

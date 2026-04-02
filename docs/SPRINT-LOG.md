@@ -2383,3 +2383,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 086-004: Coverage Threshold Config + Adaptive Thresholds (DONE)
 
 ---
+## Sprint 87 — sprint-087
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-02
+**Duration:** 1905s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1904812ms |
+
+### Tasks
+
+- 087-001: Kalan Sessiz Catch Bloklari — Son Dalga (EXECUTING)
+- 087-002: Tech Debt Kapatma — Eksik Entegrasyonlar (EXECUTING)
+- 087-003: Adaptive Thresholds — NO_GO Rate Bazli Otomatik Ayar (EXECUTING)
+- 087-004: Mid-Sprint Reroute Guclendirme — Max 1 → 3 (EXECUTING)
+
+---

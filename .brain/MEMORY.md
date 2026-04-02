@@ -223,3 +223,4 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 ## Sprint sprint-086 Learnings
 - Tech Debt Kapatma — routeTaskV2 Cagri Yerleri + Kalan Catch Bloklari: GO_WITH_TECH_DEBT — A) routeTaskV2 calls updated with sprintId/taskId/projectRoot: sprint-controller.ts planSprint routing-v2 block now pass
 - Planner'a Gecmis Bilgisi Enjeksiyonu: GO_WITH_TECH_DEBT — A) outcome-tracker.ts: getWorstCombinations(limit=5) metodu eklendi. Son 5 sprint outcomes dosyalarını okur, agent+skill
+## Sprint sprint-087 Learnings

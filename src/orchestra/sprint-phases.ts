@@ -102,7 +102,8 @@ function now(): string {
 function readFileSafe(filePath: string): string {
   try {
     return readFileSync(filePath, 'utf-8');
-  } catch {
+  } catch (e) {
+    debugLog('readFileSafe:readFileSync', e);
     return '';
   }
 }
@@ -122,7 +123,7 @@ function safeDashboardUpdate(
       alerts: [{ level: AlertLevel.WARNING, message: errorMessage, timestamp: now() }],
       updatedAt: now(),
     });
-  } catch { /* dashboard write failed -- continue */ }
+  } catch (e) { debugLog('safeDashboardUpdate:updateDashboard', e); }
 }
 
 
@@ -170,7 +171,7 @@ export async function runPlanPhase(
       try {
         const splash = showSplash(DECKENT_VERSION);
         if (splash) console.log(splash);
-      } catch { /* splash failure is non-fatal */ }
+      } catch (e) { debugLog('runPlanPhase:showSplash', e); }
     }
 
     // Run pre-sprint CI validation — may block sprint if tsc/tests fail
@@ -191,7 +192,7 @@ export async function runPlanPhase(
         config,
         projectRoot,
       } satisfies BeforeSprintContext);
-    } catch { /* beforeSprint hook failure is non-fatal */ }
+    } catch (e) { debugLog('runPlanPhase:beforeSprintHook', e); }
 
     // Create git safety point after planning but before workers spawn
     let safetyPoint: SafetyPoint | null = null;
@@ -199,7 +200,7 @@ export async function runPlanPhase(
       try {
         safetyPoint = createSafetyPoint(projectRoot, sprint.id);
         saveSafetyPoint(projectRoot, safetyPoint);
-      } catch { /* safety point creation failure is non-fatal */ }
+      } catch (e) { debugLog('runPlanPhase:createSafetyPoint', e); }
     }
 
     return { sprint, lastUsage, safetyPoint };
@@ -244,13 +245,13 @@ export function runSpawnPhase(
             id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status,
           }, scanResult);
         });
-      } catch { /* scan loop start failed -- non-fatal */ }
+      } catch (e) { debugLog('runSpawnPhase:startScanLoop', e); }
       break;
     } catch (err) {
       spawnAttempts++;
       if (spawnAttempts >= 2) {
         if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-        try { cleanup(projectRoot, sprint); } catch { /* best effort */ }
+        try { cleanup(projectRoot, sprint); } catch (e) { debugLog('runSpawnPhase:cleanup', e); }
         const hint = buildSpawnRetryHint(err, sprint);
         throw new BrainError(
           `Spawn phase failed after retry: ${err instanceof Error ? err.message : String(err)}. Hint: ${hint}`,
@@ -315,8 +316,8 @@ export async function runEvaluatePhase(
               (result as TaskResult & { regressionDetected?: boolean }).regressionDetected = true;
               (result as TaskResult & { ciAlerts?: string[] }).ciAlerts = ciCheckResult.alerts;
             }
-          } catch {
-            // CI regression check failure is non-fatal — continue with original evaluation
+          } catch (e) {
+            debugLog('runEvaluatePhase:ciRegressionCheck', e);
           }
         }
 
@@ -332,7 +333,7 @@ export async function runEvaluatePhase(
             result,
             projectRoot,
           } satisfies AfterTaskContext);
-        } catch { /* afterTask hook failure is non-fatal */ }
+        } catch (e) { debugLog('runEvaluatePhase:afterTaskHook', e); }
         if (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT) {
           if (task.isPriorityFix && task.fixForTaskId) {
             resolveDebt(projectRoot, `debt-${task.fixForTaskId}`, sprint.id);
@@ -363,7 +364,7 @@ export async function runEvaluatePhase(
             result: syntheticResult,
             projectRoot,
           } satisfies AfterTaskContext);
-        } catch { /* afterTask hook failure is non-fatal */ }
+        } catch (e) { debugLog('runEvaluatePhase:afterTaskHookTimeout', e); }
       }
     }
   } catch (err) {
@@ -399,12 +400,12 @@ export function runRollbackCheck(
         sprint.rolledBack = true;
         sprint.rollbackResult = rollbackResult.message;
       }
-    } catch { /* rollback failure is non-fatal */ }
+    } catch (e) { debugLog('runRollbackCheck:rollback', e); }
   }
 
   // After successful sprint (no rollback or partial success): clean up safety branch
   if (rollbackEnabled && safetyPoint && !sprint.rolledBack) {
-    try { deleteSafetyPoint(projectRoot, safetyPoint); } catch { /* non-fatal */ }
+    try { deleteSafetyPoint(projectRoot, safetyPoint); } catch (e) { debugLog('runRollbackCheck:deleteSafetyPoint', e); }
   }
 }
 
@@ -469,7 +470,7 @@ export async function runFixPhase(
               }
             }
           }
-        } catch { /* non-fatal: mid-sprint adapter failure */ }
+        } catch (e) { debugLog('runFixPhase:midSprintAdapter', e); }
       }
 
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
@@ -531,7 +532,8 @@ export async function runRetroPhase(
       const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
       sprint.metrics = metrics;
       return metrics;
-    } catch { /* metrics calculation failed in test mode -- non-fatal */
+    } catch (e) {
+      debugLog('runRetroPhase:calculateMetrics', e);
       return undefined;
     }
   }
@@ -548,7 +550,7 @@ export async function runRetroPhase(
 export function runDecayPhase(projectRoot: string, sprintId: string): void {
   try {
     runDecay(projectRoot, sprintId);
-  } catch { /* non-fatal: decay failure */ }
+  } catch (e) { debugLog('runDecayPhase:runDecay', e); }
 }
 
 
@@ -578,7 +580,7 @@ export function runCleanupPhase(
       const _sprint = sprint;
       const _spawnBackend = spawnBackend;
       setTimeout(() => {
-        try { cleanup(projectRoot, _sprint, _spawnBackend); } catch { /* non-fatal */ }
+        try { cleanup(projectRoot, _sprint, _spawnBackend); } catch (e) { debugLog('runCleanupPhase:cleanupDelayed', e); }
       }, cleanupDelay);
     } else {
       try {
