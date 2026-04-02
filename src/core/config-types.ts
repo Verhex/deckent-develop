@@ -143,6 +143,11 @@ export interface DeckentConfig {
   /** Enforce worker scope boundaries (default: true) */
   boundary_enforcement?: boolean;
 
+  // ─── Human Checkpoints ──────────────────────────────────────────────
+  /** Human approval checkpoints in sprint lifecycle.
+   *  Valid values: 'plan', 'evaluate', 'fix'. Empty array = fully autonomous. */
+  human_checkpoints?: ('plan' | 'evaluate' | 'fix')[];
+
   // ─── Sprint ─────────────────────────────────────────────────────────
   /** Enable fix phase after initial execution (default: true) */
   fix_phase_enabled?: boolean;
@@ -157,6 +162,8 @@ export interface DeckentConfig {
   max_reroutes?: number;
   /** Also reroute GO_WITH_TECH_DEBT tasks, not just NO_GO (default: false) */
   reroute_on_tech_debt?: boolean;
+  /** Sprint timeout in minutes. 0 = unlimited (no timeout). Positive = minutes. Default: 0 */
+  sprint_timeout_minutes?: number;
 
   // ─── Rollback ───────────────────────────────────────────────────────
   /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
@@ -210,6 +217,8 @@ export interface ResolvedConfig {
   scan_interval?: number;
   heartbeat_timeout?: number;
   boundary_enforcement?: boolean;
+  // Human Checkpoints
+  human_checkpoints?: ('plan' | 'evaluate' | 'fix')[];
   // Sprint
   fix_phase_enabled?: boolean;
   max_fix_retries?: number;
@@ -222,6 +231,8 @@ export interface ResolvedConfig {
   max_reroutes: number;
   /** Also reroute GO_WITH_TECH_DEBT tasks, not just NO_GO (default: false) */
   reroute_on_tech_debt: boolean;
+  /** Sprint timeout in minutes. 0 = unlimited. Default: 0 */
+  sprint_timeout_minutes: number;
   // Adaptive Thresholds
   adaptive_thresholds: boolean;
   agent_min_score: number;

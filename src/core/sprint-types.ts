@@ -25,6 +25,7 @@ export enum SprintStatus {
   RETROSPECTIVE = 'RETROSPECTIVE',
   COMPLETE = 'COMPLETE',
   PAUSED = 'PAUSED',
+  ABORTED = 'ABORTED',
 }
 
 export interface SprintUsageReport {

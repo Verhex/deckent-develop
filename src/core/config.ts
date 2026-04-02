@@ -402,12 +402,15 @@ export function createDefaultConfig(): DeckentConfig {
     cost_optimization: false,
     claude_backend: 'tmux',
     auth_mode: 'subscription',
+    // Human Checkpoints (empty = fully autonomous)
+    human_checkpoints: [],
     // Sprint
     fix_phase_enabled: true,
     max_fix_retries: 2,
     coverage_threshold: 90,
     max_reroutes: 3,
     reroute_on_tech_debt: false,
+    sprint_timeout_minutes: 0,
     // Memory
     memory_budget: 600,
     decay_after_sprints: 5,
@@ -556,12 +559,15 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     scan_interval: config.scan_interval,
     heartbeat_timeout: config.heartbeat_timeout,
     boundary_enforcement: config.boundary_enforcement,
+    // Human Checkpoints
+    human_checkpoints: config.human_checkpoints,
     // Sprint
     fix_phase_enabled: config.fix_phase_enabled,
     max_fix_retries: config.max_fix_retries,
     coverage_threshold: config.coverage_threshold ?? 90,
     max_reroutes: config.max_reroutes ?? 3,
     reroute_on_tech_debt: config.reroute_on_tech_debt ?? false,
+    sprint_timeout_minutes: config.sprint_timeout_minutes ?? 0,
     // Adaptive Thresholds
     adaptive_thresholds: config.adaptive_thresholds ?? false,
     agent_min_score: config.agent_min_score ?? 5,
@@ -1047,6 +1053,7 @@ export function mergeConfigs(
     coverage_threshold: config.coverage_threshold ?? 90,
     max_reroutes: config.max_reroutes ?? 3,
     reroute_on_tech_debt: config.reroute_on_tech_debt ?? false,
+    sprint_timeout_minutes: config.sprint_timeout_minutes ?? 0,
     adaptive_thresholds: config.adaptive_thresholds ?? false,
     agent_min_score: config.agent_min_score ?? 5,
   };

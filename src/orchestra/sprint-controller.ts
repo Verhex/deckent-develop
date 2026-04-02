@@ -1493,6 +1493,73 @@ export async function finalizeSprint(
  * @returns The completed sprint with metrics and final status
  * @throws {BrainError} When plan or spawn phase fails
  */
+
+// ─── Human Checkpoint Support ────────────────────────────────────
+
+/** Valid checkpoint phases that can require human approval. */
+export type CheckpointPhase = 'plan' | 'evaluate' | 'fix';
+
+interface CheckpointFile {
+  phase: string;
+  summary: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+/**
+ * Wait for human approval at a sprint checkpoint.
+ * Writes a checkpoint JSON file to `.deckent/checkpoints/` and polls every 5s
+ * until the status is changed to 'approved' or 'rejected'.
+ * @returns true if approved, false if rejected
+ */
+export async function waitForHumanApproval(
+  projectRoot: string,
+  sprintId: string,
+  phase: CheckpointPhase,
+  summary: string,
+): Promise<boolean> {
+  const checkpointsDir = join(projectRoot, '.deckent', 'checkpoints');
+  mkdirSync(checkpointsDir, { recursive: true });
+
+  const checkpointPath = join(checkpointsDir, `checkpoint-${sprintId}-${phase}.json`);
+  const checkpoint: CheckpointFile = {
+    phase,
+    summary,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  writeFileSync(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
+  debugLog('waitForHumanApproval', `Checkpoint written: ${checkpointPath} — waiting for approval`);
+
+  // Poll every 5 seconds until approved or rejected
+  while (true) {
+    await new Promise(resolve => setTimeout(resolve, 5_000));
+
+    // Check for interrupt
+    if (_isInterrupted) return false;
+
+    try {
+      const raw = readFileSync(checkpointPath, 'utf-8');
+      const current = JSON.parse(raw) as CheckpointFile;
+      if (current.status === 'approved') {
+        debugLog('waitForHumanApproval', `Checkpoint ${phase} approved`);
+        return true;
+      }
+      if (current.status === 'rejected') {
+        debugLog('waitForHumanApproval', `Checkpoint ${phase} rejected`);
+        return false;
+      }
+    } catch (e) {
+      debugLog('waitForHumanApproval:readCheckpoint', e);
+    }
+  }
+}
+
+/**
+ * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP.
+ * Supports human checkpoints, configurable timeout, and provider routing.
+ */
 export async function runSprint(
   projectRoot: string,
   config: ResolvedConfig,
@@ -1524,6 +1591,19 @@ export async function runSprint(
     projectRoot, config, opts, activeProvider, rollbackEnabled,
   );
   let lastUsage = initialUsage;
+
+  // ─── Human Checkpoint: PLAN ────────────────────────────────────
+  if (config.human_checkpoints?.includes('plan')) {
+    const taskSummary = `${sprint.tasks.length} task planlandı: ${sprint.tasks.map(t => t.title).join(', ')}`;
+    const approved = await waitForHumanApproval(projectRoot, sprint.id, 'plan', taskSummary);
+    if (!approved) {
+      sprint.status = SprintStatus.ABORTED;
+      sprint.completedAt = now();
+      clearActiveSprint();
+      clearSprintState(projectRoot);
+      return sprint;
+    }
+  }
 
   // Register active sprint for SIGINT interrupt cleanup
   setActiveSprint(projectRoot, sprint, spawnBackend);
@@ -1567,6 +1647,38 @@ export async function runSprint(
 
   // Rollback check: if rollback is enabled and all tasks are NO_GO, trigger rollback
   runRollbackCheck(projectRoot, sprint, evaluations, rollbackEnabled, safetyPoint);
+
+  // ─── Human Checkpoint: EVALUATE ────────────────────────────────
+  if (config.human_checkpoints?.includes('evaluate')) {
+    const goCount = [...evaluations.values()].filter(e => e === TaskEvaluation.DONE).length;
+    const noGoCount = [...evaluations.values()].filter(e => e === TaskEvaluation.NO_GO).length;
+    const debtCount = [...evaluations.values()].filter(e => e === TaskEvaluation.GO_WITH_TECH_DEBT).length;
+    const evalSummary = `Değerlendirme: ${goCount} GO, ${debtCount} TECH_DEBT, ${noGoCount} NO_GO — toplam ${evaluations.size} task`;
+    const approved = await waitForHumanApproval(projectRoot, sprint.id, 'evaluate', evalSummary);
+    if (!approved) {
+      sprint.status = SprintStatus.ABORTED;
+      sprint.completedAt = now();
+      clearActiveSprint();
+      clearSprintState(projectRoot);
+      return sprint;
+    }
+  }
+
+  // ─── Human Checkpoint: FIX ─────────────────────────────────────
+  if (config.human_checkpoints?.includes('fix')) {
+    const noGoTasks = sprint.tasks.filter(t => evaluations.get(t.id) === TaskEvaluation.NO_GO);
+    if (noGoTasks.length > 0) {
+      const fixSummary = `Fix fazı başlayacak: ${noGoTasks.length} NO_GO task — ${noGoTasks.map(t => t.title).join(', ')}`;
+      const approved = await waitForHumanApproval(projectRoot, sprint.id, 'fix', fixSummary);
+      if (!approved) {
+        sprint.status = SprintStatus.ABORTED;
+        sprint.completedAt = now();
+        clearActiveSprint();
+        clearSprintState(projectRoot);
+        return sprint;
+      }
+    }
+  }
 
   // Phase 5: FIX
   await runFixPhase(projectRoot, sprint, evaluations, results, config, opts, routingVersionForFix, usageTracker, spawnBackend);

@@ -47,8 +47,8 @@ describe('SprintPhase enum', () => {
 });
 
 describe('SprintStatus enum', () => {
-  it('has 7 members', () => {
-    expect(Object.values(SprintStatus)).toHaveLength(7);
+  it('has 8 members', () => {
+    expect(Object.values(SprintStatus)).toHaveLength(8);
   });
 });
 

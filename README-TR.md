@@ -4,7 +4,7 @@
 
 **Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12196%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-78%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.2.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-88%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
 
@@ -89,10 +89,13 @@ Deckent üç adımlı bir döngü izler:
 - **Yerleşik Dokümantasyon** -- `.deckent/docs/` ile hızlı başlangıç, directive rehberi ve yapılandırma referansı gelir
 - **Yerel Windows Desteği** -- `shell:true` ile tam subprocess backend, periyodik heartbeat güncellemeleri ve UTF-8 desteği
 - **Plugin Sistemi** -- Özel hook'lar, komutlar ve desenlerle Deckent'i genişletin
-- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 17 MCP tool + 9 resource
+- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 19 MCP tool + 9 resource
 - **Web Dashboard** -- Gerçek zamanlı SSE güncellemeleriyle React + Vite + Tailwind dashboard
 - **Uluslararasılaştırma** -- İngilizce ve Türkçe dil desteği yerleşik
 - **Review Arşiv Yedeği** -- Sprint review, cleanup sonrasında bile arşivden okuyarak çalışır
+- **Heartbeat Daemon** -- `deckent heartbeat --daemon` komutuyla arka planda lint/test gibi periyodik kontroller çalıştıran proaktif görev sistemi
+- **Human Checkpoints** -- Denetimli otonom çalıştırmalar için `plan`, `evaluate` ve `fix` fazlarında yapılandırılabilir onay noktaları
+- **Yapılandırılabilir Sprint Timeout** -- Sınırsız süreli sprint için `sprint_timeout_minutes: 0`, ya da dakika cinsinden sabit timeout ayarı
 - **Beta Güncelleme İş Akışı** -- Yerel beta kurulumu için `deckent upgrade --local <path.tgz>`
 
 ---
@@ -109,10 +112,11 @@ Deckent üç adımlı bir döngü izler:
 | Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır |
 | Kullanım duyarlı otomatik kısıtlama | Evet | Yok | Yok | Yok | Hayır |
 | Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet | Kısmi |
-| MCP entegrasyonu | Evet (17 tool) | Yok | Yok | Yok | Yok |
+| MCP entegrasyonu | Evet (19 tool) | Yok | Yok | Yok | Yok |
 | Web dashboard | Evet | Yerleşik | Yerleşik | Hayır | Hayır |
 | Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır |
 | Çevrimdışı çalışma (yerel modeller) | Planlı | Evet | Hayır | Evet | Hayır |
+| Heartbeat / proaktif görevler | Evet | Hayır | Hayır | Hayır | Hayır |
 
 ---
 
@@ -286,6 +290,7 @@ deckent doctor
 | `deckent agent` | Agent havuzunu yönet (listele, incele, sıfırla) |
 | `deckent review` | Son sprint sonuçlarını incele |
 | `deckent config migrate` | Yapılandırmayı en son şema sürümüne taşı |
+| `deckent heartbeat` | Tek seferlik heartbeat kontrolü çalıştır (`--daemon` arka planda, `--interval <dk>` ile aralık ayarla) |
 
 ---
 
@@ -299,7 +304,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Veya `deckent init` otomatik olarak kayıt yapsın.
 
-### MCP Tool'lar (17)
+### MCP Tool'lar (19)
 
 | Tool | Açıklama |
 |------|----------|
@@ -320,6 +325,8 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent_kill` | Belirli bir worker'i durdur |
 | `deckent_cleanup` | Sprint dosyalarını arşivle ve worker'ları temizle |
 | `deckent_help` | Çalışma zamanı yetenekleri, durum bilgisi ve iş akışı rehberi |
+| `deckent_agent_list` | Kayıtlı agent'ları listele (yerleşik ve geçici) |
+| `deckent_skill_list` | Kayıtlı skill'leri manifest bilgisiyle listele |
 
 ### MCP Resource'lar (9)
 
@@ -392,7 +399,7 @@ Tam yapılandırma referansı için [docs/reference/config-reference.md](docs/re
 deckent web     # localhost:3100 adresinde açılır
 ```
 
-React + Vite + Tailwind -- 4 sayfa (Dashboard, Ayarlar, Geçmiş, Bellek), SSE gerçek zamanlı güncellemeler, koyu/açık tema.
+React + Vite + Tailwind -- 6 sayfa (Dashboard, Ayarlar, Geçmiş, Bellek, Config, Durum), SSE gerçek zamanlı güncellemeler, koyu/açık tema, TR/EN dil değiştirici.
 
 ---
 

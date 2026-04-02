@@ -143,16 +143,17 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
 
   // ── Promise contract ────────────────────────────────────────────
 
-  it('returns a Promise (is async, not sync)', () => {
+  it('returns a Promise (is async, not sync)', async () => {
     const sprint = makeSprint(['001-001']);
-    const returnValue = waitForResults('/root', sprint, 0);
+    const returnValue = waitForResults('/root', sprint, 1);
     expect(returnValue).toBeInstanceOf(Promise);
-    return returnValue; // prevent unhandled rejection
+    await vi.runAllTimersAsync();
+    await returnValue;
   });
 
   it('Promise resolves to an array', async () => {
     const sprint = makeSprint(['001-001']);
-    const promise = waitForResults('/root', sprint, 0);
+    const promise = waitForResults('/root', sprint, 1);
     await vi.runAllTimersAsync();
     const result = await promise;
     expect(Array.isArray(result)).toBe(true);
@@ -186,7 +187,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
 
   // ── Timeout boundary ─────────────────────────────────────────────
 
-  it('exits polling loop when timeout=0 and returns collected partial results', async () => {
+  it('exits polling loop when timeout=1 and returns collected partial results', async () => {
     const sprint = makeSprint(['001-001', '001-002']);
     const result1 = makeTaskResult('001-001');
 
@@ -195,7 +196,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
     );
     mockedReadFileSync.mockReturnValue(JSON.stringify(result1) as never);
 
-    const promise = waitForResults('/root', sprint, 0);
+    const promise = waitForResults('/root', sprint, 1);
     await vi.runAllTimersAsync();
     const results = await promise;
     // Only result1 should be collected (001-002 never found)
@@ -265,7 +266,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue('{ broken json' as never);
 
-    const promise = waitForResults('/root', sprint, 0);
+    const promise = waitForResults('/root', sprint, 1);
     await vi.runAllTimersAsync();
     const results = await promise;
     expect(results).toHaveLength(0);
@@ -276,7 +277,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockImplementation(() => { throw new Error('EACCES'); });
 
-    const promise = waitForResults('/root', sprint, 0);
+    const promise = waitForResults('/root', sprint, 1);
     await vi.runAllTimersAsync();
     const results = await promise;
     expect(results).toHaveLength(0);

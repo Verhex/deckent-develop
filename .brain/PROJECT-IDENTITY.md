@@ -8,7 +8,7 @@
 - Author: Alperen @ Verhex
 
 ## Architecture
-- **orchestra/** (47 modules): Sprint lifecycle, planning, evaluation, routing
+- **orchestra/** (48 modules): Sprint lifecycle, planning, evaluation, routing
   - brain.ts → re-export layer, sprint-controller.ts → full lifecycle
   - sprint-phases.ts → extracted phase functions (Sprint 072 god object split)
   - sprint-utils.ts → shared sprint utilities (Sprint 075 god object split faz 2)
@@ -28,11 +28,11 @@
   - ConfigPage i18n tam kapsam (Sprint 084), AgentDetail geniş panel (Sprint 084)
 
 ## Current State
-- Test Count: 12
+- Test Count: 12,193+
 - Coverage: 96.0%
-- Last Sprint: sprint-087
-- Total Sprints: 87
-- Completed Tasks: 224
+- Last Sprint: sprint-088
+- Total Sprints: 88
+- Completed Tasks: 228+
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -97,3 +97,12 @@
 - ConfigPage i18n: 79 yeni key, fieldT() helper, TR/EN tam geçiş
 - Canlı veri test suite: 41 test (SSE, WorkerCard, ActivityFeed, SprintPhaseTimeline)
 - Build otomasyon: build:dashboard, build:all, postbuild npm scripts
+
+## Sprint 087-088 Achievements (Stabilizasyon + Otonom Adaptasyon + Perfect Beta)
+- Sprint 087 Stabilizasyon: Otonom adaptasyon, self-improvement, öğrenme döngüsü kapatma
+- Sprint 088 Task 1 — Sprint Timeout Reformu: `sprint_timeout_minutes: 0` = sınırsız, config-types.ts + result-collector.ts + sprint-controller.ts güncellemeleri
+- Sprint 088 Task 2 — Heartbeat Daemon: `src/orchestra/heartbeat-daemon.ts` yeni modül, `deckent heartbeat [--daemon] [--interval <min>] [--stop]` CLI komutu
+- Sprint 088 Task 3 — Human Checkpoints: `human_checkpoints: ['plan','evaluate','fix']` config, `waitForHumanApproval()` dosya bazlı onay/red, sprint-controller.ts entegrasyonu
+- Sprint 088 Task 4 — Docs Final Polish: Badge'lar, yeni özellikler, karşılaştırma tablosu, IDENTITY güncellemeleri
+- Self-improvement durumu: Faz 0+1 tamamlandı, Faz 2 devam ediyor
+- Version: v0.3.0-beta.3

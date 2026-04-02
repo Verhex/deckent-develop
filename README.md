@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-82%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-88%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -91,6 +91,9 @@ Deckent follows a three-step cycle:
 - **Web Dashboard** -- React + Vite + Tailwind dashboard with real-time SSE updates
 - **Internationalization** -- English and Turkish language support built in
 - **Review Archive Fallback** -- Sprint review works even after cleanup by reading from archive
+- **Heartbeat Daemon** -- Proactive task system that runs periodic checks (lint, tests) in the background via `deckent heartbeat --daemon`
+- **Human Checkpoints** -- Configurable approval gates at `plan`, `evaluate`, and `fix` phases for supervised autonomous runs
+- **Configurable Sprint Timeout** -- Set `sprint_timeout_minutes: 0` for unlimited-duration sprints, or any positive value for a hard timeout
 - **Beta Upgrade Workflow** -- `deckent upgrade --local <path.tgz>` for local beta installations
 
 ---
@@ -111,6 +114,7 @@ Deckent follows a three-step cycle:
 | Web dashboard | Yes | Built-in | Built-in | No | No |
 | Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
 | Works offline (local models) | Planned | Yes | No | Yes | No |
+| Heartbeat / proactive tasks | Yes | No | No | No | No |
 
 ---
 
@@ -284,6 +288,7 @@ Output:
 | `deckent agent` | Manage agent pool (list, inspect, reset) |
 | `deckent review` | Review last sprint results |
 | `deckent config migrate` | Migrate config to latest schema version |
+| `deckent heartbeat` | Run a one-shot heartbeat check (`--daemon` for background, `--interval <min>` to configure) |
 
 ---
 

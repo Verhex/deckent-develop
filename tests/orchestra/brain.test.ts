@@ -892,9 +892,9 @@ describe('waitForResults', () => {
     expect(results[0]?.taskId).toBe('001-001');
   });
 
-  it('returns empty array when no results and timeout=0', async () => {
+  it('returns empty array when no results and timeout=1', async () => {
     const sprint = makeSprint();
-    const results = await waitForResults(ROOT, sprint, 0);
+    const results = await waitForResults(ROOT, sprint, 1);
     expect(results).toEqual([]);
   });
 
@@ -903,7 +903,7 @@ describe('waitForResults', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue('NOT JSON');
 
-    const results = await waitForResults(ROOT, sprint, 0);
+    const results = await waitForResults(ROOT, sprint, 1);
     expect(results).toEqual([]);
   });
 
@@ -935,7 +935,7 @@ describe('waitForResults', () => {
       throw new Error('not found');
     });
 
-    const results = await waitForResults(ROOT, sprint, 0);
+    const results = await waitForResults(ROOT, sprint, 1);
     expect(results).toHaveLength(1);
     expect(results[0]?.taskId).toBe('001-001');
   });
@@ -971,7 +971,7 @@ describe('waitForResults', () => {
 
   it('returns Promise (is async)', () => {
     const sprint = makeSprint();
-    const returnValue = waitForResults(ROOT, sprint, 0);
+    const returnValue = waitForResults(ROOT, sprint, 1);
     expect(returnValue).toBeInstanceOf(Promise);
     return returnValue; // let vitest await it
   });

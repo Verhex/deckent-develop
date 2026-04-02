@@ -121,9 +121,13 @@ export async function waitForResults(
   spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
   channelRegistry?: ChannelRegistry,
 ): Promise<TaskResult[]> {
-  const timeout = timeoutMs ?? 30 * 60 * 1000;
+  // 0 = unlimited (no timeout). undefined falls back to 30min for backward compat.
+  const timeout = timeoutMs !== undefined ? timeoutMs : 30 * 60 * 1000;
+  const unlimited = timeout === 0;
   const WATCH_FALLBACK_MS = 5_000;
+  const PROGRESS_LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 min
   const startTime = Date.now();
+  let lastProgressLog = startTime;
   const results: TaskResult[] = [];
   const taskIds = new Set(sprint.tasks.map(t => t.id));
   const collected = new Set<string>();
@@ -218,13 +222,19 @@ export async function waitForResults(
   // Use fs.watch with fallback polling (5s instead of 15s)
   const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS);
   try {
-    while (Date.now() - startTime < timeout) {
+    while (unlimited || Date.now() - startTime < timeout) {
       ipcWakeupPromise = makeIpcWakeupPromise();
       // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
       const newlyCollected = collectResults();
       processQueue(newlyCollected);
       if (collected.size === taskIds.size) break;
+      // Periodic progress log (every 5 minutes)
+      const now = Date.now();
+      if (now - lastProgressLog >= PROGRESS_LOG_INTERVAL_MS) {
+        debugLog('waitForResults:progress', `Sprint devam ediyor — ${collected.size}/${taskIds.size} task tamamlandı (${Math.round((now - startTime) / 60000)}dk)`);
+        lastProgressLog = now;
+      }
     }
   } finally {
     watcher.close();

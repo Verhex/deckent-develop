@@ -8,7 +8,7 @@
 @.brain/MEMORY.md
 
 ## Architecture
-- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (47 modules)
+- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (48 modules)
   - brain.ts: orchestrator (re-export layer, imports from sprint-controller)
   - sprint-controller.ts: full sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
   - planner.ts: AI task planning (imports only from core/)

@@ -140,8 +140,8 @@ describe('types.ts barrel re-export — enums', () => {
     expect(SprintPhase.RETRO).toBe('RETRO');
   });
 
-  it('re-exports SprintStatus with 7 members', () => {
-    expect(Object.values(SprintStatus)).toHaveLength(7);
+  it('re-exports SprintStatus with 8 members', () => {
+    expect(Object.values(SprintStatus)).toHaveLength(8);
     expect(SprintStatus.COMPLETE).toBe('COMPLETE');
   });
 

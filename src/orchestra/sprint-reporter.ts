@@ -726,6 +726,7 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     reroute_on_tech_debt: false,
     adaptive_thresholds: false,
     agent_min_score: 5,
+    sprint_timeout_minutes: 0,
   };
   const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
   return runAllUpdaters(ctx);

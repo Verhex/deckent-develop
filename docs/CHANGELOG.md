@@ -6,6 +6,22 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint88] - 2026-04-02
+
+### Added
+
+- Sprint Timeout Reformu — `sprint_timeout_minutes: 0` ile sınırsız süre desteği, config-types + result-collector + sprint-controller güncellemeleri
+- Heartbeat Daemon — `.deckent/HEARTBEAT.md` task'larını periyodik çalıştıran arka plan servisi, `deckent heartbeat` CLI komutu
+- Human Checkpoints — plan/evaluate/fix fazlarında dosya bazlı onay noktaları, `waitForHumanApproval()` mekanizması
+- SprintStatus.ABORTED enum değeri — checkpoint reddedildiğinde sprint durumu
+
+### Changed
+
+- README.md ve README-TR.md: yeni özellik badge'ları, comparison table güncellemeleri
+- IDENTITY.md ve PROJECT-IDENTITY.md: sprint 088 metrikleri
+
+_Tasks: 4 total, 4 done, 4 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint87] - 2026-04-02
 
 ### Added
