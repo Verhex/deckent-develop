@@ -6,6 +6,23 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.2.0-beta.3-sprint80] - 2026-04-02
+
+### Added
+
+- ADR-022 Parity Dokümantasyonu
+
+### Changed
+
+- Fix debt: Tech debt from 077-001-fix: README-TR.md already contains correct UTF-8 Turkish (completed with tech debt)
+- Fix debt: Tech debt from 077-004-fix: POST /api/cleanup endpoint was already fully impleme (completed with tech debt)
+- MCP Tool Parametre Zenginleştirme — init, start, status, doctor (completed with tech debt)
+- CLI set-directives Komutu (completed with tech debt)
+- MCP agent_list + skill_list Tool'ları (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 5 tech debt, 0 no-go_
+
 ## [0.2.0-beta.3-sprint79] - 2026-04-01
 
 ### Added

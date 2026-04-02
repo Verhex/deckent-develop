@@ -16,6 +16,8 @@ import { registerRunTool } from './run.js';
 import { registerKillTool } from './kill.js';
 import { registerCleanupTool } from './cleanup.js';
 import { registerHelpTool } from './help.js'; // deckent_help
+import { registerAgentListTool } from './agent-list.js';
+import { registerSkillListTool } from './skill-list.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -35,4 +37,6 @@ export function registerTools(server: McpServer): void {
   registerKillTool(server);
   registerCleanupTool(server);
   registerHelpTool(server);
+  registerAgentListTool(server);
+  registerSkillListTool(server);
 }

@@ -15,9 +15,11 @@ export function registerDoctorTool(server: McpServer): void {
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         includeProfile: z.boolean().optional().default(false).describe('Also include system profile: CPU core count, total/free RAM, recommended max workers, and detected Claude subscription tier'),
+        profile: z.boolean().optional().default(false).describe('Alias for includeProfile — show system profile: CPU cores, RAM, recommended max workers, Claude subscription tier.'),
+        json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping.'),
       }),
     },
-    async ({ includeProfile }) => {
+    async ({ includeProfile, profile, json }) => {
       const root = process.cwd();
 
       try {
@@ -25,14 +27,15 @@ export function registerDoctorTool(server: McpServer): void {
 
       const response: Record<string, unknown> = { ...result };
 
-      if (includeProfile) {
-        const profile = getSystemProfile();
+      // profile is an alias for includeProfile
+      if (includeProfile || profile) {
+        const sysProfile = getSystemProfile();
         const subscription = detectSubscription();
         response['systemProfile'] = {
-          cpuCores: profile.cpuCores,
-          totalMemMB: profile.totalMemMB,
-          freeMemMB: profile.freeMemMB,
-          recommendedMaxWorkers: profile.recommendedMaxWorkers,
+          cpuCores: sysProfile.cpuCores,
+          totalMemMB: sysProfile.totalMemMB,
+          freeMemMB: sysProfile.freeMemMB,
+          recommendedMaxWorkers: sysProfile.recommendedMaxWorkers,
           subscription: subscription.detected,
           subscriptionMethod: subscription.method,
         };
@@ -54,6 +57,10 @@ export function registerDoctorTool(server: McpServer): void {
       }
       response['recommendations'] = recommendations;
       response['healthScore'] = healthScore;
+
+      if (json) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify(response) }] };
+      }
 
       const enriched = enrichResponse('doctor', response);
       const summary = formatDoctorResponse(response as DoctorData);

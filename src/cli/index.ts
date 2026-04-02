@@ -31,6 +31,7 @@ import { registerSkill } from './commands/skill.js';
 import { registerReview } from './commands/review.js';
 import { registerFinalize } from './commands/finalize.js';
 import { registerExplain } from './commands/explain.js';
+import { registerSetDirectives } from './commands/set-directives.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -83,6 +84,7 @@ export function buildProgram(): Command {
   registerReview(program);
   registerFinalize(program);
   registerExplain(program);
+  registerSetDirectives(program);
 
   return program;
 }

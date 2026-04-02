@@ -1,149 +1,166 @@
-# DIRECTIVES — Sprint 084: Dashboard Tutarlılık + i18n Tam Kapsam + Config Doğrulama
+# DIRECTIVES — Sprint 085: MCP/CLI Parity — Parametre Eşitleme + Eksik Komutlar
 
-## Goal: Settings/Config sayfaları birleştirilsin, TR/EN tam çalışsın, config değişiklikleri doğru dosyaya yazılsın, dashboard işlemleri terminalde görünsün.
+## Goal: ADR-022 uyumu: MCP tool parametrelerini CLI ile eşitle, eksik CLI/MCP komutlarını ekle. Altyapı komutları (attach, web, serve) CLI-only olarak belgelenir.
 
 ---
 
-## Task 1: Settings + Config Sayfa Birleştirme
+## Task 1: MCP Tool Parametre Zenginleştirme — init, start, status, doctor
 - Model: sonnet
 - Effort: high
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/pages/SettingsPage.tsx, src/dashboard/src/pages/ConfigPage.tsx, src/dashboard/src/App.tsx, src/dashboard/src/components/Layout.tsx
-- Scope: src/dashboard/
+- Agent: api-builder
+- Skills: typescript-expert
+- Files: src/mcp/tools/init.ts, src/mcp/tools/start.ts, src/mcp/tools/status.ts, src/mcp/tools/doctor.ts, src/mcp/tools/retro.ts, src/mcp/tools/history.ts
+- Scope: src/mcp/
 
 ### Description
-SettingsPage ve ConfigPage iki ayrı sayfa olarak çakışıyor — ikisi de config yazıyor. BİRLEŞTİR:
+CLI'daki parametreleri MCP tool'larına ekle:
 
-A) ConfigPage'i ana yapılandırma sayfası yap. İçine ekle:
-- En üstte: Doctor sağlık kontrol bölümü (SettingsPage'den taşı)
-- Ortada: Mevcut ConfigPage alanları (30+ alan, kategoriler halinde)
-- Altta: Save butonu
+A) `deckent_init` — şu an 0 parametre, CLI'da 9 var. Ekle:
+- `mode?: string` — plan tier (performance/balanced/economic/api)
+- `language?: string` — dil (en/tr)
+- `projectName?: string` — proje adı
+- `force?: boolean` — mevcut yapıyı yeniden oluştur
+- `auto?: boolean` — otomatik algılama modu (wizard atlama)
 
-B) SettingsPage'i kaldır veya ConfigPage'e yönlendir:
-- App.tsx'te `/settings` route'unu `/config`'e redirect yap
-- Layout.tsx navItems'dan Settings'i kaldır (veya "Settings" → "Config" olarak birleştir)
-- Sidebar'da tek "Yapılandırma/Config" linki olsun
+B) `deckent_start` — şu an sadece `autoApprove`. Ekle:
+- `dryRun?: boolean` — plan göster, spawn etme
+- `force?: boolean` — pre-flight atla
+- `timeout?: number` — sprint max süresi (ms)
+- `sandbox?: boolean` — sandbox modunda çalıştır
 
-C) SettingsPage'deki mode/language/model seçicileri ConfigPage'deki alanlarla çakışıyor. ConfigPage'in CONFIG_FIELDS zaten bu alanları içeriyor — SettingsPage'deki ayrı form gereksiz.
+C) `deckent_status` — şu an 0 parametre. Ekle:
+- `json?: boolean` — ham JSON çıktı
+- `verbose?: boolean` — detaylı çıktı
 
-D) Doctor bölümünü ConfigPage'in üstüne taşı:
-- "System Health" card'ı + Run Doctor butonu
-- Check sonuçları tablosu (pass/fail/warn)
-- Health score
+D) `deckent_doctor` — şu an 0 parametre. Ekle:
+- `profile?: boolean` — sistem profili göster
+- `json?: boolean` — ham JSON çıktı
 
-E) İlk render'da doctor otomatik çalışsın (SettingsPage'deki gibi useEffect ile).
+E) `deckent_retro` — 0 parametre. Ekle:
+- `sprintId?: string` — belirli sprint'in retrosunu oku
 
-**Kanıt:** `grep "SettingsPage" src/dashboard/src/App.tsx` → yönlendirme var veya kaldırılmış
+F) `deckent_history` — 0 parametre. Ekle:
+- `last?: number` — son N sprint
+- `json?: boolean` — ham JSON çıktı
 
-**Test:** `tsc --noEmit` temiz geçmeli.
+Her parametreyi Zod schema'sına ekle ve handler'da kullan. Parametreler opsiyonel — mevcut davranış bozulmamalı.
+
+**Kanıt:** `grep "force\|dryRun\|json\|verbose\|profile" src/mcp/tools/init.ts src/mcp/tools/start.ts src/mcp/tools/status.ts src/mcp/tools/doctor.ts` → parametreler tanımlı
+
+**Test:** `tsc --noEmit` temiz. Mevcut MCP testlerinde 0 regresyon.
 
 ---
 
-## Task 2: i18n Tam Kapsam — Kalan Hardcoded String'ler
-- Model: sonnet
-- Effort: high
-- Agent: refactorer
-- Skills: frontend-expert, typescript-expert
-- Files: src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/pages/HistoryPage.tsx, src/dashboard/src/pages/MemoryPage.tsx, src/dashboard/src/pages/ConfigPage.tsx, src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/components/SprintPhaseTimeline.tsx, src/dashboard/src/components/ActivityFeed.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/components/AgentDetail.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: src/dashboard/
-
-### Description
-Dashboard'daki TÜM hardcoded İngilizce string'leri i18n key'lerine taşı:
-
-A) Her bileşen ve sayfayı tara. Aşağıdaki kalıpları bul ve `t('key')` ile değiştir:
-- "Sprint Status" → t('dashboard.sprint_status')
-- "Updated" → t('dashboard.updated')
-- "Sprint ID" → t('dashboard.sprint_id')
-- "5hr Usage" / "Weekly Usage" → t('dashboard.usage_5hr') / t('dashboard.usage_weekly')
-- "No sprint data available." → t('dashboard.no_data')
-- "Done:", "Active:", "Pending:" → t('dashboard.done'), t('dashboard.active'), t('dashboard.pending')
-- Tablo header'ları: "ID", "Task", "Last HB", "Elapsed", "Action"
-- WorkerCard: "Agent:", "Skill:", "files changed", "Detail"
-- ActivityFeed: her event mesajı
-- HistoryPage: "All Sprints", tablo header'ları
-- MemoryPage: tab isimleri, empty state mesajları
-- ConfigPage: kategori isimleri, "Save Changes", "Reset", alan açıklamaları
-- NewSprintModal: tüm adım başlıkları ve butonlar
-- AgentDetail: header, alan isimleri
-
-B) en.ts'e tüm yeni key'leri ekle (İngilizce değerler)
-C) tr.ts'e tüm yeni key'lerin Türkçe çevirilerini ekle
-D) TranslationKey type'ı otomatik güncellenecek (en.ts'ten derive ediliyor)
-
-E) LanguageProvider'daki dil değişikliği anında tüm bileşenlere yansımalı (context re-render). Sayfa yenileme GEREKMEMELİ.
-
-**Kanıt:** Dashboard kaynak dosyalarında `grep -r '"[A-Z][a-z]' src/dashboard/src/pages/ src/dashboard/src/components/` → i18n key dışında hardcoded İngilizce string olmamalı (teknik terimler hariç)
-
-**Test:** `tsc --noEmit` temiz geçmeli.
-
----
-
-## Task 3: Config Yazma Doğrulama + Geri Okuma
-- Model: sonnet
-- Effort: normal
-- Agent: test-writer
-- Skills: typescript-expert, testing-expert
-- Files: tests/api/server.test.ts, tests/dashboard/config-integration.test.ts
-- Scope: tests/
-
-### Description
-Dashboard'dan yapılan config değişikliklerinin doğru yazılıp okunduğunu doğrulayan testler:
-
-A) API test'lerine ekle (tests/api/server.test.ts):
-- POST /api/config ile `{ mode: "economic" }` gönder → GET /api/config'te `mode: "economic"` dön
-- POST /api/config ile `{ language: "tr" }` gönder → geri oku, `language: "tr"` olmalı
-- POST /api/config ile nested key `{ git: { auto_commit: true } }` → geri oku, nested doğru olmalı
-- POST /api/config ile `{ memory_budget: 900 }` → writeFileSync çağrısında 900 olmalı
-- POST /api/config ile geçersiz değer → 422 dönmeli
-- Mevcut config'i bozmamalı — sadece gönderilen alanlar değişmeli (deepMerge)
-
-B) Round-trip testi: POST → GET → değerler eşleşmeli (en az 5 farklı alan)
-
-C) Nested key round-trip: `skill_routing.testing`, `modes.performance.max_workers` gibi
-
-**Kanıt:** `grep "round-trip\|roundtrip\|config.*write.*read\|POST.*GET.*config" tests/api/server.test.ts` → test var
-
-**Test:** Yeni testlerin tamamı geçmeli.
-
----
-
-## Task 4: Dashboard İşlemlerinin Terminal Çıktısı
+## Task 2: CLI set-directives Komutu
 - Model: sonnet
 - Effort: normal
 - Agent: api-builder
 - Skills: typescript-expert
-- Files: src/api/server.ts, src/cli/commands/web.ts
-- Scope: src/api/, src/cli/
+- Files: src/cli/commands/set-directives.ts, src/cli/index.ts
+- Scope: src/cli/
 
 ### Description
-Dashboard'dan yapılan işlemler terminalde (deckent web çalıştıran terminal) görünsün:
+MCP'de `deckent_set_directives` var ama CLI'da yok. CLI komutu ekle:
 
-A) server.ts'teki POST handler'larına console.log ekle:
-- POST /api/start → `[deckent] Sprint started via dashboard (jobId: xxx)`
-- POST /api/kill/:id → `[deckent] Worker killed via dashboard: xxx`
-- POST /api/cleanup → `[deckent] Cleanup triggered via dashboard (removed: N tasks, N locks)`
-- POST /api/config → `[deckent] Config updated via dashboard: {changed_keys}`
-- POST /api/set-directives → `[deckent] Directives updated via dashboard (N tasks)`
-- POST /api/plan → `[deckent] Plan requested via dashboard (mode: xxx)`
+A) `src/cli/commands/set-directives.ts` oluştur:
+```bash
+deckent set-directives --content "# DIRECTIVES — Sprint 086\n..."
+deckent set-directives --file directives-draft.md
+deckent set-directives  # stdin'den oku (pipe desteği)
+```
 
-B) Format: `[deckent] {action} via dashboard` — tutarlı prefix
+B) Parametreler:
+- `--content <string>` — doğrudan içerik
+- `--file <path>` — dosyadan oku
+- Parametre yoksa stdin'den oku (pipe: `cat draft.md | deckent set-directives`)
 
-C) Sadece POST işlemlerinde logla (GET'ler sessiz)
+C) İçeriği DIRECTIVES.md'ye yaz (mevcut MCP tool ile aynı mantık)
 
-D) Hassas veri loglama: API key gibi değerler loglanmamalı. Config değişikliğinde sadece key isimleri logla, değerleri değil.
+D) Başarı mesajı: "DIRECTIVES.md updated ({N} task blocks detected)"
 
-**Kanıt:** `grep "\[deckent\]" src/api/server.ts` → en az 6 log satırı
+E) `src/cli/index.ts`'e (veya `commands/index.ts`'e) komutu register et
 
-**Test:** `tsc --noEmit` temiz geçmeli.
+F) messages.ts'e çift dilli mesajlar ekle
+
+**Kanıt:** `grep "set-directives\|setDirectives" src/cli/commands/set-directives.ts` → komut var
+
+**Test:** `tsc --noEmit` temiz.
+
+---
+
+## Task 3: MCP agent_list + skill_list Tool'ları
+- Model: sonnet
+- Effort: normal
+- Agent: api-builder
+- Skills: typescript-expert
+- Files: src/mcp/tools/agent-list.ts, src/mcp/tools/skill-list.ts, src/mcp/tools/index.ts
+- Scope: src/mcp/
+
+### Description
+CLI'da `deckent agent list` ve `deckent skill list` var ama MCP'de yok. Ekle:
+
+A) `deckent_agent_list` MCP tool:
+- Parametre: yok (tümünü listele)
+- Dönüş: agent dizisi — her biri: id, name, type (built-in/temp), uses, successRate
+- `.deckent/agents/` dizininden agent.json dosyalarını oku
+
+B) `deckent_skill_list` MCP tool:
+- Parametre: yok
+- Dönüş: skill dizisi — her biri: id, name, category, triggers
+- `.deckent/skills/` dizininden manifest.json dosyalarını oku
+
+C) `src/mcp/tools/index.ts`'e her iki tool'u register et
+
+D) Tool annotations: readOnlyHint=true, destructiveHint=false
+
+**Kanıt:** `grep "agent_list\|skill_list" src/mcp/tools/index.ts` → register edilmiş
+
+**Test:** `tsc --noEmit` temiz. MCP tool sayısı 17→19.
+
+---
+
+## Task 4: ADR-022 Parity Dokümantasyonu
+- Model: haiku
+- Effort: low
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: .brain/DECISIONS.md, DECKENT.md
+- Scope: .brain/, DECKENT.md
+
+### Description
+ADR-022'yi güncelleyerek CLI-only ve MCP-only komutları belgele:
+
+A) `.brain/DECISIONS.md`'ye ADR-022 güncellemesi:
+```
+## ADR-022: CLI/MCP Feature Parity (Updated Sprint 085)
+
+CLI-only komutlar (altyapı/terminal):
+- attach, spawn, watch — tmux oturum yönetimi
+- dashboard, web, serve — sunucu/UI başlatma
+- upgrade, onboard — kurulum sihirbazları
+- plugin install/list/create — eklenti yönetimi
+
+MCP-only komutlar:
+- (yok — tüm MCP tool'ların CLI karşılığı var)
+
+Tam parity (19 MCP tool = 19 CLI komutu):
+init, set-directives, plan, start, status, doctor, retro, history,
+analyze, sync, config, usage, review, run, kill, cleanup, help,
+agent-list (yeni), skill-list (yeni)
+```
+
+B) DECKENT.md'deki MCP tool sayısını 17→19 güncelle
+
+**Kanıt:** `grep "ADR-022\|19 tools" .brain/DECISIONS.md DECKENT.md` → güncel
+
+**Test:** Bu task test gerektirmez.
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
-- Mevcut testlerde 0 regresyon
-- Dashboard'da İngilizce seçilince 0 Türkçe görünmeli
-- Dashboard'da Türkçe seçilince 0 İngilizce görünmeli (teknik terimler hariç)
-- Config round-trip: yazılan = okunan
-- Terminal logları tutarlı format: [deckent] prefix
+- Mevcut MCP/CLI testlerinde 0 regresyon
+- Yeni parametreler opsiyonel — mevcut davranış bozulmamalı
+- MCP tool sayısı: 17→19
+- CLI komut sayısı: 32→33 (set-directives eklendi)
 - %100 GO hedefli

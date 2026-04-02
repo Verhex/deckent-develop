@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
 import { readLatestJobState } from './job-runner.js';
@@ -83,8 +84,12 @@ export function registerStatusTool(server: McpServer): void {
       title: 'Sprint Status',
       description: 'Get the current sprint dashboard status. Returns: agents (active worker list with task assignments), progress (done/total counts + progress bar + ETA), alerts (stale workers, boundary violations, lock issues), job (background job state: RUNNING/COMPLETE/FAILED + sprintId + metrics), agentAssignments (which agent handles which tasks), skillAssignments (which skills are active). Call repeatedly to poll progress. No prerequisite — safe to call anytime.',
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+      inputSchema: z.object({
+        json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption.'),
+        verbose: z.boolean().optional().default(false).describe('Include verbose details: full agent assignment map, skill assignments, and per-task agent/skill breakdown.'),
+      }),
     },
-    async () => {
+    async ({ json, verbose }) => {
       const root = process.cwd();
       const dashPath = join(root, DASHBOARD_FILE);
 
@@ -102,6 +107,9 @@ export function registerStatusTool(server: McpServer): void {
             completedAt: latestJob.completedAt,
             job: latestJob,
           };
+          if (json) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify(completedData) }] };
+          }
           const completedSummary = formatStatusResponse(completedData);
           return {
             content: [{
@@ -111,6 +119,9 @@ export function registerStatusTool(server: McpServer): void {
           };
         }
         const noSprintData = { active: false, message: 'No active sprint.', job: latestJob };
+        if (json) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify(noSprintData) }] };
+        }
         const summary = formatStatusResponse(noSprintData);
         return {
           content: [{
@@ -144,7 +155,14 @@ export function registerStatusTool(server: McpServer): void {
           ? latestJob.tasks
           : undefined;
 
-        const enrichedState = enrichResponse('status', {
+        // verbose: include extra diagnostic fields beyond the standard set
+        const verboseFields = verbose ? {
+          phase: state['phase'],
+          workerDetails: agents,
+          allAlerts: alerts,
+        } : {};
+
+        const rawData = {
           ...state,
           job: latestJob,
           completedTasks,
@@ -154,7 +172,14 @@ export function registerStatusTool(server: McpServer): void {
           alertSummary,
           agentAssignments,
           skillAssignments,
-        });
+          ...verboseFields,
+        };
+
+        if (json) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify(rawData) }] };
+        }
+
+        const enrichedState = enrichResponse('status', rawData);
 
         const summary = formatStatusResponse({
           sprint: sprint as StatusData['sprint'],

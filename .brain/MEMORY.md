@@ -198,3 +198,9 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 ## Sprint sprint-079 Learnings
 - i18n Tam Kapsam — Kalan Hardcoded String'ler: GO_WITH_TECH_DEBT — i18n tam kapsam tamamlandı. 44 yeni translation key eklendi (en.ts + tr.ts). Değiştirilen string'ler: DashboardPage (Spr
 - Config Yazma Doğrulama + Geri Okuma: GO_WITH_TECH_DEBT — Added Config round-trip test suite (10 tests) to tests/api/server.test.ts: mode/language/nested key/memory_budget/422/de
+## Sprint sprint-080 Learnings
+- Fix debt: Tech debt from 077-001-fix: README-TR.md already contains correct UTF-8 Turkish: GO_WITH_TECH_DEBT — debt-077-001-fix resolved. README-TR.md verified: file is UTF-8 encoded with 176 lines containing correct Turkish specia
+- Fix debt: Tech debt from 077-004-fix: POST /api/cleanup endpoint was already fully impleme: GO_WITH_TECH_DEBT — debt-077-004-fix resolved: POST /api/cleanup endpoint was already fully implemented in server.ts:554-607 with active spr
+- MCP Tool Parametre Zenginleştirme — init, start, status, doctor: GO_WITH_TECH_DEBT — Added all 13 new parameters across 6 MCP tools: A) deckent_init: force (overwrite existing files), auto (stack auto-dete
+- CLI set-directives Komutu: GO_WITH_TECH_DEBT — CLI set-directives komutu eklendi. Üç giriş modu: --content (doğrudan içerik), --file (dosyadan oku), stdin (pipe desteğ
+- MCP agent_list + skill_list Tool'ları: GO_WITH_TECH_DEBT — A) deckent_agent_list MCP tool created (agent-list.ts): reads .deckent/agents/*/agent.json, returns id/name/type(built-i

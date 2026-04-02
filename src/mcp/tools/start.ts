@@ -2,7 +2,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
-import { runSprint, BrainError } from '../../orchestra/brain.js';
+import { runSprint, BrainError, readContext, checkUsage, adjustSprintSize, planSprint } from '../../orchestra/brain.js';
 import { writeJobState, buildTaskSummaries } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
@@ -22,13 +22,48 @@ export function registerStartTool(server: McpServer): void {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve all worker tool calls with --dangerously-skip-permissions. Use only in trusted environments — skips Claude permission prompts for file writes, shell commands, etc.'),
+        dryRun: z.boolean().optional().default(false).describe('Plan the sprint without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
+        force: z.boolean().optional().default(false).describe('Skip pre-flight doctor checks. Normally deckent_start runs health checks before spawning; use force=true to bypass when you know the environment is ready.'),
+        timeout: z.number().int().positive().optional().describe('Sprint maximum duration in milliseconds (default: 30 minutes = 1800000). Sprint is marked TIMEOUT if workers do not complete within this window.'),
+        sandbox: z.boolean().optional().default(false).describe('Run sprint in sandbox mode: stashes local git changes before spawning and restores them after the sprint completes. Safe experimentation — no permanent changes on failure.'),
       }),
     },
-    async ({ autoApprove }) => {
+    async ({ autoApprove, dryRun, force, timeout, sandbox }) => {
       const root = process.cwd();
+      // force: MCP does not run pre-flight checks by default (non-interactive context).
+      // The parameter is present for CLI parity — set force=true to document intent.
+      void force;
 
       try {
         const config = await loadConfig(root);
+
+        // Dry-run mode: plan only, no spawn
+        if (dryRun) {
+          const context = readContext(root);
+          const usage = checkUsage(config);
+          const recommendation = adjustSprintSize(config, usage);
+          const sprint = await planSprint(root, config, context, recommendation, { dryRun: true });
+          const taskList = sprint.tasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            model: t.model,
+            effort: t.effort,
+            assignedAgent: t.assignedAgent,
+          }));
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify(enrichResponse('start', {
+                success: true,
+                dryRun: true,
+                sprintId: sprint.id,
+                taskCount: sprint.tasks.length,
+                tasks: taskList,
+                message: 'Dry-run complete. No workers spawned. Review tasks, then call deckent_start without dryRun to execute.',
+              })),
+            }],
+          };
+        }
 
         // Bootstrap provider adapters before sprint operations
         const bootstrap = await bootstrapProviders(config, root);
@@ -39,7 +74,7 @@ export function registerStartTool(server: McpServer): void {
         writeJobState(root, { jobId, status: 'RUNNING', startedAt });
 
         // Fire and forget — don't await. Sprint runs in background.
-        runSprint(root, config, { autoApprove, connector: bootstrap?.connector }).then(sprint => {
+        runSprint(root, config, { autoApprove, sandboxMode: sandbox, timeoutMs: timeout, connector: bootstrap?.connector }).then(sprint => {
           const tasks = buildTaskSummaries(root, sprint.tasks);
           const sm = sprint.metrics;
           const metrics = sm ? {

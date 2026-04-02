@@ -61,16 +61,22 @@ export function registerInitTool(server: McpServer): void {
       description: 'Initialize a Deckent project in the current directory. Creates all required directories (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) and configuration files (config.json, DECKENT.md, DIRECTIVES.md, brain files). Safe to re-run — existing config fields are preserved via merge, and files are only written if missing. After init, run deckent_set_directives → deckent_plan → deckent_start.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        projectName: z.string().describe('Project name used in DECKENT.md header and PROJECT-IDENTITY.md'),
-        mode: z.enum(['max_plan', 'max5x_plan', 'pro_plan', 'api']).optional().default('max_plan').describe('Claude subscription plan mode: max_plan (Claude Max), max5x_plan (5x Max), pro_plan (Pro), api (API key)'),
+        projectName: z.string().optional().describe('Project name used in DECKENT.md header and PROJECT-IDENTITY.md. Defaults to current directory name if omitted.'),
+        mode: z.enum(['max_plan', 'max5x_plan', 'pro_plan', 'api', 'performance', 'balanced', 'economic']).optional().default('max_plan').describe('Plan tier mode: max_plan/performance (Claude Max), max5x_plan (5x Max), pro_plan/balanced (Pro), api/economic (API key)'),
         language: z.enum(['en', 'tr']).optional().default('en').describe('Language for agent prompt templates (en=English, tr=Turkish)'),
+        force: z.boolean().optional().default(false).describe('Force re-initialization: overwrites existing config.json and workspace files. Does not delete .brain/ or .tasks/ data.'),
+        auto: z.boolean().optional().default(false).describe('Auto-detection mode: skip interactive wizard, detect project stack automatically and apply defaults.'),
       }),
     },
-    async ({ projectName, mode, language }) => {
+    async ({ projectName, mode, language, force, auto }) => {
       const root = process.cwd();
+      // auto: hint that project stack should be auto-detected (already default behavior in MCP)
+      void auto;
 
       try {
       const created: string[] = [];
+      // Resolve projectName: use provided value or fall back to directory name
+      const resolvedProjectName = projectName ?? root.split('/').at(-1) ?? 'my-project';
 
       // Directories
       const dirs = [
@@ -89,10 +95,10 @@ export function registerInitTool(server: McpServer): void {
         created.push(dir.replace(root + '/', '') + '/');
       }
 
-      // Config (merge — preserve existing fields)
+      // Config (merge — preserve existing fields; force=true overwrites entirely)
       const configPath = join(root, DECKENT_DIR, 'config.json');
-      const newConfig: Record<string, unknown> = { mode: mode as PlanMode, language, projectName };
-      if (existsSync(configPath)) {
+      const newConfig: Record<string, unknown> = { mode: mode as PlanMode, language, projectName: resolvedProjectName };
+      if (existsSync(configPath) && !force) {
         try {
           const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
           Object.assign(existing, newConfig);
@@ -105,8 +111,17 @@ export function registerInitTool(server: McpServer): void {
       }
       created.push('.deckent/config.json');
 
-      // DECKENT.md (single source of truth — writeIfNotExists)
-      const deckentContent = `# ${projectName} — Deckent Orchestrated
+      // Write helper that respects force flag
+      const writeFile = (filePath: string, content: string): void => {
+        if (force) {
+          writeFileSync(filePath, content);
+        } else {
+          writeIfNotExists(filePath, content);
+        }
+      };
+
+      // DECKENT.md (single source of truth)
+      const deckentContent = `# ${resolvedProjectName} — Deckent Orchestrated
 
 ## Identity
 @.deckent/workspace/IDENTITY.md
@@ -136,7 +151,7 @@ Lint: tsc --noEmit
 ## Boot
 @.deckent/workspace/BOOT.md
 `;
-      writeIfNotExists(join(root, DECKENT_FILE), deckentContent);
+      writeFile(join(root, DECKENT_FILE), deckentContent);
       created.push(DECKENT_FILE);
 
       // Agent files — additive injection, never overwrite
@@ -146,14 +161,14 @@ Lint: tsc --noEmit
       created.push(AGENTS_FILE, CLAUDE_FILE);
 
       // Claude rules (blueprint-quality templates with frontmatter)
-      writeIfNotExists(join(root, CLAUDE_RULES_DIR, 'brain.md'), `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 200 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 600 lines\n- Sprint is NEVER left incomplete\n`);
-      writeIfNotExists(join(root, CLAUDE_RULES_DIR, 'auditor.md'), `---\npaths: [".dashboard", ".brain/PATTERNS.md"]\n---\n# Auditor Rules\n- NEVER write source code\n- Scan every 30 seconds\n- Read all heartbeat files → detect stale agents (>2min = alert)\n- Run git diff --stat → detect boundary violations\n- Check .locks/ → detect stale locks (>5min)\n- Detect circular dependencies / deadlocks\n- Overwrite .dashboard on every scan (never append)\n- Append new patterns to PATTERNS.md (never overwrite)\n- Write alerts for critical issues\n`);
-      writeIfNotExists(join(root, CLAUDE_RULES_DIR, 'worker-default.md'), `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run tests before marking done (npx vitest run)\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`);
+      writeFile(join(root, CLAUDE_RULES_DIR, 'brain.md'), `---\npaths: [".tasks/*", ".brain/*", ".contracts/*"]\n---\n# Brain Rules\n- Always read DIRECTIVES.md first\n- Always check usage before planning\n- Plan mode required before execution\n- Write sprint plan as task JSON files in .tasks/\n- Assign model and effort per task with reason\n- Define scope (directories, filesRead, filesWrite) for each task\n- Define GO/NO-GO criteria for each task\n- Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO\n- Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix\n- Update MEMORY.md after every sprint (max 200 lines)\n- Write RETRO.md (overwrite, max 100 lines)\n- Trigger decay if .brain/ exceeds 600 lines\n- Sprint is NEVER left incomplete\n`);
+      writeFile(join(root, CLAUDE_RULES_DIR, 'auditor.md'), `---\npaths: [".dashboard", ".brain/PATTERNS.md"]\n---\n# Auditor Rules\n- NEVER write source code\n- Scan every 30 seconds\n- Read all heartbeat files → detect stale agents (>2min = alert)\n- Run git diff --stat → detect boundary violations\n- Check .locks/ → detect stale locks (>5min)\n- Detect circular dependencies / deadlocks\n- Overwrite .dashboard on every scan (never append)\n- Append new patterns to PATTERNS.md (never overwrite)\n- Write alerts for critical issues\n`);
+      writeFile(join(root, CLAUDE_RULES_DIR, 'worker-default.md'), `---\npaths: ["src/**", "tests/**"]\n---\n# Worker Rules\n- Read your task file first\n- Write plan before writing code\n- Check .locks/ before writing any file\n- Create and update heartbeat file (.tasks/task-{id}.hb)\n- Run tests before marking done (npx vitest run)\n- Coverage goal: minimum 80%\n- Document changes\n- Stay within your assigned scope\n- Write result file (.tasks/task-{id}.result) — REQUIRED\n`);
 
-      // DIRECTIVES.md
+      // DIRECTIVES.md (never overwrite with force — user content is precious)
       writeIfNotExists(join(root, DIRECTIVES_FILE), '# Directives\n\nDescribe your project goals and architecture here.\nBrain reads this before every sprint.\n');
 
-      // Brain files
+      // Brain files (never overwrite — preserves accumulated knowledge)
       writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
       writeIfNotExists(join(root, BRAIN_DIR, DECISIONS_FILE), '# Architecture Decisions\n');
       writeIfNotExists(join(root, BRAIN_DIR, DEBT_FILE), '# Tech Debt\n');
@@ -164,7 +179,7 @@ Lint: tsc --noEmit
       try {
         const analysis = analyzeProject(root);
         writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
-          projectName,
+          projectName: resolvedProjectName,
           sprintId: 'sprint-000',
           totalSprints: 0,
           mode: mode as string,
@@ -176,7 +191,7 @@ Lint: tsc --noEmit
       } catch {
         // Non-fatal — create minimal identity
         writeIfNotExists(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), generateProjectIdentity({
-          projectName,
+          projectName: resolvedProjectName,
           sprintId: 'sprint-000',
           totalSprints: 0,
           mode: mode as string,
@@ -184,8 +199,8 @@ Lint: tsc --noEmit
       }
 
       // Workspace: TOOLS.md + BOOT.md
-      writeIfNotExists(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));
-      writeIfNotExists(join(root, WORKSPACE_DIR, 'BOOT.md'), `# Boot Sequence\n\n1. Brain reads DIRECTIVES.md\n2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS)\n3. Brain plans sprint\n4. Workers spawned, auditor scan loop starts\n5. Workers execute tasks, write heartbeats\n6. Brain waits for results, evaluates\n7. Sprint complete\n`);
+      writeFile(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));
+      writeFile(join(root, WORKSPACE_DIR, 'BOOT.md'), `# Boot Sequence\n\n1. Brain reads DIRECTIVES.md\n2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS)\n3. Brain plans sprint\n4. Workers spawned, auditor scan loop starts\n5. Workers execute tasks, write heartbeats\n6. Brain waits for results, evaluates\n7. Sprint complete\n`);
 
       // i18n
       const enMessages = {
@@ -238,7 +253,7 @@ Lint: tsc --noEmit
         '`deckent status` — monitor progress',
       ];
 
-      const enriched = enrichResponse('init', { success: true, created, mode, language, projectName, nextSteps }, { lang: language });
+      const enriched = enrichResponse('init', { success: true, created, mode, language, projectName: resolvedProjectName, force, auto, nextSteps }, { lang: language });
 
       return {
         content: [{

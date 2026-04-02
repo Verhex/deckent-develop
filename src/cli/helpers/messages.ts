@@ -245,6 +245,24 @@ const MESSAGES: MessageMap = {
     tr: '  2. İlk sprint\'i başlatmak için `deckent start` çalıştırın',
   },
 
+  // ─── set-directives command ──────────────────────────────────────────
+  'set_directives.updated': {
+    en: 'DIRECTIVES.md updated ({count} task blocks detected)',
+    tr: 'DIRECTIVES.md güncellendi ({count} görev bloğu algılandı)',
+  },
+  'set_directives.file_not_found': {
+    en: 'File not found: {path}',
+    tr: 'Dosya bulunamadı: {path}',
+  },
+  'set_directives.empty_content': {
+    en: 'Content is empty. Provide --content, --file, or pipe content via stdin.',
+    tr: 'İçerik boş. --content, --file kullanın ya da stdin üzerinden içerik pipe edin.',
+  },
+  'set_directives.no_input': {
+    en: 'No input provided. Use --content <string>, --file <path>, or pipe content via stdin.',
+    tr: 'Giriş sağlanmadı. --content <string>, --file <path> kullanın ya da stdin üzerinden içerik pipe edin.',
+  },
+
   // ─── error codes (structured) ─────────────────────────────────────
   'error.tmux_not_found': {
     en: 'tmux not found. Install: brew install tmux (macOS) / sudo apt install tmux (Linux). Or use spawn_backend: "subprocess" in config.',

@@ -2219,3 +2219,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 079-004: Dashboard İşlemlerinin Terminal Çıktısı (DONE)
 
 ---
+## Sprint 80 — sprint-080
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-02
+**Duration:** 885s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | 16.7% |
+| Duration | 885182ms |
+
+### Tasks
+
+- 080-001: Fix debt: Tech debt from 077-001-fix: README-TR.md already contains correct UTF-8 Turkish (GO_WITH_TECH_DEBT)
+- 080-002: Fix debt: Tech debt from 077-004-fix: POST /api/cleanup endpoint was already fully impleme (GO_WITH_TECH_DEBT)
+- 080-003: MCP Tool Parametre Zenginleştirme — init, start, status, doctor (GO_WITH_TECH_DEBT)
+- 080-004: CLI set-directives Komutu (GO_WITH_TECH_DEBT)
+- 080-005: MCP agent_list + skill_list Tool'ları (GO_WITH_TECH_DEBT)
+- 080-006: ADR-022 Parity Dokümantasyonu (DONE)
+
+---

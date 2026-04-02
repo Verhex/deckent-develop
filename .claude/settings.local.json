@@ -125,7 +125,10 @@
       "Bash(echo \"$f\")",
       "Bash(chmod +x dist/cli/entry.js dist/mcp/server.js)",
       "mcp__deckent__deckent_kill",
-      "Bash(find . -name index.html -path */dashboard/* -not -path */node_modules/*)"
+      "Bash(find . -name index.html -path */dashboard/* -not -path */node_modules/*)",
+      "Bash(grep -h \"server.registerTool\\(\" /home/alperen/deckent-dev/src/mcp/tools/*.ts -A 1)",
+      "Bash(cat:*)",
+      "Bash(grep -h \"registerResource\\(\" /home/alperen/deckent-dev/src/mcp/resources/*.ts)"
     ]
   },
   "outputStyle": "default"

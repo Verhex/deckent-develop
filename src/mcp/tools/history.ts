@@ -34,15 +34,19 @@ export function registerHistoryTool(server: McpServer): void {
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         last: z.number().min(1).max(50).optional().default(5).describe('Number of most recent sprints to return (1-50, default: 5). Sprints are sorted by sprint ID ascending.'),
+        json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping to other tools.'),
       }),
     },
-    async ({ last }) => {
+    async ({ last, json }) => {
       const root = process.cwd();
       const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
 
       try {
       if (!existsSync(sprintsDir)) {
         const emptyData = { sprints: [], trend: 'insufficient_data' };
+        if (json) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify(emptyData) }] };
+        }
         const summary = formatHistoryResponse(emptyData as HistoryData);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enrichResponse('history', emptyData), summary)) }],
@@ -61,6 +65,11 @@ export function registerHistoryTool(server: McpServer): void {
 
       const trend = detectTrend(sprints);
       const historyData = { sprints, trend };
+
+      if (json) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify(historyData) }] };
+      }
+
       const enriched = enrichResponse('history', historyData);
       const summary = formatHistoryResponse(historyData as HistoryData);
 

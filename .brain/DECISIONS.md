@@ -214,3 +214,28 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 Her fazda backward compatibility sprint-controller re-export layer üzerinden korundu.
 
 **Consequence:** `sprint-controller.ts` orchestration koordinatörü rolüne döndü — iş mantığı bağımsız modüllerde. orchestra/ modül sayısı 37'den 47'ye çıktı. Her yeni modül bağımsız unit test kapsamı kazandı. Kademeli split stratejisi büyük refactor riskini minimize etti.
+
+## ADR-022: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar (Updated Sprint 085)
+
+**Context:** Sprint 085'te MCP tool parametreleştirilmesi tamamlandı. `deckent_init`, `deckent_start`, `deckent_status`, `deckent_doctor`, `deckent_retro`, `deckent_history` araçlarına CLI karşılıkları olanyla eşit parametreler eklendi. Ayrıca `deckent_agent_list` ve `deckent_skill_list` araçları CLI-only olan `deckent agent list` ve `deckent skill list` komutlarını MCP'ye getirdi.
+
+**Decision:** CLI-only komutlar altyapı/terminal işlemleridir ve MCP'de yer almaz:
+- **Altyapı:** `attach`, `spawn`, `watch` — tmux oturum yönetimi
+- **Sunucu/UI:** `dashboard`, `web`, `serve` — arabirim başlatma
+- **Kurulum:** `upgrade`, `onboard` — setup sihirbazları
+- **Eklenti:** `plugin install`, `plugin list`, `plugin create` — eklenti yönetimi
+
+MCP-only komutlar yoktur — tüm MCP araçlarının CLI karşılığı mevcuttur.
+
+**Tam Parity:** 19 MCP araç = 19 CLI komutu (Sprint 085 sonrası):
+- Core: `init`, `set-directives`, `plan`, `start`, `status`, `doctor`, `retro`, `history`
+- Management: `analyze`, `sync`, `config`, `usage`, `review`
+- Execution: `run`, `kill`, `cleanup`
+- Meta: `help`, `agent-list`, `skill-list`
+
+**Consequence:**
+- Kullanıcı CLI'da yapabildiği her şeyi MCP (Claude Code, VS Code, JetBrains) üzerinden de yapabilir
+- MCP tool sayısı 16'dan 19'a çıktı (`deckent_agent_list`, `deckent_skill_list` eklendi)
+- CLI komut sayısı 32'den 33'e çıktı (`set-directives` eklendi)
+- Parametre parity: tüm MCP araçları CLI komutlarıyla aynı giriş/çıkış şemasını kullanır
+- Altyapı komutları (attach, web, serve, plugin) sadece CLI'da tutulur, MCP'de eksik kalır intentional olarak
