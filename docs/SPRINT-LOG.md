@@ -2749,3 +2749,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 098-005: PROJECT-IDENTITY + CLAUDE.md Sayı Güncellemeleri (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 99 — sprint-099
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 976s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 975872ms |
+
+### Tasks
+
+- 099-001: RETRO Done Sayacı — Evaluations Map Debug + Fix (GO_WITH_TECH_DEBT)
+- 099-002: Job Output Reform — Detaylı Gerekçe + Metrik (GO_WITH_TECH_DEBT)
+- 099-003: VISION.md + health-check.md + roadmap.md Sayı Güncellemeleri (GO_WITH_TECH_DEBT)
+- 099-004: README Badge + ANALYSIS Sprint 098 Güncelleme (GO_WITH_TECH_DEBT)
+- 099-005: PROJECT-IDENTITY Test Count Fix + CLAUDE.md Module Count (GO_WITH_TECH_DEBT)
+
+---

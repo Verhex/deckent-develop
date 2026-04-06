@@ -1,7 +1,7 @@
-# Sprint sprint-098 Retrospective
+# Sprint sprint-099 Retrospective
 
 ## Summary
-Completed 5/5 tasks in 8 minutes 26s.
+Completed 5/5 tasks in 16 minutes 16s.
 
 ## Highlights
 - 5 tasks completed on first try
@@ -12,8 +12,8 @@ Completed 5/5 tasks in 8 minutes 26s.
 |------|-------|
 | Tasks completed | 5/5 |
 | New test files | 1 |
-| Code changes | +77 / -56 |
-| Sprint time | 8 minutes 26s |
+| Code changes | +156 / -29 |
+| Sprint time | 16 minutes 16s |
 | NO_GO rate | 0% (0/5) |
 
 
@@ -31,9 +31,9 @@ Completed 5/5 tasks in 8 minutes 26s.
 | typescript-expert | 2 | 0 | 2 | 0 | 0% |
 
 ## Learnings
-- RETRO Done Sayacı — GO_WITH_TECH_DEBT = Done Olarak Sayılmalı: completed with tech debt — buildAgentPerformance() ve buildSkillPerformance() zaten GO_WITH_TECH_DEBT'i done'a sayıyordu (Sprint 093 fix). Ancak sprint-reporter.test.ts satır 29
-- Sprint History — Son 5 Sprint Döndürmeli: completed with tech debt — Root cause: MCP deckent_history tool only read .brain/sprints/ directory (2 files), ignoring .brain/archive/ where 85 sprint logs reside. CLI history 
-- ANALYSIS-2026-04-02.md Güncel Durum Güncellemesi: completed with tech debt — ANALYSIS-2026-04-02.md Sprint 097 sonuçlarıyla güncellendi: (A) Bölüm IX Sonuç tamamen yeniden yazıldı — Sprint 088→097, tüm tamamlanan hedefler liste
-- README + DECKENT.md ModelRegistry Özelliği Dokümante: completed with tech debt — README.md ve README-TR.md dosyalarındaki sprint badge sayısı 95+→97+ olarak güncellendi. ModelRegistry, 13 model, 16 built-in agent, 21 skill bilgiler
-- PROJECT-IDENTITY + CLAUDE.md Sayı Güncellemeleri: completed with tech debt — Modül sayıları güncellendi: orchestra/ 47→49, core/ 50→52 (model-registry.ts ve mode-presets.ts eklenmesi). IDENTITY.md zaten günceldi (16 built-in ag
-- Recurring pattern (1988x): stale_heartbeat
+- RETRO Done Sayacı — Evaluations Map Debug + Fix: completed with tech debt — Kök neden bulundu ve doğrulandı: Sprint 093 commit'inde (2085f0f) buildAgentPerformance() içindeki GO_WITH_TECH_DEBT bloğu sadece `data.debt += 1` yap
+- Job Output Reform — Detaylı Gerekçe + Metrik: completed with tech debt — Job Output Reform tamamlandı: (A) finalizeSprint() job summary bloğu zenginleştirildi — her task için evaluation, reason, filesChanged, linesAdded, li
+- VISION.md + health-check.md + roadmap.md Sayı Güncellemeleri: completed with tech debt — 3 dosyadaki tüm eski sayılar güncellendi: VISION.md (6 düzeltme: sprint 82→98+, CLI 33→34+, MCP resource 9→8, agent 9→16, skill 11→21), health-check.m
+- README Badge + ANALYSIS Sprint 098 Güncelleme: completed with tech debt — A) README.md ve README-TR.md: sprint badge 97+ → 98+ güncellendi. B) ANALYSIS-2026-04-02.md: Bölüm I tablosu güncellendi (Toplam Sprint 97→98, Orchest
+- PROJECT-IDENTITY Test Count Fix + CLAUDE.md Module Count: completed with tech debt — PROJECT-IDENTITY.md: Test Count 12 → 12,193+ düzeltildi. CLAUDE.md zaten günceldi (49 modules orchestra, 52 modules core) — ek değişiklik gerekmedi. K
+- Recurring pattern (2044x): stale_heartbeat

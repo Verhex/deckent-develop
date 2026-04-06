@@ -89,3 +89,9 @@ A) buildArgs() güncellendi:
 - ANALYSIS-2026-04-02.md Güncel Durum Güncellemesi: GO_WITH_TECH_DEBT — ANALYSIS-2026-04-02.md Sprint 097 sonuçlarıyla güncellendi: (A) Bölüm IX Sonuç tamamen yeniden yazıldı — Sprint 088→097,
 - README + DECKENT.md ModelRegistry Özelliği Dokümante: GO_WITH_TECH_DEBT — README.md ve README-TR.md dosyalarındaki sprint badge sayısı 95+→97+ olarak güncellendi. ModelRegistry, 13 model, 16 bui
 - PROJECT-IDENTITY + CLAUDE.md Sayı Güncellemeleri: GO_WITH_TECH_DEBT — Sayılar güncellendi: (A) PROJECT-IDENTITY.md — agent-pool.ts 9→16 built-in, skill-pool.ts 11→21 built-in, core/ 48→50 mo
+## Sprint sprint-099 Learnings
+- RETRO Done Sayacı — Evaluations Map Debug + Fix: GO_WITH_TECH_DEBT — Kök neden bulundu ve doğrulandı: Sprint 093 commit'inde (2085f0f) buildAgentPerformance() içindeki GO_WITH_TECH_DEBT blo
+- Job Output Reform — Detaylı Gerekçe + Metrik: GO_WITH_TECH_DEBT — Job Output Reform tamamlandı: (A) finalizeSprint() job summary bloğu zenginleştirildi — her task için evaluation, reason
+- VISION.md + health-check.md + roadmap.md Sayı Güncellemeleri: GO_WITH_TECH_DEBT — 3 dosyadaki tüm eski sayılar güncellendi: VISION.md (6 düzeltme: sprint 82→98+, CLI 33→34+, MCP resource 9→8, agent 9→16
+- README Badge + ANALYSIS Sprint 098 Güncelleme: GO_WITH_TECH_DEBT — A) README.md ve README-TR.md: sprint badge 97+ → 98+ güncellendi. B) ANALYSIS-2026-04-02.md: Bölüm I tablosu güncellendi
+- PROJECT-IDENTITY Test Count Fix + CLAUDE.md Module Count: GO_WITH_TECH_DEBT — PROJECT-IDENTITY.md: Test Count 12 → 12,193+ düzeltildi. CLAUDE.md zaten günceldi (49 modules orchestra, 52 modules core

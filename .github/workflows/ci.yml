@@ -191,6 +191,8 @@ jobs:
           node-version: '22.x'
           cache: npm
       - run: npm ci
+      - name: Install dashboard dependencies
+        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
       - run: npm run build
       - name: Verify dist
         run: |

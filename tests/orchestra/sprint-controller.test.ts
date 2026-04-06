@@ -312,6 +312,10 @@ import { providerRegistry } from '../../src/core/provider.js';
 // Rich output mock access
 import { formatRichSprintSummary } from '../../src/cli/helpers/sprint-summary-rich.js';
 const mockedFormatRichSprintSummary = vi.mocked(formatRichSprintSummary);
+
+// Sprint reporter mock access (for calculateMetrics override in job output tests)
+import { calculateMetrics } from '../../src/orchestra/sprint-reporter.js';
+const mockedCalculateMetrics = vi.mocked(calculateMetrics);
 const mockedProviderRegistry = vi.mocked(providerRegistry);
 
 // Task router mock access
@@ -2228,5 +2232,170 @@ describe('interruptActiveSprint — SIGINT cleanup', () => {
 
     expect(vi.mocked(killWorker)).toHaveBeenCalledWith('001-001');
     expect(vi.mocked(killWorker)).toHaveBeenCalledWith('001-002');
+  });
+});
+
+// ═══ finalizeSprint — Job Output Reform ═══════════════════════════════
+describe('finalizeSprint — job output reform', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupFileMocks();
+    resetInterruptState();
+    clearActiveSprint();
+    mockedExistsSync.mockReturnValue(false);
+    mockedReaddirSync.mockReturnValue([]);
+    mockedSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: ' src/foo.ts | 10 ++++\n',
+      stderr: '',
+      pid: 1,
+      output: [],
+      signal: null,
+    } as ReturnType<typeof spawnSync>);
+    // Restore calculateMetrics mock (vi.clearAllMocks may reset factory-created mockReturnValue)
+    mockedCalculateMetrics.mockReturnValue({
+      totalTasks: 1, completedTasks: 1, techDebtTasks: 0, noGoTasks: 0,
+      durationMs: 1000, coveragePercent: 90, noGoRate: 0, newDebtCount: 0,
+      resolvedDebtCount: 0, totalOpenDebt: 0, boundaryViolations: 0,
+      crossAssignments: 0, contextLinesUsed: 0,
+    });
+  });
+
+  it('writes rich evaluations with per-task details to job JSON', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([
+      [sprint.tasks[0]!.id, TaskEvaluation.DONE],
+    ]);
+    const results: TaskResult[] = [{
+      taskId: sprint.tasks[0]!.id,
+      workerId: 'w-001-001',
+      filesChanged: ['src/foo.ts', 'tests/foo.test.ts'],
+      linesAdded: 42,
+      linesRemoved: 7,
+      testsPassed: true,
+      coverage: 95,
+      selfAssessment: 'DONE',
+      notes: 'All tests pass, feature complete',
+    }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
+      typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
+    );
+    expect(jobWriteCall).toBeDefined();
+
+    const jobData = JSON.parse(jobWriteCall![1] as string);
+    const taskEval = jobData.evaluations[sprint.tasks[0]!.id];
+    expect(taskEval).toBeDefined();
+    expect(taskEval.evaluation).toBe('DONE');
+    expect(taskEval.filesChanged).toEqual(['src/foo.ts', 'tests/foo.test.ts']);
+    expect(taskEval.linesAdded).toBe(42);
+    expect(taskEval.linesRemoved).toBe(7);
+    expect(taskEval.testsPassed).toBe(true);
+    expect(taskEval.coverage).toBe(95);
+    expect(taskEval.selfAssessment).toBe('DONE');
+    expect(taskEval.reason).toBe('All tests pass, feature complete');
+    expect(taskEval.techDebtDetail).toBe('');
+  });
+
+  it('sets techDebtDetail for GO_WITH_TECH_DEBT evaluations', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([
+      [sprint.tasks[0]!.id, TaskEvaluation.GO_WITH_TECH_DEBT],
+    ]);
+    const results: TaskResult[] = [{
+      taskId: sprint.tasks[0]!.id,
+      workerId: 'w-001-001',
+      filesChanged: ['src/bar.ts'],
+      linesAdded: 15,
+      linesRemoved: 3,
+      testsPassed: true,
+      coverage: 80,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      notes: 'Tests passed but no new test files written',
+    }];
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
+      typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
+    );
+    const jobData = JSON.parse(jobWriteCall![1] as string);
+    const taskEval = jobData.evaluations[sprint.tasks[0]!.id];
+    expect(taskEval.evaluation).toBe('GO_WITH_TECH_DEBT');
+    expect(taskEval.techDebtDetail).toBe('Tests passed but no new test files written');
+  });
+
+  it('summary does not double-count TECH_DEBT in completed tasks', async () => {
+    const tasks = [
+      makeTask({ id: '001-001' }),
+      makeTask({ id: '001-002' }),
+      makeTask({ id: '001-003' }),
+    ];
+    const sprint = makeSprint({ tasks });
+    const evaluations = new Map<string, TaskEvaluation>([
+      ['001-001', TaskEvaluation.DONE],
+      ['001-002', TaskEvaluation.GO_WITH_TECH_DEBT],
+      ['001-003', TaskEvaluation.GO_WITH_TECH_DEBT],
+    ]);
+    const results: TaskResult[] = tasks.map(t => ({
+      taskId: t.id,
+      workerId: `w-${t.id}`,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 0,
+      selfAssessment: 'DONE' as const,
+      notes: '',
+    }));
+
+    // Override calculateMetrics mock to return correct values for 3-task scenario
+    mockedCalculateMetrics.mockReturnValueOnce({
+      totalTasks: 3, completedTasks: 3, techDebtTasks: 2, noGoTasks: 0,
+      durationMs: 1000, coveragePercent: 0, noGoRate: 0, newDebtCount: 2,
+      resolvedDebtCount: 0, totalOpenDebt: 0, boundaryViolations: 0,
+      crossAssignments: 0, contextLinesUsed: 0,
+    });
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
+      typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
+    );
+    const jobData = JSON.parse(jobWriteCall![1] as string);
+
+    // completedTasks = DONE(1) + TECH_DEBT(2) = 3, totalTasks = 3
+    // Summary should say 3/3, not 5/3
+    expect(jobData.summary).toContain('3/3');
+    expect(jobData.summary).toContain('1 DONE');
+    expect(jobData.summary).toContain('2 TECH_DEBT');
+    expect(jobData.summary).toContain('0 NO_GO');
+
+    // metrics.done = pure DONE count (excluding TECH_DEBT)
+    expect(jobData.metrics.done).toBe(1);
+    expect(jobData.metrics.techDebt).toBe(2);
+    expect(jobData.metrics.noGo).toBe(0);
+  });
+
+  it('handles missing result for a task gracefully', async () => {
+    const sprint = makeSprint();
+    const evaluations = new Map<string, TaskEvaluation>([
+      [sprint.tasks[0]!.id, TaskEvaluation.NO_GO],
+    ]);
+    const results: TaskResult[] = []; // no result
+
+    await finalizeSprint('/tmp/test', sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+
+    const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
+      typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
+    );
+    const jobData = JSON.parse(jobWriteCall![1] as string);
+    const taskEval = jobData.evaluations[sprint.tasks[0]!.id];
+    expect(taskEval.evaluation).toBe('NO_GO');
+    expect(taskEval.filesChanged).toEqual([]);
+    expect(taskEval.reason).toBe('');
+    expect(taskEval.selfAssessment).toBe('NO_GO');
   });
 });

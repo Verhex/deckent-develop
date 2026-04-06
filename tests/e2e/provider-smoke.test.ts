@@ -160,7 +160,7 @@ describe('Gemini Adapter Smoke Tests', () => {
     expect(cmd).toContain('gemini');
     expect(cmd).toContain('-p');
     expect(cmd).toContain('--output-format json');
-    expect(cmd).toContain('--model gemini-2.5-pro');
+    expect(cmd).toContain('-m gemini-2.5-pro');
     expect(cmd).toContain('/tmp/prompt.json');
   });
 

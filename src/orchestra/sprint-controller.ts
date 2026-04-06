@@ -1287,6 +1287,7 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:writeSprintLog', e); }
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
+  debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
   try {
     // Build skillMap from tasks for Skill Performance table in RETRO.md
     const skillMap = new Map<string, string[]>();
@@ -1554,7 +1555,44 @@ export async function finalizeSprint(
     const secs = Math.floor((durationMs % 60000) / 1000);
     const durationStr = mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
 
-    const summary = `Sprint ${sprint.id} tamamlandı (${durationStr}) — ${metrics.completedTasks + metrics.techDebtTasks}/${metrics.totalTasks} task: ${metrics.completedTasks} DONE, ${metrics.techDebtTasks} TECH_DEBT, ${metrics.noGoTasks} NO_GO | Agent: ${agentParts}`;
+    // completedTasks already includes TECH_DEBT (see calculateMetrics), so use it directly
+    const donePure = metrics.completedTasks - metrics.techDebtTasks;
+    const summary = `Sprint ${sprint.id} tamamlandı (${durationStr}) — ${metrics.completedTasks}/${metrics.totalTasks} task başarılı: ${donePure} DONE, ${metrics.techDebtTasks} TECH_DEBT, ${metrics.noGoTasks} NO_GO | Agent: ${agentParts}`;
+
+    // Build rich evaluations with per-task details from results
+    const richEvaluations: Record<string, {
+      evaluation: string;
+      title: string;
+      agent: string;
+      skills: string[];
+      reason: string;
+      filesChanged: string[];
+      linesAdded: number;
+      linesRemoved: number;
+      testsPassed: boolean;
+      coverage: number;
+      selfAssessment: string;
+      techDebtDetail: string;
+    }> = {};
+    for (const [taskId, evaluation] of evaluations) {
+      const taskResult = results.find(r => r.taskId === taskId);
+      const task = sprint.tasks.find(t => t.id === taskId);
+      const isTechDebt = evaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
+      richEvaluations[taskId] = {
+        evaluation,
+        title: task?.title ?? '',
+        agent: task?.assignedAgent ?? 'generic',
+        skills: task?.assignedSkills ?? [],
+        reason: taskResult?.notes ?? '',
+        filesChanged: taskResult?.filesChanged ?? [],
+        linesAdded: taskResult?.linesAdded ?? 0,
+        linesRemoved: taskResult?.linesRemoved ?? 0,
+        testsPassed: taskResult?.testsPassed ?? false,
+        coverage: taskResult?.coverage ?? 0,
+        selfAssessment: taskResult?.selfAssessment ?? evaluation,
+        techDebtDetail: isTechDebt ? (taskResult?.notes ?? '') : '',
+      };
+    }
 
     const jobFile = join(jobsDir, `${sprint.id}.json`);
     const jobData = {
@@ -1564,14 +1602,14 @@ export async function finalizeSprint(
       completedAt: new Date().toISOString(),
       metrics: {
         totalTasks: metrics.totalTasks,
-        done: metrics.completedTasks,
+        done: donePure,
         techDebt: metrics.techDebtTasks,
         noGo: metrics.noGoTasks,
         duration: durationStr,
         durationMs: metrics.durationMs,
       },
       agentBreakdown,
-      evaluations: Object.fromEntries(evaluations),
+      evaluations: richEvaluations,
     };
     writeFileSync(jobFile, JSON.stringify(jobData, null, 2) + '\n');
     debugLog('finalizeSprint:jobSummary', `Job summary written to ${jobFile}`);

@@ -56,7 +56,7 @@ tmux, birden fazla AI worker'ı paralel terminal session'larında çalıştırı
 
 ### MCP (Model Context Protocol) Entegrasyonu
 
-MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 19 tool ve 9 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
+MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 19 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
 
 ---
 
@@ -100,11 +100,11 @@ Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna
 |--------|-------|
 | Test sayısı | 12,193+ |
 | Coverage | 96%+ |
-| Tamamlanan sprint | 82 |
-| CLI komut | 33 |
+| Tamamlanan sprint | 98+ |
+| CLI komut | 34+ |
 | MCP tool | 19 |
-| MCP resource | 9 |
-| Built-in agent | 9 |
-| Built-in skill | 11 |
+| MCP resource | 8 |
+| Built-in agent | 16 |
+| Built-in skill | 21 |
 | Provider | 3 (Claude, Codex, Gemini) |
 | Platform | macOS, Linux, WSL2, Windows |

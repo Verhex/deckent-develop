@@ -97,5 +97,5 @@ Sprint 051-065 ile planlanan ve ilerleme durumu:
 
 ---
 
-*Current status: Sprint 095 completed — 12,193+ tests passing, 96%+ coverage, 34+ CLI commands*
+*Current status: Sprint 098+ completed — 12,193+ tests passing, 96%+ coverage, 34+ CLI commands*
 *Source of truth: [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md) — Sections 12, 19, 23, 24*

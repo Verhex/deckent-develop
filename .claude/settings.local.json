@@ -139,7 +139,10 @@
       "Bash(echo \"EXIT: $?\")",
       "mcp__deckent__deckent_agent_list",
       "mcp__deckent__deckent_skill_list",
-      "Bash(tmux kill-session:*)"
+      "Bash(tmux kill-session:*)",
+      "Bash(DECKENT_DEBUG=1 npx deckent plan --mode ai)",
+      "Bash(DECKENT_DEBUG=1 npx deckent plan --planning-mode ai)",
+      "Bash(DECKENT_DEBUG=1 npx deckent:*)"
     ]
   },
   "outputStyle": "Explanatory"

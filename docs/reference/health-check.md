@@ -1,7 +1,7 @@
 # Deckent Health Check — Sprint 065
 
 *Last audit: 2026-03-26 (Sprint 065 complete)*
-*Project: 65 sprints, 11,862 tests, 96%+ coverage*
+*Project: 98+ sprints, 12,193+ tests, 96%+ coverage*
 
 ---
 
@@ -76,7 +76,7 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 - CLI hints, MCP enrichment, error messages all localized
 
 ### Section 16: Self-Test 3 Layer — WORKING
-- 11,862 tests, 469 test files, 96%+ coverage
+- 12,193+ tests, 96%+ coverage
 
 ### Section 21: MCP — WORKING
 - 19 tools (all enriched with _enriched meta), 8 resources, background job pattern
@@ -92,7 +92,7 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 
 | Metric | Value | Source |
 |--------|-------|--------|
-| Tests | 11,862 | `npx vitest run` |
+| Tests | 12,193+ | `npx vitest run` |
 | Test files | 469 | `npx vitest run` |
 | Coverage | 96%+ | `npx vitest run --coverage` |
 | Source files | 247 .ts | src/ directory |
@@ -101,10 +101,10 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 | MCP tools | 19 (enriched) | src/mcp/tools/ |
 | MCP resources | 8 | src/mcp/resources/ |
 | HTTP endpoints | 17 | src/api/server.ts |
-| Built-in agents | 9 | .deckent/agents/ |
-| Built-in skills | 11 | .deckent/skills/ |
+| Built-in agents | 16 | .deckent/agents/ |
+| Built-in skills | 21 | .deckent/skills/ |
 | Providers | 3 (Claude, Codex, Gemini) | src/providers/ |
-| Sprints completed | 65 | .brain/sprints/ + archive/ |
+| Sprints completed | 98+ | .brain/sprints/ + archive/ |
 | ADRs | 21 | .brain/DECISIONS.md |
 | .brain/ budget | ~357 / 600 lines | countBrainLines() |
 
@@ -112,7 +112,7 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 
 ## Agent & Skill System Status
 
-### Built-in Agents (9)
+### Built-in Agents (16)
 
 | Agent | Status | Specialization |
 |-------|--------|---------------|
@@ -126,7 +126,7 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 | performance-analyzer | WORKING | Performance profiling, optimization |
 | ci-guardian | WORKING | CI/CD integration, regression detection (Sprint 062) |
 
-### Built-in Skills (11)
+### Built-in Skills (21)
 
 | Skill | Status |
 |-------|--------|

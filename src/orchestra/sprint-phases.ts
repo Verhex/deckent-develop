@@ -355,6 +355,7 @@ export async function runEvaluatePhase(
         } catch (e) { debugLog('runEvaluatePhase:afterTaskHookTimeout', e); }
       }
     }
+    debugLog('runEvaluatePhase:done', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
