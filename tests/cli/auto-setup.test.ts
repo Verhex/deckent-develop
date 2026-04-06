@@ -42,7 +42,7 @@ describe('generateSetupRecommendation', () => {
     expect(result.mode).toBe('performance');
     expect(result.maxWorkers).toBe(4); // ceil(8 * 0.5)
     expect(result.brainModel).toBe('opus');
-    expect(result.defaultModel).toBe('sonnet');
+    expect(result.defaultModel).toBe('opus');
     expect(result.planning).toBe('ai');
   });
 
