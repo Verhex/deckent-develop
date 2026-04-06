@@ -36,11 +36,11 @@ export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
  * Accepted in config.mode and --mode CLI flag.
  */
 export const MODE_ALIASES: Readonly<Record<string, PlanMode>> = {
-  performance: 'max_plan',
-  balanced: 'max5x_plan',
-  economic: 'pro_plan',
+  // Legacy aliases → new canonical names
+  max_plan: 'performance',
+  max5x_plan: 'balanced',
+  pro_plan: 'economic',
   unlimited: 'api',
-  // Reverse aliases: old names also resolve to themselves (noop, handled by ?? fallback)
 } as const;
 
 /**
@@ -53,7 +53,7 @@ export function resolveMode(mode: string): string {
 
 // ─── Default Mode Definitions (Blueprint 13) ────────────────────────
 
-const VALID_MODES: readonly PlanMode[] = ['max_plan', 'max5x_plan', 'pro_plan', 'api'] as const;
+const VALID_MODES: readonly PlanMode[] = ['performance', 'balanced', 'economic', 'api', 'max_plan', 'max5x_plan', 'pro_plan'] as const;
 const VALID_MODELS = ALL_MODELS;
 const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 
@@ -61,21 +61,21 @@ const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MODEL_MAP) as ProviderName[];
 
 export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
-  max_plan: {
+  performance: {
     max_workers: 8,
     brain_model: 'opus',
     default_model: 'opus',
     haiku_allowed: true,
     brain_planning: 'auto',
   },
-  max5x_plan: {
+  balanced: {
     max_workers: 5,
     brain_model: 'sonnet',
     default_model: 'opus',
     haiku_allowed: true,
     brain_planning: 'auto',
   },
-  pro_plan: {
+  economic: {
     max_workers: 3,
     brain_model: 'sonnet',
     default_model: 'sonnet',
@@ -152,7 +152,7 @@ export function validateConfig(config: DeckentConfig): string[] {
   const maxWorkersWarnings: string[] = [];
 
   if (!VALID_MODES.includes(config.mode)) {
-    errors.push(`Invalid value '${config.mode}' for field 'mode'. Valid options: ${VALID_MODES.join(', ')} (aliases: performance, balanced, economic, unlimited)`);
+    errors.push(`Invalid value '${config.mode}' for field 'mode'. Valid options: performance, balanced, economic, api (legacy: max_plan, max5x_plan, pro_plan)`);
   }
 
   if (config.language !== undefined && !(SUPPORTED_LANGUAGES as readonly string[]).includes(config.language)) {
@@ -487,7 +487,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     }
   }
 
-  // Resolve alias before validation so 'performance' → 'max_plan' etc.
+  // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
   // ─── Env var overrides ─────────────────────────────────────────────
@@ -511,7 +511,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
   validateConfig(config);
 
   // Mode is validated above — activeModeConfig is guaranteed to exist
-  const activeModeConfig = (config.modes[config.mode] ?? config.modes['max_plan']) as PlanModeConfig;
+  const activeModeConfig = (config.modes[config.mode] ?? config.modes['performance']) as PlanModeConfig;
 
   if (config.mode === 'api' && activeModeConfig.requires) {
     const envVar = activeModeConfig.requires;
@@ -655,9 +655,9 @@ export interface ConfigMetadataEntry {
 export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
   mode: {
     description: 'Active plan mode — controls worker count and model tier.',
-    type: "'max_plan' | 'max5x_plan' | 'pro_plan' | 'api'",
-    default: 'max5x_plan',
-    options: ['max_plan', 'max5x_plan', 'pro_plan', 'api', 'performance', 'balanced', 'economic', 'unlimited'],
+    type: "'performance' | 'balanced' | 'economic' | 'api'",
+    default: 'balanced',
+    options: ['performance', 'balanced', 'economic', 'api'],
     category: 'Sprint',
     required: true,
   },
@@ -1020,12 +1020,12 @@ export function mergeConfigs(
     config = deepMerge(config, projectConfig);
   }
 
-  // Resolve alias before validation so 'performance' → 'max_plan' etc.
+  // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
   validateConfig(config);
 
-  const activeModeConfig = (config.modes[config.mode] ?? config.modes['max_plan']) as PlanModeConfig;
+  const activeModeConfig = (config.modes[config.mode] ?? config.modes['performance']) as PlanModeConfig;
 
   return {
     mode: config.mode,

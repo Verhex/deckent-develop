@@ -27,11 +27,11 @@ function getWorkerMultiplier(size: ProjectSize): number {
 function selectMode(subscription: SubscriptionDetected): PlanMode {
   switch (subscription) {
     case 'max':
-      return 'max_plan';
+      return 'performance';
     case 'pro':
-      return 'pro_plan';
+      return 'economic';
     case 'unknown':
-      return 'pro_plan';
+      return 'economic';
   }
 }
 

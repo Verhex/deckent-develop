@@ -62,7 +62,7 @@ export function registerInitTool(server: McpServer): void {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         projectName: z.string().optional().describe('Project name used in DECKENT.md header and PROJECT-IDENTITY.md. Defaults to current directory name if omitted.'),
-        mode: z.enum(['max_plan', 'max5x_plan', 'pro_plan', 'api', 'performance', 'balanced', 'economic']).optional().default('max_plan').describe('Plan tier mode: max_plan/performance (Claude Max), max5x_plan (5x Max), pro_plan/balanced (Pro), api/economic (API key)'),
+        mode: z.enum(['performance', 'balanced', 'economic', 'api', 'max_plan', 'max5x_plan', 'pro_plan']).optional().default('performance').describe('Plan tier mode: performance (Opus, max power), balanced (Sonnet brain + Opus workers), economic (Sonnet, cost-efficient), api (API key, pay-per-use)'),
         language: z.enum(['en', 'tr']).optional().default('en').describe('Language for agent prompt templates (en=English, tr=Turkish)'),
         force: z.boolean().optional().default(false).describe('Force re-initialization: overwrites existing config.json and workspace files. Does not delete .brain/ or .tasks/ data.'),
         auto: z.boolean().optional().default(false).describe('Auto-detection mode: skip interactive wizard, detect project stack automatically and apply defaults.'),

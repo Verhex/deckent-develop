@@ -115,12 +115,12 @@ export function buildOnboardSteps(projectName: string): WizardStep[] {
       prompt: 'Select plan mode',
       type: 'select',
       choices: [
-        { label: 'max_plan (Max subscription, opus model)', value: 'max_plan' },
-        { label: 'pro_plan (Pro subscription, sonnet model)', value: 'pro_plan' },
-        { label: 'max5x_plan (Max 5x, high throughput)', value: 'max5x_plan' },
+        { label: 'performance (Opus model, max power)', value: 'performance' },
+        { label: 'balanced (Sonnet brain + Opus workers)', value: 'balanced' },
+        { label: 'economic (Sonnet model, cost-efficient)', value: 'economic' },
         { label: 'api (API key, pay-per-use)', value: 'api' },
       ],
-      default: 'max_plan',
+      default: 'performance',
     },
     {
       id: 'runInit',
@@ -184,7 +184,7 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean;
   const shouldInit = answers['runInit'] === true && (!alreadyInitialized || opts.force);
   if (shouldInit) {
     const language = String(answers['language'] ?? 'en');
-    const mode = String(answers['mode'] ?? 'max_plan');
+    const mode = String(answers['mode'] ?? 'performance');
 
     const initArgs = ['deckent', 'init', '--force'];
     if (language && language !== 'en') {

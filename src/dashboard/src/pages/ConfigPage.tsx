@@ -49,7 +49,7 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   { key: "auth_mode", label: "Auth Mode", description: "Authentication mode", type: "select", category: "Provider", defaultValue: "subscription", options: ["subscription", "api", "hybrid"] },
 
   // ─── Sprint ─────────────────────────────────────────────────
-  { key: "mode", label: "Plan Mode", description: "Active plan tier determining resource allocation", type: "select", category: "Sprint", defaultValue: "performance", options: ["performance", "balanced", "economic", "api", "max_plan", "max5x_plan", "pro_plan"] },
+  { key: "mode", label: "Plan Mode", description: "Active plan tier determining resource allocation", type: "select", category: "Sprint", defaultValue: "performance", options: ["performance", "balanced", "economic", "api"] },
   { key: "spawn_backend", label: "Spawn Backend", description: "Worker spawn backend", type: "select", category: "Sprint", defaultValue: "auto", options: ["tmux", "subprocess", "auto"] },
   { key: "fix_phase_enabled", label: "Fix Phase Enabled", description: "Enable automatic fix phase after evaluation", type: "boolean", category: "Sprint", defaultValue: true },
   { key: "max_fix_retries", label: "Max Fix Retries", description: "Maximum number of fix retries per task", type: "number", category: "Sprint", defaultValue: 2 },

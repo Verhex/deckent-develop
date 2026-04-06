@@ -197,7 +197,7 @@ export function resolveTaskModel(
 
   // Layer 1: plan access filter (highest priority)
   const mode = config.mode;
-  const isProPlan = mode === 'pro_plan';
+  const isProPlan = mode === 'economic' || mode === 'pro_plan';
   if (isProPlan && getModelTier(model) >= 2) {
     model = 'sonnet';
   }

@@ -131,7 +131,13 @@ export function getMissingFields(existing: Record<string, unknown>): string[] {
  * Check whether a config file needs migration (has missing fields).
  */
 export function needsMigration(existing: Record<string, unknown>): boolean {
-  return getMissingFields(existing).length > 0;
+  if (getMissingFields(existing).length > 0) return true;
+  // Legacy mode names need migration
+  const legacyModes = ['max_plan', 'max5x_plan', 'pro_plan'];
+  if (typeof existing['mode'] === 'string' && legacyModes.includes(existing['mode'])) return true;
+  const modes = existing['modes'] as Record<string, unknown> | undefined;
+  if (modes && legacyModes.some(m => m in modes)) return true;
+  return false;
 }
 
 /**
@@ -196,6 +202,35 @@ export function migrateConfig(
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupPath = `${configPath}.bak.${timestamp}`;
   copyFileSync(configPath, backupPath);
+
+  // Rename legacy mode names to canonical names
+  const LEGACY_MODE_MAP: Record<string, string> = {
+    max_plan: 'performance',
+    max5x_plan: 'balanced',
+    pro_plan: 'economic',
+  };
+
+  // Migrate top-level mode field
+  if (typeof existing['mode'] === 'string' && LEGACY_MODE_MAP[existing['mode']]) {
+    existing['mode'] = LEGACY_MODE_MAP[existing['mode']];
+  }
+
+  // Migrate modes object keys
+  const existingModes = existing['modes'] as Record<string, unknown> | undefined;
+  if (existingModes) {
+    for (const [oldName, newName] of Object.entries(LEGACY_MODE_MAP)) {
+      if (oldName in existingModes && !(newName in existingModes)) {
+        existingModes[newName] = existingModes[oldName];
+        delete existingModes[oldName];
+      }
+    }
+    // Remove usage_thresholds from all modes (Sprint 089 removal)
+    for (const modeConfig of Object.values(existingModes)) {
+      if (typeof modeConfig === 'object' && modeConfig !== null) {
+        delete (modeConfig as Record<string, unknown>)['usage_thresholds'];
+      }
+    }
+  }
 
   // Merge: existing values preserved, only missing fields added from defaults
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;

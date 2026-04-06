@@ -1,25 +1,25 @@
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "tr",
   "projectName": "deckent",
   "last_sprint_id": "sprint-095",
   "spawn_backend": "tmux",
   "modes": {
-    "max_plan": {
+    "performance": {
       "brain_model": "opus",
       "default_model": "opus",
       "haiku_allowed": false,
       "max_workers": 4,
       "brain_planning": "auto"
     },
-    "max5x_plan": {
+    "balanced": {
       "max_workers": 5,
       "brain_model": "sonnet",
       "default_model": "opus",
       "haiku_allowed": true,
       "brain_planning": "auto"
     },
-    "pro_plan": {
+    "economic": {
       "max_workers": 3,
       "brain_model": "sonnet",
       "default_model": "sonnet",

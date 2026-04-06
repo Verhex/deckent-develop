@@ -10,8 +10,8 @@ import type {
 
 // ─── Mode Compatibility ───────────────────────────────────────────────
 
-const MAX_MODES: readonly PlanMode[] = ['max_plan', 'max5x_plan'];
-const PRO_MODES: readonly PlanMode[] = ['pro_plan'];
+const MAX_MODES: readonly PlanMode[] = ['performance', 'balanced', 'max_plan', 'max5x_plan'];
+const PRO_MODES: readonly PlanMode[] = ['economic', 'pro_plan'];
 
 /**
  * Check if the detected subscription is compatible with the configured mode.

@@ -706,7 +706,7 @@ export function calculateMetrics(
 export function updateProjectDocs(projectRoot: string, sprintResult: SprintResult, config?: ResolvedConfig): DocUpdateResult[] {
   const isInternalProject = existsSync(join(projectRoot, 'DECKENT-MASTER-BLUEPRINT.md'));
   const resolvedConfig: ResolvedConfig = config ?? {
-    mode: 'max_plan',
+    mode: 'performance',
     activeModeConfig: {
       max_workers: 8,
       brain_model: 'opus',

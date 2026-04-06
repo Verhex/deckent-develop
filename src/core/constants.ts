@@ -70,7 +70,7 @@ export const DEBT_TABLE_HEADER = '| ID | Description | Task | Sprint | Priority 
 
 // ─── Defaults ────────────────────────────────────────────────────────
 export const DEFAULT_LANGUAGE = 'en' as const;
-export const DEFAULT_MODE = 'max_plan' as const;
+export const DEFAULT_MODE = 'performance' as const;
 export const DECKENT_VERSION: string = (() => {
   try {
     const __filename = fileURLToPath(import.meta.url);
