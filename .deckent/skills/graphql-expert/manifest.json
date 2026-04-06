@@ -1,0 +1,69 @@
+{
+  "id": "graphql-expert",
+  "name": "GraphQL Expert",
+  "version": "0.1.0",
+  "description": "GraphQL schema design, resolvers, subscriptions, federation, caching, code generation",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "graphql"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "framework",
+  "triggers": [
+    "graphql",
+    "gql",
+    "schema",
+    "resolver",
+    "mutation",
+    "subscription",
+    "federation",
+    "apollo",
+    "type-graphql",
+    "codegen"
+  ],
+  "stackDetection": {
+    "files": [
+      "schema.graphql",
+      ".graphqlrc.yml",
+      "codegen.yml",
+      "codegen.ts"
+    ],
+    "dependencies": [
+      "graphql",
+      "@apollo/server",
+      "type-graphql",
+      "@graphql-codegen/cli"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "api-builder",
+    "testing-expert",
+    "performance-optimizer"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

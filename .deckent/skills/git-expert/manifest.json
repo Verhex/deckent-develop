@@ -1,0 +1,63 @@
+{
+  "id": "git-expert",
+  "name": "Git Expert",
+  "version": "0.1.0",
+  "description": "Git workflow, branch strategy, merge conflict resolution, rebase, hooks, bisect",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "git"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "tool",
+  "triggers": [
+    "git",
+    "branch",
+    "merge",
+    "rebase",
+    "conflict",
+    "cherry-pick",
+    "bisect",
+    "hook",
+    "stash",
+    "tag"
+  ],
+  "stackDetection": {
+    "files": [
+      ".git/config",
+      ".gitignore",
+      ".gitattributes"
+    ],
+    "dependencies": [],
+    "commands": [
+      "git"
+    ]
+  },
+  "composableWith": [
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "append",
+    "maxTokens": 1200
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "code-simplifier",
+  "name": "Code Simplifier",
+  "version": "0.1.0",
+  "description": "Code simplification, dead code removal, DRY/KISS enforcement, complexity reduction",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "refactor"
+        },
+        "score": 8
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "simplification"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "simplify",
+    "refactor",
+    "cleanup",
+    "dead-code",
+    "complexity",
+    "dry",
+    "kiss",
+    "reduce",
+    "extract",
+    "inline"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "testing-expert",
+    "performance-optimizer"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1200
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "monorepo-expert",
+  "name": "Monorepo Expert",
+  "version": "0.1.0",
+  "description": "Monorepo management, Turborepo, Nx, workspace configuration, dependency graph, build caching",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "monorepo"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "tool",
+  "triggers": [
+    "monorepo",
+    "workspace",
+    "turborepo",
+    "nx",
+    "lerna",
+    "pnpm-workspace",
+    "packages",
+    "dependency-graph",
+    "build-cache"
+  ],
+  "stackDetection": {
+    "files": [
+      "turbo.json",
+      "nx.json",
+      "lerna.json",
+      "pnpm-workspace.yaml"
+    ],
+    "dependencies": [
+      "turbo",
+      "nx",
+      "lerna"
+    ],
+    "commands": [
+      "turbo",
+      "nx"
+    ]
+  },
+  "composableWith": [
+    "typescript-expert",
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1200
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

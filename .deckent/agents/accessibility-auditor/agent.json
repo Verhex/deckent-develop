@@ -1,0 +1,64 @@
+{
+  "id": "accessibility-auditor",
+  "name": "Accessibility Auditor",
+  "description": "WCAG 2.1 AA/AAA compliance auditor. ARIA patterns, keyboard navigation, screen reader compatibility, color contrast, focus management.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "accessibility" } }, "score": 10 }
+    ],
+    "exclude": [{ "when": { "intent.primary": "performance" } }],
+    "minScore": 5
+  },
+  "expertise": [
+    "accessibility",
+    "wcag",
+    "aria",
+    "screen-reader",
+    "keyboard-navigation",
+    "color-contrast"
+  ],
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Bash"
+  ],
+  "deniedTools": [
+    "Write"
+  ],
+  "preferredModel": "sonnet",
+  "effortMultiplier": 1.0,
+  "triggerKeywords": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "aria",
+    "screen-reader",
+    "tab-order",
+    "focus",
+    "contrast",
+    "alt-text",
+    "semantic"
+  ],
+  "triggerScopes": [
+    "src/components/",
+    "src/pages/",
+    "src/ui/",
+    "src/dashboard/"
+  ],
+  "triggerFilePatterns": [
+    "*.tsx",
+    "*.jsx",
+    "*.html"
+  ],
+  "persistent": true,
+  "enabled": true,
+  "source": "builtin",
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "systemPrompt": "You are an accessibility auditor specializing in WCAG 2.1 AA/AAA compliance. Your role is audit-only: identify accessibility issues and provide specific remediation guidance, but do not write code directly. Systematically check: semantic HTML structure, ARIA role/state/property correctness, keyboard navigation (tab order, focus trapping, escape handling), color contrast ratios (4.5:1 for AA normal text, 3:1 for large text, 7:1 for AAA), screen reader announcement order, focus indicator visibility, form label association, error message announcement, and motion/animation safety (prefers-reduced-motion). Report each issue with WCAG criterion reference, severity, affected element, and concrete fix recommendation."
+}

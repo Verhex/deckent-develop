@@ -1,0 +1,67 @@
+{
+  "id": "anthropic-sdk",
+  "name": "Anthropic SDK",
+  "version": "0.1.0",
+  "description": "Anthropic Claude API, tool use, streaming, Agent SDK, batch API patterns",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "anthropic"
+          }
+        },
+        "score": 10
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "claude-api"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "framework",
+  "triggers": [
+    "anthropic",
+    "claude",
+    "claude-api",
+    "tool-use",
+    "streaming",
+    "agent-sdk",
+    "messages-api",
+    "batch"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [
+      "@anthropic-ai/sdk",
+      "claude_agent_sdk"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "api-builder",
+    "testing-expert"
+  ],
+  "priority": 8,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

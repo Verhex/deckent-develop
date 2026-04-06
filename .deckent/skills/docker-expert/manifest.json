@@ -1,0 +1,66 @@
+{
+  "id": "docker-expert",
+  "name": "Docker Expert",
+  "version": "0.1.0",
+  "description": "Dockerfile optimization, multi-stage builds, Docker Compose, networking, volumes, security",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "docker"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "tool",
+  "triggers": [
+    "docker",
+    "dockerfile",
+    "container",
+    "compose",
+    "image",
+    "volume",
+    "network",
+    "registry",
+    "layer",
+    "multi-stage"
+  ],
+  "stackDetection": {
+    "files": [
+      "Dockerfile",
+      "docker-compose.yml",
+      "docker-compose.yaml",
+      ".dockerignore"
+    ],
+    "dependencies": [],
+    "commands": [
+      "docker",
+      "docker-compose"
+    ]
+  },
+  "composableWith": [
+    "devops-engineer",
+    "ci-testing",
+    "security-specialist"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}
