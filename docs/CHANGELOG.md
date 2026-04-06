@@ -6,6 +6,16 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint95] - 2026-04-06
+
+
+### Changed
+
+- Skill İsim Uyumsuzluğu Düzeltme (completed with tech debt)
+
+
+_Tasks: 1 total, 1 done, 1 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint94] - 2026-04-06
 
 

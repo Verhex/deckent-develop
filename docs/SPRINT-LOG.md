@@ -2611,3 +2611,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 094-004: Stats Sync Doğrulama Notu (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 95 — sprint-095
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 227s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 227043ms |
+
+### Tasks
+
+- 095-001: Skill İsim Uyumsuzluğu Düzeltme (GO_WITH_TECH_DEBT)
+
+---

@@ -1,53 +1,35 @@
-# DIRECTIVES — Sprint 094: Stats Sync Doğrulama + Usage Son Temizlik
+# DIRECTIVES — Sprint 095: Stats Sync + RETRO Doğrulama Sprint'i
 
-## Goal: Sprint bittiğinde agent.json ve manifest.json stats'larının gerçekten güncellendiğini doğrula. README'deki son usage referansını temizle.
+## Goal: MCP reconnect sonrası yeni kodun çalıştığını doğrulamak için minimal sprint. Bu sprint bittiğinde agent.json/manifest.json stats güncellenmiş olmalı, RETRO.md'de Skill Performance tablosu görünmeli.
 
 ---
 
-## Task 1: Usage Son Kalıntı Temizliği — README CLI Tablosu
+## Task 1: Skill İsim Uyumsuzluğu Düzeltme
 - Model: sonnet
 - Effort: low
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: docs/reference/cli.md
-- Scope: docs/
+- Files: .deckent/routing/learnings.json
+- Scope: .deckent/
 
 ### Description
-docs/reference/cli.md dosyasında `deckent usage` komutu referansı kalmış olabilir. Tüm docs/ altında `deckent usage` veya `usage` komut referansı kaldıysa kaldır.
+learnings.json'daki 4 skill ID'si .deckent/skills/ altındaki manifest'lerle eşleşmiyor:
+- `refactoring-expert` → manifest'te `refactorer` olarak olabilir veya hiç yok
+- `security-expert` → manifest'te `security-specialist`
+- `ci-cd-expert` → manifest'te `ci-testing`
+- `frontend-expert` → manifest'te `react-specialist`
 
-A) `docs/reference/cli.md`'de `deckent usage` komutu varsa kaldır
-B) docs/ altında `grep -rn "deckent usage" docs/` ile tara, kalan varsa kaldır
-C) Genel "usage" kelimesi (help text gibi) sorun değil — sadece `deckent usage` komutu ve UsageTracker referansları
+A) .deckent/skills/ altındaki tüm manifest ID'lerini listele
+B) learnings.json'daki skill ID'leriyle karşılaştır
+C) Eşleşmeyen ID'ler varsa learnings.json'da düzelt (manifest ID'sine göre rename)
+D) Veya manifest'te alias/redirect ekle
 
-**Kanıt:** `grep -rn "deckent usage\|deckent_usage\|usage-tracker\|UsageTracker" docs/ README.md README-TR.md | wc -l` → 0
+**Kanıt:** `node -e "..."` ile learnings skill ID'leri ve manifest ID'leri tam eşleşiyor
 
 **Test:** `tsc --noEmit` temiz.
 
 ---
 
-## Task 2: Stats Sync Doğrulama Notu
-- Model: sonnet
-- Effort: low
-- Agent: doc-writer
-- Skills: typescript-expert
-- Files: .brain/PROJECT-IDENTITY.md
-- Scope: .brain/
-
-### Description
-PROJECT-IDENTITY.md'yi güncelle: Sprint 093'te eklenen özellikleri (stats sync, RETRO skill tablosu, sprint bildirim) yansıt.
-
-A) Features listesine ekle: "Agent/Skill Stats Sync (V2→manifest)"
-B) MCP sayısını doğrula: 18 tools, 8 resources
-C) Sprint sayısını güncelle: 94+
-
-**Kanıt:** `grep "Stats Sync\|18 tools" .brain/PROJECT-IDENTITY.md` → eşleşme
-
-**Test:** Dosya valid markdown.
-
----
-
 ## Quality Rules
 - tsc --noEmit MUST pass
-- npx vitest run → 0 fail
-- Usage referansı → 0 (src, tests, docs, README dahil)
-- Bu sprint'in asıl amacı: finalizeSprint çalıştığında agent.json/manifest.json stats'ın güncellenmesini doğrulamak
+- Bu sprint'in asıl amacı finalizeSprint'in yeni kodla çalışarak stats sync ve RETRO skill tablosunu doğrulamak

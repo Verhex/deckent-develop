@@ -13,3 +13,5 @@
 | debt-094-001 | Tech debt from 094-001: Quality Score Routing Bonus entegrasyonu zaten tamamen y | 094-001 | sprint-094 | NORMAL | 0 | true | sprint-094 | 2026-04-06T09:58:42.819Z |
 | debt-094-003 | Tech debt from 094-003: Tüm aktif docs/ dosyalarındaki 'deckent usage', 'UsageTr | 094-003 | sprint-094 | NORMAL | 0 | true | sprint-094 | 2026-04-06T09:58:49.512Z |
 | debt-094-004 | Tech debt from 094-004: PROJECT-IDENTITY.md güncellendi: (A) Sprint 093-094 Achi | 094-004 | sprint-094 | NORMAL | 0 | true | sprint-094 | 2026-04-06T09:58:52.943Z |
+| debt-095-001 | Tech debt from 095-001: Fixed 4 mismatched skill IDs in learnings.json:
+- refact | 095-001 | sprint-095 | NORMAL | 0 | false | - | 2026-04-06T10:09:11.293Z |
