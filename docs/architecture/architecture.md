@@ -1,6 +1,6 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** Sprint 095+ | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** Sprint 099+ | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
 > For the primary system specification, see [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md).
@@ -1222,9 +1222,9 @@ project/
 │   ├── workspace/
 │   │   ├── IDENTITY.md         ← Project identity (name, type, language)
 │   │   └── BOOT.md             ← Boot sequence reference
-│   ├── agents/                 ← Agent pool (9 built-in + temp agents, LRU eviction)
+│   ├── agents/                 ← Agent pool (16 built-in + temp agents, LRU eviction)
 │   │   └── {agent-name}/      ← agent.json + PROMPT.md
-│   ├── skills/                 ← Skill registry (11 built-in + temp skills)
+│   ├── skills/                 ← Skill registry (21 built-in + temp skills)
 │   │   └── {skill-name}/      ← manifest.json + SKILL.md
 │   ├── i18n/
 │   │   ├── en.json             ← English strings
@@ -1399,4 +1399,4 @@ The ci-guardian agent is a specialized agent for CI/CD integration:
 
 ---
 
-*Last updated: Sprint 095+ — deckent v0.3.0-beta — April 2026*
+*Last updated: Sprint 099+ — deckent v0.3.0-beta.3 — April 2026*
