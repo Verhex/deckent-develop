@@ -9,8 +9,6 @@ vi.mock('../../../src/core/config.js', () => ({
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
 }));
 
@@ -33,13 +31,11 @@ vi.mock('../../../src/mcp/helpers/format.js', () => ({
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 import { loadConfig } from '../../../src/core/config.js';
-import { readContext, checkUsage, adjustSprintSize, planSprint } from '../../../src/orchestra/brain.js';
+import { readContext, planSprint } from '../../../src/orchestra/brain.js';
 import { enrichResponse } from '../../../src/mcp/helpers/enrich.js';
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockReadContext = vi.mocked(readContext);
-const mockCheckUsage = vi.mocked(checkUsage);
-const mockAdjustSprintSize = vi.mocked(adjustSprintSize);
 const mockPlanSprint = vi.mocked(planSprint);
 
 function makeServer() {
@@ -67,14 +63,8 @@ function makeDefaultMocks(overrides: Partial<{
     { id: '002', title: 'Task B', model: 'sonnet', priority: 'NORMAL' },
   ];
 
-  mockLoadConfig.mockResolvedValue({ brain_planning: 'auto', max_workers: 3 } as any);
+  mockLoadConfig.mockResolvedValue({ brain_planning: 'auto', max_workers: overrides.maxWorkers ?? 3, activeModeConfig: { max_workers: overrides.maxWorkers ?? 3 } } as any);
   mockReadContext.mockReturnValue({ directives: 'some directives', memory: '', retro: '', debt: '', patterns: [] } as any);
-  mockCheckUsage.mockReturnValue({ allowed: true, remaining: 100, used: 50 } as any);
-  mockAdjustSprintSize.mockReturnValue({
-    size: tasks.length,
-    maxWorkers: overrides.maxWorkers ?? 3,
-    reason: 'normal usage',
-  } as any);
   mockPlanSprint.mockReturnValue({
     id: 'sprint-001',
     number: 1,
@@ -369,10 +359,8 @@ describe('registerPlanTool', () => {
       const server = makeServer();
       registerPlanTool(server as any);
 
-      mockLoadConfig.mockResolvedValue({ brain_planning: 'auto', max_workers: 3 } as any);
+      mockLoadConfig.mockResolvedValue({ brain_planning: 'auto', max_workers: 3, activeModeConfig: { max_workers: 3 } } as any);
       mockReadContext.mockReturnValue({ directives: '', memory: '', retro: '', debt: '', patterns: [] } as any);
-      mockCheckUsage.mockReturnValue({ allowed: true, remaining: 100, used: 50 } as any);
-      mockAdjustSprintSize.mockReturnValue({ size: 3, maxWorkers: 3, reason: 'normal' } as any);
       mockPlanSprint.mockImplementation(() => {
         throw new Error('DIRECTIVES.md missing or empty');
       });
@@ -397,23 +385,6 @@ describe('registerPlanTool', () => {
       expect(parsed.message).toContain('Config file not found');
     });
 
-    it('returns isError when adjustSprintSize throws (usage limit)', async () => {
-      const server = makeServer();
-      registerPlanTool(server as any);
-
-      mockLoadConfig.mockResolvedValue({ brain_planning: 'auto', max_workers: 3 } as any);
-      mockReadContext.mockReturnValue({ directives: 'some directives' } as any);
-      mockCheckUsage.mockReturnValue({ allowed: false, remaining: 0, used: 100 } as any);
-      mockAdjustSprintSize.mockImplementation(() => {
-        throw new Error('Usage limit exceeded');
-      });
-
-      const result = await server.callTool('deckent_plan', {});
-      expect(result.isError).toBe(true);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.error).toBe(true);
-      expect(parsed.message).toContain('Usage limit exceeded');
-    });
   });
 
   // ── Enriched response ──────────────────────────────────────────────────────

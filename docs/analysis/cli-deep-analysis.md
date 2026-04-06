@@ -137,9 +137,7 @@ deckent plan [--no-confirm] [--structured]
 ```
 1. loadConfig(root)          → .deckent/config.json + mode defaults merge
 2. readContext(root)          → 10 kaynak okur
-3. checkUsage(config)         → claude -p /usage → 5hr% + weekly%
-4. adjustSprintSize()         → usage threshold → full/reduced/minimal
-5. planSprint()               → AI veya structured parse → task JSON'ları yazar
+3. planSprint()               → AI veya structured parse → task JSON'ları yazar
 6. Çıktı göster              → tablo + reasoning + planning mode
 7. confirmDraftTasks()        → Onay → DRAFT → PENDING geçişi
 ```
@@ -162,11 +160,11 @@ deckent plan [--no-confirm] [--structured]
 ### Usage → Sprint Boyutlandırma
 
 ```
-checkUsage() → claude -p /usage komutu çalıştırır
+*(Kullanım kontrolü kaldırıldı — Sprint 089)*
   → regex ile "5hr: XX%" ve "weekly: XX%" parse eder
   → Başarısız → safe default: 50% / 30%
 
-adjustSprintSize(config, usage):
+*(Sprint boyut ayarlama kaldırıldı — Sprint 089)*
   Her iki threshold aşıldı   → minimal  (1 worker, haiku/sonnet)
   Tek threshold aşıldı       → reduced  (max/2 worker, sonnet)
   Limit altında              → full     (max worker, serbest)
@@ -204,13 +202,13 @@ Türkçe system prompt + model seçim kriterleri + context block:
 
 ### Kaynak Dosyalar
 - `src/cli/commands/plan.ts` — CLI komutu
-- `src/orchestra/sprint-controller.ts` — planSprint, readContext, checkUsage, adjustSprintSize
+- `src/orchestra/sprint-controller.ts` — planSprint, readContext
 - `src/orchestra/planner.ts` — AI planner, buildPlanPrompt, parsePlannerResponse
 - `src/orchestra/task-builder.ts` — parseStructuredDirectives, extractScopeFromDirective
 
 ### Geliştirme Önerileri
 
-1. **[DONE] `checkUsage()` Senkron ve Yavaş** — `spawnSync` 10 saniye timeout ile blocking. Async versiyon (`checkUsageWithProvider`) var ama kullanılmıyor. *Sprint 056: `checkUsageWithProvider()` async versiyon plan.ts'de kullanılıyor.*
+1. **[REMOVED] Kullanım kontrolü kaldırıldı** — Sprint 089'da kullanım takibi tamamen kaldırıldı.
 2. **[DONE] AI Planner Timeout Sabit (60s)** — Config'den ayarlanabilir olmalı. *Sprint 065: `config.ai_planner_timeout` alanı eklendi, planner.ts'de `config.ai_planner_timeout ?? 60000` ms olarak configurable.*
 3. **[DONE] Structured Parser Sınırlı** — Sadece `## Task N:` formatını tanıyor. Bullet list, prose → her satır ayrı task olur. *Sprint 063: Parser genişletildi, birden fazla format destekleniyor.*
 4. **[DONE] Auto Mode Safeguard Zayıf** — AI az task üretirse fallback ama fazla üretirse kontrol yok. *Sprint 063: Hem minimum hem maksimum task sayısı kontrolü eklendi, max_tasks config'den alınıyor.*
@@ -247,7 +245,7 @@ Phase 0: BOOTSTRAP
   └─ Zero-config: prepareZeroConfig() → geçici DIRECTIVES.md
 
 Phase 1: PLAN
-  ├─ readContext → checkUsageWithProvider (async) → adjustSprintSize → planSprint
+  ├─ readContext → planSprint
   ├─ createSafetyPoint (git stash/tag)
   └─ runHooks('beforeSprint') + loadPluginHooks
 
@@ -322,7 +320,7 @@ Sprint başında safety point (git), sonunda: tüm NO_GO → otomatik rollback, 
 4. **[DONE] Spawn Retry Strateji Yok** — Tek retry, aynı şeyi deniyor, hata analizi yok. *Sprint 056: `spawnAttempts < 2` ile retry, `buildRetryRecommendation()` ile hata analizi eklendi.*
 5. **[DONE] Fix Phase Timeout Kısa (10 dk)** — Fix task'ları karmaşık olabilir. *Sprint 063: `fix_phase_timeout` config alanından ayarlanabilir, varsayılan artırıldı.*
 6. **[DONE] Queue Spawn Hata Yutma** — Spawn hatası sessizce geçilip task timeout'a bırakılıyor. *Sprint 063: Spawn hatası loglanıyor, task NO_GO olarak işaretleniyor.*
-7. **[DONE] Dashboard Final Update Sıfırlı Usage** — Sprint bittiğinde `fiveHourPercent: 0` yazılıyor. *Sprint 063: Sprint bitişinde checkUsage() çağrılarak gerçek usage metrikleri dashboard'a yazılıyor.*
+7. **[REMOVED] Dashboard Usage** — Sprint 089'da usage tracking tamamen kaldırıldı.
 8. **[DONE] `--watch` tmux Bağımlılığı** — Subprocess worker'lar için alternatif yok. *Sprint 063: Subprocess worker için file-based watch modu eklendi.*
 9. **[DONE] Provider Bootstrap Her Start'ta** — 5-15 saniye. Cache'lenebilir. *Sprint 056: `PROVIDER_CACHE_FILE` (.deckent/provider-cache.json) ile provider cache eklendi.*
 10. **[DONE] Phase Arası Durum Kaybı** — Process crash'te orkestrasyon kayıp, orphan worker detection yok. *Sprint 063: Phase durumu `.deckent/sprint-state.json`'a persist ediliyor, restart'ta kaldığı yerden devam ediyor.*
@@ -540,8 +538,7 @@ deckent usage [--json] [--sprint <id>]
 `subscription` → maliyet gizli
 
 ### Kaynak Dosyalar
-- `src/cli/commands/usage.ts` — CLI komutu
-- `src/core/usage-tracker.ts` — UsageTracker sınıfı
+- *(Kullanım CLI/takip modülleri Sprint 089'da kaldırıldı)*
 
 ### Geliştirme Önerileri
 
@@ -614,7 +611,7 @@ deckent config migrate [--dry-run]      # Eksik alanları default'larla doldur
 ```
 
 ### Validation
-mode, language, max_workers (1-100 veya 'auto'), brain_model, default_model, haiku_allowed, usage_thresholds, brain_planning, brain_provider, worker_provider
+mode, language, max_workers (1-100 veya 'auto'), brain_model, default_model, haiku_allowed, brain_planning, brain_provider, worker_provider
 
 ### Migration
 `getMissingFields()` → default'taki ama mevcut config'te olmayan top-level key'ler. `modes` atlanır. Backup → eksik alanları doldur → yaz.

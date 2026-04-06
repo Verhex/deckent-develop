@@ -156,29 +156,6 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
-  // ─── Invalid usage_thresholds ─────────────────────────────────────
-
-  it('throws for usage_thresholds.5hr out of range (>1)', () => {
-    const config = buildConfigWithModeOverride('max_plan', {
-      usage_thresholds: { '5hr': 1.5, weekly: 0.5 },
-    });
-    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
-  });
-
-  it('throws for usage_thresholds.weekly out of range (<0)', () => {
-    const config = buildConfigWithModeOverride('max_plan', {
-      usage_thresholds: { '5hr': 0.5, weekly: -0.1 },
-    });
-    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
-  });
-
-  it('throws for usage_thresholds.5hr as string', () => {
-    const config = buildConfigWithModeOverride('max_plan', {
-      usage_thresholds: { '5hr': 'high' as any, weekly: 0.5 },
-    });
-    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
-  });
-
   // ─── Invalid brain_planning ───────────────────────────────────────
 
   it('throws for invalid brain_planning value', () => {
@@ -279,13 +256,6 @@ describe('validateConfig', () => {
     const config = buildConfigWithModeOverride('max_plan', { max_workers: 100 });
     const warnings = validateConfig(config);
     expect(warnings.length).toBeGreaterThan(0);
-  });
-
-  it('accepts usage_thresholds at boundary (0 and 1)', () => {
-    const config = buildConfigWithModeOverride('max_plan', {
-      usage_thresholds: { '5hr': 0, weekly: 1 },
-    });
-    expect(() => validateConfig(config)).not.toThrow();
   });
 
   // ─── routing_engine validation ────────────────────────────────────

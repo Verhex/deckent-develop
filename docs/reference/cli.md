@@ -35,6 +35,7 @@ deckent <command> [options]
 - [`deckent watch`](#watch) — Open a live tmux split view: dashboard pane + worker panes
 - [`deckent dashboard`](#dashboard) — Show a terminal dashboard with auto-refresh (CLI rendering, no browser)
 - [`deckent history`](#history) — Show sprint history from 
+- [`deckent usage`](#usage) — Show usage metrics (model calls, token counts, estimated cost for API mode)
 - [`deckent analyze`](#analyze) — Analyze project stack, size, and recommended methodology
 
 ### Workers & Tasks
@@ -170,7 +171,7 @@ deckent start --force --watch
 
 ## `plan`
 
-Plan the next sprint without executing it. Reads DIRECTIVES.md and generates task files in .tasks/. Prompts for confirmation before writing.
+Plan the next sprint without executing it. Reads DIRECTIVES.md, checks usage, and generates task files in .tasks/. Prompts for confirmation before writing.
 
 **Usage:** `deckent plan`
 
@@ -404,6 +405,29 @@ Show sprint history from .brain/sprints/. Displays a table of sprints with task 
 ```bash
 deckent history
 deckent history --agent brain
+```
+
+---
+
+## `usage`
+
+Show usage metrics (model calls, token counts, estimated cost for API mode).
+
+**Usage:** `deckent usage`
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--sprint <id>` | Filter by sprint ID |
+
+**Examples:**
+
+```bash
+deckent usage
+deckent usage --sprint sprint-042
+deckent usage --json
 ```
 
 ---

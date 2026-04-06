@@ -33,11 +33,6 @@ function makeMockAdapter(
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({
-      fiveHourPercent: 0,
-      weeklyPercent: 0,
-      measuredAt: new Date().toISOString(),
-    }),
     isAvailable: vi.fn().mockResolvedValue(available),
     buildCommand: vi.fn().mockReturnValue(`${name} exec`),
   };
@@ -142,14 +137,6 @@ describe('Codex Adapter Smoke Tests', () => {
     expect(adapter.listWorkers()).toEqual([]);
   });
 
-  it('checkUsage returns valid metrics', async () => {
-    const usage = await adapter.checkUsage();
-    expect(usage).toHaveProperty('fiveHourPercent');
-    expect(usage).toHaveProperty('weeklyPercent');
-    expect(usage).toHaveProperty('measuredAt');
-    expect(typeof usage.fiveHourPercent).toBe('number');
-    expect(typeof usage.weeklyPercent).toBe('number');
-  });
 });
 
 // ─── Gemini Adapter ───────────────────────────────────────────────────────────
@@ -231,11 +218,6 @@ describe('Gemini Adapter Smoke Tests', () => {
     );
   });
 
-  it('checkUsage returns neutral defaults', async () => {
-    const usage = await adapter.checkUsage();
-    expect(usage.fiveHourPercent).toBe(0);
-    expect(usage.weeklyPercent).toBe(0);
-  });
 });
 
 // ─── Provider Registry ────────────────────────────────────────────────────────

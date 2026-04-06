@@ -64,11 +64,6 @@ function makeDashboardState(overrides?: Partial<DashboardState>): DashboardState
       blocked: 1,
       total: 5,
     },
-    usage: {
-      fiveHourPercent: 0.45,
-      weeklyPercent: 0.3,
-      measuredAt: new Date().toISOString(),
-    },
     alerts: [],
     updatedAt: new Date().toISOString(),
     ...overrides,

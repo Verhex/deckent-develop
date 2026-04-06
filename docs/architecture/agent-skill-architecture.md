@@ -322,10 +322,6 @@ The current Brain decision flow (`src/orchestra/brain.ts`) follows this path:
 ```
 readContext()           → BrainContext (directives, memory, patterns, debt)
     ↓
-checkUsage()           → UsageMetrics (5hr%, weekly%)
-    ↓
-adjustSprintSize()     → SprintSizeRecommendation (size, maxWorkers, modelConstraint)
-    ↓
 planSprint()           → Sprint (tasks with model, effort, scope)
     ├─ AI planner (callBrainPlanner → claude CLI)
     └─ Structured fallback (parseStructuredDirectives)
@@ -345,8 +341,6 @@ planSprint()           → Sprint (tasks with model, effort, scope)
 readContext()
     ↓
 detectProjectStack()        → ProjectStack (language, framework, deps)  [NEW]
-    ↓
-checkUsage() + adjustSprintSize()
     ↓
 planSprint()
     ↓

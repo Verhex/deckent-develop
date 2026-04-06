@@ -302,29 +302,6 @@ describe('SandboxSpawnBackend', () => {
     });
   });
 
-  // ─── checkUsage() ────────────────────────────────────────────────
-
-  describe('checkUsage()', () => {
-    it('should return zero percentages', async () => {
-      const backend = new SandboxSpawnBackend(projectDir);
-      const metrics = await backend.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(0);
-      expect(metrics.weeklyPercent).toBe(0);
-    });
-
-    it('should return measuredAt as ISO 8601 string', async () => {
-      const backend = new SandboxSpawnBackend(projectDir);
-      const metrics = await backend.checkUsage();
-      expect(metrics.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    });
-
-    it('should return a Promise', () => {
-      const backend = new SandboxSpawnBackend(projectDir);
-      const result = backend.checkUsage();
-      expect(result).toBeInstanceOf(Promise);
-    });
-  });
-
   // ─── isAvailable() ───────────────────────────────────────────────
 
   describe('isAvailable()', () => {

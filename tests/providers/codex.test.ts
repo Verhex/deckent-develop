@@ -18,7 +18,7 @@ vi.mock('node:fs', () => ({
   closeSync: vi.fn(),
 }));
 
-import { CodexAdapter, createCodexAdapter, CODEX_TIER_MODELS, parseCodexUsageOutput } from '../../src/providers/codex.js';
+import { CodexAdapter, createCodexAdapter, CODEX_TIER_MODELS } from '../../src/providers/codex.js';
 import type { CodexAuthMode } from '../../src/providers/codex.js';
 import { ProviderError } from '../../src/core/provider.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
@@ -89,7 +89,6 @@ describe('CodexAdapter', () => {
       expect(typeof adapter.spawn).toBe('function');
       expect(typeof adapter.kill).toBe('function');
       expect(typeof adapter.listWorkers).toBe('function');
-      expect(typeof adapter.checkUsage).toBe('function');
       expect(typeof adapter.isAvailable).toBe('function');
       expect(typeof adapter.buildCommand).toBe('function');
     });
@@ -271,67 +270,6 @@ describe('CodexAdapter', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'prompt');
       adapter.kill('task-001');
       expect(adapter.listWorkers()).toEqual([]);
-    });
-  });
-
-  // ─── checkUsage() ──────────────────────────────────────────────────
-
-  describe('checkUsage()', () => {
-    it('should return a Promise', () => {
-      const result = adapter.checkUsage();
-      expect(result).toBeInstanceOf(Promise);
-    });
-
-    it('should return UsageMetrics shape', async () => {
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
-      const metrics = await adapter.checkUsage();
-      expect(typeof metrics.fiveHourPercent).toBe('number');
-      expect(typeof metrics.weeklyPercent).toBe('number');
-      expect(typeof metrics.measuredAt).toBe('string');
-    });
-
-    it('should return zero defaults when API key is present and codex usage fails', async () => {
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(0);
-      expect(metrics.weeklyPercent).toBe(0);
-    });
-
-    it('should return safe defaults when no auth is available', async () => {
-      delete process.env['OPENAI_API_KEY'];
-      delete process.env['DECKENT_OPENAI_API_KEY'];
-      mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(50);
-      expect(metrics.weeklyPercent).toBe(30);
-    });
-
-    it('should include measuredAt as ISO 8601 string', async () => {
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    });
-
-    it('should parse JSON usage output from codex CLI', async () => {
-      mockSpawnSync.mockReturnValue({
-        status: 0,
-        stdout: JSON.stringify({ usage_percent: 42, weekly_percent: 15 }),
-        stderr: '',
-      });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(42);
-      expect(metrics.weeklyPercent).toBe(15);
-    });
-
-    it('should parse text usage output from codex CLI', async () => {
-      mockSpawnSync.mockReturnValue({
-        status: 0,
-        stdout: 'Usage: 35% (5h) / 22% (weekly)',
-        stderr: '',
-      });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(35);
-      expect(metrics.weeklyPercent).toBe(22);
     });
   });
 
@@ -540,47 +478,6 @@ describe('CodexAdapter', () => {
       expect(adapter.getModelForTier('premium')).toBe('gpt-5');
       expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
       expect(adapter.getModelForTier('economy')).toBe('gpt-4.1-mini');
-    });
-  });
-
-  // ─── parseCodexUsageOutput() ──────────────────────────────────────
-
-  describe('parseCodexUsageOutput()', () => {
-    it('should parse JSON format with usage_percent', () => {
-      const result = parseCodexUsageOutput(JSON.stringify({ usage_percent: 45, weekly_percent: 20 }));
-      expect(result).not.toBeNull();
-      expect(result!.fiveHourPercent).toBe(45);
-      expect(result!.weeklyPercent).toBe(20);
-    });
-
-    it('should parse text format "Usage: X% (5h) / Y% (weekly)"', () => {
-      const result = parseCodexUsageOutput('Usage: 35% (5h) / 22% (weekly)');
-      expect(result).not.toBeNull();
-      expect(result!.fiveHourPercent).toBe(35);
-      expect(result!.weeklyPercent).toBe(22);
-    });
-
-    it('should return null for unparseable output', () => {
-      expect(parseCodexUsageOutput('random text')).toBeNull();
-      expect(parseCodexUsageOutput('')).toBeNull();
-    });
-
-    it('should handle JSON without usage_percent', () => {
-      expect(parseCodexUsageOutput(JSON.stringify({ foo: 'bar' }))).toBeNull();
-    });
-
-    it('should handle partial text match (only 5h)', () => {
-      const result = parseCodexUsageOutput('Rate: 60% (5h)');
-      expect(result).not.toBeNull();
-      expect(result!.fiveHourPercent).toBe(60);
-      expect(result!.weeklyPercent).toBe(0);
-    });
-
-    it('should handle partial text match (only weekly)', () => {
-      const result = parseCodexUsageOutput('Rate: 25% (weekly)');
-      expect(result).not.toBeNull();
-      expect(result!.fiveHourPercent).toBe(0);
-      expect(result!.weeklyPercent).toBe(25);
     });
   });
 

@@ -270,32 +270,6 @@ describe('SubprocessSpawnBackend', () => {
     });
   });
 
-  // ─── checkUsage() ────────────────────────────────────────────────
-
-  describe('checkUsage()', () => {
-    it('should return a Promise', () => {
-      const result = backend.checkUsage();
-      expect(result).toBeInstanceOf(Promise);
-    });
-
-    it('should return UsageMetrics with numeric percentages', async () => {
-      const metrics = await backend.checkUsage();
-      expect(typeof metrics.fiveHourPercent).toBe('number');
-      expect(typeof metrics.weeklyPercent).toBe('number');
-    });
-
-    it('should return zero percentages (defers to UsageTracker)', async () => {
-      const metrics = await backend.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(0);
-      expect(metrics.weeklyPercent).toBe(0);
-    });
-
-    it('should include measuredAt as ISO 8601 string', async () => {
-      const metrics = await backend.checkUsage();
-      expect(metrics.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    });
-  });
-
   // ─── isAvailable() ───────────────────────────────────────────────
 
   describe('isAvailable()', () => {

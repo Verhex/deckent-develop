@@ -11,7 +11,6 @@ function createMockAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAd
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn(() => []),
-    checkUsage: vi.fn(async () => ({ totalCost: 0, remaining: 100, percentUsed: 0 })),
     isAvailable: vi.fn(async () => true),
     buildCommand: vi.fn(() => 'mock-command'),
     ...overrides,

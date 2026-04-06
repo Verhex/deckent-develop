@@ -36,19 +36,9 @@ vi.mock('../../src/core/config-migration.js', () => ({
   getNestedValue: vi.fn().mockReturnValue('testValue'),
 }));
 
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    getSprintUsage: vi.fn().mockReturnValue({ tokens: 1000, calls: 10 }),
-    getTotalUsage: vi.fn().mockReturnValue({ tokens: 5000, calls: 50, modelBreakdown: [] }),
-    getModelBreakdown: vi.fn().mockReturnValue([]),
-  })),
-}));
-
 vi.mock('../../src/orchestra/brain.js', () => ({
   runDecay: vi.fn().mockReturnValue({ decayed: 5 }),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
 }));
 
@@ -83,14 +73,6 @@ describe('MCP Tool Quality — enrich.ts new entries', () => {
     const summary = generateSummary('config', {}, 'en');
     expect(summary).toContain('Configuration');
     const hints = generateHints('config', {});
-    expect(Array.isArray(hints)).toBe(true);
-  });
-
-  it('usage tool has summary in enrich.ts', async () => {
-    const { generateSummary, generateHints } = await import('../../src/mcp/helpers/enrich.js');
-    const summary = generateSummary('usage', {}, 'en');
-    expect(summary).toContain('Usage');
-    const hints = generateHints('usage', {});
     expect(Array.isArray(hints)).toBe(true);
   });
 
@@ -186,12 +168,10 @@ describe('MCP Tool Quality — Error Handling', () => {
     registerPlanTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
     const { planSprint } = await import('../../src/orchestra/brain.js');
-    vi.mocked(loadConfig).mockResolvedValue({ mode: 'max_plan', language: 'en' } as unknown as Awaited<ReturnType<typeof loadConfig>>);
+    vi.mocked(loadConfig).mockResolvedValue({ mode: 'max_plan', language: 'en', activeModeConfig: { max_workers: 3 } } as unknown as Awaited<ReturnType<typeof loadConfig>>);
     vi.mocked(planSprint).mockImplementation(() => { throw new Error('directives missing'); });
-    const { readContext, checkUsage, adjustSprintSize } = await import('../../src/orchestra/brain.js');
+    const { readContext } = await import('../../src/orchestra/brain.js');
     vi.mocked(readContext).mockReturnValue({ directives: '', memory: '', retro: '', debt: [], patterns: '', decisions: '', existingTasks: [], projectState: { gitStatus: '', fileTree: [] } });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
 
     const result = await mock.tools.get('deckent_plan')!.handler({});
     expect(result.isError).toBe(true);
@@ -219,22 +199,6 @@ describe('MCP Tool Quality — Error Handling', () => {
 
 describe('MCP Tool Quality — Input Validation Improvements', () => {
   beforeEach(() => { vi.resetAllMocks(); });
-
-  it('deckent_usage returns enriched response with sprintId', async () => {
-    const { registerUsageTool } = await import('../../src/mcp/tools/usage.js');
-    const mock = createMockServer();
-    registerUsageTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-    vi.mocked(loadConfig).mockResolvedValue({ mode: 'max_plan', language: 'en' } as unknown as Awaited<ReturnType<typeof loadConfig>>);
-    const { getNextSprintId } = await import('../../src/core/utils.js');
-    vi.mocked(getNextSprintId).mockReturnValue('sprint-060');
-
-    const result = await mock.tools.get('deckent_usage')!.handler({ sprintId: 'sprint-059' });
-    const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.sprintId).toBe('sprint-059');
-    expect(parsed._enriched).toBeDefined();
-    expect(parsed._enriched.summary).toBeTruthy();
-  });
 
   it('deckent_config read action returns enriched response', async () => {
     const { registerConfigTool } = await import('../../src/mcp/tools/config.js');

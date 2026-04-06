@@ -21,7 +21,6 @@ function makeConfig(projectRoot: string): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
       brain_planning: 'structured',
     },
     modes: {} as ResolvedConfig['modes'],

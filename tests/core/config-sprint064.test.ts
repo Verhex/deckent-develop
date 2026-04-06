@@ -14,7 +14,6 @@ import {
   ConfigValidationError,
 } from '../../src/core/config.js';
 import {
-  getMissingFields,
   migrateConfigInMemory,
   needsMigration,
   migrateConfig,
@@ -107,91 +106,6 @@ describe('A) autoMigrateOnLoad', () => {
     expect(config.memory_budget).toBe(999); // original preserved
     expect(addedFields).toContain('brain_provider');
     expect(config.brain_provider).toBe('claude'); // default filled
-  });
-});
-
-// ─── B) Migration modes nesting fix ──────────────────────────────────
-
-describe('B) getMissingFields modes nesting', () => {
-  it('detects missing nested sub-field in usage_thresholds (partial object)', () => {
-    const existing = {
-      mode: 'max_plan',
-      modes: {
-        max_plan: {
-          max_workers: 8,
-          brain_model: 'opus',
-          default_model: 'opus',
-          haiku_allowed: true,
-          usage_thresholds: { '5hr': 0.8 }, // missing 'weekly'
-          brain_planning: 'auto',
-        },
-        max5x_plan: createDefaultConfig().modes.max5x_plan,
-        pro_plan: createDefaultConfig().modes.pro_plan,
-        api: createDefaultConfig().modes.api,
-      },
-    } as unknown as Record<string, unknown>;
-
-    const missing = getMissingFields(existing);
-    expect(missing).toContain('modes.max_plan.usage_thresholds.weekly');
-    expect(missing).not.toContain('modes.max_plan.usage_thresholds.5hr');
-  });
-
-  it('does not flag nested sub-fields when parent is entirely missing (parent takes priority)', () => {
-    const existing = {
-      mode: 'max_plan',
-      modes: {
-        max_plan: {
-          max_workers: 8,
-          brain_model: 'opus',
-          default_model: 'opus',
-          haiku_allowed: true,
-          // usage_thresholds entirely absent
-          brain_planning: 'auto',
-        },
-        max5x_plan: createDefaultConfig().modes.max5x_plan,
-        pro_plan: createDefaultConfig().modes.pro_plan,
-        api: createDefaultConfig().modes.api,
-      },
-    } as unknown as Record<string, unknown>;
-
-    const missing = getMissingFields(existing);
-    expect(missing).toContain('modes.max_plan.usage_thresholds');
-    // Sub-fields should NOT appear separately when parent is missing
-    expect(missing).not.toContain('modes.max_plan.usage_thresholds.5hr');
-    expect(missing).not.toContain('modes.max_plan.usage_thresholds.weekly');
-  });
-
-  it('migrateConfigInMemory fills missing nested sub-field while preserving existing sibling', () => {
-    const existing = {
-      mode: 'max_plan',
-      modes: {
-        max_plan: {
-          max_workers: 5,
-          brain_model: 'opus',
-          default_model: 'opus',
-          haiku_allowed: true,
-          usage_thresholds: { '5hr': 0.95 }, // custom value, missing 'weekly'
-          brain_planning: 'auto',
-        },
-        max5x_plan: createDefaultConfig().modes.max5x_plan,
-        pro_plan: createDefaultConfig().modes.pro_plan,
-        api: createDefaultConfig().modes.api,
-      },
-    } as unknown as Record<string, unknown>;
-
-    const { config, addedFields } = migrateConfigInMemory(existing);
-    expect(addedFields).toContain('modes.max_plan.usage_thresholds.weekly');
-    // Custom 5hr preserved
-    expect((config.modes.max_plan.usage_thresholds as Record<string, unknown>)['5hr']).toBe(0.95);
-    // Weekly added from defaults
-    expect((config.modes.max_plan.usage_thresholds as Record<string, unknown>)['weekly']).toBeDefined();
-  });
-
-  it('handles config with all modes present and all sub-fields present — no missing fields', () => {
-    const full = createDefaultConfig() as unknown as Record<string, unknown>;
-    const missing = getMissingFields(full);
-    const usageFields = missing.filter(f => f.includes('usage_thresholds'));
-    expect(usageFields).toHaveLength(0);
   });
 });
 

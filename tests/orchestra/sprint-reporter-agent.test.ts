@@ -265,7 +265,7 @@ describe('writeRetrospective — agent performance section', () => {
     const metrics = makeMetrics();
     const agentMap = new Map([['001', 'custom-agent']]);
 
-    writeRetrospective(tempDir, sprint, evaluations, metrics, undefined, agentMap);
+    writeRetrospective(tempDir, sprint, evaluations, metrics, agentMap);
 
     const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf-8');
     expect(retro).toContain('custom-agent');

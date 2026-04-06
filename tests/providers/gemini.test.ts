@@ -417,21 +417,6 @@ describe('GeminiAdapter', () => {
     expect(workers).toHaveLength(2);
   });
 
-  // ─── checkUsage() ──────────────────────────────────────────────────
-
-  it('checkUsage returns neutral defaults (no quota API available)', async () => {
-    const usage = await adapter.checkUsage();
-    expect(usage.fiveHourPercent).toBe(0);
-    expect(usage.weeklyPercent).toBe(0);
-    expect(usage.measuredAt).toBeDefined();
-  });
-
-  it('checkUsage measuredAt is a valid ISO string', async () => {
-    const usage = await adapter.checkUsage();
-    expect(() => new Date(usage.measuredAt)).not.toThrow();
-    expect(new Date(usage.measuredAt).toISOString()).toBe(usage.measuredAt);
-  });
-
   // ─── buildCommand() ────────────────────────────────────────────────
 
   it('buildCommand returns gemini CLI command with correct flags', () => {

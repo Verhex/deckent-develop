@@ -31,8 +31,6 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
@@ -94,7 +92,7 @@ vi.mock('../../src/mcp/helpers/format.js', () => ({
 
 import { loadConfig } from '../../src/core/config.js';
 import {
-  readContext, checkUsage, adjustSprintSize, planSprint, runSprint,
+  readContext, planSprint, runSprint,
 } from '../../src/orchestra/brain.js';
 import { analyzeProject } from '../../src/core/analyzer.js';
 import { writeJobState, readLatestJobState } from '../../src/mcp/tools/job-runner.js';
@@ -241,7 +239,7 @@ describe('MCP Tools', () => {
           brain_model: 'opus',
           default_model: 'sonnet',
           haiku_allowed: true,
-          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+
         },
         modes: {} as ResolvedConfig['modes'],
         language: 'en',
@@ -261,13 +259,7 @@ describe('MCP Tools', () => {
         projectState: { gitStatus: '', fileTree: [] },
       });
 
-      vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-      vi.mocked(adjustSprintSize).mockReturnValue({
-        size: 'full',
-        maxWorkers: 8,
-        modelConstraint: null,
-        reason: 'Usage OK',
-      });
+
       vi.mocked(planSprint).mockReturnValue(mockSprint);
 
       const result = await mock.tools.get('deckent_plan')!.handler({});
@@ -288,7 +280,7 @@ describe('MCP Tools', () => {
         mode: 'max_plan',
         activeModeConfig: {
           max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
-          haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+          haiku_allowed: true,
         },
         modes: {} as ResolvedConfig['modes'],
         language: 'en', projectName: 'test', projectRoot: '/tmp/test', version: '0.1.0',
@@ -297,8 +289,7 @@ describe('MCP Tools', () => {
         directives: '', memory: '', retro: '', debt: [], patterns: '', decisions: '',
         existingTasks: [], projectState: { gitStatus: '', fileTree: [] },
       });
-      vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 } as never);
-      vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+
       vi.mocked(planSprint).mockReturnValue({
         id: 'sprint-001', number: 1, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
         tasks: [], workers: [], reasoning: 'Test reasoning', planningMode: 'structured',
@@ -328,7 +319,7 @@ describe('MCP Tools', () => {
           brain_model: 'opus',
           default_model: 'sonnet',
           haiku_allowed: true,
-          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+
         },
         modes: {} as ResolvedConfig['modes'],
         language: 'en',
@@ -379,7 +370,7 @@ describe('MCP Tools', () => {
           brain_model: 'opus',
           default_model: 'sonnet',
           haiku_allowed: true,
-          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+
         },
         modes: {} as ResolvedConfig['modes'],
         language: 'en',
@@ -418,7 +409,7 @@ describe('MCP Tools', () => {
           brain_model: 'opus',
           default_model: 'sonnet',
           haiku_allowed: true,
-          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+
         },
         modes: {} as ResolvedConfig['modes'],
         language: 'en',

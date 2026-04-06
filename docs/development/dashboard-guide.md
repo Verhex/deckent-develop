@@ -157,11 +157,6 @@ The `.dashboard` file and `/api/status` response follow this structure:
     "blocked": 0,
     "total": 8
   },
-  "usage": {
-    "fiveHourPercent": 45,
-    "weeklyPercent": 30,
-    "measuredAt": "2026-03-18T10:00:00.000Z"
-  },
   "alerts": [
     {
       "level": "WARNING",

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveTaskModel } from '../../src/orchestra/model-selector.js';
-import type { ResolvedConfig, UsageMetrics, TaskScope, ModelType, ProviderName } from '../../src/core/types.js';
+import type { ResolvedConfig, TaskScope, ModelType, ProviderName } from '../../src/core/types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -12,22 +12,12 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: true,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
     projectName: 'test',
     projectRoot: '/tmp/test',
     version: '0.1.0',
-    ...overrides,
-  };
-}
-
-function makeUsage(overrides: Partial<UsageMetrics> = {}): UsageMetrics {
-  return {
-    fiveHourPercent: 10,
-    weeklyPercent: 10,
-    measuredAt: '2026-03-22T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -40,34 +30,34 @@ function makeScope(dirs: string[], filesWrite: string[] = []): TaskScope {
 
 describe('resolveTaskModel — provider parameter backward compat', () => {
   const config = makeConfig();
-  const usage = makeUsage();
+  const patterns: never[] = [];
 
   it('no provider parameter returns Claude model (haiku)', () => {
     const scope = makeScope(['src/cli/']);
-    const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config, usage);
+    const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config);
     expect(result).toBe('haiku');
   });
 
   it('no provider parameter returns Claude model (sonnet)', () => {
     const scope = makeScope(['src/core/', 'src/cli/']);
-    const result = resolveTaskModel('Normal task', 'Some description', scope, config, usage);
+    const result = resolveTaskModel('Normal task', 'Some description', scope, config);
     expect(result).toBe('sonnet');
   });
 
   it('no provider parameter returns Claude model (opus)', () => {
     const scope = makeScope(['src/core/', 'src/orchestra/']);
     const result = resolveTaskModel(
-      'Architect migration refactor', 'Cross-cutting refactor', scope, config, usage,
+      'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
     );
     expect(result).toBe('opus');
   });
 
   it('explicit provider=claude returns same as no provider', () => {
     const scope = makeScope(['src/cli/']);
-    const withoutProvider = resolveTaskModel('Simple fix', 'A tiny change', scope, config, usage);
+    const withoutProvider = resolveTaskModel('Simple fix', 'A tiny change', scope, config);
     const withProvider = resolveTaskModel(
-      'Simple fix', 'A tiny change', scope, config, usage,
-      undefined, undefined, undefined, 'claude',
+      'Simple fix', 'A tiny change', scope, config, patterns,
+      undefined, undefined, 'claude',
     );
     expect(withProvider).toBe(withoutProvider);
   });
@@ -77,13 +67,13 @@ describe('resolveTaskModel — provider parameter backward compat', () => {
 
 describe('resolveTaskModel — codex provider', () => {
   const config = makeConfig();
-  const usage = makeUsage();
+  const patterns: never[] = [];
 
   it('simple task resolves to gpt-5-mini (economy tier)', () => {
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
-      'Simple fix', 'A tiny change', scope, config, usage,
-      undefined, undefined, undefined, 'codex',
+      'Simple fix', 'A tiny change', scope, config, patterns,
+      undefined, undefined, 'codex',
     );
     expect(result).toBe('gpt-5-mini');
   });
@@ -91,8 +81,8 @@ describe('resolveTaskModel — codex provider', () => {
   it('medium task resolves to gpt-4.1 (standard tier)', () => {
     const scope = makeScope(['src/core/', 'src/cli/']);
     const result = resolveTaskModel(
-      'Normal task', 'Some description', scope, config, usage,
-      undefined, undefined, undefined, 'codex',
+      'Normal task', 'Some description', scope, config, patterns,
+      undefined, undefined, 'codex',
     );
     expect(result).toBe('gpt-4.1');
   });
@@ -100,35 +90,25 @@ describe('resolveTaskModel — codex provider', () => {
   it('complex task resolves to gpt-5 (premium tier)', () => {
     const scope = makeScope(['src/core/', 'src/orchestra/']);
     const result = resolveTaskModel(
-      'Architect migration refactor', 'Cross-cutting refactor', scope, config, usage,
-      undefined, undefined, undefined, 'codex',
+      'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
+      undefined, undefined, 'codex',
     );
     expect(result).toBe('gpt-5');
   });
 
-  it('usage pressure downgrades gpt-5 to gpt-4.1', () => {
-    const highUsage = makeUsage({ fiveHourPercent: 90 });
-    const scope = makeScope(['src/core/', 'src/orchestra/']);
-    const result = resolveTaskModel(
-      'Architect migration refactor', 'Cross-cutting refactor', scope, config, highUsage,
-      undefined, undefined, undefined, 'codex',
-    );
-    // opus -> sonnet (usage pressure) -> gpt-4.1 (codex mapping)
-    expect(result).toBe('gpt-4.1');
-  });
 });
 
 // ─── Gemini Provider ─────────────────────────────────────────────────────────
 
 describe('resolveTaskModel — gemini provider', () => {
   const config = makeConfig();
-  const usage = makeUsage();
+  const patterns: never[] = [];
 
   it('simple task resolves to gemini-2.0-flash (economy tier)', () => {
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
-      'Simple fix', 'A tiny change', scope, config, usage,
-      undefined, undefined, undefined, 'gemini',
+      'Simple fix', 'A tiny change', scope, config, patterns,
+      undefined, undefined, 'gemini',
     );
     // haiku -> economy tier -> gemini-2.0-flash (economy on gemini)
     expect(result).toBe('gemini-2.0-flash');
@@ -137,8 +117,8 @@ describe('resolveTaskModel — gemini provider', () => {
   it('medium task resolves to gemini-2.5-flash (standard tier)', () => {
     const scope = makeScope(['src/core/', 'src/cli/']);
     const result = resolveTaskModel(
-      'Normal task', 'Some description', scope, config, usage,
-      undefined, undefined, undefined, 'gemini',
+      'Normal task', 'Some description', scope, config, patterns,
+      undefined, undefined, 'gemini',
     );
     expect(result).toBe('gemini-2.5-flash');
   });
@@ -146,8 +126,8 @@ describe('resolveTaskModel — gemini provider', () => {
   it('complex task resolves to gemini-2.5-pro (premium tier)', () => {
     const scope = makeScope(['src/core/', 'src/orchestra/']);
     const result = resolveTaskModel(
-      'Architect migration refactor', 'Cross-cutting refactor', scope, config, usage,
-      undefined, undefined, undefined, 'gemini',
+      'Architect migration refactor', 'Cross-cutting refactor', scope, config, patterns,
+      undefined, undefined, 'gemini',
     );
     expect(result).toBe('gemini-2.5-pro');
   });
@@ -157,13 +137,13 @@ describe('resolveTaskModel — gemini provider', () => {
 
 describe('resolveTaskModel — forceModel + provider', () => {
   const config = makeConfig();
-  const usage = makeUsage();
+  const patterns: never[] = [];
 
   it('forceModel=opus on codex maps to gpt-5', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
-      'Forced task', 'Forced model', scope, config, usage,
-      undefined, 'opus', undefined, 'codex',
+      'Forced task', 'Forced model', scope, config, patterns,
+      'opus', undefined, 'codex',
     );
     expect(result).toBe('gpt-5');
   });
@@ -171,8 +151,8 @@ describe('resolveTaskModel — forceModel + provider', () => {
   it('forceModel=sonnet on gemini maps to gemini-2.5-flash', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
-      'Forced task', 'Forced model', scope, config, usage,
-      undefined, 'sonnet', undefined, 'gemini',
+      'Forced task', 'Forced model', scope, config, patterns,
+      'sonnet', undefined, 'gemini',
     );
     expect(result).toBe('gemini-2.5-flash');
   });
@@ -180,8 +160,8 @@ describe('resolveTaskModel — forceModel + provider', () => {
   it('forceModel=gpt-4.1 on codex returns gpt-4.1 directly (same provider)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
-      'Forced task', 'Forced model', scope, config, usage,
-      undefined, 'gpt-4.1', undefined, 'codex',
+      'Forced task', 'Forced model', scope, config, patterns,
+      'gpt-4.1', undefined, 'codex',
     );
     expect(result).toBe('gpt-4.1');
   });
@@ -189,8 +169,8 @@ describe('resolveTaskModel — forceModel + provider', () => {
   it('forceModel=opus on claude returns opus directly', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
-      'Forced task', 'Forced model', scope, config, usage,
-      undefined, 'opus', undefined, 'claude',
+      'Forced task', 'Forced model', scope, config, patterns,
+      'opus', undefined, 'claude',
     );
     expect(result).toBe('opus');
   });
@@ -198,8 +178,8 @@ describe('resolveTaskModel — forceModel + provider', () => {
   it('forceModel=haiku on gemini maps to gemini-2.0-flash (economy tier)', () => {
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
-      'Forced task', 'Forced model', scope, config, usage,
-      undefined, 'haiku', undefined, 'gemini',
+      'Forced task', 'Forced model', scope, config, patterns,
+      'haiku', undefined, 'gemini',
     );
     expect(result).toBe('gemini-2.0-flash');
   });
@@ -210,10 +190,9 @@ describe('resolveTaskModel — forceModel + provider', () => {
 describe('resolveTaskModel — layer interactions with provider', () => {
   it('pro_plan + codex: opus->sonnet(plan filter)->gpt-4.1(codex mapping)', () => {
     const proConfig = makeConfig({ mode: 'pro_plan' });
-    const usage = makeUsage();
     const scope = makeScope(['src/core/', 'src/orchestra/']);
     const result = resolveTaskModel(
-      'Architect migration refactor', 'Cross-cutting refactor', scope, proConfig, usage,
+      'Architect migration refactor', 'Cross-cutting refactor', scope, proConfig,
       undefined, undefined, undefined, 'codex',
     );
     expect(result).toBe('gpt-4.1');
@@ -226,14 +205,13 @@ describe('resolveTaskModel — layer interactions with provider', () => {
         brain_model: 'opus',
         default_model: 'sonnet',
         haiku_allowed: false,
-        usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
       },
     });
-    const usage = makeUsage();
+    const patterns: never[] = [];
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
-      'Simple fix', 'A tiny change', scope, config, usage,
-      undefined, undefined, undefined, 'gemini',
+      'Simple fix', 'A tiny change', scope, config, patterns,
+      undefined, undefined, 'gemini',
     );
     // haiku (score-based) -> sonnet (haiku not allowed) -> gemini-2.5-flash
     expect(result).toBe('gemini-2.5-flash');
@@ -241,11 +219,11 @@ describe('resolveTaskModel — layer interactions with provider', () => {
 
   it('doc scope + codex: opus->sonnet(doc cap)->gpt-4.1(codex)', () => {
     const config = makeConfig();
-    const usage = makeUsage();
+    const patterns: never[] = [];
     const scope = makeScope(['docs/']);
     const result = resolveTaskModel(
-      'Write docs', 'Documentation', scope, config, usage,
-      undefined, undefined, ['opus'], 'codex',
+      'Write docs', 'Documentation', scope, config, patterns,
+      undefined, ['opus'], 'codex',
     );
     // skill upgrades to opus, Layer 3 caps to sonnet, then codex mapping -> gpt-4.1
     expect(result).toBe('gpt-4.1');
@@ -253,11 +231,11 @@ describe('resolveTaskModel — layer interactions with provider', () => {
 
   it('skillModels + provider maps correctly', () => {
     const config = makeConfig();
-    const usage = makeUsage();
+    const patterns: never[] = [];
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
-      'Simple fix', 'A tiny change', scope, config, usage,
-      undefined, undefined, ['opus'], 'codex',
+      'Simple fix', 'A tiny change', scope, config, patterns,
+      undefined, ['opus'], 'codex',
     );
     // skill upgrades to opus, no caps apply, codex mapping -> gpt-5
     expect(result).toBe('gpt-5');

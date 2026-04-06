@@ -19,7 +19,6 @@ function makeDashboard(overrides: Partial<DashboardState> = {}): DashboardState 
     sprint: { id: 'sprint-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
     agents: [],
     progress: { done: 2, active: 1, blocked: 0, total: 5 },
-    usage: { fiveHourPercent: 30, weeklyPercent: 45 } as DashboardState['usage'],
     alerts: [],
     updatedAt: new Date().toISOString(),
     ...overrides,

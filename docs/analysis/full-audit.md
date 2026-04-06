@@ -222,7 +222,6 @@ KATMAN 0 — CORE (Temel)
     ├── config.ts — Konfigürasyon yönetimi
     ├── constants.ts — Uygulama sabitleri
     ├── utils.ts — Paylaşılan yardımcılar
-    ├── usage-tracker.ts — Token/kullanım metrikleri
     ├── provider.ts — Provider soyutlaması
     ├── spawn-backend.ts — Spawn backend factory
     ├── agent-pool.ts, agent-selector.ts, agent-cache.ts
@@ -233,7 +232,7 @@ KATMAN 0 — CORE (Temel)
 
 KATMAN 1 — ORCHESTRATION
   src/orchestra/ (30 dosya)
-    ├── brain.ts (58 satır, re-export only — split in Sprint 036 into sprint-controller.ts, result-evaluator.ts, usage-manager.ts; originally 1312 satır, 29 import, 22 export) — Ana orkestratör
+    ├── brain.ts (58 satır, re-export only — split in Sprint 036 into sprint-controller.ts, result-evaluator.ts; originally 1312 satır, 29 import, 22 export) — Ana orkestratör
     ├── planner.ts — AI/structured görev planlama
     ├── tmux.ts — Tmux session yönetimi
     ├── task-builder.ts — Task JSON üretimi
@@ -319,8 +318,7 @@ import { ensureSession, spawnWorker as tmuxSpawnWorker, ... } from '../orchestra
 
 **Sorumluluklar:**
 1. Context Management (2 fn): readContext, readJsonSafe
-2. Usage Tracking (2 fn): checkUsage, checkUsageWithProvider
-3. Sprint Planning (2 fn): adjustSprintSize, planSprint
+2. Sprint Planning (1 fn): planSprint
 4. Worker Spawning (2 fn): spawnWorkers, confirmDraftTasks
 5. Result Waiting (2 fn): waitForResults, isDocTask
 6. Evaluation (2 fn): evaluateResult, isStaleTaskFile
@@ -330,12 +328,11 @@ import { ensureSession, spawnWorker as tmuxSpawnWorker, ... } from '../orchestra
 10. Channel Management (3 fn): getChannelRegistry, registerWorkerChannel, unregisterWorkerChannel
 11. Cleanup (1 fn): cleanup
 
-**Değerlendirme:** ORTA RİSK — İyi organize edilmiş (22 fn / 1312 satır = ~60 satır/fn) ama 7 farklı alan tek dosyada. **Sprint 036 notu:** Bu sorun giderildi — brain.ts 58 satıra indirildi; işlevler sprint-controller.ts, result-evaluator.ts ve usage-manager.ts alt modüllerine taşındı.
+**Değerlendirme:** ORTA RİSK — İyi organize edilmiş (22 fn / 1312 satır = ~60 satır/fn) ama 7 farklı alan tek dosyada. **Sprint 036 notu:** Bu sorun giderildi — brain.ts 58 satıra indirildi; işlevler sprint-controller.ts, result-evaluator.ts alt modüllerine taşındı. **Sprint 089 notu:** Kullanım yöneticisi modülü kaldırıldı.
 
 **Öneri:** Bölünmesi önerilen yapı:
 - `sprint-controller.ts` — runSprint, pauseSprint, resumeSprint, cleanup
 - `result-evaluator.ts` — evaluateResult, isDocTask, isStaleTaskFile
-- `usage-manager.ts` — checkUsage, checkUsageWithProvider, adjustSprintSize
 - Core orkestrasyon brain.ts'de kalsın
 
 ## 2.6 Sprint 29-33 Yeni Modüller — Katman Uyumu
@@ -760,7 +757,7 @@ tests/
 |----------|---------|-------|
 | Claude subprocess | child_process.spawn | TAM |
 | Claude tmux | tmux pipe-pane | TAM |
-| Usage tracking | UsageTracker | TAM |
+| Usage tracking | (Sprint 089'da kaldırıldı) | KALDIRILDI |
 | Spawn backend factory | OS detection, fallback | TAM |
 
 ## M) Bildirimler
@@ -1292,7 +1289,7 @@ Publish öncesi yapılması gereken tüm manuel testler:
 
 | Dosya | Satır | Öneri | Önem |
 |-------|-------|-------|------|
-| `src/orchestra/brain.ts` | 1,312 | sprint-controller, result-evaluator, usage-manager olarak böl | P1 |
+| `src/orchestra/brain.ts` | 1,312 | sprint-controller, result-evaluator olarak bölündü (Sprint 036). Kullanım yöneticisi Sprint 089'da kaldırıldı | P1 — DONE |
 | `src/api/server.ts` | 574 | Route handler'ları ayrı dosyalara (routes/) | P2 |
 | `src/monitor/auditor.ts` | 557 | Scanner ve alerter olarak böl | P2 |
 | `src/core/types.ts` | 523 | Domain'e göre böl (task-types, config-types, agent-types) | P3 |

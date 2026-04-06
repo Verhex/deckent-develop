@@ -41,7 +41,6 @@ describe('docs/reference/config-reference.md', () => {
     expect(content).toContain('brain_model');
     expect(content).toContain('default_model');
     expect(content).toContain('haiku_allowed');
-    expect(content).toContain('usage_thresholds');
     expect(content).toContain('budget_per_sprint');
   });
 
@@ -53,20 +52,20 @@ describe('docs/reference/config-reference.md', () => {
   });
 
   it('contains example configs', () => {
-    expect(content).toContain('## 9. Example Configs');
+    expect(content).toContain('## 8. Example Configs');
     expect(content).toContain('"mode"');
     expect(content).toContain('"max_plan"');
   });
 
   it('documents global vs project config', () => {
-    expect(content).toContain('## 8. Global vs Project Config');
+    expect(content).toContain('## 7. Global vs Project Config');
     expect(content).toContain('Global Config');
     expect(content).toContain('Project Config');
     expect(content).toContain('Merge Behavior');
   });
 
   it('documents validation rules', () => {
-    expect(content).toContain('## 11. Validation Rules');
+    expect(content).toContain('## 10. Validation Rules');
     expect(content).toContain('ConfigValidationError');
   });
 

@@ -19,7 +19,6 @@ function makeDashboard(overrides: Partial<DashboardState> = {}): DashboardState 
     },
     agents: [],
     progress: { done: 2, active: 1, blocked: 0, total: 5 },
-    usage: { fiveHourPercent: 30, weeklyPercent: 45 } as DashboardState['usage'],
     alerts: [],
     updatedAt: '2026-03-20T10:00:00.000Z',
     ...overrides,

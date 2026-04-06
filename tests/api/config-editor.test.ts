@@ -54,10 +54,10 @@ vi.mock('../../src/core/config.js', () => ({
     rollback_policy: 'never',
     auto_clean_locks: false,
     modes: {
-      max_plan: { max_workers: 8, brain_model: 'opus', default_model: 'opus', haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 }, brain_planning: 'auto' },
-      max5x_plan: { max_workers: 5, brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, usage_thresholds: { '5hr': 0.7, weekly: 0.5 }, brain_planning: 'auto' },
-      pro_plan: { max_workers: 3, brain_model: 'sonnet', default_model: 'sonnet', haiku_allowed: false, usage_thresholds: { '5hr': 0.6, weekly: 0.4 }, brain_planning: 'auto' },
-      api: { max_workers: 10, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true, usage_thresholds: { '5hr': 1.0, weekly: 1.0 }, budget_per_sprint: 5.0, requires: 'ANTHROPIC_API_KEY', brain_planning: 'auto' },
+      max_plan: { max_workers: 8, brain_model: 'opus', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
+      max5x_plan: { max_workers: 5, brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
+      pro_plan: { max_workers: 3, brain_model: 'sonnet', default_model: 'sonnet', haiku_allowed: false, brain_planning: 'auto' },
+      api: { max_workers: 10, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true, budget_per_sprint: 5.0, requires: 'ANTHROPIC_API_KEY', brain_planning: 'auto' },
     },
   })),
   deepMerge: vi.fn((base: Record<string, unknown>, override: Record<string, unknown>) => ({ ...base, ...override })),
@@ -83,8 +83,6 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(async () => ({ id: 'sprint-001', status: 'COMPLETE' })),
   readContext: vi.fn(() => ({ debt: [], patterns: [], memory: '' })),
-  checkUsage: vi.fn(() => ({ fiveHourPercent: 10, weeklyPercent: 5 })),
-  adjustSprintSize: vi.fn(() => ({ maxWorkers: 4 })),
   planSprint: vi.fn(() => ({ id: 'sprint-001', number: 1, tasks: [] })),
 }));
 

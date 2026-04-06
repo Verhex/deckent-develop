@@ -87,13 +87,12 @@ describe('ClaudeAdapter', () => {
       expect(adapter.supportedModels).toHaveLength(3);
     });
 
-    it('should implement ProviderAdapter interface (name, supportedModels, spawn, kill, listWorkers, checkUsage, isAvailable, buildCommand)', () => {
+    it('should implement ProviderAdapter interface (name, supportedModels, spawn, kill, listWorkers, isAvailable, buildCommand)', () => {
       expect(typeof adapter.name).toBe('string');
       expect(Array.isArray(adapter.supportedModels)).toBe(true);
       expect(typeof adapter.spawn).toBe('function');
       expect(typeof adapter.kill).toBe('function');
       expect(typeof adapter.listWorkers).toBe('function');
-      expect(typeof adapter.checkUsage).toBe('function');
       expect(typeof adapter.isAvailable).toBe('function');
       expect(typeof adapter.buildCommand).toBe('function');
     });
@@ -289,73 +288,6 @@ describe('ClaudeAdapter', () => {
     it('should return empty array when no workers active', () => {
       mockTmuxListWorkers.mockReturnValue([]);
       expect(adapter.listWorkers()).toEqual([]);
-    });
-  });
-
-  // ─── checkUsage() ────────────────────────────────────────────────
-
-  describe('checkUsage()', () => {
-    it('should return a Promise', () => {
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
-      const result = adapter.checkUsage();
-      expect(result).toBeInstanceOf(Promise);
-    });
-
-    it('should return UsageMetrics shape with fiveHourPercent and weeklyPercent', async () => {
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
-      const metrics = await adapter.checkUsage();
-      expect(typeof metrics.fiveHourPercent).toBe('number');
-      expect(typeof metrics.weeklyPercent).toBe('number');
-      expect(typeof metrics.measuredAt).toBe('string');
-    });
-
-    it('should return safe defaults when claude command fails', async () => {
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'error' });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(50);
-      expect(metrics.weeklyPercent).toBe(30);
-    });
-
-    it('should parse 5-hour percentage from output', async () => {
-      mockSpawnSync.mockReturnValue({
-        status: 0,
-        stdout: '5hr: 75% used\nweekly: 40% used',
-        stderr: '',
-      });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(75);
-    });
-
-    it('should parse weekly percentage from output', async () => {
-      mockSpawnSync.mockReturnValue({
-        status: 0,
-        stdout: '5hr: 75% used\nweekly: 40% used',
-        stderr: '',
-      });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.weeklyPercent).toBe(40);
-    });
-
-    it('should return safe defaults when output is empty string', async () => {
-      mockSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(50);
-      expect(metrics.weeklyPercent).toBe(30);
-    });
-
-    it('should return safe defaults when spawnSync throws', async () => {
-      mockSpawnSync.mockImplementation(() => {
-        throw new Error('command not found');
-      });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.fiveHourPercent).toBe(50);
-      expect(metrics.weeklyPercent).toBe(30);
-    });
-
-    it('should include measuredAt as ISO 8601 string', async () => {
-      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: '' });
-      const metrics = await adapter.checkUsage();
-      expect(metrics.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
   });
 

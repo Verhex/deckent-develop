@@ -31,7 +31,6 @@ function makeDashboard(overrides: Partial<DashboardState> = {}): DashboardState 
     },
     agents: [],
     progress: { done: 2, active: 1, blocked: 0, total: 5 },
-    usage: { fiveHourPercent: 30, weeklyPercent: 45 } as DashboardState['usage'],
     alerts: [],
     updatedAt: '2026-03-20T10:00:00.000Z',
     ...overrides,
@@ -222,12 +221,6 @@ describe('formatDashboard', () => {
     const result = formatDashboard(makeDashboard());
     expect(result).toContain('2/5 done');
     expect(result).toContain('1 active');
-  });
-
-  it('renders usage percentages', () => {
-    const result = formatDashboard(makeDashboard());
-    expect(result).toContain('30%');
-    expect(result).toContain('45%');
   });
 
   it('renders alert count', () => {

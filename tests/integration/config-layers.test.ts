@@ -151,7 +151,6 @@ describe('Config Layers Integration', () => {
             brain_model: 'sonnet',
             default_model: 'sonnet',
             haiku_allowed: false,
-            usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
             brain_planning: 'auto',
           },
         } as DeckentConfig['modes'],
@@ -164,7 +163,6 @@ describe('Config Layers Integration', () => {
             brain_model: 'sonnet',
             default_model: 'sonnet',
             haiku_allowed: false,
-            usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
             brain_planning: 'auto',
           },
         } as DeckentConfig['modes'],
@@ -261,7 +259,6 @@ describe('Config Layers Integration', () => {
               brain_model: 'invalid' as unknown as DeckentConfig['mode'],
               default_model: 'sonnet',
               haiku_allowed: false,
-              usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
               brain_planning: 'auto',
             },
           } as DeckentConfig['modes'],
@@ -279,25 +276,6 @@ describe('Config Layers Integration', () => {
               brain_model: 'sonnet',
               default_model: 'sonnet',
               haiku_allowed: false,
-              usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
-              brain_planning: 'auto',
-            },
-          } as DeckentConfig['modes'],
-        };
-        mergeConfigs(config, null);
-      }).toThrow(ConfigValidationError);
-    });
-
-    it('throws ConfigValidationError for invalid usage thresholds', () => {
-      expect(() => {
-        const config: Partial<DeckentConfig> = {
-          modes: {
-            pro_plan: {
-              max_workers: 3,
-              brain_model: 'sonnet',
-              default_model: 'sonnet',
-              haiku_allowed: false,
-              usage_thresholds: { '5hr': 1.5, weekly: 0.4 }, // Invalid: must be 0-1
               brain_planning: 'auto',
             },
           } as DeckentConfig['modes'],
@@ -335,7 +313,6 @@ describe('Config Layers Integration', () => {
             brain_model: 'opus',
             default_model: 'opus',
             haiku_allowed: true,
-            usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
             brain_planning: 'ai',
           },
         } as DeckentConfig['modes'],

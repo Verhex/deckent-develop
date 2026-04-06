@@ -307,21 +307,10 @@ interface DashboardState {
   };
   agents:           AgentInfo[];
   progress:         { done: number; active: number; blocked: number; total: number };
-  usage:            UsageMetrics;
   alerts:           Alert[];
   auditorLastScan?: string;    // ISO 8601 — when last scan cycle completed
   violations?:      number;    // Total boundary violation count
   updatedAt:        string;
-}
-```
-
-#### `UsageMetrics`
-
-```ts
-interface UsageMetrics {
-  fiveHourPercent: number;  // 0–100
-  weeklyPercent:   number;  // 0–100
-  measuredAt:      string;  // ISO 8601
 }
 ```
 
@@ -352,7 +341,6 @@ interface PlanModeConfig {
   brain_model:      ModelType;
   default_model:    ModelType;
   haiku_allowed:    boolean;
-  usage_thresholds: { '5hr': number; weekly: number };  // 0.0–1.0
   budget_per_sprint?: number;  // USD, api mode only
   requires?:        string;    // Env var name, api mode only
   brain_planning?:  BrainPlanningMode;  // Default: 'auto'
@@ -678,50 +666,6 @@ Reads all brain files and the current task state into a single context object.
 ```ts
 const ctx = readContext('/my/project');
 console.log(ctx.debt.length); // number of open debt items
-```
-
----
-
-### `checkUsage`
-
-```ts
-function checkUsage(config: ResolvedConfig): UsageMetrics
-```
-
-Reads Claude API usage by running `claude -p /usage`. Returns safe defaults (50%/30%) if the command fails.
-
-**Returns:** `UsageMetrics` with `fiveHourPercent`, `weeklyPercent`, and `measuredAt`.
-
----
-
-### `adjustSprintSize`
-
-```ts
-function adjustSprintSize(
-  config: ResolvedConfig,
-  usage: UsageMetrics,
-): SprintSizeRecommendation
-```
-
-Pure function. Compares usage against configured thresholds and returns a sprint size recommendation.
-
-**Returns:** `SprintSizeRecommendation`:
-```ts
-interface SprintSizeRecommendation {
-  size:            'full' | 'reduced' | 'minimal';
-  maxWorkers:      number;
-  modelConstraint: ModelType | null;  // null = no constraint
-  reason:          string;
-}
-```
-
-**Example:**
-```ts
-const usage = checkUsage(config);
-const rec = adjustSprintSize(config, usage);
-if (rec.size === 'minimal') {
-  console.log('Usage critical — sprint will run with 1 worker');
-}
 ```
 
 ---
@@ -1451,7 +1395,6 @@ updateDashboard('/project', {
   sprint: { id: 'sprint-1', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
   agents: [],
   progress: { done: 2, active: 3, blocked: 0, total: 5 },
-  usage: { fiveHourPercent: 40, weeklyPercent: 20, measuredAt: new Date().toISOString() },
   alerts: [],
   updatedAt: new Date().toISOString(),
 });

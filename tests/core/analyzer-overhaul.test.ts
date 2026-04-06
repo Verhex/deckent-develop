@@ -15,6 +15,7 @@ vi.mock('node:fs', () => ({
 
 vi.mock('../../src/core/utils.js', () => ({
   readJsonSafe: vi.fn().mockReturnValue(null),
+  debugLog: vi.fn(),
 }));
 
 import { spawnSync } from 'node:child_process';

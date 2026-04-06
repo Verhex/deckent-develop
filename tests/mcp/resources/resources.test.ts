@@ -32,8 +32,6 @@ vi.mock('../../../src/core/utils.js', async (importOriginal) => {
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   BrainError: class BrainError extends Error {},
 }));
@@ -512,72 +510,6 @@ describe('MCP Resources — Comprehensive Suite', () => {
     });
   });
 
-  // ── usage resource ─────────────────────────────────────────────────
-
-  describe('deckent://usage', () => {
-    it('registers usage resource with correct name and mimeType', async () => {
-      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
-      const mock = createMockServer();
-      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-      expect(mock.resources.has('usage')).toBe(true);
-      const cfg = mock.resources.get('usage')!.config as { mimeType?: string };
-      expect(cfg.mimeType).toBe('application/json');
-    });
-
-    it('returns usage entries for current sprint', async () => {
-      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
-      const mock = createMockServer();
-      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-      const entries = [{ model: 'sonnet', tokenEstimate: 5000, taskId: '059-001' }];
-      vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync)
-        .mockReturnValueOnce(JSON.stringify({ last_sprint_id: 'sprint-059' }))
-        .mockReturnValueOnce(JSON.stringify(entries));
-
-      const handler = mock.resources.get('usage')!.handler;
-      const result = await handler(new URL('deckent://usage'));
-
-      const parsed = JSON.parse(result.contents[0]!.text);
-      expect(parsed.sprintId).toBe('sprint-059');
-      expect(parsed.entries).toHaveLength(1);
-      expect(parsed.entries[0].taskId).toBe('059-001');
-    });
-
-    it('returns error when no sprint found in config', async () => {
-      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
-      const mock = createMockServer();
-      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-      vi.mocked(existsSync).mockReturnValue(false);
-
-      const handler = mock.resources.get('usage')!.handler;
-      const result = await handler(new URL('deckent://usage'));
-
-      const parsed = JSON.parse(result.contents[0]!.text);
-      expect(parsed.error).toBeDefined();
-    });
-
-    it('returns empty entries when usage file missing', async () => {
-      const { registerUsageResource } = await import('../../../src/mcp/resources/usage.js');
-      const mock = createMockServer();
-      registerUsageResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-      vi.mocked(existsSync)
-        .mockReturnValueOnce(true)   // config exists
-        .mockReturnValueOnce(false); // usage file missing
-      vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-059' }));
-
-      const handler = mock.resources.get('usage')!.handler;
-      const result = await handler(new URL('deckent://usage'));
-
-      const parsed = JSON.parse(result.contents[0]!.text);
-      expect(parsed.sprintId).toBe('sprint-059');
-      expect(parsed.entries).toHaveLength(0);
-    });
-  });
-
   // ── tasks resource ─────────────────────────────────────────────────
 
   describe('deckent://tasks', () => {
@@ -673,7 +605,7 @@ describe('MCP Resources — Comprehensive Suite', () => {
   // ── registerResources index ────────────────────────────────────────
 
   describe('registerResources (index)', () => {
-    it('registers all 9 resources on the server', async () => {
+    it('registers all 8 resources on the server', async () => {
       const { registerResources } = await import('../../../src/mcp/resources/index.js');
       const mock = createMockServer();
       registerResources(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
@@ -684,7 +616,6 @@ describe('MCP Resources — Comprehensive Suite', () => {
       expect(mock.resources.has('memory')).toBe(true);
       expect(mock.resources.has('debt')).toBe(true);
       expect(mock.resources.has('retro')).toBe(true);
-      expect(mock.resources.has('usage')).toBe(true);
       expect(mock.resources.has('tasks')).toBe(true);
       expect(mock.resources.has('agents')).toBe(true);
     });

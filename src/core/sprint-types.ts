@@ -28,12 +28,6 @@ export enum SprintStatus {
   ABORTED = 'ABORTED',
 }
 
-export interface SprintUsageReport {
-  totalCalls: number;
-  totalTokens: number;
-  modelBreakdown: Array<{ model: string; calls: number; tokens: number }>;
-}
-
 export interface Sprint {
   id: string;
   number: number;
@@ -46,7 +40,6 @@ export interface Sprint {
   completedAt?: string;
   reasoning?: string;
   planningMode?: string;
-  usageReport?: SprintUsageReport;
   /** True if a rollback was triggered during this sprint (all tasks NO_GO) */
   rolledBack?: boolean;
   /** Human-readable rollback result message */

@@ -14,7 +14,7 @@
 | Native-first (CLI+MCP) | WORKING | 33+ CLI commands, 16 MCP tools (enriched), npm installable |
 | Self-evolving | WORKING | MEMORY.md learnings, decay, brain self-learning config suggestions (Sprint 054), sprint-to-sprint CI learning (Sprint 062) |
 | Observable | WORKING | .dashboard, deckent status/watch, web dashboard, agent/skill visibility |
-| Usage-aware | WORKING | checkUsage(), adjustSprintSize, resolveTaskModel() with usage pressure |
+| Usage-aware | REMOVED | Usage tracking removed in Sprint 089 |
 | Plan-compatible | WORKING | 4 modes (max/max5x/pro/api), auto-setup wizard, subscription detection |
 | Zero-friction | WORKING | MCP auto-registration, natural language → DIRECTIVES → sprint, zero-config mode |
 | Open source | WORKING | MIT LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md |

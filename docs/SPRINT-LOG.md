@@ -84,7 +84,7 @@
 | Tests | 83 new, 211 total (all passing) |
 | Coverage | brain.ts %93.61 stmts, %96.42 funcs; overall %91.51 |
 | Type errors | 0 |
-| Public functions | 17 (readContext, checkUsage, adjustSprintSize, createTask, planSprint, spawnWorkers, waitForResults, evaluateResult, handleEvaluation, handleCrossDependencies, escalateDebt, writeRetrospective, writeSprintLog, calculateMetrics, decay, cleanup, runSprint) |
+| Public functions | 15 (readContext, createTask, planSprint, spawnWorkers, waitForResults, evaluateResult, handleEvaluation, handleCrossDependencies, escalateDebt, writeRetrospective, writeSprintLog, calculateMetrics, decay, cleanup, runSprint) |
 | Internal helpers | 7 (readFileSafe, readJsonSafe, sleepSync, now, parseDebtTable, generateDebtTable, countBrainLines) |
 | Error classes | 1 (BrainError) |
 
@@ -95,7 +95,7 @@
 
 ### Tech Debt Accepted
 
-- DEBT-002: `checkUsage` stub (sıfır döner) — gerçek Claude CLI /status entegrasyonu sonraya
+- DEBT-002: Kullanım kontrolü stub'ı — Sprint 089'da kullanım takibi kaldırıldı
 - DEBT-003: Directive parsing satır bazlı — ileride Claude API ile akıllı parsing
 - DEBT-004: `waitForResults` sleepSync main thread bloklar — ileride async geçiş
 
@@ -162,7 +162,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 | Sprint | Tests | Coverage | Highlights |
 |--------|-------|----------|------------|
 | 2 | 480 | 91% | Async migration (sleepSync → async sleep) |
-| 3 | 540 | 92% | checkUsage real impl, haiku_allowed semantic fix |
+| 3 | 540 | 92% | haiku_allowed semantic fix |
 | 4 | 617 | 93% | resolveDebt lifecycle, stale debt cleanup |
 | 5 | 644 | 94.83% | Decay, doctor, start --dry-run, status --watch |
 | 6 | 645 | 95% | First dogfooding: README.md generated in 86s |
@@ -657,7 +657,7 @@ Full details available in CHANGELOG.md and DECKENT-MASTER-BLUEPRINT.md Section 1
 **Key Deliverables:**
 - Provider abstraction: ProviderAdapter + ProviderRegistry + ClaudeAdapter
 - SpawnBackend: TmuxBackend + SubprocessBackend + SpawnBackendFactory
-- Usage tracking: UsageTracker with sprint-based JSON storage
+- Kullanım takibi: Sprint 089'da kaldırıldı
 - Coverage validation: vitest JSON parsing + threshold checks
 - Rollback: Git safety points + auto-rollback policy
 - Worker IPC: WorkerChannel + ChannelRegistry (HEARTBEAT/PAUSE/RESUME/KILL)
@@ -2481,5 +2481,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 089-002: Usage Orchestra + Provider Modülleri Kaldır (GO_WITH_TECH_DEBT)
 - 089-003: Usage CLI + MCP + API + Dashboard Kaldır (GO_WITH_TECH_DEBT)
 - 089-004: Usage Test Dosyaları + Dokümantasyon Temizliği (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 90 — sprint-090
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 2495s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 2 |
+| Tech Debt | 2 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 2495344ms |
+
+### Tasks
+
+- 090-001: src/ Artık Temizliği — MCP Help, Server, Dashboard, Sprint Types (GO_WITH_TECH_DEBT)
+- 090-002: Test Dosyaları Artık Temizliği — Mock, Import, Fixture (NO_GO)
+- 090-003: Dokümantasyon + README Artık Temizliği (GO_WITH_TECH_DEBT)
 
 ---

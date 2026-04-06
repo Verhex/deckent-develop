@@ -116,7 +116,6 @@ function makeDashboard(overrides?: Partial<DashboardState>): DashboardState {
       } as AgentInfo,
     ],
     progress: { done: 1, active: 2, blocked: 0, total: 3 },
-    usage: { fiveHourPercent: 5, weeklyPercent: 0, measuredAt: '2026-03-16T15:42:00Z' },
     alerts: [],
     updatedAt: '2026-03-16T15:42:00Z',
     ...overrides,
@@ -154,21 +153,6 @@ describe('formatDashboard', () => {
     expect(result).toContain('Sprint 3');
     // No agent lines, but structure is intact
     expect(result).toContain('Progress:');
-  });
-
-  it('shows usage metrics', () => {
-    const result = formatDashboard(makeDashboard());
-    expect(result).toContain('5hr 5%');
-    expect(result).toContain('Weekly 0%');
-  });
-
-  it('displays percent values correctly without *100 multiplication (2C)', () => {
-    const result = formatDashboard(makeDashboard({ usage: { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: '2026-03-17T00:00:00Z' } }));
-    expect(result).toContain('5hr 50%');
-    expect(result).toContain('Weekly 30%');
-    // Old bug: 50 * 100 = 5000% — should not happen
-    expect(result).not.toContain('5000%');
-    expect(result).not.toContain('3000%');
   });
 
   it('shows alert count', () => {

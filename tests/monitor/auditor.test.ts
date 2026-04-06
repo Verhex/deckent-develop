@@ -601,7 +601,7 @@ describe('updateDashboard', () => {
       sprint: { id: 's1', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
       progress: { done: 0, active: 1, blocked: 0, total: 2 },
-      usage: { fiveHourPercent: 0.1, weeklyPercent: 0.05, measuredAt: new Date().toISOString() },
+
       alerts: [],
       updatedAt: new Date().toISOString(),
     };
@@ -822,7 +822,7 @@ describe('writeScanToDashboard', () => {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
       progress: { done: 0, active: 1, blocked: 0, total: 2 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+
       alerts: [{ level: 'INFO' as never, message: 'existing', timestamp: new Date().toISOString() }],
       updatedAt: new Date().toISOString(),
     };
@@ -846,7 +846,7 @@ describe('writeScanToDashboard', () => {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [{ id: 'w-001', role: 'worker', status: 'EXECUTING', model: 'sonnet', tmuxWindow: 'w-001' }] as never,
       progress: { done: 0, active: 1, blocked: 0, total: 1 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+
       alerts: [],
       updatedAt: new Date().toISOString(),
     };
@@ -892,7 +892,7 @@ describe('writeScanToDashboard', () => {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+
       alerts: existingAlerts as never,
       updatedAt: new Date().toISOString(),
     };
@@ -962,7 +962,6 @@ describe('writeScanToDashboard', () => {
     expect(written).toHaveProperty('sprint');
     expect(written).toHaveProperty('agents');
     expect(written).toHaveProperty('progress');
-    expect(written).toHaveProperty('usage');
     expect(written).toHaveProperty('alerts');
     expect(written).toHaveProperty('updatedAt');
     expect(written).toHaveProperty('auditorLastScan');
@@ -1011,14 +1010,6 @@ describe('resetDashboard', () => {
     expect(written.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it('sets usage metrics to zero', () => {
-    resetDashboard('/project', 'sprint-001', 1);
-
-    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
-    expect(written.usage.fiveHourPercent).toBe(0);
-    expect(written.usage.weeklyPercent).toBe(0);
-    expect(written.usage.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
 });
 
 describe('deduplicateAlerts', () => {
@@ -1122,7 +1113,7 @@ describe('deduplicateAlerts', () => {
       sprint: { id: 's1', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: ts() },
+
       alerts: [alert],
       updatedAt: ts(),
     };
@@ -1266,7 +1257,7 @@ describe('writeScanToDashboard — result file progress', () => {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [{ id: 'w-001', role: 'worker', status: 'EXECUTING' as never, model: 'sonnet', tmuxWindow: 'w-001', taskId: '001' }] as never,
       progress: { done: 0, active: 1, blocked: 0, total: 2 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+
       alerts: [],
       updatedAt: new Date().toISOString(),
     };
@@ -1292,7 +1283,7 @@ describe('writeScanToDashboard — result file progress', () => {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
       progress: { done: 1, active: 2, blocked: 1, total: 8 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+
       alerts: [],
       updatedAt: new Date().toISOString(),
     };

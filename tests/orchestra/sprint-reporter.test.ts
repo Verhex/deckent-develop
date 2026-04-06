@@ -119,7 +119,6 @@ function makeResolvedConfig(projectRoot: string): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
       brain_planning: 'auto',
     },
     modes: {} as ResolvedConfig['modes'],
@@ -1277,7 +1276,7 @@ describe('writeRetrospective human-friendly', () => {
     const sprint = makeSprint({ id: 'sprint-040' });
     const evals = new Map([['001', TaskEvaluation.DONE]]);
     const results = [makeResult({ linesAdded: 200, linesRemoved: 50 })];
-    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, undefined, results);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, results);
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
     expect(content).toContain('+200 / -50');
   });
@@ -1288,7 +1287,7 @@ describe('writeRetrospective human-friendly', () => {
     const results = [makeResult({
       feedbackLoop: { tscAttempts: 2, testAttempts: 1, tscErrorsFixed: 1, testFailuresFixed: 0, totalRetryTimeMs: 5000 },
     })];
-    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, undefined, results);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, results);
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
     expect(content).toContain('Self-healing rate');
   });
@@ -1301,7 +1300,7 @@ describe('writeRetrospective human-friendly', () => {
       makeResult({ taskId: '001', feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
       makeResult({ taskId: '002', feedbackLoop: { tscAttempts: 1, testAttempts: 1, tscErrorsFixed: 0, testFailuresFixed: 0, totalRetryTimeMs: 0 } }),
     ];
-    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, undefined, results);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics(), undefined, undefined, results);
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
     expect(content).toContain('## Highlights');
     expect(content).toContain('completed on first try');
@@ -1312,7 +1311,7 @@ describe('writeRetrospective human-friendly', () => {
     const sprint = makeSprint({ id: 'sprint-040', tasks });
     const evals = new Map([['001', TaskEvaluation.NO_GO]]);
     const results = [makeResult({ taskId: '001', selfAssessment: 'NO_GO', notes: 'Timeout' })];
-    writeRetrospective(tmpDir, sprint, evals, makeMetrics({ noGoTasks: 1 }), undefined, undefined, undefined, results);
+    writeRetrospective(tmpDir, sprint, evals, makeMetrics({ noGoTasks: 1 }), undefined, undefined, results);
     const content = readFileSync(join(tmpDir, '.brain', 'RETRO.md'), 'utf-8');
     expect(content).toContain('## Issues');
     expect(content).toContain('Broken Feature');

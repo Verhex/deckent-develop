@@ -6,7 +6,7 @@ import { DecisionOrchestrator } from '../../src/orchestra/decision-engine.js';
 import { DecisionLogger } from '../../src/orchestra/decision-logger.js';
 import { createDefaultAnalysis, createDecisionLogEntry } from '../../src/core/decision-types.js';
 import type { DecisionResult, DecisionContext } from '../../src/core/decision-types.js';
-import type { Task, TaskScope, ResolvedConfig, UsageMetrics } from '../../src/core/types.js';
+import type { Task, TaskScope, ResolvedConfig } from '../../src/core/types.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { AgentPool } from '../../src/core/agent-types.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
@@ -31,7 +31,6 @@ function makeConfig(): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: true,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
@@ -39,10 +38,6 @@ function makeConfig(): ResolvedConfig {
     projectRoot: TEST_ROOT,
     version: '0.1.0',
   };
-}
-
-function makeUsage(): UsageMetrics {
-  return { fiveHourPercent: 10, weeklyPercent: 10, measuredAt: '2026-03-22T00:00:00.000Z' };
 }
 
 function makeScope(dirs: string[] = [], filesWrite: string[] = []): TaskScope {
@@ -73,7 +68,6 @@ function makeContext(overrides: Partial<DecisionContext> = {}): DecisionContext 
     agentPool: new Map() as AgentPool,
     skillPool: new Map<string, SkillDefinition>(),
     patterns: [],
-    usageMetrics: makeUsage(),
     config: makeConfig(),
     ...overrides,
   };

@@ -34,7 +34,7 @@ function makeContext(overrides: Partial<DocUpdateContext> = {}): DocUpdateContex
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 8, brain_model: 'opus', default_model: 'opus',
-      haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+      haiku_allowed: true,
       brain_planning: 'auto',
     },
     modes: {} as ResolvedConfig['modes'],

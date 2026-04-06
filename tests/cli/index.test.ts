@@ -14,7 +14,6 @@ vi.mock('../../src/cli/commands/retro.js', () => ({ registerRetro: vi.fn() }));
 vi.mock('../../src/cli/commands/cleanup.js', () => ({ registerCleanup: vi.fn() }));
 vi.mock('../../src/cli/commands/doctor.js', () => ({ registerDoctor: vi.fn() }));
 vi.mock('../../src/cli/commands/config.js', () => ({ registerConfig: vi.fn() }));
-vi.mock('../../src/cli/commands/usage.js', () => ({ registerUsage: vi.fn() }));
 vi.mock('../../src/cli/commands/history.js', () => ({ registerHistory: vi.fn() }));
 vi.mock('../../src/cli/commands/plugin.js', () => ({ registerPlugin: vi.fn() }));
 vi.mock('../../src/cli/commands/upgrade.js', () => ({ registerUpgrade: vi.fn() }));
@@ -49,7 +48,6 @@ import { registerRetro } from '../../src/cli/commands/retro.js';
 import { registerCleanup } from '../../src/cli/commands/cleanup.js';
 import { registerDoctor } from '../../src/cli/commands/doctor.js';
 import { registerConfig } from '../../src/cli/commands/config.js';
-import { registerUsage } from '../../src/cli/commands/usage.js';
 import { registerHistory } from '../../src/cli/commands/history.js';
 import { registerPlugin } from '../../src/cli/commands/plugin.js';
 import { registerUpgrade } from '../../src/cli/commands/upgrade.js';
@@ -108,7 +106,7 @@ describe('CLI index — buildProgram()', () => {
     expect(opts).toContain('--version');
   });
 
-  it('registers all 29 command functions', () => {
+  it('registers all 28 command functions', () => {
     buildProgram();
 
     expect(registerInit).toHaveBeenCalledTimes(1);
@@ -122,7 +120,6 @@ describe('CLI index — buildProgram()', () => {
     expect(registerCleanup).toHaveBeenCalledTimes(1);
     expect(registerDoctor).toHaveBeenCalledTimes(1);
     expect(registerConfig).toHaveBeenCalledTimes(1);
-    expect(registerUsage).toHaveBeenCalledTimes(1);
     expect(registerHistory).toHaveBeenCalledTimes(1);
     expect(registerPlugin).toHaveBeenCalledTimes(1);
     expect(registerUpgrade).toHaveBeenCalledTimes(1);

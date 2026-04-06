@@ -26,8 +26,6 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
@@ -82,7 +80,7 @@ describe('DECKENT_MCP_INSTRUCTIONS', () => {
     expect(DECKENT_MCP_INSTRUCTIONS.length).toBeGreaterThan(200);
   });
 
-  it('instructions contains all 16 tool names', () => {
+  it('instructions contains all 15 tool names', () => {
     const tools = [
       'deckent_init',
       'deckent_set_directives',
@@ -96,7 +94,6 @@ describe('DECKENT_MCP_INSTRUCTIONS', () => {
       'deckent_analyze_project',
       'deckent_sync',
       'deckent_config',
-      'deckent_usage',
       'deckent_run',
       'deckent_kill',
       'deckent_cleanup',
@@ -149,7 +146,7 @@ describe('DECKENT_MCP_INSTRUCTIONS', () => {
     expect(DECKENT_MCP_INSTRUCTIONS).toContain('doctor');
   });
 
-  it('instructions contains all 9 resources', () => {
+  it('instructions contains all 8 resources', () => {
     const resources = [
       'deckent://dashboard',
       'deckent://directives',
@@ -157,7 +154,6 @@ describe('DECKENT_MCP_INSTRUCTIONS', () => {
       'deckent://debt',
       'deckent://config',
       'deckent://retro',
-      'deckent://usage',
       'deckent://tasks',
       'deckent://agents',
     ];

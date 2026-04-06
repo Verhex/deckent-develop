@@ -53,10 +53,6 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  checkUsageWithProvider: vi.fn(),
-  getDefaultProvider: vi.fn().mockReturnValue(null),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   cleanup: vi.fn(),
   runDecay: vi.fn(),
@@ -110,7 +106,7 @@ import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { countBrainLines, ensureDeckentImport, readJsonSafe } from '../../src/core/utils.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError } from '../../src/core/config.js';
-import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup, runDecay, BrainError, confirmDraftTasks } from '../../src/orchestra/brain.js';
+import { runSprint, readContext, planSprint, cleanup, runDecay, BrainError, confirmDraftTasks } from '../../src/orchestra/brain.js';
 import { isSessionActive, attach, ensureSession, spawnWorker, killWorker, destroy, setupWatchWindow, TmuxError } from '../../src/orchestra/tmux.js';
 import { readTask } from '../../src/agents/worker.js';
 
@@ -119,7 +115,6 @@ import { readTask } from '../../src/agents/worker.js';
 import { registerDoctor } from '../../src/cli/commands/doctor.js';
 import { registerAttach } from '../../src/cli/commands/attach.js';
 import { registerKill } from '../../src/cli/commands/kill.js';
-import { registerUsage } from '../../src/cli/commands/usage.js';
 import { registerRetro } from '../../src/cli/commands/retro.js';
 import { registerStatus } from '../../src/cli/commands/status.js';
 import { registerHistory, parseSprintLog, formatDurationMs } from '../../src/cli/commands/history.js';
@@ -171,7 +166,7 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
-      haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+      haiku_allowed: true,
     },
     modes: {} as ResolvedConfig['modes'],
     language: 'en',
@@ -397,24 +392,6 @@ describe('kill command', () => {
   });
 });
 
-// ─── Usage Command ──────────────────────────────────────────────────
-
-describe('usage command', () => {
-  beforeEach(() => { vi.clearAllMocks(); captureOutput(); });
-  afterEach(() => restoreOutput());
-
-  it('prints usage output', async () => {
-    await runCommand(registerUsage, ['usage']);
-    expect(stdout().length).toBeGreaterThan(0);
-  });
-
-  it('mentions usage or sprint in output', async () => {
-    await runCommand(registerUsage, ['usage']);
-    const out = stdout().toLowerCase();
-    expect(out.includes('usage') || out.includes('sprint') || out.includes('no usage')).toBe(true);
-  });
-});
-
 // ─── Retro Command ──────────────────────────────────────────────────
 
 describe('retro command', () => {
@@ -461,7 +438,7 @@ describe('status command', () => {
       sprint: { id: 's-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' },
+
       alerts: [],
       updatedAt: '2026-03-16T00:00:00Z',
     };
@@ -490,7 +467,7 @@ describe('status command', () => {
       sprint: { id: 's-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' },
+
       alerts: [],
       updatedAt: '2026-03-16T00:00:00Z',
     };
@@ -505,7 +482,7 @@ describe('status command', () => {
       sprint: { id: 's-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' },
+
       alerts: [],
       updatedAt: '2026-03-16T00:00:00Z',
     };
@@ -521,7 +498,7 @@ describe('status command', () => {
       sprint: { id: 's-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' },
+
       alerts: [],
       updatedAt: '2026-03-16T00:00:00Z',
     };
@@ -1007,10 +984,6 @@ describe('start command', () => {
       patterns: '', decisions: '', existingTasks: [],
       projectState: { gitStatus: '', fileTree: [] },
     });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
-    });
     vi.mocked(planSprint).mockReturnValue(makeSprint({
       tasks: [makeTask({ id: 'task-001', title: 'Test task' })],
     }));
@@ -1036,10 +1009,6 @@ describe('start command', () => {
       directives: '', memory: '', retro: '', debt: [],
       patterns: '', decisions: '', existingTasks: [],
       projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
     });
     vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [] }));
     await runCommand(registerStart, ['start', '--dry-run', '--watch', '--force']);
@@ -1079,33 +1048,12 @@ describe('plan command', () => {
       patterns: '', decisions: '', existingTasks: [],
       projectState: { gitStatus: '', fileTree: [] },
     });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
-    });
     vi.mocked(planSprint).mockReturnValue(makeSprint({
       tasks: [makeTask({ id: 'task-001', title: 'CLI Module', model: 'sonnet', priority: 'HIGH' })],
     }));
     await runCommand(registerPlan, ['plan']);
     expect(stdout()).toContain('task-001');
     expect(stdout()).toContain('CLI Module');
-  });
-
-  it('shows reduced sprint note', async () => {
-    vi.mocked(loadConfig).mockResolvedValue(makeConfig());
-    vi.mocked(readContext).mockReturnValue({
-      directives: '', memory: '', retro: '', debt: [],
-      patterns: '', decisions: '', existingTasks: [],
-      projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0.9, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'reduced', maxWorkers: 3, modelConstraint: null, reason: 'High usage',
-    });
-    vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [] }));
-    await runCommand(registerPlan, ['plan']);
-    expect(stdout()).toContain('reduced');
-    expect(stdout()).toContain('High usage');
   });
 
   it('handles planning error', async () => {
@@ -1121,10 +1069,6 @@ describe('plan command', () => {
       directives: '', memory: '', retro: '', debt: [],
       patterns: '', decisions: '', existingTasks: [],
       projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
     });
     vi.mocked(planSprint).mockReturnValue(makeSprint({
       tasks: [
@@ -1145,10 +1089,6 @@ describe('plan command', () => {
       patterns: '', decisions: '', existingTasks: [],
       projectState: { gitStatus: '', fileTree: [] },
     });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
-    });
     vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [makeTask()] }));
     await runCommand(registerPlan, ['plan', '--structured']);
     expect(vi.mocked(planSprint)).toHaveBeenCalledWith(
@@ -1163,10 +1103,6 @@ describe('plan command', () => {
       directives: '', memory: '', retro: '', debt: [],
       patterns: '', decisions: '', existingTasks: [],
       projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
     });
     vi.mocked(planSprint).mockReturnValue(makeSprint({ tasks: [makeTask()] }));
     await runCommand(registerPlan, ['plan', '--no-confirm']);
@@ -1184,10 +1120,6 @@ describe('plan command', () => {
       directives: '', memory: '', retro: '', debt: [],
       patterns: '', decisions: '', existingTasks: [],
       projectState: { gitStatus: '', fileTree: [] },
-    });
-    vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
     });
     vi.mocked(planSprint).mockReturnValue(makeSprint({
       tasks: [makeTask()],

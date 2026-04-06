@@ -26,8 +26,6 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
@@ -87,7 +85,7 @@ vi.mock('../../src/mcp/helpers/format.js', () => ({
 }));
 
 import { loadConfig } from '../../src/core/config.js';
-import { readContext, checkUsage, adjustSprintSize, planSprint, runSprint } from '../../src/orchestra/brain.js';
+import { readContext, planSprint, runSprint } from '../../src/orchestra/brain.js';
 import { readLatestJobState } from '../../src/mcp/tools/job-runner.js';
 
 // ─── Mock Server ─────────────────────────────────────────────────────
@@ -114,7 +112,6 @@ const baseConfig: ResolvedConfig = {
     brain_model: 'opus',
     default_model: 'sonnet',
     haiku_allowed: true,
-    usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
   },
   modes: {} as ResolvedConfig['modes'],
   language: 'en',
@@ -239,8 +236,7 @@ describe('MCP Enrichment 004 — plan', () => {
 
     vi.mocked(loadConfig).mockResolvedValue(baseConfig);
     vi.mocked(readContext).mockReturnValue(baseContext);
-    vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+
     vi.mocked(planSprint).mockReturnValue({
       id: 'sprint-022', number: 22, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
       tasks: [makeTask('1'), makeTask('2')], workers: [],
@@ -262,8 +258,7 @@ describe('MCP Enrichment 004 — plan', () => {
 
     vi.mocked(loadConfig).mockResolvedValue(baseConfig);
     vi.mocked(readContext).mockReturnValue(baseContext);
-    vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+
     vi.mocked(planSprint).mockReturnValue({
       id: 'sprint-022', number: 22, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
       tasks: Array.from({ length: 12 }, (_, i) => makeTask(String(i + 1))), workers: [],
@@ -284,8 +279,7 @@ describe('MCP Enrichment 004 — plan', () => {
 
     vi.mocked(loadConfig).mockResolvedValue(baseConfig);
     vi.mocked(readContext).mockReturnValue(baseContext);
-    vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+
     vi.mocked(planSprint).mockReturnValue({
       id: 'sprint-022', number: 22, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
       tasks: [makeTask('1', 'opus'), makeTask('2', 'haiku'), makeTask('3', 'opus')], workers: [],
@@ -307,8 +301,7 @@ describe('MCP Enrichment 004 — plan', () => {
 
     vi.mocked(loadConfig).mockResolvedValue(baseConfig);
     vi.mocked(readContext).mockReturnValue(baseContext);
-    vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+
     vi.mocked(planSprint).mockReturnValue({
       id: 'sprint-022', number: 22, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
       tasks: [makeTask('1'), makeTask('2')], workers: [],
@@ -328,8 +321,7 @@ describe('MCP Enrichment 004 — plan', () => {
 
     vi.mocked(loadConfig).mockResolvedValue(baseConfig);
     vi.mocked(readContext).mockReturnValue(baseContext);
-    vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+
     vi.mocked(planSprint).mockReturnValue({
       id: 'sprint-022', number: 22, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
       tasks: Array.from({ length: 12 }, (_, i) => makeTask(String(i + 1))), workers: [],
@@ -349,8 +341,7 @@ describe('MCP Enrichment 004 — plan', () => {
 
     vi.mocked(loadConfig).mockResolvedValue(baseConfig);
     vi.mocked(readContext).mockReturnValue(baseContext);
-    vi.mocked(checkUsage).mockReturnValue({ fiveHr: 0.3, weekly: 0.2 });
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK' });
+
     vi.mocked(planSprint).mockReturnValue({
       id: 'sprint-022', number: 22, status: SprintStatus.PLANNING, phase: SprintPhase.PLAN,
       tasks: [], workers: [], reasoning: 'Test', planningMode: 'ai',

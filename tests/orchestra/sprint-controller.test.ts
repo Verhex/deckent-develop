@@ -3,9 +3,8 @@
  *
  * Tests for the extracted sprint-controller module.
  * Covers: cleanup, isStaleTaskFile, pauseSprint, resumeSprint,
- *         checkAndAutoPause, checkAndAutoResume, RunSprintOptions interface,
- *         PauseState, BrainError, readContext, checkUsage,
- *         adjustSprintSize, evaluateResult, isDocTask, getDefaultProvider.
+ *         RunSprintOptions interface, PauseState, BrainError, readContext,
+ *         evaluateResult, isDocTask, getDefaultProvider.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -13,7 +12,7 @@ import {
   TaskStatus, TaskEvaluation, SprintPhase,
   SprintStatus, AlertLevel,
 } from '../../src/core/types.js';
-import type { Task, Sprint, ResolvedConfig, UsageMetrics, SystemProfile, TaskResult } from '../../src/core/types.js';
+import type { Task, Sprint, ResolvedConfig, SystemProfile, TaskResult } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
@@ -139,16 +138,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   ]),
 }));
 
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    recordCall: vi.fn(),
-    getSprintUsage: vi.fn().mockReturnValue({ sprintId: 'sprint-001', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [] }),
-    getTotalUsage: vi.fn(),
-    getModelBreakdown: vi.fn().mockReturnValue([]),
-    listSprints: vi.fn().mockReturnValue([]),
-  })),
-}));
-
 vi.mock('../../src/orchestra/coverage-validator.js', () => ({
   parseCoverageFromVitest: vi.fn(),
   validateCoverage: vi.fn(),
@@ -267,13 +256,9 @@ import {
   isStaleTaskFile,
   pauseSprint,
   resumeSprint,
-  checkAndAutoPause,
-  checkAndAutoResume,
   BrainError,
   isDocTask,
   evaluateResult,
-  adjustSprintSize,
-  checkUsage,
   getDefaultProvider,
   getChannelRegistry,
   spawnWorkers,
@@ -367,7 +352,7 @@ function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
   };
 }
 
-function makeConfig(thresholds = { '5hr': 0.8, weekly: 0.9 }): ResolvedConfig {
+function makeConfig(): ResolvedConfig {
   return {
     projectName: 'test',
     mode: 'max_plan',
@@ -380,28 +365,9 @@ function makeConfig(thresholds = { '5hr': 0.8, weekly: 0.9 }): ResolvedConfig {
       haiku_allowed: false,
       brain_planning: 'structured',
       brain_model: 'opus',
-      usage_thresholds: thresholds,
     },
     modes: {} as ResolvedConfig['modes'],
   } as ResolvedConfig;
-}
-
-function mockClaudeUsage(fiveHrPercent: number, weeklyPercent: number): void {
-  // Set up provider registry so checkUsage can resolve a CLI binary
-  const mockAdapter = {
-    name: 'claude',
-    buildCommand: vi.fn().mockReturnValue('claude -p /dev/null'),
-  };
-  mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
-
-  mockedSpawnSync.mockReturnValue({
-    status: 0,
-    stdout: `5hr: ${fiveHrPercent}%\nweekly: ${weeklyPercent}%`,
-    stderr: '',
-    pid: 1,
-    output: [],
-    signal: null,
-  } as ReturnType<typeof spawnSync>);
 }
 
 function setupFileMocks(): void {
@@ -716,86 +682,6 @@ describe('resumeSprint', () => {
   });
 });
 
-describe('checkAndAutoPause', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupFileMocks();
-  });
-
-  it('returns false when usage is below thresholds', () => {
-    mockClaudeUsage(50, 60); // 50% < 80%, 60% < 90%
-    const sprint = makeSprint();
-    const config = makeConfig();
-
-    const result = checkAndAutoPause('/tmp/test', sprint, config);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns true and pauses when 5hr threshold exceeded', () => {
-    mockClaudeUsage(85, 60); // 85% >= 80%
-    const sprint = makeSprint();
-    const config = makeConfig({ '5hr': 0.8, weekly: 0.9 });
-
-    const result = checkAndAutoPause('/tmp/test', sprint, config);
-
-    expect(result).toBe(true);
-    expect(sprint.status).toBe(SprintStatus.PAUSED);
-  });
-
-  it('returns true and pauses when weekly threshold exceeded', () => {
-    mockClaudeUsage(50, 95); // 95% >= 90%
-    const sprint = makeSprint();
-    const config = makeConfig({ '5hr': 0.8, weekly: 0.9 });
-
-    const result = checkAndAutoPause('/tmp/test', sprint, config);
-
-    expect(result).toBe(true);
-    expect(sprint.status).toBe(SprintStatus.PAUSED);
-  });
-});
-
-describe('checkAndAutoResume', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupFileMocks();
-  });
-
-  it('returns false for non-PAUSED sprint', () => {
-    mockClaudeUsage(10, 10);
-    const sprint = makeSprint({ status: SprintStatus.ACTIVE });
-    const config = makeConfig();
-
-    const result = checkAndAutoResume('/tmp/test', sprint, config);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns true and resumes when usage drops below resume threshold', () => {
-    // Resume threshold = 80% of 0.8 = 0.64 -> need < 64%
-    mockClaudeUsage(50, 50);
-    const task = makeTask({ status: TaskStatus.PAUSED });
-    const sprint = makeSprint({ tasks: [task], status: SprintStatus.PAUSED });
-    const config = makeConfig({ '5hr': 0.8, weekly: 0.9 });
-
-    const result = checkAndAutoResume('/tmp/test', sprint, config);
-
-    expect(result).toBe(true);
-    expect(sprint.status).toBe(SprintStatus.ACTIVE);
-  });
-
-  it('returns false when usage is still above resume threshold', () => {
-    // Resume threshold = 80% of 0.8 = 0.64 -> need < 64%, but 70% >= 64%
-    mockClaudeUsage(70, 50);
-    const sprint = makeSprint({ status: SprintStatus.PAUSED });
-    const config = makeConfig({ '5hr': 0.8, weekly: 0.9 });
-
-    const result = checkAndAutoResume('/tmp/test', sprint, config);
-
-    expect(result).toBe(false);
-  });
-});
-
 describe('isDocTask', () => {
   it('returns true for tasks with only doc directories', () => {
     const task = makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: [] } });
@@ -883,126 +769,6 @@ describe('evaluateResult', () => {
     };
 
     expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
-  });
-});
-
-describe('adjustSprintSize', () => {
-  it('returns full size when no thresholds exceeded', () => {
-    const config = makeConfig({ '5hr': 0.8, weekly: 0.9 });
-    const usage: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 50, measuredAt: new Date().toISOString() };
-
-    const result = adjustSprintSize(config, usage);
-
-    expect(result.size).toBe('full');
-    expect(result.modelConstraint).toBeNull();
-  });
-
-  it('returns reduced size when 5hr threshold exceeded', () => {
-    const config = makeConfig({ '5hr': 0.8, weekly: 0.9 });
-    const usage: UsageMetrics = { fiveHourPercent: 85, weeklyPercent: 50, measuredAt: new Date().toISOString() };
-
-    const result = adjustSprintSize(config, usage);
-
-    expect(result.size).toBe('reduced');
-    expect(result.modelConstraint).toBe('sonnet');
-  });
-
-  it('returns minimal size when both thresholds exceeded', () => {
-    const config = makeConfig({ '5hr': 0.8, weekly: 0.9 });
-    const usage: UsageMetrics = { fiveHourPercent: 85, weeklyPercent: 95, measuredAt: new Date().toISOString() };
-
-    const result = adjustSprintSize(config, usage);
-
-    expect(result.size).toBe('minimal');
-    expect(result.maxWorkers).toBe(1);
-  });
-});
-
-describe('checkUsage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns parsed usage when CLI succeeds', () => {
-    const mockAdapter = {
-      name: 'claude',
-      buildCommand: vi.fn().mockReturnValue('claude -p /dev/null'),
-    };
-    mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
-
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: '5hr: 42.5%\nweekly: 18.3%',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const config = makeConfig();
-    const result = checkUsage(config);
-
-    expect(result.fiveHourPercent).toBe(42.5);
-    expect(result.weeklyPercent).toBe(18.3);
-  });
-
-  it('returns safe defaults when CLI fails', () => {
-    mockedSpawnSync.mockReturnValue({
-      status: 1,
-      stdout: '',
-      stderr: 'error',
-      pid: 1,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const config = makeConfig();
-    const result = checkUsage(config);
-
-    expect(result.fiveHourPercent).toBe(50);
-    expect(result.weeklyPercent).toBe(30);
-  });
-
-  it('uses provider CLI binary when adapter is registered', () => {
-    const mockAdapter = {
-      name: 'codex',
-      buildCommand: vi.fn().mockReturnValue('codex --model o3 < /dev/null'),
-    };
-    mockedProviderRegistry.getDefault.mockReturnValue(mockAdapter as any);
-
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: '5hr: 10%\nweekly: 5%',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const config = makeConfig();
-    checkUsage(config);
-
-    // Should call the provider's CLI binary, not hardcoded 'claude'
-    expect(mockedSpawnSync).toHaveBeenCalledWith(
-      'codex',
-      ['-p', '/usage'],
-      expect.any(Object),
-    );
-  });
-
-  it('returns SAFE_DEFAULT when no adapter registered', () => {
-    mockedProviderRegistry.getDefault.mockImplementation(() => {
-      throw new Error('No providers registered');
-    });
-
-    const config = makeConfig();
-    const result = checkUsage(config);
-
-    // No spawnSync call should be made when no provider is available
-    expect(mockedSpawnSync).not.toHaveBeenCalled();
-    // Should return safe default values
-    expect(result.fiveHourPercent).toBe(50);
-    expect(result.weeklyPercent).toBe(30);
   });
 });
 
@@ -1214,7 +980,6 @@ describe('spawnWorkers — provider routing', () => {
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue('codex --model o3'),
   };
@@ -1225,7 +990,6 @@ describe('spawnWorkers — provider routing', () => {
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue('gemini --model gemini-2.5-pro'),
   };
@@ -1394,17 +1158,6 @@ describe('spawnWorkers — provider routing', () => {
     expect(queued[0].id).toBe('001-005');
   });
 
-  it('records usage for non-Claude providers', () => {
-    const mockTracker = { recordCall: vi.fn(), getSprintUsage: vi.fn(), getTotalUsage: vi.fn(), getModelBreakdown: vi.fn(), listSprints: vi.fn() };
-    const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
-    const sprint = makeSprint({ tasks: [task] });
-    const config = makeConfig();
-
-    spawnWorkers('/tmp/test', sprint, config, { usageTracker: mockTracker as any });
-
-    expect(mockTracker.recordCall).toHaveBeenCalledWith('o3', 5_000, '002-001', 'sprint-001');
-  });
-
   it('updates dashboard with provider info in currentAction', () => {
     const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const sprint = makeSprint({ tasks: [task] });
@@ -1465,7 +1218,6 @@ describe('cleanup — provider kill routing', () => {
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn(),
     isAvailable: vi.fn(),
     buildCommand: vi.fn(),
   };
@@ -1532,18 +1284,6 @@ describe('sprint-controller provider decoupling', () => {
     expect(source).not.toMatch(/taskProvider\s*!==\s*'claude'/);
     expect(source).not.toMatch(/provider\s*===\s*'claude'/);
     expect(source).not.toMatch(/provider\s*!==\s*'claude'/);
-  });
-
-  it('checkUsage uses resolveDefaultUsageCli instead of hardcoded string', async () => {
-    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-    const source = actualFs.readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
-      'utf-8',
-    );
-    // The checkUsage function should use resolveDefaultUsageCli() to get CLI binary
-    expect(source).toContain('resolveDefaultUsageCli');
-    // The spawnSync call inside checkUsage should use cliBinary, not a literal
-    expect(source).toContain('spawnSync(cliBinary,');
   });
 
   it('isTmuxProvider is the single source of truth for tmux routing', async () => {

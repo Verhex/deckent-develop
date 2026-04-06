@@ -266,7 +266,7 @@ describe('saveGlobalConfig — edge cases', () => {
           brain_model: 'sonnet',
           default_model: 'sonnet',
           haiku_allowed: false,
-          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+
           brain_planning: 'auto',
         },
       } as DeckentConfig['modes'],
@@ -300,7 +300,7 @@ describe('mergeConfigs — edge cases', () => {
           brain_model: 'sonnet',
           default_model: 'sonnet',
           haiku_allowed: false,
-          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+
           brain_planning: 'auto',
         },
       } as DeckentConfig['modes'],
@@ -317,7 +317,7 @@ describe('mergeConfigs — edge cases', () => {
           brain_model: 'sonnet',
           default_model: 'sonnet',
           haiku_allowed: false,
-          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+
           brain_planning: 'auto',
         },
       } as DeckentConfig['modes'],
@@ -329,7 +329,7 @@ describe('mergeConfigs — edge cases', () => {
           brain_model: 'sonnet',
           default_model: 'sonnet',
           haiku_allowed: false,
-          usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
+
           brain_planning: 'auto',
         },
       } as DeckentConfig['modes'],

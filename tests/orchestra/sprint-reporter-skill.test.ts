@@ -252,7 +252,7 @@ describe('writeRetrospective — skillMap parameter', () => {
       ['002', ['ts-skill']],
     ]);
 
-    writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, undefined, skillMap);
+    writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, skillMap);
 
     const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
     expect(retro).toContain('## Skill Performance');
@@ -277,7 +277,7 @@ describe('writeRetrospective — skillMap parameter', () => {
     const agentMap = new Map([['001', 'test-agent']]);
     const skillMap = new Map([['001', ['my-skill']]]);
 
-    writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, agentMap, skillMap);
+    writeRetrospective(tempDir, sprint, evals, makeMetrics(), agentMap, skillMap);
 
     const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
     const agentIdx = retro.indexOf('## Agent Performance');
@@ -307,7 +307,7 @@ describe('writeRetrospective — skillMap parameter', () => {
       ['003', ['super-skill']],
     ]);
 
-    writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, undefined, skillMap);
+    writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, skillMap);
 
     const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
     expect(retro).toContain('| super-skill | 3 | 1 | 1 | 1 | 0% |');

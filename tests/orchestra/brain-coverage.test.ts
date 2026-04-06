@@ -118,16 +118,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   readPreviousSprintMetrics: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    recordCall: vi.fn(),
-    getSprintUsage: vi.fn().mockReturnValue({ sprintId: 'sprint-001', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [] }),
-    getTotalUsage: vi.fn().mockReturnValue({ totalCalls: 0, totalTokens: 0, sprintCount: 0, modelBreakdown: [] }),
-    getModelBreakdown: vi.fn().mockReturnValue([]),
-    listSprints: vi.fn().mockReturnValue([]),
-  })),
-}));
-
 vi.mock('../../src/agents/worker-ipc.js', () => {
   const mockRegistry = {
     register: vi.fn(),

@@ -229,7 +229,6 @@ describe('brain sub-module integration — re-exports match direct imports', () 
           brain_model: 'opus' as const,
           default_model: 'sonnet' as const,
           haiku_allowed: true,
-          usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
           brain_planning: 'auto' as const,
         },
         modes: {} as any,
@@ -239,8 +238,7 @@ describe('brain sub-module integration — re-exports match direct imports', () 
         version: '1.0.0',
         auto_docs: { tier1: true, tier2: true, tier3: false },
       };
-      const usage = { fiveHourPercent: 10, weeklyPercent: 10, measuredAt: '' };
-      const model = resolveTaskModel('Test task', 'a test', scope, config, usage);
+      const model = resolveTaskModel('Test task', 'a test', scope, config);
       const task = createTask({
         title: 'Test task',
         description: 'a test',

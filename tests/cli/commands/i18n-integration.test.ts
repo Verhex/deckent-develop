@@ -233,10 +233,6 @@ vi.mock('../../../src/core/config.js', () => ({ loadConfig: vi.fn() }));
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  checkUsageWithProvider: vi.fn(),
-  getDefaultProvider: vi.fn().mockReturnValue(null),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   confirmDraftTasks: vi.fn(),
   cleanupDraftTasks: vi.fn(),
@@ -277,7 +273,7 @@ vi.mock('../../../src/cli/helpers/prompt.js', () => ({
 }));
 
 import { loadConfig } from '../../../src/core/config.js';
-import { runSprint, readContext, checkUsage, adjustSprintSize, planSprint } from '../../../src/orchestra/brain.js';
+import { runSprint, readContext, planSprint } from '../../../src/orchestra/brain.js';
 import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { registerStart } from '../../../src/cli/commands/start.js';
@@ -322,8 +318,6 @@ describe('start command — i18n integration', () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig('en') as any);
     vi.mocked(runDoctorChecks).mockReturnValue({ checks: [] } as any);
     vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
-    vi.mocked(checkUsage).mockReturnValue({ allowed: true, used: 0, limit: 100 } as any);
-    vi.mocked(adjustSprintSize).mockReturnValue({ maxWorkers: 3 } as any);
     vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
     vi.mocked(runSprint).mockResolvedValue(makeSprint() as any);
   });
@@ -379,8 +373,6 @@ describe('plan command — i18n integration', () => {
     process.exitCode = undefined;
     vi.mocked(loadConfig).mockResolvedValue(makeConfig('en') as any);
     vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
-    vi.mocked(checkUsage).mockReturnValue({ allowed: true, used: 0, limit: 100 } as any);
-    vi.mocked(adjustSprintSize).mockReturnValue({ size: 'full', maxWorkers: 3, modelConstraint: null, reason: 'OK' } as any);
     vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
   });
   afterEach(() => { process.exitCode = undefined; });
@@ -413,7 +405,6 @@ describe('status command — i18n integration', () => {
       sprint: { id: 'sprint-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
       progress: { done: 1, active: 1, blocked: 0, total: 2 },
-      usage: { fiveHourPercent: 10, weeklyPercent: 5, measuredAt: '2026-03-20T00:00:00Z' },
       alerts: [],
       updatedAt: '2026-03-20T00:00:00Z',
       ...overrides,

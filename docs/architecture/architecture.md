@@ -95,7 +95,6 @@ src/
 │   ├── brain.ts             ← Re-export layer (~58 lines) — sole orchestration entry point
 │   ├── sprint-controller.ts ← Sprint lifecycle (runSprint, pauseSprint, resumeSprint, cleanup)
 │   ├── result-evaluator.ts  ← Pure evaluation (evaluateResult, isDocTask, waitForResults)
-│   ├── usage-manager.ts     ← Usage/quota logic (checkUsage, adjustSprintSize)
 │   ├── planner.ts           ← AI task planning with Zod validation
 │   ├── tmux.ts              ← tmux session and window management
 │   ├── spawn-backend.ts     ← SpawnBackend interface, TmuxBackend, SubprocessBackend, factory
@@ -173,7 +172,7 @@ src/
 
 | Interface / Type | Description |
 |-----------------|-------------|
-| `ProviderAdapter` | Unified interface: `spawn()`, `kill()`, `listWorkers()`, `checkUsage()`, `isAvailable()`, `buildCommand()` |
+| `ProviderAdapter` | Unified interface: `spawn()`, `kill()`, `listWorkers()`, `isAvailable()`, `buildCommand()` |
 | `ProviderRegistry` | Singleton — `register()`, `get()`, `getDefault()`, `bootstrapProviders()` at startup |
 | `ProviderName` | `'claude' \| 'codex' \| 'gemini'` |
 | `ModelType` | `ClaudeModel \| OpenAIModel \| GeminiModel` — union across all providers |
@@ -209,7 +208,6 @@ src/
 
 | File | Lines | Responsibility |
 |------|-------|---------------|
-| `src/core/usage-tracker.ts` | ~165 | UsageTracker — sprint-based token/call counting |
 | `src/core/credentials.ts` | ~210 | CredentialManager — secure key storage (~/.deckent/credentials/) |
 | `src/core/global-config.ts` | ~100 | Global config utilities (ensureGlobalDir, readGlobalConfig, writeGlobalConfig) |
 | `src/orchestra/coverage-validator.ts` | ~310 | Coverage parsing (vitest JSON) and validation |
@@ -389,16 +387,15 @@ The orchestration layer coordinates the entire sprint lifecycle. `brain.ts` is t
 
 | File | Responsibility | Key Exports |
 |------|---------------|-------------|
-| `brain.ts` | Re-export layer (~58 lines) — re-exports from sprint-controller, result-evaluator, usage-manager, model-selector, task-builder, debt-manager, sprint-reporter. Retains `readContext()`, `planSprint()`, `spawnWorkers()`, `confirmDraftTasks()`, IPC channel registry, `BrainError` class. | `runSprint()`, `planSprint()`, `evaluateResult()`, `runDecay()`, `resolveTaskModel()` |
+| `brain.ts` | Re-export layer (~58 lines) — re-exports from sprint-controller, result-evaluator, model-selector, task-builder, debt-manager, sprint-reporter. Retains `readContext()`, `planSprint()`, `spawnWorkers()`, `confirmDraftTasks()`, IPC channel registry, `BrainError` class. | `runSprint()`, `planSprint()`, `evaluateResult()`, `runDecay()`, `resolveTaskModel()` |
 | `sprint-controller.ts` | Sprint lifecycle management | `runSprint()`, `pauseSprint()`, `resumeSprint()`, `cleanup()` |
 | `result-evaluator.ts` | Pure task evaluation (no side effects) | `evaluateResult()`, `isDocTask()`, `waitForResults()` |
-| `usage-manager.ts` | Usage/quota checking and sprint size adjustment | `checkUsage()`, `checkUsageWithProvider()`, `adjustSprintSize()` |
 | `planner.ts` | AI task planning with Zod schema validation | `planWithAI()`, `parseStructuredDirectives()`, `inferModelFromDirective()` |
 | `tmux.ts` | tmux session/window creation, worker spawning | `spawnWorker()`, `killWorker()`, `listWindows()`, `attachSession()` |
 | `sprint-estimator.ts` | Sprint duration and effort estimation | `estimateSprint()` |
 | `task-retry.ts` | NO_GO task retry and priority-fix scheduling | `scheduleRetry()`, `buildPriorityFix()` |
 
-**Key Design:** `brain.ts` is a **re-export layer** (~58 lines, down from 1,312 pre-Sprint 036). The actual logic lives in `sprint-controller.ts`, `result-evaluator.ts`, `usage-manager.ts`, and other orchestra sub-modules. `brain.ts` remains the **only** module that external code imports for orchestration, preserving backward compatibility. It re-exports all public API functions from its sub-modules.
+**Key Design:** `brain.ts` is a **re-export layer** (~58 lines, down from 1,312 pre-Sprint 036). The actual logic lives in `sprint-controller.ts`, `result-evaluator.ts`, and other orchestra sub-modules. `brain.ts` remains the **only** module that external code imports for orchestration, preserving backward compatibility. It re-exports all public API functions from its sub-modules.
 
 #### Brain Planning Modes
 
@@ -610,8 +607,6 @@ OPERATOR writes DIRECTIVES.md
         ▼
 brain.ts: runSprint()
         │
-        ├─► checkUsage() ──► abort if threshold exceeded
-        │
         ├─► readContext()
         │     reads: MEMORY.md, RETRO.md, DEBT.md, PATTERNS.md
         │
@@ -812,10 +807,6 @@ The primary project-level config. Written by `deckent init`, updated by `deckent
     "tier2": false,
     "tier3": false
   },
-  "usage_thresholds": {
-    "5hr": 0.8,
-    "weekly": 0.6
-  }
 }
 ```
 

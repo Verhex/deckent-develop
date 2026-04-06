@@ -19,7 +19,6 @@ function createMockAdapter(
 ): ProviderAdapter & {
   spawn: ReturnType<typeof vi.fn>;
   kill: ReturnType<typeof vi.fn>;
-  checkUsage: ReturnType<typeof vi.fn>;
   isAvailable: ReturnType<typeof vi.fn>;
   buildCommand: ReturnType<typeof vi.fn>;
 } {
@@ -29,11 +28,6 @@ function createMockAdapter(
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({
-      fiveHourPercent: 0,
-      weeklyPercent: 0,
-      measuredAt: new Date().toISOString(),
-    }),
     isAvailable: vi.fn().mockResolvedValue(available),
     buildCommand: vi.fn().mockReturnValue(`${name} exec --model test`),
   };
@@ -112,15 +106,6 @@ describe('Codex-only sprint (no Claude, no Gemini)', () => {
     );
     expect(result.provider).toBe('codex');
     expect(result.model).toBe('gpt-5');
-  });
-
-  it('checkUsage returns safe defaults without spawning claude CLI', async () => {
-    const usage = await codexAdapter.checkUsage();
-    expect(usage).toHaveProperty('fiveHourPercent');
-    expect(usage).toHaveProperty('weeklyPercent');
-    expect(usage).toHaveProperty('measuredAt');
-    // No claude interaction should have occurred
-    expect(codexAdapter.checkUsage).toHaveBeenCalled();
   });
 
   it('spawn is called on codexAdapter for codex tasks', () => {
@@ -220,12 +205,6 @@ describe('Gemini-only sprint (no Claude, no Codex)', () => {
     );
     expect(result.provider).toBe('gemini');
     expect(result.model).toBe('gemini-2.5-flash');
-  });
-
-  it('checkUsage returns safe defaults without spawning any CLI', async () => {
-    const usage = await geminiAdapter.checkUsage();
-    expect(usage.fiveHourPercent).toBeDefined();
-    expect(usage.weeklyPercent).toBeDefined();
   });
 
   it('spawn is routed to geminiAdapter', () => {

@@ -89,7 +89,7 @@ Deckent üç adımlı bir döngü izler:
 - **Yerleşik Dokümantasyon** -- `.deckent/docs/` ile hızlı başlangıç, directive rehberi ve yapılandırma referansı gelir
 - **Yerel Windows Desteği** -- `shell:true` ile tam subprocess backend, periyodik heartbeat güncellemeleri ve UTF-8 desteği
 - **Plugin Sistemi** -- Özel hook'lar, komutlar ve desenlerle Deckent'i genişletin
-- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 19 MCP tool + 9 resource
+- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 18 MCP tool + 8 resource
 - **Web Dashboard** -- Gerçek zamanlı SSE güncellemeleriyle React + Vite + Tailwind dashboard
 - **Uluslararasılaştırma** -- İngilizce ve Türkçe dil desteği yerleşik
 - **Review Arşiv Yedeği** -- Sprint review, cleanup sonrasında bile arşivden okuyarak çalışır
@@ -112,7 +112,7 @@ Deckent üç adımlı bir döngü izler:
 | Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır |
 | Kullanım duyarlı otomatik kısıtlama | Evet | Yok | Yok | Yok | Hayır |
 | Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet | Kısmi |
-| MCP entegrasyonu | Evet (19 tool) | Yok | Yok | Yok | Yok |
+| MCP entegrasyonu | Evet (18 tool) | Yok | Yok | Yok | Yok |
 | Web dashboard | Evet | Yerleşik | Yerleşik | Hayır | Hayır |
 | Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır |
 | Çevrimdışı çalışma (yerel modeller) | Planlı | Evet | Hayır | Evet | Hayır |
@@ -304,7 +304,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Veya `deckent init` otomatik olarak kayıt yapsın.
 
-### MCP Tool'lar (19)
+### MCP Tool'lar (18)
 
 | Tool | Açıklama |
 |------|----------|
@@ -319,7 +319,6 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent_analyze_project` | Proje stack'ini analiz et |
 | `deckent_sync` | Adapter dosyalarını senkronize et |
 | `deckent_config` | Yapılandırmayı göster veya güncelle |
-| `deckent_usage` | Mevcut plan kullanımını göster |
 | `deckent_review` | Son sprint sonuçlarını incele |
 | `deckent_run` | Proje bağlamında rastgele komut çalıştır |
 | `deckent_kill` | Belirli bir worker'i durdur |
@@ -328,7 +327,7 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent_agent_list` | Kayıtlı agent'ları listele (yerleşik ve geçici) |
 | `deckent_skill_list` | Kayıtlı skill'leri manifest bilgisiyle listele |
 
-### MCP Resource'lar (9)
+### MCP Resource'lar (8)
 
 | Resource URI | İçerik |
 |--------------|--------|
@@ -338,7 +337,6 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent://debt` | Teknik borç kalemleri |
 | `deckent://config` | Proje yapılandırması |
 | `deckent://retro` | Son sprint retrospektifi |
-| `deckent://usage` | Mevcut plan kullanım metrikleri |
 | `deckent://tasks` | Aktif görev listesi ve durumları |
 | `deckent://agents` | Agent havuzu ve performans istatistikleri |
 

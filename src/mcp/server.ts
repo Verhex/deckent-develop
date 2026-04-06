@@ -15,7 +15,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Sprint Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (16)
+## Tools (15)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -24,23 +24,21 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_review: Evaluate sprint results — returns GO/NO_GO/GO_WITH_TECH_DEBT
 - deckent_retro: Read the retrospective and learnings from the last sprint
 - deckent_history: Show sprint history with agent/skill performance stats
-- deckent_doctor: Run health checks (config, locks, usage, memory budget)
+- deckent_doctor: Run health checks (config, locks, memory budget)
 - deckent_analyze_project: Detect project stack, frameworks, and tech context
 - deckent_sync: Sync agent/skill manifests and update routing rules
 - deckent_config: Read or set Deckent configuration values
-- deckent_usage: Show token and cost usage across sprints
 - deckent_run: Run a single task directly without a full sprint
 - deckent_kill: Kill a running sprint or specific worker agent
 - deckent_cleanup: Archive task files and release all locks after a sprint
 
-## Resources (9)
+## Resources (8)
 - deckent://dashboard — Live sprint dashboard (agents, phases, alerts)
 - deckent://directives — Current DIRECTIVES.md content
 - deckent://memory — Brain memory (MEMORY.md) — sprint learnings
 - deckent://debt — Technical debt log (DEBT.md)
 - deckent://config — Current resolved configuration
 - deckent://retro — Last sprint retrospective (RETRO.md)
-- deckent://usage — Token and cost usage summary
 - deckent://tasks — Active task list with status
 - deckent://agents — Registered agent pool with stats
 

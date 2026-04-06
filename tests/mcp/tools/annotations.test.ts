@@ -1,6 +1,6 @@
 /**
  * Tests for MCP tool annotations and enriched descriptions.
- * Verifies that all 16 tools have:
+ * Verifies that all 15 tools have:
  *   - annotations (readOnlyHint, destructiveHint, idempotentHint)
  *   - sufficiently detailed descriptions (>80 chars)
  *   - correct annotation semantics (read-only tools are not destructive, etc.)
@@ -53,8 +53,6 @@ vi.mock('../../../src/core/provider.js', () => ({
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn().mockReturnValue({}),
-  checkUsage: vi.fn().mockReturnValue({ withinBudget: true }),
-  adjustSprintSize: vi.fn().mockReturnValue({ size: 'normal', maxWorkers: 3, reason: 'default' }),
   planSprint: vi.fn().mockResolvedValue({
     id: 'sprint-001',
     number: 1,
@@ -77,14 +75,6 @@ vi.mock('../../../src/core/system-profile.js', () => ({
 
 vi.mock('../../../src/core/subscription.js', () => ({
   detectSubscription: vi.fn().mockReturnValue({ detected: 'max', method: 'auto' }),
-}));
-
-vi.mock('../../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    getSprintUsage: vi.fn().mockReturnValue({ tokens: 0, cost: 0 }),
-    getTotalUsage: vi.fn().mockReturnValue({ tokens: 0, cost: 0 }),
-    getModelBreakdown: vi.fn().mockReturnValue({}),
-  })),
 }));
 
 vi.mock('../../../src/core/config-migration.js', () => ({
@@ -165,7 +155,6 @@ async function registerAllTools(server: MockServer) {
     { registerAnalyzeTool },
     { registerSyncTool },
     { registerConfigTool },
-    { registerUsageTool },
     { registerReviewTool },
     { registerRunTool },
     { registerKillTool },
@@ -182,7 +171,6 @@ async function registerAllTools(server: MockServer) {
     import('../../../src/mcp/tools/analyze.js'),
     import('../../../src/mcp/tools/sync.js'),
     import('../../../src/mcp/tools/config.js'),
-    import('../../../src/mcp/tools/usage.js'),
     import('../../../src/mcp/tools/review.js'),
     import('../../../src/mcp/tools/run.js'),
     import('../../../src/mcp/tools/kill.js'),
@@ -200,7 +188,6 @@ async function registerAllTools(server: MockServer) {
   registerAnalyzeTool(serverArg);
   registerSyncTool(serverArg);
   registerConfigTool(serverArg);
-  registerUsageTool(serverArg);
   registerReviewTool(serverArg);
   registerRunTool(serverArg);
   registerKillTool(serverArg);
@@ -219,7 +206,6 @@ const ALL_TOOL_NAMES = [
   'deckent_analyze_project',
   'deckent_sync',
   'deckent_config',
-  'deckent_usage',
   'deckent_review',
   'deckent_run',
   'deckent_kill',
@@ -240,13 +226,13 @@ describe('MCP Tool Annotations', () => {
     await registerAllTools(server);
   });
 
-  it('all 16 tools are registered', () => {
+  it('all 15 tools are registered', () => {
     for (const name of ALL_TOOL_NAMES) {
       expect(server.tools.has(name), `Missing tool: ${name}`).toBe(true);
     }
-    // Count exactly 16
+    // Count exactly 15
     const registeredNames = [...server.tools.keys()].filter((n) => ALL_TOOL_NAMES.includes(n));
-    expect(registeredNames).toHaveLength(16);
+    expect(registeredNames).toHaveLength(15);
   });
 
   it('every tool has an annotations object', () => {
@@ -419,12 +405,6 @@ describe('Specific Tool Annotation Values', () => {
 
   it('deckent_doctor: read-only', () => {
     const ann = server.tools.get('deckent_doctor')?.config.annotations;
-    expect(ann?.readOnlyHint).toBe(true);
-    expect(ann?.destructiveHint).toBe(false);
-  });
-
-  it('deckent_usage: read-only', () => {
-    const ann = server.tools.get('deckent_usage')?.config.annotations;
     expect(ann?.readOnlyHint).toBe(true);
     expect(ann?.destructiveHint).toBe(false);
   });

@@ -123,22 +123,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   readPreviousSprintMetrics: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    recordCall: vi.fn(),
-    getSprintUsage: vi.fn().mockReturnValue({
-      sprintId: 'sprint-001',
-      entries: [],
-      totalCalls: 0,
-      totalTokens: 0,
-      modelBreakdown: [],
-    }),
-    getTotalUsage: vi.fn().mockReturnValue({ totalCalls: 0, totalTokens: 0, sprintCount: 1, modelBreakdown: [] }),
-    getModelBreakdown: vi.fn().mockReturnValue([]),
-    listSprints: vi.fn().mockReturnValue([]),
-  })),
-}));
-
 // ─── Rollback mock (spy-able) ────────────────────────────────────────
 const mockCreateSafetyPoint = vi.fn();
 const mockRollback = vi.fn();
@@ -250,7 +234,6 @@ function makeConfig(): ResolvedConfig {
       haiku_allowed: false,
       brain_planning: 'structured',
       brain_model: 'opus',
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
   } as unknown as ResolvedConfig;
 }

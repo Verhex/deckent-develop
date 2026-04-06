@@ -115,7 +115,6 @@
 | Eksik Tool | Gerekçe | Öncelik |
 |-----------|---------|---------|
 | `deckent_config` | Config okuma/yazma MCP üzerinden gerekli | **KRİTİK** |
-| `deckent_usage` | Token/maliyet bilgisi MCP client'lar için gerekli | YÜKSEK |
 | `deckent_review` | Sprint sonuçlarını MCP'den değerlendirme | YÜKSEK |
 | `deckent_finalize` | Sprint kapatma MCP'den yapılabilmeli | ORTA |
 | `deckent_cleanup` | MCP client'lar temizlik tetikleyebilmeli | ORTA |
@@ -140,7 +139,6 @@
 | Resource | Gerekçe | Öncelik |
 |----------|---------|---------|
 | `deckent://retro` | Son retrospektif bilgisi | ORTA |
-| `deckent://usage` | Mevcut kullanım durumu | YÜKSEK |
 | `deckent://tasks` | Aktif task listesi | YÜKSEK |
 | `deckent://agents` | Agent pool bilgisi | DÜŞÜK |
 | `deckent://patterns` | Tespit edilen pattern'ler | DÜŞÜK |
@@ -305,7 +303,7 @@
 |---|-------|-------|-------|
 | 1 | Provider bootstrap her start'ta (5-15s) | start.ts → bootstrapProviders | Cache result in .deckent/provider-cache.json |
 | 2 | Analyzer her çağrıda git çalıştırır | analyzer.ts | stack-detector gibi cache ekle |
-| 3 | Usage dosyaları hiç temizlenmiyor | usage-tracker.ts | Retention policy (configurable) |
+| 3 | *(Sprint 089'da kaldır��ldı — kullanım takibi)* | — | — |
 | 4 | setInterval polling (dashboard, status, run) | Çeşitli | fs.watch'a geçiş (Sprint 057'de status'ta yapıldı) |
 
 ---
@@ -330,7 +328,6 @@
 | Tool | Açıklama | Gerekçe |
 |------|----------|---------|
 | `deckent_config` | Config okuma/yazma | IDE entegrasyonu için temel |
-| `deckent_usage` | Usage bilgisi | MCP client'lar kullanım görmeli |
 | `deckent_review` | Sprint review | Otomatik/interaktif review |
 | `deckent_run` | Tek seferlik task | MCP üzerinden hızlı task çalıştırma |
 | `deckent_kill` | Worker durdurma | Acil müdahale |
@@ -341,7 +338,6 @@
 | Resource | URI | Açıklama |
 |----------|-----|----------|
 | `deckent://tasks` | Aktif task listesi | Dashboard alternatifi |
-| `deckent://usage` | Kullanım bilgisi | Token/maliyet |
 | `deckent://retro` | Son retrospektif | Sprint bilgisi |
 | `deckent://patterns` | Pattern bilgisi | Code quality |
 

@@ -11,7 +11,7 @@ import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { AgentPool, AgentDefinition } from '../../src/core/agent-types.js';
 import type { SkillDefinition, ProjectStack } from '../../src/core/skill-types.js';
-import type { Task, TaskScope, ResolvedConfig, UsageMetrics, PatternEntry } from '../../src/core/types.js';
+import type { Task, TaskScope, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
 import type { DecisionContext, DecisionResult } from '../../src/core/decision-types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -58,7 +58,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
@@ -67,10 +66,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     version: '0.1.0',
     ...overrides,
   };
-}
-
-function makeUsage(overrides: Partial<UsageMetrics> = {}): UsageMetrics {
-  return { fiveHourPercent: 10, weeklyPercent: 10, measuredAt: new Date().toISOString(), ...overrides };
 }
 
 function makeProjectStack(): ProjectStack {
@@ -228,7 +223,6 @@ function makeFullContext(overrides: Partial<DecisionContext> = {}): DecisionCont
     agentPool,
     skillPool,
     patterns: [],
-    usageMetrics: makeUsage(),
     config: makeConfig(),
     ...overrides,
   };

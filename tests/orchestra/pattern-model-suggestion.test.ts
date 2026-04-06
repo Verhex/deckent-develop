@@ -5,7 +5,7 @@ import {
   suggestModelFromPatterns,
   resolveTaskModel,
 } from '../../src/orchestra/model-selector.js';
-import type { PatternEntry, TaskScope, ResolvedConfig, UsageMetrics } from '../../src/core/types.js';
+import type { PatternEntry, TaskScope, ResolvedConfig } from '../../src/core/types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -31,7 +31,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
@@ -40,10 +39,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     version: '0.1.0',
     ...overrides,
   };
-}
-
-function makeUsage(overrides: Partial<UsageMetrics> = {}): UsageMetrics {
-  return { fiveHourPercent: 10, weeklyPercent: 10, measuredAt: '2026-03-20T00:00:00.000Z', ...overrides };
 }
 
 // ─── parsePatterns ──────────────────────────────────────────────────
@@ -186,71 +181,55 @@ describe('suggestModelFromPatterns', () => {
 describe('resolveTaskModel with patterns', () => {
   it('upgrades sonnet to opus when patterns indicate boundary violations', () => {
     const config = makeConfig();
-    const usage = makeUsage();
     // Single dir → -1 → haiku → but haiku_allowed=false → sonnet normally
     // With boundary violation patterns → upgraded to opus
     const scope = makeScope(['src/core/']);
     const patterns = [makePattern('file_outside_scope', 3)];
-    const result = resolveTaskModel('Add utility', 'Simple utility function', scope, config, usage, patterns);
+    const result = resolveTaskModel('Add utility', 'Simple utility function', scope, config, patterns);
     expect(result).toBe('opus');
   });
 
   it('does not upgrade when no patterns provided', () => {
     const config = makeConfig();
-    const usage = makeUsage();
     const scope = makeScope(['src/core/']);
     // Single dir → -1 → haiku → haiku_allowed=false → sonnet (no patterns)
-    const result = resolveTaskModel('Add utility', 'Simple utility function', scope, config, usage);
+    const result = resolveTaskModel('Add utility', 'Simple utility function', scope, config);
     expect(result).toBe('sonnet');
   });
 
   it('pattern upgrade is still capped by pro_plan constraint', () => {
     const config = makeConfig({ mode: 'pro_plan' });
-    const usage = makeUsage();
     const scope = makeScope(['src/core/']);
     const patterns = [makePattern('file_outside_scope', 5)];
     // Patterns suggest opus, but pro_plan caps at sonnet
-    const result = resolveTaskModel('Task in src/', 'Source task', scope, config, usage, patterns);
-    expect(result).toBe('sonnet');
-  });
-
-  it('pattern upgrade is capped by usage pressure', () => {
-    const config = makeConfig();
-    const usage = makeUsage({ fiveHourPercent: 90 });
-    const scope = makeScope(['src/core/']);
-    const patterns = [makePattern('file_outside_scope', 5)];
-    // Patterns suggest opus, but high usage downgrades to sonnet
-    const result = resolveTaskModel('Task in src/', 'Source task', scope, config, usage, patterns);
+    const result = resolveTaskModel('Task in src/', 'Source task', scope, config, patterns);
     expect(result).toBe('sonnet');
   });
 
   it('empty patterns array has no effect on model selection', () => {
     const config = makeConfig();
-    const usage = makeUsage();
     const scope = makeScope(['src/core/']);
-    const withPatterns = resolveTaskModel('Add util', 'Simple', scope, config, usage, []);
-    const withoutPatterns = resolveTaskModel('Add util', 'Simple', scope, config, usage);
+    const withPatterns = resolveTaskModel('Add util', 'Simple', scope, config, []);
+    const withoutPatterns = resolveTaskModel('Add util', 'Simple', scope, config);
     expect(withPatterns).toBe(withoutPatterns);
   });
 
   it('resolved patterns do not trigger model upgrade', () => {
     const config = makeConfig();
-    const usage = makeUsage();
     const scope = makeScope(['src/orchestra/']);
     const patterns = [makePattern('file_outside_scope', 10, true)];
-    const result = resolveTaskModel('Refactor orchestra', 'Orchestra refactor', scope, config, usage, patterns);
+    const result = resolveTaskModel('Refactor orchestra', 'Orchestra refactor', scope, config, patterns);
     expect(result).not.toBe('opus');
   });
 
   it('multiple mixed patterns — only unresolved boundary violations count', () => {
     const config = makeConfig();
-    const usage = makeUsage();
     const scope = makeScope(['src/core/']);
     const patterns: PatternEntry[] = [
       makePattern('file_outside_scope', 5, true),  // resolved — no effect
       makePattern('stale_heartbeat', 100, false),   // not a trigger — no effect
     ];
-    const result = resolveTaskModel('Add util', 'Simple', scope, config, usage, patterns);
+    const result = resolveTaskModel('Add util', 'Simple', scope, config, patterns);
     expect(result).toBe('sonnet');
   });
 });
@@ -277,8 +256,7 @@ describe('parsePatterns + deduplicatePatterns pipeline', () => {
     expect(deduped).toHaveLength(0);
     const scope = makeScope(['src/core/']);
     const config = makeConfig();
-    const usage = makeUsage();
-    const result = resolveTaskModel('Add util', 'Simple', scope, config, usage, deduped);
+    const result = resolveTaskModel('Add util', 'Simple', scope, config, deduped);
     expect(result).toBe('sonnet');
   });
 
@@ -291,8 +269,7 @@ describe('parsePatterns + deduplicatePatterns pipeline', () => {
     expect(deduped[0]?.occurrences).toBe(3);
     const scope = makeScope(['src/orchestra/']);
     const config = makeConfig();
-    const usage = makeUsage();
-    const result = resolveTaskModel('Refactor module', 'Complex refactor', scope, config, usage, deduped);
+    const result = resolveTaskModel('Refactor module', 'Complex refactor', scope, config, deduped);
     expect(result).toBe('opus');
   });
 

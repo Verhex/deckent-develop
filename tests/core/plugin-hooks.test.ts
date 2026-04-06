@@ -76,7 +76,6 @@ function makeConfig(): ResolvedConfig {
       brain_model: 'sonnet',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 80, weekly: 80 },
     },
     modes: {} as ResolvedConfig['modes'],
     language: 'en',

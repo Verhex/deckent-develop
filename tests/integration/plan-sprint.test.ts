@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
-import type { Task, ResolvedConfig, BrainContext, SprintSizeRecommendation, UsageMetrics } from '../../src/core/types.js';
+import type { Task, ResolvedConfig, BrainContext, SprintSizeRecommendation } from '../../src/core/types.js';
 import {
   BRAIN_DIR, TASKS_DIR, DECKENT_DIR,
   DIRECTIVES_FILE, MEMORY_FILE, DECISIONS_FILE,
@@ -89,7 +89,6 @@ function makeConfig(root: string): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: true,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
       brain_planning: 'structured', // use structured to avoid AI call
     },
     modes: {} as any,

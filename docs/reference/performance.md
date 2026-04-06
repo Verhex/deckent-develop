@@ -374,63 +374,6 @@ mv .brain/sprints/sprint-002.md .brain/archive/
 
 ---
 
-## 5. Usage Limit Management
-
-Deckent monitors Claude usage and automatically throttles sprints when limits are approached. Understanding how to configure this avoids mid-sprint interruptions.
-
-### 5.1 Usage Threshold Behavior
-
-```
-Before sprint planning:
-  5hr usage > threshold → reduced sprint (fewer workers, smaller tasks)
-  weekly usage > threshold → minimal sprint (1–2 workers)
-
-Mid-sprint:
-  Limit hit → tasks PAUSE (.tasks/*.paused created)
-  Limit resets → tasks RESUME from saved state
-  Sprint is NEVER abandoned
-```
-
-### 5.2 Threshold Configuration
-
-```json
-"usage_thresholds": {
-  "5hr": 0.8,
-  "weekly": 0.6
-}
-```
-
-| Threshold | Meaning |
-|-----------|---------|
-| `"5hr": 0.8` | Pause planning when 80% of the 5-hour rolling window is used |
-| `"weekly": 0.6` | Pause planning when 60% of the weekly quota is used |
-
-### 5.3 Recommended Thresholds by Use Case
-
-**Aggressive (dev machine, morning sprint):**
-```json
-{ "5hr": 0.9, "weekly": 0.8 }
-```
-Use most of your quota — good when you have plenty left and want maximum sprint size.
-
-**Conservative (shared subscription, end of week):**
-```json
-{ "5hr": 0.5, "weekly": 0.3 }
-```
-Leave plenty in reserve — prevents surprises if usage is already high.
-
-**End-of-week sprint (Claude Pro):**
-```json
-{ "5hr": 0.4, "weekly": 0.25 }
-```
-Pro quotas are tight. Stay well below limits to guarantee the sprint completes.
-
-**API mode (no quota, cost-based):**
-```json
-{ "5hr": 1.0, "weekly": 1.0 }
-```
-Thresholds don't apply — use `budget_per_sprint` instead.
-
 ### 5.4 API Mode Budget Management
 
 API mode uses dollar-based limits instead of usage percentages:
@@ -703,7 +646,6 @@ Is free RAM < 400 MB?
       "brain_model": "opus",
       "default_model": "sonnet",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 0.85, "weekly": 0.65 },
       "brain_planning": "auto"
     }
   }
@@ -720,7 +662,6 @@ Is free RAM < 400 MB?
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": false,
-      "usage_thresholds": { "5hr": 0.45, "weekly": 0.30 },
       "brain_planning": "structured"
     }
   }
@@ -737,7 +678,6 @@ Is free RAM < 400 MB?
       "brain_model": "sonnet",
       "default_model": "haiku",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 1.0, "weekly": 1.0 },
       "budget_per_sprint": 2.00,
       "requires": "ANTHROPIC_API_KEY",
       "brain_planning": "ai"

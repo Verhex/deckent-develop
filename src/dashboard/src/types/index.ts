@@ -32,11 +32,6 @@ export interface DashboardState {
     blocked: number;
     total: number;
   };
-  usage: {
-    fiveHourPercent: number;
-    weeklyPercent: number;
-    measuredAt: string;
-  };
   alerts: Alert[];
   updatedAt: string;
   auditorLastScan?: string;

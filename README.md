@@ -87,7 +87,7 @@ Deckent follows a three-step cycle:
 - **Built-in Docs** -- `.deckent/docs/` ships with quick-start, directives-guide, and config-reference guides
 - **Native Windows Support** -- Full subprocess backend with `shell:true`, periodic heartbeat updates, and UTF-8 handling
 - **Plugin System** -- Extend Deckent with custom hooks, commands, and patterns
-- **MCP Integration** -- 19 MCP tools + 9 resources for seamless Claude Code IDE integration
+- **MCP Integration** -- 18 MCP tools + 8 resources for seamless Claude Code IDE integration
 - **Web Dashboard** -- React + Vite + Tailwind dashboard with real-time SSE updates
 - **Internationalization** -- English and Turkish language support built in
 - **Review Archive Fallback** -- Sprint review works even after cleanup by reading from archive
@@ -110,7 +110,7 @@ Deckent follows a three-step cycle:
 | GO/NO-GO evaluation per task | Yes | No | No | No | No |
 | Usage-aware auto-throttling | Yes | N/A | N/A | N/A | No |
 | Open source | Yes (MIT) | No | No | Yes | Partial |
-| MCP integration | Yes (19 tools) | N/A | N/A | N/A | N/A |
+| MCP integration | Yes (18 tools) | N/A | N/A | N/A | N/A |
 | Web dashboard | Yes | Built-in | Built-in | No | No |
 | Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
 | Works offline (local models) | Planned | Yes | No | Yes | No |
@@ -302,7 +302,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Or let `deckent init` auto-register it.
 
-### MCP Tools (19)
+### MCP Tools (18)
 
 | Tool | Description |
 |------|-------------|
@@ -317,7 +317,6 @@ Or let `deckent init` auto-register it.
 | `deckent_analyze_project` | Analyze project stack |
 | `deckent_sync` | Sync adapter files |
 | `deckent_config` | Show or update configuration |
-| `deckent_usage` | Show current plan usage |
 | `deckent_review` | Review last sprint results |
 | `deckent_run` | Run an arbitrary command in project context |
 | `deckent_kill` | Kill a specific worker |
@@ -326,7 +325,7 @@ Or let `deckent init` auto-register it.
 | `deckent_agent_list` | List registered agents (built-in and temporary) |
 | `deckent_skill_list` | List registered skills with manifest info |
 
-### MCP Resources (9)
+### MCP Resources (8)
 
 | Resource URI | Contents |
 |--------------|---------|
@@ -336,7 +335,6 @@ Or let `deckent init` auto-register it.
 | `deckent://debt` | Technical debt items |
 | `deckent://config` | Project configuration |
 | `deckent://retro` | Last sprint retrospective |
-| `deckent://usage` | Current plan usage metrics |
 | `deckent://tasks` | Active task list and statuses |
 | `deckent://agents` | Agent pool and performance stats |
 

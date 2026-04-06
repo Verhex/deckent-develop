@@ -503,7 +503,7 @@ describe('writeScanToDashboard — edge cases', () => {
         currentAction: 'old action',
       }] as never,
       progress: { done: 0, active: 1, blocked: 0, total: 1 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+
       alerts: [],
       updatedAt: new Date().toISOString(),
     };
@@ -528,7 +528,7 @@ describe('writeScanToDashboard — edge cases', () => {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: ts },
+
       alerts: [{ level: AlertLevel.WARNING, message: 'Stale lock: src/x.ts by w1', source: 'w1', timestamp: ts, count: 1 }],
       updatedAt: ts,
     };
@@ -560,7 +560,7 @@ describe('writeScanToDashboard — edge cases', () => {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
+
       alerts: existingAlerts as never,
       updatedAt: new Date().toISOString(),
     };
@@ -581,31 +581,6 @@ describe('writeScanToDashboard — edge cases', () => {
     expect(written.alerts.find((a: { message: string }) => a.message === 'alert-0')).toBeUndefined();
   });
 
-  it('usage is preserved from existing dashboard', () => {
-    const ts = new Date().toISOString();
-    const existingDash: DashboardState = {
-      sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
-      agents: [],
-      progress: { done: 0, active: 0, blocked: 0, total: 5 },
-      usage: { fiveHourPercent: 0.75, weeklyPercent: 0.4, measuredAt: ts },
-      alerts: [],
-      updatedAt: ts,
-    };
-    mockedExistsSync.mockReturnValue(true);
-    mockedReadFileSync.mockReturnValueOnce(JSON.stringify(existingDash) as never);
-    mockedReaddirSync.mockReturnValue([] as never);
-
-    writeScanToDashboard('/project', sprintInfo, {
-      heartbeats: [],
-      violations: [],
-      alerts: [],
-      locks: [],
-    });
-
-    const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
-    expect(written.usage.fiveHourPercent).toBe(0.75);
-    expect(written.usage.weeklyPercent).toBe(0.4);
-  });
 });
 
 // ─── startScanLoop edge cases ─────────────────────────────────────────

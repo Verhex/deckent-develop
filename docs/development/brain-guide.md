@@ -64,7 +64,7 @@ Keywords that trigger `opus`: `mimari`, `architect`, `cross-cutting`, `refactor 
 ## Sprint Lifecycle
 
 ```
-checkUsage → readContext → planSprint → spawnWorkers
+readContext → planSprint → spawnWorkers
     → startScanLoop → waitForResults → stopScanLoop
     → evaluateResult → handleEvaluation → handleCrossDependencies
     → writeRetrospective → writeSprintLog → escalateDebt
@@ -78,8 +78,6 @@ Each phase is wrapped in `try/catch` in `runSprint()`. **Sprints are never left 
 | Function | Description |
 |----------|-------------|
 | `readContext(root)` | Loads DIRECTIVES, MEMORY, RETRO, DEBT, PATTERNS, DECISIONS + git state |
-| `checkUsage(config)` | Calls `claude -p /usage`, parses 5-hour and weekly % |
-| `adjustSprintSize(config, usage)` | Returns `SprintSizeRecommendation`: full / reduced / minimal |
 | `planSprint(root, config, ctx, rec)` | Creates task JSONs in `.tasks/`, returns `Sprint` |
 | `spawnWorkers(root, sprint, config)` | Spawns tmux windows via `spawnWorker()` |
 | `waitForResults(root, sprint, timeout)` | Polls `.tasks/task-*.result` every 15s (default timeout: 30min) |
@@ -188,20 +186,6 @@ Runs at sprint end when `.brain/` exceeds 600 lines (or with `force: true`):
 
 ---
 
-## Usage Constraints
-
-Brain reads Claude API usage before planning:
-
-| Usage State | Sprint Size | Max Workers | Model |
-|-------------|-------------|-------------|-------|
-| Both thresholds exceeded | `minimal` | 1 | haiku (if allowed) or sonnet |
-| One threshold exceeded | `reduced` | `max_workers / 2` | sonnet |
-| No constraints | `full` | `max_workers` | per config |
-
-Thresholds are defined in `activeModeConfig.usage_thresholds` (5hr and weekly).
-
----
-
 ## Worker Prompt Generation
 
 `buildWorkerPrompt(task)` generates the full Claude prompt sent to each worker tmux window. The prompt includes:
@@ -226,7 +210,6 @@ Key `activeModeConfig` fields relevant to Brain:
 | `default_model` | Default model for workers when not inferred |
 | `max_workers` | Max concurrent workers |
 | `haiku_allowed` | Whether haiku is allowed in minimal usage mode |
-| `usage_thresholds` | `{ '5hr': 0.8, weekly: 0.9 }` |
 
 See [CONFIG-REFERENCE.md](CONFIG-REFERENCE.md) for the full config schema.
 

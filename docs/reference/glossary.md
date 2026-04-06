@@ -333,7 +333,7 @@ Gelecek fazda (Sprint 20+) planlanmış, farklı AI sağlayıcılarını (Claude
 **Blueprint §1** — "What Deckent Is NOT" + §23
 
 ### ProviderAdapter
-Provider soyutlama arayüzü. `spawn()`, `kill()`, `listWorkers()`, `checkUsage()`, `isAvailable()`, `buildCommand()` metotlarını tanımlar. `ClaudeAdapter`, `CodexAdapter`, `GeminiAdapter` bu interface'i implement eder.
+Provider soyutlama arayüzü. `spawn()`, `kill()`, `listWorkers()`, `isAvailable()`, `buildCommand()` metotlarını tanımlar. `ClaudeAdapter`, `CodexAdapter`, `GeminiAdapter` bu interface'i implement eder.
 **Sprint 037** — `src/core/provider.ts`
 
 ### ProviderName

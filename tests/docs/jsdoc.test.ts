@@ -18,7 +18,6 @@ const PRIORITY_FILES: string[] = [
   'src/orchestra/sprint-reporter.ts',
   'src/orchestra/sprint-controller.ts',
   'src/orchestra/result-evaluator.ts',
-  'src/orchestra/usage-manager.ts',
 ];
 
 /**

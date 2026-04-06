@@ -135,16 +135,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   updateProjectIdentity: vi.fn(),
 }));
 
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    recordCall: vi.fn(),
-    getSprintUsage: vi.fn().mockReturnValue({ sprintId: 'sprint-042', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [] }),
-    getTotalUsage: vi.fn(),
-    getModelBreakdown: vi.fn().mockReturnValue([]),
-    listSprints: vi.fn().mockReturnValue([]),
-  })),
-}));
-
 vi.mock('../../src/orchestra/coverage-validator.js', () => ({
   parseCoverageFromVitest: vi.fn(),
   validateCoverage: vi.fn(),
@@ -361,28 +351,6 @@ describe('finalizeSprint', () => {
       sprint,
       evaluations,
       expect.objectContaining({ totalTasks: 3 }),
-      undefined, // no usageTracker passed
-      undefined, // agentMap
-      undefined, // skillMap
-      results,
-    );
-  });
-
-  it('should pass usageTracker to writeRetrospective when provided', async () => {
-    const tasks = [createTestTask('042-001')];
-    const sprint = createTestSprint(tasks);
-    const evaluations = new Map([['042-001', TaskEvaluation.DONE]]);
-    const results = [createTestResult('042-001')];
-    const mockTracker = { recordCall: vi.fn() } as unknown as import('../../src/core/usage-tracker.js').UsageTracker;
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { usageTracker: mockTracker });
-
-    expect(vi.mocked(writeRetrospective)).toHaveBeenCalledWith(
-      PROJECT_ROOT,
-      sprint,
-      evaluations,
-      expect.any(Object),
-      mockTracker,
       undefined, // agentMap
       undefined, // skillMap
       results,
@@ -642,7 +610,6 @@ describe('finalizeSprint', () => {
       sprint,
       evaluations,
       expect.any(Object),
-      undefined, // no usageTracker
       undefined, // agentMap
       undefined, // skillMap
       results,

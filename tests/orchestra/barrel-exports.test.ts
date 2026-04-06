@@ -22,14 +22,6 @@ describe('Public Brain API is accessible via barrel', () => {
     expect(typeof orchestraBarrel.readContext).toBe('function');
   });
 
-  it('exports checkUsage', () => {
-    expect(typeof orchestraBarrel.checkUsage).toBe('function');
-  });
-
-  it('exports adjustSprintSize', () => {
-    expect(typeof orchestraBarrel.adjustSprintSize).toBe('function');
-  });
-
   it('exports planSprint', () => {
     expect(typeof orchestraBarrel.planSprint).toBe('function');
   });
@@ -184,9 +176,6 @@ describe('Internal functions are NOT exported from the barrel', () => {
     expect((orchestraBarrel as Record<string, unknown>).waitForResultsDI).toBeUndefined();
   });
 
-  it('does NOT export checkUsageStandalone (internal standalone variant)', () => {
-    expect((orchestraBarrel as Record<string, unknown>).checkUsageStandalone).toBeUndefined();
-  });
 
   it('does NOT export TmuxBackend (internal spawn backend)', () => {
     expect((orchestraBarrel as Record<string, unknown>).TmuxBackend).toBeUndefined();
@@ -234,7 +223,7 @@ describe('Internal functions are NOT exported from the barrel', () => {
 describe('Barrel exports form a minimal public surface', () => {
   const EXPECTED_PUBLIC_FUNCTIONS = [
     // Brain API
-    'runSprint', 'finalizeSprint', 'readContext', 'checkUsage', 'adjustSprintSize',
+    'runSprint', 'finalizeSprint', 'readContext',
     'planSprint', 'confirmDraftTasks', 'cleanupDraftTasks', 'buildWorkerPrompt', 'cleanup', 'runDecay',
     'BrainError',
     // Tmux API

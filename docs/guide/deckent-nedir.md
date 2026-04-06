@@ -160,7 +160,6 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 |-------|-------|-------|----------|
 | `deckent onboard` | src/cli/commands/onboard.ts | **Tam** | Interaktif wizard: Claude tespit, sistem profil, config onerisi |
 | `deckent upgrade` | src/cli/commands/upgrade.ts | **Tam** | npm view ile versiyon kontrolu, --check flag, npm install -g |
-| `deckent usage` | src/cli/commands/usage.ts | **Tam** | UsageTracker'dan veri okuma, --json, --sprint filtre |
 
 ---
 
@@ -312,8 +311,6 @@ Brain, sistemin **tek karar vericisidir**. ADR-008'e göre yalnızca Brain, tmux
 | Fonksiyon | Açıklama |
 |-----------|----------|
 | `readContext()` | DIRECTIVES, MEMORY, RETRO, DEBT, PATTERNS, DECISIONS, mevcut task'lar, git status, dosya ağacı okur |
-| `checkUsage()` | `claude -p /usage` ile 5 saatlik ve haftalık kullanım yüzdelerini ölçer |
-| `adjustSprintSize()` | Kullanıma göre sprint boyutunu ayarlar: minimal/reduced/full |
 | `planSprint()` | CRITICAL debt → öncelik fix, AI planner → structured fallback, deadlock tespiti, task JSON yazımı |
 | `spawnWorkers()` | max_workers kadar task spawn eder, kalanları kuyruğa alır |
 | `waitForResults()` | fs.watch ile .result dosyalarını izler, kuyruktan yeni task'lar spawn eder |
@@ -547,8 +544,8 @@ buildPlanPrompt() → callBrainPlanner() → parsePlannerResponse()
 
 ```
 ┌─ 1. PLAN ─────────────────────────────────────────────────┐
-│  readContext() → checkUsage() → adjustSprintSize()        │
-│  → planSprint() (AI/structured) → task JSON'lar yazılır   │
+│  readContext() → planSprint() (AI/structured)              │
+│  → task JSON'lar yazılır                                   │
 └───────────────────────────────────────────────────────────┘
          │
 ┌─ 2. SPAWN ────────────────────────────────────────────────┐
@@ -695,7 +692,7 @@ Hook hataları **non-fatal**: hata loglanır ama sprint/task devam eder.
 |--------|-----------|-----------------|
 | **1. Scope Zorlama** | Task'a atanan dizin/dosya sınırları | Worker: `isWithinScope()`, Auditor: `checkBoundaryViolations()` |
 | **2. Dosya Kilitleme** | Atomik lock dosyaları (O_EXCL) | Worker: `acquireLock()`, `.locks/` dizini |
-| **3. Kullanım Eşikleri** | 5 saatlik ve haftalık API limitleri | Brain: `checkUsage()`, `checkAndAutoPause()` |
+| **3. Otomatik Duraklatma** | Sprint duraklatma ve devam ettirme | Brain: `checkAndAutoPause()` |
 | **4. HTTP Auth** | Opsiyonel Bearer token | API sunucusu: POST endpoint'leri |
 
 ### Scope Kuralları
@@ -763,14 +760,12 @@ HTTP API **yalnızca 127.0.0.1'e** bağlanır — dış ağdan erişilemez. CORS
 |---------|-------|-------|----------|
 | `deckent onboard` | src/cli/commands/onboard.ts | Tam | Interaktif wizard: Claude tespit, sistem profil, config onerisi |
 | `deckent upgrade` | src/cli/commands/upgrade.ts | Tam | npm view ile versiyon kontrolu, --check flag |
-| `deckent usage` | src/cli/commands/usage.ts | Tam | UsageTracker entegrasyonu, --json, --sprint filtre |
 
 ### Eksik / Kısıtlı Özellikler
 
 | Özellik | Durum | Açıklama |
 |---------|-------|----------|
 | **Sandbox Mode** | Temel uygulama var | `start --sandbox-mode` SandboxSpawnBackend kullanir: bellek limiti, scope zorlama, ag kisitlamasi |
-| **Usage Tracking** | Tam | UsageTracker: model/token/call sayimi, sprint bazli ve kumulatif raporlama (.deckent/usage/) |
 | **Remote Plugin Install** | Kisitli | Git URL destegi var ama npm registry destegi yok |
 | **Multi-Project** | Yok | Tek proje dizininde calisir, cross-project orkestrasyon yok |
 | **API Key Dogrulamasi** | Tam | Credentials yonetimi: ~/.deckent/credentials/ ile guvenli key saklama (0600 izin) |

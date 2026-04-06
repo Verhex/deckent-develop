@@ -4,7 +4,6 @@
  * Tests for each debt fix in DIRECTIVES.md (Sprint 2 / Dogfooding):
  *   DEBT-004 : waitForResults async polling
  *   DEBT-005 : buildWorkerPrompt test instructions
- *   DEBT-002 : checkUsage safe defaults & spawnSync contract
  *   DEBT-003 : extractScopeFromDirective — DIRECTIVES.md format
  *   DEBT-005b: StartOptions autoApprove / sandbox separation
  */
@@ -49,18 +48,14 @@ vi.mock('../../src/agents/worker.js', () => ({
 }));
 
 import { existsSync, readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import {
   waitForResults,
   buildWorkerPrompt,
-  checkUsage,
-  adjustSprintSize,
   extractScopeFromDirective,
 } from '../../src/orchestra/brain.js';
 
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedReadFileSync = vi.mocked(readFileSync);
-const mockedSpawnSync = vi.mocked(spawnSync);
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -105,7 +100,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     ...overrides,
@@ -361,89 +355,6 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
     task.title = "Task with it's apostrophe";
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain("it's");
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════
-// DEBT-002: checkUsage — safe defaults & spawnSync contract
-// ═══════════════════════════════════════════════════════════════════
-
-describe('DEBT-002: checkUsage — safe defaults & spawnSync contract', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default: spawnSync returns failure (CLI unavailable)
-    mockedSpawnSync.mockReturnValue({
-      status: 1, stdout: '', stderr: 'command not found', pid: 0, signal: null, output: [],
-    } as never);
-  });
-
-  it('returns an object with all three required UsageMetrics fields', () => {
-    const usage = checkUsage(makeConfig());
-    expect(usage).toHaveProperty('fiveHourPercent');
-    expect(usage).toHaveProperty('weeklyPercent');
-    expect(usage).toHaveProperty('measuredAt');
-  });
-
-  it('fiveHourPercent is a finite number in [0, 100]', () => {
-    const usage = checkUsage(makeConfig());
-    expect(typeof usage.fiveHourPercent).toBe('number');
-    expect(Number.isFinite(usage.fiveHourPercent)).toBe(true);
-    expect(usage.fiveHourPercent).toBeGreaterThanOrEqual(0);
-    expect(usage.fiveHourPercent).toBeLessThanOrEqual(100);
-  });
-
-  it('weeklyPercent is a finite number in [0, 100]', () => {
-    const usage = checkUsage(makeConfig());
-    expect(typeof usage.weeklyPercent).toBe('number');
-    expect(Number.isFinite(usage.weeklyPercent)).toBe(true);
-    expect(usage.weeklyPercent).toBeGreaterThanOrEqual(0);
-    expect(usage.weeklyPercent).toBeLessThanOrEqual(100);
-  });
-
-  it('measuredAt is a valid ISO-8601 date string', () => {
-    const usage = checkUsage(makeConfig());
-    expect(typeof usage.measuredAt).toBe('string');
-    expect(usage.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    expect(new Date(usage.measuredAt).getTime()).not.toBeNaN();
-  });
-
-  it('does not throw when spawnSync returns exit code 1', () => {
-    mockedSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'fail', pid: 0, signal: null, output: [] } as never);
-    expect(() => checkUsage(makeConfig())).not.toThrow();
-  });
-
-  it('does not throw when spawnSync throws', () => {
-    mockedSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
-    expect(() => checkUsage(makeConfig())).not.toThrow();
-  });
-
-  it('does not throw when called repeatedly (idempotent)', () => {
-    const config = makeConfig();
-    expect(() => {
-      checkUsage(config);
-      checkUsage(config);
-      checkUsage(config);
-    }).not.toThrow();
-  });
-
-  it('result is usable by adjustSprintSize without errors', () => {
-    const config = makeConfig();
-    const usage = checkUsage(config);
-    // adjustSprintSize is a pure function that consumes UsageMetrics
-    expect(() => adjustSprintSize(config, usage)).not.toThrow();
-  });
-
-  it('safe default values keep sprint size "full" (no usage pressure)', () => {
-    const config = makeConfig();
-    const usage = checkUsage(config);
-    const rec = adjustSprintSize(config, usage);
-    // If percentages are 0 (stub), no threshold is exceeded → full sprint
-    if (usage.fiveHourPercent === 0 && usage.weeklyPercent === 0) {
-      expect(rec.size).toBe('full');
-    } else {
-      // Real implementation returns non-zero — still must return a valid size
-      expect(['full', 'reduced', 'minimal']).toContain(rec.size);
-    }
   });
 });
 

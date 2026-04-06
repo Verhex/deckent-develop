@@ -13,8 +13,6 @@ vi.mock('../../../src/core/config.js', () => ({
 vi.mock('../../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
@@ -61,7 +59,7 @@ vi.mock('../../../src/cli/commands/quick-start.js', () => ({
 
 import { loadConfig } from '../../../src/core/config.js';
 import {
-  runSprint, readContext, checkUsage, adjustSprintSize, planSprint, BrainError,
+  runSprint, readContext, planSprint, BrainError,
 } from '../../../src/orchestra/brain.js';
 import { isSessionActive, setupWatchWindow } from '../../../src/orchestra/tmux.js';
 import { runDoctorChecks } from '../../../src/cli/commands/doctor.js';
@@ -132,8 +130,6 @@ describe('start command (isolated)', () => {
     vi.mocked(loadConfig).mockResolvedValue(makeConfig() as any);
     vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(true) as any);
     vi.mocked(readContext).mockReturnValue({ memory: '', retro: '', debt: '', patterns: [] } as any);
-    vi.mocked(checkUsage).mockReturnValue({ allowed: true, used: 0, limit: 100 } as any);
-    vi.mocked(adjustSprintSize).mockReturnValue({ maxWorkers: 3 } as any);
     vi.mocked(planSprint).mockReturnValue(makeSprint() as any);
     vi.mocked(runSprint).mockResolvedValue(makeSprint() as any);
     vi.mocked(isSessionActive).mockReturnValue(true);
@@ -269,12 +265,10 @@ describe('start command (isolated)', () => {
       expect(print).toHaveBeenCalledWith(expect.stringContaining('--watch ignored'));
     });
 
-    it('passes readContext, checkUsage, adjustSprintSize to planSprint', async () => {
+    it('passes readContext to planSprint', async () => {
       await runCommand(['start', '--dry-run']);
 
       expect(readContext).toHaveBeenCalledWith('/mock/root');
-      expect(checkUsage).toHaveBeenCalled();
-      expect(adjustSprintSize).toHaveBeenCalled();
     });
 
     it('prints sprint reasoning when present', async () => {

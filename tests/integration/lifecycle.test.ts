@@ -18,7 +18,7 @@ import {
 import type {
   Task, TaskResult, TaskPlan, Sprint, SprintMetrics,
   DashboardState, ResolvedConfig, Heartbeat, LockInfo,
-  BoundaryViolation, UsageMetrics,
+  BoundaryViolation,
 } from '../../src/core/types.js';
 import {
   DECKENT_DIR, BRAIN_DIR, TASKS_DIR, LOCKS_DIR,
@@ -145,7 +145,7 @@ function makeTestConfig(root: string, overrides?: Partial<ResolvedConfig>): Reso
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 3, brain_model: 'opus', default_model: 'sonnet',
-      haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+      haiku_allowed: true,
     },
     modes: {} as ResolvedConfig['modes'],
     language: 'en',
@@ -460,7 +460,6 @@ describe('Auditor scan integration', () => {
       sprint: { id: 'sprint-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
       progress: { done: 0, active: 1, blocked: 0, total: 2 },
-      usage: { fiveHourPercent: 0.1, weeklyPercent: 0.05, measuredAt: new Date().toISOString() },
       alerts: [],
       updatedAt: new Date().toISOString(),
     };
@@ -587,7 +586,6 @@ describe('Sprint mini-cycle integration', () => {
       spawn: () => {},
       kill: () => {},
       listWorkers: () => [],
-      checkUsage: async () => ({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() }),
       isAvailable: async () => true,
       buildCommand: (model: string) => `claude -p --model ${model}`,
       buildPlannerCommand: (prompt: string, model: string) => ({

@@ -239,3 +239,7 @@ A) src/core/usage-tracker.ts SİLİNDİ (395 satır) — UsageTracker class, Usa
 A) usage-manager.ts SİLİNDİ (462 satır) — checkUsage, adjustSp
 - Usage CLI + MCP + API + Dashboard Kaldır: GO_WITH_TECH_DEBT — A) src/cli/commands/usage.ts SİLİNDİ (214 satır — registerUsage, buildUsageOutput, UsageTracker import'ları). B) src/cli
 - Usage Test Dosyaları + Dokümantasyon Temizliği: GO_WITH_TECH_DEBT — A) 6 usage test dosyası silindi: tests/core/usage-tracker.test.ts, tests/cli/usage.test.ts, tests/cli/commands/usage.tes
+## Sprint sprint-090 Learnings
+- src/ Artık Temizliği — MCP Help, Server, Dashboard, Sprint Types: GO_WITH_TECH_DEBT — src/ altındaki tüm usage tracking artıkları temizlendi: (A) help.ts: deckent_usage tool + deckent://usage resource kaldı
+- Test Dosyaları Artık Temizliği — Mock, Import, Fixture: NO_GO
+- Dokümantasyon + README Artık Temizliği: GO_WITH_TECH_DEBT — Tüm 19 hedef dosyadan usage tracking referansları temizlendi. README: deckent_usage tool/resource satırları kaldırıldı, 

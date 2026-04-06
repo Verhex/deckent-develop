@@ -181,7 +181,8 @@ describe('stack-detector readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/stack-detector.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
+    expect(source).toContain("readJsonSafe");
+    expect(source).toContain("from './utils.js'");
     const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
     expect(jsonParseCount).toBe(1); // readConfigLanguageOverride uses JSON.parse directly
   });

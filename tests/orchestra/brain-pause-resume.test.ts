@@ -147,7 +147,6 @@ vi.mock('../../src/core/provider.js', () => ({
 // ─── Imports after mocks ─────────────────────────────────────────────
 
 import { writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import { updateDashboard } from '../../src/monitor/auditor.js';
 import { killWorker } from '../../src/orchestra/tmux.js';
 import { readJsonSafe } from '../../src/core/utils.js';
@@ -155,7 +154,6 @@ import { readJsonSafe } from '../../src/core/utils.js';
 import {
   pauseSprint,
   resumeSprint,
-  checkAndAutoPause,
   getChannelRegistry,
 } from '../../src/orchestra/brain.js';
 
@@ -166,7 +164,6 @@ const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 const mockedKillWorker = vi.mocked(killWorker);
 const mockedReadJsonSafe = vi.mocked(readJsonSafe);
-const mockedSpawnSync = vi.mocked(spawnSync);
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -199,7 +196,7 @@ function makeSprint(tasks: Task[]): Sprint {
   };
 }
 
-function makeConfig(fiveHrPct = 0.5, weeklyPct = 0.3): ResolvedConfig {
+function makeConfig(): ResolvedConfig {
   return {
     projectName: 'test',
     activeModeConfig: {
@@ -208,7 +205,6 @@ function makeConfig(fiveHrPct = 0.5, weeklyPct = 0.3): ResolvedConfig {
       brain_model: 'opus',
       brain_planning: 'auto',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': fiveHrPct, weekly: weeklyPct },
     },
   } as unknown as ResolvedConfig;
 }
@@ -791,75 +787,3 @@ describe('pause/resume roundtrip', () => {
   });
 });
 
-// ─── checkAndAutoPause ───────────────────────────────────────────────
-
-describe('checkAndAutoPause — integration with pauseSprint', () => {
-  const projectRoot = '/tmp/test-project';
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
-    getChannelRegistry().clear?.();
-  });
-
-  function mockUsage(fiveHrPct: number, weeklyPct: number): void {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: `5hr: ${fiveHrPct}%\nweekly: ${weeklyPct}%`,
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-  }
-
-  it('auto-pause kills tmux workers when 5hr threshold exceeded', () => {
-    mockUsage(85, 40);
-    const config = makeConfig(0.8, 0.9);
-    const tasks = [makeTask('090', TaskStatus.EXECUTING)];
-    const sprint = makeSprint(tasks);
-
-    const paused = checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(paused).toBe(true);
-    expect(mockedKillWorker).toHaveBeenCalledWith('090');
-  });
-
-  it('auto-pause kills tmux workers when weekly threshold exceeded', () => {
-    mockUsage(50, 80);
-    const config = makeConfig(0.9, 0.7);
-    const tasks = [makeTask('091', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    const paused = checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(paused).toBe(true);
-    expect(mockedKillWorker).toHaveBeenCalledWith('091');
-  });
-
-  it('auto-pause sends IPC PAUSE to subprocess workers', () => {
-    const channel = registerMockChannel('092');
-    mockUsage(85, 40);
-    const config = makeConfig(0.8, 0.9);
-    const tasks = [makeTask('092', TaskStatus.EXECUTING)];
-    const sprint = makeSprint(tasks);
-
-    checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(channel.pause).toHaveBeenCalledTimes(1);
-    expect(mockedKillWorker).not.toHaveBeenCalledWith('092');
-  });
-
-  it('no workers killed when usage is below thresholds', () => {
-    mockUsage(50, 40);
-    const config = makeConfig(0.8, 0.7);
-    const tasks = [makeTask('093', TaskStatus.EXECUTING)];
-    const sprint = makeSprint(tasks);
-
-    checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(mockedKillWorker).not.toHaveBeenCalled();
-    expect(sprint.status).toBe(SprintStatus.ACTIVE);
-  });
-});

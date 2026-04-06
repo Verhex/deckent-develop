@@ -81,7 +81,6 @@ const MOCK_CONFIG: ResolvedConfig = {
     brain_model: 'opus',
     default_model: 'sonnet',
     haiku_allowed: false,
-    usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
   },
   modes: {} as ResolvedConfig['modes'],
   language: 'en',

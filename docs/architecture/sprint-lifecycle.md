@@ -56,9 +56,7 @@ This is the only phase that happens outside of `runSprint()`. DIRECTIVES.md is t
 **What happens:**
 
 1. **Read context** — `readContext(projectRoot)` reads `DIRECTIVES.md`, `MEMORY.md`, `RETRO.md`, `DEBT.md`, `PATTERNS.md`, `DECISIONS.md`
-2. **Check usage** — `checkUsage(config)` measures 5-hour window and weekly quota against configured thresholds
-3. **Adjust sprint size** — `adjustSprintSize(config, usage)` determines `maxWorkers`, `modelConstraint`, and `effortCap` based on usage
-4. **Handle critical debt** — Any `CRITICAL` priority unresolved debt from `DEBT.md` generates priority-fix tasks first
+2. **Handle critical debt** — Any `CRITICAL` priority unresolved debt from `DEBT.md` generates priority-fix tasks first
 5. **Generate tasks** (three modes controlled by `brain_planning` config):
    - **`ai` mode:** `callBrainPlanner()` sends context to Claude CLI, gets Zod-validated task JSON
    - **`structured` mode:** `parseStructuredDirectives()` parses `## Task N:` blocks from DIRECTIVES.md
@@ -441,8 +439,8 @@ User writes DIRECTIVES.md
          │
          ▼
   ┌─────────────┐
-  │  Phase 1    │  readContext() → checkUsage() → adjustSprintSize()
-  │    PLAN     │  planSprint() → writes .tasks/*.json
+  │  Phase 1    │  readContext() → planSprint() → writes .tasks/*.json
+  │    PLAN     │
   │             │  resetDashboard()
   │             │  hook: beforeSprint (after plan, before spawn)
   └──────┬──────┘

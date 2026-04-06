@@ -19,7 +19,7 @@ import { formatSyncOutput, type SyncResult } from '../../src/cli/commands/sync.j
 import { buildExplainOutput, type SprintSummary, type RetroLearnings } from '../../src/cli/commands/explain.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 import type { Task } from '../../src/core/task-types.js';
-import type { ModelType, UsageMetrics } from '../../src/core/types.js';
+import type { ModelType } from '../../src/core/types.js';
 import type { ProviderName } from '../../src/core/task-types.js';
 import type { TaskRouterConfig } from '../../src/orchestra/task-router.js';
 
@@ -38,11 +38,6 @@ function createMockAdapter(name: string): ProviderAdapter {
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({
-      fiveHourPercent: 20,
-      weeklyPercent: 10,
-      measuredAt: new Date().toISOString(),
-    } satisfies UsageMetrics),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue(`${name} --model opus`),
   };

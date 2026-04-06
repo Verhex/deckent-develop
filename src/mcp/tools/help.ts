@@ -57,7 +57,6 @@ const TOOLS: HelpToolInfo[] = [
   { name: 'deckent_analyze_project', description: 'Analyze project stack: language, framework, test runner, build tool', readOnly: true },
   { name: 'deckent_sync', description: 'Sync workspace files and agent/skill manifests to disk', readOnly: false },
   { name: 'deckent_config', description: 'Read, get, or set Deckent configuration values', readOnly: false },
-  { name: 'deckent_usage', description: 'Show token usage statistics and cost estimates', readOnly: true },
   { name: 'deckent_review', description: 'Evaluate sprint results — returns GO / NO_GO / GO_WITH_TECH_DEBT', readOnly: true },
   { name: 'deckent_run', description: 'Run a single task directly without a full sprint', readOnly: false },
   { name: 'deckent_kill', description: 'Kill a running worker by task ID or kill all workers', readOnly: false },
@@ -72,7 +71,6 @@ const RESOURCES: HelpResourceInfo[] = [
   { name: 'debt', uri: 'deckent://debt', description: 'Tech debt register: open and resolved items (.brain/DEBT.md)' },
   { name: 'config', uri: 'deckent://config', description: 'Resolved Deckent configuration (merged defaults + global + project)' },
   { name: 'retro', uri: 'deckent://retro', description: 'Latest sprint retrospective (.brain/RETRO.md)' },
-  { name: 'usage', uri: 'deckent://usage', description: 'Token usage records (.deckent/usage/)' },
   { name: 'tasks', uri: 'deckent://tasks', description: 'Current .tasks/ directory listing with task statuses' },
   { name: 'agents', uri: 'deckent://agents', description: 'Registered agents: built-in and project-specific (.deckent/agents/)' },
 ];

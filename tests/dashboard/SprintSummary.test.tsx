@@ -23,7 +23,6 @@ function makeState(overrides: Partial<DashboardState> = {}): DashboardState {
     sprint: { id: "sprint-040", number: 40, phase: "EXECUTE", status: "running" },
     agents: [],
     progress: { done: 5, active: 2, blocked: 0, total: 10 },
-    usage: { fiveHourPercent: 30, weeklyPercent: 15, measuredAt: new Date().toISOString() },
     alerts: [],
     updatedAt: new Date(Date.now() - 10 * 60000).toISOString(), // 10 min ago
     ...overrides,

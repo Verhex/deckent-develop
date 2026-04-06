@@ -6,12 +6,12 @@
  *   B) Structured Parser Bullet/Prose (already implemented — confirm behavior)
  *   C) Auto Mode >2x Task Safeguard with fallback
  *   D) Agent/Skill Selection Error Logging — per-task try/catch
- *   E) Usage Safe Default — status:'unknown' when failed, adjustSprintSize skips throttling
+ *   E) (removed — usage tracking no longer exists)
  *   F) Context Truncation Priority (already implemented — confirm behavior)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { BrainContext, SprintSizeRecommendation, ModelType, UsageMetrics, ResolvedConfig } from '../../src/core/types.js';
+import type { BrainContext, SprintSizeRecommendation, ModelType, ResolvedConfig } from '../../src/core/types.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
@@ -30,7 +30,6 @@ import {
   parseStructuredDirectives,
   parseBulletOrNumberedTasks,
 } from '../../src/orchestra/task-builder.js';
-import { adjustSprintSize } from '../../src/orchestra/sprint-controller.js';
 import { providerRegistry } from '../../src/core/provider.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
 
@@ -69,7 +68,6 @@ function makeMockAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAdap
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue('mock-cli -p - --model sonnet < /dev/null'),
     ...overrides,
@@ -84,7 +82,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'sonnet',
       default_model: 'sonnet',
       haiku_allowed: true,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.8 },
     },
     modes: {} as ResolvedConfig['modes'],
     language: 'tr',
@@ -221,59 +218,6 @@ describe('B) Structured Parser Bullet/Prose fallback', () => {
     expect(tasks.length).toBe(1);
     expect(tasks[0]!.forceModel).toBe('opus');
     expect(tasks[0]!.forceEffort).toBe('high');
-  });
-});
-
-// ═══ E) Usage Safe Default ════════════════════════════════════════════
-
-describe('E) Usage Safe Default', () => {
-  it('checkUsage default returns status "unknown" (verified via source)', async () => {
-    const { readFileSync } = await import('node:fs');
-    const source = readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
-      'utf-8',
-    );
-    // UNKNOWN_DEFAULT should have status: 'unknown'
-    expect(source).toContain("status: 'unknown'");
-    // Successful measurement should have status: 'ok'
-    expect(source).toContain("status: 'ok'");
-  });
-
-  it('adjustSprintSize returns full sprint when usage status is unknown', () => {
-    const config = makeConfig();
-    const usage: UsageMetrics = {
-      fiveHourPercent: 95, // Would normally trigger throttling
-      weeklyPercent: 95,
-      measuredAt: new Date().toISOString(),
-      status: 'unknown',
-    };
-    const result = adjustSprintSize(config, usage);
-    expect(result.size).toBe('full');
-    expect(result.reason).toContain('unknown');
-  });
-
-  it('adjustSprintSize throttles normally when usage status is ok', () => {
-    const config = makeConfig();
-    const usage: UsageMetrics = {
-      fiveHourPercent: 95,
-      weeklyPercent: 95,
-      measuredAt: new Date().toISOString(),
-      status: 'ok',
-    };
-    const result = adjustSprintSize(config, usage);
-    expect(result.size).toBe('minimal');
-  });
-
-  it('adjustSprintSize throttles when status is undefined (backward compat)', () => {
-    const config = makeConfig();
-    const usage: UsageMetrics = {
-      fiveHourPercent: 95,
-      weeklyPercent: 95,
-      measuredAt: new Date().toISOString(),
-      // status is undefined — old behavior should still throttle
-    };
-    const result = adjustSprintSize(config, usage);
-    expect(result.size).toBe('minimal');
   });
 });
 

@@ -128,14 +128,12 @@ vi.mock('../../src/core/provider.js', () => ({
 }));
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import { updateDashboard } from '../../src/monitor/auditor.js';
 import { readJsonSafe } from '../../src/core/utils.js';
 
 import {
   pauseSprint,
   resumeSprint,
-  checkAndAutoPause,
 } from '../../src/orchestra/brain.js';
 
 const mockedWriteFileSync = vi.mocked(writeFileSync);
@@ -144,7 +142,6 @@ const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 const mockedReadJsonSafe = vi.mocked(readJsonSafe);
-const mockedSpawnSync = vi.mocked(spawnSync);
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -177,7 +174,7 @@ function makeSprint(tasks: Task[]): Sprint {
   };
 }
 
-function makeConfig(fiveHrPct: number = 0.5, weeklyPct: number = 0.3): ResolvedConfig {
+function makeConfig(): ResolvedConfig {
   return {
     projectName: 'test',
     activeModeConfig: {
@@ -186,7 +183,6 @@ function makeConfig(fiveHrPct: number = 0.5, weeklyPct: number = 0.3): ResolvedC
       brain_model: 'opus',
       brain_planning: 'auto',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': fiveHrPct, weekly: weeklyPct },
     },
   } as unknown as ResolvedConfig;
 }
@@ -527,141 +523,6 @@ describe('resumeSprint', () => {
     const sprint = makeSprint(tasks);
 
     expect(() => resumeSprint(projectRoot, sprint)).not.toThrow();
-  });
-});
-
-describe('checkAndAutoPause', () => {
-  const projectRoot = '/tmp/test-project';
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedExistsSync.mockReturnValue(false);
-    mockedMkdirSync.mockReturnValue(undefined as unknown as ReturnType<typeof mkdirSync>);
-  });
-
-  function mockUsageOutput(fiveHrPct: number, weeklyPct: number): void {
-    mockedSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: `5hr: ${fiveHrPct}%\nweekly: ${weeklyPct}%`,
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-  }
-
-  it('returns false and does not pause when usage is below thresholds', () => {
-    // Config thresholds: 5hr=80%, weekly=70%
-    const config = makeConfig(0.8, 0.7);
-    mockUsageOutput(50, 40);
-
-    const tasks = [makeTask('001', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    const result = checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(result).toBe(false);
-    expect(sprint.status).toBe(SprintStatus.ACTIVE);
-    expect(tasks[0].status).toBe(TaskStatus.PENDING);
-  });
-
-  it('pauses when 5hr usage exceeds threshold', () => {
-    const config = makeConfig(0.8, 0.9); // thresholds: 80% and 90%
-    mockUsageOutput(85, 40); // 5hr at 85% — exceeded
-
-    const tasks = [makeTask('001', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    const result = checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(result).toBe(true);
-    expect(sprint.status).toBe(SprintStatus.PAUSED);
-    expect(tasks[0].status).toBe(TaskStatus.PAUSED);
-  });
-
-  it('pauses when weekly usage exceeds threshold', () => {
-    const config = makeConfig(0.9, 0.7); // thresholds: 90% and 70%
-    mockUsageOutput(50, 75); // weekly at 75% — exceeded
-
-    const tasks = [makeTask('001', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    const result = checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(result).toBe(true);
-    expect(sprint.status).toBe(SprintStatus.PAUSED);
-  });
-
-  it('includes 5hr usage info in pause reason', () => {
-    const config = makeConfig(0.8, 0.9);
-    mockUsageOutput(85, 40);
-
-    const tasks = [makeTask('001', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    checkAndAutoPause(projectRoot, sprint, config);
-
-    // Check that writeFileSync was called with pause state containing the reason
-    const pauseStateWrite = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('pause-state.json'),
-    );
-    expect(pauseStateWrite).toBeDefined();
-    const state = JSON.parse(pauseStateWrite![1] as string);
-    expect(state.reason).toContain('5hr usage limit exceeded');
-  });
-
-  it('includes weekly usage info in pause reason when weekly exceeded', () => {
-    const config = makeConfig(0.99, 0.7);
-    mockUsageOutput(50, 75);
-
-    const tasks = [makeTask('001', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    checkAndAutoPause(projectRoot, sprint, config);
-
-    const pauseStateWrite = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('pause-state.json'),
-    );
-    const state = JSON.parse(pauseStateWrite![1] as string);
-    expect(state.reason).toContain('Weekly usage limit exceeded');
-  });
-
-  it('pauses when both thresholds are exceeded (prioritizes 5hr message)', () => {
-    const config = makeConfig(0.8, 0.7);
-    mockUsageOutput(90, 80); // both exceeded
-
-    const tasks = [makeTask('001', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    const result = checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(result).toBe(true);
-    // 5hr is checked first, so the reason should mention 5hr
-    const pauseStateWrite = mockedWriteFileSync.mock.calls.find(
-      c => (c[0] as string).includes('pause-state.json'),
-    );
-    const state = JSON.parse(pauseStateWrite![1] as string);
-    expect(state.reason).toContain('5hr');
-  });
-
-  it('returns false when claude command fails to report usage', () => {
-    const config = makeConfig(0.8, 0.7);
-    mockedSpawnSync.mockReturnValue({
-      status: 1,
-      stdout: '',
-      stderr: 'error',
-      pid: 1,
-      output: [],
-      signal: null,
-    } as ReturnType<typeof spawnSync>);
-
-    const tasks = [makeTask('001', TaskStatus.PENDING)];
-    const sprint = makeSprint(tasks);
-
-    // With safe defaults (50% / 30%) and thresholds (80% / 70%), should NOT pause
-    const result = checkAndAutoPause(projectRoot, sprint, config);
-
-    expect(result).toBe(false);
   });
 });
 

@@ -93,11 +93,6 @@ curl http://localhost:3100/api/status
     }
   ],
   "progress": { "done": 3, "active": 5, "blocked": 0, "total": 8 },
-  "usage": {
-    "fiveHourPercent": 42,
-    "weeklyPercent": 28,
-    "measuredAt": "2026-03-20T10:00:00.000Z"
-  },
   "alerts": [],
   "auditorLastScan": "2026-03-20T10:00:30.000Z",
   "violations": 0,
@@ -172,8 +167,7 @@ curl http://localhost:3100/api/config
       "max_workers": 8,
       "brain_model": "opus",
       "default_model": "sonnet",
-      "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 0.8, "weekly": 0.7 }
+      "haiku_allowed": true
     }
   }
 }
@@ -515,7 +509,6 @@ interface DashboardState {
   sprint: { id: string; number: number; phase: string; status: string };
   agents: { id: string; role: string; status: string; model: string; tmuxWindow: string }[];
   progress: DashboardProgress;
-  usage: { fiveHourPercent: number; weeklyPercent: number; measuredAt: string };
   alerts: { level: string; message: string; timestamp: string }[];
   updatedAt: string;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DecisionOrchestrator } from '../../src/orchestra/decision-engine.js';
-import type { Task, TaskScope, ResolvedConfig, UsageMetrics, PatternEntry } from '../../src/core/types.js';
+import type { Task, TaskScope, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { AgentPool } from '../../src/core/agent-types.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
@@ -18,22 +18,12 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: true,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
     projectName: 'test',
     projectRoot: '/tmp/test',
     version: '0.1.0',
-    ...overrides,
-  };
-}
-
-function makeUsage(overrides: Partial<UsageMetrics> = {}): UsageMetrics {
-  return {
-    fiveHourPercent: 10,
-    weeklyPercent: 10,
-    measuredAt: '2026-03-22T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -66,7 +56,6 @@ function makeContext(overrides: Partial<DecisionContext> = {}): DecisionContext 
     agentPool: new Map() as AgentPool,
     skillPool: new Map<string, SkillDefinition>(),
     patterns: [],
-    usageMetrics: makeUsage(),
     config: makeConfig(),
     ...overrides,
   };

@@ -32,8 +32,6 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   BrainError: class BrainError extends Error {},
 }));

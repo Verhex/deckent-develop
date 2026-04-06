@@ -48,7 +48,6 @@ import type {
   SubscriptionProfile,
   SetupRecommendation,
   SystemProfile,
-  SprintUsageReport,
   Sprint,
   SprintMetrics,
   SprintResult,
@@ -200,7 +199,6 @@ describe('types.ts barrel re-export — interfaces', () => {
       sprint: { id: 'sprint-001', number: 1, phase: SprintPhase.EXECUTE, status: SprintStatus.ACTIVE },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
       alerts: [],
       updatedAt: new Date().toISOString(),
     };

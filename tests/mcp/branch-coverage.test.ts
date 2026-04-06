@@ -32,8 +32,6 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   BrainError: class BrainError extends Error {
     phase?: string;
@@ -316,7 +314,7 @@ describe('MCP Branch Coverage', () => {
         mode: 'max_plan',
         activeModeConfig: {
           max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
-          haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+          haiku_allowed: true,
         },
         modes: {} as import('../../src/core/types.js').ResolvedConfig['modes'],
         language: 'en', projectName: 'test', projectRoot: '/tmp/test', version: '0.1.0',

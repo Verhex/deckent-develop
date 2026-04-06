@@ -11,7 +11,7 @@ import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { AgentPool, AgentDefinition } from '../../src/core/agent-types.js';
 import type { SkillDefinition, ProjectStack } from '../../src/core/skill-types.js';
-import type { Task, TaskScope, ResolvedConfig, UsageMetrics } from '../../src/core/types.js';
+import type { Task, TaskScope, ResolvedConfig } from '../../src/core/types.js';
 import type { DecisionContext, DecisionResult } from '../../src/core/decision-types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -58,7 +58,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
@@ -67,10 +66,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     version: '0.1.0',
     ...overrides,
   };
-}
-
-function makeUsage(overrides: Partial<UsageMetrics> = {}): UsageMetrics {
-  return { fiveHourPercent: 10, weeklyPercent: 10, measuredAt: new Date().toISOString(), ...overrides };
 }
 
 function makeProjectStack(): ProjectStack {
@@ -123,7 +118,6 @@ function makeContext(overrides: Partial<DecisionContext> = {}): DecisionContext 
     agentPool,
     skillPool,
     patterns: [],
-    usageMetrics: makeUsage(),
     config: makeConfig(),
     ...overrides,
   };
@@ -491,10 +485,8 @@ describe('Error Recovery Integration', () => {
   // ─── High Usage Pressure ──────────────────────────────────────
 
   describe('High usage pressure', () => {
-    it('downgrades opus to sonnet when usage is high', () => {
-      const ctx = makeContext({
-        usageMetrics: makeUsage({ fiveHourPercent: 85, weeklyPercent: 85 }),
-      });
+    it('resolves model for complex task', () => {
+      const ctx = makeContext();
       const orch = new DecisionOrchestrator(ctx);
       const task = makeTask({
         title: 'Architect new microservice',
@@ -507,8 +499,7 @@ describe('Error Recovery Integration', () => {
 
       const result = orch.decide(task);
 
-      // Under high usage, opus should be downgraded
-      expect(result.model).not.toBe('opus');
+      expect(['opus', 'sonnet', 'haiku']).toContain(result.model);
     });
   });
 

@@ -59,7 +59,6 @@ function makeMockAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAdap
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 50, weeklyPercent: 30, measuredAt: '' }),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockImplementation(
       (model: ModelType, promptPath: string) => `mock-cli -p - --model ${model} < ${promptPath}`,
@@ -75,7 +74,6 @@ function makeCodexAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAda
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockImplementation(
       (model: ModelType, promptPath: string) => `codex --model ${model} --quiet < ${promptPath}`,

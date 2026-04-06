@@ -12,7 +12,7 @@ import {
   SubprocessBackend,
   SpawnBackendError,
 } from '../../src/orchestra/spawn-backend.js';
-import type { ModelType, UsageMetrics } from '../../src/core/types.js';
+import type { ModelType } from '../../src/core/types.js';
 
 // ─── Mock ProviderAdapter factory ────────────────────────────────────
 
@@ -26,11 +26,6 @@ function createMockProvider(
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({
-      fiveHourPercent: 30,
-      weeklyPercent: 20,
-      measuredAt: new Date().toISOString(),
-    } satisfies UsageMetrics),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue('claude -p - --model opus < /tmp/prompt.txt'),
   };
@@ -210,17 +205,6 @@ describe('Provider Flow Integration', () => {
     // Build command for dry-run
     const cmd = activeProvider.buildCommand('opus', '/tmp/prompt.txt');
     expect(cmd).toBeTruthy();
-  });
-
-  it('full flow: provider checkUsage returns metrics', async () => {
-    const provider = createMockProvider('claude-tmux');
-    registry.registerProvider(provider);
-
-    const usage = await provider.checkUsage();
-    expect(usage).toHaveProperty('fiveHourPercent');
-    expect(usage).toHaveProperty('weeklyPercent');
-    expect(usage).toHaveProperty('measuredAt');
-    expect(typeof usage.fiveHourPercent).toBe('number');
   });
 
   // ─── Fallback: tmux to subprocess ─────────────────────────────────

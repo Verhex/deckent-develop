@@ -42,8 +42,6 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(async () => ({ id: 'sprint-001', status: 'COMPLETE' })),
   readContext: vi.fn(() => ({ debt: [], patterns: [], memory: '' })),
-  checkUsage: vi.fn(() => ({ fiveHourPercent: 10, weeklyPercent: 5 })),
-  adjustSprintSize: vi.fn(() => ({ maxWorkers: 4 })),
   planSprint: vi.fn(() => ({
     id: 'sprint-001',
     number: 1,
@@ -114,7 +112,6 @@ const dashboardJson = JSON.stringify({
   sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' },
   agents: [],
   progress: { done: 2, active: 1, blocked: 0, total: 4 },
-  usage: { fiveHourPercent: 10, weeklyPercent: 5, measuredAt: '2026-01-01T00:00:00Z' },
   alerts: [],
   updatedAt: '2026-01-01T00:00:00Z',
 });

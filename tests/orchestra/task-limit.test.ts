@@ -69,7 +69,7 @@ function setupProjectDir(root: string): void {
   mkdirSync(join(root, '.locks'), { recursive: true });
   const emptyDash = {
     sprint: null, agents: [], progress: { done: 0, active: 0, blocked: 0, total: 0 },
-    alerts: [], updatedAt: '', usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' },
+    alerts: [], updatedAt: '',
   };
   writeFileSync(join(root, DASHBOARD_FILE), JSON.stringify(emptyDash));
 }
@@ -92,7 +92,6 @@ function makeConfig(root: string, maxWorkers = 8): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: true,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
     },
     modes: {} as ResolvedConfig['modes'],
     language: 'en',

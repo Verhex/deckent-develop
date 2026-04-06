@@ -325,7 +325,7 @@ describe('registerHelpTool', () => {
       const result = await handler({});
       const data = parseResult(result);
       expect(data.resources).toBeInstanceOf(Array);
-      expect(data.resources.length).toBe(9);
+      expect(data.resources.length).toBe(8);
       const dashRes = data.resources.find((r: { name: string }) => r.name === 'dashboard');
       expect(dashRes).toBeDefined();
       expect(dashRes.uri).toBe('deckent://dashboard');

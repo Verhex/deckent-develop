@@ -486,7 +486,6 @@ function createMockAdapter(overrides?: Partial<ProviderAdapter>): ProviderAdapte
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn(() => []),
-    checkUsage: vi.fn(async () => ({ used: 0, limit: 100, remaining: 100, percentUsed: 0 })),
     isAvailable: vi.fn(async () => true),
     buildCommand: vi.fn(
       (model: ModelType, promptPath: string, _opts?: { allowedTools?: string; autoApprove?: boolean }) =>

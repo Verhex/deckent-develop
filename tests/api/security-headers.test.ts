@@ -38,8 +38,6 @@ vi.mock('../../src/core/utils.js', () => ({
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(async () => ({ id: 'sprint-001', status: 'COMPLETE' })),
   readContext: vi.fn(() => ({ debt: [], patterns: [], memory: '' })),
-  checkUsage: vi.fn(() => ({ fiveHourPercent: 10, weeklyPercent: 5 })),
-  adjustSprintSize: vi.fn(() => ({ maxWorkers: 4 })),
   planSprint: vi.fn(() => ({
     id: 'sprint-001',
     number: 1,

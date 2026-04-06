@@ -36,19 +36,9 @@ vi.mock('../../src/core/config-migration.js', () => ({
   getNestedValue: vi.fn().mockReturnValue('testValue'),
 }));
 
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    getSprintUsage: vi.fn().mockReturnValue({ tokens: 1000, calls: 10 }),
-    getTotalUsage: vi.fn().mockReturnValue({ tokens: 5000, calls: 50 }),
-    getModelBreakdown: vi.fn().mockReturnValue([]),
-  })),
-}));
-
 vi.mock('../../src/orchestra/brain.js', () => ({
   runDecay: vi.fn().mockReturnValue({ decayed: 5 }),
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
 }));
 
@@ -225,21 +215,6 @@ describe('MCP Tool Error Format — debt-059-008-fix (sprint-061)', () => {
       expect(parsed.message).toContain('permission error');
     });
 
-    it('deckent_usage catch error uses error:true format', async () => {
-      const { registerUsageTool } = await import('../../src/mcp/tools/usage.js');
-      const mock = createMockServer();
-      registerUsageTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-      vi.mocked(loadConfig).mockRejectedValue(new Error('usage load failed'));
-
-      const result = await mock.tools.get('deckent_usage')!.handler({});
-      const parsed = JSON.parse(result.content[0]!.text);
-
-      expect(result.isError).toBe(true);
-      expect(parsed.error).toBe(true);
-      expect(parsed.message).toContain('usage load failed');
-    });
-
     it('deckent_review catch error uses error:true format', async () => {
       const { registerReviewTool } = await import('../../src/mcp/tools/review.js');
       const mock = createMockServer();
@@ -333,16 +308,6 @@ describe('MCP Tool Error Format — debt-059-008-fix (sprint-061)', () => {
       registerConfigTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
       const toolConfig = mock.tools.get('deckent_config')!.config as { inputSchema?: unknown };
-      expect(toolConfig).toBeDefined();
-      expect(toolConfig.inputSchema).toBeDefined();
-    });
-
-    it('deckent_usage has Zod schema with optional sprintId', async () => {
-      const { registerUsageTool } = await import('../../src/mcp/tools/usage.js');
-      const mock = createMockServer();
-      registerUsageTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-      const toolConfig = mock.tools.get('deckent_usage')!.config as { inputSchema?: unknown };
       expect(toolConfig).toBeDefined();
       expect(toolConfig.inputSchema).toBeDefined();
     });

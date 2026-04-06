@@ -57,7 +57,6 @@ vi.mock('../../src/core/provider.js', () => {
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue('claude --model sonnet /dev/null'),
     buildPlannerCommand: (prompt: string, model: string) => ({
@@ -141,16 +140,6 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
   deleteSafetyPoint: vi.fn(),
   isCleanWorkingTree: vi.fn().mockReturnValue(true),
   safetyBranchExists: vi.fn().mockReturnValue(false),
-}));
-
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    recordCall: vi.fn(),
-    getSprintUsage: vi.fn().mockReturnValue({ sprintId: 'sprint-001', entries: [], totalCalls: 0, totalTokens: 0, modelBreakdown: [] }),
-    getTotalUsage: vi.fn(),
-    getModelBreakdown: vi.fn().mockReturnValue([]),
-    listSprints: vi.fn().mockReturnValue([]),
-  })),
 }));
 
 vi.mock('../../src/orchestra/coverage-validator.js', () => ({
@@ -251,7 +240,6 @@ function makeConfig(): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
   };

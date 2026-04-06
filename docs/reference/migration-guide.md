@@ -96,7 +96,6 @@ The `selfAssessment` field is now required in result files:
       "brain_model": "opus",
       "default_model": "sonnet",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 80, "weekly": 70 },
       "brain_planning": "ai"
     },
     "max5x_plan": {
@@ -104,7 +103,6 @@ The `selfAssessment` field is now required in result files:
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 80, "weekly": 70 },
       "brain_planning": "auto"
     },
     "pro_plan": {
@@ -112,15 +110,13 @@ The `selfAssessment` field is now required in result files:
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": false,
-      "usage_thresholds": { "5hr": 80, "weekly": 70 },
       "brain_planning": "structured"
     },
     "api": {
       "max_workers": 2,
       "brain_model": "haiku",
       "default_model": "haiku",
-      "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 90, "weekly": 80 }
+      "haiku_allowed": true
     }
   }
 }
@@ -143,8 +139,7 @@ The `selfAssessment` field is now required in result files:
 
 1. Wrap your existing fields under the appropriate mode (e.g. `pro_plan`).
 2. Add the `mode` field pointing to that mode.
-3. Add `usage_thresholds` — recommended defaults: `{ "5hr": 80, "weekly": 70 }`.
-4. Run `deckent doctor` to validate.
+3. Run `deckent doctor` to validate.
 
 Or run `deckent upgrade` to migrate automatically (see [below](#automatic-migration-deckent-upgrade)).
 

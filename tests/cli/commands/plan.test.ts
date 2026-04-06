@@ -21,10 +21,6 @@ vi.mock('../../../src/core/provider.js', () => ({
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
   readContext: vi.fn(),
-  checkUsage: vi.fn(),
-  checkUsageWithProvider: vi.fn(),
-  getDefaultProvider: vi.fn(),
-  adjustSprintSize: vi.fn(),
   planSprint: vi.fn(),
   confirmDraftTasks: vi.fn(),
   cleanupDraftTasks: vi.fn(),
@@ -49,8 +45,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 import { loadConfig } from '../../../src/core/config.js';
 import { bootstrapProviders } from '../../../src/core/provider.js';
 import {
-  readContext, checkUsage, checkUsageWithProvider, getDefaultProvider,
-  adjustSprintSize, planSprint, confirmDraftTasks, cleanupDraftTasks,
+  readContext, planSprint, confirmDraftTasks, cleanupDraftTasks,
 } from '../../../src/orchestra/brain.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { promptConfirm } from '../../../src/cli/helpers/prompt.js';
@@ -63,7 +58,7 @@ function makeConfig(): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
-      haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+      haiku_allowed: true,
       brain_planning: 'auto',
     },
     modes: {} as any,
@@ -100,11 +95,6 @@ function setupMocks(): void {
     patterns: '', decisions: '', existingTasks: [],
     projectState: { gitStatus: '', fileTree: [] },
   });
-  vi.mocked(checkUsage).mockReturnValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' });
-  vi.mocked(getDefaultProvider).mockReturnValue(null);
-  vi.mocked(adjustSprintSize).mockReturnValue({
-    size: 'full', maxWorkers: 8, modelConstraint: null, reason: 'OK',
-  });
   vi.mocked(planSprint).mockReturnValue(makeSprint());
 }
 
@@ -139,12 +129,10 @@ describe('plan command (isolated)', () => {
     expect(cmd!.options.some(o => o.long === '--structured')).toBe(true);
   });
 
-  it('calls readContext, checkUsage, adjustSprintSize, and planSprint', async () => {
+  it('calls readContext and planSprint', async () => {
     setupMocks();
     await runCommand(['plan', '--no-confirm']);
     expect(readContext).toHaveBeenCalled();
-    expect(checkUsage).toHaveBeenCalled();
-    expect(adjustSprintSize).toHaveBeenCalled();
     expect(planSprint).toHaveBeenCalled();
   });
 
@@ -204,16 +192,6 @@ describe('plan command (isolated)', () => {
     expect(print).toHaveBeenCalledWith(expect.stringContaining('Planning mode: ai'));
   });
 
-  it('shows sprint size note when reduced', async () => {
-    setupMocks();
-    vi.mocked(adjustSprintSize).mockReturnValue({
-      size: 'reduced', maxWorkers: 3, modelConstraint: 'sonnet', reason: 'High 5hr usage',
-    });
-    await runCommand(['plan', '--no-confirm']);
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('reduced'));
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('High 5hr usage'));
-  });
-
   it('handles loadConfig error gracefully', async () => {
     vi.mocked(loadConfig).mockRejectedValue(new Error('config missing'));
     await runCommand(['plan']);
@@ -227,35 +205,6 @@ describe('plan command (isolated)', () => {
     await runCommand(['plan', '--no-confirm']);
     expect(printError).toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
-  });
-
-  // ─── A) Async usage check ─────────────────────────────────────────
-
-  it('uses async checkUsageWithProvider when provider is available', async () => {
-    setupMocks();
-    const fakeProvider = { checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: '' }) };
-    vi.mocked(getDefaultProvider).mockReturnValue(fakeProvider as any);
-    vi.mocked(checkUsageWithProvider).mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: '' });
-    await runCommand(['plan', '--no-confirm']);
-    expect(checkUsageWithProvider).toHaveBeenCalledWith(fakeProvider);
-    expect(checkUsage).not.toHaveBeenCalled();
-  });
-
-  it('falls back to sync checkUsage when async fails', async () => {
-    setupMocks();
-    const fakeProvider = { checkUsage: vi.fn() };
-    vi.mocked(getDefaultProvider).mockReturnValue(fakeProvider as any);
-    vi.mocked(checkUsageWithProvider).mockRejectedValue(new Error('provider error'));
-    await runCommand(['plan', '--no-confirm']);
-    expect(checkUsage).toHaveBeenCalled();
-  });
-
-  it('uses sync checkUsage when no provider available', async () => {
-    setupMocks();
-    vi.mocked(getDefaultProvider).mockReturnValue(null);
-    await runCommand(['plan', '--no-confirm']);
-    expect(checkUsage).toHaveBeenCalled();
-    expect(checkUsageWithProvider).not.toHaveBeenCalled();
   });
 
   // ─── B) --dry-run ────────────────────────────────────────────────

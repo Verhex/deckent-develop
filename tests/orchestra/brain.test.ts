@@ -3,7 +3,7 @@ import {
   TaskStatus, TaskEvaluation, SprintPhase, SprintStatus, DebtPriority, AgentStatus,
 } from '../../src/core/types.js';
 import type {
-  Task, TaskResult, Sprint, SprintMetrics, DebtItem, ResolvedConfig, UsageMetrics, PatternEntry,
+  Task, TaskResult, Sprint, SprintMetrics, DebtItem, ResolvedConfig, PatternEntry,
 } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
@@ -62,7 +62,6 @@ vi.mock('../../src/core/provider.js', () => ({
     getDefault: vi.fn().mockReturnValue({
       name: 'claude',
       buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
-      checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 10, measuredAt: new Date().toISOString() }),
       isAvailable: vi.fn().mockResolvedValue(true),
     }),
     registerProvider: vi.fn(),
@@ -107,7 +106,7 @@ const mockedUpdateTaskStatus = vi.mocked(updateTaskStatus);
 const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
 
 import {
-  readContext, checkUsage, adjustSprintSize, createTask,
+  readContext, createTask,
   planSprint, spawnWorkers, waitForResults,
   evaluateResult, isDocTask, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
@@ -128,7 +127,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
@@ -317,100 +315,6 @@ describe('readContext', () => {
   });
 });
 
-describe('checkUsage', () => {
-  it('returns safe default when spawnSync fails', () => {
-    // vi.fn() mock returns undefined → catch → safe defaults
-    const usage = checkUsage(makeConfig());
-    expect(usage.fiveHourPercent).toBe(50);
-    expect(usage.weeklyPercent).toBe(30);
-  });
-
-  it('returns valid ISO timestamp', () => {
-    const usage = checkUsage(makeConfig());
-    expect(usage.measuredAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
-
-  it('returns safe default when status is non-zero', () => {
-    mockedSpawnSync.mockReturnValueOnce({ status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
-    const usage = checkUsage(makeConfig());
-    expect(usage.fiveHourPercent).toBe(50);
-    expect(usage.weeklyPercent).toBe(30);
-  });
-
-  it('returns safe default when stdout is empty', () => {
-    mockedSpawnSync.mockReturnValueOnce({ status: 0, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
-    const usage = checkUsage(makeConfig());
-    expect(usage.fiveHourPercent).toBe(50);
-    expect(usage.weeklyPercent).toBe(30);
-  });
-
-  it('parses 5hr and weekly percentages from output', () => {
-    mockedSpawnSync.mockReturnValueOnce({
-      status: 0,
-      stdout: '5h: 42.5%\nweekly: 18.0%',
-      stderr: '', pid: 0, output: [], signal: null,
-    } as ReturnType<typeof spawnSync>);
-    const usage = checkUsage(makeConfig());
-    expect(usage.fiveHourPercent).toBeCloseTo(42.5);
-    expect(usage.weeklyPercent).toBeCloseTo(18.0);
-  });
-
-  it('falls back to safe defaults for unmatched fields', () => {
-    mockedSpawnSync.mockReturnValueOnce({
-      status: 0,
-      stdout: 'some output without usage numbers',
-      stderr: '', pid: 0, output: [], signal: null,
-    } as ReturnType<typeof spawnSync>);
-    const usage = checkUsage(makeConfig());
-    expect(usage.fiveHourPercent).toBe(50);
-    expect(usage.weeklyPercent).toBe(30);
-  });
-});
-
-describe('adjustSprintSize', () => {
-  const config = makeConfig();
-
-  it('returns full when no thresholds exceeded', () => {
-    const usage: UsageMetrics = { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' };
-    const rec = adjustSprintSize(config, usage);
-    expect(rec.size).toBe('full');
-    expect(rec.maxWorkers).toBe(4);
-    expect(rec.modelConstraint).toBeNull();
-  });
-
-  it('returns reduced when one threshold exceeded', () => {
-    const usage: UsageMetrics = { fiveHourPercent: 85, weeklyPercent: 0, measuredAt: '' };
-    const rec = adjustSprintSize(config, usage);
-    expect(rec.size).toBe('reduced');
-    expect(rec.maxWorkers).toBe(2);
-    expect(rec.modelConstraint).toBe('sonnet');
-  });
-
-  it('returns minimal when both thresholds exceeded', () => {
-    const usage: UsageMetrics = { fiveHourPercent: 85, weeklyPercent: 95, measuredAt: '' };
-    const rec = adjustSprintSize(config, usage);
-    expect(rec.size).toBe('minimal');
-    expect(rec.maxWorkers).toBe(1);
-  });
-
-  it('returns haiku constraint when haiku_allowed and minimal', () => {
-    const haikuConfig = makeConfig({
-      activeModeConfig: { ...makeConfig().activeModeConfig, haiku_allowed: true },
-    });
-    const usage: UsageMetrics = { fiveHourPercent: 85, weeklyPercent: 95, measuredAt: '' };
-    const rec = adjustSprintSize(haikuConfig, usage);
-    expect(rec.modelConstraint).toBe('haiku');
-  });
-
-  it('ensures minWorkers is 1 even with small max_workers', () => {
-    const smallConfig = makeConfig({
-      activeModeConfig: { ...makeConfig().activeModeConfig, max_workers: 1 },
-    });
-    const usage: UsageMetrics = { fiveHourPercent: 85, weeklyPercent: 0, measuredAt: '' };
-    const rec = adjustSprintSize(smallConfig, usage);
-    expect(rec.maxWorkers).toBeGreaterThanOrEqual(1);
-  });
-});
 
 describe('createTask', () => {
   it('creates task with correct ID format', () => {
@@ -1799,13 +1703,6 @@ describe('RunSprintOptions — sandboxMode separation (DEBT-005)', () => {
 
   it('haiku_allowed in config is not conflated with autoApprove in RunSprintOptions', () => {
     // haiku_allowed is a model constraint; autoApprove is a permission flag — no relation
-    const configWithHaiku = makeConfig({
-      activeModeConfig: { ...makeConfig().activeModeConfig, haiku_allowed: true },
-    });
-    // adjustSprintSize uses haiku_allowed for modelConstraint only
-    const usage: UsageMetrics = { fiveHourPercent: 90, weeklyPercent: 90, measuredAt: '' };
-    const rec = adjustSprintSize(configWithHaiku, usage);
-    expect(rec.modelConstraint).toBe('haiku');
     // autoApprove lives in RunSprintOptions — completely separate
     const runOpts: import('../../src/orchestra/brain.js').RunSprintOptions = { autoApprove: false };
     expect(runOpts.autoApprove).toBe(false);

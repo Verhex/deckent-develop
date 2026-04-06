@@ -29,7 +29,6 @@ function makeValidConfig(): DeckentConfig {
         brain_model: 'opus',
         default_model: 'opus',
         haiku_allowed: true,
-        usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
         brain_planning: 'auto',
       },
       max5x_plan: {
@@ -37,7 +36,6 @@ function makeValidConfig(): DeckentConfig {
         brain_model: 'sonnet',
         default_model: 'opus',
         haiku_allowed: true,
-        usage_thresholds: { '5hr': 0.7, weekly: 0.5 },
         brain_planning: 'auto',
       },
       pro_plan: {
@@ -45,7 +43,6 @@ function makeValidConfig(): DeckentConfig {
         brain_model: 'sonnet',
         default_model: 'sonnet',
         haiku_allowed: false,
-        usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
         brain_planning: 'auto',
       },
       api: {
@@ -53,7 +50,6 @@ function makeValidConfig(): DeckentConfig {
         brain_model: 'opus',
         default_model: 'sonnet',
         haiku_allowed: true,
-        usage_thresholds: { '5hr': 1.0, weekly: 1.0 },
         budget_per_sprint: 5.0,
         requires: 'ANTHROPIC_API_KEY',
         brain_planning: 'auto',
@@ -212,18 +208,6 @@ describe('validateConfig', () => {
     const warnings = validateConfig(config);
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toMatch(/high worker count/);
-  });
-
-  it('throws for invalid usage_thresholds.5hr value', () => {
-    const config = makeValidConfig();
-    config.modes.max_plan.usage_thresholds['5hr'] = 1.5;
-    expect(() => validateConfig(config)).toThrow(/usage_thresholds.5hr/);
-  });
-
-  it('throws for invalid usage_thresholds.weekly value', () => {
-    const config = makeValidConfig();
-    config.modes.max_plan.usage_thresholds.weekly = -0.1;
-    expect(() => validateConfig(config)).toThrow(/usage_thresholds.weekly/);
   });
 
   it('throws for invalid brain_planning value', () => {

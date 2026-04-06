@@ -111,7 +111,7 @@ function makeConfig(root: string): ResolvedConfig {
     mode: 'max_plan',
     activeModeConfig: {
       max_workers: 3, brain_model: 'opus', default_model: 'sonnet',
-      haiku_allowed: true, usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
+      haiku_allowed: true,
     },
     modes: {} as ResolvedConfig['modes'],
     language: 'en', projectName: 'test-project', projectRoot: root, version: '0.1.0',

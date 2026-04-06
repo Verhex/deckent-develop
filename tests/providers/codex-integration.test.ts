@@ -45,13 +45,6 @@ describe.skipIf(!codexAvailable)('CodexAdapter Integration (real CLI)', () => {
     expect(['api_key', 'subscription', 'none']).toContain(mode);
   });
 
-  it('should check usage without throwing', async () => {
-    const metrics = await adapter.checkUsage();
-    expect(typeof metrics.fiveHourPercent).toBe('number');
-    expect(typeof metrics.weeklyPercent).toBe('number');
-    expect(typeof metrics.measuredAt).toBe('string');
-  });
-
   it('should build valid exec command', () => {
     const cmd = adapter.buildCommand('gpt-4.1', '/tmp/prompt.txt');
     expect(cmd).toContain('codex exec');

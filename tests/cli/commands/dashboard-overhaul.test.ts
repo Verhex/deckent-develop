@@ -30,7 +30,6 @@ function makeDashboardState(overrides: Partial<DashboardState> = {}): DashboardS
     sprint: { id: 'sprint-057', number: 57, phase: 'EXECUTE', status: 'IN_PROGRESS' as any },
     agents: [],
     progress: { done: 3, active: 2, blocked: 1, total: 6 },
-    usage: { fiveHourPercent: 45, weeklyPercent: 30, measuredAt: new Date().toISOString() },
     alerts: [],
     updatedAt: new Date().toISOString(),
     ...overrides,
@@ -57,13 +56,6 @@ describe('renderDashboard', () => {
     const output = renderDashboard(state);
     expect(output).toContain('3/6 done');
     expect(output).toContain('2 active');
-  });
-
-  it('renders usage metrics (E)', () => {
-    const state = makeDashboardState();
-    const output = renderDashboard(state);
-    expect(output).toContain('5hr=45%');
-    expect(output).toContain('weekly=30%');
   });
 
   it('renders "No alerts." when no alerts', () => {

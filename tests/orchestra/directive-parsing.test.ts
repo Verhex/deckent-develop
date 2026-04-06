@@ -448,10 +448,10 @@ Coverage hedefi: değişen her dosyada minimum %80.
 - Test: config validation, start komutu flag parsing
 - Kapsam: src/core/types.ts, src/cli/commands/start.ts, src/orchestra/tmux.ts, src/orchestra/brain.ts
 
-## Görev 3: checkUsage gerçek entegrasyon (DEBT-002)
+## Görev 3: Config doğrulama entegrasyonu (DEBT-002)
 - Dosya: src/orchestra/brain.ts
-- Sorun: checkUsage her zaman sıfır dönen stub
-- Fix: claude -p "/usage" CLI çıktısını parse et
+- Sorun: Config doğrulama eksik
+- Fix: Zod schema ile config validasyonu ekle
 - Test: mock spawnSync çıktısı ile parsing testleri, hata senaryoları
 - Kapsam: src/orchestra/brain.ts
 
@@ -484,9 +484,9 @@ Coverage hedefi: değişen her dosyada minimum %80.
     expect(tasks[1]?.title).toContain('haiku_allowed');
   });
 
-  it('task 3 title is "checkUsage gerçek entegrasyon (DEBT-002)"', () => {
+  it('task 3 title is "Config doğrulama entegrasyonu (DEBT-002)"', () => {
     const tasks = parseStructuredDirectives(DIRECTIVES_SPRINT2);
-    expect(tasks[2]?.title).toContain('checkUsage');
+    expect(tasks[2]?.title).toContain('Config doğrulama');
   });
 
   it('task 4 title is "Directive parsing iyileştirme (DEBT-003)"', () => {

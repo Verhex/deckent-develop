@@ -7,7 +7,6 @@
  * - waitForResults uses SpawnBackend in processQueue
  * - cleanup uses SpawnBackend list/kill methods
  * - cleanup removes .tasks/.prompt-* hidden tmpfiles
- * - checkUsageWithProvider delegates to ProviderAdapter
  * - getDefaultProvider returns registered provider or null
  * - RunSprintOptions accepts spawnBackend and provider
  * - runSprint creates SpawnBackend via factory when none provided
@@ -16,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TaskStatus, SprintPhase, SprintStatus, AgentStatus } from '../../src/core/types.js';
-import type { Task, Sprint, ResolvedConfig, UsageMetrics } from '../../src/core/types.js';
+import type { Task, Sprint, ResolvedConfig } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
@@ -110,14 +109,6 @@ vi.mock('../../src/core/provider.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../src/core/usage-tracker.js', () => ({
-  UsageTracker: vi.fn().mockImplementation(() => ({
-    recordCall: vi.fn(),
-    getSprintUsage: vi.fn().mockReturnValue({ totalCalls: 0, totalTokens: 0, modelBreakdown: {} }),
-    getTotalUsage: vi.fn().mockReturnValue({ totalCalls: 0, totalTokens: 0, modelBreakdown: {} }),
-  })),
-}));
-
 vi.mock('../../src/orchestra/result-watcher.js', () => ({
   createResultWatcher: vi.fn().mockReturnValue({
     waitForChange: vi.fn().mockResolvedValue(undefined),
@@ -189,9 +180,7 @@ import {
   spawnWorkers,
   waitForResults,
   cleanup,
-  checkUsageWithProvider,
   getDefaultProvider,
-  checkUsage,
   SpawnBackendFactory,
 } from '../../src/orchestra/brain.js';
 
@@ -207,7 +196,6 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
       brain_model: 'opus',
       default_model: 'sonnet',
       haiku_allowed: false,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.9 },
     },
     modes: {} as never,
     language: 'en',
@@ -265,20 +253,13 @@ function makeMockBackend(): SpawnBackend & {
   };
 }
 
-function makeMockProvider(usageOverride?: Partial<UsageMetrics>): ProviderAdapter {
-  const usage: UsageMetrics = {
-    fiveHourPercent: 25,
-    weeklyPercent: 15,
-    measuredAt: new Date().toISOString(),
-    ...usageOverride,
-  };
+function makeMockProvider(): ProviderAdapter {
   return {
     name: 'mock-provider',
     supportedModels: ['opus', 'sonnet', 'haiku'] as const,
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue(usage),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue('claude -p -'),
   };
@@ -300,29 +281,6 @@ beforeEach(() => {
 });
 
 // ═══ Tests ═══════════════════════════════════════════════════════════
-
-describe('checkUsageWithProvider', () => {
-  it('delegates to provider.checkUsage()', async () => {
-    const provider = makeMockProvider({ fiveHourPercent: 42, weeklyPercent: 18 });
-    const result = await checkUsageWithProvider(provider);
-    expect(provider.checkUsage).toHaveBeenCalledOnce();
-    expect(result.fiveHourPercent).toBe(42);
-    expect(result.weeklyPercent).toBe(18);
-  });
-
-  it('returns provider usage metrics', async () => {
-    const provider = makeMockProvider({ fiveHourPercent: 75, weeklyPercent: 60 });
-    const result = await checkUsageWithProvider(provider);
-    expect(result).toMatchObject({ fiveHourPercent: 75, weeklyPercent: 60 });
-    expect(result.measuredAt).toBeDefined();
-  });
-
-  it('propagates provider errors', async () => {
-    const provider = makeMockProvider();
-    vi.mocked(provider.checkUsage).mockRejectedValue(new Error('Provider unavailable'));
-    await expect(checkUsageWithProvider(provider)).rejects.toThrow('Provider unavailable');
-  });
-});
 
 describe('getDefaultProvider', () => {
   it('returns null when no provider is registered', () => {
@@ -435,7 +393,7 @@ describe('spawnWorkers with SpawnBackend', () => {
       makeTask({ id: '001-003' }),
     ];
     const sprint = makeSprint({ tasks });
-    const config = makeConfig({ activeModeConfig: { max_workers: 2, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, usage_thresholds: { '5hr': 0.8, weekly: 0.9 } } });
+    const config = makeConfig({ activeModeConfig: { max_workers: 2, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false } });
 
     const queued = spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 
@@ -553,37 +511,3 @@ describe('SpawnBackendFactory re-export', () => {
   });
 });
 
-describe('checkUsage (existing sync implementation)', () => {
-  beforeEach(() => {
-    // Restore provider mock so resolveDefaultUsageCli() returns 'claude'
-    vi.mocked(providerRegistry.getDefault).mockReturnValue({
-      name: 'claude',
-      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
-      checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 10, measuredAt: new Date().toISOString() }),
-      isAvailable: vi.fn().mockResolvedValue(true),
-    } as never);
-  });
-
-  it('returns safe defaults when spawnSync fails', () => {
-    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: 'error', pid: 1, signal: null, output: [] } as never);
-    const config = makeConfig();
-    const result = checkUsage(config);
-    expect(result.fiveHourPercent).toBe(50);
-    expect(result.weeklyPercent).toBe(30);
-  });
-
-  it('parses 5hr percentage from claude output', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: '5hr: 65.3% used\nweekly: 40.0% used',
-      stderr: '',
-      pid: 1,
-      signal: null,
-      output: [],
-    } as never);
-    const config = makeConfig();
-    const result = checkUsage(config);
-    expect(result.fiveHourPercent).toBe(65.3);
-    expect(result.weeklyPercent).toBe(40.0);
-  });
-});

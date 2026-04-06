@@ -269,22 +269,6 @@ describe('validatePartialConfig', () => {
     ).toThrow(ConfigValidationError);
   });
 
-  it('rejects threshold 5hr=1.5', () => {
-    expect(() =>
-      validatePartialConfig({
-        modes: {
-          max_plan: {
-            ...getDefaultModes().max_plan,
-            usage_thresholds: { '5hr': 1.5, weekly: 0.6 },
-          },
-          max5x_plan: getDefaultModes().max5x_plan,
-          pro_plan: getDefaultModes().pro_plan,
-          api: getDefaultModes().api,
-        },
-      }),
-    ).toThrow(ConfigValidationError);
-  });
-
   it('accepts max_workers="auto"', () => {
     expect(() =>
       validatePartialConfig({

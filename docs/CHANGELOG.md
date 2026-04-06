@@ -6,6 +6,17 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint90] - 2026-04-06
+
+
+### Changed
+
+- src/ Artık Temizliği — MCP Help, Server, Dashboard, Sprint Types (completed with tech debt)
+- Dokümantasyon + README Artık Temizliği (completed with tech debt)
+
+
+_Tasks: 3 total, 2 done, 2 tech debt, 1 no-go_
+
 ## [0.3.0-beta.3-sprint89] - 2026-04-06
 
 
@@ -969,7 +980,7 @@ _Görevler: 16 toplam, 16 tamamlanan, 0 teknik borç, 0 no-go — +258 test (781
 ### Added
 - **sprint-controller.ts**: brain.ts'den çıkarılan sprint yaşam döngüsü yönetimi
 - **result-evaluator.ts**: brain.ts'den çıkarılan görev sonuç değerlendirme mantığı
-- **usage-manager.ts**: brain.ts'den çıkarılan kullanım takibi ve bütçe yönetimi
+- **Kullanım yöneticisi modülü**: brain.ts'den çıkarılan kullanım takibi ve bütçe yönetimi *(Sprint 089'da kaldırıldı)*
 - **Tip Modülleri**: types.ts → task-types, config-types, monitoring-types, sprint-types + barrel olarak bölündü
 
 ### Changed
@@ -1175,7 +1186,7 @@ _Görevler: 17 toplam, 14 tamamlanan, 7 teknik borç, 3 no-go_
 - **Provider Soyutlama**: ProviderAdapter arayüzü, ProviderRegistry singleton, ClaudeAdapter
 - **SpawnBackend Soyutlama**: TmuxBackend, SubprocessBackend, SpawnBackendFactory (yapılandırma-güdümlü)
 - **Subprocess Backend**: child_process.spawn ile worker'lar — tmux artık gerekli değil
-- **Kullanım Takibi**: .deckent/usage/'da sprint tabanlı JSON depolama ile UsageTracker sınıfı
+- **Kullanım Takibi**: Sprint tabanlı JSON depolama ile kullanım takip sınıfı *(Sprint 089'da kaldırıldı)*
 - **Coverage Doğrulama**: %5 eşik ile parseCoverageFromVitest, validateCoverage
 - **Geri Alma Mekanizması**: Git güvenlik noktaları (deckent-backup-{sprintId}), tüm NO_GO'larda otomatik geri alma
 - **Worker IPC**: process.send tabanlı iletişim için WorkerChannel + ChannelRegistry
@@ -1352,7 +1363,7 @@ _Görevler: 17 toplam, 14 tamamlanan, 7 teknik borç, 3 no-go_
 - **`deckent_sync`** MCP aracı (10. araç): MCP üzerinden aynı işlevsellik
 - **`deckent://config`** MCP kaynağı (5. kaynak): MCP üzerinden proje yapılandırmasını oku
 - **Kendi kendini barındırma**: deckent-dev artık kendi `.deckent/` yapısını çalıştırıyor (config, workspace, i18n, plugins)
-- **DEBT-002 kapatıldı**: checkUsage sprint-003'te çözüldü, borç kaydı resmileştirildi
+- **DEBT-002 kapatıldı**: Kullanım kontrolü sprint-003'te çözüldü, Sprint 089'da kaldırıldı
 - **Test paketi**: 967 test (+29 yeni), %97.5 coverage, 0 regresyon
 
 ## [0.1.0-sprint12-13] - 2026-03-18
@@ -1456,7 +1467,7 @@ _Görevler: 17 toplam, 14 tamamlanan, 7 teknik borç, 3 no-go_
 ### Fixed
 
 - **haiku_allowed**: Semantik düzeltme (true = haiku düşürme seçeneği olarak izinli)
-- **checkUsage regex**: Kullanım yüzdesi ayrıştırma düzeltildi
+- **Kullanım yüzdesi regex**: Kullanım yüzdesi ayrıştırma düzeltildi *(Sprint 089'da kaldırıldı)*
 
 ### Added
 
