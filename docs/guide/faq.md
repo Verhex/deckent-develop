@@ -78,12 +78,11 @@ Yes. You can run `deckent init --force-reconfigure` to update your plan tier wit
 
 ### What if I run out of tokens?
 
-Deckent includes a **usage monitor** (`deckent usage`) that tracks token consumption. If you exceed your monthly budget, you can:
+If you exceed your monthly budget, you can:
 
 1. Pause the current sprint: `deckent pause`
-2. Check usage: `deckent usage`
-3. Review DIRECTIVES.md and reduce task scope
-4. Resume: `deckent resume`
+2. Review DIRECTIVES.md and reduce task scope
+3. Resume: `deckent resume`
 
 ---
 
@@ -372,8 +371,7 @@ For teams managing multiple projects:
 
 1. **Global config** — `deckent onboard` sets up your default Claude plan, model preferences, and team settings once
 2. **Project-local config** — Each project has its own `.deckent/config.json` with project-specific settings
-3. **Monitoring** — Use `deckent usage` to track token burn across projects
-4. **Coordination** — Document which projects are in active sprints to avoid quota contention
+3. **Coordination** — Document which projects are in active sprints to avoid quota contention
 
 ### Example Team Setup
 

@@ -2,7 +2,7 @@
   "mode": "max_plan",
   "language": "tr",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-093",
+  "last_sprint_id": "sprint-094",
   "spawn_backend": "tmux",
   "modes": {
     "max_plan": {

@@ -14,11 +14,13 @@ import { TaskEvaluation } from '../../src/core/task-types.js';
 import type { Sprint } from '../../src/core/sprint-types.js';
 import type { LearningConfig } from '../../src/core/decision-config.js';
 
-// Mock fs to avoid real file I/O
+// In-memory fs store — captures writeFileSync data and replays via readFileSync
+const fsStore = new Map<string, string>();
+
 vi.mock('fs', () => ({
-  existsSync: vi.fn().mockReturnValue(false),
-  readFileSync: vi.fn().mockReturnValue('{}'),
-  writeFileSync: vi.fn(),
+  existsSync: vi.fn().mockImplementation((p: string) => fsStore.has(p)),
+  readFileSync: vi.fn().mockImplementation((p: string) => fsStore.get(p) ?? '{}'),
+  writeFileSync: vi.fn().mockImplementation((p: string, data: string) => { fsStore.set(p, data); }),
   mkdirSync: vi.fn(),
   cpSync: vi.fn(),
   readdirSync: vi.fn().mockReturnValue([]),
@@ -111,6 +113,7 @@ describe('Evolution Pipeline Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    fsStore.clear();
     tracker = new OutcomeTracker('/tmp/test-evo');
   });
 
@@ -532,6 +535,334 @@ describe('Evolution Pipeline Integration', () => {
       const recency = defaultTracker.calculateSprintRecencyBonuses();
       // Default sprintRecencySuccessBonus = 3
       expect(recency.get('typescript-expert')).toBe(3);
+    });
+  });
+
+  // ── Scenario 7: getWorstCombinations ──────────────────────────────────
+
+  describe('Scenario 7: getWorstCombinations', () => {
+    it('returns empty string when no sprints recorded', () => {
+      expect(tracker.getWorstCombinations()).toBe('');
+    });
+
+    it('returns empty string when combos have fewer than MIN_COMB_SAMPLES', () => {
+      for (let i = 0; i < 2; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `task-${i}`,
+          sprintId: 'sprint-001',
+          evaluation: 'NO_GO',
+        }));
+      }
+      expect(tracker.getWorstCombinations()).toBe('');
+    });
+
+    it('returns formatted worst combinations', () => {
+      for (let i = 0; i < 4; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `fail-${i}`,
+          sprintId: 'sprint-001',
+          agentId: 'bug-fixer',
+          skillIds: ['typescript-expert'],
+          evaluation: 'NO_GO',
+        }));
+      }
+
+      const result = tracker.getWorstCombinations(5);
+      expect(result).toContain('agent:bug-fixer');
+      expect(result).toContain('skill:typescript-expert');
+      expect(result).toContain('%0');
+      expect(result).toContain('4 task');
+    });
+
+    it('sorts by success rate ascending and respects limit', () => {
+      // Pair A: 1 success, 3 failures → 25%
+      for (let i = 0; i < 4; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `a-${i}`,
+          sprintId: 'sprint-001',
+          agentId: 'agent-a',
+          skillIds: ['skill-a'],
+          evaluation: i === 0 ? 'DONE' : 'NO_GO',
+        }));
+      }
+      // Pair B: 3 successes, 1 failure → 75%
+      for (let i = 0; i < 4; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `b-${i}`,
+          sprintId: 'sprint-001',
+          agentId: 'agent-b',
+          skillIds: ['skill-b'],
+          evaluation: i === 3 ? 'NO_GO' : 'DONE',
+        }));
+      }
+
+      const result = tracker.getWorstCombinations(1);
+      expect(result.split('\n').length).toBe(1);
+      expect(result).toContain('agent:agent-a');
+    });
+
+    it('skips generic agent outcomes', () => {
+      for (let i = 0; i < 4; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `gen-${i}`,
+          sprintId: 'sprint-001',
+          agentId: 'generic',
+          skillIds: ['skill-x'],
+          evaluation: 'NO_GO',
+        }));
+      }
+      expect(tracker.getWorstCombinations()).toBe('');
+    });
+  });
+
+  // ── Scenario 8: GO_WITH_TECH_DEBT counts as success ─────────────────────
+
+  describe('Scenario 8: GO_WITH_TECH_DEBT counts as success', () => {
+    it('treats GO_WITH_TECH_DEBT as success in performance tracking', () => {
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `debt-${i}`,
+          evaluation: 'GO_WITH_TECH_DEBT',
+        }));
+      }
+
+      const learnings = tracker.getLearnings();
+      const perf = learnings.agentPerformance['bug-fixer']!;
+      expect(perf.successCount).toBe(6);
+      expect(perf.failCount).toBe(0);
+      expect(perf.successRate).toBe(1);
+    });
+  });
+
+  // ── Scenario 9: sprint recency edge cases ───────────────────────────────
+
+  describe('Scenario 9: sprint recency edge cases', () => {
+    it('returns +1 for mostly successful (≥75%)', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-recency', {
+        minSamplesForBonus: 3,
+      });
+      customTracker.recordOutcome(makeOutcome({ taskId: 't1', sprintId: 'sprint-001', evaluation: 'DONE', skillIds: ['skill-r'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't2', sprintId: 'sprint-001', evaluation: 'DONE', skillIds: ['skill-r'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't3', sprintId: 'sprint-002', evaluation: 'DONE', skillIds: ['skill-r'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't4', sprintId: 'sprint-002', evaluation: 'NO_GO', skillIds: ['skill-r'] }));
+
+      const recency = customTracker.calculateSprintRecencyBonuses();
+      expect(recency.get('skill-r')).toBe(1);
+    });
+
+    it('returns -1 for mostly failed (<35%)', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-recency-fail', {
+        minSamplesForBonus: 3,
+      });
+      customTracker.recordOutcome(makeOutcome({ taskId: 't1', sprintId: 'sprint-001', evaluation: 'DONE', skillIds: ['skill-f'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't2', sprintId: 'sprint-001', evaluation: 'NO_GO', skillIds: ['skill-f'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't3', sprintId: 'sprint-002', evaluation: 'NO_GO', skillIds: ['skill-f'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't4', sprintId: 'sprint-002', evaluation: 'NO_GO', skillIds: ['skill-f'] }));
+
+      const recency = customTracker.calculateSprintRecencyBonuses();
+      expect(recency.get('skill-f')).toBe(-1);
+    });
+
+    it('returns no bonus for mixed rate (35-75%)', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-recency-mixed', {
+        minSamplesForBonus: 3,
+      });
+      customTracker.recordOutcome(makeOutcome({ taskId: 't1', sprintId: 'sprint-001', evaluation: 'DONE', skillIds: ['skill-m'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't2', sprintId: 'sprint-001', evaluation: 'NO_GO', skillIds: ['skill-m'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't3', sprintId: 'sprint-002', evaluation: 'DONE', skillIds: ['skill-m'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't4', sprintId: 'sprint-002', evaluation: 'NO_GO', skillIds: ['skill-m'] }));
+
+      const recency = customTracker.calculateSprintRecencyBonuses();
+      expect(recency.has('skill-m')).toBe(false);
+    });
+
+    it('returns empty map when fewer than 2 sprints', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-recency-one');
+      customTracker.recordOutcome(makeOutcome({ taskId: 't1', sprintId: 'sprint-001', skillIds: ['skill-x'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't2', sprintId: 'sprint-001', skillIds: ['skill-x'] }));
+      customTracker.recordOutcome(makeOutcome({ taskId: 't3', sprintId: 'sprint-001', skillIds: ['skill-x'] }));
+
+      const recency = customTracker.calculateSprintRecencyBonuses();
+      expect(recency.size).toBe(0);
+    });
+  });
+
+  // ── Scenario 10: synergy conflict path ──────────────────────────────────
+
+  describe('Scenario 10: synergy conflict → exclusion rules', () => {
+    it('generates exclusion rules for skill-skill conflict', () => {
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `conflict-${i}`,
+          agentId: null,
+          skillIds: ['skill-x', 'skill-y'],
+          evaluation: i === 0 ? 'DONE' : 'NO_GO',
+        }));
+      }
+
+      const synergy = tracker.getSynergyMatrix();
+      const pair = synergy.find(e => e.pair === 'skill-x+skill-y');
+      expect(pair).toBeDefined();
+      expect(pair!.verdict).toBe('conflict');
+
+      const evolver = new RuleEvolver(tracker);
+      const result = evolver.evolveRules();
+
+      const exclusions = result.newRules.filter(
+        r => r.type === 'exclusion' && r.evidence.includes('skill-y'),
+      );
+      expect(exclusions.length).toBeGreaterThan(0);
+      expect(result.reasoning.some(r => r.includes('Conflict detected'))).toBe(true);
+    });
+
+    it('does not generate synergy rules for agent+skill pairs', () => {
+      for (let i = 0; i < 10; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `as-${i}`,
+          agentId: 'bug-fixer',
+          skillIds: ['typescript-expert'],
+          evaluation: 'DONE',
+        }));
+      }
+
+      const evolver = new RuleEvolver(tracker);
+      const result = evolver.evolveRules();
+
+      const synergyRules = result.newRules.filter(r =>
+        r.evidence.includes('co-uses') && r.entityId === 'bug-fixer',
+      );
+      expect(synergyRules).toEqual([]);
+    });
+  });
+
+  // ── Scenario 11: promote/demote execution ───────────────────────────────
+
+  describe('Scenario 11: promote and demote execution', () => {
+    it('promote returns false when temp entity not found', () => {
+      const pipeline = new PromotionPipeline('/tmp/test-promote');
+      expect(pipeline.promote('nonexistent-agent', 'agent')).toBe(false);
+      expect(pipeline.promote('nonexistent-skill', 'skill')).toBe(false);
+    });
+
+    it('demote returns false when manifest not found', () => {
+      const pipeline = new PromotionPipeline('/tmp/test-demote');
+      expect(pipeline.demote('nonexistent-agent', 'agent')).toBe(false);
+      expect(pipeline.demote('nonexistent-skill', 'skill')).toBe(false);
+    });
+
+    it('evaluateDemotions returns empty for entities below minTasks', () => {
+      recordSuccesses(tracker, 2);
+      const pipeline = new PromotionPipeline('/tmp/test-demote-threshold');
+      const demotions = pipeline.evaluateDemotions(tracker);
+      expect(demotions).toEqual([]);
+    });
+
+    it('evaluateDemotions returns nothing for entities with acceptable fail rate', () => {
+      recordSuccesses(tracker, 8);
+      recordFailures(tracker, 2);
+
+      const pipeline = new PromotionPipeline('/tmp/test-demote-ok');
+      const demotions = pipeline.evaluateDemotions(tracker);
+      const agentDemotion = demotions.find(d => d.entityId === 'bug-fixer');
+      expect(agentDemotion).toBeUndefined();
+    });
+  });
+
+  // ── Scenario 12: buildSkillPerformance fallback ─────────────────────────
+
+  describe('Scenario 12: buildSkillPerformance fallback to task.assignedSkills', () => {
+    it('uses task.assignedSkills when skillMap is not provided', () => {
+      const sprint = makeSprint([
+        { id: 'task-001', skills: ['typescript-expert'] },
+        { id: 'task-002', skills: ['testing-expert'] },
+      ]);
+
+      const evaluations = new Map<string, TaskEvaluation>([
+        ['task-001', TaskEvaluation.DONE],
+        ['task-002', TaskEvaluation.DONE],
+      ]);
+
+      const rows = buildSkillPerformance(sprint, evaluations);
+      expect(rows.length).toBe(2);
+
+      const tsRow = rows.find(r => r.skill === 'typescript-expert');
+      expect(tsRow).toBeDefined();
+      expect(tsRow!.tasks).toBe(1);
+      expect(tsRow!.done).toBe(1);
+    });
+
+    it('computes avgCoverage from results when provided', () => {
+      const sprint = makeSprint([
+        { id: 'task-001', skills: ['typescript-expert'] },
+        { id: 'task-002', skills: ['typescript-expert'] },
+      ]);
+
+      const evaluations = new Map<string, TaskEvaluation>([
+        ['task-001', TaskEvaluation.DONE],
+        ['task-002', TaskEvaluation.DONE],
+      ]);
+
+      const results = [
+        { taskId: 'task-001', coverage: 80 },
+        { taskId: 'task-002', coverage: 100 },
+      ] as any[];
+
+      const rows = buildSkillPerformance(sprint, evaluations, undefined, results);
+      const tsRow = rows.find(r => r.skill === 'typescript-expert');
+      expect(tsRow).toBeDefined();
+      expect(tsRow!.avgCoverage).toBe(90);
+    });
+  });
+
+  // ── Scenario 13: intent-specific bonus delta paths ──────────────────────
+
+  describe('Scenario 13: intent-specific bonus delta paths', () => {
+    it('returns positive intent-specific bonus when delta > 0.15', () => {
+      const bugDNA = makeDNA('bugfix');
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `bug-${i}`,
+          taskDNA: bugDNA,
+          evaluation: 'DONE',
+        }));
+      }
+      const implDNA = makeDNA('implementation');
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `impl-${i}`,
+          taskDNA: implDNA,
+          evaluation: 'NO_GO',
+        }));
+      }
+
+      const bonuses = tracker.calculateBonuses(bugDNA);
+      const agentBonus = bonuses.find(b => b.entityId === 'bug-fixer');
+      expect(agentBonus).toBeDefined();
+      expect(agentBonus!.bonus).toBeGreaterThan(0);
+    });
+
+    it('returns negative intent-specific bonus when delta < -0.15', () => {
+      const bugDNA = makeDNA('bugfix');
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `bug-${i}`,
+          taskDNA: bugDNA,
+          evaluation: 'DONE',
+        }));
+      }
+      const implDNA = makeDNA('implementation');
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({
+          taskId: `impl-${i}`,
+          taskDNA: implDNA,
+          evaluation: 'NO_GO',
+        }));
+      }
+
+      const bonuses = tracker.calculateBonuses(implDNA);
+      const agentBonus = bonuses.find(b => b.entityId === 'bug-fixer');
+      expect(agentBonus).toBeDefined();
+      expect(agentBonus!.bonus).toBeLessThan(0);
     });
   });
 

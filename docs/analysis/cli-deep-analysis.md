@@ -512,50 +512,7 @@ deckent cleanup [--decay]
 
 ---
 
-## 8. `deckent usage`
-
-### Komut Tanımı
-```
-deckent usage [--json] [--sprint <id>]
-```
-
-### Veri Kaynağı
-`.deckent/usage/{sprintId}.json` — Her sprint için ayrı JSON, `UsageEntry[]` dizisi.
-
-### Veri Kaydı
-
-| Yer | Tetik | Token Tahmini |
-|-----|-------|---------------|
-| spawnWorkers | Worker spawn | 5,000 (sabit) |
-| evaluateResult | Task eval | 2,000 (sabit) |
-| Timeout result | Worker cevapsız | 1,000 (sabit) |
-
-**Gerçek token sayısı ölçülmüyor.**
-
-### Auth Mode → Maliyet Sütunu
-
-`api` → maliyet gösterilir (opus: $0.015/1K, sonnet: $0.003/1K, haiku: $0.00025/1K)
-`subscription` → maliyet gizli
-
-### Kaynak Dosyalar
-- *(Kullanım CLI/takip modülleri Sprint 089'da kaldırıldı)*
-
-### Geliştirme Önerileri
-
-1. **[DONE] Token Tahminleri Sabit ve Yanlış** — Gerçek kullanımla alakası yok. Claude CLI'dan gerçek token bilgisi alınabilir. *Sprint 057: `MODEL_TOKEN_ESTIMATES` model bazlı (opus ~15K, sonnet ~8K, haiku ~3K), `estimateTokens()` prompt boyutuna göre ayarlama yapıyor.*
-2. **[DONE] recordCall Race Condition** — Concurrent write → last-write-wins, entry kaybı. File lock veya append-only. *Sprint 057: `appendFileSync` ile JSONL append-only format, `recordCallAppendOnly()` metodu eklendi.*
-3. **[DONE] Canlı Usage (5hr/weekly) Gösterilmiyor** — Rate limit durumu yok. *Sprint 063: 5hr/weekly rate limit durumu gösteriliyor, `formatLiveUsage()` eklendi.*
-4. **[DONE] Maliyet Fiyatları Stale** — Hardcode, API fiyat değişiklikleri yansımaz. *Sprint 057: `DEFAULT_TOKEN_COSTS` export ediliyor, `usage.ts` override desteği (`getTokenCosts()`) ile configurable.*
-5. **[DONE] Usage Dosyaları Hiç Temizlenmiyor** — Sonsuza kadar birikir. *Sprint 057: `archiveOldSprints(retentionCount)` ile configurable retention, eski sprint dosyaları arşivleniyor.*
-6. **[DONE] `--since` / `--last` Filtre Yok**. *Sprint 057: `--since <date>` ve `--last <n>` flag'leri eklendi.*
-7. **[DONE] Subscription Modda Faydasız** — Rate limit bilgisi gösterilmeli. *Sprint 063: Subscription plan bilgisi ve rate limit uyarısı eklendi.*
-8. **[DONE] Sprint Arası Karşılaştırma Yok** — Trend/insight yok. *Sprint 057: `formatTrendLine()` ile sprint arası token/call trend'i gösteriliyor.*
-9. **[DONE] Task-Level Granularity Yok** — Hangi task en çok harcadı gösterilmiyor. *Sprint 057: `--verbose` flag ile `taskBreakdown` tablosu gösteriliyor.*
-10. **[DONE] Provider Ayrımı Yok** — Aynı model farklı provider'dan gelebilir, maliyet farklı. *Sprint 057: `providerBreakdown` sütunu eklendi, provider bazlı token/call ayrımı.*
-
----
-
-## 9. `deckent history`
+## 8. `deckent history`
 
 ### Komut Tanımı
 ```

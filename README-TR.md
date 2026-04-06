@@ -267,7 +267,6 @@ deckent doctor
 | `deckent doctor` | Sistem sağlığını kontrol et |
 | `deckent config` | Yapılandırmayı göster/düzenle |
 | `deckent config set <key> <value>` | Bir yapılandırma değerini ayarla |
-| `deckent usage` | Mevcut plan kullanımını göster |
 | `deckent history` | Sprint geçmişini ve metrikleri göster |
 | `deckent plugin install <name>` | Bir plugin kur |
 | `deckent plugin list` | Kurulu plugin'leri listele |

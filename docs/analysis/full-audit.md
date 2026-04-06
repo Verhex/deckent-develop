@@ -1214,8 +1214,7 @@ Publish öncesi yapılması gereken tüm manuel testler:
 | 7 | Start --dry-run | `deckent start --dry-run` | planSprint çağrılır, spawn yok |
 | 8 | Doctor kontrol | `deckent doctor` | Sağlık kontrolleri çalışır |
 | 9 | Config göster | `deckent config` | Mevcut yapılandırma görüntülenir |
-| 10 | Usage göster | `deckent usage` | Token kullanım metrikleri |
-| 11 | History göster | `deckent history` | Sprint geçmişi |
+| 10 | History göster | `deckent history` | Sprint geçmişi |
 | 12 | Analyze proje | `deckent analyze` | Proje analizi raporu |
 | 13 | Cleanup | `deckent cleanup` | Task dosyaları temizlenir |
 | 14 | Review | `deckent review` | Task sonuçları incelenir |

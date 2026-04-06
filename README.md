@@ -265,7 +265,6 @@ Output:
 | `deckent doctor` | Check system health |
 | `deckent config` | Show/edit configuration |
 | `deckent config set <key> <value>` | Set a config value |
-| `deckent usage` | Show current plan usage |
 | `deckent history` | Show sprint history and metrics |
 | `deckent plugin install <name>` | Install a plugin |
 | `deckent plugin list` | List installed plugins |

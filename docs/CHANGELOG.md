@@ -6,6 +6,22 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint94] - 2026-04-06
+
+
+### Changed
+
+- Fix debt: Tech debt from 091-006-fix: Quality Score Routing Bonus entegrasyonu zaten tam o (completed with tech debt)
+- Usage Son Kalıntı Temizliği — README CLI Tablosu (completed with tech debt)
+- Stats Sync Doğrulama Notu (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 091-007-fix: Integration test file created with 26 tests across 7
+
+
+_Tasks: 4 total, 4 done, 3 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint93] - 2026-04-06
 
 ### Added

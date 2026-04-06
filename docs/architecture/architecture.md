@@ -126,7 +126,6 @@ src/
 │   │   ├── sync.ts          ← deckent sync — memory sync
 │   │   ├── analyze.ts       ← deckent analyze — project analysis
 │   │   ├── upgrade.ts       ← deckent upgrade — self-update
-│   │   ├── usage.ts         ← deckent usage — token/cost report
 │   │   ├── config.ts        ← deckent config — config management
 │   │   ├── archive-debt.ts  ← deckent archive-debt
 │   │   ├── run.ts           ← deckent run — task runner

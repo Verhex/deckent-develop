@@ -78,7 +78,6 @@ describe('docs/reference/cli.md', () => {
   it('documents monitoring commands', () => {
     expect(content).toContain('`deckent watch`');
     expect(content).toContain('`deckent dashboard`');
-    expect(content).toContain('`deckent usage`');
     expect(content).toContain('`deckent history`');
     expect(content).toContain('`deckent analyze`');
   });

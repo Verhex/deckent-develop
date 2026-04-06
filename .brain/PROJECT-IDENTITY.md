@@ -21,7 +21,7 @@
 - **agents/** (16 modules): Worker execution, prompt engineering
 - **providers/** (5 modules): Claude, Codex, Gemini adapters
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
-- **mcp/**: MCP server — 18 tools + 8 resources, stdio transport
+- **mcp/**: MCP server — 18 tools + 8 resources, stdio transport (verified sprint-093)
 - **cli/** (33 commands): Full CLI with helpers, entry point
 - **dashboard/**: React + Vite + Tailwind (4 pages, SSE indicator, language switcher)
   - i18n/LanguageProvider.tsx, i18n/en.ts (~282 keys), i18n/tr.ts (~282 keys)
@@ -30,9 +30,9 @@
 ## Current State
 - Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-093
-- Total Sprints: 93
-- Completed Tasks: 251
+- Last Sprint: sprint-094
+- Total Sprints: 94
+- Completed Tasks: 255
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -97,6 +97,13 @@
 - ConfigPage i18n: 79 yeni key, fieldT() helper, TR/EN tam geçiş
 - Canlı veri test suite: 41 test (SSE, WorkerCard, ActivityFeed, SprintPhaseTimeline)
 - Build otomasyon: build:dashboard, build:all, postbuild npm scripts
+
+## Sprint 093-094 Achievements (Stats Sync + RETRO Skill Tablosu + Sprint Bildirim)
+- Agent/Skill Stats Sync (V2→manifest): finalizeSprint() artık agent.json ve manifest.json stats'larını güncelliyor (totalUses, successRate, avgQualityScore, qualityTaskCount)
+- RETRO.md Skill Performance tablosu: buildSkillPerformance() guard fix — skillMap boş/undefined durumunda güvenli fallback
+- avgQualityScore persist fix: EntityPerformance'a qualityTaskCount eklendi, formül düzeltildi
+- Sprint bitişinde otomatik output: finalizeSprint() sonunda .deckent/jobs/{sprintId}.json yazılıyor (Job Completion Notification)
+- Sprint 094: Stats Sync doğrulama + Usage son kalıntı temizliği (docs/reference/cli.md)
 
 ## Sprint 087-088 Achievements (Stabilizasyon + Otonom Adaptasyon + Perfect Beta)
 - Sprint 087 Stabilizasyon: Otonom adaptasyon, self-improvement, öğrenme döngüsü kapatma
