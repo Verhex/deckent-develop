@@ -422,14 +422,6 @@ Deckent'in Worker'ları dinamik olarak başlatıp sonlandırdığı terminal ço
 
 ---
 
-## U
-
-### usage-aware planning
-Brain'in sprint boyutunu belirlemeden önce Claude planının mevcut kullanımını kontrol etme zorunluluğu; sprint hiçbir zaman yarıda bırakılmaz.
-**Blueprint §9** — "Usage-Aware Planning"
-
----
-
 ## V
 
 ### Verhex

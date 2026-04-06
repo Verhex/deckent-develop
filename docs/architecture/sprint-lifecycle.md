@@ -362,9 +362,9 @@ Phase 4 produces NO_GO tasks
 **What happens:**
 
 1. **Count brain lines** — `countBrainLines(projectRoot)` totals lines across all `.brain/` files
-2. **Decay triggers when:** total > `BRAIN_TOTAL_LINE_BUDGET` (600 lines)
+2. **Decay triggers when:** total > `BRAIN_TOTAL_LINE_BUDGET` (900 lines)
 3. **Decay actions:**
-   - `MEMORY.md` trimmed to `MEMORY_MAX_LINES` (200 lines)
+   - `MEMORY.md` trimmed to `MEMORY_MAX_LINES` (300 lines)
    - `RETRO.md` trimmed to `RETRO_MAX_LINES` (100 lines)
    - Old sprint logs archived to `.brain/archive/`
    - Stale entries pruned from `PATTERNS.md`
@@ -487,7 +487,7 @@ User writes DIRECTIVES.md
          │
          ▼
   ┌─────────────┐
-  │  Phase 7    │  countBrainLines() → if > 600: runDecay()
+  │  Phase 7    │  countBrainLines() → if > 900: runDecay()
   │    DECAY    │  trim MEMORY.md, RETRO.md, archive old sprint logs
   │             │
   └──────┬──────┘
@@ -554,10 +554,10 @@ All constants are defined in `src/core/constants.ts`:
 
 | Constant | Value | Used In |
 |----------|-------|---------|
-| `MEMORY_MAX_LINES` | 200 | Phase 7: MEMORY.md trim |
+| `MEMORY_MAX_LINES` | 300 | Phase 7: MEMORY.md trim |
 | `RETRO_MAX_LINES` | 100 | Phase 6/7: RETRO.md trim |
 | `SPRINT_LOG_MAX_LINES` | 80 | Phase 6: sprint log |
-| `BRAIN_TOTAL_LINE_BUDGET` | 600 | Phase 7: decay trigger |
+| `BRAIN_TOTAL_LINE_BUDGET` | 900 | Phase 7: decay trigger |
 | `MEMORY_DECAY_SPRINTS` | — | Phase 7: MEMORY.md rotation |
 | `DEBT_HIGH_PRIORITY_SPRINTS` | 2 | Phase 5: debt escalation |
 | `DEBT_CRITICAL_SPRINTS` | 3 | Phase 5: debt escalation |

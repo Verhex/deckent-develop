@@ -210,6 +210,6 @@ See the full [Config Reference](/reference/config) for all available parameters.
 
 - [Core Concepts](/guide/concepts) -- Understand Sprint, Task, Agent, Brain, Auditor
 - [Your First Sprint](/guide/first-sprint) -- Detailed walkthrough with examples
-- [CLI Reference](/reference/cli) -- All 33 commands documented
+- [CLI Reference](/reference/cli) -- All 34+ commands documented
 - [Config Reference](/reference/config) -- Every configuration option explained
 - [Architecture](/guide/architecture) -- How the system works under the hood

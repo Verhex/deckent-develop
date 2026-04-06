@@ -42,14 +42,14 @@ type ModelType  = 'opus' | 'sonnet' | 'haiku';
 type TaskEffort = 'low' | 'normal' | 'high';
 type TaskPriority = 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW';
 type AgentRole    = 'brain' | 'auditor' | 'worker';
-type PlanMode     = 'max_plan' | 'max5x_plan' | 'pro_plan' | 'api';
+type PlanMode     = 'performance' | 'balanced' | 'economic' | 'api';
+// Legacy aliases (still accepted): max_plan → performance, max5x_plan → balanced, pro_plan → economic
 type SelfAssessment = 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
 type BoundaryViolationType =
   | 'file_outside_scope'
   | 'stale_heartbeat'
   | 'stale_lock'
   | 'circular_dependency'
-  | 'usage_threshold_exceeded'
   | 'memory_budget_exceeded';
 ```
 
@@ -474,7 +474,7 @@ const DEBT_CRITICAL_SPRINTS          = 3;  // Escalate to CRITICAL after 3 sprin
 
 ```ts
 const DEFAULT_LANGUAGE  = 'en';
-const DEFAULT_MODE      = 'max_plan';
+const DEFAULT_MODE      = 'performance';  // Legacy alias: 'max_plan'
 const DECKENT_VERSION   = '0.1.0';
 const SUPPORTED_LANGUAGES = ['en', 'tr'];
 ```
@@ -514,7 +514,7 @@ Loads and merges global config (`~/.deckent/config.json`) and project config (`.
 import { loadConfig } from 'deckent';
 
 const config = await loadConfig('/path/to/project');
-console.log(config.mode);             // 'max_plan'
+console.log(config.mode);             // 'performance'
 console.log(config.activeModeConfig.max_workers); // 8
 ```
 
@@ -537,7 +537,7 @@ Validates a partial config object by merging it with defaults before validation.
 ```ts
 import { validatePartialConfig } from 'deckent';
 
-validatePartialConfig({ mode: 'pro_plan', language: 'en' }); // OK
+validatePartialConfig({ mode: 'economic', language: 'en' }); // OK
 validatePartialConfig({ mode: 'invalid' as any });            // throws ConfigValidationError
 ```
 
@@ -549,7 +549,7 @@ validatePartialConfig({ mode: 'invalid' as any });            // throws ConfigVa
 function getDefaultConfig(): DeckentConfig
 ```
 
-Returns a fresh copy of the factory default config (mode: `max_plan`, all mode configs at defaults).
+Returns a fresh copy of the factory default config (mode: `performance`, all mode configs at defaults).
 
 ---
 
@@ -1499,7 +1499,7 @@ Factory function for `Alert` objects. Stamps the current ISO timestamp automatic
 function createServer(): McpServer
 ```
 
-Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 16 tools and 9 resources.
+Creates and configures an MCP server named `'deckent'` (version from `DECKENT_VERSION`). Registers all 19 tools and 8 resources.
 
 **Example:**
 ```ts
@@ -1512,7 +1512,7 @@ await server.connect(new StdioServerTransport());
 
 ---
 
-### Tools (10)
+### Tools (19)
 
 | Tool name | Description |
 |---|---|
@@ -1526,6 +1526,15 @@ await server.connect(new StdioServerTransport());
 | `deckent_history` | Return recent sprint log summaries |
 | `deckent_analyze_project` | Analyze project stack, size, and methodology recommendation |
 | `deckent_sync` | Sync adapter files (CLAUDE.md, AGENTS.md) with @DECKENT.md reference |
+| `deckent_config` | Read or update project configuration |
+| `deckent_review` | Evaluate sprint results: GO / NO_GO / GO_WITH_TECH_DEBT |
+| `deckent_run` | Run a single task in the background |
+| `deckent_kill` | Kill active sprint or specific workers |
+| `deckent_cleanup` | Archive task files, release locks, close sessions |
+| `deckent_help` | Show runtime capabilities, project status, and usage guide |
+| `deckent_agent_list` | List registered agents (built-in and temp) |
+| `deckent_skill_list` | List registered skills (manifest and AST sandbox info) |
+| `deckent_checkpoint` | Approve or reject human checkpoints |
 
 #### `deckent_plan` Input Schema
 ```ts
@@ -1539,7 +1548,8 @@ await server.connect(new StdioServerTransport());
 ```ts
 {
   projectName: string;
-  mode?:     'max_plan' | 'max5x_plan' | 'pro_plan' | 'api';  // default: 'max_plan'
+  mode?:     'performance' | 'balanced' | 'economic' | 'api';  // default: 'performance'
+  // Legacy aliases: max_plan → performance, max5x_plan → balanced, pro_plan → economic
   language?: 'en' | 'tr';                                       // default: 'en'
 }
 ```
@@ -1553,7 +1563,7 @@ await server.connect(new StdioServerTransport());
 
 ---
 
-### Resources (5)
+### Resources (8)
 
 Resources provide read-only context that MCP hosts can inject into the AI's context window.
 
@@ -1564,6 +1574,9 @@ Resources provide read-only context that MCP hosts can inject into the AI's cont
 | `deckent://memory` | text/markdown | Current contents of `.brain/MEMORY.md` (learned patterns) |
 | `deckent://debt` | text/markdown | Current contents of `.brain/DEBT.md` (technical debt items) |
 | `deckent://config` | application/json | Current project config from `.deckent/config.json` |
+| `deckent://retro` | text/markdown | Latest sprint retrospective report |
+| `deckent://tasks` | application/json | Current sprint task list and statuses |
+| `deckent://agents` | application/json | Registered agent pool, stats, usage rates |
 
 ### MCP Registration
 
@@ -1773,11 +1786,11 @@ Returns the project configuration from `.deckent/config.json`.
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en",
   "brain_planning": "ai",
-  "max_plan": { "max_workers": 8, "model": "opus" },
-  "pro_plan": { "max_workers": 4, "model": "sonnet" }
+  "performance": { "max_workers": 8, "model": "opus" },
+  "economic": { "max_workers": 4, "model": "sonnet" }
 }
 ```
 
@@ -2129,17 +2142,17 @@ Merges the provided fields into the project config (`/.deckent/config.json`) and
 **Request body:** Any JSON object. Keys are merged with the existing config using shallow merge (`{ ...existing, ...body }`).
 
 ```json
-{ "mode": "pro_plan", "language": "en" }
+{ "mode": "economic", "language": "en" }
 ```
 
 **Response `200`:** The full merged config object after writing to disk.
 
 ```json
 {
-  "mode": "pro_plan",
+  "mode": "economic",
   "language": "en",
   "brain_planning": "ai",
-  "max_plan": { "max_workers": 8, "model": "opus" }
+  "performance": { "max_workers": 8, "model": "opus" }
 }
 ```
 
@@ -2151,7 +2164,7 @@ Merges the provided fields into the project config (`/.deckent/config.json`) and
 curl -X POST http://localhost:3100/api/config \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-secret-token" \
-  -d '{"mode": "pro_plan"}'
+  -d '{"mode": "economic"}'
 ```
 
 ---
@@ -2192,7 +2205,6 @@ Run via `deckent <command>` (globally installed) or `npx deckent <command>`.
 | `cleanup` | Clean up locks and heartbeats after a sprint | `--decay` (force memory decay) |
 | `config` | Show project configuration | — |
 | `config set <key> <value>` | Set a configuration value | — |
-| `usage` | Show Claude API usage metrics | — |
 | `upgrade` | Self-update deckent to the latest version | — |
 | `plugin` | Manage plugins | — |
 | `plugin install <name>` | Install a plugin | — |

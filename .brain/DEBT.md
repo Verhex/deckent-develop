@@ -13,5 +13,14 @@
 | debt-094-001 | Tech debt from 094-001: Quality Score Routing Bonus entegrasyonu zaten tamamen y | 094-001 | sprint-094 | NORMAL | 0 | true | sprint-094 | 2026-04-06T09:58:42.819Z |
 | debt-094-003 | Tech debt from 094-003: Tüm aktif docs/ dosyalarındaki 'deckent usage', 'UsageTr | 094-003 | sprint-094 | NORMAL | 0 | true | sprint-094 | 2026-04-06T09:58:49.512Z |
 | debt-094-004 | Tech debt from 094-004: PROJECT-IDENTITY.md güncellendi: (A) Sprint 093-094 Achi | 094-004 | sprint-094 | NORMAL | 0 | true | sprint-094 | 2026-04-06T09:58:52.943Z |
-| debt-095-001 | Tech debt from 095-001: Fixed 4 mismatched skill IDs in learnings.json:
-- refact | 095-001 | sprint-095 | NORMAL | 0 | false | - | 2026-04-06T10:09:11.293Z |
+| debt-096-001 | Tech debt from 096-001: README.md ve README-TR.md dosyalarındaki tüm sayılar gün | 096-001 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:56:54.397Z |
+| debt-096-002 | Tech debt from 096-002: DECKENT.md düzeltmeleri tamamlandı: (A) Built-in Skills | 096-002 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:56:57.481Z |
+| debt-096-003 | Tech debt from 096-003: Tüm üç dosyadaki sayısal tutarsızlıklar düzeltildi: (A) | 096-003 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:57:00.638Z |
+| debt-096-004 | Tech debt from 096-004: A) TOC'dan `deckent usage` satırı kaldırıldı (satır 38). | 096-004 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:57:03.860Z |
+| debt-096-005 | Tech debt from 096-005: api.md eski referanslar temizlendi: (A) PlanMode tipi ma | 096-005 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:57:10.643Z |
+| debt-096-006 | Tech debt from 096-006: config-reference.md'deki tüm eski mod isimleri canonical | 096-006 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:57:13.905Z |
+| debt-096-007 | Tech debt from 096-007: architecture.md tam güncelleme tamamlandı: (A) Version S | 096-007 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:57:17.176Z |
+| debt-096-008 | Tech debt from 096-008: All 6 reference docs cleaned: (A) performance.md: max_pl | 096-008 | sprint-096 | NORMAL | 0 | true | sprint-096 | 2026-04-06T10:57:20.385Z |
+| debt-096-009 | Tech debt from 096-009: All documentation fixes applied:
+
+A) quickstart.md + fir | 096-009 | sprint-096 | NORMAL | 0 | false | - | 2026-04-06T10:57:23.648Z |

@@ -6,6 +6,27 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint96] - 2026-04-06
+
+### Added
+
+- src/cli/commands/init.ts — Skill İsimleri Düzeltme
+
+### Changed
+
+- README.md + README-TR.md Sayı ve Tablo Düzeltmeleri (completed with tech debt)
+- DECKENT.md Skill İsimleri + MCP Tablo + Checkpoint (completed with tech debt)
+- CLAUDE.md + IDENTITY.md + PROJECT-IDENTITY.md Sayı Düzeltmeleri (completed with tech debt)
+- docs/reference/cli.md — Usage Komutu Kaldır + Sayılar (completed with tech debt)
+- docs/reference/api.md — Usage + Eski Mod İsimleri Temizliği (completed with tech debt)
+- docs/reference/config-reference.md — Mod İsimleri Canonical Güncelleme (completed with tech debt)
+- docs/architecture/architecture.md — Tam Güncelleme (completed with tech debt)
+- docs/reference/ Kalan Dosyalar — Mod İsimleri + Usage Temizliği (completed with tech debt)
+- docs/guide/ + docs/development/ + docs/architecture/ Kalan — Sayı ve Referans Düzeltmeleri (completed with tech debt)
+
+
+_Tasks: 10 total, 10 done, 9 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint95] - 2026-04-06
 
 

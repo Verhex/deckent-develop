@@ -11,19 +11,18 @@
 
 | Principle | Status | Evidence |
 |-----------|--------|----------|
-| Native-first (CLI+MCP) | WORKING | 33+ CLI commands, 16 MCP tools (enriched), npm installable |
+| Native-first (CLI+MCP) | WORKING | 34+ CLI commands, 19 MCP tools (enriched), npm installable |
 | Self-evolving | WORKING | MEMORY.md learnings, decay, brain self-learning config suggestions (Sprint 054), sprint-to-sprint CI learning (Sprint 062) |
 | Observable | WORKING | .dashboard, deckent status/watch, web dashboard, agent/skill visibility |
-| Usage-aware | REMOVED | Usage tracking removed in Sprint 089 |
-| Plan-compatible | WORKING | 4 modes (max/max5x/pro/api), auto-setup wizard, subscription detection |
+| Plan-compatible | WORKING | 4 modes (performance/balanced/economic/api), auto-setup wizard, subscription detection |
 | Zero-friction | WORKING | MCP auto-registration, natural language → DIRECTIVES → sprint, zero-config mode |
 | Open source | WORKING | MIT LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md |
 
-### Section 3: CLI Commands (33+)
+### Section 3: CLI Commands (34+)
 
 | Status | Count | Commands |
 |--------|-------|----------|
-| WORKING | 33+ | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, usage, onboard, upgrade, explain, review, finalize, agent, skill, plugin |
+| WORKING | 34+ | init, start, plan, status, doctor, retro, history, config, attach, spawn, kill, cleanup, sync, watch, analyze, archive-debt, dashboard, serve, web, mcp, config set, start --watch, test, run, onboard, upgrade, explain, review, finalize, agent, skill, plugin, checkpoint |
 
 ### Section 5: Agent System
 
@@ -63,8 +62,6 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 
 ### Section 8: GO/NO-GO Protocol — WORKING
 
-### Section 9: Usage-Aware Planning — WORKING
-
 ### Section 10: tmux Management — WORKING (also subprocess backend available)
 
 ### Section 11: Plugin System — WORKING
@@ -82,7 +79,7 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 - 11,862 tests, 469 test files, 96%+ coverage
 
 ### Section 21: MCP — WORKING
-- 16 tools (all enriched with _enriched meta), 9 resources, background job pattern
+- 19 tools (all enriched with _enriched meta), 8 resources, background job pattern
 
 ### Section 22: User Flows — PARTIAL
 - No dedicated end-to-end flow test suite (covered by sprint execution)
@@ -100,12 +97,12 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 | Coverage | 96%+ | `npx vitest run --coverage` |
 | Source files | 247 .ts | src/ directory |
 | Source lines | 75,105 | All .ts files |
-| CLI commands | 33+ | src/cli/commands/ |
-| MCP tools | 16 (enriched) | src/mcp/tools/ |
-| MCP resources | 9 | src/mcp/resources/ |
-| HTTP endpoints | 16 | src/api/server.ts |
-| Built-in agents | 8 + ci-guardian | .deckent/agents/ |
-| Built-in skills | 10 + ci-testing | .deckent/skills/ |
+| CLI commands | 34+ | src/cli/commands/ |
+| MCP tools | 19 (enriched) | src/mcp/tools/ |
+| MCP resources | 8 | src/mcp/resources/ |
+| HTTP endpoints | 17 | src/api/server.ts |
+| Built-in agents | 9 | .deckent/agents/ |
+| Built-in skills | 11 | .deckent/skills/ |
 | Providers | 3 (Claude, Codex, Gemini) | src/providers/ |
 | Sprints completed | 65 | .brain/sprints/ + archive/ |
 | ADRs | 21 | .brain/DECISIONS.md |

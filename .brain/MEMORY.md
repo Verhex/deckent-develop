@@ -55,3 +55,15 @@ A) DebtTable.tsx — useTranslati
 ## Sprint sprint-095 Learnings
 - Skill İsim Uyumsuzluğu Düzeltme: GO_WITH_TECH_DEBT — Fixed 4 mismatched skill IDs in learnings.json:
 - refactoring-expert: removed (no manifest exists, was legacy data from 
+## Sprint sprint-096 Learnings
+- README.md + README-TR.md Sayı ve Tablo Düzeltmeleri: GO_WITH_TECH_DEBT — README.md ve README-TR.md dosyalarındaki tüm sayılar güncellendi: sprints badge 88→95+, MCP tools 18→19 (3 yerde: featur
+- DECKENT.md Skill İsimleri + MCP Tablo + Checkpoint: GO_WITH_TECH_DEBT — DECKENT.md düzeltmeleri tamamlandı: (A) Built-in Skills tablosundaki 6 yanlış isim düzeltildi — security-expert→security
+- CLAUDE.md + IDENTITY.md + PROJECT-IDENTITY.md Sayı Düzeltmeleri: GO_WITH_TECH_DEBT — Tüm üç dosyadaki sayısal tutarsızlıklar düzeltildi: (A) CLAUDE.md: orchestra 48→47, core 49→48, MCP 18→19, CLI 33+→34+. 
+- docs/reference/cli.md — Usage Komutu Kaldır + Sayılar: GO_WITH_TECH_DEBT — A) TOC'dan `deckent usage` satırı kaldırıldı (satır 38). B) usage komutu tam dokümantasyon bloğu kaldırıldı (satır 412-4
+- docs/reference/api.md — Usage + Eski Mod İsimleri Temizliği: GO_WITH_TECH_DEBT — api.md eski referanslar temizlendi: (A) PlanMode tipi max_plan/max5x_plan/pro_plan → performance/balanced/economic günce
+- docs/reference/config-reference.md — Mod İsimleri Canonical Güncelleme: GO_WITH_TECH_DEBT — config-reference.md'deki tüm eski mod isimleri canonical olarak güncellendi: max_plan→performance, max5x_plan→balanced, 
+- docs/architecture/architecture.md — Tam Güncelleme: GO_WITH_TECH_DEBT — architecture.md tam güncelleme tamamlandı: (A) Version Sprint 065→095+, (B) CLI 28→34+, (C) MCP tools 10→19 (tüm 19 tool
+- docs/reference/ Kalan Dosyalar — Mod İsimleri + Usage Temizliği: GO_WITH_TECH_DEBT — All 6 reference docs cleaned: (A) performance.md: max_plan→performance, pro_plan→economic, max5x_plan→balanced canonical
+- docs/guide/ + docs/development/ + docs/architecture/ Kalan — Sayı ve Referans Düzeltmeleri: GO_WITH_TECH_DEBT — All documentation fixes applied:
+
+A) quickstart.md + first-sprint.md: 'Max workers: 5 (max_plan)' → 'Max workers: 8 (per

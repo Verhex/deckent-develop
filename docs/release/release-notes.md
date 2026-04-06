@@ -62,7 +62,7 @@ Deckent is an AI agent orchestration CLI that coordinates multiple AI agents (Cl
 | Test Count | 11,862 |
 | Test Files | 469 |
 | Code Coverage | 96%+ |
-| CLI Commands | 33+ |
+| CLI Commands | 34+ |
 | MCP Tools | 16 |
 | MCP Resources | 9 |
 | Built-in Agents | 8 + ci-guardian |

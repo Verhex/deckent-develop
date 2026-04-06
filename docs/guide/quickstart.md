@@ -203,7 +203,7 @@ Sprint 001 -- 2 tasks planned
   001-001   User Authentication      sonnet   HIGH       normal
   001-002   User Profile Page        haiku    NORMAL     low
 
-Max workers: 5 (max_plan)
+Max workers: 8 (performance)
 Planning mode: ai
 ```
 

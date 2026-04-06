@@ -44,7 +44,7 @@ Built-in Defaults
 ResolvedConfig  (runtime)
 ```
 
-The deep merge function recursively merges plain objects. Nested mode configs (for example, `modes.max_plan.max_workers`) can be overridden individually without replacing the entire mode block.
+The deep merge function recursively merges plain objects. Nested mode configs (for example, `modes.performance.max_workers`) can be overridden individually without replacing the entire mode block.
 
 Source: `src/core/config.ts` -- `loadConfig()`
 
@@ -56,7 +56,7 @@ These fields sit at the root of `.deckent/config.json`:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | `PlanMode` | `"max_plan"` | Active plan mode. Determines model limits and worker count. Also accepts aliases (see section 4.1). |
+| `mode` | `PlanMode` | `"performance"` | Active plan mode. Determines model limits and worker count. Also accepts legacy aliases (see section 4.1). |
 | `modes` | `Record<PlanMode, PlanModeConfig>` | (see section 4) | Per-mode configuration blocks. |
 | `language` | `"en"` or `"tr"` | `"en"` | CLI output language. |
 | `projectName` | `string` | `"deckent-project"` | Project name shown in dashboard and logs. |
@@ -71,7 +71,7 @@ These fields sit at the root of `.deckent/config.json`:
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en",
   "projectName": "my-project"
 }
@@ -87,7 +87,7 @@ Deckent ships with four built-in plan modes, each tuned for a different Claude s
 
 ### Comparison Table
 
-| Field | `max_plan` | `max5x_plan` | `pro_plan` | `api` |
+| Field | `performance` | `balanced` | `economic` | `api` |
 |-------|-----------|-------------|-----------|-------|
 | **Subscription** | Max 20x ($200/mo) | Max 5x ($100/mo) | Pro ($20/mo) | API key (pay-as-you-go) |
 | `max_workers` | 8 | 5 | 3 | 10 |
@@ -98,32 +98,33 @@ Deckent ships with four built-in plan modes, each tuned for a different Claude s
 | `requires` env var | -- | -- | -- | `ANTHROPIC_API_KEY` |
 | `brain_planning` | `"auto"` | `"auto"` | `"auto"` | `"auto"` |
 
-### 4.1 Mode Aliases
+### 4.1 Legacy Aliases
 
-For convenience, you can use friendly aliases instead of canonical mode names:
+The following legacy aliases are still accepted for backward compatibility:
 
-| Alias | Canonical Mode |
-|-------|---------------|
-| `performance` | `max_plan` |
-| `balanced` | `max5x_plan` |
-| `economic` | `pro_plan` |
-| `unlimited` | `api` |
+| Legacy Alias | Canonical Mode | Note |
+|-------|---------------|------|
+| `max_plan` | `performance` | legacy alias |
+| `max5x_plan` | `balanced` | legacy alias |
+| `pro_plan` | `economic` | legacy alias |
+| `unlimited` | `api` | legacy alias |
 
-Aliases are resolved automatically in config files and CLI flags:
+Legacy aliases are resolved automatically in config files and CLI flags:
 
 ```bash
-deckent config set mode performance   # Same as: deckent config set mode max_plan
+deckent config set mode performance   # Canonical name
+deckent config set mode max_plan      # Legacy alias — also works, resolves to performance
 ```
 
-### max_plan -- Claude Max 20x
+### performance -- Claude Max 20x
 
 Full parallelism with up to 8 workers. Brain uses Opus for highest-quality planning. Workers default to Opus. Brain can downgrade individual tasks to Sonnet or Haiku.
 
-### max5x_plan -- Claude Max 5x
+### balanced -- Claude Max 5x
 
 Good parallelism at 5 workers. Brain uses Sonnet to conserve budget. Workers can still use Opus for complex tasks.
 
-### pro_plan -- Claude Pro
+### economic -- Claude Pro
 
 Conservative mode with 3 workers maximum. Haiku is disabled because Pro plan usage limits are tight. Everything runs on Sonnet.
 
@@ -155,7 +156,7 @@ Each mode block (`modes.<modeName>`) supports these fields:
 
 **default_model** -- Fallback model for worker tasks when Brain's planner does not specify a different model. Brain can override per-task.
 
-**haiku_allowed** -- When `false`, Brain will never assign `haiku` to any worker task. Set to `false` for Pro plan to conserve rate limits.
+**haiku_allowed** -- When `false`, Brain will never assign `haiku` to any worker task. Set to `false` for `economic` mode to conserve rate limits.
 
 **budget_per_sprint** -- Only meaningful for `api` mode. Brain tracks estimated token cost and pauses execution if the budget would be exceeded. Value is in USD.
 
@@ -203,19 +204,19 @@ Brain tries AI first. If AI planning succeeds, the AI plan is used. If AI fails 
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "modes": {
-    "max_plan": {
+    "performance": {
       "brain_planning": "ai"
     },
-    "pro_plan": {
+    "economic": {
       "brain_planning": "structured"
     }
   }
 }
 ```
 
-This gives `max_plan` AI planning (higher quality) while `pro_plan` uses structured parsing (zero token cost).
+This gives `performance` AI planning (higher quality) while `economic` uses structured parsing (zero token cost).
 
 ---
 
@@ -227,7 +228,7 @@ Located at `~/.deckent/config.json`. Applies to all projects on this machine. Us
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en"
 }
 ```
@@ -240,7 +241,7 @@ Located at `.deckent/config.json`. Applies to this project only. Use it for proj
 {
   "projectName": "my-api",
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 4,
       "brain_planning": "structured"
     }
@@ -252,7 +253,7 @@ Located at `.deckent/config.json`. Applies to this project only. Use it for proj
 
 Project config always takes priority. If the global config sets `language: "en"` and the project config sets `language: "tr"`, the resolved config uses `"tr"`.
 
-Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` in the project config only overrides that field; all other `max_plan` fields keep their global or default values.
+Nested objects are merged recursively. Setting `modes.performance.max_workers: 4` in the project config only overrides that field; all other `performance` fields keep their global or default values.
 
 ---
 
@@ -262,7 +263,7 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en",
   "projectName": "my-app"
 }
@@ -272,10 +273,10 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "projectName": "my-app",
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 4,
       "brain_model": "opus",
       "default_model": "sonnet",
@@ -307,15 +308,15 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
 }
 ```
 
-### Pro Plan (Conservative)
+### Economic (Conservative)
 
 ```json
 {
-  "mode": "pro_plan",
+  "mode": "economic",
   "language": "en",
   "projectName": "my-project",
   "modes": {
-    "pro_plan": {
+    "economic": {
       "max_workers": 3,
       "brain_model": "sonnet",
       "default_model": "sonnet",
@@ -330,25 +331,25 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en",
   "projectName": "my-project",
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 8,
       "brain_model": "opus",
       "default_model": "opus",
       "haiku_allowed": true,
       "brain_planning": "ai"
     },
-    "max5x_plan": {
+    "balanced": {
       "max_workers": 5,
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": true,
       "brain_planning": "auto"
     },
-    "pro_plan": {
+    "economic": {
       "max_workers": 2,
       "brain_model": "sonnet",
       "default_model": "sonnet",
@@ -368,7 +369,7 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
 }
 ```
 
-Switch modes with: `deckent config set mode pro_plan`
+Switch modes with: `deckent config set mode economic`
 
 ---
 
@@ -385,7 +386,7 @@ Outputs the fully resolved config as JSON, including merged values from global +
 ### Set a Value
 
 ```bash
-deckent config set mode pro_plan
+deckent config set mode economic
 deckent config set language en
 deckent config set projectName my-new-name
 ```
@@ -395,9 +396,9 @@ Values are written to `.deckent/config.json`. The value is parsed as JSON first 
 ### Switch Plan Mode
 
 ```bash
-deckent config set mode max_plan
-deckent config set mode max5x_plan
-deckent config set mode pro_plan
+deckent config set mode performance
+deckent config set mode balanced
+deckent config set mode economic
 deckent config set mode api
 ```
 
@@ -409,13 +410,13 @@ The mode switch takes effect on the next `deckent start` or `deckent plan`.
 deckent config set brain_planning auto
 ```
 
-To set brain_planning per-mode, edit `.deckent/config.json` directly under `modes.<modeName>.brain_planning`.
+To set brain_planning per-mode, edit `.deckent/config.json` directly under `modes.<modeName>.brain_planning` (e.g. `modes.performance.brain_planning`).
 
 ### Global Config
 
 ```bash
 deckent config --global           # Show global config
-deckent config set --global mode max_plan   # Set a global value
+deckent config set --global mode performance   # Set a global value
 deckent config export --global    # Export global config
 ```
 
@@ -427,7 +428,7 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 
 | Field | Constraint |
 |-------|-----------|
-| `mode` | Must be one of: `max_plan`, `max5x_plan`, `pro_plan`, `api` |
+| `mode` | Must be one of: `performance`, `balanced`, `economic`, `api` (legacy aliases `max_plan`, `max5x_plan`, `pro_plan` also accepted) |
 | `language` | Must be one of: `en`, `tr` |
 | `modes.<name>.max_workers` | Number between 1 and 20 (inclusive) |
 | `modes.<name>.brain_model` | One of: `opus`, `sonnet`, `haiku` |
@@ -444,8 +445,8 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 
 ```
 ConfigValidationError: Config validation failed:
-  - Invalid mode "turbo". Must be one of: max_plan, max5x_plan, pro_plan, api
-  - modes.max_plan.max_workers must be a number between 1 and 20
+  - Invalid mode "turbo". Must be one of: performance, balanced, economic, api
+  - modes.performance.max_workers must be a number between 1 and 20
 ```
 
 ---
@@ -484,7 +485,7 @@ When switching providers, models are mapped to equivalent tiers:
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "brain_provider": "claude",
   "worker_provider": "codex",
   "fallback_provider": "gemini"

@@ -8,7 +8,7 @@
 @.brain/MEMORY.md
 
 ## Architecture
-- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (48 modules)
+- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (47 modules)
   - brain.ts: orchestrator (re-export layer, imports from sprint-controller)
   - sprint-controller.ts: full sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
   - planner.ts: AI task planning (imports only from core/)
@@ -27,7 +27,7 @@
   - promotion-pipeline.ts: temp→permanent agent/skill promotion, demotion
   - sprint-utils.ts: shared utilities for sprint phases, task analysis, timing helpers
   - result-collector.ts: waitForResults, processQueue, collectResults, result aggregation + IPC
-- **core/** — Types, config, utilities, agent/skill pools (49 modules)
+- **core/** — Types, config, utilities, agent/skill pools (48 modules)
   - types.ts + *-types.ts: all type definitions (task, config, sprint, monitoring, routing)
   - config.ts: 3-layer config merge (defaults → global → project)
   - agent-pool.ts: AgentPoolManager, 9 built-in agents, LRU eviction
@@ -44,8 +44,8 @@
   - adaptive-agent.ts: runtime agent adaptation
 - **providers/** — Claude, Codex, Gemini adapters (5 modules)
 - **api/** — HTTP API server, SSE, rate limiting (3 modules)
-- **mcp/** — MCP server: 18 tools + 8 resources, stdio transport
-- **cli/** — 33+ commands, helpers, entry point
+- **mcp/** — MCP server: 19 tools + 8 resources, stdio transport
+- **cli/** — 34+ commands, helpers, entry point
 - **dashboard/** — React + Vite + Tailwind web dashboard
 
 ## Commands

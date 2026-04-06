@@ -1,7 +1,7 @@
 # PERFORMANCE — Deckent Performance Tuning Guide
 
 > Reference: CONFIG-REFERENCE.md, ARCHITECTURE.md, SPRINT-LIFECYCLE.md
-> Last updated: Sprint 065 (2026-03-26)
+> Last updated: Sprint 096 (2026-04-06)
 
 ---
 
@@ -11,8 +11,7 @@
 2. [Model Selection Strategy](#2-model-selection-strategy)
 3. [Sprint Size Optimization](#3-sprint-size-optimization)
 4. [Memory Budget Management](#4-memory-budget-management)
-5. [Usage Limit Management](#5-usage-limit-management)
-6. [Troubleshooting](#6-troubleshooting)
+5. [Troubleshooting](#5-troubleshooting)
 
 ---
 
@@ -26,9 +25,9 @@ Worker count is controlled by `max_workers` in the active plan mode:
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 8
     }
   }
@@ -38,7 +37,6 @@ Worker count is controlled by `max_workers` in the active plan mode:
 Brain spawns **at most** `max_workers` workers, but may spawn fewer if:
 - Fewer tasks were planned than the limit
 - Dependencies between tasks constrain parallelism
-- Usage thresholds reduce the sprint size
 
 ### 1.2 System Resource Formula
 
@@ -61,34 +59,36 @@ Run `deckent doctor --profile` to see your system profile and its recommendation
 
 | Mode | Default `max_workers` | Target subscription |
 |------|-----------------------|---------------------|
-| `max_plan` | 8 | Claude Max $200/mo |
-| `max5x_plan` | 5 | Claude Max $100/mo |
-| `pro_plan` | 3 | Claude Pro $20/mo |
+| `performance` | 8 | Claude Max $200/mo |
+| `balanced` | 5 | Claude Max $100/mo |
+| `economic` | 3 | Claude Pro $20/mo |
 | `api` | 10 | API key (pay-as-you-go) |
+
+> **Legacy aliases:** `max_plan` → `performance`, `max5x_plan` → `balanced`, `pro_plan` → `economic`. Old names still work but are deprecated.
 
 ### 1.4 Tuning Recommendations
 
 **Increase workers when:**
 - Sprints have many independent tasks (no cross-task dependencies)
 - Your machine has ≥ 8 GB free RAM and ≥ 8 CPU cores
-- You have a Claude Max subscription with generous usage limits
+- You have a Claude Max subscription (performance mode)
 
 **Decrease workers when:**
-- You're hitting usage thresholds mid-sprint (tasks pause/resume)
+- Sprint quality is poor due to resource contention
 - RAM is under pressure (< 400 MB free per intended worker)
 - Many tasks depend on each other (dependencies limit parallelism anyway)
 - Sprint quality is poor — fewer workers means more focused attention
 
-**Optimal range by subscription:**
+**Optimal range by mode:**
 
 ```json
-// Claude Max 20x — aggressive parallelism
+// performance (Claude Max 20x) — aggressive parallelism
 "max_workers": 6
 
-// Claude Max 5x — balanced
+// balanced (Claude Max 5x) — balanced
 "max_workers": 4
 
-// Claude Pro — conservative
+// economic (Claude Pro) — conservative
 "max_workers": 2
 
 // API key — budget-limited, not rate-limited
@@ -151,7 +151,7 @@ When using structured mode, model is inferred from directive task content using 
 
 ### 2.4 Recommended Model Configuration
 
-**Max throughput (Claude Max 20x):**
+**Max throughput (performance mode):**
 ```json
 {
   "brain_model": "opus",
@@ -161,7 +161,7 @@ When using structured mode, model is inferred from directive task content using 
 ```
 Brain uses Opus for high-quality planning; workers default to Sonnet (fast, capable). Haiku handles trivial tasks.
 
-**Budget-conscious (Claude Max 5x):**
+**Budget-conscious (balanced mode):**
 ```json
 {
   "brain_model": "sonnet",
@@ -171,7 +171,7 @@ Brain uses Opus for high-quality planning; workers default to Sonnet (fast, capa
 ```
 Sonnet for everything. Brain still plans well; workers execute efficiently.
 
-**Token-conservative (Claude Pro):**
+**Token-conservative (economic mode):**
 ```json
 {
   "brain_model": "sonnet",
@@ -179,7 +179,7 @@ Sonnet for everything. Brain still plans well; workers execute efficiently.
   "haiku_allowed": false
 }
 ```
-Haiku disabled — Pro plan rate limits are tight. Sonnet is a good single-model choice.
+Haiku disabled — economic mode rate limits are tight. Sonnet is a good single-model choice.
 
 **API key (cost-first):**
 ```json
@@ -203,7 +203,7 @@ Opus for Brain (quality planning), Haiku for workers by default (low cost). Over
 
 **When to use `structured` mode:**
 - DIRECTIVES.md has explicit `## Task N:` blocks with full details
-- You want zero planning tokens — critical under Pro usage limits
+- You want zero planning tokens — critical under economic mode limits
 - Sprint planning speed matters (CI environments, rapid iteration)
 
 **When to use `ai` mode:**
@@ -374,9 +374,9 @@ mv .brain/sprints/sprint-002.md .brain/archive/
 
 ---
 
-### 5.4 API Mode Budget Management
+### 4.5 API Mode Budget Management
 
-API mode uses dollar-based limits instead of usage percentages:
+API mode uses dollar-based limits:
 
 ```json
 {
@@ -402,32 +402,11 @@ A sprint of 8 Sonnet tasks ≈ $0.24. A sprint of 8 Opus tasks ≈ $1.20.
 
 **Set `budget_per_sprint` conservatively** — an interrupted sprint is worse than a smaller one.
 
-### 5.5 Checking Current Usage
-
-```bash
-# See usage in doctor output
-deckent doctor
-
-# See usage in status dashboard
-deckent status
-
-# JSON output for scripting
-deckent status --json | jq '.usage'
-```
-
-### 5.6 Scheduling Sprints Around Limits
-
-- **5-hour window** resets every 5 hours from first message
-- **Weekly quota** resets every 7 days from account creation
-- Run large sprints (8+ tasks) at the **start of a fresh 5-hour window**
-- Run small sprints (1–3 tasks) when usage is already at 50–70%
-- Use `structured` planning mode when usage is high — it costs 0 planning tokens
-
 ---
 
-## 6. Troubleshooting
+## 5. Troubleshooting
 
-### 6.1 Slow Sprint Execution
+### 5.1 Slow Sprint Execution
 
 **Symptom:** Sprint takes much longer than expected.
 
@@ -450,15 +429,14 @@ cat .tasks/task-XXX.log
 | All tasks assigned `opus` | Switch complex tasks to `sonnet` where possible |
 | All tasks have `high` effort | Review scope — is effort realistic? |
 | Many `high` dependency chains | Restructure tasks to reduce sequential blocking |
-| Only 1–2 workers spawned | Check `max_workers` config and usage thresholds |
-| Workers paused by usage limit | Wait for limit reset, or lower thresholds for next sprint |
+| Only 1–2 workers spawned | Check `max_workers` config |
 | Large scope per task | Split tasks with narrow scope per worker |
 
 **Quick fix — reduce model costs for the next sprint:**
 ```json
 {
   "modes": {
-    "max_plan": {
+    "performance": {
       "default_model": "sonnet",
       "haiku_allowed": true
     }
@@ -466,7 +444,7 @@ cat .tasks/task-XXX.log
 }
 ```
 
-### 6.2 Memory Overflow
+### 5.2 Memory Overflow
 
 **Symptom:** `deckent doctor` warns `Brain Budget over 600 lines`.
 
@@ -494,7 +472,7 @@ deckent doctor
 - Keep MEMORY.md under 80 lines (leave headroom for the next sprint's learnings)
 - Don't add verbose summaries to MEMORY.md — only unique, actionable insights
 
-### 6.3 tmux Issues Affecting Performance
+### 5.3 tmux Issues Affecting Performance
 
 **Symptom:** Workers spawn slowly or not at all; `deckent status` shows no active workers.
 
@@ -550,7 +528,7 @@ deckent kill task-XXX
 deckent spawn task-XXX
 ```
 
-### 6.4 High No-Go Rate
+### 5.4 High No-Go Rate
 
 **Symptom:** Many tasks completing with `NO_GO` or `GO_WITH_TECH_DEBT` status.
 
@@ -574,7 +552,7 @@ cat .brain/sprints/sprint-NNN.md
 - Add explicit GO criteria in DIRECTIVES.md task blocks
 - Clear CRITICAL debt before starting a new sprint
 
-### 6.5 Performance Benchmark Checklist
+### 5.5 Performance Benchmark Checklist
 
 Before starting a large sprint, run this checklist:
 
@@ -582,20 +560,17 @@ Before starting a large sprint, run this checklist:
 # 1. System health
 deckent doctor
 
-# 2. Check usage level
-deckent status --json | jq '.usage'
-
-# 3. Check memory budget
+# 2. Check memory budget
 wc -l .brain/*.md | tail -1
 
-# 4. Preview the plan (0 tokens with structured mode)
+# 3. Preview the plan (0 tokens with structured mode)
 deckent plan --dry-run
 
-# 5. Verify config
+# 4. Verify config
 deckent config | jq '{mode, max_workers: .activeModeConfig.max_workers, brain_planning: .activeModeConfig.brain_planning}'
 ```
 
-All required checks in step 1 must pass. Usage should be below your configured thresholds. Memory should be under 250 lines. The plan should have ≤ `max_workers` tasks for best parallelism.
+All required checks in step 1 must pass. Memory should be under 250 lines. The plan should have ≤ `max_workers` tasks for best parallelism.
 
 ---
 
@@ -622,7 +597,7 @@ Is free RAM < 400 MB?
 | Documentation, config, i18n | `haiku` |
 | Bug fix (trivial) | `haiku` or `sonnet` |
 | Bug fix (complex, multi-file) | `sonnet` or `opus` |
-| AI planning (brain_model) | `opus` (Max) or `sonnet` (Pro) |
+| AI planning (brain_model) | `opus` (performance) or `sonnet` (economic) |
 
 ### Sprint Size Quick Reference
 
@@ -639,9 +614,9 @@ Is free RAM < 400 MB?
 **Maximum performance (Claude Max 20x):**
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 8,
       "brain_model": "opus",
       "default_model": "sonnet",
@@ -655,9 +630,9 @@ Is free RAM < 400 MB?
 **Budget-conscious (Claude Pro):**
 ```json
 {
-  "mode": "pro_plan",
+  "mode": "economic",
   "modes": {
-    "pro_plan": {
+    "economic": {
       "max_workers": 2,
       "brain_model": "sonnet",
       "default_model": "sonnet",

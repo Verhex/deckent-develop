@@ -73,7 +73,7 @@ Sprint 001 -- 2 tasks planned
   001-001   Health Check Endpoint  sonnet   NORMAL     low
   001-002   Settings Page          opus     HIGH       normal
 
-Max workers: 5 (max_plan)
+Max workers: 8 (performance)
 Planning mode: ai
 ```
 

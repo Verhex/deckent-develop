@@ -1,6 +1,6 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** Sprint 065 | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** Sprint 095+ | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
 > For the primary system specification, see [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md).
@@ -26,7 +26,7 @@
 
 ## 1. System Overview
 
-Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents (Claude, Codex, Gemini) working in parallel on a single codebase. A human operator writes `DIRECTIVES.md`, and Deckent translates those directives into coordinated agent work via a Brain-Worker-Auditor model. The system uses an intent-based routing v2 engine (Sprint 063) for agent/skill selection with learning feedback.
+Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents (Claude, Codex, Gemini) working in parallel on a single codebase. A human operator writes `DIRECTIVES.md`, and Deckent translates those directives into coordinated agent work via a Brain-Worker-Auditor model. The system uses an intent-based routing v2 engine (Sprint 063+) for agent/skill selection with learning feedback, heartbeat daemon, human checkpoints, and adaptive thresholds.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -36,7 +36,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  DECKENT CLI  (src/cli/)                                            │
+│  DECKENT CLI  (src/cli/ — 34+ commands)                             │
 │  deckent start | deckent plan | deckent status | deckent web        │
 └────────────────────────┬────────────────────────────────────────────┘
                          │
@@ -59,7 +59,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  HTTP API + WEB DASHBOARD                                           │
-│  src/api/ (16 endpoints + SSE)  |  src/dashboard/ (React+Vite)     │
+│  src/api/ (17 endpoints + SSE)  |  src/dashboard/ (React+Vite)     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,29 +87,57 @@ src/
 │   ├── utils.ts             ← Shared utilities (countBrainLines, parseDebtTable, etc.)
 │   ├── analyzer.ts          ← Project stack, size, and methodology detection
 │   ├── system-profile.ts    ← CPU, RAM, recommended-worker-count detection
-│   ├── subscription.ts      ← Claude plan detection (max_20x/max_5x/pro/api/unknown)
+│   ├── subscription.ts      ← Claude plan detection (performance/balanced/economic/api/unknown)
 │   ├── plugin.ts            ← Plugin manifest validation, load, install, remove
 │   └── plugin-hooks.ts      ← Plugin hook execution (beforeSprint/afterSprint/etc.)
 │
-├── orchestra/               ← Sprint orchestration
-│   ├── brain.ts             ← Re-export layer (~58 lines) — sole orchestration entry point
-│   ├── sprint-controller.ts ← Sprint lifecycle (runSprint, pauseSprint, resumeSprint, cleanup)
-│   ├── result-evaluator.ts  ← Pure evaluation (evaluateResult, isDocTask, waitForResults)
+├── orchestra/               ← Sprint orchestration (49 modules)
+│   ├── brain.ts             ← Re-export layer — sole orchestration entry point
+│   ├── sprint-controller.ts ← Sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
+│   ├── sprint-phases.ts     ← Phase-specific execution logic
+│   ├── result-evaluator.ts  ← Pure evaluation (evaluateResult, isDocTask)
+│   ├── result-collector.ts  ← waitForResults, processQueue, collectResults, result aggregation + IPC
+│   ├── result-watcher.ts    ← File-based result watching
+│   ├── result-merger.ts     ← Merge worker results
 │   ├── planner.ts           ← AI task planning with Zod validation
+│   ├── task-builder.ts      ← Task creation, directive parsing, worker prompt building
+│   ├── task-router.ts       ← Provider + agent + skill routing per task
+│   ├── task-analyzer.ts     ← Type inference, complexity, keywords
+│   ├── task-retry.ts        ← NO_GO task retry and priority-fix logic
 │   ├── tmux.ts              ← tmux session and window management
 │   ├── spawn-backend.ts     ← SpawnBackend interface, TmuxBackend, SubprocessBackend, factory
 │   ├── sprint-estimator.ts  ← Sprint duration and effort estimation
-│   └── task-retry.ts        ← NO_GO task retry and priority-fix logic
+│   ├── sprint-reporter.ts   ← Retro, learnings, agent/skill performance
+│   ├── sprint-utils.ts      ← Shared utilities for sprint phases, timing helpers
+│   ├── debt-manager.ts      ← DEBT.md I/O, decay, pattern management
+│   ├── heartbeat-daemon.ts  ← Heartbeat monitoring daemon
+│   ├── mid-sprint-adapter.ts← Real-time rerouting on task failure (FIX phase)
+│   ├── outcome-tracker.ts   ← Routing outcome recording, learning bonuses, synergy matrix
+│   ├── quality-assessor.ts  ← Multi-dimensional quality scoring
+│   ├── rule-evolver.ts      ← Auto-generate activation rules from outcome data
+│   ├── temp-skill-generator.ts ← Template-based project-conventions skill generation
+│   ├── promotion-pipeline.ts← Temp→permanent agent/skill promotion, demotion
+│   ├── model-selector.ts    ← Task model resolution
+│   └── ...                  ← decision-engine, learning, collaboration modules
 │
-├── agents/                  ← Worker agent runtime
-│   └── worker.ts            ← Worker lifecycle, heartbeat, result writing
-│
-├── monitor/                 ← Observability and boundary enforcement
-│   └── auditor.ts           ← Scan loop, boundary detection, alert writing
+├── agents/                  ← Worker agent runtime (16 modules)
+│   ├── worker.ts            ← Worker lifecycle, heartbeat, result writing
+│   ├── adaptive-agent.ts    ← Runtime agent adaptation
+│   ├── worker-ipc.ts        ← WorkerChannel, ChannelRegistry — process.send IPC
+│   ├── shared-context.ts    ← SharedContext — inter-agent communication
+│   ├── prompt-analytics.ts  ← Unified PromptAnalytics — metrics + A/B testing
+│   ├── prompt-version.ts    ← Prompt versioning (max 10)
+│   ├── prompt-rollback.ts   ← Auto-rollback bad prompts
+│   ├── prompt-evolution.ts  ← Evolution timeline log
+│   ├── agent-genealogy.ts   ← Parent-child agent tracking
+│   ├── agent-retirement.ts  ← Retire/reinstate underperformers
+│   ├── specialization-drift.ts ← Drift detection (score 0-1)
+│   ├── cross-sprint-analyzer.ts ← Multi-sprint trends and suggestions
+│   └── permission-guard.ts  ← Escalation prevention
 │
 ├── cli/                     ← Command-line interface
 │   ├── auto-setup.ts        ← Setup wizard (generateSetupRecommendation)
-│   ├── commands/            ← 28 CLI commands (one file per command)
+│   ├── commands/            ← 34+ CLI commands (one file per command)
 │   │   ├── init.ts          ← deckent init — project initialization
 │   │   ├── start.ts         ← deckent start — sprint execution
 │   │   ├── plan.ts          ← deckent plan — dry-run planning
@@ -134,32 +162,58 @@ src/
 │   │   ├── dashboard.ts     ← deckent dashboard — dashboard redirect
 │   │   ├── test-run.ts      ← deckent test — run test suite
 │   │   ├── watch.ts         ← deckent watch — file watcher
+│   │   ├── checkpoint.ts    ← deckent checkpoint — approve/reject human checkpoints
+│   │   ├── review.ts        ← deckent review — post-sprint review
+│   │   ├── set-directives.ts← deckent set-directives — update DIRECTIVES.md
+│   │   ├── heartbeat.ts     ← deckent heartbeat — heartbeat daemon control
+│   │   ├── explain.ts       ← deckent explain — code explanation
+│   │   ├── finalize.ts      ← deckent finalize — sprint finalization
+│   │   ├── skill-marketplace.ts ← deckent skill-marketplace
 │   │   └── ...              ← additional command files
 │   └── helpers/
 │       ├── hints.ts         ← Phase-based contextual hints (tr/en)
 │       └── messages.ts      ← Localized message system (getMessage)
 │
-├── mcp/                     ← Model Context Protocol integration
-│   ├── tools/               ← 10 MCP tool handlers
+├── mcp/                     ← Model Context Protocol integration (19 tools + 8 resources)
+│   ├── tools/               ← 19 MCP tool handlers
 │   │   ├── index.ts         ← Tool registration
-│   │   ├── analyze.ts       ← deckent_analyze_project
-│   │   ├── directives.ts    ← deckent_set_directives
-│   │   ├── doctor.ts        ← deckent_doctor [includeProfile]
-│   │   ├── history.ts       ← deckent_history
 │   │   ├── init.ts          ← deckent_init
-│   │   ├── job-runner.ts    ← background job execution
+│   │   ├── directives.ts    ← deckent_set_directives
 │   │   ├── plan.ts          ← deckent_plan
-│   │   ├── retro.ts         ← deckent_retro
 │   │   ├── start.ts         ← deckent_start
 │   │   ├── status.ts        ← deckent_status
-│   │   └── sync.ts          ← deckent_sync
-│   ├── resources/           ← 5 MCP resource handlers
-│   │   └── memory.ts        ← deckent://memory, deckent://memory/patterns
+│   │   ├── doctor.ts        ← deckent_doctor [includeProfile]
+│   │   ├── retro.ts         ← deckent_retro
+│   │   ├── history.ts       ← deckent_history
+│   │   ├── analyze.ts       ← deckent_analyze_project
+│   │   ├── sync.ts          ← deckent_sync
+│   │   ├── config.ts        ← deckent_config
+│   │   ├── review.ts        ← deckent_review
+│   │   ├── run.ts           ← deckent_run
+│   │   ├── kill.ts          ← deckent_kill
+│   │   ├── cleanup.ts       ← deckent_cleanup
+│   │   ├── help.ts          ← deckent_help
+│   │   ├── agent-list.ts    ← deckent_agent_list
+│   │   ├── skill-list.ts    ← deckent_skill_list
+│   │   ├── checkpoint.ts    ← deckent_checkpoint
+│   │   └── job-runner.ts    ← background job execution (internal)
+│   ├── resources/           ← 8 MCP resource handlers
+│   │   ├── index.ts         ← Resource registration
+│   │   ├── dashboard.ts     ← deckent://dashboard
+│   │   ├── directives.ts    ← deckent://directives
+│   │   ├── memory.ts        ← deckent://memory
+│   │   ├── debt.ts          ← deckent://debt
+│   │   ├── config.ts        ← deckent://config
+│   │   ├── retro.ts         ← deckent://retro
+│   │   ├── tasks.ts         ← deckent://tasks
+│   │   └── agents.ts        ← deckent://agents
 │   └── helpers/
 │       └── enrich.ts        ← enrichResponse() — _enriched meta injection
 │
-├── api/                     ← HTTP REST API
-│   └── server.ts            ← Express server, 16 endpoints + SSE stream
+├── api/                     ← HTTP REST API (3 modules)
+│   ├── server.ts            ← Express server, 17 endpoints + SSE stream
+│   ├── rate-limiter.ts      ← API rate limiting
+│   └── watcher.ts           ← File watcher for SSE
 │
 └── dashboard/               ← Web Dashboard
     └── ...                  ← React + Vite + Tailwind (4 pages)
@@ -476,12 +530,12 @@ The CLI layer exposes Deckent's functionality to the operator via terminal comma
 
 | Command Group | Commands |
 |--------------|----------|
-| **Sprint** | `start`, `plan`, `status`, `spawn`, `attach`, `kill` |
-| **Project** | `init`, `onboard`, `doctor`, `analyze`, `upgrade` |
-| **Memory** | `retro`, `history`, `sync`, `archive-debt`, `usage` |
-| **Config** | `config`, `cleanup`, `run` |
-| **Web** | `web`, `serve`, `dashboard`, `watch` |
-| **Plugin** | `plugin install`, `plugin remove`, `plugin list`, `plugin toggle` |
+| **Sprint** | `start`, `plan`, `status`, `spawn`, `attach`, `kill`, `checkpoint`, `finalize` |
+| **Project** | `init`, `onboard`, `doctor`, `analyze`, `upgrade`, `explain` |
+| **Memory** | `retro`, `history`, `sync`, `archive-debt` |
+| **Config** | `config`, `cleanup`, `run`, `set-directives`, `review` |
+| **Web** | `web`, `serve`, `dashboard`, `watch`, `heartbeat` |
+| **Plugin** | `plugin install`, `plugin remove`, `plugin list`, `plugin toggle`, `skill-marketplace` |
 
 **Contextual Hints System (`hints.ts`):**
 Provides phase-based hints to guide operator actions. Hints are localized (tr/en) and returned per phase: `COMPLETE`, `EXECUTE`, `PLAN`, `IDLE`.
@@ -498,7 +552,7 @@ The HTTP API exposes Deckent state and control via REST endpoints. Used by the W
 | Category | Count | Examples |
 |----------|-------|---------|
 | Status endpoints | 4 | `GET /status`, `GET /tasks`, `GET /dashboard`, `GET /health` |
-| Control endpoints | 6 | `POST /start`, `POST /stop`, `POST /kill`, `POST /plan`, `POST /cleanup`, `POST /sync` |
+| Control endpoints | 7 | `POST /start`, `POST /stop`, `POST /kill`, `POST /plan`, `POST /cleanup`, `POST /sync`, `POST /checkpoint` |
 | Memory endpoints | 4 | `GET /memory`, `GET /retro`, `GET /history`, `GET /patterns` |
 | Streaming | 1 | `GET /events` (SSE — real-time dashboard updates) |
 | Config endpoint | 1 | `GET/POST /config` |
@@ -511,30 +565,42 @@ The HTTP API exposes Deckent state and control via REST endpoints. Used by the W
 
 The MCP layer exposes Deckent capabilities as Claude Code tools and resources, enabling operators to control Deckent directly from within Claude Code conversations.
 
-**Tools (10):**
+**Tools (19):**
 
 | Tool | MCP Name | Description |
 |------|----------|-------------|
-| `analyze.ts` | `deckent_analyze_project` | Analyze project stack and suggest config |
-| `directives.ts` | `deckent_set_directives` | Read/write DIRECTIVES.md |
-| `doctor.ts` | `deckent_doctor` | Health check (optional `includeProfile` for system info) |
-| `history.ts` | `deckent_history` | Sprint history and trend data |
 | `init.ts` | `deckent_init` | Initialize Deckent in the project |
+| `directives.ts` | `deckent_set_directives` | Read/write DIRECTIVES.md |
 | `plan.ts` | `deckent_plan` | Dry-run sprint planning |
-| `retro.ts` | `deckent_retro` | Retrospective summary |
 | `start.ts` | `deckent_start` | Execute a sprint |
 | `status.ts` | `deckent_status` | Real-time system status |
+| `doctor.ts` | `deckent_doctor` | Health check (optional `includeProfile` for system info) |
+| `retro.ts` | `deckent_retro` | Retrospective summary |
+| `history.ts` | `deckent_history` | Sprint history and trend data |
+| `analyze.ts` | `deckent_analyze_project` | Analyze project stack and suggest config |
 | `sync.ts` | `deckent_sync` | Sync memory and config |
+| `config.ts` | `deckent_config` | Config read/write |
+| `review.ts` | `deckent_review` | Sprint evaluation (GO/NO_GO/TECH_DEBT) |
+| `run.ts` | `deckent_run` | Run a single task in background |
+| `kill.ts` | `deckent_kill` | Stop workers or sprint |
+| `cleanup.ts` | `deckent_cleanup` | Clean task artifacts |
+| `help.ts` | `deckent_help` | Runtime capabilities and usage guide |
+| `agent-list.ts` | `deckent_agent_list` | List registered agents |
+| `skill-list.ts` | `deckent_skill_list` | List registered skills |
+| `checkpoint.ts` | `deckent_checkpoint` | Approve/reject human checkpoints |
 
-**Resources (5):**
+**Resources (8):**
 
 | URI | Description |
 |-----|-------------|
+| `deckent://dashboard` | Live dashboard state (JSON) |
+| `deckent://directives` | Current `DIRECTIVES.md` content |
 | `deckent://memory` | Current `MEMORY.md` content |
-| `deckent://memory/patterns` | `PATTERNS.md` (JSON array) |
-| `deckent://config` | Current resolved config |
 | `deckent://debt` | `DEBT.md` tech debt ledger |
+| `deckent://config` | Current resolved config |
 | `deckent://retro` | Latest retrospective |
+| `deckent://tasks` | Current sprint tasks (JSON) |
+| `deckent://agents` | Agent pool stats (JSON) |
 
 **MCP Enrichment (`enrich.ts`):**
 All MCP tool responses are enriched via `enrichResponse()`, which appends a `_enriched` metadata object without modifying existing response fields:
@@ -649,7 +715,7 @@ brain.ts: runSprint()
         │     write .brain/sprints/sprint-NNN.md
         │
         └─► runDecay()
-              if countBrainLines() > 600: compress
+              if countBrainLines() > 900: compress
               step1: remove resolved PATTERNS
               step2: remove resolved DEBT rows
               step3: archive oldest sprint logs
@@ -766,9 +832,9 @@ Defaults per subscription tier, defined in `src/core/config.ts`:
 
 | Plan | `max_workers` | `brain_model` | `default_model` | `haiku_allowed` |
 |------|:------------:|:-------------:|:---------------:|:---------------:|
-| `max_plan` (Max 20x) | 8 | opus | opus | true |
-| `max5x_plan` (Max 5x) | 5 | sonnet | opus | true |
-| `pro_plan` (Pro) | 3 | sonnet | sonnet | false |
+| `performance` (formerly max_plan) | 8 | opus | opus | true |
+| `balanced` (formerly max5x_plan) | 5 | sonnet | opus | true |
+| `economic` (formerly pro_plan) | 3 | sonnet | sonnet | false |
 | `api` (API key) | 2 | haiku | haiku | true |
 
 ### Layer 2 — Global Config
@@ -792,7 +858,7 @@ The primary project-level config. Written by `deckent init`, updated by `deckent
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "brain_planning": "auto",
   "max_workers": 8,
   "brain_model": "opus",
@@ -853,11 +919,11 @@ Deckent's memory system is a **3-tier, file-based knowledge store** in `.brain/`
 
 ```
 .brain/
-├── MEMORY.md          ← Tier 1: Short-term (always loaded, max 200 lines)
-├── PATTERNS.md        ← Tier 2: Long-term patterns (JSON array, max 80 lines)
+├── MEMORY.md          ← Tier 1: Short-term (always loaded, max 300 lines)
+├── PATTERNS.md        ← Tier 2: Long-term patterns (JSON array, max 150 lines)
 ├── DECISIONS.md       ← Tier 3: Permanent ADRs (never decayed)
 ├── DEBT.md            ← Tech debt ledger (markdown table, 9 columns)
-├── RETRO.md           ← Latest retrospective (overwritten each sprint, max 100 lines)
+├── RETRO.md           ← Latest retrospective (overwritten each sprint, max 120 lines)
 ├── sprints/           ← Per-sprint logs (max 80 lines each)
 │   ├── sprint-001.md
 │   └── sprint-NNN.md
@@ -867,7 +933,7 @@ Deckent's memory system is a **3-tier, file-based knowledge store** in `.brain/`
 
 ### Tier 1 — MEMORY.md (Short-Term Memory)
 
-- **Max lines:** 200 (`MEMORY_MAX_LINES`)
+- **Max lines:** 300 (`MEMORY_MAX_LINES`)
 - **Written:** After every sprint retrospective
 - **Loaded:** Into Brain context at the start of every sprint via `@import`
 - **Content:** Recent learnings, wave summaries, sprint-to-sprint patterns
@@ -876,7 +942,7 @@ Deckent's memory system is a **3-tier, file-based knowledge store** in `.brain/`
 
 ### Tier 2 — PATTERNS.md (Long-Term Patterns)
 
-- **Max lines:** 80 (`PATTERNS_MAX_LINES`)
+- **Max lines:** 150 (`PATTERNS_MAX_LINES`)
 - **Written:** Auditor appends new patterns (never overwrites)
 - **Format:** JSON array of `PatternEntry` objects
 - **Decay Rule:** `resolved: true` entries removed first on budget exceeded
@@ -901,7 +967,7 @@ Deckent's memory system is a **3-tier, file-based knowledge store** in `.brain/`
 - **Never decayed**
 - **Format:** `## ADR-NNN: Title` + Decision / Context / Consequence
 
-Current ADRs (Sprint 25):
+Current ADRs (as of Sprint 095):
 
 | ADR | Subject |
 |-----|---------|
@@ -923,20 +989,20 @@ Current ADRs (Sprint 25):
 
 | File | Max Lines | Decay Strategy |
 |------|:---------:|----------------|
-| `MEMORY.md` | 200 | Remove sections ≥ 5 sprints old; hard-truncate to 50 as last resort |
-| `PATTERNS.md` | 80 | Remove `resolved: true` entries when budget exceeded |
+| `MEMORY.md` | 300 | Remove sections ≥ 5 sprints old; hard-truncate to 50 as last resort |
+| `PATTERNS.md` | 150 | Remove `resolved: true` entries when budget exceeded |
 | `DECISIONS.md` | ∞ | Never decayed |
-| `RETRO.md` | 100 | Overwritten every sprint |
+| `RETRO.md` | 120 | Overwritten every sprint |
 | `DEBT.md` | ∞ | Remove resolved rows when budget exceeded |
-| `sprints/sprint-NNN.md` | 80 | Archive oldest (keep last 2 active) |
-| **Total `.brain/` budget** | **600** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
+| `sprints/sprint-NNN.md` | 100 | Archive oldest (keep last 2 active) |
+| **Total `.brain/` budget** | **900** | `BRAIN_TOTAL_LINE_BUDGET` in `constants.ts` |
 
 ### Decay Cycle
 
 ```typescript
 // src/orchestra/sprint-controller.ts (re-exported via brain.ts)
 function runDecay(projectRoot: string, sprintId: string, opts?: { force?: boolean }): DecayResult {
-  if (!opts?.force && countBrainLines(projectRoot) <= BRAIN_TOTAL_LINE_BUDGET) {
+  if (!opts?.force && countBrainLines(projectRoot) <= BRAIN_TOTAL_LINE_BUDGET) { // 900
     return earlyReturn(); // no-op if under budget
   }
 
@@ -1129,7 +1195,7 @@ Locks held >5 minutes generate a `WARNING` alert from the Auditor.
 | Concurrent write conflict | File-based lock mutex in `.locks/` |
 | Deadlocked task graph | Kahn's algorithm circular dependency detection |
 | Brain overreach | `--allowedTools` excludes DIRECTIVES and config paths |
-| Memory budget overflow | `runDecay()` triggered at sprint end when >900 lines |
+| Memory budget overflow | `runDecay()` triggered at sprint end when `.brain/` exceeds 900 lines |
 | Sprint abandonment | `runSprint()` wraps all phases in try/catch; always reaches COMPLETE |
 
 ### Operating Modes
@@ -1156,6 +1222,10 @@ project/
 │   ├── workspace/
 │   │   ├── IDENTITY.md         ← Project identity (name, type, language)
 │   │   └── BOOT.md             ← Boot sequence reference
+│   ├── agents/                 ← Agent pool (9 built-in + temp agents, LRU eviction)
+│   │   └── {agent-name}/      ← agent.json + PROMPT.md
+│   ├── skills/                 ← Skill registry (11 built-in + temp skills)
+│   │   └── {skill-name}/      ← manifest.json + SKILL.md
 │   ├── i18n/
 │   │   ├── en.json             ← English strings
 │   │   └── tr.json             ← Turkish strings
@@ -1163,12 +1233,13 @@ project/
 │       ├── .gitkeep
 │       └── {plugin-name}/      ← Plugin directories (gitignored)
 │
-├── .brain/                     ← Memory system (3 tiers)
-│   ├── MEMORY.md               ← Tier 1: Short-term (max 200 lines)
-│   ├── PATTERNS.md             ← Tier 2: Long-term patterns (JSON)
+├── .brain/                     ← Memory system (3 tiers, 900-line budget)
+│   ├── MEMORY.md               ← Tier 1: Short-term (max 300 lines)
+│   ├── PATTERNS.md             ← Tier 2: Long-term patterns (JSON, max 150 lines)
 │   ├── DECISIONS.md            ← Tier 3: Permanent ADRs
+│   ├── PROJECT-IDENTITY.md     ← Permanent project memory (never decayed)
 │   ├── DEBT.md                 ← Tech debt ledger (markdown table)
-│   ├── RETRO.md                ← Latest retrospective (max 100 lines)
+│   ├── RETRO.md                ← Latest retrospective (max 120 lines)
 │   ├── sprints/                ← Per-sprint logs (max 80 lines each)
 │   │   └── sprint-NNN.md
 │   └── archive/                ← Archived sprint logs
@@ -1211,7 +1282,7 @@ DIRECTIVE → PLAN → SPAWN → AUDIT_START → EXECUTE → AUDIT_STOP → EVAL
 | Phase | Actor | Action | Output |
 |-------|-------|--------|--------|
 | **DIRECTIVE** | Operator | Write/update `DIRECTIVES.md` | Updated directives |
-| **PLAN** | Brain | Read context, check usage, create task JSONs | `.tasks/task-{id}.json` × N |
+| **PLAN** | Brain | Read context, create task JSONs | `.tasks/task-{id}.json` × N |
 | **SPAWN** | Brain | Spawn workers via provider adapters (tmux/subprocess) | N workers across providers |
 | **AUDIT_START** | Brain | Start auditor scan loop (in-process) | Running scan interval |
 | **EXECUTE** | Workers | Code, test, document, report | `.tasks/task-{id}.result` × N |
@@ -1219,7 +1290,7 @@ DIRECTIVE → PLAN → SPAWN → AUDIT_START → EXECUTE → AUDIT_STOP → EVAL
 | **EVALUATE** | Brain | Grade each result: DONE / GO_DEBT / NO_GO | Evaluation records |
 | **FIX** | Brain | Spawn priority-fix workers for NO_GO tasks | Fixed tasks (or recorded as debt) |
 | **RETRO** | Brain | Update MEMORY, RETRO, DECISIONS, sprint log | Updated `.brain/` files |
-| **DECAY** | Brain | Compress if `.brain/` > 600 lines | Cleaned `.brain/` |
+| **DECAY** | Brain | Compress if `.brain/` > 900 lines | Cleaned `.brain/` |
 | **TRANSITION** | Brain | More directives? Loop. Done? Report. | Sprint complete |
 
 **Invariant:** Sprints are **never** left incomplete. Every phase is wrapped in try/catch, and the sprint always reaches the COMPLETE state even if individual tasks fail.
@@ -1250,6 +1321,7 @@ The HTTP API runs on port 3100 (default). Started via `deckent web` or `deckent 
 | `POST` | `/plan` | Dry-run plan (no spawn) |
 | `POST` | `/cleanup` | Clean task artifacts |
 | `POST` | `/sync` | Sync memory |
+| `POST` | `/checkpoint` | Approve/reject human checkpoints |
 
 ### SSE Real-Time Updates
 
@@ -1327,4 +1399,4 @@ The ci-guardian agent is a specialized agent for CI/CD integration:
 
 ---
 
-*Last updated: Sprint 065 — deckent v0.2.0-beta.1 — March 2026*
+*Last updated: Sprint 095+ — deckent v0.3.0-beta — April 2026*

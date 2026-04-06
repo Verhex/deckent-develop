@@ -86,26 +86,26 @@ The `selfAssessment` field is now required in result files:
 
 ```json
 {
-  "mode": "pro_plan",
+  "mode": "economic",
   "language": "en",
   "projectName": "my-project",
   "version": "1.0.0",
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 8,
       "brain_model": "opus",
       "default_model": "sonnet",
       "haiku_allowed": true,
       "brain_planning": "ai"
     },
-    "max5x_plan": {
+    "balanced": {
       "max_workers": 5,
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": true,
       "brain_planning": "auto"
     },
-    "pro_plan": {
+    "economic": {
       "max_workers": 3,
       "brain_model": "sonnet",
       "default_model": "sonnet",
@@ -120,13 +120,15 @@ The `selfAssessment` field is now required in result files:
     }
   }
 }
+
+> **Legacy aliases:** `max_plan` → `performance`, `max5x_plan` → `balanced`, `pro_plan` → `economic`. Old names still work but are deprecated.
 ```
 
 ### New Config Fields (v1.0)
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | `PlanMode` | `"pro_plan"` | Active subscription mode |
+| `mode` | `PlanMode` | `"economic"` | Active plan mode (legacy: `pro_plan`) |
 | `modes` | `Record<PlanMode, PlanModeConfig>` | — | Per-mode configuration |
 | `language` | `"en" \| "tr"` | `"en"` | UI language |
 | `projectName` | `string` | directory name | Project display name |
@@ -137,7 +139,7 @@ The `selfAssessment` field is now required in result files:
 
 ### Migrating Flat Config Manually
 
-1. Wrap your existing fields under the appropriate mode (e.g. `pro_plan`).
+1. Wrap your existing fields under the appropriate mode (e.g. `economic`).
 2. Add the `mode` field pointing to that mode.
 3. Run `deckent doctor` to validate.
 
@@ -402,7 +404,7 @@ deckent sync                       # re-inject @DECKENT.md reference
 ```json
 {
   "modes": {
-    "pro_plan": {
+    "economic": {
       "haiku_allowed": false,
       "brain_planning": "auto"
     }

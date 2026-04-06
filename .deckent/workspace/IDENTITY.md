@@ -9,9 +9,9 @@ Platform: macOS, Linux, WSL2
 Tests: 12,193+
 Dashboard Tests: 413
 Coverage: 96%+
-Sprints: 91+
+Sprints: 95+
 CLI Commands: 34+
-MCP: 18 tools, 8 resources
+MCP: 19 tools, 8 resources
 Agents: 9 built-in
 Skills: 11 built-in
 Providers: Claude, Codex, Gemini

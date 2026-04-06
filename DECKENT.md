@@ -25,7 +25,7 @@
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 18 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list
+- 19 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint
 - 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
 - Registration: `claude mcp add deckent -- npx deckent mcp`
 
@@ -167,6 +167,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 | `deckent_help` | Runtime yetenekleri, proje durumu ve kullanim rehberi goster | Evet | Hayir |
 | `deckent_agent_list` | Kayitli agent'lari listele (built-in ve temp) | Evet | Hayir |
 | `deckent_skill_list` | Kayitli skill'leri listele (manifest ve AST sandbox info) | Evet | Hayir |
+| `deckent_checkpoint` | Checkpoint approve/reject | Hayir | Hayir |
 
 ### Parametre Ornekleri
 
@@ -347,11 +348,11 @@ tsc
 | `typescript-expert` | TypeScript tip sistemi, ESM, generics, decorators |
 | `testing-expert` | Vitest/Jest, mock'lama, coverage, test stratejisi |
 | `documentation-writer` | Markdown, JSDoc, API docs, changelog |
-| `security-expert` | Guvenlik patternleri, input validasyon, kriptografi |
-| `performance-expert` | Async optimizasyon, memory, profiling |
-| `api-designer` | REST tasarimi, OpenAPI spec, versiyonlama |
-| `refactoring-expert` | SOLID prensipler, design patterns, clean code |
-| `ci-cd-expert` | GitHub Actions, Docker, deployment pipeline |
-| `database-expert` | Query optimizasyon, migration, ORM |
-| `frontend-expert` | React, Vite, Tailwind, component mimari |
+| `security-specialist` | Guvenlik patternleri, input validasyon, kriptografi |
+| `performance-optimizer` | Async optimizasyon, memory, profiling |
+| `api-builder` | REST tasarimi, OpenAPI spec, versiyonlama |
+| `devops-engineer` | GitHub Actions, Docker, deployment pipeline |
+| `database-migration` | Query optimizasyon, migration, ORM |
+| `react-specialist` | React, Vite, Tailwind, component mimari |
+| `python-expert` | Python ekosistemi, FastAPI, veri islemleri |
 | `ci-testing` | CI ortaminda test yurutme, regresyon algilama |

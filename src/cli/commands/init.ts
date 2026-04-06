@@ -1317,9 +1317,9 @@ Task'ın ne yapacağını detaylı açıkla.
 
 ## Mevcut Skills
 - typescript-expert, testing-expert, documentation-writer
-- security-expert, performance-expert, api-designer
-- refactoring-expert, ci-cd-expert, database-expert
-- frontend-expert, ci-testing
+- security-specialist, performance-optimizer, api-builder
+- devops-engineer, database-migration, react-specialist
+- python-expert, ci-testing
 
 ## İpuçları
 - Her task bağımsız olmalı — birbirine bağımlı task'lar dependencies ile belirtin
@@ -1363,9 +1363,9 @@ Describe what the task will do in detail.
 
 ## Available Skills
 - typescript-expert, testing-expert, documentation-writer
-- security-expert, performance-expert, api-designer
-- refactoring-expert, ci-cd-expert, database-expert
-- frontend-expert, ci-testing
+- security-specialist, performance-optimizer, api-builder
+- devops-engineer, database-migration, react-specialist
+- python-expert, ci-testing
 
 ## Tips
 - Each task should be independent — use dependencies for related tasks

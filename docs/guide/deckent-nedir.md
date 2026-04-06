@@ -53,8 +53,8 @@ DIRECTIVES.md → Brain okur → Plan oluştur → Task JSON'lar yaz
 ```
 Kullanıcı
   │
-  ├─→ CLI (25 komut) ──→ Brain (orchestrator)
-  ├─→ MCP (10 tool) ───→ Brain
+  ├─→ CLI (34+ komut) ──→ Brain (orchestrator)
+  ├─→ MCP (19 tool) ───→ Brain
   ├─→ HTTP API (16 endpoint) ─→ Brain
   │
   Brain
@@ -86,7 +86,7 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 
 ## 3. CLI KOMUTLARI
 
-**Toplam: 25 komut** | 21 tam uygulama | 4 stub
+**Toplam: 34+ komut** | CLI komutları tam uygulama
 
 ### Sprint Yönetimi (5 komut)
 
@@ -165,11 +165,11 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 
 ## 4. MCP TOOL'LARI
 
-**Toplam: 10 tool** | Kayıt: `src/mcp/server.ts` | SDK: `@modelcontextprotocol/sdk` | Transport: stdio
+**Toplam: 19 tool** | Kayıt: `src/mcp/server.ts` | SDK: `@modelcontextprotocol/sdk` | Transport: stdio
 
 | # | Tool Adı | Dosya | Parametreler | Açıklama |
 |---|----------|-------|-------------|----------|
-| 1 | `deckent_init` | src/mcp/tools/init.ts | `projectName` (zorunlu), `mode` (max_plan/max5x_plan/pro_plan/api), `language` (en/tr) | Proje başlat, dizin yapısı oluştur |
+| 1 | `deckent_init` | src/mcp/tools/init.ts | `projectName` (zorunlu), `mode` (performance/balanced/economic/api), `language` (en/tr) | Proje başlat, dizin yapısı oluştur |
 | 2 | `deckent_set_directives` | src/mcp/tools/directives.ts | `content` (zorunlu) | DIRECTIVES.md yaz, görev sayısı ve model dağılımı döndür |
 | 3 | `deckent_plan` | src/mcp/tools/plan.ts | `dryRun` (varsayılan true), `mode` (ai/structured/auto) | Sprint planla, wave dağılımı ve risk analizi döndür |
 | 4 | `deckent_start` | src/mcp/tools/start.ts | `autoApprove` (varsayılan false) | Sprint'i arka planda başlat (fire-and-forget), jobId döndür |
@@ -180,7 +180,7 @@ Her worker bağımsız bir Claude CLI process'idir. Deckent'in kendisi AI kararl
 | 9 | `deckent_analyze_project` | src/mcp/tools/analyze.ts | — | Proje stack analizi, config önerileri |
 | 10 | `deckent_sync` | src/mcp/tools/sync.ts | — | Adapter dosya senkronizasyonu, değişiklik sayısı |
 
-### MCP Resource'ları (5 adet)
+### MCP Resource'ları (8 adet)
 
 | # | URI | MIME | Dosya | Açıklama |
 |---|-----|------|-------|----------|
@@ -327,7 +327,7 @@ Brain, sistemin **tek karar vericisidir**. ADR-008'e göre yalnızca Brain, tmux
 
 Deckent, gorevlere otomatik olarak uzmanlasmis agent atayabilir:
 
-- **8 yerlesik agent:** security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer
+- **9 yerlesik agent:** security-auditor, test-writer, doc-writer, code-reviewer, refactorer, bug-fixer, api-builder, performance-analyzer, ci-guardian
 - **Brain entegrasyonu:** planSprint sirasinda her gorev icin keyword+scope bazli otomatik agent secimi
 - **Multi-agent pipeline:** Sirali agent calistirma, shared context ile ajanlar arasi iletisim
 - **CLI:** `deckent agent list`, `deckent agent create`, `deckent agent enable/disable`
@@ -337,7 +337,7 @@ Deckent, gorevlere otomatik olarak uzmanlasmis agent atayabilir:
 
 Deckent, proje teknolojisine gore dinamik skill secimi yapar:
 
-- **10 yerlesik skill:** typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer
+- **11 yerlesik skill:** typescript-expert, react-specialist, python-expert, api-builder, database-migration, testing-expert, documentation-writer, security-specialist, performance-optimizer, devops-engineer, ci-testing
 - **Stack detection:** Proje teknolojisini otomatik tespit (TypeScript, React, Python, Rust, Go, Docker) ve sonuclari cache'ler
 - **Brain entegrasyonu:** Her gorev icin uygun skill secimi ve SKILL.md prompt enjeksiyonu (1500 karakter/skill, 4000 toplam limit)
 - **CLI:** `deckent skill list`, `deckent skill create`, `deckent skill install`
@@ -458,10 +458,10 @@ Auditor **asla kaynak kodu yazmaz**. 30 saniyelik döngülerle sistemi tarar.
 ### Bellek Bütçesi
 
 ```
-.brain/ toplam: max 600 satır (BRAIN_TOTAL_LINE_BUDGET)
-├── MEMORY.md: max 200 satır
-├── RETRO.md: max 100 satır
-├── PATTERNS.md: max 80 satır
+.brain/ toplam: max 900 satır (BRAIN_TOTAL_LINE_BUDGET)
+├── MEMORY.md: max 300 satır
+├── RETRO.md: max 120 satır
+├── PATTERNS.md: max 150 satır
 ├── DEBT.md: bütçeden hariç (ayrı yönetilir)
 ├── DECISIONS.md: bütçeden hariç
 └── sprints/: bütçeden hariç (80 satır per dosya)
@@ -584,7 +584,7 @@ buildPlanPrompt() → callBrainPlanner() → parsePlannerResponse()
 ┌─ 7. DECAY ────────────────────────────────────────────────┐
 │  runDecay() — resolved debt temizliği (3 sprint kuralı)   │
 │  Memory kırpma, pattern temizliği                         │
-│  Bütçe kontrolü: .brain/ < 600 satır                      │
+│  Bütçe kontrolü: .brain/ < 900 satır                      │
 └───────────────────────────────────────────────────────────┘
          │
 ┌─ 8. CLEANUP ──────────────────────────────────────────────┐
@@ -729,16 +729,14 @@ Hook hataları **non-fatal**: hata loglanır ama sprint/task devam eder.
 - **Stale tespiti:** >300s (5dk) olan lock'lar Auditor tarafından uyarılır
 - **Cleanup:** Sprint sonunda tüm lock'lar serbest bırakılır
 
-### Kullanım Eşikleri (Subscription Bazlı)
+### Plan Modları (Subscription Bazlı)
 
-| Plan | 5 Saatlik | Haftalık | Max Workers |
-|------|-----------|----------|-------------|
-| max_plan | %80 | %60 | 8 |
-| max5x_plan | %70 | %50 | 5 |
-| pro_plan | %60 | %40 | 3 |
-| api | %100 | %100 | 10 |
-
-Eşik aşılırsa: sprint otomatik duraklatılır (`checkAndAutoPause`), worker sayısı azaltılır, model downgrade edilir.
+| Plan | Max Workers | Açıklama |
+|------|-------------|----------|
+| performance (eski: max_plan) | 8 | Tam güç, opus destekli |
+| balanced (eski: max5x_plan) | 5 | Dengeli kullanım |
+| economic (eski: pro_plan) | 3 | Ekonomik mod |
+| api | 10 | API tabanlı, pay-as-you-go |
 
 ### localhost Binding
 
@@ -866,9 +864,9 @@ Sprint 38 (Multi-Provider): 8.555+ test (+555) — Claude/Codex/Gemini provider 
 
 | Mod | Brain Model | Default Model | Haiku | Max Workers | Bütçe |
 |-----|------------|---------------|-------|-------------|-------|
-| max_plan | opus | opus | Evet | 8 | — |
-| max5x_plan | sonnet | opus | Evet | 5 | — |
-| pro_plan | sonnet | sonnet | Hayır | 3 | — |
+| performance (eski: max_plan) | opus | opus | Evet | 8 | — |
+| balanced (eski: max5x_plan) | sonnet | opus | Evet | 5 | — |
+| economic (eski: pro_plan) | sonnet | sonnet | Hayır | 3 | — |
 | api | opus | sonnet | Evet | 10 | $5/sprint |
 
 ---

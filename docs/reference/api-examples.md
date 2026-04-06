@@ -159,11 +159,11 @@ curl http://localhost:3100/api/config
 **Example response:**
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en",
   "projectName": "my-app",
   "modes": {
-    "max_plan": {
+    "performance": {
       "max_workers": 8,
       "brain_model": "opus",
       "default_model": "sonnet",
@@ -459,7 +459,7 @@ Merges the provided fields into `.deckent/config.json`. Existing fields not in t
 curl -X POST http://localhost:3100/api/config \
   -H "Authorization: Bearer your-token" \
   -H "Content-Type: application/json" \
-  -d '{"mode": "pro_plan"}'
+  -d '{"mode": "economic"}'
 
 # Change language
 curl -X POST http://localhost:3100/api/config \
@@ -471,7 +471,7 @@ curl -X POST http://localhost:3100/api/config \
 curl -X POST http://localhost:3100/api/config \
   -H "Authorization: Bearer your-token" \
   -H "Content-Type: application/json" \
-  -d '{"mode": "max5x_plan", "language": "en"}'
+  -d '{"mode": "balanced", "language": "en"}'
 ```
 
 **Response:** Full merged config object (same as `GET /api/config`).
@@ -654,7 +654,7 @@ async function updateConfig(patch: Record<string, unknown>): Promise<unknown> {
   return res.json();
 }
 
-const merged = await updateConfig({ mode: 'pro_plan', language: 'en' });
+const merged = await updateConfig({ mode: 'economic', language: 'en' });
 console.log('Config updated:', merged);
 ```
 

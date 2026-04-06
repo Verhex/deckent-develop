@@ -139,5 +139,5 @@
       "Bash(echo \"EXIT: $?\")"
     ]
   },
-  "outputStyle": "default"
+  "outputStyle": "Explanatory"
 }

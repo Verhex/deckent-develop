@@ -8,21 +8,21 @@
 - Author: Alperen @ Verhex
 
 ## Architecture
-- **orchestra/** (48 modules): Sprint lifecycle, planning, evaluation, routing
+- **orchestra/** (47 modules): Sprint lifecycle, planning, evaluation, routing
   - brain.ts → re-export layer, sprint-controller.ts → full lifecycle
   - sprint-phases.ts → extracted phase functions (Sprint 072 god object split)
   - sprint-utils.ts → shared sprint utilities (Sprint 075 god object split faz 2)
   - result-collector.ts → result collection, IPC+fs.watch loop (Sprint 076 god object split faz 3)
   - planner.ts, task-builder.ts, result-evaluator.ts, task-router.ts
   - debt-manager.ts, sprint-reporter.ts, tmux.ts, spawn-backend.ts
-- **core/** (49 modules): Types, config, utilities, agent/skill pools
+- **core/** (48 modules): Types, config, utilities, agent/skill pools
   - types.ts + domain-types, config.ts (3-layer merge), provider.ts
-  - agent-pool.ts (8 built-in, LRU), skill-pool.ts + skill-registry.ts (AST sandbox)
+  - agent-pool.ts (9 built-in, LRU), skill-pool.ts + skill-registry.ts (AST sandbox)
 - **agents/** (16 modules): Worker execution, prompt engineering
 - **providers/** (5 modules): Claude, Codex, Gemini adapters
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
-- **mcp/**: MCP server — 18 tools + 8 resources, stdio transport (verified sprint-093)
-- **cli/** (33 commands): Full CLI with helpers, entry point
+- **mcp/**: MCP server — 19 tools + 8 resources, stdio transport (verified sprint-093)
+- **cli/** (34 commands): Full CLI with helpers, entry point
 - **dashboard/**: React + Vite + Tailwind (4 pages, SSE indicator, language switcher)
   - i18n/LanguageProvider.tsx, i18n/en.ts (~282 keys), i18n/tr.ts (~282 keys)
   - ConfigPage i18n tam kapsam (Sprint 084), AgentDetail geniş panel (Sprint 084)
@@ -30,9 +30,9 @@
 ## Current State
 - Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-095
-- Total Sprints: 95
-- Completed Tasks: 256
+- Last Sprint: sprint-096
+- Total Sprints: 96
+- Completed Tasks: 266
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -66,8 +66,8 @@
 - core/skill-pool.ts → skill selection, stack detection
 - core/provider.ts → ProviderAdapter interface, multi-provider registry
 - agents/worker.ts → task claim, file locking, heartbeat, verify loop
-- cli/entry.ts → buildProgram() + 33+ commands
-- mcp/index.ts → 18 tools + 8 resources (Sprint 089: usage kaldırıldı)
+- cli/entry.ts → buildProgram() + 34+ commands
+- mcp/index.ts → 19 tools + 8 resources (Sprint 089: usage kaldırıldı)
 - api/server.ts → HTTP API + SSE (17 endpoints: GET /api/status, /api/tasks, etc.)
 
 ## Sprint 067 Learnings

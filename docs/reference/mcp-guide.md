@@ -211,7 +211,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
 | Parametre | Tip | Zorunlu | Varsayılan | Açıklama |
 |-----------|-----|---------|-----------|----------|
 | `projectName` | string | Evet | — | Proje adı (DECKENT.md başlığında kullanılır) |
-| `mode` | enum | Hayır | `max_plan` | Claude plan modu: `max_plan`, `max5x_plan`, `pro_plan`, `api` |
+| `mode` | enum | Hayır | `performance` | Plan modu: `performance`, `balanced`, `economic`, `api` (legacy: `max_plan`, `max5x_plan`, `pro_plan`) |
 | `language` | enum | Hayır | `en` | Ajan prompt dili: `en`, `tr` |
 
 **Örnek Çağrı:**
@@ -221,7 +221,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
   "tool": "deckent_init",
   "arguments": {
     "projectName": "my-app",
-    "mode": "max_plan",
+    "mode": "performance",
     "language": "en"
   }
 }
@@ -244,7 +244,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
     "CLAUDE.md",
     ".claude/settings.json"
   ],
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en",
   "projectName": "my-app"
 }
@@ -325,7 +325,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
   "recommendation": {
     "size": 4,
     "maxWorkers": 4,
-    "reason": "Max plan: up to 5 parallel workers"
+    "reason": "Performance mode: up to 5 parallel workers"
   },
   "reasoning": "Tasks prioritized by dependency and complexity.",
   "planningMode": "ai"
@@ -740,7 +740,7 @@ Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deck
 
 ```json
 {
-  "mode": "max_plan",
+  "mode": "performance",
   "language": "en",
   "projectName": "my-app",
   "brain_planning": "ai",
@@ -761,7 +761,7 @@ Kullanıcı: "Set up Deckent for my TypeScript project"
 Claude:
   1. deckent_doctor()         → sağlık kontrolü
   2. deckent_analyze_project() → proje analizi
-  3. deckent_init({ projectName: "my-app", mode: "max_plan" })
+  3. deckent_init({ projectName: "my-app", mode: "performance" })
   4. deckent_sync()            → CLAUDE.md + AGENTS.md güncellenir
 ```
 
