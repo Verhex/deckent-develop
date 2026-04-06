@@ -169,8 +169,8 @@ describe('Defaults', () => {
     expect(SUPPORTED_LANGUAGES).toContain('tr');
   });
 
-  it('DEFAULT_MODE === max_plan', () => {
-    expect(DEFAULT_MODE).toBe('max_plan');
+  it('DEFAULT_MODE === performance', () => {
+    expect(DEFAULT_MODE).toBe('performance');
   });
 
   it('DEFAULT_LANGUAGE === en', () => {

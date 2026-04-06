@@ -355,7 +355,7 @@ function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
 function makeConfig(): ResolvedConfig {
   return {
     projectName: 'test',
-    mode: 'max_plan',
+    mode: 'performance',
     projectRoot: '/tmp/test',
     language: 'en',
     version: '1.0.0',

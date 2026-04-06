@@ -23,7 +23,7 @@ vi.mock('../../src/core/config.js', () => ({
     activeModeConfig: { brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, max_workers: 4 },
   })),
   createDefaultConfig: vi.fn(() => ({
-    mode: 'max_plan',
+    mode: 'performance',
     brain_provider: 'claude',
     worker_provider: 'claude',
     cost_optimization: false,
@@ -54,9 +54,9 @@ vi.mock('../../src/core/config.js', () => ({
     rollback_policy: 'never',
     auto_clean_locks: false,
     modes: {
-      max_plan: { max_workers: 8, brain_model: 'opus', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
-      max5x_plan: { max_workers: 5, brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
-      pro_plan: { max_workers: 3, brain_model: 'sonnet', default_model: 'sonnet', haiku_allowed: false, brain_planning: 'auto' },
+      performance: { max_workers: 8, brain_model: 'opus', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
+      balanced: { max_workers: 5, brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, brain_planning: 'auto' },
+      economic: { max_workers: 3, brain_model: 'sonnet', default_model: 'sonnet', haiku_allowed: false, brain_planning: 'auto' },
       api: { max_workers: 10, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true, budget_per_sprint: 5.0, requires: 'ANTHROPIC_API_KEY', brain_planning: 'auto' },
     },
   })),
@@ -147,7 +147,7 @@ describe('API — Config Editor endpoints', () => {
     const res = await request(api, '/api/config/defaults');
     expect(res.status).toBe(200);
     const data = JSON.parse(res.body);
-    expect(data.mode).toBe('max_plan');
+    expect(data.mode).toBe('performance');
     expect(data.brain_provider).toBe('claude');
     expect(data.output_mode).toBe('normal');
     expect(data.telemetry_enabled).toBe(false);
@@ -155,12 +155,12 @@ describe('API — Config Editor endpoints', () => {
   });
 
   it('GET /api/config returns current project config', async () => {
-    const configData = { mode: 'pro_plan', brain_provider: 'codex' };
+    const configData = { mode: 'economic', brain_provider: 'codex' };
     mockReadJsonSafe.mockReturnValueOnce(configData);
     const res = await request(api, '/api/config');
     expect(res.status).toBe(200);
     const data = JSON.parse(res.body);
-    expect(data.mode).toBe('pro_plan');
+    expect(data.mode).toBe('economic');
     expect(data.brain_provider).toBe('codex');
   });
 
@@ -171,7 +171,7 @@ describe('API — Config Editor endpoints', () => {
   });
 
   it('POST /api/config saves valid config and returns merged result', async () => {
-    const existing = { mode: 'max_plan', brain_provider: 'claude' };
+    const existing = { mode: 'performance', brain_provider: 'claude' };
     mockReadJsonSafe.mockReturnValueOnce(existing);
     mockValidatePartialConfig.mockImplementation(() => { /* pass */ });
 
@@ -180,14 +180,14 @@ describe('API — Config Editor endpoints', () => {
     expect(res.status).toBe(200);
 
     const data = JSON.parse(res.body);
-    expect(data.mode).toBe('max_plan');
+    expect(data.mode).toBe('performance');
     expect(data.output_mode).toBe('verbose');
     expect(data.search_cache_ttl).toBe(7200);
     expect(mockWriteFileSync).toHaveBeenCalled();
   });
 
   it('POST /api/config returns 422 on validation error', async () => {
-    const existing = { mode: 'max_plan' };
+    const existing = { mode: 'performance' };
     mockReadJsonSafe.mockReturnValueOnce(existing);
     mockValidatePartialConfig.mockImplementation(() => {
       throw new ConfigValidationError(['Invalid brain_provider "invalid"']);
@@ -210,7 +210,7 @@ describe('API — Config Editor endpoints', () => {
 
   it('POST /api/config merges with existing config preserving untouched fields', async () => {
     const existing = {
-      mode: 'max_plan',
+      mode: 'performance',
       brain_provider: 'claude',
       output_splash: true,
       telemetry_enabled: false,
@@ -223,7 +223,7 @@ describe('API — Config Editor endpoints', () => {
     expect(res.status).toBe(200);
 
     const data = JSON.parse(res.body);
-    expect(data.mode).toBe('max_plan');
+    expect(data.mode).toBe('performance');
     expect(data.brain_provider).toBe('claude');
     expect(data.output_splash).toBe(true);
     expect(data.telemetry_enabled).toBe(true);

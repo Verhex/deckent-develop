@@ -46,8 +46,8 @@ describe('docs/reference/api.md', () => {
     expect(content).toContain('Server-Sent Events');
   });
 
-  it('documents MCP Tools (10)', () => {
-    expect(content).toContain('### Tools (10)');
+  it('documents MCP Tools (19)', () => {
+    expect(content).toContain('### Tools (19)');
     expect(content).toContain('deckent_init');
     expect(content).toContain('deckent_set_directives');
     expect(content).toContain('deckent_plan');
@@ -58,15 +58,27 @@ describe('docs/reference/api.md', () => {
     expect(content).toContain('deckent_history');
     expect(content).toContain('deckent_analyze_project');
     expect(content).toContain('deckent_sync');
+    expect(content).toContain('deckent_config');
+    expect(content).toContain('deckent_review');
+    expect(content).toContain('deckent_run');
+    expect(content).toContain('deckent_kill');
+    expect(content).toContain('deckent_cleanup');
+    expect(content).toContain('deckent_help');
+    expect(content).toContain('deckent_agent_list');
+    expect(content).toContain('deckent_skill_list');
+    expect(content).toContain('deckent_checkpoint');
   });
 
-  it('documents MCP Resources (5)', () => {
-    expect(content).toContain('### Resources (5)');
+  it('documents MCP Resources (8)', () => {
+    expect(content).toContain('### Resources (8)');
     expect(content).toContain('deckent://dashboard');
     expect(content).toContain('deckent://directives');
     expect(content).toContain('deckent://memory');
     expect(content).toContain('deckent://debt');
     expect(content).toContain('deckent://config');
+    expect(content).toContain('deckent://retro');
+    expect(content).toContain('deckent://tasks');
+    expect(content).toContain('deckent://agents');
   });
 
   it('contains authentication note', () => {

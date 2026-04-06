@@ -46,10 +46,10 @@ describe('loadGlobalConfig', () => {
 
   it('returns partial config when global config exists', async () => {
     const cfgPath = join(tempDir, 'config.json');
-    writeCfg(cfgPath, { mode: 'pro_plan', language: 'tr' });
+    writeCfg(cfgPath, { mode: 'economic', language: 'tr' });
     const result = await loadGlobalConfig(cfgPath);
     expect(result).not.toBeNull();
-    expect((result as Partial<DeckentConfig>).mode).toBe('pro_plan');
+    expect((result as Partial<DeckentConfig>).mode).toBe('economic');
     expect((result as Partial<DeckentConfig>).language).toBe('tr');
   });
 
@@ -78,25 +78,25 @@ describe('loadGlobalConfig', () => {
 describe('mergeConfigs', () => {
   it('returns defaults when both global and project are null', () => {
     const result = mergeConfigs(null, null);
-    expect(result.mode).toBe('max_plan');
+    expect(result.mode).toBe('performance');
     expect(result.language).toBe('en');
   });
 
   it('applies global config over defaults', () => {
     const result = mergeConfigs({ language: 'tr' }, null);
     expect(result.language).toBe('tr');
-    expect(result.mode).toBe('max_plan');
+    expect(result.mode).toBe('performance');
   });
 
   it('project config overrides global config', () => {
-    const result = mergeConfigs({ language: 'tr', mode: 'pro_plan' }, { language: 'en' });
+    const result = mergeConfigs({ language: 'tr', mode: 'economic' }, { language: 'en' });
     expect(result.language).toBe('en');
-    expect(result.mode).toBe('pro_plan');
+    expect(result.mode).toBe('economic');
   });
 
   it('project config overrides global mode', () => {
-    const result = mergeConfigs({ mode: 'pro_plan' }, { mode: 'max_plan' });
-    expect(result.mode).toBe('max_plan');
+    const result = mergeConfigs({ mode: 'economic' }, { mode: 'performance' });
+    expect(result.mode).toBe('performance');
   });
 
   it('null global config with project config applies project', () => {
@@ -132,10 +132,10 @@ describe('mergeConfigs', () => {
   it('merges both global and project config fields', () => {
     const result = mergeConfigs(
       { language: 'tr', projectName: 'from-global' },
-      { mode: 'pro_plan', projectName: 'from-project' },
+      { mode: 'economic', projectName: 'from-project' },
     );
     expect(result.language).toBe('tr');
-    expect(result.mode).toBe('pro_plan');
+    expect(result.mode).toBe('economic');
     expect(result.projectName).toBe('from-project');
   });
 });
@@ -164,10 +164,10 @@ describe('saveGlobalConfig', () => {
   it('overwrites existing global config', async () => {
     const cfgPath = join(tempDir, 'config.json');
     writeCfg(cfgPath, { language: 'en' });
-    await saveGlobalConfig({ language: 'tr', mode: 'pro_plan' }, cfgPath);
+    await saveGlobalConfig({ language: 'tr', mode: 'economic' }, cfgPath);
     const saved = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Partial<DeckentConfig>;
     expect(saved.language).toBe('tr');
-    expect(saved.mode).toBe('pro_plan');
+    expect(saved.mode).toBe('economic');
   });
 
   it('writes valid JSON with trailing newline', async () => {
@@ -218,13 +218,13 @@ describe('loadGlobalConfig — edge cases', () => {
   it('reads config with all supported top-level fields', async () => {
     const cfgPath = join(tempDir, 'config.json');
     writeCfg(cfgPath, {
-      mode: 'pro_plan',
+      mode: 'economic',
       language: 'tr',
       projectName: 'full-config-project',
       version: '2.0.0',
     });
     const result = await loadGlobalConfig(cfgPath) as Partial<DeckentConfig>;
-    expect(result?.mode).toBe('pro_plan');
+    expect(result?.mode).toBe('economic');
     expect(result?.language).toBe('tr');
     expect(result?.projectName).toBe('full-config-project');
     expect(result?.version).toBe('2.0.0');
@@ -259,9 +259,9 @@ describe('saveGlobalConfig — edge cases', () => {
   it('preserves nested modes in the written file', async () => {
     const cfgPath = join(tempDir, 'config.json');
     const cfg: Partial<DeckentConfig> = {
-      mode: 'pro_plan',
+      mode: 'economic',
       modes: {
-        pro_plan: {
+        economic: {
           max_workers: 5,
           brain_model: 'sonnet',
           default_model: 'sonnet',
@@ -273,7 +273,7 @@ describe('saveGlobalConfig — edge cases', () => {
     };
     await saveGlobalConfig(cfg, cfgPath);
     const loaded = await loadGlobalConfig(cfgPath) as Partial<DeckentConfig>;
-    expect(loaded?.modes?.pro_plan?.max_workers).toBe(5);
+    expect(loaded?.modes?.economic?.max_workers).toBe(5);
   });
 });
 
@@ -282,7 +282,7 @@ describe('saveGlobalConfig — edge cases', () => {
 describe('mergeConfigs — edge cases', () => {
   it('both configs are empty objects (not null) — returns defaults', () => {
     const result = mergeConfigs({}, {});
-    expect(result.mode).toBe('max_plan');
+    expect(result.mode).toBe('performance');
     expect(result.language).toBe('en');
     expect(result.activeModeConfig).toBeDefined();
   });
@@ -295,7 +295,7 @@ describe('mergeConfigs — edge cases', () => {
   it('deep merges nested mode config from global', () => {
     const global: Partial<DeckentConfig> = {
       modes: {
-        pro_plan: {
+        economic: {
           max_workers: 7,
           brain_model: 'sonnet',
           default_model: 'sonnet',
@@ -305,14 +305,14 @@ describe('mergeConfigs — edge cases', () => {
         },
       } as DeckentConfig['modes'],
     };
-    const result = mergeConfigs(global, { mode: 'pro_plan' });
-    expect(result.modes.pro_plan.max_workers).toBe(7);
+    const result = mergeConfigs(global, { mode: 'economic' });
+    expect(result.modes.economic.max_workers).toBe(7);
   });
 
   it('project config can override a nested mode field from global', () => {
     const global: Partial<DeckentConfig> = {
       modes: {
-        pro_plan: {
+        economic: {
           max_workers: 3,
           brain_model: 'sonnet',
           default_model: 'sonnet',
@@ -324,7 +324,7 @@ describe('mergeConfigs — edge cases', () => {
     };
     const project: Partial<DeckentConfig> = {
       modes: {
-        pro_plan: {
+        economic: {
           max_workers: 5,
           brain_model: 'sonnet',
           default_model: 'sonnet',
@@ -335,7 +335,7 @@ describe('mergeConfigs — edge cases', () => {
       } as DeckentConfig['modes'],
     };
     const result = mergeConfigs(global, project);
-    expect(result.modes.pro_plan.max_workers).toBe(5);
+    expect(result.modes.economic.max_workers).toBe(5);
   });
 
   it('projectRoot is always a resolved string path', () => {
@@ -382,7 +382,7 @@ describe('loadConfig — global + project merge', () => {
     // No config files — loadConfig uses real GLOBAL_CONFIG_PATH which may or may not exist
     // We test with a fresh project dir that has no .deckent/config.json
     const result = await loadConfig(tempDir);
-    expect(result.mode).toBe('max_plan');
+    expect(result.mode).toBe('performance');
     expect(['en', 'tr']).toContain(result.language); // default is 'en' unless real global overrides
   });
 
@@ -397,9 +397,9 @@ describe('loadConfig — global + project merge', () => {
   it('project config mode is used in loadConfig', async () => {
     const projectDeckentDir = join(tempDir, '.deckent');
     mkdirSync(projectDeckentDir, { recursive: true });
-    writeCfg(join(projectDeckentDir, 'config.json'), { mode: 'pro_plan' });
+    writeCfg(join(projectDeckentDir, 'config.json'), { mode: 'economic' });
     const result = await loadConfig(tempDir);
-    expect(result.mode).toBe('pro_plan');
+    expect(result.mode).toBe('economic');
   });
 
   it('sets projectRoot to the resolved directory', async () => {

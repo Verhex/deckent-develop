@@ -14,7 +14,7 @@ function buildConfig(overrides?: Partial<DeckentConfig>): DeckentConfig {
 }
 
 function buildConfigWithModeOverride(
-  modeName: 'max_plan' | 'max5x_plan' | 'pro_plan' | 'api',
+  modeName: 'performance' | 'balanced' | 'economic' | 'api',
   overrides: Partial<PlanModeConfig>,
 ): DeckentConfig {
   const config = createDefaultConfig();
@@ -73,49 +73,49 @@ describe('validateConfig', () => {
   // ─── Invalid max_workers ──────────────────────────────────────────
 
   it('throws for max_workers = 0', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 0 });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 0 });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('throws for max_workers = -1', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: -1 });
+    const config = buildConfigWithModeOverride('performance', { max_workers: -1 });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('throws for max_workers = 101 (above limit)', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 101 });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 101 });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('throws for max_workers as string (non-auto)', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 'fast' as any });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 'fast' as any });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('accepts max_workers = "auto"', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 'auto' });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 'auto' });
     expect(() => validateConfig(config)).not.toThrow();
   });
 
   it('returns warning (not error) for max_workers >= 20', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 25 });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 25 });
     const warnings = validateConfig(config);
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain('>=20');
   });
 
   it('max_workers = 19 does not produce a warning', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 19 });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 19 });
     const warnings = validateConfig(config);
-    // Should have no warnings about max_plan specifically
-    const maxPlanWarnings = warnings.filter(w => w.includes('max_plan'));
+    // Should have no warnings about performance specifically
+    const maxPlanWarnings = warnings.filter(w => w.includes('performance'));
     expect(maxPlanWarnings).toHaveLength(0);
   });
 
   // ─── Invalid brain_model ──────────────────────────────────────────
 
   it('throws for invalid brain_model', () => {
-    const config = buildConfigWithModeOverride('max_plan', { brain_model: 'gpt4' as any });
+    const config = buildConfigWithModeOverride('performance', { brain_model: 'gpt4' as any });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
       validateConfig(config);
@@ -128,7 +128,7 @@ describe('validateConfig', () => {
   // ─── Invalid default_model ────────────────────────────────────────
 
   it('throws for invalid default_model', () => {
-    const config = buildConfigWithModeOverride('pro_plan', { default_model: 'llama' as any });
+    const config = buildConfigWithModeOverride('economic', { default_model: 'llama' as any });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
       validateConfig(config);
@@ -141,7 +141,7 @@ describe('validateConfig', () => {
   // ─── Invalid haiku_allowed ────────────────────────────────────────
 
   it('throws for non-boolean haiku_allowed', () => {
-    const config = buildConfigWithModeOverride('max_plan', { haiku_allowed: 'yes' as any });
+    const config = buildConfigWithModeOverride('performance', { haiku_allowed: 'yes' as any });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
       validateConfig(config);
@@ -152,14 +152,14 @@ describe('validateConfig', () => {
   });
 
   it('throws for numeric haiku_allowed', () => {
-    const config = buildConfigWithModeOverride('max_plan', { haiku_allowed: 1 as any });
+    const config = buildConfigWithModeOverride('performance', { haiku_allowed: 1 as any });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   // ─── Invalid brain_planning ───────────────────────────────────────
 
   it('throws for invalid brain_planning value', () => {
-    const config = buildConfigWithModeOverride('max_plan', { brain_planning: 'manual' as any });
+    const config = buildConfigWithModeOverride('performance', { brain_planning: 'manual' as any });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
       validateConfig(config);
@@ -171,7 +171,7 @@ describe('validateConfig', () => {
 
   it('accepts valid brain_planning values (ai, structured, auto)', () => {
     for (const value of ['ai', 'structured', 'auto'] as const) {
-      const config = buildConfigWithModeOverride('max_plan', { brain_planning: value });
+      const config = buildConfigWithModeOverride('performance', { brain_planning: value });
       expect(() => validateConfig(config)).not.toThrow();
     }
   });
@@ -218,9 +218,9 @@ describe('validateConfig', () => {
   it('accumulates multiple errors in ConfigValidationError.errors', () => {
     const config = createDefaultConfig();
     config.mode = 'invalid' as any;
-    config.modes.max_plan.brain_model = 'gpt4' as any;
-    config.modes.max_plan.haiku_allowed = 'maybe' as any;
-    config.modes.pro_plan.default_model = 'llama' as any;
+    config.modes.performance.brain_model = 'gpt4' as any;
+    config.modes.performance.haiku_allowed = 'maybe' as any;
+    config.modes.economic.default_model = 'llama' as any;
 
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
@@ -248,12 +248,12 @@ describe('validateConfig', () => {
   // ─── Edge: boundary values ────────────────────────────────────────
 
   it('accepts max_workers = 1 (lower boundary)', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 1 });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 1 });
     expect(() => validateConfig(config)).not.toThrow();
   });
 
   it('accepts max_workers = 100 (upper boundary) with warning', () => {
-    const config = buildConfigWithModeOverride('max_plan', { max_workers: 100 });
+    const config = buildConfigWithModeOverride('performance', { max_workers: 100 });
     const warnings = validateConfig(config);
     expect(warnings.length).toBeGreaterThan(0);
   });

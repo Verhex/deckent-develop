@@ -21,7 +21,7 @@ vi.mock('../../../src/core/system-profile.js', () => ({
 }));
 
 vi.mock('../../../src/cli/helpers/wizard.js', () => ({
-  runWizard: vi.fn().mockResolvedValue({ language: 'en', mode: 'max_plan', runInit: false }),
+  runWizard: vi.fn().mockResolvedValue({ language: 'en', mode: 'performance', runInit: false }),
 }));
 
 vi.mock('node:child_process', () => ({

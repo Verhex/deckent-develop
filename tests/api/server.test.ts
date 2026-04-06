@@ -285,7 +285,7 @@ describe('createHttpServer', () => {
     });
 
     it('returns config JSON when file exists', async () => {
-      const configData = { mode: 'max_plan', max_workers: 4 };
+      const configData = { mode: 'performance', max_workers: 4 };
       mockReadJsonSafe.mockReturnValue(configData);
 
       api = createHttpServer(PROJECT_ROOT, 0);
@@ -577,7 +577,7 @@ describe('createHttpServer', () => {
 
   describe('POST /api/config', () => {
     it('merges and writes config', async () => {
-      const existingConfig = { mode: 'max_plan', max_workers: 2 };
+      const existingConfig = { mode: 'performance', max_workers: 2 };
       mockReadJsonSafe.mockReturnValue(existingConfig);
 
       api = createHttpServer(PROJECT_ROOT, 0);
@@ -586,7 +586,7 @@ describe('createHttpServer', () => {
       const res = await request(api, '/api/config', 'POST', { max_workers: 4 });
       expect(res.status).toBe(200);
       const body = JSON.parse(res.body);
-      expect(body.mode).toBe('max_plan');
+      expect(body.mode).toBe('performance');
       expect(body.max_workers).toBe(4);
       expect(mockWriteFileSync).toHaveBeenCalled();
     });

@@ -90,7 +90,7 @@ function setupProjectDir(root: string): void {
   mkdirSync(join(root, LOCKS_DIR), { recursive: true });
   mkdirSync(join(root, '.claude', 'rules'), { recursive: true });
 
-  writeFileSync(join(root, DECKENT_DIR, 'config.json'), JSON.stringify({ mode: 'max_plan' }, null, 2));
+  writeFileSync(join(root, DECKENT_DIR, 'config.json'), JSON.stringify({ mode: 'performance' }, null, 2));
   writeFileSync(join(root, DIRECTIVES_FILE), 'Implement feature A\nImplement feature B\n');
   writeFileSync(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
   writeFileSync(join(root, BRAIN_DIR, DECISIONS_FILE), '# Architecture Decisions\n');
@@ -142,7 +142,7 @@ function makeTestResult(taskId: string, overrides?: Partial<TaskResult>): TaskRe
 
 function makeTestConfig(root: string, overrides?: Partial<ResolvedConfig>): ResolvedConfig {
   return {
-    mode: 'max_plan',
+    mode: 'performance',
     activeModeConfig: {
       max_workers: 3, brain_model: 'opus', default_model: 'sonnet',
       haiku_allowed: true,
@@ -174,7 +174,7 @@ describe('Config integration', () => {
 
   it('loads default config when no project config exists', async () => {
     const config = await loadConfig(root);
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
     expect(config.language).toBe('en');
     expect(config.activeModeConfig.max_workers).toBe(8);
   });
@@ -185,8 +185,8 @@ describe('Config integration', () => {
       JSON.stringify({ mode: 'economic', language: 'tr' }),
     );
     const config = await loadConfig(root);
-    // 'economic' is an alias → resolved to 'pro_plan' by loadConfig
-    expect(config.mode).toBe('pro_plan');
+    // 'economic' is already canonical — loadConfig keeps it as-is
+    expect(config.mode).toBe('economic');
     expect(config.language).toBe('tr');
     expect(config.activeModeConfig.max_workers).toBe(3);
   });
@@ -194,7 +194,7 @@ describe('Config integration', () => {
   it('deep merges mode overrides', async () => {
     writeFileSync(
       join(root, PROJECT_CONFIG_PATH),
-      JSON.stringify({ modes: { max_plan: { max_workers: 6 } } }),
+      JSON.stringify({ modes: { performance: { max_workers: 6 } } }),
     );
     const config = await loadConfig(root);
     expect(config.activeModeConfig.max_workers).toBe(6);
@@ -829,7 +829,7 @@ describe('Init wizard integration', () => {
   }
 
   it('init creates full directory scaffold on real filesystem', async () => {
-    mockPrompts(['1', '1', 'test-project']); // max_plan, en, name
+    mockPrompts(['1', '1', 'test-project']); // performance, en, name
 
     const { Command } = await import('commander');
     const { registerInit } = await import('../../src/cli/commands/init.js');

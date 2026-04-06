@@ -184,17 +184,17 @@ describe('mergeWithProjectConfig', () => {
 
   it('deep merges nested mode configs — project takes priority', () => {
     const project = getDefaultConfig();
-    project.modes.max_plan.max_workers = 4;
+    project.modes.performance.max_workers = 4;
 
     const global = {
       modes: {
-        max_plan: { max_workers: 10 },
+        performance: { max_workers: 10 },
       },
     } as Partial<typeof project>;
 
     const result = mergeWithProjectConfig(project, global);
 
-    expect(result.modes.max_plan.max_workers).toBe(4); // project wins
+    expect(result.modes.performance.max_workers).toBe(4); // project wins
   });
 
   it('preserves global nested values not overridden by project', () => {

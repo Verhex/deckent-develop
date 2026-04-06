@@ -22,23 +22,23 @@ import type { DeckentConfig, ResolvedConfig, SystemProfile } from '../../src/cor
 
 function makeValidConfig(): DeckentConfig {
   return {
-    mode: 'max_plan',
+    mode: 'performance',
     modes: {
-      max_plan: {
+      performance: {
         max_workers: 4,
         brain_model: 'opus',
         default_model: 'opus',
         haiku_allowed: true,
         brain_planning: 'auto',
       },
-      max5x_plan: {
+      balanced: {
         max_workers: 5,
         brain_model: 'sonnet',
         default_model: 'opus',
         haiku_allowed: true,
         brain_planning: 'auto',
       },
-      pro_plan: {
+      economic: {
         max_workers: 3,
         brain_model: 'sonnet',
         default_model: 'sonnet',
@@ -61,8 +61,8 @@ function makeValidConfig(): DeckentConfig {
 function makeResolvedConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   const base = makeValidConfig();
   return {
-    mode: 'max_plan',
-    activeModeConfig: base.modes.max_plan,
+    mode: 'performance',
+    activeModeConfig: base.modes.performance,
     modes: base.modes,
     language: 'en',
     projectName: 'test-project',
@@ -155,7 +155,7 @@ describe('validateConfig', () => {
 
   it('throws ConfigValidationError for invalid mode', () => {
     const config = makeValidConfig();
-    (config as unknown as Record<string, unknown>).mode = 'super_plan';
+    (config as unknown as Record<string, unknown>).mode = 'super_mode';
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     expect(() => validateConfig(config)).toThrow(/Invalid value.*mode/);
   });
@@ -168,43 +168,43 @@ describe('validateConfig', () => {
 
   it('throws when a mode config is missing', () => {
     const config = makeValidConfig();
-    delete (config.modes as Record<string, unknown>)['pro_plan'];
+    delete (config.modes as Record<string, unknown>)['economic'];
     expect(() => validateConfig(config)).toThrow(/Missing mode config/);
   });
 
   it('throws for invalid brain_model', () => {
     const config = makeValidConfig();
-    (config.modes.max_plan as unknown as Record<string, unknown>).brain_model = 'gpt4';
+    (config.modes.performance as unknown as Record<string, unknown>).brain_model = 'gpt4';
     expect(() => validateConfig(config)).toThrow(/brain_model/);
   });
 
   it('throws for invalid default_model', () => {
     const config = makeValidConfig();
-    (config.modes.max_plan as unknown as Record<string, unknown>).default_model = 'turbo';
+    (config.modes.performance as unknown as Record<string, unknown>).default_model = 'turbo';
     expect(() => validateConfig(config)).toThrow(/default_model/);
   });
 
   it('throws for max_workers out of range', () => {
     const config = makeValidConfig();
-    config.modes.max_plan.max_workers = 0;
+    config.modes.performance.max_workers = 0;
     expect(() => validateConfig(config)).toThrow(/max_workers must be a number between 1 and 100/);
   });
 
   it('throws for max_workers > 100', () => {
     const config = makeValidConfig();
-    config.modes.max_plan.max_workers = 101;
+    config.modes.performance.max_workers = 101;
     expect(() => validateConfig(config)).toThrow(/max_workers must be a number between 1 and 100/);
   });
 
   it('accepts max_workers = "auto"', () => {
     const config = makeValidConfig();
-    config.modes.max_plan.max_workers = 'auto';
+    config.modes.performance.max_workers = 'auto';
     expect(() => validateConfig(config)).not.toThrow();
   });
 
   it('returns warning (not error) when max_workers >= 20', () => {
     const config = makeValidConfig();
-    config.modes.max_plan.max_workers = 25;
+    config.modes.performance.max_workers = 25;
     const warnings = validateConfig(config);
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toMatch(/high worker count/);
@@ -212,13 +212,13 @@ describe('validateConfig', () => {
 
   it('throws for invalid brain_planning value', () => {
     const config = makeValidConfig();
-    (config.modes.max_plan as unknown as Record<string, unknown>).brain_planning = 'magic';
+    (config.modes.performance as unknown as Record<string, unknown>).brain_planning = 'magic';
     expect(() => validateConfig(config)).toThrow(/brain_planning/);
   });
 
   it('throws for non-boolean haiku_allowed', () => {
     const config = makeValidConfig();
-    (config.modes.max_plan as unknown as Record<string, unknown>).haiku_allowed = 'yes';
+    (config.modes.performance as unknown as Record<string, unknown>).haiku_allowed = 'yes';
     expect(() => validateConfig(config)).toThrow(/haiku_allowed must be a boolean/);
   });
 
@@ -231,7 +231,7 @@ describe('validateConfig', () => {
   it('collects multiple errors and throws once', () => {
     const config = makeValidConfig();
     (config as unknown as Record<string, unknown>).mode = 'bad_mode';
-    config.modes.max_plan.max_workers = 0;
+    config.modes.performance.max_workers = 0;
     try {
       validateConfig(config);
       expect.fail('should have thrown');
@@ -300,23 +300,23 @@ describe('loadConfig', () => {
 
   it('returns defaults when no config file exists', async () => {
     const config = await loadConfig(tmpDir);
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
     expect(config.language).toBe('en');
     expect(config.projectName).toBe('deckent-project');
   });
 
   it('merges a partial project config over defaults', async () => {
     const projectConfigPath = join(tmpDir, '.deckent', 'config.json');
-    writeFileSync(projectConfigPath, JSON.stringify({ mode: 'pro_plan' }));
+    writeFileSync(projectConfigPath, JSON.stringify({ mode: 'economic' }));
     const config = await loadConfig(tmpDir);
-    expect(config.mode).toBe('pro_plan');
+    expect(config.mode).toBe('economic');
   });
 
   it('returns defaults when config file contains malformed JSON', async () => {
     const projectConfigPath = join(tmpDir, '.deckent', 'config.json');
     writeFileSync(projectConfigPath, '{ invalid json ===');
     const config = await loadConfig(tmpDir);
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
   });
 
   it('includes projectRoot in the resolved config', async () => {
@@ -363,12 +363,12 @@ describe('validatePartialConfig', () => {
   });
 
   it('does not throw for a valid partial mode override', () => {
-    expect(() => validatePartialConfig({ mode: 'pro_plan' })).not.toThrow();
+    expect(() => validatePartialConfig({ mode: 'economic' })).not.toThrow();
   });
 
   it('throws for an invalid mode in partial config', () => {
     expect(() =>
-      validatePartialConfig({ mode: 'not_a_mode' as unknown as 'max_plan' }),
+      validatePartialConfig({ mode: 'not_a_mode' as unknown as 'performance' }),
     ).toThrow(ConfigValidationError);
   });
 
@@ -420,20 +420,20 @@ describe('ConfigValidationError', () => {
 describe('createDefaultConfig', () => {
   it('returns a config with default mode', () => {
     const config = createDefaultConfig();
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
   });
 
   it('returns a config with all four modes defined', () => {
     const config = createDefaultConfig();
     expect(Object.keys(config.modes)).toEqual(
-      expect.arrayContaining(['max_plan', 'max5x_plan', 'pro_plan', 'api']),
+      expect.arrayContaining(['performance', 'balanced', 'economic', 'api']),
     );
   });
 
   it('returns a deep clone — mutating result does not affect DEFAULT_MODES', () => {
     const config = createDefaultConfig();
-    config.modes.max_plan.max_workers = 999;
-    expect(DEFAULT_MODES.max_plan.max_workers).not.toBe(999);
+    config.modes.performance.max_workers = 999;
+    expect(DEFAULT_MODES.performance.max_workers).not.toBe(999);
   });
 
   it('getDefaultConfig returns same shape as createDefaultConfig', () => {
@@ -442,7 +442,7 @@ describe('createDefaultConfig', () => {
 
   it('getDefaultModes returns all four plan modes', () => {
     const modes = getDefaultModes();
-    expect(modes).toHaveProperty('max_plan');
+    expect(modes).toHaveProperty('performance');
     expect(modes).toHaveProperty('api');
   });
 });

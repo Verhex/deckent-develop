@@ -32,15 +32,15 @@ describe('config nested key support', () => {
       writeConfig({
         language: 'en',
         modes: {
-          max_plan: { max_workers: 4, brain_model: 'opus' },
-          pro_plan: { max_workers: 2 },
+          performance: { max_workers: 4, brain_model: 'opus' },
+          economic: { max_workers: 2 },
         },
       });
 
       const importFile = join(TEST_DIR, 'import.json');
       writeFileSync(importFile, JSON.stringify({
         modes: {
-          max_plan: { max_workers: 8 },
+          performance: { max_workers: 8 },
         },
       }));
 
@@ -49,10 +49,10 @@ describe('config nested key support', () => {
       const modes = result.modes as Record<string, Record<string, unknown>>;
 
       // Deep merge: max_workers overridden, brain_model preserved
-      expect(modes.max_plan.max_workers).toBe(8);
-      expect(modes.max_plan.brain_model).toBe('opus');
-      // pro_plan preserved
-      expect(modes.pro_plan.max_workers).toBe(2);
+      expect(modes.performance.max_workers).toBe(8);
+      expect(modes.performance.brain_model).toBe('opus');
+      // economic preserved
+      expect(modes.economic.max_workers).toBe(2);
     });
 
     it('should override top-level fields on import', () => {
@@ -69,19 +69,19 @@ describe('config nested key support', () => {
 
     it('should expand nested import into existing nested object', () => {
       writeConfig({
-        modes: { max_plan: { max_workers: 4 } },
+        modes: { performance: { max_workers: 4 } },
       });
 
       const importFile = join(TEST_DIR, 'import.json');
       writeFileSync(importFile, JSON.stringify({
-        modes: { max_plan: { brain_model: 'sonnet' } },
+        modes: { performance: { brain_model: 'sonnet' } },
       }));
 
       importConfig(importFile, CONFIG_PATH);
       const result = readConfig();
       const modes = result.modes as Record<string, Record<string, unknown>>;
-      expect(modes.max_plan.max_workers).toBe(4);
-      expect(modes.max_plan.brain_model).toBe('sonnet');
+      expect(modes.performance.max_workers).toBe(4);
+      expect(modes.performance.brain_model).toBe('sonnet');
     });
   });
 
@@ -90,22 +90,22 @@ describe('config nested key support', () => {
     it('setNestedValue should create nested path', async () => {
       const { setNestedValue } = await import('../../../src/core/config-migration.js');
       const obj: Record<string, unknown> = {};
-      setNestedValue(obj, 'modes.max_plan.max_workers', 8);
-      expect((obj as any).modes.max_plan.max_workers).toBe(8);
+      setNestedValue(obj, 'modes.performance.max_workers', 8);
+      expect((obj as any).modes.performance.max_workers).toBe(8);
     });
 
     it('setNestedValue should preserve sibling keys', async () => {
       const { setNestedValue } = await import('../../../src/core/config-migration.js');
-      const obj: Record<string, unknown> = { modes: { max_plan: { max_workers: 4, brain_model: 'opus' } } };
-      setNestedValue(obj, 'modes.max_plan.max_workers', 8);
-      expect((obj as any).modes.max_plan.max_workers).toBe(8);
-      expect((obj as any).modes.max_plan.brain_model).toBe('opus');
+      const obj: Record<string, unknown> = { modes: { performance: { max_workers: 4, brain_model: 'opus' } } };
+      setNestedValue(obj, 'modes.performance.max_workers', 8);
+      expect((obj as any).modes.performance.max_workers).toBe(8);
+      expect((obj as any).modes.performance.brain_model).toBe('opus');
     });
 
     it('getNestedValue should return nested value', async () => {
       const { getNestedValue } = await import('../../../src/core/config-migration.js');
-      const obj = { modes: { max_plan: { max_workers: 4 } } };
-      expect(getNestedValue(obj as Record<string, unknown>, 'modes.max_plan.max_workers')).toBe(4);
+      const obj = { modes: { performance: { max_workers: 4 } } };
+      expect(getNestedValue(obj as Record<string, unknown>, 'modes.performance.max_workers')).toBe(4);
     });
 
     it('getNestedValue should return undefined for missing key', async () => {
@@ -116,8 +116,8 @@ describe('config nested key support', () => {
 
     it('getNestedValue should return object for intermediate path', async () => {
       const { getNestedValue } = await import('../../../src/core/config-migration.js');
-      const obj = { modes: { max_plan: { max_workers: 4, brain_model: 'opus' } } };
-      const result = getNestedValue(obj as Record<string, unknown>, 'modes.max_plan');
+      const obj = { modes: { performance: { max_workers: 4, brain_model: 'opus' } } };
+      const result = getNestedValue(obj as Record<string, unknown>, 'modes.performance');
       expect(result).toEqual({ max_workers: 4, brain_model: 'opus' });
     });
 
@@ -136,7 +136,7 @@ describe('config nested key support', () => {
     });
 
     it('nested key should be detected by dot presence', () => {
-      const key = 'modes.max_plan.max_workers';
+      const key = 'modes.performance.max_workers';
       expect(key.includes('.')).toBe(true);
     });
   });

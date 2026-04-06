@@ -32,42 +32,42 @@ function makeAnalysis(overrides: Partial<ProjectAnalysis> = {}): ProjectAnalysis
 // ─── Tests ───────────────────────────────────────────────────────────
 
 describe('generateSetupRecommendation', () => {
-  it('max subscription + 16GB + small project → max_plan, ~4 workers', () => {
+  it('max subscription + 16GB + small project → performance, ~4 workers', () => {
     const result = generateSetupRecommendation(
       makeProfile({ recommendedMaxWorkers: 8, totalMemMB: 16384 }),
       'max',
       makeAnalysis({ size: 'small' }),
     );
 
-    expect(result.mode).toBe('max_plan');
+    expect(result.mode).toBe('performance');
     expect(result.maxWorkers).toBe(4); // ceil(8 * 0.5)
     expect(result.brainModel).toBe('opus');
     expect(result.defaultModel).toBe('sonnet');
     expect(result.planning).toBe('ai');
   });
 
-  it('pro subscription + 8GB + large project → pro_plan, ~3 workers', () => {
+  it('pro subscription + 8GB + large project → economic, ~3 workers', () => {
     const result = generateSetupRecommendation(
       makeProfile({ recommendedMaxWorkers: 3, totalMemMB: 8192 }),
       'pro',
       makeAnalysis({ size: 'large' }),
     );
 
-    expect(result.mode).toBe('pro_plan');
+    expect(result.mode).toBe('economic');
     expect(result.maxWorkers).toBe(3); // ceil(3 * 1.0)
     expect(result.brainModel).toBe('sonnet');
     expect(result.defaultModel).toBe('sonnet');
     expect(result.planning).toBe('structured');
   });
 
-  it('unknown subscription → pro_plan safe default', () => {
+  it('unknown subscription → economic safe default', () => {
     const result = generateSetupRecommendation(
       makeProfile(),
       'unknown',
       makeAnalysis(),
     );
 
-    expect(result.mode).toBe('pro_plan');
+    expect(result.mode).toBe('economic');
     expect(result.brainModel).toBe('sonnet');
     expect(result.defaultModel).toBe('sonnet');
     expect(result.planning).toBe('structured');
@@ -167,7 +167,7 @@ describe('generateSetupRecommendation', () => {
 
     const joined = result.reasons.join(' ');
     expect(joined).toContain('max');
-    expect(joined).toContain('max_plan');
+    expect(joined).toContain('performance');
     expect(joined).toContain('small');
     expect(joined).toContain('workers');
   });

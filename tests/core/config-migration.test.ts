@@ -195,8 +195,8 @@ describe('migrateConfig', () => {
       const migrated = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
       expect(migrated['memory_budget']).toBe(600);
       expect(migrated['scan_interval']).toBe(30);
-      // Original fields preserved
-      expect(migrated['mode']).toBe('max_plan');
+      // Legacy mode name migrated to canonical name
+      expect(migrated['mode']).toBe('performance');
     } finally {
       cleanupTmp(p);
     }

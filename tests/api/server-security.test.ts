@@ -226,9 +226,9 @@ describe('Server Security Hardening', () => {
   // ─── C) DeepMerge ──────────────────────────────────────────
   describe('POST /api/config deep merge', () => {
     it('uses deepMerge instead of shallow merge', async () => {
-      const existingConfig = { mode: 'max_plan', nested: { a: 1, b: 2 } };
+      const existingConfig = { mode: 'performance', nested: { a: 1, b: 2 } };
       mockReadJsonSafe.mockReturnValue(existingConfig);
-      mockDeepMerge.mockReturnValue({ mode: 'max_plan', nested: { a: 1, b: 2, c: 3 } });
+      mockDeepMerge.mockReturnValue({ mode: 'performance', nested: { a: 1, b: 2, c: 3 } });
 
       api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
       await new Promise<void>((r) => api.server.once('listening', r));

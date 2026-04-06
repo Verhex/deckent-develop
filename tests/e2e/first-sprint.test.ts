@@ -102,7 +102,7 @@ function setupProject(root: string): void {
 
 function makeResolvedConfig(root: string): ResolvedConfig {
   return {
-    mode: 'max_plan',
+    mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
       brain_model: 'opus',

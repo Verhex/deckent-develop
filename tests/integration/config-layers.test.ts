@@ -76,7 +76,7 @@ describe('Config Layers Integration', () => {
       writeCfg(globalConfigPath, {
         language: 'tr',
         projectName: 'global-project',
-        mode: 'pro_plan',
+        mode: 'economic',
       });
 
       // Create project config (partial)
@@ -94,20 +94,20 @@ describe('Config Layers Integration', () => {
       const result = mergeConfigs(globalConfig, projectConfig as Partial<DeckentConfig>);
 
       expect(result.language).toBe('tr'); // from global
-      expect(result.mode).toBe('pro_plan'); // from global
+      expect(result.mode).toBe('economic'); // from global (resolved from legacy alias)
       expect(result.projectName).toBe('project-override'); // project overrides
     });
 
     it('applies global config over defaults', async () => {
       const globalConfig = {
         language: 'tr',
-        mode: 'pro_plan' as const,
+        mode: 'economic' as const,
       };
 
       const result = mergeConfigs(globalConfig as Partial<DeckentConfig>, null);
 
       expect(result.language).toBe('tr');
-      expect(result.mode).toBe('pro_plan');
+      expect(result.mode).toBe('economic');
       expect(result.projectName).toBe('deckent-project'); // default
     });
 
@@ -126,12 +126,12 @@ describe('Config Layers Integration', () => {
 
   describe('Project Override Global', () => {
     it('project mode overrides global mode', async () => {
-      const globalConfig: Partial<DeckentConfig> = { mode: 'pro_plan' };
-      const projectConfig: Partial<DeckentConfig> = { mode: 'max_plan' };
+      const globalConfig: Partial<DeckentConfig> = { mode: 'economic' };
+      const projectConfig: Partial<DeckentConfig> = { mode: 'performance' };
 
       const result = mergeConfigs(globalConfig, projectConfig);
 
-      expect(result.mode).toBe('max_plan');
+      expect(result.mode).toBe('performance');
     });
 
     it('project language overrides global language', async () => {
@@ -146,7 +146,7 @@ describe('Config Layers Integration', () => {
     it('project config overrides nested mode settings', () => {
       const globalConfig: Partial<DeckentConfig> = {
         modes: {
-          pro_plan: {
+          economic: {
             max_workers: 3,
             brain_model: 'sonnet',
             default_model: 'sonnet',
@@ -158,7 +158,7 @@ describe('Config Layers Integration', () => {
 
       const projectConfig: Partial<DeckentConfig> = {
         modes: {
-          pro_plan: {
+          economic: {
             max_workers: 5,
             brain_model: 'sonnet',
             default_model: 'sonnet',
@@ -170,7 +170,7 @@ describe('Config Layers Integration', () => {
 
       const result = mergeConfigs(globalConfig, projectConfig);
 
-      expect(result.modes.pro_plan.max_workers).toBe(5);
+      expect(result.modes.economic.max_workers).toBe(5);
     });
 
     it('project config preserves global settings not specified in project', () => {
@@ -199,7 +199,7 @@ describe('Config Layers Integration', () => {
 
       const result = mergeConfigs(globalConfig, null);
 
-      expect(result.mode).toBe('max_plan'); // default
+      expect(result.mode).toBe('performance'); // default
       expect(result.language).toBe('en'); // default
     });
 
@@ -208,13 +208,13 @@ describe('Config Layers Integration', () => {
       const result = mergeConfigs(globalConfig, null);
 
       expect(result.language).toBe('tr');
-      expect(result.mode).toBe('max_plan'); // default
+      expect(result.mode).toBe('performance'); // default
     });
 
     it('uses all defaults when both global and project are null', () => {
       const result = mergeConfigs(null, null);
 
-      expect(result.mode).toBe('max_plan');
+      expect(result.mode).toBe('performance');
       expect(result.language).toBe('en');
       expect(result.projectName).toBe('deckent-project');
       expect(result.activeModeConfig).toBeDefined();
@@ -254,7 +254,7 @@ describe('Config Layers Integration', () => {
       expect(() => {
         const config: Partial<DeckentConfig> = {
           modes: {
-            pro_plan: {
+            economic: {
               max_workers: 3,
               brain_model: 'invalid' as unknown as DeckentConfig['mode'],
               default_model: 'sonnet',
@@ -271,7 +271,7 @@ describe('Config Layers Integration', () => {
       expect(() => {
         const config: Partial<DeckentConfig> = {
           modes: {
-            pro_plan: {
+            economic: {
               max_workers: -1, // Invalid: must be >= 1 or 'auto'
               brain_model: 'sonnet',
               default_model: 'sonnet',
@@ -308,7 +308,7 @@ describe('Config Layers Integration', () => {
       const base = createDefaultConfig();
       const override: Partial<DeckentConfig> = {
         modes: {
-          pro_plan: {
+          economic: {
             max_workers: 10,
             brain_model: 'opus',
             default_model: 'opus',
@@ -320,10 +320,10 @@ describe('Config Layers Integration', () => {
 
       const result = deepMerge(base, override);
 
-      expect(result.modes.pro_plan.max_workers).toBe(10);
-      expect(result.modes.pro_plan.brain_model).toBe('opus');
+      expect(result.modes.economic.max_workers).toBe(10);
+      expect(result.modes.economic.brain_model).toBe('opus');
       // Other modes should be unchanged
-      expect(result.modes.max_plan.max_workers).toBe(8);
+      expect(result.modes.performance.max_workers).toBe(8);
     });
 
     it('preserves non-overridden fields in nested merge', () => {
@@ -346,7 +346,7 @@ describe('Config Layers Integration', () => {
       const original: Partial<DeckentConfig> = {
         language: 'tr',
         projectName: 'round-trip-test',
-        mode: 'pro_plan',
+        mode: 'economic',
       };
 
       await saveGlobalConfig(original, configPath);
@@ -386,7 +386,7 @@ describe('Config Layers Integration', () => {
     it('handles empty global and project configs', () => {
       const result = mergeConfigs({}, {});
 
-      expect(result.mode).toBe('max_plan');
+      expect(result.mode).toBe('performance');
       expect(result.language).toBe('en');
       expect(result.activeModeConfig).toBeDefined();
     });

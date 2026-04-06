@@ -27,7 +27,7 @@ function buildConfig(overrides?: Partial<DeckentConfig>): DeckentConfig {
 }
 
 function buildModeOverride(
-  modeName: 'max_plan' | 'max5x_plan' | 'pro_plan' | 'api',
+  modeName: 'performance' | 'balanced' | 'economic' | 'api',
   overrides: Partial<PlanModeConfig>,
 ): DeckentConfig {
   const config = createDefaultConfig();
@@ -65,7 +65,7 @@ function cleanupTmp(...paths: string[]): void {
 describe('autoMigrateOnLoad — loadConfig integration', () => {
   it('migrateConfigInMemory adds missing fields (simulates what loadConfig triggers)', () => {
     // Minimal config missing many fields
-    const minimal = { mode: 'max_plan', modes: {} } as Record<string, unknown>;
+    const minimal = { mode: 'performance', modes: {} } as Record<string, unknown>;
     expect(needsMigration(minimal)).toBe(true);
     const { config, addedFields } = migrateConfigInMemory(minimal);
     expect(addedFields.length).toBeGreaterThan(0);
@@ -80,7 +80,7 @@ describe('autoMigrateOnLoad — loadConfig integration', () => {
 
   it('file-based: loadConfig auto-migrates missing fields on disk', async () => {
     // Write a minimal config and load it — migration should update the file
-    const minimal = { mode: 'pro_plan', modes: {} };
+    const minimal = { mode: 'economic', modes: {} };
     const configFile = writeTmp('sprint063-auto-migrate-test.json', minimal);
     const root = tmpdir();
     // Temporarily override PROJECT_CONFIG_PATH by writing to the expected location
@@ -106,7 +106,7 @@ describe('autoMigrateOnLoad — loadConfig integration', () => {
 
 describe('validateConfig — improved error messages (C)', () => {
   it('brain_model error uses "Invalid value X for field Y. Valid: ..."', () => {
-    const config = buildModeOverride('max_plan', { brain_model: 'gpt-99' as never });
+    const config = buildModeOverride('performance', { brain_model: 'gpt-99' as never });
     try {
       validateConfig(config);
       expect.fail('should have thrown');
@@ -121,7 +121,7 @@ describe('validateConfig — improved error messages (C)', () => {
   });
 
   it('default_model error uses consistent format', () => {
-    const config = buildModeOverride('pro_plan', { default_model: 'llama-4' as never });
+    const config = buildModeOverride('economic', { default_model: 'llama-4' as never });
     try {
       validateConfig(config);
       expect.fail('should have thrown');
@@ -135,7 +135,7 @@ describe('validateConfig — improved error messages (C)', () => {
   });
 
   it('brain_planning error uses consistent format', () => {
-    const config = buildModeOverride('max_plan', { brain_planning: 'manual' as never });
+    const config = buildModeOverride('performance', { brain_planning: 'manual' as never });
     try {
       validateConfig(config);
       expect.fail('should have thrown');
@@ -217,7 +217,7 @@ describe('validateConfig — improved error messages (C)', () => {
     const config = createDefaultConfig();
     config.brain_provider = 'unknown' as never;
     config.worker_provider = 'other' as never;
-    config.modes.max_plan.brain_model = 'bad' as never;
+    config.modes.performance.brain_model = 'bad' as never;
     try {
       validateConfig(config);
       expect.fail('should have thrown');

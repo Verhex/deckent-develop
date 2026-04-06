@@ -429,7 +429,7 @@ describe('config readJsonSafeAsync migration', () => {
     const projDir = join(TMP, 'no-config-proj');
     mkdirSync(projDir, { recursive: true });
     const config = await loadConfig(projDir);
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
   });
 
   it('loadConfig reads project config', async () => {
@@ -450,7 +450,7 @@ describe('config readJsonSafeAsync migration', () => {
     writeInvalid(join(projDir, '.deckent', 'config.json'));
     // Should return defaults (readJsonSafeAsync returns null for invalid JSON)
     const config = await loadConfig(projDir);
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
   });
 });
 

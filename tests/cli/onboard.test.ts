@@ -25,7 +25,7 @@ vi.mock('../../core/system-profile.js', () => ({
 vi.mock('../../src/cli/helpers/wizard.js', () => ({
   runWizard: vi.fn().mockResolvedValue({
     language: 'en',
-    mode: 'max_plan',
+    mode: 'performance',
     runInit: false,
   }),
 }));
@@ -69,7 +69,7 @@ beforeEach(() => {
   });
   vi.mocked(runWizard).mockResolvedValue({
     language: 'en',
-    mode: 'max_plan',
+    mode: 'performance',
     runInit: false,
   });
 });

@@ -104,7 +104,7 @@ function readDashboard(dashPath: string): DashboardState | null {
 
 function makeResolvedConfig(root: string): ResolvedConfig {
   return {
-    mode: 'max_plan',
+    mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
       brain_model: 'opus',
@@ -142,7 +142,7 @@ describe('E2E Integration: init→plan→status flow', () => {
     const config = makeResolvedConfig(root);
 
     expect(config.projectRoot).toBe(root);
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
     expect(config.activeModeConfig.max_workers).toBe(4);
     expect(config.language).toBe('en');
     expect(existsSync(join(root, DECKENT_DIR, 'config.json'))).toBe(true);
@@ -315,7 +315,7 @@ Unique to this project.
     // Original config
     const originalConfig = makeResolvedConfig(root);
     expect(originalConfig.projectRoot).toBe(root);
-    expect(originalConfig.mode).toBe('max_plan');
+    expect(originalConfig.mode).toBe('performance');
 
     // Plan sprint (should not change config)
     writeFileSync(join(root, DIRECTIVES_FILE), `# DIRECTIVES
@@ -337,7 +337,7 @@ Test config preservation.
     // Verify config persists
     const configPath = join(root, DECKENT_DIR, 'config.json');
     const savedConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-    expect(savedConfig.mode).toBe('max_plan');
+    expect(savedConfig.mode).toBe('performance');
   });
 
   it('creates proper brain directory structure during init', () => {

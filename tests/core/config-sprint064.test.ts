@@ -54,7 +54,7 @@ function cleanupTmp(...paths: string[]): void {
 
 describe('A) autoMigrateOnLoad', () => {
   it('needsMigration returns true for minimal config missing many fields', () => {
-    const minimal = { mode: 'max_plan', modes: {} } as Record<string, unknown>;
+    const minimal = { mode: 'performance', modes: {} } as Record<string, unknown>;
     expect(needsMigration(minimal)).toBe(true);
   });
 
@@ -64,7 +64,7 @@ describe('A) autoMigrateOnLoad', () => {
   });
 
   it('migrateConfig (file-based) adds missing fields and creates backup', () => {
-    const minimal = { mode: 'pro_plan', modes: {}, memory_budget: 400 };
+    const minimal = { mode: 'economic', modes: {}, memory_budget: 400 };
     const configFile = writeTmp('migrate-a.json', minimal);
     try {
       const result = migrateConfig(configFile);
@@ -82,7 +82,7 @@ describe('A) autoMigrateOnLoad', () => {
   });
 
   it('migrateConfig dry-run does not write to disk', () => {
-    const minimal = { mode: 'max_plan', modes: {} };
+    const minimal = { mode: 'performance', modes: {} };
     const configFile = writeTmp('migrate-dryrun.json', minimal);
     try {
       const before = readFileSync(configFile, 'utf-8');
@@ -114,7 +114,7 @@ describe('A) autoMigrateOnLoad', () => {
 describe('C) validateConfig — error message format "Invalid value X for field Y. Valid: ..."', () => {
   it('brain_model validation message uses consistent format', () => {
     const config = createDefaultConfig();
-    config.modes.max_plan.brain_model = 'gpt-999' as never;
+    config.modes.performance.brain_model = 'gpt-999' as never;
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
       validateConfig(config);
@@ -144,7 +144,7 @@ describe('C) validateConfig — error message format "Invalid value X for field 
 
   it('brain_planning validation message uses consistent format with valid options listed', () => {
     const config = createDefaultConfig();
-    config.modes.pro_plan.brain_planning = 'manual' as never;
+    config.modes.economic.brain_planning = 'manual' as never;
     try {
       validateConfig(config);
       expect.fail('should throw');
@@ -196,7 +196,7 @@ describe('C) validateConfig — error message format "Invalid value X for field 
     const config = createDefaultConfig();
     config.brain_provider = 'bad1' as never;
     config.worker_provider = 'bad2' as never;
-    config.modes.max_plan.brain_model = 'bad3' as never;
+    config.modes.performance.brain_model = 'bad3' as never;
     try {
       validateConfig(config);
       expect.fail('should throw');

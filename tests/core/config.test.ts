@@ -60,18 +60,18 @@ describe('getDefaultConfig', () => {
 });
 
 describe('getDefaultModes', () => {
-  it('contains 4 modes: max_plan, max5x_plan, pro_plan, api', () => {
+  it('contains 4 modes: performance, balanced, economic, api', () => {
     const modes = getDefaultModes();
     expect(Object.keys(modes)).toEqual(
-      expect.arrayContaining(['max_plan', 'max5x_plan', 'pro_plan', 'api']),
+      expect.arrayContaining(['performance', 'balanced', 'economic', 'api']),
     );
     expect(Object.keys(modes)).toHaveLength(4);
   });
 
-  it('max_plan: max_workers=8, brain_model=opus', () => {
+  it('performance: max_workers=8, brain_model=opus', () => {
     const modes = getDefaultModes();
-    expect(modes.max_plan.max_workers).toBe(8);
-    expect(modes.max_plan.brain_model).toBe('opus');
+    expect(modes.performance.max_workers).toBe(8);
+    expect(modes.performance.brain_model).toBe('opus');
   });
 
   it('api: budget_per_sprint=5.0, requires=ANTHROPIC_API_KEY', () => {
@@ -84,7 +84,7 @@ describe('getDefaultModes', () => {
 describe('loadConfig', () => {
   it('returns defaults when no config files exist', async () => {
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
     expect(config.activeModeConfig.max_workers).toBe(8);
     expect(config.language).toBe('en');
     expect(config.projectRoot).toContain('test');
@@ -97,7 +97,7 @@ describe('loadConfig', () => {
     mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'pro_plan' }));
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('pro_plan');
+    expect(config.mode).toBe('economic');
     expect(config.activeModeConfig.max_workers).toBe(3);
     expect(config.activeModeConfig.brain_model).toBe('sonnet');
   });
@@ -117,7 +117,7 @@ describe('loadConfig', () => {
 
     const config = await loadConfig('/test/project');
     expect(config.language).toBe('tr');
-    expect(config.mode).toBe('max5x_plan');
+    expect(config.mode).toBe('balanced');
   });
 
   it('deep merges nested mode config', async () => {
@@ -125,12 +125,12 @@ describe('loadConfig', () => {
       return String(p).includes('.deckent');
     });
     mockedReadFile.mockResolvedValue(
-      JSON.stringify({ modes: { max_plan: { max_workers: 6 } } }),
+      JSON.stringify({ modes: { performance: { max_workers: 6 } } }),
     );
 
     const config = await loadConfig('/test/project');
-    expect(config.modes.max_plan.max_workers).toBe(6);
-    expect(config.modes.max_plan.brain_model).toBe('opus'); // preserved
+    expect(config.modes.performance.max_workers).toBe(6);
+    expect(config.modes.performance.brain_model).toBe('opus'); // preserved
   });
 
   it('throws ConfigValidationError for API mode without env var', async () => {
@@ -160,7 +160,7 @@ describe('loadConfig', () => {
     mockedReadFile.mockResolvedValue('{ invalid json !!!');
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
   });
 
   it('resolves projectRoot from parameter', async () => {
@@ -181,9 +181,9 @@ describe('brain_planning config', () => {
     for (const value of ['ai', 'structured', 'auto'] as const) {
       expect(() => validatePartialConfig({
         modes: {
-          max_plan: { ...getDefaultModes().max_plan, brain_planning: value },
-          max5x_plan: getDefaultModes().max5x_plan,
-          pro_plan: getDefaultModes().pro_plan,
+          performance: { ...getDefaultModes().performance, brain_planning: value },
+          balanced: getDefaultModes().balanced,
+          economic: getDefaultModes().economic,
           api: getDefaultModes().api,
         },
       })).not.toThrow();
@@ -193,9 +193,9 @@ describe('brain_planning config', () => {
   it('rejects invalid brain_planning value', () => {
     expect(() => validatePartialConfig({
       modes: {
-        max_plan: { ...getDefaultModes().max_plan, brain_planning: 'invalid' as 'auto' },
-        max5x_plan: getDefaultModes().max5x_plan,
-        pro_plan: getDefaultModes().pro_plan,
+        performance: { ...getDefaultModes().performance, brain_planning: 'invalid' as 'auto' },
+        balanced: getDefaultModes().balanced,
+        economic: getDefaultModes().economic,
         api: getDefaultModes().api,
       },
     })).toThrow(ConfigValidationError);
@@ -203,8 +203,8 @@ describe('brain_planning config', () => {
 });
 
 describe('validatePartialConfig', () => {
-  it('accepts { mode: "pro_plan" }', () => {
-    expect(() => validatePartialConfig({ mode: 'pro_plan' })).not.toThrow();
+  it('accepts { mode: "economic" }', () => {
+    expect(() => validatePartialConfig({ mode: 'economic' })).not.toThrow();
   });
 
   it('accepts empty object (merges with defaults)', () => {
@@ -213,7 +213,7 @@ describe('validatePartialConfig', () => {
 
   it('rejects invalid mode', () => {
     expect(() =>
-      validatePartialConfig({ mode: 'invalid' as 'max_plan' }),
+      validatePartialConfig({ mode: 'invalid' as 'performance' }),
     ).toThrow(ConfigValidationError);
   });
 
@@ -221,9 +221,9 @@ describe('validatePartialConfig', () => {
     expect(() =>
       validatePartialConfig({
         modes: {
-          max_plan: { max_workers: 0 } as never,
-          max5x_plan: getDefaultModes().max5x_plan,
-          pro_plan: getDefaultModes().pro_plan,
+          performance: { max_workers: 0 } as never,
+          balanced: getDefaultModes().balanced,
+          economic: getDefaultModes().economic,
           api: getDefaultModes().api,
         },
       }),
@@ -234,9 +234,9 @@ describe('validatePartialConfig', () => {
     expect(() =>
       validatePartialConfig({
         modes: {
-          max_plan: { ...getDefaultModes().max_plan, max_workers: 100 },
-          max5x_plan: getDefaultModes().max5x_plan,
-          pro_plan: getDefaultModes().pro_plan,
+          performance: { ...getDefaultModes().performance, max_workers: 100 },
+          balanced: getDefaultModes().balanced,
+          economic: getDefaultModes().economic,
           api: getDefaultModes().api,
         },
       }),
@@ -247,9 +247,9 @@ describe('validatePartialConfig', () => {
     expect(() =>
       validatePartialConfig({
         modes: {
-          max_plan: { ...getDefaultModes().max_plan, max_workers: 101 },
-          max5x_plan: getDefaultModes().max5x_plan,
-          pro_plan: getDefaultModes().pro_plan,
+          performance: { ...getDefaultModes().performance, max_workers: 101 },
+          balanced: getDefaultModes().balanced,
+          economic: getDefaultModes().economic,
           api: getDefaultModes().api,
         },
       }),
@@ -260,9 +260,9 @@ describe('validatePartialConfig', () => {
     expect(() =>
       validatePartialConfig({
         modes: {
-          max_plan: { ...getDefaultModes().max_plan, brain_model: 'gpt4' as 'opus' },
-          max5x_plan: getDefaultModes().max5x_plan,
-          pro_plan: getDefaultModes().pro_plan,
+          performance: { ...getDefaultModes().performance, brain_model: 'gpt4' as 'opus' },
+          balanced: getDefaultModes().balanced,
+          economic: getDefaultModes().economic,
           api: getDefaultModes().api,
         },
       }),
@@ -273,9 +273,9 @@ describe('validatePartialConfig', () => {
     expect(() =>
       validatePartialConfig({
         modes: {
-          max_plan: { ...getDefaultModes().max_plan, max_workers: 'auto' },
-          max5x_plan: getDefaultModes().max5x_plan,
-          pro_plan: getDefaultModes().pro_plan,
+          performance: { ...getDefaultModes().performance, max_workers: 'auto' },
+          balanced: getDefaultModes().balanced,
+          economic: getDefaultModes().economic,
           api: getDefaultModes().api,
         },
       }),
@@ -286,11 +286,11 @@ describe('validatePartialConfig', () => {
 // ─── Helper: build a minimal ResolvedConfig ──────────────────────────
 function makeResolvedConfig(maxWorkers: number | 'auto') {
   const modes = getDefaultModes();
-  const activeModeConfig = { ...modes.max_plan, max_workers: maxWorkers };
+  const activeModeConfig = { ...modes.performance, max_workers: maxWorkers };
   return {
-    mode: 'max_plan' as const,
+    mode: 'performance' as const,
     activeModeConfig,
-    modes: { ...modes, max_plan: activeModeConfig },
+    modes: { ...modes, performance: activeModeConfig },
     language: 'en',
     projectName: 'test',
     projectRoot: '/test',
@@ -365,7 +365,7 @@ describe('resolveEffectiveWorkers', () => {
 describe('validateConfig — max_workers warnings', () => {
   it('max_workers=50 returns warning (not error)', () => {
     const config = getDefaultConfig();
-    config.modes.max_plan.max_workers = 50;
+    config.modes.performance.max_workers = 50;
     const warnings = validateConfig(config);
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain('50');
@@ -374,7 +374,7 @@ describe('validateConfig — max_workers warnings', () => {
 
   it('max_workers=19 returns no warning', () => {
     const config = getDefaultConfig();
-    config.modes.max_plan.max_workers = 19;
+    config.modes.performance.max_workers = 19;
     const warnings = validateConfig(config);
     const maxWorkerWarnings = warnings.filter(w => w.includes('max_workers'));
     expect(maxWorkerWarnings).toHaveLength(0);
@@ -382,13 +382,13 @@ describe('validateConfig — max_workers warnings', () => {
 
   it('max_workers=101 throws ConfigValidationError', () => {
     const config = getDefaultConfig();
-    config.modes.max_plan.max_workers = 101;
+    config.modes.performance.max_workers = 101;
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('max_workers="auto" returns no warning', () => {
     const config = getDefaultConfig();
-    config.modes.max_plan.max_workers = 'auto';
+    config.modes.performance.max_workers = 'auto';
     const warnings = validateConfig(config);
     const autoWarnings = warnings.filter(w => w.includes('max_workers'));
     expect(autoWarnings).toHaveLength(0);
@@ -398,16 +398,16 @@ describe('validateConfig — max_workers warnings', () => {
 // ─── MODE_ALIASES & resolveMode ──────────────────────────────────────
 
 describe('MODE_ALIASES', () => {
-  it('maps performance to max_plan', () => {
-    expect(MODE_ALIASES['performance']).toBe('max_plan');
+  it('maps max_plan to performance', () => {
+    expect(MODE_ALIASES['max_plan']).toBe('performance');
   });
 
-  it('maps balanced to max5x_plan', () => {
-    expect(MODE_ALIASES['balanced']).toBe('max5x_plan');
+  it('maps max5x_plan to balanced', () => {
+    expect(MODE_ALIASES['max5x_plan']).toBe('balanced');
   });
 
-  it('maps economic to pro_plan', () => {
-    expect(MODE_ALIASES['economic']).toBe('pro_plan');
+  it('maps pro_plan to economic', () => {
+    expect(MODE_ALIASES['pro_plan']).toBe('economic');
   });
 
   it('maps unlimited to api', () => {
@@ -420,32 +420,32 @@ describe('MODE_ALIASES', () => {
 });
 
 describe('resolveMode', () => {
-  it("resolves 'performance' to 'max_plan'", () => {
-    expect(resolveMode('performance')).toBe('max_plan');
+  it("resolves legacy 'max_plan' to 'performance'", () => {
+    expect(resolveMode('max_plan')).toBe('performance');
   });
 
-  it("resolves 'balanced' to 'max5x_plan'", () => {
-    expect(resolveMode('balanced')).toBe('max5x_plan');
+  it("resolves legacy 'max5x_plan' to 'balanced'", () => {
+    expect(resolveMode('max5x_plan')).toBe('balanced');
   });
 
-  it("resolves 'economic' to 'pro_plan'", () => {
-    expect(resolveMode('economic')).toBe('pro_plan');
+  it("resolves legacy 'pro_plan' to 'economic'", () => {
+    expect(resolveMode('pro_plan')).toBe('economic');
   });
 
-  it("resolves 'unlimited' to 'api'", () => {
+  it("resolves legacy 'unlimited' to 'api'", () => {
     expect(resolveMode('unlimited')).toBe('api');
   });
 
-  it('passes through canonical name max_plan unchanged', () => {
-    expect(resolveMode('max_plan')).toBe('max_plan');
+  it('passes through canonical name performance unchanged', () => {
+    expect(resolveMode('performance')).toBe('performance');
   });
 
-  it('passes through canonical name max5x_plan unchanged', () => {
-    expect(resolveMode('max5x_plan')).toBe('max5x_plan');
+  it('passes through canonical name balanced unchanged', () => {
+    expect(resolveMode('balanced')).toBe('balanced');
   });
 
-  it('passes through canonical name pro_plan unchanged', () => {
-    expect(resolveMode('pro_plan')).toBe('pro_plan');
+  it('passes through canonical name economic unchanged', () => {
+    expect(resolveMode('economic')).toBe('economic');
   });
 
   it('passes through canonical name api unchanged', () => {
@@ -458,34 +458,34 @@ describe('resolveMode', () => {
 });
 
 describe('loadConfig — mode alias resolution', () => {
-  it("resolves alias 'performance' in project config to 'max_plan'", async () => {
+  it("resolves legacy alias 'max_plan' in project config to 'performance'", async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
-    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'performance' }));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'max_plan' }));
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
     expect(config.activeModeConfig.max_workers).toBe(8);
   });
 
-  it("resolves alias 'balanced' in project config to 'max5x_plan'", async () => {
+  it("resolves legacy alias 'max5x_plan' in project config to 'balanced'", async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
-    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'balanced' }));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'max5x_plan' }));
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('max5x_plan');
+    expect(config.mode).toBe('balanced');
     expect(config.activeModeConfig.max_workers).toBe(5);
   });
 
-  it("resolves alias 'economic' in project config to 'pro_plan'", async () => {
+  it("resolves legacy alias 'pro_plan' in project config to 'economic'", async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
-    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'economic' }));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'pro_plan' }));
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('pro_plan');
+    expect(config.mode).toBe('economic');
     expect(config.activeModeConfig.brain_model).toBe('sonnet');
   });
 
-  it("resolves alias 'unlimited' in project config to 'api' (with API key)", async () => {
+  it("resolves legacy alias 'unlimited' in project config to 'api' (with API key)", async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
     mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'unlimited' }));
     process.env['ANTHROPIC_API_KEY'] = 'test-key';
@@ -638,7 +638,7 @@ describe('multi-provider env var overrides', () => {
     mockedReadFile.mockRejectedValue(new Error('not found'));
     process.env['DECKENT_MODE'] = 'pro_plan';
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('pro_plan');
+    expect(config.mode).toBe('economic');
     delete process.env['DECKENT_MODE'];
   });
 
@@ -647,7 +647,7 @@ describe('multi-provider env var overrides', () => {
     mockedReadFile.mockRejectedValue(new Error('not found'));
     process.env['DECKENT_MODE'] = 'balanced';
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('max5x_plan');
+    expect(config.mode).toBe('balanced');
     delete process.env['DECKENT_MODE'];
   });
 
@@ -810,7 +810,7 @@ describe('extended config validation', () => {
     mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'pro_plan', language: 'tr' }));
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('pro_plan');
+    expect(config.mode).toBe('economic');
     // New fields should be available via defaults after merge
   });
 
@@ -1113,39 +1113,39 @@ describe('Plan tier generalization (sprint-072)', () => {
     expect(legacyModes).toHaveLength(3);
   });
 
-  it('new tier aliases resolve to canonical internal names', () => {
-    expect(resolveMode('performance')).toBe('max_plan');
-    expect(resolveMode('balanced')).toBe('max5x_plan');
-    expect(resolveMode('economic')).toBe('pro_plan');
+  it('legacy aliases resolve to canonical names', () => {
+    expect(resolveMode('max_plan')).toBe('performance');
+    expect(resolveMode('max5x_plan')).toBe('balanced');
+    expect(resolveMode('pro_plan')).toBe('economic');
   });
 
-  it('loadConfig migrates alias tier to canonical name', async () => {
+  it('loadConfig migrates legacy alias to canonical name', async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
-    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'performance' }));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ mode: 'max_plan' }));
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('max_plan');
+    expect(config.mode).toBe('performance');
     expect(config.activeModeConfig.max_workers).toBe(8);
     expect(config.activeModeConfig.brain_model).toBe('opus');
   });
 
   it('DEFAULT_MODES contains all 4 canonical tiers', () => {
     const modes = getDefaultModes();
-    expect(modes['max_plan']).toBeDefined();
-    expect(modes['max5x_plan']).toBeDefined();
-    expect(modes['pro_plan']).toBeDefined();
+    expect(modes['performance']).toBeDefined();
+    expect(modes['balanced']).toBeDefined();
+    expect(modes['economic']).toBeDefined();
     expect(modes['api']).toBeDefined();
   });
 
-  it('config merge preserves tier settings with new alias as mode', async () => {
+  it('config merge preserves tier settings with canonical alias as mode', async () => {
     mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
     mockedReadFile.mockResolvedValue(JSON.stringify({
       mode: 'economic',
-      modes: { pro_plan: { max_workers: 4 } },
+      modes: { economic: { max_workers: 4 } },
     }));
 
     const config = await loadConfig('/test/project');
-    expect(config.mode).toBe('pro_plan');
+    expect(config.mode).toBe('economic');
     expect(config.activeModeConfig.max_workers).toBe(4);
     expect(config.activeModeConfig.brain_model).toBe('sonnet'); // preserved from default
   });

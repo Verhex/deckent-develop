@@ -54,7 +54,7 @@ describe('docs/reference/config-reference.md', () => {
   it('contains example configs', () => {
     expect(content).toContain('## 8. Example Configs');
     expect(content).toContain('"mode"');
-    expect(content).toContain('"max_plan"');
+    expect(content).toContain('"performance"');
   });
 
   it('documents global vs project config', () => {

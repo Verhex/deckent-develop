@@ -35,8 +35,8 @@ deckent <command> [options]
 - [`deckent watch`](#watch) — Open a live tmux split view: dashboard pane + worker panes
 - [`deckent dashboard`](#dashboard) — Show a terminal dashboard with auto-refresh (CLI rendering, no browser)
 - [`deckent history`](#history) — Show sprint history from 
+- [`deckent usage`](#usage) — Show usage metrics (model calls, token counts, estimated cost for API mode)
 - [`deckent analyze`](#analyze) — Analyze project stack, size, and recommended methodology
-- [`deckent checkpoint`](#checkpoint) — Manage human checkpoints — list, approve, or reject
 
 ### Workers & Tasks
 
@@ -171,7 +171,7 @@ deckent start --force --watch
 
 ## `plan`
 
-Plan the next sprint without executing it. Reads DIRECTIVES.md and generates task files in .tasks/. Prompts for confirmation before writing.
+Plan the next sprint without executing it. Reads DIRECTIVES.md, checks usage, and generates task files in .tasks/. Prompts for confirmation before writing.
 
 **Usage:** `deckent plan`
 
@@ -409,6 +409,29 @@ deckent history --agent brain
 
 ---
 
+## `usage`
+
+Show usage metrics (model calls, token counts, estimated cost for API mode).
+
+**Usage:** `deckent usage`
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--sprint <id>` | Filter by sprint ID |
+
+**Examples:**
+
+```bash
+deckent usage
+deckent usage --sprint sprint-042
+deckent usage --json
+```
+
+---
+
 ## `analyze`
 
 Analyze project stack, size, and recommended methodology. Detects framework, language, test framework, and build tool from the project.
@@ -426,68 +449,6 @@ Analyze project stack, size, and recommended methodology. Detects framework, lan
 ```bash
 deckent analyze
 deckent analyze --json
-```
-
----
-
-## `checkpoint`
-
-Manage human checkpoints — list, approve, or reject pending checkpoints. Checkpoints are created during sprint execution when human review is required before proceeding.
-
-**Usage:** `deckent checkpoint`
-
-**Subcommands:**
-
-#### `list`
-
-List all checkpoints.
-
-**Usage:** `deckent checkpoint list`
-
-**Options:**
-
-| Flag | Description |
-|------|-------------|
-| `--pending` | Show only pending checkpoints |
-| `--json` | Output as JSON |
-
-**Examples:**
-
-```bash
-deckent checkpoint list
-deckent checkpoint list --pending
-```
-
-#### `approve <sprintId> <phase>`
-
-Approve a pending checkpoint.
-
-**Usage:** `deckent checkpoint approve <sprintId> <phase>`
-
-**Examples:**
-
-```bash
-deckent checkpoint approve sprint-042 EVALUATE
-```
-
-#### `reject <sprintId> <phase>`
-
-Reject a pending checkpoint.
-
-**Usage:** `deckent checkpoint reject <sprintId> <phase>`
-
-**Examples:**
-
-```bash
-deckent checkpoint reject sprint-042 EVALUATE
-```
-
-**Examples:**
-
-```bash
-deckent checkpoint list
-deckent checkpoint approve sprint-042 EVALUATE
-deckent checkpoint reject sprint-042 EVALUATE
 ```
 
 ---

@@ -6,7 +6,7 @@ import type { ResolvedConfig, TaskScope, ModelType } from '../../src/core/types.
 
 function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
-    mode: 'max_plan',
+    mode: 'performance',
     activeModeConfig: {
       max_workers: 4,
       brain_model: 'opus',
@@ -39,7 +39,7 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
       undefined, undefined, ['opus'],
     );
     // opus from skill, but Layer 3 does not cap here (src/ scope, not docs/test-only)
-    // Layer 1 does not downgrade (max_plan)
+    // Layer 1 does not downgrade (performance)
     expect(result).toBe('opus');
   });
 
@@ -100,14 +100,14 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
     expect(result).toBe('sonnet');
   });
 
-  it('skill model upgrade still capped by Layer 1 (pro_plan)', () => {
-    const proConfig = makeConfig({ mode: 'pro_plan' });
+  it('skill model upgrade still capped by Layer 1 (economic)', () => {
+    const proConfig = makeConfig({ mode: 'economic' });
     const scope = makeScope(['src/core/']);
     const result = resolveTaskModel(
       'Important task', 'Critical implementation', scope, proConfig,
       undefined, undefined, ['opus'],
     );
-    // Layer 4d upgrades to opus, but Layer 1 downgrades opus on pro_plan
+    // Layer 4d upgrades to opus, but Layer 1 downgrades opus on economic
     expect(result).toBe('sonnet');
   });
 

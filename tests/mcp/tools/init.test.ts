@@ -102,7 +102,7 @@ describe('registerInitTool', () => {
   describe('successful init', () => {
     it('creates required directories', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'my-project', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'my-project', mode: 'performance', language: 'en' });
       expect(vi.mocked(mkdirSync)).toHaveBeenCalled();
       const calls = vi.mocked(mkdirSync).mock.calls.map((c) => String(c[0]));
       // Check that key directories are created
@@ -113,27 +113,27 @@ describe('registerInitTool', () => {
 
     it('creates config.json with correct fields', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'test-project', mode: 'pro_plan', language: 'tr' });
+      await tool.handler({ projectName: 'test-project', mode: 'economic', language: 'tr' });
       const writeCall = vi.mocked(writeFileSync).mock.calls.find(
         (c) => String(c[0]).includes('config.json'),
       );
       expect(writeCall).toBeDefined();
       const content = JSON.parse(String(writeCall![1]));
       expect(content.projectName).toBe('test-project');
-      expect(content.mode).toBe('pro_plan');
+      expect(content.mode).toBe('economic');
       expect(content.language).toBe('tr');
     });
 
     it('returns success: true in response', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'my-project', mode: 'max_plan', language: 'en' });
+      const result = await tool.handler({ projectName: 'my-project', mode: 'performance', language: 'en' });
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.success).toBe(true);
     });
 
     it('writes DECKENT.md with project name', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'awesome-project', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'awesome-project', mode: 'performance', language: 'en' });
       const deckentWrite = vi.mocked(writeFileSync).mock.calls.find(
         (c) => String(c[0]).endsWith('DECKENT.md'),
       );
@@ -143,7 +143,7 @@ describe('registerInitTool', () => {
 
     it('writes i18n files for en and tr', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       const writeCalls = vi.mocked(writeFileSync).mock.calls.map((c) => String(c[0]));
       expect(writeCalls.some((p) => p.includes('en.json'))).toBe(true);
       expect(writeCalls.some((p) => p.includes('tr.json'))).toBe(true);
@@ -151,13 +151,13 @@ describe('registerInitTool', () => {
 
     it('calls ensureDeckentImport for AGENTS.md and CLAUDE.md', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       expect(vi.mocked(ensureDeckentImport)).toHaveBeenCalledTimes(2);
     });
 
     it('registers MCP server in .claude/settings.json', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       const settingsCalls = vi.mocked(writeFileSync).mock.calls.filter(
         (c) => String(c[0]).includes('settings.json'),
       );
@@ -172,7 +172,7 @@ describe('registerInitTool', () => {
   describe('parameter handling', () => {
     it('uses provided projectName in response', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'special-name', mode: 'max_plan', language: 'en' });
+      const result = await tool.handler({ projectName: 'special-name', mode: 'performance', language: 'en' });
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.projectName).toBe('special-name');
     });
@@ -186,21 +186,21 @@ describe('registerInitTool', () => {
 
     it('uses provided language in response', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'tr' });
+      const result = await tool.handler({ projectName: 'proj', mode: 'performance', language: 'tr' });
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.language).toBe('tr');
     });
 
-    it('supports max5x_plan mode', async () => {
+    it('supports balanced mode', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'proj', mode: 'max5x_plan', language: 'en' });
+      const result = await tool.handler({ projectName: 'proj', mode: 'balanced', language: 'en' });
       const parsed = JSON.parse(result.content[0]!.text);
-      expect(parsed.mode).toBe('max5x_plan');
+      expect(parsed.mode).toBe('balanced');
     });
 
     it('passes language to enrichResponse for localization', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'tr' });
+      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'tr' });
       expect(vi.mocked(enrichResponse)).toHaveBeenCalledWith(
         'init',
         expect.objectContaining({ language: 'tr' }),
@@ -222,7 +222,7 @@ describe('registerInitTool', () => {
       });
 
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
 
       const configWriteCalls = vi.mocked(writeFileSync).mock.calls.filter(
         (c) => String(c[0]).includes('config.json'),
@@ -230,7 +230,7 @@ describe('registerInitTool', () => {
       expect(configWriteCalls.length).toBeGreaterThan(0);
       const content = JSON.parse(String(configWriteCalls[0]![1]));
       expect(content.customField).toBe('keep-me');
-      expect(content.mode).toBe('max_plan'); // overwritten by new config
+      expect(content.mode).toBe('performance'); // overwritten by new config
     });
 
     it('handles malformed existing config.json gracefully', async () => {
@@ -243,7 +243,7 @@ describe('registerInitTool', () => {
       const tool = await getInitTool();
       // Should not throw — writes fresh config instead
       await expect(
-        tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' }),
+        tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' }),
       ).resolves.toBeDefined();
     });
 
@@ -257,7 +257,7 @@ describe('registerInitTool', () => {
       });
 
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
 
       const settingsCalls = vi.mocked(writeFileSync).mock.calls.filter(
         (c) => String(c[0]).includes('settings.json'),
@@ -272,14 +272,14 @@ describe('registerInitTool', () => {
   describe('response format', () => {
     it('returns content array with type: text', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      const result = await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       expect(result.content).toHaveLength(1);
       expect(result.content[0]!.type).toBe('text');
     });
 
     it('response includes _enriched meta with summary and hints', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      const result = await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed._enriched).toBeDefined();
       expect(parsed._enriched.summary).toBeDefined();
@@ -288,7 +288,7 @@ describe('registerInitTool', () => {
 
     it('response includes nextSteps array', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      const result = await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       const parsed = JSON.parse(result.content[0]!.text);
       expect(Array.isArray(parsed.nextSteps)).toBe(true);
       expect(parsed.nextSteps.length).toBeGreaterThan(0);
@@ -296,7 +296,7 @@ describe('registerInitTool', () => {
 
     it('response includes created array of created paths', async () => {
       const tool = await getInitTool();
-      const result = await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      const result = await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       const parsed = JSON.parse(result.content[0]!.text);
       expect(Array.isArray(parsed.created)).toBe(true);
       expect(parsed.created.length).toBeGreaterThan(0);
@@ -304,7 +304,7 @@ describe('registerInitTool', () => {
 
     it('calls enrichResponse with tool name "init"', async () => {
       const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'max_plan', language: 'en' });
+      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
       expect(vi.mocked(enrichResponse)).toHaveBeenCalledWith(
         'init',
         expect.any(Object),

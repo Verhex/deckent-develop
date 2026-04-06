@@ -53,7 +53,7 @@ export function resolveMode(mode: string): string {
 
 // ─── Default Mode Definitions (Blueprint 13) ────────────────────────
 
-const VALID_MODES: readonly PlanMode[] = ['performance', 'balanced', 'economic', 'api', 'max_plan', 'max5x_plan', 'pro_plan'] as const;
+const VALID_MODES: readonly PlanMode[] = ['performance', 'balanced', 'economic', 'api'] as const;
 const VALID_MODELS = ALL_MODELS;
 const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 
