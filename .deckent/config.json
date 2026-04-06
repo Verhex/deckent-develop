@@ -10,33 +10,21 @@
       "default_model": "opus",
       "haiku_allowed": false,
       "max_workers": 4,
-      "brain_planning": "auto",
-      "usage_thresholds": {
-        "5hr": 0.8,
-        "weekly": 0.6
-      }
+      "brain_planning": "auto"
     },
     "max5x_plan": {
       "max_workers": 5,
       "brain_model": "sonnet",
       "default_model": "opus",
       "haiku_allowed": true,
-      "brain_planning": "auto",
-      "usage_thresholds": {
-        "5hr": 0.7,
-        "weekly": 0.5
-      }
+      "brain_planning": "auto"
     },
     "pro_plan": {
       "max_workers": 3,
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": false,
-      "brain_planning": "auto",
-      "usage_thresholds": {
-        "5hr": 0.6,
-        "weekly": 0.4
-      }
+      "brain_planning": "auto"
     },
     "api": {
       "max_workers": 10,
@@ -45,11 +33,7 @@
       "haiku_allowed": true,
       "budget_per_sprint": 5,
       "requires": "ANTHROPIC_API_KEY",
-      "brain_planning": "auto",
-      "usage_thresholds": {
-        "5hr": 1,
-        "weekly": 1
-      }
+      "brain_planning": "auto"
     }
   },
   "brain_provider": "claude",
