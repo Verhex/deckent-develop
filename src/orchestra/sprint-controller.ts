@@ -629,6 +629,68 @@ export async function planSprint(
         }
       } catch (e) { debugLog('planSprint:generateTempAgents', e); }
 
+      // Inject evolved rules into agent/skill activation configs (in-memory only)
+      try {
+        const { OutcomeTracker: OT } = await import('./outcome-tracker.js');
+        const ot = new OT(projectRoot);
+        const allLearnings = ot.getLearnings();
+        const evolvedRules = (allLearnings.evolvedRules ?? []) as import('./rule-evolver.js').EvolvedRule[];
+        const autoApplied = evolvedRules.filter(r => r.status === 'auto-applied');
+        let injectedCount = 0;
+
+        for (const evolved of autoApplied) {
+          if (evolved.entityType === 'agent') {
+            const agent = pool.get(evolved.entityId);
+            if (!agent) continue;
+            if (!agent.activation) {
+              agent.activation = { rules: [], exclude: [], minScore: 0 };
+            }
+            if (evolved.type === 'activation') {
+              const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
+              const hasDuplicate = agent.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
+              if (!hasDuplicate) {
+                agent.activation.rules.push(rule);
+                injectedCount++;
+              }
+            } else if (evolved.type === 'exclusion') {
+              const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
+              const hasDuplicate = agent.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
+              if (!hasDuplicate) {
+                agent.activation.exclude.push(rule);
+                injectedCount++;
+              }
+            }
+          } else if (evolved.entityType === 'skill') {
+            const skill = skillsV2.get(evolved.entityId);
+            if (!skill) continue;
+            if (!skill.activation) {
+              skill.activation = { rules: [], exclude: [], minScore: 0 };
+            }
+            if (evolved.type === 'activation') {
+              const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
+              const hasDuplicate = skill.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
+              if (!hasDuplicate) {
+                skill.activation.rules.push(rule);
+                injectedCount++;
+              }
+            } else if (evolved.type === 'exclusion') {
+              const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
+              const hasDuplicate = skill.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
+              if (!hasDuplicate) {
+                skill.activation.exclude.push(rule);
+                injectedCount++;
+              }
+            }
+          }
+        }
+
+        if (injectedCount > 0) {
+          debugLog('planSprint:evolved-rules', `Injected ${injectedCount} auto-applied evolved rules into activation configs`);
+        }
+      } catch (e) {
+        debugLog('planSprint:evolved-rules', e);
+      }
+
       for (const task of tasks) {
         try {
           const overrides: UserOverride[] = [];
@@ -1226,7 +1288,14 @@ export async function finalizeSprint(
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
   try {
-    writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, undefined, results);
+    // Build skillMap from tasks for Skill Performance table in RETRO.md
+    const skillMap = new Map<string, string[]>();
+    for (const task of sprint.tasks) {
+      if (task.assignedSkills && task.assignedSkills.length > 0) {
+        skillMap.set(task.id, task.assignedSkills);
+      }
+    }
+    writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
   } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
 
   // 5. Update PROJECT-IDENTITY.md
@@ -1269,19 +1338,30 @@ export async function finalizeSprint(
   const routingVersion = (opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined;
 
   if (routingVersion !== 'v2') {
-    // V1: Write stats directly to agent.json manifests (legacy behavior)
+    // V1: Write stats directly to agent.json and skill manifest files (legacy behavior)
     try {
       const poolManager = new AgentPoolManager(projectRoot);
+      const skillPoolManager = new SkillPoolManager(projectRoot);
       for (const task of sprint.tasks) {
-        const agentId = task.assignedAgent;
-        if (!agentId) continue;
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
         const taskResult = results.find(r => r.taskId === task.id);
         const coverage = taskResult?.coverage ?? 0;
-        poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
+
+        // Update agent stats
+        const agentId = task.assignedAgent;
+        if (agentId) {
+          poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
+        }
+
+        // Update skill stats
+        if (task.assignedSkills) {
+          for (const skillId of task.assignedSkills) {
+            skillPoolManager.updateSkillStats(skillId, evaluation, coverage, sprint.id);
+          }
+        }
       }
-    } catch (e) { debugLog('finalizeSprint:updateAgentStats', e); }
+    } catch (e) { debugLog('finalizeSprint:updateAgentSkillStats', e); }
   } else {
     // V2: Record outcomes to learnings.json (single source of truth)
     // Agent.json manifests are NOT touched — stats live in learnings.json only
@@ -1338,9 +1418,19 @@ export async function finalizeSprint(
         const demotions = pipeline.evaluateDemotions(tracker);
         for (const p of promotions.filter(r => r.action === 'promote')) {
           debugLog('finalizeSprint:promotion', `${p.entityType} '${p.entityId}': ${p.reason}`);
+          try {
+            pipeline.promote(p.entityId, p.entityType);
+          } catch (promoteErr) {
+            debugLog('finalizeSprint:promotion', `Failed to promote ${p.entityType} '${p.entityId}': ${promoteErr}`);
+          }
         }
         for (const d of demotions.filter(r => r.action === 'demote')) {
           debugLog('finalizeSprint:demotion', `${d.entityType} '${d.entityId}': ${d.reason}`);
+          try {
+            pipeline.demote(d.entityId, d.entityType);
+          } catch (demoteErr) {
+            debugLog('finalizeSprint:demotion', `Failed to demote ${d.entityType} '${d.entityId}': ${demoteErr}`);
+          }
         }
       } catch (e) { debugLog('finalizeSprint:promotionDemotion', e); }
     } catch (err) {

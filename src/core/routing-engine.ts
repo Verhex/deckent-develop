@@ -190,12 +190,11 @@ function selectBestAgent(
     return { agentId: null, score: 0, confidence: 'uncertain', reasoning };
   }
 
-  // Sort by finalScore descending, then by successRate for tiebreaker
+  // Sort by finalScore descending, then by learning bonus for tiebreaker
+  // (V2: stats live in learnings.json, not agent.json — pool stats are always 0)
   candidates.sort((a, b) => {
     if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
-    const agentA = pool.get(a.id);
-    const agentB = pool.get(b.id);
-    return (agentB?.stats.successRate ?? 0) - (agentA?.stats.successRate ?? 0);
+    return getLearningBonus(b.id, learningData) - getLearningBonus(a.id, learningData);
   });
 
   const best = candidates[0]!;

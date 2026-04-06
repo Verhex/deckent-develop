@@ -2507,3 +2507,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 090-003: Dokümantasyon + README Artık Temizliği (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 91 — sprint-091
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 2084s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 4 |
+| Tech Debt | 4 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 2084215ms |
+
+### Tasks
+
+- 091-001: Agent Tiebreaker — learnings.json'dan Oku (GO_WITH_TECH_DEBT)
+- 091-002: Promotion/Demotion Execute Et (GO_WITH_TECH_DEBT)
+- 091-003: Evolved Rules Activation'a Inject Et (GO_WITH_TECH_DEBT)
+- 091-004: updateSkillStats V1 + SkillMap RETRO İçin (GO_WITH_TECH_DEBT)
+- 091-005: Hard-Coded Sabitleri Config'den Oku (NO_GO)
+- 091-006: Quality Score Routing Bonus'a Entegre Et (NO_GO)
+- 091-007: Integration Test — Tam Evolution Pipeline (NO_GO)
+
+---

@@ -7,6 +7,7 @@ import { join } from 'path';
 import type { TaskDNA, LearningBonus, IntentType } from '../core/routing-types.js';
 import { LEARNING_BONUS_CAP } from '../core/routing-types.js';
 import { debugLog } from '../core/utils.js';
+import type { LearningConfig } from '../core/decision-config.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ export interface EntityPerformance {
   successCount: number; // DONE + GO_WITH_TECH_DEBT
   failCount: number;    // NO_GO
   successRate: number;  // 0.0-1.0
+  avgQualityScore: number; // 0-100, incremental average from QualityAssessor
   byIntent: Record<string, { tasks: number; successRate: number }>;
 }
 
@@ -63,19 +65,23 @@ export interface LearningsData {
 const ROUTING_DIR = '.deckent/routing';
 const OUTCOMES_DIR = '.deckent/routing/outcomes';
 const LEARNINGS_FILE = '.deckent/routing/learnings.json';
-const MIN_SAMPLES_FOR_BONUS = 3;
-const RECENT_SPRINT_WINDOW = 3;
-const SPRINT_RECENCY_SUCCESS_BONUS = 3;
-const SPRINT_RECENCY_FAILURE_PENALTY = -2;
 
 // ─── OutcomeTracker ─────────────────────────────────────────────────────────
 
 export class OutcomeTracker {
   private readonly projectRoot: string;
   private learnings: LearningsData;
+  private readonly MIN_SAMPLES_FOR_BONUS: number;
+  private readonly RECENT_SPRINT_WINDOW: number;
+  private readonly SPRINT_RECENCY_SUCCESS_BONUS: number;
+  private readonly SPRINT_RECENCY_FAILURE_PENALTY: number;
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, config?: Partial<LearningConfig>) {
     this.projectRoot = projectRoot;
+    this.MIN_SAMPLES_FOR_BONUS = config?.minSamplesForBonus ?? 3;
+    this.RECENT_SPRINT_WINDOW = config?.recentSprintWindow ?? 3;
+    this.SPRINT_RECENCY_SUCCESS_BONUS = config?.sprintRecencySuccessBonus ?? 3;
+    this.SPRINT_RECENCY_FAILURE_PENALTY = config?.sprintRecencyFailurePenalty ?? -2;
     this.learnings = this.loadLearnings();
   }
 
@@ -92,6 +98,7 @@ export class OutcomeTracker {
         outcome.agentId,
         outcome.taskDNA.intent.primary,
         isSuccess,
+        outcome.qualityScore,
       );
     }
 
@@ -102,6 +109,7 @@ export class OutcomeTracker {
         skillId,
         outcome.taskDNA.intent.primary,
         isSuccess,
+        outcome.qualityScore,
       );
       this.updateSkillSprintHistory(skillId, outcome.sprintId, isSuccess, outcome.coverage);
     }
@@ -183,7 +191,7 @@ export class OutcomeTracker {
    */
   calculateSprintRecencyBonuses(): Map<string, number> {
     const result = new Map<string, number>();
-    const lastSprints = this.learnings.recentSprints.slice(-RECENT_SPRINT_WINDOW);
+    const lastSprints = this.learnings.recentSprints.slice(-this.RECENT_SPRINT_WINDOW);
     // Need at least 2 sprints and 3+ total outcomes to compute meaningful recency
     if (lastSprints.length < 2) return result;
 
@@ -199,14 +207,14 @@ export class OutcomeTracker {
       }
 
       const total = successCount + failCount;
-      if (total < MIN_SAMPLES_FOR_BONUS) continue;
+      if (total < this.MIN_SAMPLES_FOR_BONUS) continue;
 
       const recentSuccessRate = successCount / total;
 
       if (recentSuccessRate === 1) {
-        result.set(skillId, SPRINT_RECENCY_SUCCESS_BONUS);
+        result.set(skillId, this.SPRINT_RECENCY_SUCCESS_BONUS);
       } else if (recentSuccessRate === 0) {
-        result.set(skillId, SPRINT_RECENCY_FAILURE_PENALTY);
+        result.set(skillId, this.SPRINT_RECENCY_FAILURE_PENALTY);
       } else if (recentSuccessRate >= 0.75) {
         result.set(skillId, 1);
       } else if (recentSuccessRate < 0.35) {
@@ -312,22 +320,30 @@ export class OutcomeTracker {
 
   private computeBonus(perf: EntityPerformance, intent: IntentType): number {
     // Need minimum samples for any bonus
-    if (perf.totalTasks < MIN_SAMPLES_FOR_BONUS) return 0;
+    if (perf.totalTasks < this.MIN_SAMPLES_FOR_BONUS) return 0;
 
     // Check intent-specific data first
     const intentData = perf.byIntent[intent];
-    if (intentData && intentData.tasks >= MIN_SAMPLES_FOR_BONUS) {
+    if (intentData && intentData.tasks >= this.MIN_SAMPLES_FOR_BONUS) {
       const delta = intentData.successRate - perf.successRate;
       // Intent-specific performance significantly different from overall
       if (delta > 0.15) return Math.min(Math.round(delta * 10), LEARNING_BONUS_CAP);
       if (delta < -0.15) return Math.max(Math.round(delta * 10), -LEARNING_BONUS_CAP);
     }
 
-    // Overall performance bonus/penalty
-    if (perf.successRate >= 0.9 && perf.totalTasks >= 5) return 1;
-    if (perf.successRate < 0.5 && perf.totalTasks >= 5) return -2;
+    let bonus = 0;
 
-    return 0;
+    // Overall performance bonus/penalty
+    if (perf.successRate >= 0.9 && perf.totalTasks >= 5) bonus += 1;
+    else if (perf.successRate < 0.5 && perf.totalTasks >= 5) bonus += -2;
+
+    // Quality score bonus/penalty (only when quality data exists, i.e. avgQualityScore > 0)
+    if (perf.avgQualityScore > 0) {
+      if (perf.avgQualityScore >= 80) bonus += 1;
+      else if (perf.avgQualityScore < 40) bonus += -1;
+    }
+
+    return Math.max(-LEARNING_BONUS_CAP, Math.min(LEARNING_BONUS_CAP, bonus));
   }
 
   private updateEntityPerformance(
@@ -335,6 +351,7 @@ export class OutcomeTracker {
     entityId: string,
     intent: IntentType,
     isSuccess: boolean,
+    qualityScore?: number,
   ): void {
     if (!store[entityId]) {
       store[entityId] = {
@@ -342,6 +359,7 @@ export class OutcomeTracker {
         successCount: 0,
         failCount: 0,
         successRate: 0,
+        avgQualityScore: 0,
         byIntent: {},
       };
     }
@@ -351,6 +369,11 @@ export class OutcomeTracker {
     if (isSuccess) perf.successCount++;
     else perf.failCount++;
     perf.successRate = perf.successCount / perf.totalTasks;
+
+    // Incremental average quality score
+    if (qualityScore !== undefined) {
+      perf.avgQualityScore = (perf.avgQualityScore * (perf.totalTasks - 1) + qualityScore) / perf.totalTasks;
+    }
 
     // Update intent-specific
     if (!perf.byIntent[intent]) {
@@ -410,12 +433,21 @@ export class OutcomeTracker {
         const raw = readFileSync(filePath, 'utf-8');
         const parsed = JSON.parse(raw) as Partial<LearningsData>;
         // Backfill fields added in later versions (backward compatibility)
+        const agentPerf = parsed.agentPerformance ?? {};
+        const skillPerf = parsed.skillPerformance ?? {};
+        // Backfill avgQualityScore for entities loaded from older learnings data
+        for (const perf of Object.values(agentPerf)) {
+          if (perf.avgQualityScore === undefined) perf.avgQualityScore = 0;
+        }
+        for (const perf of Object.values(skillPerf)) {
+          if (perf.avgQualityScore === undefined) perf.avgQualityScore = 0;
+        }
         return {
           recentSprints: [],
           skillSprintHistory: {},
           ...parsed,
-          agentPerformance: parsed.agentPerformance ?? {},
-          skillPerformance: parsed.skillPerformance ?? {},
+          agentPerformance: agentPerf,
+          skillPerformance: skillPerf,
           synergyMatrix: parsed.synergyMatrix ?? [],
         } as LearningsData;
       }

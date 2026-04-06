@@ -21,7 +21,7 @@
 - **agents/** (16 modules): Worker execution, prompt engineering
 - **providers/** (5 modules): Claude, Codex, Gemini adapters
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
-- **mcp/**: MCP server — 19 tools + 9 resources, stdio transport
+- **mcp/**: MCP server — 18 tools + 8 resources, stdio transport
 - **cli/** (33 commands): Full CLI with helpers, entry point
 - **dashboard/**: React + Vite + Tailwind (4 pages, SSE indicator, language switcher)
   - i18n/LanguageProvider.tsx, i18n/en.ts (~282 keys), i18n/tr.ts (~282 keys)
@@ -30,10 +30,10 @@
 ## Current State
 - Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-090
-- Total Sprints: 90
-- Completed Tasks: 238
-- No-Go Rate: 33.3%
+- Last Sprint: sprint-091
+- Total Sprints: 91
+- Completed Tasks: 242
+- No-Go Rate: 42.9%
 
 ## Active Configuration
 - Build: tsc
@@ -67,7 +67,7 @@
 - core/provider.ts → ProviderAdapter interface, multi-provider registry
 - agents/worker.ts → task claim, file locking, heartbeat, verify loop
 - cli/entry.ts → buildProgram() + 33+ commands
-- mcp/index.ts → 19 tools + 9 resources (Sprint 086)
+- mcp/index.ts → 18 tools + 8 resources (Sprint 089: usage kaldırıldı)
 - api/server.ts → HTTP API + SSE (17 endpoints: GET /api/status, /api/tasks, etc.)
 
 ## Sprint 067 Learnings

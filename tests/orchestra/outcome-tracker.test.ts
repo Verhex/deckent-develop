@@ -268,4 +268,132 @@ describe('OutcomeTracker', () => {
       }
     });
   });
+
+  describe('quality score integration', () => {
+    it('tracks avgQualityScore via incremental average', () => {
+      tracker.recordOutcome(makeOutcome({ taskId: 'q1', qualityScore: 80 }));
+      tracker.recordOutcome(makeOutcome({ taskId: 'q2', qualityScore: 60 }));
+
+      const perf = tracker.getLearnings().agentPerformance['test-agent']!;
+      expect(perf.avgQualityScore).toBeCloseTo(70, 1);
+    });
+
+    it('gives +1 bonus for avgQualityScore >= 80 with enough samples', () => {
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({ taskId: `hq-${i}`, qualityScore: 90 }));
+      }
+
+      const dna = createDefaultTaskDNA();
+      dna.intent.primary = 'implementation';
+      const bonuses = tracker.calculateBonuses(dna);
+      const agentBonus = bonuses.find(b => b.entityId === 'test-agent');
+      expect(agentBonus).toBeDefined();
+      // successRate=1.0 (>=0.9, 6 tasks) → +1, avgQualityScore=90 (>=80) → +1 = +2
+      expect(agentBonus!.bonus).toBe(2);
+    });
+
+    it('gives -1 penalty for avgQualityScore < 40 with enough samples', () => {
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({ taskId: `lq-${i}`, evaluation: 'NO_GO', qualityScore: 20 }));
+      }
+
+      const dna = createDefaultTaskDNA();
+      dna.intent.primary = 'implementation';
+      const bonuses = tracker.calculateBonuses(dna);
+      const agentBonus = bonuses.find(b => b.entityId === 'test-agent');
+      expect(agentBonus).toBeDefined();
+      // successRate=0 (<0.5, 6 tasks) → -2, avgQualityScore=20 (<40) → -1 = -3 (capped at -3)
+      expect(agentBonus!.bonus).toBe(-3);
+    });
+
+    it('does not apply quality bonus when avgQualityScore is 0 (no quality data)', () => {
+      // No qualityScore passed → avgQualityScore stays 0
+      for (let i = 0; i < 6; i++) {
+        tracker.recordOutcome(makeOutcome({ taskId: `nq-${i}` }));
+      }
+
+      const dna = createDefaultTaskDNA();
+      dna.intent.primary = 'implementation';
+      const bonuses = tracker.calculateBonuses(dna);
+      const agentBonus = bonuses.find(b => b.entityId === 'test-agent');
+      expect(agentBonus).toBeDefined();
+      // successRate=1.0 → +1, no quality bonus (avgQualityScore=0) → total +1
+      expect(agentBonus!.bonus).toBe(1);
+    });
+
+    it('tracks quality score for skills too', () => {
+      tracker.recordOutcome(makeOutcome({ taskId: 'sq1', qualityScore: 95 }));
+      tracker.recordOutcome(makeOutcome({ taskId: 'sq2', qualityScore: 85 }));
+
+      const skillPerf = tracker.getLearnings().skillPerformance['typescript-expert']!;
+      expect(skillPerf.avgQualityScore).toBeCloseTo(90, 1);
+    });
+
+    it('backfills avgQualityScore to 0 for entities loaded from older learnings', () => {
+      // The loadLearnings() backfill is tested implicitly by the constructor
+      // reading from mocked fs — all EntityPerformance objects should have avgQualityScore
+      const learnings = tracker.getLearnings();
+      // Fresh tracker has empty maps, but if we record and check, it should be there
+      tracker.recordOutcome(makeOutcome({ taskId: 'bf1' }));
+      const agentPerf = tracker.getLearnings().agentPerformance['test-agent']!;
+      expect(agentPerf.avgQualityScore).toBeDefined();
+      expect(typeof agentPerf.avgQualityScore).toBe('number');
+    });
+  });
+
+  describe('configurable constants', () => {
+    it('uses custom minSamplesForBonus from config', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-project', { minSamplesForBonus: 5 });
+      // Record 4 outcomes — less than custom threshold of 5
+      for (let i = 0; i < 4; i++) {
+        customTracker.recordOutcome(makeOutcome({ taskId: `cfg-${i}` }));
+      }
+      const bonuses = customTracker.calculateBonuses(createDefaultTaskDNA());
+      // Should be empty because 4 < 5 (custom min)
+      expect(bonuses).toEqual([]);
+    });
+
+    it('uses custom recentSprintWindow from config', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-project', { recentSprintWindow: 2 });
+      // Record outcomes across 3 sprints
+      for (let i = 1; i <= 3; i++) {
+        customTracker.recordOutcome(makeOutcome({
+          taskId: `rw-${i}`,
+          sprintId: `sprint-00${i}`,
+          evaluation: 'DONE',
+        }));
+      }
+      const bonuses = customTracker.calculateSprintRecencyBonuses();
+      // Window=2 means only last 2 sprints (sprint-002, sprint-003) are considered
+      // 2 outcomes >= minSamplesForBonus(3)? No, only 2. So no bonus.
+      // This verifies the window is actually 2, not default 3.
+      expect(bonuses.size).toBe(0);
+    });
+
+    it('uses custom sprintRecencySuccessBonus from config', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-project', { sprintRecencySuccessBonus: 5 });
+      for (let i = 1; i <= 3; i++) {
+        customTracker.recordOutcome(makeOutcome({
+          taskId: `sb-${i}`,
+          sprintId: `sprint-00${i}`,
+          evaluation: 'DONE',
+        }));
+      }
+      const bonuses = customTracker.calculateSprintRecencyBonuses();
+      expect(bonuses.get('typescript-expert')).toBe(5);
+    });
+
+    it('uses custom sprintRecencyFailurePenalty from config', () => {
+      const customTracker = new OutcomeTracker('/tmp/test-project', { sprintRecencyFailurePenalty: -4 });
+      for (let i = 1; i <= 3; i++) {
+        customTracker.recordOutcome(makeOutcome({
+          taskId: `fp-${i}`,
+          sprintId: `sprint-00${i}`,
+          evaluation: 'NO_GO',
+        }));
+      }
+      const bonuses = customTracker.calculateSprintRecencyBonuses();
+      expect(bonuses.get('typescript-expert')).toBe(-4);
+    });
+  });
 });

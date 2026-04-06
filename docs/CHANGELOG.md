@@ -6,6 +6,19 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint91] - 2026-04-06
+
+
+### Changed
+
+- Agent Tiebreaker — learnings.json'dan Oku (completed with tech debt)
+- Promotion/Demotion Execute Et (completed with tech debt)
+- Evolved Rules Activation'a Inject Et (completed with tech debt)
+- updateSkillStats V1 + SkillMap RETRO İçin (completed with tech debt)
+
+
+_Tasks: 7 total, 4 done, 4 tech debt, 3 no-go_
+
 ## [0.3.0-beta.3-sprint90] - 2026-04-06
 
 

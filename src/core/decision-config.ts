@@ -18,6 +18,10 @@ export interface LearningConfig {
   minConfidenceForRecommendation: number;  // 0-1, default 0.6
   decayInterval: number;  // sprints between compaction
   patternMigrationDone: boolean;
+  minSamplesForBonus?: number;  // minimum outcome samples before applying bonus (default 3)
+  recentSprintWindow?: number;  // how many recent sprints to consider for recency bonus (default 3)
+  sprintRecencySuccessBonus?: number;  // bonus for 100% success in recent window (default 3)
+  sprintRecencyFailurePenalty?: number;  // penalty for 0% success in recent window (default -2)
 }
 
 // ─── Collaboration Config ───────────────────────────────────────────
@@ -49,6 +53,10 @@ export function createDefaultLearningConfig(): LearningConfig {
     minConfidenceForRecommendation: 0.6,
     decayInterval: 5,
     patternMigrationDone: false,
+    minSamplesForBonus: 3,
+    recentSprintWindow: 3,
+    sprintRecencySuccessBonus: 3,
+    sprintRecencyFailurePenalty: -2,
   };
 }
 
