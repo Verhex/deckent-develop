@@ -22,6 +22,7 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
+import { modelRegistry } from '../core/model-registry.js';
 import { getSystemProfile } from '../core/system-profile.js';
 
 import type { ProviderAdapter } from '../core/provider.js';
@@ -119,7 +120,8 @@ export function resolveMaxWorkersNumeric(config: ResolvedConfig, systemProfile?:
 export function resolveDefaultUsageCli(): string | undefined {
   try {
     const defaultAdapter = providerRegistry.getDefault();
-    const cmdStr = defaultAdapter.buildCommand('opus' as ModelType, '/dev/null');
+    const defaultModel = (modelRegistry.getByProviderAndTier('claude', 'premium')?.id ?? 'opus') as ModelType;
+    const cmdStr = defaultAdapter.buildCommand(defaultModel, '/dev/null');
     const firstToken = cmdStr.split(/\s+/)[0];
     return firstToken || undefined;
   } catch {

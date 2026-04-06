@@ -112,13 +112,13 @@ export function buildOnboardSteps(projectName: string): WizardStep[] {
     },
     {
       id: 'mode',
-      prompt: 'Select plan mode',
+      prompt: 'Select working mode',
       type: 'select',
       choices: [
-        { label: 'performance (Opus model, max power)', value: 'performance' },
-        { label: 'balanced (Sonnet brain + Opus workers)', value: 'balanced' },
-        { label: 'economic (Sonnet model, cost-efficient)', value: 'economic' },
-        { label: 'api (API key, pay-per-use)', value: 'api' },
+        { label: 'performance (premium tier, max power)', value: 'performance' },
+        { label: 'balanced (standard brain + premium workers)', value: 'balanced' },
+        { label: 'economic (standard tier, cost-efficient)', value: 'economic' },
+        { label: 'api (pay-per-use, premium brain + standard workers)', value: 'api' },
       ],
       default: 'performance',
     },

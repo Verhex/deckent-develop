@@ -5,8 +5,12 @@ import { writeFileSync, readFileSync, existsSync, unlinkSync, readdirSync } from
 import {
   migrateConfig,
   migrateConfigInMemory,
+  migrateConfigFull,
   getMissingFields,
   needsMigration,
+  modelToTier,
+  migrateConfigV1ToV2,
+  needsV2Migration,
 } from '../../src/core/config-migration.js';
 import { createDefaultConfig } from '../../src/core/config.js';
 
@@ -332,5 +336,292 @@ describe('routing_engine migration', () => {
     } finally {
       cleanupTmp(p);
     }
+  });
+});
+
+// ─── modelToTier ────────────────────────────────────────────────────
+
+describe('modelToTier', () => {
+  it('maps Claude models to correct tiers', () => {
+    expect(modelToTier('opus')).toBe('premium');
+    expect(modelToTier('sonnet')).toBe('standard');
+    expect(modelToTier('haiku')).toBe('economy');
+  });
+
+  it('maps OpenAI models to correct tiers', () => {
+    expect(modelToTier('gpt-5')).toBe('premium');
+    expect(modelToTier('gpt-4.1')).toBe('standard');
+    expect(modelToTier('o3')).toBe('standard');
+    expect(modelToTier('gpt-5-mini')).toBe('economy');
+    expect(modelToTier('gpt-4.1-mini')).toBe('economy');
+    expect(modelToTier('o4-mini')).toBe('economy');
+  });
+
+  it('maps Gemini models to correct tiers', () => {
+    expect(modelToTier('gemini-2.5-pro')).toBe('premium');
+    expect(modelToTier('gemini-2.5-flash')).toBe('standard');
+    expect(modelToTier('gemini-2.0-flash')).toBe('economy');
+  });
+
+  it('returns standard as fallback for unknown models', () => {
+    expect(modelToTier('unknown-model')).toBe('standard');
+  });
+});
+
+// ─── migrateConfigV1ToV2 ────────────────────────────────────────────
+
+describe('migrateConfigV1ToV2', () => {
+  it('migrates brain_model to model_strategy.brain_tier', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: {
+        performance: { brain_model: 'opus', default_model: 'sonnet', haiku_allowed: true, max_workers: 4 },
+      },
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.migrated).toBe(true);
+    const strategy = config['model_strategy'] as Record<string, unknown>;
+    expect(strategy['brain_tier']).toBe('premium');
+  });
+
+  it('migrates default_model to model_strategy.worker_tier', () => {
+    const config: Record<string, unknown> = {
+      mode: 'balanced',
+      modes: {
+        balanced: { brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, max_workers: 5 },
+      },
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.migrated).toBe(true);
+    const strategy = config['model_strategy'] as Record<string, unknown>;
+    expect(strategy['worker_tier']).toBe('premium');
+  });
+
+  it('migrates haiku_allowed false to min_tier standard', () => {
+    const config: Record<string, unknown> = {
+      mode: 'economic',
+      modes: {
+        economic: { brain_model: 'sonnet', default_model: 'sonnet', haiku_allowed: false, max_workers: 3 },
+      },
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.migrated).toBe(true);
+    const strategy = config['model_strategy'] as Record<string, unknown>;
+    expect(strategy['min_tier']).toBe('standard');
+  });
+
+  it('migrates haiku_allowed true to min_tier economy', () => {
+    const config: Record<string, unknown> = {
+      mode: 'balanced',
+      modes: {
+        balanced: { brain_model: 'sonnet', default_model: 'opus', haiku_allowed: true, max_workers: 5 },
+      },
+    };
+    migrateConfigV1ToV2(config);
+    const strategy = config['model_strategy'] as Record<string, unknown>;
+    expect(strategy['min_tier']).toBe('economy');
+  });
+
+  it('migrates brain_provider and worker_provider to providers block', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: { performance: { brain_model: 'opus', default_model: 'opus', haiku_allowed: false, max_workers: 4 } },
+      brain_provider: 'claude',
+      worker_provider: 'codex',
+      fallback_provider: 'gemini',
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.migrated).toBe(true);
+    const providers = config['providers'] as Record<string, unknown>;
+    expect(providers['brain']).toBe('claude');
+    expect(providers['worker']).toBe('codex');
+    expect(providers['fallback']).toBe('gemini');
+  });
+
+  it('does not overwrite existing model_strategy fields', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: { performance: { brain_model: 'opus', default_model: 'opus', haiku_allowed: false, max_workers: 4 } },
+      model_strategy: { brain_tier: 'economy' }, // pre-existing
+    };
+    migrateConfigV1ToV2(config);
+    const strategy = config['model_strategy'] as Record<string, unknown>;
+    // Existing brain_tier preserved
+    expect(strategy['brain_tier']).toBe('economy');
+    // worker_tier added
+    expect(strategy['worker_tier']).toBe('premium');
+  });
+
+  it('does not overwrite existing providers fields', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: { performance: { brain_model: 'opus', default_model: 'opus', haiku_allowed: false, max_workers: 4 } },
+      brain_provider: 'claude',
+      worker_provider: 'codex',
+      providers: { brain: 'gemini' }, // pre-existing
+    };
+    migrateConfigV1ToV2(config);
+    const providers = config['providers'] as Record<string, unknown>;
+    // Existing brain preserved
+    expect(providers['brain']).toBe('gemini');
+    // worker added from worker_provider
+    expect(providers['worker']).toBe('codex');
+  });
+
+  it('returns migrated=false when no v1 fields to migrate', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: { performance: { max_workers: 4 } },
+      model_strategy: { brain_tier: 'premium' },
+      providers: { brain: 'claude' },
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.migrated).toBe(false);
+    expect(result.changes).toHaveLength(0);
+  });
+
+  it('handles flat v1 config (no modes object)', () => {
+    const config: Record<string, unknown> = {
+      brain_model: 'sonnet',
+      default_model: 'haiku',
+      haiku_allowed: true,
+      brain_provider: 'claude',
+      worker_provider: 'claude',
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.migrated).toBe(true);
+    const strategy = config['model_strategy'] as Record<string, unknown>;
+    expect(strategy['brain_tier']).toBe('standard');
+    expect(strategy['worker_tier']).toBe('economy');
+    expect(strategy['min_tier']).toBe('economy');
+  });
+
+  it('reports all changes made', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: { performance: { brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false, max_workers: 8 } },
+      brain_provider: 'claude',
+      worker_provider: 'claude',
+    };
+    const result = migrateConfigV1ToV2(config);
+    expect(result.changes.length).toBeGreaterThanOrEqual(5);
+    expect(result.changes.some(c => c.includes('brain_tier'))).toBe(true);
+    expect(result.changes.some(c => c.includes('worker_tier'))).toBe(true);
+    expect(result.changes.some(c => c.includes('min_tier'))).toBe(true);
+    expect(result.changes.some(c => c.includes('providers.brain'))).toBe(true);
+    expect(result.changes.some(c => c.includes('providers.worker'))).toBe(true);
+  });
+});
+
+// ─── needsV2Migration ───────────────────────────────────────────────
+
+describe('needsV2Migration', () => {
+  it('returns true for v1 config with brain_provider', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: {},
+      brain_provider: 'claude',
+    };
+    expect(needsV2Migration(config)).toBe(true);
+  });
+
+  it('returns true for v1 config with haiku_allowed in active mode', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: { performance: { haiku_allowed: false } },
+    };
+    expect(needsV2Migration(config)).toBe(true);
+  });
+
+  it('returns false when model_strategy and providers already exist', () => {
+    const config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: {},
+      model_strategy: { brain_tier: 'premium' },
+      providers: { brain: 'claude' },
+    };
+    expect(needsV2Migration(config)).toBe(false);
+  });
+});
+
+// ─── v1→v2 integration with migrateConfigFull ──────────────────────
+
+describe('v1-to-v2 integration with migrateConfigFull', () => {
+  it('migrateConfigFull applies v2 migration alongside field filling', () => {
+    const v1Config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: {
+        performance: { brain_model: 'opus', default_model: 'opus', haiku_allowed: false, max_workers: 4 },
+      },
+      brain_provider: 'claude',
+      worker_provider: 'claude',
+    };
+    const { config, v2Changes } = migrateConfigFull(v1Config);
+    // v2 changes should be reported
+    expect(v2Changes.some(c => c.includes('brain_tier'))).toBe(true);
+    expect(v2Changes.some(c => c.includes('worker_tier'))).toBe(true);
+    expect(v2Changes.some(c => c.includes('min_tier'))).toBe(true);
+    // config should have model_strategy
+    const raw = config as unknown as Record<string, unknown>;
+    const strategy = raw['model_strategy'] as Record<string, unknown>;
+    expect(strategy['brain_tier']).toBe('premium');
+    expect(strategy['worker_tier']).toBe('premium');
+    expect(strategy['min_tier']).toBe('standard');
+    // config should have providers
+    const providers = raw['providers'] as Record<string, unknown>;
+    expect(providers['brain']).toBe('claude');
+    expect(providers['worker']).toBe('claude');
+  });
+
+  it('migrateConfigFull returns empty v2Changes for already-v2 config', () => {
+    const v2Config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: { performance: { max_workers: 8 } },
+      model_strategy: { brain_tier: 'premium', worker_tier: 'premium', min_tier: 'economy' },
+      providers: { brain: 'claude', worker: 'claude' },
+    };
+    const { v2Changes } = migrateConfigFull(v2Config);
+    expect(v2Changes).toHaveLength(0);
+  });
+
+  it('migrateConfigV1ToV2 is applied by migrateConfigFull but not by migrateConfigInMemory', () => {
+    const v1Config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: {
+        performance: { brain_model: 'opus', default_model: 'opus', haiku_allowed: false, max_workers: 4 },
+      },
+      brain_provider: 'claude',
+      worker_provider: 'claude',
+    };
+    // migrateConfigInMemory does NOT apply v2 migration
+    const inMemoryResult = migrateConfigInMemory({ ...v1Config });
+    const rawInMemory = inMemoryResult.config as unknown as Record<string, unknown>;
+    expect(rawInMemory['model_strategy']).toBeUndefined();
+    // migrateConfigFull DOES apply v2 migration
+    const fullResult = migrateConfigFull({ ...v1Config });
+    const rawFull = fullResult.config as unknown as Record<string, unknown>;
+    expect(rawFull['model_strategy']).toBeDefined();
+  });
+
+  it('needsV2Migration detects v1 config needing v2 upgrade', () => {
+    const v1Config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: {
+        performance: { brain_model: 'opus', default_model: 'opus', haiku_allowed: false, max_workers: 4 },
+      },
+      brain_provider: 'claude',
+      worker_provider: 'claude',
+    };
+    expect(needsV2Migration(v1Config)).toBe(true);
+  });
+
+  it('needsV2Migration returns false for full v2 config', () => {
+    const v2Config: Record<string, unknown> = {
+      mode: 'performance',
+      modes: {},
+      model_strategy: { brain_tier: 'premium' },
+      providers: { brain: 'claude' },
+    };
+    expect(needsV2Migration(v2Config)).toBe(false);
   });
 });

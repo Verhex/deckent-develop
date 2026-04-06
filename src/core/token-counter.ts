@@ -2,6 +2,7 @@
 // Estimates token counts for prompts. Pure logic, no fs.
 
 import type { ModelType } from './task-types.js';
+import { modelRegistry } from './model-registry.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -37,16 +38,20 @@ const WORDS_PER_TOKEN = 0.75;
 
 const DEFAULT_BUDGET = 200000;
 
-const DEFAULT_BUDGETS: TokenBudget = {
-  opus: DEFAULT_BUDGET,
-  sonnet: DEFAULT_BUDGET,
-  haiku: DEFAULT_BUDGET,
-  'gpt-4.1': DEFAULT_BUDGET,
-  o3: DEFAULT_BUDGET,
-  'o4-mini': DEFAULT_BUDGET,
-  'gemini-2.5-pro': DEFAULT_BUDGET,
-  'gemini-2.5-flash': DEFAULT_BUDGET,
-};
+/**
+ * Derive token budgets from ModelRegistry context windows.
+ * Budget = min(contextWindow, DEFAULT_BUDGET) — keeps the safe 200K cap
+ * while automatically covering all registered models.
+ */
+function buildDefaultBudgets(): TokenBudget {
+  const budgets: TokenBudget = {};
+  for (const model of modelRegistry.getAllModels()) {
+    budgets[model.id] = Math.min(model.contextWindow, DEFAULT_BUDGET);
+  }
+  return budgets;
+}
+
+const DEFAULT_BUDGETS: TokenBudget = buildDefaultBudgets();
 
 // ─── TokenCounter ───────────────────────────────────────────────────
 

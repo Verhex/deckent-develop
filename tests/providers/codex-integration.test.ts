@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { CodexAdapter, createCodexAdapter, CODEX_TIER_MODELS } from '../../src/providers/codex.js';
-import type { CodexAuthMode } from '../../src/providers/codex.js';
+import type { CodexAuthMode, CodexCliVariant } from '../../src/providers/codex.js';
 
 // ─── Skip if codex CLI not available ─────────────────────────────────
 
@@ -62,7 +62,12 @@ describe.skipIf(!codexAvailable)('CodexAdapter Integration (real CLI)', () => {
   it('should return correct tier models', () => {
     expect(adapter.getModelForTier('premium')).toBe('gpt-5');
     expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
-    expect(adapter.getModelForTier('economy')).toBe('gpt-4.1-mini');
+    expect(adapter.getModelForTier('economy')).toBe('gpt-5-mini');
+  });
+
+  it('should detect CLI variant (rust/node/unknown)', () => {
+    const variant = adapter.detectCliVariant();
+    expect(['rust', 'node', 'unknown']).toContain(variant);
   });
 
   it('should have name codex', () => {

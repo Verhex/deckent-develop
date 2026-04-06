@@ -4,6 +4,8 @@
 import type { DecisionEngineConfig, LearningConfig, CollaborationConfig } from './decision-config.js';
 import type { NotificationConfig } from './notifications.js';
 import type { ModelType, ProviderName } from './task-types.js';
+import type { ModelStrategy } from './mode-presets.js';
+import type { ModelTier } from './model-equivalence.js';
 
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
@@ -11,6 +13,9 @@ export interface PlanModeConfig {
   brain_model: ModelType;
   default_model: ModelType;
   haiku_allowed: boolean;
+  /** Tier-based minimum model tier. Preferred over haiku_allowed.
+   *  When set, haiku_allowed is ignored. Backward compat: haiku_allowed=false → min_tier='standard'. */
+  min_tier?: ModelTier;
   budget_per_sprint?: number;
   requires?: string;
   brain_planning?: BrainPlanningMode;
@@ -68,6 +73,17 @@ export interface DeckentConfig {
   fallback_provider?: ProviderName;
   /** Per-task-type provider overrides */
   provider_overrides?: Record<string, ProviderName>;
+  /** Tier-based model selection strategy. Merged with mode preset defaults.
+   *  Partial — unset fields fall back to the active mode preset. */
+  model_strategy?: Partial<ModelStrategy>;
+  /** Grouped provider config (alternative to flat brain_provider/worker_provider).
+   *  Both formats supported — grouped takes precedence when both present. */
+  providers?: {
+    brain?: ProviderName;
+    worker?: ProviderName;
+    fallback?: ProviderName;
+    overrides?: Record<string, ProviderName>;
+  };
   /** Auto-select cheapest capable provider (default: false) */
   cost_optimization?: boolean;
   /** Claude execution backend: 'tmux' (default), 'subprocess' (headless), 'mcp' (future) */
@@ -198,6 +214,8 @@ export interface ResolvedConfig {
   projectName: string;
   projectRoot: string;
   version: string;
+  /** Resolved tier-based model strategy (from mode preset + config overrides) */
+  model_strategy?: ModelStrategy;
   auto_docs?: AutoDocsConfig;
   /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'tmux' | 'subprocess' | 'auto';
@@ -316,8 +334,14 @@ export interface SubscriptionProfile {
 export interface SetupRecommendation {
   mode: PlanMode;
   maxWorkers: number;
+  /** @deprecated Use brain_tier instead. Kept for backward compatibility. */
   brainModel: ModelType;
+  /** @deprecated Use worker_tier instead. Kept for backward compatibility. */
   defaultModel: ModelType;
+  /** Tier-based brain model selection (provider-agnostic). */
+  brain_tier: ModelTier;
+  /** Tier-based worker model selection (provider-agnostic). */
+  worker_tier: ModelTier;
   planning: BrainPlanningMode;
   reasons: string[];
 }

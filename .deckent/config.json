@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "tr",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-096",
+  "last_sprint_id": "sprint-097",
   "spawn_backend": "tmux",
   "modes": {
     "performance": {
@@ -34,7 +34,40 @@
       "budget_per_sprint": 5,
       "requires": "ANTHROPIC_API_KEY",
       "brain_planning": "auto"
+    },
+    "max_plan": {
+      "max_workers": 8,
+      "brain_model": "opus",
+      "default_model": "opus",
+      "haiku_allowed": true,
+      "brain_planning": "auto"
+    },
+    "max5x_plan": {
+      "max_workers": 5,
+      "brain_model": "sonnet",
+      "default_model": "opus",
+      "haiku_allowed": true,
+      "brain_planning": "auto"
+    },
+    "pro_plan": {
+      "max_workers": 3,
+      "brain_model": "sonnet",
+      "default_model": "sonnet",
+      "haiku_allowed": false,
+      "brain_planning": "auto"
     }
+  },
+  "model_strategy": {
+    "brain_tier": "premium",
+    "worker_tier": "premium",
+    "min_tier": "standard",
+    "max_tier": "premium",
+    "auto_upgrade": true,
+    "auto_downgrade": false
+  },
+  "providers": {
+    "brain": "claude",
+    "worker": "claude"
   },
   "brain_provider": "claude",
   "worker_provider": "claude",

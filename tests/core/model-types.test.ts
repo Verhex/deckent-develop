@@ -28,12 +28,12 @@ describe('PROVIDER_MODEL_MAP', () => {
     expect(PROVIDER_MODEL_MAP.claude).toEqual(['opus', 'sonnet', 'haiku']);
   });
 
-  it('maps codex to gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, o3, o4-mini', () => {
-    expect(PROVIDER_MODEL_MAP.codex).toEqual(['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini']);
+  it('maps codex to o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini', () => {
+    expect(PROVIDER_MODEL_MAP.codex).toEqual(['o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']);
   });
 
-  it('maps gemini to gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash', () => {
-    expect(PROVIDER_MODEL_MAP.gemini).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
+  it('maps gemini to gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash', () => {
+    expect(PROVIDER_MODEL_MAP.gemini).toEqual(['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
   });
 
   it('has exactly 3 providers', () => {
@@ -57,8 +57,8 @@ describe('CLAUDE_MODELS', () => {
 // ─── ALL_MODELS ──────────────────────────────────────────────────────────────
 
 describe('ALL_MODELS', () => {
-  it('contains all 12 model names', () => {
-    expect(ALL_MODELS).toHaveLength(12);
+  it('contains all 13 model names', () => {
+    expect(ALL_MODELS).toHaveLength(13);
   });
 
   it('includes all Claude models', () => {
@@ -202,19 +202,23 @@ describe('isGeminiModel', () => {
 // ─── getModelTier ────────────────────────────────────────────────────────────
 
 describe('getModelTier', () => {
-  it('tier 0 (economy): haiku, gpt-5-mini, gpt-4.1-mini, o4-mini, gemini-2.0-flash', () => {
+  it('tier 0 (economy): haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash', () => {
     expect(getModelTier('haiku')).toBe(0);
     expect(getModelTier('gpt-5-mini')).toBe(0);
     expect(getModelTier('gpt-4.1-mini')).toBe(0);
-    expect(getModelTier('o4-mini')).toBe(0);
     expect(getModelTier('gemini-2.0-flash')).toBe(0);
   });
 
-  it('tier 1 (standard): sonnet, gpt-4.1, o3, gemini-2.5-flash', () => {
+  it('tier 1 (standard): sonnet, gpt-4.1, o4-mini, gemini-2.5-flash', () => {
     expect(getModelTier('sonnet')).toBe(1);
     expect(getModelTier('gpt-4.1')).toBe(1);
-    expect(getModelTier('o3')).toBe(1);
+    expect(getModelTier('o4-mini')).toBe(1);
     expect(getModelTier('gemini-2.5-flash')).toBe(1);
+  });
+
+  it('tier 3 (premium_plus): o3, gemini-3.1-pro-preview', () => {
+    expect(getModelTier('o3')).toBe(3);
+    expect(getModelTier('gemini-3.1-pro-preview' as ModelType)).toBe(3);
   });
 
   it('tier 2 (premium): opus, gpt-5, gemini-2.5-pro', () => {
@@ -223,7 +227,7 @@ describe('getModelTier', () => {
     expect(getModelTier('gemini-2.5-pro')).toBe(2);
   });
 
-  it('all 12 models have a defined tier', () => {
+  it('all 13 models have a defined tier', () => {
     for (const m of ALL_MODELS) {
       expect(typeof getModelTier(m)).toBe('number');
     }
@@ -267,7 +271,7 @@ describe('Type compatibility', () => {
   });
 
   it('GeminiModel values are valid ModelType values', () => {
-    const models: GeminiModel[] = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+    const models: GeminiModel[] = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-3.1-pro-preview'];
     for (const m of models) {
       const _mt: ModelType = m;
       expect(isValidModel(_mt)).toBe(true);
@@ -397,7 +401,7 @@ describe('Tier equivalence consistency', () => {
     }
   });
 
-  it('all 12 models have corresponding API IDs', () => {
-    expect(Object.keys(MODEL_API_IDS)).toHaveLength(12);
+  it('all 13 models have corresponding API IDs', () => {
+    expect(Object.keys(MODEL_API_IDS)).toHaveLength(13);
   });
 });

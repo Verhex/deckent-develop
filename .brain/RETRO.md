@@ -1,43 +1,53 @@
-# Sprint sprint-096 Retrospective
+# Sprint sprint-097 Retrospective
 
 ## Summary
-Completed 10/10 tasks in 10 minutes.
+Completed 12/12 tasks in 18 minutes 33s.
 
 ## Highlights
-- 10 tasks completed on first try
+- 12 tasks completed on first try
 - No boundary violations detected
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 10/10 |
-| Code changes | +248 / -175 |
-| Sprint time | 10 minutes |
-| NO_GO rate | 0% (0/10) |
+| Tasks completed | 12/12 |
+| New test files | 10 |
+| Code changes | +1670 / -255 |
+| Sprint time | 18 minutes 33s |
+| NO_GO rate | 0% (0/12) |
+| Coverage | 24.0% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| refactorer | 10 | 1 | 9 | 0 | 0% |
+| refactorer | 8 | 2 | 6 | 0 | 96% |
+| architecture-planner | 3 | 0 | 3 | 0 | 48% |
+| test-writer | 1 | 0 | 1 | 0 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| typescript-expert | 10 | 1 | 9 | 0 | 0% |
+| typescript-expert | 12 | 2 | 10 | 0 | 72% |
+| system-architect | 3 | 0 | 3 | 0 | 48% |
+| testing-expert | 1 | 0 | 1 | 0 | 0% |
 
 ## Learnings
-- README.md + README-TR.md Sayı ve Tablo Düzeltmeleri: completed with tech debt — README.md ve README-TR.md dosyalarındaki tüm sayılar güncellendi: sprints badge 88→95+, MCP tools 18→19 (3 yerde: features, karşılaştırma tablosu, MCP
-- DECKENT.md Skill İsimleri + MCP Tablo + Checkpoint: completed with tech debt — DECKENT.md düzeltmeleri tamamlandı: (A) Built-in Skills tablosundaki 6 yanlış isim düzeltildi — security-expert→security-specialist, performance-exper
-- CLAUDE.md + IDENTITY.md + PROJECT-IDENTITY.md Sayı Düzeltmeleri: completed with tech debt — Tüm üç dosyadaki sayısal tutarsızlıklar düzeltildi: (A) CLAUDE.md: orchestra 48→47, core 49→48, MCP 18→19, CLI 33+→34+. (B) IDENTITY.md: Sprints 91+→9
-- docs/reference/cli.md — Usage Komutu Kaldır + Sayılar: completed with tech debt — A) TOC'dan `deckent usage` satırı kaldırıldı (satır 38). B) usage komutu tam dokümantasyon bloğu kaldırıldı (satır 412-433 arası). C) `deckent checkpo
-- docs/reference/api.md — Usage + Eski Mod İsimleri Temizliği: completed with tech debt — api.md eski referanslar temizlendi: (A) PlanMode tipi max_plan/max5x_plan/pro_plan → performance/balanced/economic güncellendi (legacy alias notu ile)
-- docs/reference/config-reference.md — Mod İsimleri Canonical Güncelleme: completed with tech debt — config-reference.md'deki tüm eski mod isimleri canonical olarak güncellendi: max_plan→performance, max5x_plan→balanced, pro_plan→economic. Section 4.1
-- docs/architecture/architecture.md — Tam Güncelleme: completed with tech debt — architecture.md tam güncelleme tamamlandı: (A) Version Sprint 065→095+, (B) CLI 28→34+, (C) MCP tools 10→19 (tüm 19 tool listelendi), (D) MCP resource
-- docs/reference/ Kalan Dosyalar — Mod İsimleri + Usage Temizliği: completed with tech debt — All 6 reference docs cleaned: (A) performance.md: max_plan→performance, pro_plan→economic, max5x_plan→balanced canonical, usage Section 5 removed, sec
-- docs/guide/ + docs/development/ + docs/architecture/ Kalan — Sayı ve Referans Düzeltmeleri: completed with tech debt — All documentation fixes applied:
+- ModelRegistry Class + BUILTIN_MODELS Kataloğu: completed with tech debt — ModelRegistry class + BUILTIN_MODELS kataloğu tamamlandı. Değişiklikler: (A) ModelStatus, ModelCapabilities, ModelCost ayrı exported interface'ler ola
+- task-types.ts Delegasyonu — Registry'den Re-export: completed with tech debt — task-types.ts ve model-equivalence.ts artık ModelRegistry'den veri türetiyor. PROVIDER_MODEL_MAP, ALL_MODELS, MODEL_API_IDS, getModelTier(), resolveAp
+- Provider Adapter Tier Duplicate Kaldırma: completed with tech debt — Provider tier duplicate kaldırma tamamlandı. CODEX_TIER_MODELS ve GEMINI_TIER_MODELS sabitleri artık hard-coded değerler yerine model-equivalence.ts'd
+- mode-presets.ts + model_strategy Config Yapısı: completed with tech debt — A) mode-presets.ts — ModelStrategy interface + MODE_PRESETS (performance/balanced/economic/api) + TIER_ORDER + compareTiers/isAtLeastTier/getModePrese
+- MCP + CLI Model Enum Genişletme: completed with tech debt — A) src/mcp/tools/run.ts: Hard-coded z.enum(['opus','sonnet','haiku']) replaced with z.enum(ALL_MODELS) — now supports all 12 models dynamically. Impor
+- Codex Adapter CLI Uyumluluk Güncellemesi: completed with tech debt — Codex adapter CLI uyumluluk güncellemesi tamamlandı:
 
-A) quickstart.md + first-sprint.md: 'Max workers: 5 (max_plan)' → 'Max workers: 8 (performance)'
-B) getting-started.
-- Recurring pattern (1721x): stale_heartbeat
+A) buildArgs/buildCommand/buildPlannerCommand: Rust rewrite uyumluluğu belgelendi. --full-auto b
+- Gemini Adapter CLI Uyumluluk + gemini-3.1-pro-preview: completed with tech debt — Gemini Adapter CLI uyumluluk güncellemesi tamamlandı:
+
+A) buildArgs() güncellendi:
+  - --model → -m kısa flag (Gemini CLI docs uyumlu)
+  - --approval-
+- Init Wizard Provider-Agnostic Tier Seçimi: completed with tech debt — Init wizard provider-agnostic tier seçimine geçirildi. auto-setup.ts: selectModels() → selectTiers() + tierToModel() refactor edildi. Model isimleri a
+- token-counter.ts + sprint-reporter.ts Hard-Code Temizliği: completed with tech debt — Hard-coded model referansları 4 dosyada temizlendi: (A) token-counter.ts — DEFAULT_BUDGETS artık buildDefaultBudgets() fonksiyonu ile modelRegistry'de
+- Dashboard Test Fix + Integration Test: completed with tech debt — A) TaskCard.test.tsx — 20 failing tests fixed: Added React import, vi/beforeEach/afterEach imports, LanguageProvider wrapper (renderWithProviders help
+- Recurring pattern (1909x): stale_heartbeat

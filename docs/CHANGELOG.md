@@ -6,6 +6,29 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint97] - 2026-04-06
+
+### Added
+
+- model-selector.ts Tier-Based Refactor
+- Config Migration v1→v2 + config.json Güncelleme
+
+### Changed
+
+- ModelRegistry Class + BUILTIN_MODELS Kataloğu (completed with tech debt)
+- task-types.ts Delegasyonu — Registry'den Re-export (completed with tech debt)
+- Provider Adapter Tier Duplicate Kaldırma (completed with tech debt)
+- mode-presets.ts + model_strategy Config Yapısı (completed with tech debt)
+- MCP + CLI Model Enum Genişletme (completed with tech debt)
+- Codex Adapter CLI Uyumluluk Güncellemesi (completed with tech debt)
+- Gemini Adapter CLI Uyumluluk + gemini-3.1-pro-preview (completed with tech debt)
+- Init Wizard Provider-Agnostic Tier Seçimi (completed with tech debt)
+- token-counter.ts + sprint-reporter.ts Hard-Code Temizliği (completed with tech debt)
+- Dashboard Test Fix + Integration Test (completed with tech debt)
+
+
+_Tasks: 12 total, 12 done, 10 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint96] - 2026-04-06
 
 ### Added

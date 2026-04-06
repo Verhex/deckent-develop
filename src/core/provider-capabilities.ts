@@ -2,6 +2,8 @@
 // Defines what each provider can do: features, context limits, cost.
 
 import type { ProviderName } from './model-equivalence.js';
+import { getModelProvider } from './model-equivalence.js';
+import type { ModelType } from './task-types.js';
 import { DeckentError } from './errors.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -127,4 +129,28 @@ export function canProviderHandle(
  */
 export function getAllProviders(): ProviderName[] {
   return Object.keys(PROVIDER_CAPABILITIES) as ProviderName[];
+}
+
+/**
+ * Get capabilities for a specific model by resolving its provider first.
+ * This enables model-level capability queries without duplicating data per-model.
+ *
+ * When ModelRegistry (Task 1) lands, this will delegate to per-model definitions.
+ * For now, returns the provider-level capabilities as a reasonable approximation.
+ */
+export function getModelCapabilities(modelId: ModelType): ProviderCapability {
+  try {
+    const provider = getModelProvider(modelId);
+    return { ...PROVIDER_CAPABILITIES[provider] };
+  } catch {
+    // Unknown model — return a conservative default
+    return {
+      streaming: true,
+      toolUse: true,
+      vision: false,
+      codeExecution: false,
+      maxContextTokens: 200_000,
+      costPerMillionTokens: { input: 3, output: 15 },
+    };
+  }
 }

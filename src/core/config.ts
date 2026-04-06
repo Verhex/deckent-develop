@@ -21,6 +21,8 @@ import type {
 } from './types.js';
 import { ALL_MODELS, PROVIDER_MODEL_MAP } from './types.js';
 import type { ProviderName } from './types.js';
+import { MODE_PRESETS } from './mode-presets.js';
+import type { ModelStrategy } from './mode-presets.js';
 
 // ─── Default Auto Docs Config ───────────────────────────────────────
 export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
@@ -508,6 +510,42 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     config.language = envLanguage;
   }
 
+  // ─── Grouped providers → flat provider fields ──────────────────────
+  // If config.providers is set, it takes precedence over flat fields
+  if (config.providers) {
+    if (config.providers.brain) config.brain_provider = config.providers.brain;
+    if (config.providers.worker) config.worker_provider = config.providers.worker;
+    if (config.providers.fallback) config.fallback_provider = config.providers.fallback;
+    if (config.providers.overrides) config.provider_overrides = config.providers.overrides;
+  }
+
+  // ─── Mode preset → model_strategy merge ────────────────────────────
+  // Start from the mode preset (if any), then overlay user config overrides
+  const preset = MODE_PRESETS[config.mode];
+  let resolvedModelStrategy: ModelStrategy | undefined;
+  if (preset) {
+    resolvedModelStrategy = { ...preset.model_strategy };
+    if (config.model_strategy) {
+      Object.assign(resolvedModelStrategy, config.model_strategy);
+    }
+  } else if (config.model_strategy) {
+    // Custom mode with explicit model_strategy — fill defaults from 'balanced'
+    const fallbackPreset = MODE_PRESETS['balanced'];
+    if (fallbackPreset) {
+      resolvedModelStrategy = { ...fallbackPreset.model_strategy, ...config.model_strategy };
+    }
+  }
+
+  // ─── haiku_allowed backward compat → min_tier ─────────────────────
+  // If min_tier is already set (via model_strategy), it takes precedence.
+  // Otherwise, derive from haiku_allowed for backward compatibility.
+  for (const modeName of Object.keys(config.modes)) {
+    const mc = config.modes[modeName];
+    if (mc && mc.min_tier === undefined && mc.haiku_allowed === false) {
+      mc.min_tier = 'standard';
+    }
+  }
+
   validateConfig(config);
 
   // Mode is validated above — activeModeConfig is guaranteed to exist
@@ -530,6 +568,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     projectName: config.projectName ?? 'deckent-project',
     projectRoot: root,
     version: config.version ?? DECKENT_VERSION,
+    model_strategy: resolvedModelStrategy,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     spawn_backend: config.spawn_backend,
     skills: config.skills,

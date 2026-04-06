@@ -200,7 +200,7 @@ describe('GeminiAdapter', () => {
 
   it('buildArgs returns correct Gemini CLI arguments', () => {
     const args = adapter.buildArgs('gemini-2.5-pro', 'Hello Gemini');
-    expect(args).toEqual(['-p', 'Hello Gemini', '--output-format', 'json', '--model', 'gemini-2.5-pro']);
+    expect(args).toEqual(['-p', 'Hello Gemini', '--output-format', 'json', '-m', 'gemini-2.5-pro', '--approval-mode', 'plan']);
   });
 
   it('buildArgs includes -p flag for headless mode', () => {
@@ -215,10 +215,16 @@ describe('GeminiAdapter', () => {
     expect(args).toContain('json');
   });
 
-  it('buildArgs includes --model flag', () => {
+  it('buildArgs includes -m flag for model selection', () => {
     const args = adapter.buildArgs('gemini-2.5-pro', 'prompt');
-    expect(args).toContain('--model');
+    expect(args).toContain('-m');
     expect(args).toContain('gemini-2.5-pro');
+  });
+
+  it('buildArgs includes --approval-mode plan for non-interactive mode', () => {
+    const args = adapter.buildArgs('gemini-2.5-pro', 'prompt');
+    expect(args).toContain('--approval-mode');
+    expect(args).toContain('plan');
   });
 
   // ─── Streaming Support ─────────────────────────────────────────────
@@ -270,7 +276,7 @@ describe('GeminiAdapter', () => {
     expect(args).toContain('Hello Gemini');
     expect(args).toContain('--output-format');
     expect(args).toContain('json');
-    expect(args).toContain('--model');
+    expect(args).toContain('-m');
     expect(args).toContain('gemini-2.5-pro');
   });
 
@@ -424,7 +430,8 @@ describe('GeminiAdapter', () => {
     expect(cmd).toContain('gemini');
     expect(cmd).toContain('-p');
     expect(cmd).toContain('--output-format json');
-    expect(cmd).toContain('--model gemini-2.5-pro');
+    expect(cmd).toContain('-m gemini-2.5-pro');
+    expect(cmd).toContain('--approval-mode plan');
     expect(cmd).toContain('/tmp/prompt.json');
   });
 
@@ -435,7 +442,7 @@ describe('GeminiAdapter', () => {
 
   it('buildCommand includes model parameter', () => {
     const cmd = adapter.buildCommand('gemini-2.5-pro', '/tmp/p.json');
-    expect(cmd).toContain('--model gemini-2.5-pro');
+    expect(cmd).toContain('-m gemini-2.5-pro');
   });
 
   // ─── buildPlannerCommand() ─────────────────────────────────────────
@@ -447,8 +454,10 @@ describe('GeminiAdapter', () => {
     expect(result.args).toContain('Plan this sprint');
     expect(result.args).toContain('--output-format');
     expect(result.args).toContain('json');
-    expect(result.args).toContain('--model');
+    expect(result.args).toContain('-m');
     expect(result.args).toContain('gemini-2.5-pro');
+    expect(result.args).toContain('--approval-mode');
+    expect(result.args).toContain('plan');
   });
 
   it('buildPlannerCommand uses correct model in args', () => {
@@ -617,6 +626,88 @@ describe('GeminiAdapter', () => {
     const output = JSON.stringify({ response: 'no stats' });
     const result = parseGeminiOutput(output);
     expect(result.stats).toBeUndefined();
+  });
+
+  // ─── parseGeminiOutput() stream-json (NDJSON) ─────────────────────
+
+  it('parseGeminiOutput parses stream-json (NDJSON) with multiple chunks', () => {
+    const chunk1 = JSON.stringify({ response: 'Hello ' });
+    const chunk2 = JSON.stringify({ response: 'world' });
+    const output = `${chunk1}\n${chunk2}`;
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('Hello world');
+  });
+
+  it('parseGeminiOutput parses stream-json with candidates structure', () => {
+    const chunk1 = JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Part 1 ' }] } }] });
+    const chunk2 = JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Part 2' }] } }] });
+    const output = `${chunk1}\n${chunk2}`;
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('Part 1 Part 2');
+  });
+
+  it('parseGeminiOutput extracts usage from last stream-json chunk', () => {
+    const chunk1 = JSON.stringify({ response: 'Hello ' });
+    const chunk2 = JSON.stringify({
+      response: 'world',
+      usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 100 },
+    });
+    const output = `${chunk1}\n${chunk2}`;
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('Hello world');
+    expect(result.stats).toEqual({ inputTokens: 50, outputTokens: 100 });
+  });
+
+  it('parseGeminiOutput falls back to plain text when NDJSON lines are not valid JSON', () => {
+    const output = 'line one\nline two plain text';
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('line one\nline two plain text');
+    expect(result.stats).toBeUndefined();
+  });
+
+  it('parseGeminiOutput stream-json without usage returns undefined stats', () => {
+    const chunk1 = JSON.stringify({ response: 'a' });
+    const chunk2 = JSON.stringify({ response: 'b' });
+    const output = `${chunk1}\n${chunk2}`;
+    const result = parseGeminiOutput(output);
+    expect(result.response).toBe('ab');
+    expect(result.stats).toBeUndefined();
+  });
+
+  // ─── gemini-3.1-pro-preview model support ─────────────────────────
+
+  it('supports gemini-3.1-pro-preview model from registry', () => {
+    expect(adapter.supportedModels).toContain('gemini-3.1-pro-preview');
+  });
+
+  it('supports all 4 gemini models from registry', () => {
+    expect(adapter.supportedModels).toContain('gemini-3.1-pro-preview');
+    expect(adapter.supportedModels).toContain('gemini-2.5-pro');
+    expect(adapter.supportedModels).toContain('gemini-2.5-flash');
+    expect(adapter.supportedModels).toContain('gemini-2.0-flash');
+    expect(adapter.supportedModels.length).toBe(4);
+  });
+
+  // ─── getCliVersion() ──────────────────────────────────────────────
+
+  it('getCliVersion returns version string when CLI is installed', () => {
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '1.2.3\n' });
+    expect(adapter.getCliVersion()).toBe('1.2.3');
+  });
+
+  it('getCliVersion returns undefined when CLI is not installed', () => {
+    mockSpawnSync.mockReturnValue({ status: 1, stdout: '' });
+    expect(adapter.getCliVersion()).toBeUndefined();
+  });
+
+  it('getCliVersion returns undefined when CLI throws', () => {
+    mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+    expect(adapter.getCliVersion()).toBeUndefined();
+  });
+
+  it('getCliVersion returns undefined when stdout is empty', () => {
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '' });
+    expect(adapter.getCliVersion()).toBeUndefined();
   });
 
   // ─── Factory ───────────────────────────────────────────────────────

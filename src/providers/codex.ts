@@ -17,6 +17,8 @@ import { PROVIDER_MODEL_MAP, isOpenAIModel } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
+import type { ModelTier } from '../core/model-equivalence.js';
+import { getModelForProviderTier } from '../core/model-equivalence.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -24,16 +26,20 @@ const CODEX_MODELS: readonly OpenAIModel[] = [...PROVIDER_MODEL_MAP.codex] as Op
 
 /**
  * Tier-based model mapping for Codex CLI.
- * Used by getModelForTier() to select appropriate models.
+ * @deprecated Derived from model-equivalence.ts — use adapter.getModelForTier() instead.
+ * Kept for backward compatibility with existing imports.
  */
 export const CODEX_TIER_MODELS = {
-  premium: 'gpt-5' as OpenAIModel,
-  standard: 'gpt-4.1' as OpenAIModel,
-  economy: 'gpt-4.1-mini' as OpenAIModel,
-} as const;
+  get premium() { return (getModelForProviderTier('codex', 'premium') ?? 'gpt-5') as OpenAIModel; },
+  get standard() { return (getModelForProviderTier('codex', 'standard') ?? 'gpt-4.1') as OpenAIModel; },
+  get economy() { return (getModelForProviderTier('codex', 'economy') ?? 'gpt-4.1-mini') as OpenAIModel; },
+};
 
 /** Auth modes supported by Codex CLI */
 export type CodexAuthMode = 'api_key' | 'subscription' | 'none';
+
+/** Codex CLI variant (Rust rewrite vs legacy Node) */
+export type CodexCliVariant = 'rust' | 'node' | 'unknown';
 
 // ─── Worker Entry ────────────────────────────────────────────────────
 
@@ -184,6 +190,30 @@ export class CodexAdapter implements ProviderAdapter {
     }
   }
 
+  /**
+   * Detect Codex CLI variant (Rust rewrite vs legacy Node).
+   *
+   * Rust rewrite outputs semver like "codex 0.1.2025..." or similar with "rust" marker.
+   * Legacy Node outputs "codex-cli 1.x.x" or plain version string.
+   */
+  detectCliVariant(): CodexCliVariant {
+    try {
+      const result = spawnSync('codex', ['--version'], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+      });
+      if (result.status !== 0) return 'unknown';
+      const output = (result.stdout ?? '').toLowerCase();
+      // Rust rewrite typically outputs version >= 1.0 with different format
+      // or contains "codex" without "codex-cli" prefix
+      if (output.includes('codex-cli')) return 'node';
+      if (output.includes('codex')) return 'rust';
+      return 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  }
+
   // ─── detectAuthMode() ─────────────────────────────────────────────
 
   /**
@@ -217,8 +247,10 @@ export class CodexAdapter implements ProviderAdapter {
 
   /**
    * Build the shell command string for running codex CLI.
-   * Format: `codex exec --full-auto "<prompt>" --model <model>`
-   * For file-based prompts, the prompt file content is read and passed as arg.
+   *
+   * Uses `--full-auto` for backward compat with Node CLI.
+   * Rust rewrite: exec is non-interactive by default, `--full-auto` is ignored harmlessly.
+   * Alternative format `--approval-mode full-auto` also accepted by Rust CLI.
    */
   buildCommand(
     model: ModelType,
@@ -232,7 +264,11 @@ export class CodexAdapter implements ProviderAdapter {
 
   /**
    * Build CLI command + args for planner invocations using Codex.
-   * Format: codex exec --full-auto <prompt> --model <model>
+   *
+   * Rust rewrite: `codex exec "prompt" --model <model>` (exec is non-interactive)
+   * Legacy Node: `codex exec --full-auto "prompt" --model <model>`
+   *
+   * We keep `--full-auto` for backward compat — Rust CLI ignores it harmlessly.
    */
   buildPlannerCommand(prompt: string, model: ModelType): { command: string; args: string[] } {
     return {
@@ -245,13 +281,22 @@ export class CodexAdapter implements ProviderAdapter {
 
   /**
    * Get the recommended Codex model for a given capability tier.
+   * Delegates to model-equivalence.ts as the single source of truth.
    */
-  getModelForTier(tier: 'premium' | 'standard' | 'economy'): OpenAIModel {
-    return CODEX_TIER_MODELS[tier];
+  getModelForTier(tier: ModelTier): OpenAIModel {
+    return (getModelForProviderTier('codex', tier) ?? 'gpt-4.1') as OpenAIModel;
   }
 
   // ─── Internal helpers ───────────────────────────────────────────────
 
+  /**
+   * Build CLI args for codex exec.
+   *
+   * Rust rewrite format: `codex exec "prompt" --model <model>` (exec is non-interactive by default)
+   * Legacy Node format: `codex exec --full-auto "prompt" --model <model>`
+   *
+   * We keep `--full-auto` for backward compat with Node CLI — the Rust rewrite ignores it harmlessly.
+   */
   private buildArgs(model: ModelType, prompt: string, _opts?: ProviderSpawnOptions): string[] {
     const args = ['exec', '--full-auto', prompt, '--model', model];
     return args;

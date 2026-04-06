@@ -51,7 +51,7 @@ describe("dashboard/components — SprintChart", () => {
 
   it("renders empty state when no data", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("No chart data available");
+    expect(content).toContain("chart.no_chart_data");
   });
 });
 
@@ -109,11 +109,11 @@ describe("dashboard/components — DebtTable", () => {
 
   it("renders table with correct columns", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("ID");
-    expect(content).toContain("Description");
-    expect(content).toContain("Priority");
-    expect(content).toContain("Sprint");
-    expect(content).toContain("Status");
+    expect(content).toContain("debt.col_id");
+    expect(content).toContain("debt.col_description");
+    expect(content).toContain("debt.col_priority");
+    expect(content).toContain("debt.col_sprint");
+    expect(content).toContain("debt.col_status");
   });
 
   it("has priority badge styling", () => {
@@ -125,7 +125,7 @@ describe("dashboard/components — DebtTable", () => {
 
   it("renders empty state", () => {
     const content = readFileSync(filePath, "utf-8");
-    expect(content).toContain("No technical debt entries");
+    expect(content).toContain("debt.no_entries");
   });
 
   it("exports parseDebtMarkdown function", () => {

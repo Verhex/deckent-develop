@@ -35,8 +35,8 @@ describe('model-equivalence', () => {
       expect(getModelTier('gpt-4.1')).toBe('standard');
     });
 
-    it('returns standard for o3', () => {
-      expect(getModelTier('o3')).toBe('standard');
+    it('returns premium_plus for o3', () => {
+      expect(getModelTier('o3')).toBe('premium_plus');
     });
 
     it('returns standard for gemini-2.5-flash', () => {
@@ -55,8 +55,8 @@ describe('model-equivalence', () => {
       expect(getModelTier('gpt-4.1-mini')).toBe('economy');
     });
 
-    it('returns economy for o4-mini', () => {
-      expect(getModelTier('o4-mini')).toBe('economy');
+    it('returns standard for o4-mini', () => {
+      expect(getModelTier('o4-mini')).toBe('standard');
     });
 
     it('returns economy for gemini-2.0-flash', () => {
@@ -108,8 +108,8 @@ describe('model-equivalence', () => {
       expect(getEquivalentModel('gpt-4.1', 'claude')).toBe('sonnet');
     });
 
-    it('o3 → sonnet for claude (standard)', () => {
-      expect(getEquivalentModel('o3', 'claude')).toBe('sonnet');
+    it('o3 → opus for claude (premium_plus falls back to premium)', () => {
+      expect(getEquivalentModel('o3', 'claude')).toBe('opus');
     });
 
     it('gpt-5-mini → haiku for claude (economy)', () => {
@@ -120,8 +120,8 @@ describe('model-equivalence', () => {
       expect(getEquivalentModel('gpt-4.1-mini', 'claude')).toBe('haiku');
     });
 
-    it('o4-mini → haiku for claude (economy)', () => {
-      expect(getEquivalentModel('o4-mini', 'claude')).toBe('haiku');
+    it('o4-mini → sonnet for claude (standard)', () => {
+      expect(getEquivalentModel('o4-mini', 'claude')).toBe('sonnet');
     });
   });
 
@@ -177,8 +177,8 @@ describe('model-equivalence', () => {
       expect(getEquivalentModel('gpt-4.1', 'gemini')).toBe('gemini-2.5-flash');
     });
 
-    it('o3 → gemini-2.5-flash for gemini (standard)', () => {
-      expect(getEquivalentModel('o3', 'gemini')).toBe('gemini-2.5-flash');
+    it('o3 → gemini-2.5-pro for gemini (premium_plus falls back to premium)', () => {
+      expect(getEquivalentModel('o3', 'gemini')).toBe('gemini-2.5-pro');
     });
 
     it('gpt-5-mini → gemini-2.0-flash for gemini (economy)', () => {
@@ -189,8 +189,8 @@ describe('model-equivalence', () => {
       expect(getEquivalentModel('gpt-4.1-mini', 'gemini')).toBe('gemini-2.0-flash');
     });
 
-    it('o4-mini → gemini-2.0-flash for gemini (economy)', () => {
-      expect(getEquivalentModel('o4-mini', 'gemini')).toBe('gemini-2.0-flash');
+    it('o4-mini → gemini-2.5-flash for gemini (standard)', () => {
+      expect(getEquivalentModel('o4-mini', 'gemini')).toBe('gemini-2.5-flash');
     });
   });
 
@@ -298,11 +298,11 @@ describe('model-equivalence', () => {
     });
 
     it('standard tier has 4 models', () => {
-      expect(getModelsInTier('standard')).toEqual(['sonnet', 'gpt-4.1', 'o3', 'gemini-2.5-flash']);
+      expect(getModelsInTier('standard')).toEqual(['sonnet', 'gpt-4.1', 'o4-mini', 'gemini-2.5-flash']);
     });
 
-    it('economy tier has 5 models', () => {
-      expect(getModelsInTier('economy')).toEqual(['haiku', 'gpt-5-mini', 'gpt-4.1-mini', 'o4-mini', 'gemini-2.0-flash']);
+    it('economy tier has 4 models', () => {
+      expect(getModelsInTier('economy')).toEqual(['haiku', 'gpt-5-mini', 'gpt-4.1-mini', 'gemini-2.0-flash']);
     });
   });
 
@@ -313,23 +313,23 @@ describe('model-equivalence', () => {
     });
 
     it('codex has 6 models', () => {
-      expect(getProviderModels('codex')).toEqual(['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini']);
+      expect(getProviderModels('codex')).toEqual(['o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini']);
     });
 
-    it('gemini has 3 models', () => {
-      expect(getProviderModels('gemini')).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
+    it('gemini has 4 models', () => {
+      expect(getProviderModels('gemini')).toEqual(['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
     });
   });
 
   // ─── MODEL_TIERS constant ────────────────────────────────────────
   describe('MODEL_TIERS', () => {
     it('all tiers defined', () => {
-      expect(Object.keys(MODEL_TIERS)).toEqual(['premium', 'standard', 'economy']);
+      expect(Object.keys(MODEL_TIERS)).toEqual(['premium', 'standard', 'economy', 'premium_plus']);
     });
 
-    it('total model count is 12', () => {
+    it('total model count is 13', () => {
       const total = Object.values(MODEL_TIERS).reduce((sum, models) => sum + models.length, 0);
-      expect(total).toBe(12);
+      expect(total).toBe(13);
     });
 
     it('every model in MODEL_TIERS has a provider', () => {
@@ -340,7 +340,7 @@ describe('model-equivalence', () => {
       }
     });
 
-    it('every tier has at least one model per provider', () => {
+    it('every base tier has at least one model per provider', () => {
       const tiers: ModelTier[] = ['premium', 'standard', 'economy'];
       const providers: ProviderName[] = ['claude', 'codex', 'gemini'];
       for (const tier of tiers) {
@@ -358,8 +358,8 @@ describe('model-equivalence', () => {
     const providers: ProviderName[] = ['claude', 'codex', 'gemini'];
     const allModels: MultiProviderModelType[] = [
       'opus', 'sonnet', 'haiku',
-      'gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
-      'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash',
+      'o3', 'gpt-5', 'gpt-4.1', 'o4-mini', 'gpt-5-mini', 'gpt-4.1-mini',
+      'gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash',
     ];
 
     it('every model can find an equivalent on every provider', () => {
@@ -407,6 +407,13 @@ describe('model-equivalence', () => {
       const { getModelTier: numericTier } = await import('../../src/core/task-types.js');
       for (const model of MODEL_TIERS.economy) {
         expect(numericTier(model as MultiProviderModelType)).toBe(0);
+      }
+    });
+
+    it('premium_plus models map to numeric tier 3', async () => {
+      const { getModelTier: numericTier } = await import('../../src/core/task-types.js');
+      for (const model of MODEL_TIERS.premium_plus) {
+        expect(numericTier(model as MultiProviderModelType)).toBe(3);
       }
     });
   });

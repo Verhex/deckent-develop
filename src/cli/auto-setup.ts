@@ -8,6 +8,9 @@ import type {
   ModelType,
   BrainPlanningMode,
 } from '../core/types.js';
+import type { ModelTier } from '../core/model-registry.js';
+import { getModePreset } from '../core/mode-presets.js';
+import { modelRegistry } from '../core/model-registry.js';
 
 // ─── Project Size Multiplier ─────────────────────────────────────────
 
@@ -35,17 +38,24 @@ function selectMode(subscription: SubscriptionDetected): PlanMode {
   }
 }
 
-// ─── Model Selection ─────────────────────────────────────────────────
+// ─── Tier Selection (provider-agnostic) ──────────────────────────────
 
-function selectModels(subscription: SubscriptionDetected): { brainModel: ModelType; defaultModel: ModelType } {
-  switch (subscription) {
-    case 'max':
-      return { brainModel: 'opus', defaultModel: 'sonnet' };
-    case 'pro':
-      return { brainModel: 'sonnet', defaultModel: 'sonnet' };
-    case 'unknown':
-      return { brainModel: 'sonnet', defaultModel: 'sonnet' };
+function selectTiers(mode: PlanMode): { brain_tier: ModelTier; worker_tier: ModelTier } {
+  const preset = getModePreset(mode);
+  if (preset) {
+    return { brain_tier: preset.model_strategy.brain_tier, worker_tier: preset.model_strategy.worker_tier };
   }
+  // Fallback for unknown modes
+  return { brain_tier: 'standard', worker_tier: 'standard' };
+}
+
+/**
+ * Resolve tier to a concrete model name for backward compatibility.
+ * Uses Claude provider as default since it's the primary provider.
+ */
+function tierToModel(tier: ModelTier): ModelType {
+  const model = modelRegistry.getByProviderAndTier('claude', tier);
+  return (model?.id ?? 'sonnet') as ModelType;
 }
 
 // ─── Planning Mode ───────────────────────────────────────────────────
@@ -79,9 +89,11 @@ export function generateSetupRecommendation(
   const maxWorkers = Math.max(1, Math.ceil(baseWorkers * multiplier));
   reasons.push(`Project size "${projectAnalysis.size}" (×${multiplier}) → ${maxWorkers} workers`);
 
-  // 4. Models
-  const { brainModel, defaultModel } = selectModels(subscription);
-  reasons.push(`Brain model: ${brainModel}, Default model: ${defaultModel}`);
+  // 4. Tiers (provider-agnostic) → derive model names for backward compat
+  const { brain_tier, worker_tier } = selectTiers(mode);
+  const brainModel = tierToModel(brain_tier);
+  const defaultModel = tierToModel(worker_tier);
+  reasons.push(`Brain tier: ${brain_tier} (${brainModel}), Worker tier: ${worker_tier} (${defaultModel})`);
 
   // 5. Planning mode
   const planning = selectPlanning(subscription);
@@ -92,6 +104,8 @@ export function generateSetupRecommendation(
     maxWorkers,
     brainModel,
     defaultModel,
+    brain_tier,
+    worker_tier,
     planning,
     reasons,
   };

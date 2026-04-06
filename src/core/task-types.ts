@@ -1,5 +1,8 @@
 // ─── Task Domain Types ──────────────────────────────────────────────────────
 // Split from types.ts — Task, planning, and model-related types
+// Model data is now delegated to ModelRegistry (single source of truth).
+
+import { modelRegistry } from './model-registry.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -10,7 +13,7 @@ export type ClaudeModel = 'opus' | 'sonnet' | 'haiku';
 export type OpenAIModel = 'gpt-5' | 'gpt-5-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'o3' | 'o4-mini';
 
 /** Gemini model identifiers */
-export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-flash';
+export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-3.1-pro-preview';
 
 /** Union of all supported model identifiers across providers */
 export type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
@@ -18,58 +21,45 @@ export type ModelType = ClaudeModel | OpenAIModel | GeminiModel;
 /** Supported AI provider names */
 export type ProviderName = 'claude' | 'codex' | 'gemini';
 
-/** Mapping from each provider to its supported model list */
+/** Mapping from each provider to its supported model list — derived from ModelRegistry */
+const _providerMap = Object.fromEntries(
+  modelRegistry.getAllProviders().map(p => [
+    p,
+    modelRegistry.getByProvider(p).map(m => m.id) as readonly ModelType[],
+  ]),
+);
 export const PROVIDER_MODEL_MAP: Record<ProviderName, readonly ModelType[]> = {
-  claude: ['opus', 'sonnet', 'haiku'] as const,
-  codex: ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini'] as const,
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'] as const,
-} as const;
+  claude: _providerMap['claude'] ?? [],
+  codex: _providerMap['codex'] ?? [],
+  gemini: _providerMap['gemini'] ?? [],
+};
 
 /** All Claude model names (backward-compat convenience) */
-export const CLAUDE_MODELS: readonly ClaudeModel[] = ['opus', 'sonnet', 'haiku'] as const;
+export const CLAUDE_MODELS: readonly ClaudeModel[] = modelRegistry
+  .getByProvider('claude')
+  .map(m => m.id) as unknown as readonly ClaudeModel[];
 
-/** All valid model names across all providers */
-export const ALL_MODELS: readonly ModelType[] = [
-  ...CLAUDE_MODELS,
-  'gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini',
-  'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash',
-] as const;
+/** All valid model names across all providers — derived from ModelRegistry */
+export const ALL_MODELS: readonly ModelType[] = modelRegistry.getAllModelIds() as unknown as readonly ModelType[];
 
 /**
  * Mapping from internal model aliases to actual provider API model IDs.
- * Used for documentation, validation, and direct API calls.
- * Updated: 2026-03-27 (Claude 4.5/4.6, GPT-5, Gemini 2.5)
+ * Derived from ModelRegistry.
  */
-export const MODEL_API_IDS: Record<ModelType, string> = {
-  // Claude (Anthropic)
-  opus: 'claude-opus-4-6',
-  sonnet: 'claude-sonnet-4-6',
-  haiku: 'claude-haiku-4-5-20251001',
-  // OpenAI / Codex
-  'gpt-5': 'gpt-5',
-  'gpt-5-mini': 'gpt-5-mini',
-  'gpt-4.1': 'gpt-4.1',
-  'gpt-4.1-mini': 'gpt-4.1-mini',
-  o3: 'o3',
-  'o4-mini': 'o4-mini',
-  // Google Gemini
-  'gemini-2.5-pro': 'gemini-2.5-pro',
-  'gemini-2.5-flash': 'gemini-2.5-flash',
-  'gemini-2.0-flash': 'gemini-2.0-flash',
-} as const;
+export const MODEL_API_IDS: Record<string, string> = Object.fromEntries(
+  modelRegistry.getAllModels().map(m => [m.id, m.apiId]),
+);
 
 /**
  * Resolve the actual provider API model ID from an internal alias.
- * For Claude, this maps e.g. 'opus' → 'claude-opus-4-6'.
- * For OpenAI/Gemini, the alias and API ID are typically the same.
+ * Delegates to ModelRegistry.
  * @throws {UnknownModelError} if model is not recognized
  */
 export function resolveApiModelId(model: ModelType): string {
-  const apiId = MODEL_API_IDS[model];
-  if (!apiId) {
+  if (!modelRegistry.has(model)) {
     throw new UnknownModelError(model);
   }
-  return apiId;
+  return modelRegistry.resolveApiId(model);
 }
 
 /** Error thrown when a model is not recognized */
@@ -85,13 +75,11 @@ export class UnknownModelError extends TypeError {
  * @throws {UnknownModelError} if model is not recognized
  */
 export function getProviderForModel(model: ModelType): ProviderName {
-  for (const [provider, models] of Object.entries(PROVIDER_MODEL_MAP)) {
-    if ((models as readonly string[]).includes(model)) {
-      return provider as ProviderName;
-    }
+  const def = modelRegistry.get(model);
+  if (!def) {
+    throw new UnknownModelError(model);
   }
-  // Should never reach here with valid ModelType — guard for runtime safety
-  throw new UnknownModelError(model);
+  return def.provider;
 }
 
 /** Type guard: checks whether a model is a Claude model */
@@ -111,36 +99,22 @@ export function isGeminiModel(model: ModelType): model is GeminiModel {
 
 /**
  * Get a numeric rank for model capability tier (provider-agnostic).
- * Higher = more capable. Used for model comparison/upgrade logic.
+ * Delegates to ModelRegistry.getNumericTier().
+ * Higher = more capable.
  *   Tier 0 (economy): haiku, gpt-5-mini, gpt-4.1-mini, o4-mini, gemini-2.0-flash
- *   Tier 1 (standard): sonnet, gpt-4.1, o3, gemini-2.5-flash
+ *   Tier 1 (standard): sonnet, gpt-4.1, o3, o4-mini, gemini-2.5-flash
  *   Tier 2 (premium): opus, gpt-5, gemini-2.5-pro
+ *   Tier 3 (premium_plus): gemini-3.1-pro-preview
  */
 export function getModelTier(model: ModelType): number {
-  switch (model) {
-    case 'haiku':
-    case 'gpt-5-mini':
-    case 'gpt-4.1-mini':
-    case 'o4-mini':
-    case 'gemini-2.0-flash':
-      return 0;
-    case 'sonnet':
-    case 'gpt-4.1':
-    case 'o3':
-    case 'gemini-2.5-flash':
-      return 1;
-    case 'opus':
-    case 'gpt-5':
-    case 'gemini-2.5-pro':
-      return 2;
-  }
+  return modelRegistry.getNumericTier(model);
 }
 
 /**
  * Check if a string is a valid model name.
  */
 export function isValidModel(value: string): value is ModelType {
-  return (ALL_MODELS as readonly string[]).includes(value);
+  return modelRegistry.has(value);
 }
 
 export type TaskEffort = 'low' | 'normal' | 'high';

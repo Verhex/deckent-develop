@@ -19,7 +19,7 @@ vi.mock('node:fs', () => ({
 }));
 
 import { CodexAdapter, createCodexAdapter, CODEX_TIER_MODELS } from '../../src/providers/codex.js';
-import type { CodexAuthMode } from '../../src/providers/codex.js';
+import type { CodexAuthMode, CodexCliVariant } from '../../src/providers/codex.js';
 import { ProviderError } from '../../src/core/provider.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { spawn, spawnSync } from 'node:child_process';
@@ -373,6 +373,35 @@ describe('CodexAdapter', () => {
     });
   });
 
+  // ─── detectCliVariant() ────────────────────────────────────────────
+
+  describe('detectCliVariant()', () => {
+    it('should return rust when output contains "codex" without "codex-cli"', () => {
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: 'codex 1.0.5', stderr: '' });
+      expect(adapter.detectCliVariant()).toBe('rust');
+    });
+
+    it('should return node when output contains "codex-cli"', () => {
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: 'codex-cli 1.2.3', stderr: '' });
+      expect(adapter.detectCliVariant()).toBe('node');
+    });
+
+    it('should return unknown when codex --version fails', () => {
+      mockSpawnSync.mockReturnValue({ status: 1, stdout: '', stderr: 'not found' });
+      expect(adapter.detectCliVariant()).toBe('unknown');
+    });
+
+    it('should return unknown when spawnSync throws', () => {
+      mockSpawnSync.mockImplementation(() => { throw new Error('ENOENT'); });
+      expect(adapter.detectCliVariant()).toBe('unknown');
+    });
+
+    it('should return unknown when output is empty', () => {
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+      expect(adapter.detectCliVariant()).toBe('unknown');
+    });
+  });
+
   // ─── buildCommand() ────────────────────────────────────────────────
 
   describe('buildCommand()', () => {
@@ -466,8 +495,8 @@ describe('CodexAdapter', () => {
       expect(CODEX_TIER_MODELS.standard).toBe('gpt-4.1');
     });
 
-    it('should map economy to gpt-4.1-mini', () => {
-      expect(CODEX_TIER_MODELS.economy).toBe('gpt-4.1-mini');
+    it('should map economy to gpt-5-mini', () => {
+      expect(CODEX_TIER_MODELS.economy).toBe('gpt-5-mini');
     });
   });
 
@@ -477,7 +506,7 @@ describe('CodexAdapter', () => {
     it('should return correct model for each tier', () => {
       expect(adapter.getModelForTier('premium')).toBe('gpt-5');
       expect(adapter.getModelForTier('standard')).toBe('gpt-4.1');
-      expect(adapter.getModelForTier('economy')).toBe('gpt-4.1-mini');
+      expect(adapter.getModelForTier('economy')).toBe('gpt-5-mini');
     });
   });
 

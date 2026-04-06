@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { TASKS_DIR } from '../../core/constants.js';
+import { ALL_MODELS } from '../../core/types.js';
 import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 
@@ -19,7 +20,7 @@ export function registerRunTool(server: McpServer): void {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         description: z.string().describe('Clear description of what the worker should do. Be specific: include file paths, expected outcome, and any constraints.'),
-        model: z.enum(['opus', 'sonnet', 'haiku']).optional().default('sonnet').describe('Claude model: opus (most capable, highest cost), sonnet (balanced, recommended), haiku (fastest, lowest cost)'),
+        model: z.enum(ALL_MODELS as unknown as readonly [string, ...string[]]).optional().default('sonnet').describe('AI model to use. Supports all providers (Claude, OpenAI, Gemini). Default: sonnet'),
         scope: z.string().optional().describe('Comma-separated directory paths the worker may modify (e.g. "src/,tests/"). Defaults to "src/" if omitted.'),
       }),
     },

@@ -6,9 +6,28 @@
   "manifestVersion": 2,
   "activation": {
     "rules": [
-      { "when": { "intent.primary": "design" }, "score": 10 },
-      { "when": { "domains": { "$contains": "core" } }, "score": 6 },
-      { "when": { "domains": { "$contains": "config" } }, "score": 8 }
+      {
+        "when": {
+          "intent.primary": "design"
+        },
+        "score": 10
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "core"
+          }
+        },
+        "score": 6
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "config"
+          }
+        },
+        "score": 8
+      }
     ],
     "exclude": [],
     "minScore": 5
@@ -16,14 +35,30 @@
   "entrypoint": "SKILL.md",
   "category": "domain",
   "triggers": [
-    "architecture", "registry", "config", "migration",
-    "provider", "tier", "model", "interface", "pattern",
-    "single-source", "backward-compat", "parametric",
-    "enterprise", "scalability", "abstraction"
+    "architecture",
+    "registry",
+    "config",
+    "migration",
+    "provider",
+    "tier",
+    "model",
+    "interface",
+    "pattern",
+    "single-source",
+    "backward-compat",
+    "parametric",
+    "enterprise",
+    "scalability",
+    "abstraction"
   ],
   "stackDetection": {
-    "files": ["tsconfig.json", "src/core/"],
-    "dependencies": ["typescript"],
+    "files": [
+      "tsconfig.json",
+      "src/core/"
+    ],
+    "dependencies": [
+      "typescript"
+    ],
     "commands": []
   },
   "composableWith": [
@@ -38,10 +73,10 @@
   },
   "enabled": true,
   "stats": {
-    "totalUses": 0,
-    "successCount": 0,
-    "successRate": 0,
+    "totalUses": 3,
+    "successCount": 3,
+    "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": ""
+    "lastUsedInSprint": "sprint-097"
   }
 }

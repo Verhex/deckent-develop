@@ -58,6 +58,7 @@ import {
   runWizard,
 } from '../helpers/wizard.js';
 import type { ProviderName } from '../../core/task-types.js';
+import { getModePreset } from '../../core/mode-presets.js';
 import { runDoctorChecks } from './doctor.js';
 
 function ensureDir(dir: string): void {
@@ -424,12 +425,12 @@ export function registerInit(program: Command): void {
             { label: 'Türkçe', value: 'tr' },
           ]);
 
-          // Step 2: Plan selection in selected language
+          // Step 2: Plan selection in selected language (tier-based labels)
           mode = await promptSelect<PlanMode>(getMessage('init.select_plan', language), [
-            { label: 'Performance — 8 workers, premium model brain', value: 'performance' },
-            { label: 'Balanced — 5 workers, standard model brain', value: 'balanced' },
-            { label: 'Economic — 3 workers, standard model only', value: 'economic' },
-            { label: 'API (pay-as-you-go) — 10 workers, any model', value: 'api' },
+            { label: 'Performance — 8 workers, premium tier brain + workers', value: 'performance' },
+            { label: 'Balanced — 5 workers, standard brain + premium workers', value: 'balanced' },
+            { label: 'Economic — 3 workers, standard tier only', value: 'economic' },
+            { label: 'API (pay-as-you-go) — 10 workers, premium brain + standard workers', value: 'api' },
           ]);
 
           // Step 3: Project name in selected language
@@ -459,6 +460,11 @@ export function registerInit(program: Command): void {
         // 5. Config (merge — preserve existing fields)
         const configPath = join(root, DECKENT_DIR, 'config.json');
         const newConfig: Record<string, unknown> = { mode, language, projectName };
+        // Apply tier-based model_strategy from mode preset
+        const modePreset = getModePreset(mode);
+        if (modePreset) {
+          newConfig.model_strategy = modePreset.model_strategy;
+        }
         // Windows: auto-set subprocess backend (tmux unavailable)
         if (platform() === 'win32') {
           newConfig.spawn_backend = 'subprocess';

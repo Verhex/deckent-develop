@@ -67,3 +67,19 @@ A) DebtTable.tsx — useTranslati
 - docs/guide/ + docs/development/ + docs/architecture/ Kalan — Sayı ve Referans Düzeltmeleri: GO_WITH_TECH_DEBT — All documentation fixes applied:
 
 A) quickstart.md + first-sprint.md: 'Max workers: 5 (max_plan)' → 'Max workers: 8 (per
+## Sprint sprint-097 Learnings
+- ModelRegistry Class + BUILTIN_MODELS Kataloğu: GO_WITH_TECH_DEBT — ModelRegistry class + BUILTIN_MODELS kataloğu tamamlandı. Değişiklikler: (A) ModelStatus, ModelCapabilities, ModelCost a
+- task-types.ts Delegasyonu — Registry'den Re-export: GO_WITH_TECH_DEBT — task-types.ts ve model-equivalence.ts artık ModelRegistry'den veri türetiyor. PROVIDER_MODEL_MAP, ALL_MODELS, MODEL_API_
+- Provider Adapter Tier Duplicate Kaldırma: GO_WITH_TECH_DEBT — Provider tier duplicate kaldırma tamamlandı. CODEX_TIER_MODELS ve GEMINI_TIER_MODELS sabitleri artık hard-coded değerler
+- mode-presets.ts + model_strategy Config Yapısı: GO_WITH_TECH_DEBT — A) mode-presets.ts — ModelStrategy interface + MODE_PRESETS (performance/balanced/economic/api) + TIER_ORDER + compareTi
+- MCP + CLI Model Enum Genişletme: GO_WITH_TECH_DEBT — A) src/mcp/tools/run.ts: Hard-coded z.enum(['opus','sonnet','haiku']) replaced with z.enum(ALL_MODELS) — now supports al
+- Codex Adapter CLI Uyumluluk Güncellemesi: GO_WITH_TECH_DEBT — Codex adapter CLI uyumluluk güncellemesi tamamlandı:
+
+A) buildArgs/buildCommand/buildPlannerCommand: Rust rewrite uyumlu
+- Gemini Adapter CLI Uyumluluk + gemini-3.1-pro-preview: GO_WITH_TECH_DEBT — Gemini Adapter CLI uyumluluk güncellemesi tamamlandı:
+
+A) buildArgs() güncellendi:
+  - --model → -m kısa flag (Gemini CL
+- Init Wizard Provider-Agnostic Tier Seçimi: GO_WITH_TECH_DEBT — Init wizard provider-agnostic tier seçimine geçirildi. auto-setup.ts: selectModels() → selectTiers() + tierToModel() ref
+- token-counter.ts + sprint-reporter.ts Hard-Code Temizliği: GO_WITH_TECH_DEBT — Hard-coded model referansları 4 dosyada temizlendi: (A) token-counter.ts — DEFAULT_BUDGETS artık buildDefaultBudgets() f
+- Dashboard Test Fix + Integration Test: GO_WITH_TECH_DEBT — A) TaskCard.test.tsx — 20 failing tests fixed: Added React import, vi/beforeEach/afterEach imports, LanguageProvider wra

@@ -8,6 +8,8 @@
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { createDefaultConfig } from './config.js';
 import type { DeckentConfig } from './types.js';
+import type { ModelTier } from './model-equivalence.js';
+import type { ProviderName } from './task-types.js';
 
 export interface MigrationResult {
   /** Whether any fields were added */
@@ -289,6 +291,204 @@ export function migrateConfigInMemory(
     config: merged as unknown as DeckentConfig,
     addedFields: missingFields,
   };
+}
+
+/**
+ * Full migration: field-fill + v1→v2. Returns both the migrated config
+ * and a detailed list of all changes (missing fields + v2 tier conversions).
+ *
+ * Use this instead of migrateConfigInMemory when you want v2 tier migration applied.
+ */
+export function migrateConfigFull(
+  existing: Record<string, unknown>,
+): { config: DeckentConfig; addedFields: string[]; v2Changes: string[] } {
+  const defaults = createDefaultConfig() as unknown as Record<string, unknown>;
+  const merged = { ...existing };
+
+  // Apply v1→v2 migration (model_strategy + providers)
+  const v2Result = migrateConfigV1ToV2(merged);
+
+  const missingFields = getMissingFields(merged);
+
+  for (const field of missingFields) {
+    if (field.startsWith('modes.')) {
+      setNestedValue(merged, field, getNestedValue(defaults, field));
+    } else {
+      const defaultValue = defaults[field];
+      merged[field] = defaultValue === undefined ? null : defaultValue;
+    }
+  }
+
+  return {
+    config: merged as unknown as DeckentConfig,
+    addedFields: missingFields,
+    v2Changes: v2Result.changes,
+  };
+}
+
+// ─── V1 → V2 Migration ─────────────────────────────────────────────────────
+
+/**
+ * Map a v1 model name to a v2 ModelTier.
+ * Used during config migration to convert brain_model / default_model to tier-based config.
+ */
+export function modelToTier(model: string): ModelTier {
+  switch (model) {
+    case 'opus':
+    case 'gpt-5':
+    case 'gemini-2.5-pro':
+      return 'premium';
+    case 'sonnet':
+    case 'gpt-4.1':
+    case 'o3':
+    case 'gemini-2.5-flash':
+      return 'standard';
+    case 'haiku':
+    case 'gpt-5-mini':
+    case 'gpt-4.1-mini':
+    case 'o4-mini':
+    case 'gemini-2.0-flash':
+      return 'economy';
+    default:
+      return 'standard'; // safe fallback
+  }
+}
+
+/**
+ * V2 model_strategy shape embedded in config.
+ * Mirrors the ModelStrategy interface from mode-presets.ts (Task 4).
+ * Kept as a plain object type here to avoid circular dependency.
+ */
+export interface ConfigModelStrategy {
+  brain_tier?: ModelTier;
+  worker_tier?: ModelTier;
+  min_tier?: ModelTier;
+  max_tier?: ModelTier;
+  auto_upgrade?: boolean;
+  auto_downgrade?: boolean;
+}
+
+/**
+ * V2 providers shape embedded in config.
+ */
+export interface ConfigProviders {
+  brain?: ProviderName;
+  worker?: ProviderName;
+  fallback?: ProviderName;
+  overrides?: Record<string, ProviderName>;
+}
+
+/**
+ * Apply v1 → v2 migration rules to a config object in-memory.
+ *
+ * Migration rules:
+ * - haiku_allowed: false → model_strategy.min_tier = 'standard'
+ * - haiku_allowed: true  → model_strategy.min_tier = 'economy'
+ * - brain_model: X       → model_strategy.brain_tier = modelToTier(X)
+ * - default_model: X     → model_strategy.worker_tier = modelToTier(X)
+ * - brain_provider / worker_provider → providers.brain / providers.worker
+ *
+ * Old fields are PRESERVED for backward compatibility. New fields are ADDED.
+ * If new fields already exist, they are NOT overwritten.
+ */
+export function migrateConfigV1ToV2(config: Record<string, unknown>): {
+  migrated: boolean;
+  changes: string[];
+} {
+  const changes: string[] = [];
+
+  // ── model_strategy migration ──────────────────────────────────────
+
+  const existingStrategy = (config['model_strategy'] ?? {}) as Record<string, unknown>;
+  const strategy: ConfigModelStrategy = { ...existingStrategy } as ConfigModelStrategy;
+  let strategyChanged = false;
+
+  // Migrate active mode's fields (top-level mode → modes[mode])
+  const activeMode = config['mode'] as string | undefined;
+  const modes = config['modes'] as Record<string, Record<string, unknown>> | undefined;
+  const activeModeConfig: Record<string, unknown> = (activeMode ? modes?.[activeMode] : undefined) ?? {};
+
+  // Also check top-level fields for flat v1 configs
+  const brainModel = (activeModeConfig['brain_model'] ?? config['brain_model']) as string | undefined;
+  const defaultModel = (activeModeConfig['default_model'] ?? config['default_model']) as string | undefined;
+  const haikuAllowed = activeModeConfig['haiku_allowed'] ?? config['haiku_allowed'];
+
+  // brain_model → brain_tier
+  if (brainModel && strategy.brain_tier === undefined) {
+    strategy.brain_tier = modelToTier(brainModel);
+    strategyChanged = true;
+    changes.push(`brain_model '${brainModel}' → model_strategy.brain_tier '${strategy.brain_tier}'`);
+  }
+
+  // default_model → worker_tier
+  if (defaultModel && strategy.worker_tier === undefined) {
+    strategy.worker_tier = modelToTier(defaultModel);
+    strategyChanged = true;
+    changes.push(`default_model '${defaultModel}' → model_strategy.worker_tier '${strategy.worker_tier}'`);
+  }
+
+  // haiku_allowed → min_tier
+  if (haikuAllowed !== undefined && strategy.min_tier === undefined) {
+    strategy.min_tier = haikuAllowed === false ? 'standard' : 'economy';
+    strategyChanged = true;
+    changes.push(`haiku_allowed ${String(haikuAllowed)} → model_strategy.min_tier '${strategy.min_tier}'`);
+  }
+
+  if (strategyChanged) {
+    config['model_strategy'] = strategy;
+  }
+
+  // ── providers migration ───────────────────────────────────────────
+
+  const existingProviders = (config['providers'] ?? {}) as Record<string, unknown>;
+  const providers: ConfigProviders = { ...existingProviders } as ConfigProviders;
+  let providersChanged = false;
+
+  const brainProvider = config['brain_provider'] as ProviderName | undefined;
+  const workerProvider = config['worker_provider'] as ProviderName | undefined;
+  const fallbackProvider = config['fallback_provider'] as ProviderName | undefined;
+
+  if (brainProvider && providers.brain === undefined) {
+    providers.brain = brainProvider;
+    providersChanged = true;
+    changes.push(`brain_provider '${brainProvider}' → providers.brain`);
+  }
+
+  if (workerProvider && providers.worker === undefined) {
+    providers.worker = workerProvider;
+    providersChanged = true;
+    changes.push(`worker_provider '${workerProvider}' → providers.worker`);
+  }
+
+  if (fallbackProvider && providers.fallback === undefined) {
+    providers.fallback = fallbackProvider;
+    providersChanged = true;
+    changes.push(`fallback_provider '${fallbackProvider}' → providers.fallback`);
+  }
+
+  if (providersChanged) {
+    config['providers'] = providers;
+  }
+
+  return {
+    migrated: changes.length > 0,
+    changes,
+  };
+}
+
+/**
+ * Extended needsMigration that also checks for v1→v2 migration needs.
+ * Performs a dry-run of v1→v2 migration on a shallow clone to determine
+ * if any actual changes would be made.
+ */
+export function needsV2Migration(existing: Record<string, unknown>): boolean {
+  // Already has v2 fields → no migration needed
+  if (existing['model_strategy'] && existing['providers']) return false;
+
+  // Dry-run: clone and check if migrateConfigV1ToV2 would actually change anything
+  const clone = { ...existing };
+  const result = migrateConfigV1ToV2(clone);
+  return result.migrated;
 }
 
 // Collect leaf keys is exported for testing purposes

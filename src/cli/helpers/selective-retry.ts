@@ -2,6 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Task } from '../../core/types.js';
+import { modelRegistry } from '../../core/model-registry.js';
 
 export interface RetryQueue {
   sprintId: string;
@@ -69,7 +70,7 @@ export class SelectiveRetry {
         : `Retry of task ${taskId}.`;
 
       lines.push(`## Task ${taskNum}: ${title}`);
-      lines.push(`- Model: ${original?.model ?? 'opus'}`);
+      lines.push(`- Model: ${original?.model ?? modelRegistry.getByProviderAndTier('claude', 'premium')?.id ?? 'opus'}`);
       lines.push(`- Effort: ${original?.effort ?? 'high'}`);
       lines.push('');
       lines.push('### Description');

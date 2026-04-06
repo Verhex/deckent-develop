@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import React from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { LanguageProvider } from "../../src/dashboard/src/i18n/LanguageProvider";
 import {
   TaskCard,
   getCardColor,
@@ -11,6 +13,19 @@ import {
   getBadgeLabel,
   type TaskCardData,
 } from "../../src/dashboard/src/components/TaskCard";
+
+// Mock fetch for LanguageProvider's /api/config call
+beforeEach(() => {
+  globalThis.fetch = vi.fn().mockRejectedValue(new Error('no server'));
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
 
 // ─── Fixtures ───────────────────────────────────────────────────────
 
@@ -204,57 +219,57 @@ describe("getBadgeLabel", () => {
 
 describe("TaskCard component", () => {
   it("renders without crashing", () => {
-    render(<TaskCard task={makeTask()} />);
+    renderWithProviders(<TaskCard task={makeTask()} />);
     expect(screen.getByTestId("task-card-041-001")).toBeTruthy();
   });
 
   it("shows task ID and title", () => {
-    render(<TaskCard task={makeTask({ title: "Fix logging" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ title: "Fix logging" })} />);
     expect(screen.getByText("Task 041-001")).toBeTruthy();
     expect(screen.getByText("Fix logging")).toBeTruthy();
   });
 
   it("shows correct data-status attribute", () => {
-    render(<TaskCard task={makeTask({ status: "DONE" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "DONE" })} />);
     expect(screen.getByTestId("task-card-041-001").getAttribute("data-status")).toBe("DONE");
   });
 
   it("shows current action text", () => {
-    render(<TaskCard task={makeTask({ status: "CODING" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "CODING" })} />);
     expect(screen.getByTestId("task-action-041-001").textContent).toBe("Writing code");
   });
 
   it("shows badge with correct label", () => {
-    render(<TaskCard task={makeTask({ status: "DONE" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "DONE" })} />);
     expect(screen.getByText("Done")).toBeTruthy();
   });
 
   it("shows correct color for DONE status (green)", () => {
-    render(<TaskCard task={makeTask({ status: "DONE" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "DONE" })} />);
     const card = screen.getByTestId("task-card-041-001");
     expect(card.className).toContain("green");
   });
 
   it("shows correct color for EXECUTING status (blue)", () => {
-    render(<TaskCard task={makeTask({ status: "EXECUTING" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "EXECUTING" })} />);
     const card = screen.getByTestId("task-card-041-001");
     expect(card.className).toContain("blue");
   });
 
   it("shows correct color for NO_GO status (red)", () => {
-    render(<TaskCard task={makeTask({ status: "NO_GO" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "NO_GO" })} />);
     const card = screen.getByTestId("task-card-041-001");
     expect(card.className).toContain("red");
   });
 
   it("shows correct color for PAUSED status (yellow)", () => {
-    render(<TaskCard task={makeTask({ status: "PAUSED" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "PAUSED" })} />);
     const card = screen.getByTestId("task-card-041-001");
     expect(card.className).toContain("yellow");
   });
 
   it("shows correct color for PENDING status (gray/zinc)", () => {
-    render(<TaskCard task={makeTask({ status: "PENDING" })} />);
+    renderWithProviders(<TaskCard task={makeTask({ status: "PENDING" })} />);
     const card = screen.getByTestId("task-card-041-001");
     expect(card.className).toContain("zinc");
   });
@@ -264,7 +279,7 @@ describe("TaskCard component", () => {
       status: "DONE",
       filesChanged: ["src/foo.ts"],
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
     expect(screen.queryByTestId("task-details-041-001")).toBeNull();
   });
 
@@ -273,7 +288,7 @@ describe("TaskCard component", () => {
       status: "DONE",
       filesChanged: ["src/foo.ts", "src/bar.ts"],
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
 
     fireEvent.click(screen.getByTestId("task-card-toggle-041-001"));
 
@@ -288,7 +303,7 @@ describe("TaskCard component", () => {
       status: "DONE",
       filesChanged: ["a.ts", "b.ts", "c.ts"],
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
     fireEvent.click(screen.getByTestId("task-card-toggle-041-001"));
 
     expect(screen.getByText(/Files changed \(3\)/)).toBeTruthy();
@@ -300,7 +315,7 @@ describe("TaskCard component", () => {
       filesChanged: ["a.ts"],
       testResults: { passed: 10, failed: 2, total: 12 },
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
     fireEvent.click(screen.getByTestId("task-card-toggle-041-001"));
 
     expect(screen.getByTestId("task-tests-041-001")).toBeTruthy();
@@ -315,7 +330,7 @@ describe("TaskCard component", () => {
       filesChanged: ["a.ts"],
       testResults: { passed: 10, failed: 0, total: 10 },
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
     fireEvent.click(screen.getByTestId("task-card-toggle-041-001"));
 
     expect(screen.getByText("10 passed")).toBeTruthy();
@@ -331,7 +346,7 @@ describe("TaskCard component", () => {
         { attempt: 2, reason: "test assertion mismatch" },
       ],
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
     fireEvent.click(screen.getByTestId("task-card-toggle-041-001"));
 
     expect(screen.getByTestId("task-retries-041-001")).toBeTruthy();
@@ -344,7 +359,7 @@ describe("TaskCard component", () => {
       status: "DONE",
       filesChanged: ["src/foo.ts"],
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
 
     const toggle = screen.getByTestId("task-card-toggle-041-001");
     fireEvent.click(toggle);
@@ -356,7 +371,7 @@ describe("TaskCard component", () => {
 
   it("does not expand when task has no details", () => {
     const task = makeTask({ status: "PENDING" });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
 
     fireEvent.click(screen.getByTestId("task-card-toggle-041-001"));
     expect(screen.queryByTestId("task-details-041-001")).toBeNull();
@@ -364,7 +379,7 @@ describe("TaskCard component", () => {
 
   it("shows 'Waiting for Task X' when PENDING with dependencies", () => {
     const task = makeTask({ status: "PENDING", dependsOn: ["041-003"] });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
     expect(screen.getByTestId("task-action-041-001").textContent).toBe("Waiting for Task 041-003");
   });
 
@@ -373,7 +388,7 @@ describe("TaskCard component", () => {
       status: "TESTING",
       feedbackLoop: { tscAttempts: 1, testAttempts: 2 },
     });
-    render(<TaskCard task={task} />);
+    renderWithProviders(<TaskCard task={task} />);
     expect(screen.getByTestId("task-action-041-001").textContent).toBe("Running tests (attempt 2/3)");
   });
 });

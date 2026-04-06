@@ -226,7 +226,7 @@ export function registerRun(program: Command): void {
   program
     .command('run <description>')
     .description('Run a single one-shot task without a sprint cycle')
-    .option('--model <model>', 'Model to use (default: sonnet). Options: opus, sonnet, haiku, gpt-4.1, o3, o4-mini, gemini-2.5-pro, gemini-2.5-flash', 'sonnet')
+    .option('--model <model>', `Model to use (default: sonnet). Options: ${ALL_MODELS.join(', ')}`, 'sonnet')
     .option('--scope <dir>', 'Worker scope directory (default: ./)', './')
     .option('--timeout <ms>', 'Maximum wait time in milliseconds (default: 300000)', '300000')
     .option('--keep', 'Keep task files after completion (skip cleanup)')

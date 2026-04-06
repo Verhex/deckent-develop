@@ -3,6 +3,37 @@
 import type { TaskScope, ModelType, ResolvedConfig, PatternEntry, ProviderName } from '../core/types.js';
 import { getModelTier } from '../core/types.js';
 import { getEquivalentModel, isModelAvailable } from '../core/model-equivalence.js';
+import type { ModelTier } from '../core/model-equivalence.js';
+
+// ─── Tier Helpers ───────────────────────────────────────────────────
+
+/** Numeric tier rank for comparison: economy=0, standard=1, premium=2, premium_plus=3 */
+const TIER_RANK: Record<ModelTier, number> = {
+  economy: 0,
+  standard: 1,
+  premium: 2,
+  premium_plus: 3,
+};
+
+/** Claude model for each tier — used as canonical reference for cross-provider mapping */
+const TIER_CLAUDE_MODEL: Record<string, ModelType> = {
+  economy: 'haiku',
+  standard: 'sonnet',
+  premium: 'opus',
+  premium_plus: 'opus', // Falls back to premium until premium_plus models are added
+};
+
+/**
+ * Resolve a tier name to a concrete model for the configured provider.
+ * Uses config's worker_provider (fallback: brain_provider, then 'claude').
+ * Maps the tier to its Claude reference model, then converts to target provider via equivalence.
+ */
+function resolveTierToModel(tier: ModelTier, config: ResolvedConfig): ModelType {
+  const provider: ProviderName = config.worker_provider ?? config.brain_provider ?? 'claude';
+  const claudeModel: ModelType = TIER_CLAUDE_MODEL[tier] ?? 'sonnet';
+  if (provider === 'claude') return claudeModel;
+  return getEquivalentModel(claudeModel, provider);
+}
 
 /**
  * Calculate a numeric complexity score for a task based on its title, description, and scope.
@@ -64,19 +95,31 @@ export function calculateModelScore(title: string, description: string, scope: T
 }
 
 /**
+ * Infer the appropriate tier based on task complexity score.
+ * Score >= 4 → premium, score <= -1 → economy, otherwise standard.
+ * Internal helper used by both inferModelFromDirective and resolveTaskModel.
+ */
+function inferTierFromScore(title: string, description: string, scope: TaskScope): ModelTier {
+  const score = calculateModelScore(title, description, scope);
+
+  if (score >= 4) return 'premium';
+  if (score <= -1) return 'economy';
+  return 'standard';
+}
+
+/**
  * Infer the appropriate AI model based on task complexity score.
- * Score >= 4 maps to opus, score <= -1 maps to haiku, otherwise sonnet.
+ * Score >= 4 maps to premium tier, score <= -1 maps to economy tier, otherwise standard.
+ * Returns Claude-centric model names for backward compatibility.
  * @param title - Task title text
  * @param description - Task description text
  * @param scope - Task scope defining directories and files
- * @returns The recommended model type
+ * @returns The recommended model type (Claude-centric: opus/sonnet/haiku)
  */
 export function inferModelFromDirective(title: string, description: string, scope: TaskScope): ModelType {
-  const score = calculateModelScore(title, description, scope);
-
-  if (score >= 4) return 'opus';
-  if (score <= -1) return 'haiku';
-  return 'sonnet';
+  const tier = inferTierFromScore(title, description, scope);
+  // Return Claude-centric defaults for backward compat (no config available here)
+  return TIER_CLAUDE_MODEL[tier] ?? 'sonnet';
 }
 
 // ─── Pattern Utilities ──────────────────────────────────────────────
@@ -106,11 +149,11 @@ export function deduplicatePatterns(patterns: PatternEntry[]): PatternEntry[] {
 }
 
 /**
- * Suggest model upgrade based on detected patterns.
- * Returns 'opus' if patterns indicate boundary violations or circular deps in src/tests scope.
- * Returns null otherwise.
+ * Suggest a tier upgrade based on detected patterns.
+ * Returns 'premium' if patterns indicate boundary violations or circular deps in src/tests scope.
+ * Returns null otherwise. Internal helper for resolveTaskModel.
  */
-export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntry[]): ModelType | null {
+function suggestTierFromPatterns(scope: TaskScope, patterns: PatternEntry[]): ModelTier | null {
   // Only upgrade for src/ or tests/ scopes
   const hasSrcOrTest = scope.directories.some(d =>
     d.startsWith('src/') || d.startsWith('tests/') || d === 'src' || d === 'tests',
@@ -119,10 +162,23 @@ export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntr
 
   for (const p of patterns) {
     if (p.resolved) continue;
-    if (p.pattern === 'file_outside_scope' && p.occurrences >= 2) return 'opus';
-    if (p.pattern === 'circular_dependency' && p.occurrences >= 1) return 'opus';
+    if (p.pattern === 'file_outside_scope' && p.occurrences >= 2) return 'premium';
+    if (p.pattern === 'circular_dependency' && p.occurrences >= 1) return 'premium';
   }
   return null;
+}
+
+/**
+ * Suggest model upgrade based on detected patterns.
+ * Returns 'opus' if patterns indicate boundary violations or circular deps in src/tests scope.
+ * Returns null otherwise.
+ * Returns Claude-centric model names for backward compatibility.
+ */
+export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntry[]): ModelType | null {
+  const tier = suggestTierFromPatterns(scope, patterns);
+  if (!tier) return null;
+  // Return Claude-centric default for backward compat (no config available here)
+  return TIER_CLAUDE_MODEL[tier] ?? 'opus';
 }
 
 /**
@@ -164,24 +220,29 @@ export function resolveTaskModel(
     return forceModel;
   }
 
-  // Layer 4: base model from score system (always Claude-centric internally)
-  let model: ModelType = inferModelFromDirective(title, description, scope);
+  // Layer 4: base tier from score system (provider-agnostic)
+  let currentTier: ModelTier = inferTierFromScore(title, description, scope);
 
-  // Layer 4b: pattern-based upgrade
+  // Layer 4b: pattern-based tier upgrade
   if (patterns && patterns.length > 0) {
-    const suggestion = suggestModelFromPatterns(scope, patterns);
-    if (suggestion === 'opus') {
-      model = 'opus';
+    const suggestedTier = suggestTierFromPatterns(scope, patterns);
+    if (suggestedTier && TIER_RANK[suggestedTier] > TIER_RANK[currentTier]) {
+      currentTier = suggestedTier;
     }
   }
 
-  // Layer 4d: skill model preference (highest model among skills wins)
+  // Layer 4d: skill model preference (highest tier among skills wins)
   if (skillModels && skillModels.length > 0) {
-    const highest = skillModels.reduce<ModelType>((best, m) => getModelTier(m) > getModelTier(best) ? m : best, model);
-    if (getModelTier(highest) > getModelTier(model)) model = highest;
+    const highest = skillModels.reduce<ModelType>((best, m) => getModelTier(m) > getModelTier(best) ? m : best,
+      resolveTierToModel(currentTier, config));
+    if (getModelTier(highest) > TIER_RANK[currentTier]) {
+      // Upgrade currentTier to match the skill's tier
+      const skillTierNum = getModelTier(highest);
+      currentTier = skillTierNum >= 2 ? 'premium' : skillTierNum >= 1 ? 'standard' : 'economy';
+    }
   }
 
-  // Layer 2: task type filter — docs or test-only → cap at sonnet
+  // Layer 2: task type filter — docs or test-only → cap at standard tier
   const isDocScope = scope.directories.length > 0 && scope.directories.every(d =>
     d === 'docs' || d.startsWith('docs/') ||
     d === 'tmp-test' || d.startsWith('tmp-test/') ||
@@ -191,25 +252,30 @@ export function resolveTaskModel(
     scope.filesWrite.every(f => f.includes('.test.') || f.includes('.spec.'));
 
   if (isDocScope || isTestOnly) {
-    // Downgrade tier-2 models to tier-1 equivalent for doc/test scope
-    if (getModelTier(model) >= 2) model = 'sonnet';
+    if (TIER_RANK[currentTier] >= TIER_RANK.premium) {
+      currentTier = 'standard';
+    }
   }
 
   // Layer 1: plan access filter (highest priority)
   const mode = config.mode;
-  const isProPlan = mode === 'economic' || mode === 'pro_plan';
-  if (isProPlan && getModelTier(model) >= 2) {
-    model = 'sonnet';
+  const isRestrictedPlan = mode === 'economic' || mode === 'pro_plan';
+  if (isRestrictedPlan && TIER_RANK[currentTier] >= TIER_RANK.premium) {
+    currentTier = 'standard';
   }
 
-  const haikuAllowed = config.activeModeConfig.haiku_allowed;
-  if (!haikuAllowed && getModelTier(model) === 0) {
-    model = 'sonnet';
+  // Layer 1b: minimum tier enforcement (haiku_allowed backward compat)
+  const minTier: ModelTier = config.activeModeConfig.haiku_allowed === false ? 'standard' : 'economy';
+  if (TIER_RANK[currentTier] < TIER_RANK[minTier]) {
+    currentTier = minTier;
   }
 
-  // Layer 5: provider mapping — convert Claude model to target provider equivalent
-  if (targetProvider !== 'claude') {
-    model = getEquivalentModel(model, targetProvider);
+  // Resolve tier to concrete model for target provider
+  const model: ModelType = resolveTierToModel(currentTier, { ...config, worker_provider: targetProvider === 'claude' ? config.worker_provider : targetProvider } as ResolvedConfig);
+
+  // Layer 5: provider mapping — ensure final model belongs to target provider
+  if (targetProvider !== 'claude' && !isModelAvailable(model, targetProvider)) {
+    return getEquivalentModel(model, targetProvider);
   }
 
   return model;

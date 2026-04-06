@@ -13,24 +13,30 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType, GeminiModel } from '../core/types.js';
-import { PROVIDER_MODEL_MAP } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
+import type { ModelTier } from '../core/model-equivalence.js';
+import { getModelForProviderTier } from '../core/model-equivalence.js';
+import { modelRegistry } from '../core/model-registry.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
-const GEMINI_MODELS: readonly GeminiModel[] = [...PROVIDER_MODEL_MAP.gemini] as GeminiModel[];
+const GEMINI_MODELS: readonly GeminiModel[] = modelRegistry
+  .getByProvider('gemini')
+  .map(m => m.id as GeminiModel);
 
 /**
  * Tier-based model mapping for Gemini CLI.
- * Used by getModelForTier() to select appropriate models.
+ * @deprecated Derived from model-equivalence.ts — use adapter.getModelForTier() instead.
+ * Kept for backward compatibility with existing imports.
  */
 export const GEMINI_TIER_MODELS = {
-  premium: 'gemini-2.5-pro' as GeminiModel,
-  standard: 'gemini-2.5-flash' as GeminiModel,
-  economy: 'gemini-2.0-flash' as GeminiModel,
-} as const;
+  get premium_plus() { return (modelRegistry.getByProviderAndTier('gemini', 'premium_plus')?.id ?? getModelForProviderTier('gemini', 'premium') ?? 'gemini-2.5-pro') as GeminiModel; },
+  get premium() { return (getModelForProviderTier('gemini', 'premium') ?? 'gemini-2.5-pro') as GeminiModel; },
+  get standard() { return (getModelForProviderTier('gemini', 'standard') ?? 'gemini-2.5-flash') as GeminiModel; },
+  get economy() { return (getModelForProviderTier('gemini', 'economy') ?? 'gemini-2.0-flash') as GeminiModel; },
+};
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -40,8 +46,12 @@ export const GEMINI_AUTH_HEADER = 'x-goog-api-key';
 // ─── Gemini CLI Output Parser ────────────────────────────────────────
 
 /**
- * Parse stdout from `gemini -p ... --output-format json`.
+ * Parse stdout from `gemini -p ... --output-format json` or `--output-format stream-json`.
  * The Gemini CLI returns structured JSON with the response text and optional usage stats.
+ *
+ * For `stream-json` format, output is newline-delimited JSON (NDJSON) where each line
+ * is a separate JSON object with partial response chunks. This function concatenates
+ * all chunks into a single response.
  */
 export function parseGeminiOutput(stdout: string): {
   response: string;
@@ -49,6 +59,13 @@ export function parseGeminiOutput(stdout: string): {
 } {
   if (!stdout.trim()) {
     return { response: '' };
+  }
+
+  // Try stream-json (NDJSON) format first: multiple JSON lines
+  const lines = stdout.trim().split('\n').filter(l => l.trim());
+  if (lines.length > 1) {
+    const streamResult = tryParseStreamJson(lines);
+    if (streamResult) return streamResult;
   }
 
   try {
@@ -74,6 +91,53 @@ export function parseGeminiOutput(stdout: string): {
     // If not valid JSON, treat the entire stdout as plain text response
     return { response: stdout.trim() };
   }
+}
+
+/**
+ * Try to parse NDJSON (stream-json) output from Gemini CLI.
+ * Each line is a JSON chunk with partial text and optional usage metadata.
+ * Returns null if the lines are not valid NDJSON.
+ */
+function tryParseStreamJson(
+  lines: string[],
+): { response: string; stats?: { inputTokens: number; outputTokens: number } } | null {
+  const chunks: string[] = [];
+  let lastUsage: { promptTokenCount?: number; candidatesTokenCount?: number } | undefined;
+
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+
+      // Extract text from each chunk
+      const text =
+        parsed?.response ??
+        parsed?.candidates?.[0]?.content?.parts?.[0]?.text ??
+        (typeof parsed === 'string' ? parsed : undefined);
+      if (text) chunks.push(text);
+
+      // Keep last usage metadata (final chunk typically has totals)
+      if (parsed?.usageMetadata) {
+        lastUsage = parsed.usageMetadata;
+      }
+    } catch {
+      // Not valid JSON line — this is not NDJSON format
+      return null;
+    }
+  }
+
+  let stats: { inputTokens: number; outputTokens: number } | undefined;
+  if (
+    lastUsage &&
+    typeof lastUsage.promptTokenCount === 'number' &&
+    typeof lastUsage.candidatesTokenCount === 'number'
+  ) {
+    stats = {
+      inputTokens: lastUsage.promptTokenCount,
+      outputTokens: lastUsage.candidatesTokenCount,
+    };
+  }
+
+  return { response: chunks.join(''), stats };
 }
 
 // ─── Worker Entry ────────────────────────────────────────────────────
@@ -218,9 +282,11 @@ export class GeminiAdapter implements ProviderAdapter {
   /**
    * Build CLI arguments for `gemini` binary invocation.
    * Uses `-p` flag for headless/non-interactive mode.
+   * Uses `-m` short flag (Gemini CLI docs: `-m gemini-2.5-flash`).
+   * Adds `--approval-mode plan` for non-interactive auto-approval.
    */
   buildArgs(model: ModelType, prompt: string): string[] {
-    return ['-p', prompt, '--output-format', 'json', '--model', model];
+    return ['-p', prompt, '--output-format', 'json', '-m', model, '--approval-mode', 'plan'];
   }
 
   // ─── buildCommand() ────────────────────────────────────────────────
@@ -230,7 +296,7 @@ export class GeminiAdapter implements ProviderAdapter {
     promptPath: string,
     _opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove'>,
   ): string {
-    return `gemini -p "$(cat ${promptPath})" --output-format json --model ${model}`;
+    return `gemini -p "$(cat ${promptPath})" --output-format json -m ${model} --approval-mode plan`;
   }
 
   /**
@@ -282,9 +348,31 @@ export class GeminiAdapter implements ProviderAdapter {
 
   /**
    * Get the recommended Gemini model for a given capability tier.
+   * Delegates to model-equivalence.ts as the single source of truth.
    */
-  getModelForTier(tier: 'premium' | 'standard' | 'economy'): GeminiModel {
-    return GEMINI_TIER_MODELS[tier];
+  getModelForTier(tier: ModelTier): GeminiModel {
+    return (getModelForProviderTier('gemini', tier) ?? 'gemini-2.5-flash') as GeminiModel;
+  }
+
+  // ─── getCliVersion() ──────────────────────────────────────────────
+
+  /**
+   * Get the installed Gemini CLI version string.
+   * Returns undefined if the CLI is not installed or version cannot be determined.
+   */
+  getCliVersion(): string | undefined {
+    try {
+      const result = spawnSync('gemini', ['--version'], {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      if (result.status === 0 && result.stdout) {
+        return result.stdout.trim();
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   // ─── Internal helpers ──────────────────────────────────────────────

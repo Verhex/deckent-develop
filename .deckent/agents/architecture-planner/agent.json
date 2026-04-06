@@ -5,12 +5,35 @@
   "manifestVersion": 2,
   "activation": {
     "rules": [
-      { "when": { "intent.primary": "design" }, "score": 10 },
-      { "when": { "intent.primary": "refactor" }, "score": 7 },
-      { "when": { "domains": { "$contains": "architecture" } }, "score": 9 }
+      {
+        "when": {
+          "intent.primary": "design"
+        },
+        "score": 10
+      },
+      {
+        "when": {
+          "intent.primary": "refactor"
+        },
+        "score": 7
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "architecture"
+          }
+        },
+        "score": 9
+      }
     ],
     "exclude": [
-      { "when": { "intent.primary": "testing" }, "name": "not-for-testing", "reason": "Architecture planner designs systems, does not write tests" }
+      {
+        "when": {
+          "intent.primary": "testing"
+        },
+        "name": "not-for-testing",
+        "reason": "Architecture planner designs systems, does not write tests"
+      }
     ],
     "minScore": 5
   },
@@ -23,25 +46,50 @@
     "scalability",
     "enterprise-patterns"
   ],
-  "allowedTools": ["Read", "Grep", "Glob", "Bash", "Write", "Edit"],
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash",
+    "Write",
+    "Edit"
+  ],
   "deniedTools": [],
   "preferredModel": "opus",
   "effortMultiplier": 1.3,
   "triggerKeywords": [
-    "architecture", "design", "blueprint", "refactor", "restructure",
-    "module", "interface", "migration", "registry", "pattern",
-    "scalability", "coupling", "dependency", "infrastructure"
+    "architecture",
+    "design",
+    "blueprint",
+    "refactor",
+    "restructure",
+    "module",
+    "interface",
+    "migration",
+    "registry",
+    "pattern",
+    "scalability",
+    "coupling",
+    "dependency",
+    "infrastructure"
   ],
-  "triggerScopes": ["src/core/", "src/orchestra/", "src/"],
-  "triggerFilePatterns": ["*.ts", "*.tsx"],
+  "triggerScopes": [
+    "src/core/",
+    "src/orchestra/",
+    "src/"
+  ],
+  "triggerFilePatterns": [
+    "*.ts",
+    "*.tsx"
+  ],
   "persistent": false,
   "enabled": true,
   "source": "builtin",
   "stats": {
-    "totalUses": 0,
-    "successRate": 0,
-    "avgCoverage": 0,
-    "lastUsedInSprint": ""
+    "totalUses": 3,
+    "successRate": 1,
+    "avgCoverage": 32,
+    "lastUsedInSprint": "sprint-097"
   },
   "systemPrompt": "You are a senior system architect specializing in enterprise-grade software design. Your core strengths: 1) Analyze existing codebases to identify architectural debt, coupling issues, and redundancy patterns. 2) Design modular, extensible systems using registry patterns, dependency injection, and clean layering. 3) Plan incremental migration paths that maintain backward compatibility while modernizing internal structures. 4) Create single-source-of-truth designs that eliminate data duplication across modules. 5) Design config schemas that are user-friendly, parametric, and evolvable. Always consider: scalability to 1M+ users, plugin/extension points, minimal breaking changes, and clear separation of concerns. Produce concrete file-level plans with specific function signatures, not abstract diagrams."
 }

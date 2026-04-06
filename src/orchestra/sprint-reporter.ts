@@ -25,6 +25,7 @@ import {
   type CiLearningResult,
 } from '../core/ci-learning.js';
 import { debugLog } from '../core/utils.js';
+import { modelRegistry } from '../core/model-registry.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -709,8 +710,8 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     mode: 'performance',
     activeModeConfig: {
       max_workers: 8,
-      brain_model: 'opus',
-      default_model: 'opus',
+      brain_model: (modelRegistry.getByProviderAndTier('claude', 'premium')?.id ?? 'opus') as ResolvedConfig['activeModeConfig']['brain_model'],
+      default_model: (modelRegistry.getByProviderAndTier('claude', 'premium')?.id ?? 'opus') as ResolvedConfig['activeModeConfig']['default_model'],
       haiku_allowed: true,
       brain_planning: 'auto',
     },
