@@ -3,7 +3,7 @@
   "language": "tr",
   "projectName": "deckent",
   "brain_planning": "structured",
-  "last_sprint_id": "sprint-087",
+  "last_sprint_id": "sprint-089",
   "spawn_backend": "tmux",
   "modes": {
     "max_plan": {
@@ -82,5 +82,12 @@
   "output_theme": "default",
   "rollback_policy": "never",
   "routing_engine": "v2",
-  "cleanup_delay_ms": 180000
+  "cleanup_delay_ms": 180000,
+  "human_checkpoints": [],
+  "coverage_threshold": 90,
+  "max_reroutes": 3,
+  "reroute_on_tech_debt": false,
+  "sprint_timeout_minutes": 0,
+  "adaptive_thresholds": false,
+  "agent_min_score": 5
 }

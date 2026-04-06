@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { detectEnvironment } from './environment.js';
+import { debugLog } from './utils.js';
 
 /** Sprint lock information returned by isSprintLocked */
 export interface SprintLockInfo {
@@ -92,9 +93,10 @@ export function acquireSprintLock(projectRoot: string, sprintId: string, env?: s
 
       // Stale lock — remove it
       unlinkSync(filePath);
-    } catch {
+    } catch (e) {
+      debugLog('acquireSprintLock:readLock', e);
       // Corrupt lock file — remove and proceed
-      try { unlinkSync(filePath); } catch { /* ignore */ }
+      try { unlinkSync(filePath); } catch (e2) { debugLog('acquireSprintLock:unlinkStale', e2); }
     }
   }
 

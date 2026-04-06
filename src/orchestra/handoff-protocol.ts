@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ErrorRegistry } from '../core/errors.js';
+import { debugLog } from '../core/utils.js';
 
 export interface Handoff {
   id: string;
@@ -114,12 +115,13 @@ export class HandoffProtocol {
           if (parsed && parsed.id) {
             handoffs.push(parsed);
           }
-        } catch {
-          // skip invalid files
+        } catch (e) {
+          debugLog('HandoffProtocol:_listHandoffs:parseFile', e);
         }
       }
       return handoffs.sort((a, b) => a.id.localeCompare(b.id));
-    } catch {
+    } catch (e) {
+      debugLog('HandoffProtocol:_listHandoffs:readdirSync', e);
       return [];
     }
   }

@@ -85,12 +85,6 @@ export function renderDashboard(state: DashboardState, noColor?: boolean): strin
   const bar = '#'.repeat(filledWidth) + '+'.repeat(activeWidth) + '.'.repeat(Math.max(0, pendingWidth));
   const progressLine = `[${bar}] ${p.done}/${p.total} done ${p.active} active ${p.blocked} pending`;
 
-  // E) Usage metrics
-  const usage = state.usage;
-  const usageLine = usage
-    ? `Usage: 5hr=${usage.fiveHourPercent}%  weekly=${usage.weeklyPercent}%  (as of ${new Date(usage.measuredAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})`
-    : 'Usage: --';
-
   // Alerts
   const alertLines = state.alerts.length > 0
     ? state.alerts.map((a) => {
@@ -115,7 +109,6 @@ export function renderDashboard(state: DashboardState, noColor?: boolean): strin
     ...workerRows,
     mid,
     row(progressLine),
-    row(usageLine),
     mid,
     row('Alerts:'),
     ...alertLines,

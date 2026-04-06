@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import type { ModelType, ProviderName, UsageMetrics } from './types.js';
+import type { ModelType, ProviderName } from './types.js';
 import type { ResolvedConfig } from './config-types.js';
 import { PROVIDER_MODEL_MAP } from './task-types.js';
 import { getEquivalentModel } from './model-equivalence.js';
@@ -55,11 +55,6 @@ export interface ProviderAdapter {
    * List currently active worker task IDs.
    */
   listWorkers(): string[];
-
-  /**
-   * Check current API / subscription usage.
-   */
-  checkUsage(): Promise<UsageMetrics>;
 
   /**
    * Check whether the provider is available in the current environment.

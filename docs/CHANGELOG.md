@@ -6,6 +6,34 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint89] - 2026-04-06
+
+
+### Changed
+
+- Usage Core Modülleri Kaldır — Tipler, Config, Tracker (completed with tech debt)
+- Usage Orchestra + Provider Modülleri Kaldır (completed with tech debt)
+- Usage CLI + MCP + API + Dashboard Kaldır (completed with tech debt)
+- Usage Test Dosyaları + Dokümantasyon Temizliği (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 4 tech debt, 0 no-go_
+
+## [0.3.0-beta.3-sprint88] - 2026-04-06
+
+### Added
+
+- Adaptive Thresholds — NO_GO Rate Bazlı Otomatik Ayar
+
+### Changed
+
+- Mid-Sprint Reroute Güçlendirme — Max 3 + Config (completed with tech debt)
+- Checkpoint CLI/MCP Entegrasyonu — Approve/Reject Komutları (completed with tech debt)
+- Kalan Sessiz Catch Blokları — Son Dalga (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 3 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint88] - 2026-04-02
 
 ### Added

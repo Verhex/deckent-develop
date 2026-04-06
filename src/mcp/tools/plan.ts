@@ -1,8 +1,8 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
-import { readContext, checkUsage, adjustSprintSize, planSprint } from '../../orchestra/brain.js';
-import type { BrainPlanningMode } from '../../core/types.js';
+import { readContext, planSprint } from '../../orchestra/brain.js';
+import type { BrainPlanningMode, SprintSizeRecommendation } from '../../core/types.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
 
@@ -52,8 +52,12 @@ export function registerPlanTool(server: McpServer): void {
       try {
       const config = await loadConfig(root);
       const context = readContext(root);
-      const usage = checkUsage(config);
-      const recommendation = adjustSprintSize(config, usage);
+      const recommendation: SprintSizeRecommendation = {
+        size: 'full',
+        maxWorkers: typeof config.activeModeConfig.max_workers === 'number' ? config.activeModeConfig.max_workers : 4,
+        modelConstraint: null,
+        reason: 'No usage constraints',
+      };
       const sprint = await planSprint(root, config, context, recommendation, {
         mode: input.mode as BrainPlanningMode | undefined,
       });

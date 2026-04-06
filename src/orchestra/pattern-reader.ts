@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { BRAIN_DIR } from '../core/constants.js';
 import type { LearningEntry } from './pattern-recorder.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -133,12 +134,12 @@ export class PatternReader {
           if (Array.isArray(parsed)) {
             entries.push(...(parsed as LearningEntry[]));
           }
-        } catch {
-          // skip malformed files
+        } catch (e) {
+          debugLog('PatternReader:loadFromDisk:parseFile', e);
         }
       }
-    } catch {
-      // directory read error
+    } catch (e) {
+      debugLog('PatternReader:loadFromDisk:readdirSync', e);
     }
     return entries;
   }

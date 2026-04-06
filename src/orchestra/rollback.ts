@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BRAIN_DIR, DEBT_FILE } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -241,7 +242,7 @@ export function recordRollbackInDebt(
   const brainPath = join(projectRoot, BRAIN_DIR);
   try {
     if (!existsSync(brainPath)) mkdirSync(brainPath, { recursive: true });
-  } catch { /* ignore */ }
+  } catch (e) { debugLog('recordRollbackDebt:mkdirSync', e); }
 
   const debtPath = join(brainPath, DEBT_FILE);
   const timestamp = new Date().toISOString().slice(0, 10);
@@ -255,7 +256,7 @@ export function recordRollbackInDebt(
     } else {
       appendFileSync(debtPath, entry, 'utf-8');
     }
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('recordRollbackDebt:writeDebt', e); }
 }
 
 // ─── saveSafetyPoint / loadSafetyPoint ────────────────────────────
@@ -274,7 +275,7 @@ export function saveSafetyPoint(projectRoot: string, safetyPoint: SafetyPoint): 
       JSON.stringify(safetyPoint, null, 2),
       'utf-8',
     );
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('saveSafetyPoint:writeFile', e); }
 }
 
 /**
@@ -285,7 +286,8 @@ export function loadSafetyPoint(projectRoot: string): SafetyPoint | null {
   if (!existsSync(path)) return null;
   try {
     return JSON.parse(readFileSync(path, 'utf-8')) as SafetyPoint;
-  } catch {
+  } catch (e) {
+    debugLog('loadSafetyPoint:readFile', e);
     return null;
   }
 }

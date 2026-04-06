@@ -12,7 +12,7 @@ import {
   closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { ModelType, GeminiModel, UsageMetrics } from '../core/types.js';
+import type { ModelType, GeminiModel } from '../core/types.js';
 import { PROVIDER_MODEL_MAP } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
@@ -36,12 +36,6 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models
 
 /** Auth header name per official Google AI docs (used by REST API fallback) */
 export const GEMINI_AUTH_HEADER = 'x-goog-api-key';
-
-const SAFE_USAGE_DEFAULT: UsageMetrics = {
-  fiveHourPercent: 0,
-  weeklyPercent: 0,
-  measuredAt: new Date().toISOString(),
-};
 
 // ─── Gemini CLI Output Parser ────────────────────────────────────────
 
@@ -206,17 +200,6 @@ export class GeminiAdapter implements ProviderAdapter {
 
   listWorkers(): string[] {
     return Array.from(this.workers.keys());
-  }
-
-  // ─── checkUsage() ──────────────────────────────────────────────────
-
-  async checkUsage(): Promise<UsageMetrics> {
-    // Google AI API does not expose a simple quota endpoint via CLI.
-    // Return neutral defaults; actual quota tracking is external.
-    return {
-      ...SAFE_USAGE_DEFAULT,
-      measuredAt: new Date().toISOString(),
-    };
   }
 
   // ─── isAvailable() ─────────────────────────────────────────────────

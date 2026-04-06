@@ -2,9 +2,9 @@ import type { Command } from 'commander';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import {
-  readContext, checkUsage, checkUsageWithProvider, getDefaultProvider,
-  adjustSprintSize, planSprint, confirmDraftTasks, cleanupDraftTasks,
+  readContext, planSprint, confirmDraftTasks, cleanupDraftTasks,
 } from '../../orchestra/brain.js';
+import type { SprintSizeRecommendation } from '../../core/types.js';
 import type { BrainPlanningMode } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
@@ -48,20 +48,12 @@ export function registerPlan(program: Command): void {
           }
         }
 
-        // Use async provider-based usage check when available, fall back to sync
-        let usage;
-        const provider = getDefaultProvider();
-        if (provider) {
-          try {
-            usage = await checkUsageWithProvider(provider);
-          } catch {
-            usage = checkUsage(config);
-          }
-        } else {
-          usage = checkUsage(config);
-        }
-
-        const recommendation = adjustSprintSize(config, usage);
+        const recommendation: SprintSizeRecommendation = {
+          size: 'full',
+          maxWorkers: typeof config.activeModeConfig.max_workers === 'number' ? config.activeModeConfig.max_workers : 4,
+          modelConstraint: null,
+          reason: 'No usage constraints',
+        };
 
         // Clean up existing DRAFT tasks before planning (idempotency)
         cleanupDraftTasks(root);

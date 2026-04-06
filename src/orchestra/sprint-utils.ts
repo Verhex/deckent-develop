@@ -21,7 +21,7 @@ import {
   TASKS_DIR,
 } from '../core/constants.js';
 
-import { readJsonSafe } from '../core/utils.js';
+import { readJsonSafe, debugLog } from '../core/utils.js';
 import { getSystemProfile } from '../core/system-profile.js';
 
 import type { ProviderAdapter } from '../core/provider.js';
@@ -150,11 +150,13 @@ export function resolveTaskProvider(task: Task): ProviderName {
   if (task.provider) return task.provider;
   try {
     return getProviderForModel(task.model);
-  } catch {
+  } catch (e) {
+    debugLog('resolveTaskProvider:getProviderForModel', e);
     // Model unrecognized — try default provider from registry
     try {
       return providerRegistry.getDefault().name as ProviderName;
-    } catch {
+    } catch (e2) {
+      debugLog('resolveTaskProvider:getDefault', e2);
       throw new ProviderError(`No providers registered and model '${task.model}' is unrecognized — cannot resolve provider`, 'unknown');
     }
   }
@@ -233,7 +235,9 @@ export function writeSprintState(projectRoot: string, sprint: Sprint): void {
     };
     mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
     writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
-  } catch { /* non-fatal */ }
+  } catch (e) {
+    debugLog('persistSprintState:writeFile', e);
+  }
 }
 
 /**
@@ -251,7 +255,9 @@ export function clearSprintState(projectRoot: string): void {
   try {
     const statePath = join(projectRoot, SPRINT_STATE_FILE);
     if (existsSync(statePath)) unlinkSync(statePath);
-  } catch { /* non-fatal */ }
+  } catch (e) {
+    debugLog('clearSprintState:unlinkSync', e);
+  }
 }
 
 

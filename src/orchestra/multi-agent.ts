@@ -3,6 +3,7 @@
 import type { Task } from '../core/types.js';
 import type { SharedContext } from '../agents/shared-context.js';
 import { ErrorRegistry } from '../core/errors.js';
+import { debugLog } from '../core/utils.js';
 
 // ═══ Types ═══════════════════════════════════════════════════════════════════
 
@@ -99,8 +100,8 @@ export async function runPipeline(
         status: result.status,
         output: result.output,
       });
-    } catch {
-      // Shared context write failure is non-fatal
+    } catch (e) {
+      debugLog('MultiAgentPipeline:run:sharedContextWrite', e);
     }
 
     // Abort on failure

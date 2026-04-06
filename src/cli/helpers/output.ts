@@ -196,8 +196,6 @@ export function formatDashboard(state: DashboardState): string {
 
   const p = state.progress;
   const progressLine = `Progress: ${p.done}/${p.total} done | ${p.active} active | ${p.blocked} blocked`;
-  const u = state.usage;
-  const usageLine = `Usage: 5hr ${Math.round(u.fiveHourPercent)}% | Weekly ${Math.round(u.weeklyPercent)}% | Budget: OK`;
   const alertLine = `Alerts: ${state.alerts.length}`;
 
   return [
@@ -207,7 +205,6 @@ export function formatDashboard(state: DashboardState): string {
     ...agentLines,
     mid,
     row(progressLine),
-    row(usageLine),
     row(alertLine),
     bot,
   ].join('\n');

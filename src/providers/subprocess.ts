@@ -11,7 +11,7 @@ import {
   closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { ModelType, UsageMetrics } from '../core/types.js';
+import type { ModelType } from '../core/types.js';
 import { CLAUDE_MODELS } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
@@ -229,18 +229,6 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
 
   listWorkers(): string[] {
     return Array.from(this.workers.keys());
-  }
-
-  // ─── checkUsage() ──────────────────────────────────────────────────
-
-  async checkUsage(): Promise<UsageMetrics> {
-    // Subprocess backend defers usage tracking to the UsageTracker.
-    // Return a neutral default — actual tracking happens via brain.ts.
-    return {
-      fiveHourPercent: 0,
-      weeklyPercent: 0,
-      measuredAt: new Date().toISOString(),
-    };
   }
 
   // ─── isAvailable() ─────────────────────────────────────────────────

@@ -3,7 +3,6 @@
 
 import type { ModelType } from './task-types.js';
 import type { SprintPhase, SprintStatus } from './sprint-types.js';
-import type { UsageMetrics } from './config-types.js';
 
 // ─── Agent System ────────────────────────────────────────────────────
 export type AgentRole = 'brain' | 'auditor' | 'worker';
@@ -72,7 +71,6 @@ export type BoundaryViolationType =
   | 'stale_heartbeat'
   | 'stale_lock'
   | 'circular_dependency'
-  | 'usage_threshold_exceeded'
   | 'memory_budget_exceeded';
 
 export interface BoundaryViolation {
@@ -97,7 +95,6 @@ export interface DashboardState {
     blocked: number;
     total: number;
   };
-  usage: UsageMetrics;
   alerts: Alert[];
   updatedAt: string;
   auditorLastScan?: string;

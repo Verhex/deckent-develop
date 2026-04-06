@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { ModelType } from '../core/types.js';
 import type { ProviderAdapter } from '../core/provider.js';
+import { debugLog } from '../core/utils.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
@@ -62,7 +63,7 @@ function writePromptFile(projectRoot: string, prompt: string): string {
 
 /** Exported for testing */
 export function cleanupPromptFile(promptPath: string): void {
-  try { unlinkSync(promptPath); } catch { /* already deleted */ }
+  try { unlinkSync(promptPath); } catch (e) { debugLog('cleanupPromptFile:unlinkSync', e); }
 }
 
 /**
@@ -216,8 +217,8 @@ export function attach(): void {
 export function destroy(): void {
   try {
     run(['kill-session', '-t', TMUX_SESSION_NAME]);
-  } catch {
-    // Session doesn't exist — silent
+  } catch (e) {
+    debugLog('destroy:killSession', e);
   }
 }
 
@@ -228,8 +229,8 @@ export function destroy(): void {
 export function killAllSessions(): void {
   try {
     run(['kill-session', '-t', TMUX_SESSION_NAME]);
-  } catch {
-    // Session doesn't exist — silent
+  } catch (e) {
+    debugLog('killAllSessions:killSession', e);
   }
 }
 

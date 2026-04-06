@@ -18,7 +18,6 @@ function makeAdapter(name: string, models: ModelType[] = ['opus', 'sonnet', 'hai
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 10, weeklyPercent: 5, measuredAt: new Date().toISOString() }),
     isAvailable: vi.fn().mockResolvedValue(true),
     buildCommand: vi.fn().mockReturnValue(`claude -p ${name}`),
   };
@@ -34,7 +33,6 @@ describe('ProviderAdapter interface', () => {
     expect(typeof adapter.spawn).toBe('function');
     expect(typeof adapter.kill).toBe('function');
     expect(typeof adapter.listWorkers).toBe('function');
-    expect(typeof adapter.checkUsage).toBe('function');
     expect(typeof adapter.isAvailable).toBe('function');
     expect(typeof adapter.buildCommand).toBe('function');
   });
@@ -68,14 +66,6 @@ describe('ProviderAdapter interface', () => {
     const workers = adapter.listWorkers();
     expect(Array.isArray(workers)).toBe(true);
     expect(workers).toHaveLength(2);
-  });
-
-  it('checkUsage should return a promise resolving to UsageMetrics shape', async () => {
-    const adapter = makeAdapter('usage-test');
-    const metrics = await adapter.checkUsage();
-    expect(typeof metrics.fiveHourPercent).toBe('number');
-    expect(typeof metrics.weeklyPercent).toBe('number');
-    expect(typeof metrics.measuredAt).toBe('string');
   });
 
   it('isAvailable should return a promise resolving to boolean', async () => {

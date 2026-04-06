@@ -9,8 +9,6 @@
 // Public functions (cli/ + mcp/ + api/ consumers):
 //   runSprint          — execute a full sprint (start.ts, test-run.ts, server.ts, mcp/start.ts)
 //   readContext        — read brain context (plan.ts, server.ts, mcp/plan.ts)
-//   checkUsage         — check claude usage quota (plan.ts, server.ts, mcp/plan.ts)
-//   adjustSprintSize   — adjust sprint size based on usage (plan.ts, server.ts, mcp/plan.ts)
 //   planSprint         — plan sprint tasks (plan.ts, server.ts, mcp/plan.ts)
 //   confirmDraftTasks  — prompt user to confirm draft tasks (plan.ts)
 //   buildWorkerPrompt  — build a worker's task prompt (run.ts)
@@ -60,8 +58,6 @@ export type { SpawnOptions } from './tmux.js';
 export {
   BrainError,
   readContext,
-  checkUsage,
-  adjustSprintSize,
   planSprint,
   confirmDraftTasks,
   cleanupDraftTasks,

@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { debugLog } from '../core/utils.js';
 import type {
   ActivationConfig,
   ActivationRule,
@@ -77,8 +78,8 @@ export function analyzeNewSkill(skillPath: string): ActivationConfig {
   if (existsSync(manifestPath)) {
     try {
       manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as Record<string, unknown>;
-    } catch {
-      // Use empty manifest on parse failure — rules will be minimal
+    } catch (e) {
+      debugLog('analyzeNewSkill:readManifest', e);
     }
   }
 
@@ -90,8 +91,8 @@ export function analyzeNewSkill(skillPath: string): ActivationConfig {
       try {
         skillContent = readFileSync(contentPath, 'utf-8').toLowerCase();
         break;
-      } catch {
-        // Continue to next candidate file
+      } catch (e) {
+        debugLog('analyzeNewSkill:readSkillContent', e);
       }
     }
   }
@@ -177,8 +178,9 @@ export function persistSkillActivation(skillPath: string, activation: Activation
   let manifest: Record<string, unknown> = {};
   try {
     manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    return; // Cannot parse — skip
+  } catch (e) {
+    debugLog('persistSkillActivation:readManifest', e);
+    return;
   }
 
   // Idempotent: don't overwrite an existing V2 manifest

@@ -1,4 +1,5 @@
 // ─── Notification Dispatcher ─────────────────────────────────────────
+import { debugLog } from './utils.js';
 
 export type NotificationEventType =
   | 'sprint_complete'
@@ -87,8 +88,8 @@ export class NotificationDispatcher {
       try {
         await this.webhookProvider.send(config.webhook, event);
         dispatched++;
-      } catch {
-        // Silently ignore webhook errors
+      } catch (e) {
+        debugLog('NotificationDispatcher:dispatch:webhook', e);
       }
     }
 
@@ -97,8 +98,8 @@ export class NotificationDispatcher {
       try {
         await this.discordProvider.send(config.discord, event);
         dispatched++;
-      } catch {
-        // Silently ignore discord errors
+      } catch (e) {
+        debugLog('NotificationDispatcher:dispatch:discord', e);
       }
     }
 
@@ -107,8 +108,8 @@ export class NotificationDispatcher {
       try {
         await this.slackProvider.send(config.slack, event);
         dispatched++;
-      } catch {
-        // Silently ignore slack errors
+      } catch (e) {
+        debugLog('NotificationDispatcher:dispatch:slack', e);
       }
     }
 

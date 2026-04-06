@@ -132,7 +132,10 @@
       "Bash(find /home/alperen/deckent-dev/tests -name *.test.ts)",
       "Bash(grep -c '\"\": \"\"' /home/alperen/deckent-dev/src/dashboard/src/i18n/en.ts)",
       "Bash(claude -p '/usage')",
-      "Bash(claude -p 'What is your current usage status? How much of my rate limit have I used?')"
+      "Bash(claude -p 'What is your current usage status? How much of my rate limit have I used?')",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && cat {}')",
+      "Bash(find /home/alperen/deckent-dev/.tasks -name \"*.hb\" -exec cat {} \\\\;)",
+      "Bash(find:*)"
     ]
   },
   "outputStyle": "default"

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { BRAIN_DIR, PATTERNS_FILE } from '../core/constants.js';
 import type { PatternEntry } from '../core/types.js';
 import type { LearningEntry } from './pattern-recorder.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -102,8 +103,8 @@ export function migratePatternsToLearning(
         if (Array.isArray(parsed)) {
           existingEntries = parsed as LearningEntry[];
         }
-      } catch {
-        // overwrite if malformed
+      } catch (e) {
+        debugLog('migratePatternsToPerId:readExisting', e);
       }
     }
     existingEntries.push(...entries);
@@ -134,12 +135,12 @@ export function exportLearningData(projectRoot: string): string {
         if (Array.isArray(parsed)) {
           result[sprintId] = parsed as LearningEntry[];
         }
-      } catch {
-        // skip malformed
+      } catch (e) {
+        debugLog('exportLearningData:parseFile', e);
       }
     }
-  } catch {
-    // directory read error
+  } catch (e) {
+    debugLog('exportLearningData:readdirSync', e);
   }
 
   return JSON.stringify({ sprints: result }, null, 2);
@@ -190,8 +191,8 @@ export function importLearningData(
         if (Array.isArray(prev)) {
           existingEntries = prev as LearningEntry[];
         }
-      } catch {
-        // overwrite if malformed
+      } catch (e) {
+        debugLog('importLearningData:readExisting', e);
       }
     }
 

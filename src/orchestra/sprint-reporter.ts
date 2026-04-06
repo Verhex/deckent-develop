@@ -16,7 +16,6 @@ import {
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
-import type { UsageTracker } from '../core/usage-tracker.js';
 // Side-effect import: registers all updaters
 import './doc-updaters/index.js';
 import {
@@ -25,13 +24,15 @@ import {
   writeCiLearnings,
   type CiLearningResult,
 } from '../core/ci-learning.js';
+import { debugLog } from '../core/utils.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
 function readFileSafe(filePath: string): string {
   try {
     return readFileSync(filePath, 'utf-8');
-  } catch {
+  } catch (e) {
+    debugLog('readFileSafe:readFile', e);
     return '';
   }
 }
@@ -220,7 +221,6 @@ export interface HumanRetroData {
   evaluations: Map<string, TaskEvaluation>;
   metrics: SprintMetrics;
   results?: TaskResult[];
-  usageTracker?: UsageTracker;
   agentRows?: AgentPerformanceRow[];
   skillRows?: SkillPerformanceRow[];
   previousMetrics?: SprintMetrics | null;
@@ -460,7 +460,6 @@ export function buildRetroLearnings(
  * @param sprint - The completed sprint
  * @param evaluations - Map of task ID to evaluation result
  * @param metrics - Calculated sprint metrics
- * @param usageTracker - Optional usage tracker for cost/token reporting
  * @param agentMap - Optional map of task ID to agent ID
  * @param skillMap - Optional map of task ID to skill ID array
  */
@@ -469,7 +468,6 @@ export function writeRetrospective(
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
   metrics: SprintMetrics,
-  usageTracker?: UsageTracker,
   agentMap?: Map<string, string>,
   skillMap?: Map<string, string[]>,
   results?: TaskResult[],
@@ -481,12 +479,12 @@ export function writeRetrospective(
   let agentRows: AgentPerformanceRow[] = [];
   try {
     agentRows = buildAgentPerformance(sprint, evaluations, results ?? [], agentMap);
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('writeRetrospective:buildAgentPerformance', e); }
 
   let skillRows: SkillPerformanceRow[] = [];
   try {
     skillRows = buildSkillPerformance(sprint, evaluations, skillMap, results);
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('writeRetrospective:buildSkillPerformance', e); }
 
   // Read previous sprint metrics for comparison
   const previousMetrics = readPreviousSprintMetrics(projectRoot, sprint.id);
@@ -496,13 +494,13 @@ export function writeRetrospective(
   try {
     const patternsRaw = readFileSafe(join(brainPath, PATTERNS_FILE));
     if (patternsRaw) patterns = JSON.parse(patternsRaw);
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('writeRetrospective:parsePatterns', e); }
 
   let debt: DebtItem[] = [];
   try {
     const debtRaw = readFileSafe(join(brainPath, DEBT_FILE));
     if (debtRaw) debt = JSON.parse(debtRaw);
-  } catch { /* non-fatal — DEBT.md may be markdown, not JSON */ }
+  } catch (e) { debugLog('writeRetrospective:parseDebt', e); }
 
   // Generate human-friendly RETRO content
   const retroContent = formatHumanRetro({
@@ -510,7 +508,6 @@ export function writeRetrospective(
     evaluations,
     metrics,
     results,
-    usageTracker,
     agentRows,
     skillRows,
     previousMetrics,
@@ -531,7 +528,7 @@ export function writeRetrospective(
       if (!existsSync(archivePath)) {
         copyFileSync(retroPath, archivePath);
       }
-    } catch { /* non-fatal */ }
+    } catch (e) { debugLog('writeRetrospective:archiveRetro', e); }
   }
 
   writeFileSync(
@@ -712,7 +709,6 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
       brain_model: 'opus',
       default_model: 'opus',
       haiku_allowed: true,
-      usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
       brain_planning: 'auto',
     },
     modes: {} as ResolvedConfig['modes'],
@@ -726,6 +722,7 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     reroute_on_tech_debt: false,
     adaptive_thresholds: false,
     agent_min_score: 5,
+    adaptive_config: { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     sprint_timeout_minutes: 0,
   };
   const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
@@ -920,10 +917,10 @@ export function countProjectTestCases(projectRoot: string): number {
             const content = readFileSync(fullPath, 'utf-8');
             const matches = content.match(testPattern);
             if (matches) totalTests += matches.length;
-          } catch { /* skip unreadable files */ }
+          } catch (e) { debugLog('countTestsInProject:readFile', e); }
         }
       }
-    } catch { /* skip unreadable directories */ }
+    } catch (e) { debugLog('countTestsInProject:readdirSync', e); }
   }
 
   scanDir(testsDir);
@@ -954,7 +951,8 @@ export function parseCoverageFromClover(projectRoot: string): number | null {
     if (total === 0) return 0;
 
     return (covered / total) * 100;
-  } catch {
+  } catch (e) {
+    debugLog('parseCoverageFromClover:parse', e);
     return null;
   }
 }
@@ -1012,7 +1010,8 @@ export function getTestCountFromVitest(projectRoot: string): number | null {
       return parsed.numTotalTests;
     }
     return null;
-  } catch {
+  } catch (e) {
+    debugLog('getTestCountFromVitest:parseJSON', e);
     return null;
   }
 }
@@ -1038,7 +1037,8 @@ export function getCoverageFromVitest(projectRoot: string): number | null {
     if (!allFilesMatch) return null;
     const value = parseFloat(allFilesMatch[1] ?? '0');
     return isNaN(value) ? null : value;
-  } catch {
+  } catch (e) {
+    debugLog('getCoverageFromVitest:parse', e);
     return null;
   }
 }
@@ -1521,7 +1521,8 @@ export function autoDraftDecisions(
       encoding: 'utf-8',
       timeout: 10000,
     });
-  } catch {
+  } catch (e) {
+    debugLog('countNewModules:gitDiff', e);
     return 0;
   }
 
@@ -1567,7 +1568,8 @@ export function autoDraftDecisions(
       if (allNew && entries.length > 0) {
         trulyNewDirs.push(dir);
       }
-    } catch {
+    } catch (e) {
+      debugLog('countNewModules:readdirSync', e);
       continue;
     }
   }
@@ -1718,8 +1720,8 @@ export function addRecurringPatternsToFile(projectRoot: string, recurringFiles: 
   if (existsSync(patternsPath)) {
     try {
       data = JSON.parse(readFileSync(patternsPath, 'utf-8'));
-    } catch {
-      // corrupt file, start fresh
+    } catch (e) {
+      debugLog('appendPatterns:parsePatterns', e);
     }
   }
   if (!Array.isArray(data.active)) data.active = [];
@@ -1820,7 +1822,8 @@ export function readCiReportTrend(projectRoot: string, maxSprints = 5): CiTrend 
       .filter(f => f.startsWith('ci-report-') && f.endsWith('.json'))
       .sort()
       .slice(-maxSprints);
-  } catch {
+  } catch (e) {
+    debugLog('getCiTrend:readdirSync', e);
     return empty;
   }
 
@@ -1843,7 +1846,7 @@ export function readCiReportTrend(projectRoot: string, maxSprints = 5): CiTrend 
         tscPassed: report.tscPassed ?? true,
         timestamp: report.timestamp ?? '',
       });
-    } catch { /* skip malformed reports */ }
+    } catch (e) { debugLog('getCiHistory:parseCiReport', e); }
   }
 
   const totalRegressions = entries.reduce((sum, e) => sum + e.testFailed, 0);
@@ -1919,7 +1922,8 @@ export function appendCiHealthToRetro(projectRoot: string, sprintId: string): vo
 
   try {
     report = JSON.parse(readFileSync(reportPath, 'utf-8'));
-  } catch {
+  } catch (e) {
+    debugLog('appendCiHealthSection:readReport', e);
     return;
   }
 

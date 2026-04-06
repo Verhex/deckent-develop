@@ -2,7 +2,8 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
-import { runSprint, BrainError, readContext, checkUsage, adjustSprintSize, planSprint } from '../../orchestra/brain.js';
+import { runSprint, BrainError, readContext, planSprint } from '../../orchestra/brain.js';
+import type { SprintSizeRecommendation } from '../../core/types.js';
 import { writeJobState, buildTaskSummaries } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
@@ -40,8 +41,12 @@ export function registerStartTool(server: McpServer): void {
         // Dry-run mode: plan only, no spawn
         if (dryRun) {
           const context = readContext(root);
-          const usage = checkUsage(config);
-          const recommendation = adjustSprintSize(config, usage);
+          const recommendation: SprintSizeRecommendation = {
+            size: 'full',
+            maxWorkers: typeof config.activeModeConfig.max_workers === 'number' ? config.activeModeConfig.max_workers : 4,
+            modelConstraint: null,
+            reason: 'No usage constraints',
+          };
           const sprint = await planSprint(root, config, context, recommendation, { dryRun: true });
           const taskList = sprint.tasks.map((t) => ({
             id: t.id,

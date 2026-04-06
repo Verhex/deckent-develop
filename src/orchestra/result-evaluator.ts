@@ -1,10 +1,14 @@
 // ═══ Result Evaluator — Pure evaluation module ═══════════════════════
 // Extracted from brain.ts (Sprint 036).
-// Contains: evaluateResult, isDocTask, waitForResults
+// Contains: evaluateResult, isDocTask, waitForResults, getRecentSprintStats
 // No side effects, no file writes — evaluation logic only.
 
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Task, TaskResult } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
+import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
+import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 
 // ─── Source code directory detection ──────────────────────────────────
@@ -215,14 +219,14 @@ export async function waitForResults(
       // Kill completed worker (clean up slot)
       try {
         if (killWorkerFn) killWorkerFn(taskId);
-      } catch { /* ignore */ }
+      } catch (e) { debugLog('processQueue:killWorker', e); }
       const nextTask = remainingQueue.shift(); // length > 0 checked above
       if (!nextTask) break;
       try {
         if (spawnTaskFn) {
           spawnTaskFn(nextTask, { autoApprove, projectDir: projectRoot });
         }
-      } catch { /* ignore spawn errors — task will timeout */ }
+      } catch (e) { debugLog('processQueue:spawnTask', e); }
     }
   };
 
@@ -251,7 +255,8 @@ function defaultReadJson<T>(filePath: string): T | null {
   try {
     const { readFileSync } = require('node:fs');
     return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
-  } catch {
+  } catch (e) {
+    debugLog('defaultReadJson:readFile', e);
     return null;
   }
 }
@@ -260,7 +265,8 @@ function defaultFileExists(filePath: string): boolean {
   try {
     const { existsSync } = require('node:fs');
     return existsSync(filePath);
-  } catch {
+  } catch (e) {
+    debugLog('defaultFileExists:existsSync', e);
     return false;
   }
 }
@@ -277,5 +283,91 @@ function defaultCreateWatcher(_projectRoot: string, fallbackMs: number): ResultW
     close(): void {
       if (timer) clearTimeout(timer);
     },
+  };
+}
+
+// ─── Recent Sprint Stats (for adaptive thresholds) ──────────────────
+
+/** Aggregated stats from recent sprints for adaptive threshold decisions */
+export interface RecentSprintStats {
+  avgNoGoRate: number;
+  avgCoverage: number;
+  sprintCount: number;
+}
+
+/**
+ * Reads the last N sprint log files from .brain/sprints/ and computes
+ * average NO_GO rate and average coverage.
+ * Used by applyAdaptiveThresholds to decide whether to adjust config values.
+ */
+export function getRecentSprintStats(projectRoot: string, lookback: number): RecentSprintStats {
+  const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+  if (!existsSync(sprintsPath)) {
+    return { avgNoGoRate: 0, avgCoverage: 0, sprintCount: 0 };
+  }
+
+  const files = readdirSync(sprintsPath)
+    .filter(f => f.endsWith('.md'))
+    .sort()
+    .slice(-lookback);
+
+  if (files.length === 0) {
+    return { avgNoGoRate: 0, avgCoverage: 0, sprintCount: 0 };
+  }
+
+  let totalNoGoRate = 0;
+  let totalCoverage = 0;
+  let validCount = 0;
+
+  for (const file of files) {
+    try {
+      const content = readFileSync(join(sprintsPath, file), 'utf-8');
+      const parsed = parseSprintStats(content);
+      if (parsed) {
+        totalNoGoRate += parsed.noGoRate;
+        totalCoverage += parsed.coverage;
+        validCount++;
+      }
+    } catch (e) {
+      debugLog('getRecentSprintStats:readFile', e);
+    }
+  }
+
+  if (validCount === 0) {
+    return { avgNoGoRate: 0, avgCoverage: 0, sprintCount: 0 };
+  }
+
+  return {
+    avgNoGoRate: totalNoGoRate / validCount,
+    avgCoverage: totalCoverage / validCount,
+    sprintCount: validCount,
+  };
+}
+
+/** Parse NO_GO rate and coverage from a sprint log markdown table */
+function parseSprintStats(content: string): { noGoRate: number; coverage: number } | null {
+  const lines = content.split('\n');
+  const metricsMap = new Map<string, string>();
+
+  for (const line of lines) {
+    if (!line.startsWith('|') || line.startsWith('|---') || line.startsWith('| Metric')) continue;
+    const cols = line.split('|').map(c => c.trim()).filter(c => c);
+    if (cols.length >= 2 && cols[0] !== undefined && cols[1] !== undefined) {
+      metricsMap.set(cols[0], cols[1]);
+    }
+  }
+
+  if (metricsMap.size === 0) return null;
+
+  const totalTasks = parseInt(metricsMap.get('Total Tasks') ?? '0', 10);
+  const noGoTasks = parseInt(metricsMap.get('No-Go') ?? '0', 10);
+  const coverageStr = metricsMap.get('Coverage') ?? '0';
+  const coverage = parseFloat(coverageStr.replace('%', ''));
+
+  if (isNaN(totalTasks) || totalTasks === 0) return null;
+
+  return {
+    noGoRate: noGoTasks / totalTasks,
+    coverage: isNaN(coverage) ? 0 : coverage,
   };
 }

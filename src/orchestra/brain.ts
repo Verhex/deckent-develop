@@ -3,7 +3,6 @@
 // All implementations live in dedicated sub-modules:
 //   sprint-controller.ts — runSprint, pause/resume, cleanup, planning, spawning
 //   result-evaluator.ts  — evaluateResult, isDocTask, waitForResults (DI version)
-//   usage-manager.ts     — checkUsage, adjustSprintSize, provider helpers
 //   model-selector.ts    — model inference and selection
 //   task-builder.ts      — task creation, scope extraction, directive parsing
 //   debt-manager.ts      — debt lifecycle, escalation, decay
@@ -13,10 +12,7 @@
 export {
   BrainError,
   readContext,
-  checkUsage,
-  checkUsageWithProvider,
   getDefaultProvider,
-  adjustSprintSize,
   planSprint,
   confirmDraftTasks,
   cleanupDraftTasks,
@@ -30,8 +26,6 @@ export {
   finalizeSprint,
   pauseSprint,
   resumeSprint,
-  checkAndAutoPause,
-  checkAndAutoResume,
   getChannelRegistry,
   registerWorkerChannel,
   unregisterWorkerChannel,
@@ -40,7 +34,6 @@ export type { PauseState, RunSprintOptions, FinalizeSprintOptions } from './spri
 
 // ─── Type re-exports (backward compat) ─────────────────────────────
 export type { BrainContext, ProjectState, SprintSizeRecommendation } from '../core/types.js';
-export type { SprintUsage, TotalUsage, ModelBreakdown } from '../core/usage-tracker.js';
 export type { ProviderAdapter } from '../core/provider.js';
 export type { SpawnBackend } from './spawn-backend.js';
 export { SpawnBackendFactory } from './spawn-backend.js';

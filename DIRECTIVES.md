@@ -1,129 +1,160 @@
-# DIRECTIVES — Sprint 089: Otonom Adaptasyon Faz 2 + Kalan Tech Debt
+# DIRECTIVES — Sprint 089: Usage Özelliğini Tamamen Kaldır
 
-## Goal: Faz 2 otonom adaptasyon hedeflerini tamamla — adaptive thresholds, mid-sprint reroute güçlendirme, kalan sessiz catch'ler, checkpoint CLI/MCP entegrasyonu. Self-improving orkestratörü tamamla.
+## Goal: Projedeki usage tracking, usage thresholds, usage CLI/MCP/API/Dashboard özelliğini tamamen kaldır. Tüm referansları temizle, tsc --noEmit ve testler temiz kalmalı.
 
 ---
 
-## Task 1: Adaptive Thresholds — NO_GO Rate Bazlı Otomatik Ayar
+## Task 1: Usage Core Modülleri Kaldır — Tipler, Config, Tracker
 - Model: opus
 - Effort: high
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts, src/orchestra/result-evaluator.ts, src/core/config.ts, src/core/config-types.ts
-- Scope: src/orchestra/, src/core/
+- Files: src/core/usage-tracker.ts, src/core/config-types.ts, src/core/config.ts, src/core/monitoring-types.ts, src/core/config-migration.ts, src/core/provider.ts, src/core/types.ts
+- Scope: src/core/
 
 ### Description
-Sprint sonuçlarına göre threshold'ları otomatik ayarlayan mekanizma ekle.
+Usage ile ilgili tüm core tanımlarını kaldır.
 
-A) config-types.ts'e:
-- `DeckentConfig.adaptive_thresholds?: boolean` zaten var (varsayılan false)
-- `DeckentConfig.adaptive_config?: { min_samples: number; no_go_threshold: number; coverage_lookback: number }` ekle
-- Varsayılanlar: min_samples=3, no_go_threshold=0.3, coverage_lookback=3
+A) `src/core/usage-tracker.ts` dosyasını SİL (295 satır) — UsageTracker class, UsageEntry, SprintUsage, TotalUsage, ModelBreakdown, ProviderBreakdown, TaskUsage, MODEL_TOKEN_ESTIMATES, DEFAULT_TOKEN_COSTS
 
-B) sprint-controller.ts'de RETRO fazına `applyAdaptiveThresholds()` ekle:
-- Son N sprint'in NO_GO rate'ini hesapla (`.brain/sprints/` dosyalarından)
-- NO_GO rate > %30 → `agent_min_score` değerini 1 düşür (min 1)
-- NO_GO rate < %10 → `agent_min_score` değerini 1 artır (max 10)
-- Coverage ortalaması < %70 → `coverage_threshold` değerini ortalamaya ayarla
-- Değişiklikleri `.deckent/config.json`'a yaz + debugLog ile logla
+B) `src/core/config-types.ts`'den kaldır:
+- `UsageMetrics` interface (fiveHourPercent, weeklyPercent, measuredAt)
+- `UsageThresholds` interface ('5hr', weekly)
+- `PlanModeConfig.usage_thresholds` field
+- Bu tiplere referans veren diğer field'lar
 
-C) result-evaluator.ts'de:
-- `getRecentSprintStats(projectRoot: string, lookback: number)` fonksiyonu
-- `.brain/sprints/sprint-NNN.md` dosyalarını parse et
-- Return: `{ avgNoGoRate, avgCoverage, sprintCount }`
+C) `src/core/config.ts`'den kaldır:
+- Her plan mode'daki `usage_thresholds` defaults (max_plan, max5x_plan, pro_plan, api — 4 adet)
+- Usage ile ilgili config metadata descriptions
 
-**Kanıt:** `grep "applyAdaptiveThresholds\|getRecentSprintStats" src/orchestra/sprint-controller.ts src/orchestra/result-evaluator.ts` → 2+ eşleşme
+D) `src/core/monitoring-types.ts`'den kaldır:
+- `'usage_threshold_exceeded'` alert type
+- `DashboardState` içindeki `usage: UsageMetrics` field
 
-**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
+E) `src/core/config-migration.ts`'den kaldır:
+- `usage_thresholds` field kontrolü
+
+F) `src/core/provider.ts`'den kaldır:
+- `ProviderAdapter` interface'inden `checkUsage()` metodu
+
+G) `src/core/types.ts` barrel'dan ilgili export'ları temizle
+
+**Kanıt:** `grep -rn "UsageMetrics\|UsageTracker\|UsageThresholds\|usage_thresholds" src/core/ | wc -l` → 0
+
+**Test:** `tsc --noEmit` temiz.
 
 ---
 
-## Task 2: Mid-Sprint Reroute Güçlendirme — Max 3 + Config
+## Task 2: Usage Orchestra + Provider Modülleri Kaldır
+- Model: opus
+- Effort: high
+- Agent: refactorer
+- Skills: typescript-expert
+- Files: src/orchestra/usage-manager.ts, src/orchestra/sprint-controller.ts, src/orchestra/sprint-phases.ts, src/orchestra/sprint-reporter.ts, src/orchestra/brain.ts, src/orchestra/model-selector.ts, src/orchestra/decision-engine.ts, src/orchestra/index.ts, src/providers/claude.ts, src/providers/codex.ts, src/providers/gemini.ts, src/providers/subprocess.ts, src/providers/sandbox.ts
+- Scope: src/orchestra/, src/providers/
+
+### Description
+Usage manager ve tüm orchestra/provider referanslarını kaldır.
+
+A) `src/orchestra/usage-manager.ts` dosyasını SİL (462 satır) — checkUsage, adjustSprintSize, checkAllProviderUsage, selectOptimalProvider, suggestFallbackProvider, getSprintUsageEstimate, recordSprintUsage
+
+B) `src/orchestra/sprint-controller.ts`'den kaldır:
+- `UsageTracker` import
+- Sprint state'deki usage metrics
+- `checkUsage()` fonksiyon çağrıları
+
+C) `src/orchestra/sprint-phases.ts`'den usage referanslarını kaldır
+
+D) `src/orchestra/sprint-reporter.ts`'den usage referanslarını kaldır
+
+E) `src/orchestra/brain.ts`'den kaldır:
+- Usage-manager comment
+- `SprintUsage, TotalUsage, ModelBreakdown` export'ları
+
+F) `src/orchestra/model-selector.ts`'den usage referanslarını kaldır
+
+G) `src/orchestra/decision-engine.ts`'den usage referanslarını kaldır
+
+H) `src/orchestra/index.ts`'den usage-manager export'larını kaldır
+
+I) Tüm provider dosyalarından `checkUsage()` implementasyonlarını kaldır:
+- src/providers/claude.ts, codex.ts, gemini.ts, subprocess.ts, sandbox.ts
+
+**Kanıt:** `grep -rn "usage-manager\|UsageTracker\|checkUsage\|adjustSprintSize" src/orchestra/ src/providers/ | wc -l` → 0
+
+**Test:** `tsc --noEmit` temiz.
+
+---
+
+## Task 3: Usage CLI + MCP + API + Dashboard Kaldır
 - Model: opus
 - Effort: normal
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/orchestra/mid-sprint-adapter.ts, src/core/config-types.ts, src/core/config.ts
-- Scope: src/orchestra/, src/core/
+- Files: src/cli/commands/usage.ts, src/cli/index.ts, src/mcp/tools/usage.ts, src/mcp/tools/index.ts, src/mcp/resources/usage.ts, src/mcp/resources/index.ts, src/mcp/index.ts, src/api/server.ts, src/dashboard/analytics/usage-graph-data.ts
+- Scope: src/cli/, src/mcp/, src/api/, src/dashboard/
 
 ### Description
-Mid-sprint reroute mekanizmasını güçlendir.
+Usage CLI komutu, MCP tool/resource, API endpoint ve Dashboard bileşenini kaldır.
 
-A) config-types.ts'e:
-- `DeckentConfig.max_reroutes?: number` zaten var (varsayılan 3)
-- `DeckentConfig.reroute_on_tech_debt?: boolean` zaten var (varsayılan false)
-- Doğrula: bu field'lar gerçekten config.ts defaults'ta ve loadConfig'de var mı
+A) `src/cli/commands/usage.ts` dosyasını SİL (214 satır)
+B) `src/cli/index.ts`'den `registerUsage` import ve çağrısını kaldır
 
-B) mid-sprint-adapter.ts'de:
-- `MAX_REROUTES` sabitini `config.max_reroutes` ile değiştir (config parametre olarak al)
-- Reroute tetikleme: NO_GO task'lar + opsiyonel GO_WITH_TECH_DEBT (`config.reroute_on_tech_debt`)
-- Confidence threshold: sadece confidence > 0.7 ise reroute yap
-- Her reroute'ta debugLog ile karar logla
-- Reroute counter'ı task bazlı tut (task.routingMeta.rerouteCount)
+C) `src/mcp/tools/usage.ts` dosyasını SİL (52 satır)
+D) `src/mcp/tools/index.ts`'den `registerUsageTool` import ve çağrısını kaldır
 
-C) sprint-controller.ts FIX fazında:
-- `runFixPhase()` fonksiyonuna config geçir
-- mid-sprint-adapter'a config'den max_reroutes ve reroute_on_tech_debt oku
+E) `src/mcp/resources/usage.ts` dosyasını SİL (50 satır)
+F) `src/mcp/resources/index.ts`'den `registerUsageResource` import ve çağrısını kaldır
 
-**Kanıt:** `grep "max_reroutes\|reroute_on_tech_debt" src/orchestra/mid-sprint-adapter.ts` → 2+
+G) `src/mcp/index.ts`'den usage tool kaydını kaldır (varsa)
 
-**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
+H) `src/api/server.ts`'den:
+- `/plan` endpoint'teki usage check kodunu kaldır (checkUsage, adjustSprintSize çağrıları)
+- `/api/usage` endpoint'i varsa kaldır
+
+I) `src/dashboard/analytics/usage-graph-data.ts` dosyasını SİL — UsageGraphData class, BarDataEntry, UsageEntry, TaskTypeEntry
+
+J) Dashboard'da usage-graph-data'ya referans veren bileşenleri temizle
+
+**Kanıt:** `ls src/cli/commands/usage.ts src/mcp/tools/usage.ts src/mcp/resources/usage.ts src/dashboard/analytics/usage-graph-data.ts 2>&1 | grep "No such file" | wc -l` → 4
+
+**Test:** `tsc --noEmit` temiz.
 
 ---
 
-## Task 3: Checkpoint CLI/MCP Entegrasyonu — Approve/Reject Komutları
-- Model: opus
-- Effort: normal
-- Agent: api-builder
-- Skills: typescript-expert
-- Files: src/cli/commands/checkpoint.ts, src/cli/index.ts, src/mcp/tools/checkpoint.ts, src/mcp/index.ts
-- Scope: src/cli/, src/mcp/
-
-### Description
-Human checkpoint'leri CLI ve MCP'den approve/reject edebilmeyi sağla.
-
-A) `src/cli/commands/checkpoint.ts` yeni dosya:
-- `deckent checkpoint list` — bekleyen checkpoint'leri listele (`.deckent/checkpoints/` oku)
-- `deckent checkpoint approve <sprintId> <phase>` — checkpoint status'u "approved" yap
-- `deckent checkpoint reject <sprintId> <phase>` — checkpoint status'u "rejected" yap
-- JSON dosyasını oku, status'u güncelle, geri yaz
-
-B) `src/cli/index.ts`'de komutu kaydet
-
-C) `src/mcp/tools/checkpoint.ts` yeni dosya:
-- `deckent_checkpoint` MCP tool: action='list'|'approve'|'reject', sprintId, phase parametreleri
-- Aynı mantık: `.deckent/checkpoints/` dizinini oku/yaz
-
-D) `src/mcp/index.ts`'de tool'u kaydet
-
-**Kanıt:** `ls src/cli/commands/checkpoint.ts src/mcp/tools/checkpoint.ts` → dosyalar var
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
-
----
-
-## Task 4: Kalan Sessiz Catch Blokları — Son Dalga
+## Task 4: Usage Test Dosyaları + Dokümantasyon Temizliği
 - Model: sonnet
 - Effort: normal
-- Agent: bug-fixer
+- Agent: refactorer
 - Skills: typescript-expert
-- Files: src/orchestra/*.ts, src/core/*.ts
-- Scope: src/orchestra/, src/core/
+- Files: tests/core/usage-tracker.test.ts, tests/cli/usage.test.ts, tests/cli/commands/usage.test.ts, tests/orchestra/usage-manager.test.ts, tests/analytics/usage-graph-data.test.ts, tests/orchestra/brain-usage.test.ts, DECKENT.md, docs/reference/cli.md, docs/reference/config-reference.md
+- Scope: tests/, docs/, .brain/
 
 ### Description
-Kalan ~20 sessiz catch bloğunu debugLog'a dönüştür.
+Usage ile ilgili tüm test dosyalarını ve dokümantasyonu temizle.
 
-A) Tüm `catch (e) { }` ve `catch { }` (boş gövdeli) blokları bul:
-- `grep -rn "catch.*{[^}]*}" src/orchestra/ src/core/` ile tara
-- Boş gövdeli veya sadece yorum olan catch blokları hedef
+A) Test dosyalarını SİL:
+- `tests/core/usage-tracker.test.ts`
+- `tests/cli/usage.test.ts`
+- `tests/cli/commands/usage.test.ts` (varsa)
+- `tests/orchestra/usage-manager.test.ts`
+- `tests/analytics/usage-graph-data.test.ts`
+- `tests/orchestra/brain-usage.test.ts`
 
-B) Her birini `catch (e) { debugLog('fonksiyonAdi:context', e); }` ile değiştir
-- debugLog import'u yoksa ekle
+B) `DECKENT.md`'den kaldır:
+- MCP tools listesinden `deckent_usage` satırı
+- MCP resources listesinden `usage` satırı
+- Parametre örneklerinden usage referansları
+- Tool reference tablosundan usage satırı
+- Resource reference tablosundan usage satırı
 
-C) Hedef: 0 sessiz catch bloğu kalmalı
-- Utility fonksiyonları dahil (readJsonSafe, vb hariç — bunlar bilinçli olarak sessiz)
+C) `docs/reference/cli.md`'den `deckent usage` komut açıklamasını kaldır
 
-**Kanıt:** `grep -rn "catch.*{[\s]*}" src/orchestra/ src/core/ | wc -l` → 0
+D) `docs/reference/config-reference.md`'den usage_thresholds açıklamalarını kaldır
+
+E) Diğer test dosyalarında usage import/mock varsa temizle (grep ile tara)
+
+**Kanıt:** `find tests/ -name "*usage*" | wc -l` → 0
 
 **Test:** `tsc --noEmit` temiz. `npx vitest run` → 0 fail.
 
@@ -132,8 +163,6 @@ C) Hedef: 0 sessiz catch bloğu kalmalı
 ## Quality Rules
 - tsc --noEmit MUST pass
 - npx vitest run → 0 fail (pre-existing hariç)
-- Adaptive thresholds configurable ve default off
-- Mid-sprint reroute max 3 deneme, config'den okunur
-- Checkpoint CLI + MCP çalışır
-- 0 sessiz catch bloğu hedef
+- Usage kelimesi sadece "CLI usage help" gibi genel anlamda kalabilir, tracking/metrics/thresholds anlamında 0 referans kalmalı
+- Silinen dosyaların import'ları başka dosyalarda kalmamalı
 - %100 GO hedefli

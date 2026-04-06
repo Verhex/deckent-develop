@@ -21,7 +21,7 @@ import {
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
   Task, TaskResult, TaskScope, Sprint, SprintMetrics,
-  UsageMetrics, AgentInfo, ResolvedConfig, SystemProfile,
+  AgentInfo, ResolvedConfig,
   BrainContext, SprintSizeRecommendation,
   BrainPlanningMode, PlannerResult, ProviderName,
 } from '../core/types.js';
@@ -44,7 +44,7 @@ import { getSystemProfile } from '../core/system-profile.js';
 
 // ─── Sprint Utilities (extracted Phase 2) ─────────────────────────
 import {
-  readFileSafe, now, resolveMaxWorkersNumeric,
+  readFileSafe, now,
   isDocTask, isStaleTaskFile,
   isTmuxProvider, resolveDefaultUsageCli, getDefaultProvider,
   resolveTaskProvider, getProviderAdapterForTask,
@@ -64,9 +64,6 @@ export {
   detectOrphanWorkers, buildSpawnRetryHint,
 };
 export type { SprintState } from './sprint-utils.js';
-
-// ─── Core — usage tracker ─────────────────────────────────────────
-import { UsageTracker } from '../core/usage-tracker.js';
 
 // ─── Core — provider abstraction ──────────────────────────────────
 import type { ProviderAdapter } from '../core/provider.js';
@@ -125,7 +122,8 @@ import type { UserOverride, TaskDNA } from '../core/routing-types.js';
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
 import { runDecay } from './debt-manager.js';
-import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance, readPreviousSprintMetrics } from './sprint-reporter.js';
+import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance } from './sprint-reporter.js';
+import { getRecentSprintStats } from './result-evaluator.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
@@ -171,7 +169,7 @@ export interface RunSprintOptions {
   fixPhaseTimeoutMs?: number;
   /** Optional SpawnBackend override -- defaults to SpawnBackendFactory.create() */
   spawnBackend?: SpawnBackend;
-  /** Optional ProviderAdapter override -- used for usage checking */
+  /** Optional ProviderAdapter override */
   provider?: ProviderAdapter;
   /**
    * Enable git rollback safety mechanism.
@@ -327,7 +325,6 @@ function safeDashboardUpdate(
       sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
       alerts: [{ level: AlertLevel.WARNING, message: errorMessage, timestamp: new Date().toISOString() }],
       updatedAt: new Date().toISOString(),
     });
@@ -381,106 +378,7 @@ export function readContext(projectRoot: string): BrainContext {
 
 // resolveDefaultUsageCli: moved to sprint-utils.ts, re-exported above
 
-/**
- * Check current API usage by invoking the default provider CLI synchronously.
- * Tries to determine the CLI binary from the registered default provider adapter;
- * falls back to DEFAULT_USAGE_CLI if no adapter is registered.
- *
- * For provider-aware async usage checking, prefer checkUsageWithProvider() instead.
- *
- * @param _config - Resolved config (reserved for future use)
- * @returns Current usage metrics with percentage values
- */
-export function checkUsage(_config: ResolvedConfig): UsageMetrics {
-  // status: 'unknown' indicates measurement failed — callers should skip throttling
-  const UNKNOWN_DEFAULT = { fiveHourPercent: 50, weeklyPercent: 30, measuredAt: now(), status: 'unknown' as const };
-  try {
-    // Determine CLI binary from provider registry; skip usage check if none available
-    const cliBinary = resolveDefaultUsageCli();
-    if (!cliBinary) return UNKNOWN_DEFAULT;
-    const result = spawnSync(cliBinary, ['-p', '/usage'], { encoding: 'utf-8', timeout: 10_000 });
-    if (result.status !== 0 || !result.stdout) return UNKNOWN_DEFAULT;
-
-    const output = result.stdout;
-    const fiveHrMatch = output.match(/5[- ]?h(?:r|our(?:ly)?)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
-      ?? output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*5[- ]?h/i);
-    const weeklyMatch = output.match(/week(?:ly)?[:\s]+(\d+(?:\.\d+)?)\s*%/i)
-      ?? output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*week/i);
-
-    const fiveHourPercent = fiveHrMatch?.[1] ? parseFloat(fiveHrMatch[1]) : UNKNOWN_DEFAULT.fiveHourPercent;
-    const weeklyPercent = weeklyMatch?.[1] ? parseFloat(weeklyMatch[1]) : UNKNOWN_DEFAULT.weeklyPercent;
-    // status: 'ok' indicates successful measurement — throttling should apply normally
-    const okResult = { fiveHourPercent, weeklyPercent, measuredAt: now(), status: 'ok' as const };
-    return okResult;
-  } catch (e) {
-    debugLog('checkUsage:spawnSync', e);
-    return UNKNOWN_DEFAULT;
-  }
-}
-
-/**
- * Check usage via a ProviderAdapter (async, provider-based).
- * @param provider - The provider adapter to delegate usage checking to
- * @returns Usage metrics from the provider
- */
-export async function checkUsageWithProvider(provider: ProviderAdapter): Promise<UsageMetrics> {
-  return provider.checkUsage();
-}
-
 // getDefaultProvider: moved to sprint-utils.ts, re-exported above
-
-/**
- * Recommend sprint size based on current usage vs configured thresholds.
- * Returns 'minimal' (1 worker) when both thresholds exceeded, 'reduced' (half workers)
- * when one exceeded, or 'full' when usage is within limits.
- * @param config - Resolved project configuration
- * @param usage - Current usage metrics
- * @param systemProfile - Optional system profile for 'auto' worker resolution
- * @returns Sprint size recommendation with worker count and model constraint
- */
-export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics, systemProfile?: SystemProfile): SprintSizeRecommendation {
-  // Skip throttling when usage measurement failed (status unknown)
-  const usageStatus = (usage as unknown as Record<string, unknown>).status;
-  if (usageStatus === 'unknown') {
-    const fullWorkers = resolveMaxWorkersNumeric(config, systemProfile);
-    return {
-      size: 'full',
-      maxWorkers: fullWorkers,
-      modelConstraint: null,
-      reason: 'Usage status unknown — skipping throttling',
-    };
-  }
-
-  const thresholds = config.activeModeConfig.usage_thresholds;
-  const fiveHrExceeded = usage.fiveHourPercent / 100 >= thresholds['5hr'];
-  const weeklyExceeded = usage.weeklyPercent / 100 >= thresholds.weekly;
-
-  // Resolve numeric max_workers (handles 'auto')
-  const baseMaxWorkers = resolveMaxWorkersNumeric(config, systemProfile);
-
-  if (fiveHrExceeded && weeklyExceeded) {
-    return {
-      size: 'minimal',
-      maxWorkers: 1,
-      modelConstraint: config.activeModeConfig.haiku_allowed ? 'haiku' : 'sonnet',
-      reason: 'Both usage thresholds exceeded',
-    };
-  }
-  if (fiveHrExceeded || weeklyExceeded) {
-    return {
-      size: 'reduced',
-      maxWorkers: Math.max(1, Math.floor(baseMaxWorkers / 2)),
-      modelConstraint: 'sonnet',
-      reason: `${fiveHrExceeded ? '5hr' : 'Weekly'} usage threshold exceeded`,
-    };
-  }
-  return {
-    size: 'full',
-    maxWorkers: baseMaxWorkers,
-    modelConstraint: null,
-    reason: 'No usage constraints',
-  };
-}
 
 /**
  * Plan a new sprint by creating task definitions from directives.
@@ -489,7 +387,7 @@ export function adjustSprintSize(config: ResolvedConfig, usage: UsageMetrics, sy
  * @param projectRoot - Project root directory
  * @param config - Resolved project configuration
  * @param context - Brain context with directives, memory, debt, etc.
- * @param recommendation - Sprint size recommendation from adjustSprintSize
+ * @param recommendation - Sprint size recommendation
  * @param options - Optional planning mode, draft flag, and usage metrics
  * @returns The planned sprint with all tasks
  * @throws {BrainError} When AI planner fails in 'ai' mode or circular dependencies detected
@@ -499,13 +397,12 @@ export async function planSprint(
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
-  options?: { mode?: BrainPlanningMode; asDraft?: boolean; usage?: UsageMetrics; dryRun?: boolean },
+  options?: { mode?: BrainPlanningMode; asDraft?: boolean; dryRun?: boolean },
 ): Promise<Sprint> {
   const sprintId = getNextSprintId(projectRoot);
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
   const planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
-  const usageForModel: UsageMetrics = options?.usage ?? { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() };
 
   const tasks: Task[] = [];
   let seq = 1;
@@ -554,7 +451,7 @@ export async function planSprint(
     const brainModel = resolveTaskModel(
       'sprint-planning', 'AI planner invocation',
       { directories: [], filesRead: [], filesWrite: [] },
-      config, usageForModel,
+      config,
       undefined, config.activeModeConfig.brain_model,
       undefined, brainProviderName,
     );
@@ -632,7 +529,7 @@ export async function planSprint(
 
     for (const src of directiveSources) {
       const resolvedModel = recommendation.modelConstraint ??
-        resolveTaskModel(src.title, src.description, src.scope, config, usageForModel, parsedPatterns, src.forceModel);
+        resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, src.forceModel);
       const resolvedEffort = src.forceEffort ?? 'normal';
       tasks.push(createTask({
         title: src.title,
@@ -642,7 +539,7 @@ export async function planSprint(
         priority: 'NORMAL',
         reason: src.forceModel
           ? `Directive (model: ${resolvedModel} -- user override)`
-          : `Directive (model: ${resolvedModel} -- resolved from scope/complexity/plan/usage)`,
+          : `Directive (model: ${resolvedModel} -- resolved from scope/complexity/plan)`,
         scope: src.scope,
         dependencies: [],
         goNogo: extractGoNogoCriteria(src.description, src.testTarget),
@@ -955,7 +852,7 @@ export function spawnWorkers(
   projectRoot: string,
   sprint: Sprint,
   config: ResolvedConfig,
-  spawnOpts?: { autoApprove?: boolean; usageTracker?: UsageTracker; spawnBackend?: SpawnBackend },
+  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
 ): Task[] {
   // Use provided SpawnBackend, or fall back to direct tmux calls (backward compat)
   const backend = spawnOpts?.spawnBackend;
@@ -1028,10 +925,6 @@ export function spawnWorkers(
       );
     } catch (e) { debugLog('spawnWorkers:writeTaskFile', e); }
 
-    // Record spawn call in usage tracker
-    if (spawnOpts?.usageTracker) {
-      spawnOpts.usageTracker.recordCall(model, 5_000, task.id, sprint.id);
-    }
   }
 
   const agents: AgentInfo[] = activeTasks.map(task => ({
@@ -1049,7 +942,6 @@ export function spawnWorkers(
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
     agents,
     progress: { done: 0, active: activeTasks.length, blocked: 0, total: sprint.tasks.length },
-    usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
     alerts: [],
     updatedAt: now(),
   });
@@ -1224,8 +1116,71 @@ export interface FinalizeSprintOptions {
   skipHooks?: boolean;
   /** Resolved config (used for updateProjectDocs) */
   config?: ResolvedConfig;
-  /** Usage tracker for retro usage section */
-  usageTracker?: UsageTracker;
+}
+
+// ─── Adaptive Thresholds ────────────────────────────────────────────
+
+/**
+ * Auto-adjust agent_min_score and coverage_threshold based on recent sprint stats.
+ * Reads .brain/sprints/ files, computes NO_GO rate and avg coverage,
+ * then writes updated values to .deckent/config.json and appends a note to RETRO.md.
+ *
+ * Rules:
+ * - NO_GO rate > no_go_threshold → agent_min_score decremented (min 1)
+ * - NO_GO rate < 10% → agent_min_score incremented (max 10)
+ * - avg coverage < 70% → coverage_threshold lowered to avg
+ * - Requires min_samples sprints before any adjustment
+ */
+export function applyAdaptiveThresholds(projectRoot: string, config: ResolvedConfig): void {
+  const ac = config.adaptive_config;
+  const stats = getRecentSprintStats(projectRoot, ac.coverage_lookback);
+
+  if (stats.sprintCount < ac.min_samples) {
+    debugLog('applyAdaptiveThresholds', `Not enough sprints (${stats.sprintCount}/${ac.min_samples}) — skipping`);
+    return;
+  }
+
+  const changes: string[] = [];
+  const configPath = join(projectRoot, '.deckent', 'config.json');
+  const rawCfg: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
+
+  // Adjust agent_min_score based on NO_GO rate
+  const currentScore = config.agent_min_score;
+  let newScore = currentScore;
+  if (stats.avgNoGoRate > ac.no_go_threshold && currentScore > 1) {
+    newScore = currentScore - 1;
+  } else if (stats.avgNoGoRate < 0.1 && currentScore < 10) {
+    newScore = currentScore + 1;
+  }
+  if (newScore !== currentScore) {
+    rawCfg['agent_min_score'] = newScore;
+    changes.push(`agent_min_score ${currentScore} => ${newScore} (NO_GO rate: ${(stats.avgNoGoRate * 100).toFixed(1)}%)`);
+    debugLog('applyAdaptiveThresholds', changes.at(-1));
+  }
+
+  // Adjust coverage_threshold based on avg coverage
+  const currentCoverage = config.coverage_threshold;
+  if (stats.avgCoverage < 70 && stats.avgCoverage > 0) {
+    const newCoverage = Math.round(stats.avgCoverage);
+    if (newCoverage !== currentCoverage) {
+      rawCfg['coverage_threshold'] = newCoverage;
+      changes.push(`coverage_threshold ${currentCoverage} => ${newCoverage} (avg coverage: ${stats.avgCoverage.toFixed(1)}%)`);
+      debugLog('applyAdaptiveThresholds', changes.at(-1));
+    }
+  }
+
+  if (changes.length === 0) return;
+
+  // Write updated config
+  writeFileSync(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
+
+  // Append adaptive notes to RETRO.md
+  try {
+    const retroPath = join(projectRoot, BRAIN_DIR, RETRO_FILE);
+    const retroContent = readFileSafe(retroPath) ?? '';
+    const adaptiveLines = changes.map(c => `- Adaptive: ${c}`).join('\n') + '\n';
+    writeFileSync(retroPath, retroContent + adaptiveLines);
+  } catch (e) { debugLog('applyAdaptiveThresholds:retroAppend', e); }
 }
 
 /**
@@ -1271,7 +1226,7 @@ export async function finalizeSprint(
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
   try {
-    writeRetrospective(projectRoot, sprint, evaluations, metrics, opts?.usageTracker, undefined, undefined, results);
+    writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, undefined, results);
   } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
 
   // 5. Update PROJECT-IDENTITY.md
@@ -1428,53 +1383,10 @@ export async function finalizeSprint(
     if (richOutput) console.log(richOutput);
   } catch (e) { debugLog('finalizeSprint:richOutput', e); }
 
-  // 11. Adaptive thresholds: auto-adjust agent_min_score based on last 3 sprints NO_GO rate
+  // 11. Adaptive thresholds: auto-adjust agent_min_score + coverage_threshold based on recent sprints
   if (opts?.config?.adaptive_thresholds) {
     try {
-      const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
-      let totalTasks = 0;
-      let totalNoGo = 0;
-      if (existsSync(sprintsPath)) {
-        const sprintFiles = readdirSync(sprintsPath)
-          .filter(f => f.endsWith('.md') && !f.includes(sprint.id))
-          .sort()
-          .slice(-2); // last 2 previous sprints
-        for (const file of sprintFiles) {
-          const prevMetrics = readPreviousSprintMetrics(projectRoot, file.replace('.md', ''));
-          if (prevMetrics) {
-            totalTasks += prevMetrics.totalTasks;
-            totalNoGo += prevMetrics.noGoTasks;
-          }
-        }
-        // Include current sprint
-        totalTasks += metrics.totalTasks;
-        totalNoGo += metrics.noGoTasks;
-      } else {
-        totalTasks = metrics.totalTasks;
-        totalNoGo = metrics.noGoTasks;
-      }
-      const noGoRate = totalTasks > 0 ? (totalNoGo / totalTasks) * 100 : 0;
-      const currentScore = opts.config.agent_min_score;
-      let newScore = currentScore;
-      if (noGoRate > 30 && currentScore > 2) {
-        newScore = currentScore - 1;
-      } else if (noGoRate < 10 && currentScore < 8) {
-        newScore = currentScore + 1;
-      }
-      if (newScore !== currentScore) {
-        const configPath = join(projectRoot, '.deckent', 'config.json');
-        const rawCfg: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
-        rawCfg['agent_min_score'] = newScore;
-        writeFileSync(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
-        debugLog('finalizeSprint:adaptive', `agent_min_score ${currentScore} => ${newScore} (NO_GO rate: ${noGoRate.toFixed(1)}%)`);
-        // Append adaptive note to RETRO.md
-        try {
-          const retroPath = join(projectRoot, BRAIN_DIR, RETRO_FILE);
-          const retroContent = readFileSafe(retroPath) ?? '';
-          const adaptiveLine = `- Adaptive: agent_min_score ${currentScore} => ${newScore} (NO_GO rate: ${noGoRate.toFixed(1)}%)\n`;
-          writeFileSync(retroPath, retroContent + adaptiveLine);
-        } catch (e) { debugLog('finalizeSprint:retroAppend', e); }
-      }
+      applyAdaptiveThresholds(projectRoot, opts.config);
     } catch (err) {
       debugLog('finalizeSprint:adaptive', `Adaptive threshold update failed: ${err}`);
     }
@@ -1566,7 +1478,6 @@ export async function runSprint(
   opts?: RunSprintOptions,
 ): Promise<Sprint> {
   const routingVersionForFix = config.routing_engine ?? 'v1';
-  const usageTracker = new UsageTracker(projectRoot);
 
   // Use provided SpawnBackend, or create one from config.spawn_backend via SpawnBackendFactory.
   // Falls back to legacy direct-tmux path only when spawn_backend is not set and no backend provided.
@@ -1575,7 +1486,7 @@ export async function runSprint(
       ? SpawnBackendFactory.create({ backend: config.spawn_backend, projectDir: projectRoot })
       : undefined);
 
-  // Resolve provider for usage checks (use provided override or registry default)
+  // Resolve provider (use provided override or registry default)
   const activeProvider: ProviderAdapter | null = opts?.provider ?? getDefaultProvider();
 
   // Rollback enabled by default (unless explicitly disabled via opts.rollback === false)
@@ -1587,10 +1498,9 @@ export async function runSprint(
   } catch (e) { debugLog('runSprint:loadPluginHooks', e); }
 
   // Phase 1: PLAN
-  const { sprint, lastUsage: initialUsage, safetyPoint } = await runPlanPhase(
+  const { sprint, safetyPoint } = await runPlanPhase(
     projectRoot, config, opts, activeProvider, rollbackEnabled,
   );
-  let lastUsage = initialUsage;
 
   // ─── Human Checkpoint: PLAN ────────────────────────────────────
   if (config.human_checkpoints?.includes('plan')) {
@@ -1627,7 +1537,7 @@ export async function runSprint(
 
   // Phase 2: SPAWN (1 retry with diagnostic hints)
   const { taskQueue, scanInterval: initialScanInterval } = runSpawnPhase(
-    projectRoot, sprint, config, opts, usageTracker, spawnBackend,
+    projectRoot, sprint, config, opts, spawnBackend,
   );
   let scanInterval = initialScanInterval;
 
@@ -1643,7 +1553,7 @@ export async function runSprint(
 
   // Phase 4: EVALUATE
   const evaluations = new Map<string, TaskEvaluation>();
-  await runEvaluatePhase(projectRoot, sprint, results, evaluations, usageTracker, config.coverage_threshold);
+  await runEvaluatePhase(projectRoot, sprint, results, evaluations, config.coverage_threshold);
 
   // Rollback check: if rollback is enabled and all tasks are NO_GO, trigger rollback
   runRollbackCheck(projectRoot, sprint, evaluations, rollbackEnabled, safetyPoint);
@@ -1681,10 +1591,10 @@ export async function runSprint(
   }
 
   // Phase 5: FIX
-  await runFixPhase(projectRoot, sprint, evaluations, results, config, opts, routingVersionForFix, usageTracker, spawnBackend);
+  await runFixPhase(projectRoot, sprint, evaluations, results, config, opts, routingVersionForFix, spawnBackend);
 
   // Phase 6+7: RETRO + DECAY via finalizeSprint (skipped in testMode)
-  await runRetroPhase(projectRoot, sprint, evaluations, results, config, usageTracker, opts?.testMode);
+  await runRetroPhase(projectRoot, sprint, evaluations, results, config, opts?.testMode);
 
   // Phase 8: CLEANUP (skipped when skipCleanup is true)
   scanInterval = runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
@@ -1699,29 +1609,10 @@ export async function runSprint(
   // Clear sprint state file after successful completion
   clearSprintState(projectRoot);
 
-  // Sprint usage report
-  try {
-    const sprintUsage = usageTracker.getSprintUsage(sprint.id);
-    sprint.usageReport = {
-      totalCalls: sprintUsage.totalCalls,
-      totalTokens: sprintUsage.totalTokens,
-      modelBreakdown: sprintUsage.modelBreakdown,
-    };
-  } catch (e) { debugLog('runSprint:getSprintUsage', e); }
-
-  // Re-check usage before final dashboard update for accurate end-of-sprint metrics
-  try {
-    const finalUsage = activeProvider
-      ? await checkUsageWithProvider(activeProvider)
-      : checkUsage(config);
-    lastUsage = finalUsage;
-  } catch (e) { debugLog('runSprint:finalUsageCheck', e); }
-
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
     agents: [],
     progress: { done: sprint.tasks.length, active: 0, blocked: 0, total: sprint.tasks.length },
-    usage: lastUsage,
     alerts: [],
     updatedAt: now(),
   });
@@ -1818,8 +1709,7 @@ export function pauseSprint(
         blocked: pausedTaskIds.length,
         total: sprint.tasks.length,
       },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
-      alerts: [{ level: AlertLevel.WARNING, message: `Sprint paused: ${reason}`, timestamp: now() }],
+        alerts: [{ level: AlertLevel.WARNING, message: `Sprint paused: ${reason}`, timestamp: now() }],
       updatedAt: now(),
     });
   } catch (e) { debugLog('pauseSprint:updateDashboard', e); }
@@ -1892,8 +1782,7 @@ export function resumeSprint(
         blocked: 0,
         total: sprint.tasks.length,
       },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
-      alerts: [],
+        alerts: [],
       updatedAt: now(),
     });
   } catch (e) { debugLog('resumeSprint:updateDashboard', e); }
@@ -1901,60 +1790,3 @@ export function resumeSprint(
   return pauseState;
 }
 
-/**
- * Checks usage thresholds and auto-pauses the sprint if limits are exceeded.
- * Returns true if the sprint was paused, false otherwise.
- * @internal Used only within orchestra/ — not part of the public API surface.
- */
-export function checkAndAutoPause(
-  projectRoot: string,
-  sprint: Sprint,
-  config: ResolvedConfig,
-): boolean {
-  const usage = checkUsage(config);
-  const thresholds = config.activeModeConfig.usage_thresholds;
-  const fiveHrExceeded = usage.fiveHourPercent / 100 >= thresholds['5hr'];
-  const weeklyExceeded = usage.weeklyPercent / 100 >= thresholds.weekly;
-
-  if (fiveHrExceeded || weeklyExceeded) {
-    const reason = fiveHrExceeded
-      ? `5hr usage limit exceeded (${usage.fiveHourPercent.toFixed(1)}%)`
-      : `Weekly usage limit exceeded (${usage.weeklyPercent.toFixed(1)}%)`;
-    pauseSprint(projectRoot, sprint, reason);
-    return true;
-  }
-  return false;
-}
-
-/**
- * Checks usage thresholds and auto-resumes the sprint when usage has dropped.
- * Hysteresis prevents rapid pause/resume oscillation.
- * Returns true if the sprint was resumed, false otherwise.
- * @internal Used only within orchestra/ — not part of the public API surface.
- */
-export function checkAndAutoResume(
-  projectRoot: string,
-  sprint: Sprint,
-  config: ResolvedConfig,
-): boolean {
-  // Only auto-resume a PAUSED sprint
-  if (sprint.status !== SprintStatus.PAUSED) {
-    return false;
-  }
-
-  const usage = checkUsage(config);
-  const thresholds = config.activeModeConfig.usage_thresholds;
-
-  // Resume threshold: usage must drop to 80% of the pause threshold (hysteresis)
-  const resumeThreshold5hr = thresholds['5hr'] * 0.8;
-  const resumeThresholdWeekly = thresholds.weekly * 0.8;
-
-  const fiveHrSafe = usage.fiveHourPercent / 100 < resumeThreshold5hr;
-  const weeklySafe = usage.weeklyPercent / 100 < resumeThresholdWeekly;
-
-  if (fiveHrSafe && weeklySafe) {
-    resumeSprint(projectRoot, sprint);
-    return true;
-  }
-  return false;
-}

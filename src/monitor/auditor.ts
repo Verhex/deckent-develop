@@ -318,7 +318,6 @@ export function resetDashboard(
     sprint: { id: sprintId, number: 0, phase: SprintPhase.PLAN, status: SprintStatus.PLANNING },
     agents: [],
     progress: { done: 0, active: 0, blocked: 0, total: taskCount },
-    usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
     alerts: [],
     updatedAt: new Date().toISOString(),
   };
@@ -597,7 +596,6 @@ export function writeScanToDashboard(
       done: resultCount,
       active: activeWorkerCount,
     },
-    usage: existing?.usage ?? { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: new Date().toISOString() },
     alerts: mergedAlerts,
     updatedAt: new Date().toISOString(),
     auditorLastScan: new Date().toISOString(),

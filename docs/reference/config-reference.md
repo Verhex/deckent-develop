@@ -12,11 +12,10 @@ Complete reference for all Deckent configuration options.
 4. [Plan Modes](#4-plan-modes)
 5. [PlanModeConfig Fields](#5-planmodeconfig-fields)
 6. [Brain Planning Modes](#6-brain-planning-modes)
-7. [Usage Thresholds](#7-usage-thresholds)
-8. [Global vs Project Config](#8-global-vs-project-config)
-9. [Example Configs](#9-example-configs)
-10. [CLI Config Commands](#10-cli-config-commands)
-11. [Validation Rules](#11-validation-rules)
+7. [Global vs Project Config](#7-global-vs-project-config)
+8. [Example Configs](#8-example-configs)
+9. [CLI Config Commands](#9-cli-config-commands)
+10. [Validation Rules](#10-validation-rules)
 
 ---
 
@@ -95,8 +94,6 @@ Deckent ships with four built-in plan modes, each tuned for a different Claude s
 | `brain_model` | `opus` | `sonnet` | `sonnet` | `opus` |
 | `default_model` | `opus` | `opus` | `sonnet` | `sonnet` |
 | `haiku_allowed` | `true` | `true` | `false` | `true` |
-| `5hr` threshold | 0.8 (80%) | 0.7 (70%) | 0.6 (60%) | 1.0 (100%) |
-| `weekly` threshold | 0.6 (60%) | 0.5 (50%) | 0.4 (40%) | 1.0 (100%) |
 | `budget_per_sprint` | -- | -- | -- | $5.00 |
 | `requires` env var | -- | -- | -- | `ANTHROPIC_API_KEY` |
 | `brain_planning` | `"auto"` | `"auto"` | `"auto"` | `"auto"` |
@@ -122,19 +119,13 @@ deckent config set mode performance   # Same as: deckent config set mode max_pla
 
 Full parallelism with up to 8 workers. Brain uses Opus for highest-quality planning. Workers default to Opus. Brain can downgrade individual tasks to Sonnet or Haiku.
 
-Limits: Sprint planning pauses when 5-hour usage exceeds 80% or weekly usage exceeds 60%.
-
 ### max5x_plan -- Claude Max 5x
 
 Good parallelism at 5 workers. Brain uses Sonnet to conserve budget. Workers can still use Opus for complex tasks.
 
-Limits: Sprint planning pauses at 70% 5-hour usage or 50% weekly usage.
-
 ### pro_plan -- Claude Pro
 
 Conservative mode with 3 workers maximum. Haiku is disabled because Pro plan usage limits are tight. Everything runs on Sonnet.
-
-Limits: Sprint planning pauses at 60% 5-hour usage or 40% weekly usage.
 
 ### api -- API Key Mode
 
@@ -152,9 +143,6 @@ Each mode block (`modes.<modeName>`) supports these fields:
 | `brain_model` | `"opus"`, `"sonnet"`, or `"haiku"` | Yes | Model used by Brain for planning and evaluation. |
 | `default_model` | `"opus"`, `"sonnet"`, or `"haiku"` | Yes | Default model assigned to workers. |
 | `haiku_allowed` | boolean | Yes | Whether Brain can assign `haiku` to workers. |
-| `usage_thresholds` | object | Yes | When to reduce or pause the sprint. |
-| `usage_thresholds["5hr"]` | number (0-1) | Yes | 5-hour rolling window threshold. |
-| `usage_thresholds.weekly` | number (0-1) | Yes | Weekly quota threshold. |
 | `budget_per_sprint` | number > 0 | No (API mode only) | Maximum USD budget per sprint. |
 | `requires` | string | No | Required environment variable name. |
 | `brain_planning` | `BrainPlanningMode` | No | Planning mode override for this mode. |
@@ -231,45 +219,7 @@ This gives `max_plan` AI planning (higher quality) while `pro_plan` uses structu
 
 ---
 
-## 7. Usage Thresholds
-
-Usage thresholds control when Brain reduces sprint size or pauses execution.
-
-```json
-"usage_thresholds": {
-  "5hr": 0.8,
-  "weekly": 0.6
-}
-```
-
-| Threshold | Key | Meaning |
-|-----------|-----|---------|
-| 5-hour rolling window | `"5hr"` | Fraction of 5-hour message quota used (0.0 to 1.0) |
-| Weekly quota | `"weekly"` | Fraction of weekly message quota used (0.0 to 1.0) |
-
-### Behavior When Thresholds Are Exceeded
-
-Before sprint planning:
-- `5hr` exceeded: sprint size is reduced (fewer workers, smaller tasks)
-- `weekly` exceeded: minimal sprint (1-2 workers only)
-
-During sprint execution:
-- If a limit is hit mid-sprint, active tasks are paused
-- The sprint waits for the limit to reset, then resumes
-- Sprints are never abandoned
-
-### Threshold Summary by Mode
-
-| Mode | 5hr Pause Trigger | Weekly Pause Trigger |
-|------|-------------------|---------------------|
-| `max_plan` | > 80% | > 60% |
-| `max5x_plan` | > 70% | > 50% |
-| `pro_plan` | > 60% | > 40% |
-| `api` | N/A (budget-based) | N/A (budget-based) |
-
----
-
-## 8. Global vs Project Config
+## 7. Global vs Project Config
 
 ### Global Config
 
@@ -306,7 +256,7 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
 
 ---
 
-## 9. Example Configs
+## 8. Example Configs
 
 ### Minimal (Max 20x User)
 
@@ -330,7 +280,6 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
       "brain_model": "opus",
       "default_model": "sonnet",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 0.75, "weekly": 0.55 },
       "brain_planning": "auto"
     }
   }
@@ -350,7 +299,6 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
       "brain_model": "opus",
       "default_model": "sonnet",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 1.0, "weekly": 1.0 },
       "budget_per_sprint": 3.00,
       "requires": "ANTHROPIC_API_KEY",
       "brain_planning": "ai"
@@ -372,7 +320,6 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": false,
-      "usage_thresholds": { "5hr": 0.5, "weekly": 0.35 },
       "brain_planning": "structured"
     }
   }
@@ -392,7 +339,6 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
       "brain_model": "opus",
       "default_model": "opus",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 0.8, "weekly": 0.6 },
       "brain_planning": "ai"
     },
     "max5x_plan": {
@@ -400,7 +346,6 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 0.7, "weekly": 0.5 },
       "brain_planning": "auto"
     },
     "pro_plan": {
@@ -408,7 +353,6 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
       "brain_model": "sonnet",
       "default_model": "sonnet",
       "haiku_allowed": false,
-      "usage_thresholds": { "5hr": 0.5, "weekly": 0.35 },
       "brain_planning": "structured"
     },
     "api": {
@@ -416,7 +360,6 @@ Nested objects are merged recursively. Setting `modes.max_plan.max_workers: 4` i
       "brain_model": "opus",
       "default_model": "sonnet",
       "haiku_allowed": true,
-      "usage_thresholds": { "5hr": 1.0, "weekly": 1.0 },
       "budget_per_sprint": 5.0,
       "requires": "ANTHROPIC_API_KEY",
       "brain_planning": "ai"
@@ -429,7 +372,7 @@ Switch modes with: `deckent config set mode pro_plan`
 
 ---
 
-## 10. CLI Config Commands
+## 9. CLI Config Commands
 
 ### Show Resolved Config
 
@@ -478,7 +421,7 @@ deckent config export --global    # Export global config
 
 ---
 
-## 11. Validation Rules
+## 10. Validation Rules
 
 Deckent validates the config on every load. A `ConfigValidationError` is thrown with all validation failures listed.
 
@@ -490,8 +433,6 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 | `modes.<name>.brain_model` | One of: `opus`, `sonnet`, `haiku` |
 | `modes.<name>.default_model` | One of: `opus`, `sonnet`, `haiku` |
 | `modes.<name>.haiku_allowed` | Must be a boolean |
-| `modes.<name>.usage_thresholds["5hr"]` | Number between 0.0 and 1.0 |
-| `modes.<name>.usage_thresholds.weekly` | Number between 0.0 and 1.0 |
 | `modes.<name>.budget_per_sprint` | Positive number (API mode only) |
 | `modes.<name>.brain_planning` | One of: `ai`, `structured`, `auto` |
 | `brain_provider` | One of: `claude`, `codex`, `gemini` (if set) |
@@ -505,12 +446,11 @@ Deckent validates the config on every load. A `ConfigValidationError` is thrown 
 ConfigValidationError: Config validation failed:
   - Invalid mode "turbo". Must be one of: max_plan, max5x_plan, pro_plan, api
   - modes.max_plan.max_workers must be a number between 1 and 20
-  - modes.api.usage_thresholds.5hr must be a number between 0 and 1
 ```
 
 ---
 
-## 12. Multi-Provider Configuration
+## 11. Multi-Provider Configuration
 
 Deckent supports three AI providers. Configure them at the top level of your config:
 

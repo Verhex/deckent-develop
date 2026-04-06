@@ -2,7 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ProjectStack } from './skill-types.js';
-import { readJsonSafe } from './utils.js';
+import { readJsonSafe, debugLog } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -83,8 +83,8 @@ export function detectProjectStack(projectRoot: string): ProjectStack {
     const cacheDir = path.dirname(cachePath);
     fs.mkdirSync(cacheDir, { recursive: true });
     fs.writeFileSync(cachePath, JSON.stringify(stack, null, 2), 'utf8');
-  } catch {
-    // Cache write failure is non-fatal
+  } catch (e) {
+    debugLog('detectProjectStack:writeCache', e);
   }
 
   return stack;
@@ -104,7 +104,8 @@ export function isStackStale(projectRoot: string): boolean {
   let cacheStat: fs.Stats;
   try {
     cacheStat = fs.statSync(cachePath);
-  } catch {
+  } catch (e) {
+    debugLog('isStackStale:statSync', e);
     return true;
   }
 
@@ -115,8 +116,8 @@ export function isStackStale(projectRoot: string): boolean {
     try {
       const fileStat = fs.statSync(filePath);
       if (fileStat.mtimeMs > cacheMtime) return true;
-    } catch {
-      // File doesn't exist, not a staleness indicator
+    } catch (e) {
+      debugLog('isStackStale:statSyncFile', e);
     }
   }
 
@@ -134,8 +135,8 @@ export function refreshStack(projectRoot: string): ProjectStack {
   // Remove existing cache to force re-detection
   try {
     if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
-  } catch {
-    // Removal failure is non-fatal
+  } catch (e) {
+    debugLog('refreshStack:unlinkSync', e);
   }
 
   return detectProjectStack(projectRoot);
@@ -189,7 +190,8 @@ function readConfigLanguageOverride(projectRoot: string): string | undefined {
     // Only return if it's a known STACK_COMMANDS key
     if (lang && typeof lang === 'string' && lang in STACK_COMMANDS) return lang;
     return undefined;
-  } catch {
+  } catch (e) {
+    debugLog('getLanguageOverride:readConfig', e);
     return undefined;
   }
 }
@@ -218,13 +220,13 @@ function countSourceFiles(projectRoot: string): Record<string, number> {
   function walk(dir: string, depth: number): void {
     if (depth > 4) return; // max 4 levels deep for performance
     let entries: string[];
-    try { entries = fs.readdirSync(dir); } catch { return; }
+    try { entries = fs.readdirSync(dir); } catch (e) { debugLog('countLanguageFiles:readdirSync', e); return; }
     if (!Array.isArray(entries)) return;
     for (const entry of entries) {
       if (skipDirs.has(entry)) continue;
       const full = path.join(dir, entry);
       let stat: fs.Stats;
-      try { stat = fs.statSync(full); } catch { continue; }
+      try { stat = fs.statSync(full); } catch (e) { debugLog('countLanguageFiles:statSync', e); continue; }
       if (stat.isDirectory()) {
         walk(full, depth + 1);
       } else {
@@ -295,7 +297,7 @@ function detectFresh(projectRoot: string): ProjectStack {
   const hasPipfile = fs.existsSync(path.join(projectRoot, 'Pipfile'));
   const hasPython = hasPyprojectToml || hasSetupPy || hasRequirementsTxt || hasPipfile;
   let hasCsproj = false;
-  try { hasCsproj = fs.readdirSync(projectRoot).some(f => f.endsWith('.csproj') || f.endsWith('.sln')); } catch { /* skip */ }
+  try { hasCsproj = fs.readdirSync(projectRoot).some(f => f.endsWith('.csproj') || f.endsWith('.sln')); } catch (e) { debugLog('detectFresh:hasCsproj', e); }
   const hasSwiftPackage = fs.existsSync(path.join(projectRoot, 'Package.swift'));
   const hasGemfile = fs.existsSync(path.join(projectRoot, 'Gemfile'));
   const hasComposer = fs.existsSync(path.join(projectRoot, 'composer.json'));
@@ -480,8 +482,8 @@ function detectCOrCpp(projectRoot: string): string {
       if (content.includes('project(') || content.includes('add_executable')) {
         return 'c'; // default to C if CMake exists but no CXX hints
       }
-    } catch {
-      // Read failure — fall through
+    } catch (e) {
+      debugLog('detectCOrCpp:readCMake', e);
     }
   }
 
@@ -492,8 +494,8 @@ function detectCOrCpp(projectRoot: string): string {
     if (hasCpp) return 'cpp';
     const hasC = files.some(f => /\.(c|h)$/.test(f));
     if (hasC) return 'c';
-  } catch {
-    // Readdir failure — fall through
+  } catch (e) {
+    debugLog('detectCOrCpp:readdirSync', e);
   }
 
   return 'unknown';
@@ -517,8 +519,8 @@ function detectPythonFramework(projectRoot: string): string {
         if (content.includes('django') || content.includes('Django')) return 'django';
         if (content.includes('fastapi') || content.includes('FastAPI')) return 'fastapi';
         if (content.includes('flask') || content.includes('Flask')) return 'flask';
-      } catch {
-        // Read failure — continue
+      } catch (e) {
+        debugLog('detectPythonFramework:readFile', e);
       }
     }
   }
@@ -541,8 +543,8 @@ function detectPythonTestFramework(projectRoot: string): string {
     try {
       const content = fs.readFileSync(pyprojectPath, 'utf8');
       if (content.includes('pytest')) return 'pytest';
-    } catch {
-      // fall through
+    } catch (e) {
+      debugLog('detectPythonTestFramework:readPyproject', e);
     }
   }
 
@@ -552,8 +554,8 @@ function detectPythonTestFramework(projectRoot: string): string {
     try {
       const content = fs.readFileSync(reqPath, 'utf8');
       if (content.includes('pytest')) return 'pytest';
-    } catch {
-      // fall through
+    } catch (e) {
+      debugLog('detectPythonTestFramework:readRequirements', e);
     }
   }
 
@@ -572,8 +574,8 @@ function detectJavaTestFramework(projectRoot: string, hasPomXml: boolean, hasBui
     try {
       const content = fs.readFileSync(filePath, 'utf8');
       if (content.includes('junit') || content.includes('JUnit')) return 'junit';
-    } catch {
-      // Read failure — continue
+    } catch (e) {
+      debugLog('detectJavaTestFramework:readFile', e);
     }
   }
 
@@ -592,8 +594,8 @@ function detectJavaFramework(projectRoot: string, hasPomXml: boolean, hasBuildGr
     try {
       const content = fs.readFileSync(filePath, 'utf8');
       if (content.includes('spring-boot-starter') || content.includes('spring-boot')) return 'spring';
-    } catch {
-      // Read failure — continue
+    } catch (e) {
+      debugLog('detectJavaFramework:readFile', e);
     }
   }
 
@@ -607,8 +609,8 @@ function detectGoTestFramework(projectRoot: string): string {
     const files = fs.readdirSync(projectRoot);
     const hasTestFiles = files.some(f => f.endsWith('_test.go'));
     if (hasTestFiles) return 'go_test';
-  } catch {
-    // Readdir failure
+  } catch (e) {
+    debugLog('detectGoTestFramework:readdirSync', e);
   }
   return 'unknown';
 }
@@ -684,8 +686,8 @@ function scanSubProjectLanguages(projectRoot: string): string[] {
         }
         scanDir(subDir, depth + 1);
       }
-    } catch {
-      // Dir read failure is non-fatal
+    } catch (e) {
+      debugLog('scanSubProjectLanguages:readdirSync', e);
     }
   }
 
@@ -722,12 +724,12 @@ function scanSubProjectPackageJsons(projectRoot: string): SubProject[] {
             results.push({ path: deepPkgPath, relativePath: `${entry.name}/${subEntry.name}` });
           }
         }
-      } catch {
-        // Sub-directory read failure is non-fatal
+      } catch (e) {
+        debugLog('scanSubProjectPackageJsons:subReaddirSync', e);
       }
     }
-  } catch {
-    // Root readdir failure — return empty
+  } catch (e) {
+    debugLog('scanSubProjectPackageJsons:readdirSync', e);
   }
 
   return results;

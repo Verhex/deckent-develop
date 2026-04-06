@@ -10,6 +10,7 @@ import type { Task, TaskResult, Sprint, ResolvedConfig } from './types.js';
 import { scanPlugins } from './plugin.js';
 import type { Plugin } from './plugin.js';
 import { detectFullStack } from './stack-detector.js';
+import { debugLog } from './utils.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -280,8 +281,8 @@ export function findTargetedTestFiles(filesChanged: string[], projectRoot: strin
           testFiles.add(join('tests', dirname(withoutSrc), entry));
         }
       }
-    } catch {
-      // Directory read failed — skip
+    } catch (e) {
+      debugLog('findRelatedTestFiles:readdirSync', e);
     }
   }
 
@@ -357,7 +358,8 @@ export function readCiBaseline(projectRoot: string): CiBaseline | null {
   if (!existsSync(baselinePath)) return null;
   try {
     return JSON.parse(readFileSync(baselinePath, 'utf-8')) as CiBaseline;
-  } catch {
+  } catch (e) {
+    debugLog('readCiBaseline:readFile', e);
     return null;
   }
 }
@@ -389,7 +391,8 @@ export function resolveCiGuardianConfig(projectRoot: string): CiGuardianConfig {
       track_coverage: ciConfig.track_coverage ?? DEFAULT_CI_GUARDIAN_CONFIG.track_coverage,
       track_test_count: ciConfig.track_test_count ?? DEFAULT_CI_GUARDIAN_CONFIG.track_test_count,
     };
-  } catch {
+  } catch (e) {
+    debugLog('resolveCiGuardianConfig:parseConfig', e);
     return { ...DEFAULT_CI_GUARDIAN_CONFIG };
   }
 }
@@ -618,7 +621,8 @@ export function runPreSprintValidation(
   try {
     writeCiBaseline(projectRoot, baseline);
     baselineSaved = true;
-  } catch {
+  } catch (e) {
+    debugLog('runPreSprintCiCheck:writeCiBaseline', e);
     process.stderr.write('[ci-guardian] Failed to save CI baseline\n');
   }
 
@@ -693,7 +697,8 @@ export function readCiReport(projectRoot: string, sprintId: string): CiReport | 
   if (!existsSync(reportPath)) return null;
   try {
     return JSON.parse(readFileSync(reportPath, 'utf-8')) as CiReport;
-  } catch {
+  } catch (e) {
+    debugLog('readCiReport:readFile', e);
     return null;
   }
 }
@@ -759,7 +764,8 @@ export function runAfterSprintCiReport(
 
   try {
     writeCiReport(projectRoot, report);
-  } catch {
+  } catch (e) {
+    debugLog('runCiRegressionCheck:writeCiReport', e);
     process.stderr.write('[ci-guardian] Failed to write CI report\n');
   }
 

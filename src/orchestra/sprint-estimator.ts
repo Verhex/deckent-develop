@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, DASHBOARD_FILE } from '../core/constants.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Duration Baselines (minutes) ────────────────────────────────────────────
 
@@ -140,8 +141,8 @@ export function readHistoricalDurations(projectRoot: string, limit = 3): number[
       const content = readFileSync(join(sprintsDir, file), 'utf-8');
       const min = parseSprintDurationFromLog(content);
       if (min !== null) durations.push(min);
-    } catch {
-      // skip unreadable files
+    } catch (e) {
+      debugLog('getHistoricalDurations:readFile', e);
     }
   }
   return durations;
@@ -270,7 +271,7 @@ export function writeEstimateToDashboard(
 
   try {
     writeFileSync(dashPath, JSON.stringify(dashState, null, 2), 'utf-8');
-  } catch {
-    // dashboard write failure is non-fatal
+  } catch (e) {
+    debugLog('writeDashboardEstimate:writeFile', e);
   }
 }

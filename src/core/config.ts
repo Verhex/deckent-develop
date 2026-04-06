@@ -18,7 +18,6 @@ import type {
   PlanModeConfig,
   ResolvedConfig,
   SystemProfile,
-  UsageThresholds,
 } from './types.js';
 import { ALL_MODELS, PROVIDER_MODEL_MAP } from './types.js';
 import type { ProviderName } from './types.js';
@@ -67,7 +66,6 @@ export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
     brain_model: 'opus',
     default_model: 'opus',
     haiku_allowed: true,
-    usage_thresholds: { '5hr': 0.8, weekly: 0.6 },
     brain_planning: 'auto',
   },
   max5x_plan: {
@@ -75,7 +73,6 @@ export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
     brain_model: 'sonnet',
     default_model: 'opus',
     haiku_allowed: true,
-    usage_thresholds: { '5hr': 0.7, weekly: 0.5 },
     brain_planning: 'auto',
   },
   pro_plan: {
@@ -83,7 +80,6 @@ export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
     brain_model: 'sonnet',
     default_model: 'sonnet',
     haiku_allowed: false,
-    usage_thresholds: { '5hr': 0.6, weekly: 0.4 },
     brain_planning: 'auto',
   },
   api: {
@@ -91,7 +87,6 @@ export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
     brain_model: 'opus',
     default_model: 'sonnet',
     haiku_allowed: true,
-    usage_thresholds: { '5hr': 1.0, weekly: 1.0 },
     budget_per_sprint: 5.0,
     requires: 'ANTHROPIC_API_KEY',
     brain_planning: 'auto',
@@ -192,16 +187,6 @@ export function validateConfig(config: DeckentConfig): string[] {
 
     if (typeof mc.haiku_allowed !== 'boolean') {
       errors.push(`${prefix}.haiku_allowed must be a boolean`);
-    }
-
-    const thresholds: UsageThresholds | undefined = mc.usage_thresholds;
-    if (thresholds) {
-      if (typeof thresholds['5hr'] !== 'number' || thresholds['5hr'] < 0 || thresholds['5hr'] > 1) {
-        errors.push(`${prefix}.usage_thresholds.5hr must be a number between 0 and 1`);
-      }
-      if (typeof thresholds.weekly !== 'number' || thresholds.weekly < 0 || thresholds.weekly > 1) {
-        errors.push(`${prefix}.usage_thresholds.weekly must be a number between 0 and 1`);
-      }
     }
 
     if (mc.brain_planning !== undefined &&
@@ -445,6 +430,7 @@ export function createDefaultConfig(): DeckentConfig {
     // Adaptive Thresholds
     adaptive_thresholds: false,
     agent_min_score: 5,
+    adaptive_config: { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     // Routing Engine v2 (default since sprint-067)
     routing_engine: 'v2',
     // Cleanup delay: wait before deleting .tasks/ files (ms)
@@ -571,6 +557,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     // Adaptive Thresholds
     adaptive_thresholds: config.adaptive_thresholds ?? false,
     agent_min_score: config.agent_min_score ?? 5,
+    adaptive_config: config.adaptive_config ?? { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     // Rollback
     rollback_policy: config.rollback_policy,
     // Routing Engine v2
@@ -667,7 +654,7 @@ export interface ConfigMetadataEntry {
  */
 export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
   mode: {
-    description: 'Active plan mode — controls worker count, model tier, and usage thresholds.',
+    description: 'Active plan mode — controls worker count and model tier.',
     type: "'max_plan' | 'max5x_plan' | 'pro_plan' | 'api'",
     default: 'max5x_plan',
     options: ['max_plan', 'max5x_plan', 'pro_plan', 'api', 'performance', 'balanced', 'economic', 'unlimited'],
@@ -675,7 +662,7 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     required: true,
   },
   modes: {
-    description: 'Per-mode configuration overrides (worker count, model, thresholds, budget).',
+    description: 'Per-mode configuration overrides (worker count, model, budget).',
     type: 'Record<PlanMode, PlanModeConfig>',
     default: null,
     category: 'Sprint',
@@ -1056,6 +1043,7 @@ export function mergeConfigs(
     sprint_timeout_minutes: config.sprint_timeout_minutes ?? 0,
     adaptive_thresholds: config.adaptive_thresholds ?? false,
     agent_min_score: config.agent_min_score ?? 5,
+    adaptive_config: config.adaptive_config ?? { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
   };
 }
 

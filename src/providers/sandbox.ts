@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { existsSync, realpathSync } from 'node:fs';
-import type { ModelType, UsageMetrics } from '../core/types.js';
+import type { ModelType } from '../core/types.js';
 import type { ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
 import { SubprocessSpawnBackend } from './subprocess.js';
@@ -76,16 +76,6 @@ export class SandboxSpawnBackend extends SubprocessSpawnBackend {
       child.once('exit', (code) => resolve(code === 0));
       child.once('error', () => resolve(false));
     });
-  }
-
-  // ─── checkUsage() ──────────────────────────────────────────────────
-
-  override async checkUsage(): Promise<UsageMetrics> {
-    return {
-      fiveHourPercent: 0,
-      weeklyPercent: 0,
-      measuredAt: new Date().toISOString(),
-    };
   }
 
   // ─── enforceScope() ────────────────────────────────────────────────

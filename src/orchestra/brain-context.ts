@@ -7,6 +7,7 @@ import type { BrainContext } from '../core/types.js';
 import type { ProjectStack, SkillDefinition } from '../core/skill-types.js';
 import type { AgentDefinition } from '../core/agent-types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
+import { debugLog } from '../core/utils.js';
 
 // ═══ Task 23: Stack Context ═══════════════════════════════════════════════
 
@@ -22,8 +23,8 @@ export function enrichContextWithStack(context: BrainContext, projectRoot: strin
       const stack = JSON.parse(raw) as ProjectStack;
       stackLine = formatStackContext(stack);
     }
-  } catch {
-    // non-fatal
+  } catch (e) {
+    debugLog('enrichContextWithStack:readStack', e);
   }
 
   return {
@@ -240,7 +241,8 @@ function _loadSprintHistory(projectRoot: string, maxSprints: number): SprintHist
     const successRate = totalTasks > 0 ? doneTasks / totalTasks : 0;
 
     return { taskTypes, models, successRate, noGoPatterns };
-  } catch {
+  } catch (e) {
+    debugLog('_loadSprintHistory:parse', e);
     return null;
   }
 }
@@ -258,7 +260,8 @@ function _inferTaskType(title: string): string {
 function _readFileSafe(path: string): string {
   try {
     return readFileSync(path, 'utf-8');
-  } catch {
+  } catch (e) {
+    debugLog('_readFileSafe:readFile', e);
     return '';
   }
 }

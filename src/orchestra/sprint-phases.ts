@@ -23,7 +23,7 @@ import {
 // ─── Core (type imports) ──────────────────────────────────────────
 import type {
   Task, TaskResult, Sprint, SprintMetrics,
-  UsageMetrics, ResolvedConfig,
+  ResolvedConfig, SprintSizeRecommendation,
 } from '../core/types.js';
 
 import {
@@ -31,7 +31,6 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe, parseDebtTable, debugLog } from '../core/utils.js';
-import { UsageTracker } from '../core/usage-tracker.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import type { SpawnBackend } from './spawn-backend.js';
 
@@ -78,9 +77,6 @@ import { calculateMetrics } from './sprint-reporter.js';
 import {
   BrainError,
   readContext,
-  checkUsage,
-  checkUsageWithProvider,
-  adjustSprintSize,
   planSprint,
   writeSprintState,
   spawnWorkers,
@@ -119,7 +115,6 @@ function safeDashboardUpdate(
       sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
-      usage: { fiveHourPercent: 0, weeklyPercent: 0, measuredAt: now() },
       alerts: [{ level: AlertLevel.WARNING, message: errorMessage, timestamp: now() }],
       updatedAt: now(),
     });
@@ -131,7 +126,6 @@ function safeDashboardUpdate(
 
 export interface PlanPhaseResult {
   sprint: Sprint;
-  lastUsage: UsageMetrics;
   safetyPoint: SafetyPoint | null;
 }
 
@@ -152,17 +146,17 @@ export async function runPlanPhase(
   projectRoot: string,
   config: ResolvedConfig,
   _opts: RunSprintOptions | undefined,
-  activeProvider: ProviderAdapter | null,
+  _activeProvider: ProviderAdapter | null,
   rollbackEnabled: boolean,
 ): Promise<PlanPhaseResult> {
   try {
     const context = readContext(projectRoot);
-    // Use provider-based async usage check when a provider is available
-    const usage = activeProvider
-      ? await checkUsageWithProvider(activeProvider)
-      : checkUsage(config);
-    const lastUsage = usage;
-    const recommendation = adjustSprintSize(config, usage);
+    const recommendation: SprintSizeRecommendation = {
+      size: 'full',
+      maxWorkers: typeof config.activeModeConfig.max_workers === 'number' ? config.activeModeConfig.max_workers : 4,
+      modelConstraint: null,
+      reason: 'No usage constraints',
+    };
     const sprint = await planSprint(projectRoot, config, context, recommendation);
     sprint.startedAt = now();
 
@@ -203,7 +197,7 @@ export async function runPlanPhase(
       } catch (e) { debugLog('runPlanPhase:createSafetyPoint', e); }
     }
 
-    return { sprint, lastUsage, safetyPoint };
+    return { sprint, safetyPoint };
   } catch (err) {
     throw new BrainError(
       `Plan phase failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -225,7 +219,6 @@ export function runSpawnPhase(
   sprint: Sprint,
   config: ResolvedConfig,
   opts: RunSprintOptions | undefined,
-  usageTracker: UsageTracker,
   spawnBackend: SpawnBackend | undefined,
 ): SpawnPhaseResult {
   let scanInterval: ReturnType<typeof setInterval> | null = null;
@@ -236,7 +229,7 @@ export function runSpawnPhase(
     try {
       sprint.phase = SprintPhase.SPAWN;
       writeSprintState(projectRoot, sprint);
-      taskQueue = spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
+      taskQueue = spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
       sprint.status = SprintStatus.ACTIVE;
       writeSprintState(projectRoot, sprint);
       try {
@@ -277,7 +270,6 @@ export async function runEvaluatePhase(
   sprint: Sprint,
   results: TaskResult[],
   evaluations: Map<string, TaskEvaluation>,
-  usageTracker: UsageTracker,
   coverageThreshold = 90,
 ): Promise<void> {
   try {
@@ -323,8 +315,6 @@ export async function runEvaluatePhase(
 
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
-        // Record evaluation call in usage tracker
-        usageTracker.recordCall(task.model, 2_000, task.id, sprint.id);
         // Run afterTask hooks (non-fatal)
         try {
           await runHooks('afterTask', {
@@ -354,8 +344,6 @@ export async function runEvaluatePhase(
         };
         handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
         evaluations.set(task.id, TaskEvaluation.NO_GO);
-        // Record evaluation call for timeout tasks too
-        usageTracker.recordCall(task.model, 1_000, task.id, sprint.id);
         // Run afterTask hooks for timeout tasks too (non-fatal)
         try {
           await runHooks('afterTask', {
@@ -425,7 +413,6 @@ export async function runFixPhase(
   config: ResolvedConfig,
   opts: RunSprintOptions | undefined,
   routingVersionForFix: string,
-  usageTracker: UsageTracker,
   spawnBackend: SpawnBackend | undefined,
 ): Promise<void> {
   try {
@@ -454,7 +441,7 @@ export async function runFixPhase(
           const { OutcomeTracker } = await import('./outcome-tracker.js');
           const fixTracker = new OutcomeTracker(projectRoot);
           const fixStack = detectProjectStack(projectRoot);
-          const adapter = new MidSprintAdapter(fixPool, fixSkills, fixTracker, fixStack);
+          const adapter = new MidSprintAdapter(fixPool, fixSkills, fixTracker, fixStack, config);
 
           for (const fixTask of fixTasks) {
             if (fixTask.fixForTaskId) {
@@ -474,7 +461,7 @@ export async function runFixPhase(
       }
 
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
-      spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, usageTracker, spawnBackend });
+      spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
         ?? opts?.fixPhaseTimeoutMs
         ?? 600_000;
@@ -511,7 +498,6 @@ export async function runRetroPhase(
   evaluations: Map<string, TaskEvaluation>,
   results: TaskResult[],
   config: ResolvedConfig,
-  usageTracker: UsageTracker,
   testMode?: boolean,
 ): Promise<SprintMetrics | undefined> {
   if (!testMode) {
@@ -520,7 +506,6 @@ export async function runRetroPhase(
       sprint.phase = SprintPhase.RETRO;
       return await finalizeSprint(projectRoot, sprint, evaluations, results, {
         config,
-        usageTracker,
       });
     } catch (err) {
       safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);

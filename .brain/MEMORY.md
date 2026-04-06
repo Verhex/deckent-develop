@@ -224,3 +224,18 @@ A) Çift Geçiş Fix: dry-run path'de 2 ayrı readdirSync() → tek allTaskFiles
 - Tech Debt Kapatma — routeTaskV2 Cagri Yerleri + Kalan Catch Bloklari: GO_WITH_TECH_DEBT — A) routeTaskV2 calls updated with sprintId/taskId/projectRoot: sprint-controller.ts planSprint routing-v2 block now pass
 - Planner'a Gecmis Bilgisi Enjeksiyonu: GO_WITH_TECH_DEBT — A) outcome-tracker.ts: getWorstCombinations(limit=5) metodu eklendi. Son 5 sprint outcomes dosyalarını okur, agent+skill
 ## Sprint sprint-087 Learnings
+## Sprint sprint-088 Learnings
+- Mid-Sprint Reroute Güçlendirme — Max 3 + Config: GO_WITH_TECH_DEBT — Mid-sprint reroute güçlendirme tamamlandı.
+
+A) config-types.ts DOĞRULANDI: max_reroutes ve reroute_on_tech_debt DeckentC
+- Checkpoint CLI/MCP Entegrasyonu — Approve/Reject Komutları: GO_WITH_TECH_DEBT — Checkpoint CLI/MCP entegrasyonu tamamlandı. A) CLI: `deckent checkpoint list/approve/reject` komutları eklendi (checkpoi
+- Kalan Sessiz Catch Blokları — Son Dalga: GO_WITH_TECH_DEBT — A) README.md: badge'lar 12239+/87+/v0.3.0-beta.3 güncellendi, Key Features'a Heartbeat Daemon/Human Checkpoints/Configur
+## Sprint sprint-089 Learnings
+- Usage Core Modülleri Kaldır — Tipler, Config, Tracker: GO_WITH_TECH_DEBT — Usage core modülleri tamamen kaldırıldı:
+
+A) src/core/usage-tracker.ts SİLİNDİ (395 satır) — UsageTracker class, UsageEn
+- Usage Orchestra + Provider Modülleri Kaldır: GO_WITH_TECH_DEBT — Usage Orchestra + Provider Modülleri tamamen kaldırıldı.
+
+A) usage-manager.ts SİLİNDİ (462 satır) — checkUsage, adjustSp
+- Usage CLI + MCP + API + Dashboard Kaldır: GO_WITH_TECH_DEBT — A) src/cli/commands/usage.ts SİLİNDİ (214 satır — registerUsage, buildUsageOutput, UsageTracker import'ları). B) src/cli
+- Usage Test Dosyaları + Dokümantasyon Temizliği: GO_WITH_TECH_DEBT — A) 6 usage test dosyası silindi: tests/core/usage-tracker.test.ts, tests/cli/usage.test.ts, tests/cli/commands/usage.tes

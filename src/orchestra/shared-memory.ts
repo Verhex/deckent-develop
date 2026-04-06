@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { ErrorRegistry } from '../core/errors.js';
+import { debugLog } from '../core/utils.js';
 
 export interface SharedMemoryEntry {
   value: unknown;
@@ -98,13 +99,13 @@ export class SharedMemory {
           try {
             unlinkSync(this._keyPath(key));
             removed++;
-          } catch {
-            // best effort
+          } catch (e) {
+            debugLog('SharedMemory:evictExpired:unlinkSync', e);
           }
         }
       }
-    } catch {
-      // best effort
+    } catch (e) {
+      debugLog('SharedMemory:evictExpired:readdirSync', e);
     }
     return removed;
   }

@@ -78,18 +78,27 @@ export class MidSprintAdapter {
       return { should: false, reason: 'Alternative routing is same as original' };
     }
 
-    // Only reroute if we have reasonable confidence
-    if (newDecision.agentConfidence === 'uncertain' && newDecision.skillConfidence === 'uncertain') {
+    // Confidence threshold: only reroute when at least one dimension has medium+ confidence
+    const confidenceOk =
+      newDecision.agentConfidence === 'high' || newDecision.agentConfidence === 'medium' ||
+      newDecision.skillConfidence === 'high' || newDecision.skillConfidence === 'medium';
+
+    if (!confidenceOk) {
+      debugLog('mid-sprint-adapter:shouldReroute', `Skipping reroute for task ${task.id}: insufficient confidence (agent=${newDecision.agentConfidence}, skill=${newDecision.skillConfidence})`);
       return { should: false, reason: 'No confident alternative available' };
     }
 
-    this.rerouteAttempts.set(task.id, attempts + 1);
+    const newAttempts = attempts + 1;
+    this.rerouteAttempts.set(task.id, newAttempts);
 
-    return {
-      should: true,
-      reason: `Rerouting: agent ${task.assignedAgent}→${newDecision.agentId}, skills [${(task.assignedSkills ?? []).join(',')}]→[${newDecision.skillIds.join(',')}]`,
-      newDecision,
-    };
+    // Track reroute count in task routing metadata
+    if (!task.routingMeta) task.routingMeta = {};
+    task.routingMeta.rerouteCount = newAttempts;
+
+    const reason = `Rerouting: agent ${task.assignedAgent}→${newDecision.agentId}, skills [${(task.assignedSkills ?? []).join(',')}]→[${newDecision.skillIds.join(',')}] (attempt ${newAttempts}/${this.maxReroutesPerTask})`;
+    debugLog('mid-sprint-adapter:shouldReroute', reason);
+
+    return { should: true, reason, newDecision };
   }
 
   /**

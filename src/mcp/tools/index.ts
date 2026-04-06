@@ -10,7 +10,6 @@ import { registerHistoryTool } from './history.js';
 import { registerAnalyzeTool } from './analyze.js';
 import { registerSyncTool } from './sync.js';
 import { registerConfigTool } from './config.js';
-import { registerUsageTool } from './usage.js';
 import { registerReviewTool } from './review.js';
 import { registerRunTool } from './run.js';
 import { registerKillTool } from './kill.js';
@@ -18,6 +17,7 @@ import { registerCleanupTool } from './cleanup.js';
 import { registerHelpTool } from './help.js'; // deckent_help
 import { registerAgentListTool } from './agent-list.js';
 import { registerSkillListTool } from './skill-list.js';
+import { registerCheckpointTool } from './checkpoint.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -31,7 +31,6 @@ export function registerTools(server: McpServer): void {
   registerAnalyzeTool(server);
   registerSyncTool(server);
   registerConfigTool(server);
-  registerUsageTool(server);
   registerReviewTool(server);
   registerRunTool(server);
   registerKillTool(server);
@@ -39,4 +38,5 @@ export function registerTools(server: McpServer): void {
   registerHelpTool(server);
   registerAgentListTool(server);
   registerSkillListTool(server);
+  registerCheckpointTool(server);
 }

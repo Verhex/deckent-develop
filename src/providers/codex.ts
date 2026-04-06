@@ -12,7 +12,7 @@ import {
   closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { ModelType, OpenAIModel, UsageMetrics } from '../core/types.js';
+import type { ModelType, OpenAIModel } from '../core/types.js';
 import { PROVIDER_MODEL_MAP, isOpenAIModel } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
@@ -34,12 +34,6 @@ export const CODEX_TIER_MODELS = {
 
 /** Auth modes supported by Codex CLI */
 export type CodexAuthMode = 'api_key' | 'subscription' | 'none';
-
-const SAFE_USAGE_DEFAULT: UsageMetrics = {
-  fiveHourPercent: 50,
-  weeklyPercent: 30,
-  measuredAt: new Date().toISOString(),
-};
 
 // ─── Worker Entry ────────────────────────────────────────────────────
 
@@ -164,42 +158,6 @@ export class CodexAdapter implements ProviderAdapter {
 
   listWorkers(): string[] {
     return Array.from(this.workers.keys());
-  }
-
-  // ─── checkUsage() ───────────────────────────────────────────────────
-
-  /**
-   * Check OpenAI API usage / rate limit status.
-   * Attempts to query the Codex CLI for usage info.
-   * Falls back to safe defaults if unavailable.
-   */
-  async checkUsage(): Promise<UsageMetrics> {
-    try {
-      const authMode = this.detectAuthMode();
-      if (authMode === 'none') {
-        return { ...SAFE_USAGE_DEFAULT, measuredAt: new Date().toISOString() };
-      }
-
-      // Attempt to get usage from codex CLI
-      const result = spawnSync('codex', ['usage'], {
-        encoding: 'utf-8',
-        timeout: 5_000,
-      });
-
-      if (result.status === 0 && result.stdout) {
-        const parsed = parseCodexUsageOutput(result.stdout);
-        if (parsed) return parsed;
-      }
-
-      // CLI doesn't expose usage — return conservative defaults
-      return {
-        fiveHourPercent: 0,
-        weeklyPercent: 0,
-        measuredAt: new Date().toISOString(),
-      };
-    } catch {
-      return { ...SAFE_USAGE_DEFAULT, measuredAt: new Date().toISOString() };
-    }
   }
 
   // ─── isAvailable() ──────────────────────────────────────────────────
@@ -353,40 +311,6 @@ function ensureDir(dir: string): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
-}
-
-/**
- * Parse codex CLI usage output into UsageMetrics.
- * Expected format varies — attempts to extract percentage values.
- * Returns null if parsing fails.
- */
-export function parseCodexUsageOutput(stdout: string): UsageMetrics | null {
-  try {
-    // Try JSON format first
-    const parsed = JSON.parse(stdout) as Record<string, unknown>;
-    if (typeof parsed['usage_percent'] === 'number') {
-      return {
-        fiveHourPercent: (parsed['usage_percent'] as number) ?? 0,
-        weeklyPercent: (parsed['weekly_percent'] as number) ?? 0,
-        measuredAt: new Date().toISOString(),
-      };
-    }
-  } catch {
-    // Not JSON — try text parsing
-  }
-
-  // Try text format: "Usage: 45% (5h) / 20% (weekly)"
-  const fiveHourMatch = /(\d+)%\s*\(5h\)/i.exec(stdout);
-  const weeklyMatch = /(\d+)%\s*\(weekly\)/i.exec(stdout);
-  if (fiveHourMatch || weeklyMatch) {
-    return {
-      fiveHourPercent: fiveHourMatch ? parseInt(fiveHourMatch[1]!, 10) : 0,
-      weeklyPercent: weeklyMatch ? parseInt(weeklyMatch[1]!, 10) : 0,
-      measuredAt: new Date().toISOString(),
-    };
-  }
-
-  return null;
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────

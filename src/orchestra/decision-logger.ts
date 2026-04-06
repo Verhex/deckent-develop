@@ -3,6 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { DecisionLogEntry } from '../core/decision-types.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Persisted Decision Log ────────────────────────────────────────────────
 
@@ -73,7 +74,8 @@ export class DecisionLogger {
       const raw = fs.readFileSync(filePath, 'utf-8');
       const parsed = JSON.parse(raw) as PersistedDecisionLog;
       return { steps: parsed.steps, decidedAt: parsed.decidedAt };
-    } catch {
+    } catch (e) {
+      debugLog('decision-logger:readDecisionLog', e);
       return null;
     }
   }
@@ -96,8 +98,8 @@ export class DecisionLogger {
         if (parsed.sprintId === sprintId) {
           taskIds.push(parsed.taskId);
         }
-      } catch {
-        // Skip corrupted files
+      } catch (e) {
+        debugLog('decision-logger:getDecisionTaskIds', e);
       }
     }
     return taskIds;

@@ -1,5 +1,5 @@
 // ─── Decision System Types ─────────────────────────────────────────────────
-import type { ModelType, TaskEffort, TaskScope, PatternEntry, UsageMetrics, ResolvedConfig } from './types.js';
+import type { ModelType, TaskEffort, TaskScope, PatternEntry, ResolvedConfig } from './types.js';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import type { SkillDefinition, ProjectStack } from './skill-types.js';
 
@@ -49,7 +49,6 @@ export interface DecisionContext {
   agentPool: AgentPool;
   skillPool: Map<string, SkillDefinition>;
   patterns: PatternEntry[];
-  usageMetrics: UsageMetrics;
   config: ResolvedConfig;
 }
 

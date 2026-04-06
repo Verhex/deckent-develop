@@ -20,11 +20,6 @@ function makeAdapter(
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({
-      fiveHourPercent: 10,
-      weeklyPercent: 5,
-      measuredAt: new Date().toISOString(),
-    }),
     isAvailable: vi.fn().mockResolvedValue(available),
     buildCommand: vi.fn().mockReturnValue(`${name} -p`),
   };

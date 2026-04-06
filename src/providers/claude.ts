@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ModelType, UsageMetrics } from '../core/types.js';
+import type { ModelType } from '../core/types.js';
 import { CLAUDE_MODELS } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
@@ -31,11 +31,6 @@ export interface ClaudeAdapterOptions {
 // ─── Constants ───────────────────────────────────────────────────────
 
 const SUPPORTED_MODELS: readonly ModelType[] = [...CLAUDE_MODELS];
-const SAFE_USAGE_DEFAULT: UsageMetrics = {
-  fiveHourPercent: 50,
-  weeklyPercent: 30,
-  measuredAt: new Date().toISOString(),
-};
 
 /**
  * Informative error message for MCP backend — includes sprint context,
@@ -154,43 +149,6 @@ export class ClaudeAdapter implements ProviderAdapter {
       return this.subprocessBackend.listWorkers();
     }
     return listWorkers();
-  }
-
-  /**
-   * Check Claude CLI usage (5-hour and weekly percentages).
-   * Runs `claude -p /usage` and parses the output.
-   * Falls back to safe defaults if the command fails.
-   */
-  async checkUsage(): Promise<UsageMetrics> {
-    try {
-      const result = spawnSync('claude', ['-p', '/usage'], {
-        encoding: 'utf-8',
-        timeout: 10_000,
-        shell: process.platform === 'win32',
-      });
-      if (result.status !== 0 || !result.stdout) {
-        return { ...SAFE_USAGE_DEFAULT, measuredAt: new Date().toISOString() };
-      }
-
-      const output = result.stdout;
-      const fiveHrMatch =
-        output.match(/5[- ]?h(?:r|our(?:ly)?)?[:\s]+(\d+(?:\.\d+)?)\s*%/i) ??
-        output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*5[- ]?h/i);
-      const weeklyMatch =
-        output.match(/week(?:ly)?[:\s]+(\d+(?:\.\d+)?)\s*%/i) ??
-        output.match(/(\d+(?:\.\d+)?)\s*%[^%\n]*week/i);
-
-      const fiveHourPercent = fiveHrMatch?.[1]
-        ? parseFloat(fiveHrMatch[1])
-        : SAFE_USAGE_DEFAULT.fiveHourPercent;
-      const weeklyPercent = weeklyMatch?.[1]
-        ? parseFloat(weeklyMatch[1])
-        : SAFE_USAGE_DEFAULT.weeklyPercent;
-
-      return { fiveHourPercent, weeklyPercent, measuredAt: new Date().toISOString() };
-    } catch {
-      return { ...SAFE_USAGE_DEFAULT, measuredAt: new Date().toISOString() };
-    }
   }
 
   /**

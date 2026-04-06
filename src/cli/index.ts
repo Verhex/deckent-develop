@@ -12,7 +12,6 @@ import { registerRetro } from './commands/retro.js';
 import { registerCleanup } from './commands/cleanup.js';
 import { registerDoctor } from './commands/doctor.js';
 import { registerConfig } from './commands/config.js';
-import { registerUsage } from './commands/usage.js';
 import { registerHistory } from './commands/history.js';
 import { registerPlugin } from './commands/plugin.js';
 import { registerUpgrade } from './commands/upgrade.js';
@@ -33,6 +32,7 @@ import { registerFinalize } from './commands/finalize.js';
 import { registerExplain } from './commands/explain.js';
 import { registerSetDirectives } from './commands/set-directives.js';
 import { registerHeartbeat } from './commands/heartbeat.js';
+import { registerCheckpoint } from './commands/checkpoint.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -66,7 +66,6 @@ export function buildProgram(): Command {
   registerCleanup(program);
   registerDoctor(program);
   registerConfig(program);
-  registerUsage(program);
   registerHistory(program);
   registerPlugin(program);
   registerUpgrade(program);
@@ -87,6 +86,7 @@ export function buildProgram(): Command {
   registerExplain(program);
   registerSetDirectives(program);
   registerHeartbeat(program);
+  registerCheckpoint(program);
 
   return program;
 }

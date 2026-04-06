@@ -326,38 +326,6 @@ describe('credentials readJsonSafe migration', () => {
   });
 });
 
-// ─── usage-tracker.ts migration ─────────────────────────────────────────────
-
-describe('usage-tracker readJsonSafe migration', () => {
-  it('source file imports readJsonSafe', async () => {
-    const { readFileSync } = await import('node:fs');
-    const source = readFileSync('src/core/usage-tracker.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
-    const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
-    expect(jsonParseCount).toBe(0);
-  });
-
-  it('UsageTracker reads sprint usage correctly', async () => {
-    const { UsageTracker } = await import('../../src/core/usage-tracker.js');
-    const tracker = new UsageTracker(TMP);
-    tracker.recordCall('opus', 100, 'task-001', 'sprint-001');
-    const usage = tracker.getSprintUsage('sprint-001');
-    expect(usage.totalCalls).toBe(1);
-    expect(usage.totalTokens).toBe(100);
-  });
-
-  it('UsageTracker handles invalid sprint file gracefully', async () => {
-    const { UsageTracker } = await import('../../src/core/usage-tracker.js');
-    const usageDir = join(TMP, '.deckent', 'usage');
-    mkdirSync(usageDir, { recursive: true });
-    writeInvalid(join(usageDir, 'sprint-bad.json'));
-    const tracker = new UsageTracker(TMP);
-    const usage = tracker.getSprintUsage('sprint-bad');
-    expect(usage.totalCalls).toBe(0);
-    expect(usage.entries).toEqual([]);
-  });
-});
-
 // ─── skill-pool.ts migration ────────────────────────────────────────────────
 
 describe('skill-pool readJsonSafe migration', () => {
@@ -602,7 +570,6 @@ describe('migration completeness — no inline JSON.parse(readFileSync) in migra
     'src/core/stack-detector.ts',
     'src/core/agent-pool.ts',
     'src/core/credentials.ts',
-    'src/core/usage-tracker.ts',
     'src/core/skill-pool.ts',
     'src/core/subscription.ts',
     'src/core/analyzer.ts',

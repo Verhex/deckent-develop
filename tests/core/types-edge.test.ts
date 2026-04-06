@@ -18,7 +18,6 @@ import type {
   TaskScope,
   GoNoGoCriteria,
   DashboardState,
-  UsageMetrics,
   AgentInfo,
   Alert,
   DebtItem,
@@ -388,11 +387,6 @@ describe('SelfAssessment type', () => {
 
 describe('DashboardState interface', () => {
   it('should validate a minimal DashboardState', () => {
-    const usage: UsageMetrics = {
-      fiveHourPercent: 50,
-      weeklyPercent: 30,
-      measuredAt: '2026-01-01T00:00:00.000Z',
-    };
     const dashboard: DashboardState = {
       sprint: {
         id: 'sprint-001',
@@ -402,7 +396,6 @@ describe('DashboardState interface', () => {
       },
       agents: [],
       progress: { done: 3, active: 2, blocked: 0, total: 5 },
-      usage,
       alerts: [],
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
@@ -412,11 +405,6 @@ describe('DashboardState interface', () => {
   });
 
   it('should allow optional auditorLastScan and violations', () => {
-    const usage: UsageMetrics = {
-      fiveHourPercent: 0,
-      weeklyPercent: 0,
-      measuredAt: '2026-01-01T00:00:00.000Z',
-    };
     const dashboard: DashboardState = {
       sprint: {
         id: 'sprint-002',
@@ -426,7 +414,6 @@ describe('DashboardState interface', () => {
       },
       agents: [],
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
-      usage,
       alerts: [],
       updatedAt: '2026-01-01T00:00:00.000Z',
       auditorLastScan: '2026-01-01T00:00:30.000Z',
@@ -437,11 +424,6 @@ describe('DashboardState interface', () => {
   });
 
   it('should support nested agents with AgentInfo', () => {
-    const usage: UsageMetrics = {
-      fiveHourPercent: 10,
-      weeklyPercent: 5,
-      measuredAt: '2026-01-01T00:00:00.000Z',
-    };
     const agentInfo: AgentInfo = {
       id: 'w-001',
       role: 'worker',
@@ -460,7 +442,6 @@ describe('DashboardState interface', () => {
       },
       agents: [agentInfo],
       progress: { done: 0, active: 1, blocked: 0, total: 1 },
-      usage,
       alerts: [],
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
@@ -469,11 +450,6 @@ describe('DashboardState interface', () => {
   });
 
   it('should support alerts with different levels', () => {
-    const usage: UsageMetrics = {
-      fiveHourPercent: 90,
-      weeklyPercent: 80,
-      measuredAt: '2026-01-01T00:00:00.000Z',
-    };
     const criticalAlert: Alert = {
       level: AlertLevel.CRITICAL,
       message: 'Usage threshold exceeded',
@@ -494,7 +470,6 @@ describe('DashboardState interface', () => {
       },
       agents: [],
       progress: { done: 0, active: 0, blocked: 1, total: 1 },
-      usage,
       alerts: [criticalAlert, infoAlert],
       updatedAt: '2026-01-01T00:00:00.000Z',
     };

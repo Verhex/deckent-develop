@@ -3,6 +3,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -72,8 +73,8 @@ export class BatchStatsUpdater {
         if (fs.existsSync(filePath)) {
           try {
             existing = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-          } catch {
-            // start fresh
+          } catch (e) {
+            debugLog('BatchStatsUpdater:flush:readFile', e);
           }
         }
 

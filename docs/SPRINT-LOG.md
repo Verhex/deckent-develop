@@ -2433,3 +2433,53 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 088-004: README + IDENTITY + Docs Final Polish (DONE)
 
 ---
+## Sprint 88 — sprint-088
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 948s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | 24.0% |
+| Duration | 948145ms |
+
+### Tasks
+
+- 088-001: Adaptive Thresholds — NO_GO Rate Bazlı Otomatik Ayar (DONE)
+- 088-002: Mid-Sprint Reroute Güçlendirme — Max 3 + Config (GO_WITH_TECH_DEBT)
+- 088-003: Checkpoint CLI/MCP Entegrasyonu — Approve/Reject Komutları (GO_WITH_TECH_DEBT)
+- 088-004: Kalan Sessiz Catch Blokları — Son Dalga (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 89 — sprint-089
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 1193s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1193065ms |
+
+### Tasks
+
+- 089-001: Usage Core Modülleri Kaldır — Tipler, Config, Tracker (GO_WITH_TECH_DEBT)
+- 089-002: Usage Orchestra + Provider Modülleri Kaldır (GO_WITH_TECH_DEBT)
+- 089-003: Usage CLI + MCP + API + Dashboard Kaldır (GO_WITH_TECH_DEBT)
+- 089-004: Usage Test Dosyaları + Dokümantasyon Temizliği (GO_WITH_TECH_DEBT)
+
+---

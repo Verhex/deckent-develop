@@ -246,8 +246,8 @@ function findTempEntityDir(tempBaseDir: string, entityId: string): string | null
         return join(tempBaseDir, entry.name);
       }
     }
-  } catch {
-    // ignore
+  } catch (e) {
+    debugLog('findTempDir:readdirSync', e);
   }
   return null;
 }

@@ -41,7 +41,6 @@ vi.mock('../../src/providers/subprocess.js', () => {
     spawn: vi.fn(),
     kill: vi.fn(),
     listWorkers: vi.fn().mockReturnValue([]),
-    checkUsage: vi.fn().mockResolvedValue({ fiveHourPercent: 0, weeklyPercent: 0, measuredAt: '' }),
     isAvailable: vi.fn().mockResolvedValue(true),
   };
   return {

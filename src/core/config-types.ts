@@ -5,25 +5,12 @@ import type { DecisionEngineConfig, LearningConfig, CollaborationConfig } from '
 import type { NotificationConfig } from './notifications.js';
 import type { ModelType, ProviderName } from './task-types.js';
 
-// ─── Usage & Budgeting (Blueprint 9) ────────────────────────────────
-export interface UsageMetrics {
-  fiveHourPercent: number;
-  weeklyPercent: number;
-  measuredAt: string;
-}
-
-export interface UsageThresholds {
-  '5hr': number;
-  weekly: number;
-}
-
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
   brain_model: ModelType;
   default_model: ModelType;
   haiku_allowed: boolean;
-  usage_thresholds: UsageThresholds;
   budget_per_sprint?: number;
   requires?: string;
   brain_planning?: BrainPlanningMode;
@@ -38,6 +25,16 @@ export interface SkillConfig {
   maxPerTask: number;         // default 3
   autoDetectStack: boolean;   // default true
   preferredSkills: string[];
+}
+
+/** Tuning parameters for adaptive threshold adjustment */
+export interface AdaptiveConfig {
+  /** Minimum number of past sprints required before adjusting (default: 3) */
+  min_samples: number;
+  /** NO_GO rate threshold (0-1) above which agent_min_score is lowered (default: 0.3) */
+  no_go_threshold: number;
+  /** Number of recent sprints to consider for coverage averaging (default: 3) */
+  coverage_lookback: number;
 }
 
 export interface DeckentConfig {
@@ -174,6 +171,8 @@ export interface DeckentConfig {
   adaptive_thresholds?: boolean;
   /** Minimum agent score for routing selection (default: 5, range: 2-8) */
   agent_min_score?: number;
+  /** Adaptive threshold tuning parameters */
+  adaptive_config?: AdaptiveConfig;
 
   // ─── Routing Engine v2 ─────────────────────────────────────────────
   /** Routing engine version: 'v1' (keyword-based), 'v2' (intent-based). Default: 'v2' */
@@ -236,6 +235,7 @@ export interface ResolvedConfig {
   // Adaptive Thresholds
   adaptive_thresholds: boolean;
   agent_min_score: number;
+  adaptive_config: AdaptiveConfig;
   // Rollback
   rollback_policy?: 'never' | 'on_failure' | 'always';
   // Routing Engine v2

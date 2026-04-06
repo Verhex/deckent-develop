@@ -3,9 +3,10 @@ import { loadConfig } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import type { BootstrapResult } from '../../core/provider.js';
 import {
-  runSprint, readContext, checkUsage, adjustSprintSize, planSprint,
+  runSprint, readContext, planSprint,
   BrainError,
 } from '../../orchestra/brain.js';
+import type { SprintSizeRecommendation } from '../../core/types.js';
 import { isSessionActive, setupWatchWindow } from '../../orchestra/tmux.js';
 import { TMUX_SESSION_NAME } from '../../core/constants.js';
 import { runDoctorChecks } from './doctor.js';
@@ -234,8 +235,12 @@ export function registerStart(program: Command): void {
             print(getMessage('start.watch_ignored_dry_run', lang));
           }
           const context = readContext(root);
-          const usage = checkUsage(config);
-          const recommendation = adjustSprintSize(config, usage);
+          const recommendation: SprintSizeRecommendation = {
+            size: 'full',
+            maxWorkers: typeof config.activeModeConfig.max_workers === 'number' ? config.activeModeConfig.max_workers : 4,
+            modelConstraint: null,
+            reason: 'No usage constraints',
+          };
           const sprint = await planSprint(root, config, context, recommendation);
 
           print(getMessage('start.sprint_planned', lang, {

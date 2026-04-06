@@ -97,7 +97,7 @@ export function getMissingFields(existing: Record<string, unknown>): string[] {
           if (!(modeKey in existingMode)) {
             missing.push(`modes.${modeName}.${modeKey}`);
           } else {
-            // Check nested sub-fields for plain objects (e.g. usage_thresholds)
+            // Check nested sub-fields for plain objects
             const defaultVal = defaultMode[modeKey];
             const existingVal = existingMode[modeKey];
             if (

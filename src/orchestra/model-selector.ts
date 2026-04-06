@@ -1,6 +1,6 @@
 // ─── Model Selection Logic ─────────────────────────────────────────
 // Extracted from brain.ts — score-based and layered model selection
-import type { TaskScope, ModelType, ResolvedConfig, UsageMetrics, PatternEntry, ProviderName } from '../core/types.js';
+import type { TaskScope, ModelType, ResolvedConfig, PatternEntry, ProviderName } from '../core/types.js';
 import { getModelTier } from '../core/types.js';
 import { getEquivalentModel, isModelAvailable } from '../core/model-equivalence.js';
 
@@ -129,16 +129,14 @@ export function suggestModelFromPatterns(scope: TaskScope, patterns: PatternEntr
  * Top-level model selector that applies layered filtering rules.
  * Layer order (highest priority first):
  *   1. Plan access filter: pro_plan disallows opus; haiku_allowed=false disallows haiku
- *   2. Usage pressure: 80%+ usage downgrades opus to sonnet
- *   3. Task type filter: doc/test-only scope caps at sonnet
- *   4. Score system: inferModelFromDirective as base
- *   5. Pattern-based upgrade and skill model preferences
- *   6. Provider mapping: map final model to target provider via tier equivalence
+ *   2. Task type filter: doc/test-only scope caps at sonnet
+ *   3. Score system: inferModelFromDirective as base
+ *   4. Pattern-based upgrade and skill model preferences
+ *   5. Provider mapping: map final model to target provider via tier equivalence
  * @param title - Task title text
  * @param description - Task description text
  * @param scope - Task scope defining directories and files
  * @param config - Resolved project configuration
- * @param usage - Current usage metrics (percentage-based)
  * @param patterns - Optional pattern entries for model upgrade suggestions
  * @param forceModel - Optional user override that bypasses all auto-selection
  * @param skillModels - Optional model preferences from assigned skills
@@ -150,7 +148,6 @@ export function resolveTaskModel(
   description: string,
   scope: TaskScope,
   config: ResolvedConfig,
-  usage: UsageMetrics,
   patterns?: PatternEntry[],
   forceModel?: ModelType,
   skillModels?: ModelType[],
@@ -184,7 +181,7 @@ export function resolveTaskModel(
     if (getModelTier(highest) > getModelTier(model)) model = highest;
   }
 
-  // Layer 3: task type filter — docs or test-only → cap at sonnet
+  // Layer 2: task type filter — docs or test-only → cap at sonnet
   const isDocScope = scope.directories.length > 0 && scope.directories.every(d =>
     d === 'docs' || d.startsWith('docs/') ||
     d === 'tmp-test' || d.startsWith('tmp-test/') ||
@@ -196,12 +193,6 @@ export function resolveTaskModel(
   if (isDocScope || isTestOnly) {
     // Downgrade tier-2 models to tier-1 equivalent for doc/test scope
     if (getModelTier(model) >= 2) model = 'sonnet';
-  }
-
-  // Layer 2: usage pressure — 80%+ → downgrade tier-2 to tier-1
-  const usageHigh = usage.fiveHourPercent >= 80 || usage.weeklyPercent >= 80;
-  if (usageHigh && getModelTier(model) >= 2) {
-    model = 'sonnet';
   }
 
   // Layer 1: plan access filter (highest priority)
@@ -216,7 +207,7 @@ export function resolveTaskModel(
     model = 'sonnet';
   }
 
-  // Layer 6: provider mapping — convert Claude model to target provider equivalent
+  // Layer 5: provider mapping — convert Claude model to target provider equivalent
   if (targetProvider !== 'claude') {
     model = getEquivalentModel(model, targetProvider);
   }

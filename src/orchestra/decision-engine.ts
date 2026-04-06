@@ -105,7 +105,6 @@ export class DecisionOrchestrator {
       task.description,
       task.scope,
       this.context.config,
-      this.context.usageMetrics,
       this.context.patterns,
       task.forceModel,
       allSkillModels.length > 0 ? allSkillModels : undefined,

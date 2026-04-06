@@ -47,8 +47,6 @@ import type {
   DetectionMethod,
   SubscriptionProfile,
   SetupRecommendation,
-  UsageMetrics,
-  UsageThresholds,
   SystemProfile,
   SprintUsageReport,
   Sprint,
@@ -516,12 +514,8 @@ describe('Comprehensive export presence check', () => {
   it('type-only exports compile correctly (TypeScript-level check)', () => {
     // These are compile-time checks — if this file compiles, the types exist.
     // We create instances to verify the type shapes.
-    const usage: UsageMetrics = { fiveHourPercent: 50, weeklyPercent: 25, measuredAt: '' };
-    const thresholds: UsageThresholds = { '5hr': 80, weekly: 70 };
     const profile: SystemProfile = { cpuCores: 4, totalMemMB: 8192, freeMemMB: 4096, recommendedMaxWorkers: 3 };
 
-    expect(usage.fiveHourPercent).toBe(50);
-    expect(thresholds['5hr']).toBe(80);
     expect(profile.cpuCores).toBe(4);
   });
 

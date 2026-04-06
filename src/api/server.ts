@@ -18,7 +18,7 @@ import { killWorker } from '../orchestra/tmux.js';
 import { loadConfig, createDefaultConfig, validatePartialConfig, ConfigValidationError } from '../core/config.js';
 import { readWorkerLog } from '../agents/worker.js';
 import {
-  runSprint, readContext, checkUsage, adjustSprintSize, planSprint, cleanup,
+  runSprint, readContext, planSprint, cleanup,
 } from '../orchestra/brain.js';
 
 const MIME_TYPES: Record<string, string> = {
@@ -504,8 +504,13 @@ async function handleRequest(
         void b.directive; // reserved for future use
         const config = await loadConfig(projectRoot);
         const context = readContext(projectRoot);
-        const usage = checkUsage(config);
-        const recommendation = adjustSprintSize(config, usage);
+        const maxW = config.activeModeConfig.max_workers;
+        const recommendation = {
+          size: 'full' as const,
+          maxWorkers: typeof maxW === 'number' ? maxW : 4,
+          modelConstraint: null,
+          reason: 'No usage constraints',
+        };
         const plan = await planSprint(projectRoot, config, context, recommendation, {
           mode: b.mode,
         });

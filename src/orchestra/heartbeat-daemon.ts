@@ -190,8 +190,8 @@ export class HeartbeatDaemon {
     const pidPath = join(this.projectRoot, DECKENT_DIR, PID_FILE);
     try {
       writeFileSync(pidPath, String(process.pid), 'utf-8');
-    } catch {
-      /* best-effort */
+    } catch (e) {
+      debugLog('HeartbeatDaemon:writePidFile', e);
     }
   }
 
@@ -199,8 +199,8 @@ export class HeartbeatDaemon {
     const pidPath = join(this.projectRoot, DECKENT_DIR, PID_FILE);
     try {
       if (existsSync(pidPath)) unlinkSync(pidPath);
-    } catch {
-      /* best-effort */
+    } catch (e) {
+      debugLog('HeartbeatDaemon:removePidFile', e);
     }
   }
 }
@@ -217,11 +217,12 @@ export function readDaemonPid(projectRoot: string): number | null {
     // Check if process is alive
     process.kill(pid, 0);
     return pid;
-  } catch {
+  } catch (e) {
+    debugLog('readDaemonPid:kill0', e);
     // Process not running or permission denied — remove stale PID
     try {
       unlinkSync(pidPath);
-    } catch { /* ignore */ }
+    } catch (e2) { debugLog('readDaemonPid:unlinkSync', e2); }
     return null;
   }
 }
@@ -239,7 +240,8 @@ export function stopDaemonByPid(projectRoot: string): boolean {
     const pidPath = join(projectRoot, DECKENT_DIR, PID_FILE);
     if (existsSync(pidPath)) unlinkSync(pidPath);
     return true;
-  } catch {
+  } catch (e) {
+    debugLog('stopDaemonByPid:kill', e);
     return false;
   }
 }

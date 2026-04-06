@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, readdirSync } from
 import { join } from 'node:path';
 import { BRAIN_DIR } from '../core/constants.js';
 import type { LearningEntry } from './pattern-recorder.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -60,8 +61,8 @@ export function decayLearningData(
   for (const file of toRemove) {
     try {
       unlinkSync(join(learningPath, `${file}.json`));
-    } catch {
-      // ignore removal errors
+    } catch (e) {
+      debugLog('decayOldLearnings:unlinkSync', e);
     }
   }
 
@@ -134,8 +135,8 @@ function readAllEntries(learningPath: string): LearningEntry[] {
       if (Array.isArray(parsed)) {
         entries.push(...(parsed as LearningEntry[]));
       }
-    } catch {
-      // skip malformed files
+    } catch (e) {
+      debugLog('readAllLearnings:parseFile', e);
     }
   }
 
