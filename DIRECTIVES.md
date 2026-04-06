@@ -1,208 +1,183 @@
-# DIRECTIVES — Sprint 091: Agent/Skill Stats & Otonom Evrim Pipeline
+# DIRECTIVES — Sprint 092: Config Temizliği + Dashboard i18n Tam Kapsam
 
-## Goal: Agent ve skill performans izleme mekanizmasının 8 kopuk noktasını kapat. Tiebreaker düzelt, promotion/demotion execute et, evolved rules inject et, skill stats güncelle, RETRO'da skill tablosu göster, hard-coded sabitleri config'den oku, quality score routing'e entegre et, integration test yaz.
+## Goal: Config.json'u agresif temizle (usage artıkları, duplikasyon, tip güvenliği). Dashboard'daki 6 bileşende ~109 hardcoded İngilizce string'i i18n ile çevir. Türkçe seçildiğinde tüm UI Türkçe olmalı. Phase/Status enum değerleri İngilizce kalacak (teknik terim).
 
 ---
 
-## Task 1: Agent Tiebreaker — learnings.json'dan Oku
+## Task 1: Config.json Agresif Temizlik + Tip Güvenliği
 - Model: opus
 - Effort: normal
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/core/routing-engine.ts
-- Scope: src/core/
+- Files: .deckent/config.json, src/core/config-types.ts, src/core/config.ts
+- Scope: .deckent/, src/core/
 
 ### Description
-V2 modunda agent tiebreaker agent.json'daki stats.successRate'i okuyor ama bu değer V2'de hep 0 çünkü stats learnings.json'a yazılıyor.
+Config.json'u temizle ve tip güvenliğini sağla.
 
-A) `src/core/routing-engine.ts` satır 193-198'deki sort callback'inde:
-- `pool.get(a.id)?.stats.successRate` yerine `getLearningBonus(a.id, learningData)` kullan
-- `getLearningBonus()` fonksiyonu zaten bu dosyada tanımlı (satır ~463)
-- learningData parametresi zaten selectBestAgent fonksiyonuna geçiyor
+A) `.deckent/config.json`'dan kaldır:
+- Her mod (max_plan, max5x_plan, pro_plan, api) altındaki `usage_thresholds` objesini SİL — usage özelliği Sprint 089'da kaldırıldı
+- Üst seviye `brain_planning` field'ını kaldır — duplike, zaten modes altında var
+- Gereksiz/boş field'ları temizle
 
-B) Aynı pattern'i skill tiebreaker'da da kontrol et — varsa düzelt
+B) `src/core/config-types.ts`'de:
+- `DeckentConfig`'e `last_sprint_id?: string` ekle (tip güvenliği)
+- `PlanModeConfig`'den `usage_thresholds` field'ı kalmışsa kaldır (Sprint 089'dan kalma)
+- `brain_planning` üst seviye field varsa kaldır veya deprecated işaretle
 
-**Kanıt:** `grep "getLearningBonus" src/core/routing-engine.ts` → tiebreaker bloğunda kullanılıyor
+C) `src/core/config.ts`'de:
+- `createDefaultConfig()` ve `loadConfig()`'da usage_thresholds referansı kaldıysa kaldır
+- `last_sprint_id` load/save akışını kontrol et, DeckentConfig üzerinden geçmeli
 
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/core/routing-engine.test.ts` → 0 fail.
+D) Config.json'un final hali temiz, okunabilir, kategorize olmalı
+
+**Kanıt:** `grep "usage_thresholds\|brain_planning" .deckent/config.json` → 0 eşleşme
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run tests/core/config*.test.ts` → 0 fail.
 
 ---
 
-## Task 2: Promotion/Demotion Execute Et
-- Model: opus
-- Effort: normal
-- Agent: refactorer
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts
-- Scope: src/orchestra/
-
-### Description
-finalizeSprint() satır ~1333-1345'te promotion/demotion evaluate ediliyor ama pipeline.promote() ve pipeline.demote() asla çağrılmıyor. Sadece debugLog.
-
-A) Promote döngüsünde (action === 'promote') debugLog'dan sonra:
-- `pipeline.promote(p.entityId, p.entityType)` çağır
-- try/catch ile sarmala, hata durumunda debugLog
-
-B) Demote döngüsünde (action === 'demote') debugLog'dan sonra:
-- `pipeline.demote(d.entityId, d.entityType)` çağır
-- try/catch ile sarmala
-
-C) Her iki fonksiyon da promotion-pipeline.ts'de hazır ve çalışıyor
-
-**Kanıt:** `grep "pipeline.promote\|pipeline.demote" src/orchestra/sprint-controller.ts` → 2+ eşleşme
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/sprint-controller.test.ts` → 0 fail.
-
----
-
-## Task 3: Evolved Rules Activation'a Inject Et
+## Task 2: Dashboard i18n — StatusPage + SprintSummary (~34 key)
 - Model: opus
 - Effort: high
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts
-- Scope: src/orchestra/
+- Files: src/dashboard/src/pages/StatusPage.tsx, src/dashboard/src/components/SprintSummary.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
+- Scope: src/dashboard/
 
 ### Description
-Evolved rules learnings.json'a yazılıyor ama sonraki sprintlerde agent/skill activation config'lerine enjekte edilmiyor.
+StatusPage ve SprintSummary bileşenlerindeki hardcoded string'leri i18n ile çevir.
 
-A) planSprint() fonksiyonunda V2 routing bloğunda (satır ~607 civarı), routeTaskV2 çağrılmadan ÖNCE:
-- OutcomeTracker'dan learnings'i oku
-- evolvedRules array'inden status === 'auto-applied' olanları filtrele
-- Her kural için:
-  - entityType === 'agent' → pool'daki ilgili agent'ın activation.rules veya activation.exclude dizisine ekle
-  - entityType === 'skill' → skills map'teki ilgili skill'e ekle
-- Sadece IN-MEMORY değişiklik — diske yazmaz (her sprint başında temiz başlar)
-- Duplicate kontrolü: rule.name ile aynı isimli kural zaten varsa ekleme
+A) `StatusPage.tsx` — useTranslation import et ve tüm string'leri t() ile değiştir:
+- "No active sprint." → t('status.no_sprint')
+- "Run deckent start to begin." → t('status.run_start')
+- "Loading sprint data..." → t('status.loading')
+- "Sprint Status" → t('status.title')
 
-B) debugLog ile kaç kural inject edildiğini logla
+B) `SprintSummary.tsx` — useTranslation import et ve ~30 string'i t() ile değiştir:
+- Status label'ları: "Done", "Active", "Writing code", "Running tests", "Type checking", "Needs attention", "Error", "Paused", "Queued", "Draft", "Waiting"
+- Zaman: "< 1 min remaining", "~N min remaining", "just started", "N min elapsed"
+- Task sayıları: "N/M tasks done", "Done: N", "Active: N", "Queued: N", "N done", "N active", "N queued", "N auto-fixed"
+- Bölüm başlıkları: "What's happening now", "Working...", "Tasks", "Providers", "Needs attention"
+- NOT: Phase/Status enum değerleri (PLAN, EXECUTE, DONE vb.) İngilizce KALACAK — çevirme
 
-**Kanıt:** `grep "evolvedRules\|evolved.rules\|auto-applied" src/orchestra/sprint-controller.ts` → 2+ eşleşme
+C) `en.ts`'e ~34 yeni key ekle (status.* ve sprint_summary.* prefix'leri)
+D) `tr.ts`'e aynı ~34 key'in Türkçe çevirilerini ekle
 
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/sprint-controller.test.ts` → 0 fail.
+**Kanıt:** `grep -n "useTranslation" src/dashboard/src/pages/StatusPage.tsx src/dashboard/src/components/SprintSummary.tsx` → 2 eşleşme
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts` → 0 fail.
 
 ---
 
-## Task 4: updateSkillStats V1 + SkillMap RETRO İçin
-- Model: opus
-- Effort: normal
-- Agent: refactorer
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts
-- Scope: src/orchestra/
-
-### Description
-İki kopuk noktayı düzelt:
-
-A) V1 akışında (satır ~1271-1284) updateAgentStats() çağrılıyor ama updateSkillStats() asla çağrılmıyor:
-- V1 döngüsünde her task'ın assignedSkills'i için SkillPoolManager.updateSkillStats() çağır
-- SkillPoolManager import'u zaten mevcut (V2 bloğunda kullanılıyor)
-
-B) writeRetrospective() çağrısında (satır ~1229) skillMap=undefined geçiliyor:
-- sprint.tasks'ten skillMap oluştur: Map<taskId, string[]> — her task'ın assignedSkills'ini ekle
-- writeRetrospective'e skillMap parametresi olarak geç
-- Bu sayede RETRO.md'de Skill Performance tablosu görünecek
-
-**Kanıt:** `grep "updateSkillStats\|skillMap" src/orchestra/sprint-controller.ts` → 2+ eşleşme
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/sprint-controller.test.ts` → 0 fail.
-
----
-
-## Task 5: Hard-Coded Sabitleri Config'den Oku
-- Model: opus
-- Effort: normal
-- Agent: refactorer
-- Skills: typescript-expert
-- Files: src/core/decision-config.ts, src/orchestra/outcome-tracker.ts
-- Scope: src/core/, src/orchestra/
-
-### Description
-OutcomeTracker'daki sabitler hard-coded. LearningConfig interface'i var ama OutcomeTracker tarafından okunmuyor.
-
-A) `src/core/decision-config.ts`'de LearningConfig interface'ine ekle:
-- `minSamplesForBonus?: number` (default 3)
-- `recentSprintWindow?: number` (default 3)
-- `sprintRecencySuccessBonus?: number` (default 3)
-- `sprintRecencyFailurePenalty?: number` (default -2)
-- createDefaultLearningConfig() fonksiyonuna da default'ları ekle
-
-B) `src/orchestra/outcome-tracker.ts`'de:
-- Module-level const'ları (MIN_SAMPLES_FOR_BONUS, RECENT_SPRINT_WINDOW, vb.) instance değişkenlere çevir
-- Constructor'a opsiyonel `config?: Partial<LearningConfig>` parametresi ekle
-- `this.MIN_SAMPLES_FOR_BONUS = config?.minSamplesForBonus ?? 3` şeklinde ata
-- Dosyadaki tüm bare referansları `this.` prefix ile güncelle
-
-**Kanıt:** `grep "minSamplesForBonus\|recentSprintWindow" src/core/decision-config.ts src/orchestra/outcome-tracker.ts` → 4+ eşleşme
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/outcome-tracker.test.ts` → 0 fail.
-
----
-
-## Task 6: Quality Score Routing Bonus'a Entegre Et
-- Model: opus
-- Effort: normal
-- Agent: refactorer
-- Skills: typescript-expert
-- Files: src/orchestra/outcome-tracker.ts
-- Scope: src/orchestra/
-
-### Description
-recordOutcome() qualityScore'u kaydediyor ama calculateBonuses() bu veriyi hiç kullanmıyor.
-
-A) EntityPerformance interface'ine ekle:
-- `avgQualityScore: number` (0-100)
-
-B) updateEntityPerformance() metoduna qualityScore parametresi ekle:
-- Incremental ortalama ile avgQualityScore hesapla
-
-C) recordOutcome() içinde updateEntityPerformance çağrılarına outcome.qualityScore geç
-
-D) computeBonus() fonksiyonunda quality-based bonus mantığı:
-- avgQualityScore >= 80 ve minSamples geçildiyse → +1 bonus
-- avgQualityScore < 40 ve minSamples geçildiyse → -1 penalty
-
-E) loadLearnings() backfill'inde avgQualityScore: 0 default ekle
-
-**Kanıt:** `grep "avgQualityScore" src/orchestra/outcome-tracker.ts` → 3+ eşleşme
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/outcome-tracker.test.ts` → 0 fail.
-
----
-
-## Task 7: Integration Test — Tam Evolution Pipeline
+## Task 3: Dashboard i18n — TaskCard (~30 key)
 - Model: opus
 - Effort: high
+- Agent: refactorer
+- Skills: typescript-expert
+- Files: src/dashboard/src/components/TaskCard.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
+- Scope: src/dashboard/
+
+### Description
+TaskCard bileşenindeki ~30 hardcoded string'i i18n ile çevir.
+
+A) `TaskCard.tsx` — useTranslation import et ve tüm string'leri t() ile değiştir:
+- Status label'ları: "Completed", "Working...", "Writing code", "Running tests", "Running tests (attempt N/3)", "Type checking", "Failed — needs attention", "Error occurred", "Paused", "Waiting for Task X", "Queued", "Waiting"
+- Badge label'ları: "Done", "Active", "Writing code", "Running tests", "Type checking", "No-Go", "Error", "Paused", "Queued", "Draft", "Waiting"
+- Detay bölümleri: "Task N", "Files changed (N)", "Test results", "N passed", "N failed", "N total", "Retry history (N)", "Attempt N: reason"
+- NOT: Phase/Status enum değerleri İngilizce KALACAK
+
+B) `en.ts`'e ~30 yeni key ekle (task_card.* prefix'i)
+C) `tr.ts`'e aynı ~30 key'in Türkçe çevirilerini ekle
+
+**Kanıt:** `grep -n "useTranslation" src/dashboard/src/components/TaskCard.tsx` → 1 eşleşme
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts` → 0 fail.
+
+---
+
+## Task 4: Dashboard i18n — DebtTable + SprintChart + Layout + Kalan (~25 key)
+- Model: opus
+- Effort: normal
+- Agent: refactorer
+- Skills: typescript-expert
+- Files: src/dashboard/src/components/DebtTable.tsx, src/dashboard/src/components/SprintChart.tsx, src/dashboard/src/components/Layout.tsx, src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/pages/ConfigPage.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
+- Scope: src/dashboard/
+
+### Description
+Kalan bileşenlerdeki hardcoded string'leri i18n ile çevir.
+
+A) `DebtTable.tsx` — useTranslation import et:
+- "No technical debt entries." → t('debt.no_entries')
+- Tablo başlıkları: "ID", "Description", "Priority", "Sprint", "Status" → t('debt.col_id'), vb.
+
+B) `SprintChart.tsx` — useTranslation import et:
+- Tooltip: "Coverage", "Tasks" → t('chart.coverage'), t('chart.tasks')
+- "No data available." → t('chart.no_data')
+- "Success Rate" → t('chart.success_rate')
+- "Tasks", "Coverage %" → t('chart.tasks'), t('chart.coverage_pct')
+- "No chart data available." → t('chart.no_chart_data')
+
+C) `Layout.tsx` — SSE_LABELS'ı t() ile değiştir:
+- "Live" → t('common.live')
+- "..." → t('common.connecting')
+- "Offline" → t('common.offline')
+
+D) `DashboardPage.tsx` — relativeTime fonksiyonunu i18n-aware yap:
+- "Ns ago" → t('common.seconds_ago', { n })
+- "Nm ago" → t('common.minutes_ago', { n })
+- "Nh ago" → t('common.hours_ago', { n })
+
+E) `WorkerCard.tsx` — aynı relativeTime düzeltmesi
+
+F) `ConfigPage.tsx` — kalan hardcoded string'ler:
+- "Reset to default: X" → t('config.reset_to_default', { value })
+- "(default: X)" → t('config.default_value', { value })
+
+G) `NewSprintModal.tsx`:
+- Placeholder "# Sprint Directives..." → t('modal.directives_placeholder')
+
+H) `en.ts` + `tr.ts`'e ~25 yeni key ekle
+
+**Kanıt:** Tüm hedef dosyalarda useTranslation kullanılıyor
+
+**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts` → 0 fail.
+
+---
+
+## Task 5: i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği
+- Model: opus
+- Effort: normal
 - Agent: test-writer
 - Skills: typescript-expert, testing-expert
-- Files: tests/orchestra/evolution-pipeline.test.ts
-- Scope: tests/
+- Files: tests/dashboard/i18n-coverage.test.ts, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
+- Scope: tests/dashboard/, src/dashboard/
 
 ### Description
-Tüm pipeline'ı uçtan uca test eden integration test dosyası yaz.
+Dashboard i18n tam kapsam doğrulaması.
 
-A) Test senaryoları:
-1. recordOutcome → calculateBonuses → pozitif bonus dönmeli (5+ başarılı outcome)
-2. evolveRules → auto-applied status'lu kural üretmeli (yeterli veri ile)
-3. evaluatePromotions → promote action dönmeli (8+ task, %85+ success)
-4. buildSkillPerformance → skillMap ile çalışmalı, boş olmayan satırlar dönmeli
-5. quality score → yüksek qualityScore ile ek bonus dönmeli
-6. configurable constants → custom LearningConfig ile farklı window değerleri çalışmalı
+A) `tests/dashboard/i18n-coverage.test.ts` yeni dosya:
+- Test 1: en.ts ve tr.ts key sayıları eşit olmalı
+- Test 2: en.ts'deki her key tr.ts'de de bulunmalı (ve tersi)
+- Test 3: Hiçbir tr.ts çevirisi boş string olmamalı
+- Test 4: Tüm bileşen dosyalarında hardcoded İngilizce UI string taraması (regex ile)
+  - StatusPage, SprintSummary, TaskCard, DebtTable, SprintChart, Layout hedef dosyalar
+  - "No ", "Loading", "Error", "Failed", gibi pattern'ler bulunamazsa geçer
+  - Teknik terimler (PLAN, EXECUTE, DONE, NO_GO) hariç tutulmalı
 
-B) fs mock kullan — .deckent/routing/ dizinini mock'la
-C) Her test bağımsız çalışmalı (beforeEach ile temizle)
+B) en.ts ve tr.ts arasında eksik key varsa düzelt
 
-**Kanıt:** `ls tests/orchestra/evolution-pipeline.test.ts` → dosya var
+**Kanıt:** `ls tests/dashboard/i18n-coverage.test.ts` → dosya var
 
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/evolution-pipeline.test.ts` → 0 fail.
+**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts tests/dashboard/i18n-coverage.test.ts` → 0 fail.
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
-- npx vitest run → 0 fail (pre-existing hariç)
-- Tüm 8 kopuk nokta kapatılmalı
-- Config-driven: hard-coded sabit kalmamalı
-- learnings.json tek kaynak (V2 modunda)
-- In-memory injection — manifest dosyaları kirletilmemeli
+- npx vitest run → 0 fail
+- npx vitest run --config src/dashboard/vitest.config.ts → 0 fail
+- Dashboard Türkçe'de hardcoded İngilizce UI string → 0 (teknik terimler hariç)
+- config.json'da usage_thresholds → 0
+- en.ts ve tr.ts key sayısı eşit
 - %100 GO hedefli — yarım iş yok

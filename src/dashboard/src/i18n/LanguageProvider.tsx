@@ -8,7 +8,7 @@ type Language = 'en' | 'tr';
 interface LanguageContextValue {
   lang: Language;
   setLang: (lang: Language) => void;
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
 }
 
 const translations = { en, tr } as const;
@@ -16,7 +16,7 @@ const translations = { en, tr } as const;
 const LanguageContext = createContext<LanguageContextValue>({
   lang: 'en',
   setLang: () => {},
-  t: (key) => key,
+  t: (key) => String(key),
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
@@ -43,7 +43,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: TranslationKey): string => translations[lang][key] ?? translations.en[key] ?? key,
+    (key: TranslationKey, params?: Record<string, string | number>): string => {
+      let value = translations[lang][key] ?? translations.en[key] ?? key;
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          value = value.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
+        }
+      }
+      return value;
+    },
     [lang],
   );
 

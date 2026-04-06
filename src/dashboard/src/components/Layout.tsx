@@ -59,10 +59,16 @@ function LanguageSwitcher() {
   );
 }
 
-const SSE_LABELS: Record<SSEStatus, { label: string; color: string }> = {
-  connected: { label: "Live", color: "bg-green-500" },
-  connecting: { label: "...", color: "bg-yellow-500" },
-  disconnected: { label: "Offline", color: "bg-red-500" },
+const SSE_COLORS: Record<SSEStatus, string> = {
+  connected: "bg-green-500",
+  connecting: "bg-yellow-500",
+  disconnected: "bg-red-500",
+};
+
+const SSE_LABEL_KEYS: Record<SSEStatus, "common.live" | "common.connecting" | "common.offline"> = {
+  connected: "common.live",
+  connecting: "common.connecting",
+  disconnected: "common.offline",
 };
 
 function SidebarContent({ onNavigate, sseState, sseStatus }: { onNavigate?: () => void; sseState: DashboardState | null; sseStatus: SSEStatus }) {
@@ -94,8 +100,8 @@ function SidebarContent({ onNavigate, sseState, sseStatus }: { onNavigate?: () =
       <NavLinks onNavigate={onNavigate} />
       <div className="mt-auto pt-4 border-t border-zinc-800 space-y-2">
         <div className="flex items-center gap-2 px-3">
-          <span className={`h-2 w-2 rounded-full ${SSE_LABELS[sseStatus].color}`} />
-          <span className="text-xs text-zinc-500">{SSE_LABELS[sseStatus].label}</span>
+          <span className={`h-2 w-2 rounded-full ${SSE_COLORS[sseStatus]}`} />
+          <span className="text-xs text-zinc-500">{t(SSE_LABEL_KEYS[sseStatus])}</span>
         </div>
         <LanguageSwitcher />
       </div>

@@ -6,6 +6,20 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint92] - 2026-04-06
+
+
+### Changed
+
+- Config.json Agresif Temizlik + Tip Güvenliği (completed with tech debt)
+- Dashboard i18n — StatusPage + SprintSummary (~34 key) (completed with tech debt)
+- Dashboard i18n — TaskCard (~30 key) (completed with tech debt)
+- Dashboard i18n — DebtTable + SprintChart + Layout + Kalan (~25 key) (completed with tech debt)
+- i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 5 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint91] - 2026-04-06
 
 

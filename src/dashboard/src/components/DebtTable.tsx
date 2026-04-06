@@ -1,3 +1,5 @@
+import { useTranslation } from "../i18n/LanguageProvider";
+
 export interface DebtRow {
   id: string;
   description: string;
@@ -48,8 +50,10 @@ interface DebtTableProps {
 }
 
 export default function DebtTable({ rows }: DebtTableProps) {
+  const { t } = useTranslation();
+
   if (rows.length === 0) {
-    return <p className="text-zinc-500">No technical debt entries.</p>;
+    return <p className="text-zinc-500">{t('debt.no_entries')}</p>;
   }
 
   return (
@@ -57,11 +61,11 @@ export default function DebtTable({ rows }: DebtTableProps) {
       <table className="w-full text-sm text-left">
         <thead className="text-xs uppercase text-zinc-400 border-b border-zinc-700">
           <tr>
-            <th className="px-4 py-3">ID</th>
-            <th className="px-4 py-3">Description</th>
-            <th className="px-4 py-3">Priority</th>
-            <th className="px-4 py-3">Sprint</th>
-            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">{t('debt.col_id')}</th>
+            <th className="px-4 py-3">{t('debt.col_description')}</th>
+            <th className="px-4 py-3">{t('debt.col_priority')}</th>
+            <th className="px-4 py-3">{t('debt.col_sprint')}</th>
+            <th className="px-4 py-3">{t('debt.col_status')}</th>
           </tr>
         </thead>
         <tbody>

@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import React from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
+import { LanguageProvider } from "../../src/dashboard/src/i18n/LanguageProvider";
 import {
   SprintSummary,
   getTaskStatusColor,
@@ -15,6 +17,19 @@ import {
   type SprintSummaryProps,
 } from "../../src/dashboard/src/components/SprintSummary";
 import type { DashboardState, AgentInfo } from "../../src/dashboard/src/types";
+
+beforeEach(() => {
+  // Mock fetch for LanguageProvider's /api/config call
+  globalThis.fetch = vi.fn().mockRejectedValue(new Error('no server'));
+});
+
+afterEach(() => {
+  cleanup();
+});;
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
 
 // ─── Fixtures ───────────────────────────────────────────────────────
 
@@ -311,55 +326,55 @@ describe("formatElapsedTime", () => {
 describe("SprintSummary component", () => {
   it("renders without crashing", () => {
     const state = makeState();
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByTestId("sprint-summary")).toBeTruthy();
   });
 
   it("renders progress bar", () => {
     const state = makeState({ progress: { done: 7, active: 2, blocked: 0, total: 12 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByTestId("progress-bar")).toBeTruthy();
   });
 
   it("shows correct percentage", () => {
     const state = makeState({ progress: { done: 6, active: 2, blocked: 0, total: 12 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByTestId("progress-percentage").textContent).toBe("50%");
   });
 
   it("shows fraction (done/total)", () => {
     const state = makeState({ progress: { done: 7, active: 2, blocked: 0, total: 12 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByTestId("progress-fraction").textContent).toContain("7/12");
   });
 
   it("shows sprint ID in header", () => {
     const state = makeState();
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByText(/Sprint 040/)).toBeTruthy();
   });
 
   it("shows phase in header", () => {
     const state = makeState();
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByText(/EXECUTE/)).toBeTruthy();
   });
 
   it("shows done count", () => {
     const state = makeState({ progress: { done: 5, active: 2, blocked: 0, total: 10 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByText("5 done")).toBeTruthy();
   });
 
   it("shows active count", () => {
     const state = makeState({ progress: { done: 5, active: 2, blocked: 0, total: 10 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByText("2 active")).toBeTruthy();
   });
 
   it("shows queued count", () => {
     const state = makeState({ progress: { done: 5, active: 2, blocked: 0, total: 10 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
     expect(screen.getByText("3 queued")).toBeTruthy();
   });
 
@@ -371,7 +386,7 @@ describe("SprintSummary component", () => {
       { id: "004", title: "Prompt", status: "PENDING" },
     ];
     const state = makeState();
-    render(<SprintSummary state={state} tasks={tasks} />);
+    renderWithProviders(<SprintSummary state={state} tasks={tasks} />);
 
     const taskList = screen.getByTestId("task-list");
     expect(taskList).toBeTruthy();
@@ -395,7 +410,7 @@ describe("SprintSummary component", () => {
       { id: "002", title: "Test verify", status: "EXECUTING" },
     ];
     const state = makeState();
-    render(<SprintSummary state={state} tasks={tasks} />);
+    renderWithProviders(<SprintSummary state={state} tasks={tasks} />);
 
     expect(screen.getByText("Done")).toBeTruthy();
     expect(screen.getByText("Active")).toBeTruthy();
@@ -408,7 +423,7 @@ describe("SprintSummary component", () => {
       { id: "003", title: "T3", status: "DONE", feedbackLoop: { tscAttempts: 1, testAttempts: 1 } },
     ];
     const state = makeState();
-    render(<SprintSummary state={state} tasks={tasks} />);
+    renderWithProviders(<SprintSummary state={state} tasks={tasks} />);
 
     const selfHealing = screen.getByTestId("self-healing-count");
     expect(selfHealing.textContent).toContain("2 auto-fixed");
@@ -419,7 +434,7 @@ describe("SprintSummary component", () => {
       { id: "001", title: "T1", status: "DONE", feedbackLoop: { tscAttempts: 1, testAttempts: 1 } },
     ];
     const state = makeState();
-    render(<SprintSummary state={state} tasks={tasks} />);
+    renderWithProviders(<SprintSummary state={state} tasks={tasks} />);
 
     expect(screen.queryByTestId("self-healing-count")).toBeNull();
   });
@@ -431,7 +446,7 @@ describe("SprintSummary component", () => {
       { id: "003", title: "T3", status: "DONE", provider: "Codex" },
     ];
     const state = makeState();
-    render(<SprintSummary state={state} tasks={tasks} />);
+    renderWithProviders(<SprintSummary state={state} tasks={tasks} />);
 
     const breakdown = screen.getByTestId("provider-breakdown");
     expect(breakdown).toBeTruthy();
@@ -446,7 +461,7 @@ describe("SprintSummary component", () => {
         makeAgent({ id: "w-2", taskId: "040-006", currentAction: "Running tests, attempt 2/3" }),
       ],
     });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
 
     expect(screen.getByText("What's happening now")).toBeTruthy();
     expect(screen.getByText("040-005")).toBeTruthy();
@@ -459,7 +474,7 @@ describe("SprintSummary component", () => {
     const state = makeState({
       agents: [makeAgent({ id: "w-1", status: "DONE" })],
     });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
 
     expect(screen.queryByText("What's happening now")).toBeNull();
   });
@@ -470,7 +485,7 @@ describe("SprintSummary component", () => {
       progress: { done: 5, active: 2, blocked: 0, total: 10 },
       updatedAt: tenMinAgo,
     });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
 
     // Should show some time remaining text
     expect(screen.getByText(/min remaining/)).toBeTruthy();
@@ -479,7 +494,7 @@ describe("SprintSummary component", () => {
   it("shows elapsed time", () => {
     const fiveMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
     const state = makeState({ updatedAt: fiveMinAgo });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
 
     expect(screen.getByText(/5 min elapsed/)).toBeTruthy();
   });
@@ -489,7 +504,7 @@ describe("SprintSummary component", () => {
       { id: "009", title: "Dashboard chart", status: "NO_GO", feedbackLoop: { tscAttempts: 3, testAttempts: 1 } },
     ];
     const state = makeState();
-    render(<SprintSummary state={state} tasks={tasks} />);
+    renderWithProviders(<SprintSummary state={state} tasks={tasks} />);
 
     const warningsEl = screen.getByTestId("warnings");
     expect(warningsEl).toBeTruthy();
@@ -499,7 +514,7 @@ describe("SprintSummary component", () => {
 
   it("handles zero total tasks gracefully", () => {
     const state = makeState({ progress: { done: 0, active: 0, blocked: 0, total: 0 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
 
     expect(screen.getByTestId("progress-percentage").textContent).toBe("0%");
     expect(screen.getByTestId("progress-fraction").textContent).toContain("0/0");
@@ -507,21 +522,21 @@ describe("SprintSummary component", () => {
 
   it("handles 100% completion", () => {
     const state = makeState({ progress: { done: 12, active: 0, blocked: 0, total: 12 } });
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
 
     expect(screen.getByTestId("progress-percentage").textContent).toBe("100%");
   });
 
   it("does not show task list when no tasks provided", () => {
     const state = makeState();
-    render(<SprintSummary state={state} />);
+    renderWithProviders(<SprintSummary state={state} />);
 
     expect(screen.queryByTestId("task-list")).toBeNull();
   });
 
   it("does not show provider breakdown when no providers", () => {
     const state = makeState({ agents: [] });
-    render(<SprintSummary state={state} tasks={[]} />);
+    renderWithProviders(<SprintSummary state={state} tasks={[]} />);
 
     expect(screen.queryByTestId("provider-breakdown")).toBeNull();
   });

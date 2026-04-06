@@ -75,14 +75,14 @@ const ALERT_ICON: Record<string, typeof Info> = {
   CRITICAL: XOctagon,
 };
 
-function relativeTime(isoDate: string): string {
+function relativeTime(isoDate: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   const ms = Date.now() - new Date(isoDate).getTime();
   const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s ago`;
+  if (secs < 60) return t('common.seconds_ago', { n: secs });
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t('common.minutes_ago', { n: mins });
   const hrs = Math.floor(mins / 60);
-  return `${hrs}h ago`;
+  return t('common.hours_ago', { n: hrs });
 }
 
 export default function DashboardPage() {
@@ -269,7 +269,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-zinc-400">{t("dashboard.updated")}</p>
                 <p className="text-zinc-100">
-                  {state.updatedAt ? relativeTime(state.updatedAt) : "—"}
+                  {state.updatedAt ? relativeTime(state.updatedAt, t) : "—"}
                 </p>
               </div>
             </div>

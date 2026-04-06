@@ -436,7 +436,7 @@ export default function ConfigPage() {
                             size="sm"
                             className="shrink-0 gap-1 text-xs"
                             onClick={() => handleResetField(field)}
-                            title={`Reset to default: ${formatValue(field.defaultValue) || "null"}`}
+                            title={t('config.reset_to_default' as TranslationKey, { value: formatValue(field.defaultValue) || "null" })}
                             data-testid={`reset-${field.key}`}
                           >
                             <RotateCcw className="h-3 w-3" />
@@ -449,7 +449,7 @@ export default function ConfigPage() {
                         {fieldT(field, 'desc')}
                         {!isDefault_ && (
                           <span className="ml-1 text-zinc-500">
-                            (default: {formatValue(field.defaultValue) || "null"})
+                            {t('config.default_value' as TranslationKey, { value: formatValue(field.defaultValue) || "null" })}
                           </span>
                         )}
                       </p>

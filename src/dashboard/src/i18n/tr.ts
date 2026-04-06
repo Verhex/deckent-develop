@@ -269,6 +269,114 @@ export const tr: Record<TranslationKey, string> = {
   'config.true': 'evet',
   'config.false': 'hayır',
 
+  // Debt Table
+  'debt.no_entries': 'Teknik borç kaydı yok.',
+  'debt.col_id': 'ID',
+  'debt.col_description': 'Açıklama',
+  'debt.col_priority': 'Öncelik',
+  'debt.col_sprint': 'Sprint',
+  'debt.col_status': 'Durum',
+
+  // Sprint Chart
+  'chart.coverage': 'Kapsam',
+  'chart.tasks': 'Görevler',
+  'chart.no_data': 'Veri mevcut değil.',
+  'chart.success_rate': 'Başarı Oranı',
+  'chart.coverage_pct': 'Kapsam %',
+  'chart.no_chart_data': 'Grafik verisi mevcut değil.',
+
+  // SSE Status
+  'common.live': 'Canlı',
+  'common.connecting': '...',
+  'common.offline': 'Çevrimdışı',
+
+  // Relative Time
+  'common.seconds_ago': '{{n}}sn önce',
+  'common.minutes_ago': '{{n}}dk önce',
+  'common.hours_ago': '{{n}}sa önce',
+
+  // Config additional
+  'config.reset_to_default': 'Varsayılana sıfırla: {{value}}',
+  'config.default_value': '(varsayılan: {{value}})',
+
+  // Modal
+  'modal.directives_placeholder': '# Sprint Direktifleri\n\n## Task 1: ...',
+
+  // Status Page
+  'status.no_sprint': 'Aktif sprint yok.',
+  'status.run_start': 'Başlamak için deckent start çalıştırın.',
+  'status.loading': 'Sprint verileri yükleniyor...',
+  'status.title': 'Sprint Durumu',
+
+  // Sprint Summary
+  'sprint_summary.tasks_done': '{{done}}/{{total}} görev tamamlandı',
+  'sprint_summary.done_count': 'Tamamlanan: {{n}}',
+  'sprint_summary.active_count': 'Aktif: {{n}}',
+  'sprint_summary.queued_count': 'Kuyrukta: {{n}}',
+  'sprint_summary.n_done': '{{n}} tamamlandı',
+  'sprint_summary.n_active': '{{n}} aktif',
+  'sprint_summary.n_queued': '{{n}} kuyrukta',
+  'sprint_summary.n_auto_fixed': '{{n}} otomatik düzeltildi',
+  'sprint_summary.whats_happening': 'Şu anda neler oluyor',
+  'sprint_summary.working': 'Çalışıyor...',
+  'sprint_summary.tasks': 'Görevler',
+  'sprint_summary.providers': 'Sağlayıcılar',
+  'sprint_summary.needs_attention': 'İlgi gerektiriyor',
+  'sprint_summary.n_on_provider': '{{provider}} üzerinde {{n}}',
+  'sprint_summary.task_retries': 'Görev {{id}} ({{title}}) — {{retries}} yeniden deneme, ilgi gerekebilir',
+  'sprint_summary.time_less_than_1min': '< 1 dk kaldı',
+  'sprint_summary.time_remaining': '~{{n}} dk kaldı',
+  'sprint_summary.just_started': 'yeni başladı',
+  'sprint_summary.time_elapsed': '{{n}} dk geçti',
+  'sprint_summary.status_done': 'Tamamlandı',
+  'sprint_summary.status_active': 'Aktif',
+  'sprint_summary.status_writing_code': 'Kod yazıyor',
+  'sprint_summary.status_running_tests': 'Test çalıştırıyor',
+  'sprint_summary.status_type_checking': 'Tip kontrolü',
+  'sprint_summary.status_needs_attention': 'İlgi gerektiriyor',
+  'sprint_summary.status_error': 'Hata',
+  'sprint_summary.status_paused': 'Duraklatıldı',
+  'sprint_summary.status_queued': 'Kuyrukta',
+  'sprint_summary.status_draft': 'Taslak',
+  'sprint_summary.status_waiting': 'Bekliyor',
+
+  // Task Card — Durum eylemleri
+  'task_card.action_completed': 'Tamamlandı',
+  'task_card.action_working': 'Çalışıyor...',
+  'task_card.action_writing_code': 'Kod yazıyor',
+  'task_card.action_running_tests': 'Test çalıştırıyor',
+  'task_card.action_running_tests_attempt': 'Test çalıştırıyor (deneme {{n}}/3)',
+  'task_card.action_type_checking': 'Tip kontrolü',
+  'task_card.action_failed': 'Başarısız — ilgi gerektiriyor',
+  'task_card.action_error': 'Hata oluştu',
+  'task_card.action_paused': 'Duraklatıldı',
+  'task_card.action_waiting_for_task': 'Görev {{id}} bekleniyor',
+  'task_card.action_queued': 'Kuyrukta',
+  'task_card.action_waiting': 'Bekliyor',
+
+  // Task Card — Rozet etiketleri
+  'task_card.badge_done': 'Tamam',
+  'task_card.badge_active': 'Aktif',
+  'task_card.badge_writing_code': 'Kod yazıyor',
+  'task_card.badge_running_tests': 'Test çalıştırıyor',
+  'task_card.badge_type_checking': 'Tip kontrolü',
+  'task_card.badge_nogo': 'No-Go',
+  'task_card.badge_error': 'Hata',
+  'task_card.badge_paused': 'Duraklatıldı',
+  'task_card.badge_queued': 'Kuyrukta',
+  'task_card.badge_draft': 'Taslak',
+  'task_card.badge_waiting': 'Bekliyor',
+
+  // Task Card — Detay bölümleri
+  'task_card.task_label': 'Görev {{id}}',
+  'task_card.files_changed': 'Değişen dosyalar ({{n}})',
+  'task_card.test_results': 'Test sonuçları',
+  'task_card.n_passed': '{{n}} geçti',
+  'task_card.n_failed': '{{n}} başarısız',
+  'task_card.n_total': '{{n}} toplam',
+  'task_card.retry_history': 'Yeniden deneme geçmişi ({{n}})',
+  'task_card.attempt_n': 'Deneme {{n}}',
+
   // Common
   'common.loading': 'Yükleniyor...',
   'common.error': 'Hata',

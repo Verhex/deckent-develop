@@ -6,9 +6,11 @@ import { useState, useEffect } from "react";
 import { SprintSummary, type TaskInfo } from "../components/SprintSummary";
 import { useSSE } from "../hooks/useSSE";
 import { fetchJson, ApiError } from "../lib/api";
+import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
 
 export default function StatusPage() {
+  const { t } = useTranslation();
   const sseState = useSSE("/api/events");
   const [fallbackState, setFallbackState] = useState<DashboardState | null>(null);
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
@@ -41,9 +43,9 @@ export default function StatusPage() {
   if (noSprint) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
-        <p className="text-lg">No active sprint.</p>
+        <p className="text-lg">{t('status.no_sprint')}</p>
         <p className="mt-2 text-sm">
-          Run <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">deckent start</code> to begin.
+          {t('status.run_start')}
         </p>
       </div>
     );
@@ -52,14 +54,14 @@ export default function StatusPage() {
   if (!state) {
     return (
       <div className="flex items-center justify-center py-20 text-zinc-500">
-        Loading sprint data...
+        {t('status.loading')}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-zinc-100">Sprint Status</h1>
+      <h1 className="text-2xl font-bold text-zinc-100">{t('status.title')}</h1>
       <SprintSummary state={state} tasks={tasks} />
     </div>
   );

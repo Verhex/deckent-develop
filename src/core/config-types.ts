@@ -42,6 +42,8 @@ export interface DeckentConfig {
   modes: Record<string, PlanModeConfig>;
   language?: string;
   projectName?: string;
+  /** Last completed sprint ID (e.g. 'sprint-091') */
+  last_sprint_id?: string;
   version?: string;
   auto_docs?: AutoDocsConfig;
   /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */

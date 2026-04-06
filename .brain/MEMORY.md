@@ -34,3 +34,13 @@ A) usage-manager.ts SİLİNDİ (462 satır) — checkUsage, adjustSp
 - Hard-Coded Sabitleri Config'den Oku: NO_GO
 - Quality Score Routing Bonus'a Entegre Et: NO_GO
 - Integration Test — Tam Evolution Pipeline: NO_GO
+## Sprint sprint-092 Learnings
+- Config.json Agresif Temizlik + Tip Güvenliği: GO_WITH_TECH_DEBT — Config.json agresif temizlik tamamlandı: (A) 4 mod altındaki usage_thresholds blokları silindi (Sprint 089 artığı), (B) 
+- Dashboard i18n — StatusPage + SprintSummary (~34 key): GO_WITH_TECH_DEBT — StatusPage ve SprintSummary bileşenlerindeki tüm hardcoded İngilizce stringler i18n ile çevrildi. ~35 yeni key eklendi (
+- Dashboard i18n — TaskCard (~30 key): GO_WITH_TECH_DEBT — TaskCard i18n tamamlandı. 31 yeni key (task_card.* prefix) en.ts ve tr.ts'e eklendi. Component içinde useTranslation imp
+- Dashboard i18n — DebtTable + SprintChart + Layout + Kalan (~25 key): GO_WITH_TECH_DEBT — Dashboard i18n Task 4 tamamlandı. 7 bileşendeki hardcoded string'ler i18n ile çevrildi:
+
+A) DebtTable.tsx — useTranslati
+- i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği: GO_WITH_TECH_DEBT — i18n doğrulama test dosyası oluşturuldu (tests/dashboard/i18n-coverage.test.ts) — 16 test, 4 describe bloğu:
+
+1) Key cou

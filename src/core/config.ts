@@ -142,7 +142,7 @@ export function deepMerge<T>(base: T, override: Partial<T>): T {
 /**
  * Validate a complete DeckentConfig object against all known rules.
  * Checks mode validity, language support, worker counts, model names,
- * usage thresholds, brain planning mode, and skills config.
+ * brain planning mode, and skills config.
  * @param config - The full configuration object to validate
  * @returns Array of warning strings (non-fatal); empty if no warnings
  * @throws {ConfigValidationError} When validation errors are found

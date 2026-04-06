@@ -267,6 +267,114 @@ export const en = {
   'config.true': 'true',
   'config.false': 'false',
 
+  // Debt Table
+  'debt.no_entries': 'No technical debt entries.',
+  'debt.col_id': 'ID',
+  'debt.col_description': 'Description',
+  'debt.col_priority': 'Priority',
+  'debt.col_sprint': 'Sprint',
+  'debt.col_status': 'Status',
+
+  // Sprint Chart
+  'chart.coverage': 'Coverage',
+  'chart.tasks': 'Tasks',
+  'chart.no_data': 'No data available.',
+  'chart.success_rate': 'Success Rate',
+  'chart.coverage_pct': 'Coverage %',
+  'chart.no_chart_data': 'No chart data available.',
+
+  // SSE Status
+  'common.live': 'Live',
+  'common.connecting': '...',
+  'common.offline': 'Offline',
+
+  // Relative Time
+  'common.seconds_ago': '{{n}}s ago',
+  'common.minutes_ago': '{{n}}m ago',
+  'common.hours_ago': '{{n}}h ago',
+
+  // Config additional
+  'config.reset_to_default': 'Reset to default: {{value}}',
+  'config.default_value': '(default: {{value}})',
+
+  // Modal
+  'modal.directives_placeholder': '# Sprint Directives\n\n## Task 1: ...',
+
+  // Status Page
+  'status.no_sprint': 'No active sprint.',
+  'status.run_start': 'Run deckent start to begin.',
+  'status.loading': 'Loading sprint data...',
+  'status.title': 'Sprint Status',
+
+  // Sprint Summary
+  'sprint_summary.tasks_done': '{{done}}/{{total}} tasks done',
+  'sprint_summary.done_count': 'Done: {{n}}',
+  'sprint_summary.active_count': 'Active: {{n}}',
+  'sprint_summary.queued_count': 'Queued: {{n}}',
+  'sprint_summary.n_done': '{{n}} done',
+  'sprint_summary.n_active': '{{n}} active',
+  'sprint_summary.n_queued': '{{n}} queued',
+  'sprint_summary.n_auto_fixed': '{{n}} auto-fixed',
+  'sprint_summary.whats_happening': "What's happening now",
+  'sprint_summary.working': 'Working...',
+  'sprint_summary.tasks': 'Tasks',
+  'sprint_summary.providers': 'Providers',
+  'sprint_summary.needs_attention': 'Needs attention',
+  'sprint_summary.n_on_provider': '{{n}} on {{provider}}',
+  'sprint_summary.task_retries': 'Task {{id}} ({{title}}) — had {{retries}} retries, may need attention',
+  'sprint_summary.time_less_than_1min': '< 1 min remaining',
+  'sprint_summary.time_remaining': '~{{n}} min remaining',
+  'sprint_summary.just_started': 'just started',
+  'sprint_summary.time_elapsed': '{{n}} min elapsed',
+  'sprint_summary.status_done': 'Done',
+  'sprint_summary.status_active': 'Active',
+  'sprint_summary.status_writing_code': 'Writing code',
+  'sprint_summary.status_running_tests': 'Running tests',
+  'sprint_summary.status_type_checking': 'Type checking',
+  'sprint_summary.status_needs_attention': 'Needs attention',
+  'sprint_summary.status_error': 'Error',
+  'sprint_summary.status_paused': 'Paused',
+  'sprint_summary.status_queued': 'Queued',
+  'sprint_summary.status_draft': 'Draft',
+  'sprint_summary.status_waiting': 'Waiting',
+
+  // Task Card — Status actions
+  'task_card.action_completed': 'Completed',
+  'task_card.action_working': 'Working...',
+  'task_card.action_writing_code': 'Writing code',
+  'task_card.action_running_tests': 'Running tests',
+  'task_card.action_running_tests_attempt': 'Running tests (attempt {{n}}/3)',
+  'task_card.action_type_checking': 'Type checking',
+  'task_card.action_failed': 'Failed — needs attention',
+  'task_card.action_error': 'Error occurred',
+  'task_card.action_paused': 'Paused',
+  'task_card.action_waiting_for_task': 'Waiting for Task {{id}}',
+  'task_card.action_queued': 'Queued',
+  'task_card.action_waiting': 'Waiting',
+
+  // Task Card — Badge labels
+  'task_card.badge_done': 'Done',
+  'task_card.badge_active': 'Active',
+  'task_card.badge_writing_code': 'Writing code',
+  'task_card.badge_running_tests': 'Running tests',
+  'task_card.badge_type_checking': 'Type checking',
+  'task_card.badge_nogo': 'No-Go',
+  'task_card.badge_error': 'Error',
+  'task_card.badge_paused': 'Paused',
+  'task_card.badge_queued': 'Queued',
+  'task_card.badge_draft': 'Draft',
+  'task_card.badge_waiting': 'Waiting',
+
+  // Task Card — Detail sections
+  'task_card.task_label': 'Task {{id}}',
+  'task_card.files_changed': 'Files changed ({{n}})',
+  'task_card.test_results': 'Test results',
+  'task_card.n_passed': '{{n}} passed',
+  'task_card.n_failed': '{{n}} failed',
+  'task_card.n_total': '{{n}} total',
+  'task_card.retry_history': 'Retry history ({{n}})',
+  'task_card.attempt_n': 'Attempt {{n}}',
+
   // Common
   'common.loading': 'Loading...',
   'common.error': 'Error',

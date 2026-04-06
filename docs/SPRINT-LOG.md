@@ -2535,3 +2535,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 091-007: Integration Test — Tam Evolution Pipeline (NO_GO)
 
 ---
+## Sprint 92 — sprint-092
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 577s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 577487ms |
+
+### Tasks
+
+- 092-001: Config.json Agresif Temizlik + Tip Güvenliği (GO_WITH_TECH_DEBT)
+- 092-002: Dashboard i18n — StatusPage + SprintSummary (~34 key) (GO_WITH_TECH_DEBT)
+- 092-003: Dashboard i18n — TaskCard (~30 key) (GO_WITH_TECH_DEBT)
+- 092-004: Dashboard i18n — DebtTable + SprintChart + Layout + Kalan (~25 key) (GO_WITH_TECH_DEBT)
+- 092-005: i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği (GO_WITH_TECH_DEBT)
+
+---

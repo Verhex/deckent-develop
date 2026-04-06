@@ -12,6 +12,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -184,11 +185,11 @@ export function getBadgeLabel(status: string): string {
 
 export function TaskCard({ task }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useTranslation();
 
   const Icon = getCardIcon(task.status);
   const iconColor = getCardIconColor(task.status);
   const cardColor = getCardColor(task.status);
-  const action = describeCurrentAction(task);
   const isActive = ["EXECUTING", "CODING", "TESTING", "VERIFYING"].includes(
     task.status,
   );
@@ -196,6 +197,71 @@ export function TaskCard({ task }: TaskCardProps) {
     (task.filesChanged && task.filesChanged.length > 0) ||
     task.testResults ||
     (task.retryHistory && task.retryHistory.length > 0);
+
+  // i18n-aware current action (uses t() for translated strings)
+  const getTranslatedAction = (): string => {
+    if (task.currentAction) return task.currentAction;
+    switch (task.status) {
+      case "DONE":
+        return t('task_card.action_completed');
+      case "EXECUTING":
+        return t('task_card.action_working');
+      case "CODING":
+        return t('task_card.action_writing_code');
+      case "TESTING": {
+        const attempts = task.feedbackLoop?.testAttempts ?? 1;
+        return attempts > 1
+          ? t('task_card.action_running_tests_attempt', { n: attempts })
+          : t('task_card.action_running_tests');
+      }
+      case "VERIFYING":
+        return t('task_card.action_type_checking');
+      case "NO_GO":
+        return t('task_card.action_failed');
+      case "ERROR":
+        return t('task_card.action_error');
+      case "PAUSED":
+        return t('task_card.action_paused');
+      case "PENDING": {
+        if (task.dependsOn && task.dependsOn.length > 0) {
+          return t('task_card.action_waiting_for_task', { id: task.dependsOn[0] });
+        }
+        return t('task_card.action_queued');
+      }
+      default:
+        return t('task_card.action_waiting');
+    }
+  };
+
+  // i18n-aware badge label
+  const getTranslatedBadge = (): string => {
+    switch (task.status) {
+      case "DONE":
+        return t('task_card.badge_done');
+      case "EXECUTING":
+        return t('task_card.badge_active');
+      case "CODING":
+        return t('task_card.badge_writing_code');
+      case "TESTING":
+        return t('task_card.badge_running_tests');
+      case "VERIFYING":
+        return t('task_card.badge_type_checking');
+      case "NO_GO":
+        return t('task_card.badge_nogo');
+      case "ERROR":
+        return t('task_card.badge_error');
+      case "PAUSED":
+        return t('task_card.badge_paused');
+      case "PENDING":
+        return t('task_card.badge_queued');
+      case "DRAFT":
+        return t('task_card.badge_draft');
+      default:
+        return t('task_card.badge_waiting');
+    }
+  };
+
+  const action = getTranslatedAction();
 
   return (
     <div
@@ -224,7 +290,7 @@ export function TaskCard({ task }: TaskCardProps) {
             className={`h-4 w-4 ${iconColor} ${isActive ? "animate-spin" : ""}`}
           />
           <span className="text-sm font-medium text-zinc-200">
-            Task {task.id}
+            {t('task_card.task_label', { id: task.id })}
           </span>
           <span className="text-sm text-zinc-400">{task.title}</span>
         </div>
@@ -236,7 +302,7 @@ export function TaskCard({ task }: TaskCardProps) {
             {action}
           </span>
           <Badge variant={getBadgeVariant(task.status)}>
-            {getBadgeLabel(task.status)}
+            {getTranslatedBadge()}
           </Badge>
         </div>
       </button>
@@ -252,7 +318,7 @@ export function TaskCard({ task }: TaskCardProps) {
             <div data-testid={`task-files-${task.id}`}>
               <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 mb-1">
                 <FileText className="h-3.5 w-3.5" />
-                Files changed ({task.filesChanged.length})
+                {t('task_card.files_changed', { n: task.filesChanged.length })}
               </div>
               <ul className="ml-5 space-y-0.5">
                 {task.filesChanged.map((file) => (
@@ -269,19 +335,19 @@ export function TaskCard({ task }: TaskCardProps) {
             <div data-testid={`task-tests-${task.id}`}>
               <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 mb-1">
                 <TestTube className="h-3.5 w-3.5" />
-                Test results
+                {t('task_card.test_results')}
               </div>
               <div className="ml-5 flex gap-4 text-xs">
                 <span className="text-green-400">
-                  {task.testResults.passed} passed
+                  {t('task_card.n_passed', { n: task.testResults.passed })}
                 </span>
                 {task.testResults.failed > 0 && (
                   <span className="text-red-400">
-                    {task.testResults.failed} failed
+                    {t('task_card.n_failed', { n: task.testResults.failed })}
                   </span>
                 )}
                 <span className="text-zinc-500">
-                  {task.testResults.total} total
+                  {t('task_card.n_total', { n: task.testResults.total })}
                 </span>
               </div>
             </div>
@@ -292,7 +358,7 @@ export function TaskCard({ task }: TaskCardProps) {
             <div data-testid={`task-retries-${task.id}`}>
               <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 mb-1">
                 <RotateCcw className="h-3.5 w-3.5" />
-                Retry history ({task.retryHistory.length})
+                {t('task_card.retry_history', { n: task.retryHistory.length })}
               </div>
               <ul className="ml-5 space-y-0.5">
                 {task.retryHistory.map((retry) => (
@@ -300,7 +366,7 @@ export function TaskCard({ task }: TaskCardProps) {
                     key={retry.attempt}
                     className="text-xs text-zinc-500"
                   >
-                    Attempt {retry.attempt}: {retry.reason}
+                    {t('task_card.attempt_n', { n: retry.attempt })}: {retry.reason}
                   </li>
                 ))}
               </ul>

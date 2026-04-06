@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { TaskCard, type TaskCardData } from "./TaskCard";
+import { useTranslation } from "../i18n/LanguageProvider";
 import type { AgentInfo, DashboardState } from "../types";
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -165,6 +166,7 @@ export function estimateTimeRemaining(
   done: number,
   total: number,
   startedAt?: string,
+  translate?: (key: string) => string,
 ): string {
   if (!startedAt || done === 0 || done >= total) return "";
   const elapsedMs = Date.now() - new Date(startedAt).getTime();
@@ -172,21 +174,32 @@ export function estimateTimeRemaining(
   const remainingTasks = total - done;
   const remainingMs = msPerTask * remainingTasks;
   const remainingMin = Math.ceil(remainingMs / 60000);
-  if (remainingMin < 1) return "< 1 min remaining";
+  if (remainingMin < 1) {
+    return translate ? translate('sprint_summary.time_less_than_1min') : "< 1 min remaining";
+  }
+  if (translate) {
+    return translate('sprint_summary.time_remaining').replace('{{n}}', String(remainingMin));
+  }
   return `~${remainingMin} min remaining`;
 }
 
-export function formatElapsedTime(startedAt?: string): string {
+export function formatElapsedTime(startedAt?: string, translate?: (key: string) => string): string {
   if (!startedAt) return "";
   const ms = Date.now() - new Date(startedAt).getTime();
   const mins = Math.floor(ms / 60000);
-  if (mins < 1) return "just started";
+  if (mins < 1) {
+    return translate ? translate('sprint_summary.just_started') : "just started";
+  }
+  if (translate) {
+    return translate('sprint_summary.time_elapsed').replace('{{n}}', String(mins));
+  }
   return `${mins} min elapsed`;
 }
 
 // ─── Component ──────────────────────────────────────────────────────
 
 export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
+  const { t } = useTranslation();
   const { progress, agents, sprint } = state;
   const done = progress?.done ?? 0;
   const active = progress?.active ?? 0;
@@ -200,12 +213,12 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
     [agents, tasks],
   );
   const eta = useMemo(
-    () => estimateTimeRemaining(done, total, state.updatedAt),
-    [done, total, state.updatedAt],
+    () => estimateTimeRemaining(done, total, state.updatedAt, t as (key: string) => string),
+    [done, total, state.updatedAt, t],
   );
   const elapsed = useMemo(
-    () => formatElapsedTime(state.updatedAt),
-    [state.updatedAt],
+    () => formatElapsedTime(state.updatedAt, t as (key: string) => string),
+    [state.updatedAt, t],
   );
 
   const activeAgents = agents.filter((a) => a.status === "EXECUTING");
@@ -244,15 +257,15 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
                 {pct}%
               </span>
               <span className="text-sm text-zinc-400" data-testid="progress-fraction">
-                {done}/{total} tasks done
+                {t('sprint_summary.tasks_done').replace('{{done}}', String(done)).replace('{{total}}', String(total))}
               </span>
             </div>
             <Progress
               total={total}
               segments={[
-                { value: done, color: "bg-green-500", label: `Done: ${done}` },
-                { value: active, color: "bg-blue-500", label: `Active: ${active}` },
-                { value: pending, color: "bg-zinc-600", label: `Queued: ${pending}` },
+                { value: done, color: "bg-green-500", label: t('sprint_summary.done_count').replace('{{n}}', String(done)) },
+                { value: active, color: "bg-blue-500", label: t('sprint_summary.active_count').replace('{{n}}', String(active)) },
+                { value: pending, color: "bg-zinc-600", label: t('sprint_summary.queued_count').replace('{{n}}', String(pending)) },
               ]}
               className="h-6"
               data-testid="progress-bar"
@@ -263,15 +276,15 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
           <div className="flex items-center gap-6 text-sm">
             <span className="flex items-center gap-1.5 text-green-400">
               <CheckCircle className="h-4 w-4" />
-              {done} done
+              {t('sprint_summary.n_done').replace('{{n}}', String(done))}
             </span>
             <span className="flex items-center gap-1.5 text-blue-400">
               <Loader2 className="h-4 w-4" />
-              {active} active
+              {t('sprint_summary.n_active').replace('{{n}}', String(active))}
             </span>
             <span className="flex items-center gap-1.5 text-zinc-400">
               <Clock className="h-4 w-4" />
-              {pending} queued
+              {t('sprint_summary.n_queued').replace('{{n}}', String(pending))}
             </span>
             {selfHealingCount > 0 && (
               <span
@@ -279,7 +292,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
                 data-testid="self-healing-count"
               >
                 <Wrench className="h-4 w-4" />
-                {selfHealingCount} auto-fixed
+                {t('sprint_summary.n_auto_fixed').replace('{{n}}', String(selfHealingCount))}
               </span>
             )}
           </div>
@@ -292,7 +305,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-zinc-100">
               <Cpu className="h-5 w-5 text-blue-400" />
-              What's happening now
+              {t('sprint_summary.whats_happening')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -309,7 +322,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
                     </span>
                   </div>
                   <span className="text-xs text-zinc-400">
-                    {agent.currentAction ?? "Working..."}
+                    {agent.currentAction ?? t('sprint_summary.working')}
                   </span>
                 </div>
               ))}
@@ -322,7 +335,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
       {tasks.length > 0 && (
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader className="pb-3">
-            <CardTitle className="text-zinc-100">Tasks</CardTitle>
+            <CardTitle className="text-zinc-100">{t('sprint_summary.tasks')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-1.5" data-testid="task-list">
@@ -338,7 +351,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
       {Object.keys(providerBreakdown).length > 0 && (
         <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader className="pb-3">
-            <CardTitle className="text-zinc-100">Providers</CardTitle>
+            <CardTitle className="text-zinc-100">{t('sprint_summary.providers')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4" data-testid="provider-breakdown">
@@ -346,7 +359,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
                 <div key={provider} className="flex items-center gap-2">
                   <Cpu className="h-4 w-4 text-zinc-400" />
                   <span className="text-sm text-zinc-200">
-                    {count} on {provider}
+                    {t('sprint_summary.n_on_provider').replace('{{n}}', String(count)).replace('{{provider}}', provider)}
                   </span>
                 </div>
               ))}
@@ -361,7 +374,7 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-yellow-400">
               <AlertTriangle className="h-5 w-5" />
-              Needs attention
+              {t('sprint_summary.needs_attention')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -371,11 +384,14 @@ export function SprintSummary({ state, tasks = [] }: SprintSummaryProps) {
                   key={task.id}
                   className="rounded-md bg-yellow-900/20 border border-yellow-800/30 px-3 py-2 text-sm text-zinc-300"
                 >
-                  Task {task.id} ({task.title}) — had{" "}
-                  {(task.feedbackLoop?.tscAttempts ?? 0) +
-                    (task.feedbackLoop?.testAttempts ?? 0) -
-                    2}{" "}
-                  retries, may need attention
+                  {t('sprint_summary.task_retries')
+                    .replace('{{id}}', task.id)
+                    .replace('{{title}}', task.title)
+                    .replace('{{retries}}', String(
+                      (task.feedbackLoop?.tscAttempts ?? 0) +
+                      (task.feedbackLoop?.testAttempts ?? 0) -
+                      2
+                    ))}
                 </div>
               ))}
             </div>

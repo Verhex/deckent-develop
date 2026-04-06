@@ -69,7 +69,7 @@ describe("dashboard/pages — ConfigPage", () => {
   it("shows default value indicator when value differs from default", () => {
     const content = readFileSync(CONFIG_PAGE_PATH, "utf-8");
     expect(content).toContain("isDefault");
-    expect(content).toContain("(default:");
+    expect(content).toContain("config.default_value");
   });
 
   it("uses POST /api/config to save", () => {

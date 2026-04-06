@@ -1,38 +1,37 @@
-# Sprint sprint-091 Retrospective
+# Sprint sprint-092 Retrospective
 
 ## Summary
-Completed 4/7 tasks in 34 minutes 44s.
+Completed 5/5 tasks in 9 minutes 37s.
 
 ## Highlights
-- 4 tasks completed on first try
+- 5 tasks completed on first try
 - No boundary violations detected
-
-## Issues
-- Task 091-005 (Hard-Coded Sabitleri Config'den Oku) failed
-- Task 091-006 (Quality Score Routing Bonus'a Entegre Et) failed
-- Task 091-007 (Integration Test — Tam Evolution Pipeline) failed
+- NO_GO rate improved from 43% to 0%
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 4/7 |
-| Code changes | +85 / -10 |
-| Sprint time | 34 minutes 44s |
-| NO_GO rate | 43% (3/7) |
+| Tasks completed | 5/5 |
+| New test files | 3 |
+| Code changes | +480 / -106 |
+| Sprint time | 9 minutes 37s |
+| NO_GO rate | 0% (0/5) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| refactorer | 6 | 0 | 4 | 2 | 0% |
-| test-writer | 1 | 0 | 0 | 1 | 0% |
+| refactorer | 4 | 0 | 4 | 0 | 0% |
+| test-writer | 1 | 0 | 1 | 0 | 0% |
 
 ## Learnings
-- Agent Tiebreaker — learnings.json'dan Oku: completed with tech debt — Agent tiebreaker V2 fix: pool.get(id)?.stats.successRate (always 0 in V2) replaced with getLearningBonus(id, learningData) which reads from learnings.
-- Promotion/Demotion Execute Et: completed with tech debt — finalizeSprint() içindeki promotion/demotion döngülerine pipeline.promote() ve pipeline.demote() çağrıları eklendi. Her çağrı try/catch ile sarmalanmı
-- Evolved Rules Activation'a Inject Et: completed with tech debt — Evolved rules artık planSprint() V2 routing bloğunda agent/skill activation config'lerine inject ediliyor. OutcomeTracker'dan learnings okunuyor, evol
-- updateSkillStats V1 + SkillMap RETRO İçin: completed with tech debt — İki kopuk nokta düzeltildi: (A) V1 akışında updateSkillStats() çağrısı eklendi — her task'ın assignedSkills'i için SkillPoolManager.updateSkillStats()
-- Hard-Coded Sabitleri Config'den Oku: failed — investigate root cause
-- Quality Score Routing Bonus'a Entegre Et: failed — investigate root cause
-- Integration Test — Tam Evolution Pipeline: failed — investigate root cause
-- Recurring pattern (1555x): stale_heartbeat
+- Config.json Agresif Temizlik + Tip Güvenliği: completed with tech debt — Config.json agresif temizlik tamamlandı: (A) 4 mod altındaki usage_thresholds blokları silindi (Sprint 089 artığı), (B) üst seviye duplike brain_plann
+- Dashboard i18n — StatusPage + SprintSummary (~34 key): completed with tech debt — StatusPage ve SprintSummary bileşenlerindeki tüm hardcoded İngilizce stringler i18n ile çevrildi. ~35 yeni key eklendi (status.* ve sprint_summary.* p
+- Dashboard i18n — TaskCard (~30 key): completed with tech debt — TaskCard i18n tamamlandı. 31 yeni key (task_card.* prefix) en.ts ve tr.ts'e eklendi. Component içinde useTranslation import edildi, tüm hardcoded stri
+- Dashboard i18n — DebtTable + SprintChart + Layout + Kalan (~25 key): completed with tech debt — Dashboard i18n Task 4 tamamlandı. 7 bileşendeki hardcoded string'ler i18n ile çevrildi:
+
+A) DebtTable.tsx — useTranslation import, 6 string (no_entrie
+- i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği: completed with tech debt — i18n doğrulama test dosyası oluşturuldu (tests/dashboard/i18n-coverage.test.ts) — 16 test, 4 describe bloğu:
+
+1) Key count equality: en.ts ve tr.ts ke
+- Recurring pattern (1595x): stale_heartbeat

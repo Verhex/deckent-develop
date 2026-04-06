@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { useTranslation } from "../i18n/LanguageProvider";
 
 export interface SprintChartEntry {
   sprintId: string;
@@ -23,9 +24,9 @@ interface SprintChartProps {
   data: SprintChartEntry[];
 }
 
-function tooltipFormatter(value: number, name: string): [string, string] {
-  if (name === "coverage") return [`${value}%`, "Coverage"];
-  return [String(value), "Tasks"];
+function tooltipFormatter(value: number, name: string, coverageLabel: string, tasksLabel: string): [string, string] {
+  if (name === "coverage") return [`${value}%`, coverageLabel];
+  return [String(value), tasksLabel];
 }
 
 function getSuccessColor(rate: number): string {
@@ -53,11 +54,14 @@ interface SuccessRateTrendProps {
 }
 
 export function SuccessRateTrend({ data }: SuccessRateTrendProps) {
+  const { t } = useTranslation();
   const last10 = data.slice(-10);
 
   if (last10.length === 0) {
-    return <p className="text-zinc-500">No data available.</p>;
+    return <p className="text-zinc-500">{t('chart.no_data')}</p>;
   }
+
+  const successRateLabel = t('chart.success_rate');
 
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -71,12 +75,12 @@ export function SuccessRateTrend({ data }: SuccessRateTrendProps) {
           tickFormatter={(v: number) => `${v}%`}
         />
         <Tooltip
-          formatter={(value: number) => [`${value}%`, "Success Rate"] as [string, string]}
+          formatter={(value: number) => [`${value}%`, successRateLabel] as [string, string]}
           contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46" }}
           labelStyle={{ color: "#e4e4e7" }}
           itemStyle={{ color: "#e4e4e7" }}
         />
-        <Bar dataKey="successRate" name="Success Rate" radius={[4, 4, 0, 0]}>
+        <Bar dataKey="successRate" name={successRateLabel} radius={[4, 4, 0, 0]}>
           {last10.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={getSuccessColor(entry.successRate)} />
           ))}
@@ -87,9 +91,15 @@ export function SuccessRateTrend({ data }: SuccessRateTrendProps) {
 }
 
 export default function SprintChart({ data }: SprintChartProps) {
+  const { t } = useTranslation();
+
   if (data.length === 0) {
-    return <p className="text-zinc-500">No chart data available.</p>;
+    return <p className="text-zinc-500">{t('chart.no_chart_data')}</p>;
   }
+
+  const coverageLabel = t('chart.coverage');
+  const tasksLabel = t('chart.tasks');
+  const coveragePctLabel = t('chart.coverage_pct');
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -99,14 +109,14 @@ export default function SprintChart({ data }: SprintChartProps) {
         <YAxis yAxisId="left" stroke="#60a5fa" fontSize={12} />
         <YAxis yAxisId="right" orientation="right" stroke="#4ade80" fontSize={12} domain={[0, 100]} />
         <Tooltip
-          formatter={tooltipFormatter}
+          formatter={(value: number, name: string) => tooltipFormatter(value, name, coverageLabel, tasksLabel)}
           contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46" }}
           labelStyle={{ color: "#e4e4e7" }}
           itemStyle={{ color: "#e4e4e7" }}
         />
         <Legend />
-        <Line yAxisId="left" type="monotone" dataKey="taskCount" stroke="#60a5fa" name="Tasks" dot />
-        <Line yAxisId="right" type="monotone" dataKey="coverage" stroke="#4ade80" name="Coverage %" dot />
+        <Line yAxisId="left" type="monotone" dataKey="taskCount" stroke="#60a5fa" name={tasksLabel} dot />
+        <Line yAxisId="right" type="monotone" dataKey="coverage" stroke="#4ade80" name={coveragePctLabel} dot />
       </LineChart>
     </ResponsiveContainer>
   );

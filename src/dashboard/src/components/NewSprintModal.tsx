@@ -95,7 +95,7 @@ export function NewSprintModal({ open, onOpenChange }: NewSprintModalProps) {
             <Textarea
               value={directives}
               onChange={(e) => setDirectives(e.target.value)}
-              placeholder="# Sprint Directives&#10;&#10;## Task 1: ..."
+              placeholder={t("modal.directives_placeholder")}
               rows={10}
               data-testid="directives-textarea"
             />

@@ -55,15 +55,15 @@ function elapsed(startedAt?: string): string {
   return `${mins}m ${remSecs}s`;
 }
 
-function relativeTime(isoDate?: string): string {
+function relativeTime(isoDate: string | undefined, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (!isoDate) return "—";
   const ms = Date.now() - new Date(isoDate).getTime();
   const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s ago`;
+  if (secs < 60) return t('common.seconds_ago', { n: secs });
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t('common.minutes_ago', { n: mins });
   const hrs = Math.floor(mins / 60);
-  return `${hrs}h ago`;
+  return t('common.hours_ago', { n: hrs });
 }
 
 interface WorkerCardProps {
@@ -111,7 +111,7 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
       {/* Elapsed + Heartbeat */}
       <div className="flex items-center justify-between text-xs text-zinc-400 mb-3">
         <span>⏱ {elapsed(agent.spawnedAt)}</span>
-        <span>❤️ {relativeTime(agent.lastHeartbeat)}</span>
+        <span>❤️ {relativeTime(agent.lastHeartbeat, t)}</span>
       </div>
 
       {/* Current action (SSE live data) */}
