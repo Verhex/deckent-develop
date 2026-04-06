@@ -2923,12 +2923,13 @@ describe('buildSkillPerformance', () => {
 
     expect(tsRow).toBeDefined();
     expect(tsRow!.tasks).toBe(2);
-    expect(tsRow!.done).toBe(1);
+    expect(tsRow!.done).toBe(2); // DONE + GO_WITH_TECH_DEBT both count as done
     expect(tsRow!.debt).toBe(1);
     expect(tsRow!.noGo).toBe(0);
 
     expect(testRow).toBeDefined();
     expect(testRow!.tasks).toBe(1);
+    expect(testRow!.done).toBe(1); // GO_WITH_TECH_DEBT counts as done
     expect(testRow!.debt).toBe(1);
   });
 

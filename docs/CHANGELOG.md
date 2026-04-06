@@ -6,6 +6,34 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint98] - 2026-04-06
+
+
+### Changed
+
+- RETRO Done Sayacı — GO_WITH_TECH_DEBT = Done Olarak Sayılmalı (completed with tech debt)
+- Sprint History — Son 5 Sprint Döndürmeli (completed with tech debt)
+- ANALYSIS-2026-04-02.md Güncel Durum Güncellemesi (completed with tech debt)
+- README + DECKENT.md ModelRegistry Özelliği Dokümante (completed with tech debt)
+- PROJECT-IDENTITY + CLAUDE.md Sayı Güncellemeleri (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 5 tech debt, 0 no-go_
+
+## [0.3.0-beta.3-sprint98] - 2026-04-06
+
+
+### Changed
+
+- RETRO Done Sayacı — GO_WITH_TECH_DEBT = Done Olarak Sayılmalı (completed with tech debt)
+- Sprint History — Son 5 Sprint Döndürmeli (completed with tech debt)
+- ANALYSIS-2026-04-02.md Güncel Durum Güncellemesi (completed with tech debt)
+- README + DECKENT.md ModelRegistry Özelliği Dokümante (completed with tech debt)
+- PROJECT-IDENTITY + CLAUDE.md Sayı Güncellemeleri (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 5 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint97] - 2026-04-06
 
 ### Added

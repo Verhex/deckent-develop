@@ -83,3 +83,9 @@ A) buildArgs() güncellendi:
 - Init Wizard Provider-Agnostic Tier Seçimi: GO_WITH_TECH_DEBT — Init wizard provider-agnostic tier seçimine geçirildi. auto-setup.ts: selectModels() → selectTiers() + tierToModel() ref
 - token-counter.ts + sprint-reporter.ts Hard-Code Temizliği: GO_WITH_TECH_DEBT — Hard-coded model referansları 4 dosyada temizlendi: (A) token-counter.ts — DEFAULT_BUDGETS artık buildDefaultBudgets() f
 - Dashboard Test Fix + Integration Test: GO_WITH_TECH_DEBT — A) TaskCard.test.tsx — 20 failing tests fixed: Added React import, vi/beforeEach/afterEach imports, LanguageProvider wra
+## Sprint sprint-098 Learnings
+- RETRO Done Sayacı — GO_WITH_TECH_DEBT = Done Olarak Sayılmalı: GO_WITH_TECH_DEBT — buildAgentPerformance() ve buildSkillPerformance() zaten GO_WITH_TECH_DEBT'i done'a sayıyordu (Sprint 093 fix). Ancak sp
+- Sprint History — Son 5 Sprint Döndürmeli: GO_WITH_TECH_DEBT — Root cause: MCP deckent_history tool only read .brain/sprints/ directory (2 files), ignoring .brain/archive/ where 85 sp
+- ANALYSIS-2026-04-02.md Güncel Durum Güncellemesi: GO_WITH_TECH_DEBT — ANALYSIS-2026-04-02.md Sprint 097 sonuçlarıyla güncellendi: (A) Bölüm IX Sonuç tamamen yeniden yazıldı — Sprint 088→097,
+- README + DECKENT.md ModelRegistry Özelliği Dokümante: GO_WITH_TECH_DEBT — README.md ve README-TR.md dosyalarındaki sprint badge sayısı 95+→97+ olarak güncellendi. ModelRegistry, 13 model, 16 bui
+- PROJECT-IDENTITY + CLAUDE.md Sayı Güncellemeleri: GO_WITH_TECH_DEBT — Sayılar güncellendi: (A) PROJECT-IDENTITY.md — agent-pool.ts 9→16 built-in, skill-pool.ts 11→21 built-in, core/ 48→50 mo

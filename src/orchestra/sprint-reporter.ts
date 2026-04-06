@@ -10,7 +10,7 @@ import type {
 } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import {
-  BRAIN_DIR, SPRINTS_DIR, MEMORY_FILE, PROJECT_IDENTITY_FILE,
+  BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, MEMORY_FILE, PROJECT_IDENTITY_FILE,
   RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
   PATTERNS_FILE, DEBT_FILE, DECISIONS_FILE,
 } from '../core/constants.js';
@@ -93,8 +93,9 @@ export function buildAgentPerformance(
     data.tasks += 1;
 
     const ev = evaluations.get(task.id);
+    debugLog('buildAgentPerformance', `task=${task.id} agent=${agentId} ev=${ev} evalMapSize=${evaluations.size} evalKeys=[${[...evaluations.keys()].join(',')}]`);
     if (ev === TaskEvaluation.DONE) data.done += 1;
-    else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) data.debt += 1;
+    else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) { data.done += 1; data.debt += 1; }
     else if (ev === TaskEvaluation.NO_GO) data.noGo += 1;
 
     const result = results.find(r => r.taskId === task.id);
@@ -176,7 +177,7 @@ export function buildSkillPerformance(
 
       const ev = evaluations.get(task.id);
       if (ev === TaskEvaluation.DONE) data.done += 1;
-      else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) data.debt += 1;
+      else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) { data.done += 1; data.debt += 1; }
       else if (ev === TaskEvaluation.NO_GO) data.noGo += 1;
 
       const result = results?.find(r => r.taskId === task.id);
@@ -2025,3 +2026,43 @@ export function appendCiLearningsToMemory(projectRoot: string, result: CiLearnin
 
 // Re-export CI learning types for consumers
 export type { CiLearningResult } from '../core/ci-learning.js';
+
+// ═══ Sprint File Collection ══════════════════════════════════════════
+
+/** Extract sprint number from filename for numeric sorting */
+function sprintFileNumber(filename: string): number {
+  const m = filename.match(/sprint-(\d+)/);
+  return m ? parseInt(m[1] ?? '0', 10) : 0;
+}
+
+/**
+ * Collect sprint log files from both sprints/ and archive/ directories.
+ * Returns entries sorted numerically by sprint number, deduped (sprints/ takes precedence).
+ */
+export function collectSprintFiles(root: string): Array<{ file: string; dir: string }> {
+  const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
+  const archiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR);
+
+  const collected: Array<{ file: string; dir: string }> = [];
+  const seen = new Set<string>();
+
+  if (existsSync(sprintsDir)) {
+    const files = readdirSync(sprintsDir).filter((f) => f.startsWith('sprint-') && f.endsWith('.md'));
+    for (const f of files) {
+      collected.push({ file: f, dir: sprintsDir });
+      seen.add(f);
+    }
+  }
+
+  if (existsSync(archiveDir)) {
+    const files = readdirSync(archiveDir).filter((f) => f.startsWith('sprint-') && f.endsWith('.md'));
+    for (const f of files) {
+      if (!seen.has(f)) {
+        collected.push({ file: f, dir: archiveDir });
+      }
+    }
+  }
+
+  collected.sort((a, b) => sprintFileNumber(a.file) - sprintFileNumber(b.file));
+  return collected;
+}

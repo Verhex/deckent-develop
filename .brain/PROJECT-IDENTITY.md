@@ -8,16 +8,18 @@
 - Author: Alperen @ Verhex
 
 ## Architecture
-- **orchestra/** (47 modules): Sprint lifecycle, planning, evaluation, routing
+- **orchestra/** (49 modules): Sprint lifecycle, planning, evaluation, routing
   - brain.ts → re-export layer, sprint-controller.ts → full lifecycle
   - sprint-phases.ts → extracted phase functions (Sprint 072 god object split)
   - sprint-utils.ts → shared sprint utilities (Sprint 075 god object split faz 2)
   - result-collector.ts → result collection, IPC+fs.watch loop (Sprint 076 god object split faz 3)
   - planner.ts, task-builder.ts, result-evaluator.ts, task-router.ts
   - debt-manager.ts, sprint-reporter.ts, tmux.ts, spawn-backend.ts
-- **core/** (48 modules): Types, config, utilities, agent/skill pools
+- **core/** (52 modules): Types, config, utilities, agent/skill pools
   - types.ts + domain-types, config.ts (3-layer merge), provider.ts
-  - agent-pool.ts (9 built-in, LRU), skill-pool.ts + skill-registry.ts (AST sandbox)
+  - agent-pool.ts (16 built-in, LRU), skill-pool.ts + skill-registry.ts (AST sandbox)
+  - model-registry.ts (ModelRegistry class, 13 models, 3 providers, tier-based routing)
+  - mode-presets.ts (ModelStrategy, MODE_PRESETS: performance/balanced/economic/api)
 - **agents/** (16 modules): Worker execution, prompt engineering
 - **providers/** (5 modules): Claude, Codex, Gemini adapters
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
@@ -30,9 +32,9 @@
 ## Current State
 - Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-097
-- Total Sprints: 97
-- Completed Tasks: 278
+- Last Sprint: sprint-098
+- Total Sprints: 98
+- Completed Tasks: 288
 - No-Go Rate: 0.0%
 
 ## Active Configuration
@@ -42,8 +44,8 @@
 - Providers: Claude (default), Codex, Gemini
 - Planning: ai | structured | auto
 - Routing Engine: **v2** (intent-based, default since sprint-067)
-- Agents: 9 built-in (security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian)
-- Skills: 11 built-in (including ci-testing)
+- Agents: 16 built-in (security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, data-engineer, devops-engineer, frontend-designer, migration-specialist, accessibility-auditor)
+- Skills: 21 built-in (typescript-expert, testing-expert, documentation-writer, security-specialist, performance-optimizer, api-builder, devops-engineer, database-migration, react-specialist, python-expert, ci-testing, accessibility-expert, anthropic-sdk, code-simplifier, docker-expert, frontend-design, git-expert, graphql-expert, migration-expert, monorepo-expert, system-architect)
 
 ## Key Rules
 - See .brain/DECISIONS.md for 26 architecture decision records (ADR-001 through ADR-026)

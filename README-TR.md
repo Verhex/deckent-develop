@@ -4,7 +4,7 @@
 
 **Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-95%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-97%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
 
@@ -96,6 +96,8 @@ Deckent üç adımlı bir döngü izler:
 - **Heartbeat Daemon** -- `deckent heartbeat --daemon` komutuyla arka planda lint/test gibi periyodik kontroller çalıştıran proaktif görev sistemi
 - **Human Checkpoints** -- Denetimli otonom çalıştırmalar için `plan`, `evaluate` ve `fix` fazlarında yapılandırılabilir onay noktaları
 - **Yapılandırılabilir Sprint Timeout** -- Sınırsız süreli sprint için `sprint_timeout_minutes: 0`, ya da dakika cinsinden sabit timeout ayarı
+- **Model Registry** -- 13 model, 3 provider, 4 katman (premium_plus, premium, standard, economy) ile katman tabanlı yönlendirme
+- **Provider-Agnostik Yapılandırma** -- Model adları yerine `brain_tier`/`worker_tier` yapılandırın; ModelRegistry provider'a göre en uygun modeli otomatik seçer
 - **Beta Güncelleme İş Akışı** -- Yerel beta kurulumu için `deckent upgrade --local <path.tgz>`
 
 ---
@@ -380,10 +382,10 @@ Deckent üç AI provider ile çalışır. Rol bazlı veya görev bazlı yapılan
 | Provider | Modeller | Ortam Değişkeni |
 |----------|----------|-----------------|
 | Claude (varsayılan) | opus, sonnet, haiku | Oturum doğrulaması veya `ANTHROPIC_API_KEY` |
-| Codex (OpenAI) | gpt-5, gpt-4.1, gpt-5-mini | `OPENAI_API_KEY` |
-| Gemini (Google) | gemini-2.5-pro, gemini-2.5-flash | `GOOGLE_API_KEY` |
+| Codex (OpenAI) | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
+| Gemini (Google) | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
 
-Provider'lar arası model eşdeğerliği: opus = gpt-5 = gemini-2.5-pro (premium), sonnet = gpt-4.1 = gemini-2.5-flash (standard), haiku = gpt-5-mini (economy).
+**3 provider'da 13 model.** Katman eşdeğerliği: premium_plus (o3, gemini-3.1-pro-preview), premium (opus, gpt-5, gemini-2.5-pro), standard (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), economy (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
 
 Tam rehber için [docs/reference/multi-provider.md](docs/reference/multi-provider.md) dosyasına bakın.
 

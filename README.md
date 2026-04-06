@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-95%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-97%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -94,6 +94,8 @@ Deckent follows a three-step cycle:
 - **Heartbeat Daemon** -- Proactive task system that runs periodic checks (lint, tests) in the background via `deckent heartbeat --daemon`
 - **Human Checkpoints** -- Configurable approval gates at `plan`, `evaluate`, and `fix` phases for supervised autonomous runs
 - **Configurable Sprint Timeout** -- Set `sprint_timeout_minutes: 0` for unlimited-duration sprints, or any positive value for a hard timeout
+- **Model Registry** -- 13 models, 3 providers, 4 tiers (premium_plus, premium, standard, economy) with tier-based routing
+- **Provider-Agnostic Config** -- Configure `brain_tier`/`worker_tier` instead of model names; ModelRegistry resolves the best model per provider automatically
 - **Beta Upgrade Workflow** -- `deckent upgrade --local <path.tgz>` for local beta installations
 
 ---
@@ -378,10 +380,10 @@ Deckent works with three AI providers. Configure per-role or per-task:
 | Provider | Models | Env Var |
 |----------|--------|---------|
 | Claude (default) | opus, sonnet, haiku | Session auth or `ANTHROPIC_API_KEY` |
-| Codex (OpenAI) | gpt-5, gpt-4.1, gpt-5-mini | `OPENAI_API_KEY` |
-| Gemini (Google) | gemini-2.5-pro, gemini-2.5-flash | `GOOGLE_API_KEY` |
+| Codex (OpenAI) | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
+| Gemini (Google) | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
 
-Model equivalence across providers: opus = gpt-5 = gemini-2.5-pro (premium), sonnet = gpt-4.1 = gemini-2.5-flash (standard), haiku = gpt-5-mini (economy).
+**13 models across 3 providers.** Tier equivalence: premium_plus (o3, gemini-3.1-pro-preview), premium (opus, gpt-5, gemini-2.5-pro), standard (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), economy (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
 
 See [docs/reference/multi-provider.md](docs/reference/multi-provider.md) for the full guide.
 

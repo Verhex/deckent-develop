@@ -9,10 +9,10 @@ Platform: macOS, Linux, WSL2
 Tests: 12,193+
 Dashboard Tests: 413
 Coverage: 96%+
-Sprints: 95+
+Sprints: 97+
 CLI Commands: 34+
 MCP: 19 tools, 8 resources
-Agents: 9 built-in
-Skills: 11 built-in
+Agents: 16 built-in
+Skills: 21 built-in
 Providers: Claude, Codex, Gemini
-Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint CLI/MCP, Agent/Skill Evolution Pipeline, Adaptive Thresholds
+Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint CLI/MCP, Agent/Skill Evolution Pipeline, Adaptive Thresholds, ModelRegistry (13 models, 3 providers, tier-based routing)

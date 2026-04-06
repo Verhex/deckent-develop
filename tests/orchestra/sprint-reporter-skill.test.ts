@@ -119,7 +119,7 @@ describe('buildSkillPerformance', () => {
 
     const result = buildSkillPerformance(sprint, evals, skillMap);
     expect(result[0]!.debt).toBe(1);
-    expect(result[0]!.done).toBe(0);
+    expect(result[0]!.done).toBe(1); // GO_WITH_TECH_DEBT counts as done
   });
 
   it('counts NO_GO correctly', () => {
@@ -312,6 +312,6 @@ describe('writeRetrospective — skillMap parameter', () => {
     writeRetrospective(tempDir, sprint, evals, makeMetrics(), undefined, skillMap);
 
     const retro = readFileSync(join(tempDir, '.brain', 'RETRO.md'), 'utf8');
-    expect(retro).toContain('| super-skill | 3 | 1 | 1 | 1 | 0% |');
+    expect(retro).toContain('| super-skill | 3 | 2 | 1 | 1 | 0% |'); // Done=2: DONE + GO_WITH_TECH_DEBT
   });
 });

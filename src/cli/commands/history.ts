@@ -1,9 +1,10 @@
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { BRAIN_DIR, SPRINTS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { print, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { collectSprintFiles } from '../../orchestra/sprint-reporter.js';
 
 interface SprintRecord {
   sprint: string;
@@ -162,41 +163,6 @@ function loadUsageData(root: string, sprintId: string): { tokens: number; calls:
   } catch {
     return { tokens: 0, calls: 0 };
   }
-}
-
-/** Extract sprint number for numeric sort */
-function sprintNumber(filename: string): number {
-  const m = filename.match(/sprint-(\d+)/);
-  return m ? parseInt(m[1] ?? '0', 10) : 0;
-}
-
-/** Collect sprint log files from sprints dir and optional archive dir, sorted numerically */
-function collectSprintFiles(root: string): Array<{ file: string; dir: string }> {
-  const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
-  const archiveDir = join(root, BRAIN_DIR, 'archive');
-
-  const collected: Array<{ file: string; dir: string }> = [];
-  const seen = new Set<string>();
-
-  if (existsSync(sprintsDir)) {
-    const files = readdirSync(sprintsDir).filter((f) => f.startsWith('sprint-') && f.endsWith('.md'));
-    for (const f of files) {
-      collected.push({ file: f, dir: sprintsDir });
-      seen.add(f);
-    }
-  }
-
-  if (existsSync(archiveDir)) {
-    const files = readdirSync(archiveDir).filter((f) => f.startsWith('sprint-') && f.endsWith('.md'));
-    for (const f of files) {
-      if (!seen.has(f)) {
-        collected.push({ file: f, dir: archiveDir });
-      }
-    }
-  }
-
-  collected.sort((a, b) => sprintNumber(a.file) - sprintNumber(b.file));
-  return collected;
 }
 
 /** Parse a percentage string like "90%" or "90.5%" to its numeric value, or null if not parseable */

@@ -91,7 +91,7 @@ describe('buildAgentPerformance', () => {
     const secRow = rows.find(r => r.agent === 'security-auditor');
     expect(secRow).toBeDefined();
     expect(secRow!.tasks).toBe(2);
-    expect(secRow!.done).toBe(1);
+    expect(secRow!.done).toBe(2); // DONE + GO_WITH_TECH_DEBT both count as done
     expect(secRow!.debt).toBe(1);
     expect(secRow!.noGo).toBe(0);
 

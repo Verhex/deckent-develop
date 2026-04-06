@@ -1,10 +1,10 @@
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatHistoryResponse, wrapResponse, type HistoryData } from '../helpers/format.js';
+import { collectSprintFiles } from '../../orchestra/sprint-reporter.js';
 
 function detectTrend(sprints: Array<{ id: string; content: string }>): string {
   if (sprints.length < 2) return 'insufficient_data';
@@ -39,10 +39,11 @@ export function registerHistoryTool(server: McpServer): void {
     },
     async ({ last, json }) => {
       const root = process.cwd();
-      const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
 
       try {
-      if (!existsSync(sprintsDir)) {
+      const allEntries = collectSprintFiles(root);
+
+      if (allEntries.length === 0) {
         const emptyData = { sprints: [], trend: 'insufficient_data' };
         if (json) {
           return { content: [{ type: 'text' as const, text: JSON.stringify(emptyData) }] };
@@ -53,14 +54,11 @@ export function registerHistoryTool(server: McpServer): void {
         };
       }
 
-      const files = readdirSync(sprintsDir)
-        .filter((f) => f.startsWith('sprint-') && f.endsWith('.md'))
-        .sort()
-        .slice(-last);
+      const entries = allEntries.slice(-last);
 
-      const sprints = files.map((f) => ({
-        id: f.replace('.md', ''),
-        content: readFileSync(join(sprintsDir, f), 'utf-8'),
+      const sprints = entries.map(({ file, dir }) => ({
+        id: file.replace('.md', ''),
+        content: readFileSync(join(dir, file), 'utf-8'),
       }));
 
       const trend = detectTrend(sprints);

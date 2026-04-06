@@ -14,12 +14,14 @@
 - Default: Claude (tmux backend, session auth)
 - Optional: Codex (set OPENAI_API_KEY), Gemini (set GOOGLE_API_KEY)
 - Config: brain_provider, worker_provider, fallback_provider in .deckent/config.json
-- Model equivalence: opus↔gpt-5↔gemini-2.5-pro, sonnet↔gpt-4.1↔gemini-2.5-flash, haiku↔gpt-5-mini↔gemini-2.0-flash
+- Model Registry: 13 models, 3 providers, 4 tiers — single source of truth (model-registry.ts)
+- Tier equivalence: premium_plus (o3, gemini-3.1-pro-preview), premium (opus↔gpt-5↔gemini-2.5-pro), standard (sonnet↔gpt-4.1↔o4-mini↔gemini-2.5-flash), economy (haiku↔gpt-5-mini↔gpt-4.1-mini↔gemini-2.0-flash)
+- Provider-agnostic config: brain_tier/worker_tier instead of model names
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- 9 built-in agents: security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian
-- 11 built-in skills: typescript-expert, testing-expert, documentation-writer, etc.
+- 16 built-in agents: security-auditor, test-writer, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- 21 built-in skills: typescript-expert, testing-expert, documentation-writer, security-specialist, performance-optimizer, api-builder, devops-engineer, database-migration, react-specialist, python-expert, ci-testing, accessibility-expert, anthropic-sdk, code-simplifier, docker-expert, frontend-design, git-expert, graphql-expert, migration-expert, monorepo-expert, system-architect
 - Agent pool: .deckent/agents/*/agent.json — LRU eviction (max 50 temp, 5 sprint age)
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
 - Task routing: task-router.ts assigns agent + skills + provider per task
@@ -225,11 +227,25 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 | `opus` | Claude | Premium | Karmasik mimari, kritik karar, multi-file refactor |
 | `sonnet` | Claude | Standard | Genel gelistirme, bug fix, test yazimi |
 | `haiku` | Claude | Economy | Dokumantasyon, basit degisiklik, format duzenlemesi |
+| `o3` | Codex | Premium+ | En yuksek seviye reasoning (OPENAI_API_KEY gerekli) |
 | `gpt-5` | Codex | Premium | opus esdegeri (OPENAI_API_KEY gerekli) |
 | `gpt-4.1` | Codex | Standard | sonnet esdegeri |
+| `o4-mini` | Codex | Standard | Hafif reasoning modeli |
 | `gpt-5-mini` | Codex | Economy | haiku esdegeri |
+| `gpt-4.1-mini` | Codex | Economy | Dusuk maliyetli genel kullanim |
+| `gemini-3.1-pro-preview` | Gemini | Premium+ | En yuksek seviye Gemini (GOOGLE_API_KEY gerekli, preview) |
 | `gemini-2.5-pro` | Gemini | Premium | opus esdegeri (GOOGLE_API_KEY gerekli) |
 | `gemini-2.5-flash` | Gemini | Standard | sonnet esdegeri |
+| `gemini-2.0-flash` | Gemini | Economy | haiku esdegeri |
+
+### Tier
+
+| Tier | Aciklama | Ornek Modeller |
+|------|----------|----------------|
+| `premium_plus` | En yuksek seviye, ileri reasoning | o3, gemini-3.1-pro-preview |
+| `premium` | Karmasik gorevler, mimari kararlar | opus, gpt-5, gemini-2.5-pro |
+| `standard` | Genel gelistirme, dengeli maliyet | sonnet, gpt-4.1, o4-mini, gemini-2.5-flash |
+| `economy` | Basit gorevler, dusuk maliyet | haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash |
 
 ### Effort
 
@@ -327,11 +343,11 @@ tsc
 
 ---
 
-## Built-in Agents
+## Built-in Agents (16)
 
 | Agent | Uzmanlik | Aktivasyon |
 |-------|----------|------------|
-| `security-auditor` | Guvenlilk aciklari, OWASP top 10, auth | security/auth/vuln anahtar kelimeleri |
+| `security-auditor` | Guvenlik aciklari, OWASP top 10, auth | security/auth/vuln anahtar kelimeleri |
 | `test-writer` | Unit test, integration test, coverage | test/spec/coverage anahtar kelimeleri |
 | `doc-writer` | README, JSDoc, API docs, CHANGELOG | docs/readme/comment anahtar kelimeleri |
 | `bug-fixer` | Hata ayiklama, regression, hotfix | fix/bug/error/crash anahtar kelimeleri |
@@ -340,8 +356,15 @@ tsc
 | `api-builder` | REST API, OpenAPI, endpoint tasarimi | api/endpoint/route/schema anahtar kelimeleri |
 | `performance-analyzer` | Profiling, optimizasyon, benchmark | perf/slow/optimize anahtar kelimeleri |
 | `ci-guardian` | CI/CD saglik, test regresyon, build | ci/pipeline/test anahtar kelimeleri |
+| `architect` | Sistem tasarimi, modul yonetimi, bagimlilk analizi | architecture/design/module anahtar kelimeleri |
+| `architecture-planner` | Mimari planlama, ADR yazimi, yol haritasi | plan/roadmap/adr anahtar kelimeleri |
+| `accessibility-auditor` | WCAG, a11y, erisilebilirlik denetimi | accessibility/a11y/wcag anahtar kelimeleri |
+| `data-engineer` | Veri pipeline, ETL, veri modeli | data/pipeline/etl anahtar kelimeleri |
+| `devops-engineer` | CI/CD, Docker, deployment, altyapi | devops/deploy/docker anahtar kelimeleri |
+| `frontend-designer` | UI/UX, component tasarimi, responsive | frontend/ui/design anahtar kelimeleri |
+| `migration-specialist` | Versiyon gecisi, framework migration | migration/upgrade/deprecation anahtar kelimeleri |
 
-## Built-in Skills
+## Built-in Skills (21)
 
 | Skill | Aciklama |
 |-------|----------|
@@ -356,3 +379,13 @@ tsc
 | `react-specialist` | React, Vite, Tailwind, component mimari |
 | `python-expert` | Python ekosistemi, FastAPI, veri islemleri |
 | `ci-testing` | CI ortaminda test yurutme, regresyon algilama |
+| `accessibility-expert` | WCAG standartlari, a11y test, erisilebilirlik |
+| `anthropic-sdk` | Claude API, Anthropic SDK, tool use, agent SDK |
+| `code-simplifier` | Kod sadestirme, karmasiklik azaltma, temizlik |
+| `docker-expert` | Dockerfile, compose, container optimizasyon |
+| `frontend-design` | UI component, CSS, responsive tasarim |
+| `git-expert` | Git is akisi, branch stratejisi, merge yonetimi |
+| `graphql-expert` | GraphQL schema, resolver, subscription |
+| `migration-expert` | Framework gecisi, versiyon yukseltme, API migration |
+| `monorepo-expert` | Monorepo yonetimi, workspace, paket bagimliliklari |
+| `system-architect` | Sistem mimarisi, tasarim desenleri, olceklenebilirlik |

@@ -136,7 +136,10 @@
       "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && cat {}')",
       "Bash(find /home/alperen/deckent-dev/.tasks -name \"*.hb\" -exec cat {} \\\\;)",
       "Bash(find:*)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "mcp__deckent__deckent_agent_list",
+      "mcp__deckent__deckent_skill_list",
+      "Bash(tmux kill-session:*)"
     ]
   },
   "outputStyle": "Explanatory"

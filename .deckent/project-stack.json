@@ -32,7 +32,7 @@
   ],
   "buildTool": "vite",
   "testFramework": "vitest",
-  "detectedAt": "2026-04-06T12:30:13.680Z",
+  "detectedAt": "2026-04-06T13:27:33.617Z",
   "detectedLanguages": [
     "typescript"
   ],
