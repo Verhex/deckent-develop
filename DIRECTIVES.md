@@ -1,183 +1,159 @@
-# DIRECTIVES — Sprint 092: Config Temizliği + Dashboard i18n Tam Kapsam
+# DIRECTIVES — Sprint 093: Agent/Skill Stats Gerçek Çalışma + Sprint Bildirim
 
-## Goal: Config.json'u agresif temizle (usage artıkları, duplikasyon, tip güvenliği). Dashboard'daki 6 bileşende ~109 hardcoded İngilizce string'i i18n ile çevir. Türkçe seçildiğinde tüm UI Türkçe olmalı. Phase/Status enum değerleri İngilizce kalacak (teknik terim).
-
----
-
-## Task 1: Config.json Agresif Temizlik + Tip Güvenliği
-- Model: opus
-- Effort: normal
-- Agent: refactorer
-- Skills: typescript-expert
-- Files: .deckent/config.json, src/core/config-types.ts, src/core/config.ts
-- Scope: .deckent/, src/core/
-
-### Description
-Config.json'u temizle ve tip güvenliğini sağla.
-
-A) `.deckent/config.json`'dan kaldır:
-- Her mod (max_plan, max5x_plan, pro_plan, api) altındaki `usage_thresholds` objesini SİL — usage özelliği Sprint 089'da kaldırıldı
-- Üst seviye `brain_planning` field'ını kaldır — duplike, zaten modes altında var
-- Gereksiz/boş field'ları temizle
-
-B) `src/core/config-types.ts`'de:
-- `DeckentConfig`'e `last_sprint_id?: string` ekle (tip güvenliği)
-- `PlanModeConfig`'den `usage_thresholds` field'ı kalmışsa kaldır (Sprint 089'dan kalma)
-- `brain_planning` üst seviye field varsa kaldır veya deprecated işaretle
-
-C) `src/core/config.ts`'de:
-- `createDefaultConfig()` ve `loadConfig()`'da usage_thresholds referansı kaldıysa kaldır
-- `last_sprint_id` load/save akışını kontrol et, DeckentConfig üzerinden geçmeli
-
-D) Config.json'un final hali temiz, okunabilir, kategorize olmalı
-
-**Kanıt:** `grep "usage_thresholds\|brain_planning" .deckent/config.json` → 0 eşleşme
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/core/config*.test.ts` → 0 fail.
+## Goal: Agent/skill stats'ın gerçekten çalışmasını sağla — manifest dosyalarına sync, RETRO'da skill tablosu, avgQualityScore persist, Agent Done sayacı düzeltme. Sprint bitişinde otomatik output mekanizması ekle.
 
 ---
 
-## Task 2: Dashboard i18n — StatusPage + SprintSummary (~34 key)
+## Task 1: V2 Stats → Agent.json / Manifest.json Sync
 - Model: opus
 - Effort: high
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/dashboard/src/pages/StatusPage.tsx, src/dashboard/src/components/SprintSummary.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: src/dashboard/
+- Files: src/orchestra/sprint-controller.ts, src/core/agent-pool.ts, src/core/skill-pool.ts
+- Scope: src/orchestra/, src/core/
 
 ### Description
-StatusPage ve SprintSummary bileşenlerindeki hardcoded string'leri i18n ile çevir.
+V2 modunda stats sadece learnings.json'a yazılıyor, agent.json ve manifest.json HİÇ güncellenmiyor. Dashboard ve CLI bu dosyaları okuduğu için kullanıcı hep 0 görüyor.
 
-A) `StatusPage.tsx` — useTranslation import et ve tüm string'leri t() ile değiştir:
-- "No active sprint." → t('status.no_sprint')
-- "Run deckent start to begin." → t('status.run_start')
-- "Loading sprint data..." → t('status.loading')
-- "Sprint Status" → t('status.title')
+A) `src/orchestra/sprint-controller.ts` V2 bloğunda (satır ~1365-1398), `tracker.recordOutcome()` döngüsünden SONRA:
+- AgentPoolManager ve SkillPoolManager oluştur
+- tracker'dan güncel learnings'i oku (agentPerformance, skillPerformance)
+- Her agent için: `poolManager.updateAgentStats()` ile agent.json'daki stats'ı güncelle
+  - totalUses = learnings.agentPerformance[agentId].totalTasks
+  - successRate = learnings.agentPerformance[agentId].successRate
+  - avgCoverage = hesapla (outcome'lardan)
+  - lastUsedInSprint = sprint.id
+- Her skill için: `skillPoolManager.updateSkillStats()` çağır veya doğrudan manifest.json'a yaz
+  - totalUses = learnings.skillPerformance[skillId].totalTasks
+  - successRate = learnings.skillPerformance[skillId].successRate
+  - lastUsedInSprint = sprint.id
 
-B) `SprintSummary.tsx` — useTranslation import et ve ~30 string'i t() ile değiştir:
-- Status label'ları: "Done", "Active", "Writing code", "Running tests", "Type checking", "Needs attention", "Error", "Paused", "Queued", "Draft", "Waiting"
-- Zaman: "< 1 min remaining", "~N min remaining", "just started", "N min elapsed"
-- Task sayıları: "N/M tasks done", "Done: N", "Active: N", "Queued: N", "N done", "N active", "N queued", "N auto-fixed"
-- Bölüm başlıkları: "What's happening now", "Working...", "Tasks", "Providers", "Needs attention"
-- NOT: Phase/Status enum değerleri (PLAN, EXECUTE, DONE vb.) İngilizce KALACAK — çevirme
+B) Alternatif: `syncStatsToManifests(projectRoot, tracker)` yeni bir fonksiyon yaz ve finalizeSprint'ten çağır. Bu fonksiyon learnings.json'daki tüm agent/skill performans verilerini ilgili manifest dosyalarına yazar.
 
-C) `en.ts`'e ~34 yeni key ekle (status.* ve sprint_summary.* prefix'leri)
-D) `tr.ts`'e aynı ~34 key'in Türkçe çevirilerini ekle
+C) MCP agent_list tool'u (src/mcp/tools/agent-list.ts) ve CLI'ın okuduğu stats artık güncel olacak.
 
-**Kanıt:** `grep -n "useTranslation" src/dashboard/src/pages/StatusPage.tsx src/dashboard/src/components/SprintSummary.tsx` → 2 eşleşme
+**Kanıt:** Sprint sonrasında `cat .deckent/agents/refactorer/agent.json | grep totalUses` → 0'dan büyük değer
+**Kanıt:** `cat .deckent/skills/typescript-expert/manifest.json | grep totalUses` → 0'dan büyük değer
 
-**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts` → 0 fail.
+**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/sprint-controller.test.ts` → 0 fail.
 
 ---
 
-## Task 3: Dashboard i18n — TaskCard (~30 key)
-- Model: opus
-- Effort: high
-- Agent: refactorer
-- Skills: typescript-expert
-- Files: src/dashboard/src/components/TaskCard.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: src/dashboard/
-
-### Description
-TaskCard bileşenindeki ~30 hardcoded string'i i18n ile çevir.
-
-A) `TaskCard.tsx` — useTranslation import et ve tüm string'leri t() ile değiştir:
-- Status label'ları: "Completed", "Working...", "Writing code", "Running tests", "Running tests (attempt N/3)", "Type checking", "Failed — needs attention", "Error occurred", "Paused", "Waiting for Task X", "Queued", "Waiting"
-- Badge label'ları: "Done", "Active", "Writing code", "Running tests", "Type checking", "No-Go", "Error", "Paused", "Queued", "Draft", "Waiting"
-- Detay bölümleri: "Task N", "Files changed (N)", "Test results", "N passed", "N failed", "N total", "Retry history (N)", "Attempt N: reason"
-- NOT: Phase/Status enum değerleri İngilizce KALACAK
-
-B) `en.ts`'e ~30 yeni key ekle (task_card.* prefix'i)
-C) `tr.ts`'e aynı ~30 key'in Türkçe çevirilerini ekle
-
-**Kanıt:** `grep -n "useTranslation" src/dashboard/src/components/TaskCard.tsx` → 1 eşleşme
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts` → 0 fail.
-
----
-
-## Task 4: Dashboard i18n — DebtTable + SprintChart + Layout + Kalan (~25 key)
+## Task 2: RETRO.md Skill Performance Tablosu Düzeltme
 - Model: opus
 - Effort: normal
 - Agent: refactorer
 - Skills: typescript-expert
-- Files: src/dashboard/src/components/DebtTable.tsx, src/dashboard/src/components/SprintChart.tsx, src/dashboard/src/components/Layout.tsx, src/dashboard/src/pages/DashboardPage.tsx, src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/pages/ConfigPage.tsx, src/dashboard/src/components/NewSprintModal.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: src/dashboard/
+- Files: src/orchestra/sprint-reporter.ts, src/orchestra/sprint-controller.ts
+- Scope: src/orchestra/
 
 ### Description
-Kalan bileşenlerdeki hardcoded string'leri i18n ile çevir.
+RETRO.md'de Skill Performance tablosu görünmüyor. skillMap oluşturma kodu var (satır 1291-1298) ama tablo yazılmıyor.
 
-A) `DebtTable.tsx` — useTranslation import et:
-- "No technical debt entries." → t('debt.no_entries')
-- Tablo başlıkları: "ID", "Description", "Priority", "Sprint", "Status" → t('debt.col_id'), vb.
+A) Sorunu teşhis et:
+- `writeRetrospective()` fonksiyonunda skillMap parametresi alınıyor mu kontrol et
+- `buildSkillPerformance()` fonksiyonu çağrılıyor mu?
+- skillMap boş mu geliyor? (task.assignedSkills dolu mu?)
+- formatSkillPerformanceTable() çıktısı RETRO.md'ye yazılıyor mu?
 
-B) `SprintChart.tsx` — useTranslation import et:
-- Tooltip: "Coverage", "Tasks" → t('chart.coverage'), t('chart.tasks')
-- "No data available." → t('chart.no_data')
-- "Success Rate" → t('chart.success_rate')
-- "Tasks", "Coverage %" → t('chart.tasks'), t('chart.coverage_pct')
-- "No chart data available." → t('chart.no_chart_data')
+B) Düzelt:
+- buildSkillPerformance() fonksiyonundaki guard'ı kontrol et — `if (!skillMap || skillMap.size === 0) return []` satırı yüzünden erken dönüyor olabilir
+- writeRetrospective'te skill performance bloğunun gerçekten markdown'a yazıldığından emin ol
+- Sprint.tasks'teki assignedSkills field'ı dolu olmalı — planSprint'te atanıyor mu kontrol et
 
-C) `Layout.tsx` — SSE_LABELS'ı t() ile değiştir:
-- "Live" → t('common.live')
-- "..." → t('common.connecting')
-- "Offline" → t('common.offline')
+C) Düzeltme sonrasında RETRO.md'de şu tablo görünmeli:
+```
+## Skill Performance
+| Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
+|-------|-------|------|------|------|-------------|
+| typescript-expert | 5 | 3 | 2 | 0 | 90% |
+```
 
-D) `DashboardPage.tsx` — relativeTime fonksiyonunu i18n-aware yap:
-- "Ns ago" → t('common.seconds_ago', { n })
-- "Nm ago" → t('common.minutes_ago', { n })
-- "Nh ago" → t('common.hours_ago', { n })
+**Kanıt:** Sprint çalıştırıldıktan sonra `grep "Skill Performance" .brain/RETRO.md` → eşleşme
 
-E) `WorkerCard.tsx` — aynı relativeTime düzeltmesi
-
-F) `ConfigPage.tsx` — kalan hardcoded string'ler:
-- "Reset to default: X" → t('config.reset_to_default', { value })
-- "(default: X)" → t('config.default_value', { value })
-
-G) `NewSprintModal.tsx`:
-- Placeholder "# Sprint Directives..." → t('modal.directives_placeholder')
-
-H) `en.ts` + `tr.ts`'e ~25 yeni key ekle
-
-**Kanıt:** Tüm hedef dosyalarda useTranslation kullanılıyor
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts` → 0 fail.
+**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/sprint-reporter*.test.ts` → 0 fail.
 
 ---
 
-## Task 5: i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği
+## Task 3: avgQualityScore Persist Düzeltme + Agent Done Sayacı
 - Model: opus
 - Effort: normal
-- Agent: test-writer
-- Skills: typescript-expert, testing-expert
-- Files: tests/dashboard/i18n-coverage.test.ts, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts
-- Scope: tests/dashboard/, src/dashboard/
+- Agent: refactorer
+- Skills: typescript-expert
+- Files: src/orchestra/outcome-tracker.ts, src/orchestra/sprint-reporter.ts
+- Scope: src/orchestra/
 
 ### Description
-Dashboard i18n tam kapsam doğrulaması.
+İki sorunu düzelt:
 
-A) `tests/dashboard/i18n-coverage.test.ts` yeni dosya:
-- Test 1: en.ts ve tr.ts key sayıları eşit olmalı
-- Test 2: en.ts'deki her key tr.ts'de de bulunmalı (ve tersi)
-- Test 3: Hiçbir tr.ts çevirisi boş string olmamalı
-- Test 4: Tüm bileşen dosyalarında hardcoded İngilizce UI string taraması (regex ile)
-  - StatusPage, SprintSummary, TaskCard, DebtTable, SprintChart, Layout hedef dosyalar
-  - "No ", "Loading", "Error", "Failed", gibi pattern'ler bulunamazsa geçer
-  - Teknik terimler (PLAN, EXECUTE, DONE, NO_GO) hariç tutulmalı
+A) avgQualityScore learnings.json'a persist edilmiyor:
+- outcome-tracker.ts'de updateEntityPerformance() fonksiyonunda avgQualityScore hesaplanıyor (satır 375)
+- saveLearnings() JSON.stringify ile tüm objeyi yazıyor — ama veri dosyada yok
+- Sorun: loadLearnings() backfill'inde avgQualityScore ekleniyor (satır 438-443) ama ilk recordOutcome'dan ÖNCE çağrılan loadLearnings'de mevcut entity'ler backfill edilmiyor olabilir
+- Düzelt: loadLearnings() her entity yüklendiğinde avgQualityScore field'ı yoksa 0 olarak ekle
+- recordOutcome sonrası saveLearnings çağrısının avgQualityScore'u kaybetmediğinden emin ol
 
-B) en.ts ve tr.ts arasında eksik key varsa düzelt
+B) RETRO.md Agent Performance tablosunda Done sütunu hep 0:
+- sprint-reporter.ts buildAgentPerformance() fonksiyonunda "Done" sayacı nasıl hesaplanıyor?
+- DONE ve GO_WITH_TECH_DEBT ayrımı doğru yapılıyor mu?
+- evaluation === 'DONE' ise done++, evaluation === 'GO_WITH_TECH_DEBT' ise debt++ olmalı
+- Kontrol et ve düzelt
 
-**Kanıt:** `ls tests/dashboard/i18n-coverage.test.ts` → dosya var
+**Kanıt:** Sprint sonrasında learnings.json'da avgQualityScore > 0 olan entity var
+**Kanıt:** RETRO.md'de Agent Performance tablosunda Done > 0
 
-**Test:** `tsc --noEmit` temiz. `npx vitest run --config src/dashboard/vitest.config.ts tests/dashboard/i18n-coverage.test.ts` → 0 fail.
+**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/outcome-tracker.test.ts tests/orchestra/sprint-reporter*.test.ts` → 0 fail.
+
+---
+
+## Task 4: Sprint Bitişinde Otomatik Output (Job Completion Notification)
+- Model: opus
+- Effort: normal
+- Agent: api-builder
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-controller.ts, src/mcp/tools/start.ts, src/cli/commands/start.ts
+- Scope: src/orchestra/, src/mcp/, src/cli/
+
+### Description
+Sprint bittiğinde kullanıcıya otomatik bildirim göndermeli. Şu an sprint arka planda çalışıyor, bitmesini anlamak için kullanıcı manuel status sorgulaması yapıyor.
+
+A) `src/orchestra/sprint-controller.ts` finalizeSprint() sonunda:
+- Job dosyasına (.deckent/jobs/{jobId}.json) sprint sonuç özeti yaz:
+  - status: COMPLETE
+  - summary: "Sprint sprint-NNN: N/M done, X tech debt, Y no-go, Zdk süre"
+  - GO/NO_GO/TECH_DEBT sayıları
+  - evaluation sonuçları
+  - completedAt timestamp
+
+B) `src/mcp/tools/start.ts`'de:
+- Sprint job başlatıldıktan sonra, job dosyasını periyodik olarak poll et (veya completion callback)
+- Sprint tamamlandığında MCP response'a completion summary ekle
+- Alternatif: MCP tool zaten "background job" olarak çalışıyor — job completion'da notifications/resource update tetikle
+
+C) `src/cli/commands/start.ts`'de:
+- Sprint tamamlandığında terminal'e otomatik output yaz
+- Eğer --watch modundaysa zaten gösteriyor — değilse tamamlanma mesajı göster
+
+D) Minimum bildirim formatı:
+```
+✅ Sprint sprint-092 tamamlandı (9dk 37sn)
+   5/5 task: 5 GO_WITH_TECH_DEBT, 0 NO_GO
+   Agent: refactorer(4), test-writer(1)
+```
+
+**Kanıt:** Sprint bittiğinde .deckent/jobs/ dosyasında summary field'ı dolu
+
+**Test:** `tsc --noEmit` temiz.
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
 - npx vitest run → 0 fail
-- npx vitest run --config src/dashboard/vitest.config.ts → 0 fail
-- Dashboard Türkçe'de hardcoded İngilizce UI string → 0 (teknik terimler hariç)
-- config.json'da usage_thresholds → 0
-- en.ts ve tr.ts key sayısı eşit
-- %100 GO hedefli — yarım iş yok
+- Agent.json stats > 0 (gerçek veri, learnings.json ile tutarlı)
+- Skill manifest.json stats > 0 (gerçek veri)
+- RETRO.md'de Skill Performance tablosu görünür
+- RETRO.md'de Agent Done sayacı doğru
+- avgQualityScore learnings.json'da persist edilir
+- Sprint bitişinde otomatik output/bildirim var
+- %100 GO hedefli — test geçmesi yetmez, gerçek sonuç lazım

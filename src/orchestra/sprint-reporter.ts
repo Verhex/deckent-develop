@@ -156,12 +156,15 @@ export function buildSkillPerformance(
   skillMap?: Map<string, string[]>,
   results?: TaskResult[],
 ): SkillPerformanceRow[] {
-  if (!skillMap || skillMap.size === 0) return [];
+  // Check if there is any skill data available — either from skillMap or from task.assignedSkills
+  const hasSkillMap = skillMap && skillMap.size > 0;
+  const hasTaskSkills = sprint.tasks.some(t => t.assignedSkills && t.assignedSkills.length > 0);
+  if (!hasSkillMap && !hasTaskSkills) return [];
 
   const skillData = new Map<string, { tasks: number; done: number; debt: number; noGo: number; coverageSum: number; coverageCount: number }>();
 
   for (const task of sprint.tasks) {
-    const skillIds = skillMap.get(task.id) ?? task.assignedSkills ?? [];
+    const skillIds = skillMap?.get(task.id) ?? task.assignedSkills ?? [];
     for (const skillId of skillIds) {
       if (!skillData.has(skillId)) {
         skillData.set(skillId, { tasks: 0, done: 0, debt: 0, noGo: 0, coverageSum: 0, coverageCount: 0 });

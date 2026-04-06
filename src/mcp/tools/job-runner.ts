@@ -28,6 +28,10 @@ export interface JobState {
     noGo: number;
     duration: string;
   };
+  /** Human-readable completion summary */
+  summary?: string;
+  /** Agent usage breakdown: agentId → task count */
+  agentBreakdown?: Record<string, number>;
 }
 
 export function writeJobState(projectRoot: string, state: JobState): void {

@@ -30,7 +30,7 @@ import {
   BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE, SPRINTS_DIR,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE,
   RETRO_FILE, PROJECT_IDENTITY_FILE, TASK_FILE_EXTENSIONS,
-  LOCKS_DIR,
+  LOCKS_DIR, JOBS_DIR,
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
@@ -1410,6 +1410,59 @@ export async function finalizeSprint(
         }
       } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
 
+      // 8d2. Sync V2 learnings → agent.json / manifest.json (so Dashboard/CLI see real stats)
+      try {
+        const poolManager = new AgentPoolManager(projectRoot);
+        const skillPoolManager = new SkillPoolManager(projectRoot);
+        const learnings = tracker.getLearnings();
+
+        for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
+          // Compute average coverage from task results for this agent
+          const agentTasks = sprint.tasks.filter(t => t.assignedAgent === agentId);
+          let avgCov = 0;
+          if (agentTasks.length > 0) {
+            const totalCov = agentTasks.reduce((sum, t) => {
+              const r = results.find(res => res.taskId === t.id);
+              return sum + (r?.coverage ?? 0);
+            }, 0);
+            avgCov = totalCov / agentTasks.length;
+          }
+
+          // Build cumulative stats from learnings performance data
+          const agent = poolManager.getAgent(agentId);
+          if (agent) {
+            const stats = agent.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' };
+            stats.totalUses = perf.totalTasks;
+            stats.successRate = perf.successRate;
+            // Blend historical avg coverage with current sprint coverage
+            if (avgCov > 0 && agentTasks.length > 0) {
+              const prevTotal = stats.totalUses - agentTasks.length;
+              stats.avgCoverage = prevTotal > 0
+                ? ((stats.avgCoverage * prevTotal) + (avgCov * agentTasks.length)) / stats.totalUses
+                : avgCov;
+            }
+            stats.lastUsedInSprint = sprint.id;
+            agent.stats = stats;
+            poolManager.saveAgent(agent);
+          }
+        }
+
+        for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
+          const skill = skillPoolManager.getSkill(skillId);
+          if (skill) {
+            const stats = skill.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '', successCount: 0 };
+            stats.totalUses = perf.totalTasks;
+            stats.successRate = perf.successRate;
+            stats.successCount = perf.successCount;
+            stats.lastUsedInSprint = sprint.id;
+            skill.stats = stats;
+            skillPoolManager.saveSkill(skill);
+          }
+        }
+
+        debugLog('finalizeSprint:syncStatsToManifests', `Synced ${Object.keys(learnings.agentPerformance).length} agents, ${Object.keys(learnings.skillPerformance).length} skills to manifest files`);
+      } catch (e) { debugLog('finalizeSprint:syncStatsToManifests', e); }
+
       // 8e. Evaluate promotions/demotions
       try {
         const { PromotionPipeline } = await import('./promotion-pipeline.js');
@@ -1481,6 +1534,48 @@ export async function finalizeSprint(
       debugLog('finalizeSprint:adaptive', `Adaptive threshold update failed: ${err}`);
     }
   }
+
+  // 12. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
+  try {
+    const jobsDir = join(projectRoot, JOBS_DIR);
+    mkdirSync(jobsDir, { recursive: true });
+
+    // Build agent breakdown
+    const agentBreakdown: Record<string, number> = {};
+    for (const task of sprint.tasks) {
+      const agent = task.assignedAgent ?? 'generic';
+      agentBreakdown[agent] = (agentBreakdown[agent] ?? 0) + 1;
+    }
+    const agentParts = Object.entries(agentBreakdown).map(([a, c]) => `${a}(${c})`).join(', ');
+
+    // Format duration
+    const durationMs = metrics.durationMs;
+    const mins = Math.floor(durationMs / 60000);
+    const secs = Math.floor((durationMs % 60000) / 1000);
+    const durationStr = mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
+
+    const summary = `Sprint ${sprint.id} tamamlandı (${durationStr}) — ${metrics.completedTasks + metrics.techDebtTasks}/${metrics.totalTasks} task: ${metrics.completedTasks} DONE, ${metrics.techDebtTasks} TECH_DEBT, ${metrics.noGoTasks} NO_GO | Agent: ${agentParts}`;
+
+    const jobFile = join(jobsDir, `${sprint.id}.json`);
+    const jobData = {
+      status: 'COMPLETE',
+      sprintId: sprint.id,
+      summary,
+      completedAt: new Date().toISOString(),
+      metrics: {
+        totalTasks: metrics.totalTasks,
+        done: metrics.completedTasks,
+        techDebt: metrics.techDebtTasks,
+        noGo: metrics.noGoTasks,
+        duration: durationStr,
+        durationMs: metrics.durationMs,
+      },
+      agentBreakdown,
+      evaluations: Object.fromEntries(evaluations),
+    };
+    writeFileSync(jobFile, JSON.stringify(jobData, null, 2) + '\n');
+    debugLog('finalizeSprint:jobSummary', `Job summary written to ${jobFile}`);
+  } catch (e) { debugLog('finalizeSprint:jobSummary', e); }
 
   return metrics;
 }

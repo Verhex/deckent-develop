@@ -182,8 +182,10 @@ describe('buildSkillPerformance', () => {
     const skillMap = new Map<string, string[]>(); // No entry for 001
 
     const result = buildSkillPerformance(sprint, evals, skillMap);
-    // With empty skillMap, it uses task.assignedSkills as fallback
-    expect(result).toHaveLength(0); // empty map = returns early
+    // With empty skillMap but task.assignedSkills present, falls back to task skills
+    expect(result).toHaveLength(1);
+    expect(result[0]!.skill).toBe('fallback-skill');
+    expect(result[0]!.done).toBe(1);
   });
 });
 

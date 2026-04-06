@@ -291,6 +291,28 @@ export function registerStart(program: Command): void {
           if (stopSubprocessWatch) stopSubprocessWatch();
         }
         print(formatSprintSummary(sprintResult));
+
+        // Compact completion notification with agent breakdown
+        const sm = sprintResult.metrics;
+        if (sm) {
+          const totalSec = Math.round(sm.durationMs / 1000);
+          const mins = Math.floor(totalSec / 60);
+          const secs = totalSec % 60;
+          const dur = mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
+          const agentMap: Record<string, number> = {};
+          for (const t of sprintResult.tasks) {
+            const a = t.assignedAgent ?? 'generic';
+            agentMap[a] = (agentMap[a] ?? 0) + 1;
+          }
+          const agentStr = Object.entries(agentMap).map(([a, c]) => `${a}(${c})`).join(', ');
+          const done = sm.completedTasks;
+          const debt = sm.techDebtTasks;
+          const noGo = sm.noGoTasks;
+          print('');
+          print(`✅ Sprint ${sprintResult.id} tamamlandı (${dur})`);
+          print(`   ${done + debt}/${sm.totalTasks} task: ${done} DONE, ${debt} TECH_DEBT, ${noGo} NO_GO`);
+          print(`   Agent: ${agentStr}`);
+        }
       } catch (error) {
         if (error instanceof BrainError) {
           printError(new Error(`Sprint failed at phase ${error.phase ?? 'unknown'}: ${error.message}`));

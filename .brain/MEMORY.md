@@ -44,3 +44,7 @@ A) DebtTable.tsx — useTranslati
 - i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği: GO_WITH_TECH_DEBT — i18n doğrulama test dosyası oluşturuldu (tests/dashboard/i18n-coverage.test.ts) — 16 test, 4 describe bloğu:
 
 1) Key cou
+## Sprint sprint-093 Learnings
+- RETRO.md Skill Performance Tablosu Düzeltme: GO_WITH_TECH_DEBT — RETRO.md Skill Performance tablosu düzeltildi. Kök neden: buildSkillPerformance() guard'ı skillMap boş/undefined olduğun
+- avgQualityScore Persist Düzeltme + Agent Done Sayacı: GO_WITH_TECH_DEBT — A) avgQualityScore persist FIX: EntityPerformance'a qualityTaskCount alanı eklendi. updateEntityPerformance() formülü dü
+- Sprint Bitişinde Otomatik Output (Job Completion Notification): GO_WITH_TECH_DEBT — Sprint bitişinde otomatik output mekanizması eklendi: (A) finalizeSprint() sonuna .deckent/jobs/{sprintId}.json dosyasın

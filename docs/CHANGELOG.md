@@ -6,6 +6,21 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint93] - 2026-04-06
+
+### Added
+
+- V2 Stats → Agent.json / Manifest.json Sync
+
+### Changed
+
+- RETRO.md Skill Performance Tablosu Düzeltme (completed with tech debt)
+- avgQualityScore Persist Düzeltme + Agent Done Sayacı (completed with tech debt)
+- Sprint Bitişinde Otomatik Output (Job Completion Notification) (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 3 tech debt, 0 no-go_
+
 ## [0.3.0-beta.3-sprint92] - 2026-04-06
 
 

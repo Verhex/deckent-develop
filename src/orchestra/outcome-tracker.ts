@@ -29,6 +29,7 @@ export interface EntityPerformance {
   failCount: number;    // NO_GO
   successRate: number;  // 0.0-1.0
   avgQualityScore: number; // 0-100, incremental average from QualityAssessor
+  qualityTaskCount: number; // number of tasks that had a qualityScore (used for correct averaging)
   byIntent: Record<string, { tasks: number; successRate: number }>;
 }
 
@@ -360,6 +361,7 @@ export class OutcomeTracker {
         failCount: 0,
         successRate: 0,
         avgQualityScore: 0,
+        qualityTaskCount: 0,
         byIntent: {},
       };
     }
@@ -370,9 +372,11 @@ export class OutcomeTracker {
     else perf.failCount++;
     perf.successRate = perf.successCount / perf.totalTasks;
 
-    // Incremental average quality score
+    // Incremental average quality score (only over tasks that have a qualityScore)
     if (qualityScore !== undefined) {
-      perf.avgQualityScore = (perf.avgQualityScore * (perf.totalTasks - 1) + qualityScore) / perf.totalTasks;
+      const prevCount = perf.qualityTaskCount;
+      perf.qualityTaskCount++;
+      perf.avgQualityScore = (perf.avgQualityScore * prevCount + qualityScore) / perf.qualityTaskCount;
     }
 
     // Update intent-specific
@@ -435,12 +439,14 @@ export class OutcomeTracker {
         // Backfill fields added in later versions (backward compatibility)
         const agentPerf = parsed.agentPerformance ?? {};
         const skillPerf = parsed.skillPerformance ?? {};
-        // Backfill avgQualityScore for entities loaded from older learnings data
+        // Backfill avgQualityScore and qualityTaskCount for entities loaded from older learnings data
         for (const perf of Object.values(agentPerf)) {
           if (perf.avgQualityScore === undefined) perf.avgQualityScore = 0;
+          if (perf.qualityTaskCount === undefined) perf.qualityTaskCount = perf.avgQualityScore > 0 ? perf.totalTasks : 0;
         }
         for (const perf of Object.values(skillPerf)) {
           if (perf.avgQualityScore === undefined) perf.avgQualityScore = 0;
+          if (perf.qualityTaskCount === undefined) perf.qualityTaskCount = perf.avgQualityScore > 0 ? perf.totalTasks : 0;
         }
         return {
           recentSprints: [],

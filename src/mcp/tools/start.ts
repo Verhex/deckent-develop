@@ -82,13 +82,30 @@ export function registerStartTool(server: McpServer): void {
         runSprint(root, config, { autoApprove, sandboxMode: sandbox, timeoutMs: timeout, connector: bootstrap?.connector }).then(sprint => {
           const tasks = buildTaskSummaries(root, sprint.tasks);
           const sm = sprint.metrics;
+          const duration = sm ? formatJobDuration(sm.durationMs) : '?';
           const metrics = sm ? {
             totalTasks: sm.totalTasks,
             done: sm.completedTasks,
             techDebt: sm.techDebtTasks,
             noGo: sm.noGoTasks,
-            duration: formatJobDuration(sm.durationMs),
+            duration,
           } : undefined;
+
+          // Build agent breakdown: agentId → task count
+          const agentBreakdown: Record<string, number> = {};
+          for (const t of sprint.tasks) {
+            const agent = t.assignedAgent ?? 'generic';
+            agentBreakdown[agent] = (agentBreakdown[agent] ?? 0) + 1;
+          }
+
+          // Build human-readable summary
+          const total = sm?.totalTasks ?? sprint.tasks.length;
+          const done = sm?.completedTasks ?? 0;
+          const techDebt = sm?.techDebtTasks ?? 0;
+          const noGo = sm?.noGoTasks ?? 0;
+          const agentParts = Object.entries(agentBreakdown).map(([a, c]) => `${a}(${c})`).join(', ');
+          const summary = `Sprint ${sprint.id} tamamlandı (${duration}) — ${done + techDebt}/${total} task: ${done} DONE, ${techDebt} TECH_DEBT, ${noGo} NO_GO | Agent: ${agentParts}`;
+
           writeJobState(root, {
             jobId,
             status: 'COMPLETE',
@@ -97,6 +114,8 @@ export function registerStartTool(server: McpServer): void {
             sprintId: sprint.id,
             tasks,
             metrics,
+            summary,
+            agentBreakdown,
           });
         }).catch(err => {
           const message = err instanceof BrainError

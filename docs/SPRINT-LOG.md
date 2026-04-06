@@ -2561,3 +2561,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 092-005: i18n Doğrulama — Hardcoded String Tarama + Key Eşitliği (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 93 — sprint-093
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-06
+**Duration:** 642s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | 49.0% |
+| Duration | 641560ms |
+
+### Tasks
+
+- 093-001: V2 Stats → Agent.json / Manifest.json Sync (DONE)
+- 093-002: RETRO.md Skill Performance Tablosu Düzeltme (GO_WITH_TECH_DEBT)
+- 093-003: avgQualityScore Persist Düzeltme + Agent Done Sayacı (GO_WITH_TECH_DEBT)
+- 093-004: Sprint Bitişinde Otomatik Output (Job Completion Notification) (GO_WITH_TECH_DEBT)
+
+---
