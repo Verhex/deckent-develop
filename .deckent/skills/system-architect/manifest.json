@@ -1,0 +1,47 @@
+{
+  "id": "system-architect",
+  "name": "System Architect",
+  "version": "0.1.0",
+  "description": "Enterprise system architecture patterns: registry design, config schema evolution, provider abstraction, tier-based routing, migration planning, backward compatibility strategies",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "intent.primary": "design" }, "score": 10 },
+      { "when": { "domains": { "$contains": "core" } }, "score": 6 },
+      { "when": { "domains": { "$contains": "config" } }, "score": 8 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "architecture", "registry", "config", "migration",
+    "provider", "tier", "model", "interface", "pattern",
+    "single-source", "backward-compat", "parametric",
+    "enterprise", "scalability", "abstraction"
+  ],
+  "stackDetection": {
+    "files": ["tsconfig.json", "src/core/"],
+    "dependencies": ["typescript"],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "api-builder",
+    "performance-optimizer"
+  ],
+  "priority": 12,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 2000
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}
