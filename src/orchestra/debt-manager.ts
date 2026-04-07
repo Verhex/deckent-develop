@@ -136,8 +136,12 @@ export function handleEvaluation(
     mkdirSync(brainPath, { recursive: true });
     const existing = readFileSafe(debtPath);
     const items = existing ? parseDebtTable(existing) : [];
+    const debtId = `debt-${task.id}`;
+    if (items.some(d => d.id === debtId)) {
+      return;
+    }
     items.push({
-      id: `debt-${task.id}`,
+      id: debtId,
       description: `Tech debt from ${task.id}: ${result.notes}`.slice(0, 80),
       originTaskId: task.id,
       originSprintId: task.sprintId ?? '',

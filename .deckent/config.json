@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "tr",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-102",
+  "last_sprint_id": "sprint-103",
   "spawn_backend": "tmux",
   "modes": {
     "performance": {

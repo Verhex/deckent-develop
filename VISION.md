@@ -112,17 +112,17 @@ Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
-| sprint-100 | tamamlandı |
 | sprint-101 | tamamlandı |
 | sprint-102 | tamamlandı |
+| sprint-103 | tamamlandı |
 
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-102 |
-| Toplam Task | 6 |
-| Tamamlanan | 0 |
-| Tech Debt | 0 |
-| No-Go | 6 |
-| Süre | 12dk 9sn |
+| Sprint | sprint-103 |
+| Toplam Task | 7 |
+| Tamamlanan | 6 |
+| Tech Debt | 6 |
+| No-Go | 1 |
+| Süre | 19dk 57sn |
 | Coverage | 0.0% |

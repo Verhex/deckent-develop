@@ -1,0 +1,362 @@
+# Docker Backend Guide
+
+> Run Deckent workers in isolated Docker containers for stronger isolation and reproducibility.
+
+---
+
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Prerequisites](#2-prerequisites)
+3. [Building the Worker Image](#3-building-the-worker-image)
+4. [Configuration](#4-configuration)
+5. [Architecture](#5-architecture)
+6. [Running a Sprint](#6-running-a-sprint)
+7. [Troubleshooting](#7-troubleshooting)
+
+---
+
+## 1. Overview
+
+Deckent supports three spawn backends for worker processes:
+
+| Backend | Description | Default |
+|---------|-------------|---------|
+| `tmux` | Workers run in tmux panes (session auth) | Yes |
+| `subprocess` | Workers run as child processes | Fallback |
+| `docker` | Workers run in isolated Docker containers | Optional |
+
+The **Docker backend** provides the strongest isolation: each worker gets its own filesystem namespace. Workers cannot interfere with each other or corrupt the project directory — the project is mounted read-only inside the container.
+
+---
+
+## 2. Prerequisites
+
+### 2.1 Docker Engine
+
+Install Docker Engine on your platform:
+
+**Ubuntu / WSL2:**
+```bash
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add your user to the docker group (avoids sudo for every command)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Verify
+docker info
+```
+
+**macOS (Docker Desktop):**
+```bash
+# Install Docker Desktop from https://www.docker.com/products/docker-desktop/
+# Or via Homebrew:
+brew install --cask docker
+
+# Verify
+docker info
+```
+
+**WSL2 Notes:**
+- Docker Desktop with WSL2 backend is recommended for Windows
+- Alternatively, install Docker Engine directly inside WSL2 (Ubuntu steps above)
+- Ensure Docker daemon is running: `sudo service docker start`
+
+### 2.2 Claude Code CLI Authentication
+
+The Docker backend mounts your host `~/.claude/` directory into each container (read-only). This means workers use **your existing Claude Code session** — no separate login needed inside containers.
+
+Verify your host session is active before launching Docker-backed sprints:
+```bash
+claude --version
+# Should print version without prompting for login
+```
+
+---
+
+## 3. Building the Worker Image
+
+The worker image is defined in `Dockerfile.worker` at the project root.
+
+```bash
+# Build the image (run from project root)
+docker build -f Dockerfile.worker -t deckent-worker:latest .
+
+# Verify the image was built
+docker images | grep deckent-worker
+```
+
+The image includes:
+- **Node.js 22** (slim base)
+- **Git** (for diff operations)
+- **curl** (for health checks)
+- **Claude Code CLI** (`@anthropic-ai/claude-code`) installed globally
+
+**Optional providers** (uncomment in `Dockerfile.worker` if needed):
+```dockerfile
+# Codex CLI
+RUN npm i -g @openai/codex
+
+# Gemini CLI
+RUN npm i -g @google/gemini-cli
+```
+
+> The image has no entrypoint — the command is injected by `DockerSpawnBackend` at spawn time.
+
+---
+
+## 4. Configuration
+
+### 4.1 Enable Docker Backend
+
+```bash
+npx deckent config set spawn_backend docker
+```
+
+Or edit `.deckent/config.json` directly:
+```json
+{
+  "spawn_backend": "docker"
+}
+```
+
+### 4.2 Verify Configuration
+
+```bash
+npx deckent config read | grep spawn_backend
+# spawn_backend: docker
+```
+
+---
+
+## 5. Architecture
+
+### 5.1 Volume Mount Strategy
+
+Each container receives four volume mounts:
+
+| Mount | Container Path | Mode | Purpose |
+|-------|---------------|------|---------|
+| Project root | `/workspace` | `ro` | Source code (read-only — workers cannot corrupt) |
+| `.tasks/` | `/workspace/.tasks/` | `rw` | Results, heartbeats, prompts (shared volume) |
+| `.locks/` | `/workspace/.locks/` | `rw` | File locking between workers |
+| `~/.claude/` | `~/.claude/` | `ro` | Claude Code session auth credentials |
+
+The project is mounted read-only to prevent accidental corruption. Only `.tasks/` and `.locks/` are writable — all inter-process communication happens through these directories.
+
+### 5.2 Authentication
+
+Workers use the host user's Claude Code session via the `~/.claude/` mount:
+
+```
+Host ~/.claude/
+  ├── .credentials.json   ← session token (mounted ro into container)
+  └── settings.json       ← Claude settings
+```
+
+If `~/.claude.json` exists on the host, it is also mounted read-only (Claude config file).
+
+For API-key-based providers (Codex, Gemini), keys are passed as environment variables:
+- `ANTHROPIC_API_KEY` → Claude API mode
+- `OPENAI_API_KEY` → Codex provider
+- `GOOGLE_API_KEY` → Gemini provider
+
+### 5.3 Non-Root Execution
+
+**Claude Code's `--dangerously-skip-permissions` flag is blocked when running as root.** The Docker backend explicitly runs containers as the host user:
+
+```bash
+docker run --user <uid>:<gid> -e HOME=<host_home> ...
+```
+
+The host user's UID and GID are detected at runtime via `process.getuid()` / `process.getgid()`. This ensures:
+- Workers have the same filesystem permissions as the host user
+- `--dangerously-skip-permissions` is accepted by the Claude CLI
+- Files written to `.tasks/` are owned by the host user (no permission issues after cleanup)
+
+### 5.4 Container Lifecycle
+
+```
+spawn()
+  │
+  ├─ Write prompt to .tasks/.prompt-<id>.txt
+  ├─ docker run -d --name deckent-w-<taskId> ...
+  ├─ Write initial .tasks/task-<id>.hb (backend: "docker")
+  └─ monitorContainer() [async, fire-and-forget]
+       │
+       ├─ docker wait <containerName>   ← blocks until container exits
+       ├─ Update .hb → status: DONE/FAILED
+       ├─ If no .result + exit != 0 → write .timeout marker
+       └─ docker rm -f <containerName>  ← automatic cleanup
+```
+
+Container names follow the pattern `deckent-w-<taskId>` (e.g., `deckent-w-103-001`).
+
+The container timeout is 20 minutes by default (`DEFAULT_TIMEOUT_SECONDS = 1200`). If a worker exceeds this, the `timeout` wrapper inside the container kills the process and writes a `.timeout` marker file to `.tasks/`.
+
+---
+
+## 6. Running a Sprint
+
+Once Docker is configured:
+
+```bash
+# 1. Install Docker Engine (see Prerequisites)
+
+# 2. Build the worker image
+docker build -f Dockerfile.worker -t deckent-worker:latest .
+
+# 3. Enable Docker backend
+npx deckent config set spawn_backend docker
+
+# 4. Write sprint directives
+npx deckent set_directives
+
+# 5. Plan the sprint
+npx deckent plan
+
+# 6. Start the sprint
+npx deckent start
+
+# 7. Monitor progress
+npx deckent status --watch
+```
+
+### Checking Active Containers
+
+While a sprint is running, you can inspect active worker containers:
+
+```bash
+# List running deckent containers
+docker ps --filter name=deckent-w
+
+# View container logs for a specific worker
+docker logs deckent-w-103-001
+
+# Check container resource usage
+docker stats --no-stream --filter name=deckent-w
+```
+
+---
+
+## 7. Troubleshooting
+
+### 7.1 "dangerously-skip-permissions cannot be used with root"
+
+**Symptom:** Worker task writes `NO_GO` immediately; container logs show this error.
+
+**Cause:** The Docker daemon is running containers as root. This happens when:
+- The Docker backend fails to detect `process.getuid()` (returns undefined)
+- The container image overrides the user
+
+**Fix:**
+```bash
+# Verify your UID is non-zero
+id -u  # Should be >= 1000
+
+# Check if docker group membership is active
+groups | grep docker
+
+# If not in docker group, add and re-login
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+If `process.getuid()` fails (rare on some platforms), the backend falls back to UID 1000. Ensure your host user has UID >= 1000.
+
+### 7.2 "Not logged in" / Auth Errors
+
+**Symptom:** Worker fails with authentication errors; `claude --version` works on host but not in container.
+
+**Cause:** `~/.claude/` directory is empty or `.credentials.json` is missing.
+
+**Diagnosis:**
+```bash
+# Check credentials exist on host
+ls -la ~/.claude/
+# Should include .credentials.json or similar auth files
+
+# Verify host session is active
+claude --version
+```
+
+**Fix:**
+```bash
+# Re-authenticate on host
+claude auth login
+
+# Then re-run the sprint (auth is volume-mounted, not baked into image)
+npx deckent start
+```
+
+### 7.3 Container Timeout Issues
+
+**Symptom:** Tasks write `.timeout` marker files; heartbeat shows `status: FAILED`.
+
+**Cause:** The worker exceeded the 20-minute container timeout (`DEFAULT_TIMEOUT_SECONDS = 1200`).
+
+**Diagnosis:**
+```bash
+# Check timeout markers
+ls .tasks/*.timeout
+
+# Check container exit code (if container still exists)
+docker logs deckent-w-<taskId>
+```
+
+**Fix — Break tasks into smaller units:**
+High-effort tasks should be split into sub-tasks in DIRECTIVES. The container timeout is 20 minutes per container.
+
+**Fix — Enable Fix Phase for retries:**
+```bash
+npx deckent config set fix_phase_enabled true
+npx deckent config set max_fix_retries 2
+```
+
+### 7.4 Docker Not Available
+
+**Symptom:** Sprint starts but immediately falls back to subprocess backend.
+
+**Diagnosis:**
+```bash
+docker info
+# If this fails, Docker daemon is not running
+```
+
+**Fix (Ubuntu/WSL2):**
+```bash
+sudo service docker start
+# or
+sudo systemctl start docker
+```
+
+**Fix (WSL2 with Docker Desktop):**
+Open Docker Desktop on Windows and ensure the WSL2 integration is enabled for your distro.
+
+### 7.5 Permission Denied on `.tasks/` Files
+
+**Symptom:** Worker cannot write heartbeat or result files.
+
+**Cause:** The `.tasks/` directory on the host was created by root or a different user.
+
+**Fix:**
+```bash
+# Check ownership
+ls -la .tasks/
+
+# Fix ownership if needed
+sudo chown -R $USER:$USER .tasks/
+sudo chown -R $USER:$USER .locks/
+```
+
+---
+
+## See Also
+
+- [Quickstart Guide](quickstart.md) — General sprint setup
+- [Configuration Reference](../reference/config-reference.md) — All config options
+- [Architecture Overview](../architecture/architecture.md) — Sprint lifecycle internals

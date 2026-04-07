@@ -144,3 +144,9 @@
 | debt-099-005 | Tech debt from 099-005: PROJECT-IDENTITY.md: Test Count 12 → 12,193+ düzeltildi. | 099-005 | sprint-099 | NORMAL | 0 | true | sprint-099 | 2026-04-06T15:27:08.980Z |
 | debt-101-002 | Tech debt from 101-002: debt-098-002 already fully resolved. collectSprintFiles( | 101-002 | sprint-101 | NORMAL | 0 | true | sprint-101 | 2026-04-07T09:15:05.783Z |
 | debt-101-004 | Tech debt from 101-004: Fixed debt-098-004: (A) Removed obsolete 'Usage-Aware Pl | 101-004 | sprint-101 | NORMAL | 0 | true | sprint-101 | 2026-04-07T09:15:11.640Z |
+| debt-103-002 | Tech debt from 103-002: debt-098-002 is already fully resolved in code. collectS | 103-002 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:35.438Z |
+| debt-103-003 | Tech debt from 103-003: ANALYSIS-2026-04-02.md güncellendi: (1) Bölüm I tablosu | 103-003 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:39.332Z |
+| debt-103-004 | Tech debt from 103-004: Sprint badge sayıları 101+ → 102+ olarak güncellendi: RE | 103-004 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:43.052Z |
+| debt-103-005 | Tech debt from 103-005: debt-098-005 resolved: (A) CLAUDE.md orchestra/ module c | 103-005 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:46.826Z |
+| debt-103-006 | Tech debt from 103-006: Docker Backend Integration Test yazıldı. 7 test, hepsi g | 103-006 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:50.602Z |
+| debt-103-007 | Tech debt from 103-007: Created docs/guide/docker-backend.md (362 lines). Covers | 103-007 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:54.612Z |
