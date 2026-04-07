@@ -117,11 +117,12 @@ export function registerStartTool(server: McpServer): void {
 
           // Build human-readable summary
           const total = sm?.totalTasks ?? sprint.tasks.length;
-          const done = sm?.completedTasks ?? 0;
+          const completed = sm?.completedTasks ?? 0; // DONE + GO_WITH_TECH_DEBT
+          const donePure = completed - (sm?.techDebtTasks ?? 0);
           const techDebt = sm?.techDebtTasks ?? 0;
           const noGo = sm?.noGoTasks ?? 0;
           const agentParts = Object.entries(agentBreakdown).map(([a, c]) => `${a}(${c})`).join(', ');
-          const summary = `Sprint ${sprint.id} tamamlandı (${duration}) — ${done + techDebt}/${total} task: ${done} DONE, ${techDebt} TECH_DEBT, ${noGo} NO_GO | Agent: ${agentParts}`;
+          const summary = `Sprint ${sprint.id} tamamlandı (${duration}) — ${completed}/${total} task: ${donePure} DONE, ${techDebt} TECH_DEBT, ${noGo} NO_GO | Agent: ${agentParts}`;
 
           writeJobState(root, {
             jobId,

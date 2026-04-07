@@ -319,12 +319,13 @@ export function registerStart(program: Command): void {
             agentMap[a] = (agentMap[a] ?? 0) + 1;
           }
           const agentStr = Object.entries(agentMap).map(([a, c]) => `${a}(${c})`).join(', ');
-          const done = sm.completedTasks;
+          const completed = sm.completedTasks; // DONE + GO_WITH_TECH_DEBT
+          const donePure = completed - sm.techDebtTasks;
           const debt = sm.techDebtTasks;
           const noGo = sm.noGoTasks;
           print('');
           print(`✅ Sprint ${sprintResult.id} tamamlandı (${dur})`);
-          print(`   ${done + debt}/${sm.totalTasks} task: ${done} DONE, ${debt} TECH_DEBT, ${noGo} NO_GO`);
+          print(`   ${completed}/${sm.totalTasks} task: ${donePure} DONE, ${debt} TECH_DEBT, ${noGo} NO_GO`);
           print(`   Agent: ${agentStr}`);
         }
       } catch (error) {
