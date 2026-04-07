@@ -283,7 +283,7 @@ export function registerStart(program: Command): void {
         try {
           sprintResult = await runSprint(root, config, {
             connector: bootstrap.connector,
-            autoApprove: opts.autoApprove ?? false,
+            autoApprove: true, // Deckent standard: workers MUST have full write permissions
             sandboxMode: opts.sandboxMode,
             timeoutMs,
           });
