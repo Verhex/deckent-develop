@@ -95,3 +95,21 @@ A) buildArgs() güncellendi:
 - VISION.md + health-check.md + roadmap.md Sayı Güncellemeleri: GO_WITH_TECH_DEBT — 3 dosyadaki tüm eski sayılar güncellendi: VISION.md (6 düzeltme: sprint 82→98+, CLI 33→34+, MCP resource 9→8, agent 9→16
 - README Badge + ANALYSIS Sprint 098 Güncelleme: GO_WITH_TECH_DEBT — A) README.md ve README-TR.md: sprint badge 97+ → 98+ güncellendi. B) ANALYSIS-2026-04-02.md: Bölüm I tablosu güncellendi
 - PROJECT-IDENTITY Test Count Fix + CLAUDE.md Module Count: GO_WITH_TECH_DEBT — PROJECT-IDENTITY.md: Test Count 12 → 12,193+ düzeltildi. CLAUDE.md zaten günceldi (49 modules orchestra, 52 modules core
+## Sprint sprint-100 Learnings
+- Config Ölü Alan Temizliği: NO_GO — A) config.json legacy modları (max_plan, max5x_plan, pro_plan) zaten yoktu — Sprint 097'de temizlenmiş. B) config.json'd
+- Constants→Config Entegrasyonu: NO_GO
+- Dashboard CONFIG_FIELDS Güncelleme: NO_GO — Edit/Write tool permissions denied in don't-ask mode. Cannot modify ConfigPage.tsx without file write permissions. All p
+- Init Wizard İyileştirme: NO_GO — Init wizard genişletildi — 15+ yeni config alanı eklendi.
+
+A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
+- Worker Result Yazma Güvenilirliği — tmux Timeout + Fallback: NO_GO
+- Sprint Status + Dashboard Stale Data Fix: NO_GO
+## Sprint sprint-101 Learnings
+- Fix debt: Tech debt from 098-001: buildAgentPerformance() ve buildSkillPerformance() zaten: NO_GO — Edit/Write tool permissions denied in don't-ask mode. Root cause fully analyzed: (1) handleEvaluation() in debt-manager.
+- Fix debt: Tech debt from 098-002: Root cause: MCP deckent_history tool only read .brain/sp: GO_WITH_TECH_DEBT — debt-098-002 already fully resolved. collectSprintFiles() in sprint-reporter.ts (line 2051) reads both .brain/sprints/ a
+- Fix debt: Tech debt from 098-004: README.md ve README-TR.md dosyalarındaki sprint badge sa: GO_WITH_TECH_DEBT — Fixed debt-098-004: (A) Removed obsolete 'Usage-Aware Planning' from Key Features in both README.md and README-TR.md — u
+- Sprint Singleton + Lock Mekanizması: NO_GO — Edit/Write tool permissions denied in don't-ask mode. Cannot modify sprint-controller.ts, start.ts, or MCP start.ts with
+- Brain Evaluate Fix — Result Dosyalarını Doğru Oku: NO_GO
+- Zombie Process Koruması + tmux Cleanup: NO_GO — Edit/Write tool permissions denied in don't-ask mode. Cannot modify sprint-controller.ts, start.ts, or cleanup.ts withou
+- Prompt Dosyası Lifecycle Düzeltme: NO_GO — Edit and Write tools denied in don't-ask mode. Cannot modify source files. Two changes needed: (1) cleanupDraftTasks() —
+- CLI/MCP Start Parity — Davranış Eşitliği: NO_GO

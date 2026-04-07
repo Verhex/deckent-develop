@@ -163,10 +163,10 @@ describe('start --sandbox-mode', () => {
     );
   });
 
-  it('without --sandbox-mode, sprint runs normally', async () => {
+  it('without --sandbox-mode, sprint runs normally with autoApprove', async () => {
     await runCommand('--force');
     expect(runSprint).toHaveBeenCalledWith('/mock/root', expect.anything(), expect.objectContaining({
-      autoApprove: false,
+      autoApprove: true,
     }));
   });
 

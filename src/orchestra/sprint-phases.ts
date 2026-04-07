@@ -283,6 +283,7 @@ export async function runEvaluatePhase(
     sprint.status = SprintStatus.EVALUATING;
     sprint.phase = SprintPhase.EVALUATE;
     const collectedIds = new Set(results.map(r => r.taskId));
+    debugLog('runEvaluatePhase:start', `totalTasks=${sprint.tasks.length} collectedResults=${results.length} collectedIds=[${[...collectedIds].join(',')}]`);
 
     // Resolve CI guardian config once for all tasks
     const ciGuardianConfig = resolveCiGuardianConfig(projectRoot);
@@ -320,6 +321,7 @@ export async function runEvaluatePhase(
           }
         }
 
+        debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
         // Run afterTask hooks (non-fatal)
@@ -349,6 +351,7 @@ export async function runEvaluatePhase(
           selfAssessment: 'NO_GO',
           notes: 'Timeout - no result received',
         };
+        debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing)`);
         handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
         evaluations.set(task.id, TaskEvaluation.NO_GO);
         // Run afterTask hooks for timeout tasks too (non-fatal)

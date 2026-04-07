@@ -17,6 +17,7 @@ import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdir
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
+import { isSprintLocked } from '../../core/multi-ide.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -213,6 +214,19 @@ export function registerStart(program: Command): void {
             print('Sandbox mode: no changes to stash. Running sprint on clean state.');
           }
           // Continue with sprint in sandbox mode (does not abort)
+        }
+
+        // ─── Sprint Lock Check ─────────────────────────────────────
+        if (!opts.force) {
+          const lockInfo = isSprintLocked(root);
+          if (lockInfo.locked) {
+            if (sandboxState) restoreSandbox(root, sandboxState);
+            printError(new Error(
+              `Sprint already running (PID ${lockInfo.pid}, env: ${lockInfo.env}, sprint: ${lockInfo.sprintId}, started: ${lockInfo.acquiredAt}). Use --force to override.`
+            ));
+            process.exitCode = 1;
+            return;
+          }
         }
 
         // Pre-flight doctor check (unless --force)

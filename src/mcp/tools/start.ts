@@ -7,6 +7,7 @@ import type { SprintSizeRecommendation } from '../../core/types.js';
 import { writeJobState, buildTaskSummaries } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
+import { isSprintLocked } from '../../core/multi-ide.js';
 
 function formatJobDuration(ms: number): string {
   const mins = Math.floor(ms / 60000);
@@ -33,10 +34,26 @@ export function registerStartTool(server: McpServer): void {
       const root = process.cwd();
       // force: MCP does not run pre-flight checks by default (non-interactive context).
       // The parameter is present for CLI parity — set force=true to document intent.
-      void force;
 
       try {
         const config = await loadConfig(root);
+
+        // ─── Sprint Lock Check ─────────────────────────────────────
+        if (!force) {
+          const lockInfo = isSprintLocked(root);
+          if (lockInfo.locked) {
+            const errData = {
+              error: true,
+              success: false,
+              message: `Sprint already running (PID ${lockInfo.pid}, env: ${lockInfo.env}, sprint: ${lockInfo.sprintId}, started: ${lockInfo.acquiredAt}). Use force=true to override.`,
+            };
+            const errSummary = formatErrorResponse({ message: errData.message });
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(errData, errSummary)) }],
+              isError: true,
+            };
+          }
+        }
 
         // Dry-run mode: plan only, no spawn
         if (dryRun) {

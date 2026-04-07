@@ -1512,7 +1512,7 @@ await server.connect(new StdioServerTransport());
 
 ---
 
-### Tools (19)
+### Tools (20)
 
 | Tool name | Description |
 |---|---|
@@ -1535,6 +1535,7 @@ await server.connect(new StdioServerTransport());
 | `deckent_agent_list` | List registered agents (built-in and temp) |
 | `deckent_skill_list` | List registered skills (manifest and AST sandbox info) |
 | `deckent_checkpoint` | Approve or reject human checkpoints |
+| `deckent_docs` | Manage user-defined documents in sprint lifecycle |
 
 #### `deckent_plan` Input Schema
 ```ts

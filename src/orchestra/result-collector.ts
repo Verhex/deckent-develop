@@ -266,5 +266,18 @@ export async function waitForResults(
   } finally {
     watcher.close();
   }
+  // Final sweep: collect any real .result files written during/after the last poll cycle
+  // Note: Only read .result files here (not .timeout) to avoid side effects in edge cases
+  for (const taskId of taskIds) {
+    if (collected.has(taskId)) continue;
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+    if (existsSync(resultPath)) {
+      const result = readJsonSafe<TaskResult>(resultPath);
+      if (result) {
+        results.push(result);
+        collected.add(taskId);
+      }
+    }
+  }
   return results;
 }

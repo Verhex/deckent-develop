@@ -334,13 +334,13 @@ describe('start command (isolated)', () => {
       );
     });
 
-    it('passes autoApprove: false to runSprint by default', async () => {
+    it('passes autoApprove: true to runSprint by default (Deckent standard)', async () => {
       await runCommand(['start']);
 
       expect(runSprint).toHaveBeenCalledWith(
         '/mock/root',
         expect.anything(),
-        expect.objectContaining({ autoApprove: false }),
+        expect.objectContaining({ autoApprove: true }),
       );
     });
   });

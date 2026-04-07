@@ -932,7 +932,7 @@ describe('start command', () => {
     vi.mocked(runSprint).mockResolvedValue(makeSprint());
     await runCommand(registerStart, ['start']);
     const optsArg = vi.mocked(runSprint).mock.calls[0]?.[2];
-    expect(optsArg?.autoApprove).toBe(false);
+    expect(optsArg?.autoApprove).toBe(true); // Deckent standard: always true
     expect(optsArg?.sandboxMode).toBeFalsy();
   });
 

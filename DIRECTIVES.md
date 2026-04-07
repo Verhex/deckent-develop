@@ -1,189 +1,159 @@
-# DIRECTIVES — Sprint 099: RETRO Debug + Job Output Reform + Docs Tutarlılık
+# DIRECTIVES — Sprint 102: CLI Sprint Güvenilirliği — Singleton, Lock, Evaluate Fix
 
-## Goal: RETRO Done sayacı evaluations map debug, job output'a detaylı gerekçe/metrik ekle, summary çift sayım fix, tüm docs dosyalarındaki eski sayıları güncelle, ANALYSIS Sprint 098 sonuçlarını ekle.
+## Goal: CLI sprint akışını MCP standartlarına yükselt: singleton enforcement, sprint lock, Brain evaluate fix, zombie process koruması, prompt cleanup.
 
 ---
 
-## Task 1: RETRO Done Sayacı — Evaluations Map Debug + Fix
+## Task 1: Sprint Singleton + Lock Mekanizması
 - Model: opus
 - Effort: high
 - Agent: bug-fixer
 - Skills: typescript-expert
-- Files: src/orchestra/sprint-reporter.ts, src/orchestra/sprint-controller.ts, src/orchestra/sprint-phases.ts
+- Files: src/orchestra/sprint-controller.ts, src/cli/commands/start.ts, src/mcp/tools/start.ts
+- Scope: src/orchestra/, src/cli/, src/mcp/
+
+### Description
+Birden fazla `deckent start` çağrısı aynı anda çalışınca aynı .tasks/ dizinine yazıyorlar, zombie process'ler kalıyor, sprint'ler çakışıyor.
+
+A) Sprint lock dosyası mekanizması ekle:
+- Sprint başladığında `.deckent/sprint.lock` oluştur (PID + timestamp + sprintId)
+- Sprint bittiğinde (finalize veya cleanup) lock dosyasını sil
+- Start çağrıldığında lock kontrolü yap:
+  - Lock varsa ve PID hâlâ çalışıyorsa → "Sprint zaten çalışıyor" hatası ver, başlatma
+  - Lock varsa ama PID ölmüşse → stale lock, temizle ve devam et
+
+B) CLI start.ts: Sprint başlamadan önce kontrol zinciri:
+```
+1. tmux ls → deckent session var mı?
+2. .deckent/sprint.lock var mı? PID canlı mı?
+3. .tasks/ dizininde aktif task dosyaları var mı?
+4. Hepsi temizse → sprint başlat
+5. Değilse → uyarı ver, --force ile override edilebilir
+```
+
+C) MCP start tool'una da aynı lock kontrolü ekle.
+
+**Kanıt:** `grep "sprint.lock" src/orchestra/sprint-controller.ts src/cli/commands/start.ts` → 2+ satır
+
+**Test:** `tsc --noEmit` temiz. İki kez `deckent start` çağır → ikincisi hata vermeli.
+
+---
+
+## Task 2: Brain Evaluate Fix — Result Dosyalarını Doğru Oku
+- Model: opus
+- Effort: high
+- Agent: bug-fixer
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-phases.ts, src/orchestra/result-collector.ts, src/orchestra/sprint-controller.ts
 - Scope: src/orchestra/
 
 ### Description
-RETRO Agent/Skill Performance tablosunda Done sütunu hep 0. Kod doğru (buildAgentPerformance GO_WITH_TECH_DEBT'i done'a sayıyor) ama runtime'da evaluations map writeRetrospective'e boş ulaşıyor.
+Worker'lar DONE ve GO_WITH_TECH_DEBT result bıraktı ama Brain tüm task'ları NO_GO olarak evaluate etti. RETRO'da "0/6 completed" yazıldı.
 
-A) Mevcut debug log'u kontrol et (sprint-reporter.ts satır ~96, buildAgentPerformance içinde debugLog çağrısı var).
-
-B) sprint-controller.ts finalizeSprint() fonksiyonunda evaluations map'in writeRetrospective'e geçirildiği noktaya (satır ~1298) debug log ekle:
+A) result-collector.ts waitForResults() debug: Her .result dosyası okunduğunda evaluations map'e ne ekleniyor logla:
 ```
-debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
+debugLog('waitForResults:collected', `task=${taskId} assessment=${result.selfAssessment}`);
 ```
 
-C) sprint-phases.ts runEvaluatePhase() sonunda evaluations map'in dolu olduğunu doğrula:
-```
-debugLog('runEvaluatePhase:done', `evaluations.size=${evaluations.size}`);
-```
+B) sprint-phases.ts runEvaluatePhase(): evaluations map'in populate edildiği noktayı kontrol et. .result dosyasındaki selfAssessment ("DONE" string) ile TaskEvaluation.DONE enum'ı arasında mapping doğru mu?
 
-D) Kök nedeni bul ve düzelt. Olası nedenler:
-- FIX phase'de evaluations map temizleniyor
-- handleCrossDependencies evaluations'ı bozuyor
-- sprint.tasks referansı değişiyor
+C) Olası sorun: selfAssessment string "DONE" vs TaskEvaluation enum mismatch. result-evaluator.ts'de selfAssessment → TaskEvaluation dönüşümü kontrol et.
 
-E) Fix'ten sonra RETRO'da Done > 0 olmalı.
+D) sprint-controller.ts finalizeSprint(): evaluations map'in writeRetrospective'e boş ulaşma sorununu (Sprint 098-099'da tespit edildi) tekrar kontrol et.
 
-**Kanıt:** `grep "debugLog.*evaluations" src/orchestra/sprint-controller.ts src/orchestra/sprint-phases.ts` → 2+ satır
+**Kanıt:** Debug log'larla evaluate akışı doğrulanmış olmalı
 
-**Test:** `npx vitest run tests/orchestra/sprint-reporter*.test.ts` → 0 fail
+**Test:** `tsc --noEmit` temiz. Mock test: DONE result → evaluations map'te TaskEvaluation.DONE
 
 ---
 
-## Task 2: Job Output Reform — Detaylı Gerekçe + Metrik
+## Task 3: Zombie Process Koruması + tmux Cleanup
 - Model: opus
-- Effort: high
+- Effort: normal
 - Agent: bug-fixer
 - Skills: typescript-expert
-- Files: src/orchestra/sprint-controller.ts, src/core/types.ts
-- Scope: src/orchestra/, src/core/
+- Files: src/orchestra/sprint-controller.ts, src/cli/commands/start.ts, src/cli/commands/cleanup.ts
+- Scope: src/orchestra/, src/cli/
 
 ### Description
-.deckent/jobs/{sprintId}.json dosyası sadece evaluation kararını tutuyor. Her task için detaylı bilgi eklenmeli.
+Eski sprint'lerden kalan zombie start process'ler yeni sprint'i bozuyor. Eski sprint worker'ları tekrar çalışıp yeni sonuçların üzerine yazıyor.
 
-A) finalizeSprint() içindeki job summary yazma bloğunu (satır ~1538-1578) genişlet:
+A) Sprint start pre-flight check'e ekle:
+- `ps aux | grep "deckent start"` ile mevcut start process'leri tespit et
+- Mevcut process varsa uyarı ver ve --force olmadan başlatma
+- `tmux kill-server` ile eski deckent session'ını temizle (sadece deckent session'ı)
 
-evaluations objesini zenginleştir — her task için:
-```json
-{
-  "098-001": {
-    "evaluation": "GO_WITH_TECH_DEBT",
-    "reason": "Tests passed but no new test files written",
-    "filesChanged": ["src/orchestra/sprint-reporter.ts"],
-    "linesAdded": 15,
-    "linesRemoved": 3,
-    "testsPassed": true,
-    "coverage": 0,
-    "selfAssessment": "DONE",
-    "techDebtDetail": "Test dosyası güncellendi ama yeni test eklenmedi"
-  }
-}
-```
+B) Cleanup komutuna zombie process temizleme ekle:
+- `deckent cleanup` çağrıldığında eski start process'leri de kill et
+- tmux deckent session'ını kapat
 
-B) Summary çift sayım fix: `completedTasks + techDebtTasks` formülü yanlış. GO_WITH_TECH_DEBT hem completedTasks'a hem techDebtTasks'a sayılıyor → "10/5 task" gibi çıktı. Doğru formül: summary'de `completedTasks` (DONE + GO_WITH_TECH_DEBT toplamı) kullan, ayrı satırda DONE ve TECH_DEBT say.
+C) Sprint finalize sonunda: tüm tmux window'ları kapatıldığını doğrula, kalan window varsa kill et.
 
-C) Summary format önerisi:
-```
-Sprint sprint-099 tamamlandı (Xdk Ysn) — 5/5 task başarılı: 3 DONE, 2 TECH_DEBT, 0 NO_GO | Agent: bug-fixer(2), doc-writer(3)
-```
+**Kanıt:** `deckent cleanup` → eski process'ler temizlenmeli
 
-**Kanıt:** `grep "reason\|filesChanged\|selfAssessment" src/orchestra/sprint-controller.ts` → 3+ satır
-
-**Test:** `tsc --noEmit` temiz. `npx vitest run tests/orchestra/sprint-controller*.test.ts` → 0 fail
+**Test:** `tsc --noEmit` temiz
 
 ---
 
-## Task 3: VISION.md + health-check.md + roadmap.md Sayı Güncellemeleri
+## Task 4: Prompt Dosyası Lifecycle Düzeltme
 - Model: opus
 - Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: VISION.md, docs/reference/health-check.md, docs/reference/roadmap.md
-- Scope: ./, docs/reference/
+- Agent: bug-fixer
+- Skills: typescript-expert
+- Files: src/orchestra/tmux.ts, src/orchestra/sprint-controller.ts
+- Scope: src/orchestra/
 
 ### Description
-3 dosyada eski sayılar var, hepsini güncelle:
+Her sprint start'ta yeni .prompt-* dosyaları oluşuyor, eski start'lardan kalanlar temizlenmiyor. Sprint tekrarlanınca prompt dosyaları birikiyor.
 
-A) VISION.md (7 düzeltme):
-- Sprint sayısı: 82 → 98+
-- CLI komut: 33 → 34+
-- MCP resource: 9 → 8 (satır 59 ve 106)
-- Built-in agent: 9 → 16
-- Built-in skill: 11 → 21
-- Model sayısı: varsa → 13 (ModelRegistry)
+A) Sprint plan başlamadan önce eski .prompt-* dosyalarını temizle (plan aşamasında, spawn'dan önce):
+```typescript
+// cleanupDraftTasks() sonuna ekle:
+const promptFiles = readdirSync(tasksDir).filter(f => f.startsWith('.prompt-'));
+for (const f of promptFiles) { unlinkSync(join(tasksDir, f)); }
+```
 
-B) docs/reference/health-check.md (6 düzeltme):
-- Satır 4: 65 sprints → 98+ sprints
-- Satır 4: 11,862 tests → 12,193+ tests
-- Satır 79: 11,862 tests, 469 test files → 12,193+ tests
-- Satır 95: 11,862 → 12,193+
-- Satır 104: agents 9 → 16
-- Satır 105: skills 11 → 21
+B) Worker spawn sonrası prompt dosyasını hemen silme — Claude CLI stdin'den okuyana kadar bekle. Ama sprint finalize/cleanup'ta mutlaka temizle.
 
-C) docs/reference/roadmap.md:
-- Satır 100: Sprint 095 → Sprint 098+
+**Kanıt:** Sprint plan sonrası eski .prompt-* dosyası kalmamalı
 
-**Kanıt:** `grep "98\|12,193\|16 built-in\|21 skill" VISION.md docs/reference/health-check.md docs/reference/roadmap.md | wc -l` → 6+
-
-**Test:** Dosyalar valid markdown.
+**Test:** `tsc --noEmit` temiz
 
 ---
 
-## Task 4: README Badge + ANALYSIS Sprint 098 Güncelleme
+## Task 5: CLI/MCP Start Parity — Davranış Eşitliği
 - Model: opus
 - Effort: normal
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: README.md, README-TR.md, docs/ANALYSIS-2026-04-02.md
-- Scope: ./, docs/
+- Agent: bug-fixer
+- Skills: typescript-expert
+- Files: src/cli/commands/start.ts, src/mcp/tools/start.ts
+- Scope: src/cli/, src/mcp/
 
 ### Description
-A) README.md ve README-TR.md:
-- Sprint badge: 97+ → 98+
-- Varsa eski sayıları güncelle
+MCP deckent_start ile CLI deckent start arasında kritik davranış farkları var. Eşitleme:
 
-B) ANALYSIS-2026-04-02.md:
-- Bölüm I tablo: Toplam Sprint 97 → 98
-- Orchestra Modülleri: 47 → 49
-- Core Modülleri: 48 → 52
-- Sprint 098 metriklerini ekle (IV. bölüm sonuna):
-  ```
-  ### Sprint 098 Metrikleri
-  - **Kapsam:** Dokümantasyon + Sprint Output + History Fix
-  - **Task:** 5/5 (tümü GO_WITH_TECH_DEBT)
-  - **Süre:** 8dk 25sn
-  - **Kod:** +77 / -56 satır
-  - **Önemli değişiklikler:**
-    - MCP history tool .brain/archive/ okuyor (85 sprint log erişilebilir)
-    - sprint-reporter.ts debug log eklendi (evaluations map debug)
-    - ANALYSIS, README, DECKENT.md ModelRegistry güncellemeleri
-  ```
-- Bölüm IX Sonuç: Sprint 097 → Sprint 098
+A) CLI start'a MCP start'taki pre-flight skip'i ekle:
+- MCP: `force=true` default (non-interactive context)
+- CLI: doctor check yapıyor → yavaşlatıyor. --no-doctor flag ekle veya default skip yap
 
-**Kanıt:** `grep "Sprint 098\|98\+\|49\|52" docs/ANALYSIS-2026-04-02.md | wc -l` → 4+
+B) Sprint output format eşitliği:
+- MCP: JSON response ile task listesi + status döner
+- CLI: Human-readable summary → bu doğru ama eksik bilgi veriyor
 
-**Test:** Dosyalar valid markdown.
+C) Timeout default eşitliği:
+- MCP: default 1800000ms (30 dk)
+- CLI: default undefined → kontrol et, aynı olmalı
 
----
+**Kanıt:** Her iki start komutu aynı autoApprove, timeout, force default'ları kullanmalı
 
-## Task 5: PROJECT-IDENTITY Test Count Fix + CLAUDE.md Module Count
-- Model: sonnet
-- Effort: low
-- Agent: doc-writer
-- Skills: documentation-writer
-- Files: .brain/PROJECT-IDENTITY.md, CLAUDE.md
-- Scope: .brain/, ./
-
-### Description
-A) .brain/PROJECT-IDENTITY.md:
-- Test Count: 12 → 12,193+  (kısaltılmış/bozuk değer)
-- Sprint: 98 doğrula
-
-B) CLAUDE.md:
-- orchestra/ modül sayısı: 47 modules → 49 modules
-- core/ modül sayısı: 50 modules → 52 modules (model-registry.ts, mode-presets.ts eklendi)
-- Sprint sayısı: 97+ → 98+
-
-**Kanıt:** `grep "49 modules\|52 modules\|12,193\|98" .brain/PROJECT-IDENTITY.md CLAUDE.md | wc -l` → 4+
-
-**Test:** Dosyalar valid markdown.
+**Test:** `tsc --noEmit` temiz
 
 ---
 
 ## Quality Rules
 - tsc --noEmit MUST pass
 - npx vitest run → 0 fail
-- Job output'da her task için reason + filesChanged + selfAssessment bulunmalı
-- Summary'de çift sayım olmamalı (totalTasks = done + techDebt + noGo DEĞİL, completedTasks = DONE + TECH_DEBT)
-- Tüm docs'ta sayılar güncel: sprint 98+, agent 16, skill 21, model 13, tests 12,193+
+- Sprint lock mekanizması çalışmalı (çift start engellenmeli)
+- Brain evaluate DONE result'ı NO_GO olarak değerlendirmemeli
+- Zombie process koruması aktif olmalı
 - %100 GO hedefli

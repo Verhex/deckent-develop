@@ -2829,3 +2829,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 100-006: Sprint Status + Dashboard Stale Data Fix (PENDING)
 
 ---
+## Sprint 101 — sprint-101
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-07
+**Duration:** 2516s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 6 |
+| Coverage | NaN% |
+| Duration | 2515805ms |
+
+### Tasks
+
+- 101-001: Fix debt: Tech debt from 098-001: buildAgentPerformance() ve buildSkillPerformance() zaten (NO_GO)
+- 101-002: Fix debt: Tech debt from 098-002: Root cause: MCP deckent_history tool only read .brain/sp (GO_WITH_TECH_DEBT)
+- 101-003: Fix debt: Tech debt from 098-003: ANALYSIS-2026-04-02.md Sprint 097 sonuçlarıyla güncellen (DONE)
+- 101-004: Fix debt: Tech debt from 098-004: README.md ve README-TR.md dosyalarındaki sprint badge sa (GO_WITH_TECH_DEBT)
+- 101-005: Fix debt: Tech debt from 098-005: Modül sayıları güncellendi: orchestra/ 47→49, core/ 50→5 (DONE)
+- 101-006: Sprint Singleton + Lock Mekanizması (NO_GO)
+- 101-007: Brain Evaluate Fix — Result Dosyalarını Doğru Oku (NO_GO)
+- 101-008: Zombie Process Koruması + tmux Cleanup (NO_GO)
+- 101-009: Prompt Dosyası Lifecycle Düzeltme (NO_GO)
+- 101-010: CLI/MCP Start Parity — Davranış Eşitliği (NO_GO)
+
+---

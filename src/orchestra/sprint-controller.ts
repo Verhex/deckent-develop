@@ -65,6 +65,9 @@ export {
 };
 export type { SprintState } from './sprint-utils.js';
 
+// ─── Core — sprint lock ───────────────────────────────────────────
+import { acquireSprintLock, releaseSprintLock } from '../core/multi-ide.js';
+
 // ─── Core — provider abstraction ──────────────────────────────────
 import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry } from '../core/provider.js';
@@ -277,6 +280,9 @@ export function interruptActiveSprint(): void {
       } catch (e) { debugLog('interruptActiveSprint:killWorker', e); }
     }
   } catch (e) { debugLog('interruptActiveSprint:listWorkers', e); }
+
+  // Release sprint lock on interrupt
+  try { releaseSprintLock(projectRoot); } catch (e) { debugLog('interruptActiveSprint:releaseSprintLock', e); }
 }
 
 // ═══ IPC Channel Registry ══════════════════════════════════════════
@@ -1172,6 +1178,9 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
     }
   }
 
+  // Release sprint lock on cleanup
+  try { releaseSprintLock(projectRoot); } catch (e) { debugLog('cleanup:releaseSprintLock', e); }
+
   // Clear plugin hooks so they don't persist across sprints
   clearHooks();
 }
@@ -1730,6 +1739,18 @@ export async function runSprint(
     await loadPluginHooks(projectRoot);
   } catch (e) { debugLog('runSprint:loadPluginHooks', e); }
 
+  // ─── Sprint Lock ──────────────────────────────────────────────────
+  // Acquire sprint lock to prevent concurrent sprints on the same project.
+  // Uses PID-based locking: stale locks (dead PIDs) are auto-cleared.
+  const sprintLockId = `sprint-${Date.now()}`;
+  const lockAcquired = acquireSprintLock(projectRoot, sprintLockId);
+  if (!lockAcquired) {
+    throw new BrainError(
+      'Another sprint is already running in this project. Use --force or wait for the active sprint to complete.',
+      SprintPhase.PLAN,
+    );
+  }
+
   // Phase 1: PLAN
   const { sprint, safetyPoint } = await runPlanPhase(
     projectRoot, config, opts, activeProvider, rollbackEnabled,
@@ -1743,6 +1764,7 @@ export async function runSprint(
       sprint.status = SprintStatus.ABORTED;
       sprint.completedAt = now();
       clearActiveSprint();
+      releaseSprintLock(projectRoot);
       clearSprintState(projectRoot);
       return sprint;
     }
@@ -1789,6 +1811,22 @@ export async function runSprint(
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  // Post-collect sweep: pick up any .result files written during/after waitForResults timeout
+  try {
+    const preGraceCollectedIds = new Set(results.map(r => r.taskId));
+    for (const task of sprint.tasks) {
+      if (preGraceCollectedIds.has(task.id)) continue;
+      const latePath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
+      if (existsSync(latePath)) {
+        const lateResult = readJsonSafe<TaskResult>(latePath);
+        if (lateResult) {
+          debugLog('postCollect:lateResult', `task=${task.id} selfAssessment=${lateResult.selfAssessment} — collected post-timeout result`);
+          results.push(lateResult);
+        }
+      }
+    }
+  } catch (e) { debugLog('postCollect:main', e); }
+
   // Grace period: for tasks with heartbeat but no result, wait 5 min then kill worker
   try {
     const collectedIds = new Set(results.map(r => r.taskId));
@@ -1806,7 +1844,14 @@ export async function runSprint(
 
       for (const task of staleWorkers) {
         const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
-        if (!existsSync(resultPath)) {
+        if (existsSync(resultPath)) {
+          // Worker wrote result during grace period — read and collect it
+          const lateResult = readJsonSafe<TaskResult>(resultPath);
+          if (lateResult) {
+            debugLog('graceKill:lateResult', `task=${task.id} selfAssessment=${lateResult.selfAssessment} — collected late result`);
+            results.push(lateResult);
+          }
+        } else {
           // Worker still hasn't written result — kill it
           try {
             if (spawnBackend) spawnBackend.kill(task.id);
@@ -1856,6 +1901,7 @@ export async function runSprint(
       sprint.status = SprintStatus.ABORTED;
       sprint.completedAt = now();
       clearActiveSprint();
+      releaseSprintLock(projectRoot);
       clearSprintState(projectRoot);
       return sprint;
     }
@@ -1871,6 +1917,7 @@ export async function runSprint(
         sprint.status = SprintStatus.ABORTED;
         sprint.completedAt = now();
         clearActiveSprint();
+        releaseSprintLock(projectRoot);
         clearSprintState(projectRoot);
         return sprint;
       }
@@ -1891,6 +1938,7 @@ export async function runSprint(
   sprint.completedAt = now();
 
   // Clear active sprint reference — sprint completed normally
+  releaseSprintLock(projectRoot);
   clearActiveSprint();
 
   // Clear sprint state file after successful completion

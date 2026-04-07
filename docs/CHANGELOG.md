@@ -6,6 +6,22 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.3.0-beta.3-sprint101] - 2026-04-07
+
+
+### Changed
+
+- Fix debt: Tech debt from 098-002: Root cause: MCP deckent_history tool only read .brain/sp (completed with tech debt)
+- Fix debt: Tech debt from 098-004: README.md ve README-TR.md dosyalarındaki sprint badge sa (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 098-003: ANALYSIS-2026-04-02.md Sprint 097 sonuçlarıyla güncellen
+- Fix debt: Tech debt from 098-005: Modül sayıları güncellendi: orchestra/ 47→49, core/ 50→5
+
+
+_Tasks: 10 total, 4 done, 2 tech debt, 6 no-go_
+
 ## [0.3.0-beta.3-sprint100] - 2026-04-07
 
 ### Added

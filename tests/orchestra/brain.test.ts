@@ -804,7 +804,10 @@ describe('waitForResults', () => {
 
   it('handles corrupt result files gracefully', async () => {
     const sprint = makeSprint();
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation((p: string) => {
+      if (typeof p === 'string' && p.endsWith('.timeout')) return false;
+      return p.toString().endsWith('.result');
+    });
     mockedReadFileSync.mockReturnValue('NOT JSON');
 
     const results = await waitForResults(ROOT, sprint, 1);
