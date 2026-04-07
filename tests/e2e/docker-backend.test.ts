@@ -7,7 +7,7 @@
 //   We verify observable outcomes: .hb file contents, list() state, kill() behavior.
 //   We do NOT assert on container "running" state since it's racing with claude exit.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -65,7 +65,16 @@ describe('Docker Backend Integration', () => {
 
   afterEach(() => {
     forceRemoveContainer(containerName);
-    cleanupTaskFiles(testTaskId);
+    forceRemoveContainer(`${containerName}-b`);
+    // Cleanup ALL test-docker artifacts (any PID, any suffix)
+    try {
+      const files = fs.readdirSync(TEST_TASKS_DIR);
+      for (const f of files) {
+        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-')) {
+          try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+        }
+      }
+    } catch { /* ok */ }
   });
 
   // ─── Test 1: isAvailable() matches sync isDockerAvailable() ─────────────
@@ -234,5 +243,18 @@ describe('Docker Backend Integration', () => {
       forceRemoveContainer(containerName2);
       cleanupTaskFiles(taskId2);
     }
+  });
+
+  // Final cleanup — monitorContainer writes .hb/.timeout asynchronously AFTER afterEach runs
+  afterAll(async () => {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const files = fs.readdirSync(TEST_TASKS_DIR);
+      for (const f of files) {
+        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-')) {
+          try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
+        }
+      }
+    } catch { /* ok */ }
   });
 });
