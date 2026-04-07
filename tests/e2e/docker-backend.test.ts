@@ -15,7 +15,16 @@ import { DockerSpawnBackend, isDockerAvailable } from '../../src/orchestra/spawn
 
 const PROJECT_ROOT = process.cwd();
 const TEST_TASKS_DIR = path.join(PROJECT_ROOT, '.tasks');
-const dockerAvailable = isDockerAvailable();
+
+// Docker tests require BOTH: Docker daemon running AND deckent-worker image built
+function isDockerReady(): boolean {
+  if (!isDockerAvailable()) return false;
+  const result = spawnSync('docker', ['images', '-q', 'deckent-worker:latest'], {
+    encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return (result.stdout?.trim().length ?? 0) > 0;
+}
+const dockerAvailable = isDockerReady();
 
 /**
  * Check if a container exists (running or exited — before monitorContainer cleanup).
