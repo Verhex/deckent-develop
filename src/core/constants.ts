@@ -19,6 +19,8 @@ export const WORKSPACE_DIR = join(DECKENT_DIR, 'workspace');
 export const PLUGINS_DIR = join(DECKENT_DIR, 'plugins');
 export const I18N_DIR = join(DECKENT_DIR, 'i18n');
 export const JOBS_DIR = join(DECKENT_DIR, 'jobs');
+export const DECISIONS_LOG_DIR = join(DECKENT_DIR, 'decisions');
+export const DOCS_CONFIG_FILE = join(DECKENT_DIR, 'docs.json');
 export const DASHBOARD_FILE = '.dashboard' as const;
 
 // ─── Memory Files (relative to BRAIN_DIR) ────────────────────────────

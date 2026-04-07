@@ -18,6 +18,7 @@ import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
 // Side-effect import: registers all updaters
 import './doc-updaters/index.js';
+import { runManagedDocUpdates } from './managed-docs/managed-doc-runner.js';
 import {
   analyzeCiLearnings,
   buildCiLearningsSection,
@@ -731,7 +732,15 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     sprint_timeout_minutes: 0,
   };
   const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
-  return runAllUpdaters(ctx);
+  const builtinResults = runAllUpdaters(ctx);
+  // Run user-defined managed doc updates (non-fatal)
+  try {
+    const managedResults = runManagedDocUpdates(ctx);
+    return [...builtinResults, ...managedResults];
+  } catch (e) {
+    debugLog('updateProjectDocs:managedDocs', e);
+    return builtinResults;
+  }
 }
 
 // ═══ Sprint Comparison ═══════════════════════════════════════════

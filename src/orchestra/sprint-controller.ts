@@ -30,7 +30,7 @@ import {
   BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE, SPRINTS_DIR,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE,
   RETRO_FILE, PROJECT_IDENTITY_FILE, TASK_FILE_EXTENSIONS,
-  LOCKS_DIR, JOBS_DIR,
+  LOCKS_DIR, JOBS_DIR, DECISIONS_LOG_DIR,
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
@@ -1151,6 +1151,16 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
     for (const file of readdirSync(tasksDir)) {
       if (file.startsWith('.prompt-')) {
         try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkPromptFile', e); }
+      }
+    }
+  }
+
+  // Clean up decision trail files from .deckent/decisions/
+  const decisionsDir = join(projectRoot, DECISIONS_LOG_DIR);
+  if (existsSync(decisionsDir)) {
+    for (const file of readdirSync(decisionsDir)) {
+      if (file.startsWith('decision-') && file.endsWith('.json')) {
+        try { unlinkSync(join(decisionsDir, file)); } catch (e) { debugLog('cleanup:unlinkDecisionFile', e); }
       }
     }
   }

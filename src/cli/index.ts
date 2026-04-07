@@ -33,6 +33,7 @@ import { registerExplain } from './commands/explain.js';
 import { registerSetDirectives } from './commands/set-directives.js';
 import { registerHeartbeat } from './commands/heartbeat.js';
 import { registerCheckpoint } from './commands/checkpoint.js';
+import { registerDocs } from './commands/docs.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -87,6 +88,7 @@ export function buildProgram(): Command {
   registerSetDirectives(program);
   registerHeartbeat(program);
   registerCheckpoint(program);
+  registerDocs(program);
 
   return program;
 }

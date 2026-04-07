@@ -18,6 +18,7 @@ import { registerHelpTool } from './help.js'; // deckent_help
 import { registerAgentListTool } from './agent-list.js';
 import { registerSkillListTool } from './skill-list.js';
 import { registerCheckpointTool } from './checkpoint.js';
+import { registerDocsTool } from './docs.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -39,4 +40,5 @@ export function registerTools(server: McpServer): void {
   registerAgentListTool(server);
   registerSkillListTool(server);
   registerCheckpointTool(server);
+  registerDocsTool(server);
 }

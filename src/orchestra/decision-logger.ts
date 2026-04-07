@@ -3,6 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { DecisionLogEntry } from '../core/decision-types.js';
+import { DECISIONS_LOG_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Persisted Decision Log ────────────────────────────────────────────────
@@ -27,7 +28,7 @@ export class DecisionLogger {
    * Get the directory path for decision logs.
    */
   private getLogDir(): string {
-    return path.join(this.projectRoot, '.tasks', 'decisions');
+    return path.join(this.projectRoot, DECISIONS_LOG_DIR);
   }
 
   /**
