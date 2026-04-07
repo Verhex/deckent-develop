@@ -142,7 +142,8 @@
       "Bash(tmux kill-session:*)",
       "Bash(DECKENT_DEBUG=1 npx deckent plan --mode ai)",
       "Bash(DECKENT_DEBUG=1 npx deckent plan --planning-mode ai)",
-      "Bash(DECKENT_DEBUG=1 npx deckent:*)"
+      "Bash(DECKENT_DEBUG=1 npx deckent:*)",
+      "mcp__deckent__deckent_docs"
     ]
   },
   "outputStyle": "Explanatory"

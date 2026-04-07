@@ -1,6 +1,6 @@
 # Deckent Architecture — Comprehensive Reference
 
-> **Version:** Sprint 099+ | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
+> **Version:** Sprint 100+ | **Language:** TypeScript (ESM) | **Runtime:** Node.js ≥18
 >
 > This document is the single comprehensive architectural reference for the Deckent system.
 > For the primary system specification, see [DECKENT-MASTER-BLUEPRINT.md](../DECKENT-MASTER-BLUEPRINT.md).
@@ -36,7 +36,7 @@ Deckent is an **AI agent orchestration CLI** that coordinates multiple AI agents
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  DECKENT CLI  (src/cli/ — 34+ commands)                             │
+│  DECKENT CLI  (src/cli/ — 35+ commands)                             │
 │  deckent start | deckent plan | deckent status | deckent web        │
 └────────────────────────┬────────────────────────────────────────────┘
                          │
@@ -91,7 +91,7 @@ src/
 │   ├── plugin.ts            ← Plugin manifest validation, load, install, remove
 │   └── plugin-hooks.ts      ← Plugin hook execution (beforeSprint/afterSprint/etc.)
 │
-├── orchestra/               ← Sprint orchestration (49 modules)
+├── orchestra/               ← Sprint orchestration (55 modules)
 │   ├── brain.ts             ← Re-export layer — sole orchestration entry point
 │   ├── sprint-controller.ts ← Sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
 │   ├── sprint-phases.ts     ← Phase-specific execution logic
@@ -137,7 +137,7 @@ src/
 │
 ├── cli/                     ← Command-line interface
 │   ├── auto-setup.ts        ← Setup wizard (generateSetupRecommendation)
-│   ├── commands/            ← 34+ CLI commands (one file per command)
+│   ├── commands/            ← 35+ CLI commands (one file per command)
 │   │   ├── init.ts          ← deckent init — project initialization
 │   │   ├── start.ts         ← deckent start — sprint execution
 │   │   ├── plan.ts          ← deckent plan — dry-run planning
@@ -174,8 +174,8 @@ src/
 │       ├── hints.ts         ← Phase-based contextual hints (tr/en)
 │       └── messages.ts      ← Localized message system (getMessage)
 │
-├── mcp/                     ← Model Context Protocol integration (19 tools + 8 resources)
-│   ├── tools/               ← 19 MCP tool handlers
+├── mcp/                     ← Model Context Protocol integration (20 tools + 8 resources)
+│   ├── tools/               ← 20 MCP tool handlers
 │   │   ├── index.ts         ← Tool registration
 │   │   ├── init.ts          ← deckent_init
 │   │   ├── directives.ts    ← deckent_set_directives
@@ -1399,4 +1399,4 @@ The ci-guardian agent is a specialized agent for CI/CD integration:
 
 ---
 
-*Last updated: Sprint 099+ — deckent v0.3.0-beta.3 — April 2026*
+*Last updated: Sprint 100+ — deckent v0.3.0-beta.3 — April 2026*

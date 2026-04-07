@@ -8,7 +8,7 @@
 @.brain/MEMORY.md
 
 ## Architecture
-- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (49 modules)
+- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (55 modules)
   - brain.ts: orchestrator (re-export layer, imports from sprint-controller)
   - sprint-controller.ts: full sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
   - planner.ts: AI task planning (imports only from core/)
@@ -46,8 +46,8 @@
   - adaptive-agent.ts: runtime agent adaptation
 - **providers/** — Claude, Codex, Gemini adapters (5 modules)
 - **api/** — HTTP API server, SSE, rate limiting (3 modules)
-- **mcp/** — MCP server: 19 tools + 8 resources, stdio transport
-- **cli/** — 34+ commands, helpers, entry point
+- **mcp/** — MCP server: 20 tools + 8 resources, stdio transport
+- **cli/** — 35+ commands, helpers, entry point
 - **dashboard/** — React + Vite + Tailwind web dashboard
 
 ## Commands

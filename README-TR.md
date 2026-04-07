@@ -4,7 +4,7 @@
 
 **Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-98%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12051%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-100%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
 
@@ -89,7 +89,7 @@ Deckent üç adımlı bir döngü izler:
 - **Yerleşik Dokümantasyon** -- `.deckent/docs/` ile hızlı başlangıç, directive rehberi ve yapılandırma referansı gelir
 - **Yerel Windows Desteği** -- `shell:true` ile tam subprocess backend, periyodik heartbeat güncellemeleri ve UTF-8 desteği
 - **Plugin Sistemi** -- Özel hook'lar, komutlar ve desenlerle Deckent'i genişletin
-- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 19 MCP tool + 8 resource
+- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 20 MCP tool + 8 resource
 - **Web Dashboard** -- Gerçek zamanlı SSE güncellemeleriyle React + Vite + Tailwind dashboard
 - **Uluslararasılaştırma** -- İngilizce ve Türkçe dil desteği yerleşik
 - **Review Arşiv Yedeği** -- Sprint review, cleanup sonrasında bile arşivden okuyarak çalışır
@@ -114,7 +114,7 @@ Deckent üç adımlı bir döngü izler:
 | Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır |
 | Kullanım duyarlı otomatik kısıtlama | Evet | Yok | Yok | Yok | Hayır |
 | Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet | Kısmi |
-| MCP entegrasyonu | Evet (19 tool) | Yok | Yok | Yok | Yok |
+| MCP entegrasyonu | Evet (20 tool) | Yok | Yok | Yok | Yok |
 | Web dashboard | Evet | Yerleşik | Yerleşik | Hayır | Hayır |
 | Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır |
 | Çevrimdışı çalışma (yerel modeller) | Planlı | Evet | Hayır | Evet | Hayır |
@@ -305,7 +305,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Veya `deckent init` otomatik olarak kayıt yapsın.
 
-### MCP Tool'lar (19)
+### MCP Tool'lar (20)
 
 | Tool | Açıklama |
 |------|----------|
