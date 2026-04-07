@@ -3,7 +3,7 @@
 // Workers instantly write .result files without actually running Claude CLI.
 // Supports DONE, GO_WITH_TECH_DEBT, NO_GO, and TIMEOUT scenarios.
 
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
@@ -58,6 +58,9 @@ export class MockSpawnBackend implements SpawnBackend {
 
     // Simulate worker execution with delay
     setTimeout(() => {
+      // Guard: test cleanup may have removed the directory before this fires
+      if (!existsSync(tasksDir)) { this.activeWorkers.delete(taskId); return; }
+
       if (scenario === 'TIMEOUT') {
         // Write .timeout marker
         writeFileSync(join(tasksDir, `task-${taskId}.timeout`), 'mock_timeout', 'utf-8');
