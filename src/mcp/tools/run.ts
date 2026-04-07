@@ -4,8 +4,13 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { TASKS_DIR } from '../../core/constants.js';
 import { ALL_MODELS } from '../../core/types.js';
+import type { ModelType, Task } from '../../core/types.js';
 import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { loadConfig } from '../../core/config.js';
+import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
+import { buildWorkerPrompt } from '../../orchestra/brain.js';
+import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 
 function generateJobId(): string {
   return `run-${Date.now().toString(36)}`;
@@ -22,9 +27,10 @@ export function registerRunTool(server: McpServer): void {
         description: z.string().describe('Clear description of what the worker should do. Be specific: include file paths, expected outcome, and any constraints.'),
         model: z.enum(ALL_MODELS as unknown as readonly [string, ...string[]]).optional().default('sonnet').describe('AI model to use. Supports all providers (Claude, OpenAI, Gemini). Default: sonnet'),
         scope: z.string().optional().describe('Comma-separated directory paths the worker may modify (e.g. "src/,tests/"). Defaults to "src/" if omitted.'),
+        autoApprove: z.boolean().optional().default(true).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. Deckent standard: workers MUST have full write permissions.'),
       }),
     },
-    async ({ description, model, scope }) => {
+    async ({ description, model, scope, autoApprove }) => {
       const root = process.cwd();
 
       try {
@@ -42,7 +48,13 @@ export function registerRunTool(server: McpServer): void {
           effort: 'normal',
           priority: 'NORMAL',
           scope: { directories, filesRead: [], filesWrite: [] },
+          reason: 'One-off task via MCP deckent_run',
           dependencies: [],
+          goNogo: {
+            goCriteria: 'Task completed successfully',
+            noGoCriteria: 'Task failed or timed out',
+            techDebtAcceptable: 'Minor issues acceptable',
+          },
           status: 'PENDING',
           sprintId: 'one-off',
           createdAt: new Date().toISOString(),
@@ -52,6 +64,22 @@ export function registerRunTool(server: McpServer): void {
         };
 
         writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2) + '\n');
+
+        // Build worker prompt with agent/skill context
+        const agentPrompt = resolveAgentPrompt(root, task as Task);
+        const skillPrompts = resolveSkillPrompts(root, task as Task);
+        const prompt = buildWorkerPrompt(task as Task, agentPrompt, skillPrompts);
+
+        // Spawn worker via config-aware backend (docker/tmux/subprocess/auto)
+        const cfg = await loadConfig(root);
+        const backend = SpawnBackendFactory.create({
+          backend: cfg.spawn_backend ?? 'auto',
+          projectDir: root,
+        });
+        backend.spawn(taskId, model as ModelType, prompt, {
+          autoApprove,
+          projectDir: root,
+        });
 
         writeJobState(root, {
           jobId,
@@ -65,6 +93,7 @@ export function registerRunTool(server: McpServer): void {
           status: 'RUNNING',
           model,
           scope: directories,
+          backend: backend.name,
         });
 
         return {

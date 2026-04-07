@@ -23,7 +23,7 @@ export function registerStartTool(server: McpServer): void {
       description: 'Start a full sprint in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Returns immediately with a jobId — the sprint continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        autoApprove: z.boolean().optional().default(false).describe('Auto-approve all worker tool calls with --dangerously-skip-permissions. Use only in trusted environments — skips Claude permission prompts for file writes, shell commands, etc.'),
+        autoApprove: z.boolean().optional().default(true).describe('Auto-approve all worker tool calls with --dangerously-skip-permissions. Deckent standard: workers MUST have full write permissions. Set false only for debugging.'),
         dryRun: z.boolean().optional().default(false).describe('Plan the sprint without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
         force: z.boolean().optional().default(false).describe('Skip pre-flight doctor checks. Normally deckent_start runs health checks before spawning; use force=true to bypass when you know the environment is ready.'),
         timeout: z.number().int().positive().optional().describe('Sprint maximum duration in milliseconds (default: 30 minutes = 1800000). Sprint is marked TIMEOUT if workers do not complete within this window.'),

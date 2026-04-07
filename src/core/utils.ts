@@ -140,7 +140,19 @@ export function getNextSprintId(projectRoot: string): string {
 export function updateLastSprintId(projectRoot: string, sprintId: string): void {
   const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
   try {
-    const config: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
+    // Read existing config — use empty object ONLY if file doesn't exist yet
+    // If file exists but is corrupted/unreadable, skip update to preserve whatever is there
+    let config: Record<string, unknown>;
+    if (existsSync(configPath)) {
+      const parsed = readJsonSafe<Record<string, unknown>>(configPath);
+      if (!parsed) {
+        debugLog('updateLastSprintId', 'config.json exists but unreadable — skipping to preserve settings');
+        return;
+      }
+      config = parsed;
+    } else {
+      config = {};
+    }
     config.last_sprint_id = sprintId;
     writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
   } catch (e) { debugLog('updateLastSprintId', e); }
