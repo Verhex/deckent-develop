@@ -91,7 +91,7 @@ src/
 │   ├── plugin.ts            ← Plugin manifest validation, load, install, remove
 │   └── plugin-hooks.ts      ← Plugin hook execution (beforeSprint/afterSprint/etc.)
 │
-├── orchestra/               ← Sprint orchestration (55 modules)
+├── orchestra/               ← Sprint orchestration (63 modules)
 │   ├── brain.ts             ← Re-export layer — sole orchestration entry point
 │   ├── sprint-controller.ts ← Sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
 │   ├── sprint-phases.ts     ← Phase-specific execution logic

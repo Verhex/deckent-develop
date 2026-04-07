@@ -9,7 +9,7 @@ Platform: macOS, Linux, WSL2
 Tests: 12,051+
 Dashboard Tests: 413
 Coverage: 96%+
-Sprints: 100+
+Sprints: 101+
 CLI Commands: 35+
 MCP: 20 tools, 8 resources
 Agents: 16 built-in

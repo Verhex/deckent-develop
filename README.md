@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12051%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-100%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12051%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-101%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -81,7 +81,6 @@ Deckent follows a three-step cycle:
 - **GO / NO-GO Evaluation** -- Every task result is evaluated against defined criteria. NO-GO tasks get logged and optionally retried
 - **Multi-Provider Support** -- Works with Claude (default), OpenAI Codex, and Google Gemini. Configure per-role (brain, worker) or per-task
 - **Provider Fallback Chain** -- Primary provider fails? Automatic fallback to alternative provider with model equivalence mapping
-- **Usage-Aware Planning** -- Automatically adjusts sprint size based on your Claude plan usage (5-hour and weekly thresholds)
 - **Stack-Aware Init** -- Detects your project stack (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin, TypeScript) and configures build/test commands automatically
 - **TempAgent and TempSkill** -- Auto-generates project-specific agents and skills based on your codebase conventions
 - **Built-in Docs** -- `.deckent/docs/` ships with quick-start, directives-guide, and config-reference guides
@@ -110,7 +109,6 @@ Deckent follows a three-step cycle:
 | Quality auditor with boundary enforcement | Yes | No | No | No | No |
 | Memory and learning across sprints | Yes | No | Partial | No | No |
 | GO/NO-GO evaluation per task | Yes | No | No | No | No |
-| Usage-aware auto-throttling | Yes | N/A | N/A | N/A | No |
 | Open source | Yes (MIT) | No | No | Yes | Partial |
 | MCP integration | Yes (20 tools) | N/A | N/A | N/A | N/A |
 | Web dashboard | Yes | Built-in | Built-in | No | No |
@@ -326,6 +324,7 @@ Or let `deckent init` auto-register it.
 | `deckent_agent_list` | List registered agents (built-in and temporary) |
 | `deckent_skill_list` | List registered skills with manifest info |
 | `deckent_checkpoint` | Approve/reject human checkpoints |
+| `deckent_docs` | Manage and serve built-in documentation |
 
 ### MCP Resources (8)
 

@@ -15,6 +15,7 @@ coverage/
 .brain/PATTERNS.md
 .brain/sprints/
 .brain/archive/
+!.brain/archive/
 
 # Deckent runtime config & state
 .deckent/routing/

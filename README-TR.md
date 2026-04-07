@@ -4,7 +4,7 @@
 
 **Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12051%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-100%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12051%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-101%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
 
@@ -83,7 +83,6 @@ Deckent üç adımlı bir döngü izler:
 - **GO / NO-GO Değerlendirme** -- Her görev sonucu belirlenmiş kriterlere göre değerlendirilir. NO-GO görevler kaydedilir ve isteğe bağlı olarak yeniden denenir
 - **Çoklu Provider Desteği** -- Claude (varsayılan), OpenAI Codex ve Google Gemini ile çalışır. Rol bazlı (brain, worker) veya görev bazlı yapılandırma
 - **Provider Yedekleme Zinciri** -- Birincil provider başarısız mı? Model eşdeğerliği eşleşmesiyle otomatik yedek provider'a geçiş
-- **Kullanım Duyarlı Planlama** -- Claude plan kullanımınıza göre (5 saatlik ve haftalık eşikler) sprint boyutunu otomatik ayarlar
 - **Stack Algılayan Başlangıç** -- Proje stack'inizi (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin, TypeScript) algılar ve build/test komutlarını otomatik yapılandırır
 - **TempAgent ve TempSkill** -- Kod tabanınızın konvansiyonlarına göre projeye özel agent ve skill'ler otomatik üretir
 - **Yerleşik Dokümantasyon** -- `.deckent/docs/` ile hızlı başlangıç, directive rehberi ve yapılandırma referansı gelir
@@ -112,7 +111,6 @@ Deckent üç adımlı bir döngü izler:
 | Sınır denetimli kalite auditor | Evet | Hayır | Hayır | Hayır | Hayır |
 | Sprint'ler arası bellek ve öğrenme | Evet | Hayır | Kısmi | Hayır | Hayır |
 | Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır |
-| Kullanım duyarlı otomatik kısıtlama | Evet | Yok | Yok | Yok | Hayır |
 | Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet | Kısmi |
 | MCP entegrasyonu | Evet (20 tool) | Yok | Yok | Yok | Yok |
 | Web dashboard | Evet | Yerleşik | Yerleşik | Hayır | Hayır |
@@ -328,6 +326,7 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent_agent_list` | Kayıtlı agent'ları listele (yerleşik ve geçici) |
 | `deckent_skill_list` | Kayıtlı skill'leri manifest bilgisiyle listele |
 | `deckent_checkpoint` | Human checkpoint'leri onayla/reddet |
+| `deckent_docs` | Yerleşik dokümantasyonu yönet ve sun |
 
 ### MCP Resource'lar (8)
 

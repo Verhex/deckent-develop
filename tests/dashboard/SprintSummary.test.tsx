@@ -292,9 +292,9 @@ describe("estimateTimeRemaining", () => {
 
   it("calculates remaining time based on average pace", () => {
     const tenMinAgo = new Date(Date.now() - 10 * 60000).toISOString();
-    // 5 done in 10 min = 2 min/task, 5 remaining = ~10 min
+    // 5 done in 10 min = 2 min/task, 5 remaining = ~10-11 min (timing-dependent rounding)
     const result = estimateTimeRemaining(5, 10, tenMinAgo);
-    expect(result).toContain("~10 min remaining");
+    expect(result).toMatch(/~1[01] min remaining/);
   });
 
   it("returns ~1 min for very short remaining", () => {
