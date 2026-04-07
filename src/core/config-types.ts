@@ -51,8 +51,10 @@ export interface DeckentConfig {
   last_sprint_id?: string;
   version?: string;
   auto_docs?: AutoDocsConfig;
-  /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
-  spawn_backend?: 'tmux' | 'subprocess' | 'auto';
+  /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
+  spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
+  /** Docker image for worker containers (default: 'deckent-worker:latest') */
+  docker_image?: string;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Decision engine configuration */
@@ -219,8 +221,10 @@ export interface ResolvedConfig {
   /** Resolved tier-based model strategy (from mode preset + config overrides) */
   model_strategy?: ModelStrategy;
   auto_docs?: AutoDocsConfig;
-  /** Spawn backend: 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
-  spawn_backend?: 'tmux' | 'subprocess' | 'auto';
+  /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
+  spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
+  /** Docker image for worker containers (default: 'deckent-worker:latest') */
+  docker_image?: string;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Provider for Brain planning (default: 'claude') */

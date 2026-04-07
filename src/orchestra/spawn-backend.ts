@@ -3,6 +3,7 @@ import type { ModelType } from '../core/types.js';
 import type { ProviderSpawnOptions } from '../core/provider.js';
 import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from './tmux.js';
 import { SubprocessSpawnBackend } from '../providers/subprocess.js';
+import { DockerSpawnBackend, isDockerAvailable } from './spawn-backend-docker.js';
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
@@ -164,22 +165,26 @@ export class SubprocessBackend implements SpawnBackend {
 
 // ─── SpawnBackendFactory ──────────────────────────────────────────────────────
 
-export type BackendType = 'tmux' | 'subprocess' | 'auto';
+export type BackendType = 'tmux' | 'subprocess' | 'docker' | 'auto';
 
 export interface SpawnBackendFactoryOptions {
   /**
    * Backend type to use.
-   * - 'tmux': always use TmuxBackend (fail if tmux not available)
-   * - 'subprocess': always use SubprocessBackend
-   * - 'auto' (default): prefer tmux if available, fall back to subprocess
+   * - 'docker': isolated Docker containers (recommended)
+   * - 'tmux': tmux windows (legacy, shared filesystem)
+   * - 'subprocess': child processes (Windows fallback)
+   * - 'auto' (default): docker → tmux → subprocess fallback chain
    */
   backend?: BackendType;
 
   /** Project root directory for spawned workers */
   projectDir: string;
 
-  /** Default worker timeout in ms (subprocess backend only, 0 = no timeout) */
+  /** Default worker timeout in ms (0 = no timeout) */
   defaultTimeoutMs?: number;
+
+  /** Docker image for worker containers (default: deckent-worker:latest) */
+  dockerImage?: string;
 }
 
 /**
@@ -200,6 +205,13 @@ export class SpawnBackendFactory {
   static create(opts: SpawnBackendFactoryOptions): SpawnBackend {
     const backendType = opts.backend ?? 'auto';
 
+    if (backendType === 'docker') {
+      return new DockerSpawnBackend(opts.projectDir, {
+        image: opts.dockerImage,
+        timeoutSeconds: opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined,
+      });
+    }
+
     if (backendType === 'subprocess') {
       return new SubprocessBackend(opts.projectDir, {
         timeoutMs: opts.defaultTimeoutMs,
@@ -210,7 +222,13 @@ export class SpawnBackendFactory {
       return new TmuxBackend(opts.projectDir);
     }
 
-    // 'auto': check if tmux is installed
+    // 'auto': prefer docker if available, then tmux, then subprocess
+    if (isDockerAvailable()) {
+      return new DockerSpawnBackend(opts.projectDir, {
+        image: opts.dockerImage,
+        timeoutSeconds: opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined,
+      });
+    }
     if (SpawnBackendFactory.isTmuxAvailable()) {
       return new TmuxBackend(opts.projectDir);
     }
