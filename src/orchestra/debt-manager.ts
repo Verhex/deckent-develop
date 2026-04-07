@@ -9,7 +9,6 @@ import type {
 import {
   BRAIN_DIR, TASKS_DIR, DEBT_FILE, PATTERNS_FILE,
   SPRINTS_DIR, ARCHIVE_DIR, MEMORY_FILE,
-  BRAIN_TOTAL_LINE_BUDGET, MEMORY_DECAY_SPRINTS,
   DEBT_HIGH_PRIORITY_SPRINTS, DEBT_CRITICAL_SPRINTS,
 } from '../core/constants.js';
 import { countBrainLines, parseDebtTable, generateDebtTable, readJsonSafe } from '../core/utils.js';
@@ -332,6 +331,8 @@ export function archiveResolvedDebt(projectRoot: string): number {
 // ═══ Decay ═════════════════════════════════════════════════════════
 
 export interface RunDecayOptions {
+  memoryBudget?: number;
+  decaySprints?: number;
   force?: boolean;
 }
 
@@ -345,6 +346,8 @@ export interface RunDecayOptions {
  * @returns Summary of what was removed and the before/after line counts
  */
 export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayOptions): DecayResult {
+  const budget = opts?.memoryBudget ?? 900;
+  const decaySprints = opts?.decaySprints ?? 8;
   const linesBefore = countBrainLines(projectRoot);
   const brainPath = join(projectRoot, BRAIN_DIR);
 
@@ -353,7 +356,7 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   let removedPatternCount = 0;
   const archivedSprints: string[] = [];
 
-  const shouldRun = opts?.force || linesBefore > BRAIN_TOTAL_LINE_BUDGET;
+  const shouldRun = opts?.force || linesBefore > budget;
   if (!shouldRun) {
     return { linesBefore, linesAfter: linesBefore, archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0 };
   }
@@ -402,7 +405,7 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
 
   // 4. Memory archive — trim old sections
   const memoryPath = join(brainPath, MEMORY_FILE);
-  if (existsSync(memoryPath) && countBrainLines(projectRoot) > BRAIN_TOTAL_LINE_BUDGET) {
+  if (existsSync(memoryPath) && countBrainLines(projectRoot) > budget) {
     const content = readFileSafe(memoryPath);
     const currentNum = getSprintNumber(sprintId);
     const lines = content.split('\n');
@@ -414,7 +417,7 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
       const sectionMatch = line.match(/^## Sprint (?:sprint-)?(\d+)/i);
       if (sectionMatch?.[1]) {
         const sectionNum = parseInt(sectionMatch[1], 10);
-        currentSectionOld = (currentNum - sectionNum) >= MEMORY_DECAY_SPRINTS;
+        currentSectionOld = (currentNum - sectionNum) >= decaySprints;
       }
       if (!currentSectionOld) kept.push(line);
     }
@@ -422,7 +425,7 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   }
 
   // 5. Last resort — smart truncation: preserve sprint headers, trim detail content
-  if (countBrainLines(projectRoot) > BRAIN_TOTAL_LINE_BUDGET) {
+  if (countBrainLines(projectRoot) > budget) {
     const memContent = readFileSafe(join(brainPath, MEMORY_FILE));
     // E) Improved truncation: keep headers + recent content, trim old section details
     const trimmedContent = smartTrimMemory(memContent);

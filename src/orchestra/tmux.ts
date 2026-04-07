@@ -66,16 +66,23 @@ export function cleanupPromptFile(promptPath: string): void {
   try { unlinkSync(promptPath); } catch (e) { debugLog('cleanupPromptFile:unlinkSync', e); }
 }
 
+/** Default worker timeout in seconds (20 minutes) */
+export const WORKER_TIMEOUT_SECONDS = 1200;
+
 /**
  * Build the shell command to invoke a worker.
  * If a ProviderAdapter is supplied, delegates to adapter.buildCommand().
- * Otherwise falls back to the default Claude CLI syntax.
+ * Otherwise falls back to the default Claude CLI syntax wrapped with a
+ * `timeout` guard. When the timeout fires, a `.timeout` marker file is
+ * written so result-collector can detect the failure immediately.
  */
 export function buildWorkerCommand(
   model: ModelType,
   promptFilePath: string,
   opts?: SpawnOptions,
   adapter?: ProviderAdapter,
+  taskId?: string,
+  timeoutSeconds?: number,
 ): string {
   // Delegate to provider adapter when available
   if (adapter) {
@@ -96,6 +103,15 @@ export function buildWorkerCommand(
     cmd += ' --dangerously-skip-permissions';
   }
   cmd += ` < ${promptFilePath}`;
+
+  // Wrap with timeout — writes .timeout marker on expiry so result-collector
+  // can detect worker death immediately instead of waiting 30 minutes
+  const tSec = timeoutSeconds ?? WORKER_TIMEOUT_SECONDS;
+  if (tSec > 0 && taskId) {
+    const tasksDir = join(promptFilePath, '..'); // .tasks/ dir (prompt is inside .tasks/)
+    const timeoutMarker = join(tasksDir, `task-${taskId}.timeout`);
+    cmd = `timeout ${tSec} sh -c '${cmd.replace(/'/g, "'\\''")}' || echo "WORKER_TIMEOUT" > ${timeoutMarker}`;
+  }
   return cmd;
 }
 
@@ -132,7 +148,7 @@ export function spawnWorker(
     '-c', projectDir,
   ]);
   const promptPath = writePromptFile(projectDir, prompt);
-  const cmd = buildWorkerCommand(model, promptPath, opts, adapter);
+  const cmd = buildWorkerCommand(model, promptPath, opts, adapter, taskId);
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${windowName}`,

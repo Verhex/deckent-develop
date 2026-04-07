@@ -4,7 +4,7 @@
 // Sprint 076: God Object Split Phase 3
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Core Types ────────────────────────────────────────────────────
@@ -144,7 +144,34 @@ export async function waitForResults(
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
+          continue;
         }
+      }
+      // Check for .timeout marker — worker exceeded time limit
+      const timeoutPath = join(projectRoot, TASKS_DIR, `task-${taskId}.timeout`);
+      if (existsSync(timeoutPath)) {
+        const syntheticResult: TaskResult = {
+          taskId,
+          workerId: `w-${taskId}`,
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          coverage: 0,
+          selfAssessment: 'NO_GO',
+          notes: 'Worker timeout — process exceeded time limit and was killed',
+        };
+        // Write synthetic result to disk so evaluate phase can also read it
+        try {
+          writeFileSync(
+            join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
+            JSON.stringify(syntheticResult, null, 2),
+            'utf-8',
+          );
+        } catch (e) { debugLog('collectResults:writeTimeoutResult', e); }
+        results.push(syntheticResult);
+        collected.add(taskId);
+        newlyCollected.push(taskId);
       }
     }
     return newlyCollected;

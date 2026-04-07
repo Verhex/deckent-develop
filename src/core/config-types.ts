@@ -157,6 +157,8 @@ export interface DeckentConfig {
   heartbeat_timeout?: number;
   /** Enforce worker scope boundaries (default: true) */
   boundary_enforcement?: boolean;
+  /** Lock stale threshold in seconds (default: 300) */
+  lock_stale_threshold?: number;
 
   // ─── Human Checkpoints ──────────────────────────────────────────────
   /** Human approval checkpoints in sprint lifecycle.
@@ -236,6 +238,7 @@ export interface ResolvedConfig {
   scan_interval?: number;
   heartbeat_timeout?: number;
   boundary_enforcement?: boolean;
+  lock_stale_threshold?: number;
   // Human Checkpoints
   human_checkpoints?: ('plan' | 'evaluate' | 'fix')[];
   // Sprint

@@ -1760,6 +1760,11 @@ export async function runSprint(
     routeSprintTasks(sprint.tasks, config, availableProviders);
   } catch (e) { /* Router failure is non-fatal — all tasks use brain_provider */ debugLog('runSprint:routeSprintTasks', e); }
 
+  // Update last_sprint_id early so `deckent status` shows the current sprint
+  try {
+    updateLastSprintId(projectRoot, sprint.id);
+  } catch (e) { debugLog('runSprint:updateLastSprintId', e); }
+
   // Reset dashboard for new sprint
   try {
     resetDashboard(projectRoot, sprint.id, sprint.tasks.length);
@@ -1783,6 +1788,55 @@ export async function runSprint(
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }
+
+  // Grace period: for tasks with heartbeat but no result, wait 5 min then kill worker
+  try {
+    const collectedIds = new Set(results.map(r => r.taskId));
+    const staleWorkers = sprint.tasks.filter(t => {
+      if (collectedIds.has(t.id)) return false;
+      const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
+      const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
+      return existsSync(hbPath) && !existsSync(resultPath);
+    });
+
+    if (staleWorkers.length > 0) {
+      const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes
+      debugLog('[Brain]', `Grace period: ${staleWorkers.length} worker(s) have heartbeat but no result — waiting ${GRACE_PERIOD_MS / 1000}s`);
+      await new Promise(resolve => setTimeout(resolve, GRACE_PERIOD_MS));
+
+      for (const task of staleWorkers) {
+        const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
+        if (!existsSync(resultPath)) {
+          // Worker still hasn't written result — kill it
+          try {
+            if (spawnBackend) spawnBackend.kill(task.id);
+            else killWorker(task.id);
+          } catch (e) { debugLog('graceKill:killWorker', e); }
+
+          // Write synthetic NO_GO result
+          const syntheticResult: TaskResult = {
+            taskId: task.id,
+            workerId: task.assignedWorker ?? `w-${task.id}`,
+            filesChanged: [],
+            linesAdded: 0,
+            linesRemoved: 0,
+            testsPassed: false,
+            coverage: 0,
+            selfAssessment: 'NO_GO',
+            notes: 'Worker had heartbeat but failed to write result within grace period — killed',
+          };
+          try {
+            writeFileSync(
+              resultPath,
+              JSON.stringify(syntheticResult, null, 2),
+              'utf-8',
+            );
+          } catch (e) { debugLog('graceKill:writeResult', e); }
+          results.push(syntheticResult);
+        }
+      }
+    }
+  } catch (e) { debugLog('graceKill:main', e); }
 
   // Phase 4: EVALUATE
   const evaluations = new Map<string, TaskEvaluation>();

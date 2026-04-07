@@ -53,7 +53,7 @@ import type {
 
 // ─── Auditor ──────────────────────────────────────────────────────
 import {
-  updateDashboard, startScanLoop, writeScanToDashboard,
+  updateDashboard, startScanLoop, writeScanToDashboard, runScanCycle,
 } from '../monitor/auditor.js';
 
 // ─── Debt Manager ─────────────────────────────────────────────────
@@ -233,6 +233,13 @@ export function runSpawnPhase(
       sprint.status = SprintStatus.ACTIVE;
       writeSprintState(projectRoot, sprint);
       try {
+        // Run the first scan immediately (0ms delay) so dashboard is fresh from the start
+        try {
+          const firstScan = runScanCycle(projectRoot, sprint.id);
+          writeScanToDashboard(projectRoot, {
+            id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status,
+          }, firstScan);
+        } catch (e) { debugLog('runSpawnPhase:firstScan', e); }
         scanInterval = startScanLoop(projectRoot, sprint.id, undefined, (scanResult) => {
           writeScanToDashboard(projectRoot, {
             id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status,

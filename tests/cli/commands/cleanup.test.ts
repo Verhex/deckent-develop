@@ -126,7 +126,7 @@ describe('cleanup command (isolated)', () => {
       removedDebtCount: 3, removedPatternCount: 2,
     });
     await runCommand(['cleanup', '--decay']);
-    expect(runDecay).toHaveBeenCalledWith(expect.any(String), 'sprint-cleanup', { force: true });
+    expect(runDecay).toHaveBeenCalledWith(expect.any(String), 'sprint-cleanup', expect.objectContaining({ force: true }));
     expect(print).toHaveBeenCalledWith(expect.stringContaining('400'));
     expect(print).toHaveBeenCalledWith(expect.stringContaining('250'));
     expect(print).toHaveBeenCalledWith(expect.stringContaining('sprint-001.md'));

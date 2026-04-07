@@ -307,6 +307,12 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  if (config.lock_stale_threshold !== undefined) {
+    if (typeof config.lock_stale_threshold !== 'number' || config.lock_stale_threshold < 30 || config.lock_stale_threshold > 3600) {
+      errors.push('lock_stale_threshold must be a number between 30 and 3600');
+    }
+  }
+
   if (config.boundary_enforcement !== undefined && typeof config.boundary_enforcement !== 'boolean') {
     errors.push('boundary_enforcement must be a boolean');
   }
@@ -407,6 +413,7 @@ export function createDefaultConfig(): DeckentConfig {
     scan_interval: 30,
     heartbeat_timeout: 120,
     boundary_enforcement: true,
+    lock_stale_threshold: 300,
     // Skill-Based Provider Routing
     skill_routing: undefined,
     // Search & Documentation
@@ -584,6 +591,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     scan_interval: config.scan_interval,
     heartbeat_timeout: config.heartbeat_timeout,
     boundary_enforcement: config.boundary_enforcement,
+    lock_stale_threshold: config.lock_stale_threshold,
     // Human Checkpoints
     human_checkpoints: config.human_checkpoints,
     // Sprint

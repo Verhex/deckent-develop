@@ -5,7 +5,7 @@ import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../core/types.js';
 import {
-  TASKS_DIR, LOCKS_DIR, BRAIN_TOTAL_LINE_BUDGET,
+  TASKS_DIR, LOCKS_DIR,
   TMUX_SESSION_NAME, PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { countBrainLines } from '../../core/utils.js';
@@ -78,8 +78,19 @@ export function registerCleanup(program: Command): void {
 
       try {
         // --decay + normal cleanup combo: run decay first, then continue to normal cleanup
+        // Read memory config from project config (sync)
+        let decayMemoryBudget = 900;
+        let decayAfterSprints = 8;
+        try {
+          const cfgPath = join(root, PROJECT_CONFIG_PATH);
+          if (existsSync(cfgPath)) {
+            const rawCfg = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { memory_budget?: number; decay_after_sprints?: number };
+            if (typeof rawCfg.memory_budget === 'number') decayMemoryBudget = rawCfg.memory_budget;
+            if (typeof rawCfg.decay_after_sprints === 'number') decayAfterSprints = rawCfg.decay_after_sprints;
+          }
+        } catch { /* use defaults */ }
         if (opts.decay) {
-          const result = runDecay(root, 'sprint-cleanup', { force: true });
+          const result = runDecay(root, 'sprint-cleanup', { force: true, memoryBudget: decayMemoryBudget, decaySprints: decayAfterSprints });
           print(getMessage('cleanup.decay_complete', lang, {
             before: String(result.linesBefore),
             after: String(result.linesAfter),
@@ -174,8 +185,8 @@ export function registerCleanup(program: Command): void {
 
         // Budget warning: check .brain/ size after cleanup
         const brainLines = countBrainLines(root);
-        if (brainLines > BRAIN_TOTAL_LINE_BUDGET) {
-          print(`\nWarning: .brain/ has ${brainLines} lines (budget: ${BRAIN_TOTAL_LINE_BUDGET}). Run \`deckent cleanup --decay\` to reduce memory.`);
+        if (brainLines > decayMemoryBudget) {
+          print(`\nWarning: .brain/ has ${brainLines} lines (budget: ${decayMemoryBudget}). Run \`deckent cleanup --decay\` to reduce memory.`);
         }
       } catch (error) {
         printError(error);

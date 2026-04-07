@@ -723,5 +723,7 @@ Update periodically: increment sequence, refresh timestamp via new Date().toISOS
 
 ## Result File
 Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
-The result file is REQUIRED — without it your work cannot be evaluated.`;
+The result file is REQUIRED — without it your work cannot be evaluated.
+
+CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.`;
 }

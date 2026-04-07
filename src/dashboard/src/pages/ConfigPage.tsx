@@ -39,6 +39,8 @@ interface ConfigFieldMeta {
   options?: string[];
 }
 
+const PLANNED_CATEGORY = "Planned";
+
 const CONFIG_FIELDS: ConfigFieldMeta[] = [
   // ─── Provider ───────────────────────────────────────────────
   { key: "brain_provider", label: "Brain Provider", description: "AI provider for Brain planning", type: "select", category: "Provider", defaultValue: "claude", options: ["claude", "codex", "gemini"] },
@@ -53,6 +55,31 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   { key: "spawn_backend", label: "Spawn Backend", description: "Worker spawn backend", type: "select", category: "Sprint", defaultValue: "auto", options: ["tmux", "subprocess", "auto"] },
   { key: "fix_phase_enabled", label: "Fix Phase Enabled", description: "Enable automatic fix phase after evaluation", type: "boolean", category: "Sprint", defaultValue: true },
   { key: "max_fix_retries", label: "Max Fix Retries", description: "Maximum number of fix retries per task", type: "number", category: "Sprint", defaultValue: 2 },
+  { key: "coverage_threshold", label: "Coverage Threshold", description: "Minimum coverage % to pass without tech debt", type: "number", category: "Sprint", defaultValue: 90 },
+  { key: "max_reroutes", label: "Max Reroutes", description: "Max reroute attempts per task during mid-sprint adapter", type: "number", category: "Sprint", defaultValue: 3 },
+  { key: "reroute_on_tech_debt", label: "Reroute on Tech Debt", description: "Also reroute GO_WITH_TECH_DEBT tasks, not just NO_GO", type: "boolean", category: "Sprint", defaultValue: false },
+  { key: "sprint_timeout_minutes", label: "Sprint Timeout (min)", description: "Sprint timeout in minutes. 0 = unlimited", type: "number", category: "Sprint", defaultValue: 0 },
+  { key: "routing_engine", label: "Routing Engine", description: "Routing engine version", type: "select", category: "Sprint", defaultValue: "v2", options: ["v1", "v2"] },
+  { key: "cleanup_delay_ms", label: "Cleanup Delay (ms)", description: "Delay before cleanup deletes .tasks/ files", type: "number", category: "Sprint", defaultValue: 180000 },
+  { key: "human_checkpoints", label: "Human Checkpoints", description: "Sprint phases requiring human approval", type: "select", category: "Sprint", defaultValue: "", options: ["plan", "evaluate", "fix"] },
+
+  // ─── Model Strategy ─────────────────────────────────────────
+  { key: "brain_tier", label: "Brain Tier", description: "Tier-based brain model selection (provider-agnostic)", type: "select", category: "Model Strategy", defaultValue: "premium", options: ["premium_plus", "premium", "standard", "economy"] },
+  { key: "worker_tier", label: "Worker Tier", description: "Tier-based worker model selection (provider-agnostic)", type: "select", category: "Model Strategy", defaultValue: "standard", options: ["premium_plus", "premium", "standard", "economy"] },
+  { key: "auto_upgrade", label: "Auto Upgrade", description: "Auto-upgrade tier when task complexity is high", type: "boolean", category: "Model Strategy", defaultValue: true },
+  { key: "auto_downgrade", label: "Auto Downgrade", description: "Auto-downgrade tier for doc/test tasks", type: "boolean", category: "Model Strategy", defaultValue: true },
+
+  // ─── Adaptive ───────────────────────────────────────────────
+  { key: "adaptive_thresholds", label: "Adaptive Thresholds", description: "Auto-adjust routing parameters based on sprint NO_GO rate", type: "boolean", category: "Adaptive", defaultValue: false },
+  { key: "agent_min_score", label: "Agent Min Score", description: "Minimum agent score for routing selection (range: 2-8)", type: "number", category: "Adaptive", defaultValue: 5 },
+  { key: "adaptive_config.min_samples", label: "Min Samples", description: "Minimum past sprints required before adjusting", type: "number", category: "Adaptive", defaultValue: 3 },
+  { key: "adaptive_config.no_go_threshold", label: "NO_GO Threshold", description: "NO_GO rate threshold (0-1) above which agent_min_score is lowered", type: "number", category: "Adaptive", defaultValue: 0.3 },
+  { key: "adaptive_config.coverage_lookback", label: "Coverage Lookback", description: "Number of recent sprints to consider for coverage averaging", type: "number", category: "Adaptive", defaultValue: 3 },
+
+  // ─── Auto Docs ──────────────────────────────────────────────
+  { key: "auto_docs.tier1", label: "Tier 1 Docs", description: "Auto-generate CHANGELOG, SPRINT-LOG", type: "boolean", category: "Auto Docs", defaultValue: true },
+  { key: "auto_docs.tier2", label: "Tier 2 Docs", description: "Auto-generate README counts, CONTRIBUTING, HEALTH-CHECK", type: "boolean", category: "Auto Docs", defaultValue: false },
+  { key: "auto_docs.tier3", label: "Tier 3 Docs", description: "Auto-generate BLUEPRINT, ARCHITECTURE", type: "boolean", category: "Auto Docs", defaultValue: false },
 
   // ─── Memory ───────────────────────────────────────────────
   { key: "memory_budget", label: "Memory Budget", description: "Maximum total lines for .brain/ directory (MEMORY + PATTERNS + RETRO + sprint logs)", type: "number", category: "Memory", defaultValue: 900 },
@@ -68,25 +95,9 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
   // ─── Output ─────────────────────────────────────────────────
   { key: "output_splash", label: "Show Splash", description: "Show kraken splash on init/version", type: "boolean", category: "Output", defaultValue: true },
   { key: "output_mode", label: "Output Mode", description: "Output verbosity level", type: "select", category: "Output", defaultValue: "normal", options: ["quiet", "normal", "verbose"] },
-  { key: "output_theme", label: "Output Theme", description: "Output display theme", type: "select", category: "Output", defaultValue: "default", options: ["default", "minimal", "rich"] },
-
-  // ─── Search ─────────────────────────────────────────────────
-  { key: "search_enabled", label: "Search Enabled", description: "Enable online search for documentation", type: "boolean", category: "Search", defaultValue: true },
-  { key: "search_provider", label: "Search Provider", description: "Documentation search provider", type: "select", category: "Search", defaultValue: "context7", options: ["context7", "web", "none"] },
-  { key: "search_cache_ttl", label: "Search Cache TTL", description: "Search cache TTL in seconds", type: "number", category: "Search", defaultValue: 3600 },
-
-  // ─── Notifications ──────────────────────────────────────────
-  { key: "notify_on_complete", label: "Notify on Complete", description: "Send notification when sprint completes", type: "boolean", category: "Notifications", defaultValue: false },
-  { key: "notify_channel", label: "Notify Channel", description: "Notification delivery channel", type: "select", category: "Notifications", defaultValue: null, options: ["slack", "discord", "email", "webhook"] },
-  { key: "notify_url", label: "Notify URL", description: "Webhook URL for notifications", type: "text", category: "Notifications", defaultValue: null },
-
-  // ─── Telemetry ──────────────────────────────────────────────
-  { key: "telemetry_enabled", label: "Telemetry Enabled", description: "Enable usage telemetry", type: "boolean", category: "Telemetry", defaultValue: false },
-  { key: "telemetry_anonymous", label: "Anonymous Telemetry", description: "Keep telemetry anonymous", type: "boolean", category: "Telemetry", defaultValue: true },
 
   // ─── Environment ────────────────────────────────────────────
   { key: "detected_env", label: "Detected Environment", description: "Auto-detected IDE/environment", type: "select", category: "Environment", defaultValue: null, options: ["vscode", "codex", "gemini", "cursor", "tmux", "shell"] },
-  { key: "multi_ide_mode", label: "Multi-IDE Mode", description: "Enable multi-IDE support", type: "boolean", category: "Environment", defaultValue: false },
 
   // ─── Skill Routing ──────────────────────────────────────────
   { key: "skill_routing.design", label: "Design Skill Route", description: "Provider for design-related skills", type: "select", category: "Skill Routing", defaultValue: null, options: ["claude", "codex", "gemini"] },
@@ -104,28 +115,42 @@ const CONFIG_FIELDS: ConfigFieldMeta[] = [
 
   // ─── Advanced ─────────────────────────────────────────────
   { key: "auto_clean_locks", label: "Auto Clean Locks", description: "Automatically clean stale lock files", type: "boolean", category: "Advanced", defaultValue: false },
+
+  // ─── Planned (not yet implemented) ─────────────────────────
+  // Previously: "Search", "Notifications", "Telemetry" categories — moved to Planned
+  { key: "output_theme", label: "Output Theme", description: "Output display theme", type: "select", category: PLANNED_CATEGORY, defaultValue: "default", options: ["default", "minimal", "rich"] },
+  { key: "search_enabled", label: "Search Enabled", description: "Enable online search for documentation", type: "boolean", category: PLANNED_CATEGORY, defaultValue: true },
+  { key: "search_provider", label: "Search Provider", description: "Documentation search provider", type: "select", category: PLANNED_CATEGORY, defaultValue: "context7", options: ["context7", "web", "none"] },
+  { key: "search_cache_ttl", label: "Search Cache TTL", description: "Search cache TTL in seconds", type: "number", category: PLANNED_CATEGORY, defaultValue: 3600 },
+  { key: "notify_on_complete", label: "Notify on Complete", description: "Send notification when sprint completes", type: "boolean", category: PLANNED_CATEGORY, defaultValue: false },
+  { key: "notify_channel", label: "Notify Channel", description: "Notification delivery channel", type: "select", category: PLANNED_CATEGORY, defaultValue: null, options: ["slack", "discord", "email", "webhook"] },
+  { key: "notify_url", label: "Notify URL", description: "Webhook URL for notifications", type: "text", category: PLANNED_CATEGORY, defaultValue: null },
+  { key: "telemetry_enabled", label: "Telemetry Enabled", description: "Enable usage telemetry", type: "boolean", category: PLANNED_CATEGORY, defaultValue: false },
+  { key: "telemetry_anonymous", label: "Anonymous Telemetry", description: "Keep telemetry anonymous", type: "boolean", category: PLANNED_CATEGORY, defaultValue: true },
+  { key: "multi_ide_mode", label: "Multi-IDE Mode", description: "Enable multi-IDE support", type: "boolean", category: PLANNED_CATEGORY, defaultValue: false },
 ];
 
 const CATEGORIES = [
-  "Provider", "Sprint", "Memory", "Auditor", "Output", "Search",
-  "Notifications", "Telemetry", "Environment", "Skill Routing",
-  "Rollback", "Project", "Advanced",
+  "Provider", "Sprint", "Model Strategy", "Adaptive", "Auto Docs",
+  "Memory", "Auditor", "Output", "Environment", "Skill Routing",
+  "Rollback", "Project", "Advanced", PLANNED_CATEGORY,
 ] as const;
 
 const CATEGORY_KEY_MAP: Record<string, string> = {
   "Provider": "config.category.provider",
   "Sprint": "config.category.sprint",
+  "Model Strategy": "config.category.model_strategy",
+  "Adaptive": "config.category.adaptive",
+  "Auto Docs": "config.category.auto_docs",
   "Memory": "config.category.memory",
   "Auditor": "config.category.auditor",
   "Output": "config.category.output",
-  "Search": "config.category.search",
-  "Notifications": "config.category.notifications",
-  "Telemetry": "config.category.telemetry",
   "Environment": "config.category.environment",
   "Skill Routing": "config.category.routing",
   "Rollback": "config.category.rollback",
   "Project": "config.category.project",
   "Advanced": "config.category.advanced",
+  [PLANNED_CATEGORY]: "config.category.planned",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -360,11 +385,17 @@ export default function ConfigPage() {
       {CATEGORIES.map((category) => {
         const fields = CONFIG_FIELDS.filter((f) => f.category === category);
         if (fields.length === 0) return null;
+        const isPlanned = category === PLANNED_CATEGORY;
 
         return (
-          <Card key={category} data-testid={`config-category-${category.toLowerCase().replace(/\s+/g, "-")}`}>
+          <Card key={category} data-testid={`config-category-${category.toLowerCase().replace(/\s+/g, "-")}`} className={isPlanned ? "opacity-50" : ""}>
             <CardHeader>
-              <CardTitle>{CATEGORY_KEY_MAP[category] ? t(CATEGORY_KEY_MAP[category] as TranslationKey) : category}</CardTitle>
+              <CardTitle>
+                {CATEGORY_KEY_MAP[category] ? t(CATEGORY_KEY_MAP[category] as TranslationKey) : category}
+                {isPlanned && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">(not yet implemented)</span>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -391,6 +422,7 @@ export default function ConfigPage() {
                             id={`config-${field.key}`}
                             value={formatValue(currentValue)}
                             onChange={(e) => handleChange(field, e.target.value)}
+                            disabled={isPlanned}
                           >
                             <option value="">{t('config.none' as TranslationKey)}</option>
                             {field.options?.map((opt) => (
@@ -404,6 +436,7 @@ export default function ConfigPage() {
                             id={`config-${field.key}`}
                             value={currentValue === true ? "true" : currentValue === false ? "false" : ""}
                             onChange={(e) => handleChange(field, e.target.value)}
+                            disabled={isPlanned}
                           >
                             <option value="">{t('config.none' as TranslationKey)}</option>
                             <option value="true">{t('config.true' as TranslationKey)}</option>
@@ -417,6 +450,7 @@ export default function ConfigPage() {
                             type="number"
                             value={currentValue !== null && currentValue !== undefined ? String(currentValue) : ""}
                             onChange={(e) => handleChange(field, e.target.value)}
+                            disabled={isPlanned}
                           />
                         )}
 
@@ -427,10 +461,11 @@ export default function ConfigPage() {
                             value={formatValue(currentValue)}
                             onChange={(e) => handleChange(field, e.target.value)}
                             placeholder={fieldT(field, 'desc')}
+                            disabled={isPlanned}
                           />
                         )}
 
-                        {!isDefault_ && (
+                        {!isDefault_ && !isPlanned && (
                           <Button
                             variant="outline"
                             size="sm"

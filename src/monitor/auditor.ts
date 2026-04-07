@@ -18,9 +18,6 @@ import {
   BRAIN_DIR,
   DASHBOARD_FILE,
   PATTERNS_FILE,
-  HEARTBEAT_STALE_THRESHOLD_MS,
-  LOCK_STALE_THRESHOLD_MS,
-  AUDITOR_SCAN_INTERVAL_MS,
   PATTERNS_MAX_LINES,
 } from '../core/constants.js';
 
@@ -47,7 +44,7 @@ export function createAlert(
   };
 }
 
-export function scanHeartbeats(projectRoot: string): {
+export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000): {
   heartbeats: Heartbeat[];
   staleAgents: BoundaryViolation[];
   alerts: Alert[];
@@ -76,7 +73,7 @@ export function scanHeartbeats(projectRoot: string): {
     const parsedTime = new Date(hb.timestamp).getTime();
     if (isNaN(parsedTime)) continue; // malformed timestamp — skip, do not mark as stale
     const elapsed = currentTime - parsedTime;
-    if (elapsed > HEARTBEAT_STALE_THRESHOLD_MS) {
+    if (elapsed > heartbeatTimeoutMs) {
       // Check if the worker's task is already completed (DONE or NO_GO).
       // Completed workers stop updating heartbeats — this is expected, not a real stale agent.
       const taskFilePath = join(tasksDir, `task-${hb.taskId}.json`);
@@ -176,7 +173,7 @@ function isFileInScope(filePath: string, scope: TaskScope): boolean {
   return false;
 }
 
-export function checkStaleLocks(projectRoot: string, autoClean = false): {
+export function checkStaleLocks(projectRoot: string, autoClean = false, lockStaleThresholdMs = 300_000): {
   locks: LockInfo[];
   staleLocks: BoundaryViolation[];
   alerts: Alert[];
@@ -203,7 +200,7 @@ export function checkStaleLocks(projectRoot: string, autoClean = false): {
     locks.push(lock);
 
     const elapsed = currentTime - new Date(lock.acquiredAt).getTime();
-    if (elapsed > LOCK_STALE_THRESHOLD_MS) {
+    if (elapsed > lockStaleThresholdMs) {
       staleLocks.push({
         type: 'stale_lock',
         agentId: lock.ownerWorkerId,
@@ -411,6 +408,12 @@ export function buildWorkerScopeMap(
   return scopeMap;
 }
 
+export interface ScanOptions {
+  autoCleanLocks?: boolean;
+  heartbeatTimeoutMs?: number;
+  lockStaleThresholdMs?: number;
+}
+
 export interface ScanResult {
   heartbeats: Heartbeat[];
   violations: BoundaryViolation[];
@@ -421,13 +424,16 @@ export interface ScanResult {
 export function runScanCycle(
   projectRoot: string,
   currentSprintId: string,
-  autoCleanLocks = false,
+  autoCleanLocksOrOpts: boolean | ScanOptions = false,
 ): ScanResult {
+  const opts: ScanOptions = typeof autoCleanLocksOrOpts === 'boolean'
+    ? { autoCleanLocks: autoCleanLocksOrOpts }
+    : autoCleanLocksOrOpts;
   try {
-    const hbResult = scanHeartbeats(projectRoot);
+    const hbResult = scanHeartbeats(projectRoot, opts.heartbeatTimeoutMs);
     const workerScopes = buildWorkerScopeMap(projectRoot);
     const boundaryViolations = checkBoundaryViolations(projectRoot, workerScopes);
-    const lockResult = checkStaleLocks(projectRoot, autoCleanLocks);
+    const lockResult = checkStaleLocks(projectRoot, opts.autoCleanLocks ?? false, opts.lockStaleThresholdMs);
 
     // Read tasks for deadlock detection
     const tasksDir = join(projectRoot, TASKS_DIR);
@@ -476,11 +482,13 @@ export function startScanLoop(
   intervalMs?: number,
   onScanComplete?: (result: ScanResult) => void,
   autoCleanLocks = false,
+  scanOpts?: ScanOptions,
 ): ReturnType<typeof setInterval> {
-  const interval = intervalMs ?? AUDITOR_SCAN_INTERVAL_MS;
+  const interval = intervalMs ?? 30_000;
+  const mergedOpts: ScanOptions = { autoCleanLocks, ...scanOpts };
   return setInterval(() => {
     try {
-      const result = runScanCycle(projectRoot, currentSprintId, autoCleanLocks);
+      const result = runScanCycle(projectRoot, currentSprintId, mergedOpts);
       if (onScanComplete) {
         try { onScanComplete(result); } catch { /* callback must not kill loop */ }
       }

@@ -1,8 +1,8 @@
-import { existsSync, readdirSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { TASKS_DIR, LOCKS_DIR, BRAIN_TOTAL_LINE_BUDGET } from '../../core/constants.js';
+import { TASKS_DIR, LOCKS_DIR, PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { countBrainLines, getNextSprintId } from '../../core/utils.js';
 import { runDecay } from '../../orchestra/brain.js';
 import { enrichResponse } from '../helpers/enrich.js';
@@ -50,6 +50,18 @@ export function registerCleanupTool(server: McpServer): void {
     async ({ decay, dryRun }) => {
       const root = process.cwd();
 
+      // Read memory config from project config (sync)
+      let memoryBudget = 900;
+      let decayAfterSprints = 8;
+      try {
+        const cfgPath = join(root, PROJECT_CONFIG_PATH);
+        if (existsSync(cfgPath)) {
+          const rawCfg = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { memory_budget?: number; decay_after_sprints?: number };
+          if (typeof rawCfg.memory_budget === 'number') memoryBudget = rawCfg.memory_budget;
+          if (typeof rawCfg.decay_after_sprints === 'number') decayAfterSprints = rawCfg.decay_after_sprints;
+        }
+      } catch { /* use defaults */ }
+
       try {
         if (dryRun) {
           const taskFiles = listCleanableFiles(root);
@@ -58,7 +70,7 @@ export function registerCleanupTool(server: McpServer): void {
             ? readdirSync(locksDir).filter((f) => f.endsWith('.lock'))
             : [];
           const brainLines = countBrainLines(root);
-          const wouldDecay = decay && brainLines > BRAIN_TOTAL_LINE_BUDGET;
+          const wouldDecay = decay && brainLines > memoryBudget;
 
           const enriched = enrichResponse('cleanup', {
             dryRun: true,
@@ -82,7 +94,7 @@ export function registerCleanupTool(server: McpServer): void {
             const nextId = getNextSprintId(root);
           const num = parseInt(nextId.replace('sprint-', ''), 10);
           const currentSprintId = `sprint-${String(Math.max(1, num - 1)).padStart(3, '0')}`;
-          decayResult = runDecay(root, currentSprintId);
+          decayResult = runDecay(root, currentSprintId, { memoryBudget, decaySprints: decayAfterSprints });
           } catch {
             decayResult = { error: 'Decay failed' };
           }

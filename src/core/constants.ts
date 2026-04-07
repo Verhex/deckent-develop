@@ -39,21 +39,11 @@ export const CLAUDE_FILE = 'CLAUDE.md' as const;
 export const DIRECTIVES_FILE = 'DIRECTIVES.md' as const;
 export const DECKENT_FILE = 'DECKENT.md' as const;
 
-// ─── Timing ──────────────────────────────────────────────────────────
-export const AUDITOR_SCAN_INTERVAL_MS = 30_000 as const;
-export const HEARTBEAT_STALE_THRESHOLD_MS = 120_000 as const;
-export const HEARTBEAT_WRITE_INTERVAL_MS = 15_000 as const;
-export const LOCK_TIMEOUT_MS = 30_000 as const;
-export const LOCK_STALE_THRESHOLD_MS = 300_000 as const;
-
 // ─── Memory Limits ───────────────────────────────────────────────────
 export const MEMORY_MAX_LINES = 300 as const;
 export const PATTERNS_MAX_LINES = 150 as const;
 export const RETRO_MAX_LINES = 120 as const;
 export const SPRINT_LOG_MAX_LINES = 100 as const;
-export const BRAIN_TOTAL_LINE_BUDGET = 900 as const;
-export const MEMORY_DECAY_SPRINTS = 8 as const;
-export const PATTERN_DECAY_SPRINTS = 12 as const;
 
 // ─── Task File Extensions ────────────────────────────────────────────
 export const TASK_FILE_EXTENSIONS = ['.json', '.plan', '.hb', '.result', '.paused', '.log'] as const;
@@ -89,3 +79,20 @@ export const SUPPORTED_LANGUAGES = ['en', 'tr'] as const;
 // ─── Brain AI Planner ───────────────────────────────────────────────
 export const BRAIN_PLAN_TIMEOUT_MS = 60_000 as const;
 export const BRAIN_PLAN_MAX_CONTEXT_LINES = 200 as const;
+
+// ─── Timing (deprecated — prefer config: scan_interval, heartbeat_timeout) ──
+/** @deprecated Use config.scan_interval instead. Kept for backward compat & tests. */
+export const AUDITOR_SCAN_INTERVAL_MS = 30_000 as const;
+/** @deprecated Use config.heartbeat_timeout instead. Kept for backward compat & tests. */
+export const HEARTBEAT_STALE_THRESHOLD_MS = 120_000 as const;
+/** @deprecated Use config.lock_stale_threshold instead. Kept for backward compat & tests. */
+export const LOCK_STALE_THRESHOLD_MS = 300_000 as const;
+export const HEARTBEAT_WRITE_INTERVAL_MS = 15_000 as const;
+export const LOCK_TIMEOUT_MS = 30_000 as const;
+
+// ─── Memory Budget (deprecated — prefer config: memory_budget, decay_after_sprints) ──
+/** @deprecated Use config.memory_budget instead. Kept for backward compat & tests. */
+export const BRAIN_TOTAL_LINE_BUDGET = 900 as const;
+/** @deprecated Use config.decay_after_sprints instead. Kept for backward compat & tests. */
+export const MEMORY_DECAY_SPRINTS = 8 as const;
+export const PATTERN_DECAY_SPRINTS = 12 as const;

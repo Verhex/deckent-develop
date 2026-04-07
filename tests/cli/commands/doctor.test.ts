@@ -554,9 +554,9 @@ describe('error handling', () => {
     expect(check!.message).toMatch(/stale/i);
   });
 
-  it('brain budget over 600 — check passes=false with decay hint', () => {
+  it('brain budget over 900 — check passes=false with decay hint', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
-    vi.mocked(countBrainLines).mockReturnValue(650);
+    vi.mocked(countBrainLines).mockReturnValue(950);
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Brain Budget');
     expect(check!.passed).toBe(false);

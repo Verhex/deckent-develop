@@ -14,6 +14,7 @@ import {
   cleanupPromptFile,
   buildWorkerCommand,
   buildClaudeCommand,
+  WORKER_TIMEOUT_SECONDS,
   TmuxError,
 } from '../../src/orchestra/tmux.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
@@ -549,6 +550,44 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
     expect(cmd).toBe('custom-cli run --fast');
     expect(cmd).not.toContain('claude');
     expect(cmd).not.toContain('--allowedTools');
+  });
+
+  it('wraps with timeout when taskId is provided (no adapter)', () => {
+    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
+    expect(cmd).toContain(`timeout ${WORKER_TIMEOUT_SECONDS}`);
+    expect(cmd).toContain('WORKER_TIMEOUT');
+    expect(cmd).toContain('task-001-001.timeout');
+    expect(cmd).toContain('claude -p - --model opus');
+  });
+
+  it('does not wrap timeout when taskId is not provided (backward compat)', () => {
+    const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
+    expect(cmd).not.toContain('timeout');
+    expect(cmd).not.toContain('WORKER_TIMEOUT');
+    expect(cmd).toBe('claude -p - --model sonnet < /tmp/prompt.txt');
+  });
+
+  it('uses custom timeout seconds when provided', () => {
+    const cmd = buildWorkerCommand('haiku', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '002-001', 600);
+    expect(cmd).toContain('timeout 600');
+    expect(cmd).toContain('task-002-001.timeout');
+  });
+
+  it('does not wrap timeout when adapter is provided', () => {
+    const adapter = createMockAdapter();
+    const cmd = buildWorkerCommand('opus', '/tmp/p.txt', undefined, adapter, '001-001');
+    expect(cmd).not.toContain('timeout');
+    expect(cmd).toBe('mock-cli --model opus < /tmp/p.txt');
+  });
+
+  it('does not wrap timeout when timeoutSeconds is 0', () => {
+    const cmd = buildWorkerCommand('sonnet', '/proj/.tasks/.prompt-z.txt', undefined, undefined, '003-001', 0);
+    expect(cmd).not.toContain('timeout');
+    expect(cmd).toContain('claude -p - --model sonnet');
+  });
+
+  it('WORKER_TIMEOUT_SECONDS has the expected default value', () => {
+    expect(WORKER_TIMEOUT_SECONDS).toBe(1200);
   });
 });
 

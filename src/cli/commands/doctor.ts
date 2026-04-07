@@ -8,8 +8,8 @@ import type { DetectedProvider } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
   DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
-  DIRECTIVES_FILE, LOCKS_DIR, LOCK_STALE_THRESHOLD_MS, DEBT_TABLE_HEADER,
-  PROJECT_CONFIG_PATH, BRAIN_TOTAL_LINE_BUDGET,
+  DIRECTIVES_FILE, LOCKS_DIR, DEBT_TABLE_HEADER,
+  PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { countBrainLines } from '../../core/utils.js';
 import { getSystemProfile } from '../../core/system-profile.js';
@@ -213,13 +213,13 @@ function checkDirectives(root: string): DoctorCheck {
   return { name: 'Directives', passed: true, message: 'DIRECTIVES.md found', required: false };
 }
 
-function checkBrainBudget(root: string): DoctorCheck {
+function checkBrainBudget(root: string, memoryBudget = 900): DoctorCheck {
   const lines = countBrainLines(root);
-  const passed = lines <= BRAIN_TOTAL_LINE_BUDGET;
+  const passed = lines <= memoryBudget;
   return {
     name: 'Brain Budget',
     passed,
-    message: `${lines}/${BRAIN_TOTAL_LINE_BUDGET} lines${passed ? '' : ' — OVER BUDGET, run cleanup --decay'}`,
+    message: `${lines}/${memoryBudget} lines${passed ? '' : ' — OVER BUDGET, run cleanup --decay'}`,
     required: false,
   };
 }
@@ -242,7 +242,7 @@ function checkDebt(root: string): DoctorCheck {
   }
 }
 
-function checkStaleLocks(root: string): DoctorCheck {
+function checkStaleLocks(root: string, lockStaleThresholdMs = 300_000): DoctorCheck {
   const locksPath = join(root, LOCKS_DIR);
   if (!existsSync(locksPath)) {
     return { name: 'Locks', passed: true, message: 'No lock files', required: false };
@@ -256,7 +256,7 @@ function checkStaleLocks(root: string): DoctorCheck {
     for (const file of lockFiles) {
       try {
         const lock = JSON.parse(readFileSync(join(locksPath, file), 'utf-8'));
-        if (lock.acquiredAt && (Date.now() - new Date(lock.acquiredAt).getTime()) > LOCK_STALE_THRESHOLD_MS) {
+        if (lock.acquiredAt && (Date.now() - new Date(lock.acquiredAt).getTime()) > lockStaleThresholdMs) {
           staleCount++;
         }
       } catch { /* skip malformed */ }
@@ -878,11 +878,21 @@ export function registerDoctor(program: Command): void {
         const ciBaseline = readCIBaseline(root);
         const ciReports = readAllCIReports(root, 5);
 
+        // Read memory_budget from config (sync) — default 900
+        let brainBudget = 900;
+        try {
+          const configPath = join(root, PROJECT_CONFIG_PATH);
+          if (existsSync(configPath)) {
+            const rawCfg = JSON.parse(readFileSync(configPath, 'utf-8')) as { memory_budget?: number };
+            if (typeof rawCfg.memory_budget === 'number') brainBudget = rawCfg.memory_budget;
+          }
+        } catch { /* use default */ }
+
         print(formatHumanDoctor({
           result,
           providers,
           brainLines,
-          brainBudget: BRAIN_TOTAL_LINE_BUDGET,
+          brainBudget,
           lastSprintId,
           debtItems,
           projectRoot: root,

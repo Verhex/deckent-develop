@@ -858,7 +858,7 @@ describe('cleanup command', () => {
       archivedSprints: ['sprint-001.md'], removedDebtCount: 2, removedPatternCount: 1,
     });
     await runCommand(registerCleanup, ['cleanup', '--decay']);
-    expect(runDecay).toHaveBeenCalledWith(expect.any(String), 'sprint-cleanup', { force: true });
+    expect(runDecay).toHaveBeenCalledWith(expect.any(String), 'sprint-cleanup', { force: true, memoryBudget: 900, decaySprints: 8 });
     expect(stdout()).toContain('350');
     expect(stdout()).toContain('200');
     expect(stdout()).toContain('sprint-001.md');
