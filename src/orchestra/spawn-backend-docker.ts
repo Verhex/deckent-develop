@@ -66,7 +66,15 @@ export class DockerSpawnBackend implements SpawnBackend {
     claudeArgs.push('--dangerously-skip-permissions');
 
     const claudeCmd = `claude ${claudeArgs.join(' ')}`;
-    const containerCmd = `timeout ${this.timeoutSeconds} sh -c '${claudeCmd} < ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}' || echo "WORKER_TIMEOUT" > ${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
+    const resultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.result`;
+    const timeoutPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
+    const fallbackJson = JSON.stringify({
+      taskId, workerId: `docker-${taskId}`, filesChanged: [], linesAdded: 0,
+      linesRemoved: 0, testsPassed: false, coverage: 0,
+      selfAssessment: 'NO_GO', notes: 'Docker worker exited without writing result file',
+    });
+    // EXIT trap: guarantees .result file is ALWAYS written, even if Claude crashes
+    const containerCmd = `RFILE=${resultPath}; trap '[ -f $RFILE ] || echo '"'"'${fallbackJson}'"'"' > $RFILE' EXIT; timeout ${this.timeoutSeconds} sh -c '${claudeCmd} < ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}' || echo "WORKER_TIMEOUT" > ${timeoutPath}`;
 
     // Build docker run args
     // Run as host user to avoid root — Claude CLI blocks --dangerously-skip-permissions as root

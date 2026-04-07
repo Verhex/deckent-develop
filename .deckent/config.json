@@ -3,7 +3,7 @@
   "language": "tr",
   "projectName": "deckent",
   "last_sprint_id": "sprint-103",
-  "spawn_backend": "tmux",
+  "spawn_backend": "docker",
   "modes": {
     "performance": {
       "brain_model": "opus",

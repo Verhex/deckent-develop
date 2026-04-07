@@ -104,13 +104,23 @@ export function buildWorkerCommand(
   }
   cmd += ` < ${promptFilePath}`;
 
-  // Wrap with timeout — writes .timeout marker on expiry so result-collector
-  // can detect worker death immediately instead of waiting 30 minutes
+  // Wrap with timeout + EXIT trap — guarantees .result file is ALWAYS written.
+  // Without this, workers can exit without writing .result (crash, permission error, etc.)
+  // causing the entire sprint to stall waiting for a result that will never come.
   const tSec = timeoutSeconds ?? WORKER_TIMEOUT_SECONDS;
   if (tSec > 0 && taskId) {
     const tasksDir = join(promptFilePath, '..'); // .tasks/ dir (prompt is inside .tasks/)
+    const resultFile = join(tasksDir, `task-${taskId}.result`);
     const timeoutMarker = join(tasksDir, `task-${taskId}.timeout`);
-    cmd = `timeout ${tSec} sh -c '${cmd.replace(/'/g, "'\\''")}' || echo "WORKER_TIMEOUT" > ${timeoutMarker}`;
+    const fallbackJson = JSON.stringify({
+      taskId, workerId: `w-${taskId}`, filesChanged: [], linesAdded: 0,
+      linesRemoved: 0, testsPassed: false, coverage: 0,
+      selfAssessment: 'NO_GO', notes: 'Worker exited without writing result file',
+    });
+    // RFILE env var avoids nested quoting issues; trap fires on ANY exit (normal, crash, timeout)
+    // Use single-quoted JSON to prevent bash brace expansion on { }
+    const trap = `RFILE=${resultFile}; trap '[ -f $RFILE ] || echo '"'"'${fallbackJson}'"'"' > $RFILE' EXIT`;
+    cmd = `${trap}; timeout ${tSec} sh -c '${cmd.replace(/'/g, "'\\''")}' || echo "WORKER_TIMEOUT" > ${timeoutMarker}`;
   }
   return cmd;
 }
