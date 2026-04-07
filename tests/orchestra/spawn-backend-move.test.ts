@@ -36,6 +36,18 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: 'tmux 3.3a', stderr: '' }),
 }));
 
+// Mock Docker backend so auto mode doesn't depend on real Docker
+vi.mock('../../src/orchestra/spawn-backend-docker.js', () => ({
+  DockerSpawnBackend: vi.fn().mockImplementation(() => ({
+    name: 'docker',
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    list: vi.fn().mockReturnValue([]),
+    isAvailable: vi.fn().mockResolvedValue(false),
+  })),
+  isDockerAvailable: vi.fn().mockReturnValue(false),
+}));
+
 // ─── Import from NEW location ─────────────────────────────────────────────────
 
 import {
@@ -121,11 +133,11 @@ describe('Task 036-005: spawn-backend moved to orchestra/', () => {
     expect(err.backendName).toBe('subprocess');
   });
 
-  it('BackendType type is correctly constrained (tmux | subprocess | auto)', () => {
-    const validTypes: BackendType[] = ['tmux', 'subprocess', 'auto'];
+  it('BackendType type is correctly constrained (tmux | subprocess | docker | auto)', () => {
+    const validTypes: BackendType[] = ['tmux', 'subprocess', 'docker', 'auto'];
     for (const type of validTypes) {
       const backend = SpawnBackendFactory.create({ backend: type, projectDir: '/proj' });
-      expect(['tmux', 'subprocess']).toContain(backend.name);
+      expect(['tmux', 'subprocess', 'docker']).toContain(backend.name);
     }
   });
 

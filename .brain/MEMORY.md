@@ -113,3 +113,10 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - Zombie Process Koruması + tmux Cleanup: NO_GO — Edit/Write tool permissions denied in don't-ask mode. Cannot modify sprint-controller.ts, start.ts, or cleanup.ts withou
 - Prompt Dosyası Lifecycle Düzeltme: NO_GO — Edit and Write tools denied in don't-ask mode. Cannot modify source files. Two changes needed: (1) cleanupDraftTasks() —
 - CLI/MCP Start Parity — Davranış Eşitliği: NO_GO
+## Sprint sprint-102 Learnings
+- Fix debt: Tech debt from 098-001: buildAgentPerformance() ve buildSkillPerformance() zaten: NO_GO — Worker timeout — process exceeded time limit and was killed
+- Fix debt: Tech debt from 098-002: Root cause: MCP deckent_history tool only read .brain/sp: NO_GO — Worker timeout — process exceeded time limit and was killed
+- Fix debt: Tech debt from 098-003: ANALYSIS-2026-04-02.md Sprint 097 sonuçlarıyla güncellen: NO_GO — Worker timeout — process exceeded time limit and was killed
+- Fix debt: Tech debt from 098-004: README.md ve README-TR.md dosyalarındaki sprint badge sa: NO_GO — Worker timeout — process exceeded time limit and was killed
+- Fix debt: Tech debt from 098-005: Modül sayıları güncellendi: orchestra/ 47→49, core/ 50→5: NO_GO — Worker timeout — process exceeded time limit and was killed
+- Docker Smoke Test: NO_GO — Worker timeout — process exceeded time limit and was killed

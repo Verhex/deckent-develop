@@ -6,6 +6,19 @@ import {
   type ProviderAdapter,
   type ProviderSpawnOptions,
 } from '../../src/core/provider.js';
+
+// Mock Docker backend so auto-mode tests don't depend on real Docker
+vi.mock('../../src/orchestra/spawn-backend-docker.js', () => ({
+  DockerSpawnBackend: vi.fn().mockImplementation(() => ({
+    name: 'docker',
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    list: vi.fn().mockReturnValue([]),
+    isAvailable: vi.fn().mockResolvedValue(false),
+  })),
+  isDockerAvailable: vi.fn().mockReturnValue(false),
+}));
+
 import {
   SpawnBackendFactory,
   TmuxBackend,

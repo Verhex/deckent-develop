@@ -60,6 +60,7 @@ import {
 import type { ProviderName } from '../../core/task-types.js';
 import { getModePreset } from '../../core/mode-presets.js';
 import { runDoctorChecks } from './doctor.js';
+import { isDockerAvailable } from '../../orchestra/spawn-backend-docker.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -465,9 +466,24 @@ export function registerInit(program: Command): void {
         if (modePreset) {
           newConfig.model_strategy = modePreset.model_strategy;
         }
-        // Windows: auto-set subprocess backend (tmux unavailable)
+        // Auto-detect best spawn backend
         if (platform() === 'win32') {
           newConfig.spawn_backend = 'subprocess';
+        } else if (!newConfig.spawn_backend) {
+          // Detect Docker — if available, recommend it for isolated workers
+          if (isDockerAvailable()) {
+            newConfig.spawn_backend = 'docker';
+            print('  ✓ Docker detected → spawn_backend: docker (isolated worker containers)');
+            // Check if worker image exists
+            const { spawnSync: sp } = await import('node:child_process');
+            const imgCheck = sp('docker', ['images', '-q', 'deckent-worker:latest'], {
+              encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            if (!(imgCheck.stdout?.trim())) {
+              print('  ⚠ deckent-worker image not found — build with:');
+              print('    docker build -f Dockerfile.worker -t deckent-worker:latest .');
+            }
+          }
         }
         if (existsSync(configPath)) {
           try {

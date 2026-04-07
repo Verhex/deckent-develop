@@ -69,18 +69,30 @@ export class DockerSpawnBackend implements SpawnBackend {
     const containerCmd = `timeout ${this.timeoutSeconds} sh -c '${claudeCmd} < ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}' || echo "WORKER_TIMEOUT" > ${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
 
     // Build docker run args
+    // Run as host user to avoid root — Claude CLI blocks --dangerously-skip-permissions as root
+    const uid = process.getuid?.() ?? 1000;
+    const gid = process.getgid?.() ?? 1000;
+    const home = homedir();
+
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
     const dockerArgs: string[] = [
       'run', '-d',
       '--name', containerName,
+      // Run as host user (non-root) — required for --dangerously-skip-permissions
+      '--user', `${uid}:${gid}`,
+      '-e', `HOME=${home}`,
       // Project mounted read-only (workers can't corrupt main branch)
       '-v', `${dir}:${CONTAINER_WORKSPACE}:ro`,
       // .tasks/ mounted read-write (results, heartbeats, prompts)
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
       '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
-      // Claude auth cache (session-based auth)
-      '-v', `${join(homedir(), '.cache', 'claude')}:/root/.cache/claude:ro`,
+      // Claude auth — ~/.claude/ contains .credentials.json (session-based auth)
+      '-v', `${join(home, '.claude')}:${home}/.claude:ro`,
+      // Claude config — ~/.claude.json (settings, permissions)
+      ...(existsSync(join(home, '.claude.json'))
+        ? ['-v', `${join(home, '.claude.json')}:${home}/.claude.json:ro`]
+        : []),
       // Working directory
       '-w', CONTAINER_WORKSPACE,
     ];

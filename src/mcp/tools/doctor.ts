@@ -5,6 +5,7 @@ import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatDoctorResponse, wrapResponse, type DoctorData } from '../helpers/format.js';
+import { loadConfig } from '../../core/config.js';
 
 export function registerDoctorTool(server: McpServer): void {
   server.registerTool(
@@ -23,7 +24,12 @@ export function registerDoctorTool(server: McpServer): void {
       const root = process.cwd();
 
       try {
-      const result = runDoctorChecks(root);
+      let spawnBackend: string | undefined;
+      try {
+        const cfg = await loadConfig(root);
+        spawnBackend = cfg.spawn_backend;
+      } catch { /* config not available — use defaults */ }
+      const result = runDoctorChecks(root, undefined, spawnBackend);
 
       const response: Record<string, unknown> = { ...result };
 

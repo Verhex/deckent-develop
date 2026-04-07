@@ -123,9 +123,10 @@ function checkGit(): DoctorCheck {
 }
 
 export function checkTmux(providerNames?: string[], spawnBackend?: string): DoctorCheck {
-  // tmux is NOT required on Windows or when using subprocess backend
-  if (platform() === 'win32' || spawnBackend === 'subprocess') {
-    return { name: 'tmux', passed: true, message: 'not required (subprocess backend)', required: false };
+  // tmux is NOT required on Windows, subprocess, or Docker backend
+  if (platform() === 'win32' || spawnBackend === 'subprocess' || spawnBackend === 'docker') {
+    const reason = spawnBackend === 'docker' ? 'docker backend' : 'subprocess backend';
+    return { name: 'tmux', passed: true, message: `not required (${reason})`, required: false };
   }
   const needsTmux = !providerNames || providerNames.includes('claude') || providerNames.length === 0;
   const required = needsTmux;
@@ -805,10 +806,50 @@ export function checkDeckSecurity(root: string): DoctorCheck {
   return { name: '.deck Security', passed: true, message: '.deck file exists and is NOT tracked by git (safe)', required: false };
 }
 
+export function checkDocker(spawnBackend?: string): DoctorCheck {
+  const wantsDocker = spawnBackend === 'docker' || spawnBackend === 'auto';
+  const result = spawnSync('docker', ['info'], {
+    encoding: 'utf-8',
+    timeout: 5_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (result.status !== 0) {
+    return {
+      name: 'Docker',
+      passed: !wantsDocker,
+      message: wantsDocker
+        ? 'Docker not available — install Docker or switch spawn_backend to tmux/subprocess'
+        : 'not installed (optional — enables isolated worker containers)',
+      required: false,
+    };
+  }
+  // Check if deckent-worker image exists
+  const imgResult = spawnSync('docker', ['images', '-q', 'deckent-worker:latest'], {
+    encoding: 'utf-8',
+    timeout: 5_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const hasImage = (imgResult.stdout?.trim().length ?? 0) > 0;
+  if (!hasImage && wantsDocker) {
+    return {
+      name: 'Docker',
+      passed: false,
+      message: 'Docker available but deckent-worker image missing — run: docker build -f Dockerfile.worker -t deckent-worker:latest .',
+      required: false,
+    };
+  }
+  return {
+    name: 'Docker',
+    passed: true,
+    message: hasImage ? 'Docker available + deckent-worker image ready' : 'Docker available (deckent-worker image not built yet)',
+    required: false,
+  };
+}
+
 export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string): DoctorResult {
   const checks: DoctorCheck[] = [
     checkPlatform(),
-    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkClaude(),
+    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkDocker(spawnBackend), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
     checkDeckSecurity(root), checkWritePermissions(root),
@@ -836,7 +877,16 @@ export function registerDoctor(program: Command): void {
       const lang = getLangFromConfig(root);
       const providers = await detectAvailableProviders();
       const activeProviderNames = providers.filter(p => p.available).map(p => p.name);
-      const result = runDoctorChecks(root, activeProviderNames);
+      // Read spawn_backend from config for Docker/tmux check context
+      let spawnBackend: string | undefined;
+      try {
+        const cfgPath = join(root, PROJECT_CONFIG_PATH);
+        if (existsSync(cfgPath)) {
+          const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Record<string, unknown>;
+          spawnBackend = (raw.spawn_backend ?? raw.claude_backend) as string | undefined;
+        }
+      } catch { /* use default */ }
+      const result = runDoctorChecks(root, activeProviderNames, spawnBackend);
 
       if (opts.json) {
         const jsonOutput: Record<string, unknown> = {

@@ -13,6 +13,18 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
+// Mock Docker backend so auto mode tests don't depend on Docker availability
+vi.mock('../../src/orchestra/spawn-backend-docker.js', () => ({
+  DockerSpawnBackend: vi.fn().mockImplementation(() => ({
+    name: 'docker',
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    list: vi.fn().mockReturnValue([]),
+    isAvailable: vi.fn().mockResolvedValue(false),
+  })),
+  isDockerAvailable: vi.fn().mockReturnValue(false),
+}));
+
 import { spawnSync } from 'node:child_process';
 const mockSpawnSync = vi.mocked(spawnSync);
 

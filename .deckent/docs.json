@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "docs": [
+    {
+      "path": "CLAUDE.md",
+      "autoSections": [
+        "Sprint Metrics",
+        "Active Debt",
+        "Agent Performance"
+      ],
+      "protectedSections": [
+        "Architecture",
+        "Commands"
+      ],
+      "id": "claude-md"
+    },
+    {
+      "path": "VISION.md",
+      "autoSections": [
+        "Sprint History",
+        "Sprint Metrics"
+      ],
+      "protectedSections": [
+        "Vision",
+        "Roadmap"
+      ],
+      "id": "vision-md"
+    }
+  ]
+}

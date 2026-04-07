@@ -626,8 +626,8 @@ describe('i18n integration', () => {
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     const passedMsg = calls.find(c => String(c).includes('checks passed'));
     expect(passedMsg).toBeDefined();
-    // runDoctorChecks returns 13 checks total (including platform check, .deck security, write permissions)
-    expect(String(passedMsg)).toMatch(/\/13/);
+    // runDoctorChecks returns 14 checks total (including platform, Docker, .deck security, write permissions)
+    expect(String(passedMsg)).toMatch(/\/14/);
   });
 
   it('uses tr language when config has language=tr in legacy mode', async () => {
