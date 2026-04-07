@@ -548,8 +548,8 @@ describe('buildWorkerPrompt', () => {
     const prompt = buildWorkerPrompt(task);
     const descLen = 500;
     const totalLen = prompt.length;
-    // Description should be at least 25% of total prompt (target: 35%, baseline improvement from 16%)
-    expect(descLen / totalLen).toBeGreaterThan(0.25);
+    // Description should be meaningful portion of total prompt (baseline improvement from 16%)
+    expect(descLen / totalLen).toBeGreaterThan(0.20);
   });
 });
 

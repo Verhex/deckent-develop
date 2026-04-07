@@ -257,7 +257,10 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
 
   it('skips tasks whose result files contain invalid JSON', async () => {
     const sprint = makeSprint(['001-001']);
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation((p: string) => {
+      if (typeof p === 'string' && p.endsWith('.timeout')) return false;
+      return p.toString().endsWith('.result');
+    });
     mockedReadFileSync.mockReturnValue('{ broken json' as never);
 
     const promise = waitForResults('/root', sprint, 1);
@@ -268,7 +271,10 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
 
   it('skips tasks whose result files throw on read', async () => {
     const sprint = makeSprint(['001-001']);
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation((p: string) => {
+      if (typeof p === 'string' && p.endsWith('.timeout')) return false;
+      return p.toString().endsWith('.result');
+    });
     mockedReadFileSync.mockImplementation(() => { throw new Error('EACCES'); });
 
     const promise = waitForResults('/root', sprint, 1);
