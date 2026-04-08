@@ -149,7 +149,8 @@
       "Bash(sh -n /tmp/old-broken.sh)",
       "Bash(chmod +x /home/alperen/deckent-dev/.tasks/.worker-direct-test.sh)",
       "Bash(sh -n /home/alperen/deckent-dev/.tasks/.worker-direct-test.sh)",
-      "Bash(docker rm:*)"
+      "Bash(docker rm:*)",
+      "Bash(echo \"CLI start launched in background, PID: $!\")"
     ]
   },
   "outputStyle": "Explanatory"

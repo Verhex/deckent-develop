@@ -48,3 +48,7 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - Tmux Smoke Test Dosyasi: GO_WITH_TECH_DEBT — Created tests/smoke/tmux-smoke.test.ts with 3 existsSync-based smoke tests. All 3 pass: docs/tmux-smoke/x.md, y.md, z.md
 ## Sprint sprint-119 Learnings
 - Docker Verification Files: NO_GO — Docker worker exited without writing result file
+## Sprint sprint-120 Learnings
+- MCP Docker Test Dosyasi: NO_GO — Docker worker exited without writing result file
+## Sprint sprint-121 Learnings
+- CLI Docker Test Dosyasi: GO_WITH_TECH_DEBT — docs/docker-smoke/cli-test.md olusturuldu. Icerigi: '# CLI Docker Test\nSprint 121 — Docker backend CLI ile dogrulandi.'

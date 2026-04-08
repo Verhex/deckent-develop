@@ -3057,3 +3057,47 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 119-001: Docker Verification Files (NO_GO)
 
 ---
+## Sprint 120 — sprint-120
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 112s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 112426ms |
+
+### Tasks
+
+- 120-001: MCP Docker Test Dosyasi (NO_GO)
+
+---
+## Sprint 121 — sprint-121
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 140s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 139788ms |
+
+### Tasks
+
+- 121-001: CLI Docker Test Dosyasi (GO_WITH_TECH_DEBT)
+
+---

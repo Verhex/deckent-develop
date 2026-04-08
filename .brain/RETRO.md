@@ -1,33 +1,33 @@
-# Sprint sprint-119 Retrospective
+# Sprint sprint-121 Retrospective
 
 ## Summary
-Completed 0/1 tasks in 4 minutes 19s.
+Completed 1/1 tasks in 2 minutes 20s.
 
 ## Highlights
+- 1 task completed on first try
 - No boundary violations detected
-
-## Issues
-- Task 119-001 (Docker Verification Files) failed — Docker worker exited without writing result file
+- NO_GO rate improved from 100% to 0%
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 0/1 |
-| Sprint time | 4 minutes 19s |
-| NO_GO rate | 100% (1/1) |
+| Tasks completed | 1/1 |
+| Code changes | +2 / -0 |
+| Sprint time | 2 minutes 20s |
+| NO_GO rate | 0% (0/1) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| bug-fixer | 1 | 0 | 0 | 1 | 0% |
+| test-writer | 1 | 1 | 1 | 0 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| documentation-writer | 1 | 0 | 0 | 1 | 0% |
+| documentation-writer | 1 | 1 | 1 | 0 | 0% |
 
 ## Learnings
-- Docker Verification Files: failed — Docker worker exited without writing result file
+- CLI Docker Test Dosyasi: completed with tech debt — docs/docker-smoke/cli-test.md olusturuldu. Icerigi: '# CLI Docker Test\nSprint 121 — Docker backend CLI ile dogrulandi.'
 - Recurring pattern (2809x): stale_heartbeat

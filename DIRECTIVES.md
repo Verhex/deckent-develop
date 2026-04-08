@@ -1,28 +1,25 @@
-# DIRECTIVES — Sprint 109: Tmux CLI Backend Smoke Test
+# DIRECTIVES — Sprint 121: Docker CLI E2E Test
 
-## Goal: Tmux backend CLI ile dogrulama — dosya olusturma. CLI'den baslatilacak.
+## Goal: Docker spawn backend CLI uzerinden end-to-end dogrulama.
 
 ---
 
-## Task 1: Tmux CLI Smoke Dosyalari
+## Task 1: CLI Docker Test Dosyasi
 - Model: sonnet
 - Effort: low
-- Skills: typescript-expert
-- Files: docs/tmux-cli-smoke/p.md, docs/tmux-cli-smoke/q.md, docs/tmux-cli-smoke/r.md
-- Scope: docs/tmux-cli-smoke/
+- Skills: documentation-writer
+- Files: docs/docker-smoke/cli-test.md
+- Scope: docs/docker-smoke/
 
 ### Description
-docs/tmux-cli-smoke/ dizini altinda 3 markdown dosyasi olustur:
+docs/docker-smoke/cli-test.md dosyasi olustur. Icerigi:
 
-p.md: "# Tmux CLI Smoke P\nSprint 109 — tmux CLI backend test."
-q.md: "# Tmux CLI Smoke Q\nSprint 109 — tmux CLI backend test."
-r.md: "# Tmux CLI Smoke R\nSprint 109 — tmux CLI backend test."
+"# CLI Docker Test\nSprint 121 — Docker backend CLI ile dogrulandi."
 
-**Kanit:** `ls docs/tmux-cli-smoke/` → p.md q.md r.md
-
-**Test:** Dosyalar var
+**Kanit:** `ls docs/docker-smoke/cli-test.md`
+**Test:** Dosya var
 
 ---
 
 ## Quality Rules
-- docs/tmux-cli-smoke/ altinda 3 dosya olmali
+- docs/docker-smoke/cli-test.md olmali
