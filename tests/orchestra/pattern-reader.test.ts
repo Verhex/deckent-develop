@@ -56,7 +56,7 @@ function setupEntries(entries: LearningEntry[]): void {
 
 describe('PatternReader', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   describe('queryPatterns', () => {
@@ -172,7 +172,12 @@ describe('PatternReader', () => {
     });
 
     it('skips malformed files gracefully', () => {
-      mockExistsSync.mockReturnValue(true);
+      // Only return true for the learningPath existsSync check.
+      // debugLog → appendToErrorsFile calls existsSync('.brain') — returning false
+      // prevents it from calling readFileSync internally and consuming mock queue.
+      mockExistsSync.mockImplementation((p: unknown) =>
+        String(p).endsWith('learning'),
+      );
       mockReaddirSync.mockReturnValue(['sprint-001.json', 'sprint-002.json'] as unknown as ReturnType<typeof readdirSync>);
       mockReadFileSync.mockReturnValueOnce('not valid json');
       mockReadFileSync.mockReturnValueOnce(JSON.stringify([makeEntry()]));

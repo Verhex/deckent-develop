@@ -37,3 +37,6 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - CLI/MCP Start Parity Duzeltme: NO_GO — Worker timeout — process exceeded time limit and was killed
 - Docker Sprint Canli Dogrulama: NO_GO — Worker timeout — process exceeded time limit and was killed
 ## Sprint sprint-105 Learnings
+## Sprint sprint-106 Learnings
+- Auditor Edge Test Fix: GO_WITH_TECH_DEBT — Root cause: debugLog() → appendToErrorsFile() calls readFileSync('.brain/ERRORS.md') when an ENOENT is thrown inside rea
+- Pattern Reader Test Fix: GO_WITH_TECH_DEBT — Root cause: debugLog() -> appendToErrorsFile() -> readFileSync(errorsPath) was consuming mockReturnValueOnce queue entri

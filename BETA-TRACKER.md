@@ -617,13 +617,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-105 |
-| Toplam Task | 0 |
-| Tamamlanan | 0 |
-| Tech Debt | 0 |
+| Sprint | sprint-106 |
+| Toplam Task | 3 |
+| Tamamlanan | 3 |
+| Tech Debt | 2 |
 | No-Go | 0 |
-| Süre | 11dk 5sn |
-| Coverage | 24.0% |
+| Süre | 6dk 53sn |
+| Coverage | 33.3% |
 
 ## Sprint History
 | Sprint | Durum |
@@ -631,6 +631,7 @@ Every blocker was directly verified in the codebase. False claims have been corr
 | sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
+| sprint-106 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 

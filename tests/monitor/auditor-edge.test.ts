@@ -88,7 +88,12 @@ function makeLock(filePath: string, workerId: string, acquiredAt: string): LockI
 
 describe('scanHeartbeats — edge cases', () => {
   it('multiple stale agents produce separate violations and alerts each', () => {
-    mockedExistsSync.mockReturnValue(true);
+    // existsSync: true for .tasks/ dir, but false for .brain/ so that debugLog's
+    // appendToErrorsFile exits early and does NOT consume extra readFileSync mock slots.
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      return !path.includes('.brain');
+    });
     mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
 
     const stale = new Date(Date.now() - 200_000).toISOString();

@@ -2965,3 +2965,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 105-004: CLI/MCP Start Parity Kontrol (EXECUTING)
 
 ---
+## Sprint 106 — sprint-106
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 414s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 33.3% |
+| Duration | 413998ms |
+
+### Tasks
+
+- 106-001: Dosya Olusturma Smoke Test (DONE)
+- 106-002: Auditor Edge Test Fix (GO_WITH_TECH_DEBT)
+- 106-003: Pattern Reader Test Fix (GO_WITH_TECH_DEBT)
+
+---
