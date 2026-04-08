@@ -36,11 +36,10 @@ describe('README.md', () => {
     expect(content).toContain('<!-- ![demo](docs/assets/demo.gif) -->');
   });
 
-  it('contains 30-second quickstart section', () => {
-    expect(content).toContain('## 30-Second Quickstart');
-    expect(content).toContain('npm install -g deckent');
-    expect(content).toContain('deckent init');
-    expect(content).toContain('deckent start');
+  it('contains quick start section', () => {
+    expect(content).toContain('## Quick Start');
+    expect(content).toContain('npx deckent init');
+    expect(content).toContain('npx deckent start');
   });
 
   it('contains How It Works section', () => {

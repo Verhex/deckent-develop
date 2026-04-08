@@ -1,21 +1,51 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, PROJECT_CONFIG_PATH } from './constants.js';
+import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, PROJECT_CONFIG_PATH, ERRORS_FILE, ERRORS_MAX_LINES } from './constants.js';
 import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
 
 /**
- * Log a debug message to stderr when DECKENT_DEBUG environment variable is set.
- * Used in silent catch blocks to surface errors during debugging without
- * affecting normal operation.
+ * Log a debug message to stderr (when DECKENT_DEBUG is set) and always
+ * append to .brain/ERRORS.md for persistent error tracking.
  * @param context - Short label describing where the error occurred (e.g. 'readJsonSafe')
  * @param error - The caught error or message to log
  */
 export function debugLog(context: string, error: unknown): void {
-  if (!process.env['DECKENT_DEBUG']) return;
   const msg = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`[deckent:debug] ${context}: ${msg}\n`);
+  // Write to stderr when DECKENT_DEBUG is set
+  if (process.env['DECKENT_DEBUG']) {
+    process.stderr.write(`[deckent:debug] ${context}: ${msg}\n`);
+  }
+  // Always append to .brain/ERRORS.md (non-fatal)
+  appendToErrorsFile(context, msg);
+}
+
+/**
+ * Append an error entry to .brain/ERRORS.md in pipe-delimited format.
+ * Trims file to ERRORS_MAX_LINES (200) to prevent unbounded growth.
+ * Non-fatal: any write failure is silently ignored.
+ */
+function appendToErrorsFile(context: string, message: string): void {
+  try {
+    const brainDir = BRAIN_DIR;
+    if (!existsSync(brainDir)) return; // No .brain/ dir — not initialized
+    const errorsPath = join(brainDir, ERRORS_FILE);
+    const timestamp = new Date().toISOString();
+    const sanitized = message.replace(/\n/g, ' ').slice(0, 200);
+    const entry = `| ${timestamp} | ${context} | ${sanitized} |\n`;
+    appendFileSync(errorsPath, entry, 'utf-8');
+
+    // Trim to max lines
+    const content = readFileSync(errorsPath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.trim());
+    if (lines.length > ERRORS_MAX_LINES) {
+      const trimmed = lines.slice(-ERRORS_MAX_LINES).join('\n') + '\n';
+      writeFileSync(errorsPath, trimmed, 'utf-8');
+    }
+  } catch {
+    // Non-fatal: silently ignore file write errors
+  }
 }
 
 /** Type guard: validates that a string is a valid DebtPriority enum value. */

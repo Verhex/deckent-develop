@@ -24,6 +24,8 @@ export const DOCS_CONFIG_FILE = join(DECKENT_DIR, 'docs.json');
 export const DASHBOARD_FILE = '.dashboard' as const;
 
 // ─── Memory Files (relative to BRAIN_DIR) ────────────────────────────
+export const ERRORS_FILE = 'ERRORS.md' as const;
+export const ERRORS_MAX_LINES = 200 as const;
 export const MEMORY_FILE = 'MEMORY.md' as const;
 export const DECISIONS_FILE = 'DECISIONS.md' as const;
 export const DEBT_FILE = 'DEBT.md' as const;

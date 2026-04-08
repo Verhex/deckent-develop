@@ -21,6 +21,12 @@ RUN npm i -g @anthropic-ai/claude-code
 # RUN npm i -g @openai/codex
 # RUN npm i -g @google/gemini-cli
 
+# Create writable home directory for non-root execution
+# spawn-backend-docker.ts uses --tmpfs /tmp/deckent-home, but this ensures
+# the base path exists even without tmpfs (e.g., docker exec debugging)
+RUN mkdir -p /tmp/deckent-home && chmod 777 /tmp/deckent-home
+ENV HOME=/tmp/deckent-home
+
 # Set workspace directory
 WORKDIR /workspace
 

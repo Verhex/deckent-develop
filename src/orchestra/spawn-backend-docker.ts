@@ -82,24 +82,35 @@ export class DockerSpawnBackend implements SpawnBackend {
     const gid = process.getgid?.() ?? 1000;
     const home = homedir();
 
+    // Container HOME: use /tmp/deckent-home to avoid missing host HOME directory
+    // Host HOME (e.g. /home/alperen) doesn't exist in container filesystem.
+    // Claude CLI needs a writable HOME for config + cache.
+    const containerHome = '/tmp/deckent-home';
+
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
     const dockerArgs: string[] = [
       'run', '-d',
       '--name', containerName,
       // Run as host user (non-root) — required for --dangerously-skip-permissions
       '--user', `${uid}:${gid}`,
-      '-e', `HOME=${home}`,
+      // HOME must point to a directory that EXISTS in the container
+      '-e', `HOME=${containerHome}`,
+      // Memory limits — prevent OOM and runaway containers
+      '--memory', '2g',
+      '--memory-swap', '3g',
+      // Writable HOME via tmpfs — Claude CLI needs to write config/cache here
+      '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
       // Project mounted read-only (workers can't corrupt main branch)
       '-v', `${dir}:${CONTAINER_WORKSPACE}:ro`,
       // .tasks/ mounted read-write (results, heartbeats, prompts)
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
       '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
-      // Claude auth — ~/.claude/ contains .credentials.json (session-based auth)
-      '-v', `${join(home, '.claude')}:${home}/.claude:ro`,
+      // Claude auth — mount host credentials into container HOME
+      '-v', `${join(home, '.claude')}:${containerHome}/.claude:ro`,
       // Claude config — ~/.claude.json (settings, permissions)
       ...(existsSync(join(home, '.claude.json'))
-        ? ['-v', `${join(home, '.claude.json')}:${home}/.claude.json:ro`]
+        ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json:ro`]
         : []),
       // Working directory
       '-w', CONTAINER_WORKSPACE,

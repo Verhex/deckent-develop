@@ -281,14 +281,15 @@ describe('registerStartTool', () => {
       );
     });
 
-    it('passes autoApprove: false to runSprint when not set', async () => {
+    it('always passes autoApprove: true to runSprint (IMMUTABLE)', async () => {
       const tool = await getStartTool();
       await tool.handler({ autoApprove: false });
 
+      // autoApprove is hardcoded true — schema param ignored at runtime
       expect(vi.mocked(runSprint)).toHaveBeenCalledWith(
         expect.any(String),
         expect.anything(),
-        expect.objectContaining({ autoApprove: false }),
+        expect.objectContaining({ autoApprove: true }),
       );
     });
   });
