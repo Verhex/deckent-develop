@@ -344,6 +344,38 @@ describe('Docker Backend Integration', () => {
     }
   }, 30_000);
 
+  // ── Test 10: Docker log extraction writes .log file ───────────────────
+  it('monitorContainer extracts container stdout to .log file', async () => {
+    const logTaskId = `test-docker-${Date.now()}-log`;
+    const containerName = `deckent-w-${logTaskId}`;
+    const logPath = path.join(TEST_TASKS_DIR, `task-${logTaskId}.log`);
+    try {
+      backend.spawn(logTaskId, 'sonnet', 'echo "log capture test"', {
+        projectDir: PROJECT_ROOT,
+        autoApprove: true,
+      });
+      // Wait for container to exit and monitorContainer to extract logs
+      let logExists = false;
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 1500));
+        if (fs.existsSync(logPath)) {
+          logExists = true;
+          break;
+        }
+      }
+      expect(logExists).toBe(true);
+      if (logExists) {
+        const logContent = fs.readFileSync(logPath, 'utf-8');
+        expect(logContent.length).toBeGreaterThan(0);
+      }
+    } finally {
+      backend.kill(logTaskId);
+      forceRemoveContainer(containerName);
+      cleanupTaskFiles(logTaskId);
+      try { fs.unlinkSync(logPath); } catch { /* ok */ }
+    }
+  }, 30_000);
+
   // Final cleanup — monitorContainer writes .hb/.timeout asynchronously AFTER afterEach runs
   afterAll(async () => {
     await new Promise(resolve => setTimeout(resolve, 2000));

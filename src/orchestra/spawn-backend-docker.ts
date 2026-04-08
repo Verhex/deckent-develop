@@ -4,14 +4,15 @@
 // Results collected via shared .tasks/ volume mount.
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
+import { SpawnBackendError } from './spawn-backend.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -50,6 +51,31 @@ export class DockerSpawnBackend implements SpawnBackend {
     const dir = opts?.projectDir ?? this.projectDir;
     const tasksDir = join(dir, TASKS_DIR);
     mkdirSync(tasksDir, { recursive: true });
+
+    // Guard: verify Docker image exists before attempting spawn
+    const imageCheck = spawnSync('docker', ['images', '-q', this.image], {
+      encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    if (!imageCheck.stdout?.trim()) {
+      throw new SpawnBackendError(
+        `Docker image '${this.image}' not found. Run: docker build -f Dockerfile.worker -t ${this.image} .`,
+        'docker',
+      );
+    }
+
+    // WSL2 memory warning — Docker containers share WSL2 memory pool
+    if (process.platform === 'linux') {
+      try {
+        const procVersion = readFileSync('/proc/version', 'utf-8');
+        if (procVersion.includes('microsoft') || procVersion.includes('WSL')) {
+          const totalGB = Math.round(totalmem() / (1024 * 1024 * 1024));
+          if (totalGB < 6) {
+            debugLog('docker-backend:wsl2-memory',
+              `WSL2 total memory ${totalGB}GB — Docker workers need ~4GB each. Consider increasing .wslconfig memory.`);
+          }
+        }
+      } catch { /* /proc/version not readable — skip WSL2 check */ }
+    }
 
     // Write prompt to shared .tasks/ volume
     const promptId = randomBytes(8).toString('hex');
@@ -232,6 +258,18 @@ export class DockerSpawnBackend implements SpawnBackend {
       if (!existsSync(resultPath) && exitCode !== 0 && !existsSync(timeoutPath)) {
         writeFileSync(timeoutPath, `container_exit_${exitCode}`, 'utf-8');
       }
+
+      // Extract container logs BEFORE removal (docker logs requires container to exist)
+      try {
+        const logResult = spawnSync('docker', ['logs', containerName], {
+          encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        const logContent = (logResult.stdout ?? '') + (logResult.stderr ?? '');
+        if (logContent.trim()) {
+          const logPath = join(tasksDir, `task-${taskId}.log`);
+          writeFileSync(logPath, logContent, 'utf-8');
+        }
+      } catch (e) { debugLog('docker-backend:log-extract', e); }
 
       // Cleanup container
       try {

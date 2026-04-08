@@ -808,6 +808,7 @@ export function checkDeckSecurity(root: string): DoctorCheck {
 
 export function checkDocker(spawnBackend?: string): DoctorCheck {
   const wantsDocker = spawnBackend === 'docker' || spawnBackend === 'auto';
+  const isRequired = spawnBackend === 'docker'; // Required only when explicitly set
   const result = spawnSync('docker', ['info'], {
     encoding: 'utf-8',
     timeout: 5_000,
@@ -820,7 +821,7 @@ export function checkDocker(spawnBackend?: string): DoctorCheck {
       message: wantsDocker
         ? 'Docker not available — install Docker or switch spawn_backend to tmux/subprocess'
         : 'not installed (optional — enables isolated worker containers)',
-      required: false,
+      required: isRequired,
     };
   }
   // Check if deckent-worker image exists
@@ -835,14 +836,30 @@ export function checkDocker(spawnBackend?: string): DoctorCheck {
       name: 'Docker',
       passed: false,
       message: 'Docker available but deckent-worker image missing — run: docker build -f Dockerfile.worker -t deckent-worker:latest .',
-      required: false,
+      required: isRequired,
     };
+  }
+  // Memory warning for Docker backend
+  let memWarning = '';
+  if (wantsDocker) {
+    try {
+      const memResult = spawnSync('docker', ['info', '--format', '{{.MemTotal}}'], {
+        encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const memBytes = parseInt(memResult.stdout?.trim() ?? '0', 10);
+      if (memBytes > 0 && memBytes < 4 * 1024 * 1024 * 1024) {
+        const memGB = (memBytes / (1024 * 1024 * 1024)).toFixed(1);
+        memWarning = ` (warning: Docker memory ${memGB}GB < 4GB — workers may OOM)`;
+      }
+    } catch { /* non-fatal */ }
   }
   return {
     name: 'Docker',
     passed: true,
-    message: hasImage ? 'Docker available + deckent-worker image ready' : 'Docker available (deckent-worker image not built yet)',
-    required: false,
+    message: hasImage
+      ? `Docker available + deckent-worker image ready${memWarning}`
+      : `Docker available (deckent-worker image not built yet)${memWarning}`,
+    required: isRequired,
   };
 }
 
