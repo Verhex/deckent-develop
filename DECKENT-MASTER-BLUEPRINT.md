@@ -5,21 +5,15 @@
 ---
 
 ## Live Metrics
-<!-- Auto-updated by docs.json — numbers in prose below may lag behind this section -->
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Version | 0.3.0-beta.3 |
-| Completed Sprints | 103+ |
-| Tests | 12,193+ |
-| MCP Tools | 20 |
-| MCP Resources | 8 |
-| Dashboard Pages | 6 |
-| CLI Commands | 35 |
-| Built-in Agents | 16 |
-| Built-in Skills | 21 |
-| Models | 13 (3 providers) |
-
----
+| Sprint | sprint-105 |
+| Toplam Task | 0 |
+| Tamamlanan | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Süre | 11dk 5sn |
+| Coverage | 24.0% |
 
 # TABLE OF CONTENTS
 

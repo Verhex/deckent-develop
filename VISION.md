@@ -108,3 +108,21 @@ Secret leak protection (.detect-secrets), migration to the VerhexIO/deckent open
 | Built-in skills | 21 |
 | Providers | 3 (Claude, Codex, Gemini) |
 | Platforms | macOS, Linux, WSL2, Windows |
+
+## Sprint History
+| Sprint | Durum |
+|--------|-------|
+| sprint-103 | tamamlandı |
+| sprint-104 | tamamlandı |
+| sprint-105 | tamamlandı |
+
+## Sprint Metrics
+| Metrik | Değer |
+|--------|-------|
+| Sprint | sprint-105 |
+| Toplam Task | 0 |
+| Tamamlanan | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Süre | 11dk 5sn |
+| Coverage | 24.0% |

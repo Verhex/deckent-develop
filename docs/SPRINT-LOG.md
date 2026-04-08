@@ -2915,3 +2915,53 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 103-007: Docker Backend Kullanım Rehberi (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 104 — sprint-104
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 124s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 4 |
+| Coverage | 0.0% |
+| Duration | 123604ms |
+
+### Tasks
+
+- 104-001: README Docker Backend Bolumu (NO_GO)
+- 104-002: Version Bump + CHANGELOG (NO_GO)
+- 104-003: CLI/MCP Start Parity Duzeltme (NO_GO)
+- 104-004: Docker Sprint Canli Dogrulama (NO_GO)
+
+---
+## Sprint 105 — sprint-105
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 665s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 24.0% |
+| Duration | 665179ms |
+
+### Tasks
+
+- 105-001: Docker Sprint Canli Dogrulama (EXECUTING)
+- 105-002: README Docker Backend Bolumu (EXECUTING)
+- 105-003: Version Bump + CHANGELOG (EXECUTING)
+- 105-004: CLI/MCP Start Parity Kontrol (EXECUTING)
+
+---

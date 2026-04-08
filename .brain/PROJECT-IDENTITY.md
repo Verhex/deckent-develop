@@ -30,12 +30,12 @@
   - ConfigPage i18n tam kapsam (Sprint 084), AgentDetail geniş panel (Sprint 084)
 
 ## Current State
-- Test Count: 12,193+
+- Test Count: 12
 - Coverage: 96.0%
-- Last Sprint: sprint-103
-- Total Sprints: 103
+- Last Sprint: sprint-105
+- Total Sprints: 105
 - Completed Tasks: 303
-- No-Go Rate: 14.3%
+- No-Go Rate: 0.0%
 
 ## Active Configuration
 - Build: tsc

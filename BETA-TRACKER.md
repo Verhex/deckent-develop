@@ -615,128 +615,22 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ---
 
 ## Sprint Metrics
-<!-- auto:start — updated by docs.json -->
-
-### Progress Tracking — Sprint 085 Results
-
-#### Completed Goals (Sprint 085 + 086)
-
-| Goal | Status | Sprint | Detail |
-|------|--------|--------|--------|
-| Structured error logging | ✅ DONE | 085 | debugLog 3-param overload, .brain/ERRORS.md (max 200 lines) |
-| Decision logging (decision trail) | ✅ DONE | 085+086 | .deckent/routing/decisions/ JSON + call sites enriched with sprintId/taskId |
-| Rule auto-apply pipeline | ✅ DONE | 085 | applyEvolvedRules() confidence>=0.85 → manifest, rollback JSON |
-| Synergy matrix → routing | ✅ DONE | 085 | getSynergyBonuses() +2/-2 bonus/penalty, min 5 samples |
-| routeTaskV2 call sites | ✅ DONE | 086 | task-router.ts + mid-sprint-adapter.ts + sprint-controller.ts updated |
-| 14 additional catches → debugLog | ✅ DONE | 086 | cleanup(7) + finalizeSprint(7) functions |
-| Coverage threshold config | ✅ DONE | 086 | config.coverage_threshold (default 90), 6 files updated |
-| Intent classifier feedback | ✅ DONE | 086 | INTENT_WEIGHTS Map + updateIntentWeights() + loadIntentWeights() |
-| Past results for planner | ✅ DONE | 086 | getWorstCombinations(5) + AI prompt PAST RESULTS block |
-| Adaptive thresholds | ✅ DONE | 088 | applyAdaptiveThresholds() + getRecentSprintStats() |
-
-#### Sprint 085 Metrics
-- **Code:** +400 / -37 lines
-- **Duration:** 25m 22s
-- **Result:** 4/4 completed (2 DONE, 2 GO_WITH_TECH_DEBT)
-- **New files:** .brain/ERRORS.md, .deckent/routing/decisions/, .deckent/routing/applied-rules.json
-
-#### Sprint 086 Metrics
-- **Code:** +172 / -21 lines
-- **Duration:** 25m 4s
-- **Result:** 4/4 completed (2 DONE, 2 GO_WITH_TECH_DEBT)
-- **New files:** .deckent/routing/intent-weights.json
-
-#### Sprint 097 Metrics
-- **Scope:** ModelRegistry + Provider Config Evolution (Enterprise Refactor)
-- **Tasks:** 10 tasks (all GO_WITH_TECH_DEBT)
-- **New files:** src/core/model-registry.ts, src/core/mode-presets.ts
-- **Key changes:**
-  - ModelRegistry class: 13 models, 3 providers, single source of truth
-  - Tier-based routing: premium_plus/premium/standard/economy
-  - Provider-agnostic config: brain_tier/worker_tier
-  - Init wizard refactor: selectTiers() + tierToModel()
-  - Codex + Gemini adapter CLI compatibility updates
-
-#### Sprint 098 Metrics
-- **Scope:** Documentation + Sprint Output + History Fix
-- **Tasks:** 5/5 (all GO_WITH_TECH_DEBT)
-- **Duration:** 8m 25s
-- **Code:** +77 / -56 lines
-- **Key changes:**
-  - MCP history tool reads .brain/archive/ (85 sprint logs accessible)
-  - sprint-reporter.ts debug log added (evaluations map debug)
-  - ANALYSIS, README, DECKENT.md ModelRegistry updates
-
-#### Sprint 099 Metrics
-- **Scope:** RETRO Debug + Job Output Reform + Docs Update
-- **Tasks:** 5/5 (all GO_WITH_TECH_DEBT)
-- **Duration:** 16m 16s
-- **Code:** +77 / -56 lines
-- **Key changes:**
-  - RETRO Done Counter: evaluations map debug added (Sprint 093 fix verified)
-  - Job Output Reform: finalizeSprint() job summary enriched
-  - VISION.md + health-check.md + roadmap.md number updates
-  - README sprint badge 97+ → 98+ updated
-  - PROJECT-IDENTITY.md Test Count 12 → 12,193+ fixed
-
-#### Sprint 100 Metrics
-- **Scope:** Docs number updates (Sprint 100 numbers)
-- **Updated files:** docs/architecture/architecture.md, docs/ANALYSIS-2026-04-02.md
-- **Key changes:**
-  - architecture.md: Version Sprint 100+, CLI 35+, orchestra 63 modules, MCP 20 tools
-  - ANALYSIS: Total Sprint 100, tests 12,051+, orchestra 55, CLI 35+, MCP 20 tools
-  - Conclusion section updated as post-Sprint 100
-
-#### Sprint 101 Metrics
-- **Scope:** Sprint Lock + Result Timeout + autoApprove + Docker Backend
-- **Tasks:** 4/10 (2 DONE, 2 GO_WITH_TECH_DEBT, 6 NO_GO)
-- **Duration:** ~42m
-- **Key changes:**
-  - Sprint lock mechanism (multi-process collision prevention)
-  - autoApprove=true made standard
-  - Docker Spawn Backend + MockSpawnBackend + E2E Sprint Lifecycle Tests
-  - README/DECKENT.md usage cleanup + flaky test fix
-
-#### Sprint 102 Metrics
-- **Scope:** Tech Debt Fix (098 debts) + Docker Smoke Test
-- **Tasks:** 0/6 (all NO_GO — worker timeout)
-- **Duration:** 12m 9s
-- **Note:** All workers timed out, sprint rolled back
-
-#### Remaining Tech Debt
-1. ~~**085-001-debt (partial)**~~: ✅ Complete — silent catches converted to debugLog in Sprint 085-088
-2. ~~**086-001-debt**~~: ✅ Complete — routeTaskV2 call sites updated in Sprint 086
-3. ~~**086-003-debt**~~: ✅ Complete — planner integration completed in Sprint 086
-4. **Token usage tracking** — historicalTokenUsage not yet implemented (ModelRegistry infrastructure ready, work plan in Section X.I)
-<!-- auto:end -->
-
----
+| Metrik | Değer |
+|--------|-------|
+| Sprint | sprint-105 |
+| Toplam Task | 0 |
+| Tamamlanan | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Süre | 11dk 5sn |
+| Coverage | 24.0% |
 
 ## Sprint History
-<!-- auto:start — updated by docs.json -->
-| Sprint | Tasks | DONE | Highlights |
-|--------|-------|------|------------|
-| 066 | 7/7 | 7 | Phantom modules, manifest v2, MCP docs |
-| 067 | 6/6 | 6 | Package 494KB, retro notes, any cleanup |
-| 068 | 6/6 | 6 | AI-native discoverability, V2 routing |
-| 069 | 6/6 | 6 | Skill stats, agent precision, tempAgent |
-| 070 | 8/8 | 8 | Init UX overhaul, 15 bug fixes, Windows dogfooding |
-| 071 | 7/7 | 7 | BUG-19..26 fix, heartbeat periodic, upgrade --local |
-| 072 | 5/5 | 5 | Tier generalization, model API IDs, god object split, README |
-| 073 | 5/5 | 5 | Self-dogfooding: 100 test regressions fixed, 0 fail |
-| 074 | 7/7 | 7 | Docs consistency, debt-069 closure, CHANGELOG/SPRINT-LOG |
-| 075 | 5/5 | 5 | Docs TR consistency, VISION.md, link audit, detect-secrets, god object phase 2 |
-| 076 | 4/4 | 4 | Stale heartbeat fix, dashboard API test, graceful shutdown, god object phase 3 |
-| 077 | 3/3 | 3 | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md update |
-| 078 | 4/4 | 4 | Docs catch-up, HistoryPage success rate trend |
-| 079 | 4/4 | 4 | README-TR fix, dashboard control buttons, init language-first, /api/cleanup |
-| 080 | 4/4 | 4 | Dashboard UX Overhaul: WorkerCard, SprintPhaseTimeline, ActivityFeed |
-| 081 | 4/4 | 4 | Config/Settings merge, full i18n coverage (44 keys), terminal log |
-| 082 | 10/10 | 10 | MCP/CLI parity + usage fix + version bump + Dashboard Phase B (skeleton, AgentDetail, EmptyState) |
-| **Total** | **105/105** | **105** | 12,193+ tests, 0 regressions, v0.3.0-beta.1 |
-<!-- auto:end -->
-
----
+| Sprint | Durum |
+|--------|-------|
+| sprint-103 | tamamlandı |
+| sprint-104 | tamamlandı |
+| sprint-105 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 

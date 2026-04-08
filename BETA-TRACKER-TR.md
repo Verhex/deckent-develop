@@ -768,30 +768,11 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 ---
 
 ## Sprint History
-<!-- auto:start — docs.json tarafından güncellenecek -->
-| Sprint | Task | DONE | Öne Çıkan |
-|--------|------|------|-----------|
-| 066 | 7/7 | 7 | Phantom modüller, manifest v2, MCP docs |
-| 067 | 6/6 | 6 | Paket 494KB, retro notes, any cleanup |
-| 068 | 6/6 | 6 | AI-native discoverability, V2 routing |
-| 069 | 6/6 | 6 | Skill stats, agent precision, tempAgent |
-| 070 | 8/8 | 8 | Init UX overhaul, 15 bug fix, Windows dogfooding |
-| 071 | 7/7 | 7 | BUG-19..26 fix, heartbeat periodic, upgrade --local |
-| 072 | 5/5 | 5 | Tier generalizasyonu, model API IDs, god object split, README |
-| 073 | 5/5 | 5 | Self-dogfooding: 100 test regresyonu fix, 0 fail |
-| 074 | 7/7 | 7 | Docs tutarlılık, debt-069 kapanış, CHANGELOG/SPRINT-LOG |
-| 075 | 5/5 | 5 | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2 |
-| 076 | 4/4 | 4 | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3 |
-| 077 | 3/3 | 3 | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme |
-| 078 | 4/4 | 4 | Docs catch-up, HistoryPage success rate trend |
-| 079 | 4/4 | 4 | README-TR fix, dashboard kontrol butonları, init dil-ilk, /api/cleanup |
-| 080 | 4/4 | 4 | Dashboard UX Overhaul: WorkerCard, SprintPhaseTimeline, ActivityFeed |
-| 081 | 4/4 | 4 | Config/Settings birleşme, i18n tam kapsam (44 key), terminal log |
-| 082 | 10/10 | 10 | MCP/CLI parity + usage fix + version bump + Dashboard Faz B (skeleton, AgentDetail, EmptyState) |
-| **Toplam** | **105/105** | **105** | 12,193+ test, 0 regression, v0.3.0-beta.1 |
-<!-- auto:end -->
-
----
+| Sprint | Durum |
+|--------|-------|
+| sprint-103 | tamamlandı |
+| sprint-104 | tamamlandı |
+| sprint-105 | tamamlandı |
 
 ## Bug Tracker
 
@@ -1196,3 +1177,14 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - [Claude Dispatch](https://claude.com/blog/dispatch-and-computer-use) — Telefon → bilgisayar gorev akisi
 - [Claude Code Features](https://help.apiyi.com/en/claude-code-2026-new-features-loop-computer-use-remote-control-guide-en.html) — Loop, Schedule, Computer Use
 - [AI Agents Comparison 2026](https://blog.iskohm.com/en/posts/ai-agents-comparison-2026-cursor-copilot-kilo-code-claude-code/) — Tam karsilastirma
+
+## Sprint Metrics
+| Metrik | Değer |
+|--------|-------|
+| Sprint | sprint-105 |
+| Toplam Task | 0 |
+| Tamamlanan | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Süre | 11dk 5sn |
+| Coverage | 24.0% |

@@ -150,3 +150,4 @@
 | debt-103-005 | Tech debt from 103-005: debt-098-005 resolved: (A) CLAUDE.md orchestra/ module c | 103-005 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:46.826Z |
 | debt-103-006 | Tech debt from 103-006: Docker Backend Integration Test yazıldı. 7 test, hepsi g | 103-006 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:50.602Z |
 | debt-103-007 | Tech debt from 103-007: Created docs/guide/docker-backend.md (362 lines). Covers | 103-007 | sprint-103 | NORMAL | 0 | true | sprint-103 | 2026-04-07T12:36:54.612Z |
+| rollback-sprint-102 | Sprint sprint-102 rollback SUCCESS: Rolled back to safety point (linter hook revert) | sprint-102 | 2026-04-07 | NORMAL | 0 | true | sprint-103 | 2026-04-07 |

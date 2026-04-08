@@ -30,10 +30,19 @@ export function registerStartTool(server: McpServer): void {
         sandbox: z.boolean().optional().default(false).describe('Run sprint in sandbox mode: stashes local git changes before spawning and restores them after the sprint completes. Safe experimentation — no permanent changes on failure.'),
       }),
     },
-    async ({ autoApprove, dryRun, force, timeout, sandbox }) => {
+    async ({ dryRun, force, timeout, sandbox }) => {
       const root = process.cwd();
-      // force: MCP does not run pre-flight checks by default (non-interactive context).
-      // The parameter is present for CLI parity — set force=true to document intent.
+      // CLI/MCP Parity Notes:
+      // - autoApprove: IMMUTABLE true. CLI hardcodes true; MCP now hardcodes true at runSprint call.
+      //   The schema param is kept for API surface parity only (debugging use case).
+      // - spawn_backend: Both CLI and MCP read from config via loadConfig() → sprint-controller
+      //   uses config.spawn_backend automatically. No explicit handling needed here.
+      // - timeout: Both pass timeoutMs to runSprint (undefined = 30min default in result-collector).
+      //   CLI parses string→int; MCP accepts number directly. Behavior equivalent.
+      // - force: CLI skips both sprint lock check AND doctor pre-flight checks.
+      //   MCP skips only sprint lock check — no doctor check by design (non-interactive
+      //   context; doctor imports are in cli/ layer and cannot be imported from mcp/).
+      //   KNOWN DIVERGENCE: documented, acceptable for non-interactive MCP context.
 
       try {
         const config = await loadConfig(root);
@@ -96,7 +105,10 @@ export function registerStartTool(server: McpServer): void {
         writeJobState(root, { jobId, status: 'RUNNING', startedAt });
 
         // Fire and forget — don't await. Sprint runs in background.
-        runSprint(root, config, { autoApprove, sandboxMode: sandbox, timeoutMs: timeout, connector: bootstrap?.connector }).then(sprint => {
+        // autoApprove: true is immutable — workers MUST have full write permissions.
+        // CLI parity: CLI also hardcodes autoApprove: true (ignores --auto-approve flag).
+        // The schema param is accepted for debugging only; runtime always enforces true.
+        runSprint(root, config, { autoApprove: true, sandboxMode: sandbox, timeoutMs: timeout, connector: bootstrap?.connector }).then(sprint => {
           const tasks = buildTaskSummaries(root, sprint.tasks);
           const sm = sprint.metrics;
           const duration = sm ? formatJobDuration(sm.durationMs) : '?';

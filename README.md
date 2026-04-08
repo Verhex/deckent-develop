@@ -2,24 +2,18 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-103%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.3.0--beta.3-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-103%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
 <!-- ![demo](docs/assets/demo.gif) -->
 
-## 30-Second Quickstart
+## Quick Start
 
 ```bash
-# Install globally
-npm install -g deckent
-
-# Initialize in your project
-cd my-project
-deckent init
-
-# Write goals in DIRECTIVES.md, then run
-deckent start
+npx deckent init
+npx deckent plan "Add user authentication"
+npx deckent start
 ```
 
 ---
@@ -387,6 +381,28 @@ Deckent works with three AI providers. Configure per-role or per-task:
 See [docs/reference/multi-provider.md](docs/reference/multi-provider.md) for the full guide.
 
 See [docs/reference/config-reference.md](docs/reference/config-reference.md) for the full reference.
+
+---
+
+## Docker Backend (Isolated Workers)
+
+Workers run in isolated Docker containers — no cross-worker file conflicts.
+
+### Setup
+
+```bash
+docker build -f Dockerfile.worker -t deckent-worker:latest .
+npx deckent config set spawn_backend docker
+```
+
+### How It Works
+
+- Project mounted read-only (`/workspace`)
+- `.tasks/` mounted read-write (results, heartbeats)
+- Auth via `~/.claude/` mount (session-based)
+- Non-root execution (host UID/GID)
+
+See [docs/guide/docker-backend.md](docs/guide/docker-backend.md) for the full guide.
 
 ---
 

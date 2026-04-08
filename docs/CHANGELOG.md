@@ -6,7 +6,43 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
-## [0.3.0-beta.3-sprint103] - 2026-04-07
+## [0.4.0-beta.1-sprint105] - 2026-04-08
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [0.4.0-beta.1-sprint104] - 2026-04-08
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 4 total, 0 done, 0 tech debt, 4 no-go_
+
+## [0.4.0-beta.1-sprint103] - 2026-04-07
+
+### Added
+
+- Docker Spawn Backend — container-based worker isolation with read-only project mount and result persistence
+- Doctor Docker health check — container status validation and docker build availability
+- Init Docker auto-detection — spawn_backend auto-select when docker available
+- MCP run tool worker spawn fix — SpawnBackendFactory config-aware routing
+- Docker backend kullanım rehberi (docs/guide/docker-backend.md) — setup, arch, troubleshooting
+
+### Changed
+
+- Worker EXIT trap — .result file guarantee (tmux + docker + subprocess backends)
+- Config revert protection — updateLastSprintId() null guard
+- MCP autoApprove — default(true) with --dangerously-skip-permissions flag
+
+### Fixed
+
+- Docker integration tests (7 tests covering container lifecycle, auth, result persistence)
 
 
 ### Changed

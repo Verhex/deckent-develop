@@ -254,6 +254,96 @@ describe('Docker Backend Integration', () => {
     }
   });
 
+  // ─── Test 8: monitorContainer updates heartbeat with backend: docker ─────
+  // After container exits naturally, monitorContainer() must write hb with backend field.
+
+  it.skipIf(!dockerAvailable)('monitorContainer updates heartbeat with backend: docker after container exit', async () => {
+    // Arrange
+    const hbPath = path.join(TEST_TASKS_DIR, `task-${testTaskId}.hb`);
+
+    // Act — spawn (claude exits quickly without auth in test env)
+    backend.spawn(testTaskId, 'haiku', 'backend-field-test', {
+      projectDir: PROJECT_ROOT,
+    });
+
+    // Initial .hb written by spawn() — verify pre-condition
+    expect(fs.existsSync(hbPath)).toBe(true);
+    const initialHb = JSON.parse(fs.readFileSync(hbPath, 'utf-8')) as Record<string, unknown>;
+    // spawn() writes backend: 'docker' in the initial heartbeat
+    expect(initialHb.backend).toBe('docker');
+
+    // Poll until monitorContainer() rewrites the .hb with status DONE or FAILED
+    // monitorContainer fires after `docker wait` resolves (container exits naturally)
+    let finalHb: Record<string, unknown> | null = null;
+    for (let i = 0; i < 30; i++) {
+      await waitMs(500);
+      if (!fs.existsSync(hbPath)) continue;
+      try {
+        const hb = JSON.parse(fs.readFileSync(hbPath, 'utf-8')) as Record<string, unknown>;
+        // monitorContainer writes status DONE or FAILED with exitCode field
+        if (hb.status === 'DONE' || hb.status === 'FAILED') {
+          finalHb = hb;
+          break;
+        }
+      } catch { /* partial write — retry */ }
+    }
+
+    // Assert — monitorContainer must have written its updated heartbeat
+    expect(finalHb).not.toBeNull();
+    // The monitorContainer callback always sets backend: 'docker'
+    expect(finalHb!.backend).toBe('docker');
+    expect(finalHb!.taskId).toBe(testTaskId);
+    expect(['DONE', 'FAILED']).toContain(finalHb!.status);
+    expect(typeof finalHb!.exitCode).toBe('number');
+  }, 20_000);
+
+  // ─── Test 9: EXIT trap guarantees .result written from container ──────────
+  // The container runs a shell EXIT trap that writes a fallback .result file
+  // when Claude exits without writing one. This verifies host-visible result delivery
+  // via the shared .tasks/ volume mount between host and container.
+
+  it.skipIf(!dockerAvailable)('EXIT trap writes .result to shared .tasks/ volume accessible from host', async () => {
+    // Use a unique task ID separate from testTaskId to avoid afterEach cleanup collision
+    const trapTaskId = `${testTaskId}-trap`;
+    const resultPath = path.join(TEST_TASKS_DIR, `task-${trapTaskId}.result`);
+
+    // Cleanup any leftover from previous run
+    try { if (fs.existsSync(resultPath)) fs.unlinkSync(resultPath); } catch { /* ok */ }
+    expect(fs.existsSync(resultPath)).toBe(false); // pre-condition
+
+    try {
+      // Act — spawn without real Claude auth; EXIT trap will fire and write fallback .result
+      backend.spawn(trapTaskId, 'haiku', 'exit-trap-test', {
+        projectDir: PROJECT_ROOT,
+      });
+
+      // Poll up to 25s for .result to appear on host via shared volume mount
+      // (container start + claude exit + EXIT trap + volume flush can take ~5-10s)
+      let resultWritten = false;
+      for (let i = 0; i < 50; i++) {
+        await waitMs(500);
+        if (fs.existsSync(resultPath)) {
+          resultWritten = true;
+          break;
+        }
+      }
+
+      // Assert — .result must be accessible from host (shared .tasks/ volume working)
+      expect(resultWritten).toBe(true);
+
+      const result = JSON.parse(fs.readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+      // EXIT trap fallback must contain valid taskId
+      expect(result.taskId).toBe(trapTaskId);
+      // selfAssessment must be a valid value
+      expect(['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO']).toContain(result.selfAssessment);
+    } finally {
+      // Cleanup: kill any lingering container and remove files
+      backend.kill(trapTaskId);
+      forceRemoveContainer(`deckent-w-${trapTaskId}`);
+      cleanupTaskFiles(trapTaskId);
+    }
+  }, 30_000);
+
   // Final cleanup — monitorContainer writes .hb/.timeout asynchronously AFTER afterEach runs
   afterAll(async () => {
     await new Promise(resolve => setTimeout(resolve, 2000));
