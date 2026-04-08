@@ -43,3 +43,6 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 ## Sprint sprint-107 Learnings
 - CLI Smoke Dosyalari: GO_WITH_TECH_DEBT — docs/cli-smoke/ dizini oluşturuldu. 3 markdown dosyası (a.md, b.md, c.md) DIRECTIVES formatına uygun olarak oluşturuldu.
 - Vitest Kontrolu: GO_WITH_TECH_DEBT — Created tests/smoke/cli-smoke.test.ts with 3 existsSync-based smoke tests. All 3 pass: docs/cli-smoke/a.md, b.md, c.md v
+## Sprint sprint-108 Learnings
+- Tmux Smoke Dosyalari: GO_WITH_TECH_DEBT — docs/tmux-smoke/ dizini oluşturuldu. 3 markdown dosyası (x.md, y.md, z.md) DIRECTIVES formatına uygun olarak oluşturuldu
+- Tmux Smoke Test Dosyasi: GO_WITH_TECH_DEBT — Created tests/smoke/tmux-smoke.test.ts with 3 existsSync-based smoke tests. All 3 pass: docs/tmux-smoke/x.md, y.md, z.md

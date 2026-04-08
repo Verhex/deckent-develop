@@ -1,46 +1,46 @@
-# DIRECTIVES — Sprint 107: CLI Smoke Test
+# DIRECTIVES — Sprint 108: Tmux Backend Smoke Test
 
-## Goal: CLI subprocess backend smoke test — basit dosya olusturma + test calistirma.
+## Goal: Tmux backend dogrulama — dosya olusturma + test yazma. MCP ile baslatilacak.
 
 ---
 
-## Task 1: CLI Smoke Dosyalari
+## Task 1: Tmux Smoke Dosyalari
 - Model: sonnet
 - Effort: low
 - Skills: typescript-expert
-- Files: docs/cli-smoke/a.md, docs/cli-smoke/b.md, docs/cli-smoke/c.md
-- Scope: docs/cli-smoke/
+- Files: docs/tmux-smoke/x.md, docs/tmux-smoke/y.md, docs/tmux-smoke/z.md
+- Scope: docs/tmux-smoke/
 
 ### Description
-docs/cli-smoke/ dizini altinda 3 markdown dosyasi olustur:
+docs/tmux-smoke/ dizini altinda 3 markdown dosyasi olustur:
 
-a.md: "# CLI Smoke A\nSprint 107 — CLI subprocess backend test."
-b.md: "# CLI Smoke B\nSprint 107 — CLI subprocess backend test."
-c.md: "# CLI Smoke C\nSprint 107 — CLI subprocess backend test."
+x.md: "# Tmux Smoke X\nSprint 108 — tmux backend test."
+y.md: "# Tmux Smoke Y\nSprint 108 — tmux backend test."
+z.md: "# Tmux Smoke Z\nSprint 108 — tmux backend test."
 
-**Kanit:** `ls docs/cli-smoke/` → a.md b.md c.md
+**Kanit:** `ls docs/tmux-smoke/` → x.md y.md z.md
 
 **Test:** Dosyalar var
 
 ---
 
-## Task 2: Vitest Kontrolu
+## Task 2: Tmux Smoke Test Dosyasi
 - Model: sonnet
 - Effort: low
 - Skills: testing-expert
-- Files: tests/smoke/cli-smoke.test.ts
+- Files: tests/smoke/tmux-smoke.test.ts
 - Scope: tests/smoke/
 
 ### Description
-tests/smoke/cli-smoke.test.ts dosyasi olustur. 3 basit test yaz:
+tests/smoke/tmux-smoke.test.ts dosyasi olustur. 3 basit test yaz:
 
-1. docs/cli-smoke/a.md var mi kontrol et
-2. docs/cli-smoke/b.md var mi kontrol et
-3. docs/cli-smoke/c.md var mi kontrol et
+1. docs/tmux-smoke/x.md var mi kontrol et
+2. docs/tmux-smoke/y.md var mi kontrol et
+3. docs/tmux-smoke/z.md var mi kontrol et
 
 Her test `existsSync` ile dosyanin varligini dogrular.
 
-**Kanit:** `npx vitest run tests/smoke/cli-smoke.test.ts` → 3 pass
+**Kanit:** `npx vitest run tests/smoke/tmux-smoke.test.ts` → 3 pass
 
 **Test:** 3 test geciyor
 
@@ -48,5 +48,4 @@ Her test `existsSync` ile dosyanin varligini dogrular.
 
 ## Quality Rules
 - tsc --noEmit MUST pass
-- npx vitest run → 0 fail
-- docs/cli-smoke/ altinda 3 dosya olmali
+- docs/tmux-smoke/ altinda 3 dosya olmali

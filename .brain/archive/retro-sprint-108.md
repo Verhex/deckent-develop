@@ -1,7 +1,7 @@
-# Sprint sprint-108 Retrospective
+# Sprint sprint-107 Retrospective
 
 ## Summary
-Completed 2/2 tasks in 2 minutes 55s.
+Completed 2/2 tasks in 3 minutes 34s.
 
 ## Highlights
 - 2 tasks completed on first try
@@ -12,8 +12,8 @@ Completed 2/2 tasks in 2 minutes 55s.
 |------|-------|
 | Tasks completed | 2/2 |
 | New test files | 1 |
-| Code changes | +22 / -0 |
-| Sprint time | 2 minutes 55s |
+| Code changes | +21 / -0 |
+| Sprint time | 3 minutes 34s |
 | NO_GO rate | 0% (0/2) |
 
 
@@ -30,6 +30,6 @@ Completed 2/2 tasks in 2 minutes 55s.
 | testing-expert | 1 | 1 | 1 | 0 | 0% |
 
 ## Learnings
-- Tmux Smoke Dosyalari: completed with tech debt — docs/tmux-smoke/ dizini oluşturuldu. 3 markdown dosyası (x.md, y.md, z.md) DIRECTIVES formatına uygun olarak oluşturuldu. ls kanıtı: x.md y.md z.md — 
-- Tmux Smoke Test Dosyasi: completed with tech debt — Created tests/smoke/tmux-smoke.test.ts with 3 existsSync-based smoke tests. All 3 pass: docs/tmux-smoke/x.md, y.md, z.md verified present. Pattern mir
-- Recurring pattern (2809x): stale_heartbeat
+- CLI Smoke Dosyalari: completed with tech debt — docs/cli-smoke/ dizini oluşturuldu. 3 markdown dosyası (a.md, b.md, c.md) DIRECTIVES formatına uygun olarak oluşturuldu. ls docs/cli-smoke/ → a.md b.m
+- Vitest Kontrolu: completed with tech debt — Created tests/smoke/cli-smoke.test.ts with 3 existsSync-based smoke tests. All 3 pass: docs/cli-smoke/a.md, b.md, c.md verified present. tsc --noEmit 
+- Recurring pattern (2808x): stale_heartbeat

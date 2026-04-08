@@ -95,35 +95,34 @@ Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna
 ---
 
 ## Sayılarla Deckent
-
 | Metrik | Değer |
 |--------|-------|
-| Test sayısı | 12,193+ |
-| Coverage | 96%+ |
-| Tamamlanan sprint | 103+ |
-| CLI komut | 35+ |
-| MCP tool | 20 |
-| MCP resource | 8 |
-| Built-in agent | 16 |
-| Built-in skill | 21 |
-| Provider | 3 (Claude, Codex, Gemini) |
-| Platform | macOS, Linux, WSL2, Windows |
+| Version | 0.4.0-beta.1 |
+| Sprint | sprint-107 |
+| MCP Tools | 20 |
+| MCP Resources | 8 |
+| CLI Commands | 35+ |
+| Dashboard Pages | 6 |
+| Agents | 16 built-in |
+| Skills | 21 built-in |
+| Providers | 3 (Claude, Codex, Gemini) |
 
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
-| sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
 | sprint-106 | tamamlandı |
+| sprint-107 | tamamlandı |
+| sprint-108 | tamamlandı |
 
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-106 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
+| Sprint | sprint-108 |
+| Toplam Task | 2 |
+| Tamamlanan | 2 |
 | Tech Debt | 2 |
 | No-Go | 0 |
-| Süre | 6dk 53sn |
-| Coverage | 33.3% |
+| Süre | 2dk 55sn |
+| Coverage | 0.0% |

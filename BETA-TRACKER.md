@@ -6,27 +6,17 @@
 ---
 
 ## Current Status
-<!-- auto:start — updated by docs.json -->
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Version | 0.3.0-beta.3 |
-| Total Sprints | 103+ |
-| Tests | 12,193+ (413 dashboard) |
-| Coverage | 90% (line), 89% (branch), 95% (function) |
-| Source Files | 800+ |
-| Orchestra Modules | 65 |
-| Core Modules | 58 |
+| Version | 0.4.0-beta.1 |
+| Sprint | sprint-107 |
+| MCP Tools | 20 |
+| MCP Resources | 8 |
 | CLI Commands | 35+ |
-| MCP Tools | 20 tools + 8 resources |
-| HTTP Endpoints | 16 + SSE |
 | Dashboard Pages | 6 |
-| Built-in Agents | 16 (+2 temp) |
-| Built-in Skills | 21 |
+| Agents | 16 built-in |
+| Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
-| Models | 13 (ModelRegistry, tier-based routing) |
-<!-- auto:end -->
-
----
 
 ## Overview
 
@@ -617,21 +607,22 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-106 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
+| Sprint | sprint-108 |
+| Toplam Task | 2 |
+| Tamamlanan | 2 |
 | Tech Debt | 2 |
 | No-Go | 0 |
-| Süre | 6dk 53sn |
-| Coverage | 33.3% |
+| Süre | 2dk 55sn |
+| Coverage | 0.0% |
 
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
-| sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
 | sprint-106 | tamamlandı |
+| sprint-107 | tamamlandı |
+| sprint-108 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 

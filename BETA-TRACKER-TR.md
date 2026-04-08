@@ -6,27 +6,17 @@
 ---
 
 ## Mevcut Durum
-<!-- auto:start — docs.json tarafından güncellenecek -->
-| Metrik | Deger |
+| Metrik | Değer |
 |--------|-------|
-| Versiyon | 0.3.0-beta.3 |
-| Toplam Sprint | 103+ |
-| Test Sayisi | 12,193+ (413 dashboard) |
-| Coverage | 90% (line), 89% (branch), 95% (function) |
-| Kaynak Dosya | 800+ |
-| Orchestra Modulleri | 65 |
-| Core Modulleri | 58 |
-| CLI Komutlari | 35+ |
-| MCP Araclari | 20 tool + 8 resource |
-| HTTP Endpoint | 16 + SSE |
-| Dashboard Sayfalari | 6 |
-| Agent (built-in) | 16 (+2 temp) |
-| Skill (built-in) | 21 |
-| Provider | 3 (Claude, Codex, Gemini) |
-| Model | 13 (ModelRegistry, tier-based routing) |
-<!-- auto:end -->
-
----
+| Version | 0.4.0-beta.1 |
+| Sprint | sprint-107 |
+| MCP Tools | 20 |
+| MCP Resources | 8 |
+| CLI Commands | 35+ |
+| Dashboard Pages | 6 |
+| Agents | 16 built-in |
+| Skills | 21 built-in |
+| Providers | 3 (Claude, Codex, Gemini) |
 
 ## Genel Bakış
 
@@ -770,10 +760,11 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
-| sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
 | sprint-106 | tamamlandı |
+| sprint-107 | tamamlandı |
+| sprint-108 | tamamlandı |
 
 ## Bug Tracker
 
@@ -1182,10 +1173,10 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-106 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
+| Sprint | sprint-108 |
+| Toplam Task | 2 |
+| Tamamlanan | 2 |
 | Tech Debt | 2 |
 | No-Go | 0 |
-| Süre | 6dk 53sn |
-| Coverage | 33.3% |
+| Süre | 2dk 55sn |
+| Coverage | 0.0% |

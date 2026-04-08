@@ -2989,3 +2989,49 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 106-003: Pattern Reader Test Fix (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 107 — sprint-107
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 214s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 214306ms |
+
+### Tasks
+
+- 107-001: CLI Smoke Dosyalari (GO_WITH_TECH_DEBT)
+- 107-002: Vitest Kontrolu (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 108 — sprint-108
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 175s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 175451ms |
+
+### Tasks
+
+- 108-001: Tmux Smoke Dosyalari (GO_WITH_TECH_DEBT)
+- 108-002: Tmux Smoke Test Dosyasi (GO_WITH_TECH_DEBT)
+
+---
