@@ -31,10 +31,10 @@
   "enabled": true,
   "source": "learned",
   "stats": {
-    "totalUses": 5,
-    "successRate": 0.8,
+    "totalUses": 0,
+    "successRate": 0,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-106"
+    "lastUsedInSprint": ""
   },
   "id": "temp-react-specialist",
   "name": "React Specialist",

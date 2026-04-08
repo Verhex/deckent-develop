@@ -1,6 +1,6 @@
 {
-  "taskId": "106-003",
-  "sprintId": "sprint-106",
+  "taskId": "107-002",
+  "sprintId": "sprint-107",
   "steps": [
     {
       "step": 1,
@@ -56,8 +56,8 @@
       "input": {},
       "output": {},
       "durationMs": 0,
-      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+      "reasoning": "Skills forced by override: [testing-expert]"
     }
   ],
-  "decidedAt": "2026-04-08T09:52:13.867Z"
+  "decidedAt": "2026-04-08T10:04:51.396Z"
 }
