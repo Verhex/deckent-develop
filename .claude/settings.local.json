@@ -143,7 +143,13 @@
       "Bash(DECKENT_DEBUG=1 npx deckent plan --mode ai)",
       "Bash(DECKENT_DEBUG=1 npx deckent plan --planning-mode ai)",
       "Bash(DECKENT_DEBUG=1 npx deckent:*)",
-      "mcp__deckent__deckent_docs"
+      "mcp__deckent__deckent_docs",
+      "Bash(sh -n /tmp/docker-fix-test.sh)",
+      "Bash(sh -n /tmp/fix-verify.sh)",
+      "Bash(sh -n /tmp/old-broken.sh)",
+      "Bash(chmod +x /home/alperen/deckent-dev/.tasks/.worker-direct-test.sh)",
+      "Bash(sh -n /home/alperen/deckent-dev/.tasks/.worker-direct-test.sh)",
+      "Bash(docker rm:*)"
     ]
   },
   "outputStyle": "Explanatory"

@@ -2,8 +2,8 @@
   "mode": "performance",
   "language": "tr",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-113",
-  "spawn_backend": "tmux",
+  "last_sprint_id": "sprint-119",
+  "spawn_backend": "docker",
   "modes": {
     "performance": {
       "brain_model": "opus",

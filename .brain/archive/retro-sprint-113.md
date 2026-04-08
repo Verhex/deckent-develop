@@ -1,33 +1,33 @@
-# Sprint sprint-119 Retrospective
+# Sprint sprint-111 Retrospective
 
 ## Summary
-Completed 0/1 tasks in 4 minutes 19s.
+Completed 0/1 tasks in 2 minutes 4s.
 
 ## Highlights
 - No boundary violations detected
 
 ## Issues
-- Task 119-001 (Docker Verification Files) failed — Docker worker exited without writing result file
+- Task 111-001 (Docker Smoke Dosyalari) failed — Worker timeout — process exceeded time limit and was killed
 
 ## Metrics
 | What | Value |
 |------|-------|
 | Tasks completed | 0/1 |
-| Sprint time | 4 minutes 19s |
+| Sprint time | 2 minutes 4s |
 | NO_GO rate | 100% (1/1) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| bug-fixer | 1 | 0 | 0 | 1 | 0% |
+| test-writer | 1 | 0 | 0 | 1 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| documentation-writer | 1 | 0 | 0 | 1 | 0% |
+| typescript-expert | 1 | 0 | 0 | 1 | 0% |
 
 ## Learnings
-- Docker Verification Files: failed — Docker worker exited without writing result file
+- Docker Smoke Dosyalari: failed — Worker timeout — process exceeded time limit and was killed
 - Recurring pattern (2809x): stale_heartbeat

@@ -1,26 +1,26 @@
-# Sprint sprint-119 Retrospective
+# Sprint sprint-117 Retrospective
 
 ## Summary
-Completed 0/1 tasks in 4 minutes 19s.
+Completed 0/1 tasks in 1 minute 51s.
 
 ## Highlights
 - No boundary violations detected
 
 ## Issues
-- Task 119-001 (Docker Verification Files) failed — Docker worker exited without writing result file
+- Task 117-001 (Docker Smoke Dosyalari) failed — Docker worker exited without writing result file
 
 ## Metrics
 | What | Value |
 |------|-------|
 | Tasks completed | 0/1 |
-| Sprint time | 4 minutes 19s |
+| Sprint time | 1 minute 51s |
 | NO_GO rate | 100% (1/1) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| bug-fixer | 1 | 0 | 0 | 1 | 0% |
+| test-writer | 1 | 0 | 0 | 1 | 0% |
 
 
 ## Skill Performance
@@ -29,5 +29,5 @@ Completed 0/1 tasks in 4 minutes 19s.
 | documentation-writer | 1 | 0 | 0 | 1 | 0% |
 
 ## Learnings
-- Docker Verification Files: failed — Docker worker exited without writing result file
+- Docker Smoke Dosyalari: failed — Docker worker exited without writing result file
 - Recurring pattern (2809x): stale_heartbeat
