@@ -86,9 +86,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Build Claude CLI command inside container
     const claudeArgs: string[] = ['-p', '-', '--model', model];
     if (opts?.allowedTools) {
-      // No shell quoting here — the value is passed inside sh -c which handles it
-      // Single quotes around the value would conflict with the outer sh -c '...' wrapper
-      claudeArgs.push('--allowedTools', opts.allowedTools);
+      // Double-quote the value — allowedTools contains parentheses like Write(.tasks/)
+      // which sh (dash) interprets as subshell syntax without quoting
+      claudeArgs.push('--allowedTools', `"${opts.allowedTools}"`);
     }
     // IMMUTABLE — Deckent standard: workers MUST have full write permissions
     claudeArgs.push('--dangerously-skip-permissions');

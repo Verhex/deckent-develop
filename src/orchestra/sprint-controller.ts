@@ -1152,11 +1152,11 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
     }
   }
 
-  // Clean up leftover .tasks/.prompt-* hidden tmpfiles from buildClaudeCommand
+  // Clean up leftover .tasks/.prompt-* and .worker-*.sh hidden tmpfiles from Docker/tmux backends
   if (existsSync(tasksDir)) {
     for (const file of readdirSync(tasksDir)) {
-      if (file.startsWith('.prompt-')) {
-        try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkPromptFile', e); }
+      if (file.startsWith('.prompt-') || (file.startsWith('.worker-') && file.endsWith('.sh'))) {
+        try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTmpFile', e); }
       }
     }
   }

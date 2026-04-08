@@ -28,6 +28,9 @@ export function debugLog(context: string, error: unknown): void {
  */
 function appendToErrorsFile(context: string, message: string): void {
   try {
+    // Skip writing to real .brain/ERRORS.md during vitest test runs.
+    // Tests generate hundreds of expected errors that overwhelm real sprint events.
+    if (process.env['VITEST'] || process.env['NODE_ENV'] === 'test') return;
     const brainDir = BRAIN_DIR;
     if (!existsSync(brainDir)) return; // No .brain/ dir — not initialized
     const errorsPath = join(brainDir, ERRORS_FILE);

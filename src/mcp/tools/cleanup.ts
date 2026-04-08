@@ -12,7 +12,9 @@ const TASK_EXTENSIONS = /\.(json|plan|hb|result|paused|log)$/;
 function listCleanableFiles(root: string): string[] {
   const tasksDir = join(root, TASKS_DIR);
   if (!existsSync(tasksDir)) return [];
-  return readdirSync(tasksDir).filter((f) => TASK_EXTENSIONS.test(f));
+  return readdirSync(tasksDir).filter((f) =>
+    TASK_EXTENSIONS.test(f) || f.startsWith('.prompt-') || (f.startsWith('.worker-') && f.endsWith('.sh')),
+  );
 }
 
 function cleanLocks(root: string): string[] {
@@ -28,7 +30,9 @@ function cleanLocks(root: string): string[] {
 function cleanTasks(root: string): string[] {
   const tasksDir = join(root, TASKS_DIR);
   if (!existsSync(tasksDir)) return [];
-  const files = readdirSync(tasksDir).filter((f) => TASK_EXTENSIONS.test(f));
+  const files = readdirSync(tasksDir).filter((f) =>
+    TASK_EXTENSIONS.test(f) || f.startsWith('.prompt-') || (f.startsWith('.worker-') && f.endsWith('.sh')),
+  );
   for (const f of files) {
     try { unlinkSync(join(tasksDir, f)); } catch { /* ignore */ }
   }

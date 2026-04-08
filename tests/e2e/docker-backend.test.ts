@@ -79,7 +79,7 @@ describe('Docker Backend Integration', () => {
     try {
       const files = fs.readdirSync(TEST_TASKS_DIR);
       for (const f of files) {
-        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-')) {
+        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
           try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
         }
       }
@@ -382,7 +382,7 @@ describe('Docker Backend Integration', () => {
     try {
       const files = fs.readdirSync(TEST_TASKS_DIR);
       for (const f of files) {
-        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-')) {
+        if (f.startsWith('task-test-docker-') || f.startsWith('.prompt-') || f.startsWith('.worker-test-docker-')) {
           try { fs.unlinkSync(path.join(TEST_TASKS_DIR, f)); } catch { /* ok */ }
         }
       }
