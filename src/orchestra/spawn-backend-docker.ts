@@ -95,13 +95,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       '--user', `${uid}:${gid}`,
       // HOME must point to a directory that EXISTS in the container
       '-e', `HOME=${containerHome}`,
-      // Memory limits — prevent OOM and runaway containers
-      '--memory', '2g',
-      '--memory-swap', '3g',
+      // Memory limits — Claude CLI needs ~1-2GB base, leave headroom
+      '--memory', '4g',
+      '--memory-swap', '6g',
       // Writable HOME via tmpfs — Claude CLI needs to write config/cache here
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
-      // Project mounted read-only (workers can't corrupt main branch)
-      '-v', `${dir}:${CONTAINER_WORKSPACE}:ro`,
+      // Project mounted read-write — workers need to create/edit files in scope
+      '-v', `${dir}:${CONTAINER_WORKSPACE}`,
       // .tasks/ mounted read-write (results, heartbeats, prompts)
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
