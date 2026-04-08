@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-04-08 | **Sprint:** 103 | **Test:** 12,193+ | **Versiyon:** 0.3.0-beta.3
+**Son güncelleme:** 2026-04-08 | **Sprint:** 109+ | **Test:** 12,193+ | **Versiyon:** 0.4.0-beta.1
 
 ---
 
@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-107 |
+| Sprint | sprint-113 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -20,11 +20,11 @@
 
 ## Genel Bakış
 
-75+ sprint, 12,200+ test, 250+ TypeScript modülü. Windows dogfooding tamamlandı — init→plan→start→status→cleanup zinciri çalışıyor. İlk gerçek sprint Vizetron'da başarıyla tamamlandı. Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dil tutarlılığı (TR/EN) tamamlandı, VISION.md ve link audit bitti.
+109+ sprint, 12,193+ test, 250+ TypeScript modülü. Üç spawn backend test edildi: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (entegrasyon devam ediyor). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
-**Mevcut Durum:** Mono Closed Beta v0.2.0-beta.4 — Vizetron (Python/FastAPI) projesinde 2 sprint tamamlandı, 26 bug bulundu, 22'si düzeltildi. Dokümantasyon ve kod kalitesi iyileştirmeleri Sprint 075 tamamlandı.
+**Mevcut Durum:** v0.4.0-beta.1 — Sprint 105-109 backend smoke testleri tamamlandı (subprocess MCP+CLI, tmux MCP+CLI). Docker backend HOME+memory fix'leri uygulandı, sprint-controller entegrasyonu bekliyor. ERRORS.md aktif loglama, i18n content generator'lar, EN-first doküman konvansiyonu kuruldu.
 
 ---
 
@@ -760,11 +760,15 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
+| sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
 | sprint-106 | tamamlandı |
 | sprint-107 | tamamlandı |
 | sprint-108 | tamamlandı |
+| sprint-110 | tamamlandı |
+| sprint-111 | tamamlandı |
+| sprint-113 | tamamlandı |
 
 ## Bug Tracker
 
@@ -1173,10 +1177,10 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-108 |
-| Toplam Task | 2 |
-| Tamamlanan | 2 |
-| Tech Debt | 2 |
+| Sprint | sprint-113 |
+| Toplam Task | 1 |
+| Tamamlanan | 1 |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Süre | 2dk 55sn |
+| Süre | 2dk 25sn |
 | Coverage | 0.0% |

@@ -9,7 +9,7 @@ Platform: macOS, Linux, WSL2
 Tests: 12,193+
 Dashboard Tests: 413
 Coverage: 96%+
-Sprints: 103+
+Sprints: 109+
 CLI Commands: 35+
 MCP: 20 tools, 8 resources
 Agents: 16 built-in
@@ -21,7 +21,7 @@ Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-107 |
+| Sprint | sprint-113 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |

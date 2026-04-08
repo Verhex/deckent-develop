@@ -1,7 +1,7 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-04-08 | **Sprint:** 103 | **Tests:** 12,193+ | **Version:** 0.3.0-beta.3
+**Last updated:** 2026-04-08 | **Sprint:** 109+ | **Tests:** 12,193+ | **Version:** 0.4.0-beta.1
 
 ---
 
@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-107 |
+| Sprint | sprint-113 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -20,11 +20,11 @@
 
 ## Overview
 
-75+ sprints, 12,200+ tests, 250+ TypeScript modules. Windows dogfooding complete — the init→plan→start→status→cleanup chain works end-to-end. First real sprint on Vizetron completed successfully. Self-dogfooding active — Deckent uses its own sprints to fix test regressions and documentation. Language consistency (TR/EN) complete, VISION.md and link audit done.
+109+ sprints, 12,193+ tests, 250+ TypeScript modules. Three spawn backends tested: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (integration in progress). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents.
 
 **Strategy:** npm package → dogfood on own projects → feedback → fix → public repo (VerhexIO/deckent)
 
-**Current State:** Mono Closed Beta v0.2.0-beta.4 — 2 sprints completed on Vizetron (Python/FastAPI), 26 bugs found, 22 fixed. Documentation and code quality improvements completed in Sprint 075.
+**Current State:** v0.4.0-beta.1 — Sprint 105-109 backend smoke tests completed (subprocess MCP+CLI, tmux MCP+CLI). Docker backend HOME+memory fixes applied, sprint-controller integration pending. ERRORS.md active logging, i18n content generators, EN-first doc convention established.
 
 ---
 
@@ -607,22 +607,26 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-108 |
-| Toplam Task | 2 |
-| Tamamlanan | 2 |
-| Tech Debt | 2 |
+| Sprint | sprint-113 |
+| Toplam Task | 1 |
+| Tamamlanan | 1 |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Süre | 2dk 55sn |
+| Süre | 2dk 25sn |
 | Coverage | 0.0% |
 
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
+| sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
 | sprint-106 | tamamlandı |
 | sprint-107 | tamamlandı |
 | sprint-108 | tamamlandı |
+| sprint-110 | tamamlandı |
+| sprint-111 | tamamlandı |
+| sprint-113 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 
