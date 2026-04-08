@@ -4,6 +4,23 @@
 
 ---
 
+## Live Metrics
+<!-- Auto-updated by docs.json — numbers in prose below may lag behind this section -->
+| Metric | Value |
+|--------|-------|
+| Version | 0.3.0-beta.3 |
+| Completed Sprints | 103+ |
+| Tests | 12,193+ |
+| MCP Tools | 20 |
+| MCP Resources | 8 |
+| Dashboard Pages | 6 |
+| CLI Commands | 35 |
+| Built-in Agents | 16 |
+| Built-in Skills | 21 |
+| Models | 13 (3 providers) |
+
+---
+
 # TABLE OF CONTENTS
 
 1. Product Identity & Vision
@@ -90,7 +107,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  17 Tools + 9 Resources                             │
+│  20 Tools + 8 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -124,7 +141,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 ┌──────────▼──────────────────────────────────────────┐
 │          HTTP API + WEB DASHBOARD                    │
 │  src/api/server.ts — 16 endpoints + SSE             │
-│  src/dashboard/ — React+Vite+Tailwind (4 pages)     │
+│  src/dashboard/ — React+Vite+Tailwind (6 pages)     │
 │  `deckent web` → localhost:3100                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -335,10 +352,10 @@ my-project/
 │   ├── api/                          # HTTP API + SSE
 │   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
-│   ├── cli/                          # CLI commands (commander.js, 32+ files)
+│   ├── cli/                          # CLI commands (commander.js, 35 files)
 │   ├── mcp/                          # MCP server integration
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
-│   │   ├── tools/                   # 17 tool handlers
+│   │   ├── tools/                   # 20 tool handlers
 │   │   │   ├── init.ts             # deckent_init
 │   │   │   ├── directives.ts       # deckent_set_directives
 │   │   │   ├── plan.ts             # deckent_plan
@@ -356,7 +373,7 @@ my-project/
 │   │   │   ├── kill.ts             # deckent_kill
 │   │   │   ├── cleanup.ts          # deckent_cleanup
 │   │   │   └── help.ts             # deckent_help
-│   │   └── resources/               # 9 resource handlers
+│   │   └── resources/               # 8 resource handlers
 │   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
 │       └── src/
 │           ├── pages/               # 6 pages: Dashboard, Settings, History, Memory, Config, Status
@@ -894,7 +911,7 @@ $ deckent status
 
 ## Phase 2: Web Dashboard — DONE (Sprint 11)
 
-React + Vite + Tailwind, 4 pages, shadcn/ui components, SSE for real-time updates.
+React + Vite + Tailwind, 6 pages, shadcn/ui components, SSE for real-time updates.
 
 - **Dashboard page:** Live agent status, progress bars, alerts with badge colors, elapsed time, auditor status indicator
 - **Settings page:** Config viewer
@@ -1198,8 +1215,8 @@ Every file in the project, its purpose, who writes it, who reads it:
 | src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
-| src/mcp/tools/*.ts | MCP tool handlers (17) | Developer | MCP server | Permanent |
-| src/mcp/resources/*.ts | MCP resource handlers (9) | Developer | MCP server | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (20) | Developer | MCP server | Permanent |
+| src/mcp/resources/*.ts | MCP resource handlers (8) | Developer | MCP server | Permanent |
 | .deckent/workspace/TOOLS.md | Environment tools/commands | deckent init | Workers | Permanent |
 | .deckent/workspace/BOOT.md | Agent boot sequence | deckent init | All agents | Permanent |
 | .deckent/plugins/ | Installed plugins directory | deckent init | Plugin system | Permanent |
@@ -1265,7 +1282,7 @@ Deckent ran itself for the first time:
 ## Sprint 11: Web Dashboard
 
 - React + Vite + Tailwind web dashboard (`src/dashboard/`)
-- 4 pages: Dashboard, Settings, History, Memory
+- 6 pages: Dashboard, Settings, History, Memory, Config, Status
 - shadcn/ui component library (14 UI components)
 - SSE real-time updates via file watcher
 - SprintChart with Recharts, DebtTable, NewSprintModal
@@ -1374,7 +1391,7 @@ Deckent ran itself for the first time:
 
 - `shouldRemoveResolvedDebt()` + `parseSprintNumber()`: resolved entries retained for 3 sprints (DEBT-002 preserved)
 - Auto Setup Wizard (`auto-setup.ts`): `generateSetupRecommendation()` — subscription + system profile + project size
-- MCP Enrichment (`enrich.ts`): `enrichResponse()` adds `_enriched: { summary, hints, timestamp }` to all 17 tools
+- MCP Enrichment (`enrich.ts`): `enrichResponse()` adds `_enriched: { summary, hints, timestamp }` to all 20 tools
 - CLI Hints (`hints.ts`, `messages.ts`): `getContextualHints()` phase-based suggestions, `getMessage()` localized (tr/en)
 - `doctor --profile`: system profile display (CPU, RAM, workers, subscription)
 - AI planner still returned 8/12 tasks — Sprint 23 post-validation fix needed
@@ -1572,7 +1589,7 @@ Both methods register in `.claude/settings.json`:
 | `deckent_sync` | none | ensureDeckentImport() | Sync CLAUDE.md + AGENTS.md with @DECKENT.md reference |
 | `deckent_analyze_project` | none | analyzeProject() | Analyze project stack, size, methodology |
 
-## Resources (9)
+## Resources (8)
 
 | URI | Content | MIME Type |
 |-----|---------|-----------|
@@ -1727,7 +1744,7 @@ $ deckent start "Build REST API for user management"
 | 8 | Documentation, API docs, MCP dogfooding | Done |
 | 9 | Analyzer tool, CI, dynamic version, archive-debt | Done |
 | 10 | HTTP API+SSE, terminal dashboard, sprint ID refactor | Done |
-| 11 | Web Dashboard (React+Vite+Tailwind, 4 pages) | Done |
+| 11 | Web Dashboard (React+Vite+Tailwind, 6 pages) | Done |
 | 12-13 | Brain AI planning, Auditor in-process, .deckent structure | Done |
 | 14 | Auditor live integration, .deckent finalization | Done |
 | 15 | Deckent bağımsızlık, self-hosting, DECKENT.md, sync | Done |
@@ -1935,7 +1952,7 @@ Full directive: `docs/directives/sprint-034.md`
 | 8 | 669 | 95% | CONTRIBUTING.md, API docs, MCP dogfooding |
 | 9 | 720 | 95% | analyze_project tool, CI pipeline, dynamic version, archive-debt |
 | 10 | 799 | 95% | HTTP API+SSE, terminal dashboard, sprint ID refactor |
-| 11 | 852 | 97% | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui |
+| 11 | 852 | 97% | Web Dashboard: React+Vite+Tailwind, 6 pages, shadcn/ui |
 | 12-13 | 938 | 97.5% | Brain AI planning (planner.ts, Zod), Auditor in-process, .deckent structure |
 | 14 | 938 | 97.5% | Auditor live integration, .deckent finalization |
 | 15 | 967 | 97.5% | DECKENT.md bağımsızlık, ensureDeckentImport, sync CLI+MCP, self-hosting, DEBT-002 closed |
@@ -2045,17 +2062,17 @@ Full directive: `docs/directives/sprint-034.md`
 
 **MCP-Native Providers milestone (Sprint 044-045):** Full provider ecosystem wired into sprint lifecycle. .deck secrets file for API key management. Kraken splash screen added. Environment detection (vscode/codex/gemini/cursor/shell/ci). Task router (TaskRouter) + Connector module integrated into bootstrapProviders flow. Codex CLI (`codex exec --full-auto`) and Gemini CLI (`gemini -p`) upgraded to real command execution. `deckent sync` and `deckent explain` CLI commands added. Rich sprint summary (7 sections) wired into finalizeSprint. 10 MCP tools + 5 resources.
 
-**10K tests milestone (Sprint 046):** Test count exceeded 10,000 for the first time. Multi-environment runtime with deckent start lifecycle improvements. vscode extension stub, stack detection expansion (10+ stacks), multi-IDE lock files, multi-env init wizard, language-agnostic verify flow. 32+ CLI commands. 8/10 tasks done.
+**10K tests milestone (Sprint 046):** Test count exceeded 10,000 for the first time. Multi-environment runtime with deckent start lifecycle improvements. vscode extension stub, stack detection expansion (10+ stacks), multi-IDE lock files, multi-env init wizard, language-agnostic verify flow. 35 CLI commands. 8/10 tasks done.
 
-**CLI deep analysis milestone (Sprint 055-059):** Comprehensive deep analysis of all 33+ CLI commands identified 158 improvement opportunities. Sprints 055-059 systematically addressed init, plan, start, status, doctor, retro, history, cleanup, spawn, kill, attach, watch, and config commands. 10,509 tests, 96.4% coverage. cli-deep-analysis.md became the tracking document for CLI completeness.
+**CLI deep analysis milestone (Sprint 055-059):** Comprehensive deep analysis of all 35 CLI commands identified 158 improvement opportunities. Sprints 055-059 systematically addressed init, plan, start, status, doctor, retro, history, cleanup, spawn, kill, attach, watch, and config commands. 10,509 tests, 96.4% coverage. cli-deep-analysis.md became the tracking document for CLI completeness.
 
 **CI Guardian milestone (Sprint 062):** CI-aware agent system introduced. ci-guardian agent with PROMPT.md + agent.json, ci-testing skill with manifest.json + SKILL.md. Three new plugin hooks: beforeSprint (pre-sprint CI validation), afterTask (task-level regression detection), afterSprint (sprint CI report). CI learning enables sprint-to-sprint improvement. GitHub Actions workflow enhanced with coverage job.
 
-**Routing v2 milestone (Sprint 063):** Intent-based 3-layer routing engine replaced simple keyword matching. Layer 1: intent classification from task title/description. Layer 2: agent selection via intent→agent mapping with learning feedback. Layer 3: skill selection via agent expertise + project stack. forceSkills and forceModel support added to DIRECTIVES task syntax. 33+ CLI commands confirmed complete.
+**Routing v2 milestone (Sprint 063):** Intent-based 3-layer routing engine replaced simple keyword matching. Layer 1: intent classification from task title/description. Layer 2: agent selection via intent→agent mapping with learning feedback. Layer 3: skill selection via agent expertise + project stack. forceSkills and forceModel support added to DIRECTIVES task syntax. 35 CLI commands confirmed complete.
 
 **CLI completion milestone (Sprint 065):** Final CLI improvements batch: AI planner timeout configurable (`ai_planner_timeout`), config autoMigrateOnLoad, cleanup single-pass fix, spawn scope enforcement + multi-provider, analyzer engine merge, history trend analysis, retro archiving. 7/7 tasks done, 0 NO_GO. Total: 11,862 tests, 469 test files, 247 source files, 75,105 lines.
 
-**MCP completion milestone (Sprint 066-068):** MCP expanded from 10 tools + 5 resources to **17 tools + 9 resources**. All agent/skill manifests migrated to v2 with activation rules. Tool descriptions enriched with annotations (readOnlyHint, destructiveHint, openWorldHint). `deckent_help` tool provides runtime capabilities and project state detection.
+**MCP completion milestone (Sprint 066-068):** MCP expanded from 10 tools + 5 resources to **20 tools + 8 resources**. All agent/skill manifests migrated to v2 with activation rules. Tool descriptions enriched with annotations (readOnlyHint, destructiveHint, openWorldHint). `deckent_help` tool provides runtime capabilities and project state detection.
 
 **Windows dogfooding milestone (Sprint 070-071):** Deckent ran successfully on native Windows for the first time. 22 bugs found and fixed across 2 sprints. Key fixes: shell:true for all spawn calls, periodic heartbeat via setInterval(15s), UTF-8 encoding env vars, doctor c.ok→c.passed fix, scope parser explicit label parsing. `deckent upgrade --local` enabled beta development workflow.
 

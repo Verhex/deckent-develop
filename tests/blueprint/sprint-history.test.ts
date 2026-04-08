@@ -12,17 +12,17 @@ describe('Blueprint section numbers (Sprint 048 update)', () => {
     content = readFileSync(BLUEPRINT_PATH, 'utf-8');
   });
 
-  it('MCP server section shows 17 tools', () => {
-    expect(content).toContain('17 Tools');
+  it('MCP server section shows 20 tools', () => {
+    expect(content).toContain('20 Tools');
   });
 
-  it('MCP server section shows 9 resources', () => {
+  it('MCP server section shows 8 resources', () => {
     // Both in the architecture diagram and in the Resources section
-    expect(content).toContain('17 Tools + 9 Resources');
+    expect(content).toContain('20 Tools + 8 Resources');
   });
 
-  it('Resources section header shows (9)', () => {
-    expect(content).toContain('## Resources (9)');
+  it('Resources section header shows (8)', () => {
+    expect(content).toContain('## Resources (8)');
   });
 
   it('Sprint history table contains sprint 046 with 10K+ tests', () => {
@@ -39,8 +39,8 @@ describe('Blueprint section numbers (Sprint 048 update)', () => {
     }
   });
 
-  it('CLI commands files count updated to 32+', () => {
-    expect(content).toContain('32+ files');
+  it('CLI commands files count updated to 35', () => {
+    expect(content).toContain('35 files');
   });
 
   it('10K tests milestone entry exists', () => {

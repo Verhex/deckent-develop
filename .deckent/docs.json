@@ -2,29 +2,46 @@
   "version": 1,
   "docs": [
     {
+      "id": "claude-md",
       "path": "CLAUDE.md",
-      "autoSections": [
-        "Sprint Metrics",
-        "Active Debt",
-        "Agent Performance"
-      ],
-      "protectedSections": [
-        "Architecture",
-        "Commands"
-      ],
-      "id": "claude-md"
+      "autoSections": ["Sprint Metrics", "Active Debt", "Agent Performance"],
+      "protectedSections": ["Architecture", "Commands"]
     },
     {
+      "id": "vision-en",
       "path": "VISION.md",
-      "autoSections": [
-        "Sprint History",
-        "Sprint Metrics"
-      ],
-      "protectedSections": [
-        "Vision",
-        "Roadmap"
-      ],
-      "id": "vision-md"
+      "autoSections": ["Deckent by the Numbers", "Sprint History", "Sprint Metrics"],
+      "protectedSections": ["Vision", "Mission", "Competitive Analysis", "Roadmap", "Values", "Technology Decisions", "Target Users"]
+    },
+    {
+      "id": "vision-tr",
+      "path": "VISION-TR.md",
+      "autoSections": ["Sayılarla Deckent", "Sprint History", "Sprint Metrics"],
+      "protectedSections": ["Vizyon", "Misyon", "Rakip Analizi", "Yol Haritası", "Değerler", "Teknoloji Kararları", "Hedef Kullanıcılar"]
+    },
+    {
+      "id": "beta-tracker-en",
+      "path": "BETA-TRACKER.md",
+      "autoSections": ["Current Status", "Sprint Metrics", "Sprint History"],
+      "protectedSections": ["Phase Plan", "Competitive Analysis", "Verified Blockers", "Bug Tracker", "Action Plan"]
+    },
+    {
+      "id": "beta-tracker-tr",
+      "path": "BETA-TRACKER-TR.md",
+      "autoSections": ["Mevcut Durum", "Sprint Metrics", "Sprint History"],
+      "protectedSections": ["Faz Planı", "Rakip Analizi", "Doğrulanmış Engeller", "Bug Tracker", "Aksiyon Planı"]
+    },
+    {
+      "id": "identity-md",
+      "path": ".deckent/workspace/IDENTITY.md",
+      "autoSections": ["Project Status"],
+      "protectedSections": []
+    },
+    {
+      "id": "blueprint-md",
+      "path": "DECKENT-MASTER-BLUEPRINT.md",
+      "autoSections": ["Live Metrics"],
+      "protectedSections": []
     }
   ]
 }

@@ -1,128 +1,110 @@
-<!-- Dil: TR | Teknik terimler EN -->
+<!-- Language: EN | Technical terms remain as-is -->
 
-# Deckent — Vizyon ve Strateji
-
----
-
-## Vizyon
-
-Deckent, yazılım geliştirmeyi tek bir AI asistanından çok-ajanlı bir ekibe dönüştüren açık kaynak orkestrasyon CLI'dır. İnsan sadece hedefi tanımlar — Deckent planlar, paralel worker'lar atar, kaliteyi izler ve sonuçları değerlendirir. Nihai hedef: bir DIRECTIVES.md yazmak, gerisini Deckent'e bırakmak.
+# Deckent — Vision and Strategy
 
 ---
 
-## Misyon
+## Vision
 
-Solo AI asistanı kullanımı doğası gereği sınırlıdır: tek context window, tek görev, tek bakış açısı. Deckent bu sınırı Brain-Worker-Auditor mimarisi ile aşar. Brain stratejiyi belirler, Worker'lar paralel çalışır, Auditor kaliteyi garanti eder. Her sprint sonunda öğrenimler hafızaya yazılır — sistem her iterasyonda daha iyi kararlar alır.
-
----
-
-## Hedef Kullanıcılar
-
-| Segment | Profil | Deckent Değeri |
-|---------|--------|----------------|
-| **Bireysel geliştirici** | Indie dev, freelancer, solo founder | Tek kişilik bir takıma multi-agent güç katmak — sprint'lerle paralel iş çıkarma |
-| **Küçük takım** | 2-10 kişilik startup veya ekip | AI worker'ları ekip üyesi gibi kullanmak — tekrarlayan görevleri otomatize etme |
-| **Enterprise** | Büyük ölçekli organizasyon (gelecek) | Kontrollü otonom geliştirme — audit trail, scope enforcement, memory/learning |
+Deckent is an open-source orchestration CLI that transforms software development from a single AI assistant into a multi-agent team. The human defines the goal — Deckent plans, assigns parallel workers, monitors quality, and evaluates results. The ultimate objective: write a DIRECTIVES.md and let Deckent handle the rest.
 
 ---
 
-## Rakip Analizi
+## Mission
 
-| Araç | Yaklaşım | Güçlü Yön | Zayıf Yön | Deckent Farkı |
-|------|----------|-----------|-----------|---------------|
-| **Devin** | Tam otonom AI geliştirici | End-to-end otonom çalışma | Kapalı kaynak, pahalı, kontrol eksik | Açık kaynak, orkestrasyon odaklı, kullanıcı kontrollü |
-| **OpenHands** | Açık kaynak AI geliştirici | Topluluk destekli, genişletilebilir | Tek agent, sprint lifecycle yok | Multi-agent, hafıza/öğrenim, kalite kapısı |
-| **Aider** | Git-entegre AI pair programming | Hafif, hızlı, git-native | Tek agent, orkestrasyon yok | Paralel worker, planlama, değerlendirme döngüsü |
-| **Cursor** | AI-destekli IDE | Zengin IDE deneyimi | IDE'ye bağlı, orkestrasyon yok | IDE-agnostik CLI, çoklu provider, sprint yaşam döngüsü |
-| **Claude Code (solo)** | Tek AI asistanı | Güçlü tek-görev performansı | Tek context, paralel yok | Claude Code'u worker olarak kullanır, orkestrasyon katmanı ekler |
-
-**Deckent'in temel farkı:** Orkestrasyon. Tek bir AI asistanını güçlendirmek yerine, birden fazla AI worker'ı bir sprint disiplini içinde koordine eder. Planlama, yürütme, değerlendirme ve öğrenim tek bir döngüde birleşir.
+Using a solo AI assistant is inherently limited: one context window, one task, one perspective. Deckent breaks through this ceiling with its Brain-Worker-Auditor architecture. Brain sets the strategy, Workers execute in parallel, and Auditor guarantees quality. After every sprint, learnings are persisted to memory — the system makes better decisions with each iteration.
 
 ---
 
-## Teknoloji Kararları
+## Target Users
+
+| Segment | Profile | Deckent Value |
+|---------|---------|---------------|
+| **Individual developer** | Indie dev, freelancer, solo founder | Multi-agent power for a one-person team — parallel output through sprints |
+| **Small team** | 2-10 person startup or squad | Use AI workers as team members — automate repetitive tasks |
+| **Enterprise** | Large-scale organization (future) | Controlled autonomous development — audit trail, scope enforcement, memory/learning |
+
+---
+
+## Competitive Analysis
+
+| Tool | Approach | Strength | Weakness | Deckent Differentiator |
+|------|----------|----------|----------|------------------------|
+| **Devin** | Fully autonomous AI developer | End-to-end autonomous execution | Closed source, expensive, limited control | Open source, orchestration-focused, user-controlled |
+| **OpenHands** | Open-source AI developer | Community-driven, extensible | Single agent, no sprint lifecycle | Multi-agent, memory/learning, quality gates |
+| **Aider** | Git-integrated AI pair programming | Lightweight, fast, git-native | Single agent, no orchestration | Parallel workers, planning, evaluation loop |
+| **Cursor** | AI-powered IDE | Rich IDE experience | IDE-locked, no orchestration | IDE-agnostic CLI, multi-provider, sprint lifecycle |
+| **Claude Code (solo)** | Single AI assistant | Strong single-task performance | Single context, no parallelism | Uses Claude Code as a worker, adds an orchestration layer |
+
+**Deckent's core differentiator:** Orchestration. Rather than supercharging a single AI assistant, it coordinates multiple AI workers within a sprint discipline. Planning, execution, evaluation, and learning converge in a single loop.
+
+---
+
+## Technology Decisions
 
 ### TypeScript + ESM
 
-TypeScript, tip güvenliği ile büyük kod tabanlarında güvenilir refactoring sağlar. ESM (ES Modules) modern Node.js ekosistemiyle uyumludur ve tree-shaking gibi optimizasyonlara kapı açar. AI agent'ları yöneten bir sistem için tip güvenliği kritiktir — hatalı config veya task yapısı sprint'i çökertir.
+TypeScript delivers type safety that enables confident refactoring across large codebases. ESM (ES Modules) aligns with the modern Node.js ecosystem and unlocks optimizations like tree-shaking. For a system that manages AI agents, type safety is critical — a malformed config or task structure can crash an entire sprint.
 
 ### Multi-Provider (Claude + Codex + Gemini)
 
-Tek bir AI provider'a bağımlılık hem maliyet hem de erişilebilirlik riski oluşturur. Deckent, provider-agnostic bir mimari ile farklı görevlere farklı modeller atayabilir: opus karmaşık mimari kararlar için, haiku basit dokümantasyon için. Provider fallback zinciri kesinti dayanıklılığı sağlar.
+Depending on a single AI provider creates both cost and availability risk. Deckent's provider-agnostic architecture assigns different models to different tasks: opus for complex architectural decisions, haiku for simple documentation. A provider fallback chain ensures resilience against outages.
 
 ### tmux + Subprocess Backend
 
-tmux, birden fazla AI worker'ı paralel terminal session'larında çalıştırır — her worker kendi izole ortamında kod yazar, test eder ve raporlar. tmux olmayan ortamlar (Windows gibi) için subprocess backend alternatif sunar. Bu çift backend yaklaşımı platform bağımsızlığı sağlar.
+tmux runs multiple AI workers in parallel terminal sessions — each worker writes code, runs tests, and reports in its own isolated environment. For platforms without tmux (such as Windows), a subprocess backend provides an alternative. This dual-backend approach ensures platform independence.
 
-### MCP (Model Context Protocol) Entegrasyonu
+### MCP (Model Context Protocol) Integration
 
-MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 20 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
-
----
-
-## Yol Haritası
-
-### Faz 1: "Kendin Kullan" — Tamamlandı
-
-npm paketleme, dogfooding, Windows desteği, temel sprint döngüsü. Vizetron (Python/FastAPI) projesinde gerçek sprint'ler başarıyla tamamlandı.
-
-### Faz 1.5: "Init UX + Onboarding" — Tamamlandı
-
-Init wizard, stack detection, quick-start rehberi, worker prompt iyileştirmeleri. 26 dogfooding bug'ının 22'si düzeltildi.
-
-### Faz 2: "Genel Kullanılabilirlik" — Aktif
-
-Provider ve tier generalizasyonu, dokümantasyon tutarlılığı, god object split, güvenlik altyapısı. Multi-provider test ve dashboard iyileştirmeleri devam ediyor.
-
-### Faz 3: "Dokümantasyon"
-
-TR+EN çift dil desteği, VISION belgesi, link audit, config dashboard. Kullanıcı-dostu dokümantasyonla onboarding süresini kısaltma.
-
-### Faz 4: "Public Repo"
-
-Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna taşıma, CI/CD pipeline, npm publish. Topluluk katkısına açılma.
+MCP integrates Deckent with any MCP-compatible IDE or tool. With 20 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
 
 ---
 
-## Değerler
+## Roadmap
 
-- **Açık kaynak** — Deckent ücretsiz ve açık kaynaklıdır. Topluluk katkısına açıktır.
-- **Şeffaflık** — Her sprint'in planı, sonucu ve öğrenimi kayıt altındadır. `.brain/` dizini karar geçmişini tutar.
-- **Kalite** — Auditor kalite kapısı, GO/NO-GO değerlendirmesi ve test zorunluluğu ile her sprint kalite standardını karşılar.
-- **Otonom ama kontrollü** — Deckent otonom çalışır ama kullanıcı her zaman kontroldedir. Scope enforcement, audit trail ve memory budget ile sınırlar nettir.
-- **Sürekli öğrenim** — Her sprint sonunda MEMORY.md ve PATTERNS.md güncellenir. Sistem zamanla daha iyi kararlar alır, aynı hataları tekrarlamaz.
+### Phase 1: "Eat Your Own Dog Food" — Complete
+
+npm packaging, dogfooding, Windows support, core sprint cycle. Real sprints successfully completed on the Vizetron (Python/FastAPI) project.
+
+### Phase 1.5: "Init UX + Onboarding" — Complete
+
+Init wizard, stack detection, quick-start guide, worker prompt improvements. 22 of 26 dogfooding bugs resolved.
+
+### Phase 2: "General Usability" — Active
+
+Provider and tier generalization, documentation consistency, god object split, security infrastructure. Multi-provider testing and dashboard improvements in progress.
+
+### Phase 3: "Documentation"
+
+TR+EN bilingual support, VISION document, link audit, config dashboard. Shortening onboarding time through user-friendly documentation.
+
+### Phase 4: "Public Repo"
+
+Secret leak protection (.detect-secrets), migration to the VerhexIO/deckent open-source repository, CI/CD pipeline, npm publish. Opening up to community contributions.
 
 ---
 
-## Sayılarla Deckent
+## Values
 
-| Metrik | Değer |
+- **Open source** — Deckent is free and open source. Community contributions are welcome.
+- **Transparency** — Every sprint's plan, outcome, and learnings are on record. The `.brain/` directory preserves the full decision history.
+- **Quality** — Auditor quality gates, GO/NO-GO evaluation, and mandatory testing ensure every sprint meets quality standards.
+- **Autonomous yet controlled** — Deckent operates autonomously, but the user is always in control. Scope enforcement, audit trails, and memory budgets set clear boundaries.
+- **Continuous learning** — MEMORY.md and PATTERNS.md are updated after every sprint. The system improves its decisions over time and avoids repeating the same mistakes.
+
+---
+
+## Deckent by the Numbers
+
+| Metric | Value |
 |--------|-------|
-| Test sayısı | 12,051+ |
+| Tests | 12,193+ |
 | Coverage | 96%+ |
-| Tamamlanan sprint | 100+ |
-| CLI komut | 35+ |
-| MCP tool | 20 |
-| MCP resource | 8 |
-| Built-in agent | 16 |
-| Built-in skill | 21 |
-| Provider | 3 (Claude, Codex, Gemini) |
-| Platform | macOS, Linux, WSL2, Windows |
-
-## Sprint History
-| Sprint | Durum |
-|--------|-------|
-| sprint-101 | tamamlandı |
-| sprint-102 | tamamlandı |
-| sprint-103 | tamamlandı |
-
-## Sprint Metrics
-| Metrik | Değer |
-|--------|-------|
-| Sprint | sprint-103 |
-| Toplam Task | 7 |
-| Tamamlanan | 6 |
-| Tech Debt | 6 |
-| No-Go | 1 |
-| Süre | 19dk 57sn |
-| Coverage | 0.0% |
+| Completed sprints | 103+ |
+| CLI commands | 35+ |
+| MCP tools | 20 |
+| MCP resources | 8 |
+| Built-in agents | 16 |
+| Built-in skills | 21 |
+| Providers | 3 (Claude, Codex, Gemini) |
+| Platforms | macOS, Linux, WSL2, Windows |

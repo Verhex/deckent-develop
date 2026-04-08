@@ -25,12 +25,12 @@
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
 - **mcp/**: MCP server — 20 tools + 8 resources, stdio transport (verified sprint-093)
 - **cli/** (35 commands): Full CLI with helpers, entry point
-- **dashboard/**: React + Vite + Tailwind (4 pages, SSE indicator, language switcher)
+- **dashboard/**: React + Vite + Tailwind (6 pages, SSE indicator, language switcher)
   - i18n/LanguageProvider.tsx, i18n/en.ts (~282 keys), i18n/tr.ts (~282 keys)
   - ConfigPage i18n tam kapsam (Sprint 084), AgentDetail geniş panel (Sprint 084)
 
 ## Current State
-- Test Count: 12
+- Test Count: 12,193+
 - Coverage: 96.0%
 - Last Sprint: sprint-103
 - Total Sprints: 103

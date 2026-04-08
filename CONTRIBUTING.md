@@ -710,6 +710,20 @@ Deckent supports multiple languages through a runtime i18n system. Currently sup
 | `de` | German | Needs contributor | --|
 | `fr` | French | Needs contributor | --|
 
+### Documentation language convention
+
+All documentation follows a bilingual EN/TR pattern:
+
+- **Primary language**: English (EN)
+- **Base filename** = EN version (e.g., `VISION.md`, `BETA-TRACKER.md`)
+- **Turkish variant** = `-TR` suffix (e.g., `VISION-TR.md`, `BETA-TRACKER-TR.md`)
+- **Exception**: `README.md` (EN) / `README-TR.md` (TR) -- follows GitHub convention
+
+When adding or updating documentation:
+- Always update the EN (base) file first
+- Keep the TR variant in sync -- same structure, same section headings (translated)
+- Auto-updated sections (marked with `<!-- auto:start -->`) are managed by `docs.json` and should not be edited manually
+
 ---
 
 ## MCP Tool and Resource Development

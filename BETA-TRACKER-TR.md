@@ -1,16 +1,17 @@
-# Deckent Kapsamli Analiz Raporu — 2026-04-02
+<!-- Dil: TR | Teknik terimler EN -->
+# Deckent Beta Tracker
 
-## Hedef: Self-Improving Otonom AI Orkestrator → Otonom Asistan
+**Son güncelleme:** 2026-04-08 | **Sprint:** 103 | **Test:** 12,193+ | **Versiyon:** 0.3.0-beta.3
 
 ---
 
-## I. MEVCUT DURUM OZETI
-
+## Mevcut Durum
+<!-- auto:start — docs.json tarafından güncellenecek -->
 | Metrik | Deger |
 |--------|-------|
 | Versiyon | 0.3.0-beta.3 |
 | Toplam Sprint | 103+ |
-| Test Sayisi | 12,062+ (413 dashboard) |
+| Test Sayisi | 12,193+ (413 dashboard) |
 | Coverage | 90% (line), 89% (branch), 95% (function) |
 | Kaynak Dosya | 800+ |
 | Orchestra Modulleri | 65 |
@@ -18,15 +19,180 @@
 | CLI Komutlari | 35+ |
 | MCP Araclari | 20 tool + 8 resource |
 | HTTP Endpoint | 16 + SSE |
-| Dashboard Sayfalari | 5 |
+| Dashboard Sayfalari | 6 |
 | Agent (built-in) | 16 (+2 temp) |
 | Skill (built-in) | 21 |
 | Provider | 3 (Claude, Codex, Gemini) |
 | Model | 13 (ModelRegistry, tier-based routing) |
+<!-- auto:end -->
 
 ---
 
-## II. RAKIP & REHBER ANALIZI
+## Genel Bakış
+
+75+ sprint, 12,200+ test, 250+ TypeScript modülü. Windows dogfooding tamamlandı — init→plan→start→status→cleanup zinciri çalışıyor. İlk gerçek sprint Vizetron'da başarıyla tamamlandı. Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dil tutarlılığı (TR/EN) tamamlandı, VISION.md ve link audit bitti.
+
+**Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
+
+**Mevcut Durum:** Mono Closed Beta v0.2.0-beta.4 — Vizetron (Python/FastAPI) projesinde 2 sprint tamamlandı, 26 bug bulundu, 22'si düzeltildi. Dokümantasyon ve kod kalitesi iyileştirmeleri Sprint 075 tamamlandı.
+
+---
+
+## Faz Planı
+
+### Faz 1: "Kendin Kullan" — TAMAMLANDI ✅
+### Faz 1.5: "Init UX + Onboarding" — TAMAMLANDI ✅ (Sprint 070-071)
+
+### Faz 2: "Genel Kullanılabilirlik" — AKTİF
+
+**Sprint 072 — TAMAMLANDI (2026-03-27):**
+- [x] P1-7: Plan tier'ları → performance/balanced/economic + backward compat
+- [x] P1-8: Init wizard → genel provider seçimi, $ kaldırıldı
+- [x] P1-9: MODEL_API_IDS mapping + resolveApiModelId()
+- [x] P2-13: README.md → 12,192+ test, 86+ sprint, Windows full, 19 MCP tools
+- [x] P5-31: sprint-controller.ts → 7 phase fonksiyonu sprint-phases.ts'ye extract
+
+**Sprint 073 — TAMAMLANDI (2026-03-30) — Self Dogfooding:**
+- [x] 100 test regresyonu düzeltildi (43+16+9+23+3 = 100 fail → 0 fail)
+- [x] test-writer agent 5/5 task DONE, 17m 41s
+
+**Sprint 074 — TAMAMLANDI (2026-03-30) — Docs + Debt:**
+- [x] P2-13: README.md sayılar güncellendi (12,176+ test, 73+ sprint)
+- [x] P2-16: CHANGELOG + SPRINT-LOG Sprint 072-073 entry'leri
+- [x] .brain/ tutarlılık (PROJECT-IDENTITY, DECISIONS)
+- [x] CLAUDE.md + DECKENT.md modül sayıları düzeltildi (orchestra 47, core 49, MCP 19)
+- [x] debt-069-005 (TempAgent) + debt-069-006 (scope parser) kapandı
+- [x] doc-writer agent 5/5 + bug-fixer 2/2, 7m 29s
+
+**Sprint 075 — TAMAMLANDI (2026-03-30) — Dil Tutarlılığı + Vizyonu:**
+- [x] P2-14: docs/CHANGELOG.md Türkçeleştirildi — 300+ EN → TR çevirisi
+- [x] P2-18: VISION.md oluşturuldu — 7 bölüm, rakip analizi (5 tablo), roadmap
+- [x] P2-19: docs/ link audit — 4 broken link tespit ve düzeltildi
+- [x] P4-29: .detect-secrets v1.5.0 kuruldu — .pre-commit-config.yaml
+- [x] P5-31: God object split Faz 2 — sprint-controller.ts → result-collector.ts extract
+
+**Sprint 076 — TAMAMLANDI (2026-03-31):**
+- [x] P3-20: Stale heartbeat root cause fix — finalizeHeartbeat + auditor DONE skip
+- [x] P3-22: Dashboard API entegrasyon testi — 10 yeni test, 6 describe block
+- [x] P6-40: Graceful shutdown — SIGINT → interruptActiveSprint + killAllSessions
+- [x] P5-31: God object split Faz 3 — result-collector.ts extract (233 satır)
+
+**Sprint 077 — TAMAMLANDI (2026-03-31) — Docs:**
+- [x] CHANGELOG + SPRINT-LOG Sprint 076 entry'leri
+- [x] .brain/ güncelleme (PROJECT-IDENTITY, DECISIONS)
+- [x] CLAUDE.md + DECKENT.md modül sayıları güncellendi
+
+**Sprint 078 — TAMAMLANDI (2026-04-01), 6m 57s:**
+- [x] Blueprint senkronizasyonu, i18n altyapısı, TR/EN docs, /api/tasks
+- [x] CHANGELOG + SPRINT-LOG catch-up, HistoryPage success rate trend
+
+**Sprint 079 — TAMAMLANDI (2026-04-01), ~15m:**
+- [x] README-TR fix, dashboard kontrol butonları, init dil-ilk, /api/cleanup
+
+**Sprint 080 — TAMAMLANDI (2026-04-01), 9m 06s:**
+- [x] Dashboard UX Overhaul: WorkerCard, SprintPhaseTimeline, ActivityFeed
+
+**Sprint 081 — TAMAMLANDI (2026-04-01), 12m 38s:**
+- [x] Settings+Config birleştirme, i18n tam kapsam (44 key), terminal logları
+
+**Sprint 082 — TAMAMLANDI (2026-04-02):**
+- [x] MCP/CLI parity: 19 tool, 33 CLI, ADR-022
+- [x] Usage card kaldırma, v0.3.0-beta.1, init test fix
+- [x] Dashboard Faz B: skeleton loading, AgentDetail zenginleştirme, EmptyState, polish
+
+**Sonraki Planlar:**
+- [ ] Dashboard gerçek sprint ile test (P3-22) — bir sonraki sprint
+- [ ] P1-10..12: Multi-provider test (BLOCKED — API key gerekli)
+- [ ] Windows Codex CLI dogfooding
+
+### Faz 3: "Dokümantasyon"
+TR+EN çift dil, VISION, link audit, config dashboard
+
+### Faz 4: "Public Repo"
+.detect-secrets, VerhexIO/deckent'e taşıma, CI/CD, npm publish
+
+---
+
+## Öncelik Matrisi (P0-P6)
+
+### P0 — npm Paketleme + Dogfooding — TAMAMLANDI ✅
+
+| # | Sorun | Durum | Not |
+|---|-------|-------|-----|
+| 1 | npm publish test | **DONE** | 518KB, 479 dosya, local install çalışıyor |
+| 2 | `deckent init` gerçek proje testi | **DONE** | Windows'ta Vizetron (Python/FastAPI) test edildi |
+| 3 | `deckent doctor` dış ortam | **DONE** | WSL2 + Windows, SKIP/OK/FAIL, healthScore fix |
+| 4 | Shebang + bin entry | **DONE** | `deckent` + `deckent-mcp` çalışıyor |
+| 5 | İlk sprint UX | **DONE** | Vizetron'da sprint-002 başarıyla tamamlandı |
+| 6 | Windows native desteği | **DONE** | 7 dosyada shell:true, heartbeat periodic, log capture |
+
+### P1 — Provider & Tier Generalizasyonu
+
+| # | Sorun | Durum | Not |
+|---|-------|-------|-----|
+| 7 | Plan tier'ları Claude-specific | **DONE** | performance/balanced/economic + backward compat (Sprint 072) |
+| 8 | Claude subscription bağımlılığı | **DONE** | Init wizard provider-agnostic, $ kaldırıldı (Sprint 072) |
+| 9 | Model isimleri güncelliği | **DONE** | MODEL_API_IDS + resolveApiModelId() (Sprint 072) |
+| 10 | Multi-provider aynı anda test | **YAPILACAK** | Claude + Codex + Gemini aynı sprint'te hiç test edilmedi |
+| 11 | API + Subscription birlikte | **YAPILACAK** | API key ile subscription aynı anda çalışıyor mu? |
+| 12 | Codex/Gemini CLI binary check | **YAPILACAK** | Gerçek CLI binary'leri doğrulama |
+
+### P2 — Dokümantasyon
+
+| # | Sorun | Durum | Not |
+|---|-------|-------|-----|
+| 13 | README.md eski veriler | **DONE** | Badge + sayılar güncellendi (Sprint 074) |
+| 14 | Dil tutarsızlığı | **DONE** | docs/CHANGELOG.md Türkçeleştirildi (Sprint 075) |
+| 15 | TR+EN çift dil | **KISMEN** | .deckent/docs/ TR/EN desteği eklendi |
+| 16 | CHANGELOG.md boş | **DONE** | docs/CHANGELOG.md 1159 satır, Sprint 1-073 (Sprint 074) |
+| 17 | Config referans eksik | **DONE** | .deckent/docs/config-reference.md |
+| 18 | VISION.md eksik | **DONE** | VISION.md oluşturuldu — vizyon, rakip analizi, roadmap (Sprint 075) |
+| 19 | docs/ link kontrolü | **DONE** | 4 broken link tespit edildi ve düzeltildi (Sprint 075) |
+
+### P3 — UX & Dashboard
+
+| # | Sorun | Durum | Not |
+|---|-------|-------|-----|
+| 20 | Dashboard veri doğruluğu | **YAPILACAK** | Doğru veri görüntülemiyor |
+| 21 | Dashboard config arayüzü | **YAPILACAK** | Tüm config ayarları dashboard'dan seçilebilmeli |
+| 22 | Dashboard gerçek test | **YAPILACAK** | React dashboard gerçek sprint ile hiç test edilmedi |
+| 23 | Config.json karmaşıklığı | **KISMEN** | config-reference.md var, dashboard'dan seçim eksik |
+| 24 | İlk kullanım deneyimi | **DONE** | quick-start.md, directives-guide.md, workflow rehberi |
+
+### P4 — Platform & Altyapı
+
+| # | Sorun | Durum | Not |
+|---|-------|-------|-----|
+| 25 | Windows native | **DONE** | Tam destek: spawn, heartbeat, log, encoding, ps guard |
+| 26 | Node >= 18 neden? | **YAPILACAK** | OpenClaw Node 22+, ES2022+ feature check |
+| 27 | Docker/Sandbox | **YAPILACAK** | Var mı? Çalışıyor mu? |
+| 28 | CI/CD billing | **YAPILACAK** | Public repo ile çözülür |
+| 29 | .detect-secrets | **DONE** | .pre-commit-config.yaml kuruldu, detect-secrets v1.5.0 (Sprint 075) |
+
+### P5 — Kod Kalitesi
+
+| # | Sorun | Durum | Not |
+|---|-------|-------|-----|
+| 30 | .gitignore runtime state | **DONE** | |
+| 31 | God objects | **DONE** | Faz 1 (Sprint 072), Faz 2 (Sprint 075), Faz 3 (Sprint 076) — result-collector.ts extract tamamlandı |
+| 32 | V2 routing test-writer bias | **KISMEN** | Exclude kuralı yazıldı |
+
+### P6 — Kullanıcı Deneyimi İyileştirmeleri
+
+| # | Sorun | Durum | Not |
+|---|-------|-------|-----|
+| 33 | Error messages kullanıcı-dostu değil | **DONE** | DeckentError + suggestion + howToFix (53 error kodu) |
+| 34 | `deckent explain` MCP'de yok | **YAPILACAK** | CLI-only rehberlik aracı |
+| 35 | Telemetry/analytics | **YAPILACAK** | Opt-in kullanım analitikleri |
+| 36 | `deckent upgrade` test | **DONE** | `--local` flag eklendi, beta workflow |
+| 37 | Skill marketplace backend | **YAPILACAK** | CLI komutu var ama backend yok |
+| 38 | Plugin system e2e test | **YAPILACAK** | Gerçek plugin ile test edilmedi |
+| 39 | Rate limiting production | **YAPILACAK** | 100 req/60s yeterli mi? |
+| 40 | Graceful shutdown | **DONE** | SIGINT handler + interruptActiveSprint + killAllSessions (Sprint 076) |
+
+---
+
+## Rakip Analizi
 
 ### A. OpenClaw (Acik Kaynak Kisisel AI Asistan)
 
@@ -227,7 +393,7 @@
 
 ---
 
-### F. KARSILASTIRMA MATRISI
+### F. Karsilastirma Matrisi
 
 | Yetenek | OpenClaw | Cowork | Perplexity | Devin | Claude SDK | **Deckent** |
 |---------|----------|--------|------------|-------|------------|-------------|
@@ -253,7 +419,7 @@
 | **GitHub Stars** | 343K+ | - | - | - | - | **~0 (beta)** |
 | **Community** | 1,000+ contrib | - | - | - | - | **1 (solo)** |
 
-### G. DECKENT'IN BENZERSIZ KONUMU
+### G. Deckent'in Benzersiz Konumu
 
 **Hicbir rakipte BIRLIKTE bulunmayan ozellikler:**
 1. Multi-agent paralel calisma + scope enforcement + sprint planlama + retrospektif ogrenme + multi-provider + MCP native + acik kaynak + ucretsiz + self-hosted
@@ -266,7 +432,7 @@
 
 ---
 
-## III. DOGRULANMIS ENGELLER (Kod Analizi ile Teyit Edilmis)
+## Doğrulanmış Engeller
 
 Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 
@@ -310,7 +476,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 - sprint-phases.ts: runEvaluatePhase() + runFixPhase() geciriyor
 - sprint-controller.ts: config.coverage_threshold geciriyor
 
-### DUZELTILEN YANLIS IDDIALAR
+### Duzeltilen Yanlis Iddialar
 
 | Iddia | Gercek | Kanit |
 |-------|--------|-------|
@@ -320,101 +486,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 
 ---
 
-## IV. ILERLEME TAKIBI — Sprint 085 Sonuclari
-
-### Tamamlanan Hedefler (Sprint 085 + 086)
-
-| Hedef | Durum | Sprint | Detay |
-|-------|-------|--------|-------|
-| Yapilandirilmis hata loglama | ✅ DONE | 085 | debugLog 3-param overload, .brain/ERRORS.md (max 200 satir) |
-| Karar loglama (decision trail) | ✅ DONE | 085+086 | .deckent/routing/decisions/ JSON + cagri yerleri sprintId/taskId eklendi |
-| Kural auto-apply pipeline | ✅ DONE | 085 | applyEvolvedRules() confidence>=0.85 → manifest, rollback JSON |
-| Synergy matrix → routing | ✅ DONE | 085 | getSynergyBonuses() +2/-2 bonus/penalty, min 5 ornek |
-| routeTaskV2 cagri yerleri | ✅ DONE | 086 | task-router.ts + mid-sprint-adapter.ts + sprint-controller.ts guncellendi |
-| 14 ek catch → debugLog | ✅ DONE | 086 | cleanup(7) + finalizeSprint(7) fonksiyonlari |
-| Coverage threshold config | ✅ DONE | 086 | config.coverage_threshold (varsayilan 90), 6 dosya guncellendi |
-| Intent classifier feedback | ✅ DONE | 086 | INTENT_WEIGHTS Map + updateIntentWeights() + loadIntentWeights() |
-| Planner'a gecmis bilgisi | ✅ DONE | 086 | getWorstCombinations(5) + AI prompt GECMIS SONUCLAR blogu |
-| Adaptive thresholds | ✅ DONE | 088 | applyAdaptiveThresholds() + getRecentSprintStats() |
-
-### Sprint 085 Metrikleri
-- **Kod:** +400 / -37 satir
-- **Sure:** 25dk 22s
-- **Sonuc:** 4/4 tamamlandi (2 DONE, 2 GO_WITH_TECH_DEBT)
-- **Yeni dosyalar:** .brain/ERRORS.md, .deckent/routing/decisions/, .deckent/routing/applied-rules.json
-
-### Sprint 086 Metrikleri
-- **Kod:** +172 / -21 satir
-- **Sure:** 25dk 4s
-- **Sonuc:** 4/4 tamamlandi (2 DONE, 2 GO_WITH_TECH_DEBT)
-- **Yeni dosyalar:** .deckent/routing/intent-weights.json
-
-### Sprint 097 Metrikleri
-- **Kapsam:** ModelRegistry + Provider Config Evrimi (Enterprise Refactor)
-- **Task:** 10 task (tümü GO_WITH_TECH_DEBT)
-- **Yeni dosyalar:** src/core/model-registry.ts, src/core/mode-presets.ts
-- **Onemli degisiklikler:**
-  - ModelRegistry class: 13 model, 3 provider, tek kaynak
-  - Tier-based routing: premium_plus/premium/standard/economy
-  - Provider-agnostic config: brain_tier/worker_tier
-  - Init wizard refactor: selectTiers() + tierToModel()
-  - Codex + Gemini adapter CLI uyumluluk guncellemeleri
-
-### Sprint 098 Metrikleri
-- **Kapsam:** Dokümantasyon + Sprint Output + History Fix
-- **Task:** 5/5 (tümü GO_WITH_TECH_DEBT)
-- **Süre:** 8dk 25sn
-- **Kod:** +77 / -56 satır
-- **Önemli değişiklikler:**
-  - MCP history tool .brain/archive/ okuyor (85 sprint log erişilebilir)
-  - sprint-reporter.ts debug log eklendi (evaluations map debug)
-  - ANALYSIS, README, DECKENT.md ModelRegistry güncellemeleri
-
-### Sprint 099 Metrikleri
-- **Kapsam:** RETRO Debug + Job Output Reform + Docs Güncelleme
-- **Task:** 5/5 (tümü GO_WITH_TECH_DEBT)
-- **Süre:** 16dk 16sn
-- **Kod:** +77 / -56 satır
-- **Önemli değişiklikler:**
-  - RETRO Done Sayacı: evaluations map debug eklendi (Sprint 093 fix doğrulandı)
-  - Job Output Reform: finalizeSprint() job summary zenginleştirildi
-  - VISION.md + health-check.md + roadmap.md sayı güncellemeleri
-  - README sprint badge 97+ → 98+ güncellendi
-  - PROJECT-IDENTITY.md Test Count 12 → 12,193+ düzeltildi
-
-### Sprint 100 Metrikleri
-- **Kapsam:** Docs sayı güncellemeleri (Sprint 100 numaraları)
-- **Güncellenen dosyalar:** docs/architecture/architecture.md, docs/ANALYSIS-2026-04-02.md
-- **Önemli değişiklikler:**
-  - architecture.md: Version Sprint 100+, CLI 35+, orchestra 63 modules, MCP 20 tools
-  - ANALYSIS: Toplam Sprint 100, test 12,051+, orchestra 55, CLI 35+, MCP 20 tool
-  - Sonuç bölümü Sprint 100 sonrası olarak güncellendi
-
-### Sprint 101 Metrikleri
-- **Kapsam:** Sprint Lock + Result Timeout + autoApprove + Docker Backend
-- **Task:** 4/10 (2 DONE, 2 GO_WITH_TECH_DEBT, 6 NO_GO)
-- **Sure:** ~42dk
-- **Onemli degisiklikler:**
-  - Sprint lock mekanizmasi (coklu process cakisma engeli)
-  - autoApprove=true standart hale getirildi
-  - Docker Spawn Backend + MockSpawnBackend + E2E Sprint Lifecycle Tests
-  - README/DECKENT.md usage temizligi + flaky test fix
-
-### Sprint 102 Metrikleri
-- **Kapsam:** Tech Debt Fix (098 borclari) + Docker Smoke Test
-- **Task:** 0/6 (tumu NO_GO — worker timeout)
-- **Sure:** 12dk 9sn
-- **Not:** Tum worker'lar zaman asimina ugradi, sprint rollback yapildi
-
-### Kalan Tech Debt
-1. ~~**085-001-debt (kısmi)**~~: ✅ Tamamlandi — sessiz catch'ler Sprint 085-088'de debugLog'a donusturuldu
-2. ~~**086-001-debt**~~: ✅ Tamamlandi — routeTaskV2 cagri yerleri Sprint 086'da guncellendi
-3. ~~**086-003-debt**~~: ✅ Tamamlandi — planner entegrasyonu Sprint 086'da tamamlandi
-4. **Token kullanimi tracking** — historicalTokenUsage henuz implement edilmedi (ModelRegistry altyapisi hazir, Bolum X.I'de is plani)
-
----
-
-## V. SELF-IMPROVEMENT YOL HARITASI (GUNCEL)
+## Self-Improvement Yol Haritası
 
 ### FAZ 0: Gozlemlenebilirlik Temeli — ✅ TAMAMLANDI (Sprint 085)
 
@@ -540,9 +612,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 - 13 → 19+ model destegi (ModelRegistry altyapisi hazir — Sprint 097)
 - Perplexity'nin 19 model modeline yaklasma
 
----
-
-## V. ONCELIK MATRISI
+### Öncelik Matrisi
 
 ```
                     ETKI (is degeri)
@@ -562,13 +632,13 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
          └────────────┴────────────┘
 ```
 
-### P0 — ✅ TAMAMLANDI (Sprint 085)
+#### P0 — ✅ TAMAMLANDI (Sprint 085)
 1. ~~Yapilandirilmis hata loglama~~ → debugLog + .brain/ERRORS.md
 2. ~~Karar loglama (decision trail)~~ → .deckent/routing/decisions/ JSON
 3. ~~Kural auto-apply pipeline~~ → applyEvolvedRules() + rollback
 4. ~~Synergy matrix → routing engine~~ → getSynergyBonuses() entegre
 
-### P1 — ✅ TAMAMLANDI (Sprint 086)
+#### P1 — ✅ TAMAMLANDI (Sprint 086)
 5. ~~Intent classifier feedback loop~~ → INTENT_WEIGHTS + updateIntentWeights()
 6. ~~Planner'a gecmis bilgisi~~ → getWorstCombinations() + prompt blogu
 7. ~~Coverage threshold config~~ → config.coverage_threshold
@@ -576,7 +646,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 - ⏳ Adaptive thresholds → JSDoc eklendi, implementasyon Faz 2'de
 - ⏳ Mid-sprint reroute guclendirme → Faz 2'de
 
-### P2 — ✅ TAMAMLANDI (Sprint 088+091+097)
+#### P2 — ✅ TAMAMLANDI (Sprint 088+091+097)
 9. ✅ ~~Adaptive thresholds (NO_GO rate bazli otomatik ayar)~~ → Sprint 088
 10. ✅ ~~Mid-sprint reroute guclendirme (1 → 3, configurable)~~ → Sprint 088
 11. ✅ ~~Heartbeat daemon (OpenClaw modeli, proaktif calisma)~~ → Sprint 088
@@ -585,7 +655,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 13b. ✅ ~~Sprint timeout reform (sinirsiz calisma)~~ → Sprint 088
 14. ✅ ~~ModelRegistry + tier-based routing (13 model, 3 provider)~~ → Sprint 097
 
-### P3 — ORTA VADE (5-10 sprint)
+#### P3 — ORTA VADE (5-10 sprint)
 14. Worker soru sorma mekanizmasi (askBrain IPC)
 15. Interactive planning (kullanici-AI isbirlikci plan)
 16. Codebase semantik indeksleme (AST + RAG)
@@ -594,7 +664,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 19. **Context-Aware Routing** — context butcesi tahmini, model limit karsilastirma, task parcalama (Bolum X.I)
 20. **Token Usage Tracker** — JSONL parse, provider-native sayim, RETRO.md token summary (Bolum X.I)
 
-### P4 — UZUN VADE (10-15 sprint)
+#### P4 — UZUN VADE (10-15 sprint)
 19. Critique layer (multi-model dogrulama, Cowork modeli)
 20. Multi-sprint zincirleme (gunlerce calisan gorevler)
 21. Browser/Computer Use (Claude SDK entegrasyonu)
@@ -603,104 +673,184 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 
 ---
 
-## VI. BASARI METRIKLERI
+## Sprint Metrikleri
 
-### Self-Improvement Olcumleri
-| Metrik | Sprint 084 Oncesi | Sprint 086 Sonrasi | Hedef (10 sprint) | Olcum |
-|--------|-------------------|--------------------|--------------------|-------|
-| Sprint NO_GO rate | ~%15 | %0 (085+086) | <%5 | Sprint retro |
-| Agent secim accuracy | Bilinmiyor | Olculebilir (decision trail) | >%85 | Decision JSON |
-| Otomatik uygulanan kural | 0 | Altyapi hazir | 5+ per sprint | applied-rules.json |
-| Intent classifier ogrenme | Yok | updateIntentWeights() aktif | <%10 yanlis | intent-weights.json |
-| Sessiz hata | 49 | ~20 | 0 | grep count |
-| Planner gecmis bilgisi | Yok | getWorstCombinations() | Her sprint | Planner prompt |
-| Coverage threshold | Hardcoded %90 | Config'den okunuyor | Proje-bazli | config.json |
+### Tamamlanan Hedefler (Sprint 085 + 086)
 
-### Otonomi Olcumleri
-| Metrik | Mevcut | Hedef (15 sprint) | Olcum |
-|--------|--------|-------------------|-------|
-| Insan mudahale / sprint | ~3-5 | <1 | Sprint log |
-| Proaktif gorev sayisi | ✅ Daemon aktif | 5+ / gun | Heartbeat log |
-| Self-heal orani | %0 | >%50 | Auto-fix / total error |
-| Cross-sprint ogrenme | Minimal | Tam | Memory recall accuracy |
+| Hedef | Durum | Sprint | Detay |
+|-------|-------|--------|-------|
+| Yapilandirilmis hata loglama | ✅ DONE | 085 | debugLog 3-param overload, .brain/ERRORS.md (max 200 satir) |
+| Karar loglama (decision trail) | ✅ DONE | 085+086 | .deckent/routing/decisions/ JSON + cagri yerleri sprintId/taskId eklendi |
+| Kural auto-apply pipeline | ✅ DONE | 085 | applyEvolvedRules() confidence>=0.85 → manifest, rollback JSON |
+| Synergy matrix → routing | ✅ DONE | 085 | getSynergyBonuses() +2/-2 bonus/penalty, min 5 ornek |
+| routeTaskV2 cagri yerleri | ✅ DONE | 086 | task-router.ts + mid-sprint-adapter.ts + sprint-controller.ts guncellendi |
+| 14 ek catch → debugLog | ✅ DONE | 086 | cleanup(7) + finalizeSprint(7) fonksiyonlari |
+| Coverage threshold config | ✅ DONE | 086 | config.coverage_threshold (varsayilan 90), 6 dosya guncellendi |
+| Intent classifier feedback | ✅ DONE | 086 | INTENT_WEIGHTS Map + updateIntentWeights() + loadIntentWeights() |
+| Planner'a gecmis bilgisi | ✅ DONE | 086 | getWorstCombinations(5) + AI prompt GECMIS SONUCLAR blogu |
+| Adaptive thresholds | ✅ DONE | 088 | applyAdaptiveThresholds() + getRecentSprintStats() |
 
-### Rakip Yakinlastirma
-| Metrik | Mevcut | Hedef | Referans Rakip |
-|--------|--------|-------|----------------|
-| Skill/entegrasyon sayisi | 21 | 50+ | OpenClaw (13,729) |
-| Model sayisi | 13 (ModelRegistry) | 15+ | Perplexity (19) |
-| Kanal entegrasyonu | 0 | 5+ | OpenClaw (50+) |
-| Human checkpoint | ✅ 3 faz (Sprint 088) | 3+ faz | Cowork |
-| Codebase indeks | Yok | AST+RAG | Devin Wiki |
+### Sprint 085 Metrikleri
+- **Kod:** +400 / -37 satir
+- **Sure:** 25dk 22s
+- **Sonuc:** 4/4 tamamlandi (2 DONE, 2 GO_WITH_TECH_DEBT)
+- **Yeni dosyalar:** .brain/ERRORS.md, .deckent/routing/decisions/, .deckent/routing/applied-rules.json
 
----
+### Sprint 086 Metrikleri
+- **Kod:** +172 / -21 satir
+- **Sure:** 25dk 4s
+- **Sonuc:** 4/4 tamamlandi (2 DONE, 2 GO_WITH_TECH_DEBT)
+- **Yeni dosyalar:** .deckent/routing/intent-weights.json
 
-## VII. RISK ANALIZI
+### Sprint 097 Metrikleri
+- **Kapsam:** ModelRegistry + Provider Config Evrimi (Enterprise Refactor)
+- **Task:** 10 task (tümü GO_WITH_TECH_DEBT)
+- **Yeni dosyalar:** src/core/model-registry.ts, src/core/mode-presets.ts
+- **Onemli degisiklikler:**
+  - ModelRegistry class: 13 model, 3 provider, tek kaynak
+  - Tier-based routing: premium_plus/premium/standard/economy
+  - Provider-agnostic config: brain_tier/worker_tier
+  - Init wizard refactor: selectTiers() + tierToModel()
+  - Codex + Gemini adapter CLI uyumluluk guncellemeleri
 
-| Risk | Olasilik | Etki | Azaltma |
-|------|----------|------|---------|
-| Auto-apply kurallar sistemi bozarsa | Dusuk | Yuksek | Kural versiyonlama + rollback + sandbox test |
-| Heartbeat daemon kaynak tuketimi | Orta | Orta | Configurable interval, idle detection |
-| Human checkpoint UX friction | Yuksek | Orta | Progressive disclosure, smart defaults |
-| Intent feedback yanlis ogrenme | Orta | Yuksek | Minimum sample (10+), slow decay |
-| Multi-sprint zincirleme sonsuz dongu | Dusuk | Yuksek | Max chain depth, cost guard |
-| Browser control guvenlik acigi | Orta | Yuksek | Sandbox, permission system |
+### Sprint 098 Metrikleri
+- **Kapsam:** Dokümantasyon + Sprint Output + History Fix
+- **Task:** 5/5 (tümü GO_WITH_TECH_DEBT)
+- **Süre:** 8dk 25sn
+- **Kod:** +77 / -56 satır
+- **Önemli değişiklikler:**
+  - MCP history tool .brain/archive/ okuyor (85 sprint log erişilebilir)
+  - sprint-reporter.ts debug log eklendi (evaluations map debug)
+  - ANALYSIS, README, DECKENT.md ModelRegistry güncellemeleri
 
----
+### Sprint 099 Metrikleri
+- **Kapsam:** RETRO Debug + Job Output Reform + Docs Güncelleme
+- **Task:** 5/5 (tümü GO_WITH_TECH_DEBT)
+- **Süre:** 16dk 16sn
+- **Kod:** +77 / -56 satır
+- **Önemli değişiklikler:**
+  - RETRO Done Sayacı: evaluations map debug eklendi (Sprint 093 fix doğrulandı)
+  - Job Output Reform: finalizeSprint() job summary zenginleştirildi
+  - VISION.md + health-check.md + roadmap.md sayı güncellemeleri
+  - README sprint badge 97+ → 98+ güncellendi
+  - PROJECT-IDENTITY.md Test Count 12 → 12,193+ düzeltildi
 
-## VIII. STRATEJIK KONUMLANDIRMA
+### Sprint 100 Metrikleri
+- **Kapsam:** Docs sayı güncellemeleri (Sprint 100 numaraları)
+- **Güncellenen dosyalar:** docs/architecture/architecture.md, docs/ANALYSIS-2026-04-02.md
+- **Önemli değişiklikler:**
+  - architecture.md: Version Sprint 100+, CLI 35+, orchestra 63 modules, MCP 20 tools
+  - ANALYSIS: Toplam Sprint 100, test 12,051+, orchestra 55, CLI 35+, MCP 20 tool
+  - Sonuç bölümü Sprint 100 sonrası olarak güncellendi
 
-### ✅ Kisa Vade — TAMAMLANDI (Sprint 085-086): "Ogrenen Orkestrator"
-- ✅ Ogrenme dongusu kapatildi (rule auto-apply + synergy + intent feedback + planner gecmis)
-- ✅ Kurallar otomatik evrilir (applyEvolvedRules, confidence >= 0.85)
-- ✅ Karar loglama + gozlemlenebilirlik (decision trail + .brain/ERRORS.md)
-- ✅ Intent classifier sonuclardan ogreniyor (INTENT_WEIGHTS)
-- **Rakiplerden farki:** Hicbir rakip (OpenClaw, Devin, Perplexity, Cowork) ogrenme dongusu kapatmis degil
+### Sprint 101 Metrikleri
+- **Kapsam:** Sprint Lock + Result Timeout + autoApprove + Docker Backend
+- **Task:** 4/10 (2 DONE, 2 GO_WITH_TECH_DEBT, 6 NO_GO)
+- **Sure:** ~42dk
+- **Onemli degisiklikler:**
+  - Sprint lock mekanizmasi (coklu process cakisma engeli)
+  - autoApprove=true standart hale getirildi
+  - Docker Spawn Backend + MockSpawnBackend + E2E Sprint Lifecycle Tests
+  - README/DECKENT.md usage temizligi + flaky test fix
 
-### ✅ Orta Vade — TAMAMLANDI (Sprint 087-097): "Proaktif Gelistirici Asistani"
-- ✅ Heartbeat daemon ile proaktif calisma (OpenClaw modeli) — Sprint 088
-- ✅ Human checkpoint'ler ile guvenilir otonomi (Cowork modeli) — Sprint 088
-- ✅ Sprint timeout reform — sinirsiz sureli calisma — Sprint 088
-- ✅ Adaptive thresholds (NO_GO rate bazli otomatik ayar) — Sprint 088
-- ✅ Mid-sprint reroute guclendirme (max 3 deneme) — Sprint 088
-- ✅ Agent/Skill Evrim Pipeline (promotion/demotion, evolved rules) — Sprint 091
-- ✅ ModelRegistry + tier-based routing (13 model, 3 provider, tek kaynak) — Sprint 097
-- ⏳ Slack/GitHub entegrasyonlari
-- **Rakiplerden farki:** Multi-agent + ogrenme + proaktif + checkpoints + acik kaynak
+### Sprint 102 Metrikleri
+- **Kapsam:** Tech Debt Fix (098 borclari) + Docker Smoke Test
+- **Task:** 0/6 (tumu NO_GO — worker timeout)
+- **Sure:** 12dk 9sn
+- **Not:** Tum worker'lar zaman asimina ugradi, sprint rollback yapildi
 
-### Uzun Vade (Sprint 103-115): "Otonom Yazilim Takimi"
-- Codebase semantik anlayis (Devin Wiki modeli)
-- Critique layer ile cok-modelli dogrulama (Cowork modeli)
-- Browser/desktop kontrol (Claude Computer Use)
-- Multi-sprint zincirleme (gunlerce calisan gorevler, Perplexity modeli)
-- Provider genisleme: Grok, Llama, Mistral, DeepSeek (ModelRegistry altyapisi hazir)
-- **Rakiplerden farki:** Tam takim simulasyonu — tek kisiden cok ekip
-
----
-
-## IX. SONUC
-
-**Deckent'in mevcut durumu (Sprint 102+ sonrasi, v0.3.0-beta.3):**
-- 102+ sprint, 12,051+ test (413 dashboard), 96% coverage
-- 16 built-in agent (+2 temp), 21 built-in skill
-- 13 model, 3 provider (Claude, Codex, Gemini), ModelRegistry ile tek kaynak
-- 20 MCP tool + 8 resource, 35+ CLI komutu
-- Self-improving routing AKTIF (kural evrimi, synergy, intent ogrenme, planner gecmis)
-- Decision trail ile tam gozlemlenebilirlik
-- ✅ Heartbeat Daemon AKTIF (proaktif gorev calistirma) — Sprint 088
-- ✅ Human Checkpoints AKTIF (plan/evaluate/fix onay noktalari) — Sprint 088
-- ✅ Sprint Timeout Reform (sinirsiz calisma destegi) — Sprint 088
-- ✅ Adaptive Thresholds (NO_GO rate bazli otomatik ayar) — Sprint 088
-- ✅ Mid-Sprint Reroute (max 3, configurable) — Sprint 088
-- ✅ Agent/Skill Evrim Pipeline (promotion/demotion, evolved rules) — Sprint 091
-- ✅ ModelRegistry + Tier-Based Routing (13 model, 3 provider) — Sprint 097
-- ✅ Provider-Agnostic Config (brain_tier/worker_tier) — Sprint 097
-- ✅ Docker Spawn Backend (container-based worker isolation) — Sprint 101
-- ✅ Sprint Lock Mekanizmasi (coklu process cakisma engeli) — Sprint 101
+### Kalan Tech Debt
+1. ~~**085-001-debt (kısmi)**~~: ✅ Tamamlandi — sessiz catch'ler Sprint 085-088'de debugLog'a donusturuldu
+2. ~~**086-001-debt**~~: ✅ Tamamlandi — routeTaskV2 cagri yerleri Sprint 086'da guncellendi
+3. ~~**086-003-debt**~~: ✅ Tamamlandi — planner entegrasyonu Sprint 086'da tamamlandi
+4. **Token kullanimi tracking** — historicalTokenUsage henuz implement edilmedi (ModelRegistry altyapisi hazir, Bolum X.I'de is plani)
 
 ---
 
-## X. Docker Backend Canli Test Sonuclari (Sprint 102-103)
+## Sprint History
+<!-- auto:start — docs.json tarafından güncellenecek -->
+| Sprint | Task | DONE | Öne Çıkan |
+|--------|------|------|-----------|
+| 066 | 7/7 | 7 | Phantom modüller, manifest v2, MCP docs |
+| 067 | 6/6 | 6 | Paket 494KB, retro notes, any cleanup |
+| 068 | 6/6 | 6 | AI-native discoverability, V2 routing |
+| 069 | 6/6 | 6 | Skill stats, agent precision, tempAgent |
+| 070 | 8/8 | 8 | Init UX overhaul, 15 bug fix, Windows dogfooding |
+| 071 | 7/7 | 7 | BUG-19..26 fix, heartbeat periodic, upgrade --local |
+| 072 | 5/5 | 5 | Tier generalizasyonu, model API IDs, god object split, README |
+| 073 | 5/5 | 5 | Self-dogfooding: 100 test regresyonu fix, 0 fail |
+| 074 | 7/7 | 7 | Docs tutarlılık, debt-069 kapanış, CHANGELOG/SPRINT-LOG |
+| 075 | 5/5 | 5 | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2 |
+| 076 | 4/4 | 4 | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3 |
+| 077 | 3/3 | 3 | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme |
+| 078 | 4/4 | 4 | Docs catch-up, HistoryPage success rate trend |
+| 079 | 4/4 | 4 | README-TR fix, dashboard kontrol butonları, init dil-ilk, /api/cleanup |
+| 080 | 4/4 | 4 | Dashboard UX Overhaul: WorkerCard, SprintPhaseTimeline, ActivityFeed |
+| 081 | 4/4 | 4 | Config/Settings birleşme, i18n tam kapsam (44 key), terminal log |
+| 082 | 10/10 | 10 | MCP/CLI parity + usage fix + version bump + Dashboard Faz B (skeleton, AgentDetail, EmptyState) |
+| **Toplam** | **105/105** | **105** | 12,193+ test, 0 regression, v0.3.0-beta.1 |
+<!-- auto:end -->
+
+---
+
+## Bug Tracker
+
+### Sprint 070 — Init UX Overhaul (15 fix)
+
+| Bug | Açıklama | Fix |
+|-----|----------|-----|
+| BUG-3 | Claude CLI spawn ENOENT (Windows) | `shell: process.platform === 'win32'` — 7 dosyada |
+| BUG-4 | Worker rules hardcoded `tsc --noEmit` | `detectFullStack()` sonucunu worker rules'a aktar |
+| BUG-6 | Stack detection `Language: unknown` | Stack detection HER ZAMAN çalıştır |
+| BUG-7 | Doctor FAIL+OK çelişkisi | FAIL → SKIP etiketi (optional provider'lar) |
+| BUG-8 | Framework `next` (fastapi olmalı) | Python/Go/Rust projede JS framework algılama atla |
+| BUG-9 | IDENTITY.md dosyası eksik | Init'te workspace IDENTITY.md oluştur |
+| BUG-10 | DECKENT.md `Build: tsc` (Python projede) | `!== undefined` kontrolü + `echo "no build step"` |
+| BUG-11 | DIRECTIVES.md boş placeholder | Stack-aware örnek task formatı + TR/EN şablon |
+| BUG-12 | Worker rules hardcoded `npx vitest run` | `detectFullStack().commands.test` kullan |
+| BUG-13 | Brain rules yanlış limitler | 200→300, 600→900 |
+| BUG-14 | TempAgent oluşturulmuyor | `detectedLanguages` ile genişletilmiş eşleşme |
+| BUG-15 | BOOT.md kullanıcı ipucu yok | Kullanıcı-dostu açıklama + ipuçları (TR/EN) |
+| BUG-16 | `ps: unknown option -- o` (Windows) | `process.platform !== 'win32'` guard |
+| BUG-18 | MCP binary adı tutarsız | Dokümantasyon: `deckent-mcp` ayrı binary |
+
+### Sprint 071 — Dogfooding Bug Fixes (7 fix + upgrade)
+
+| Bug | Açıklama | Fix |
+|-----|----------|-----|
+| BUG-19 | UTF-8 encoding Windows | LANG + PYTHONIOENCODING env vars subprocess'e eklendi |
+| BUG-21 | Doctor healthScore=0 tüm check passed | `c.ok` → `c.passed` field mismatch düzeltildi |
+| BUG-22 | Review "No tasks found" sprint sonrası | `loadTaskResults()` archive/ fallback eklendi |
+| BUG-23 | Heartbeat 28x stale, sequence=1 | setInterval 15s periyodik heartbeat update |
+| BUG-24 | Worker .result dosyası yazmıyor | Fallback .result on child exit |
+| BUG-25 | Scope parser Files/Scope ignorluyor | Explicit `Files:` / `Scope:` label parsing |
+| BUG-26 | Task log boş (Windows) | closeSync(logFd) child exit handler'a taşındı |
+| — | Versiyon bump + upgrade --local | `deckent upgrade --local <path.tgz>` beta workflow |
+
+### Sprint 070 — Yeni Özellikler
+
+| Özellik | Açıklama |
+|---------|----------|
+| `.deckent/workspace/IDENTITY.md` | Stack detection sonuçlarıyla dolu proje kimliği |
+| `.deckent/docs/quick-start.md` | 5 adımda ilk sprint rehberi (TR/EN) |
+| `.deckent/docs/directives-guide.md` | DIRECTIVES format rehberi + alan açıklamaları |
+| `.deckent/docs/config-reference.md` | Tüm config.json ayarları referansı |
+| TempSkill init'te | `project-conventions` skill otomatik oluşturuluyor |
+| TempAgent init'te | Proje stack'ine göre temp agent'lar oluşturuluyor |
+| DECKENT.md Workflow | Workflow adımları, DIRECTIVES format, Providers bölümü |
+| Worker prompt stack-aware | Hardcoded `tsc`/`vitest` yerine DECKENT.md referansı |
+| allowedTools genişletme | `Edit`, `Glob`, `Grep` worker tool'larına eklendi |
+
+### Bilinen Açık Bug'lar
+
+| Bug | Açıklama | Önem | Not |
+|-----|----------|------|-----|
+| BUG-17 | Worker .result yazmıyor (orijinal) | Low | BUG-24 fallback ile kısmen çözüldü |
+| BUG-20 | İzin dialogu worker'ı yavaşlatıyor | Low | `--dangerously-skip-permissions` ile bypass edilebilir |
+
+---
+
+## Docker & Altyapı
 
 ### A. Bulunan ve Duzeltilen 3 Kritik Sorun
 
@@ -888,6 +1038,99 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 
 ---
 
+## Başarı Metrikleri & Risk
+
+### Self-Improvement Olcumleri
+| Metrik | Sprint 084 Oncesi | Sprint 086 Sonrasi | Hedef (10 sprint) | Olcum |
+|--------|-------------------|--------------------|--------------------|-------|
+| Sprint NO_GO rate | ~%15 | %0 (085+086) | <%5 | Sprint retro |
+| Agent secim accuracy | Bilinmiyor | Olculebilir (decision trail) | >%85 | Decision JSON |
+| Otomatik uygulanan kural | 0 | Altyapi hazir | 5+ per sprint | applied-rules.json |
+| Intent classifier ogrenme | Yok | updateIntentWeights() aktif | <%10 yanlis | intent-weights.json |
+| Sessiz hata | 49 | ~20 | 0 | grep count |
+| Planner gecmis bilgisi | Yok | getWorstCombinations() | Her sprint | Planner prompt |
+| Coverage threshold | Hardcoded %90 | Config'den okunuyor | Proje-bazli | config.json |
+
+### Otonomi Olcumleri
+| Metrik | Mevcut | Hedef (15 sprint) | Olcum |
+|--------|--------|-------------------|-------|
+| Insan mudahale / sprint | ~3-5 | <1 | Sprint log |
+| Proaktif gorev sayisi | ✅ Daemon aktif | 5+ / gun | Heartbeat log |
+| Self-heal orani | %0 | >%50 | Auto-fix / total error |
+| Cross-sprint ogrenme | Minimal | Tam | Memory recall accuracy |
+
+### Rakip Yakinlastirma
+| Metrik | Mevcut | Hedef | Referans Rakip |
+|--------|--------|-------|----------------|
+| Skill/entegrasyon sayisi | 21 | 50+ | OpenClaw (13,729) |
+| Model sayisi | 13 (ModelRegistry) | 15+ | Perplexity (19) |
+| Kanal entegrasyonu | 0 | 5+ | OpenClaw (50+) |
+| Human checkpoint | ✅ 3 faz (Sprint 088) | 3+ faz | Cowork |
+| Codebase indeks | Yok | AST+RAG | Devin Wiki |
+
+### Risk Analizi
+
+| Risk | Olasilik | Etki | Azaltma |
+|------|----------|------|---------|
+| Auto-apply kurallar sistemi bozarsa | Dusuk | Yuksek | Kural versiyonlama + rollback + sandbox test |
+| Heartbeat daemon kaynak tuketimi | Orta | Orta | Configurable interval, idle detection |
+| Human checkpoint UX friction | Yuksek | Orta | Progressive disclosure, smart defaults |
+| Intent feedback yanlis ogrenme | Orta | Yuksek | Minimum sample (10+), slow decay |
+| Multi-sprint zincirleme sonsuz dongu | Dusuk | Yuksek | Max chain depth, cost guard |
+| Browser control guvenlik acigi | Orta | Yuksek | Sandbox, permission system |
+
+---
+
+## Stratejik Konumlandırma
+
+### ✅ Kisa Vade — TAMAMLANDI (Sprint 085-086): "Ogrenen Orkestrator"
+- ✅ Ogrenme dongusu kapatildi (rule auto-apply + synergy + intent feedback + planner gecmis)
+- ✅ Kurallar otomatik evrilir (applyEvolvedRules, confidence >= 0.85)
+- ✅ Karar loglama + gozlemlenebilirlik (decision trail + .brain/ERRORS.md)
+- ✅ Intent classifier sonuclardan ogreniyor (INTENT_WEIGHTS)
+- **Rakiplerden farki:** Hicbir rakip (OpenClaw, Devin, Perplexity, Cowork) ogrenme dongusu kapatmis degil
+
+### ✅ Orta Vade — TAMAMLANDI (Sprint 087-097): "Proaktif Gelistirici Asistani"
+- ✅ Heartbeat daemon ile proaktif calisma (OpenClaw modeli) — Sprint 088
+- ✅ Human checkpoint'ler ile guvenilir otonomi (Cowork modeli) — Sprint 088
+- ✅ Sprint timeout reform — sinirsiz sureli calisma — Sprint 088
+- ✅ Adaptive thresholds (NO_GO rate bazli otomatik ayar) — Sprint 088
+- ✅ Mid-sprint reroute guclendirme (max 3 deneme) — Sprint 088
+- ✅ Agent/Skill Evrim Pipeline (promotion/demotion, evolved rules) — Sprint 091
+- ✅ ModelRegistry + tier-based routing (13 model, 3 provider, tek kaynak) — Sprint 097
+- ⏳ Slack/GitHub entegrasyonlari
+- **Rakiplerden farki:** Multi-agent + ogrenme + proaktif + checkpoints + acik kaynak
+
+### Uzun Vade (Sprint 103-115): "Otonom Yazilim Takimi"
+- Codebase semantik anlayis (Devin Wiki modeli)
+- Critique layer ile cok-modelli dogrulama (Cowork modeli)
+- Browser/desktop kontrol (Claude Computer Use)
+- Multi-sprint zincirleme (gunlerce calisan gorevler, Perplexity modeli)
+- Provider genisleme: Grok, Llama, Mistral, DeepSeek (ModelRegistry altyapisi hazir)
+- **Rakiplerden farki:** Tam takim simulasyonu — tek kisiden cok ekip
+
+---
+
+## Sonuç
+
+**Deckent'in mevcut durumu (Sprint 102+ sonrasi, v0.3.0-beta.3):**
+- 102+ sprint, 12,051+ test (413 dashboard), 96% coverage
+- 16 built-in agent (+2 temp), 21 built-in skill
+- 13 model, 3 provider (Claude, Codex, Gemini), ModelRegistry ile tek kaynak
+- 20 MCP tool + 8 resource, 35+ CLI komutu
+- Self-improving routing AKTIF (kural evrimi, synergy, intent ogrenme, planner gecmis)
+- Decision trail ile tam gozlemlenebilirlik
+- ✅ Heartbeat Daemon AKTIF (proaktif gorev calistirma) — Sprint 088
+- ✅ Human Checkpoints AKTIF (plan/evaluate/fix onay noktalari) — Sprint 088
+- ✅ Sprint Timeout Reform (sinirsiz calisma destegi) — Sprint 088
+- ✅ Adaptive Thresholds (NO_GO rate bazli otomatik ayar) — Sprint 088
+- ✅ Mid-Sprint Reroute (max 3, configurable) — Sprint 088
+- ✅ Agent/Skill Evrim Pipeline (promotion/demotion, evolved rules) — Sprint 091
+- ✅ ModelRegistry + Tier-Based Routing (13 model, 3 provider) — Sprint 097
+- ✅ Provider-Agnostic Config (brain_tier/worker_tier) — Sprint 097
+- ✅ Docker Spawn Backend (container-based worker isolation) — Sprint 101
+- ✅ Sprint Lock Mekanizmasi (coklu process cakisma engeli) — Sprint 101
+
 **Tamamlanan stratejik hedefler (Sprint 085-103+):**
 1. ✅ **Ogrenme dongusunu kapat** — rule auto-apply + synergy → router + intent feedback + planner gecmis (Sprint 085-086)
 2. ✅ **Gozlemlenebilirlik** — sessiz catch → debugLog + decision trail + .brain/ERRORS.md (Sprint 085-088)
@@ -951,6 +1194,5 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - [Claude Agent SDK](https://www.anthropic.com/engineering/building-agents-with-the-claude-agent-sdk) — Resmi agent altyapisi
 - [Claude Computer Use](https://www.cnbc.com/2026/03/24/anthropic-claude-ai-agent-use-computer-finish-tasks.html) — Desktop otomasyon
 - [Claude Dispatch](https://claude.com/blog/dispatch-and-computer-use) — Telefon → bilgisayar gorev akisi
-<!-- CLI deckent run test: 2026-04-07T16:01:51+03:00 — başarılı -->
 - [Claude Code Features](https://help.apiyi.com/en/claude-code-2026-new-features-loop-computer-use-remote-control-guide-en.html) — Loop, Schedule, Computer Use
 - [AI Agents Comparison 2026](https://blog.iskohm.com/en/posts/ai-agents-comparison-2026-cursor-copilot-kilo-code-claude-code/) — Tam karsilastirma
