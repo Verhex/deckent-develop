@@ -1,51 +1,28 @@
-# DIRECTIVES — Sprint 108: Tmux Backend Smoke Test
+# DIRECTIVES — Sprint 109: Tmux CLI Backend Smoke Test
 
-## Goal: Tmux backend dogrulama — dosya olusturma + test yazma. MCP ile baslatilacak.
+## Goal: Tmux backend CLI ile dogrulama — dosya olusturma. CLI'den baslatilacak.
 
 ---
 
-## Task 1: Tmux Smoke Dosyalari
+## Task 1: Tmux CLI Smoke Dosyalari
 - Model: sonnet
 - Effort: low
 - Skills: typescript-expert
-- Files: docs/tmux-smoke/x.md, docs/tmux-smoke/y.md, docs/tmux-smoke/z.md
-- Scope: docs/tmux-smoke/
+- Files: docs/tmux-cli-smoke/p.md, docs/tmux-cli-smoke/q.md, docs/tmux-cli-smoke/r.md
+- Scope: docs/tmux-cli-smoke/
 
 ### Description
-docs/tmux-smoke/ dizini altinda 3 markdown dosyasi olustur:
+docs/tmux-cli-smoke/ dizini altinda 3 markdown dosyasi olustur:
 
-x.md: "# Tmux Smoke X\nSprint 108 — tmux backend test."
-y.md: "# Tmux Smoke Y\nSprint 108 — tmux backend test."
-z.md: "# Tmux Smoke Z\nSprint 108 — tmux backend test."
+p.md: "# Tmux CLI Smoke P\nSprint 109 — tmux CLI backend test."
+q.md: "# Tmux CLI Smoke Q\nSprint 109 — tmux CLI backend test."
+r.md: "# Tmux CLI Smoke R\nSprint 109 — tmux CLI backend test."
 
-**Kanit:** `ls docs/tmux-smoke/` → x.md y.md z.md
+**Kanit:** `ls docs/tmux-cli-smoke/` → p.md q.md r.md
 
 **Test:** Dosyalar var
 
 ---
 
-## Task 2: Tmux Smoke Test Dosyasi
-- Model: sonnet
-- Effort: low
-- Skills: testing-expert
-- Files: tests/smoke/tmux-smoke.test.ts
-- Scope: tests/smoke/
-
-### Description
-tests/smoke/tmux-smoke.test.ts dosyasi olustur. 3 basit test yaz:
-
-1. docs/tmux-smoke/x.md var mi kontrol et
-2. docs/tmux-smoke/y.md var mi kontrol et
-3. docs/tmux-smoke/z.md var mi kontrol et
-
-Her test `existsSync` ile dosyanin varligini dogrular.
-
-**Kanit:** `npx vitest run tests/smoke/tmux-smoke.test.ts` → 3 pass
-
-**Test:** 3 test geciyor
-
----
-
 ## Quality Rules
-- tsc --noEmit MUST pass
-- docs/tmux-smoke/ altinda 3 dosya olmali
+- docs/tmux-cli-smoke/ altinda 3 dosya olmali
