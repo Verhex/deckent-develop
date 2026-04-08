@@ -6,13 +6,19 @@
 
 ## Vizyon
 
-Deckent, yazılım geliştirmeyi tek bir AI asistanından çok-ajanlı bir ekibe dönüştüren açık kaynak orkestrasyon CLI'dır. İnsan sadece hedefi tanımlar — Deckent planlar, paralel worker'lar atar, kaliteyi izler ve sonuçları değerlendirir. Nihai hedef: bir DIRECTIVES.md yazmak, gerisini Deckent'e bırakmak.
+Deckent, tam otonom bir AI geliştirme asistanı olmaya doğru ilerliyor — OpenClaw, Microsoft Copilot Cowork ve Devin ile aynı kategoride. Mevcut faz **AI agent orkestrasyon**: paralel sprint'lerle geliştirme görevlerini planlayan, yürüten ve değerlendiren çok-ajanlı bir CLI. Bu varış noktası değil — temeldir.
+
+Uzun vadeli hedef: Deckent, her zaman açık, kendi kendini geliştiren bir geliştirme takım arkadaşı olacak. Kod tabanınızı anlayacak, her sprint'ten öğrenecek, proaktif planlama yapacak ve minimum insan müdahalesiyle çalışacak. Açık kaynak, self-hosted, provider-agnostik — anti-Devin.
 
 ---
 
 ## Misyon
 
 Solo AI asistanı kullanımı doğası gereği sınırlıdır: tek context window, tek görev, tek bakış açısı. Deckent bu sınırı Brain-Worker-Auditor mimarisi ile aşar. Brain stratejiyi belirler, Worker'lar paralel çalışır, Auditor kaliteyi garanti eder. Her sprint sonunda öğrenimler hafızaya yazılır — sistem her iterasyonda daha iyi kararlar alır.
+
+**Şu an neredeyiz:** AI orkestrasyon CLI — 3 spawn backend (tmux, subprocess, Docker), 3 AI provider, 16 agent, 21 skill ile sprint bazlı çok-ajanlı yürütme.
+
+**Nereye gidiyoruz:** Otonom AI asistanı — heartbeat daemon, proaktif görev yürütme, kanal entegrasyonları (Slack, GitHub), kod tabanı semantik anlayışı, always-on gateway. OpenClaw'ın mimarisi + Deckent'in çok-ajanlı disiplini.
 
 ---
 
@@ -28,15 +34,15 @@ Solo AI asistanı kullanımı doğası gereği sınırlıdır: tek context windo
 
 ## Rakip Analizi
 
-| Araç | Yaklaşım | Güçlü Yön | Zayıf Yön | Deckent Farkı |
+| Araç | Kategori | Güçlü Yön | Zayıf Yön | Deckent Konumu |
 |------|----------|-----------|-----------|---------------|
-| **Devin** | Tam otonom AI geliştirici | End-to-end otonom çalışma | Kapalı kaynak, pahalı, kontrol eksik | Açık kaynak, orkestrasyon odaklı, kullanıcı kontrollü |
-| **OpenHands** | Açık kaynak AI geliştirici | Topluluk destekli, genişletilebilir | Tek agent, sprint lifecycle yok | Multi-agent, hafıza/öğrenim, kalite kapısı |
-| **Aider** | Git-entegre AI pair programming | Hafif, hızlı, git-native | Tek agent, orkestrasyon yok | Paralel worker, planlama, değerlendirme döngüsü |
-| **Cursor** | AI-destekli IDE | Zengin IDE deneyimi | IDE'ye bağlı, orkestrasyon yok | IDE-agnostik CLI, çoklu provider, sprint yaşam döngüsü |
-| **Claude Code (solo)** | Tek AI asistanı | Güçlü tek-görev performansı | Tek context, paralel yok | Claude Code'u worker olarak kullanır, orkestrasyon katmanı ekler |
+| **OpenClaw** | Otonom AI asistanı (343K+ star) | Always-on daemon, 13K+ skill, 50+ kanal | Tek agent, sprint lifecycle yok, scope enforcement yok | Çok-ajanlı orkestrasyon + sprint disiplini + öğrenim |
+| **Copilot Cowork** | Kurumsal AI orkestratör | Çok-modelli critique layer, M365 entegrasyonu | Kapalı kaynak, $30+/kullanıcı/ay, self-hosted yok | Açık kaynak, self-hosted, ücretsiz, provider-agnostik |
+| **Devin** | Otonom yazılım mühendisi | End-to-end otonom, interaktif planlama | Tek agent, kapalı kaynak, $20-500/ay | Çok-ajanlı paralel, açık kaynak, ücretsiz |
+| **Perplexity Computer** | Çok-modelli AI agent | 19 model, günler süren görevler, 400+ uygulama | $200-325/ay, self-hosted yok, sprint planlama yok | Self-hosted, 13 model, sprint bazlı yapı |
+| **Claude Code (solo)** | Tek AI asistanı | Güçlü tek-görev performansı | Tek context, paralel yok | Claude Code'u worker olarak kullanır, orkestrasyon ekler |
 
-**Deckent'in temel farkı:** Orkestrasyon. Tek bir AI asistanını güçlendirmek yerine, birden fazla AI worker'ı bir sprint disiplini içinde koordine eder. Planlama, yürütme, değerlendirme ve öğrenim tek bir döngüde birleşir.
+**Deckent'in benzersiz konumu:** Çok-ajanlı paralel yürütme + sprint yaşam döngüsü + scope enforcement + hafıza/öğrenim + çoklu provider + self-hosted'ı tek çatı altında birleştiren tek açık kaynak araç. Mevcut faz: orkestrasyon CLI. Sonraki faz: otonom asistan (OpenClaw/Cowork sınıfı).
 
 ---
 
@@ -50,37 +56,46 @@ TypeScript, tip güvenliği ile büyük kod tabanlarında güvenilir refactoring
 
 Tek bir AI provider'a bağımlılık hem maliyet hem de erişilebilirlik riski oluşturur. Deckent, provider-agnostic bir mimari ile farklı görevlere farklı modeller atayabilir: opus karmaşık mimari kararlar için, haiku basit dokümantasyon için. Provider fallback zinciri kesinti dayanıklılığı sağlar.
 
-### tmux + Subprocess Backend
+### Üçlü Spawn Backend (tmux + Subprocess + Docker)
 
-tmux, birden fazla AI worker'ı paralel terminal session'larında çalıştırır — her worker kendi izole ortamında kod yazar, test eder ve raporlar. tmux olmayan ortamlar (Windows gibi) için subprocess backend alternatif sunar. Bu çift backend yaklaşımı platform bağımsızlığı sağlar.
+Farklı bağlamlar için üç backend: **tmux** (en hızlı, canlı terminal, Linux/macOS default), **subprocess** (Windows fallback, dosya bazlı tracking), **Docker** (container izolasyonu, kaynak limitleri, CI/CD hazır). Her worker hangi backend olursa olsun kendi izole ortamında çalışır.
 
 ### MCP (Model Context Protocol) Entegrasyonu
 
 MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 20 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
 
+### Docker Container İzolasyonu
+
+Worker'lar izole Docker container'larında bellek limitleri, non-root yürütme ve volume mount auth ile çalışır. Proje dosya sistemi erişimi container bazında kontrol edilir. Bu, kurumsal deployment, CI/CD entegrasyonu ve gelecekteki Kubernetes ölçekleme için temeldir.
+
 ---
 
 ## Yol Haritası
 
-### Faz 1: "Kendin Kullan" — Tamamlandı
+### Faz 1: "Orkestrasyon Temeli" — Tamamlandı (Sprint 1-82)
 
-npm paketleme, dogfooding, Windows desteği, temel sprint döngüsü. Vizetron (Python/FastAPI) projesinde gerçek sprint'ler başarıyla tamamlandı.
+Temel sprint yaşam döngüsü, çok-ajanlı paralel yürütme, tmux/subprocess backend'ler, MCP entegrasyonu, çoklu provider desteği (Claude + Codex + Gemini), ModelRegistry, agent/skill ekosistemi, heartbeat daemon, human checkpoint'ler, adaptive threshold'lar.
 
-### Faz 1.5: "Init UX + Onboarding" — Tamamlandı
+### Faz 2: "Beta Hazırlığı" — Aktif (Sprint 83-115)
 
-Init wizard, stack detection, quick-start rehberi, worker prompt iyileştirmeleri. 26 dogfooding bug'ının 22'si düzeltildi.
+Docker container backend, dokümantasyon konsolidasyonu (BETA-TRACKER, i18n generator'lar, docs.json otomasyonu), ERRORS.md aktif loglama, backend smoke testing (tmux + subprocess + Docker, MCP + CLI), versiyon 0.4.0-beta.1.
 
-### Faz 2: "Genel Kullanılabilirlik" — Aktif
+### Faz 3: "Public Beta" — Sonraki
 
-Provider ve tier generalizasyonu, dokümantasyon tutarlılığı, god object split, güvenlik altyapısı. Multi-provider test ve dashboard iyileştirmeleri devam ediyor.
+VerhexIO/deckent açık kaynak repo, CI/CD pipeline (GitHub Actions + Docker backend), npm publish, .detect-secrets, CONTRIBUTING rehberi, topluluk onboarding.
 
-### Faz 3: "Dokümantasyon"
+### Faz 4: "Otonom Asistan" — Gelecek
 
-TR+EN çift dil desteği, VISION belgesi, link audit, config dashboard. Kullanıcı-dostu dokümantasyonla onboarding süresini kısaltma.
+Orkestrasyon CLI'dan otonom AI asistanına sıçrayış:
+- **Always-on gateway** — daemon modu, SSE dashboard, uzaktan kontrol
+- **Kanal entegrasyonları** — Slack bot, GitHub Issues/PR otomasyonu, Linear/Jira sync
+- **Kod tabanı semantik anlayışı** — AST indeksleme, bağımlılık grafı, RAG ile zenginleştirilmiş context
+- **Multi-sprint zincirleme** — günler süren otonom görev yürütme
+- **Critique layer** — çok-modelli doğrulama (yazar + gözden geçiren deseni)
+- **Browser/Computer Use** — Claude Computer Use SDK entegrasyonu
+- **Provider genişleme** — Grok, Llama, Mistral, DeepSeek (ModelRegistry altyapısı hazır)
 
-### Faz 4: "Public Repo"
-
-Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna taşıma, CI/CD pipeline, npm publish. Topluluk katkısına açılma.
+Deckent'in OpenClaw/Cowork/Devin kategorisine girdiği nokta — başka bir tek-ajanlı araç olarak değil, tek açık kaynak çok-ajanlı otonom geliştirme platformu olarak.
 
 ---
 
@@ -91,6 +106,7 @@ Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna
 - **Kalite** — Auditor kalite kapısı, GO/NO-GO değerlendirmesi ve test zorunluluğu ile her sprint kalite standardını karşılar.
 - **Otonom ama kontrollü** — Deckent otonom çalışır ama kullanıcı her zaman kontroldedir. Scope enforcement, audit trail ve memory budget ile sınırlar nettir.
 - **Sürekli öğrenim** — Her sprint sonunda MEMORY.md ve PATTERNS.md güncellenir. Sistem zamanla daha iyi kararlar alır, aynı hataları tekrarlamaz.
+- **Önce orkestrasyon, sonra otonomi** — Deckent sprint bazlı orkestratör olarak başlar ve tam otonomi'ye doğru evrilir. Her faz bir öncekinin üzerine inşa edilir — kestirme yok, yarım iş yok.
 
 ---
 
@@ -98,7 +114,7 @@ Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-107 |
+| Sprint | sprint-113 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -110,19 +126,23 @@ Secret leak koruması (.detect-secrets), VerhexIO/deckent açık kaynak reposuna
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
+| sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
 | sprint-106 | tamamlandı |
 | sprint-107 | tamamlandı |
 | sprint-108 | tamamlandı |
+| sprint-110 | tamamlandı |
+| sprint-111 | tamamlandı |
+| sprint-113 | tamamlandı |
 
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-108 |
-| Toplam Task | 2 |
-| Tamamlanan | 2 |
-| Tech Debt | 2 |
+| Sprint | sprint-113 |
+| Toplam Task | 1 |
+| Tamamlanan | 1 |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Süre | 2dk 55sn |
+| Süre | 2dk 25sn |
 | Coverage | 0.0% |

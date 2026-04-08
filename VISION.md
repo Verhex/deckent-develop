@@ -6,13 +6,19 @@
 
 ## Vision
 
-Deckent is an open-source orchestration CLI that transforms software development from a single AI assistant into a multi-agent team. The human defines the goal — Deckent plans, assigns parallel workers, monitors quality, and evaluates results. The ultimate objective: write a DIRECTIVES.md and let Deckent handle the rest.
+Deckent is building toward a fully autonomous AI development assistant — in the same category as OpenClaw, Microsoft Copilot Cowork, and Devin. The current phase is **AI agent orchestration**: a multi-agent CLI that plans, executes, and evaluates development tasks in parallel sprints. This is not the destination — it is the foundation.
+
+The long-term goal: Deckent becomes an always-on, self-improving development teammate. It understands your codebase, learns from every sprint, plans proactively, and operates with minimal human input. Open source, self-hosted, provider-agnostic — the anti-Devin.
 
 ---
 
 ## Mission
 
-Using a solo AI assistant is inherently limited: one context window, one task, one perspective. Deckent breaks through this ceiling with its Brain-Worker-Auditor architecture. Brain sets the strategy, Workers execute in parallel, and Auditor guarantees quality. After every sprint, learnings are persisted to memory — the system makes better decisions with each iteration.
+Solo AI assistants are inherently limited: one context window, one task, one perspective. Deckent breaks through this ceiling with its Brain-Worker-Auditor architecture. Brain sets the strategy, Workers execute in parallel, Auditor guarantees quality. After every sprint, learnings persist to memory — the system makes better decisions with each iteration.
+
+**Where we are now:** AI orchestration CLI — sprint-based multi-agent execution with 3 spawn backends (tmux, subprocess, Docker), 3 AI providers, 16 agents, 21 skills.
+
+**Where we are going:** Autonomous AI assistant — heartbeat daemon, proactive task execution, channel integrations (Slack, GitHub), codebase semantic understanding, always-on gateway. Think OpenClaw's architecture + Deckent's multi-agent discipline.
 
 ---
 
@@ -28,15 +34,15 @@ Using a solo AI assistant is inherently limited: one context window, one task, o
 
 ## Competitive Analysis
 
-| Tool | Approach | Strength | Weakness | Deckent Differentiator |
-|------|----------|----------|----------|------------------------|
-| **Devin** | Fully autonomous AI developer | End-to-end autonomous execution | Closed source, expensive, limited control | Open source, orchestration-focused, user-controlled |
-| **OpenHands** | Open-source AI developer | Community-driven, extensible | Single agent, no sprint lifecycle | Multi-agent, memory/learning, quality gates |
-| **Aider** | Git-integrated AI pair programming | Lightweight, fast, git-native | Single agent, no orchestration | Parallel workers, planning, evaluation loop |
-| **Cursor** | AI-powered IDE | Rich IDE experience | IDE-locked, no orchestration | IDE-agnostic CLI, multi-provider, sprint lifecycle |
-| **Claude Code (solo)** | Single AI assistant | Strong single-task performance | Single context, no parallelism | Uses Claude Code as a worker, adds an orchestration layer |
+| Tool | Category | Strength | Weakness | Deckent Position |
+|------|----------|----------|----------|-----------------|
+| **OpenClaw** | Autonomous AI assistant (343K+ stars) | Always-on daemon, 13K+ skills, 50+ channels | Single agent, no sprint lifecycle, no scope enforcement | Multi-agent orchestration + sprint discipline + learning |
+| **Copilot Cowork** | Enterprise AI orchestrator | Multi-model critique layer, M365 integration | Closed source, $30+/user/month, no self-hosted | Open source, self-hosted, free, provider-agnostic |
+| **Devin** | Autonomous software engineer | End-to-end autonomous, interactive planning | Single agent, closed source, $20-500/month | Multi-agent parallel, open source, free |
+| **Perplexity Computer** | Multi-model AI agent | 19 models, days-long tasks, 400+ apps | $200-325/month, no self-hosted, no sprint planning | Self-hosted, 13 models, sprint-based structure |
+| **Claude Code (solo)** | Single AI assistant | Strong single-task performance | Single context, no parallelism | Uses Claude Code as a worker, adds orchestration |
 
-**Deckent's core differentiator:** Orchestration. Rather than supercharging a single AI assistant, it coordinates multiple AI workers within a sprint discipline. Planning, execution, evaluation, and learning converge in a single loop.
+**Deckent's unique position:** The only open-source tool that combines multi-agent parallel execution + sprint lifecycle + scope enforcement + memory/learning + multi-provider support + self-hosted. Current phase: orchestration CLI. Next phase: autonomous assistant (OpenClaw/Cowork class).
 
 ---
 
@@ -50,37 +56,46 @@ TypeScript delivers type safety that enables confident refactoring across large 
 
 Depending on a single AI provider creates both cost and availability risk. Deckent's provider-agnostic architecture assigns different models to different tasks: opus for complex architectural decisions, haiku for simple documentation. A provider fallback chain ensures resilience against outages.
 
-### tmux + Subprocess Backend
+### Triple Spawn Backend (tmux + Subprocess + Docker)
 
-tmux runs multiple AI workers in parallel terminal sessions — each worker writes code, runs tests, and reports in its own isolated environment. For platforms without tmux (such as Windows), a subprocess backend provides an alternative. This dual-backend approach ensures platform independence.
+Three backends for different contexts: **tmux** (fastest, live terminal, Linux/macOS default), **subprocess** (Windows fallback, file-based tracking), **Docker** (container isolation, resource limits, CI/CD ready). Each worker runs in its own isolated environment regardless of backend.
 
 ### MCP (Model Context Protocol) Integration
 
 MCP integrates Deckent with any MCP-compatible IDE or tool. With 20 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
 
+### Docker Container Isolation
+
+Workers run in isolated Docker containers with memory limits, non-root execution, and volume-mounted auth. Project filesystem access is controlled per-container. This is the foundation for enterprise deployment, CI/CD integration, and future Kubernetes scaling.
+
 ---
 
 ## Roadmap
 
-### Phase 1: "Eat Your Own Dog Food" — Complete
+### Phase 1: "Orchestration Foundation" — Complete (Sprint 1-82)
 
-npm packaging, dogfooding, Windows support, core sprint cycle. Real sprints successfully completed on the Vizetron (Python/FastAPI) project.
+Core sprint lifecycle, multi-agent parallel execution, tmux/subprocess backends, MCP integration, multi-provider support (Claude + Codex + Gemini), ModelRegistry, agent/skill ecosystem, heartbeat daemon, human checkpoints, adaptive thresholds.
 
-### Phase 1.5: "Init UX + Onboarding" — Complete
+### Phase 2: "Beta Readiness" — Active (Sprint 83-115)
 
-Init wizard, stack detection, quick-start guide, worker prompt improvements. 22 of 26 dogfooding bugs resolved.
+Docker container backend, documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), version 0.4.0-beta.1.
 
-### Phase 2: "General Usability" — Active
+### Phase 3: "Public Beta" — Next
 
-Provider and tier generalization, documentation consistency, god object split, security infrastructure. Multi-provider testing and dashboard improvements in progress.
+VerhexIO/deckent open-source repository, CI/CD pipeline (GitHub Actions + Docker backend), npm publish, .detect-secrets, CONTRIBUTING guide, community onboarding.
 
-### Phase 3: "Documentation"
+### Phase 4: "Autonomous Assistant" — Future
 
-TR+EN bilingual support, VISION document, link audit, config dashboard. Shortening onboarding time through user-friendly documentation.
+The leap from orchestration CLI to autonomous AI assistant:
+- **Always-on gateway** — daemon mode, SSE dashboard, remote control
+- **Channel integrations** — Slack bot, GitHub Issues/PR automation, Linear/Jira sync
+- **Codebase semantic understanding** — AST indexing, dependency graph, RAG-enhanced context
+- **Multi-sprint chaining** — days-long autonomous task execution
+- **Critique layer** — multi-model verification (writer + reviewer pattern)
+- **Browser/Computer Use** — Claude Computer Use SDK integration
+- **Provider expansion** — Grok, Llama, Mistral, DeepSeek (ModelRegistry ready)
 
-### Phase 4: "Public Repo"
-
-Secret leak protection (.detect-secrets), migration to the VerhexIO/deckent open-source repository, CI/CD pipeline, npm publish. Opening up to community contributions.
+This is where Deckent enters the OpenClaw/Cowork/Devin category — not as another single-agent tool, but as the only open-source multi-agent autonomous development platform.
 
 ---
 
@@ -91,6 +106,7 @@ Secret leak protection (.detect-secrets), migration to the VerhexIO/deckent open
 - **Quality** — Auditor quality gates, GO/NO-GO evaluation, and mandatory testing ensure every sprint meets quality standards.
 - **Autonomous yet controlled** — Deckent operates autonomously, but the user is always in control. Scope enforcement, audit trails, and memory budgets set clear boundaries.
 - **Continuous learning** — MEMORY.md and PATTERNS.md are updated after every sprint. The system improves its decisions over time and avoids repeating the same mistakes.
+- **Orchestration first, autonomy next** — Deckent starts as a sprint-based orchestrator and evolves toward full autonomy. Each phase builds on the previous — no shortcuts, no half measures.
 
 ---
 
@@ -98,7 +114,7 @@ Secret leak protection (.detect-secrets), migration to the VerhexIO/deckent open
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-107 |
+| Sprint | sprint-113 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -110,19 +126,23 @@ Secret leak protection (.detect-secrets), migration to the VerhexIO/deckent open
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
+| sprint-103 | tamamlandı |
 | sprint-104 | tamamlandı |
 | sprint-105 | tamamlandı |
 | sprint-106 | tamamlandı |
 | sprint-107 | tamamlandı |
 | sprint-108 | tamamlandı |
+| sprint-110 | tamamlandı |
+| sprint-111 | tamamlandı |
+| sprint-113 | tamamlandı |
 
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-108 |
-| Toplam Task | 2 |
-| Tamamlanan | 2 |
-| Tech Debt | 2 |
+| Sprint | sprint-113 |
+| Toplam Task | 1 |
+| Tamamlanan | 1 |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Süre | 2dk 55sn |
+| Süre | 2dk 25sn |
 | Coverage | 0.0% |
