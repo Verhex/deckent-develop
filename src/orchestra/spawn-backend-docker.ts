@@ -86,7 +86,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Build Claude CLI command inside container
     const claudeArgs: string[] = ['-p', '-', '--model', model];
     if (opts?.allowedTools) {
-      claudeArgs.push('--allowedTools', `'${opts.allowedTools}'`);
+      // No shell quoting here — the value is passed inside sh -c which handles it
+      // Single quotes around the value would conflict with the outer sh -c '...' wrapper
+      claudeArgs.push('--allowedTools', opts.allowedTools);
     }
     // IMMUTABLE — Deckent standard: workers MUST have full write permissions
     claudeArgs.push('--dangerously-skip-permissions');
@@ -99,8 +101,19 @@ export class DockerSpawnBackend implements SpawnBackend {
       linesRemoved: 0, testsPassed: false, coverage: 0,
       selfAssessment: 'NO_GO', notes: 'Docker worker exited without writing result file',
     });
-    // EXIT trap: guarantees .result file is ALWAYS written, even if Claude crashes
-    const containerCmd = `RFILE=${resultPath}; trap '[ -f $RFILE ] || echo '"'"'${fallbackJson}'"'"' > $RFILE' EXIT; timeout ${this.timeoutSeconds} sh -c '${claudeCmd} < ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}' || echo "WORKER_TIMEOUT" > ${timeoutPath}`;
+    // Write worker script to .tasks/ — avoids shell quoting issues with allowedTools parentheses
+    const scriptFileName = `.worker-${taskId}.sh`;
+    const scriptHostPath = join(tasksDir, scriptFileName);
+    const scriptContent = [
+      '#!/bin/sh',
+      `RFILE="${resultPath}"`,
+      // EXIT trap: guarantees .result file is ALWAYS written, even if Claude crashes
+      `trap '[ -f "$RFILE" ] || echo '"'"'${fallbackJson}'"'"' > "$RFILE"' EXIT`,
+      `timeout ${this.timeoutSeconds} ${claudeCmd} < "${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}" || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
+    ].join('\n');
+    writeFileSync(scriptHostPath, scriptContent, { mode: 0o755 });
+
+    const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
 
     // Build docker run args
     // Run as host user to avoid root — Claude CLI blocks --dangerously-skip-permissions as root
@@ -278,11 +291,11 @@ export class DockerSpawnBackend implements SpawnBackend {
 
       this.containers.delete(taskId);
 
-      // Cleanup prompt file
+      // Cleanup prompt + worker script files
       try {
-        const promptFiles = require('node:fs').readdirSync(tasksDir) as string[];
-        for (const f of promptFiles) {
-          if (f.startsWith('.prompt-') && f.endsWith('.txt')) {
+        const tmpFiles = require('node:fs').readdirSync(tasksDir) as string[];
+        for (const f of tmpFiles) {
+          if ((f.startsWith('.prompt-') && f.endsWith('.txt')) || (f.startsWith('.worker-') && f.endsWith('.sh'))) {
             // Only cleanup if no other container is running
             if (this.containers.size === 0) {
               try { unlinkSync(join(tasksDir, f)); } catch { /* ok */ }
