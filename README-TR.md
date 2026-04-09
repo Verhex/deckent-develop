@@ -4,7 +4,7 @@
 
 **Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-109%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-123%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
 
@@ -388,7 +388,7 @@ Tam yapılandırma referansı için [docs/reference/config-reference.md](docs/re
 
 ## Docker Backend (İzole Worker'lar)
 
-Worker'lar izole Docker container'larında çalışır — worker'lar arası dosya çakışması olmaz.
+Worker'lar izole Docker container'larında çalışır — worker'lar arası dosya çakışması olmaz. Sprint 119-123 ile **canlı doğrulandı** (CLI + MCP).
 
 ### Kurulum
 
@@ -403,6 +403,11 @@ npx deckent config set spawn_backend docker
 - `.tasks/` read-write olarak mount edilir (sonuçlar, heartbeat'ler)
 - `~/.claude/` mount üzerinden kimlik doğrulama (oturum tabanlı)
 - Root olmayan kullanıcı ile çalıştırma (host UID/GID)
+- Ayarlanabilir timeout: `npx deckent config set docker_timeout 1800` (varsayılan: 1200s)
+- Config-aware backend routing: `spawn_backend` tüm spawn yollarında (CLI, MCP, sprint-controller) okunur
+- Dashboard'da worker başına backend badge gösterimi (Docker/tmux/subprocess)
+
+**Test:** 10 e2e integration test — spawn, heartbeat, cleanup, concurrency, log extraction.
 
 Tam rehber için [docs/guide/docker-backend.md](docs/guide/docker-backend.md) dosyasına bakın.
 

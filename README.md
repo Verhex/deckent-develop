@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-109%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-123%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -386,7 +386,7 @@ See [docs/reference/config-reference.md](docs/reference/config-reference.md) for
 
 ## Docker Backend (Isolated Workers)
 
-Workers run in isolated Docker containers — no cross-worker file conflicts.
+Workers run in isolated Docker containers — no cross-worker file conflicts. **Live-verified** across Sprint 119-123 (CLI + MCP).
 
 ### Setup
 
@@ -401,6 +401,11 @@ npx deckent config set spawn_backend docker
 - `.tasks/` mounted read-write (results, heartbeats)
 - Auth via `~/.claude/` mount (session-based)
 - Non-root execution (host UID/GID)
+- Configurable timeout: `npx deckent config set docker_timeout 1800` (default: 1200s)
+- Config-aware backend routing: `spawn_backend` respected by all spawn paths (CLI, MCP, sprint-controller)
+- Dashboard shows backend badge per worker (Docker/tmux/subprocess)
+
+**Testing:** 10 e2e integration tests covering spawn, heartbeat, cleanup, concurrency, log extraction.
 
 See [docs/guide/docker-backend.md](docs/guide/docker-backend.md) for the full guide.
 

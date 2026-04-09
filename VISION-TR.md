@@ -76,9 +76,9 @@ Worker'lar izole Docker container'larında bellek limitleri, non-root yürütme 
 
 Temel sprint yaşam döngüsü, çok-ajanlı paralel yürütme, tmux/subprocess backend'ler, MCP entegrasyonu, çoklu provider desteği (Claude + Codex + Gemini), ModelRegistry, agent/skill ekosistemi, heartbeat daemon, human checkpoint'ler, adaptive threshold'lar.
 
-### Faz 2: "Beta Hazırlığı" — Aktif (Sprint 83-115)
+### Faz 2: "Beta Hazırlığı" — Aktif (Sprint 83-123)
 
-Docker container backend, dokümantasyon konsolidasyonu (BETA-TRACKER, i18n generator'lar, docs.json otomasyonu), ERRORS.md aktif loglama, backend smoke testing (tmux + subprocess + Docker, MCP + CLI), versiyon 0.4.0-beta.1.
+Docker container backend (Sprint 119-123 canlı doğrulandı, 10 e2e test, ayarlanabilir timeout), dokümantasyon konsolidasyonu (BETA-TRACKER, i18n generator'lar, docs.json otomasyonu), ERRORS.md aktif loglama, backend smoke testing (tmux + subprocess + Docker, MCP + CLI), dashboard backend badge, ADR-027 hibrit backend kararı, versiyon 0.4.0-beta.1.
 
 ### Faz 3: "Public Beta" — Sonraki
 

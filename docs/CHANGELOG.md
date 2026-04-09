@@ -8,23 +8,29 @@ ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına
 
 ## [0.4.0-beta.1-sprint123] - 2026-04-09
 
+### Added
+
+- ADR-027: Hybrid Spawn Backend — DEFERRED kararı (auditor zaten backend-agnostic)
+- `Heartbeat.backend` alanı: `'docker' | 'tmux' | 'subprocess'` (monitoring-types.ts)
+- Dashboard WorkerCard backend badge: Docker→mavi, tmux→yeşil, subprocess→turuncu
+- `docker_timeout` config alanı (DeckentConfig + ResolvedConfig, varsayılan 1200s)
+- `spawnWorkerMultiProvider` config-aware: `spawn_backend` tüm spawn yollarında okunuyor
+- CI coverage Docker e2e `skipIf(!dockerAvailable)` guard
 
 ### Changed
 
-- Hybrid Backend ADR Yazımı (completed with tech debt)
-- Heartbeat Tipine Backend Alanı Ekle (completed with tech debt)
-- Dashboard WorkerCard Backend Badge (completed with tech debt)
-
+- SpawnBackendFactory `dockerTimeoutSeconds` parametresi eklendi
+- sprint-controller, MCP run, CLI run/spawn config'den docker_image + docker_timeout aktarıyor
+- CONFIG_FIELDS'a docker_timeout + spawn_backend docker seçeneği eklendi
+- docs/guide/docker-backend.md timeout konfigürasyon bölümü güncellendi
 
 _Tasks: 3 total, 3 done, 3 tech debt, 0 no-go_
 
 ## [0.4.0-beta.1-sprint122] - 2026-04-08
 
+### Added
 
-### Changed
-
-- MCP Reconnect Test Dosyasi (completed with tech debt)
-
+- MCP reconnect Docker doğrulama: docs/docker-smoke/mcp-ok.md
 
 _Tasks: 1 total, 1 done, 1 tech debt, 0 no-go_
 

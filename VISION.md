@@ -76,9 +76,9 @@ Workers run in isolated Docker containers with memory limits, non-root execution
 
 Core sprint lifecycle, multi-agent parallel execution, tmux/subprocess backends, MCP integration, multi-provider support (Claude + Codex + Gemini), ModelRegistry, agent/skill ecosystem, heartbeat daemon, human checkpoints, adaptive thresholds.
 
-### Phase 2: "Beta Readiness" — Active (Sprint 83-115)
+### Phase 2: "Beta Readiness" — Active (Sprint 83-123)
 
-Docker container backend, documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), version 0.4.0-beta.1.
+Docker container backend (live-verified Sprint 119-123, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 0.4.0-beta.1.
 
 ### Phase 3: "Public Beta" — Next
 
