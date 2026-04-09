@@ -1,7 +1,7 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-04-09 | **Sprint:** 122+ | **Tests:** 12,193+ | **Version:** 0.4.0-beta.1
+**Last updated:** 2026-04-09 | **Sprint:** 129+ | **Tests:** 12,194+ | **Version:** 0.4.0-beta.1
 
 ---
 
@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-127 |
+| Sprint | sprint-129 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -20,11 +20,11 @@
 
 ## Overview
 
-122+ sprints, 12,193+ tests, 250+ TypeScript modules. Three spawn backends verified: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (live verified — Sprint 119-122). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents.
+129+ sprints, 12,194+ tests, 250+ TypeScript modules. Three spawn backends verified: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (live verified — Sprint 119-129). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents.
 
 **Strategy:** npm package → dogfood on own projects → feedback → fix → public repo (VerhexIO/deckent)
 
-**Current State:** v0.4.0-beta.1 — All three backends live-verified. Docker backend E2E sprint tested (Sprint 119-122): CLI exit 0, MCP reconnect verified, smoke files created. CI coverage fix applied (Docker e2e skip in non-Docker environments). 10 Docker e2e tests, all passing locally.
+**Current State:** v0.4.0-beta.1 — All three backends live-verified. Docker backend fully operational (Sprint 119-129): workers run tsc/vitest inside containers. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemented. Sprint 127-128 quality reform: 7 critical fixes + litmus test. Sprint 129 enterprise tech debt cleanup: DEBT.md parse fix, evaluator consistency, all debt closed. 12,194+ tests passing, zero open debt.
 
 ---
 
@@ -677,12 +677,12 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-127 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
+| Sprint | sprint-128 |
+| Toplam Task | 8 |
+| Tamamlanan | 5 |
 | Tech Debt | 1 |
-| No-Go | 0 |
-| Süre | 7dk 26sn |
+| No-Go | 3 |
+| Süre | 34dk 31sn |
 | Coverage | 0.0% |
 
 ## Sprint History
@@ -692,6 +692,7 @@ Every blocker was directly verified in the codebase. False claims have been corr
 | sprint-125 | tamamlandı |
 | sprint-126 | tamamlandı |
 | sprint-127 | tamamlandı |
+| sprint-128 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 
@@ -1070,16 +1071,21 @@ Cache only reduces cost — tokens still occupy the context window:
 14. ✅ **Docker Spawn Backend** — container-based worker isolation, MockSpawnBackend, E2E tests (Sprint 101)
 15. ✅ **Sprint Lock Mechanism** — multi-process collision prevention, autoApprove standardized (Sprint 101)
 16. ✅ **Docker Live E2E Verification** — CLI+MCP sprint tested, CI coverage skip guard, 10 e2e tests (Sprint 119-122)
+17. ✅ **Context-Aware Routing** — context budget estimation → model selection, contextFit scoring (Sprint 124)
+18. ✅ **Token Usage Tracker** — provider-native token counting + RETRO.md token summary table (Sprint 124)
+19. ✅ **Rubric-Based Grading** — 4-criteria rubric (correctness, coverage, scope, docs), evaluateWithRubric() default evaluator (Sprint 125-129)
+20. ✅ **Worker Question Mechanism** — askBrain IPC + file-based fallback for tmux/docker, 63 tests (Sprint 125-129)
+21. ✅ **DEBT.md Parse Fix** — JSON.parse→parseDebtTable, markdown table format properly handled (Sprint 129)
+22. ✅ **Evaluator Consistency** — evaluateWithRubric() single evaluator, evaluateResult() deprecated (Sprint 129)
+23. ✅ **Enterprise Tech Debt Cleanup** — 8 CRITICAL/HIGH debts closed, zero open debt (Sprint 129)
 
-**Next 6 actions (P3):**
-1. **Context-Aware Routing** — context budget estimation → model selection → task splitting (Section X.I)
-2. **Token Usage Tracker** — JSONL parse + provider-native counting + RETRO.md token summary (Section X.I)
-3. **Worker question mechanism** — askBrain IPC, user-worker communication
-4. **Codebase semantic indexing** — AST + RAG for repo understanding
-5. **Rubric-Based Grading** — structured evaluation rubrics in result-evaluator.ts, separate grader context (CMA model)
-6. **Versioned Memory** — .brain/MEMORY.md with SHA-based version history, rollback, compliance redact (CMA model)
+**Next 4 actions (P3):**
+1. **Codebase semantic indexing** — AST + RAG for repo understanding
+2. **Versioned Memory** — .brain/MEMORY.md with SHA-based version history, rollback, compliance redact (CMA model)
+3. **Dynamic replanning** — mid-sprint plan changes based on partial results
+4. **Stale heartbeat false positive fix** — Docker completed tasks still trigger stale alerts
 
-**Estimated time to fully autonomous assistant:** 8-12 sprints
+**Estimated time to fully autonomous assistant:** 4-6 sprints
 **Self-improving orchestrator: ✅ COMPLETE (Sprint 102+)**
 
 ---

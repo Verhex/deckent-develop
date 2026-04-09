@@ -2,7 +2,7 @@
 
 **Your AI development team, orchestrated.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-128%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12194%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-129%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
 
@@ -104,7 +104,7 @@ Deckent follows a three-step cycle:
 | Memory and learning across sprints | Yes | No | Partial | No | No |
 | GO/NO-GO evaluation per task | Yes | No | No | No | No |
 | Open source | Yes (MIT) | No | No | Yes | Partial |
-| MCP integration | Yes (20 tools) | N/A | N/A | N/A | N/A |
+| MCP integration | Yes (21 tools) | N/A | N/A | N/A | N/A |
 | Web dashboard | Yes | Built-in | Built-in | No | No |
 | Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
 | Works offline (local models) | Planned | Yes | No | Yes | No |
@@ -387,7 +387,7 @@ See [docs/reference/config-reference.md](docs/reference/config-reference.md) for
 
 ## Docker Backend (Isolated Workers)
 
-Workers run in isolated Docker containers — no cross-worker file conflicts. **Live-verified** across Sprint 119-123 (CLI + MCP).
+Workers run in isolated Docker containers — no cross-worker file conflicts. **Live-verified** across Sprint 119-129 (CLI + MCP). Workers can run tsc/vitest inside containers.
 
 ### Setup
 

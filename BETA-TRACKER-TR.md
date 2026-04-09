@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-04-09 | **Sprint:** 122+ | **Test:** 12,193+ | **Versiyon:** 0.4.0-beta.1
+**Son güncelleme:** 2026-04-09 | **Sprint:** 129+ | **Test:** 12,194+ | **Versiyon:** 0.4.0-beta.1
 
 ---
 
@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-127 |
+| Sprint | sprint-129 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -20,11 +20,11 @@
 
 ## Genel Bakış
 
-122+ sprint, 12,193+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-122). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
+129+ sprint, 12,194+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-129). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
-**Mevcut Durum:** v0.4.0-beta.1 — Üç backend canlı doğrulandı. Docker backend E2E sprint testi yapıldı (Sprint 119-122): CLI exit 0, MCP reconnect doğrulandı, smoke dosyaları oluşturuldu. CI coverage fix uygulandı (Docker e2e, Docker olmayan ortamlarda skip). 10 Docker e2e test, lokal'de hepsi geçiyor.
+**Mevcut Durum:** v0.4.0-beta.1 — Üç backend canlı doğrulandı. Docker backend tam operasyonel (Sprint 119-129): worker'lar container içinde tsc/vitest çalıştırabiliyor. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemente edildi. Sprint 127-128 kalite reformu: 7 kritik düzeltme + litmus testi. Sprint 129 enterprise tech debt temizliği: DEBT.md parse fix, evaluator tutarlılığı, tüm debt kapatıldı. 12,194+ test geçiyor, açık borç yok.
 
 ---
 
@@ -834,6 +834,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 | sprint-125 | tamamlandı |
 | sprint-126 | tamamlandı |
 | sprint-127 | tamamlandı |
+| sprint-128 | tamamlandı |
 
 ## Bug Tracker
 
@@ -1207,16 +1208,21 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 14. ✅ **Docker Spawn Backend** — container-based worker isolation, MockSpawnBackend, E2E tests (Sprint 101)
 15. ✅ **Sprint Lock Mekanizmasi** — coklu process cakisma engeli, autoApprove standart (Sprint 101)
 16. ✅ **Docker Canli E2E Dogrulama** — CLI+MCP sprint test, CI coverage skip guard, 10 e2e test (Sprint 119-122)
+17. ✅ **Context-Aware Routing** — context butcesi tahmini → model secimi, contextFit puanlama (Sprint 124)
+18. ✅ **Token Usage Tracker** — provider-native token sayimi + RETRO.md token summary tablosu (Sprint 124)
+19. ✅ **Rubrik Bazli Notlama** — 4 kriterli rubrik (correctness, coverage, scope, docs), evaluateWithRubric() varsayilan evaluator (Sprint 125-129)
+20. ✅ **Worker Soru Sorma Mekanizmasi** — askBrain IPC + tmux/docker icin file-based fallback, 63 test (Sprint 125-129)
+21. ✅ **DEBT.md Parse Duzeltmesi** — JSON.parse→parseDebtTable, markdown tablo formati duzgun handle ediliyor (Sprint 129)
+22. ✅ **Evaluator Tutarliligi** — evaluateWithRubric() tek evaluator, evaluateResult() deprecated (Sprint 129)
+23. ✅ **Enterprise Tech Debt Temizligi** — 8 CRITICAL/HIGH borc kapatildi, acik borc sifir (Sprint 129)
 
-**Siradaki 6 aksiyon (P3):**
-1. **Context-Aware Routing** — context butcesi tahmini → model secimi → task parcalama (Bolum X.I)
-2. **Token Usage Tracker** — JSONL parse + provider-native sayim + RETRO.md token summary (Bolum X.I)
-3. **Worker soru sorma mekanizmasi** — askBrain IPC, kullanici-worker iletisim
-4. **Codebase semantik indeksleme** — AST + RAG ile repo anlayisi
-5. **Rubrik Bazli Notlama** — result-evaluator.ts'e yapilandirilmis degerlendirme rubrikleri, ayri grader context (CMA modeli)
-6. **Versiyonlu Bellek** — .brain/MEMORY.md SHA-based versiyon gecmisi, rollback, uyumluluk redact (CMA modeli)
+**Siradaki 4 aksiyon (P3):**
+1. **Codebase semantik indeksleme** — AST + RAG ile repo anlayisi
+2. **Versiyonlu Bellek** — .brain/MEMORY.md SHA-based versiyon gecmisi, rollback, uyumluluk redact (CMA modeli)
+3. **Dinamik yeniden planlama** — kismi sonuclara gore mid-sprint plan degisikligi
+4. **Stale heartbeat false positive duzeltmesi** — Docker tamamlanmis task'lar hala stale alert uretiyior
 
-**Tam otonom asistan icin tahmini sure:** 8-12 sprint
+**Tam otonom asistan icin tahmini sure:** 4-6 sprint
 **Self-improving orkestrator: ✅ TAMAMLANDI (Sprint 102+)
 
 ---
@@ -1266,10 +1272,10 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-127 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
+| Sprint | sprint-128 |
+| Toplam Task | 8 |
+| Tamamlanan | 5 |
 | Tech Debt | 1 |
-| No-Go | 0 |
-| Süre | 7dk 26sn |
+| No-Go | 3 |
+| Süre | 34dk 31sn |
 | Coverage | 0.0% |

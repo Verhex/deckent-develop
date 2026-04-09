@@ -4,7 +4,7 @@
 
 **Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12193%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-128%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12194%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-129%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
 Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
 
@@ -106,7 +106,7 @@ Deckent üç adımlı bir döngü izler:
 | Sprint'ler arası bellek ve öğrenme | Evet | Hayır | Kısmi | Hayır | Hayır |
 | Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır |
 | Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet | Kısmi |
-| MCP entegrasyonu | Evet (20 tool) | Yok | Yok | Yok | Yok |
+| MCP entegrasyonu | Evet (21 tool) | Yok | Yok | Yok | Yok |
 | Web dashboard | Evet | Yerleşik | Yerleşik | Hayır | Hayır |
 | Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır |
 | Çevrimdışı çalışma (yerel modeller) | Planlı | Evet | Hayır | Evet | Hayır |
@@ -389,7 +389,7 @@ Tam yapılandırma referansı için [docs/reference/config-reference.md](docs/re
 
 ## Docker Backend (İzole Worker'lar)
 
-Worker'lar izole Docker container'larında çalışır — worker'lar arası dosya çakışması olmaz. Sprint 119-123 ile **canlı doğrulandı** (CLI + MCP).
+Worker'lar izole Docker container'larında çalışır — worker'lar arası dosya çakışması olmaz. Sprint 119-129 ile **canlı doğrulandı** (CLI + MCP). Worker'lar container içinde tsc/vitest çalıştırabiliyor.
 
 ### Kurulum
 
