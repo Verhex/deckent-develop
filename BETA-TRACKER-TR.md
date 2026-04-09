@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-04-08 | **Sprint:** 109+ | **Test:** 12,193+ | **Versiyon:** 0.4.0-beta.1
+**Son güncelleme:** 2026-04-09 | **Sprint:** 122+ | **Test:** 12,193+ | **Versiyon:** 0.4.0-beta.1
 
 ---
 
@@ -20,11 +20,11 @@
 
 ## Genel Bakış
 
-109+ sprint, 12,193+ test, 250+ TypeScript modülü. Üç spawn backend test edildi: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (entegrasyon devam ediyor). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
+122+ sprint, 12,193+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-122). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
-**Mevcut Durum:** v0.4.0-beta.1 — Sprint 105-109 backend smoke testleri tamamlandı (subprocess MCP+CLI, tmux MCP+CLI). Docker backend HOME+memory fix'leri uygulandı, sprint-controller entegrasyonu bekliyor. ERRORS.md aktif loglama, i18n content generator'lar, EN-first doküman konvansiyonu kuruldu.
+**Mevcut Durum:** v0.4.0-beta.1 — Üç backend canlı doğrulandı. Docker backend E2E sprint testi yapıldı (Sprint 119-122): CLI exit 0, MCP reconnect doğrulandı, smoke dosyaları oluşturuldu. CI coverage fix uygulandı (Docker e2e, Docker olmayan ortamlarda skip). 10 Docker e2e test, lokal'de hepsi geçiyor.
 
 ---
 
@@ -155,7 +155,7 @@ TR+EN çift dil, VISION, link audit, config dashboard
 |---|-------|-------|-----|
 | 25 | Windows native | **DONE** | Tam destek: spawn, heartbeat, log, encoding, ps guard |
 | 26 | Node >= 18 neden? | **YAPILACAK** | OpenClaw Node 22+, ES2022+ feature check |
-| 27 | Docker/Sandbox | **YAPILACAK** | Var mı? Çalışıyor mu? |
+| 27 | Docker/Sandbox | **TAMAMLANDI** | Sprint 119-122 canlı doğrulandı: CLI+MCP, 10 e2e test, CI skip guard |
 | 28 | CI/CD billing | **YAPILACAK** | Public repo ile çözülür |
 | 29 | .detect-secrets | **DONE** | .pre-commit-config.yaml kuruldu, detect-secrets v1.5.0 (Sprint 075) |
 
@@ -855,7 +855,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 
 1. **`checkDocker()`** — Doctor'a Docker daemon + worker image kontrolü (14 check)
 2. **Init Docker algılama** — Docker varsa otomatik `spawn_backend: docker` set
-3. **`tests/e2e/docker-backend.test.ts`** — 7 integration test (spawn, heartbeat, cleanup, concurrent)
+3. **`tests/e2e/docker-backend.test.ts`** — 10 integration test (spawn, heartbeat, cleanup, concurrent, log extraction)
 4. **`docs/guide/docker-backend.md`** — 362 satır kapsamlı rehber
 
 ### E. Container Exit Code Analizi (Sprint 103 Test Container'lari)
@@ -896,8 +896,8 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 ### H. Guncel Is Plani (Sprint 104+)
 
 **Oncelik 1 — Docker Sprint Canli Dogrulama**
-1. ⏳ MCP server restart sonrasi Docker sprint canli testi
-2. ⏳ `deckent run` MCP + CLI canli dogrulama (fix sonrasi)
+1. ✅ MCP server restart sonrasi Docker sprint canli testi (Sprint 120-122)
+2. ✅ `deckent run` MCP + CLI canli dogrulama (Sprint 121 CLI exit 0, Sprint 122 MCP reconnect OK)
 3. ⏳ Docker container timeout ayarinin config'den okunmasi
 
 **Oncelik 2 — Beta Hazirligi**
@@ -924,6 +924,20 @@ Bu oturumda Docker backend canli ortamda calisir hale getirildi. Ozet:
 | Coverage | 90% line, 89% branch, 95% function |
 
 **Kritik fixler:** Docker auth (3 fix), Worker EXIT trap (.result garantisi), Config revert guard, MCP autoApprove default(true), MCP run worker spawn, MockSpawnBackend CI crash.
+
+### Oturum Ozeti (8-9 Nisan 2026 — Docker Canli Dogrulama)
+
+Docker backend canli E2E sprint dogrulamasi Sprint 119-122 boyunca tamamlandi. Ozet:
+
+| Kategori | Detay |
+|----------|-------|
+| Sprint | 119 (NO_GO), 120 (NO_GO), 121 (CLI GO), 122 (MCP GO) |
+| Docker test | 7 → 10 e2e test (log extraction, monitor updates) |
+| CI fix | Coverage job Docker e2e `skipIf(!dockerAvailable)` guard eklendi |
+| Canli sonuc | CLI exit 0 dogrulandi, MCP reconnect dogrulandi, smoke dosyalari olusturuldu |
+| Dosyalar | `docs/docker-smoke/cli-test.md`, `docs/docker-smoke/mcp-ok.md` |
+
+**Onemli tespit:** Sprint 119-120 Docker worker result dosyasi birakmadan cikti — MCP cache sorunu olarak tanimlandi. MCP server restart + CLI fallback sonrasi Sprint 121 CLI ve Sprint 122 MCP basarili oldu.
 
 ### I. Token Kullanim Analizi + Context-Aware Routing Is Plani
 
@@ -1088,8 +1102,8 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 
 ## Sonuç
 
-**Deckent'in mevcut durumu (Sprint 102+ sonrasi, v0.3.0-beta.3):**
-- 102+ sprint, 12,051+ test (413 dashboard), 96% coverage
+**Deckent'in mevcut durumu (Sprint 122 sonrasi, v0.4.0-beta.1):**
+- 122+ sprint, 12,193+ test (413 dashboard), 96% coverage
 - 16 built-in agent (+2 temp), 21 built-in skill
 - 13 model, 3 provider (Claude, Codex, Gemini), ModelRegistry ile tek kaynak
 - 20 MCP tool + 8 resource, 35+ CLI komutu
@@ -1122,6 +1136,7 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 13. ✅ **Docs Surekli Guncel** — ANALYSIS, README, VISION, architecture sayilari tutarli (Sprint 098-100)
 14. ✅ **Docker Spawn Backend** — container-based worker isolation, MockSpawnBackend, E2E tests (Sprint 101)
 15. ✅ **Sprint Lock Mekanizmasi** — coklu process cakisma engeli, autoApprove standart (Sprint 101)
+16. ✅ **Docker Canli E2E Dogrulama** — CLI+MCP sprint test, CI coverage skip guard, 10 e2e test (Sprint 119-122)
 
 **Siradaki 4 aksiyon (P3):**
 1. **Context-Aware Routing** — context butcesi tahmini → model secimi → task parcalama (Bolum X.I)

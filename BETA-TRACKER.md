@@ -1,7 +1,7 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-04-08 | **Sprint:** 109+ | **Tests:** 12,193+ | **Version:** 0.4.0-beta.1
+**Last updated:** 2026-04-09 | **Sprint:** 122+ | **Tests:** 12,193+ | **Version:** 0.4.0-beta.1
 
 ---
 
@@ -20,11 +20,11 @@
 
 ## Overview
 
-109+ sprints, 12,193+ tests, 250+ TypeScript modules. Three spawn backends tested: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (integration in progress). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents.
+122+ sprints, 12,193+ tests, 250+ TypeScript modules. Three spawn backends verified: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (live verified — Sprint 119-122). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents.
 
 **Strategy:** npm package → dogfood on own projects → feedback → fix → public repo (VerhexIO/deckent)
 
-**Current State:** v0.4.0-beta.1 — Sprint 105-109 backend smoke tests completed (subprocess MCP+CLI, tmux MCP+CLI). Docker backend HOME+memory fixes applied, sprint-controller integration pending. ERRORS.md active logging, i18n content generators, EN-first doc convention established.
+**Current State:** v0.4.0-beta.1 — All three backends live-verified. Docker backend E2E sprint tested (Sprint 119-122): CLI exit 0, MCP reconnect verified, smoke files created. CI coverage fix applied (Docker e2e skip in non-Docker environments). 10 Docker e2e tests, all passing locally.
 
 ---
 
@@ -155,7 +155,7 @@ TR+EN dual language, VISION, link audit, config dashboard
 |---|-------|--------|------|
 | 25 | Windows native | **DONE** | Full support: spawn, heartbeat, log, encoding, ps guard |
 | 26 | Why Node >= 18? | **TODO** | OpenClaw requires Node 22+, ES2022+ feature check |
-| 27 | Docker/Sandbox | **TODO** | Does it exist? Does it work? |
+| 27 | Docker/Sandbox | **DONE** | Live verified Sprint 119-122: CLI+MCP, 10 e2e tests, CI skip guard |
 | 28 | CI/CD billing | **TODO** | Will be resolved with public repo |
 | 29 | .detect-secrets | **DONE** | .pre-commit-config.yaml installed, detect-secrets v1.5.0 (Sprint 075) |
 
@@ -713,7 +713,7 @@ Every blocker was directly verified in the codebase. False claims have been corr
 
 1. **`checkDocker()`** — Docker daemon + worker image check added to Doctor (14 checks)
 2. **Init Docker detection** — Automatic `spawn_backend: docker` set when Docker is available
-3. **`tests/e2e/docker-backend.test.ts`** — 7 integration tests (spawn, heartbeat, cleanup, concurrent)
+3. **`tests/e2e/docker-backend.test.ts`** — 10 integration tests (spawn, heartbeat, cleanup, concurrent, log extraction)
 4. **`docs/guide/docker-backend.md`** — 362-line comprehensive guide
 
 ### E. Container Exit Code Analysis (Sprint 103 Test Containers)
@@ -754,8 +754,8 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ### H. Current Work Plan (Sprint 104+)
 
 **Priority 1 — Docker Sprint Live Verification**
-1. ⏳ Docker sprint live test after MCP server restart
-2. ⏳ `deckent run` MCP + CLI live verification (post-fix)
+1. ✅ Docker sprint live test after MCP server restart (Sprint 120-122)
+2. ✅ `deckent run` MCP + CLI live verification (Sprint 121 CLI exit 0, Sprint 122 MCP reconnect OK)
 3. ⏳ Docker container timeout reading from config
 
 **Priority 2 — Beta Preparation**
@@ -782,6 +782,20 @@ Docker backend brought to working state in live environment during this session.
 | Coverage | 90% line, 89% branch, 95% function |
 
 **Critical fixes:** Docker auth (3 fixes), Worker EXIT trap (.result guarantee), Config revert guard, MCP autoApprove default(true), MCP run worker spawn, MockSpawnBackend CI crash.
+
+### Session Wrap-Up (April 8-9, 2026 — Docker Live Verification)
+
+Docker backend live E2E sprint verification completed across Sprint 119-122. Summary:
+
+| Category | Detail |
+|----------|--------|
+| Sprints | 119 (NO_GO), 120 (NO_GO), 121 (CLI GO), 122 (MCP GO) |
+| Docker tests | 7 → 10 e2e tests (log extraction, monitor updates) |
+| CI fix | Coverage job Docker e2e `skipIf(!dockerAvailable)` guard added |
+| Live results | CLI exit 0 verified, MCP reconnect verified, smoke files created |
+| Files created | `docs/docker-smoke/cli-test.md`, `docs/docker-smoke/mcp-ok.md` |
+
+**Key insight:** Sprint 119-120 Docker worker exited without writing result file — identified as MCP cache issue. After MCP server restart + CLI fallback, Sprint 121 CLI and Sprint 122 MCP both succeeded.
 
 ### I. Token Usage Analysis + Context-Aware Routing Work Plan
 
@@ -949,8 +963,8 @@ Cache only reduces cost — tokens still occupy the context window:
 
 ## Conclusion
 
-**Deckent's current state (post-Sprint 102+, v0.3.0-beta.3):**
-- 102+ sprints, 12,051+ tests (413 dashboard), 96% coverage
+**Deckent's current state (post-Sprint 122, v0.4.0-beta.1):**
+- 122+ sprints, 12,193+ tests (413 dashboard), 96% coverage
 - 16 built-in agents (+2 temp), 21 built-in skills
 - 13 models, 3 providers (Claude, Codex, Gemini), single source of truth via ModelRegistry
 - 20 MCP tools + 8 resources, 35+ CLI commands
@@ -985,6 +999,7 @@ Cache only reduces cost — tokens still occupy the context window:
 13. ✅ **Continuous Docs Updates** — ANALYSIS, README, VISION, architecture numbers consistent (Sprint 098-100)
 14. ✅ **Docker Spawn Backend** — container-based worker isolation, MockSpawnBackend, E2E tests (Sprint 101)
 15. ✅ **Sprint Lock Mechanism** — multi-process collision prevention, autoApprove standardized (Sprint 101)
+16. ✅ **Docker Live E2E Verification** — CLI+MCP sprint tested, CI coverage skip guard, 10 e2e tests (Sprint 119-122)
 
 **Next 4 actions (P3):**
 1. **Context-Aware Routing** — context budget estimation → model selection → task splitting (Section X.I)

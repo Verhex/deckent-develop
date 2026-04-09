@@ -345,7 +345,7 @@ describe('Docker Backend Integration', () => {
   }, 30_000);
 
   // ── Test 10: Docker log extraction writes .log file ───────────────────
-  it('monitorContainer extracts container stdout to .log file', async () => {
+  it.skipIf(!dockerAvailable)('monitorContainer extracts container stdout to .log file', async () => {
     const logTaskId = `test-docker-${Date.now()}-log`;
     const containerName = `deckent-w-${logTaskId}`;
     const logPath = path.join(TEST_TASKS_DIR, `task-${logTaskId}.log`);
