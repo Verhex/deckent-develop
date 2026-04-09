@@ -1725,7 +1725,12 @@ export async function runSprint(
   // Falls back to legacy direct-tmux path only when spawn_backend is not set and no backend provided.
   const spawnBackend: SpawnBackend | undefined = opts?.spawnBackend
     ?? (config.spawn_backend
-      ? SpawnBackendFactory.create({ backend: config.spawn_backend, projectDir: projectRoot })
+      ? SpawnBackendFactory.create({
+          backend: config.spawn_backend,
+          projectDir: projectRoot,
+          dockerImage: config.docker_image,
+          dockerTimeoutSeconds: config.docker_timeout,
+        })
       : undefined);
 
   // Resolve provider (use provided override or registry default)

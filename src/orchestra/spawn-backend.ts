@@ -185,6 +185,9 @@ export interface SpawnBackendFactoryOptions {
 
   /** Docker image for worker containers (default: deckent-worker:latest) */
   dockerImage?: string;
+
+  /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
+  dockerTimeoutSeconds?: number;
 }
 
 /**
@@ -208,7 +211,8 @@ export class SpawnBackendFactory {
     if (backendType === 'docker') {
       return new DockerSpawnBackend(opts.projectDir, {
         image: opts.dockerImage,
-        timeoutSeconds: opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined,
+        timeoutSeconds: opts.dockerTimeoutSeconds
+          ?? (opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined),
       });
     }
 
@@ -226,7 +230,8 @@ export class SpawnBackendFactory {
     if (isDockerAvailable()) {
       return new DockerSpawnBackend(opts.projectDir, {
         image: opts.dockerImage,
-        timeoutSeconds: opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined,
+        timeoutSeconds: opts.dockerTimeoutSeconds
+          ?? (opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined),
       });
     }
     if (SpawnBackendFactory.isTmuxAvailable()) {

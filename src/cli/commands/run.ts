@@ -9,6 +9,7 @@ import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { spawnWorkerMultiProvider } from './spawn.js';
+import { loadConfig } from '../../core/config.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -270,9 +271,15 @@ export function registerRun(program: Command): void {
         const agentPrompt = resolveAgentPrompt(root, task as Task);
         const skillPrompts = resolveSkillPrompts(root, task as Task);
 
-        // Spawn worker via appropriate backend based on model's provider
+        // Spawn worker via config-aware backend
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
-        const { backend } = spawnWorkerMultiProvider(taskId, model, prompt, root, { autoApprove });
+        const cfg = await loadConfig(root).catch(() => ({} as { spawn_backend?: string; docker_image?: string; docker_timeout?: number }));
+        const { backend } = spawnWorkerMultiProvider(taskId, model, prompt, root, {
+          autoApprove,
+          spawnBackend: cfg.spawn_backend,
+          dockerImage: cfg.docker_image,
+          dockerTimeout: cfg.docker_timeout,
+        });
         print(`Worker spawned via ${backend} (w-${taskId})`);
 
         // Stream logs or wait for result

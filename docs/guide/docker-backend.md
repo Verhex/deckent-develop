@@ -196,7 +196,15 @@ spawn()
 
 Container names follow the pattern `deckent-w-<taskId>` (e.g., `deckent-w-103-001`).
 
-The container timeout is 20 minutes by default (`DEFAULT_TIMEOUT_SECONDS = 1200`). If a worker exceeds this, the `timeout` wrapper inside the container kills the process and writes a `.timeout` marker file to `.tasks/`.
+The container timeout is 20 minutes by default. You can override it via `config.json`:
+
+```json
+{
+  "docker_timeout": 1800
+}
+```
+
+This sets the timeout to 1800 seconds (30 minutes). If a worker exceeds the timeout, the `timeout` wrapper inside the container kills the process and writes a `.timeout` marker file to `.tasks/`.
 
 ---
 
@@ -297,7 +305,7 @@ npx deckent start
 
 **Symptom:** Tasks write `.timeout` marker files; heartbeat shows `status: FAILED`.
 
-**Cause:** The worker exceeded the 20-minute container timeout (`DEFAULT_TIMEOUT_SECONDS = 1200`).
+**Cause:** The worker exceeded the container timeout (default: 1200 seconds / 20 minutes).
 
 **Diagnosis:**
 ```bash
@@ -308,8 +316,13 @@ ls .tasks/*.timeout
 docker logs deckent-w-<taskId>
 ```
 
+**Fix — Increase timeout via config:**
+```bash
+npx deckent config set docker_timeout 1800  # 30 minutes
+```
+
 **Fix — Break tasks into smaller units:**
-High-effort tasks should be split into sub-tasks in DIRECTIVES. The container timeout is 20 minutes per container.
+High-effort tasks should be split into sub-tasks in DIRECTIVES.
 
 **Fix — Enable Fix Phase for retries:**
 ```bash

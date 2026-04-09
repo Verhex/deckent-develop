@@ -756,17 +756,17 @@ Every blocker was directly verified in the codebase. False claims have been corr
 **Priority 1 — Docker Sprint Live Verification**
 1. ✅ Docker sprint live test after MCP server restart (Sprint 120-122)
 2. ✅ `deckent run` MCP + CLI live verification (Sprint 121 CLI exit 0, Sprint 122 MCP reconnect OK)
-3. ⏳ Docker container timeout reading from config
+3. ✅ Docker container timeout reading from config (`docker_timeout` in config.json, default 1200s)
 
 **Priority 2 — Beta Preparation**
-4. ⏳ README Docker backend section + Quick Start
-5. ⏳ Version bump 0.4.0-beta.1
-6. ⏳ CLI/MCP start parity final check
+4. ✅ README Docker backend section + Quick Start (README.md:387-405, docs/guide/docker-backend.md)
+5. ✅ Version bump 0.4.0-beta.1 (already done)
+6. ✅ CLI/MCP start parity (both read config.spawn_backend via SpawnBackendFactory, MCP doctor skip documented)
 
 **Priority 3 — Feature Expansion**
 7. ⏳ Hybrid backend (Docker worker + subprocess auditor) — ADR to be written
 8. ⏳ Dashboard Docker container status display
-9. ⏳ spawnWorkerMultiProvider config-aware implementation
+9. ✅ spawnWorkerMultiProvider config-aware (reads config.spawn_backend + docker_image + docker_timeout)
 
 ### Session Wrap-Up (April 7, 2026 — 10 commits)
 

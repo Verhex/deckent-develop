@@ -75,6 +75,8 @@ export function registerRunTool(server: McpServer): void {
         const backend = SpawnBackendFactory.create({
           backend: cfg.spawn_backend ?? 'auto',
           projectDir: root,
+          dockerImage: cfg.docker_image,
+          dockerTimeoutSeconds: cfg.docker_timeout,
         });
         backend.spawn(taskId, model as ModelType, prompt, {
           autoApprove,

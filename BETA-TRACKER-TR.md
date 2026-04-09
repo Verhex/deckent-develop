@@ -898,17 +898,17 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 **Oncelik 1 — Docker Sprint Canli Dogrulama**
 1. ✅ MCP server restart sonrasi Docker sprint canli testi (Sprint 120-122)
 2. ✅ `deckent run` MCP + CLI canli dogrulama (Sprint 121 CLI exit 0, Sprint 122 MCP reconnect OK)
-3. ⏳ Docker container timeout ayarinin config'den okunmasi
+3. ✅ Docker container timeout config'den okunuyor (`docker_timeout` config.json'da, varsayilan 1200s)
 
 **Oncelik 2 — Beta Hazirligi**
-4. ⏳ README Docker backend bolumu + Quick Start
-5. ⏳ Version bump 0.4.0-beta.1
-6. ⏳ CLI/MCP start parity son kontrol
+4. ✅ README Docker backend bolumu + Quick Start (README.md:387-405, docs/guide/docker-backend.md)
+5. ✅ Version bump 0.4.0-beta.1 (zaten yapildi)
+6. ✅ CLI/MCP start parity (iki taraf da config.spawn_backend okuyor, MCP doctor skip dokumante)
 
 **Oncelik 3 — Ozellik Genisleme**
 7. ⏳ Hibrit backend (Docker worker + subprocess auditor) — ADR yazilacak
 8. ⏳ Dashboard Docker container status goruntuleme
-9. ⏳ spawnWorkerMultiProvider config-aware yapilmasi
+9. ✅ spawnWorkerMultiProvider config-aware (config.spawn_backend + docker_image + docker_timeout okuyor)
 
 ### Oturum Kapanisi (7 Nisan 2026 — 10 commit)
 
@@ -1186,14 +1186,3 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - [Claude Dispatch](https://claude.com/blog/dispatch-and-computer-use) — Telefon → bilgisayar gorev akisi
 - [Claude Code Features](https://help.apiyi.com/en/claude-code-2026-new-features-loop-computer-use-remote-control-guide-en.html) — Loop, Schedule, Computer Use
 - [AI Agents Comparison 2026](https://blog.iskohm.com/en/posts/ai-agents-comparison-2026-cursor-copilot-kilo-code-claude-code/) — Tam karsilastirma
-
-## Sprint Metrics
-| Metrik | Değer |
-|--------|-------|
-| Sprint | sprint-122 |
-| Toplam Task | 1 |
-| Tamamlanan | 1 |
-| Tech Debt | 1 |
-| No-Go | 0 |
-| Süre | 2dk 29sn |
-| Coverage | 0.0% |

@@ -578,6 +578,8 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     model_strategy: resolvedModelStrategy,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     spawn_backend: config.spawn_backend,
+    docker_image: config.docker_image,
+    docker_timeout: config.docker_timeout,
     skills: config.skills,
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
@@ -715,10 +717,16 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     category: 'Sprint',
   },
   spawn_backend: {
-    description: "Worker spawn mechanism: 'tmux' (interactive), 'subprocess' (headless), 'auto'.",
-    type: "'tmux' | 'subprocess' | 'auto'",
+    description: "Worker spawn mechanism: 'docker' (isolated), 'tmux' (interactive), 'subprocess' (headless), 'auto'.",
+    type: "'docker' | 'tmux' | 'subprocess' | 'auto'",
     default: undefined,
-    options: ['tmux', 'subprocess', 'auto'],
+    options: ['docker', 'tmux', 'subprocess', 'auto'],
+    category: 'Sprint',
+  },
+  docker_timeout: {
+    description: 'Docker container timeout in seconds. Workers killed after this duration.',
+    type: 'number',
+    default: 1200,
     category: 'Sprint',
   },
   brain_provider: {

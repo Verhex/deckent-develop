@@ -55,6 +55,8 @@ export interface DeckentConfig {
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */
   docker_image?: string;
+  /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
+  docker_timeout?: number;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Decision engine configuration */
@@ -225,6 +227,8 @@ export interface ResolvedConfig {
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */
   docker_image?: string;
+  /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
+  docker_timeout?: number;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Provider for Brain planning (default: 'claude') */

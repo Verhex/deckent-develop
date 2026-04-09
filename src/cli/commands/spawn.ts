@@ -26,18 +26,38 @@ export function buildAllowedToolsFromScope(task: Task): string | undefined {
 }
 
 /**
- * Spawn a worker using the appropriate backend based on the task's provider.
- * Claude models use tmux, Codex/Gemini models use subprocess backend.
+ * Spawn a worker using the appropriate backend.
+ *
+ * Backend selection priority:
+ * 1. config.spawn_backend (user preference — docker/tmux/subprocess/auto)
+ * 2. Provider-based fallback: Claude → tmux, Codex/Gemini → subprocess
  */
 export function spawnWorkerMultiProvider(
   taskId: string,
   model: string,
   prompt: string,
   root: string,
-  opts: { autoApprove?: boolean; allowedTools?: string },
+  opts: { autoApprove?: boolean; allowedTools?: string; spawnBackend?: string; dockerImage?: string; dockerTimeout?: number },
 ): { backend: string; provider: ProviderName } {
   const provider = getProviderForModel(model as ModelType);
 
+  // If config specifies a backend, use SpawnBackendFactory for all providers
+  if (opts.spawnBackend) {
+    const backend = SpawnBackendFactory.create({
+      backend: opts.spawnBackend as 'docker' | 'tmux' | 'subprocess' | 'auto',
+      projectDir: root,
+      dockerImage: opts.dockerImage,
+      dockerTimeoutSeconds: opts.dockerTimeout,
+    });
+    backend.spawn(taskId, model as ModelType, prompt, {
+      autoApprove: opts.autoApprove ?? false,
+      projectDir: root,
+      allowedTools: opts.allowedTools,
+    });
+    return { backend: backend.name, provider };
+  }
+
+  // No config override → provider-based fallback
   if (provider === 'claude') {
     ensureSession();
     spawnWorker(taskId, model as ModelType, prompt, root, {
@@ -95,10 +115,14 @@ export function registerSpawn(program: Command): void {
         // Derive scope-based allowedTools for boundary enforcement
         const allowedTools = buildAllowedToolsFromScope(task);
 
-        // Spawn via appropriate backend based on model's provider
+        // Spawn via config-aware backend (respects spawn_backend setting)
+        const cfgAny = config as { spawn_backend?: string; docker_image?: string; docker_timeout?: number };
         const { backend, provider } = spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
           autoApprove: opts.autoApprove ?? false,
           allowedTools,
+          spawnBackend: cfgAny.spawn_backend,
+          dockerImage: cfgAny.docker_image,
+          dockerTimeout: cfgAny.docker_timeout,
         });
 
         print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));
