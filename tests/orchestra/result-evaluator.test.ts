@@ -4,6 +4,7 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 import {
   evaluateResult,
   isDocTask,
+  isBashUnavailable,
   waitForResults,
   scoreCorrectness,
   scoreTestCoverage,
@@ -763,5 +764,174 @@ describe('evaluateWithRubric', () => {
     });
     // coverage 30 → score 30 < threshold 90 → passed = false
     expect(evaluation.rubricScores[0].passed).toBe(false);
+  });
+});
+
+// ─── isBashUnavailable() ────────────────────────────────────────────
+
+describe('isBashUnavailable', () => {
+  it('detects "Bash tool unavailable" in notes', () => {
+    const result = makeResult({ notes: 'Bash tool unavailable — session-env ENOENT' });
+    expect(isBashUnavailable(result)).toBe(true);
+  });
+
+  it('detects "session-env ENOENT" pattern', () => {
+    const result = makeResult({ notes: 'session-env ENOENT prevented running tsc' });
+    expect(isBashUnavailable(result)).toBe(true);
+  });
+
+  it('returns false for normal notes', () => {
+    const result = makeResult({ notes: 'All tests passed, coverage 95%' });
+    expect(isBashUnavailable(result)).toBe(false);
+  });
+
+  it('returns false for empty notes', () => {
+    const result = makeResult({ notes: '' });
+    expect(isBashUnavailable(result)).toBe(false);
+  });
+});
+
+// ─── evaluateResult() — Bash Unavailable Tolerance ─────────────────
+
+describe('evaluateResult — Bash unavailable tolerance', () => {
+  it('returns GO_WITH_TECH_DEBT when Bash unavailable and testsPassed=false (DONE self)', () => {
+    const task = makeTask(['src/orchestra']);
+    const result = makeResult({
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'Bash tool unavailable — session-env ENOENT prevented running tsc --noEmit',
+      filesChanged: ['src/orchestra/result-evaluator.ts'],
+    });
+    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+  });
+
+  it('returns GO_WITH_TECH_DEBT when Bash unavailable and testsPassed=false (TECH_DEBT self)', () => {
+    const task = makeTask(['src/orchestra']);
+    const result = makeResult({
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      notes: 'Bash tool is unavailable due to session-env ENOENT',
+      filesChanged: ['src/orchestra/foo.ts'],
+    });
+    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+  });
+
+  it('returns NO_GO when Bash unavailable but selfAssessment is NO_GO', () => {
+    const task = makeTask(['src/orchestra']);
+    const result = makeResult({
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'NO_GO',
+      notes: 'Bash tool unavailable — session-env ENOENT',
+    });
+    // selfAssessment NO_GO is checked BEFORE Bash tolerance
+    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+  });
+
+  it('returns NO_GO when tests fail without Bash unavailable signal', () => {
+    const task = makeTask(['src/core']);
+    const result = makeResult({
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'Tests failed due to type error in config.ts',
+    });
+    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+  });
+
+  it('detects "cannot run tsc" pattern as Bash unavailable', () => {
+    const task = makeTask(['src/orchestra']);
+    const result = makeResult({
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'Cannot run tsc due to environment constraint',
+    });
+    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+  });
+
+  it('detects "ENOENT session-env" reversed pattern', () => {
+    const task = makeTask(['src/orchestra']);
+    const result = makeResult({
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'ENOENT: no such file or directory, session-env path not found',
+    });
+    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+  });
+});
+
+// ─── scoreTestCoverage() — Bash Unavailable Tolerance ──────────────
+
+describe('scoreTestCoverage — Bash unavailable tolerance', () => {
+  it('returns neutral score 50 when Bash unavailable and coverage=0', () => {
+    const result = makeResult({
+      coverage: 0,
+      notes: 'Bash tool unavailable — session-env ENOENT',
+      filesChanged: ['src/foo.ts'],
+    });
+    const score = scoreTestCoverage(result);
+    expect(score.score).toBe(50);
+    expect(score.passed).toBe(true);
+    expect(score.reason).toContain('Bash unavailable');
+  });
+
+  it('returns normal score when Bash unavailable but coverage > 0', () => {
+    const result = makeResult({
+      coverage: 80,
+      notes: 'Bash tool unavailable — session-env ENOENT',
+      filesChanged: ['src/foo.ts'],
+    });
+    const score = scoreTestCoverage(result);
+    // coverage > 0 means tests DID run somehow — use normal scoring
+    expect(score.score).toBe(80);
+  });
+
+  it('returns normal score when coverage=0 without Bash unavailable', () => {
+    const result = makeResult({
+      coverage: 0,
+      notes: 'No tests written',
+      filesChanged: ['src/foo.ts'],
+    });
+    const score = scoreTestCoverage(result);
+    expect(score.score).toBe(0);
+    expect(score.passed).toBe(false);
+  });
+
+  it('returns neutral score with "cannot run vitest" notes', () => {
+    const result = makeResult({
+      coverage: 0,
+      notes: 'Cannot run vitest — environment unavailable',
+      filesChanged: ['src/foo.ts'],
+    });
+    const score = scoreTestCoverage(result);
+    expect(score.score).toBe(50);
+    expect(score.passed).toBe(true);
+  });
+});
+
+// ─── evaluateWithRubric() — Bash Unavailable Integration ───────────
+
+describe('evaluateWithRubric — Bash unavailable integration', () => {
+  it('returns GO_WITH_TECH_DEBT (not NO_GO) for Bash unavailable result with rubric', () => {
+    const task = makeTask(['src/orchestra/']);
+    const result = makeResult({
+      testsPassed: false,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      coverage: 0,
+      notes: 'Bash tool unavailable — session-env ENOENT prevented running tsc --noEmit and vitest. Code changes applied correctly.',
+      filesChanged: ['src/orchestra/result-evaluator.ts'],
+    });
+    const evaluation = evaluateWithRubric(result, task);
+    // correctness: tests failed (0) + GO_WITH_TECH_DEBT (20) = 20
+    // test_coverage: Bash unavailable + coverage 0 → neutral 50
+    // scope_compliance: 1/1 in scope → 100
+    // documentation: long notes → 100
+    // weighted: 20*0.4 + 50*0.25 + 100*0.2 + 100*0.15 = 8 + 12.5 + 20 + 15 = 55.5
+    // 55.5 >= 70*0.7=49 → GO_WITH_TECH_DEBT (not NO_GO)
+    expect(evaluation.decision).not.toBe('NO_GO');
   });
 });

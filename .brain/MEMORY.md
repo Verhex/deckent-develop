@@ -70,3 +70,9 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - Explain MCP Tool — deckent_explain: NO_GO — deckent_explain MCP tool implemented. New file src/mcp/tools/explain.ts created, registered in index.ts (21st tool). Cor
 - Workspace + DECKENT.md Tutarlılık Düzeltmesi: NO_GO — All 5 documentation files synchronized with Sprint 124 codebase state. IDENTITY.md: Tests 12,103+, Sprints 124+, Feature
 - BETA-TRACKER Sprint 124 Güncellemesi: NO_GO — BETA-TRACKER EN+TR Sprint 124 güncellemesi tamamlandı. Yapılan değişiklikler: (1) Current Status tabloları sprint-125'e 
+## Sprint sprint-126 Learnings
+- FIX Fazı Evaluations Map Update — CRITICAL Bug Fix: NO_GO — FIX fazı evaluations Map güncelleme bug'ı düzeltildi. runFixPhase() içinde fixEval hesaplandıktan sonra evaluations.set(
+- evaluateResult() → evaluateWithRubric() Geçişi: NO_GO — Bash tool unavailable — tsc --noEmit ve vitest run çalıştırılamadı. Kod değişiklikleri tamamlandı: (1) evaluateWithRubri
+- CI Guardian Granularity — Task-Spesifik tsc Kontrolü: NO_GO — Bash tool unavailable (session-env ENOENT) — tsc ve vitest çalıştırılamadı. Tüm kod değişiklikleri tamamlandı: (1) parse
+- Context-Aware Evaluation — Bash Unavailable Toleransı: NO_GO — Bash tool unavailable — session-env ENOENT prevented running tsc --noEmit and vitest. Code changes applied correctly: (1
+- Sprint Metrics Post-FIX Doğrulama + Debug Logging: NO_GO — Sprint Metrics Post-FIX Doğrulama + Debug Logging tamamlandı. Değişiklikler: (1) sprint-reporter.ts calculateMetrics() f

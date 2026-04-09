@@ -24,6 +24,7 @@ import {
 import type {
   Task, TaskResult, Sprint, SprintMetrics,
   ResolvedConfig, SprintSizeRecommendation,
+  EvaluationResult,
 } from '../core/types.js';
 
 import {
@@ -44,7 +45,7 @@ import {
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import {
   runHooks, runCiRegressionCheck, resolveCiGuardianConfig,
-  runPreSprintValidation,
+  runPreSprintValidation, parseTscErrorFiles,
 } from '../core/plugin-hooks.js';
 import type {
   BeforeSprintContext, AfterTaskContext,
@@ -73,6 +74,9 @@ import { showSplash } from '../cli/helpers/splash.js';
 // ─── Sprint Reporter ─────────────────────────────────────────────
 import { calculateMetrics } from './sprint-reporter.js';
 
+// ─── Rubric-Based Evaluation ─────────────────────────────────────
+import { evaluateWithRubric } from './result-evaluator.js';
+
 // ─── Sprint Controller (safe circular — all usages inside function bodies) ──
 import {
   BrainError,
@@ -81,7 +85,6 @@ import {
   writeSprintState,
   spawnWorkers,
   buildSpawnRetryHint,
-  evaluateResult,
   waitForResults,
   finalizeSprint,
   cleanup,
@@ -90,6 +93,16 @@ import type { RunSprintOptions } from './sprint-controller.js';
 
 
 // ═══ Local Helpers (duplicated from sprint-controller to avoid circular init-time deps) ══
+
+/** Map EvaluationResult.decision string to TaskEvaluation enum */
+function toTaskEvaluation(evalResult: EvaluationResult): TaskEvaluation {
+  switch (evalResult.decision) {
+    case 'DONE': return TaskEvaluation.DONE;
+    case 'GO_WITH_TECH_DEBT': return TaskEvaluation.GO_WITH_TECH_DEBT;
+    case 'NO_GO': return TaskEvaluation.NO_GO;
+    default: return TaskEvaluation.NO_GO;
+  }
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -277,7 +290,7 @@ export async function runEvaluatePhase(
   sprint: Sprint,
   results: TaskResult[],
   evaluations: Map<string, TaskEvaluation>,
-  coverageThreshold = 90,
+  _coverageThreshold = 90,
 ): Promise<void> {
   try {
     sprint.status = SprintStatus.EVALUATING;
@@ -292,7 +305,8 @@ export async function runEvaluatePhase(
       if (collectedIds.has(task.id)) {
         const result = results.find(r => r.taskId === task.id);
         if (!result) continue; // narrowed: collectedIds contains task.id
-        let evaluation = evaluateResult(result, task, undefined, coverageThreshold);
+        const rubricResult = evaluateWithRubric(result, task);
+        let evaluation = toTaskEvaluation(rubricResult);
 
         // CI regression check: run after initial evaluation (non-fatal)
         let ciCheckResult: CiRegressionCheckResult | undefined;
@@ -300,9 +314,15 @@ export async function runEvaluatePhase(
           try {
             ciCheckResult = runCiRegressionCheck(projectRoot, result, ciGuardianConfig);
             if (ciCheckResult.regressionDetected) {
-              // tsc failure + block_on_tsc_fail → downgrade to NO_GO
+              // tsc failure + block_on_tsc_fail → task-specific downgrade
+              // Only downgrade if this task's changed files overlap with tsc error files
               if (!ciCheckResult.tscPassed && ciGuardianConfig.block_on_tsc_fail) {
-                evaluation = TaskEvaluation.NO_GO;
+                const tscErrorFiles = parseTscErrorFiles(ciCheckResult.tscOutput);
+                const taskFiles = new Set(result.filesChanged);
+                const hasOverlap = tscErrorFiles.some(f => taskFiles.has(f));
+                if (hasOverlap) {
+                  evaluation = TaskEvaluation.NO_GO;
+                }
               }
               // targeted test failure + block_on_test_fail → downgrade to NO_GO
               if (!ciCheckResult.targetedTestsPassed && ciGuardianConfig.block_on_test_fail) {
@@ -480,10 +500,16 @@ export async function runFixPhase(
       for (const fixTask of fixTasks) {
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
-          const fixEval = evaluateResult(fixResult, fixTask, undefined, config.coverage_threshold);
+          const fixRubricResult = evaluateWithRubric(fixResult, fixTask);
+          const fixEval = toTaskEvaluation(fixRubricResult);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
+          evaluations.set(fixTask.id, fixEval);
           if (fixEval === TaskEvaluation.DONE && fixTask.fixForTaskId) {
             resolveDebt(projectRoot, `debt-${fixTask.fixForTaskId}`, sprint.id);
+          }
+          // Update original task evaluation if fix succeeded
+          if (fixTask.fixForTaskId && fixEval !== TaskEvaluation.NO_GO && evaluations.has(fixTask.fixForTaskId)) {
+            evaluations.set(fixTask.fixForTaskId, fixEval);
           }
         }
       }

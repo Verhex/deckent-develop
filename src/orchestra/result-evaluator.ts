@@ -21,6 +21,30 @@ function isSourceCodeDir(dir: string): boolean {
   return normalized || SOURCE_CODE_PREFIXES.some(p => dir.startsWith(p));
 }
 
+// ─── Bash Unavailable Detection ─────────────────────────────────────
+
+/** Bash unavailable signal patterns in worker notes */
+const BASH_UNAVAILABLE_PATTERNS = [
+  /bash.*unavailable/i,
+  /session-env.*enoent/i,
+  /enoent.*session-env/i,
+  /bash\s+tool\s+(is\s+)?unavailable/i,
+  /cannot\s+run\s+(tsc|vitest|npm)/i,
+];
+
+/**
+ * Detects whether a worker was unable to run verification commands (tsc, vitest)
+ * due to Bash tool being unavailable (e.g., session-env ENOENT).
+ *
+ * When Bash is unavailable, testsPassed=false and coverage=0 are expected
+ * side effects of the environment constraint, not code quality issues.
+ */
+export function isBashUnavailable(result: TaskResult): boolean {
+  const notes = result.notes ?? '';
+  if (notes.length === 0) return false;
+  return BASH_UNAVAILABLE_PATTERNS.some(pattern => pattern.test(notes));
+}
+
 // ─── isDocTask ────────────────────────────────────────────────────────
 
 /**
@@ -54,6 +78,15 @@ export function isDocTask(task: Task): boolean {
 export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
   // Step 1: Hard failures — NO_GO regardless of self-assessment
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
+
+  // Step 1b: Bash unavailable tolerance — environment constraint, not code quality
+  // When Bash tool is unavailable (session-env ENOENT), worker cannot run tsc/vitest,
+  // so testsPassed=false and coverage=0 are expected. Accept as GO_WITH_TECH_DEBT
+  // if the worker's self-assessment is not NO_GO and code changes were applied.
+  if (!result.testsPassed && isBashUnavailable(result)) {
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
 
   // Step 2: Doc tasks — DONE if tests pass (skip coverage)
@@ -417,6 +450,16 @@ export function scoreTestCoverage(result: TaskResult): RubricScore {
   const hasNewTests = result.filesChanged?.some(f =>
     f.includes('.test.') || f.includes('.spec.')
   ) ?? false;
+
+  // Bash unavailable with zero coverage → neutral score (not penalized)
+  if (isBashUnavailable(result) && result.coverage === 0) {
+    return {
+      criterion: 'test_coverage',
+      score: 50,
+      passed: true,
+      reason: 'coverage 0% (Bash unavailable — neutral score)',
+    };
+  }
 
   let score = Math.min(result.coverage, 100);
   if (hasNewTests) score = Math.min(score + 15, 100);

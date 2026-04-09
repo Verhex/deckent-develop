@@ -204,6 +204,29 @@ export async function loadPluginHooks(projectRoot: string): Promise<number> {
   return totalRegistered;
 }
 
+// ─── tsc Error File Parser ──────────────────────────────────────────────────
+
+/**
+ * Parse tsc --noEmit output to extract file paths that have errors.
+ * TypeScript compiler outputs errors in the format:
+ *   src/core/config.ts(12,5): error TS2345: Argument of type...
+ *
+ * Returns a deduplicated array of file paths (e.g. ['src/core/config.ts']).
+ * Used by runEvaluatePhase to determine which tasks are responsible for tsc failures.
+ */
+export function parseTscErrorFiles(tscOutput: string): string[] {
+  if (!tscOutput) return [];
+  const files = new Set<string>();
+  // Match lines like: path/to/file.ts(line,col): error TSXXXX: ...
+  const regex = /^(.+?)\(\d+,\d+\):\s*error\s+TS\d+/gm;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(tscOutput)) !== null) {
+    const filePath = match[1]?.trim();
+    if (filePath) files.add(filePath);
+  }
+  return [...files];
+}
+
 // ─── CI Regression Check (afterTask built-in hook) ──────────────────────────
 
 /** CI guardian configuration — controls pre/post sprint and task checks */

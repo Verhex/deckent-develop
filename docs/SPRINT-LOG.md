@@ -3198,3 +3198,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 125-005: BETA-TRACKER Sprint 124 Güncellemesi (NO_GO)
 
 ---
+## Sprint 126 — sprint-126
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-09
+**Duration:** 1252s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 5 |
+| Coverage | 0.0% |
+| Duration | 1252360ms |
+
+### Tasks
+
+- 126-001: FIX Fazı Evaluations Map Update — CRITICAL Bug Fix (NO_GO)
+- 126-002: evaluateResult() → evaluateWithRubric() Geçişi (NO_GO)
+- 126-003: CI Guardian Granularity — Task-Spesifik tsc Kontrolü (NO_GO)
+- 126-004: Context-Aware Evaluation — Bash Unavailable Toleransı (NO_GO)
+- 126-005: Sprint Metrics Post-FIX Doğrulama + Debug Logging (NO_GO)
+
+---

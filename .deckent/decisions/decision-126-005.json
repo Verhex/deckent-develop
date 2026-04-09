@@ -1,0 +1,39 @@
+{
+  "taskId": "126-005",
+  "sprintId": "sprint-126",
+  "steps": [
+    {
+      "step": 1,
+      "name": "routing-step-1",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Intent: testing (confidence: 0.95)"
+    },
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: architect"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert, testing-expert]"
+    }
+  ],
+  "decidedAt": "2026-04-09T10:49:22.233Z"
+}
