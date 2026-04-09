@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
+import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { LanguageProvider } from "../../src/dashboard/src/i18n/LanguageProvider";
 import { AgentDetail } from "../../src/dashboard/src/components/AgentDetail";
 
@@ -43,6 +44,7 @@ describe("AgentDetail component", () => {
   });
 
   afterEach(() => {
+    cleanup();
     globalThis.fetch = originalFetch;
     vi.useRealTimers();
   });
