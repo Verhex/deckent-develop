@@ -22,6 +22,12 @@ import { createResultWatcher } from './result-watcher.js';
 
 // ─── Worker IPC ───────────────────────────────────────────────────
 import type { ChannelRegistry } from '../agents/worker-ipc.js';
+import {
+  readQuestionFile,
+  writeAnswerFile,
+  getQuestionPath,
+} from '../agents/worker-ipc.js';
+import type { BrainAnswer } from '../core/task-types.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -256,6 +262,8 @@ export async function waitForResults(
       const newlyCollected = collectResults();
       processQueue(newlyCollected);
       if (collected.size === taskIds.size) break;
+      // Check for pending worker questions and auto-answer them
+      checkWorkerQuestions(projectRoot, taskIds, collected);
       // Periodic progress log (every 5 minutes)
       const now = Date.now();
       if (now - lastProgressLog >= PROGRESS_LOG_INTERVAL_MS) {
@@ -280,4 +288,58 @@ export async function waitForResults(
     }
   }
   return results;
+}
+
+// ═══ Worker Question Handling ════════════════════════════════════════
+
+/**
+ * Handle a single worker question by writing an auto-answer.
+ * In the current implementation, Brain auto-responds with 'continue'.
+ * Future: integrate with Human Checkpoint for interactive approval.
+ *
+ * @returns The answer that was written, or undefined if no question was found
+ */
+export function handleWorkerQuestion(
+  projectRoot: string,
+  taskId: string,
+): BrainAnswer | undefined {
+  const question = readQuestionFile(projectRoot, taskId);
+  if (!question) return undefined;
+
+  const answer: BrainAnswer = {
+    taskId,
+    action: 'continue',
+    message: 'Auto-continue: Brain acknowledged question',
+    timestamp: new Date().toISOString(),
+  };
+
+  writeAnswerFile(projectRoot, answer);
+  debugLog('handleWorkerQuestion', `Auto-answered question for task ${taskId}: "${question.question}"`);
+  return answer;
+}
+
+/**
+ * Check all active (uncollected) tasks for pending .question files.
+ * Called on each poll cycle in the waitForResults loop.
+ *
+ * @param projectRoot - Project root directory
+ * @param taskIds - All task IDs in the sprint
+ * @param collectedIds - Already collected (finished) task IDs
+ * @returns Array of task IDs that had questions answered
+ */
+export function checkWorkerQuestions(
+  projectRoot: string,
+  taskIds: Set<string>,
+  collectedIds: Set<string>,
+): string[] {
+  const answered: string[] = [];
+  for (const taskId of taskIds) {
+    if (collectedIds.has(taskId)) continue;
+    const questionPath = getQuestionPath(projectRoot, taskId);
+    if (existsSync(questionPath)) {
+      const result = handleWorkerQuestion(projectRoot, taskId);
+      if (result) answered.push(taskId);
+    }
+  }
+  return answered;
 }

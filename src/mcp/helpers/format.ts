@@ -278,3 +278,46 @@ export interface FormattedResponse<T> {
 export function wrapResponse<T>(data: T, summary: string): FormattedResponse<T> {
   return { data, summary };
 }
+
+export interface ExplainData {
+  found: boolean;
+  sprintId?: string;
+  sprintNumber?: number;
+  goal?: string;
+  totalTasks?: number;
+  completed?: number;
+  techDebt?: number;
+  noGo?: number;
+  durationMs?: number;
+  learnings?: string[];
+  tasks?: string[];
+  output?: string;
+}
+
+export function formatExplainResponse(data: ExplainData): string {
+  if (!data.found) {
+    if (data.sprintId) {
+      return `Sprint ${data.sprintId} not found. Check sprint ID and try again.`;
+    }
+    return 'No sprints found. Run `deckent start` to begin.';
+  }
+
+  const num = data.sprintNumber ?? 0;
+  const done = (data.completed ?? 0) + (data.techDebt ?? 0);
+  const total = data.totalTasks ?? 0;
+  const noGo = data.noGo ?? 0;
+
+  const parts: string[] = [`Sprint #${num}: ${done}/${total} ${pluralize(total, 'task')} completed`];
+
+  if (noGo > 0) {
+    parts.push(`${noGo} failed`);
+  }
+
+  if (data.durationMs && data.durationMs > 0) {
+    const mins = Math.floor(data.durationMs / 60000);
+    const secs = Math.floor((data.durationMs % 60000) / 1000);
+    parts.push(mins > 0 ? `${mins}m ${secs}s` : `${secs}s`);
+  }
+
+  return parts.join(', ') + '.';
+}

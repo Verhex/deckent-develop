@@ -3172,3 +3172,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 124-004: Sprint Reporter Token Summary — RETRO.md Token Tablosu (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 125 — sprint-125
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-09
+**Duration:** 1257s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 5 |
+| Coverage | 0.0% |
+| Duration | 1257041ms |
+
+### Tasks
+
+- 125-001: Rubric-Based Grading — Yapılandırılmış Değerlendirme Sistemi (NO_GO)
+- 125-002: Worker Question Mechanism — askBrain IPC (NO_GO)
+- 125-003: Explain MCP Tool — deckent_explain (NO_GO)
+- 125-004: Workspace + DECKENT.md Tutarlılık Düzeltmesi (NO_GO)
+- 125-005: BETA-TRACKER Sprint 124 Güncellemesi (NO_GO)
+
+---

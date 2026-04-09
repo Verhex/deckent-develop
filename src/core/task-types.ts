@@ -221,6 +221,38 @@ export interface VerifyTestsResult {
   output: string;
 }
 
+// ─── Rubric-Based Evaluation ───────────────────────────────────────
+/** A single criterion in an evaluation rubric */
+export interface RubricCriterion {
+  name: string;
+  weight: number;
+  threshold: number;
+  evaluator: 'auto' | 'pattern' | 'metric';
+}
+
+/** Rubric configuration for structured task evaluation */
+export interface EvaluationRubric {
+  criteria: RubricCriterion[];
+  passingScore: number;
+  maxRetries: number;
+}
+
+/** Score for a single rubric criterion */
+export interface RubricScore {
+  criterion: string;
+  score: number;
+  passed: boolean;
+  reason: string;
+}
+
+/** Full evaluation result from rubric-based grading */
+export interface EvaluationResult {
+  decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  totalScore: number;
+  rubricScores: RubricScore[];
+  retryCount: number;
+}
+
 // ─── Token Usage ────────────────────────────────────────────────────
 /** Token usage data from a worker's LLM interaction */
 export interface TokenUsage {
@@ -229,6 +261,28 @@ export interface TokenUsage {
   cacheReadTokens?: number;
   provider?: ProviderName;
   model?: ModelType;
+}
+
+// ─── Worker Question / Brain Answer ─────────────────────────────────
+/** Action a worker can request from Brain when it encounters ambiguity */
+export type QuestionAction = 'continue' | 'skip' | 'abort' | 'retry';
+
+/** A question written by a worker to .tasks/task-{id}.question */
+export interface WorkerQuestion {
+  taskId: string;
+  workerId: string;
+  question: string;
+  context?: string;
+  suggestedAction?: QuestionAction;
+  timestamp: string;
+}
+
+/** An answer written by Brain to .tasks/task-{id}.answer */
+export interface BrainAnswer {
+  taskId: string;
+  action: QuestionAction;
+  message?: string;
+  timestamp: string;
 }
 
 // ─── TaskResult ──────────────────────────────────────────────────────

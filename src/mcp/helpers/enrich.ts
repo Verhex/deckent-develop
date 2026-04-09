@@ -41,6 +41,8 @@ const SUMMARIES: Record<string, (response: Record<string, unknown>, lang: string
     lang === 'tr' ? 'Sprint temizliği tamamlandı.' : 'Sprint cleanup completed.',
   checkpoint: (_r, lang) =>
     lang === 'tr' ? 'Checkpoint işlemi tamamlandı.' : 'Checkpoint operation completed.',
+  explain: (_r, lang) =>
+    lang === 'tr' ? 'Sprint açıklaması oluşturuldu.' : 'Sprint explanation generated.',
 };
 
 const HINTS: Record<string, (response: Record<string, unknown>) => string[]> = {
@@ -61,6 +63,7 @@ const HINTS: Record<string, (response: Record<string, unknown>) => string[]> = {
   kill: () => ['`deckent cleanup` ile lock dosyalarını temizleyin'],
   cleanup: () => ['`deckent status` ile yeni sprint başlatın'],
   checkpoint: () => ['`deckent checkpoint list` ile checkpoint durumunu izleyin'],
+  explain: () => ['`deckent retro` ile retrospektif detaylarını okuyun', '`deckent history` ile sprint geçmişini görün'],
 };
 
 export function generateSummary(

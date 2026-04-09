@@ -7,6 +7,10 @@
  */
 
 import type { ChildProcess } from 'node:child_process';
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { TASKS_DIR } from '../core/constants.js';
+import type { WorkerQuestion, BrainAnswer, QuestionAction } from '../core/task-types.js';
 
 // ─── Message Types ───────────────────────────────────────────────────────────
 
@@ -16,7 +20,9 @@ export type IPCMessageType =
   | 'STATUS_RESPONSE'
   | 'PAUSE'
   | 'RESUME'
-  | 'KILL';
+  | 'KILL'
+  | 'QUESTION'
+  | 'ANSWER';
 
 export interface IPCMessage {
   type: IPCMessageType;
@@ -350,4 +356,124 @@ export class ChannelRegistry {
   size(): number {
     return this.channels.size;
   }
+}
+
+// ─── File-based Question/Answer IPC ──────────────────────────────────────────
+// Used when workers run in tmux/docker backends without process.send support.
+// Worker writes .question file, Brain reads it and writes .answer file.
+
+/** Get the path for a worker's question file */
+export function getQuestionPath(projectRoot: string, taskId: string): string {
+  return join(projectRoot, TASKS_DIR, `task-${taskId}.question`);
+}
+
+/** Get the path for a brain's answer file */
+export function getAnswerPath(projectRoot: string, taskId: string): string {
+  return join(projectRoot, TASKS_DIR, `task-${taskId}.answer`);
+}
+
+/** Write a question file from the worker side */
+export function writeQuestionFile(projectRoot: string, question: WorkerQuestion): void {
+  const path = getQuestionPath(projectRoot, question.taskId);
+  writeFileSync(path, JSON.stringify(question, null, 2), 'utf-8');
+}
+
+/** Read a question file (returns undefined if not found or invalid) */
+export function readQuestionFile(projectRoot: string, taskId: string): WorkerQuestion | undefined {
+  const path = getQuestionPath(projectRoot, taskId);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    return JSON.parse(raw) as WorkerQuestion;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Write an answer file from the Brain side */
+export function writeAnswerFile(projectRoot: string, answer: BrainAnswer): void {
+  const path = getAnswerPath(projectRoot, answer.taskId);
+  writeFileSync(path, JSON.stringify(answer, null, 2), 'utf-8');
+}
+
+/** Read an answer file (returns undefined if not found or invalid) */
+export function readAnswerFile(projectRoot: string, taskId: string): BrainAnswer | undefined {
+  const path = getAnswerPath(projectRoot, taskId);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    return JSON.parse(raw) as BrainAnswer;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Clean up both question and answer files for a task */
+export function cleanupQuestionFiles(projectRoot: string, taskId: string): void {
+  const qPath = getQuestionPath(projectRoot, taskId);
+  const aPath = getAnswerPath(projectRoot, taskId);
+  try { if (existsSync(qPath)) unlinkSync(qPath); } catch { /* noop */ }
+  try { if (existsSync(aPath)) unlinkSync(aPath); } catch { /* noop */ }
+}
+
+/**
+ * askBrain — File-based question mechanism for workers.
+ *
+ * 1. Writes a .question file with the worker's question
+ * 2. Polls for a .answer file at the given interval
+ * 3. Returns the answer action, or the default 'continue' on timeout
+ * 4. Cleans up question/answer files after resolution
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - The task ID
+ * @param workerId - The worker ID
+ * @param question - The question text
+ * @param options - Polling and timeout options
+ * @returns The action from Brain's answer
+ */
+export async function askBrain(
+  projectRoot: string,
+  taskId: string,
+  workerId: string,
+  question: string,
+  options?: {
+    context?: string;
+    suggestedAction?: QuestionAction;
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+  },
+): Promise<BrainAnswer> {
+  const timeoutMs = options?.timeoutMs ?? 60_000;
+  const pollIntervalMs = options?.pollIntervalMs ?? 1_000;
+
+  const questionData: WorkerQuestion = {
+    taskId,
+    workerId,
+    question,
+    context: options?.context,
+    suggestedAction: options?.suggestedAction,
+    timestamp: new Date().toISOString(),
+  };
+
+  writeQuestionFile(projectRoot, questionData);
+
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    const answer = readAnswerFile(projectRoot, taskId);
+    if (answer) {
+      cleanupQuestionFiles(projectRoot, taskId);
+      return answer;
+    }
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+
+  // Timeout — return default 'continue' answer
+  const defaultAnswer: BrainAnswer = {
+    taskId,
+    action: 'continue',
+    message: 'Auto-continue: question timed out waiting for Brain response',
+    timestamp: new Date().toISOString(),
+  };
+
+  cleanupQuestionFiles(projectRoot, taskId);
+  return defaultAnswer;
 }

@@ -9,8 +9,8 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-124 |
-| MCP Tools | 20 |
+| Sprint | sprint-125 |
+| MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
 | Dashboard Pages | 6 |
@@ -830,15 +830,8 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 ## Sprint History
 | Sprint | Durum |
 |--------|-------|
-| sprint-116 | tamamlandı |
-| sprint-117 | tamamlandı |
-| sprint-118 | tamamlandı |
-| sprint-119 | tamamlandı |
-| sprint-120 | tamamlandı |
-| sprint-121 | tamamlandı |
-| sprint-122 | tamamlandı |
-| sprint-123 | tamamlandı |
 | sprint-124 | tamamlandı |
+| sprint-125 | tamamlandı |
 
 ## Bug Tracker
 
@@ -1271,10 +1264,10 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-124 |
-| Toplam Task | 4 |
-| Tamamlanan | 4 |
-| Tech Debt | 4 |
-| No-Go | 0 |
-| Süre | 9dk 5sn |
+| Sprint | sprint-125 |
+| Toplam Task | 5 |
+| Tamamlanan | 0 |
+| Tech Debt | 0 |
+| No-Go | 5 |
+| Süre | 20dk 57sn |
 | Coverage | 0.0% |

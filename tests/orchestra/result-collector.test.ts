@@ -27,7 +27,17 @@ vi.mock('../../src/orchestra/task-builder.js', () => ({
   buildWorkerPrompt: vi.fn(() => 'mock prompt'),
 }));
 
-import { waitForResults } from '../../src/orchestra/result-collector.js';
+import {
+  waitForResults,
+  handleWorkerQuestion,
+  checkWorkerQuestions,
+} from '../../src/orchestra/result-collector.js';
+import {
+  writeQuestionFile,
+  getQuestionPath,
+  getAnswerPath,
+} from '../../src/agents/worker-ipc.js';
+import type { WorkerQuestion } from '../../src/core/task-types.js';
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `deckent-test-${randomBytes(4).toString('hex')}`);
@@ -175,5 +185,125 @@ describe('result-collector timeout detection', () => {
     expect(r1!.selfAssessment).toBe('GO_WITH_TECH_DEBT');
     expect(r2!.selfAssessment).toBe('NO_GO');
     expect(r2!.notes).toContain('timeout');
+  });
+});
+
+// ═══ Worker Question Handling ════════════════════════════════════════
+
+describe('handleWorkerQuestion', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
+  });
+
+  it('returns undefined when no question file exists', () => {
+    const result = handleWorkerQuestion(tmpDir, 'no-question');
+    expect(result).toBeUndefined();
+  });
+
+  it('auto-answers with continue when question file exists', () => {
+    const question: WorkerQuestion = {
+      taskId: 'hq-001',
+      workerId: 'w-hq-001',
+      question: 'Should I continue with this approach?',
+      timestamp: new Date().toISOString(),
+    };
+    writeQuestionFile(tmpDir, question);
+
+    const answer = handleWorkerQuestion(tmpDir, 'hq-001');
+
+    expect(answer).toBeDefined();
+    expect(answer!.action).toBe('continue');
+    expect(answer!.taskId).toBe('hq-001');
+
+    // Verify answer file was written
+    expect(existsSync(getAnswerPath(tmpDir, 'hq-001'))).toBe(true);
+  });
+});
+
+describe('checkWorkerQuestions', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
+  });
+
+  it('answers questions for active (uncollected) tasks', () => {
+    const question: WorkerQuestion = {
+      taskId: 'cq-001',
+      workerId: 'w-cq-001',
+      question: 'Is this right?',
+      timestamp: new Date().toISOString(),
+    };
+    writeQuestionFile(tmpDir, question);
+
+    const taskIds = new Set(['cq-001', 'cq-002']);
+    const collectedIds = new Set<string>();
+
+    const answered = checkWorkerQuestions(tmpDir, taskIds, collectedIds);
+
+    expect(answered).toContain('cq-001');
+    expect(answered).not.toContain('cq-002');
+  });
+
+  it('skips collected tasks', () => {
+    const question: WorkerQuestion = {
+      taskId: 'cq-003',
+      workerId: 'w-cq-003',
+      question: 'Late question',
+      timestamp: new Date().toISOString(),
+    };
+    writeQuestionFile(tmpDir, question);
+
+    const taskIds = new Set(['cq-003']);
+    const collectedIds = new Set(['cq-003']); // already collected
+
+    const answered = checkWorkerQuestions(tmpDir, taskIds, collectedIds);
+
+    expect(answered).toHaveLength(0);
+  });
+
+  it('handles multiple tasks with questions', () => {
+    const q1: WorkerQuestion = {
+      taskId: 'cq-004',
+      workerId: 'w-cq-004',
+      question: 'Question A',
+      timestamp: new Date().toISOString(),
+    };
+    const q2: WorkerQuestion = {
+      taskId: 'cq-005',
+      workerId: 'w-cq-005',
+      question: 'Question B',
+      timestamp: new Date().toISOString(),
+    };
+    writeQuestionFile(tmpDir, q1);
+    writeQuestionFile(tmpDir, q2);
+
+    const taskIds = new Set(['cq-004', 'cq-005', 'cq-006']);
+    const collectedIds = new Set<string>();
+
+    const answered = checkWorkerQuestions(tmpDir, taskIds, collectedIds);
+
+    expect(answered).toHaveLength(2);
+    expect(answered).toContain('cq-004');
+    expect(answered).toContain('cq-005');
+  });
+
+  it('returns empty array when no questions exist', () => {
+    const taskIds = new Set(['cq-007']);
+    const collectedIds = new Set<string>();
+
+    const answered = checkWorkerQuestions(tmpDir, taskIds, collectedIds);
+
+    expect(answered).toHaveLength(0);
   });
 });

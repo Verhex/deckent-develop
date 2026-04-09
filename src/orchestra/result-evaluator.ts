@@ -5,7 +5,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Task, TaskResult } from '../core/types.js';
+import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
@@ -371,6 +371,171 @@ export function aggregateTokenUsage(results: TaskResult[]): {
   }
 
   return { totalInputTokens, totalOutputTokens, totalCacheReadTokens, tasksWithTokenData };
+}
+
+// ─── Rubric-Based Evaluation ────────────────────────────────────────
+
+/** Default rubric used when no custom rubric is provided */
+export const DEFAULT_RUBRIC: EvaluationRubric = {
+  criteria: [
+    { name: 'correctness', weight: 0.4, threshold: 60, evaluator: 'auto' },
+    { name: 'test_coverage', weight: 0.25, threshold: 50, evaluator: 'metric' },
+    { name: 'scope_compliance', weight: 0.2, threshold: 80, evaluator: 'auto' },
+    { name: 'documentation', weight: 0.15, threshold: 30, evaluator: 'pattern' },
+  ],
+  passingScore: 70,
+  maxRetries: 0,
+};
+
+/** Score correctness based on testsPassed and selfAssessment */
+export function scoreCorrectness(result: TaskResult): RubricScore {
+  let score = 0;
+  const reasons: string[] = [];
+
+  if (result.testsPassed) {
+    score += 60;
+    reasons.push('tests passed');
+  } else {
+    reasons.push('tests failed');
+  }
+
+  if (result.selfAssessment === 'DONE') {
+    score += 40;
+    reasons.push('self-assessment DONE');
+  } else if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+    score += 20;
+    reasons.push('self-assessment GO_WITH_TECH_DEBT');
+  } else {
+    reasons.push('self-assessment NO_GO');
+  }
+
+  return { criterion: 'correctness', score, passed: score >= 60, reason: reasons.join('; ') };
+}
+
+/** Score test coverage based on coverage metric and presence of new test files */
+export function scoreTestCoverage(result: TaskResult): RubricScore {
+  const hasNewTests = result.filesChanged?.some(f =>
+    f.includes('.test.') || f.includes('.spec.')
+  ) ?? false;
+
+  let score = Math.min(result.coverage, 100);
+  if (hasNewTests) score = Math.min(score + 15, 100);
+
+  const reasons: string[] = [`coverage ${result.coverage}%`];
+  if (hasNewTests) reasons.push('new test files written');
+
+  return { criterion: 'test_coverage', score, passed: score >= 50, reason: reasons.join('; ') };
+}
+
+/** Score scope compliance by checking filesChanged against task scope */
+export function scoreScopeCompliance(result: TaskResult, task: Task): RubricScore {
+  const dirs = task.scope?.directories ?? [];
+  const writeFiles = task.scope?.filesWrite ?? [];
+  const changed = result.filesChanged ?? [];
+
+  if (changed.length === 0) {
+    return { criterion: 'scope_compliance', score: 100, passed: true, reason: 'no files changed' };
+  }
+
+  let inScope = 0;
+  for (const file of changed) {
+    const inDir = dirs.some(d => file.startsWith(d));
+    const inWrite = writeFiles.some(w => file === w);
+    if (inDir || inWrite) inScope++;
+  }
+
+  const score = Math.round((inScope / changed.length) * 100);
+  return {
+    criterion: 'scope_compliance',
+    score,
+    passed: score >= 80,
+    reason: `${inScope}/${changed.length} files within scope`,
+  };
+}
+
+/** Score documentation quality based on notes length and presence */
+export function scoreDocumentation(result: TaskResult): RubricScore {
+  const notes = result.notes ?? '';
+  let score = 0;
+  const reasons: string[] = [];
+
+  if (notes.length >= 100) {
+    score = 100;
+    reasons.push('detailed notes');
+  } else if (notes.length >= 50) {
+    score = 70;
+    reasons.push('moderate notes');
+  } else if (notes.length >= 20) {
+    score = 40;
+    reasons.push('brief notes');
+  } else {
+    score = 10;
+    reasons.push('minimal or no notes');
+  }
+
+  return { criterion: 'documentation', score, passed: score >= 30, reason: reasons.join('; ') };
+}
+
+/** Dispatch scoring for a named criterion */
+function scoreCriterion(name: string, result: TaskResult, task: Task): RubricScore {
+  switch (name) {
+    case 'correctness': return scoreCorrectness(result);
+    case 'test_coverage': return scoreTestCoverage(result);
+    case 'scope_compliance': return scoreScopeCompliance(result, task);
+    case 'documentation': return scoreDocumentation(result);
+    default:
+      return { criterion: name, score: 0, passed: false, reason: `unknown criterion: ${name}` };
+  }
+}
+
+/**
+ * Evaluate a task result using rubric-based grading.
+ * Accepts an optional partial rubric that is merged with DEFAULT_RUBRIC.
+ *
+ * Scoring thresholds:
+ * - totalScore >= passingScore → DONE
+ * - totalScore >= passingScore * 0.7 → GO_WITH_TECH_DEBT
+ * - totalScore < passingScore * 0.7 → NO_GO
+ */
+export function evaluateWithRubric(
+  result: TaskResult,
+  task: Task,
+  rubric?: Partial<EvaluationRubric>,
+): EvaluationResult {
+  const merged: EvaluationRubric = {
+    criteria: rubric?.criteria ?? DEFAULT_RUBRIC.criteria,
+    passingScore: rubric?.passingScore ?? DEFAULT_RUBRIC.passingScore,
+    maxRetries: Math.min(rubric?.maxRetries ?? DEFAULT_RUBRIC.maxRetries, 3),
+  };
+
+  const rubricScores: RubricScore[] = [];
+  let totalScore = 0;
+
+  for (const criterion of merged.criteria) {
+    const scored = scoreCriterion(criterion.name, result, task);
+    // Override passed based on per-criterion threshold
+    scored.passed = scored.score >= criterion.threshold;
+    rubricScores.push(scored);
+    totalScore += scored.score * criterion.weight;
+  }
+
+  totalScore = Math.round(totalScore * 100) / 100;
+
+  let decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  if (totalScore >= merged.passingScore) {
+    decision = 'DONE';
+  } else if (totalScore >= merged.passingScore * 0.7) {
+    decision = 'GO_WITH_TECH_DEBT';
+  } else {
+    decision = 'NO_GO';
+  }
+
+  return {
+    decision,
+    totalScore,
+    rubricScores,
+    retryCount: merged.maxRetries,
+  };
 }
 
 /** Parse NO_GO rate and coverage from a sprint log markdown table */

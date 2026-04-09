@@ -3,7 +3,7 @@
 
 import type { DecisionEngineConfig, LearningConfig, CollaborationConfig } from './decision-config.js';
 import type { NotificationConfig } from './notifications.js';
-import type { ModelType, ProviderName } from './task-types.js';
+import type { ModelType, ProviderName, EvaluationRubric } from './task-types.js';
 import type { ModelStrategy } from './mode-presets.js';
 import type { ModelTier } from './model-equivalence.js';
 
@@ -190,6 +190,12 @@ export interface DeckentConfig {
   /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
   rollback_policy?: 'never' | 'on_failure' | 'always';
 
+  // ─── Rubric-Based Evaluation ──────────────────────────────────────
+  /** Custom evaluation rubric overrides (merged with DEFAULT_RUBRIC) */
+  evaluation_rubric?: Partial<EvaluationRubric>;
+  /** Max retries when rubric evaluation fails (default: 0, max: 3) */
+  rubric_max_retries?: number;
+
   // ─── Adaptive Thresholds ────────────────────────────────────────────
   /** Auto-adjust routing parameters based on sprint NO_GO rate (default: false) */
   adaptive_thresholds?: boolean;
@@ -269,6 +275,9 @@ export interface ResolvedConfig {
   adaptive_config: AdaptiveConfig;
   // Rollback
   rollback_policy?: 'never' | 'on_failure' | 'always';
+  // Rubric-Based Evaluation
+  evaluation_rubric?: Partial<EvaluationRubric>;
+  rubric_max_retries?: number;
   // Routing Engine v2
   routing_engine?: 'v1' | 'v2';
   routing_config?: {

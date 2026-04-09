@@ -14,7 +14,8 @@ Create `.tasks/task-{id}.hb` BEFORE starting work, update periodically:
   "currentAction": "Starting task",
   "timestamp": "<new Date().toISOString() — UTC ISO 8601>",
   "filesChangedCount": 0,
-  "sequence": 0
+  "sequence": 0,
+  "backend": "tmux | subprocess | docker (optional)"
 }
 ```
 
@@ -38,11 +39,20 @@ Write `.tasks/task-{id}.result` when complete:
   "testsPassed": true,
   "coverage": 0,
   "selfAssessment": "DONE",
-  "notes": "Brief summary of what was done"
+  "notes": "Brief summary of what was done",
+  "tokenUsage": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
 }
 ```
 
 `selfAssessment` must be one of: `"DONE"`, `"GO_WITH_TECH_DEBT"`, `"NO_GO"`
+
+`tokenUsage` is optional — include it if your provider reports token consumption data.
 
 The result file is REQUIRED — without it your work cannot be evaluated.
 

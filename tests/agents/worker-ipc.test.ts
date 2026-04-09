@@ -4,14 +4,27 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { join } from 'node:path';
+import { mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { randomBytes } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
 import {
   WorkerChannel,
   WorkerSideChannel,
   ChannelRegistry,
   isIPCMessage,
+  getQuestionPath,
+  getAnswerPath,
+  writeQuestionFile,
+  readQuestionFile,
+  writeAnswerFile,
+  readAnswerFile,
+  cleanupQuestionFiles,
+  askBrain,
 } from '../../src/agents/worker-ipc.js';
 import type { IPCMessage, IPCMessageType } from '../../src/agents/worker-ipc.js';
+import type { WorkerQuestion, BrainAnswer } from '../../src/core/task-types.js';
 
 // ─── Mock ChildProcess ─────────────────────────────────────────────────────────
 
@@ -514,5 +527,179 @@ describe('WorkerSideChannel', () => {
     expect(h1).toHaveBeenCalledOnce();
     expect(h2).toHaveBeenCalledOnce();
     ch.close();
+  });
+});
+
+// ─── File-based Question/Answer IPC ─────────────────────────────────────────
+
+describe('File-based Question/Answer IPC', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `deckent-ipc-test-${randomBytes(4).toString('hex')}`);
+    mkdirSync(join(tmpDir, '.tasks'), { recursive: true });
+  });
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
+  });
+
+  describe('path helpers', () => {
+    it('getQuestionPath returns correct path', () => {
+      const path = getQuestionPath('/project', '125-001');
+      expect(path).toBe(join('/project', '.tasks', 'task-125-001.question'));
+    });
+
+    it('getAnswerPath returns correct path', () => {
+      const path = getAnswerPath('/project', '125-001');
+      expect(path).toBe(join('/project', '.tasks', 'task-125-001.answer'));
+    });
+  });
+
+  describe('writeQuestionFile / readQuestionFile', () => {
+    it('round-trips a question through write and read', () => {
+      const question: WorkerQuestion = {
+        taskId: 'q-001',
+        workerId: 'w-q-001',
+        question: 'Should I refactor this module?',
+        context: 'Module has 500 lines',
+        suggestedAction: 'continue',
+        timestamp: new Date().toISOString(),
+      };
+
+      writeQuestionFile(tmpDir, question);
+      const read = readQuestionFile(tmpDir, 'q-001');
+
+      expect(read).toBeDefined();
+      expect(read!.taskId).toBe('q-001');
+      expect(read!.question).toBe('Should I refactor this module?');
+      expect(read!.context).toBe('Module has 500 lines');
+      expect(read!.suggestedAction).toBe('continue');
+    });
+
+    it('readQuestionFile returns undefined for missing file', () => {
+      const result = readQuestionFile(tmpDir, 'nonexistent');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('writeAnswerFile / readAnswerFile', () => {
+    it('round-trips an answer through write and read', () => {
+      const answer: BrainAnswer = {
+        taskId: 'a-001',
+        action: 'continue',
+        message: 'Go ahead',
+        timestamp: new Date().toISOString(),
+      };
+
+      writeAnswerFile(tmpDir, answer);
+      const read = readAnswerFile(tmpDir, 'a-001');
+
+      expect(read).toBeDefined();
+      expect(read!.taskId).toBe('a-001');
+      expect(read!.action).toBe('continue');
+      expect(read!.message).toBe('Go ahead');
+    });
+
+    it('readAnswerFile returns undefined for missing file', () => {
+      const result = readAnswerFile(tmpDir, 'nonexistent');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('cleanupQuestionFiles', () => {
+    it('removes both question and answer files', () => {
+      const question: WorkerQuestion = {
+        taskId: 'c-001',
+        workerId: 'w-c-001',
+        question: 'test',
+        timestamp: new Date().toISOString(),
+      };
+      const answer: BrainAnswer = {
+        taskId: 'c-001',
+        action: 'continue',
+        timestamp: new Date().toISOString(),
+      };
+
+      writeQuestionFile(tmpDir, question);
+      writeAnswerFile(tmpDir, answer);
+
+      expect(existsSync(getQuestionPath(tmpDir, 'c-001'))).toBe(true);
+      expect(existsSync(getAnswerPath(tmpDir, 'c-001'))).toBe(true);
+
+      cleanupQuestionFiles(tmpDir, 'c-001');
+
+      expect(existsSync(getQuestionPath(tmpDir, 'c-001'))).toBe(false);
+      expect(existsSync(getAnswerPath(tmpDir, 'c-001'))).toBe(false);
+    });
+
+    it('does not throw when files do not exist', () => {
+      expect(() => cleanupQuestionFiles(tmpDir, 'no-such-task')).not.toThrow();
+    });
+  });
+
+  describe('askBrain', () => {
+    it('returns Brain answer when answer file is written promptly', async () => {
+      const answer: BrainAnswer = {
+        taskId: 'ask-001',
+        action: 'skip',
+        message: 'Skip this step',
+        timestamp: new Date().toISOString(),
+      };
+
+      // Write the answer after a short delay (simulating Brain response)
+      setTimeout(() => {
+        writeAnswerFile(tmpDir, answer);
+      }, 50);
+
+      const result = await askBrain(tmpDir, 'ask-001', 'w-ask-001', 'Can I skip?', {
+        timeoutMs: 5000,
+        pollIntervalMs: 20,
+      });
+
+      expect(result.action).toBe('skip');
+      expect(result.message).toBe('Skip this step');
+
+      // Question and answer files should be cleaned up
+      expect(existsSync(getQuestionPath(tmpDir, 'ask-001'))).toBe(false);
+      expect(existsSync(getAnswerPath(tmpDir, 'ask-001'))).toBe(false);
+    });
+
+    it('returns default continue on timeout', async () => {
+      // No answer file will be written — should timeout
+      const result = await askBrain(tmpDir, 'ask-002', 'w-ask-002', 'Waiting forever?', {
+        timeoutMs: 100,
+        pollIntervalMs: 20,
+      });
+
+      expect(result.action).toBe('continue');
+      expect(result.message).toContain('timed out');
+    });
+
+    it('passes context and suggestedAction to question file', async () => {
+      // We'll read the question file before it gets cleaned up
+      let writtenQuestion: WorkerQuestion | undefined;
+
+      setTimeout(() => {
+        writtenQuestion = readQuestionFile(tmpDir, 'ask-003');
+        // Write answer to stop polling
+        writeAnswerFile(tmpDir, {
+          taskId: 'ask-003',
+          action: 'continue',
+          timestamp: new Date().toISOString(),
+        });
+      }, 50);
+
+      await askBrain(tmpDir, 'ask-003', 'w-ask-003', 'Need guidance', {
+        context: 'Complex refactoring scenario',
+        suggestedAction: 'retry',
+        timeoutMs: 5000,
+        pollIntervalMs: 20,
+      });
+
+      expect(writtenQuestion).toBeDefined();
+      expect(writtenQuestion!.context).toBe('Complex refactoring scenario');
+      expect(writtenQuestion!.suggestedAction).toBe('retry');
+    });
   });
 });

@@ -1,37 +1,47 @@
-# Sprint sprint-124 Retrospective
+# Sprint sprint-125 Retrospective
 
 ## Summary
-Completed 4/4 tasks in 9 minutes 5s.
+Completed 0/5 tasks in 20 minutes 57s.
 
 ## Highlights
-- 4 tasks completed on first try
+- 5 tasks completed on first try
 - No boundary violations detected
+
+## Issues
+- Task 125-001 (Rubric-Based Grading — Yapılandırılmış Değerlendirme Sistemi) failed — Rubric-Based Grading sistemi implemente edildi. Değişikli...
+- Task 125-002 (Worker Question Mechanism — askBrain IPC) failed — Worker Question Mechanism implemented. Changes: (1) task-...
+- Task 125-003 (Explain MCP Tool — deckent_explain) failed — deckent_explain MCP tool implemented. New file src/mcp/to...
+- Task 125-004 (Workspace + DECKENT.md Tutarlılık Düzeltmesi) failed — All 5 documentation files synchronized with Sprint 124 co...
+- Task 125-005 (BETA-TRACKER Sprint 124 Güncellemesi) failed — BETA-TRACKER EN+TR Sprint 124 güncellemesi tamamlandı. Ya...
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 4/4 |
-| New test files | 3 |
-| Code changes | +452 / -9 |
-| Sprint time | 9 minutes 5s |
-| NO_GO rate | 0% (0/4) |
+| Tasks completed | 0/5 |
+| New test files | 4 |
+| Code changes | +990 / -37 |
+| Sprint time | 20 minutes 57s |
+| NO_GO rate | 100% (5/5) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| architect | 4 | 4 | 4 | 0 | 0% |
+| architect | 3 | 0 | 0 | 3 | 0% |
+| doc-writer | 2 | 0 | 0 | 2 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| typescript-expert | 4 | 4 | 4 | 0 | 0% |
-| system-architect | 2 | 2 | 2 | 0 | 0% |
+| typescript-expert | 3 | 0 | 0 | 3 | 0% |
+| system-architect | 3 | 0 | 0 | 3 | 0% |
+| documentation-writer | 2 | 0 | 0 | 2 | 0% |
 
 ## Learnings
-- Context Estimator — Task Scope Token Tahmini: completed with tech debt — Task 124-001 completed. Changes: (1) Added estimatedTokens?: number to Task interface in task-types.ts. (2) Added ContextBudgetEstimate interface and 
-- Context-Aware Router — Model Seçimine Budget Faktörü Ekle: completed with tech debt — Context-Aware Router implemented successfully. Changes: (1) routing-types.ts — RoutingDecision interface'e contextFit?: 'ok' | 'tight' | 'overflow' op
-- Token Usage — Worker Result'a Token Verisi Ekle: completed with tech debt — TokenUsage interface defined in task-types.ts with inputTokens, outputTokens, cacheReadTokens, provider, model fields. Added tokenUsage?: TokenUsage t
-- Sprint Reporter Token Summary — RETRO.md Token Tablosu: completed with tech debt — Task 124-004 completed. Changes: (1) Added TokenUsage type import to sprint-reporter.ts. (2) Added formatTokenCount() helper — formats token counts as
-- Recurring pattern (2823x): stale_heartbeat
+- Rubric-Based Grading — Yapılandırılmış Değerlendirme Sistemi: failed — Rubric-Based Grading sistemi implemente edildi. Değişiklikler: (1) task-types.ts — RubricCriterion, EvaluationRubric, RubricScore, EvaluationResult in
+- Worker Question Mechanism — askBrain IPC: failed — Worker Question Mechanism implemented. Changes: (1) task-types.ts — WorkerQuestion and BrainAnswer interfaces added. (2) worker-ipc.ts — QUESTION/ANSW
+- Explain MCP Tool — deckent_explain: failed — deckent_explain MCP tool implemented. New file src/mcp/tools/explain.ts created, registered in index.ts (21st tool). Core logic reused from CLI explai
+- Workspace + DECKENT.md Tutarlılık Düzeltmesi: failed — All 5 documentation files synchronized with Sprint 124 codebase state. IDENTITY.md: Tests 12,103+, Sprints 124+, Features updated with Context-Aware R
+- BETA-TRACKER Sprint 124 Güncellemesi: failed — BETA-TRACKER EN+TR Sprint 124 güncellemesi tamamlandı. Yapılan değişiklikler: (1) Current Status tabloları sprint-125'e güncellendi, MCP Tools 20→21, 
+- Recurring pattern (2826x): stale_heartbeat

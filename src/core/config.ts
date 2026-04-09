@@ -436,6 +436,9 @@ export function createDefaultConfig(): DeckentConfig {
     output_theme: 'default',
     // Rollback
     rollback_policy: 'never',
+    // Rubric-Based Evaluation
+    evaluation_rubric: undefined,
+    rubric_max_retries: 0,
     // Adaptive Thresholds
     adaptive_thresholds: false,
     agent_min_score: 5,
@@ -609,6 +612,9 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     adaptive_config: config.adaptive_config ?? { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     // Rollback
     rollback_policy: config.rollback_policy,
+    // Rubric-Based Evaluation
+    evaluation_rubric: config.evaluation_rubric,
+    rubric_max_retries: config.rubric_max_retries,
     // Routing Engine v2
     routing_engine: config.routing_engine,
     routing_config: config.routing_config,

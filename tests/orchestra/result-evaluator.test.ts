@@ -5,6 +5,12 @@ import {
   evaluateResult,
   isDocTask,
   waitForResults,
+  scoreCorrectness,
+  scoreTestCoverage,
+  scoreScopeCompliance,
+  scoreDocumentation,
+  evaluateWithRubric,
+  DEFAULT_RUBRIC,
 } from '../../src/orchestra/result-evaluator.js';
 import type {
   WaitableSprint,
@@ -561,5 +567,201 @@ describe('waitForResults (result-evaluator)', () => {
 
     // Queue was processed — spawnTask was called for task 002
     expect(spawnedTasks).toContain('002');
+  });
+});
+
+// ─── Rubric-Based Evaluation ────────────────────────────────────────
+
+describe('scoreCorrectness', () => {
+  it('returns 100 when tests pass and selfAssessment is DONE', () => {
+    const result = makeResult({ testsPassed: true, selfAssessment: 'DONE' });
+    const score = scoreCorrectness(result);
+    expect(score.score).toBe(100);
+    expect(score.passed).toBe(true);
+    expect(score.criterion).toBe('correctness');
+  });
+
+  it('returns 80 when tests pass but selfAssessment is GO_WITH_TECH_DEBT', () => {
+    const result = makeResult({ testsPassed: true, selfAssessment: 'GO_WITH_TECH_DEBT' });
+    const score = scoreCorrectness(result);
+    expect(score.score).toBe(80);
+    expect(score.passed).toBe(true);
+  });
+
+  it('returns 0 when tests fail and selfAssessment is NO_GO', () => {
+    const result = makeResult({ testsPassed: false, selfAssessment: 'NO_GO' });
+    const score = scoreCorrectness(result);
+    expect(score.score).toBe(0);
+    expect(score.passed).toBe(false);
+  });
+});
+
+describe('scoreTestCoverage', () => {
+  it('returns coverage value boosted by new test files', () => {
+    const result = makeResult({
+      coverage: 70,
+      filesChanged: ['src/foo.ts', 'tests/foo.test.ts'],
+    });
+    const score = scoreTestCoverage(result);
+    expect(score.score).toBe(85); // 70 + 15
+    expect(score.passed).toBe(true);
+  });
+
+  it('returns raw coverage when no test files', () => {
+    const result = makeResult({ coverage: 40, filesChanged: ['src/foo.ts'] });
+    const score = scoreTestCoverage(result);
+    expect(score.score).toBe(40);
+    expect(score.passed).toBe(false);
+  });
+
+  it('caps score at 100', () => {
+    const result = makeResult({
+      coverage: 95,
+      filesChanged: ['tests/foo.test.ts'],
+    });
+    const score = scoreTestCoverage(result);
+    expect(score.score).toBe(100); // 95 + 15 capped at 100
+  });
+});
+
+describe('scoreScopeCompliance', () => {
+  it('returns 100 when all files are within scope', () => {
+    const task = makeTask(['src/core/'], {
+      scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts'] },
+    });
+    const result = makeResult({ filesChanged: ['src/core/config.ts', 'src/core/types.ts'] });
+    const score = scoreScopeCompliance(result, task);
+    expect(score.score).toBe(100);
+    expect(score.passed).toBe(true);
+  });
+
+  it('returns 0 when all files are out of scope', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({ filesChanged: ['docs/README.md', 'package.json'] });
+    const score = scoreScopeCompliance(result, task);
+    expect(score.score).toBe(0);
+    expect(score.passed).toBe(false);
+  });
+
+  it('returns 100 for empty filesChanged', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({ filesChanged: [] });
+    const score = scoreScopeCompliance(result, task);
+    expect(score.score).toBe(100);
+    expect(score.passed).toBe(true);
+  });
+});
+
+describe('scoreDocumentation', () => {
+  it('returns 100 for detailed notes (>=100 chars)', () => {
+    const result = makeResult({ notes: 'A'.repeat(100) });
+    const score = scoreDocumentation(result);
+    expect(score.score).toBe(100);
+    expect(score.passed).toBe(true);
+  });
+
+  it('returns 10 for minimal notes (<20 chars)', () => {
+    const result = makeResult({ notes: 'ok' });
+    const score = scoreDocumentation(result);
+    expect(score.score).toBe(10);
+    expect(score.passed).toBe(false);
+  });
+});
+
+describe('evaluateWithRubric', () => {
+  it('returns DONE with default rubric for perfect result', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({
+      testsPassed: true,
+      selfAssessment: 'DONE',
+      coverage: 95,
+      filesChanged: ['src/core/foo.ts', 'tests/core/foo.test.ts'],
+      notes: 'Implemented the feature with full test coverage and documentation.',
+    });
+    const evaluation = evaluateWithRubric(result, task);
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.totalScore).toBeGreaterThanOrEqual(70);
+    expect(evaluation.rubricScores).toHaveLength(4);
+  });
+
+  it('returns DONE with custom rubric', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({
+      testsPassed: true,
+      selfAssessment: 'DONE',
+      coverage: 80,
+      filesChanged: ['src/core/foo.ts'],
+      notes: 'Brief notes for the change.',
+    });
+    const evaluation = evaluateWithRubric(result, task, {
+      passingScore: 50,
+    });
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.totalScore).toBeGreaterThanOrEqual(50);
+  });
+
+  it('returns NO_GO for failing result', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({
+      testsPassed: false,
+      selfAssessment: 'NO_GO',
+      coverage: 0,
+      filesChanged: [],
+      notes: '',
+    });
+    const evaluation = evaluateWithRubric(result, task);
+    expect(evaluation.decision).toBe('NO_GO');
+    expect(evaluation.totalScore).toBeLessThan(DEFAULT_RUBRIC.passingScore * 0.7);
+  });
+
+  it('returns GO_WITH_TECH_DEBT for mediocre result', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({
+      testsPassed: true,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      coverage: 30,
+      filesChanged: ['src/core/foo.ts'],
+      notes: 'Some notes about what was done here.',
+    });
+    const evaluation = evaluateWithRubric(result, task);
+    // 80*0.4 + 30*0.25 + 100*0.2 + 40*0.15 = 32 + 7.5 + 20 + 6 = 65.5
+    // 65.5 < 70 (passingScore) but >= 49 (70*0.7) → GO_WITH_TECH_DEBT
+    expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
+  });
+
+  it('caps maxRetries at 3', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult();
+    const evaluation = evaluateWithRubric(result, task, { maxRetries: 10 });
+    expect(evaluation.retryCount).toBe(3);
+  });
+
+  it('handles unknown criterion gracefully', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({ testsPassed: true, selfAssessment: 'DONE' });
+    const evaluation = evaluateWithRubric(result, task, {
+      criteria: [
+        { name: 'unknown_criterion', weight: 1.0, threshold: 50, evaluator: 'auto' },
+      ],
+    });
+    expect(evaluation.rubricScores[0].score).toBe(0);
+    expect(evaluation.rubricScores[0].reason).toContain('unknown');
+  });
+
+  it('respects per-criterion threshold', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({
+      testsPassed: true,
+      selfAssessment: 'DONE',
+      coverage: 30,
+      notes: 'x',
+    });
+    const evaluation = evaluateWithRubric(result, task, {
+      criteria: [
+        { name: 'test_coverage', weight: 1.0, threshold: 90, evaluator: 'metric' },
+      ],
+    });
+    // coverage 30 → score 30 < threshold 90 → passed = false
+    expect(evaluation.rubricScores[0].passed).toBe(false);
   });
 });

@@ -64,3 +64,9 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - Context-Aware Router — Model Seçimine Budget Faktörü Ekle: GO_WITH_TECH_DEBT — Context-Aware Router implemented successfully. Changes: (1) routing-types.ts — RoutingDecision interface'e contextFit?: 
 - Token Usage — Worker Result'a Token Verisi Ekle: GO_WITH_TECH_DEBT — TokenUsage interface defined in task-types.ts with inputTokens, outputTokens, cacheReadTokens, provider, model fields. A
 - Sprint Reporter Token Summary — RETRO.md Token Tablosu: GO_WITH_TECH_DEBT — Task 124-004 completed. Changes: (1) Added TokenUsage type import to sprint-reporter.ts. (2) Added formatTokenCount() he
+## Sprint sprint-125 Learnings
+- Rubric-Based Grading — Yapılandırılmış Değerlendirme Sistemi: NO_GO — Rubric-Based Grading sistemi implemente edildi. Değişiklikler: (1) task-types.ts — RubricCriterion, EvaluationRubric, Ru
+- Worker Question Mechanism — askBrain IPC: NO_GO — Worker Question Mechanism implemented. Changes: (1) task-types.ts — WorkerQuestion and BrainAnswer interfaces added. (2)
+- Explain MCP Tool — deckent_explain: NO_GO — deckent_explain MCP tool implemented. New file src/mcp/tools/explain.ts created, registered in index.ts (21st tool). Cor
+- Workspace + DECKENT.md Tutarlılık Düzeltmesi: NO_GO — All 5 documentation files synchronized with Sprint 124 codebase state. IDENTITY.md: Tests 12,103+, Sprints 124+, Feature
+- BETA-TRACKER Sprint 124 Güncellemesi: NO_GO — BETA-TRACKER EN+TR Sprint 124 güncellemesi tamamlandı. Yapılan değişiklikler: (1) Current Status tabloları sprint-125'e 

@@ -46,7 +46,7 @@
   - adaptive-agent.ts: runtime agent adaptation
 - **providers/** — Claude, Codex, Gemini adapters (5 modules)
 - **api/** — HTTP API server, SSE, rate limiting (3 modules)
-- **mcp/** — MCP server: 20 tools + 8 resources, stdio transport
+- **mcp/** — MCP server: 21 tools + 8 resources, stdio transport
 - **cli/** — 35+ commands, helpers, entry point
 - **dashboard/** — React + Vite + Tailwind web dashboard
 
@@ -72,12 +72,12 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-124 |
-| Toplam Task | 4 |
-| Tamamlanan | 4 |
-| Tech Debt | 4 |
-| No-Go | 0 |
-| Süre | 9dk 5sn |
+| Sprint | sprint-125 |
+| Toplam Task | 5 |
+| Tamamlanan | 0 |
+| Tech Debt | 0 |
+| No-Go | 5 |
+| Süre | 20dk 57sn |
 | Coverage | 0.0% |
 
 ## Active Debt
@@ -86,4 +86,5 @@ _Açık teknik borç yok._
 ## Agent Performance
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| architect | 4 | 4 | 100% |
+| architect | 3 | 0 | 0% |
+| doc-writer | 2 | 0 | 0% |

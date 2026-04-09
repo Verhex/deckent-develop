@@ -19,6 +19,7 @@ import { registerAgentListTool } from './agent-list.js';
 import { registerSkillListTool } from './skill-list.js';
 import { registerCheckpointTool } from './checkpoint.js';
 import { registerDocsTool } from './docs.js';
+import { registerExplainTool } from './explain.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -41,4 +42,5 @@ export function registerTools(server: McpServer): void {
   registerSkillListTool(server);
   registerCheckpointTool(server);
   registerDocsTool(server);
+  registerExplainTool(server);
 }
