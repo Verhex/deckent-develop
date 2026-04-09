@@ -34,6 +34,8 @@ import {
   autoDraftDecisions,
   buildSkillPerformance,
   formatSkillPerformanceTable,
+  formatTokenCount,
+  buildTokenUsageSection,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
@@ -3014,5 +3016,169 @@ describe('formatSkillPerformanceTable', () => {
     const lines = formatSkillPerformanceTable(rows);
     const header = lines.find(l => l.includes('Avg Coverage'));
     expect(header).toBeDefined();
+  });
+});
+
+// ═══ formatTokenCount ═══════════════════════════════════════════════
+
+describe('formatTokenCount', () => {
+  it('formats numbers under 1000 as-is', () => {
+    expect(formatTokenCount(500)).toBe('500');
+    expect(formatTokenCount(0)).toBe('0');
+    expect(formatTokenCount(999)).toBe('999');
+  });
+
+  it('formats thousands with K suffix', () => {
+    expect(formatTokenCount(1000)).toBe('1.0K');
+    expect(formatTokenCount(15420)).toBe('15.4K');
+    expect(formatTokenCount(89000)).toBe('89.0K');
+  });
+
+  it('formats millions with M suffix', () => {
+    expect(formatTokenCount(1_000_000)).toBe('1.0M');
+    expect(formatTokenCount(2_500_000)).toBe('2.5M');
+  });
+});
+
+// ═══ buildTokenUsageSection ═════════════════════════════════════════
+
+describe('buildTokenUsageSection', () => {
+  it('returns empty array when results is undefined', () => {
+    expect(buildTokenUsageSection(undefined)).toEqual([]);
+  });
+
+  it('returns empty array when results is empty', () => {
+    expect(buildTokenUsageSection([])).toEqual([]);
+  });
+
+  it('returns empty array when no results have tokenUsage', () => {
+    const results = [makeResult({ taskId: '001' })];
+    expect(buildTokenUsageSection(results)).toEqual([]);
+  });
+
+  it('builds table with token usage data', () => {
+    const results = [
+      makeResult({
+        taskId: '124-001',
+        tokenUsage: { inputTokens: 15420, outputTokens: 3200, cacheReadTokens: 89000, provider: 'claude', model: 'opus' },
+      }),
+      makeResult({
+        taskId: '124-002',
+        tokenUsage: { inputTokens: 8000, outputTokens: 2400, cacheReadTokens: 45000, provider: 'claude', model: 'sonnet' },
+      }),
+    ];
+
+    const lines = buildTokenUsageSection(results);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[0]).toBe('## Token Usage');
+    expect(lines[1]).toContain('| Task | Model |');
+    // Check data rows
+    const row1 = lines.find(l => l.includes('124-001'));
+    expect(row1).toBeDefined();
+    expect(row1).toContain('opus');
+    expect(row1).toContain('15.4K');
+    expect(row1).toContain('3.2K');
+    expect(row1).toContain('89.0K');
+
+    const row2 = lines.find(l => l.includes('124-002'));
+    expect(row2).toBeDefined();
+    expect(row2).toContain('sonnet');
+
+    // Check total row
+    const totalRow = lines.find(l => l.includes('**Total**'));
+    expect(totalRow).toBeDefined();
+    expect(totalRow).toContain('23.4K'); // 15420 + 8000
+  });
+
+  it('handles missing cacheReadTokens gracefully', () => {
+    const results = [
+      makeResult({
+        taskId: '001',
+        tokenUsage: { inputTokens: 5000, outputTokens: 1000, provider: 'claude', model: 'haiku' },
+      }),
+    ];
+
+    const lines = buildTokenUsageSection(results);
+    expect(lines.length).toBeGreaterThan(0);
+    const dataRow = lines.find(l => l.includes('001'));
+    expect(dataRow).toBeDefined();
+    expect(dataRow).toContain('haiku');
+    // cacheReadTokens defaults to 0
+    expect(dataRow).toContain('| 0 |');
+  });
+
+  it('handles missing model gracefully', () => {
+    const results = [
+      makeResult({
+        taskId: '001',
+        tokenUsage: { inputTokens: 1000, outputTokens: 500 },
+      }),
+    ];
+
+    const lines = buildTokenUsageSection(results);
+    const dataRow = lines.find(l => l.includes('001'));
+    expect(dataRow).toBeDefined();
+    expect(dataRow).toContain('—'); // fallback for missing model
+  });
+
+  it('only includes results that have tokenUsage', () => {
+    const results = [
+      makeResult({ taskId: '001' }), // no tokenUsage
+      makeResult({
+        taskId: '002',
+        tokenUsage: { inputTokens: 2000, outputTokens: 800, model: 'sonnet' },
+      }),
+    ];
+
+    const lines = buildTokenUsageSection(results);
+    expect(lines.find(l => l.includes('001'))).toBeUndefined();
+    expect(lines.find(l => l.includes('002'))).toBeDefined();
+  });
+});
+
+// ═══ formatHumanRetro — Token Usage integration ═════════════════════
+
+describe('formatHumanRetro — Token Usage section', () => {
+  it('includes Token Usage section when results have tokenUsage', () => {
+    const results = [
+      makeResult({
+        taskId: '001',
+        tokenUsage: { inputTokens: 10000, outputTokens: 2000, cacheReadTokens: 50000, model: 'opus' },
+      }),
+    ];
+
+    const retro = formatHumanRetro({
+      sprint: makeSprint(),
+      evaluations: new Map([['001', TaskEvaluation.DONE]]),
+      metrics: makeMetrics(),
+      results,
+    });
+
+    expect(retro).toContain('## Token Usage');
+    expect(retro).toContain('opus');
+    expect(retro).toContain('10.0K');
+  });
+
+  it('omits Token Usage section when no tokenUsage in results', () => {
+    const results = [makeResult({ taskId: '001' })];
+
+    const retro = formatHumanRetro({
+      sprint: makeSprint(),
+      evaluations: new Map([['001', TaskEvaluation.DONE]]),
+      metrics: makeMetrics(),
+      results,
+    });
+
+    expect(retro).not.toContain('## Token Usage');
+  });
+
+  it('omits Token Usage section when results is undefined', () => {
+    const retro = formatHumanRetro({
+      sprint: makeSprint(),
+      evaluations: new Map([['001', TaskEvaluation.DONE]]),
+      metrics: makeMetrics(),
+    });
+
+    expect(retro).not.toContain('## Token Usage');
   });
 });

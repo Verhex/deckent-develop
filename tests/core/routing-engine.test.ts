@@ -4,6 +4,7 @@ import {
   calculateSkillBudget,
   resolveOverrides,
   calculateConfidence,
+  assessContextFit,
 } from '../../src/core/routing-engine.js';
 import type { AgentDefinition, AgentPool } from '../../src/core/agent-types.js';
 import { createAgentDefinition, createDefaultStats } from '../../src/core/agent-types.js';
@@ -895,5 +896,147 @@ describe('routeTaskV2 — forceSkills UserOverride integration', () => {
 
     expect(decision.skillIds).toContain('typescript-expert');
     expect(decision.skillIds).toContain('testing-expert');
+  });
+});
+
+// ─── Sprint 124-002: Context Budget Fit Assessment ─────────────────────────────
+
+describe('assessContextFit', () => {
+  it('returns undefined when estimatedTokens is not provided', () => {
+    const reasoning: string[] = [];
+    expect(assessContextFit(undefined, 'sonnet', reasoning)).toBeUndefined();
+    expect(reasoning).toHaveLength(0);
+  });
+
+  it('returns undefined when modelId is not provided', () => {
+    const reasoning: string[] = [];
+    expect(assessContextFit(50000, undefined, reasoning)).toBeUndefined();
+    expect(reasoning).toHaveLength(0);
+  });
+
+  it('returns undefined for unknown modelId', () => {
+    const reasoning: string[] = [];
+    expect(assessContextFit(50000, 'nonexistent-model', reasoning)).toBeUndefined();
+    expect(reasoning).toHaveLength(0);
+  });
+
+  it('returns "ok" when utilization is below 75%', () => {
+    const reasoning: string[] = [];
+    // sonnet has 200_000 context window; 50_000 = 25% utilization
+    const result = assessContextFit(50_000, 'sonnet', reasoning);
+    expect(result).toBe('ok');
+    expect(reasoning.some(r => r.includes('Context fit: OK'))).toBe(true);
+  });
+
+  it('returns "tight" when utilization is between 75% and 90%', () => {
+    const reasoning: string[] = [];
+    // sonnet has 200_000 context window; 160_000 = 80% utilization
+    const result = assessContextFit(160_000, 'sonnet', reasoning);
+    expect(result).toBe('tight');
+    expect(reasoning.some(r => r.includes('Context fit: TIGHT'))).toBe(true);
+    expect(reasoning.some(r => r.includes('upgrading'))).toBe(true);
+  });
+
+  it('returns "overflow" when utilization exceeds 90%', () => {
+    const reasoning: string[] = [];
+    // sonnet has 200_000 context window; 190_000 = 95% utilization
+    const result = assessContextFit(190_000, 'sonnet', reasoning);
+    expect(result).toBe('overflow');
+    expect(reasoning.some(r => r.includes('Context fit: OVERFLOW'))).toBe(true);
+    expect(reasoning.some(r => r.includes('splitting'))).toBe(true);
+  });
+
+  it('returns "ok" for opus with large but fitting token count', () => {
+    const reasoning: string[] = [];
+    // opus has 1_000_000 context window; 500_000 = 50% utilization
+    const result = assessContextFit(500_000, 'opus', reasoning);
+    expect(result).toBe('ok');
+  });
+
+  it('boundary: exactly 75% returns "tight" (not "ok")', () => {
+    const reasoning: string[] = [];
+    // sonnet context = 200_000; 75% = 150_000 → exactly at threshold
+    // 150_001 / 200_000 = 0.7500... > 0.75 → tight
+    const result = assessContextFit(150_001, 'sonnet', reasoning);
+    expect(result).toBe('tight');
+  });
+
+  it('boundary: exactly 90% returns "overflow" (not "tight")', () => {
+    const reasoning: string[] = [];
+    // sonnet context = 200_000; 90% = 180_000 → exactly at threshold
+    // 180_001 / 200_000 = 0.9000... > 0.90 → overflow
+    const result = assessContextFit(180_001, 'sonnet', reasoning);
+    expect(result).toBe('overflow');
+  });
+});
+
+describe('routeTaskV2 — context budget integration', () => {
+  it('includes contextFit in routing decision when estimatedTokens and modelId provided', () => {
+    const decision = routeTaskV2(
+      {
+        title: 'Small task',
+        description: 'A small configuration change',
+        scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts'] },
+      },
+      makePool(),
+      makeSkillPool(),
+      {
+        estimatedTokens: 30_000,
+        modelId: 'sonnet', // 200k context window
+      },
+    );
+
+    expect(decision.contextFit).toBe('ok');
+    expect(decision.reasoning.some(r => r.includes('Context fit'))).toBe(true);
+  });
+
+  it('returns undefined contextFit when no estimatedTokens provided', () => {
+    const decision = routeTaskV2(
+      {
+        title: 'Normal task',
+        description: 'Some work',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/a.ts'] },
+      },
+      makePool(),
+      makeSkillPool(),
+    );
+
+    expect(decision.contextFit).toBeUndefined();
+  });
+
+  it('returns tight contextFit for high utilization task', () => {
+    const decision = routeTaskV2(
+      {
+        title: 'Large task',
+        description: 'Major refactoring across the codebase',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/a.ts'] },
+      },
+      makePool(),
+      makeSkillPool(),
+      {
+        estimatedTokens: 170_000,
+        modelId: 'sonnet', // 200k context → 85% utilization
+      },
+    );
+
+    expect(decision.contextFit).toBe('tight');
+  });
+
+  it('returns overflow contextFit for over-budget task', () => {
+    const decision = routeTaskV2(
+      {
+        title: 'Massive task',
+        description: 'Epic-scale refactoring',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/a.ts'] },
+      },
+      makePool(),
+      makeSkillPool(),
+      {
+        estimatedTokens: 195_000,
+        modelId: 'sonnet', // 200k context → 97.5% utilization
+      },
+    );
+
+    expect(decision.contextFit).toBe('overflow');
   });
 });

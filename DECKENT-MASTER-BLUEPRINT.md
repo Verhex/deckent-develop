@@ -7,12 +7,12 @@
 ## Live Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-123 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
-| Tech Debt | 3 |
+| Sprint | sprint-124 |
+| Toplam Task | 4 |
+| Tamamlanan | 4 |
+| Tech Debt | 4 |
 | No-Go | 0 |
-| Süre | 4dk 30sn |
+| Süre | 9dk 5sn |
 | Coverage | 0.0% |
 
 # TABLE OF CONTENTS
@@ -83,6 +83,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 - OpenClaw: workspace structure, memory tiers, skill system, AGENTS.md pattern
 - Claude Cowork: agentic loop, plan→execute→verify, plugin architecture
 - Claude Code: CLAUDE.md, .claude/rules/, headless mode, MCP, Agent Teams
+- Claude Managed Agents (CMA): rubric-based grading, versioned memory stores, agent versioning, managed environments, multi-SDK
 
 ---
 
@@ -1918,6 +1919,10 @@ Full directive: `docs/directives/sprint-034.md`
 - Skill marketplace (community skills + agents)
 - Cloud dashboard (deckent.agency remote monitoring)
 - Claude Code Agent Teams integration (native spawn backend)
+- Rubric-based grading (CMA model — structured evaluation with separate grader context, iterative improvement)
+- Versioned memory stores (CMA model — SHA-based concurrency, rollback, compliance redaction)
+- Agent versioning (CMA model — immutable version history, rollback, A/B testing)
+- REST API / OpenAPI spec for multi-SDK access (CMA model — Python/Go/Java/C# clients)
 
 ## Phase 6: Platform & Enterprise (Sprint 45+) — VISION
 
@@ -1929,6 +1934,7 @@ Full directive: `docs/directives/sprint-034.md`
 - Cloud orchestration: remote tmux-free workers
 - Multi-project orchestration: cross-repo sprints
 - Native Windows support (no WSL2 required)
+- Managed environment templates (CMA model — structured container configs per project type)
 
 ---
 

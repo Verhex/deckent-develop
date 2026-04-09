@@ -344,6 +344,35 @@ export function getRecentSprintStats(projectRoot: string, lookback: number): Rec
   };
 }
 
+// ─── Token Usage Aggregation ─────────────────────────────────────────
+
+/**
+ * Aggregates token usage data from an array of task results.
+ * Returns totals for input, output, and cache read tokens.
+ * Skips results that have no tokenUsage data.
+ */
+export function aggregateTokenUsage(results: TaskResult[]): {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheReadTokens: number;
+  tasksWithTokenData: number;
+} {
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCacheReadTokens = 0;
+  let tasksWithTokenData = 0;
+
+  for (const result of results) {
+    if (!result.tokenUsage) continue;
+    tasksWithTokenData++;
+    totalInputTokens += result.tokenUsage.inputTokens;
+    totalOutputTokens += result.tokenUsage.outputTokens;
+    totalCacheReadTokens += result.tokenUsage.cacheReadTokens ?? 0;
+  }
+
+  return { totalInputTokens, totalOutputTokens, totalCacheReadTokens, tasksWithTokenData };
+}
+
 /** Parse NO_GO rate and coverage from a sprint log markdown table */
 function parseSprintStats(content: string): { noGoRate: number; coverage: number } | null {
   const lines = content.split('\n');

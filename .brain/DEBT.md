@@ -10,3 +10,7 @@
 | debt-122-001 | Tech debt from 122-001: docs/docker-smoke/mcp-ok.md olusturuldu. Icerik: '# MCP | 122-001 | sprint-122 | NORMAL | 0 | true | sprint-122 | 2026-04-08T15:16:55.074Z |
 | debt-123-001 | Tech debt from 123-001: ADR-027 (Hybrid Spawn Backend) .brain/DECISIONS.md dosya | 123-001 | sprint-123 | NORMAL | 0 | true | sprint-123 | 2026-04-09T05:27:21.241Z |
 | debt-123-003 | Tech debt from 123-003: AgentInfo tipine backend?: 'docker' | 'tmux' | 'subproce | NORMAL | 0 | true | sprint-123 | false |
+| debt-124-001 | Tech debt from 124-001: Task 124-001 completed. Changes: (1) Added estimatedToke | 124-001 | sprint-124 | NORMAL | 0 | true | sprint-124 | 2026-04-09T08:16:51.656Z |
+| debt-124-002 | Tech debt from 124-002: Context-Aware Router implemented successfully. Changes: | 124-002 | sprint-124 | NORMAL | 0 | true | sprint-124 | 2026-04-09T08:16:55.836Z |
+| debt-124-003 | Tech debt from 124-003: TokenUsage interface defined in task-types.ts with input | 124-003 | sprint-124 | NORMAL | 0 | true | sprint-124 | 2026-04-09T08:17:00.943Z |
+| debt-124-004 | Tech debt from 124-004: Task 124-004 completed. Changes: (1) Added TokenUsage ty | 124-004 | sprint-124 | NORMAL | 0 | true | sprint-124 | 2026-04-09T08:17:05.796Z |

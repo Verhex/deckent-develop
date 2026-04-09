@@ -2,6 +2,7 @@
 // Estimates token counts for prompts. Pure logic, no fs.
 
 import type { ModelType } from './task-types.js';
+import type { ModelDefinition } from './model-registry.js';
 import { modelRegistry } from './model-registry.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -22,6 +23,17 @@ export interface PromptSizeEstimate {
   totalTokens: number;
   model: ModelType;
   withinBudget: boolean;
+}
+
+export interface ContextBudgetEstimate {
+  /** Total estimated tokens for the task context */
+  estimatedTokens: number;
+  /** Model's context window budget */
+  modelBudget: number;
+  /** Whether the estimated tokens fit within the model budget */
+  withinBudget: boolean;
+  /** Percentage of model budget used (0-100+) */
+  utilizationPercent: number;
 }
 
 export interface BudgetWarning {
@@ -146,5 +158,46 @@ export class TokenCounter {
    */
   setBudget(model: ModelType, budget: number): void {
     this._budgets[model] = budget;
+  }
+
+  /**
+   * Estimate the full context budget for a task including scope files, agent prompt,
+   * skill prompts, and system overhead.
+   *
+   * @param scopeFileLineCount - Total line count of all files in the task's scope
+   * @param agentPrompt - Agent system prompt text
+   * @param skillPrompts - Array of skill prompt texts
+   * @param model - Target model for budget comparison
+   * @param avgTokensPerLine - Average tokens per source line (default 10)
+   * @returns Context budget estimate with utilization percentage
+   */
+  estimateTaskContextBudget(
+    scopeFileLineCount: number,
+    agentPrompt: string,
+    skillPrompts: string[],
+    model: ModelType,
+    avgTokensPerLine = 10,
+  ): ContextBudgetEstimate {
+    const SYSTEM_PROMPT_OVERHEAD = 2000;
+
+    const scopeTokens = scopeFileLineCount * avgTokensPerLine;
+    const agentTokens = this.countTokens(agentPrompt);
+    const skillTokens = skillPrompts.reduce(
+      (sum, content) => sum + this.countTokens(content),
+      0,
+    );
+
+    const estimatedTokens = scopeTokens + agentTokens + skillTokens + SYSTEM_PROMPT_OVERHEAD;
+
+    // Use model's contextWindow from registry as the budget
+    const modelDef: ModelDefinition | undefined = modelRegistry.get(model);
+    const modelBudget = modelDef?.contextWindow ?? DEFAULT_BUDGET;
+
+    const withinBudget = estimatedTokens <= modelBudget;
+    const utilizationPercent = modelBudget > 0
+      ? Math.round((estimatedTokens / modelBudget) * 100)
+      : 0;
+
+    return { estimatedTokens, modelBudget, withinBudget, utilizationPercent };
   }
 }

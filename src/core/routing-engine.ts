@@ -27,6 +27,8 @@ import {
 import { classifyIntent } from './intent-classifier.js';
 import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivation } from './activation-engine.js';
 import { resolveComposition } from './skill-selector.js';
+import { modelRegistry } from './model-registry.js';
+import { debugLog } from './utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,10 @@ export interface RoutingOptions {
   taskId?: string;
   /** Project root for decision trail persistence */
   projectRoot?: string;
+  /** Estimated token count for the task's full worker prompt (from estimateTaskContextBudget) */
+  estimatedTokens?: number;
+  /** Model ID assigned to the task — used for context budget fit assessment */
+  modelId?: string;
 }
 
 interface ScoredCandidate {
@@ -129,6 +135,9 @@ export function routeTaskV2(
     reasoning.push(...skillResult.reasoning);
   }
 
+  // Step 6: Context budget fit assessment
+  const contextFit = assessContextFit(options?.estimatedTokens, options?.modelId, reasoning);
+
   return {
     agentId,
     agentScore,
@@ -139,6 +148,7 @@ export function routeTaskV2(
     overrideSource,
     taskDNA,
     reasoning,
+    contextFit,
   };
 }
 
@@ -492,4 +502,52 @@ function getIntentPriorityBonus(
   }
 
   return 0;
+}
+
+// ─── Context Budget Fit ────────────────────────────────────────────────────
+
+/** Context budget thresholds */
+const CONTEXT_TIGHT_THRESHOLD = 0.75;
+const CONTEXT_OVERFLOW_THRESHOLD = 0.90;
+
+/**
+ * Assess how well a task's estimated token usage fits within the model's context window.
+ * Returns 'ok' if within 75%, 'tight' if between 75-90%, 'overflow' if above 90%.
+ * When estimatedTokens or modelId is not provided, returns undefined (no assessment).
+ */
+export function assessContextFit(
+  estimatedTokens: number | undefined,
+  modelId: string | undefined,
+  reasoning: string[],
+): 'ok' | 'tight' | 'overflow' | undefined {
+  if (estimatedTokens === undefined || modelId === undefined) return undefined;
+
+  const modelDef = modelRegistry.get(modelId);
+  if (!modelDef) return undefined;
+
+  const contextWindow = modelDef.contextWindow;
+  const utilization = estimatedTokens / contextWindow;
+
+  if (utilization > CONTEXT_OVERFLOW_THRESHOLD) {
+    reasoning.push(
+      `Context fit: OVERFLOW — estimated ${estimatedTokens} tokens vs ${contextWindow} context window ` +
+      `(${(utilization * 100).toFixed(1)}% utilization). Consider splitting the task.`,
+    );
+    debugLog('routing-engine', `Task context overflow: ${estimatedTokens}/${contextWindow} (${(utilization * 100).toFixed(1)}%) for model ${modelId}. SPLIT recommended.`);
+    return 'overflow';
+  }
+
+  if (utilization > CONTEXT_TIGHT_THRESHOLD) {
+    reasoning.push(
+      `Context fit: TIGHT — estimated ${estimatedTokens} tokens vs ${contextWindow} context window ` +
+      `(${(utilization * 100).toFixed(1)}% utilization). Consider upgrading to a higher-tier model.`,
+    );
+    return 'tight';
+  }
+
+  reasoning.push(
+    `Context fit: OK — estimated ${estimatedTokens} tokens vs ${contextWindow} context window ` +
+    `(${(utilization * 100).toFixed(1)}% utilization).`,
+  );
+  return 'ok';
 }

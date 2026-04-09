@@ -10,6 +10,7 @@ import type { TaskDNA } from '../core/routing-types.js';
 import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
+import { TokenCounter } from '../core/token-counter.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 // ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
@@ -690,7 +691,7 @@ export function buildWorkerPrompt(
     ? task.scope.filesWrite.map(f => `  - ${f}`).join('\n')
     : '  - (determined by your task scope)';
 
-  return `${agentBlock}${skillBlock}You are a Deckent worker agent.
+  const prompt = `${agentBlock}${skillBlock}You are a Deckent worker agent.
 See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.
 
 ## Your Task
@@ -726,4 +727,20 @@ Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, 
 The result file is REQUIRED — without it your work cannot be evaluated.
 
 CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.`;
+
+  // Estimate prompt token size and write to task
+  try {
+    const tokenCounter = new TokenCounter();
+    const estimate = tokenCounter.estimatePromptSize(
+      agentPrompt ?? '',
+      (effectiveSkillPrompts ?? []).map(sp => sp.content),
+      task.description,
+      task.model,
+    );
+    task.estimatedTokens = estimate.totalTokens;
+  } catch (err) {
+    debugLog('buildWorkerPrompt:token-estimate', err instanceof Error ? err : new Error(String(err)));
+  }
+
+  return prompt;
 }

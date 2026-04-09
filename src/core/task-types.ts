@@ -190,6 +190,8 @@ export interface Task {
   assignedAgent?: string;
   /** Assigned skill IDs (from skill pool) */
   assignedSkills?: string[];
+  /** Estimated token count for the full worker prompt (populated by buildWorkerPrompt) */
+  estimatedTokens?: number;
   /** Routing metadata for debugging and learning */
   routingMeta?: {
     taskDNA?: unknown;
@@ -219,6 +221,16 @@ export interface VerifyTestsResult {
   output: string;
 }
 
+// ─── Token Usage ────────────────────────────────────────────────────
+/** Token usage data from a worker's LLM interaction */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  provider?: ProviderName;
+  model?: ModelType;
+}
+
 // ─── TaskResult ──────────────────────────────────────────────────────
 export interface TaskResult {
   taskId: string;
@@ -238,6 +250,8 @@ export interface TaskResult {
   durationMs?: number;
   /** Worker feedback loop metrics (tsc/test verify retries) */
   feedbackLoop?: FeedbackLoop;
+  /** Token usage data from the worker's LLM interaction */
+  tokenUsage?: TokenUsage;
 }
 
 // ─── TaskPlan ────────────────────────────────────────────────────────

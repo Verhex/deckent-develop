@@ -60,6 +60,10 @@ export interface SprintMetrics {
   boundaryViolations: number;
   crossAssignments: number;
   contextLinesUsed: number;
+  /** Aggregate token usage across all tasks in the sprint (if available) */
+  totalInputTokens?: number;
+  totalOutputTokens?: number;
+  totalCacheReadTokens?: number;
 }
 
 // ─── Sprint Result ─────────────────────────────────────────────────

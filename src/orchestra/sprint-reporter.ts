@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
   TaskResult, Sprint, SprintMetrics, DebtItem, ResolvedConfig,
-  SprintResult, PatternEntry,
+  SprintResult, PatternEntry, TokenUsage,
 } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import {
@@ -37,6 +37,54 @@ function readFileSafe(filePath: string): string {
     debugLog('readFileSafe:readFile', e);
     return '';
   }
+}
+
+/** Format a token count as a human-readable string (e.g. 15420 → "15.4K") */
+export function formatTokenCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(count);
+}
+
+/**
+ * Build a Token Usage markdown table from task results.
+ * Returns empty array if no results contain tokenUsage data.
+ */
+export function buildTokenUsageSection(
+  results: TaskResult[] | undefined,
+): string[] {
+  if (!results || results.length === 0) return [];
+
+  const withUsage = results.filter((r): r is TaskResult & { tokenUsage: TokenUsage } => !!r.tokenUsage);
+  if (withUsage.length === 0) return [];
+
+  const lines: string[] = [];
+  lines.push('## Token Usage');
+  lines.push('| Task | Model | Input | Output | Cache Read | Total |');
+  lines.push('|------|-------|-------|--------|------------|-------|');
+
+  let totalInput = 0;
+  let totalOutput = 0;
+  let totalCache = 0;
+
+  for (const r of withUsage) {
+    const u = r.tokenUsage;
+    const input = u.inputTokens;
+    const output = u.outputTokens;
+    const cache = u.cacheReadTokens ?? 0;
+    const total = input + output + cache;
+    totalInput += input;
+    totalOutput += output;
+    totalCache += cache;
+
+    const model = u.model ?? '—';
+    lines.push(`| ${r.taskId} | ${model} | ${formatTokenCount(input)} | ${formatTokenCount(output)} | ${formatTokenCount(cache)} | ${formatTokenCount(total)} |`);
+  }
+
+  const grandTotal = totalInput + totalOutput + totalCache;
+  lines.push(`| **Total** | — | ${formatTokenCount(totalInput)} | ${formatTokenCount(totalOutput)} | ${formatTokenCount(totalCache)} | ${formatTokenCount(grandTotal)} |`);
+
+  return lines;
 }
 
 /** Header-preserving memory trim: keep first HEADER_LINES lines, trim middle, keep recent entries */
@@ -319,6 +367,13 @@ export function formatHumanRetro(data: HumanRetroData): string {
   // ─── Skill Performance ─────────────────────────────────────────
   if (data.skillRows && data.skillRows.length > 0) {
     lines.push(...formatSkillPerformanceTable(data.skillRows));
+    lines.push('');
+  }
+
+  // ─── Token Usage ──────────────────────────────────────────────
+  const tokenLines = buildTokenUsageSection(results);
+  if (tokenLines.length > 0) {
+    lines.push(...tokenLines);
     lines.push('');
   }
 

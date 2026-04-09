@@ -1,88 +1,134 @@
-# DIRECTIVES — Sprint 123: Hybrid Backend ADR + Dashboard Docker Status
+# DIRECTIVES — Sprint 124: Context-Aware Routing + Token Usage Tracker
 
-## Goal: Docker backend için hybrid mod ADR belgesi yaz ve Dashboard'da worker backend bilgisini göster. Heartbeat tipine backend alanı ekle, WorkerCard'da backend badge'i göster.
+## Goal: Deckent'in routing engine'ına context budget awareness ekle. Task'ın tahmini token boyutuna göre model seçimini optimize et. Worker sonuçlarına token kullanım verisi ekle ve RETRO.md'ye token summary tablosu yaz. Mevcut orphan token-counter.ts'i entegre et.
 
 ---
 
-## Task 1: Hybrid Backend ADR Yazımı
-- Model: sonnet
-- Effort: low
-- Skills: documentation-writer, system-architect
-- Files: .brain/DECISIONS.md
-- Scope: .brain/
+## Task 1: Context Estimator — Task Scope Token Tahmini
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, system-architect
+- Agent: architect
+- Files: src/core/token-counter.ts, src/orchestra/task-builder.ts
+- Scope: src/core/, src/orchestra/
 
 ### Description
-`.brain/DECISIONS.md` dosyasına ADR-027 ekle. Format mevcut ADR'lerle aynı olmalı:
+Mevcut `src/core/token-counter.ts` dosyasında `estimatePromptSize()` fonksiyonu var ama task-builder.ts'den çağrılmıyor. Entegre et:
 
-```
-## ADR-027: Hybrid Spawn Backend (Sprint 123)
+1. `src/orchestra/task-builder.ts` → `buildWorkerPrompt()` fonksiyonunda prompt oluşturulduktan sonra `estimatePromptSize()` çağır. Sonucu task JSON'a `estimatedTokens` olarak yaz.
 
-**Decision:** ...
-**Context:** ...
-**Consequence(s):** ...
-```
+2. `src/core/token-counter.ts` → `estimateTaskContextBudget(task, agentPrompt, skillPrompts)` fonksiyonu ekle:
+   - Task scope dosyalarının toplam boyutunu tahmin et (satır sayısı × avg tokens/line)
+   - Agent prompt + skill prompts token tahmini
+   - System prompt overhead (~2000 token sabit)
+   - Return: `{ estimatedTokens, modelBudget, withinBudget, utilizationPercent }`
 
-Konu: Docker worker + subprocess/tmux auditor hibrit modu. Şu anda SpawnBackendFactory TEK bir backend seçiyor (docker → tmux → subprocess fallback). Hibrit modda worker'lar Docker container'da çalışırken auditor subprocess olarak kalabilir. Bu ADR karar belgesidir — implementasyon değil.
+3. Task JSON'a yeni alan: `estimatedTokens?: number` — `.tasks/task-{id}.json`'a yaz.
+   - `src/core/types.ts` veya ilgili task type dosyasına `estimatedTokens` ekle.
 
-İçerik:
-- Decision: Hibrit backend desteği DEFERRED. Mevcut tek-backend modeli yeterli. Worker isolation Docker ile sağlanıyor, auditor zaten in-process (sprint-controller içinde) — ayrı backend gerektirmiyor.
-- Context: Auditor scan loop sprint-controller.ts içinde çalışıyor (in-process), tmux/subprocess/docker backend'lerinden bağımsız. Worker'lar backend üzerinden spawn ediliyor, auditor ise dosya sistemi üzerinden .hb dosyalarını okuyor.
-- Consequence: Hibrit backend implementasyonu yapılmayacak. Auditor zaten backend-agnostic. Eğer gelecekte auditor ayrı bir process olarak çalıştırılacaksa, o zaman revisit edilecek.
+`tsc --noEmit` ve `npx vitest run tests/core/token-counter.test.ts` geçmeli.
 
-**Kanıt:** `grep "ADR-027" .brain/DECISIONS.md` → bulunmalı
+**Kanıt:** `grep "estimateTaskContextBudget" src/core/token-counter.ts` → fonksiyon bulunmalı
+**Test:** Mevcut token-counter testleri + yeni estimateTaskContextBudget testi geçmeli
 
 ---
 
-## Task 2: Heartbeat Tipine Backend Alanı Ekle
-- Model: sonnet
+## Task 2: Context-Aware Router — Model Seçimine Budget Faktörü Ekle
+- Model: opus
+- Effort: high
+- Skills: typescript-expert, system-architect
+- Agent: architect
+- Files: src/core/routing-engine.ts, src/core/model-registry.ts, src/orchestra/task-router.ts
+- Scope: src/core/, src/orchestra/
+
+### Description
+Routing engine'a context budget awareness ekle:
+
+1. `src/core/routing-engine.ts` → `routeTaskV2()` fonksiyonunda context budget'ı faktör olarak kullan:
+   - Task'ın `estimatedTokens` alanını oku
+   - Model'in `contextWindow` değerini ModelRegistry'den al
+   - Eğer `estimatedTokens > contextWindow * 0.75` → bu model uygun değil, bir üst tier'a yönlendir
+   - Eğer `estimatedTokens > contextWindow * 0.90` → SPLIT önerisi logla (debugLog)
+   - RoutingDecision'a `contextFit: 'ok' | 'tight' | 'overflow'` alanı ekle
+
+2. `src/core/routing-types.ts` → `RoutingDecision` tipine `contextFit?: 'ok' | 'tight' | 'overflow'` ekle
+
+3. Mevcut routing testleri kırılmamalı (yeni alan optional). `npx vitest run tests/core/routing-engine.test.ts` geçmeli.
+
+**Kanıt:** `grep "contextFit" src/core/routing-types.ts` → bulunmalı
+**Test:** Routing engine testleri + en az 1 yeni context-fit testi
+
+---
+
+## Task 3: Token Usage — Worker Result'a Token Verisi Ekle
+- Model: opus
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/core/monitoring-types.ts, src/agents/worker.ts, src/orchestra/spawn-backend-docker.ts
-- Scope: src/core/, src/agents/, src/orchestra/
+- Agent: architect
+- Files: src/agents/worker.ts, src/orchestra/result-evaluator.ts
+- Scope: src/agents/, src/orchestra/
 
 ### Description
-1. `src/core/monitoring-types.ts` → `Heartbeat` interface'ine `backend?: 'docker' | 'tmux' | 'subprocess'` alanı ekle.
+Worker sonuçlarına token kullanım verisi ekle:
 
-2. `src/agents/worker.ts` → `createHeartbeat()` fonksiyonunda backend alanını set et. Worker kendi backend'ini bilmiyor, bu yüzden default olarak undefined bırak (spawn eden taraf yazar).
+1. `.contracts/api-surface.md` → Result dosya formatına `tokenUsage` alanı ekle:
+   ```json
+   "tokenUsage": {
+     "inputTokens": 15420,
+     "outputTokens": 3200,
+     "cacheReadTokens": 89000,
+     "provider": "claude",
+     "model": "opus"
+   }
+   ```
 
-3. `src/orchestra/spawn-backend-docker.ts` → `monitorContainer()` callback'inde heartbeat yazarken `backend: 'docker'` alanını ekle. Mevcut kodda monitorContainer zaten heartbeat yazıyor — o noktaya backend alanı ekle.
+2. `src/core/types.ts` → `TaskResult` tipine `tokenUsage?: TokenUsage` ekle. `TokenUsage` interface tanımla.
 
-4. Mevcut testler kırılmamalı. `npx tsc --noEmit` ve `npx vitest run tests/core/ tests/agents/` geçmeli.
+3. `src/agents/worker.ts` → Worker result yazarken token bilgisini dahil et. Claude worker'lar JSONL transcript'ten post-hoc parse yapabilir (opsiyonel, şu an için yapı hazırlığı yeterli).
 
-**Kanıt:** `grep "backend" src/core/monitoring-types.ts` → 'docker' | 'tmux' | 'subprocess' bulunmalı
+4. `src/orchestra/result-evaluator.ts` → Evaluation sırasında tokenUsage'ı oku ve sprint metrics'e ekle (varsa).
 
-**Test:** Mevcut testler geçmeli (yeni alan optional olduğu için breaking change yok)
+`tsc --noEmit` geçmeli. Yeni alanlar optional — breaking change yok.
+
+**Kanıt:** `grep "tokenUsage" src/core/types.ts` → TokenUsage interface bulunmalı
+**Test:** Mevcut testler geçmeli (optional field)
 
 ---
 
-## Task 3: Dashboard WorkerCard Backend Badge
-- Model: sonnet
+## Task 4: Sprint Reporter Token Summary — RETRO.md Token Tablosu
+- Model: opus
 - Effort: normal
-- Skills: react-specialist, typescript-expert
-- Files: src/dashboard/src/components/WorkerCard.tsx, src/dashboard/src/types.ts
-- Scope: src/dashboard/
+- Skills: typescript-expert
+- Agent: architect
+- Files: src/orchestra/sprint-reporter.ts
+- Scope: src/orchestra/
 
 ### Description
-1. `src/dashboard/src/types.ts` (veya dashboard'un kendi tip dosyası) → AgentInfo tipine `backend?: string` alanı ekle.
+Sprint retrospektifine token kullanım özeti ekle:
 
-2. `src/dashboard/src/components/WorkerCard.tsx` → Worker kartında backend bilgisini göster. Küçük bir badge/chip olarak:
-   - Docker → mavi "Docker" badge
-   - tmux → yeşil "tmux" badge  
-   - subprocess → turuncu "subprocess" badge
-   - undefined → badge gösterme
+1. `src/orchestra/sprint-reporter.ts` → `generateRetro()` veya `writeRetro()` fonksiyonunda, sprint sonuçlarındaki `tokenUsage` verilerini topla.
 
-Badge'i model bilgisinin yanına veya status'un altına koy. Tailwind CSS kullan (proje zaten Tailwind kullanıyor).
+2. RETRO.md'ye yeni bölüm ekle:
+   ```markdown
+   ## Token Usage
+   | Task | Model | Input | Output | Cache Read | Total |
+   |------|-------|-------|--------|------------|-------|
+   | 124-001 | opus | 15K | 3.2K | 89K | 107K |
+   | Total | — | 45K | 9.6K | 267K | 321K |
+   ```
 
-3. Dashboard testleri geçmeli: `npx vitest run --config src/dashboard/vitest.config.ts`
+3. Token verisi yoksa (henüz worker'lar tokenUsage yazmıyorsa) → bu bölümü atla veya "Token data not available" yaz.
 
-**Kanıt:** `grep "backend" src/dashboard/src/components/WorkerCard.tsx` → badge render kodu bulunmalı
+`tsc --noEmit` geçmeli. `npx vitest run tests/orchestra/sprint-reporter.test.ts` geçmeli.
 
-**Test:** Dashboard testleri geçmeli
+**Kanıt:** `grep "Token Usage" src/orchestra/sprint-reporter.ts` → bölüm template'i bulunmalı
+**Test:** Sprint reporter testleri geçmeli
 
 ---
 
 ## Quality Rules
 - `npx tsc --noEmit` temiz olmalı
-- `npx vitest run tests/core/ tests/agents/` geçmeli
-- `npx vitest run --config src/dashboard/vitest.config.ts` geçmeli
-- ADR-027 .brain/DECISIONS.md'de olmalı
+- `npx vitest run tests/core/` geçmeli
+- `npx vitest run tests/orchestra/` geçmeli
+- Yeni alanlar optional — mevcut testlerde breaking change olmamalı
+- Task bağımlılıkları: Task 2, Task 1'e bağımlı (estimatedTokens alanı). Task 4, Task 3'e bağımlı (tokenUsage alanı).

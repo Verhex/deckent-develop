@@ -307,6 +307,7 @@ export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat): void 
 export function writeResult(projectRoot: string, result: TaskResult): void {
   ensureDir(join(projectRoot, TASKS_DIR));
   const path = resultFilePath(projectRoot, result.taskId);
+  // tokenUsage is included in result when available — serialized automatically via JSON.stringify
   writeFileSync(path, JSON.stringify(result, null, 2), 'utf-8');
 
   // Update task status based on self-assessment

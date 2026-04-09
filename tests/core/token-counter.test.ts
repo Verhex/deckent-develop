@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TokenCounter } from '../../src/core/token-counter.js';
-import type { ModelName, BudgetWarning } from '../../src/core/token-counter.js';
+import type { ModelName, BudgetWarning, ContextBudgetEstimate } from '../../src/core/token-counter.js';
 
 describe('TokenCounter', () => {
   let counter: TokenCounter;
@@ -155,5 +155,79 @@ describe('TokenCounter', () => {
     expect(custom.getBudget('opus')).toBe(1000);
     expect(custom.getBudget('sonnet')).toBe(500);
     expect(custom.getBudget('haiku')).toBe(200000); // default
+  });
+
+  // ─── estimateTaskContextBudget ────────────────────────────────────
+
+  describe('estimateTaskContextBudget', () => {
+    it('returns context budget estimate with all components', () => {
+      const result: ContextBudgetEstimate = counter.estimateTaskContextBudget(
+        100,                           // 100 lines in scope files
+        'You are a coding agent',      // agent prompt
+        ['Use TypeScript patterns'],   // skill prompts
+        'opus',
+      );
+      // scopeTokens = 100 * 10 = 1000
+      // agentTokens > 0, skillTokens > 0, system overhead = 2000
+      expect(result.estimatedTokens).toBeGreaterThan(3000);
+      expect(result.modelBudget).toBeGreaterThan(0);
+      expect(result.withinBudget).toBe(true);
+      expect(result.utilizationPercent).toBeGreaterThanOrEqual(0);
+      expect(result.utilizationPercent).toBeLessThanOrEqual(100);
+    });
+
+    it('calculates scope tokens using avgTokensPerLine', () => {
+      const result = counter.estimateTaskContextBudget(
+        500,           // 500 lines
+        '',            // no agent prompt
+        [],            // no skills
+        'sonnet',
+        15,            // 15 tokens per line
+      );
+      // scopeTokens = 500 * 15 = 7500, system overhead = 2000
+      expect(result.estimatedTokens).toBe(7500 + 2000);
+    });
+
+    it('detects when scope exceeds model budget', () => {
+      // Use a huge scope that would exceed any model budget
+      const result = counter.estimateTaskContextBudget(
+        500_000,       // 500K lines -> 5M tokens
+        'agent prompt with many words',
+        ['skill one', 'skill two'],
+        'haiku',       // haiku has 200K context window
+      );
+      expect(result.withinBudget).toBe(false);
+      expect(result.utilizationPercent).toBeGreaterThan(100);
+    });
+
+    it('handles empty agent prompt and no skills', () => {
+      const result = counter.estimateTaskContextBudget(
+        50,
+        '',
+        [],
+        'opus',
+      );
+      // scopeTokens = 50 * 10 = 500, system overhead = 2000
+      expect(result.estimatedTokens).toBe(2500);
+      expect(result.withinBudget).toBe(true);
+    });
+
+    it('includes system prompt overhead of 2000 tokens', () => {
+      const result = counter.estimateTaskContextBudget(
+        0,      // no scope files
+        '',     // no agent prompt
+        [],     // no skills
+        'opus',
+      );
+      // Only system overhead remains
+      expect(result.estimatedTokens).toBe(2000);
+    });
+
+    it('uses model contextWindow from registry as budget', () => {
+      // opus has 1M context window, sonnet has 200K
+      const opusResult = counter.estimateTaskContextBudget(100, '', [], 'opus');
+      const sonnetResult = counter.estimateTaskContextBudget(100, '', [], 'sonnet');
+      expect(opusResult.modelBudget).toBeGreaterThan(sonnetResult.modelBudget);
+    });
   });
 });

@@ -6,6 +6,19 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint124] - 2026-04-09
+
+
+### Changed
+
+- Context Estimator — Task Scope Token Tahmini (completed with tech debt)
+- Context-Aware Router — Model Seçimine Budget Faktörü Ekle (completed with tech debt)
+- Token Usage — Worker Result'a Token Verisi Ekle (completed with tech debt)
+- Sprint Reporter Token Summary — RETRO.md Token Tablosu (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 4 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint123] - 2026-04-09
 
 ### Added

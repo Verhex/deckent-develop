@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-123 |
+| Sprint | sprint-124 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -383,38 +383,91 @@ TR+EN dual language, VISION, link audit, config dashboard
 
 ---
 
-### F. Comparison Matrix
+### F. Claude Managed Agents — CMA (Anthropic Cloud Agent Platform)
 
-| Capability | OpenClaw | Cowork | Perplexity | Devin | Claude SDK | **Deckent** |
-|------------|----------|--------|------------|-------|------------|-------------|
-| **Open Source** | MIT | No | No | No | SDK yes | **MIT** |
-| **Self-Hosted** | Yes | No | No | No | Partial | **Yes** |
-| **Price** | Free | M365 | $200/mo | $20/mo | API | **Free** |
-| **Multi-Agent Parallel** | No | Limited | Yes | No | Partial | **Yes** |
-| **Sprint Planning** | No | No | No | No | No | **Yes** |
-| **Scope Enforcement** | No | No | Cloud | No | Worktree | **Yes** |
-| **Multi-Provider** | No | 2 | 19 | No | 1 | **3 (13 models, ModelRegistry)** |
-| **Retrospective/Learning** | Limited | No | No | Wiki | No | **Yes** |
-| **MCP Native** | No | No | No | No | Yes | **Yes** |
-| **Heartbeat Daemon** | 30min | No | Yes | No | Loop | **✅ Yes (Sprint 088)** |
-| **Human Checkpoints** | No | Yes | No | Yes | No | **✅ Yes (Sprint 088)** |
-| **Interactive Planning** | No | Yes | No | Yes | No | **No** |
-| **Browser Control** | Yes | No | Yes | Yes | Yes | **No** |
-| **Channel Integration** | 50+ | M365 | 400+ | Slack | No | **No** |
-| **Codebase Indexing** | No | No | No | Wiki | No | **No** |
-| **Always-On** | Yes | Yes | Yes | No | Dispatch | **No** |
-| **Long-Running Tasks** | Yes | Yes | Days | Hours | Hours | **Unlimited (Sprint 088)** |
-| **Skill Ecosystem** | 13,729 | - | - | - | 5,700 | **21** |
-| **Critique Layer** | No | GPT+Claude | No | Planner+Critic | No | **No** |
-| **GitHub Stars** | 343K+ | - | - | - | - | **~0 (beta)** |
-| **Community** | 1,000+ contrib | - | - | - | - | **1 (solo)** |
+**Overview:** Anthropic's managed agent infrastructure. Beta launched April 1, 2026 (`managed-agents-2026-04-01` header). Fully managed cloud platform where agents run on Anthropic's infrastructure — distinct from the Claude Agent SDK (Section E), which is a local development toolkit. REST API + SDKs in 7 languages (Python, TypeScript, Java, Go, C#, Ruby, PHP). Agents run in provisioned cloud containers with pre-installed packages and configurable network rules. Pricing: pay-per-use API billing. CLI tool: `ant` (Go-based).
 
-### G. Deckent's Unique Position
+**Architecture:**
+
+| Feature | Detail | Deckent Equivalent |
+|---------|--------|--------------------|
+| Versioned Agents | Every agent update creates immutable version, rollback possible | agent.json (static, no versioning) |
+| Versioned Memory | API-managed memory stores with SHA-based optimistic concurrency, redact for compliance | .brain/MEMORY.md (flat file, no versioning) |
+| Rubric-Based Grading | Define rubrics, auto-grade with separate context window grader, iterate up to 20x | result-evaluator.ts (simple GO/NO_GO) |
+| Managed Environments | Cloud containers with pre-installed packages (pip/npm/apt/cargo/gem/go), network rules | Docker backend (Sprint 101+, less structured) |
+| Multi-SDK | Python, TS, Java, Go, C#, Ruby, PHP SDKs | TypeScript CLI only |
+| Session Threads | Multi-agent with isolated context windows per agent thread | Worker scope enforcement (file-level, not context-level) |
+| Custom Tools API | JSON schema tool definitions, client-side execution | MCP tools (similar, but no custom tool definition API) |
+| Progressive Skills | Anthropic pre-built (xlsx, pptx, pdf, docx) + custom skills, on-demand loading | skill-registry (similar, AST sandbox) |
+| SSE Streaming | Server-Sent Events for real-time agent output, event-driven architecture | HTTP API + SSE (Sprint 10, less structured) |
+
+**CMA Features Missing from Deckent:**
+
+1. **Rubric-Based Grading** — Define evaluation rubrics, auto-grade with separate context window grader, iterate up to 20x until rubric passes. Deckent's result-evaluator.ts does simple GO/NO_GO without structured rubric definitions.
+2. **Versioned Memory Stores** — API-managed memory with immutable version history, SHA-based optimistic concurrency, redact operations for compliance. Deckent's .brain/MEMORY.md is a flat file with no versioning or concurrency control.
+3. **Agent Versioning** — Every agent update creates a new immutable version, rollback to any previous version. Deckent's agent.json is static — no version history.
+4. **Multi-SDK Support** — SDKs in 7 languages enabling any tech stack to drive agents. Deckent is TypeScript-only CLI.
+5. **Managed Cloud Containers** — Provisioned containers with pre-installed packages (6 package managers) and network access rules (unrestricted/limited). Deckent has Docker backend but less structured environment management.
+6. **Session Thread Isolation** — Each agent in a multi-agent session has its own context window and conversation history. Deckent's scope enforcement is file-level, not context-level.
+
+**CMA's Weaknesses Compared to Deckent:**
+
+1. Single provider (Claude only) — Deckent supports 3 providers, 13 models via ModelRegistry
+2. No sprint lifecycle — session-based, stateless between sessions
+3. No learning loop / self-improvement — no routing evolution, no synergy tracking
+4. No scope enforcement / boundary violation detection — agents have full container access
+5. No auditor pattern — no independent runtime quality monitoring
+6. No tech debt tracking — no DEBT.md equivalent
+7. No retrospective system — no cross-session learning
+8. Cloud-only, no self-hosting option — data leaves your infrastructure
+9. Paid API service — Deckent is free + open source
+10. Single-level delegation only (coordinator → agents, no deeper nesting)
+
+**Lessons for Deckent:**
+- Rubric-based grading would transform result-evaluator.ts from binary GO/NO_GO to structured, iterative quality assessment
+- Versioned memory stores would add rollback + compliance capabilities to .brain/ system
+- Agent versioning would enable safe A/B testing and rollback of agent configurations
+- Multi-SDK approach (at minimum a REST API with OpenAPI spec) would expand Deckent beyond TypeScript users
+- Managed environment templates could further structure the Docker backend
+
+---
+
+### G. Comparison Matrix
+
+| Capability | OpenClaw | Cowork | Perplexity | Devin | Claude SDK | CMA | **Deckent** |
+|------------|----------|--------|------------|-------|------------|-----|-------------|
+| **Open Source** | MIT | No | No | No | SDK yes | No | **MIT** |
+| **Self-Hosted** | Yes | No | No | No | Partial | No | **Yes** |
+| **Price** | Free | M365 | $200/mo | $20/mo | API | API pay-per-use | **Free** |
+| **Multi-Agent Parallel** | No | Limited | Yes | No | Partial | Yes (threads) | **Yes** |
+| **Sprint Planning** | No | No | No | No | No | No | **Yes** |
+| **Scope Enforcement** | No | No | Cloud | No | Worktree | No | **Yes** |
+| **Multi-Provider** | No | 2 | 19 | No | 1 | 1 | **3 (13 models, ModelRegistry)** |
+| **Retrospective/Learning** | Limited | No | No | Wiki | No | No | **Yes** |
+| **MCP Native** | No | No | No | No | Yes | No | **Yes** |
+| **Heartbeat Daemon** | 30min | No | Yes | No | Loop | No | **✅ Yes (Sprint 088)** |
+| **Human Checkpoints** | No | Yes | No | Yes | No | No | **✅ Yes (Sprint 088)** |
+| **Interactive Planning** | No | Yes | No | Yes | No | No | **No** |
+| **Browser Control** | Yes | No | Yes | Yes | Yes | No | **No** |
+| **Channel Integration** | 50+ | M365 | 400+ | Slack | No | API | **No** |
+| **Codebase Indexing** | No | No | No | Wiki | No | No | **No** |
+| **Always-On** | Yes | Yes | Yes | No | Dispatch | Yes (cloud) | **No** |
+| **Long-Running Tasks** | Yes | Yes | Days | Hours | Hours | Hours | **Unlimited (Sprint 088)** |
+| **Skill Ecosystem** | 13,729 | - | - | - | 5,700 | Custom tools | **21** |
+| **Critique Layer** | No | GPT+Claude | No | Planner+Critic | No | Rubric grader | **No** |
+| **Rubric Grading** | No | No | No | No | No | Yes (20x iterate) | **No** |
+| **Agent Versioning** | No | No | No | No | No | Yes (immutable) | **No** |
+| **Versioned Memory** | Limited | No | No | No | No | Yes (SHA-based) | **No** |
+| **Multi-SDK** | No | No | No | No | Limited | 7 languages | **TS only** |
+| **GitHub Stars** | 343K+ | - | - | - | - | - | **~0 (beta)** |
+| **Community** | 1,000+ contrib | - | - | - | - | - | **1 (solo)** |
+
+### H. Deckent's Unique Position
 
 **Features found together in no other competitor:**
 1. Multi-agent parallel execution + scope enforcement + sprint planning + retrospective learning + multi-provider + MCP native + open source + free + self-hosted
 
-**Strategic position:** Deckent is the only open-source solution in the "developer team orchestrator" niche. Competitors are either single-agent (Devin, OpenClaw) or closed/expensive (Cowork, Perplexity).
+**Strategic position:** Deckent is the only open-source solution in the "developer team orchestrator" niche. Competitors are either single-agent (Devin, OpenClaw), closed/expensive (Cowork, Perplexity), or cloud-only API services (CMA).
 
 **Growth comparison:**
 - OpenClaw: 0 → 343K stars in 4 months. Stars/day: ~2,860
@@ -602,17 +655,34 @@ Every blocker was directly verified in the codebase. False claims have been corr
 - 13 → 19+ model support (ModelRegistry infrastructure ready — Sprint 097)
 - Approaching Perplexity's 19-model footprint
 
+**5.6 Rubric-Based Grading (CMA Model)**
+- Define evaluation rubrics per task type (code quality, test coverage, documentation completeness)
+- Separate grader context window — evaluator does not share context with worker
+- Iterative improvement: re-attempt up to N times until rubric passes
+- Upgrade result-evaluator.ts from binary GO/NO_GO to rubric-scored evaluation
+
+**5.7 Versioned Memory & Agent Versioning (CMA Model)**
+- .brain/MEMORY.md → versioned memory store with SHA-based concurrency
+- Agent version history: every agent.json change creates immutable version
+- Rollback to any previous agent or memory version
+- Redact operations for compliance (PII removal from memory history)
+
+**5.8 Multi-SDK / REST API (CMA Model)**
+- REST API layer on top of HTTP API for programmatic access
+- Language-agnostic client: any HTTP client can drive Deckent sprints
+- OpenAPI spec → SDK generators (Python/Go/Java clients)
+
 ---
 
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-123 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
-| Tech Debt | 3 |
+| Sprint | sprint-124 |
+| Toplam Task | 4 |
+| Tamamlanan | 4 |
+| Tech Debt | 4 |
 | No-Go | 0 |
-| Süre | 4dk 30sn |
+| Süre | 9dk 5sn |
 | Coverage | 0.0% |
 
 ## Sprint History
@@ -626,6 +696,7 @@ Every blocker was directly verified in the codebase. False claims have been corr
 | sprint-121 | tamamlandı |
 | sprint-122 | tamamlandı |
 | sprint-123 | tamamlandı |
+| sprint-124 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 
@@ -958,6 +1029,9 @@ Cache only reduces cost — tokens still occupy the context window:
 - Browser/desktop control (Claude Computer Use)
 - Multi-sprint chaining (tasks running for days, Perplexity model)
 - Provider expansion: Grok, Llama, Mistral, DeepSeek (ModelRegistry infrastructure ready)
+- Rubric-based grading with iterative improvement (CMA model — structured evaluation beyond GO/NO_GO)
+- Versioned memory + agent versioning with rollback (CMA model — compliance, A/B testing)
+- REST API / Multi-SDK access (CMA model — beyond TypeScript CLI)
 - **Differentiator:** Full team simulation — a whole team from a single person
 
 ---
@@ -1002,11 +1076,13 @@ Cache only reduces cost — tokens still occupy the context window:
 15. ✅ **Sprint Lock Mechanism** — multi-process collision prevention, autoApprove standardized (Sprint 101)
 16. ✅ **Docker Live E2E Verification** — CLI+MCP sprint tested, CI coverage skip guard, 10 e2e tests (Sprint 119-122)
 
-**Next 4 actions (P3):**
+**Next 6 actions (P3):**
 1. **Context-Aware Routing** — context budget estimation → model selection → task splitting (Section X.I)
 2. **Token Usage Tracker** — JSONL parse + provider-native counting + RETRO.md token summary (Section X.I)
 3. **Worker question mechanism** — askBrain IPC, user-worker communication
 4. **Codebase semantic indexing** — AST + RAG for repo understanding
+5. **Rubric-Based Grading** — structured evaluation rubrics in result-evaluator.ts, separate grader context (CMA model)
+6. **Versioned Memory** — .brain/MEMORY.md with SHA-based version history, rollback, compliance redact (CMA model)
 
 **Estimated time to fully autonomous assistant:** 8-12 sprints
 **Self-improving orchestrator: ✅ COMPLETE (Sprint 102+)**
@@ -1050,3 +1126,7 @@ Cache only reduces cost — tokens still occupy the context window:
 - [Claude Dispatch](https://claude.com/blog/dispatch-and-computer-use) — Phone → computer task flow
 - [Claude Code Features](https://help.apiyi.com/en/claude-code-2026-new-features-loop-computer-use-remote-control-guide-en.html) — Loop, Schedule, Computer Use
 - [AI Agents Comparison 2026](https://blog.iskohm.com/en/posts/ai-agents-comparison-2026-cursor-copilot-kilo-code-claude-code/) — Full comparison
+
+### Claude Managed Agents (CMA)
+- [CMA Overview](https://platform.claude.com/docs/en/managed-agents/overview) — Managed agent infrastructure (beta April 2026)
+- [CMA Quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart) — Agent creation, sessions, streaming guide

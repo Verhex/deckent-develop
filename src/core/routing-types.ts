@@ -99,6 +99,8 @@ export interface RoutingDecision {
   overrideSource: OverrideSource;
   taskDNA: TaskDNA;
   reasoning: string[];
+  /** Context budget fit assessment: how well the task fits the selected model's context window */
+  contextFit?: 'ok' | 'tight' | 'overflow';
 }
 
 export type OverrideSource = 'none' | 'task-directive' | 'sprint-directive' | 'project-config';

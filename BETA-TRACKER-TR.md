@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-123 |
+| Sprint | sprint-124 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -383,38 +383,91 @@ TR+EN çift dil, VISION, link audit, config dashboard
 
 ---
 
-### F. Karsilastirma Matrisi
+### F. Claude Managed Agents — CMA (Anthropic Bulut Ajan Platformu)
 
-| Yetenek | OpenClaw | Cowork | Perplexity | Devin | Claude SDK | **Deckent** |
-|---------|----------|--------|------------|-------|------------|-------------|
-| **Acik Kaynak** | MIT | Hayir | Hayir | Hayir | SDK evet | **MIT** |
-| **Self-Hosted** | Evet | Hayir | Hayir | Hayir | Kismi | **Evet** |
-| **Fiyat** | Ucretsiz | M365 | $200/ay | $20/ay | API | **Ucretsiz** |
-| **Multi-Agent Paralel** | Hayir | Sinirli | Evet | Hayir | Kismi | **Evet** |
-| **Sprint Planlama** | Hayir | Hayir | Hayir | Hayir | Hayir | **Evet** |
-| **Scope Enforcement** | Hayir | Hayir | Cloud | Hayir | Worktree | **Evet** |
-| **Multi-Provider** | Hayir | 2 | 19 | Hayir | 1 | **3 (13 model, ModelRegistry)** |
-| **Retrospektif/Ogrenme** | Sinirli | Hayir | Hayir | Wiki | Hayir | **Evet** |
-| **MCP Native** | Hayir | Hayir | Hayir | Hayir | Evet | **Evet** |
-| **Heartbeat Daemon** | 30dk | Hayir | Evet | Hayir | Loop | **✅ Evet (Sprint 088)** |
-| **Human Checkpoints** | Hayir | Evet | Hayir | Evet | Hayir | **✅ Evet (Sprint 088)** |
-| **Interactive Plan** | Hayir | Evet | Hayir | Evet | Hayir | **Hayir** |
-| **Browser Kontrolu** | Evet | Hayir | Evet | Evet | Evet | **Hayir** |
-| **Kanal Entegrasyonu** | 50+ | M365 | 400+ | Slack | Hayir | **Hayir** |
-| **Codebase Indeks** | Hayir | Hayir | Hayir | Wiki | Hayir | **Hayir** |
-| **Always-On** | Evet | Evet | Evet | Hayir | Dispatch | **Hayir** |
-| **Uzun Sureli Gorev** | Evet | Evet | Gunler | Saatler | Saatler | **Sinirsiz (Sprint 088)** |
-| **Skill Ekosistemi** | 13,729 | - | - | - | 5,700 | **21** |
-| **Critique Layer** | Hayir | GPT+Claude | Hayir | Planner+Critic | Hayir | **Hayir** |
-| **GitHub Stars** | 343K+ | - | - | - | - | **~0 (beta)** |
-| **Community** | 1,000+ contrib | - | - | - | - | **1 (solo)** |
+**Genel:** Anthropic'in yonetilen ajan altyapisi. 1 Nisan 2026'da beta lansmani (`managed-agents-2026-04-01` header). Tum ajanlar Anthropic altyapisinda calisan bulut-barindirmali, API-odakli platform — Claude Agent SDK'dan (Bolum E) farkli bir urun (lokal degil, bulut). REST API + 7 dilde SDK (Python, TypeScript, Java, Go, C#, Ruby, PHP). Ajanlar hazir paketlerle ve yapilandirilabilir ag kurallariyla bulut container'larda calisiyor. Fiyat: kullanimla API faturasi. CLI araci: `ant` (Go tabanli).
 
-### G. Deckent'in Benzersiz Konumu
+**Mimari:**
+
+| Ozellik | Detay | Deckent Karsiligi |
+|---------|-------|-------------------|
+| Versiyonlu Ajanlar | Her guncelleme degistirilemez versiyon olusturur, rollback mumkun | agent.json (statik, versiyonlama yok) |
+| Versiyonlu Bellek | SHA-based optimistic concurrency ile API-yonetimli bellek, uyumluluk icin redact | .brain/MEMORY.md (duz dosya, versiyonlama yok) |
+| Rubrik Bazli Notlama | Rubrik tanimla, ayri context window'da grader ile notla, 20x'e kadar iterasyon | result-evaluator.ts (basit GO/NO_GO) |
+| Yonetilen Ortamlar | Hazir paketlerle (pip/npm/apt/cargo/gem/go) bulut container'lar, ag kurallari | Docker backend (Sprint 101+, daha az yapilandirilmis) |
+| Coklu SDK | Python, TS, Java, Go, C#, Ruby, PHP SDK'lari | Sadece TypeScript CLI |
+| Oturum Thread'leri | Ajan basina izole context window ile multi-agent | Worker scope enforcement (dosya-seviyesi, context-seviyesi degil) |
+| Custom Tools API | JSON schema arac tanimlari, client-side execution | MCP araclari (benzer, ama ozel arac tanim API'si yok) |
+| Progressive Skills | Anthropic on-tanimli (xlsx, pptx, pdf, docx) + ozel skill'ler, on-demand yukleme | skill-registry (benzer, AST sandbox) |
+| SSE Streaming | Gercek zamanli ajan ciktisi icin Server-Sent Events | HTTP API + SSE (Sprint 10, daha az yapilandirilmis) |
+
+**CMA'nin Deckent'te Olmayan Ozellikleri:**
+
+1. **Rubrik Bazli Notlama** — Degerlendirme rubrikleri tanimla, ayri context window'da grader ile notla, rubrik gecene kadar 20x'e kadar tekrar et. Deckent'in result-evaluator.ts'i yapilandirilmis rubrik tanimlamalari olmadan basit GO/NO_GO yapiyor.
+2. **Versiyonlu Bellek Deposu** — Degistirilemez versiyon gecmisi, SHA-based optimistic concurrency, uyumluluk icin redact islemleriyle API-yonetimli bellek. Deckent'in .brain/MEMORY.md'si versiyonlama veya esamanlilik kontrolu olmayan duz dosya.
+3. **Ajan Versiyonlama** — Her guncelleme yeni degistirilemez versiyon olusturur, herhangi bir onceki versiyona rollback. Deckent'in agent.json'u statik — versiyon gecmisi yok.
+4. **Coklu SDK Destegi** — 7 dilde SDK'lar. Deckent sadece TypeScript CLI.
+5. **Yonetilen Bulut Container'lari** — 6 paket yoneticisiyle hazir paketler ve ag erisim kurallari (sinirsiz/sinirli). Deckent'te Docker backend var ama daha az yapilandirilmis ortam yonetimi.
+6. **Oturum Thread Izolasyonu** — Multi-agent oturumdaki her ajanin kendi context window'u ve konusma gecmisi var. Deckent'in scope enforcement'i dosya-seviyesinde, context-seviyesinde degil.
+
+**CMA'nin Deckent'e Gore Zayif Yanlari:**
+
+1. Tek saglayici (sadece Claude) — Deckent ModelRegistry ile 3 saglayici, 13 model destekliyor
+2. Sprint yasam dongusu yok — oturum-bazli, oturumlar arasi durumsuz
+3. Ogrenme dongusu / self-improvement yok — routing evrimi yok, sinergy takibi yok
+4. Scope enforcement / sinir ihlali tespiti yok — ajanlar tum container erisimi var
+5. Auditor deseni yok — bagimsiz calisma zamani kalite izleme yok
+6. Tech debt takibi yok — DEBT.md karsiligi yok
+7. Retrospektif sistemi yok — oturumlar arasi ogrenme yok
+8. Sadece bulut, self-hosting secenegi yok — veri altyapinizdan cikiyor
+9. Ucretli API servisi — Deckent ucretsiz + acik kaynak
+10. Sadece tek-seviye delegasyon (koordinator → ajanlar, daha derin yuvalama yok)
+
+**Deckent Icin Dersler:**
+- Rubrik bazli notlama result-evaluator.ts'i ikili GO/NO_GO'dan yapilandirilmis, iteratif kalite degerlendirmesine donusturur
+- Versiyonlu bellek deposu .brain/ sistemine rollback + uyumluluk yetenekleri ekler
+- Ajan versiyonlama guvenli A/B testi ve ajan konfigurasyonlarinin rollback'ini saglar
+- Coklu SDK yaklasimi (en azindan OpenAPI spec ile REST API) Deckent'i TypeScript kullanicilari otesine genisletir
+- Yonetilen ortam sablonlari Docker backend'i daha fazla yapilandirabilir
+
+---
+
+### G. Karsilastirma Matrisi
+
+| Yetenek | OpenClaw | Cowork | Perplexity | Devin | Claude SDK | CMA | **Deckent** |
+|---------|----------|--------|------------|-------|------------|-----|-------------|
+| **Acik Kaynak** | MIT | Hayir | Hayir | Hayir | SDK evet | Hayir | **MIT** |
+| **Self-Hosted** | Evet | Hayir | Hayir | Hayir | Kismi | Hayir | **Evet** |
+| **Fiyat** | Ucretsiz | M365 | $200/ay | $20/ay | API | API kullanim-bazli | **Ucretsiz** |
+| **Multi-Agent Paralel** | Hayir | Sinirli | Evet | Hayir | Kismi | Evet (thread) | **Evet** |
+| **Sprint Planlama** | Hayir | Hayir | Hayir | Hayir | Hayir | Hayir | **Evet** |
+| **Scope Enforcement** | Hayir | Hayir | Cloud | Hayir | Worktree | Hayir | **Evet** |
+| **Multi-Provider** | Hayir | 2 | 19 | Hayir | 1 | 1 | **3 (13 model, ModelRegistry)** |
+| **Retrospektif/Ogrenme** | Sinirli | Hayir | Hayir | Wiki | Hayir | Hayir | **Evet** |
+| **MCP Native** | Hayir | Hayir | Hayir | Hayir | Evet | Hayir | **Evet** |
+| **Heartbeat Daemon** | 30dk | Hayir | Evet | Hayir | Loop | Hayir | **✅ Evet (Sprint 088)** |
+| **Human Checkpoints** | Hayir | Evet | Hayir | Evet | Hayir | Hayir | **✅ Evet (Sprint 088)** |
+| **Interactive Plan** | Hayir | Evet | Hayir | Evet | Hayir | Hayir | **Hayir** |
+| **Browser Kontrolu** | Evet | Hayir | Evet | Evet | Evet | Hayir | **Hayir** |
+| **Kanal Entegrasyonu** | 50+ | M365 | 400+ | Slack | Hayir | API | **Hayir** |
+| **Codebase Indeks** | Hayir | Hayir | Hayir | Wiki | Hayir | Hayir | **Hayir** |
+| **Always-On** | Evet | Evet | Evet | Hayir | Dispatch | Evet (bulut) | **Hayir** |
+| **Uzun Sureli Gorev** | Evet | Evet | Gunler | Saatler | Saatler | Saatler | **Sinirsiz (Sprint 088)** |
+| **Skill Ekosistemi** | 13,729 | - | - | - | 5,700 | Custom tools | **21** |
+| **Critique Layer** | Hayir | GPT+Claude | Hayir | Planner+Critic | Hayir | Rubrik grader | **Hayir** |
+| **Rubrik Notlama** | Hayir | Hayir | Hayir | Hayir | Hayir | Evet (20x iterasyon) | **Hayir** |
+| **Ajan Versiyonlama** | Hayir | Hayir | Hayir | Hayir | Hayir | Evet (degistirilemez) | **Hayir** |
+| **Versiyonlu Bellek** | Sinirli | Hayir | Hayir | Hayir | Hayir | Evet (SHA-based) | **Hayir** |
+| **Coklu SDK** | Hayir | Hayir | Hayir | Hayir | Sinirli | 7 dil | **Sadece TS** |
+| **GitHub Stars** | 343K+ | - | - | - | - | - | **~0 (beta)** |
+| **Community** | 1,000+ contrib | - | - | - | - | - | **1 (solo)** |
+
+### H. Deckent'in Benzersiz Konumu
 
 **Hicbir rakipte BIRLIKTE bulunmayan ozellikler:**
 1. Multi-agent paralel calisma + scope enforcement + sprint planlama + retrospektif ogrenme + multi-provider + MCP native + acik kaynak + ucretsiz + self-hosted
 
-**Stratejik pozisyon:** Deckent, "gelistirici takim orkestratoru" nisinde tek acik kaynak cozum. Rakipler ya tek-agent (Devin, OpenClaw) ya da kapali/pahali (Cowork, Perplexity).
+**Stratejik pozisyon:** Deckent, "gelistirici takim orkestratoru" nisinde tek acik kaynak cozum. Rakipler ya tek-agent (Devin, OpenClaw), kapali/pahali (Cowork, Perplexity) ya da sadece-bulut API servisleri (CMA).
 
 **Buyume karsilastirmasi:**
 - OpenClaw: 0 → 343K stars, 4 ayda. Yildiz/gun: ~2,860
@@ -602,6 +655,23 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 - 13 → 19+ model destegi (ModelRegistry altyapisi hazir — Sprint 097)
 - Perplexity'nin 19 model modeline yaklasma
 
+**5.6 Rubrik Bazli Notlama (CMA Modeli)**
+- Task tipine gore degerlendirme rubrikleri tanimla (kod kalitesi, test kapsamasi, dokumantasyon tamligi)
+- Ayri grader context window — degerlendirici worker ile context paylasmiyor
+- Iteratif iyilestirme: rubrik gecene kadar N'e kadar tekrar et
+- result-evaluator.ts'i ikili GO/NO_GO'dan rubrik-puanli degerlendirmeye yukselt
+
+**5.7 Versiyonlu Bellek ve Ajan Versiyonlama (CMA Modeli)**
+- .brain/MEMORY.md → SHA-based concurrency ile versiyonlu bellek deposu
+- Ajan versiyon gecmisi: her agent.json degisikligi degistirilemez versiyon olusturur
+- Herhangi bir onceki ajan veya bellek versiyonuna rollback
+- Uyumluluk icin redact islemleri (bellek gecmisinden PII kaldirma)
+
+**5.8 Coklu SDK / REST API (CMA Modeli)**
+- HTTP API uzerine programatik erisim icin REST API katmani
+- Dil-bagimsiz client: herhangi bir HTTP client Deckent sprint'lerini yurutebilir
+- OpenAPI spec → SDK jeneratorleri (Python/Go/Java client'lar)
+
 ### Öncelik Matrisi
 
 ```
@@ -768,6 +838,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 | sprint-121 | tamamlandı |
 | sprint-122 | tamamlandı |
 | sprint-123 | tamamlandı |
+| sprint-124 | tamamlandı |
 
 ## Bug Tracker
 
@@ -1097,6 +1168,9 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - Browser/desktop kontrol (Claude Computer Use)
 - Multi-sprint zincirleme (gunlerce calisan gorevler, Perplexity modeli)
 - Provider genisleme: Grok, Llama, Mistral, DeepSeek (ModelRegistry altyapisi hazir)
+- Rubrik bazli notlama ile iteratif iyilestirme (CMA modeli — GO/NO_GO otesinde yapilandirilmis degerlendirme)
+- Versiyonlu bellek + ajan versiyonlama ile rollback (CMA modeli — uyumluluk, A/B testi)
+- REST API / Coklu SDK erisimi (CMA modeli — TypeScript CLI otesinde)
 - **Rakiplerden farki:** Tam takim simulasyonu — tek kisiden cok ekip
 
 ---
@@ -1139,11 +1213,13 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 15. ✅ **Sprint Lock Mekanizmasi** — coklu process cakisma engeli, autoApprove standart (Sprint 101)
 16. ✅ **Docker Canli E2E Dogrulama** — CLI+MCP sprint test, CI coverage skip guard, 10 e2e test (Sprint 119-122)
 
-**Siradaki 4 aksiyon (P3):**
+**Siradaki 6 aksiyon (P3):**
 1. **Context-Aware Routing** — context butcesi tahmini → model secimi → task parcalama (Bolum X.I)
 2. **Token Usage Tracker** — JSONL parse + provider-native sayim + RETRO.md token summary (Bolum X.I)
 3. **Worker soru sorma mekanizmasi** — askBrain IPC, kullanici-worker iletisim
 4. **Codebase semantik indeksleme** — AST + RAG ile repo anlayisi
+5. **Rubrik Bazli Notlama** — result-evaluator.ts'e yapilandirilmis degerlendirme rubrikleri, ayri grader context (CMA modeli)
+6. **Versiyonlu Bellek** — .brain/MEMORY.md SHA-based versiyon gecmisi, rollback, uyumluluk redact (CMA modeli)
 
 **Tam otonom asistan icin tahmini sure:** 8-12 sprint
 **Self-improving orkestrator: ✅ TAMAMLANDI (Sprint 102+)
@@ -1188,13 +1264,17 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - [Claude Code Features](https://help.apiyi.com/en/claude-code-2026-new-features-loop-computer-use-remote-control-guide-en.html) — Loop, Schedule, Computer Use
 - [AI Agents Comparison 2026](https://blog.iskohm.com/en/posts/ai-agents-comparison-2026-cursor-copilot-kilo-code-claude-code/) — Tam karsilastirma
 
+### Claude Managed Agents (CMA)
+- [CMA Overview](https://platform.claude.com/docs/en/managed-agents/overview) — Yonetilen ajan altyapisi (beta Nisan 2026)
+- [CMA Quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart) — Ajan olusturma, oturumlar, streaming rehberi
+
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-123 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
-| Tech Debt | 3 |
+| Sprint | sprint-124 |
+| Toplam Task | 4 |
+| Tamamlanan | 4 |
+| Tech Debt | 4 |
 | No-Go | 0 |
-| Süre | 4dk 30sn |
+| Süre | 9dk 5sn |
 | Coverage | 0.0% |

@@ -59,3 +59,8 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - Heartbeat Tipine Backend Alanı Ekle: GO_WITH_TECH_DEBT — Changes applied successfully:
 1. src/core/monitoring-types.ts — Heartbeat interface'e `backend?: 'docker' | 'tmux' | 'su
 - Dashboard WorkerCard Backend Badge: GO_WITH_TECH_DEBT — AgentInfo tipine backend?: 'docker' | 'tmux' | 'subprocess' alanı eklendi. WorkerCard bileşenine BACKEND_BADGE mapping v
+## Sprint sprint-124 Learnings
+- Context Estimator — Task Scope Token Tahmini: GO_WITH_TECH_DEBT — Task 124-001 completed. Changes: (1) Added estimatedTokens?: number to Task interface in task-types.ts. (2) Added Contex
+- Context-Aware Router — Model Seçimine Budget Faktörü Ekle: GO_WITH_TECH_DEBT — Context-Aware Router implemented successfully. Changes: (1) routing-types.ts — RoutingDecision interface'e contextFit?: 
+- Token Usage — Worker Result'a Token Verisi Ekle: GO_WITH_TECH_DEBT — TokenUsage interface defined in task-types.ts with inputTokens, outputTokens, cacheReadTokens, provider, model fields. A
+- Sprint Reporter Token Summary — RETRO.md Token Tablosu: GO_WITH_TECH_DEBT — Task 124-004 completed. Changes: (1) Added TokenUsage type import to sprint-reporter.ts. (2) Added formatTokenCount() he

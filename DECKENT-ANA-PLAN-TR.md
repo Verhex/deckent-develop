@@ -703,6 +703,10 @@ Claude:    → deckent_set_directives → deckent_plan → [kullanıcı onaylar]
 - [x] Routing v2 engine (intent-based 3-layer) — Sprint 063
 - [x] 32 CLI komutu, 17 MCP aracı, 9 ajan, 11 skill
 - [ ] Bulut modu: uzak orkestrasyon
+- [ ] Rubrik bazlı notlama (CMA modeli — result-evaluator.ts iyileştirme, ayrı grader context)
+- [ ] Versiyonlu bellek (CMA modeli — .brain/MEMORY.md versiyon geçmişi, SHA-based concurrency)
+- [ ] Ajan versiyonlama (CMA modeli — değişiklik geçmişi + rollback, A/B testi)
+- [ ] REST API / OpenAPI spec (CMA modeli — çoklu SDK erişimi, dil-bağımsız client)
 
 ---
 

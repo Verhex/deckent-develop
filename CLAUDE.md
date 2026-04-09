@@ -72,12 +72,12 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-123 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
-| Tech Debt | 3 |
+| Sprint | sprint-124 |
+| Toplam Task | 4 |
+| Tamamlanan | 4 |
+| Tech Debt | 4 |
 | No-Go | 0 |
-| Süre | 4dk 30sn |
+| Süre | 9dk 5sn |
 | Coverage | 0.0% |
 
 ## Active Debt
@@ -86,5 +86,4 @@ _Açık teknik borç yok._
 ## Agent Performance
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| ci-guardian | 1 | 1 | 100% |
-| architect | 2 | 2 | 100% |
+| architect | 4 | 4 | 100% |

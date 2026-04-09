@@ -3147,3 +3147,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 123-003: Dashboard WorkerCard Backend Badge (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 124 — sprint-124
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-09
+**Duration:** 545s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 545017ms |
+
+### Tasks
+
+- 124-001: Context Estimator — Task Scope Token Tahmini (GO_WITH_TECH_DEBT)
+- 124-002: Context-Aware Router — Model Seçimine Budget Faktörü Ekle (GO_WITH_TECH_DEBT)
+- 124-003: Token Usage — Worker Result'a Token Verisi Ekle (GO_WITH_TECH_DEBT)
+- 124-004: Sprint Reporter Token Summary — RETRO.md Token Tablosu (GO_WITH_TECH_DEBT)
+
+---

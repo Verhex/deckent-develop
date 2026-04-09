@@ -57,7 +57,14 @@ Each completed task writes `.tasks/task-{id}.result`:
   "testsPassed": true,
   "coverage": 95.2,
   "selfAssessment": "DONE | GO_WITH_TECH_DEBT | NO_GO",
-  "notes": "Brief summary of what was done"
+  "notes": "Brief summary of what was done",
+  "tokenUsage": {
+    "inputTokens": 15420,
+    "outputTokens": 3200,
+    "cacheReadTokens": 89000,
+    "provider": "claude",
+    "model": "opus"
+  }
 }
 ```
 
