@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "tr",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-126",
+  "last_sprint_id": "sprint-127",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -89,5 +89,7 @@
     "no_go_threshold": 0.3,
     "coverage_lookback": 3
   },
-  "lock_stale_threshold": 300
+  "lock_stale_threshold": 300,
+  "claude_backend": "tmux",
+  "rubric_max_retries": 0
 }

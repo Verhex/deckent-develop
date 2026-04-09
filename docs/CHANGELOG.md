@@ -6,6 +6,20 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint127] - 2026-04-09
+
+### Added
+
+- Worker Verify Loop Smoke Test
+- Sprint Controller İkili Spawn Prevention Testi
+
+### Changed
+
+- Promotion Pipeline Guard Doğrulaması (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint126] - 2026-04-09
 
 ### Added

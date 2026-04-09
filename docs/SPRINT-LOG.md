@@ -3224,3 +3224,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 126-005: Sprint Metrics Post-FIX Doğrulama + Debug Logging (NO_GO)
 
 ---
+## Sprint 127 — sprint-127
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-09
+**Duration:** 447s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 446528ms |
+
+### Tasks
+
+- 127-001: Worker Verify Loop Smoke Test (DONE)
+- 127-002: Promotion Pipeline Guard Doğrulaması (GO_WITH_TECH_DEBT)
+- 127-003: Sprint Controller İkili Spawn Prevention Testi (DONE)
+
+---

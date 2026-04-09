@@ -1,46 +1,42 @@
-# Sprint sprint-126 Retrospective
+# Sprint sprint-127 Retrospective
 
 ## Summary
-Completed 0/5 tasks in 20 minutes 52s.
+Completed 3/3 tasks in 7 minutes 27s.
 
 ## Highlights
-- 5 tasks completed on first try
+- 3 tasks completed on first try
 - No boundary violations detected
-
-## Issues
-- Task 126-001 (FIX Fazı Evaluations Map Update — CRITICAL Bug Fix) failed — FIX fazı evaluations Map güncelleme bug'ı düzeltildi. run...
-- Task 126-002 (evaluateResult() → evaluateWithRubric() Geçişi) failed — Bash tool unavailable — tsc --noEmit ve vitest run çalışt...
-- Task 126-003 (CI Guardian Granularity — Task-Spesifik tsc Kontrolü) failed — Bash tool unavailable (session-env ENOENT) — tsc ve vites...
-- Task 126-004 (Context-Aware Evaluation — Bash Unavailable Toleransı) failed — Bash tool unavailable — session-env ENOENT prevented runn...
-- Task 126-005 (Sprint Metrics Post-FIX Doğrulama + Debug Logging) failed — Sprint Metrics Post-FIX Doğrulama + Debug Logging tamamla...
+- NO_GO rate improved from 100% to 0%
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 0/5 |
-| New test files | 5 |
-| Code changes | +1005 / -20 |
-| Sprint time | 20 minutes 52s |
-| NO_GO rate | 100% (5/5) |
+| Tasks completed | 3/3 |
+| New test files | 3 |
+| Code changes | +452 / -0 |
+| Sprint time | 7 minutes 27s |
+| NO_GO rate | 0% (0/3) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| architect | 5 | 0 | 0 | 5 | 0% |
+| test-writer | 3 | 3 | 1 | 0 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| typescript-expert | 5 | 0 | 0 | 5 | 0% |
-| system-architect | 3 | 0 | 0 | 3 | 0% |
-| testing-expert | 1 | 0 | 0 | 1 | 0% |
+| typescript-expert | 3 | 3 | 1 | 0 | 0% |
+| testing-expert | 3 | 3 | 1 | 0 | 0% |
+
+## Token Usage
+| Task | Model | Input | Output | Cache Read | Total |
+|------|-------|-------|--------|------------|-------|
+| 127-002 | opus | 0 | 0 | 0 | 0 |
+| 127-003 | opus | 0 | 0 | 0 | 0 |
+| **Total** | — | 0 | 0 | 0 | 0 |
 
 ## Learnings
-- FIX Fazı Evaluations Map Update — CRITICAL Bug Fix: failed — FIX fazı evaluations Map güncelleme bug'ı düzeltildi. runFixPhase() içinde fixEval hesaplandıktan sonra evaluations.set(fixTask.fixForTaskId, fixEval)
-- evaluateResult() → evaluateWithRubric() Geçişi: failed — Bash tool unavailable — tsc --noEmit ve vitest run çalıştırılamadı. Kod değişiklikleri tamamlandı: (1) evaluateWithRubric import'u result-evaluator.js
-- CI Guardian Granularity — Task-Spesifik tsc Kontrolü: failed — Bash tool unavailable (session-env ENOENT) — tsc ve vitest çalıştırılamadı. Tüm kod değişiklikleri tamamlandı: (1) parseTscErrorFiles() fonksiyonu plu
-- Context-Aware Evaluation — Bash Unavailable Toleransı: failed — Bash tool unavailable — session-env ENOENT prevented running tsc --noEmit and vitest. Code changes applied correctly: (1) evaluateResult() — Bash/sess
-- Sprint Metrics Post-FIX Doğrulama + Debug Logging: failed — Sprint Metrics Post-FIX Doğrulama + Debug Logging tamamlandı. Değişiklikler: (1) sprint-reporter.ts calculateMetrics() fonksiyonuna debugLog çağrısı e
-- Recurring pattern (2835x): stale_heartbeat
+- Promotion Pipeline Guard Doğrulaması: completed with tech debt — Promotion Pipeline Guard test dosyası oluşturuldu. 4 test yazıldı: (1) promote() built-in agent için false döner, (2) demote() built-in agent için fal
+- Recurring pattern (2842x): stale_heartbeat

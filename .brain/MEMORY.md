@@ -76,3 +76,5 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - CI Guardian Granularity — Task-Spesifik tsc Kontrolü: NO_GO — Bash tool unavailable (session-env ENOENT) — tsc ve vitest çalıştırılamadı. Tüm kod değişiklikleri tamamlandı: (1) parse
 - Context-Aware Evaluation — Bash Unavailable Toleransı: NO_GO — Bash tool unavailable — session-env ENOENT prevented running tsc --noEmit and vitest. Code changes applied correctly: (1
 - Sprint Metrics Post-FIX Doğrulama + Debug Logging: NO_GO — Sprint Metrics Post-FIX Doğrulama + Debug Logging tamamlandı. Değişiklikler: (1) sprint-reporter.ts calculateMetrics() f
+## Sprint sprint-127 Learnings
+- Promotion Pipeline Guard Doğrulaması: GO_WITH_TECH_DEBT — Promotion Pipeline Guard test dosyası oluşturuldu. 4 test yazıldı: (1) promote() built-in agent için false döner, (2) de

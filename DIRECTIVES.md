@@ -1,134 +1,97 @@
-# DIRECTIVES — Sprint 124: Context-Aware Routing + Token Usage Tracker
+# DIRECTIVES — Sprint 128: Litmus Testi — Sprint 127 Düzeltme Doğrulaması
 
-## Goal: Deckent'in routing engine'ına context budget awareness ekle. Task'ın tahmini token boyutuna göre model seçimini optimize et. Worker sonuçlarına token kullanım verisi ekle ve RETRO.md'ye token summary tablosu yaz. Mevcut orphan token-counter.ts'i entegre et.
-
----
-
-## Task 1: Context Estimator — Task Scope Token Tahmini
-- Model: opus
-- Effort: high
-- Skills: typescript-expert, system-architect
-- Agent: architect
-- Files: src/core/token-counter.ts, src/orchestra/task-builder.ts
-- Scope: src/core/, src/orchestra/
-
-### Description
-Mevcut `src/core/token-counter.ts` dosyasında `estimatePromptSize()` fonksiyonu var ama task-builder.ts'den çağrılmıyor. Entegre et:
-
-1. `src/orchestra/task-builder.ts` → `buildWorkerPrompt()` fonksiyonunda prompt oluşturulduktan sonra `estimatePromptSize()` çağır. Sonucu task JSON'a `estimatedTokens` olarak yaz.
-
-2. `src/core/token-counter.ts` → `estimateTaskContextBudget(task, agentPrompt, skillPrompts)` fonksiyonu ekle:
-   - Task scope dosyalarının toplam boyutunu tahmin et (satır sayısı × avg tokens/line)
-   - Agent prompt + skill prompts token tahmini
-   - System prompt overhead (~2000 token sabit)
-   - Return: `{ estimatedTokens, modelBudget, withinBudget, utilizationPercent }`
-
-3. Task JSON'a yeni alan: `estimatedTokens?: number` — `.tasks/task-{id}.json`'a yaz.
-   - `src/core/types.ts` veya ilgili task type dosyasına `estimatedTokens` ekle.
-
-`tsc --noEmit` ve `npx vitest run tests/core/token-counter.test.ts` geçmeli.
-
-**Kanıt:** `grep "estimateTaskContextBudget" src/core/token-counter.ts` → fonksiyon bulunmalı
-**Test:** Mevcut token-counter testleri + yeni estimateTaskContextBudget testi geçmeli
+## Goal: Sprint 127'de ELLE yapılan 7 kritik düzeltmenin Deckent sprint mekanizmasıyla çalıştığını doğrula. Worker'lar tsc/vitest çalıştırabilmeli, FIX fazı gereksiz tetiklenmemeli, metrics doğru olmalı, stale heartbeat false positive olmamalı.
 
 ---
 
-## Task 2: Context-Aware Router — Model Seçimine Budget Faktörü Ekle
-- Model: opus
-- Effort: high
-- Skills: typescript-expert, system-architect
-- Agent: architect
-- Files: src/core/routing-engine.ts, src/core/model-registry.ts, src/orchestra/task-router.ts
-- Scope: src/core/, src/orchestra/
-
-### Description
-Routing engine'a context budget awareness ekle:
-
-1. `src/core/routing-engine.ts` → `routeTaskV2()` fonksiyonunda context budget'ı faktör olarak kullan:
-   - Task'ın `estimatedTokens` alanını oku
-   - Model'in `contextWindow` değerini ModelRegistry'den al
-   - Eğer `estimatedTokens > contextWindow * 0.75` → bu model uygun değil, bir üst tier'a yönlendir
-   - Eğer `estimatedTokens > contextWindow * 0.90` → SPLIT önerisi logla (debugLog)
-   - RoutingDecision'a `contextFit: 'ok' | 'tight' | 'overflow'` alanı ekle
-
-2. `src/core/routing-types.ts` → `RoutingDecision` tipine `contextFit?: 'ok' | 'tight' | 'overflow'` ekle
-
-3. Mevcut routing testleri kırılmamalı (yeni alan optional). `npx vitest run tests/core/routing-engine.test.ts` geçmeli.
-
-**Kanıt:** `grep "contextFit" src/core/routing-types.ts` → bulunmalı
-**Test:** Routing engine testleri + en az 1 yeni context-fit testi
-
----
-
-## Task 3: Token Usage — Worker Result'a Token Verisi Ekle
+## Task 1: Worker Verify Loop Smoke Test
 - Model: opus
 - Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: src/agents/worker.ts, src/orchestra/result-evaluator.ts
-- Scope: src/agents/, src/orchestra/
+- Skills: typescript-expert, testing-expert
+- Agent: test-writer
+- Files: tests/smoke/verify-loop-smoke.test.ts
+- Scope: tests/smoke/, tests/, src/orchestra/
 
 ### Description
-Worker sonuçlarına token kullanım verisi ekle:
+Worker'ın `tsc --noEmit` ve `npx vitest run` komutlarını çalıştırabildiğini doğrula.
 
-1. `.contracts/api-surface.md` → Result dosya formatına `tokenUsage` alanı ekle:
-   ```json
-   "tokenUsage": {
-     "inputTokens": 15420,
-     "outputTokens": 3200,
-     "cacheReadTokens": 89000,
-     "provider": "claude",
-     "model": "opus"
-   }
-   ```
+1. `tests/smoke/verify-loop-smoke.test.ts` oluştur ve şu testleri yaz:
+   - `buildWorkerPrompt()` çıktısında `tsc --noEmit` string'i bulunduğunu doğrula (import: `../../src/orchestra/task-builder.js`)
+   - `buildWorkerPrompt()` çıktısında `npx vitest run` string'i bulunduğunu doğrula
+   - `buildWorkerPrompt()` çıktısında `CRITICAL VERIFY STEPS` bölümü bulunduğunu doğrula
+   - Prompt'ta eski `run the project lint command` ifadesi OLMAMALI (negative test)
+   - buildWorkerPrompt() için minimum Task objesi oluştur: `{ id: 'test-001', title: 'Test', description: 'Test task', model: 'sonnet', effort: 'normal', status: 'PENDING', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], sprintId: 'sprint-test', createdAt: new Date().toISOString() }` — eksik alanlar varsa types.ts'den kontrol et
 
-2. `src/core/types.ts` → `TaskResult` tipine `tokenUsage?: TokenUsage` ekle. `TokenUsage` interface tanımla.
+2. `tsc --noEmit` çalıştır → temiz olmalı
+3. `npx vitest run tests/smoke/verify-loop-smoke.test.ts` çalıştır → geçmeli
 
-3. `src/agents/worker.ts` → Worker result yazarken token bilgisini dahil et. Claude worker'lar JSONL transcript'ten post-hoc parse yapabilir (opsiyonel, şu an için yapı hazırlığı yeterli).
-
-4. `src/orchestra/result-evaluator.ts` → Evaluation sırasında tokenUsage'ı oku ve sprint metrics'e ekle (varsa).
-
-`tsc --noEmit` geçmeli. Yeni alanlar optional — breaking change yok.
-
-**Kanıt:** `grep "tokenUsage" src/core/types.ts` → TokenUsage interface bulunmalı
-**Test:** Mevcut testler geçmeli (optional field)
+**Kanıt:** `npx vitest run tests/smoke/verify-loop-smoke.test.ts` → tüm testler geçer
+**Test:** 4 test (prompt contains tsc, prompt contains vitest, prompt contains CRITICAL VERIFY, prompt NOT contains old lint)
 
 ---
 
-## Task 4: Sprint Reporter Token Summary — RETRO.md Token Tablosu
+## Task 2: Promotion Pipeline Guard Doğrulaması
 - Model: opus
 - Effort: normal
-- Skills: typescript-expert
-- Agent: architect
-- Files: src/orchestra/sprint-reporter.ts
-- Scope: src/orchestra/
+- Skills: typescript-expert, testing-expert
+- Agent: test-writer
+- Files: tests/orchestra/promotion-guard.test.ts
+- Scope: tests/orchestra/, tests/, src/orchestra/
 
 ### Description
-Sprint retrospektifine token kullanım özeti ekle:
+Built-in agent'ların promotion/demotion pipeline'dan atlandığını doğrula.
 
-1. `src/orchestra/sprint-reporter.ts` → `generateRetro()` veya `writeRetro()` fonksiyonunda, sprint sonuçlarındaki `tokenUsage` verilerini topla.
+1. `tests/orchestra/promotion-guard.test.ts` oluştur ve şu testleri yaz:
+   - Test setup: `mkdtempSync` ile geçici projectRoot oluştur. `.deckent/agents/test-builtin/agent.json` dosyası yaz: `{ "id": "test-builtin", "name": "Test Builtin", "source": "builtin", "enabled": true }`
+   - `PromotionPipeline.promote('test-builtin', 'agent')` → `false` dönmeli (built-in skip)
+   - `PromotionPipeline.demote('test-builtin', 'agent')` → `false` dönmeli (built-in skip)
+   - Temp agent için promote çalışmalı: `.tasks/agents/temp-my-agent/` dizini oluştur, agent.json yaz (source: 'temp'), `promote('my-agent', 'agent')` → `true` dönmeli. Sonra temizle.
+   - Import: `import { PromotionPipeline } from '../../src/orchestra/promotion-pipeline.js'`
+   - afterEach'de geçici dizini temizle: `rmSync(tmpDir, { recursive: true, force: true })`
 
-2. RETRO.md'ye yeni bölüm ekle:
-   ```markdown
-   ## Token Usage
-   | Task | Model | Input | Output | Cache Read | Total |
-   |------|-------|-------|--------|------------|-------|
-   | 124-001 | opus | 15K | 3.2K | 89K | 107K |
-   | Total | — | 45K | 9.6K | 267K | 321K |
-   ```
+2. `tsc --noEmit` çalıştır → temiz olmalı
+3. `npx vitest run tests/orchestra/promotion-guard.test.ts` çalıştır → geçmeli
 
-3. Token verisi yoksa (henüz worker'lar tokenUsage yazmıyorsa) → bu bölümü atla veya "Token data not available" yaz.
+**Kanıt:** `npx vitest run tests/orchestra/promotion-guard.test.ts` → tüm testler geçer
+**Test:** 3+ test (promote skip builtin, demote skip builtin, promote works for temp)
 
-`tsc --noEmit` geçmeli. `npx vitest run tests/orchestra/sprint-reporter.test.ts` geçmeli.
+---
 
-**Kanıt:** `grep "Token Usage" src/orchestra/sprint-reporter.ts` → bölüm template'i bulunmalı
-**Test:** Sprint reporter testleri geçmeli
+## Task 3: Sprint Controller İkili Spawn Prevention Testi
+- Model: opus
+- Effort: normal
+- Skills: typescript-expert, testing-expert
+- Agent: test-writer
+- Files: tests/orchestra/spawn-prevention.test.ts
+- Scope: tests/orchestra/, tests/, src/orchestra/
+
+### Description
+spawnWorkers() fonksiyonunun backend verildiğinde SADECE backend kullandığını doğrula.
+
+1. `tests/orchestra/spawn-prevention.test.ts` oluştur ve şu testleri yaz:
+   - `vi.mock('../../src/orchestra/sprint-controller.js')` ile spawnWorkers'ı mock'lamak yerine, sprint-controller.ts'in kaynak kodunu oku ve `spawnWorkers` fonksiyonunun if/else yapısını doğrula:
+     - Kaynak kodda `if (backend)` ilk koşul olmalı (adapter'dan önce)
+     - `else if (!isTmuxProvider(taskProvider))` ikinci koşul (adapter path)
+     - `else` son koşul (legacy tmux)
+   - VEYA: spawnWorkers'ı doğrudan test et — minimal Sprint ve Task mock'ları ile:
+     - Mock SpawnBackend: `{ name: 'mock', spawn: vi.fn(), kill: vi.fn(), list: vi.fn(() => []), isAvailable: vi.fn(async () => true) }`
+     - `spawnWorkers(projectRoot, sprint, config, { spawnBackend: mockBackend })` çağır
+     - `mockBackend.spawn` çağrılmış olmalı
+     - Eski tmux `spawnWorker` fonksiyonu çağrılmamış olmalı (vi.mock ile mock'la)
+   - İKİNCİ yaklaşımı tercih et — runtime davranış testi daha güvenilir
+
+2. `tsc --noEmit` çalıştır → temiz olmalı  
+3. `npx vitest run tests/orchestra/spawn-prevention.test.ts` çalıştır → geçmeli
+
+**Kanıt:** `npx vitest run tests/orchestra/spawn-prevention.test.ts` → tüm testler geçer
+**Test:** 3+ test (backend spawn called, legacy NOT called when backend exists, adapter NOT called when backend exists)
 
 ---
 
 ## Quality Rules
 - `npx tsc --noEmit` temiz olmalı
-- `npx vitest run tests/core/` geçmeli
-- `npx vitest run tests/orchestra/` geçmeli
-- Yeni alanlar optional — mevcut testlerde breaking change olmamalı
-- Task bağımlılıkları: Task 2, Task 1'e bağımlı (estimatedTokens alanı). Task 4, Task 3'e bağımlı (tokenUsage alanı).
+- `npx vitest run tests/smoke/` geçmeli
+- `npx vitest run tests/orchestra/promotion-guard.test.ts` geçmeli
+- `npx vitest run tests/orchestra/spawn-prevention.test.ts` geçmeli
+- FIX fazı tetiklenmemeli — tüm testler ilk seferde geçmeli
+- Yeni dosyalar oluşturulacak — mevcut dosyalar DEĞİŞTİRİLMEMELİ
