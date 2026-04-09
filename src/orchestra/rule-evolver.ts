@@ -2,8 +2,11 @@
 // Generates new activation rules from historical outcome data.
 // Rules with confidence >= 0.85 are auto-applied, >= 0.65 are suggested.
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import type { ActivationRule, ExclusionRule } from '../core/routing-types.js';
 import type { OutcomeTracker, EntityPerformance } from './outcome-tracker.js';
+import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,11 +37,15 @@ const SIGNIFICANT_DELTA = 0.15;
 
 // ─── RuleEvolver ────────────────────────────────────────────────────────────
 
+const EVOLVED_RULES_FILE = '.deckent/routing/evolved-rules.json';
+
 export class RuleEvolver {
   private readonly tracker: OutcomeTracker;
+  private readonly projectRoot: string;
 
-  constructor(tracker: OutcomeTracker) {
+  constructor(tracker: OutcomeTracker, projectRoot?: string) {
     this.tracker = tracker;
+    this.projectRoot = projectRoot ?? process.cwd();
   }
 
   /**
@@ -217,5 +224,55 @@ export class RuleEvolver {
   private isAgentId(entityId: string): boolean {
     const learnings = this.tracker.getLearnings();
     return entityId in learnings.agentPerformance;
+  }
+
+  /**
+   * Persist evolved rules to a standalone JSON file.
+   * Merges with existing rules (newer rules for the same name overwrite).
+   */
+  saveRules(rules: EvolvedRule[]): void {
+    if (rules.length === 0) return;
+    try {
+      const filePath = join(this.projectRoot, EVOLVED_RULES_FILE);
+      const dir = join(this.projectRoot, '.deckent', 'routing');
+      mkdirSync(dir, { recursive: true });
+
+      // Load existing rules and merge
+      let existing: EvolvedRule[] = [];
+      if (existsSync(filePath)) {
+        try {
+          existing = JSON.parse(readFileSync(filePath, 'utf-8'));
+        } catch { /* corrupt file — start fresh */ }
+      }
+
+      // Merge: newer rules overwrite same-name rules
+      const ruleMap = new Map<string, EvolvedRule>();
+      for (const r of existing) {
+        const key = r.rule && 'name' in r.rule ? (r.rule as ActivationRule).name : `${r.entityId}-${r.type}`;
+        if (key) ruleMap.set(key, r);
+      }
+      for (const r of rules) {
+        const key = r.rule && 'name' in r.rule ? (r.rule as ActivationRule).name : `${r.entityId}-${r.type}`;
+        if (key) ruleMap.set(key, r);
+      }
+
+      writeFileSync(filePath, JSON.stringify([...ruleMap.values()], null, 2), 'utf-8');
+      debugLog('rule-evolver:saveRules', `${rules.length} rules saved to ${EVOLVED_RULES_FILE}`);
+    } catch (err) {
+      debugLog('rule-evolver:saveRules', err);
+    }
+  }
+
+  /**
+   * Load previously persisted evolved rules.
+   */
+  loadRules(): EvolvedRule[] {
+    try {
+      const filePath = join(this.projectRoot, EVOLVED_RULES_FILE);
+      if (!existsSync(filePath)) return [];
+      return JSON.parse(readFileSync(filePath, 'utf-8'));
+    } catch {
+      return [];
+    }
   }
 }

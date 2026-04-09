@@ -101,20 +101,6 @@ export class DockerSpawnBackend implements SpawnBackend {
       linesRemoved: 0, testsPassed: false, coverage: 0,
       selfAssessment: 'NO_GO', notes: 'Docker worker exited without writing result file',
     });
-    // Write worker script to .tasks/ — avoids shell quoting issues with allowedTools parentheses
-    const scriptFileName = `.worker-${taskId}.sh`;
-    const scriptHostPath = join(tasksDir, scriptFileName);
-    const scriptContent = [
-      '#!/bin/sh',
-      `RFILE="${resultPath}"`,
-      // EXIT trap: guarantees .result file is ALWAYS written, even if Claude crashes
-      `trap '[ -f "$RFILE" ] || echo '"'"'${fallbackJson}'"'"' > "$RFILE"' EXIT`,
-      `timeout ${this.timeoutSeconds} ${claudeCmd} < "${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}" || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
-    ].join('\n');
-    writeFileSync(scriptHostPath, scriptContent, { mode: 0o755 });
-
-    const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
-
     // Build docker run args
     // Run as host user to avoid root — Claude CLI blocks --dangerously-skip-permissions as root
     const uid = process.getuid?.() ?? 1000;
@@ -125,6 +111,28 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Host HOME (e.g. /home/alperen) doesn't exist in container filesystem.
     // Claude CLI needs a writable HOME for config + cache.
     const containerHome = '/tmp/deckent-home';
+
+    // Write worker script to .tasks/ — avoids shell quoting issues with allowedTools parentheses
+    const scriptFileName = `.worker-${taskId}.sh`;
+    const scriptHostPath = join(tasksDir, scriptFileName);
+    const hbContainerPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.hb`;
+    const scriptContent = [
+      '#!/bin/sh',
+      `RFILE="${resultPath}"`,
+      `HBFILE="${hbContainerPath}"`,
+      // Ensure session-env exists (Claude CLI requires it)
+      `mkdir -p "${containerHome}/.claude" 2>/dev/null || true`,
+      `touch "${containerHome}/.claude/session-env" 2>/dev/null || true`,
+      // EXIT trap: guarantees .result file is ALWAYS written, even if Claude crashes
+      `trap '[ -f "$RFILE" ] || echo '"'"'${fallbackJson}'"'"' > "$RFILE"; kill $HB_PID 2>/dev/null' EXIT`,
+      // Heartbeat update loop (every 15s) — prevents false stale alerts
+      `( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$SEQ,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$HBFILE"; done ) &`,
+      'HB_PID=$!',
+      `timeout ${this.timeoutSeconds} ${claudeCmd} < "${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}" || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
+    ].join('\n');
+    writeFileSync(scriptHostPath, scriptContent, { mode: 0o755 });
+
+    const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
 
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
     const dockerArgs: string[] = [
@@ -145,8 +153,8 @@ export class DockerSpawnBackend implements SpawnBackend {
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
       '-v', `${join(dir, '.locks')}:${CONTAINER_WORKSPACE}/.locks`,
-      // Claude auth — mount host credentials into container HOME
-      '-v', `${join(home, '.claude')}:${containerHome}/.claude:ro`,
+      // Claude auth — mount host credentials into container HOME (rw: session-env must be writable)
+      '-v', `${join(home, '.claude')}:${containerHome}/.claude`,
       // Claude config — ~/.claude.json (settings, permissions)
       ...(existsSync(join(home, '.claude.json'))
         ? ['-v', `${join(home, '.claude.json')}:${containerHome}/.claude.json:ro`]

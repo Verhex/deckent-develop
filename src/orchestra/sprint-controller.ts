@@ -956,8 +956,17 @@ export function spawnWorkers(
 
     const taskProvider = resolveTaskProvider(task);
 
-    // Route to adapter-based provider if task uses a non-tmux provider
-    if (!isTmuxProvider(taskProvider)) {
+    // Single spawn path — NEVER spawn the same task twice.
+    // Priority: SpawnBackend > adapter > legacy tmux
+    if (backend) {
+      // SpawnBackend abstraction path (Docker, tmux, subprocess)
+      backend.spawn(task.id, model, prompt, {
+        allowedTools,
+        autoApprove: spawnOpts?.autoApprove ?? false,
+        projectDir: projectRoot,
+      });
+    } else if (!isTmuxProvider(taskProvider)) {
+      // Non-tmux provider (Codex, Gemini) — use adapter
       const adapter = getProviderAdapterForTask(taskProvider);
       if (adapter) {
         adapter.spawn(task.id, model, prompt, {
@@ -966,17 +975,8 @@ export function spawnWorkers(
           projectDir: projectRoot,
         });
       }
-      // If no adapter found, fall through — task will be tracked but not spawned
-      // (provider registration is a precondition the caller must satisfy)
-    } else if (backend) {
-      // SpawnBackend abstraction path (Claude)
-      backend.spawn(task.id, model, prompt, {
-        allowedTools,
-        autoApprove: spawnOpts?.autoApprove ?? false,
-        projectDir: projectRoot,
-      });
     } else {
-      // Legacy direct tmux path (Claude)
+      // Legacy direct tmux path (Claude, no SpawnBackend)
       spawnWorker(task.id, model, prompt, projectRoot, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -1421,12 +1421,13 @@ export async function finalizeSprint(
       // 8d. Evolve routing rules from accumulated data
       try {
         const { RuleEvolver } = await import('./rule-evolver.js');
-        const evolver = new RuleEvolver(tracker);
+        const evolver = new RuleEvolver(tracker, projectRoot);
         const evolution = evolver.evolveRules();
         if (evolution.newRules.length > 0) {
           debugLog('finalizeSprint:rule-evolution', `${evolution.newRules.length} new rules evolved`);
-          // Persist evolved rules in learnings
+          // Persist evolved rules in learnings AND standalone file
           tracker.saveEvolvedRules(evolution.newRules);
+          evolver.saveRules(evolution.newRules);
         }
       } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
 

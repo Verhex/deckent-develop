@@ -308,14 +308,14 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
     expect(prompt).toContain('task-002-007.result');
   });
 
-  it('instructs worker to run project test command', () => {
+  it('instructs worker to run vitest', () => {
     const prompt = buildWorkerPrompt(makeTask());
-    expect(prompt).toContain('run the project test command');
+    expect(prompt).toContain('npx vitest run');
   });
 
-  it('instructs worker to run project lint command', () => {
+  it('instructs worker to run tsc', () => {
     const prompt = buildWorkerPrompt(makeTask());
-    expect(prompt).toContain('run the project lint command');
+    expect(prompt).toContain('tsc --noEmit');
   });
 
   it('marks result file as REQUIRED', () => {

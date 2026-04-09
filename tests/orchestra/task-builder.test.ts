@@ -427,16 +427,17 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain(`Effort: ${effort}`);
   });
 
-  it('includes "What To Do" section with all 6 steps', () => {
+  it('includes "What To Do" section with steps and explicit verify block', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('## What To Do');
     expect(prompt).toContain('1. Read the task scope carefully');
     expect(prompt).toContain('2. Write the code changes');
-    expect(prompt).toContain('3. Verify: run the project lint command');
-    expect(prompt).toContain('4. Test: run the project test command');
-    expect(prompt).toContain('5. Document:');
-    expect(prompt).toContain('6. Report: write your result file');
+    expect(prompt).toContain('3. Document:');
+    expect(prompt).toContain('4. Report: write your result file');
+    expect(prompt).toContain('## CRITICAL VERIFY STEPS');
+    expect(prompt).toContain('tsc --noEmit');
+    expect(prompt).toContain('npx vitest run');
   });
 
   it('includes "Scope Rules" section with directories', () => {

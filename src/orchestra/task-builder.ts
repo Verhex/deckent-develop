@@ -702,12 +702,19 @@ ${task.id}: ${task.title} — ${task.description}
 ## What To Do
 1. Read the task scope carefully — understand what files you may touch
 2. Write the code changes described above
-3. Verify: run the project lint command — fix any errors (max 3 attempts)
-4. Test: run the project test command — fix any failures (max 3 attempts)
-5. Document: update relevant docs if your changes affect them
-6. Report: write your result file to .tasks/task-${task.id}.result
+3. Document: update relevant docs if your changes affect them
+4. Report: write your result file to .tasks/task-${task.id}.result
 
-Note: Check DECKENT.md "## Environment" section for the correct Build/Test/Lint commands for this project.
+## CRITICAL VERIFY STEPS (DO NOT SKIP)
+You MUST run these commands before marking your task as done:
+
+1. \`tsc --noEmit\` — fix ALL type errors (max 3 attempts)
+2. \`npx vitest run\` — fix ALL test failures (max 3 attempts)
+
+If BOTH pass → selfAssessment = "DONE"
+If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
+If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_DEBT"
+If tests fail after 3 attempts → selfAssessment = "NO_GO" with error details
 
 ## Scope Rules
 You may ONLY modify files in these directories:

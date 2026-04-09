@@ -56,14 +56,18 @@ export class PromotionPipeline {
     const results: PromotionResult[] = [];
     const learnings = tracker.getLearnings();
 
-    // Check agent promotion
+    // Check agent promotion (skip built-in agents)
     for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
-      results.push(this.evaluateEntityPromotion(agentId, 'agent', perf));
+      if (!this.isBuiltIn(agentId, 'agent')) {
+        results.push(this.evaluateEntityPromotion(agentId, 'agent', perf));
+      }
     }
 
-    // Check skill promotion
+    // Check skill promotion (skip built-in skills)
     for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
-      results.push(this.evaluateEntityPromotion(skillId, 'skill', perf));
+      if (!this.isBuiltIn(skillId, 'skill')) {
+        results.push(this.evaluateEntityPromotion(skillId, 'skill', perf));
+      }
     }
 
     return results;
@@ -77,11 +81,13 @@ export class PromotionPipeline {
     const learnings = tracker.getLearnings();
 
     for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
+      if (this.isBuiltIn(agentId, 'agent')) continue;
       const demotion = this.evaluateEntityDemotion(agentId, 'agent', perf);
       if (demotion) results.push(demotion);
     }
 
     for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
+      if (this.isBuiltIn(skillId, 'skill')) continue;
       const demotion = this.evaluateEntityDemotion(skillId, 'skill', perf);
       if (demotion) results.push(demotion);
     }
@@ -101,6 +107,11 @@ export class PromotionPipeline {
    */
   promote(entityId: string, entityType: 'agent' | 'skill'): boolean {
     try {
+      // Guard: skip built-in/permanent entities — they don't need promotion
+      if (this.isBuiltIn(entityId, entityType)) {
+        return false;
+      }
+
       // For agents, also check persistent temp pool (.deckent/agents/temp-{id}/)
       if (entityType === 'agent') {
         const persistentTempDir = join(this.projectRoot, '.deckent', 'agents', `temp-${entityId}`);
@@ -158,6 +169,11 @@ export class PromotionPipeline {
    */
   demote(entityId: string, entityType: 'agent' | 'skill'): boolean {
     try {
+      // Guard: never demote built-in/permanent entities
+      if (this.isBuiltIn(entityId, entityType)) {
+        return false;
+      }
+
       const manifestFile = entityType === 'agent'
         ? join(this.projectRoot, '.deckent', 'agents', entityId, 'agent.json')
         : join(this.projectRoot, '.deckent', 'skills', entityId, 'manifest.json');
@@ -210,6 +226,23 @@ export class PromotionPipeline {
       reason: `${perf.totalTasks} tasks, ${Math.round(perf.successRate * 100)}% success — meets promotion criteria`,
       performance: perf,
     };
+  }
+
+  /**
+   * Check if an entity is built-in (permanent) by reading its manifest source field.
+   * Built-in entities must never be promoted or demoted.
+   */
+  private isBuiltIn(entityId: string, entityType: 'agent' | 'skill'): boolean {
+    try {
+      const manifestFile = entityType === 'agent'
+        ? join(this.projectRoot, '.deckent', 'agents', entityId, 'agent.json')
+        : join(this.projectRoot, '.deckent', 'skills', entityId, 'manifest.json');
+      if (!existsSync(manifestFile)) return false;
+      const raw = JSON.parse(readFileSync(manifestFile, 'utf-8'));
+      return raw.source === 'builtin';
+    } catch {
+      return false;
+    }
   }
 
   private evaluateEntityDemotion(

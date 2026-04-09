@@ -437,16 +437,16 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain("'quotes'");
   });
 
-  it('includes vitest run instruction', () => {
+  it('includes explicit vitest run instruction', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('run the project test command');
+    expect(prompt).toContain('npx vitest run');
   });
 
-  it('includes tsc verify instruction', () => {
+  it('includes explicit tsc verify instruction', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('run the project lint command');
+    expect(prompt).toContain('tsc --noEmit');
   });
 
   it('references WORKER-GUIDE.md for error handling instructions', () => {
