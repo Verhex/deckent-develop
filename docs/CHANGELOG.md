@@ -6,6 +6,18 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint123] - 2026-04-09
+
+
+### Changed
+
+- Hybrid Backend ADR Yazımı (completed with tech debt)
+- Heartbeat Tipine Backend Alanı Ekle (completed with tech debt)
+- Dashboard WorkerCard Backend Badge (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 3 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint122] - 2026-04-08
 
 

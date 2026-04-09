@@ -280,6 +280,7 @@ export function createHeartbeat(
   sequence?: number,
   filesChangedCount?: number,
   agentId?: string,
+  backend?: 'docker' | 'tmux' | 'subprocess',
 ): Heartbeat {
   const count = filesChangedCount ?? 0;
   return {
@@ -293,6 +294,7 @@ export function createHeartbeat(
     sequence: sequence ?? 0,
     progress: calculateProgress({ status, filesChangedCount: count }),
     agentId,
+    backend,
   };
 }
 

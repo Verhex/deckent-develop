@@ -8,6 +8,7 @@ export interface AgentInfo {
   currentAction?: string;
   spawnedAt?: string;
   lastHeartbeat?: string;
+  backend?: 'docker' | 'tmux' | 'subprocess';
 }
 
 export interface Alert {

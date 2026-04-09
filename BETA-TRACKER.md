@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-122 |
+| Sprint | sprint-123 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -607,12 +607,12 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-122 |
-| Toplam Task | 1 |
-| Tamamlanan | 1 |
-| Tech Debt | 1 |
+| Sprint | sprint-123 |
+| Toplam Task | 3 |
+| Tamamlanan | 3 |
+| Tech Debt | 3 |
 | No-Go | 0 |
-| Süre | 2dk 29sn |
+| Süre | 4dk 30sn |
 | Coverage | 0.0% |
 
 ## Sprint History
@@ -625,6 +625,7 @@ Every blocker was directly verified in the codebase. False claims have been corr
 | sprint-120 | tamamlandı |
 | sprint-121 | tamamlandı |
 | sprint-122 | tamamlandı |
+| sprint-123 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 

@@ -37,6 +37,12 @@ const MODEL_ICON: Record<string, string> = {
   haiku: "🍃",
 };
 
+const BACKEND_BADGE: Record<string, { label: string; className: string }> = {
+  docker: { label: "Docker", className: "bg-blue-900/50 text-blue-300 border border-blue-700" },
+  tmux: { label: "tmux", className: "bg-green-900/50 text-green-300 border border-green-700" },
+  subprocess: { label: "subprocess", className: "bg-orange-900/50 text-orange-300 border border-orange-700" },
+};
+
 function getModelIcon(model: string): string {
   const lower = model.toLowerCase();
   for (const [key, icon] of Object.entries(MODEL_ICON)) {
@@ -84,14 +90,21 @@ export function WorkerCard({ agent, onClick, onKill }: WorkerCardProps) {
       className={`rounded-lg ${borderClass} bg-zinc-900 p-4 cursor-pointer transition-all duration-200 hover:bg-zinc-800/80 hover:scale-[1.02] shadow-lg shadow-zinc-950/50`}
       onClick={onClick}
     >
-      {/* Header: Worker ID + Model badge */}
+      {/* Header: Worker ID + Model badge + Backend badge */}
       <div className="flex items-center justify-between mb-3">
         <span className="font-mono text-sm text-zinc-100">
           🤖 {agent.id}
         </span>
-        <Badge variant="outline" className="text-xs">
-          {modelIcon} {agent.model}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          {agent.backend && BACKEND_BADGE[agent.backend] && (
+            <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${BACKEND_BADGE[agent.backend].className}`}>
+              {BACKEND_BADGE[agent.backend].label}
+            </span>
+          )}
+          <Badge variant="outline" className="text-xs">
+            {modelIcon} {agent.model}
+          </Badge>
+        </div>
       </div>
 
       <div className="h-px bg-zinc-800 mb-3" />

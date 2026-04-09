@@ -8,3 +8,5 @@
 | debt-108-002 | Tech debt from 108-002: Created tests/smoke/tmux-smoke.test.ts with 3 existsSync | 108-002 | sprint-108 | NORMAL | 0 | true | sprint-108 | 2026-04-08T10:21:26.751Z |
 | debt-121-001 | Tech debt from 121-001: docs/docker-smoke/cli-test.md olusturuldu. Icerigi: '# C | 121-001 | sprint-121 | NORMAL | 0 | true | sprint-121 | 2026-04-08T15:05:41.232Z |
 | debt-122-001 | Tech debt from 122-001: docs/docker-smoke/mcp-ok.md olusturuldu. Icerik: '# MCP | 122-001 | sprint-122 | NORMAL | 0 | true | sprint-122 | 2026-04-08T15:16:55.074Z |
+| debt-123-001 | Tech debt from 123-001: ADR-027 (Hybrid Spawn Backend) .brain/DECISIONS.md dosya | 123-001 | sprint-123 | NORMAL | 0 | true | sprint-123 | 2026-04-09T05:27:21.241Z |
+| debt-123-003 | Tech debt from 123-003: AgentInfo tipine backend?: 'docker' | 'tmux' | 'subproce | NORMAL | 0 | true | sprint-123 | false |

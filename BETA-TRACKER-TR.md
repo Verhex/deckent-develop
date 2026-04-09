@@ -9,7 +9,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-122 |
+| Sprint | sprint-123 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -767,6 +767,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 | sprint-120 | tamamlandı |
 | sprint-121 | tamamlandı |
 | sprint-122 | tamamlandı |
+| sprint-123 | tamamlandı |
 
 ## Bug Tracker
 
@@ -1186,3 +1187,14 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - [Claude Dispatch](https://claude.com/blog/dispatch-and-computer-use) — Telefon → bilgisayar gorev akisi
 - [Claude Code Features](https://help.apiyi.com/en/claude-code-2026-new-features-loop-computer-use-remote-control-guide-en.html) — Loop, Schedule, Computer Use
 - [AI Agents Comparison 2026](https://blog.iskohm.com/en/posts/ai-agents-comparison-2026-cursor-copilot-kilo-code-claude-code/) — Tam karsilastirma
+
+## Sprint Metrics
+| Metrik | Değer |
+|--------|-------|
+| Sprint | sprint-123 |
+| Toplam Task | 3 |
+| Tamamlanan | 3 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Süre | 4dk 30sn |
+| Coverage | 0.0% |

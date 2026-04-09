@@ -54,3 +54,8 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - CLI Docker Test Dosyasi: GO_WITH_TECH_DEBT — docs/docker-smoke/cli-test.md olusturuldu. Icerigi: '# CLI Docker Test\nSprint 121 — Docker backend CLI ile dogrulandi.'
 ## Sprint sprint-122 Learnings
 - MCP Reconnect Test Dosyasi: GO_WITH_TECH_DEBT — docs/docker-smoke/mcp-ok.md olusturuldu. Icerik: '# MCP Docker OK\nSprint 122 — Docker backend MCP reconnect sonrasi dog
+## Sprint sprint-123 Learnings
+- Hybrid Backend ADR Yazımı: GO_WITH_TECH_DEBT — ADR-027 (Hybrid Spawn Backend) .brain/DECISIONS.md dosyasına eklendi. Karar: Hibrit backend DEFERRED — auditor zaten in-
+- Heartbeat Tipine Backend Alanı Ekle: GO_WITH_TECH_DEBT — Changes applied successfully:
+1. src/core/monitoring-types.ts — Heartbeat interface'e `backend?: 'docker' | 'tmux' | 'su
+- Dashboard WorkerCard Backend Badge: GO_WITH_TECH_DEBT — AgentInfo tipine backend?: 'docker' | 'tmux' | 'subprocess' alanı eklendi. WorkerCard bileşenine BACKEND_BADGE mapping v

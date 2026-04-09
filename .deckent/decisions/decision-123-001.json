@@ -1,0 +1,39 @@
+{
+  "taskId": "123-001",
+  "sprintId": "sprint-123",
+  "steps": [
+    {
+      "step": 1,
+      "name": "routing-step-1",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Intent: devops (confidence: 0.67)"
+    },
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'ci-guardian' (score=10, rules=[rule(score=10)])"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 0 (trivial task, 0 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [documentation-writer, system-architect]"
+    }
+  ],
+  "decidedAt": "2026-04-09T05:22:59.002Z"
+}

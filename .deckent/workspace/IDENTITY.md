@@ -21,7 +21,7 @@ Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-122 |
+| Sprint | sprint-123 |
 | MCP Tools | 20 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |

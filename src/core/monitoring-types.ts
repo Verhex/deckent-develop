@@ -34,6 +34,8 @@ export interface Heartbeat {
   progress: number;
   /** Agent ID for this heartbeat */
   agentId?: string;
+  /** Spawn backend that created this worker */
+  backend?: 'docker' | 'tmux' | 'subprocess';
 }
 
 export interface AgentInfo {
