@@ -74,6 +74,11 @@ export function isDocTask(task: Task): boolean {
  * 7. coverage >= coverageThreshold → DONE
  * 8. worker hint GO_WITH_TECH_DEBT (fallback only) → GO_WITH_TECH_DEBT
  * 9. default → DONE
+ *
+ * @deprecated Use evaluateWithRubric() instead. This function uses a simpler grading
+ * algorithm without rubric scoring. Sprint phases already use evaluateWithRubric()
+ * for consistent EVALUATE and FIX phase evaluation. This function is retained only
+ * for backward compatibility with CLI finalize command.
  */
 export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
   // Step 1: Hard failures — NO_GO regardless of self-assessment

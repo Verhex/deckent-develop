@@ -23,17 +23,17 @@
 - **agents/** (16 modules): Worker execution, prompt engineering
 - **providers/** (5 modules): Claude, Codex, Gemini adapters
 - **api/** (3 modules): HTTP API server, SSE, rate limiting
-- **mcp/**: MCP server — 20 tools + 8 resources, stdio transport (verified sprint-093)
+- **mcp/**: MCP server — 21 tools + 8 resources, stdio transport (verified sprint-093)
 - **cli/** (35 commands): Full CLI with helpers, entry point
 - **dashboard/**: React + Vite + Tailwind (6 pages, SSE indicator, language switcher)
   - i18n/LanguageProvider.tsx, i18n/en.ts (~282 keys), i18n/tr.ts (~282 keys)
   - ConfigPage i18n tam kapsam (Sprint 084), AgentDetail geniş panel (Sprint 084)
 
 ## Current State
-- Test Count: 12
+- Test Count: 12,193+
 - Coverage: 96.0%
-- Last Sprint: sprint-127
-- Total Sprints: 127
+- Last Sprint: sprint-128
+- Total Sprints: 128
 - Completed Tasks: 323
 - No-Go Rate: 0.0%
 
@@ -48,7 +48,7 @@
 - Skills: 21 built-in (typescript-expert, testing-expert, documentation-writer, security-specialist, performance-optimizer, api-builder, devops-engineer, database-migration, react-specialist, python-expert, ci-testing, accessibility-expert, anthropic-sdk, code-simplifier, docker-expert, frontend-design, git-expert, graphql-expert, migration-expert, monorepo-expert, system-architect)
 
 ## Key Rules
-- See .brain/DECISIONS.md for 26 architecture decision records (ADR-001 through ADR-026)
+- See .brain/DECISIONS.md for 28 architecture decision records (ADR-001 through ADR-028)
 - Brain is the ONLY orchestrator — workers never plan
 - Sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - Memory budget: 900 lines max in .brain/ (increased sprint-067)
@@ -69,7 +69,7 @@
 - core/provider.ts → ProviderAdapter interface, multi-provider registry
 - agents/worker.ts → task claim, file locking, heartbeat, verify loop
 - cli/entry.ts → buildProgram() + 35+ commands
-- mcp/index.ts → 20 tools + 8 resources (Sprint 089: usage kaldırıldı)
+- mcp/index.ts → 21 tools + 8 resources (Sprint 089: usage kaldırıldı)
 - api/server.ts → HTTP API + SSE (17 endpoints: GET /api/status, /api/tasks, etc.)
 
 ## Sprint 067 Learnings

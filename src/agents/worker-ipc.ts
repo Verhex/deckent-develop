@@ -439,6 +439,7 @@ export async function askBrain(
     suggestedAction?: QuestionAction;
     timeoutMs?: number;
     pollIntervalMs?: number;
+    channel?: WorkerSideChannel;
   },
 ): Promise<BrainAnswer> {
   const timeoutMs = options?.timeoutMs ?? 60_000;
@@ -453,6 +454,39 @@ export async function askBrain(
     timestamp: new Date().toISOString(),
   };
 
+  const channel = options?.channel;
+
+  // If IPC channel is available and supports IPC, send question via IPC
+  if (channel && channel.supportsIPC() && !channel.isClosed()) {
+    return new Promise<BrainAnswer>((resolve) => {
+      const timer = setTimeout(() => {
+        const defaultAnswer: BrainAnswer = {
+          taskId,
+          action: 'continue',
+          message: 'Auto-continue: IPC question timed out waiting for Brain response',
+          timestamp: new Date().toISOString(),
+        };
+        resolve(defaultAnswer);
+      }, timeoutMs);
+
+      channel.onMessage('ANSWER', (msg) => {
+        clearTimeout(timer);
+        const answer = msg.payload as BrainAnswer;
+        resolve(answer ?? {
+          taskId,
+          action: 'continue',
+          message: 'Auto-continue: Brain answered via IPC',
+          timestamp: new Date().toISOString(),
+        });
+      });
+
+      channel.send('QUESTION', questionData);
+      // Also write file for compatibility
+      writeQuestionFile(projectRoot, questionData);
+    });
+  }
+
+  // File-based fallback for tmux/docker backends
   writeQuestionFile(projectRoot, questionData);
 
   const startTime = Date.now();

@@ -71,13 +71,12 @@
     "position": "prepend",
     "maxTokens": 2000
   },
-  "enabled": false,
+  "enabled": true,
   "stats": {
-    "totalUses": 12,
-    "successCount": 6,
-    "successRate": 0.5,
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 1.0,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-127"
-  },
-  "_demotedAt": "2026-04-09T12:43:09.613Z"
+    "lastUsedInSprint": ""
+  }
 }

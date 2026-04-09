@@ -72,12 +72,12 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-127 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
+| Sprint | sprint-129 |
+| Toplam Task | 7 (+1 fix) |
+| Tamamlanan | 7 |
 | Tech Debt | 1 |
-| No-Go | 0 |
-| Süre | 7dk 26sn |
+| No-Go | 1 (timeout → fix ile kurtarıldı) |
+| Süre | ~30dk |
 | Coverage | 0.0% |
 
 ## Active Debt
@@ -86,4 +86,6 @@ _Açık teknik borç yok._
 ## Agent Performance
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| test-writer | 3 | 3 | 100% |
+| bug-fixer | 6 | 5 | 83% |
+| refactorer | 1 | 1 | 100% |
+| test-writer | 1 | 1 | 100% |

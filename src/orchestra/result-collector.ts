@@ -27,7 +27,7 @@ import {
   writeAnswerFile,
   getQuestionPath,
 } from '../agents/worker-ipc.js';
-import type { BrainAnswer } from '../core/task-types.js';
+import type { BrainAnswer, WorkerQuestion } from '../core/task-types.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -241,6 +241,27 @@ export async function waitForResults(
           ipcWakeup.pending = false;
           ipcWakeup.resolve();
         }
+      });
+
+      // Handle QUESTION messages via IPC — auto-answer and reply via IPC ANSWER
+      channel.onMessage('QUESTION', (msg) => {
+        const question = msg.payload as WorkerQuestion | undefined;
+        const questionText = question?.question ?? '(no question text)';
+        debugLog('ipc:question', `Worker question for task ${taskId}: "${questionText}"`);
+
+        const answer: BrainAnswer = {
+          taskId,
+          action: 'continue',
+          message: 'Auto-continue: Brain acknowledged question via IPC',
+          timestamp: new Date().toISOString(),
+        };
+
+        // Reply via IPC channel
+        channel.send('ANSWER', answer);
+        // Also write file-based answer for compatibility
+        writeAnswerFile(projectRoot, answer);
+
+        debugLog('ipc:question:answered', `Auto-answered IPC question for task ${taskId}`);
       });
     }
   };

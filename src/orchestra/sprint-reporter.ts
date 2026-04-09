@@ -25,7 +25,7 @@ import {
   writeCiLearnings,
   type CiLearningResult,
 } from '../core/ci-learning.js';
-import { debugLog } from '../core/utils.js';
+import { debugLog, parseDebtTable } from '../core/utils.js';
 import { modelRegistry } from '../core/model-registry.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
@@ -560,7 +560,7 @@ export function writeRetrospective(
   let debt: DebtItem[] = [];
   try {
     const debtRaw = readFileSafe(join(brainPath, DEBT_FILE));
-    if (debtRaw) debt = JSON.parse(debtRaw);
+    if (debtRaw) debt = parseDebtTable(debtRaw);
   } catch (e) { debugLog('writeRetrospective:parseDebt', e); }
 
   // Generate human-friendly RETRO content

@@ -1859,9 +1859,11 @@ describe('writeRetrospective reads patterns and debt', () => {
   it('includes debt learnings in RETRO.md when DEBT.md has open high debt', () => {
     const brainDir = join(tempDir, '.brain');
     mkdirSync(brainDir, { recursive: true });
-    writeFileSync(join(brainDir, 'DEBT.md'), JSON.stringify([
-      { id: 'd1', description: 'Unhandled edge case in planner', originTaskId: '039-001', originSprintId: 'sprint-039', priority: 'HIGH', sprintsOpen: 2, resolved: false, createdAt: '2026-03-20T00:00:00Z' },
-    ]));
+    writeFileSync(join(brainDir, 'DEBT.md'), [
+      '| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |',
+      '|----|-------------|------|--------|----------|------|----------|----------|---------|',
+      '| d1 | Unhandled edge case in planner | 039-001 | sprint-039 | HIGH | 2 | false | - | 2026-03-20T00:00:00Z |',
+    ].join('\n'));
     const sprint = makeSprint();
     const evals = new Map([['001', TaskEvaluation.DONE]]);
     const metrics = makeMetrics();
