@@ -22,7 +22,7 @@ export interface Alert {
 export interface DashboardState {
   sprint: {
     id: string;
-    number: number;
+    number?: number;
     phase: string;
     status: string;
   };
@@ -37,6 +37,12 @@ export interface DashboardState {
   updatedAt: string;
   auditorLastScan?: string;
   violations?: number;
+  idle?: boolean;
+  lastSprint?: {
+    id: string;
+    metrics: Record<string, string>;
+    tasks: string[];
+  };
 }
 
 export interface DeckentConfig {

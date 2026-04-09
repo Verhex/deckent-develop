@@ -19,9 +19,10 @@ import type { DashboardState, Alert } from "../types";
 // WelcomeScreen: shown when no active sprint
 interface WelcomeScreenProps {
   lastSprintId?: string;
+  lastSprintMetrics?: Record<string, string>;
   onNewSprint: () => void;
 }
-function WelcomeScreen({ lastSprintId, onNewSprint }: WelcomeScreenProps) {
+function WelcomeScreen({ lastSprintId, lastSprintMetrics, onNewSprint }: WelcomeScreenProps) {
   const { t } = useTranslation();
   return (
     <Card className="border-zinc-800 bg-zinc-900 shadow-lg shadow-zinc-950/50">
@@ -35,9 +36,17 @@ function WelcomeScreen({ lastSprintId, onNewSprint }: WelcomeScreenProps) {
           {t("dashboard.new_sprint")}
         </Button>
         {lastSprintId && (
-          <p className="text-xs text-zinc-600 mt-1">
-            {t("welcome.last_sprint")}: {lastSprintId}
-          </p>
+          <div className="mt-2 text-center space-y-1">
+            <p className="text-xs text-zinc-500">
+              {t("welcome.last_sprint")}: <span className="font-mono text-zinc-400">{lastSprintId}</span>
+            </p>
+            {lastSprintMetrics && (
+              <div className="flex gap-3 text-xs text-zinc-600">
+                {lastSprintMetrics.completed && <span>{lastSprintMetrics.completed}/{lastSprintMetrics.tasks} tasks</span>}
+                {lastSprintMetrics.duration && <span>{lastSprintMetrics.duration}</span>}
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
@@ -101,15 +110,14 @@ export default function DashboardPage() {
       fetchJson<DashboardState>("/api/status")
         .then((data) => {
           setFallbackState(data);
-          setNoSprint(false);
+          setNoSprint(data.idle === true);
         })
-        .catch((err) => {
-          if (err instanceof ApiError && err.status === 404) {
-            setNoSprint(true);
-          }
+        .catch(() => {
+          setNoSprint(true);
         })
         .finally(() => setInitialLoading(false));
     } else {
+      setNoSprint(sseState.idle === true);
       setInitialLoading(false);
     }
   }, [sseState]);
@@ -228,8 +236,12 @@ export default function DashboardPage() {
       )}
 
       {/* Welcome Screen: shown when no active sprint */}
-      {!initialLoading && noSprint && !state && (
-        <WelcomeScreen onNewSprint={() => setModalOpen(true)} />
+      {!initialLoading && noSprint && (
+        <WelcomeScreen
+          lastSprintId={state?.lastSprint?.id}
+          lastSprintMetrics={state?.lastSprint?.metrics}
+          onNewSprint={() => setModalOpen(true)}
+        />
       )}
 
       {/* Sprint Status Card */}

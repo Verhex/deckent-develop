@@ -544,22 +544,27 @@ describe('Error response edge cases', () => {
     expect(JSON.parse(res.body)).toEqual({ error: 'Not found' });
   });
 
-  it('returns 404 for /api/status when dashboard does not exist', async () => {
+  it('returns idle state for /api/status when dashboard does not exist', async () => {
     mockExistsSync.mockReturnValue(false);
     api = await startServer();
     const res = await makeRequest(api, '/api/status');
-    expect(res.status).toBe(404);
-    expect(JSON.parse(res.body)).toEqual({ error: 'No active sprint' });
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.idle).toBe(true);
+    expect(body.sprint.phase).toBe('IDLE');
   });
 
-  it('returns 404 for /api/status when dashboard contains invalid JSON', async () => {
+  it('returns idle state for /api/status when dashboard contains invalid JSON', async () => {
     mockExistsSync.mockImplementation((p) =>
       typeof p === 'string' && p.endsWith('.dashboard'),
     );
     mockReadFileSync.mockReturnValue('not-json!!!');
     api = await startServer();
     const res = await makeRequest(api, '/api/status');
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.idle).toBe(true);
+    expect(body.sprint.phase).toBe('IDLE');
   });
 
   it('returns 405 for unsupported HTTP methods', async () => {
@@ -619,7 +624,6 @@ describe('Error response edge cases', () => {
   it('returns error JSON with "error" field on all error responses', async () => {
     api = await startServer();
     const routes = [
-      { path: '/api/status', method: 'GET' },
       { path: '/totally/unknown', method: 'GET' },
       { path: '/api/status', method: 'DELETE' },
     ];

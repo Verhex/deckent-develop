@@ -302,8 +302,27 @@ async function handleRequest(
   if (method === 'GET') {
     if (url === '/api/status') {
       const data = readDashboardJson(dashPath);
-      if (!data) { sendError(res, 404, 'No active sprint'); return; }
-      sendJson(res, data);
+      if (data) { sendJson(res, data); return; }
+
+      // No active sprint — return idle state with last sprint summary
+      const lastSprint = getLatestSprintLog(projectRoot);
+      sendJson(res, {
+        sprint: {
+          id: lastSprint?.id ?? null,
+          phase: 'IDLE',
+          status: 'IDLE',
+        },
+        agents: [],
+        progress: { done: 0, active: 0, blocked: 0, total: 0 },
+        alerts: [],
+        updatedAt: new Date().toISOString(),
+        idle: true,
+        lastSprint: lastSprint ? {
+          id: lastSprint.id,
+          metrics: lastSprint.metrics,
+          tasks: lastSprint.tasks,
+        } : null,
+      });
       return;
     }
 

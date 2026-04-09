@@ -143,9 +143,9 @@ TR+EN dual language, VISION, link audit, config dashboard
 
 | # | Issue | Status | Note |
 |---|-------|--------|------|
-| 20 | Dashboard data accuracy | **TODO** | Not displaying correct data |
-| 21 | Dashboard config interface | **TODO** | All config settings should be selectable from dashboard |
-| 22 | Dashboard real test | **TODO** | React dashboard never tested with a real sprint |
+| 20 | Dashboard data accuracy | **DONE** | Idle state with last sprint summary, no more 404 on /api/status |
+| 21 | Dashboard config interface | **DONE** | 50+ fields across 13 categories, read/write via API, fully functional |
+| 22 | Dashboard real test | **DONE** | 7+ real sprints recorded, 429 dashboard tests passing, API integration tested |
 | 23 | Config.json complexity | **PARTIAL** | config-reference.md exists, dashboard selection missing |
 | 24 | First-use experience | **DONE** | quick-start.md, directives-guide.md, workflow guide |
 

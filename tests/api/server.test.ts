@@ -159,12 +159,17 @@ describe('createHttpServer', () => {
   // ─── Existing GET endpoints ─────────────────────────────────
 
   describe('GET /api/status', () => {
-    it('returns 404 when dashboard file missing', async () => {
+    it('returns idle state when dashboard file missing', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
       const res = await request(api, '/api/status');
-      expect(res.status).toBe(404);
-      expect(JSON.parse(res.body)).toEqual({ error: 'No active sprint' });
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.idle).toBe(true);
+      expect(body.sprint.phase).toBe('IDLE');
+      expect(body.sprint.status).toBe('IDLE');
+      expect(body.agents).toEqual([]);
+      expect(body.progress.total).toBe(0);
     });
 
     it('returns dashboard JSON when file exists', async () => {
@@ -1039,7 +1044,7 @@ describe('createHttpServer', () => {
   });
 
   describe('dashboard JSON parse error', () => {
-    it('returns 404 when dashboard file is invalid JSON', async () => {
+    it('returns idle state when dashboard file is invalid JSON', async () => {
       mockExistsSync.mockImplementation((p) => {
         if (typeof p === 'string' && p.endsWith('.dashboard')) return true;
         return false;
@@ -1050,7 +1055,9 @@ describe('createHttpServer', () => {
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/status');
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.idle).toBe(true);
     });
   });
 

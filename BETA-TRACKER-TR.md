@@ -143,9 +143,9 @@ TR+EN çift dil, VISION, link audit, config dashboard
 
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
-| 20 | Dashboard veri doğruluğu | **YAPILACAK** | Doğru veri görüntülemiyor |
-| 21 | Dashboard config arayüzü | **YAPILACAK** | Tüm config ayarları dashboard'dan seçilebilmeli |
-| 22 | Dashboard gerçek test | **YAPILACAK** | React dashboard gerçek sprint ile hiç test edilmedi |
+| 20 | Dashboard veri doğruluğu | **DONE** | Idle state + son sprint özeti, /api/status artık 404 dönmüyor |
+| 21 | Dashboard config arayüzü | **DONE** | 13 kategori, 50+ alan, API üzerinden okuma/yazma, tam fonksiyonel |
+| 22 | Dashboard gerçek test | **DONE** | 7+ gerçek sprint kaydı, 429 dashboard test geçiyor, API entegrasyonu test edildi |
 | 23 | Config.json karmaşıklığı | **KISMEN** | config-reference.md var, dashboard'dan seçim eksik |
 | 24 | İlk kullanım deneyimi | **DONE** | quick-start.md, directives-guide.md, workflow rehberi |
 
