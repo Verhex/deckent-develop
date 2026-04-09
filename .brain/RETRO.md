@@ -1,42 +1,38 @@
-# Sprint sprint-127 Retrospective
+# Sprint sprint-129 Retrospective
 
 ## Summary
-Completed 3/3 tasks in 7 minutes 27s.
+Completed 3/3 tasks in 14 minutes 43s.
 
 ## Highlights
 - 3 tasks completed on first try
 - No boundary violations detected
-- NO_GO rate improved from 100% to 0%
+- NO_GO rate improved from 38% to 0%
 
 ## Metrics
 | What | Value |
 |------|-------|
 | Tasks completed | 3/3 |
-| New test files | 3 |
-| Code changes | +452 / -0 |
-| Sprint time | 7 minutes 27s |
+| Code changes | +62 / -214 |
+| Sprint time | 14 minutes 43s |
 | NO_GO rate | 0% (0/3) |
+| Coverage | 29.8% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| test-writer | 3 | 3 | 1 | 0 | 0% |
+| doc-writer | 1 | 1 | 0 | 0 | 0% |
+| refactorer | 1 | 1 | 0 | 0 | 0% |
+| test-writer | 1 | 1 | 0 | 0 | 89% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| typescript-expert | 3 | 3 | 1 | 0 | 0% |
-| testing-expert | 3 | 3 | 1 | 0 | 0% |
-
-## Token Usage
-| Task | Model | Input | Output | Cache Read | Total |
-|------|-------|-------|--------|------------|-------|
-| 127-002 | opus | 0 | 0 | 0 | 0 |
-| 127-003 | opus | 0 | 0 | 0 | 0 |
-| **Total** | — | 0 | 0 | 0 | 0 |
+| typescript-expert | 3 | 3 | 0 | 0 | 45% |
+| documentation-writer | 1 | 1 | 0 | 0 | 0% |
+| code-simplifier | 1 | 1 | 0 | 0 | 0% |
+| testing-expert | 1 | 1 | 0 | 0 | 89% |
 
 ## Learnings
-- Promotion Pipeline Guard Doğrulaması: completed with tech debt — Promotion Pipeline Guard test dosyası oluşturuldu. 4 test yazıldı: (1) promote() built-in agent için false döner, (2) demote() built-in agent için fal
-- Recurring pattern (2842x): stale_heartbeat
+- Recurring pattern (2931x): stale_heartbeat

@@ -1,5 +1,6 @@
 {
   "id": "api-builder",
+  "source": "builtin",
   "name": "API Builder",
   "version": "0.2.0",
   "description": "RESTful API design, validation, error handling, OpenAPI, versioning",

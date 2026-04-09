@@ -115,7 +115,7 @@ deckent/
 │   │   └── watcher.ts      --Dashboard file watcher
 │   ├── mcp/                --Model Context Protocol server
 │   │   ├── server.ts       --MCP server entry: createServer()
-│   │   ├── tools/          --16 MCP tool handlers
+│   │   ├── tools/          --21 MCP tool handlers
 │   │   └── resources/      --9 MCP resource handlers
 │   └── dashboard/          --Web Dashboard (React+Vite+Tailwind, 4 pages)
 ├── tests/                  --Test files mirroring src/ structure
@@ -147,7 +147,7 @@ deckent/
 | `src/monitor` | Heartbeat scanning, scope boundary enforcement, in-process scan loop, dashboard state, alert dedup |
 | `src/api` | HTTP API (16 endpoints + SSE), dashboard file watcher |
 | `src/cli` | CLI commands (28 commands), interactive prompts, display helpers, contextual hints, auto setup wizard |
-| `src/mcp` | MCP server with 16 tools (enriched responses) and 9 resources for IDE/host integration |
+| `src/mcp` | MCP server with 21 tools (enriched responses) and 8 resources for IDE/host integration |
 | `src/dashboard` | Web Dashboard: React+Vite+Tailwind, 4 pages, shadcn/ui components |
 
 ---

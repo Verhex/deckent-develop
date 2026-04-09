@@ -1,5 +1,6 @@
 {
   "id": "testing-expert",
+  "source": "builtin",
   "name": "Testing Expert",
   "version": "0.2.0",
   "description": "Test pyramid, mocking strategies, coverage, CI integration, vitest/jest patterns",
@@ -53,10 +54,10 @@
   },
   "enabled": true,
   "stats": {
-    "totalUses": 29,
-    "successCount": 25,
-    "successRate": 0.8620689655172413,
+    "totalUses": 33,
+    "successCount": 29,
+    "successRate": 0.8787878787878788,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-127"
+    "lastUsedInSprint": "sprint-129"
   }
 }

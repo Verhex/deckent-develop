@@ -1,5 +1,6 @@
 {
   "id": "anthropic-sdk",
+  "source": "builtin",
   "name": "Anthropic SDK",
   "version": "0.1.0",
   "description": "Anthropic Claude API, tool use, streaming, Agent SDK, batch API patterns",

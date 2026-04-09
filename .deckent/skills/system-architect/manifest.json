@@ -1,5 +1,6 @@
 {
   "id": "system-architect",
+  "source": "builtin",
   "name": "System Architect",
   "version": "0.1.0",
   "description": "Enterprise system architecture patterns: registry design, config schema evolution, provider abstraction, tier-based routing, migration planning, backward compatibility strategies",

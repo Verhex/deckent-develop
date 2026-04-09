@@ -1,3 +1,6 @@
+/**
+ * @deprecated Since Sprint 066. Part of V1 routing. See decision-engine.ts.
+ */
 // ─── Decision Replay ───────────────────────────────────────────────────────
 // @deprecated This module is NOT used in production sprint execution.
 // Re-run decisions and compare results for diagnostic purposes.

@@ -46,8 +46,8 @@ describe('docs/reference/api.md', () => {
     expect(content).toContain('Server-Sent Events');
   });
 
-  it('documents MCP Tools (20)', () => {
-    expect(content).toContain('### Tools (20)');
+  it('documents MCP Tools (21)', () => {
+    expect(content).toContain('### Tools (21)');
     expect(content).toContain('deckent_init');
     expect(content).toContain('deckent_set_directives');
     expect(content).toContain('deckent_plan');

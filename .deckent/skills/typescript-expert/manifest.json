@@ -1,5 +1,6 @@
 {
   "id": "typescript-expert",
+  "source": "builtin",
   "name": "TypeScript Expert",
   "version": "0.2.0",
   "description": "TypeScript best practices, strict typing, utility types, error handling patterns",
@@ -56,10 +57,10 @@
   },
   "enabled": true,
   "stats": {
-    "totalUses": 149,
-    "successCount": 119,
-    "successRate": 0.7986577181208053,
+    "totalUses": 155,
+    "successCount": 125,
+    "successRate": 0.8064516129032258,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-127"
+    "lastUsedInSprint": "sprint-129"
   }
 }

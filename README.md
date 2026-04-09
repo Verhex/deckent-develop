@@ -80,7 +80,7 @@ Deckent follows a three-step cycle:
 - **Built-in Docs** -- `.deckent/docs/` ships with quick-start, directives-guide, and config-reference guides
 - **Native Windows Support** -- Full subprocess backend with `shell:true`, periodic heartbeat updates, and UTF-8 handling
 - **Plugin System** -- Extend Deckent with custom hooks, commands, and patterns
-- **MCP Integration** -- 20 MCP tools + 8 resources for seamless Claude Code IDE integration
+- **MCP Integration** -- 21 MCP tools + 8 resources for seamless Claude Code IDE integration
 - **Web Dashboard** -- React + Vite + Tailwind dashboard with real-time SSE updates
 - **Internationalization** -- English and Turkish language support built in
 - **Review Archive Fallback** -- Sprint review works even after cleanup by reading from archive
@@ -90,6 +90,10 @@ Deckent follows a three-step cycle:
 - **Model Registry** -- 13 models, 3 providers, 4 tiers (premium_plus, premium, standard, economy) with tier-based routing
 - **Provider-Agnostic Config** -- Configure `brain_tier`/`worker_tier` instead of model names; ModelRegistry resolves the best model per provider automatically
 - **Beta Upgrade Workflow** -- `deckent upgrade --local <path.tgz>` for local beta installations
+- **Rubric-Based Grading** -- 4-criteria structured evaluation (correctness, coverage, scope, docs) with configurable weights
+- **Worker Question Mechanism** -- IPC + file-based fallback for worker-to-brain communication during task execution
+- **Context-Aware Routing** -- Token budget estimation and contextFit scoring for intelligent model selection
+- **Token Usage Tracker** -- Per-task token counting with provider-native metrics and RETRO.md summary table
 
 ---
 

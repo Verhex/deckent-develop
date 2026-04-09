@@ -1,5 +1,6 @@
 {
   "id": "ci-testing",
+  "source": "builtin",
   "name": "CI Testing Expert",
   "version": "1.0.0",
   "description": "CI/CD testing expertise — regression detection, coverage analysis, test strategy",
@@ -70,6 +71,6 @@
     "successCount": 1,
     "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-127"
+    "lastUsedInSprint": "sprint-129"
   }
 }

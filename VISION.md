@@ -62,7 +62,7 @@ Three backends for different contexts: **tmux** (fastest, live terminal, Linux/m
 
 ### MCP (Model Context Protocol) Integration
 
-MCP integrates Deckent with any MCP-compatible IDE or tool. With 20 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
+MCP integrates Deckent with any MCP-compatible IDE or tool. With 21 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
 
 ### Docker Container Isolation
 
@@ -76,7 +76,7 @@ Workers run in isolated Docker containers with memory limits, non-root execution
 
 Core sprint lifecycle, multi-agent parallel execution, tmux/subprocess backends, MCP integration, multi-provider support (Claude + Codex + Gemini), ModelRegistry, agent/skill ecosystem, heartbeat daemon, human checkpoints, adaptive thresholds.
 
-### Phase 2: "Beta Readiness" — Active (Sprint 83-123)
+### Phase 2: "Beta Readiness" — Active (Sprint 83-129)
 
 Docker container backend (live-verified Sprint 119-123, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 0.4.0-beta.1.
 
@@ -111,10 +111,10 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 ---
 
 ## Deckent by the Numbers
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-127 |
+| Sprint | sprint-129 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -124,20 +124,22 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 | Providers | 3 (Claude, Codex, Gemini) |
 
 ## Sprint History
-| Sprint | Durum |
+| Sprint | Status |
 |--------|-------|
-| sprint-124 | tamamlandı |
-| sprint-125 | tamamlandı |
-| sprint-126 | tamamlandı |
-| sprint-127 | tamamlandı |
+| sprint-124 | completed |
+| sprint-125 | completed |
+| sprint-126 | completed |
+| sprint-127 | completed |
+| sprint-128 | completed |
+| sprint-129 | completed |
 
 ## Sprint Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-127 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
-| Tech Debt | 1 |
+| Sprint | sprint-129 |
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 7dk 26sn |
-| Coverage | 0.0% |
+| Duration | 14dk 43sn |
+| Coverage | 29.8% |

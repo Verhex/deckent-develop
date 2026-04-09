@@ -86,3 +86,4 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - Evaluator Tutarlılık Reformu: DONE — sprint-phases.ts zaten evaluateWithRubric() kullanıyor. evaluateResult() @deprecated yapıldı. 5 yeni test.
 - FIX Fazı Map Mutation Doğrulaması: DONE — sprint-phases.ts satır 510-512 doğru çalışıyor, bug yok. 5 yeni test yazıldı.
 - Documentation Sync: NO_GO — Docker worker timeout. debt-125-004-fix manuel kapatıldı.
+## Sprint sprint-129 Learnings

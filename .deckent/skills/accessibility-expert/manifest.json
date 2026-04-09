@@ -1,5 +1,6 @@
 {
   "id": "accessibility-expert",
+  "source": "builtin",
   "name": "Accessibility Expert",
   "version": "0.1.0",
   "description": "WCAG 2.1 compliance, ARIA patterns, keyboard navigation, screen reader, color contrast",

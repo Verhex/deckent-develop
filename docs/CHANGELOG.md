@@ -6,6 +6,39 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint129] - 2026-04-09
+
+### Added
+
+- Decision-Engine Arşivleme + .brain/ Temizlik + ADR Yazımı
+- Coverage Altyapısı Doğrulama + Gerçek Ölçüm
+
+### Fixed
+
+- MCP Instructions Fix + Dokümantasyon Kapsamlı Güncelleme
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
+## [0.4.0-beta.1-sprint128] - 2026-04-09
+
+### Added
+
+- DEBT.md Parse Hatası Düzeltmesi + Sprint Reporter Robustness
+- Evaluator Tutarlılık Reformu — evaluateResult/evaluateWithRubric Birleştirme
+
+### Changed
+
+- Fix debt: Tech debt from 125-003-fix: Fixed NO_GO task 125-003 — deckent_explain MCP tool (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 125-001-fix: Rubric-Based Grading sistemi sıfırdan implemente edi
+- FIX Fazı Map Mutation Doğrulaması + Tech Debt Kapatma
+
+
+_Tasks: 8 total, 5 done, 1 tech debt, 3 no-go_
+
 ## [0.4.0-beta.1-sprint127] - 2026-04-09
 
 ### Added

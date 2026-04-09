@@ -8,7 +8,7 @@ Runtime: Node.js >=18
 Platform: macOS, Linux, WSL2
 Tests: 12,194+
 Dashboard Tests: 413
-Coverage: 96%+
+Coverage: 89.33%
 Sprints: 129+
 CLI Commands: 35+
 MCP: 21 tools, 8 resources
@@ -18,7 +18,7 @@ Providers: Claude, Codex, Gemini
 Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint CLI/MCP, Agent/Skill Evolution Pipeline, Adaptive Thresholds, ModelRegistry (13 models, 3 providers, tier-based routing), Docker Backend (live-verified, 10 e2e tests, configurable timeout), Context-Aware Routing, Token Usage Tracker
 
 ## Project Status
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
 | Sprint | sprint-129 |

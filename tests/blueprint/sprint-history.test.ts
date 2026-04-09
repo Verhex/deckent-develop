@@ -12,13 +12,13 @@ describe('Blueprint section numbers (Sprint 048 update)', () => {
     content = readFileSync(BLUEPRINT_PATH, 'utf-8');
   });
 
-  it('MCP server section shows 20 tools', () => {
-    expect(content).toContain('20 Tools');
+  it('MCP server section shows 21 tools', () => {
+    expect(content).toContain('21 Tools');
   });
 
   it('MCP server section shows 8 resources', () => {
     // Both in the architecture diagram and in the Resources section
-    expect(content).toContain('20 Tools + 8 Resources');
+    expect(content).toContain('21 Tools + 8 Resources');
   });
 
   it('Resources section header shows (8)', () => {

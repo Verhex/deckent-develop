@@ -1,5 +1,6 @@
 {
   "id": "react-specialist",
+  "source": "builtin",
   "name": "React Specialist",
   "version": "0.2.0",
   "description": "React 18+ patterns, functional components, hooks, performance, testing",
@@ -55,6 +56,6 @@
     "successCount": 13,
     "successRate": 0.9285714285714286,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-127"
+    "lastUsedInSprint": "sprint-129"
   }
 }

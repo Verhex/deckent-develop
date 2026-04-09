@@ -1,5 +1,6 @@
 {
   "id": "devops-engineer",
+  "source": "builtin",
   "name": "DevOps Engineer",
   "version": "0.2.0",
   "description": "Docker, CI/CD, GitHub Actions, infrastructure, deployment, monitoring",

@@ -1,3 +1,11 @@
+/**
+ * @deprecated Since Sprint 066. Superseded by V2 intent-based routing engine
+ * (src/core/routing-engine.ts → routeTaskV2). Kept as reference implementation.
+ * V1: keyword-based 6-step pipeline (TaskAnalysis → AgentSelection → SkillSelection
+ *   → ModelResolution → EffortResolution → ScopeComputation)
+ * V2: intent-based 3-layer engine (Intent Classification → Activation Evaluation → Routing Decision)
+ * All 38 tests still pass. Do not delete without ADR update.
+ */
 // ─── Decision Engine ───────────────────────────────────────────────────────
 // @deprecated This module is NOT used in production sprint execution.
 // V1 routing uses selectAgent + selectSkills directly in sprint-controller.ts (line 770+).

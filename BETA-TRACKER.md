@@ -6,7 +6,7 @@
 ---
 
 ## Current Status
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
 | Sprint | sprint-129 |
@@ -675,24 +675,25 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ---
 
 ## Sprint Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-128 |
-| Toplam Task | 8 |
-| Tamamlanan | 5 |
-| Tech Debt | 1 |
-| No-Go | 3 |
-| Süre | 34dk 31sn |
-| Coverage | 0.0% |
+| Sprint | sprint-129 |
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Duration | 14dk 43sn |
+| Coverage | 29.8% |
 
 ## Sprint History
-| Sprint | Durum |
+| Sprint | Status |
 |--------|-------|
-| sprint-124 | tamamlandı |
-| sprint-125 | tamamlandı |
-| sprint-126 | tamamlandı |
-| sprint-127 | tamamlandı |
-| sprint-128 | tamamlandı |
+| sprint-124 | completed |
+| sprint-125 | completed |
+| sprint-126 | completed |
+| sprint-127 | completed |
+| sprint-128 | completed |
+| sprint-129 | completed |
 
 ## Dogfooding Bug Tracker
 

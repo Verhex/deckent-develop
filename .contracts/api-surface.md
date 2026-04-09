@@ -64,7 +64,14 @@ Each completed task writes `.tasks/task-{id}.result`:
     "cacheReadTokens": 89000,
     "provider": "claude",
     "model": "opus"
-  }
+  },
+  "rubricScores": {
+    "correctness": 90,
+    "test_coverage": 85,
+    "scope_compliance": 100,
+    "documentation": 70
+  },
+  "evaluationDecision": "DONE | GO_WITH_TECH_DEBT | NO_GO"
 }
 ```
 

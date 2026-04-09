@@ -5,15 +5,15 @@
 ---
 
 ## Live Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-127 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
-| Tech Debt | 1 |
+| Sprint | sprint-129 |
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 7dk 26sn |
-| Coverage | 0.0% |
+| Duration | 14dk 43sn |
+| Coverage | 29.8% |
 
 # TABLE OF CONTENTS
 
@@ -102,7 +102,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  20 Tools + 8 Resources                             │
+│  21 Tools + 8 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -350,7 +350,7 @@ my-project/
 │   ├── cli/                          # CLI commands (commander.js, 35 files)
 │   ├── mcp/                          # MCP server integration
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
-│   │   ├── tools/                   # 20 tool handlers
+│   │   ├── tools/                   # 21 tool handlers
 │   │   │   ├── init.ts             # deckent_init
 │   │   │   ├── directives.ts       # deckent_set_directives
 │   │   │   ├── plan.ts             # deckent_plan
@@ -1386,7 +1386,7 @@ Deckent ran itself for the first time:
 
 - `shouldRemoveResolvedDebt()` + `parseSprintNumber()`: resolved entries retained for 3 sprints (DEBT-002 preserved)
 - Auto Setup Wizard (`auto-setup.ts`): `generateSetupRecommendation()` — subscription + system profile + project size
-- MCP Enrichment (`enrich.ts`): `enrichResponse()` adds `_enriched: { summary, hints, timestamp }` to all 20 tools
+- MCP Enrichment (`enrich.ts`): `enrichResponse()` adds `_enriched: { summary, hints, timestamp }` to all 21 tools
 - CLI Hints (`hints.ts`, `messages.ts`): `getContextualHints()` phase-based suggestions, `getMessage()` localized (tr/en)
 - `doctor --profile`: system profile display (CPU, RAM, workers, subscription)
 - AI planner still returned 8/12 tasks — Sprint 23 post-validation fix needed

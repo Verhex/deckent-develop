@@ -1,5 +1,6 @@
 {
   "id": "git-expert",
+  "source": "builtin",
   "name": "Git Expert",
   "version": "0.1.0",
   "description": "Git workflow, branch strategy, merge conflict resolution, rebase, hooks, bisect",

@@ -1,3 +1,6 @@
+/**
+ * @deprecated Since Sprint 066. Part of V1 routing. See decision-engine.ts.
+ */
 // ─── Agent Selection Step ──────────────────────────────────────────────────
 // @deprecated This module is part of the abandoned DecisionOrchestrator pipeline.
 // Production code uses selectAgent directly from core/agent-selector.js.

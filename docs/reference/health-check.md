@@ -79,7 +79,7 @@ Last sprint execution: **Sprint 065** (2026-03-26, 27m 10s). All 65 sprints ran 
 - 12,051+ tests, 96%+ coverage
 
 ### Section 21: MCP — WORKING
-- 20 tools (all enriched with _enriched meta), 8 resources, background job pattern
+- 21 tools (all enriched with _enriched meta), 8 resources, background job pattern
 
 ### Section 22: User Flows — PARTIAL
 - No dedicated end-to-end flow test suite (covered by sprint execution)

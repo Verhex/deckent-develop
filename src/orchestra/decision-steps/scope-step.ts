@@ -1,3 +1,6 @@
+/**
+ * @deprecated Since Sprint 066. Part of V1 routing. See decision-engine.ts.
+ */
 // ─── Scope Merge Step ──────────────────────────────────────────────────────
 // @deprecated This module is part of the abandoned DecisionOrchestrator pipeline.
 // Production code uses enrichScopeWithTestFiles directly from task-builder.ts.

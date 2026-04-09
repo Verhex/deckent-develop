@@ -1,5 +1,6 @@
 {
   "id": "monorepo-expert",
+  "source": "builtin",
   "name": "Monorepo Expert",
   "version": "0.1.0",
   "description": "Monorepo management, Turborepo, Nx, workspace configuration, dependency graph, build caching",

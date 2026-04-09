@@ -15,7 +15,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Sprint Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (15)
+## Tools (21)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -31,6 +31,12 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_run: Run a single task directly without a full sprint
 - deckent_kill: Kill a running sprint or specific worker agent
 - deckent_cleanup: Archive task files and release all locks after a sprint
+- deckent_help: Show runtime capabilities, project status, and usage guide
+- deckent_agent_list: List registered agents (built-in and temp)
+- deckent_skill_list: List registered skills with manifest info
+- deckent_checkpoint: Approve or reject a checkpoint gate
+- deckent_docs: Sprint lifecycle document management (add/remove/list)
+- deckent_explain: Explain sprint history and results
 
 ## Resources (8)
 - deckent://dashboard — Live sprint dashboard (agents, phases, alerts)

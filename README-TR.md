@@ -82,7 +82,7 @@ Deckent üç adımlı bir döngü izler:
 - **Yerleşik Dokümantasyon** -- `.deckent/docs/` ile hızlı başlangıç, directive rehberi ve yapılandırma referansı gelir
 - **Yerel Windows Desteği** -- `shell:true` ile tam subprocess backend, periyodik heartbeat güncellemeleri ve UTF-8 desteği
 - **Plugin Sistemi** -- Özel hook'lar, komutlar ve desenlerle Deckent'i genişletin
-- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 20 MCP tool + 8 resource
+- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 21 MCP tool + 8 resource
 - **Web Dashboard** -- Gerçek zamanlı SSE güncellemeleriyle React + Vite + Tailwind dashboard
 - **Uluslararasılaştırma** -- İngilizce ve Türkçe dil desteği yerleşik
 - **Review Arşiv Yedeği** -- Sprint review, cleanup sonrasında bile arşivden okuyarak çalışır
@@ -92,6 +92,10 @@ Deckent üç adımlı bir döngü izler:
 - **Model Registry** -- 13 model, 3 provider, 4 katman (premium_plus, premium, standard, economy) ile katman tabanlı yönlendirme
 - **Provider-Agnostik Yapılandırma** -- Model adları yerine `brain_tier`/`worker_tier` yapılandırın; ModelRegistry provider'a göre en uygun modeli otomatik seçer
 - **Beta Güncelleme İş Akışı** -- Yerel beta kurulumu için `deckent upgrade --local <path.tgz>`
+- **Rubrik Tabanlı Notlama** -- 4 kriterli yapılandırılmış değerlendirme (doğruluk, kapsam, scope uyumu, dokümantasyon)
+- **Worker Soru Mekanizması** -- Görev yürütme sırasında worker-brain IPC + dosya tabanlı fallback iletişimi
+- **Bağlam Farkında Yönlendirme** -- Token bütçesi tahmini ve contextFit puanlama ile akıllı model seçimi
+- **Token Kullanım İzleyici** -- Provider-native metriklerle görev bazlı token sayımı ve RETRO.md özet tablosu
 
 ---
 

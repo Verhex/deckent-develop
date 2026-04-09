@@ -1,5 +1,6 @@
 {
   "id": "graphql-expert",
+  "source": "builtin",
   "name": "GraphQL Expert",
   "version": "0.1.0",
   "description": "GraphQL schema design, resolvers, subscriptions, federation, caching, code generation",

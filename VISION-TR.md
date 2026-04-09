@@ -62,7 +62,7 @@ Farklı bağlamlar için üç backend: **tmux** (en hızlı, canlı terminal, Li
 
 ### MCP (Model Context Protocol) Entegrasyonu
 
-MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 20 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
+MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 21 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
 
 ### Docker Container İzolasyonu
 
@@ -111,10 +111,10 @@ Deckent'in OpenClaw/Cowork/Devin kategorisine girdiği nokta — başka bir tek-
 ---
 
 ## Sayılarla Deckent
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-127 |
+| Sprint | sprint-129 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -124,20 +124,22 @@ Deckent'in OpenClaw/Cowork/Devin kategorisine girdiği nokta — başka bir tek-
 | Providers | 3 (Claude, Codex, Gemini) |
 
 ## Sprint History
-| Sprint | Durum |
+| Sprint | Status |
 |--------|-------|
-| sprint-124 | tamamlandı |
-| sprint-125 | tamamlandı |
-| sprint-126 | tamamlandı |
-| sprint-127 | tamamlandı |
+| sprint-124 | completed |
+| sprint-125 | completed |
+| sprint-126 | completed |
+| sprint-127 | completed |
+| sprint-128 | completed |
+| sprint-129 | completed |
 
 ## Sprint Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-127 |
-| Toplam Task | 3 |
-| Tamamlanan | 3 |
-| Tech Debt | 1 |
+| Sprint | sprint-129 |
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 7dk 26sn |
-| Coverage | 0.0% |
+| Duration | 14dk 43sn |
+| Coverage | 29.8% |

@@ -1,5 +1,6 @@
 {
   "id": "database-migration",
+  "source": "builtin",
   "name": "Database Migration",
   "version": "0.2.0",
   "description": "Migration safety, schema design, query optimization, transaction management",

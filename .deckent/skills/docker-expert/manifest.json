@@ -1,5 +1,6 @@
 {
   "id": "docker-expert",
+  "source": "builtin",
   "name": "Docker Expert",
   "version": "0.1.0",
   "description": "Dockerfile optimization, multi-stage builds, Docker Compose, networking, volumes, security",
@@ -61,6 +62,6 @@
     "successCount": 0,
     "successRate": 0,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-127"
+    "lastUsedInSprint": "sprint-129"
   }
 }

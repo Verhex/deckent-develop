@@ -1,5 +1,6 @@
 {
   "id": "performance-optimizer",
+  "source": "builtin",
   "name": "Performance Optimizer",
   "version": "0.2.0",
   "description": "Profiling, caching, Big-O analysis, memory optimization, lazy loading, bundle optimization",

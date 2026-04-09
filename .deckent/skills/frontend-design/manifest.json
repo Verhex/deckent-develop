@@ -1,5 +1,6 @@
 {
   "id": "frontend-design",
+  "source": "builtin",
   "name": "Frontend Design",
   "version": "0.1.0",
   "description": "UI/UX design patterns, Tailwind CSS, responsive layouts, animations, design systems",

@@ -150,7 +150,8 @@
       "Bash(chmod +x /home/alperen/deckent-dev/.tasks/.worker-direct-test.sh)",
       "Bash(sh -n /home/alperen/deckent-dev/.tasks/.worker-direct-test.sh)",
       "Bash(docker rm:*)",
-      "Bash(echo \"CLI start launched in background, PID: $!\")"
+      "Bash(echo \"CLI start launched in background, PID: $!\")",
+      "Bash(awk '{print $9, $5}')"
     ]
   },
   "outputStyle": "Explanatory"

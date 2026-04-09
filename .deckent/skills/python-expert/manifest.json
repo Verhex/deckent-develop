@@ -1,5 +1,6 @@
 {
   "id": "python-expert",
+  "source": "builtin",
   "name": "Python Expert",
   "version": "0.2.0",
   "description": "Python best practices, type hints, async patterns, testing, modern tooling",

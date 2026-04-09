@@ -1,5 +1,6 @@
 {
   "id": "migration-expert",
+  "source": "builtin",
   "name": "Migration Expert",
   "version": "0.1.0",
   "description": "Framework migration, version upgrades, breaking change resolution, codemods, incremental migration",

@@ -3248,3 +3248,55 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 127-003: Sprint Controller İkili Spawn Prevention Testi (DONE)
 
 ---
+## Sprint 128 — sprint-128
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-09
+**Duration:** 2072s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 5 |
+| Tech Debt | 1 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 2071740ms |
+
+### Tasks
+
+- 128-001: Fix debt: Tech debt from 125-001-fix: Rubric-Based Grading sistemi sıfırdan implemente edi (DONE)
+- 128-002: Fix debt: Tech debt from 125-002-fix: Worker Question Mechanism implemented as file-based (NO_GO)
+- 128-003: Fix debt: Tech debt from 125-003-fix: Fixed NO_GO task 125-003 — deckent_explain MCP tool (GO_WITH_TECH_DEBT)
+- 128-004: Fix debt: Tech debt from 125-004-fix: All 5 documentation files synchronized with Sprint 1 (NO_GO)
+- 128-005: DEBT.md Parse Hatası Düzeltmesi + Sprint Reporter Robustness (DONE)
+- 128-006: Evaluator Tutarlılık Reformu — evaluateResult/evaluateWithRubric Birleştirme (DONE)
+- 128-007: FIX Fazı Map Mutation Doğrulaması + Tech Debt Kapatma (DONE)
+
+---
+## Sprint 129 — sprint-129
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-09
+**Duration:** 883s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 29.8% |
+| Duration | 883066ms |
+
+### Tasks
+
+- 129-001: MCP Instructions Fix + Dokümantasyon Kapsamlı Güncelleme (DONE)
+- 129-002: Decision-Engine Arşivleme + .brain/ Temizlik + ADR Yazımı (DONE)
+- 129-003: Coverage Altyapısı Doğrulama + Gerçek Ölçüm (DONE)
+
+---

@@ -1,5 +1,6 @@
 {
   "id": "security-specialist",
+  "source": "builtin",
   "name": "Security Specialist",
   "version": "0.2.0",
   "description": "OWASP Top 10, authentication, input validation, secret management, vulnerability prevention",
@@ -51,6 +52,6 @@
     "successCount": 1,
     "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-127"
+    "lastUsedInSprint": "sprint-129"
   }
 }
