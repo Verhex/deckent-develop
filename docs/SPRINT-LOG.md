@@ -3101,3 +3101,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 121-001: CLI Docker Test Dosyasi (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 122 — sprint-122
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-08
+**Duration:** 150s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 149615ms |
+
+### Tasks
+
+- 122-001: MCP Reconnect Test Dosyasi (GO_WITH_TECH_DEBT)
+
+---

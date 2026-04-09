@@ -7,3 +7,4 @@
 | debt-108-001 | Tech debt from 108-001: docs/tmux-smoke/ dizini oluşturuldu. 3 markdown dosyası | 108-001 | sprint-108 | NORMAL | 0 | true | sprint-108 | 2026-04-08T10:21:23.278Z |
 | debt-108-002 | Tech debt from 108-002: Created tests/smoke/tmux-smoke.test.ts with 3 existsSync | 108-002 | sprint-108 | NORMAL | 0 | true | sprint-108 | 2026-04-08T10:21:26.751Z |
 | debt-121-001 | Tech debt from 121-001: docs/docker-smoke/cli-test.md olusturuldu. Icerigi: '# C | 121-001 | sprint-121 | NORMAL | 0 | true | sprint-121 | 2026-04-08T15:05:41.232Z |
+| debt-122-001 | Tech debt from 122-001: docs/docker-smoke/mcp-ok.md olusturuldu. Icerik: '# MCP | 122-001 | sprint-122 | NORMAL | 0 | true | sprint-122 | 2026-04-08T15:16:55.074Z |

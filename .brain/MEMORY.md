@@ -52,3 +52,5 @@ A) CLI init config bloğuna 10 yeni alan eklendi: routing_engi
 - MCP Docker Test Dosyasi: NO_GO — Docker worker exited without writing result file
 ## Sprint sprint-121 Learnings
 - CLI Docker Test Dosyasi: GO_WITH_TECH_DEBT — docs/docker-smoke/cli-test.md olusturuldu. Icerigi: '# CLI Docker Test\nSprint 121 — Docker backend CLI ile dogrulandi.'
+## Sprint sprint-122 Learnings
+- MCP Reconnect Test Dosyasi: GO_WITH_TECH_DEBT — docs/docker-smoke/mcp-ok.md olusturuldu. Icerik: '# MCP Docker OK\nSprint 122 — Docker backend MCP reconnect sonrasi dog

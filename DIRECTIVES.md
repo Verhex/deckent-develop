@@ -1,25 +1,25 @@
-# DIRECTIVES — Sprint 121: Docker CLI E2E Test
+# DIRECTIVES — Sprint 122: Docker MCP Reconnect Test
 
-## Goal: Docker spawn backend CLI uzerinden end-to-end dogrulama.
+## Goal: MCP reconnect sonrasi Docker backend fix dogrulamasi.
 
 ---
 
-## Task 1: CLI Docker Test Dosyasi
+## Task 1: MCP Reconnect Test Dosyasi
 - Model: sonnet
 - Effort: low
 - Skills: documentation-writer
-- Files: docs/docker-smoke/cli-test.md
+- Files: docs/docker-smoke/mcp-ok.md
 - Scope: docs/docker-smoke/
 
 ### Description
-docs/docker-smoke/cli-test.md dosyasi olustur. Icerigi:
+docs/docker-smoke/mcp-ok.md dosyasi olustur. Icerigi:
 
-"# CLI Docker Test\nSprint 121 — Docker backend CLI ile dogrulandi."
+"# MCP Docker OK\nSprint 122 — Docker backend MCP reconnect sonrasi dogrulandi."
 
-**Kanit:** `ls docs/docker-smoke/cli-test.md`
+**Kanit:** `ls docs/docker-smoke/mcp-ok.md`
 **Test:** Dosya var
 
 ---
 
 ## Quality Rules
-- docs/docker-smoke/cli-test.md olmali
+- docs/docker-smoke/mcp-ok.md olmali
