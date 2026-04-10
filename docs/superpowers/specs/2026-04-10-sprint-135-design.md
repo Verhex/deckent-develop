@@ -172,10 +172,10 @@ Tüm task'lar performance mode, opus default. DIRECTIVES yazımında aynen kulla
 
 #### T-013: Brain Memory Budget Enforcement + Config Sync
 - **Agent:** architect · **Effort:** normal · **Skills:** typescript-expert, system-architect
-- **Files:** `src/orchestra/decay.ts`, `src/core/config.ts`, `.deckent/config.json`
+- **Files:** `src/orchestra/debt-manager.ts` (runDecay lives here), `src/core/config.ts`, `.deckent/config.json`
 - **Scope:** `src/orchestra/`, `src/core/`, `.deckent/`
 - **Description:** Pre-flight canlı kanıtı: decay no-op (1179→1179) çünkü DECISIONS.md (702 permanent) budget içinde sayılıyor ama decay edilmiyor. Fix: (a) `DECAY_EXEMPT = ['DECISIONS.md','PROJECT-IDENTITY.md']`, budget accounting "decayable only", (b) config memory_budget 600→900 sync, (c) `finalizeSprint()` auto-trigger decay when over. Meta-dogfood canlı.
-- **Kanıt:** `grep -n "DECAY_EXEMPT\|memory_budget" src/orchestra/decay.ts src/core/config.ts && grep "memory_budget" .deckent/config.json` → 900
+- **Kanıt:** `grep -n "DECAY_EXEMPT\|memory_budget" src/orchestra/debt-manager.ts src/core/config.ts && grep "memory_budget" .deckent/config.json` → 900
 - **Test:** 5+ — (1) decay excludes DECISIONS.md, (2) decay excludes PROJECT-IDENTITY.md, (3) decay reduces MEMORY.md when over, (4) config loads 900 default, (5) finalizeSprint auto-trigger when over
 
 ### Dependency Graph
