@@ -8,7 +8,10 @@ import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import type { Task, TaskResult, Sprint, ResolvedConfig } from './types.js';
 import { scanPlugins } from './plugin.js';
+import { PluginSecurityError } from './plugin.js';
 import type { Plugin } from './plugin.js';
+import { validatePluginSecurity } from './plugin-loader.js';
+import type { PluginSecurityConfig } from './plugin-loader.js';
 import { detectFullStack } from './stack-detector.js';
 import { debugLog } from './utils.js';
 
@@ -156,12 +159,34 @@ export async function loadHookModule(
 /**
  * Register hooks from a single plugin's manifest.
  * For each hook declared in manifest.hooks, loads the module and registers the callback.
+ * When securityConfig is provided, runs sandbox scan + signature verification before loading.
  * Non-fatal — loading failures are logged and skipped.
  * @internal
  */
-export async function registerPluginHooks(plugin: Plugin): Promise<number> {
+export async function registerPluginHooks(
+  plugin: Plugin,
+  securityConfig?: PluginSecurityConfig,
+): Promise<number> {
   const hooks = plugin.manifest.hooks;
   if (!hooks) return 0;
+
+  // Security validation gate — if config provided, validate before loading any hooks
+  if (securityConfig) {
+    const secResult = validatePluginSecurity(plugin, securityConfig);
+
+    // Emit warnings to stderr (non-fatal)
+    for (const warning of secResult.warnings) {
+      process.stderr.write(`[plugin-hooks] ${warning}\n`);
+    }
+
+    // If not allowed, reject the plugin entirely
+    if (!secResult.allowed) {
+      const errorMsg = secResult.errors.join('; ');
+      throw new PluginSecurityError(
+        `Plugin "${plugin.manifest.name}" rejected: ${errorMsg}`
+      );
+    }
+  }
 
   let registered = 0;
   for (const hookName of VALID_HOOK_NAMES) {
@@ -181,18 +206,30 @@ export async function registerPluginHooks(plugin: Plugin): Promise<number> {
  * Scan .deckent/plugins/ for enabled plugins, load their hook modules, and register
  * all declared hooks. Clears any previously registered hooks first.
  *
+ * When `options.plugin_require_signature` is true, plugins without a valid SHA-256
+ * signature are rejected. When false (default), unsigned plugins emit a warning.
+ *
  * Non-fatal: individual plugin/hook loading failures are logged to stderr.
  * Returns the total number of hooks registered.
  */
-export async function loadPluginHooks(projectRoot: string): Promise<number> {
+export async function loadPluginHooks(
+  projectRoot: string,
+  options?: { plugin_require_signature?: boolean },
+): Promise<number> {
   clearHooks();
   const plugins = scanPlugins(projectRoot);
   if (plugins.length === 0) return 0;
 
+  // Security config is only created when explicitly requested via options.
+  // This preserves backwards-compat: existing callers without options get no sandbox scan.
+  const securityConfig: PluginSecurityConfig | undefined = options
+    ? { require_signature: options.plugin_require_signature ?? false, projectRoot }
+    : undefined;
+
   let totalRegistered = 0;
   for (const plugin of plugins) {
     try {
-      const count = await registerPluginHooks(plugin);
+      const count = await registerPluginHooks(plugin, securityConfig);
       totalRegistered += count;
     } catch (err) {
       // Non-fatal — log and continue with next plugin

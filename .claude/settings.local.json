@@ -156,7 +156,13 @@
       "Bash(awk '{print $1, $2}')",
       "Bash(awk '$1 > 1500 {count++} END {print \"Files >1500 lines:\", count}')",
       "mcp__deckent__deckent_config",
-      "Bash(stat -c '%Y %n' /home/alperen/deckent-dev/.tasks/*.hb)"
+      "Bash(stat -c '%Y %n' /home/alperen/deckent-dev/.tasks/*.hb)",
+      "Bash(mkdir -p /tmp/sprint-133-monitor)",
+      "Bash(chmod +x /tmp/sprint-133-monitor/watchdog.sh)",
+      "Bash(nohup /tmp/sprint-133-monitor/watchdog.sh)",
+      "Bash(echo \"Watchdog PID: $!\")",
+      "Bash(kill 218393)",
+      "Bash(echo \"=== tsc exit: $? ===\")"
     ]
   },
   "outputStyle": "Explanatory"

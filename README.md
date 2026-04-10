@@ -99,20 +99,25 @@ Deckent follows a three-step cycle:
 
 ## Comparison
 
-| Feature | deckent | Cursor | Devin | Aider | Claude Code (solo) |
-|---------|---------|--------|-------|-------|-------------------|
-| Multi-agent parallel execution | Yes (up to 10 workers) | No | Yes | No | No |
-| Sprint lifecycle management | Yes | No | Partial | No | No |
-| Automatic task planning from goals | Yes (AI + structured) | No | Yes | No | No |
-| Quality auditor with boundary enforcement | Yes | No | No | No | No |
-| Memory and learning across sprints | Yes | No | Partial | No | No |
-| GO/NO-GO evaluation per task | Yes | No | No | No | No |
-| Open source | Yes (MIT) | No | No | Yes | Partial |
-| MCP integration | Yes (21 tools) | N/A | N/A | N/A | N/A |
-| Web dashboard | Yes | Built-in | Built-in | No | No |
-| Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No |
-| Works offline (local models) | Planned | Yes | No | Yes | No |
-| Heartbeat / proactive tasks | Yes | No | No | No | No |
+> April 2026 — see [full competitive analysis](docs/analysis/competitive-analysis.md) for detailed head-to-head breakdowns.
+
+| Feature | deckent | Cursor Agents | Devin | OpenHands | Copilot Cowork | OpenClaw |
+|---------|---------|--------------|-------|-----------|----------------|---------|
+| Multi-agent parallel execution | Yes (up to 10 workers) | Limited | Yes | Yes | No | Yes (100+ AgentSkill) |
+| Sprint lifecycle management | Yes (8-phase) | No | Partial | No | No | No |
+| Automatic task planning from goals | Yes (AI + structured) | No | Yes | Partial | No | No |
+| Quality auditor with boundary enforcement | Yes | No | No | No | No | No |
+| Memory and learning across sprints | Yes (native) | No | No | No | No | 3rd party (Mem0/Cognee) |
+| GO/NO-GO evaluation per task | Yes | No | No | No | No | No |
+| Open source | Yes (MIT) | No | No | Yes (OSS) | No | Yes (OSS) |
+| MCP integration | Yes (21 tools, 8 resources) | Partial | No | No | No | Limited |
+| Web dashboard | Yes (6 pages) | Built-in | Built-in | No | No | No |
+| Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No | Limited |
+| Built-in agents | 16 | — | — | Registry | — | 100+ |
+| Built-in skills | 21 | — | — | — | — | 13K+ (hub) |
+| Test coverage | 89.33% | — | — | — | — | — |
+| Heartbeat / proactive tasks | Yes | No | No | No | No | No |
+| Price | Free (MIT) | $20-40/mo | $20-500/mo | Free | $19-39/mo | Free |
 
 ---
 
@@ -281,7 +286,7 @@ Output:
 | `deckent explain <topic>` | Explain a concept or command |
 | `deckent quick-start` | Quick-start wizard for new projects |
 | `deckent skill` | List or manage installed skills |
-| `deckent skill-marketplace` | Browse and install skills from marketplace |
+| `deckent skill-marketplace` | [EXPERIMENTAL] Browse and install skills from marketplace |
 | `deckent agent` | Manage agent pool (list, inspect, reset) |
 | `deckent review` | Review last sprint results |
 | `deckent config migrate` | Migrate config to latest schema version |

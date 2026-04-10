@@ -258,6 +258,232 @@ MCP-only komutlar yoktur — tüm MCP araçlarının CLI karşılığı mevcuttu
 
 **Status:** ACCEPTED (Sprint 130)
 
+## ADR-029: Managed-Docs Universalization — Sprint Lifecycle Template-Based Document Generation
+
+**Status:** ACCEPTED (Sprint 131)
+
+**Context:**
+Önceki sprintlerde `sprint-reporter.ts` içindeki `updateProjectDocs()` fonksiyonu yalnızca hard-coded dokümanlara (CLAUDE.md, IDENTITY.md, README.md gibi) güncelleme yapabiliyordu. Kullanıcı kendi dokümanlarını (ARCHITECTURE.md, ONBOARDING.md, KPI dashboards) sprint döngüsüne dahil etmek istediğinde doğrudan `sprint-reporter.ts` kodunu değiştirmek zorunda kalıyordu. Bu durum:
+- Kullanıcı konfigürasyonunu kaynak koduyla karıştırıyordu (separation of concerns ihlali)
+- Her sprint sonrasında kullanıcı dokümanları stale kalıyordu
+- Multi-language (TR/EN) proje dokümanları için tutarsız içerik üretiliyordu
+- Plugin sistemi yok — yeni bölüm türü eklemek kaynak kodu değişikliği gerektiriyordu
+
+Deckent'in hedef vizyonu "sprint lifecycle'ı herhangi bir proje türüne uygulayabilme" iken, doküman sistemi TypeScript mono-repo'ya hard-coded kalmıştı.
+
+**Decision:**
+`src/orchestra/managed-docs/` modül paketi oluşturuldu. Sprint finalizasyonunda `updateProjectDocs()` built-in updater'lardan sonra `runManagedDocUpdates()` çağırır. Sistem şu bileşenlerden oluşur:
+
+1. **`.deckent/docs.json` konfigürasyon şeması** — `ManagedDocEntry` arayüzü: `path`, `autoSections`, `protectedSections`, `skills`, `maxLines`, `templates` alanları. Kullanıcı hangi dosyanın hangi bölümlerinin otomatik güncelleneceğini bildirir.
+2. **`SectionGenerator` arayüzü** — `{ id, patterns, patternsByLang, generate(ctx) }`. Her generator bir bölüm başlığı deseni eşleştirir ve `DocUpdateContext`'ten markdown içeriği üretir.
+3. **`content-generators.ts`** — 8 built-in generator: sprint-metrics, active-debt, sprint-history, agent-performance, changelog, test-coverage, module-map, dependencies. Generator registry runtime-extensible.
+4. **`section-updater.ts`** — Mevcut dosyayı parse eder, sadece `autoSections` bölümlerini değiştirir, `protectedSections` ve kullanıcı içeriğini korur.
+5. **`managed-doc-runner.ts`** — Orchestration: config okuma → user generator yükleme → cache kontrol → içerik üretimi → bölüm güncelleme → cache yazma.
+
+Yeni doküman eklemek sıfır kaynak kodu değişikliği gerektirir — sadece `.deckent/docs.json` düzenlemesi yeterlidir.
+
+**Consequences (+):**
+- Kullanıcı herhangi bir markdown dokümanı sprint döngüsüne dahil edebilir
+- `protectedSections` ile el ile yazılan bölümler hiç dokunulmaz
+- `autoSections` match case-insensitive ve kısmi eşleşme destekler (TR/EN başlıkları)
+- `templates` alanıyla built-in generator olmayan bölümler için `{{placeholder}}` syntax ile custom içerik tanımlanabilir
+- `maxLines` ile uzun otomatik bölümler kırpılır
+
+**Consequences (-):**
+- `.deckent/docs.json` yoksa sistem hiçbir şey yapmaz — opt-in
+- Büyük projelerde onlarca doküman için sprint bitişinde ek I/O yükü
+- `section-updater.ts` markdown heading parse'ı stdlib yokluğundan regex-based — edge case'ler mümkün
+
+**Alternatives Considered:**
+- Hard-coded `sprint-reporter.ts` güncellemeleri — ölçeklenmez, kullanıcı özelleştirme yok, her yeni bölüm tipi kaynak kodu değişikliği gerektirir
+- Harici template engine (Handlebars, Mustache) — runtime dependency, format vendor lock-in, ADR-010 minimal-dependency politikasıyla çelişir
+- Ayrı CLI komutu (`deckent docs run`) — sprint döngüsüne entegre değil, kullanıcıların her seferinde manuel çağırması gerekir, tutarsız state riski
+- Git-based template merge (patch stratejisi) — conflict resolution kompleks, merge çakışmaları kullanıcı deneyimini bozar
+
+**Migration Impact:**
+Mevcut projeler `.deckent/docs.json` oluşturmadan bu sistemi kullanmaz — backward-compat sağlanmıştır. İlk kez etkinleştirmek için `deckent docs add <path>` komutu veya dosyayı manuel oluşturmak yeterlidir.
+
+**References:**
+- Sprint 131 commit: `e1da3c7` — feat: Sprint 131 — Managed Docs Universalization
+- Kaynak: `src/orchestra/managed-docs/managed-doc-runner.ts`, `types.ts`, `docs-config.ts`
+- Entegrasyon noktası: `src/orchestra/sprint-reporter.ts` → `updateProjectDocs()` → `runManagedDocUpdates()`
+
+---
+
+## ADR-030: Template Engine + Plugin Loader — Managed-Docs Render Pipeline
+
+**Status:** ACCEPTED (Sprint 131)
+
+**Context:**
+Managed-Docs sistemi built-in `SectionGenerator`'ları sprint context'inden markdown üretir. Ancak bazı kullanıcılar:
+- TypeScript yazmadan özel bölüm içeriği oluşturmak istiyor
+- Proje-spesifik metrikler üretmek için kendi JavaScript mantığını çalıştırmak istiyor
+- Farklı dillerdeki bölüm başlıkları için aynı generator'ı kullanmak istiyor
+
+Built-in generator sistemi genişletilemez yapıda kalırsa, her yeni section türü `content-generators.ts` kaynak kodu değişikliği gerektirir.
+
+**Decision:**
+İki katmanlı extensibility sistemi tasarlandı:
+
+**Katman 1: Template Renderer (`template-renderer.ts`)**
+- `{{path.to.value}}` placeholder syntax — `DocUpdateContext`'e karşı çözümlenir
+- `buildTemplateScope()` — sprint result, config, metrikler, agent/skill sayıları, paket versiyonu gibi standart değerleri scope'a ekler
+- `resolvePath()` — nokta-ayrılmış yol üzerinden nested nesne/Map erişimi
+- `renderTemplate()` — regex replace, unresolved placeholder → boş string (non-fatal)
+- Konfigürasyon-level: `ManagedDocEntry.templates: Record<sectionTitle, templateString>`
+
+**Katman 2: Plugin Loader (`plugin-loader.ts`)**
+- `.deckent/generators/` dizininden kullanıcı generator'ları yüklenir
+- **Format A — Declarative JSON** (`.json` uzantısı): `{ id, patterns, patternsByLang, template }` — güvenli, kod çalıştırmaz, `renderTemplate()` ile işlenir
+- **Format B — Executable MJS** (`.mjs` uzantısı): `default export` olarak `SectionGenerator` — `loadUserGeneratorsAsync()` ile dinamik import, sprint pipeline'da *varsayılan olarak* çalışmaz (`--with-plugins` flag gerekir)
+- User generator'lar built-in generator'lardan **önce** denenir (override semantiği)
+
+Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak sprint içinde çalışır; MJS generator'lar ise ayrı `loadUserGeneratorsAsync()` çağrısı gerektirir ve yalnızca güvenilen kaynaklardan yüklenmelidir.
+
+**Consequences (+):**
+- Template syntax öğrenme eğrisi düşük — `{{metrics.coveragePercent}}%` yeterli
+- JSON format code review kolaylığı ve static analysis uyumluluğu sağlar
+- MJS format güçlü extensibility (herhangi bir hesaplama yapılabilir)
+- User generator'lar built-in'leri override edebilir — proje-spesifik davranış mümkün
+
+**Consequences (-):**
+- MJS generator'lar için güvenlik modeli geliştirilmemiş — keyfi kod çalıştırma riski
+- `buildTemplateScope()` context-snapshot; generator çalışırken yeni değerler scope'a giremez
+- `renderTemplate()` hata toleransı (unresolved → empty string) sessiz hataları gizleyebilir
+
+**Alternatives Considered:**
+- Sadece built-in generator'lar — extensibility yok, her özelleştirme PR gerektirir
+- Tam template engine (Nunjucks, EJS) — ağır bağımlılık, XSS riski context-injection'da
+- WebAssembly sandbox'lı plugin'ler — aşırı karmaşıklık, current requirements ötesinde
+
+**References:**
+- Sprint 131 commit: `e1da3c7`
+- Kaynak: `src/orchestra/managed-docs/template-renderer.ts`, `plugin-loader.ts`
+- Güvenlik notu: MJS loader gelecekte `src/core/plugin-loader.ts` SkillSandbox entegrasyonuyla güçlendirilebilir (Sprint 133 Task 1)
+
+---
+
+## ADR-031: Content Hash Cache — Sprint Dokümanları Hash-Based Invalidation
+
+**Status:** ACCEPTED (Sprint 131)
+
+**Context:**
+`runManagedDocUpdates()` her sprint bitişinde tüm konfigüre edilmiş dokümanlar için içerik üretimi çalıştırır. Büyük projelerde:
+- 10+ managed doküman, her biri için built-in generator chain çalışır
+- `readdirSync`, `readFileSync`, `JSON.parse` → her doküman için disk I/O
+- AgentPoolManager, SkillPoolManager, modelRegistry instantiation → her bölüm üretiminde
+
+Eğer sprint aralarında doküman içeriği ve konfigürasyon değişmediyse (örn. hotfix sprint — yalnızca küçük bug düzeltmeleri), tüm bu işlem gereksizdir.
+
+Sprint 132 audit'i sync I/O'yu 799 kaynak satırda tespit etti. Cache olmaksızın managed-docs bu sayıyı her sprint'te anlamlı ölçüde artırır.
+
+**Decision:**
+**Dual-key SHA-1 cache** tasarlandı (`doc-cache.ts`):
+
+- **Cache dosyası:** `.deckent/cache/managed-docs-cache.json` — `Record<docId, { entryHash, fileHash, updatedAt }>`
+- **`entryHash`:** `ManagedDocEntry`'nin `autoSections + templates + protectedSections + maxLines` alanlarının JSON serialization hash'i — konfigürasyon değişikliklerini tespit eder
+- **`fileHash`:** Hedef dosyanın mevcut içeriğinin hash'i — dışarıdan yapılan değişiklikleri (manuel düzenleme, başka araç) tespit eder
+- **`contentHash(input)`:** `node:crypto` SHA-1, 40 hex karakter — çarpışma-güvenli yerel cache invalidation için yeterli
+- **Cache skip mantığı:** `cached.entryHash === entryHash && cached.fileHash === fileHash` → `reason: 'cached_no_change'`, generator çalışmaz
+- **Cache yenileme:** Doküman güncellendikten sonra yeni `fileHash` yazılır; hiç değişmese bile `updatedAt` güncellenir
+- **Cache temizleme:** `clearDocCache()` → CLI `docs run --no-cache` tarafından çağrılır
+
+**Consequences (+):**
+- Değişmeyen dokümanlar için sıfır I/O — repeated sprint'lerde anlamlı hız farkı
+- Cache dosyası küçük (doküman başına ~100 byte JSON), `.gitignore`'a eklenebilir
+- İki ayrı key sayesinde konfigürasyon değişikliği veya dosya değişikliği ikisi de ayrı ayrı invalidation tetikler
+- `--no-cache` escape hatch ile kullanıcı her zaman tam yenileme yapabilir
+
+**Consequences (-):**
+- SHA-1 artık kriptografik güvenlik için önerilmez — ancak burada yalnızca cache invalidation için kullanılıyor, güvenlik riski yok
+- Cache dosyası stale olabilir (örn. generator mantığı kaynak kodda değiştiğinde) — major version bump'ta `clearDocCache()` çağrılmalı
+- `node:crypto` ek I/O — ancak tek `createHash` çağrısı generator chain I/O'sunu geçemez
+
+**Alternatives Considered:**
+- mtime-based invalidation — symlink ve cross-filesystem mount'larda güvenilmez; WSL2 üzerinde mtime'lar zaman zaman tutarsız davranır
+- MD5 hash — SHA-1 kadar hızlı, ancak SHA-1 Node.js `crypto` built-in API'de standart ve daha yaygın kabul görür
+- In-memory cache (process lifetime) — Sprint restart'larında ve yeni terminal session'larında korunmaz; uzun-süren sprint'lerde tutarlı ama genel çözüm değil
+- No cache — her sprint'te gereksiz I/O (rejected, Sprint 132 audit bulgusu: 799 sync I/O hot path)
+- File watcher (fs.watch) — event-driven invalidation gereksiz karmaşıklık, doküman sayısı az, polling yeterli
+
+**Cache Key Design Rationale:**
+Dual-key (entryHash + fileHash) tasarımı şu senaryoları bağımsız olarak ele alır:
+- Sadece konfigürasyon değişti (yeni autoSection eklendi) → entryHash değişir, rebuild gerekir
+- Sadece dosya değişti (kullanıcı manual düzenledi) → fileHash değişir, rebuild gerekir
+- İkisi de değişmedi → cache hit, rebuild atlanır
+Tek-key (yalnızca fileHash) konfigürasyon değişikliklerini gözden kaçırırdı.
+
+**References:**
+- Sprint 131 commit: `e1da3c7`
+- Kaynak: `src/orchestra/managed-docs/doc-cache.ts`, `managed-doc-runner.ts:60-71`
+- İlgili: Sprint 132 Task 4 (loadConfig module-level cache) — benzer dual-key pattern, aynı motivasyon
+
+---
+
+## ADR-032: i18n Pattern System — TR/EN İçerik Çeşitliliği Desteği
+
+**Status:** ACCEPTED (Sprint 131)
+
+**Context:**
+Deckent TR ve EN kullanıcı tabanına sahip. Sprint 131 öncesinde:
+- `content-generators.ts` built-in generator'ları yalnızca İngilizce başlık desenleri eşleştiriyordu
+- Türkçe dokümanlar (`## Sprint Metrikleri`, `## Agent Performansı`) için generator match yoktu
+- Sabit string'ler (tablo başlıkları, hata mesajları) EN-only hard-coded
+- Kullanıcı Türkçe bölüm başlığı kullandığında generator hiç çalışmıyor, bölüm boş kalıyordu
+
+Sprint 092'de `Dashboard i18n` implementasyonu (React tarafı) yapılmıştı; ancak server-side doküman üretim sistemi dil-agnostik hale getirilmemişti.
+
+**Decision:**
+İki katmanlı i18n stratejisi:
+
+**Katman 1: `patternsByLang` — Dil-Spesifik Başlık Eşleştirme**
+`SectionGenerator` arayüzüne `patternsByLang?: Record<string, string[]>` eklendi:
+```typescript
+{
+  patterns: ['sprint metrics', 'metrics'],
+  patternsByLang: {
+    tr: ['sprint metrikleri', 'metrikler', 'sprint istatistikleri'],
+    de: ['sprint-metriken', 'metriken'],
+    es: ['métricas', 'estadísticas del sprint'],
+  }
+}
+```
+`findGenerator()` hem `patterns` hem tüm `patternsByLang` değerlerini birleştirerek arar. Konfigürasyon dil anahtarı kullanılmaz — tüm diller her zaman aranır (language-agnostic match). Bu yaklaşım mixed-language dokümanları da destekler.
+
+**Katman 2: `I18nStrings` — Üretilen İçerik Lokalizasyonu**
+`content-generators.ts` içinde:
+- `I18nStrings` interface — tablo başlıkları, durum mesajları, hata string'leri
+- `EN` ve `TR` sabit objeleri — compile-time derleme, runtime yük yok
+- `i18n(ctx)` helper — `ctx.config?.language === 'tr' ? TR : EN` — EN default
+- Her built-in generator `i18n(ctx)` çağırır: `const s = i18n(ctx)` → `| ${s.metric} | ${s.value} |`
+
+Dil konfigürasyonu: `.deckent/config.json`'da `"language": "tr"` veya `"en"`. `buildStandaloneDocContext()` config.json'dan okur, sprint pipeline'da `ctx.config.language` üzerinden taşınır.
+
+**Consequences (+):**
+- Tüm built-in generator'lar TR ve EN çıktı üretir — zero configuration
+- `patternsByLang` ile DE, ES, FR gibi yeni diller ekleme kolaylığı — tek obje değişikliği
+- User-defined JSON generator'lar da `patternsByLang` kullanabilir — tam extensibility
+- Mixed-language dokümanlarda hem Türkçe hem İngilizce başlıklar eşleşir
+
+**Consequences (-):**
+- Yalnızca TR ve EN tam string tablosu — DE/ES/FR için `patternsByLang` match yapar ama içerik EN çıkar
+- `i18n()` helper context-based, statik — runtime dil değişimi desteklenmiyor (sprint restart gerektirir)
+- Yeni built-in string eklemek hem `EN` hem `TR` objelerini güncellemeyi gerektirir — senkronizasyon riski
+
+**Alternatives Considered:**
+- ICU message format (i18next, formatjs) — ağır bağımlılık, Deckent minimal-dependency politikasıyla çelişir (ADR-010)
+- Harici `.json` locale dosyaları — runtime file I/O, deployment karmaşıklığı
+- Yalnızca İngilizce — TR kullanıcı deneyimini kırar, Deckent TR-first tasarım vizyonuyla çelişir
+- Enum-based dil anahtarı yerine string — `'tr' | 'en'` union type daha iyi tip güvenliği sağlardı (gelecek iyileştirme)
+
+**References:**
+- Sprint 131 commit: `e1da3c7`
+- Kaynak: `src/orchestra/managed-docs/content-generators.ts:15-66` (I18nStrings, EN, TR, i18n)
+- Kaynak: `src/orchestra/managed-docs/types.ts:64-65` (patternsByLang field)
+- İlgili: Sprint 092 Dashboard i18n (React tarafı), Sprint 084 i18n kapsam genişletmesi
+
+---
+
 ## NOTE: Büyük Dosya Split Analizi (Sprint 130)
 
 - sprint-controller.ts (2133 satır) — Split önerisi: sprint-lifecycle.ts (faz yönetimi) + sprint-orchestrator.ts (worker koordinasyonu)

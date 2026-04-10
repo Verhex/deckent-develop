@@ -10,6 +10,7 @@ import {
   MODE_ALIASES,
   resolveMode,
   VALID_PROVIDERS,
+  clearConfigCache,
 } from '../../src/core/config.js';
 import type { SystemProfile, PlanMode } from '../../src/core/types.js';
 import { DEFAULT_MODE } from '../../src/core/constants.js';
@@ -17,6 +18,7 @@ import { DEFAULT_MODE } from '../../src/core/constants.js';
 // Mock fs modules
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
+  statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -32,6 +34,7 @@ const mockedReadFile = vi.mocked(readFile);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearConfigCache();
   mockedExistsSync.mockReturnValue(false);
 });
 

@@ -1,5 +1,5 @@
 import { writeFile, mkdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import {
   PROJECT_CONFIG_PATH,
@@ -377,6 +377,32 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
   return readJsonSafeAsync<T>(filePath);
 }
 
+// ─── Config Cache ───────────────────────────────────────────────────
+let cachedConfig: ResolvedConfig | null = null;
+let cacheStamp: number = 0;
+let cachedProjectRoot: string | null = null;
+
+/**
+ * Clear the module-level config cache. Useful for testing.
+ */
+export function clearConfigCache(): void {
+  cachedConfig = null;
+  cacheStamp = 0;
+  cachedProjectRoot = null;
+}
+
+/**
+ * Get the mtime of the project config file, or 0 if the file does not exist.
+ */
+function getConfigMtime(projectRoot: string): number {
+  const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
+  try {
+    return statSync(configPath).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
@@ -469,12 +495,29 @@ export function getDefaultModes(): Record<string, PlanModeConfig> {
 /**
  * Load and resolve the full configuration by merging defaults, global config,
  * and project-level config. Resolves mode aliases and validates the result.
+ *
+ * Results are cached at module level. Cache is invalidated when:
+ * - `options.force` is true
+ * - The project config file mtime has changed
+ * - `DECKENT_CONFIG_RELOAD=1` environment variable is set
+ * - A different `projectRoot` is requested
+ *
  * @param projectRoot - Project root directory; defaults to process.cwd()
+ * @param options - Optional: `{ force: true }` to bypass cache
  * @returns Fully resolved configuration ready for use
  * @throws {ConfigValidationError} When merged config fails validation or API key is missing
  */
-export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> {
+export async function loadConfig(projectRoot?: string, options?: { force?: boolean }): Promise<ResolvedConfig> {
   const root = resolve(projectRoot ?? process.cwd());
+
+  // ─── Cache check ────────────────────────────────────────────────────
+  const forceReload = options?.force === true || process.env['DECKENT_CONFIG_RELOAD'] === '1';
+  if (!forceReload && cachedConfig !== null && cachedProjectRoot === root) {
+    const currentMtime = getConfigMtime(root);
+    if (currentMtime === cacheStamp) {
+      return cachedConfig;
+    }
+  }
 
   let config = createDefaultConfig();
 
@@ -570,7 +613,7 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     }
   }
 
-  return {
+  const resolved: ResolvedConfig = {
     mode: config.mode,
     activeModeConfig,
     modes: config.modes,
@@ -623,6 +666,13 @@ export async function loadConfig(projectRoot?: string): Promise<ResolvedConfig> 
     // AI planner timeout
     ai_planner_timeout: config.ai_planner_timeout,
   };
+
+  // ─── Update cache ───────────────────────────────────────────────────
+  cachedConfig = resolved;
+  cacheStamp = getConfigMtime(root);
+  cachedProjectRoot = root;
+
+  return resolved;
 }
 
 /**

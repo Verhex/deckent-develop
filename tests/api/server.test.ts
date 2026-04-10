@@ -1433,7 +1433,7 @@ describe('createHttpServer', () => {
       const calls = stderrSpy.mock.calls.map((c) => String(c[0]));
       const warnCall = calls.find((s) => s.includes('[deckent:warn]'));
       expect(warnCall).toContain('DECKENT_API_TOKEN');
-      expect(warnCall).toContain('config.api_token');
+      expect(warnCall).toContain('config.api_auth_token');
     });
   });
 });
@@ -1589,7 +1589,7 @@ describe('Bearer token timing-safe auth (checkAuth)', () => {
     await new Promise<void>((r) => api.server.once('listening', r));
 
     const res = await requestWithAuth(api, 'Bearer wrong-token-xyz');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 
   it('rejects missing Authorization header', async () => {
@@ -1605,9 +1605,9 @@ describe('Bearer token timing-safe auth (checkAuth)', () => {
     api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'a-very-long-token-that-exceeds-short-one' });
     await new Promise<void>((r) => api.server.once('listening', r));
 
-    // Provide a much shorter token — should return 401, not throw
+    // Provide a much shorter token — should return 403, not throw
     const res = await requestWithAuth(api, 'Bearer short');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 
   it('handles longer-than-expected token without crashing', async () => {
@@ -1615,7 +1615,7 @@ describe('Bearer token timing-safe auth (checkAuth)', () => {
     await new Promise<void>((r) => api.server.once('listening', r));
 
     const res = await requestWithAuth(api, 'Bearer this-is-a-very-long-token-that-is-much-longer-than-tok');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 
   it('rejects wrong Bearer scheme (Basic instead of Bearer)', async () => {

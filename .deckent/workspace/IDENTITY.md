@@ -21,11 +21,11 @@ Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-132 |
+| Sprint | sprint-133 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
 | Dashboard Pages | 6 |
-| Agents | 16 built-in |
+| Agents | 16 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |

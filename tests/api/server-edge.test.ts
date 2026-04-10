@@ -152,16 +152,16 @@ describe('checkAuth edge cases', () => {
     api = await startServer({ apiToken: 'my-secret-token' });
     const res = await makeRequest(api, '/api/start', { method: 'POST', body: {} });
     expect(res.status).toBe(401);
-    expect(JSON.parse(res.body).error).toContain('Unauthorized');
+    expect(JSON.parse(res.body).error).toContain('authentication required');
   });
 
-  it('returns 401 when wrong token value is supplied', async () => {
+  it('returns 403 when wrong token value is supplied', async () => {
     api = await startServer({ apiToken: 'correct-token' });
     const res = await makeRequest(api, '/api/start', {
       method: 'POST', body: {},
       headers: { Authorization: 'Bearer wrong-token' },
     });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 
   it('returns 401 when auth scheme is Basic instead of Bearer', async () => {
@@ -200,10 +200,16 @@ describe('checkAuth edge cases', () => {
     expect(res.status).toBe(202);
   });
 
-  it('GET routes do not require auth even when token is set', async () => {
+  it('GET routes require auth when token is set', async () => {
     api = await startServer({ apiToken: 'secret' });
+    // Without token → 401
     const res = await makeRequest(api, '/api/history');
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
+    // With correct token → 200
+    const res2 = await makeRequest(api, '/api/history', {
+      headers: { Authorization: 'Bearer secret' },
+    });
+    expect(res2.status).toBe(200);
   });
 });
 
@@ -533,8 +539,7 @@ describe('Error response edge cases', () => {
     expect(res.status).toBe(401);
     const body = JSON.parse(res.body);
     expect(body).toHaveProperty('error');
-    expect(body.error).toContain('Unauthorized');
-    expect(body.error).toContain('Bearer');
+    expect(body.error).toBe('authentication required');
   });
 
   it('returns 404 for completely unknown route', async () => {

@@ -101,20 +101,25 @@ Deckent üç adımlı bir döngü izler:
 
 ## Karşılaştırma
 
-| Özellik | deckent | Cursor | Devin | Aider | Claude Code (tek başına) |
-|---------|---------|--------|-------|-------|--------------------------|
-| Çoklu agent paralel çalıştırma | Evet (10 worker'a kadar) | Hayır | Evet | Hayır | Hayır |
-| Sprint yaşam döngüsü yönetimi | Evet | Hayır | Kısmi | Hayır | Hayır |
-| Hedeflerden otomatik görev planlama | Evet (AI + structured) | Hayır | Evet | Hayır | Hayır |
-| Sınır denetimli kalite auditor | Evet | Hayır | Hayır | Hayır | Hayır |
-| Sprint'ler arası bellek ve öğrenme | Evet | Hayır | Kısmi | Hayır | Hayır |
-| Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır |
-| Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet | Kısmi |
-| MCP entegrasyonu | Evet (21 tool) | Yok | Yok | Yok | Yok |
-| Web dashboard | Evet | Yerleşik | Yerleşik | Hayır | Hayır |
-| Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır |
-| Çevrimdışı çalışma (yerel modeller) | Planlı | Evet | Hayır | Evet | Hayır |
-| Heartbeat / proaktif görevler | Evet | Hayır | Hayır | Hayır | Hayır |
+> Nisan 2026 — ayrıntılı karşılaştırma için [tam rekabet analizi](docs/analysis/competitive-analysis.md) sayfasına bakın.
+
+| Özellik | deckent | Cursor Agents | Devin | OpenHands | Copilot Cowork | OpenClaw |
+|---------|---------|--------------|-------|-----------|----------------|---------|
+| Çoklu agent paralel çalıştırma | Evet (10 worker'a kadar) | Sınırlı | Evet | Evet | Hayır | Evet (100+ AgentSkill) |
+| Sprint yaşam döngüsü yönetimi | Evet (8 faz) | Hayır | Kısmi | Hayır | Hayır | Hayır |
+| Hedeflerden otomatik görev planlama | Evet (AI + structured) | Hayır | Evet | Kısmi | Hayır | Hayır |
+| Sınır denetimli kalite auditor | Evet | Hayır | Hayır | Hayır | Hayır | Hayır |
+| Sprint'ler arası bellek ve öğrenme | Evet (native) | Hayır | Hayır | Hayır | Hayır | 3rd party (Mem0/Cognee) |
+| Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır | Hayır |
+| Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet (OSS) | Hayır | Evet (OSS) |
+| MCP entegrasyonu | Evet (21 tool, 8 resource) | Kısmi | Hayır | Hayır | Hayır | Sınırlı |
+| Web dashboard | Evet (6 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır | Hayır |
+| Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır | Sınırlı |
+| Yerleşik agent sayısı | 16 | — | — | Registry | — | 100+ |
+| Yerleşik skill sayısı | 21 | — | — | — | — | 13K+ (hub) |
+| Test coverage | %89.33 | — | — | — | — | — |
+| Heartbeat / proaktif görevler | Evet | Hayır | Hayır | Hayır | Hayır | Hayır |
+| Fiyat | Ücretsiz (MIT) | $20-40/ay | $20-500/ay | Ücretsiz | $19-39/ay | Ücretsiz |
 
 ---
 
@@ -283,7 +288,7 @@ deckent doctor
 | `deckent explain <topic>` | Bir kavram veya komutu açıkla |
 | `deckent quick-start` | Yeni projeler için hızlı başlangıç sihirbazı |
 | `deckent skill` | Kurulu skill'leri listele veya yönet |
-| `deckent skill-marketplace` | Skill marketplace'i gezin ve kur |
+| `deckent skill-marketplace` | [EXPERIMENTAL] Skill marketplace'i gezin ve kur |
 | `deckent agent` | Agent havuzunu yönet (listele, incele, sıfırla) |
 | `deckent review` | Son sprint sonuçlarını incele |
 | `deckent config migrate` | Yapılandırmayı en son şema sürümüne taşı |

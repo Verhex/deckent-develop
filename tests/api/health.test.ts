@@ -72,9 +72,7 @@ function request(
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
-// Note: /health and /ready endpoints are NOT yet implemented in server.ts.
-// These tests verify the current behavior (404) and are skipped for the
-// expected future behavior until the endpoints are added.
+// /health endpoint returns 200 with { status: 'ok', timestamp } — auth exempt.
 
 describe('GET /health', () => {
   let api: HttpApi;
@@ -89,14 +87,15 @@ describe('GET /health', () => {
     if (api) await api.close();
   });
 
-  it('returns 404 since /health endpoint is not yet implemented', async () => {
+  it('returns 200 with ok status', async () => {
     api = createHttpServer(PROJECT_ROOT, 0);
     await new Promise<void>((r) => api.server.once('listening', r));
     const res = await request(api, '/health');
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect((res.body as Record<string, unknown>).status).toBe('ok');
   });
 
-  it('returns application/json content-type even for 404', async () => {
+  it('returns application/json content-type', async () => {
     api = createHttpServer(PROJECT_ROOT, 0);
     await new Promise<void>((r) => api.server.once('listening', r));
     const res = await request(api, '/health');

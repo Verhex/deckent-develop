@@ -1,6 +1,15 @@
-# Marketplace Guide
+# Marketplace Guide [EXPERIMENTAL]
 
 Comprehensive guide to deckent's skill and agent marketplace -- searching, installing, publishing, ratings, dependencies, and security.
+
+> **Note:** The deckent marketplace registry is currently under active development and is in **experimental stage**. This section describes the planned feature set and API surface. Marketplace features may change significantly before the stable release. For feedback and contributions, see the [marketplace roadmap](#roadmap) section below.
+
+## Roadmap
+
+The marketplace is planned for release in Q2 2026. Current status:
+- **Phase 1** (Current): Design and API specification
+- **Phase 2** (Next): Prototype implementation and community feedback
+- **Phase 3**: Stable release with full CLI and web interface support
 
 ## 1. What Is the Marketplace?
 

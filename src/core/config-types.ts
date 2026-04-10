@@ -143,6 +143,8 @@ export interface DeckentConfig {
   // ─── Auth ──────────────────────────────────────────────────────────
   /** Auth mode (default: 'subscription') */
   auth_mode?: 'subscription' | 'api' | 'hybrid';
+  /** Bearer token for HTTP API authentication. Falls back to DECKENT_API_TOKEN env var. */
+  api_auth_token?: string;
 
   // ─── Memory ─────────────────────────────────────────────────────────
   /** Max lines in .brain/ directory (default: 600) */
@@ -216,6 +218,11 @@ export interface DeckentConfig {
     confidenceThreshold?: number;
     maxSkillsDefault?: number;
   };
+
+  // ─── Plugin Security ──────────────────────────────────────────────
+  /** Require valid SHA-256 signature for plugin hook modules (default: false).
+   *  When true, unsigned plugins are rejected. When false, they emit a warning. */
+  plugin_require_signature?: boolean;
 }
 
 export interface ResolvedConfig {

@@ -77,6 +77,9 @@ import { calculateMetrics } from './sprint-reporter.js';
 // ─── Rubric-Based Evaluation ─────────────────────────────────────
 import { evaluateWithRubric } from './result-evaluator.js';
 
+// ─── Result Map Helper ──────────────────────────────────────────
+import { buildResultsMap } from './result-collector.js';
+
 // ─── Sprint Controller (safe circular — all usages inside function bodies) ──
 import {
   BrainError,
@@ -295,6 +298,7 @@ export async function runEvaluatePhase(
   try {
     sprint.status = SprintStatus.EVALUATING;
     sprint.phase = SprintPhase.EVALUATE;
+    const resultsMap = buildResultsMap(results);
     const collectedIds = new Set(results.map(r => r.taskId));
     debugLog('runEvaluatePhase:start', `totalTasks=${sprint.tasks.length} collectedResults=${results.length} collectedIds=[${[...collectedIds].join(',')}]`);
 
@@ -303,7 +307,7 @@ export async function runEvaluatePhase(
 
     for (const task of sprint.tasks) {
       if (collectedIds.has(task.id)) {
-        const result = results.find(r => r.taskId === task.id);
+        const result = resultsMap.get(task.id);
         if (!result) continue; // narrowed: collectedIds contains task.id
         const rubricResult = evaluateWithRubric(result, task);
         let evaluation = toTaskEvaluation(rubricResult);
@@ -473,11 +477,12 @@ export async function runFixPhase(
           const fixTracker = new OutcomeTracker(projectRoot);
           const fixStack = detectProjectStack(projectRoot);
           const adapter = new MidSprintAdapter(fixPool, fixSkills, fixTracker, fixStack, config);
+          const fixResultsMap = buildResultsMap(results);
 
           for (const fixTask of fixTasks) {
             if (fixTask.fixForTaskId) {
-              // Find the original failed task's result
-              const originalResult = results.find(r => r.taskId === fixTask.fixForTaskId);
+              // Find the original failed task's result via O(1) Map lookup
+              const originalResult = fixResultsMap.get(fixTask.fixForTaskId);
               if (originalResult) {
                 const rerouteResult = adapter.shouldReroute(fixTask, originalResult);
                 if (rerouteResult.should && rerouteResult.newDecision) {

@@ -9,12 +9,25 @@ import {
 import { join } from 'node:path';
 import { GLOBAL_CREDENTIALS_DIR } from './constants.js';
 import { readJsonSafe } from './utils.js';
+import {
+  encrypt,
+  decrypt,
+  getMasterKey,
+  isEncryptedEntry,
+  type EncryptedPayload,
+} from './credential-encryption.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CredentialEntry {
   provider: string;
   key: string;
+  storedAt: string;
+}
+
+export interface EncryptedCredentialEntry {
+  provider: string;
+  encrypted: EncryptedPayload;
   storedAt: string;
 }
 
@@ -40,9 +53,13 @@ export class CredentialStorageError extends Error {
  */
 export class CredentialManager {
   private readonly credentialsDir: string;
+  private readonly encryptionEnabled: boolean;
+  private readonly keyringPath?: string;
 
-  constructor(credentialsDir: string = GLOBAL_CREDENTIALS_DIR) {
+  constructor(credentialsDir: string = GLOBAL_CREDENTIALS_DIR, options?: { encryption?: boolean; keyringPath?: string }) {
     this.credentialsDir = credentialsDir;
+    this.encryptionEnabled = options?.encryption ?? true;
+    this.keyringPath = options?.keyringPath;
   }
 
   private ensureDir(): void {
@@ -59,6 +76,7 @@ export class CredentialManager {
 
   /**
    * Store a credential for a given provider.
+   * When encryption is enabled, the key is encrypted with AES-256-GCM.
    * File permissions are set to 0600 (owner read/write only).
    */
   storeCredential(provider: string, key: string): void {
@@ -71,11 +89,29 @@ export class CredentialManager {
 
     this.ensureDir();
 
-    const entry: CredentialEntry = {
-      provider,
-      key,
-      storedAt: new Date().toISOString(),
-    };
+    let entry: CredentialEntry | EncryptedCredentialEntry;
+
+    if (this.encryptionEnabled) {
+      try {
+        const masterKey = getMasterKey({ keyringPath: this.keyringPath });
+        const encrypted = encrypt(key, masterKey);
+        entry = {
+          provider,
+          encrypted,
+          storedAt: new Date().toISOString(),
+        };
+      } catch (err) {
+        throw new CredentialStorageError(
+          `Encryption failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    } else {
+      entry = {
+        provider,
+        key,
+        storedAt: new Date().toISOString(),
+      };
+    }
 
     const filePath = this.credentialFilePath(provider);
     writeFileSync(filePath, JSON.stringify(entry, null, 2) + '\n', { encoding: 'utf-8', mode: 0o600 });
@@ -90,13 +126,29 @@ export class CredentialManager {
 
   /**
    * Retrieve the stored API key for a provider.
+   * Supports both encrypted and legacy plaintext entries.
    * Returns null if no credential is found or on parse error.
    */
   getCredential(provider: string): string | null {
     if (!provider || typeof provider !== 'string') return null;
 
     const filePath = this.credentialFilePath(provider);
-    const entry = readJsonSafe<CredentialEntry>(filePath);
+    const raw = readJsonSafe<Record<string, unknown>>(filePath);
+    if (!raw) return null;
+
+    // Encrypted entry
+    if (isEncryptedEntry(raw)) {
+      if (!this.encryptionEnabled) return null;
+      try {
+        const masterKey = getMasterKey({ keyringPath: this.keyringPath });
+        return decrypt(raw.encrypted, masterKey);
+      } catch {
+        return null;
+      }
+    }
+
+    // Legacy plaintext entry
+    const entry = raw as unknown as CredentialEntry;
     return entry?.key ?? null;
   }
 
@@ -148,13 +200,33 @@ export class CredentialManager {
 
   /**
    * Get the full credential entry (provider + key + storedAt) for a provider.
+   * Decrypts encrypted entries transparently.
    * Returns null if not found.
    */
   getCredentialEntry(provider: string): CredentialEntry | null {
     if (!provider || typeof provider !== 'string') return null;
 
     const filePath = this.credentialFilePath(provider);
-    return readJsonSafe<CredentialEntry>(filePath);
+    const raw = readJsonSafe<Record<string, unknown>>(filePath);
+    if (!raw) return null;
+
+    // Encrypted entry — decrypt to return a CredentialEntry
+    if (isEncryptedEntry(raw)) {
+      if (!this.encryptionEnabled) return null;
+      try {
+        const masterKey = getMasterKey({ keyringPath: this.keyringPath });
+        const key = decrypt(raw.encrypted, masterKey);
+        return {
+          provider: (raw as { provider?: string }).provider ?? provider,
+          key,
+          storedAt: (raw as { storedAt?: string }).storedAt ?? '',
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    return raw as unknown as CredentialEntry;
   }
 
   /**

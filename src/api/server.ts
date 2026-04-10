@@ -12,6 +12,7 @@ import type { Task, Sprint } from '../core/types.js';
 import { readJsonSafe } from '../core/utils.js';
 import { deepMerge } from '../core/config.js';
 import { watchDashboard } from './watcher.js';
+import { bearerAuthMiddleware, resolveAuthToken } from './auth.js';
 import { parseSprintLog } from '../cli/commands/history.js';
 import { runDoctorChecks } from '../cli/commands/doctor.js';
 import { killWorker } from '../orchestra/tmux.js';
@@ -259,6 +260,7 @@ async function handleRequest(
   initWatcher?: () => void,
   apiToken?: string | null,
   rateLimiter?: RateLimiter,
+  authMiddleware?: (req: IncomingMessage, res: ServerResponse) => boolean,
 ): Promise<void> {
   // Normalize /api/v1/... → /api/... for backward compat
   const rawUrl = req.url ?? '/';
@@ -290,12 +292,21 @@ async function handleRequest(
     return;
   }
 
-  // Auth check for API routes (POST and mutating endpoints)
-  if (url.startsWith('/api/') && method === 'POST') {
+  // Auth check for all API routes (health endpoint exempt, handled by bearerAuthMiddleware)
+  if (url.startsWith('/api/') && authMiddleware) {
+    if (!authMiddleware(req, res)) return;
+  } else if (url.startsWith('/api/') && method === 'POST') {
+    // Legacy fallback: if no authMiddleware provided, check POST-only (backward-compat)
     if (!checkAuth(req, apiToken ?? null)) {
       sendError(res, 401, 'Unauthorized — provide Authorization: Bearer <token>');
       return;
     }
+  }
+
+  // ─── Health endpoint (always accessible, no auth) ──────────
+  if (method === 'GET' && (url === '/health' || url === '/api/health')) {
+    sendJson(res, { status: 'ok', timestamp: new Date().toISOString() });
+    return;
   }
 
   // ─── GET routes ────────────────────────────────────────────
@@ -724,12 +735,21 @@ export function createHttpServer(
     process.stderr.write(`[deckent:info] Auto-generated API token: ${resolvedToken}\n`);
   }
 
+  // Resolve final token: explicit param > env var fallback
+  const finalToken = resolveAuthToken(resolvedToken);
+
   // Warn once at startup if no auth token is configured
-  if (!resolvedToken) {
+  if (!finalToken) {
     process.stderr.write(
-      '[deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_token to enable auth.\n',
+      '[deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_auth_token to enable auth.\n',
     );
   }
+
+  // Build auth middleware with health endpoint exempt
+  const authMiddleware = bearerAuthMiddleware({
+    configToken: finalToken,
+    exemptPaths: ['/health', '/api/health'],
+  });
 
   const rateLimiter = rateLimitMax > 0 ? new RateLimiter(rateLimitMax) : undefined;
 
@@ -761,7 +781,7 @@ export function createHttpServer(
   }
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-    handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, resolvedToken, rateLimiter).catch((err: unknown) => {
+    handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware).catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });
   });

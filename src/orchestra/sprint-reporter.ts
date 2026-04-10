@@ -12,7 +12,7 @@ import { TaskStatus } from '../core/types.js';
 import {
   BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, MEMORY_FILE, PROJECT_IDENTITY_FILE,
   RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES, SPRINT_LOG_MAX_LINES,
-  PATTERNS_FILE, DEBT_FILE, DECISIONS_FILE,
+  PATTERNS_FILE, DEBT_FILE, DECISIONS_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
 import type { DocUpdateResult } from './doc-updaters/types.js';
@@ -27,6 +27,7 @@ import {
 } from '../core/ci-learning.js';
 import { debugLog, parseDebtTable } from '../core/utils.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { buildResultsMap } from './result-collector.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -131,6 +132,7 @@ export function buildAgentPerformance(
   agentMap?: Map<string, string>,
 ): AgentPerformanceRow[] {
   const agentData = new Map<string, { tasks: number; done: number; debt: number; noGo: number; coverageSum: number; coverageCount: number }>();
+  const resultsMap = buildResultsMap(results);
 
   for (const task of sprint.tasks) {
     const agentId = agentMap?.get(task.id) ?? task.assignedAgent ?? 'generic';
@@ -147,7 +149,7 @@ export function buildAgentPerformance(
     else if (ev === TaskEvaluation.GO_WITH_TECH_DEBT) { data.done += 1; data.debt += 1; }
     else if (ev === TaskEvaluation.NO_GO) data.noGo += 1;
 
-    const result = results.find(r => r.taskId === task.id);
+    const result = resultsMap.get(task.id);
     if (result && typeof result.coverage === 'number') {
       data.coverageSum += result.coverage;
       data.coverageCount += 1;
@@ -2129,4 +2131,71 @@ export function collectSprintFiles(root: string): Array<{ file: string; dir: str
 
   collected.sort((a, b) => sprintFileNumber(a.file) - sprintFileNumber(b.file));
   return collected;
+}
+
+// ═══ DIRECTIVES Auto-Archive ══════════════════════════════════════════
+
+/**
+ * Archive the current DIRECTIVES.md and replace it with a placeholder
+ * for the next sprint. Called by finalizeSprint() after RETRO is written.
+ *
+ * - Copies DIRECTIVES.md → .brain/archive/DIRECTIVES-sprint-NNN.md
+ * - Writes a placeholder DIRECTIVES.md with next-sprint header
+ * - Creates .brain/archive/ if it doesn't exist
+ * - No-ops gracefully if DIRECTIVES.md doesn't exist
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - The completed sprint ID (e.g. 'sprint-133')
+ */
+export function archiveDirectives(projectRoot: string, sprintId: string): void {
+  const directivesPath = join(projectRoot, DIRECTIVES_FILE);
+  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR);
+
+  // If DIRECTIVES.md doesn't exist, nothing to archive
+  if (!existsSync(directivesPath)) {
+    debugLog('archiveDirectives', `${DIRECTIVES_FILE} not found — skipping`);
+    return;
+  }
+
+  // Ensure archive directory exists
+  mkdirSync(archiveDir, { recursive: true });
+
+  // Copy current DIRECTIVES to archive
+  const archiveFileName = `DIRECTIVES-${sprintId}.md`;
+  const archivePath = join(archiveDir, archiveFileName);
+  copyFileSync(directivesPath, archivePath);
+
+  // Compute next sprint number for placeholder
+  const currentNum = extractSprintNumber(sprintId);
+  const nextNum = currentNum !== null ? currentNum + 1 : '???';
+
+  // Write placeholder DIRECTIVES.md
+  const placeholder = [
+    `# DIRECTIVES — (Sprint ${nextNum} için hazırlanıyor)`,
+    '',
+    `> Önceki sprint (${sprintId}) tamamlandı. Bu dosya yeni sprint hedefleri için hazırdır.`,
+    '',
+    `## Referanslar`,
+    `- Arşiv: .brain/archive/${archiveFileName}`,
+    `- Retro: .brain/RETRO.md`,
+    `- Bellek: .brain/MEMORY.md`,
+    '',
+    `## Goal: (Sprint ${nextNum} hedefini buraya yazın)`,
+    '',
+    '---',
+    '',
+    '## Task 1: (Task başlığı)',
+    '- Model: sonnet',
+    '- Effort: normal',
+    '- Skills: ',
+    '- Files: ',
+    '- Scope: ',
+    '',
+    '### Description',
+    '(Task açıklamasını buraya yazın)',
+    '',
+  ].join('\n');
+
+  writeFileSync(directivesPath, placeholder);
+  debugLog('archiveDirectives', `Archived ${DIRECTIVES_FILE} → ${archivePath}`);
 }

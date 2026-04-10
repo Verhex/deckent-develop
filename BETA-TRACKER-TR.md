@@ -9,12 +9,12 @@
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-132 |
+| Sprint | sprint-133 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
 | Dashboard Pages | 6 |
-| Agents | 16 built-in |
+| Agents | 16 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
 
@@ -838,8 +838,8 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 ## Sprint History
 | Sprint | Status |
 |--------|-------|
-| sprint-129 | completed |
 | sprint-132 | completed |
+| sprint-133 | completed |
 
 ## Bug Tracker
 
@@ -1280,10 +1280,10 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-132 |
-| Total Tasks | 7 |
-| Completed | 7 |
-| Tech Debt | 0 |
+| Sprint | sprint-133 |
+| Total Tasks | 12 |
+| Completed | 12 |
+| Tech Debt | 4 |
 | No-Go | 0 |
-| Duration | 17dk 45sn |
-| Coverage | 38.3% |
+| Duration | 27dk 21sn |
+| Coverage | 8.3% |

@@ -6,6 +6,29 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint133] - 2026-04-10
+
+### Added
+
+- Plugin Hook Sandbox Sertleştirme
+- npm --ignore-scripts Varsayılan
+- results → Map Index (O(n²)→O(n))
+- Kritik Modül Unit Testleri (5 Modül, ≥15 Test)
+- Yük Testi — P50/P95/P99 Mikrobenchmark
+- finalizeSprint() DIRECTIVES Auto-Archive
+- Credential Encryption (OS Keychain Minimal Wrapper)
+- Marketplace [EXPERIMENTAL] Işaretleme
+
+### Changed
+
+- HTTP API Bearer Token Auth (completed with tech debt)
+- loadConfig() Module-Level Cache (completed with tech debt)
+- Sprint 131 ADR'leri Yazımı (ADR-029..032) (completed with tech debt)
+- Competitive Analysis Güncelleme (completed with tech debt)
+
+
+_Tasks: 12 total, 12 done, 4 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint132] - 2026-04-10
 
 ### Added

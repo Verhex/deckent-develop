@@ -401,14 +401,39 @@ describe('installPlugin — npm registry', () => {
     expect(result.dir).toBe(`${PLUGINS_DIR}/my-plugin`);
   });
 
-  it('calls spawnSync with npm install', async () => {
+  it('calls spawnSync with npm install including --ignore-scripts', async () => {
     mockSuccessfulNpmInstall('my-plugin');
     await installPlugin('my-plugin', PLUGINS_DIR);
     expect(spawnSync).toHaveBeenCalledWith(
       'npm',
-      ['install', '--prefix', expect.stringContaining('.tmp-npm-'), 'my-plugin'],
+      ['install', '--prefix', expect.stringContaining('.tmp-npm-'), '--ignore-scripts', 'my-plugin'],
       { encoding: 'utf8', timeout: 60_000 }
     );
+  });
+
+  it('passes --ignore-scripts flag to prevent postinstall script execution', async () => {
+    mockSuccessfulNpmInstall('my-plugin');
+    await installPlugin('my-plugin', PLUGINS_DIR);
+    const call = vi.mocked(spawnSync).mock.calls.find(c => c[0] === 'npm');
+    expect(call).toBeDefined();
+    expect(call![1]).toContain('--ignore-scripts');
+  });
+
+  it('does not pass --ignore-scripts to git clone (only npm)', async () => {
+    // Set up git install mock
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stderr: '' } as any);
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const str = String(p);
+      if (str.endsWith('manifest.json')) return true;
+      if (str.endsWith('/my-plugin')) return false;
+      return false;
+    });
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(validManifest) as any);
+
+    await installPlugin('https://github.com/org/my-plugin.git', PLUGINS_DIR);
+    const gitCall = vi.mocked(spawnSync).mock.calls.find(c => c[0] === 'git');
+    expect(gitCall).toBeDefined();
+    expect(gitCall![1]).not.toContain('--ignore-scripts');
   });
 
   it('handles scoped npm packages', async () => {

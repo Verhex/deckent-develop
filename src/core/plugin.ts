@@ -7,6 +7,11 @@ import { readJsonSafe } from './utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export interface PluginSignature {
+  algorithm: 'sha256';
+  value: string;
+}
+
 export interface PluginManifest {
   name: string;
   version: string;
@@ -19,6 +24,8 @@ export interface PluginManifest {
   model?: ModelType;
   enabled?: boolean;
   dependencies?: string[];
+  /** Optional SHA-256 signature for integrity verification */
+  signature?: PluginSignature;
 }
 
 export interface Plugin {
@@ -30,6 +37,13 @@ export class PluginError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'PluginError';
+  }
+}
+
+export class PluginSecurityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PluginSecurityError';
   }
 }
 
@@ -91,6 +105,20 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
     }
   }
 
+  // Validate signature
+  if (obj['signature'] !== undefined) {
+    if (typeof obj['signature'] !== 'object' || Array.isArray(obj['signature']) || obj['signature'] === null) {
+      throw new PluginError(`Invalid manifest in ${pluginDir}: "signature" must be an object`);
+    }
+    const sig = obj['signature'] as Record<string, unknown>;
+    if (sig['algorithm'] !== 'sha256') {
+      throw new PluginError(`Invalid manifest in ${pluginDir}: "signature.algorithm" must be "sha256"`);
+    }
+    if (typeof sig['value'] !== 'string' || !(sig['value'] as string).trim()) {
+      throw new PluginError(`Invalid manifest in ${pluginDir}: "signature.value" must be a non-empty string`);
+    }
+  }
+
   // safe: all fields validated as non-empty strings by the required field loop above
   const manifest: PluginManifest = {
     name: obj['name'] as string,
@@ -110,6 +138,10 @@ export function validateManifest(raw: unknown, pluginDir: string): PluginManifes
     manifest.hooks = {};
     if (typeof h['beforeSprint'] === 'string') manifest.hooks.beforeSprint = h['beforeSprint'];
     if (typeof h['afterSprint'] === 'string') manifest.hooks.afterSprint = h['afterSprint'];
+  }
+  if (obj['signature'] !== undefined) {
+    const sig = obj['signature'] as Record<string, unknown>;
+    manifest.signature = { algorithm: 'sha256', value: sig['value'] as string };
   }
 
   return manifest;
@@ -282,9 +314,10 @@ async function installFromNpm(packageName: string, pluginsDir: string): Promise<
     await fsp.mkdir(tmpDir, { recursive: true });
 
     // npm install the package into the temp directory
+    // --ignore-scripts prevents malicious postinstall/preinstall scripts from running
     const result = spawnSync(
       'npm',
-      ['install', '--prefix', tmpDir, packageName],
+      ['install', '--prefix', tmpDir, '--ignore-scripts', packageName],
       { encoding: 'utf8', timeout: 60_000 }
     );
     if (result.status !== 0) {

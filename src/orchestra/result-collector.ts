@@ -38,6 +38,21 @@ import { buildWorkerPrompt } from './task-builder.js';
 // ─── tmux ─────────────────────────────────────────────────────────
 import { spawnWorker, killWorker } from './tmux.js';
 
+// ═══ Results Map Helper ═══════════════════════════════════════════
+
+/**
+ * Build a Map<taskId, TaskResult> index from a TaskResult array.
+ * Provides O(1) lookup by taskId instead of O(n) linear scan.
+ * If duplicate taskIds exist, the last entry wins (override behavior).
+ */
+export function buildResultsMap(results: TaskResult[]): Map<string, TaskResult> {
+  const map = new Map<string, TaskResult>();
+  for (const r of results) {
+    map.set(r.taskId, r);
+  }
+  return map;
+}
+
 // ═══ Exported Functions ═══════════════════════════════════════════
 
 /**

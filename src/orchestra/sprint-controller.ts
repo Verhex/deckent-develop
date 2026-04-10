@@ -104,6 +104,7 @@ import {
   waitForResults as waitForResultsImpl,
   resolveAgentPrompt,
   resolveSkillPrompts,
+  buildResultsMap,
 } from './result-collector.js';
 
 // Re-export for backward compatibility (previously defined in this file)
@@ -125,7 +126,7 @@ import type { UserOverride, TaskDNA } from '../core/routing-types.js';
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
 import { runDecay } from './debt-manager.js';
-import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance } from './sprint-reporter.js';
+import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance, archiveDirectives } from './sprint-reporter.js';
 import { getRecentSprintStats } from './result-evaluator.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 
@@ -1295,6 +1296,9 @@ export async function finalizeSprint(
   results: TaskResult[],
   opts?: FinalizeSprintOptions,
 ): Promise<SprintMetrics> {
+  // Build O(1) lookup index from results array — eliminates O(n²) linear scans
+  const resultsMap = buildResultsMap(results);
+
   // 1. Calculate metrics
   const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
   const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
@@ -1365,7 +1369,7 @@ export async function finalizeSprint(
       for (const task of sprint.tasks) {
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
-        const taskResult = results.find(r => r.taskId === task.id);
+        const taskResult = resultsMap.get(task.id);
         const coverage = taskResult?.coverage ?? 0;
 
         // Update agent stats
@@ -1393,7 +1397,7 @@ export async function finalizeSprint(
       for (const task of sprint.tasks) {
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
-        const taskResult = results.find(r => r.taskId === task.id);
+        const taskResult = resultsMap.get(task.id);
 
         // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
         let qualityScore: number | undefined;
@@ -1443,7 +1447,7 @@ export async function finalizeSprint(
           let avgCov = 0;
           if (agentTasks.length > 0) {
             const totalCov = agentTasks.reduce((sum, t) => {
-              const r = results.find(res => res.taskId === t.id);
+              const r = resultsMap.get(t.id);
               return sum + (r?.coverage ?? 0);
             }, 0);
             avgCov = totalCov / agentTasks.length;
@@ -1556,7 +1560,18 @@ export async function finalizeSprint(
     }
   }
 
-  // 12. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
+  // 12. Archive DIRECTIVES.md (auto_archive_directives config flag, default true)
+  try {
+    const rawCfg = opts?.config as Record<string, unknown> | undefined;
+    const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;
+    if (autoArchive) {
+      archiveDirectives(projectRoot, sprint.id);
+    } else {
+      debugLog('finalizeSprint:archiveDirectives', 'Skipped — auto_archive_directives=false');
+    }
+  } catch (e) { debugLog('finalizeSprint:archiveDirectives', e); }
+
+  // 13. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
   try {
     const jobsDir = join(projectRoot, JOBS_DIR);
     mkdirSync(jobsDir, { recursive: true });
@@ -1595,7 +1610,7 @@ export async function finalizeSprint(
       techDebtDetail: string;
     }> = {};
     for (const [taskId, evaluation] of evaluations) {
-      const taskResult = results.find(r => r.taskId === taskId);
+      const taskResult = resultsMap.get(taskId);
       const task = sprint.tasks.find(t => t.id === taskId);
       const isTechDebt = evaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
       richEvaluations[taskId] = {
