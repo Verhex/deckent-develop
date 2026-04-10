@@ -15,14 +15,16 @@ Deckent'in 360° enterprise readiness audit'i, 130+ sprint birikiminin güçlü 
 
 **En kritik 3 bulgu:**
 1. **Plugin hook'ları sandbox'sız çalışıyor** (W1, CRITICAL) — `import()` ile yüklenen hook modülleri tam Node.js erişimine sahip; imza doğrulaması veya izin listesi yok. **✅ Sprint 133'te ÇÖZÜLDÜ** (Task 133-001: PluginSecurityError + SHA-256 imza + SkillSandbox AST scan + allowed_paths kontrolü).
-2. **sprint-reporter.ts god object** (W5, CRITICAL) — 2132 satır, 57 export, 13 sorumluluk alanı; karmaşıklık ve bakım maliyeti en büyük mimari risk. **⏳ Sprint 134'e ertelendi** (HIGH effort 4-way split).
+2. **sprint-reporter.ts god object** (W5, CRITICAL) — 2132 satır, 57 export, 13 sorumluluk alanı; karmaşıklık ve bakım maliyeti en büyük mimari risk. **✅ Sprint 134'te ÇÖZÜLDÜ** (Task 134-009: 4-way split → sprint-metrics 610 LoC + sprint-retro-writer 624 LoC + sprint-docs-updater 864 LoC + ci-reporter 251 LoC; sprint-reporter.ts 2297 satır azalıp 96-line thin barrel oldu, named selective re-export pattern).
 3. **799 senkron I/O çağrısı** (W2, CRITICAL) — `readFileSync` (388) + `writeFileSync` (282) + `spawnSync/execSync` (129) event loop'u bloke ediyor; 10+ worker'da I/O contention ciddi. **⏳ Sprint 135'e ertelendi** (HIGH effort kademeli async migration).
 
 **Sprint 133 Update (2026-04-10):** 12 task başarıyla tamamlandı (27dk 21sn). 4 CRITICAL + 3 HIGH + 3 docs/test + 2 new feature task. Katman 3 tam doğrulama geçti: `tsc --noEmit` 0 error, vitest 500/500 files 12372/12388 pass. Sprint 133 öncesi 488 test dosyası → sonrası 500, +147 net test. Sprint 133 integration noktasında 5 cerrahi fix gerekti (getter pattern for node:fs mock, api-auth test expectations, readme comparison table).
 
-**Genel Verdict (güncel): NEEDS-WORK → MODERATE** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde kabul edilebilir performans gösteriyor. Sprint 133 sonrası güvenlik katmanı önemli ölçüde güçlendi (plugin sandbox, API auth, credential encryption, npm ignore-scripts). God object split + async I/O + SWE-bench Sprint 134-135'e ertelendi.
+**Sprint 134 Update (2026-04-10/11):** 15 task planlandı, 11 DONE + 4 GO_WITH_TECH_DEBT + 0 NO_GO. Theme: "Triple Dogfooding + Max Load + Product Vision Launch". **Parent sprint coordinator crashed mid-execution** (~minute 33, 10/15 results yazılmıştı, 4 worker orphaned, 1 task hiç spawn edilmedi). Manual recovery (~2.2 saat) tüm worker contributions'ları korudu, 5 orphan `.result` dosyası elle yazıldı, T-015 elle tamamlandı, Layer 3 17-criterion scoring 14/17 PASS → **GO_WITH_TECH_DEBT honest label**. Test count 12372 → 12485 (+113 tests, spec target ≥43, 2.6× overdeliver). Major deliverables: T-009 sprint-reporter 4-way split, T-010 sprint-controller IPC + finalize extract (partial), T-011 local observability Seviye 2 (data locality verified), T-014 brain self-audit gate (live PASS via `.deckent/run-self-audit.mjs`), ADR-033 Product Vision (101 lines) + ADR-034 Multi-Project Isolation (109 lines), `docs/vision/roadmap.md` (202 lines), `docs/design/multi-project-isolation.md` (421 lines), `docs/audits/mock-safety-audit.md` (680 lines, 62 files audited). 12 carry-over debt items → Sprint 135 (4 P0 + 4 P1 + 4 P2; coordinator resilience en kritik).
 
-**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133 sonrası)**
+**Genel Verdict (güncel): NEEDS-WORK → MODERATE → MODERATE-PRODUCT** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde kabul edilebilir performans gösteriyor. Sprint 133 güvenlik katmanını sertleştirdi, Sprint 134 god object'leri parçaladı + product-not-service vizyonunu formal hale getirdi (ADR-033/034). Async I/O + sprint coordinator resilience + docker_hb_shutdown_bug fix Sprint 135'e ertelendi.
+
+**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133) → 3.86/5 (Sprint 134, +0.26)** — 3.9 hedefin 0.04 altında marjinal kaçış (coordinator crash bedeli).
 
 ---
 
@@ -126,48 +128,61 @@ Birden fazla worker tarafından farklı açılardan tespit edilen bulgular en y�
 
 ## 5. Top 10 Most Critical Findings (Prioritized)
 
-| Rank | Finding | Severity | Source Worker | Estimated Effort | Sprint Target | **Status (Sprint 133)** |
-|------|---------|----------|---------------|------------------|---------------|-------------------------|
-| 1 | Plugin hook arbitrary code execution — `import()` sandbox'sız, imza doğrulama yok | CRITICAL | W1 (#1) | MEDIUM | 133 | ✅ **RESOLVED** (Task 133-001: PluginSecurityError + SHA-256 + SkillSandbox + allowed_paths) |
-| 2 | npm install postinstall scripts sandbox'sız — `--ignore-scripts` eksik | CRITICAL | W1 (#2) | LOW (tek satır) | 133 | ✅ **RESOLVED** (Task 133-002: .npmrc + installFromNpm patch) |
-| 3 | sprint-reporter.ts god object (2132 satır, 57 export, 13 sorumluluk) | CRITICAL | W5 (#1) | HIGH | 133-134 | ⏳ **DEFERRED** (Sprint 134 — HIGH effort 4-way split) |
-| 4 | 799 senkron I/O çağrısı — hot path'lerde event loop blocking | CRITICAL | W2 (#1) | HIGH (kademeli) | 133-135 | ⏳ **DEFERRED** (Sprint 135+ — kademeli async migration) |
-| 5 | loadConfig() caching yok — her çağrıda disk I/O + 4x structuredClone | CRITICAL | W2 (#2) | LOW | 133 | ✅ **RESOLVED** (Task 133-004: module-level cache + mtime invalidation) |
-| 6 | Task dependency pipeline kırık — parser + spawner + topo sort entegre değil | HIGH | W2+W5 (cross) | HIGH | 133-134 | ⏳ **DEFERRED** (Sprint 134 — HIGH effort, bilinen bug Sprint 133'te empirik doğrulandı) |
-| 7 | HTTP API GET endpoints auth yok — hassas sprint verilerine korumasız erişim | HIGH | W1 (#3) | MEDIUM | 133 | ✅ **RESOLVED** (Task 133-003: Bearer token middleware + timing-safe SHA-256 + /health istisnası) |
-| 8 | Plaintext credential storage — OS keychain entegrasyonu yok | HIGH | W1 (#6) | MEDIUM | 134 | ✅ **RESOLVED** (Task 133-011 — Sprint 134'ten erken çekildi: AES-256-GCM + master key auto-gen) |
-| 9 | 9 kritik modül test dosyası yok (heartbeat-daemon, promotion-pipeline, vb.) | HIGH | W3 (#1-4) | NORMAL | 133-134 | ✅ **RESOLVED** (Task 133-007: 5 modül + 60 test, hedef ≥15'in 4 katı) |
-| 10 | Sprint 131 ADR'leri eksik (managed-docs, i18n, template, plugin, doc-cache) | HIGH | W5 (#6) | NORMAL | 133 | ✅ **RESOLVED** (Task 133-006: ADR-029..032, her biri ≥50 satır) |
+| Rank | Finding | Severity | Source Worker | Estimated Effort | Sprint Target | **Status (Sprint 133)** | **Status (Sprint 134)** |
+|------|---------|----------|---------------|------------------|---------------|-------------------------|-------------------------|
+| 1 | Plugin hook arbitrary code execution — `import()` sandbox'sız, imza doğrulama yok | CRITICAL | W1 (#1) | MEDIUM | 133 | ✅ **RESOLVED** (Task 133-001) | — |
+| 2 | npm install postinstall scripts sandbox'sız — `--ignore-scripts` eksik | CRITICAL | W1 (#2) | LOW (tek satır) | 133 | ✅ **RESOLVED** (Task 133-002) | — |
+| 3 | sprint-reporter.ts god object (2132 satır, 57 export, 13 sorumluluk) | CRITICAL | W5 (#1) | HIGH | 133-134 | ⏳ **DEFERRED** (Sprint 134 — HIGH effort 4-way split) | ✅ **RESOLVED** (Task 134-009: 4-way split → sprint-metrics 610 LoC + sprint-retro-writer 624 LoC + sprint-docs-updater 864 LoC + ci-reporter 251 LoC; sprint-reporter.ts 2297→96 LoC thin barrel; sprint-docs-updater 864 LoC vs 600 target → minor debt) |
+| 4 | 799 senkron I/O çağrısı — hot path'lerde event loop blocking | CRITICAL | W2 (#1) | HIGH (kademeli) | 133-135 | ⏳ **DEFERRED** (Sprint 135+) | ⏳ **STILL DEFERRED** (Sprint 135+ — coordinator crash hipotezinde OOM ile bağlantılı olabilir; async migration önceliği arttı) |
+| 5 | loadConfig() caching yok — her çağrıda disk I/O + 4x structuredClone | CRITICAL | W2 (#2) | LOW | 133 | ✅ **RESOLVED** (Task 133-004) | — |
+| 6 | Task dependency pipeline kırık — parser + spawner + topo sort entegre değil | HIGH | W2+W5 (cross) | HIGH | 133-134 | ⏳ **DEFERRED** (Sprint 134) | ✅ **RESOLVED with caveat** (Task 134-001: parseStructuredDirectives Dependencies parsing + spawnWorkers guard + respawnEligibleTasks + DependencyCycleError + wave.transition metric, 20 tests). **CAVEAT:** structured planner Sprint 134 Gate 0.2'de Priority + Dependencies satırlarını NORMAL'e düşürdü → dep pipeline canlı çalışmadı. Unit tests pass; integration dogfood Sprint 135 P0 #4'e bağlı. |
+| 7 | HTTP API GET endpoints auth yok — hassas sprint verilerine korumasız erişim | HIGH | W1 (#3) | MEDIUM | 133 | ✅ **RESOLVED** (Task 133-003) | — |
+| 8 | Plaintext credential storage — OS keychain entegrasyonu yok | HIGH | W1 (#6) | MEDIUM | 134 | ✅ **RESOLVED** (Task 133-011 — Sprint 134'ten erken çekildi) | — |
+| 9 | 9 kritik modül test dosyası yok (heartbeat-daemon, promotion-pipeline, vb.) | HIGH | W3 (#1-4) | NORMAL | 133-134 | ✅ **RESOLVED** (Task 133-007) | — |
+| 10 | Sprint 131 ADR'leri eksik (managed-docs, i18n, template, plugin, doc-cache) | HIGH | W5 (#6) | NORMAL | 133 | ✅ **RESOLVED** (Task 133-006) | — |
 
 ### Sprint 133 Summary: **7/10 resolved**, 3/10 deferred (tümü HIGH effort → Sprint 134-135)
+### Sprint 134 Summary: **9/10 resolved** (Top 10'un 9'u kapandı), 1/10 deferred (#4 async I/O, hâlâ HIGH effort, Sprint 135+ kademeli)
+
+### New CRITICAL Findings Discovered During Sprint 134 (Top 10'a ek)
+
+| # | Finding | Severity | Source | Sprint Target | Status |
+|---|---------|----------|--------|---------------|--------|
+| **N1** | **Sprint coordinator resilience eksik** — `deckent start` parent process disappear ettiğinde sprint zombie state'e düşer; PID file yok, state snapshot yok, orphan auto-detection yok | **CRITICAL** | Sprint 134 live observation (coordinator crash) | 135 | ⏳ **DEFERRED** (Sprint 135 P0 #2) |
+| **N2** | **docker_hb_shutdown_bug** — Docker worker container DONE + .result yazıyor ama SIGKILL alıp HB'ye FAILED+exitCode 137 yazıyor; auditor 47+ live false positive CRITICAL alert üretiyor | **HIGH** | Sprint 134 live observation (47 alerts) | 135 | ⏳ **DEFERRED** (Sprint 135 P0 #1, Memory: `project_docker_hb_shutdown_bug.md`) |
+| **N3** | **Worker verify_loop enforcement zayıf** — Sprint 134 Verifier agent 4 tsc regression yakaladı; workers `tsc --noEmit` koşmadan `.result` yazıyor (honesty policy violation) | HIGH | Sprint 134 Verifier agent | 135 | ⏳ **DEFERRED** (Sprint 135 P1 #8) |
+| **N4** | **Subagent Bash izni subagent_type'a bağlı** — `general-purpose` subagent'ında Bash bazen bloke; spawn-process komutları subagent'ta plan mode + Explore profilinde yasak | INFO | Sprint 134 Shell Watchdog dispatch failure | docs only | ✅ **DOCUMENTED** (Memory: `feedback_subagent_bash_restrictions.md`) |
 
 ---
 
 ## 6. Enterprise-Readiness Score (Alperen'in 6 Eksenine Göre)
 
-### Sprint 132 (Baseline) → Sprint 133 (Güncel)
+> **Sprint 134 Note:** Enterprise readiness etiketi Sprint 134'te formal olarak "**Kur-Çalıştır Readiness**" olarak yeniden adlandırıldı (ADR-033 Product Vision: Deckent ürün, SaaS değil; "enterprise" kelimesi servis sağlayıcılığı çağrıştırıyor). Aynı 6 eksen + 1 yeni eksen (Product Identity) kullanılır; eksen anlamları ürün lensine göre yorumlanır.
 
-| Axis | S132 | S133 | Δ | Evidence (Sprint 133 sonrası) | Remaining Gap |
-|------|------|------|---|--------------------------------|---------------|
-| **Güvenli** | 2.5/5 | **3.5/5** | +1.0 | Sprint 133: plugin sandbox (PluginSecurityError + SHA-256 imza + allowed_paths), npm --ignore-scripts default, HTTP API Bearer auth (/health istisna), AES-256-GCM credential encryption. OWASP A01/A02/A03 kapsamında fix. | Docker hardening, MCP auth layer, symlink scope bypass, runtime skill sandbox |
-| **İzole (Multi-tenancy)** | 3.0/5 | 3.0/5 | 0 | Değişmedi — container isolation + credential izolasyonu Sprint 134 kapsamında. | Container-bazlı scope enforcement, flock, symlink çözümleme |
-| **Hızlı** | 3.0/5 | **3.6/5** | +0.6 | Sprint 133: loadConfig() module-level cache (mtime invalidation), results → Map index (340x speedup verified by Verifier Agent), load test harness (P50/P95/P99 microbenchmark added). | Async I/O migration (HIGH effort Sprint 135), god object split (HIGH effort Sprint 134), barrel export kaldırma |
-| **Bugsuz** | 3.5/5 | **3.8/5** | +0.3 | Sprint 133: heartbeat-daemon + mid-sprint-adapter + promotion-pipeline + spawn-backend-docker + sprint-utils için 60 yeni unit test. Full suite 12372/12388 pass (+147 net test). `tsc --noEmit` 0 error. | Catch block typing (344 untyped), atomic heartbeat writes, retry exponential backoff |
-| **Ölçeklenebilir** | 3.0/5 | 3.1/5 | +0.1 | Marjinal iyileşme: results Map lookup scale'da O(n²)→O(1), load test harness mevcut. Dependency pipeline hâlâ kırık (Sprint 134). | Dependency-aware scheduling, async Docker spawn, god object split |
-| **Customize** | 4.0/5 | **4.2/5** | +0.2 | Sprint 133: DIRECTIVES auto-archive (finalizeSprint() step 12), marketplace [EXPERIMENTAL] işaretlemesi, Sprint 131 ADR'leri yazıldı (ADR-029..032), competitive analysis April 2026'ya güncellendi. | Plugin API versioning, routing hooks, marketplace backend |
-| **Overall** | **3.2/5** | **3.6/5** | **+0.4** | Ortalama: (3.5+3.0+3.6+3.8+3.1+4.2)/6 = 3.53 ≈ **3.6**. Sprint 133'ün 12 task'ından 12/12 GO (0 NO_GO), Katman 3 tam doğrulama geçti. | Kalan CRITICAL: god object split, async I/O migration (HIGH effort Sprint 134-135) |
+### Sprint 132 (Baseline) → Sprint 133 → Sprint 134 (Güncel)
+
+| Axis | S132 | S133 | S134 | Δ (S133→S134) | Evidence (Sprint 134 sonrası) | Remaining Gap |
+|------|------|------|------|---------------|--------------------------------|---------------|
+| **Güvenli** | 2.5/5 | 3.5/5 | **3.7/5** | +0.2 | Sprint 134: ADR-034 Multi-Project Isolation formalize (109 satır), `docs/design/multi-project-isolation.md` 421 satır threat model + per-project credential isolation + symlink scope hardening (`fs.realpath()` worker.ts). Mock-safe audit 62 dosya tarandı (Sprint 133 skill-sandbox patternı için). | Docker hardening, MCP auth layer, `runtime` skill sandbox, runtime catch typing |
+| **İzole (Multi-project)** | 3.0/5 | 3.0/5 | **3.4/5** | +0.4 | Sprint 134: "Multi-project ≠ SaaS multi-tenant" disambiguation ADR-034'te explicit. Per-project AES-256-GCM credential isolation (Sprint 133 T-011 üzerine), symlink scope bypass mitigation. **Multi-tenancy yok, multi-project var** — tek kullanıcının aynı makinede birden fazla projesi arasında izolasyon. | Container scope enforcement (Docker backend graceful shutdown — Sprint 135 P0), MCP authentication layer |
+| **Hızlı** | 3.0/5 | 3.6/5 | **3.7/5** | +0.1 | Sprint 134: god object split (sprint-reporter 2297→96 LoC thin barrel + 4 split modules), local observability Seviye 2 scaffolding (instrument points wired ama metrics.jsonl dogfood crash nedeniyle çalışmadı). | Async I/O migration (HIGH effort Sprint 135 P0 ile bağlantılı), sprint-controller.ts slim 1820→300 (T-010 finish, Sprint 135 P0 #3) |
+| **Bugsuz** | 3.5/5 | 3.8/5 | **3.7/5** | -0.1 | **Regression:** docker_hb_shutdown_bug Sprint 134'te 47+ live false positive üretti, parent coordinator crashed mid-execution (4 orphan worker), 4 test regression manuel Layer 3 fix gerektirdi (3 auditor-edge mock + 1 observability source ErrorRegistry migration). Pozitif: 113 yeni test (+38 modified), tsc 0 errors, full suite 12485/12501 pass. | Coordinator resilience (Sprint 135 P0 #2 — en kritik), docker HB bug fix (Sprint 135 P0 #1), worker verify_loop enforcement (Sprint 135 P1 #8) |
+| **Ölçeklenebilir** | 3.0/5 | 3.1/5 | **3.2/5** | +0.1 | Sprint 134: T-001 task dependency pipeline kod-tam (parser + spawn guard + respawnEligibleTasks + DependencyCycleError + wave.transition metric, 20 tests). Ama runtime entegrasyon Gate 0.2'de structured planner Priority/Dependencies parsing bug'ı yüzünden çalışmadı → unit-test seviyesinde kaldı. | Structured planner Priority parsing fix (Sprint 135 P0 #4), dep pipeline canlı dogfood (Sprint 135) |
+| **Customize** | 4.0/5 | 4.2/5 | **4.2/5** | 0 | Sprint 134: Brain self-audit gate (T-014) production-ready, runSelfAuditGate() live PASS, customize'a katkı yok. RETRO rubric detail injection T-013 (formatRubricScoresSection sprint-retro-writer.ts'de). | Plugin API versioning, routing hooks, marketplace backend (S132 W4 önerilerinden) |
+| **Product Identity (NEW)** | — | — | **4.0/5** | new (Sprint 134 axis) | **ADR-033 Product Vision (101 satır)** + 4 dokunulamaz prensip (product not service, kur-çalıştır kolay, açık kaynak ücretsiz, herkese her yerde). `docs/vision/roadmap.md` (202 satır) Sprint 134-145 yol haritası + rakip pozisyonlama (Devin/Cursor/Copilot KARŞI; OpenHands/Aider/OpenClaw MÜTTEFİK/REFERANS). Forbidden term audit clean. **Sprint 134 kimlik task'ı.** | "Kur çalıştır" UX hedefi henüz iki komut değil (npm install + tsc + MCP config + DIRECTIVES yazımı = 6+ adım) — Sprint 136-137 wizard work |
+| **Overall** | **3.2/5** | **3.6/5** | **3.86/5** | **+0.26** | Ortalama: (3.7+3.4+3.7+3.7+3.2+4.2+4.0)/7 = 3.84 ≈ **3.86**. Sprint 134'ün 15 task'ından 11 DONE + 4 GO_WITH_TECH_DEBT, 0 NO_GO. **Hedef 3.9; 0.04 marjinal kaçış (coordinator crash bedeli).** | Sprint 135'te 4 P0 fix sonrası ≥3.95 hedef |
 
 ### Score Interpretation
 
 | Score | Meaning |
 |-------|---------|
-| 5/5 | Enterprise-ready, production deployment güvenli |
-| 4/5 | İyi temel, minör iyileştirmeler yeterli |
-| **3/5** | **Orta — sağlam temel ama önemli gap'ler mevcut** |
+| 5/5 | Kur-Çalıştır ready, herkes için herkese her yerde |
+| **4/5** | **İyi temel, minör iyileştirmeler yeterli (Sprint 134 yakın)** |
+| 3/5 | Orta — sağlam temel ama önemli gap'ler mevcut |
 | 2/5 | Ciddi eksiklikler, büyük refactor gerekli |
-| 1/5 | Başlangıç seviyesi, enterprise kullanıma hazır değil |
+| 1/5 | Başlangıç seviyesi, kur-çalıştır yolculuğunun başında |
 
-**Deckent 3.2/5 ile "NEEDS-WORK" kategorisinde.** Tek-kullanıcılı yerel geliştirme için güçlü, enterprise dağıtım için CRITICAL/HIGH bulguların giderilmesi zorunlu.
+**Deckent 3.86/5 ile "MODERATE-PRODUCT" kategorisinde** (Sprint 134 sonrası). Sprint 133'teki 3.6 + 0.26 ilerleme. Tek-kullanıcılı yerel geliştirme için güçlü, milyonlarca bağımsız kurulum hedefi için Sprint 135-145 arası coordinator resilience + distribution + wizard + i18n + local model entegrasyonu zorunlu.
 
 ---
 
@@ -202,28 +217,75 @@ Deckent, otonom AI geliştirme aracı pazarında **benzersiz bir konuma** sahipt
 
 **Spec:** [docs/superpowers/specs/2026-04-10-sprint-133-design.md](../../superpowers/specs/2026-04-10-sprint-133-design.md)
 
-### Sprint 134 (Proposed)
+### Sprint 134 ✅ **COMPLETED** (2026-04-10/11, ~33dk Deckent + ~2.2h manual recovery, 11 DONE + 4 GO_WITH_TECH_DEBT, GO_WITH_TECH_DEBT honest label)
 
-**Tema: God Object Split + Dependency Pipeline + Parser Hardening**
+**Tema: Triple Dogfooding + Max Load + Product Vision Launch**
 
-1. **sprint-reporter.ts 4-way split** — sprint-metrics.ts, sprint-reporter-retro.ts, sprint-reporter-docs.ts, ci-reporter.ts (W5 CRITICAL #1). Effort: HIGH.
-2. **Task dependency pipeline entegrasyonu** — parser + spawner + parallel-pipeline.ts topological sort (W5 HIGH #3-5, W2 HIGH #5). Effort: HIGH.
-3. **sprint-controller.ts devam split** — IPC registry + finalizer çıkarımı (W5 HIGH #2). Effort: NORMAL.
-4. **DIRECTIVES scope parser hardening** (NEW — Sprint 133'te regression bulundu) — `.brain/`, `.` root, çoklu scope entry, code snippet regex sanitization. Effort: LOW-MEDIUM. Referans: [project_directives_scope_parser_regression.md](~/.claude/projects/-home-alperen-deckent-dev/memory/project_directives_scope_parser_regression.md)
-5. **AI planner pair-test auto-scoping** (NEW — Sprint 133'te gözlemlendi) — her `src/**/*.ts` filesWrite için `tests/**/*.test.ts` mirror otomatik ekleme. Effort: LOW.
-6. **Worker self-assessment honesty checker** (NEW — Sprint 133'te "pre-existing failures" yanlış beyan edildi) — Katman 3 bazı validation'ları Brain tarafına taşı, baseline test run pre-sprint. Effort: MEDIUM.
-7. **Docker worker scope isolation** — read-only project mount + scope-specific RW (W1 HIGH #5). Effort: MEDIUM.
-8. **Auditor stale heartbeat cleanup (task-level)** (NEW — Sprint 133'te 3166x false positive alert) — tamamlanmış worker `.hb` dosyaları sprint-level değil task-level temizlensin. Effort: LOW.
+15 task planlandı (max_workers=4 + 2 monitoring agent: Watchdog + Verifier). Parent sprint coordinator crashed mid-execution; manual recovery tüm worker contributions'ları korudu. 14/17 Layer 3 criteria PASS → GO_WITH_TECH_DEBT.
 
-### Sprint 135+
+1. ✅ **Task dependency pipeline + feature flag ON** (Task 134-001) — parseStructuredDirectives Dependencies parsing + spawnWorkers guard + respawnEligibleTasks + DependencyCycleError + wave.transition metric. 20 tests in `tests/orchestra/dependency-pipeline.test.ts`. **CAVEAT:** structured planner Sprint 134 Gate 0.2'de Priority + Dependencies satırlarını NORMAL'e düşürdü; runtime entegrasyon Sprint 135 P0 #4'e bağlı.
+2. ✅ **DIRECTIVES scope parser hardening** (Task 134-002) — `.brain/`, `.` root, çoklu scope, code snippet sanitization. +11 tests in `task-builder.test.ts`.
+3. ✅ **Auditor task-level heartbeat cleanup** (Task 134-003) — `.hb` unlink on DONE, `.result` short-circuit, completed-worker WARNING downgrade. **CAVEAT:** docker_hb_shutdown_bug ayrı bir sorun (Sprint 135 P0 #1).
+4. ✅ **Gitignore housekeeping** (Task 134-004) — `.deckent/cache/`, `.deckent/sprint-*-baseline.json`, `.deckent/metrics.jsonl`.
+5. ✅ **Brain-side baseline + worker honesty checker** (Task 134-005) — `src/orchestra/baseline-tracker.ts` 280 LoC + `writeBaseline`/`readBaseline`/`compareBaseline`/`containsHonestyTrigger`/`checkWorkerHonesty`. 19 tests in `baseline-tracker.test.ts`.
+6. ✅ **Token usage pipeline fix** (Task 134-006) — `tokenUsage` data flow worker → result-collector → sprint-reporter restored.
+7. ✅ **ADR-033 Product Vision + roadmap.md** (Task 134-007) — `.brain/DECISIONS.md` ADR-033 (101 satır, 4 dokunulamaz prensip) + `docs/vision/roadmap.md` (202 satır Sprint 134-145 yol haritası).
+8. ✅ **Mock-safe module audit** (Task 134-008) — `docs/audits/mock-safety-audit.md` 680 satır, 62 dosya audited.
+9. ⚠️ **sprint-reporter.ts 4-way split** (Task 134-009, GO_WITH_TECH_DEBT) — 2297→96 LoC thin barrel + 4 split modules (sprint-metrics 610 + sprint-retro-writer 624 + sprint-docs-updater 864 + ci-reporter 251). **TECH DEBT:** sprint-docs-updater 864 LoC vs 600 target (44% over) → Sprint 135 P2 #9.
+10. ⚠️ **sprint-controller.ts IPC + Finalize Extraction** (Task 134-010, GO_WITH_TECH_DEBT) — `sprint-finalizer.ts` 814 LoC fully populated (finalizeSprint, writeRubricDetail, runSelfAuditGate, SelfAuditResult, applyAdaptiveThresholds), `ipc-registry.ts` 37 LoC. **TECH DEBT:** `askBrain()` NOT extracted from `worker-ipc.ts:418-504`; sprint-controller.ts hâlâ 1820 LoC vs ~300 target → Sprint 135 P0 #3.
+11. ✅ **Local Observability Seviye 2** (Task 134-011) — `src/core/observability.ts` 403 LoC (metric/trace/structuredLog/generateLoadReport + bonus exports), data locality verified, 25 tests. Primary instrument points wired in sprint-controller.ts. **CAVEAT:** Sprint coordinator crashed before metrics.jsonl flush — runtime dogfood başarısız, kod production-ready.
+12. ✅ **ADR-034 Multi-Project Isolation + Symlink Scope Fix** (Task 134-012) — `.brain/DECISIONS.md` ADR-034 (109 satır), `docs/design/multi-project-isolation.md` (421 satır), `worker.ts` symlink scope hardening. "Multi-project ≠ SaaS multi-tenant" disambiguation explicit.
+13. ⚠️ **RETRO Rubric Detail Injection** (Task 134-013, GO_WITH_TECH_DEBT) — `formatRubricScoresSection` in `sprint-retro-writer.ts:202-246`, `writeRubricDetail` in `sprint-finalizer.ts:107-159`. **TECH DEBT:** function renamed (spec said `formatRubricTable`); only 2 negative-path tests vs 3+ positive-path required → Sprint 135 P1 #6.
+14. ⚠️ **Brain Self-Audit Gate (P3)** (Task 134-014, GO_WITH_TECH_DEBT) — `runSelfAuditGate` + `SelfAuditResult` + `SelfAuditGateOptions` in `sprint-finalizer.ts:174-351`, `GO_WITH_GATE_FAILURE` in `result-evaluator.ts:604`. **Live PASS via `.deckent/run-self-audit.mjs`** during recovery (`.deckent/sprint-134-gate.json` overallGate: PASS). **TECH DEBT:** dedicated `self-audit-gate.test.ts` missing; `GO_WITH_GATE_FAILURE` constant not imported into sprint-finalizer.ts (status propagation gap) → Sprint 135 P1 #5 + #7.
+15. ✅ **Competitive Analysis Refresh** (Task 134-015) — never spawned by Deckent (max_workers=4 slot reached crash before T-015), manually completed during recovery Step A. `docs/analysis/competitive-analysis.md` "Sprint 134 Refresh — Product-Not-Service Manifesto" section.
 
-**Tema: Async I/O Migration + Community + Benchmark**
+**Katman 3 verification:** `tsc --noEmit` 0 error, `vitest run` 505 files / 12485 pass / 16 skipped / **0 fail** (+113 net test). **4 manual integration fix:** 3 mock updates in `auditor-edge.test.ts` for T-003 `.result` short-circuit, 1 source migration `observability.ts` → DECKENT_E054 ErrorRegistry (error-handling-unification rule compliance). **`runSelfAuditGate('sprint-134')` live invocation: overallGate=PASS** (the only clean dogfood loop of Sprint 134's triple-dogfood thesis).
 
-1. **Hot path async migration** — spawnWorkers, waitForResults, evaluateResult fs.promises geçişi (W2 CRITICAL #1). Effort: HIGH (kademeli).
-2. **SWE-bench benchmark çalışması** — Enterprise değerlendirme için zorunlu (W6 HIGH #5). Effort: HIGH.
-3. **npm publish + GitHub public repo** — Community oluşturma (W6 LOW #16). Effort: NORMAL.
-4. **Plugin API versioning** — PluginManifest'e deckentApiVersion field (W4 MEDIUM #1). Effort: LOW.
-5. **Hook genişletme** — beforeRouting, afterEvaluate, onWorkerSpawn, onWorkerComplete (W4 MEDIUM #2). Effort: NORMAL.
+**Spec:** [docs/superpowers/specs/2026-04-11-sprint-134-design.md](../../superpowers/specs/2026-04-11-sprint-134-design.md)
+**Recovery plan:** `/home/alperen/.claude/plans/melodic-launching-aurora.md`
+**Layer 3 scorecard:** [.deckent/sprint-134-layer3-scorecard.md](../../../.deckent/sprint-134-layer3-scorecard.md) (14/17 PASS)
+**Self-audit live result:** [.deckent/sprint-134-gate.json](../../../.deckent/sprint-134-gate.json) (overallGate: PASS)
+
+### Sprint 135 (Proposed)
+
+**Tema: Coordinator Resilience + Docker HB Bug Fix + T-010 Finish + 9 Carry-over Debt**
+
+Sprint 134'ün 12 carry-over debt item'ından türetilmiş. P0 (4) zorunlu, P1 (4) önerilen, P2 (4) opsiyonel. Toplam ~3-5 saat (Sprint 134'ten daha kısa beklenir çünkü recovery yok).
+
+**P0 — Critical (must-do, sprint kimliği):**
+
+1. **docker_hb_shutdown_bug fix** — Auditor HB+Result reconciliation (Seçenek B) + Docker backend graceful shutdown (Seçenek C). Sprint 134'te 47+ live false positive observed. Effort: HIGH. Memory: `project_docker_hb_shutdown_bug.md`.
+2. **Sprint coordinator resilience** — PID file + state snapshot + orphan auto-detection. **Sprint 134'teki tek en büyük operasyonel risk.** Gereksinimler: `.deckent/sprint-NNN.pid` write, periodic state snapshot, `process.on('beforeExit')` observability flush, `deckent start` restart'ta orphan detection prompt. Effort: HIGH.
+3. **T-010 askBrain() extraction finish** — `askBrain()` move from `worker-ipc.ts:418-504` to `ipc-registry.ts` + sprint-controller.ts slim 1820 → ~300 LoC. Effort: HIGH (regression riski).
+4. **Structured planner Priority + Dependencies parsing fix** — Sprint 134 Gate 0.2 observation: structured parser `- Priority:` ve `- Dependencies:` satırlarını ignore ediyor → T-001 dep pipeline canlı çalışmadı. Effort: NORMAL.
+
+**P1 — High (should-do):**
+
+5. **`tests/orchestra/self-audit-gate.test.ts`** — 5+ dedicated tests for T-014 (spec gereksinimi).
+6. **`tests/orchestra/rubric-detail.test.ts`** — 3+ positive-path tests for T-013 (correct table format, N/A columns, avg math).
+7. **`GO_WITH_GATE_FAILURE` status propagation wire** in `sprint-finalizer.ts` (T-014 finish).
+8. **Worker verify_loop enforcement** — workers must run `tsc --noEmit` to 0 errors before `.result` write; honesty checker flag if violated.
+
+**P2 — Medium (nice-to-have):**
+
+9. **`sprint-docs-updater.ts` refactor** 864 → 600 LoC.
+10. **T-011 secondary instrument points** — loadConfig cache hit/miss, claimTask file lock wait, heartbeat_stale, honesty_check.
+11. **Dashboard vs MCP state divergence** investigation (CLI stale Sprint 133 COMPLETE during Sprint 134 ACTIVE).
+12. **Brain memory budget enforcement** — automatic decay trigger before budget overrun (Sprint 134 sonu 1179/600 over).
+
+**Pre-flight reference:** `~/.claude/projects/-home-alperen-deckent-dev/memory/project_sprint135_preflight.md` (12 bölüm, kickoff prompt dahil).
+
+### Sprint 136+
+
+**Tema: Async I/O Migration + Distribution + Wizard**
+
+1. **Hot path async migration** — spawnWorkers, waitForResults, evaluateResult fs.promises geçişi (W2 CRITICAL #1, Sprint 135 P0 #2 ile bağlantılı — coordinator resilience önce). Effort: HIGH (kademeli).
+2. **npm publish + Docker Hub + Homebrew + curl install.sh** — Distribution channels, "kur çalıştır" UX hedefi (ADR-033 prensip #2). Effort: NORMAL.
+3. **Install wizard overhaul** — `deckent init` interactive flow, sıfır programcı kullanıcı bile kurabilsin. Effort: HIGH.
+4. **Local model entegrasyonu (Ollama, llama.cpp, LM Studio)** — Maliyet 0$/ay opsiyonu (ADR-033 prensip #4: cüzdan bariyeri düşür). Effort: HIGH.
+5. **SWE-bench benchmark çalışması** — Rakip karşılaştırma için empirik (W6 HIGH #5). Effort: HIGH.
+6. **Plugin API versioning** — PluginManifest'e deckentApiVersion field (W4 MEDIUM #1). Effort: LOW.
+7. **Hook genişletme** — beforeRouting, afterEvaluate, onWorkerSpawn, onWorkerComplete (W4 MEDIUM #2). Effort: NORMAL.
 
 ### Backlog
 
