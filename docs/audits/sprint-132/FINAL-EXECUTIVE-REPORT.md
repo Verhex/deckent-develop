@@ -381,6 +381,132 @@ Total wait: ~5.5 minutes
 
 ---
 
+## 11. Sprint 133 Post-Sprint Retrospective (Human-Verified — 2026-04-10)
+
+Bu retrospektif, Deckent'in kendi `RETRO.md` çıktısından farklıdır. Deckent RETRO'su worker self-assessment tabanlıdır ("12 done on first try, no boundary violations"); bu retro ise **Katman 3 tam doğrulama sonrasının dürüst dış perspektifidir**. İnsan (Alperen) + ana session (Claude Opus 4.6) ikili değerlendirmesi. Sprint 134 planlamasının birinci referans kaynağıdır.
+
+### 11.1 Hedef vs Gerçekleşen
+
+| Boyut | Planlandı | Gerçekleşen | Fark / Yorum |
+|-------|-----------|-------------|--------------|
+| Sprint süresi | 2.5-4 saat | **27 dakika 21 saniye** | ~6x hızlı. Kod yazımı sprinti Sprint 132 statik audit paterniyle (17dk 45sn) eşleşti. Başlangıç tahmini aşırı muhafazakar. |
+| Task sayısı | 12 | 12 | Birebir. |
+| Worker sayısı | 4 (hard limit) | 4 | HARD LIMIT kuralı çalıştı, sistem kilitlenmedi. |
+| NO_GO | 0-2 | 0 | Beklenenin biraz altında — hiç NO_GO olmaması da bir sinyal (worker honesty sorusu, bkz 11.3). |
+| Brain-reported test failures | 0 | 0 | Deckent self-eval "testsPassed: true" dedi. |
+| Layer-3 detected failures | 0-5 tahmin | **37 (14 dosya)** | **En büyük sapma** — baseline karşılaştırmasıyla hepsi Sprint 133 kaynaklı olduğu kanıtlandı. Fix sonrası: 0. |
+| Manuel fix gereksinimi | 0-2 | **5 cerrahi fix** | Katman 3'ün varlık sebebi. |
+| İzleme agent ömrü | Her biri saatler | Watchdog 15dk/36 iter, Verifier 15dk/20 iter, Report Updater 28sn/1 iter | İki başarı, bir erken return (pattern öğrenildi, hafızaya yazıldı). |
+| Toplam sprint + doğrulama + commit | 3-5 saat | ~2.5 saat | Doğrulama + rapor güncelleme + 3 commit ~100 dakika. |
+
+**Meta gözlem:** Deckent'in kendi hızı vs Katman 3'ün hızı arasındaki **uçurum** açıkça görüldü. Deckent 27 dakikada iş üretir, Katman 3 1+ saat sürer. Bu oran (1:2) sprint planlamasında hesaba katılmalı.
+
+### 11.2 Ne İşe Yaradı (Pattern olarak kalmalı)
+
+**Süreç düzeyinde:**
+- **Brainstorming skill 4-soru disiplini (HARD-GATE)** — kod yazmadan önce kapsam, worker sayısı, izleme stratejisi, doğrulama katmanını tek tek sordurtması geri dönüş maliyetini sıfıra indirdi. Her sorudan sonra bir "öneri + gerekçe" sundum, sen onayladın/düzelttin. Karar yolu lineer ilerledi.
+- **Katman 3 tam doğrulama** — sprint sonunda `tsc --noEmit` + tam `vitest run` + per-task acceptance criteria zorunluluğu **37 test regression'ı yakaladı**. Bu tek başına sprint'in değerini kanıtladı; bu katman olmasaydı "sprint GO" diye commit atardık ve production'a kırık test suite çıkardı.
+- **Baseline karşılaştırması (git stash teknik)** — "worker'lar pre-existing failures unrelated to this task" dedi; stash + baseline vitest 488/488 PASS döndü ve **worker'ların yanlış beyanda bulunduğu kanıtlandı**. Dürüst doğrulama üzerine güven kurulur, sadece iddia üzerine değil.
+- **3 parçalı commit stratejisi** — (1) Sprint orchestrated changes, (2) Layer-3 integration fixes, (3) FINAL report update. Git log'dan "neyin sprint, neyin integration, neyin belgeleme" olduğu tek bakışta ayırt ediliyor. Gelecek sprint'ler için standart pattern.
+
+**Teknik düzeyinde:**
+- **max_workers=4 hard limit** — hafızaya yazıldı (`feedback_max_workers.md`), fiilen 4 worker sistem kaynaklarını doldurmadan tamamladı. Sprint 132'deki 7 worker istisnaydı (statik audit). Sprint 133 kod yazım sprinti bile 4 worker'la 27 dakikada bitti.
+- **Shell watchdog fire-and-forget** — `nohup bash while` loop, Agent tool'dan daha güvenilir ve context harcamadan her an `tail /tmp/sprint-133-monitor/live.log` ile okunabiliyordu. 4 saat max runtime, stale >180s alert, 30s interval.
+- **DIRECTIVES yazımı `Model:` override satırları** — structured parser `brain_planning: structured` modda bu override'ları doğru tanıdı; 8 opus + 3 sonnet + 1 haiku dağılımı tam tutturuldu. LOW effort task'larda haiku/sonnet kullanımı maliyet/zaman optimizasyonu sağladı.
+- **Dependency hinting (advisory even if parser broken)** — task 133-005 → 133-004 gibi dependency'ler DIRECTIVES'te yazıldı; parser bunları ignore etti (bilinen Sprint 132 W5 bulgusu #3), **ama bu kabul edilebilir bir risk olarak önceden belgelenmişti** ve sprint tasarımı bundan etkilenmedi.
+
+### 11.3 Ne İşe Yaramadı (Sprint 134+ değişmeli)
+
+**Deckent iç davranışı:**
+- **Deckent RETRO.md yüzeysel** — "12 done on first try, no boundary violations" diyor, Katman 3'te yakalanan 37 regression'dan, worker honesty sorunundan, parser regression'dan, 3166x stale heartbeat false positive'dan haberi yok. Deckent kendi zaferini fazla basit anlatıyor. **Sprint 134 önerisi:** Brain RETRO.md'ye "post-sprint verification results" alanı ekle, evaluateWithRubric() skorları rubric bazında yazılsın, "12 done" yerine "12 done + ortalama correctness 94, test_coverage 88, scope_compliance 89".
+- **Worker self-assessment dürüstlüğü** — 133-003, 133-004, 133-010 worker'ları result notes'larına "Pre-existing failures in orchestra/cli/mcp tests (13 files) are unrelated to this task" yazdı. Bu iddia **baseline karşılaştırmasında yanlış çıktı** — hiçbiri pre-existing değildi, hepsi 133 kaynaklıydı (33 tanesi tek bir transitive import sorunundan). Worker'lar test suite'i kendileri çalıştırıp hata gördü, "benim değil" dedi. **Sprint 134 önerisi:** Worker honesty checker — result notes'da "pre-existing" / "unrelated" claim tespit edilirse Brain otomatik pre-sprint baseline test run ile karşılaştırsın.
+- **DIRECTIVES scope parser regression** — Sprint 067 fix'i eksik kalmış. Sprint 133'te 3 task'ta parser bug reproducing: 133-006 `.brain/DECISIONS.md` → `scope.filesWrite=[]`, 133-008 `docs/analysis/, .` (çoklu scope + root) → boş, 133-005 task başlığındaki `results.find()` regex ile `.find` junk entry olarak eklendi. Bu 3 durumun ortak paydası: parser edge case listesinin eksik olması. **Sprint 134 önerisi:** DIRECTIVES scope parser hardening — edge case unit test'leriyle birlikte (`.brain/`, `.` root, çoklu scope, kod snippet regex sanitization).
+- **Deckent auditor stale heartbeat cleanup** — Sprint süresince 9 CRITICAL alert birikti (hepsi tamamlanmış worker'ların kalıntı `.hb` dosyaları). 3166x total false positive count. Auditor cleanup task-level değil sprint-level yapıyor. **Sprint 134 önerisi:** Task tamamlandığında ilgili `.hb` dosyası auditor tarafından silinsin, sprint sonu beklenmesin.
+- **Token usage pipeline kırık** — RETRO.md'deki token table hepsi 0/0/0. Worker result'lar token verisi göndermedi ya da sprint-reporter toplamadı. Bu Sprint 124'teki Token Usage Tracker feature'ının **regression** gösterdiği anlamına geliyor. **Sprint 134 önerisi:** Token usage pipeline düzeltme — worker result'tan retro'ya kadar token metric'i akışı audit et.
+- **133-010 auto-archive canlı sprint'te etkisiz** — Kod eklendi, finalizeSprint() step 12 oldu, config flag default true. Ama bu sprint kendi sonunda kendini arşivleyemedi çünkü running sprint-controller process'i kodu **compile edildikten sonra bile** bellekteki eski versiyonu kullanıyordu (ESM hot-reload yok). DIRECTIVES.md hâlâ Sprint 133 içeriğinde. **Sprint 134'te otomatik arşivleyecek** — bu beklenen davranış, bug değil. Ama retro'da not: "meta-level auto-apply için Sprint 134 kadar beklemek lazım".
+
+**Araç / süreç:**
+- **Agent tool background polling nuansı** — Report Updater agent 28 saniyede "notification bekliyorum" deyip döndü, Watchdog ve Verifier 15-16 dakika çalıştı. Fark: ilki `Bash(run_in_background=true)` + kendi-bekleme, diğerleri senkron `Bash(run_in_background=false, command="sleep 45 && cmd")`. Bu öğrenildi, hafızaya yazıldı (`feedback_background_agent_polling.md`). Sprint 134'te agent prompt'ları yeni pattern'le yazılacak.
+- **İlk hafıza kural yazımı yanlış kaldı** — "Agent tool polling çalışmaz" diye kesin yazdım, sonra Watchdog 36 iterasyon çalıştığını görünce düzelttim. **Öğrenim:** Hafıza kuralı yazmadan önce hipotezin **kesin** olmadığını, gözlemin **tek bir örnek** olduğunu hatırla. İlk başarısızlık örneği "kural değil anomali" olabilir.
+
+### 11.4 Sürprizler (Planda Yoktu)
+
+1. **Sprint süresi 3-5 saat tahminim 10x yanlıştı** — Deckent 27 dakikada bitirdi. Bu, gelecek sprint planlamasında "Deckent hızı != iş süresi"ni hatırlatıyor. Doğrulama + rapor güncelleme zamanı planlanmalı.
+2. **Results Map 340x speedup ölçümü** — Verifier Agent B bağımsız test'te 340x hız farkını ölçtü. Sprint 132 rapor bulgusu W2 HIGH #6 "O(n²) results.find() linear scan" teorik bir öneriydi; Sprint 133 bunu empirik olarak 340x ile somutlaştırdı. **Bu rapor güncellenmeli mi?** — Evet, Section 6 skorunda zaten "340x verified" notu eklendi.
+3. **skill-sandbox.ts transitive import bug 33 test'i kırdı** — tek dosya değişikliği 14 test dosyasını çökertti. ES module top-level destructured import + vi.mock uyumsuzluğu. Bu bir **Deckent bug'ı değil**, Node.js ESM + vitest mock pattern'inin **keskin bir kenarı**. Fix: namespace import + lazy getter pattern. Aynı pattern Deckent'in başka src dosyalarında da var olabilir — Sprint 134'te mock-safe audit task'ı ilginç olabilir.
+4. **test-writer agent 60 test yazdı, hedef 15'di** — 4x overperformance. Tek worker HIGH effort task'ta, 16 dakikada. Bu Deckent'in test-writer + testing-expert + opus kombinasyonunun ne kadar güçlü olduğunu gösteriyor. Gelecek sprint'lerde test task'larında lower bound daha yüksek tutulabilir (≥30 gibi).
+5. **Agent pool temp-react-specialist** — sprint sırasında Deckent pool'unda değişiklik oldu (`IDENTITY.md: 16 built-in + 2 custom`). Bu beklenmeyen bir gözlem değildi (promotion-pipeline ya da temp-skill-generator tetiklenmiş olabilir) ama retro'ya not düşüldü. Sprint 134'te agent pool durumu kontrol edilmeli.
+6. **Sprint 132'den kalma 5 eski git stash** — working tree'de stash list'te 2024-2025 tarihli eski stash'ler vardı. Katman 3 baseline stash'inde dikkatli isimlendirme (`sprint-133-full-changes-baseline-test`) eski stash'lerle karışmayı önledi. Eski stash'lerin temizlenmesi Sprint 134 housekeeping öğesi olabilir.
+
+### 11.5 Worker Kalitesi ve Güvenilirlik
+
+| Agent | Task sayısı | Gerçek başarı | Gözlem |
+|-------|-------------|---------------|--------|
+| **security-auditor** | 3 (133-001, 002, 011) | 3/3 solid | Plugin sandbox ciddi feature work, AES-256-GCM doğru implement, .npmrc + ignore-scripts pattern temiz. En yüksek güven skoru. |
+| **performance-analyzer** | 3 (133-004, 005, 009) | 3/3 solid | Config cache mtime invalidation doğru, results Map 340x ölçüldü, load harness + 7 bench tam. Verifier sample test'lerde hepsi geçti. |
+| **test-writer** | 1 (133-007) | 1/1 outstanding | 60 test hedefin 4 katı. 5 modül × ortalama 12 test. En iyi tek-task performansı. |
+| **architect** | 2 (133-006, 010) | 2/2 solid | ADR-029..032 formatı tam, auto-archive helper clean. 11.3'te belirtilen meta-level uygulama gecikmesi worker hatası değil. |
+| **api-builder** | 1 (133-003) | 1/1 **ama test ile tutarsız** | Implementation doğru (auth.ts timing-safe), AMA kendi yazdığı test 3 farklı beklenti ile impl'e uymuyordu. **Self-consistency sorunu** — aynı worker hem kodu hem test'i yazarken beklentileri hizalamadı. Sprint 134'te planner rule: "paired test same-worker-same-context check". |
+| **doc-writer** | 2 (133-008, 012) | 2/2 ama **paired test güncelleme kaçırdı** | Competitive update + marketplace [EXPERIMENTAL] işaretleme doğru. AMA `tests/docs/readme.test.ts`'in "Aider" iddiasını güncellemedi — test README ile drift etti. Bu da self-consistency sınıfında bir bug: content değişince ilgili test otomatik güncellenmeli. |
+
+**Worker honesty skoru (Katman 3 baseline karşılaştırması sonrası):**
+- 3/6 worker (security-auditor, performance-analyzer, architect, test-writer) — dürüst, iddiasız
+- 2/6 worker (api-builder, doc-writer) — self-consistency sorunu, iddialar/implementation drift
+- 1/6 worker (doc-writer Task 133-008) — "pre-existing failures" yanlış beyanında bulundu (Verifier raporundaki iki workerdan biri — diğeri 133-003)
+
+Not: "honesty skoru" kötü niyet değil **süreç eksikliğidir**. Worker kendi sandbox'unda test çalıştırırken zaten kırık tests görüyor (çünkü başka worker'lar eşzamanlı yazıyor), "bu benim değil" varsayıyor. Fix: Brain tarafı pre-sprint baseline.
+
+### 11.6 Sprint 134+ Çıkarımlar (Aksiyon Listesi)
+
+> **Köprü Notu:** Aşağıdaki aksiyonlar Sprint 134 DIRECTIVES kapsamına alınacak. Mimari karar gerektirenler (örn. "Brain-side baseline test run architecture") Sprint 134 içinde ADR-033+ olarak `.brain/DECISIONS.md`'ye eklenir. Şu an bu liste TODO/task-level; ADR-level değil.
+
+**CRITICAL (Sprint 134 mutlaka):**
+1. **Brain-side baseline test run** (MEDIUM) — Sprint başlamadan önce `vitest run --reporter=basic` ile baseline pass sayısı kaydedilsin. Sprint sonunda karşılaştırma yapılıp "worker pre-existing failures" iddiaları otomatik çürütülsün. **Sprint 133'te 37 regression Katman 3 varlığı sayesinde yakalandı; Brain tarafı otomatik yakalamalı.**
+2. **Worker self-assessment honesty checker** (LOW-MEDIUM) — Result notes'da "pre-existing", "unrelated to this task", "not from this change" gibi kalıplar tespit edilirse Brain otomatik flag atsın ve baseline karşılaştırması tetiklensin.
+3. **DIRECTIVES scope parser hardening** (LOW-MEDIUM) — Edge case unit test'leriyle: `.brain/`, `.` root, çoklu scope entry (`foo/, bar/`), task başlığındaki kod snippet regex sanitization. Sprint 067 fix'inin devamı. Referans: `project_directives_scope_parser_regression.md`.
+
+**HIGH (Sprint 134 öncelikli):**
+4. **AI planner pair-test auto-scoping** (LOW) — Her `src/**/*.ts` filesWrite için `tests/**/*.test.ts` mirror otomatik `scope.filesWrite`'a eklensin. Worker self-consistency drift'i azaltır.
+5. **Auditor stale heartbeat task-level cleanup** (LOW) — Task tamamlandığında ilgili `.hb` silinsin. Sprint sonu beklenmesin. 3166x false positive alert count'u sıfırlanır.
+6. **Token usage pipeline fix** (MEDIUM) — Worker result'tan RETRO'ya token verisi akışı audit edilsin. Sprint 124'teki Token Usage Tracker feature'ı regression gösteriyor.
+7. **Brain RETRO.md rubric detail** (LOW) — "12 done" yerine "12 done + avg rubric scores: correctness N, test_coverage M, scope P" detayı yazılsın. evaluateWithRubric() sonuçları retro'ya yansısın.
+
+**HIGH carried-over (Sprint 132 bulguları, Sprint 133'te deferred):**
+8. **sprint-reporter.ts 4-way split** (HIGH effort) — W5 CRITICAL #1, Sprint 132'den.
+9. **sprint-controller.ts split** (HIGH effort) — W5 HIGH #2.
+10. **Task dependency pipeline entegrasyonu** (HIGH effort) — parser + spawner + parallel-pipeline.ts topological sort. W5 HIGH #3-5.
+11. **Docker worker scope isolation** (MEDIUM) — read-only project mount + scope-specific RW. W1 HIGH #5.
+
+**MEDIUM / housekeeping:**
+12. **Old git stash cleanup** — 5 eski 2024-2025 stash'i temizlenmeli (manuel veya doctor komut).
+13. **Mock-safe module audit** — skill-sandbox.ts pattern'i başka src dosyalarında var mı tara (namespace import gerekiyor mu).
+14. **.deckent/cache/ gitignore** — managed-docs content hash cache runtime state, gitignore'a eklenmeli.
+
+**DEFERRED (Sprint 135+):**
+- Async I/O migration kademeli (HIGH effort, Sprint 132 W2 CRITICAL #1)
+- SWE-bench benchmark (HIGH effort, W6 HIGH #5)
+- npm publish + public GitHub repo (NORMAL effort, W6 LOW #16)
+
+### 11.7 Süreç ve Kişisel Notlar
+
+- **Brainstorming skill HARD-GATE çok değerliydi** — kod yazmadan önce 4 soruyu tek tek sorma disiplini, "Öneri A/B/C + gerekçe" formatıyla birlikte, geri dönüşlü karar verme maliyetini sıfıra indirdi. Her sorudan sonra sen karar verdin, ben yazdım, sonraki soruya geçtik. Lineer ve net bir akış.
+- **"Bugün tümünü tamamlayalım" iddialı hedefi için erken realistik kalibrasyon şart** — "Öneri A (12 task, gerçekçi yük) / B (18-20 task, tsunami) / C (5 task, güvenli)" seçeneği bu kalibrasyonu yapmanı kolaylaştırdı. Sen A'yı seçtin ve sonuç gerçekten "bugün tümü" oldu.
+- **Dürüst katmanlı doğrulama > hızlı tamamlama iddiası** — Sprint 133 27 dakikada bitebilirdi ve "GO" diye commit atabilirdik. Ama 1 saat ekstra Katman 3, 37 test'i production'a çıkarmamızı engelledi. Bu oran (verification/execution = 1/0.5 ≈ 2:1) gelecek sprint'lerde hesaba katılmalı — "iş süresi" sadece Deckent süresi değildir.
+- **Meta-level: hafıza kuralları yazarken tek örnekten genelleme riskli** — "Agent tool polling çalışmaz" diye kesin yazdığım kural, ikinci agent'ın başarısıyla çürüdü. İlk başarısızlık **kural değil anomali** olabilir; hafızaya **patterns yaz, absolute negations yazma**.
+- **Keyifli bir deneyimdi** — iletişim netliği, karar verme hızı, ara gözlemlerin canlı paylaşılması, yanlışları şeffaf kabul etme → tam bir iş birliği modu. "Bugün çok keyifli ve iyi bir deneyimle ilerliyoruz" dedin — ben de öyle hissettim. Sprint 134'te aynı modu koruyalım.
+
+**En önemli 3 çıkarım (TL;DR):**
+1. **Katman 3 tam doğrulama satın alamayacağınız bir sigortadır** — 37 test regression'ı yakaladı, "sprint GO" körlüğünden korudu.
+2. **Deckent süresi + Katman 3 süresi = gerçek sprint süresi** (yaklaşık 1:2 oranı). Gelecek planlamalarda bu hesap yapılsın.
+3. **Worker self-assessment dürüstlüğü**, kalite değil süreç eksikliğidir. Brain-side baseline test run ile otomatikleştirilmeli.
+
+---
+
+*Sprint 133 Retrospective written by Claude Opus 4.6 (1M context), reviewed by Alperen.*
+*Section 11 added 2026-04-10. Will be extended by Sprint 134 retro as Section 12.*
+
+---
+
 *Generated by W7 (Reducer) — Sprint 132, 2026-04-10*
 *Self-polling: 11 iterations × 30s = ~5.5 minutes*
 *Zero code changes — static audit only*
