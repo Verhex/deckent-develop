@@ -13,6 +13,7 @@ import { analyzeProject } from '../../core/analyzer.js';
 import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { ensureDeckentImport } from '../../core/utils.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { loadDocsConfig, saveDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -201,6 +202,21 @@ Lint: tsc --noEmit
       // Workspace: TOOLS.md + BOOT.md
       writeFile(join(root, WORKSPACE_DIR, 'TOOLS.md'), generateToolsContent(root));
       writeFile(join(root, WORKSPACE_DIR, 'BOOT.md'), `# Boot Sequence\n\n1. Brain reads DIRECTIVES.md\n2. Brain checks context (MEMORY, RETRO, DEBT, PATTERNS)\n3. Brain plans sprint\n4. Workers spawned, auditor scan loop starts\n5. Workers execute tasks, write heartbeats\n6. Brain waits for results, evaluates\n7. Sprint complete\n`);
+
+      // Bootstrap docs.json — managed docs automation
+      try {
+        if (!loadDocsConfig(root)) {
+          saveDocsConfig(root, {
+            version: 1,
+            docs: [{
+              id: 'claude-md',
+              path: 'CLAUDE.md',
+              autoSections: ['Sprint Metrics'],
+              protectedSections: [],
+            }],
+          });
+        }
+      } catch { /* non-fatal */ }
 
       // i18n
       const enMessages = {

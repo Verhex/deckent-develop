@@ -5,6 +5,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { addDoc, removeDoc, loadDocsConfig, saveDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
+import { runManagedDocUpdates, buildStandaloneDocContext } from '../../orchestra/managed-docs/managed-doc-runner.js';
+import { clearDocCache } from '../../orchestra/managed-docs/doc-cache.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
@@ -121,5 +123,35 @@ export function registerDocs(program: Command): void {
       // Save back
       saveDocsConfig(root, config);
       print(`✓ Updated: ${entry.id}`);
+    });
+
+  // ─── docs run ─────────────────────────────────────────────────────────
+  docs
+    .command('run')
+    .description('Run managed doc updates without a sprint')
+    .option('--no-cache', 'Clear the doc cache before running')
+    .action((opts: { cache?: boolean }) => {
+      const root = resolveProjectRoot();
+      if (opts.cache === false) {
+        clearDocCache(root);
+      }
+      const ctx = buildStandaloneDocContext(root);
+      if (!ctx) {
+        printError('No docs config found. Use `deckent docs add <path>` first.');
+        return;
+      }
+      const results = runManagedDocUpdates(ctx);
+      if (results.length === 0) {
+        print('No managed documents to update.');
+        return;
+      }
+      for (const r of results) {
+        if (r.updated) {
+          print(`  ✓ ${r.file}: ${r.reason}`);
+        } else {
+          print(`  - ${r.file}: ${r.reason}`);
+        }
+      }
+      print(`\nDone. ${results.filter(r => r.updated).length}/${results.length} docs updated.`);
     });
 }

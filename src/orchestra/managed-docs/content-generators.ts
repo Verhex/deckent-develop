@@ -6,6 +6,9 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { BRAIN_DIR, DEBT_FILE, SPRINTS_DIR } from '../../core/constants.js';
 import { TaskEvaluation } from '../../core/types.js';
+import { AgentPoolManager } from '../../core/agent-pool.js';
+import { SkillPoolManager } from '../../core/skill-pool.js';
+import { modelRegistry } from '../../core/model-registry.js';
 import type { DocUpdateContext } from '../doc-updaters/types.js';
 import type { SectionGenerator } from './types.js';
 
@@ -72,12 +75,22 @@ function register(g: SectionGenerator): void {
 
 /**
  * Find a generator matching the given section title (case-insensitive fuzzy match).
+ * Searches `patterns` and all entries in `patternsByLang` to support multi-language titles.
  */
-export function findGenerator(sectionTitle: string): SectionGenerator | null {
+export function findGenerator(sectionTitle: string, extraGenerators: SectionGenerator[] = []): SectionGenerator | null {
   const normalized = sectionTitle.toLowerCase().trim();
-  for (const g of generators) {
-    for (const pattern of g.patterns) {
-      if (normalized === pattern.toLowerCase() || normalized.includes(pattern.toLowerCase())) {
+  // User-defined generators take precedence over built-ins
+  const pool = [...extraGenerators, ...generators];
+  for (const g of pool) {
+    const allPatterns: string[] = [...g.patterns];
+    if (g.patternsByLang) {
+      for (const langPatterns of Object.values(g.patternsByLang)) {
+        allPatterns.push(...langPatterns);
+      }
+    }
+    for (const pattern of allPatterns) {
+      const p = pattern.toLowerCase();
+      if (normalized === p || normalized.includes(p) || p.includes(normalized)) {
         return g;
       }
     }
@@ -85,17 +98,24 @@ export function findGenerator(sectionTitle: string): SectionGenerator | null {
   return null;
 }
 
+/** Exposed for tests and plugin loaders. */
+export function getAllGenerators(): SectionGenerator[] {
+  return [...generators];
+}
+
 /**
  * Generate content for all auto sections.
  * Returns a map of sectionTitle → generated markdown content.
+ * Optional `extraGenerators` are searched before built-ins (user overrides).
  */
 export function generateAllSections(
   autoSections: string[],
   ctx: DocUpdateContext,
+  extraGenerators: SectionGenerator[] = [],
 ): Map<string, string> {
   const result = new Map<string, string>();
   for (const title of autoSections) {
-    const generator = findGenerator(title);
+    const generator = findGenerator(title, extraGenerators);
     if (generator) {
       try {
         result.set(title, generator.generate(ctx));
@@ -112,7 +132,13 @@ export function generateAllSections(
 // ─── Sprint Metrics ───────────────────────────────────────────────────────
 
 register({
+  id: 'sprint-metrics',
   patterns: ['sprint metrics', 'metrics', 'stats', 'sprint stats'],
+  patternsByLang: {
+    tr: ['sprint metrikleri', 'metrikler', 'sprint istatistikleri', 'istatistikler'],
+    de: ['sprint-metriken', 'metriken'],
+    es: ['métricas', 'estadísticas del sprint'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const { metrics } = ctx.sprintResult;
@@ -136,7 +162,13 @@ register({
 // ─── Active Debt ──────────────────────────────────────────────────────────
 
 register({
-  patterns: ['active debt', 'tech debt', 'debt', 'teknik borç'],
+  id: 'active-debt',
+  patterns: ['active debt', 'tech debt', 'debt'],
+  patternsByLang: {
+    tr: ['teknik borç', 'aktif borç', 'açık borç'],
+    de: ['technische schulden'],
+    es: ['deuda técnica'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const debtPath = join(ctx.projectRoot, BRAIN_DIR, DEBT_FILE);
@@ -158,7 +190,13 @@ register({
 // ─── Sprint History ───────────────────────────────────────────────────────
 
 register({
+  id: 'sprint-history',
   patterns: ['sprint history', 'history', 'progress', 'sprint progress'],
+  patternsByLang: {
+    tr: ['sprint geçmişi', 'geçmiş', 'sprint tarihçesi', 'ilerleme'],
+    de: ['sprint-verlauf', 'verlauf'],
+    es: ['historial de sprint', 'historial'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const sprintsDir = join(ctx.projectRoot, BRAIN_DIR, SPRINTS_DIR);
@@ -186,7 +224,13 @@ register({
 // ─── Agent Performance ────────────────────────────────────────────────────
 
 register({
+  id: 'agent-performance',
   patterns: ['agent performance', 'agents', 'agent stats'],
+  patternsByLang: {
+    tr: ['agent performansı', 'ajan performansı', 'agent istatistikleri'],
+    de: ['agent-leistung'],
+    es: ['rendimiento de agentes'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const { sprint, evaluations } = ctx.sprintResult;
@@ -215,7 +259,13 @@ register({
 // ─── Changelog / Recent Changes ───────────────────────────────────────────
 
 register({
-  patterns: ['changelog', 'recent changes', 'changes', 'son değişiklikler'],
+  id: 'changelog',
+  patterns: ['changelog', 'recent changes', 'changes'],
+  patternsByLang: {
+    tr: ['son değişiklikler', 'değişiklik günlüğü', 'değişiklikler'],
+    de: ['änderungsprotokoll', 'änderungen'],
+    es: ['registro de cambios', 'cambios'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const { sprint, evaluations } = ctx.sprintResult;
@@ -237,7 +287,13 @@ register({
 // ─── Test Coverage ────────────────────────────────────────────────────────
 
 register({
+  id: 'test-coverage',
   patterns: ['test coverage', 'coverage', 'test stats'],
+  patternsByLang: {
+    tr: ['test kapsamı', 'kapsam', 'test istatistikleri'],
+    de: ['testabdeckung', 'abdeckung'],
+    es: ['cobertura de pruebas', 'cobertura'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const { metrics } = ctx.sprintResult;
@@ -253,7 +309,13 @@ register({
 // ─── Module Map ───────────────────────────────────────────────────────────
 
 register({
+  id: 'module-map',
   patterns: ['module map', 'modules', 'module list'],
+  patternsByLang: {
+    tr: ['modüller', 'modül haritası', 'modül listesi'],
+    de: ['modulübersicht', 'module'],
+    es: ['mapa de módulos', 'módulos'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const srcDir = join(ctx.projectRoot, 'src');
@@ -276,7 +338,13 @@ register({
 // ─── Dependencies ─────────────────────────────────────────────────────────
 
 register({
-  patterns: ['dependencies', 'deps', 'bağımlılıklar'],
+  id: 'dependencies',
+  patterns: ['dependencies', 'deps'],
+  patternsByLang: {
+    tr: ['bağımlılıklar', 'paketler', 'kütüphaneler'],
+    de: ['abhängigkeiten'],
+    es: ['dependencias'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const pkgPath = join(ctx.projectRoot, 'package.json');
@@ -308,10 +376,13 @@ register({
 // ─── Project Status ───────────────────────────────────────────────────────
 
 register({
-  patterns: [
-    'project status', 'current status', 'mevcut durum',
-    'deckent by the numbers', 'sayılarla deckent', 'live metrics',
-  ],
+  id: 'project-status',
+  patterns: ['project status', 'current status', 'live metrics', 'deckent by the numbers'],
+  patternsByLang: {
+    tr: ['mevcut durum', 'proje durumu', 'sayılarla deckent', 'canlı metrikler'],
+    de: ['projektstatus', 'aktueller status'],
+    es: ['estado del proyecto', 'estado actual'],
+  },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
     const srcDir = join(ctx.projectRoot, 'src');
@@ -352,6 +423,33 @@ register({
     // Sprint id
     const sprintId = ctx.sprintResult.sprint.id;
 
+    // Dynamic agent count
+    let agentLabel = 'unknown';
+    try {
+      const agentPool = new AgentPoolManager(ctx.projectRoot);
+      const allAgents = agentPool.listAgents();
+      const builtinCount = allAgents.filter(a => a.source === 'builtin').length;
+      const customCount = allAgents.length - builtinCount;
+      agentLabel = customCount > 0
+        ? `${builtinCount} built-in + ${customCount} custom`
+        : `${builtinCount} built-in`;
+    } catch { /* non-fatal */ }
+
+    // Dynamic skill count
+    let skillLabel = 'unknown';
+    try {
+      const skillPool = new SkillPoolManager(ctx.projectRoot);
+      skillLabel = `${skillPool.listSkills().length} built-in`;
+    } catch { /* non-fatal */ }
+
+    // Dynamic provider list
+    let providerLabel = 'unknown';
+    try {
+      const providers = modelRegistry.getAllProviders();
+      const names = providers.map(p => p.charAt(0).toUpperCase() + p.slice(1));
+      providerLabel = `${providers.length} (${names.join(', ')})`;
+    } catch { /* non-fatal */ }
+
     return [
       `| ${s.metric} | ${s.value} |`,
       `|--------|-------|`,
@@ -361,9 +459,9 @@ register({
       `| MCP Resources | ${mcpResources} |`,
       `| CLI Commands | ${cliCmds}+ |`,
       `| Dashboard Pages | ${dashPages} |`,
-      `| Agents | 16 built-in |`,
-      `| Skills | 21 built-in |`,
-      `| Providers | 3 (Claude, Codex, Gemini) |`,
+      `| Agents | ${agentLabel} |`,
+      `| Skills | ${skillLabel} |`,
+      `| Providers | ${providerLabel} |`,
     ].join('\n');
   },
 });

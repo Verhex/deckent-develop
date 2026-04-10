@@ -5,26 +5,30 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { addDoc, removeDoc, loadDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
+import { addDoc, removeDoc, loadDocsConfig, saveDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
+import { runManagedDocUpdates, buildStandaloneDocContext } from '../../orchestra/managed-docs/managed-doc-runner.js';
 
 export function registerDocsTool(server: McpServer): void {
   server.registerTool(
     'deckent_docs',
     {
       title: 'Managed Docs',
-      description: 'Manage user-defined documents in sprint lifecycle. Actions: "add" registers a file with auto-update and protected section rules; "remove" unregisters a file; "list" shows all managed docs and their rules. Auto sections are updated by Deckent at sprint end with generated content (metrics, debt, history, etc.). Protected sections are never touched.',
+      description: 'Manage user-defined documents in sprint lifecycle. Actions: "add" registers a file; "remove" unregisters; "list" shows all; "update" modifies section rules; "run" triggers doc updates without a sprint. Auto sections are updated with generated content (metrics, debt, history, etc.). Protected sections are never touched.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        action: z.enum(['add', 'remove', 'list']).describe('Action to perform'),
-        file: z.string().optional().describe('File path relative to project root (required for add/remove)'),
+        action: z.enum(['add', 'remove', 'list', 'update', 'run']).describe('Action to perform'),
+        file: z.string().optional().describe('File path or doc ID (required for add/remove/update)'),
         autoSections: z.array(z.string()).optional().describe('Section headings for auto-update (e.g., ["Sprint Metrics", "Active Debt"])'),
         protectedSections: z.array(z.string()).optional().describe('Section headings to protect (e.g., ["Vision", "Architecture"])'),
+        addAutoSections: z.array(z.string()).optional().describe('Add auto-update sections (for update action)'),
+        removeAutoSections: z.array(z.string()).optional().describe('Remove auto-update sections (for update action)'),
+        addProtectedSections: z.array(z.string()).optional().describe('Add protected sections (for update action)'),
         skills: z.array(z.string()).optional().describe('Skill IDs for content generation (e.g., ["typescript-expert"])'),
         maxLines: z.number().optional().describe('Max lines for auto sections'),
         root: z.string().optional().describe('Project root (default: cwd)'),
       }),
     },
-    async ({ action, file, autoSections, protectedSections, skills, maxLines, root: rootArg }) => {
+    async ({ action, file, autoSections, protectedSections, addAutoSections, removeAutoSections, addProtectedSections, skills, maxLines, root: rootArg }) => {
       const root = rootArg ?? process.cwd();
 
       try {
@@ -37,6 +41,60 @@ export function registerDocsTool(server: McpServer): void {
           }
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({ docs: config.docs }) }],
+          };
+        }
+
+        if (action === 'run') {
+          const ctx = buildStandaloneDocContext(root);
+          if (!ctx) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'No docs config found. Use action=add first.' }) }],
+              isError: true,
+            };
+          }
+          const results = runManagedDocUpdates(ctx);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ success: true, results }) }],
+          };
+        }
+
+        if (action === 'update') {
+          if (!file) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'file is required for action=update' }) }],
+              isError: true,
+            };
+          }
+          const config = loadDocsConfig(root);
+          if (!config) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'No docs config found.' }) }],
+              isError: true,
+            };
+          }
+          const entry = config.docs.find(d => d.id === file || d.path === file);
+          if (!entry) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `Not found: ${file}` }) }],
+              isError: true,
+            };
+          }
+          if (addAutoSections?.length) {
+            entry.autoSections = [...new Set([...(entry.autoSections ?? []), ...addAutoSections])];
+          }
+          if (removeAutoSections?.length) {
+            const removeSet = new Set(removeAutoSections.map(s => s.toLowerCase()));
+            entry.autoSections = (entry.autoSections ?? []).filter(s => !removeSet.has(s.toLowerCase()));
+          }
+          if (addProtectedSections?.length) {
+            entry.protectedSections = [...new Set([...(entry.protectedSections ?? []), ...addProtectedSections])];
+          }
+          if (maxLines !== undefined) {
+            entry.maxLines = maxLines;
+          }
+          saveDocsConfig(root, config);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ success: true, id: entry.id, updated: entry }) }],
           };
         }
 

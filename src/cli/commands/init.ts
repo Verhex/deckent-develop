@@ -18,6 +18,7 @@ import { generateAgentsMd, generateGeminiMd, generateCursorRules } from '../help
 import { detectFullStack } from '../../core/stack-detector.js';
 import type { FullStackResult } from '../../core/stack-detector.js';
 import { generateProjectConventionsSkill, getGeneratedContent, generateTempAgents } from '../../orchestra/temp-skill-generator.js';
+import { loadDocsConfig, saveDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import type { ProjectStack } from '../../core/skill-types.js';
 import {
   DECKENT_DIR,
@@ -796,7 +797,22 @@ Platform: ${platform() === 'win32' ? 'Windows' : platform() === 'darwin' ? 'macO
         writeIfNotExists(join(docsDir, 'directives-guide.md'), generateDirectivesGuideDoc(language));
         writeIfNotExists(join(docsDir, 'config-reference.md'), generateConfigReferenceDoc(language));
 
-        // 10c. i18n
+        // 10c. Bootstrap docs.json — managed docs automation
+        try {
+          if (!loadDocsConfig(root)) {
+            saveDocsConfig(root, {
+              version: 1,
+              docs: [{
+                id: 'claude-md',
+                path: 'CLAUDE.md',
+                autoSections: ['Sprint Metrics'],
+                protectedSections: [],
+              }],
+            });
+          }
+        } catch { /* non-fatal */ }
+
+        // 10d. i18n
         const enMessages = {
           sprint_started: 'Sprint {id} started with {count} tasks',
           sprint_complete: 'Sprint {id} complete',

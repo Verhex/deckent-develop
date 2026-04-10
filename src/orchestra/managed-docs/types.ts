@@ -20,6 +20,13 @@ export interface ManagedDocEntry {
   maxLines?: number;
   /** Whether this doc is managed (default: true) */
   enabled?: boolean;
+  /**
+   * User-defined templates per section. Key = section heading, value = template string.
+   * Templates support {{path.to.value}} placeholders resolved against DocUpdateContext.
+   * Templates take precedence over built-in generators for matching sections.
+   * Example: { "KPI": "Coverage: {{sprintResult.metrics.coveragePercent}}%" }
+   */
+  templates?: Record<string, string>;
 }
 
 // ─── DocsConfig ───────────────────────────────────────────────────────────
@@ -49,8 +56,12 @@ export interface ParsedSection {
 // ─── SectionGenerator ─────────────────────────────────────────────────────
 
 export interface SectionGenerator {
-  /** Matching patterns for section titles (case-insensitive) */
+  /** Unique identifier for this generator (used by user overrides) */
+  id?: string;
+  /** Matching patterns for section titles (case-insensitive, language-agnostic) */
   patterns: string[];
+  /** Language-specific patterns merged with `patterns` at match time. Key = lang code (en, tr, de, ...) */
+  patternsByLang?: Record<string, string[]>;
   /** Generate section content from sprint context */
   generate(ctx: DocUpdateContext): string;
 }
