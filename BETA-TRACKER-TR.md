@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-04-09 | **Sprint:** 129+ | **Test:** 12,194+ | **Versiyon:** 0.4.0-beta.1
+**Son güncelleme:** 2026-04-10 | **Sprint:** 130+ | **Test:** 12,194+ | **Versiyon:** 0.4.0-beta.1
 
 ---
 
@@ -9,7 +9,7 @@
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-129 |
+| Sprint | sprint-130 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -20,11 +20,11 @@
 
 ## Genel Bakış
 
-129+ sprint, 12,194+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-129). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
+130+ sprint, 12,194+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-129). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
-**Mevcut Durum:** v0.4.0-beta.1 — Üç backend canlı doğrulandı. Docker backend tam operasyonel (Sprint 119-129): worker'lar container içinde tsc/vitest çalıştırabiliyor. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemente edildi. Sprint 127-128 kalite reformu: 7 kritik düzeltme + litmus testi. Sprint 129 enterprise tech debt temizliği: DEBT.md parse fix, evaluator tutarlılığı, tüm debt kapatıldı. 12,194+ test geçiyor, açık borç yok.
+**Mevcut Durum:** v0.4.0-beta.1 — Üç backend canlı doğrulandı. Docker backend tam operasyonel (Sprint 119-129): worker'lar container içinde tsc/vitest çalıştırabiliyor. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemente edildi. Sprint 127-128 kalite reformu: 7 kritik düzeltme + litmus testi. Sprint 129 enterprise tech debt temizliği: DEBT.md parse fix, evaluator tutarlılığı, tüm debt kapatıldı. Sprint 130 codebase doğruluk reformu: MCP instructions 21 tool fix, decision-engine V1 @deprecated arşivleme + ADR-028, gerçek coverage ölçümü (89.33%). 12,194+ test geçiyor, açık borç yok.
 
 ---
 
@@ -89,6 +89,14 @@
 - [x] MCP/CLI parity: 19 tool, 33 CLI, ADR-022
 - [x] Usage card kaldırma, v0.3.0-beta.1, init test fix
 - [x] Dashboard Faz B: skeleton loading, AgentDetail zenginleştirme, EmptyState, polish
+
+**Sprint 130 — TAMAMLANDI (2026-04-10) — Codebase Doğruluk Reformu:**
+- [x] MCP server.ts instructions string düzeltildi: Tools (15) → Tools (21), eksik 6 tool eklendi
+- [x] README.md, README-TR.md, CONTRIBUTING.md MCP tool sayıları 21 olarak düzeltildi
+- [x] README.md + README-TR.md'ye 4 yeni Key Feature eklendi (Rubric Grading, Worker Questions, Context-Aware Routing, Token Tracker)
+- [x] Decision-engine V1 modülleri @deprecated yapıldı (4 dosya), ADR-028 yazıldı
+- [x] Gerçek coverage ölçüldü: 89.33% (96%+ iddiası düzeltildi)
+- [x] .contracts/api-surface.md rubricScores + evaluationDecision alanları eklendi
 
 **Sonraki Planlar:**
 - [ ] Dashboard gerçek sprint ile test (P3-22) — bir sonraki sprint
@@ -172,7 +180,7 @@ TR+EN çift dil, VISION, link audit, config dashboard
 | # | Sorun | Durum | Not |
 |---|-------|-------|-----|
 | 33 | Error messages kullanıcı-dostu değil | **DONE** | DeckentError + suggestion + howToFix (53 error kodu) |
-| 34 | `deckent explain` MCP'de yok | **YAPILACAK** | CLI-only rehberlik aracı |
+| 34 | `deckent explain` MCP'de yok | **DONE** | MCP tool eklendi (Sprint 125), 43 test geçiyor |
 | 35 | Telemetry/analytics | **YAPILACAK** | Opt-in kullanım analitikleri |
 | 36 | `deckent upgrade` test | **DONE** | `--local` flag eklendi, beta workflow |
 | 37 | Skill marketplace backend | **YAPILACAK** | CLI komutu var ama backend yok |
@@ -1216,6 +1224,9 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 21. ✅ **DEBT.md Parse Duzeltmesi** — JSON.parse→parseDebtTable, markdown tablo formati duzgun handle ediliyor (Sprint 129)
 22. ✅ **Evaluator Tutarliligi** — evaluateWithRubric() tek evaluator, evaluateResult() deprecated (Sprint 129)
 23. ✅ **Enterprise Tech Debt Temizligi** — 8 CRITICAL/HIGH borc kapatildi, acik borc sifir (Sprint 129)
+24. ✅ **MCP Instructions Dogrulugu** — server.ts Tools (15)→(21) fix, 6 eksik tool instructions string'e eklendi (Sprint 130)
+25. ✅ **Decision-Engine V1 Arsivleme** — 4 dosya @deprecated, ADR-028 yazildi, V1 referans olarak korundu (Sprint 130)
+26. ✅ **Coverage Gercegi** — gercek olcum 89.33%, yanlis 96%+ iddiasi IDENTITY.md'de duzeltildi (Sprint 130)
 
 **Siradaki 4 aksiyon (P3):**
 1. **Codebase semantik indeksleme** — AST + RAG ile repo anlayisi

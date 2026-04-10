@@ -1,7 +1,7 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-04-09 | **Sprint:** 129+ | **Tests:** 12,194+ | **Version:** 0.4.0-beta.1
+**Last updated:** 2026-04-10 | **Sprint:** 130+ | **Tests:** 12,194+ | **Version:** 0.4.0-beta.1
 
 ---
 
@@ -9,7 +9,7 @@
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-129 |
+| Sprint | sprint-130 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -20,11 +20,11 @@
 
 ## Overview
 
-129+ sprints, 12,194+ tests, 250+ TypeScript modules. Three spawn backends verified: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (live verified — Sprint 119-129). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents.
+130+ sprints, 12,194+ tests, 250+ TypeScript modules. Three spawn backends verified: tmux (fastest, 2m55s), subprocess (working, 6m53s), Docker (live verified — Sprint 119-129). Self-dogfooding active — Deckent fixes its own test regressions and documentation via sprints. Documentation consolidated: BETA-TRACKER (EN+TR), docs.json auto-updates 7 documents.
 
 **Strategy:** npm package → dogfood on own projects → feedback → fix → public repo (VerhexIO/deckent)
 
-**Current State:** v0.4.0-beta.1 — All three backends live-verified. Docker backend fully operational (Sprint 119-129): workers run tsc/vitest inside containers. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemented. Sprint 127-128 quality reform: 7 critical fixes + litmus test. Sprint 129 enterprise tech debt cleanup: DEBT.md parse fix, evaluator consistency, all debt closed. 12,194+ tests passing, zero open debt.
+**Current State:** v0.4.0-beta.1 — All three backends live-verified. Docker backend fully operational (Sprint 119-129): workers run tsc/vitest inside containers. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemented. Sprint 127-128 quality reform: 7 critical fixes + litmus test. Sprint 129 enterprise tech debt cleanup: DEBT.md parse fix, evaluator consistency, all debt closed. Sprint 130 codebase accuracy reform: MCP instructions 21 tools fix, decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%). 12,194+ tests passing, zero open debt.
 
 ---
 
@@ -89,6 +89,14 @@
 - [x] MCP/CLI parity: 19 tools, 33 CLI, ADR-022
 - [x] Usage card removal, v0.3.0-beta.1, init test fix
 - [x] Dashboard Phase B: skeleton loading, AgentDetail enrichment, EmptyState, polish
+
+**Sprint 130 — COMPLETE (2026-04-10) — Codebase Accuracy Reform:**
+- [x] MCP server.ts instructions string fixed: Tools (15) → Tools (21), 6 missing tools added
+- [x] README.md, README-TR.md, CONTRIBUTING.md MCP tool counts corrected to 21
+- [x] 4 new Key Features added to README.md + README-TR.md (Rubric Grading, Worker Questions, Context-Aware Routing, Token Tracker)
+- [x] Decision-engine V1 modules @deprecated (4 files), ADR-028 written
+- [x] Real coverage measured: 89.33% (was falsely claiming 96%+)
+- [x] .contracts/api-surface.md rubricScores + evaluationDecision fields added
 
 **Upcoming Plans:**
 - [ ] Dashboard real sprint test (P3-22) — next sprint
@@ -172,7 +180,7 @@ TR+EN dual language, VISION, link audit, config dashboard
 | # | Issue | Status | Note |
 |---|-------|--------|------|
 | 33 | Error messages not user-friendly | **DONE** | DeckentError + suggestion + howToFix (53 error codes) |
-| 34 | `deckent explain` missing from MCP | **TODO** | CLI-only guidance tool |
+| 34 | `deckent explain` missing from MCP | **DONE** | MCP tool added (Sprint 125), 43 tests passing |
 | 35 | Telemetry/analytics | **TODO** | Opt-in usage analytics |
 | 36 | `deckent upgrade` test | **DONE** | `--local` flag added, beta workflow |
 | 37 | Skill marketplace backend | **TODO** | CLI command exists but no backend |
@@ -1079,6 +1087,9 @@ Cache only reduces cost — tokens still occupy the context window:
 21. ✅ **DEBT.md Parse Fix** — JSON.parse→parseDebtTable, markdown table format properly handled (Sprint 129)
 22. ✅ **Evaluator Consistency** — evaluateWithRubric() single evaluator, evaluateResult() deprecated (Sprint 129)
 23. ✅ **Enterprise Tech Debt Cleanup** — 8 CRITICAL/HIGH debts closed, zero open debt (Sprint 129)
+24. ✅ **MCP Instructions Accuracy** — server.ts Tools (15)→(21) fix, 6 missing tools added to instructions string (Sprint 130)
+25. ✅ **Decision-Engine V1 Archive** — 4 files @deprecated, ADR-028 written, V1 preserved as reference (Sprint 130)
+26. ✅ **Coverage Truth** — real measurement 89.33%, false 96%+ claim corrected in IDENTITY.md (Sprint 130)
 
 **Next 4 actions (P3):**
 1. **Codebase semantic indexing** — AST + RAG for repo understanding

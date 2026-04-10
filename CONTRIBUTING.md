@@ -735,7 +735,7 @@ Deckent exposes its API to IDE hosts (Claude, Cursor, etc.) through the Model Co
 ```
 src/mcp/
 ├── server.ts          --MCP server entry point
-├── tools/             --Tool implementations (16 tools)
+├── tools/             --Tool implementations (21 tools)
 │   ├── directives.ts
 │   ├── plan.ts
 │   ├── start.ts

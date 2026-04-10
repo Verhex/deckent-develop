@@ -76,9 +76,9 @@ Workers run in isolated Docker containers with memory limits, non-root execution
 
 Core sprint lifecycle, multi-agent parallel execution, tmux/subprocess backends, MCP integration, multi-provider support (Claude + Codex + Gemini), ModelRegistry, agent/skill ecosystem, heartbeat daemon, human checkpoints, adaptive thresholds.
 
-### Phase 2: "Beta Readiness" — Active (Sprint 83-129)
+### Phase 2: "Beta Readiness" — Active (Sprint 83-130)
 
-Docker container backend (live-verified Sprint 119-123, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 0.4.0-beta.1.
+Docker container backend (live-verified Sprint 119-129, 10 e2e tests, configurable timeout), documentation consolidation (BETA-TRACKER, i18n generators, docs.json automation), ERRORS.md active logging, backend smoke testing (tmux + subprocess + Docker via MCP + CLI), dashboard backend badge, ADR-027 hybrid backend decision, version 0.4.0-beta.1. Sprint 130: MCP instructions accuracy fix (21 tools), decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%).
 
 ### Phase 3: "Public Beta" — Next
 
@@ -114,7 +114,7 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-129 |
+| Sprint | sprint-130 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -132,14 +132,15 @@ This is where Deckent enters the OpenClaw/Cowork/Devin category — not as anoth
 | sprint-127 | completed |
 | sprint-128 | completed |
 | sprint-129 | completed |
+| sprint-130 | completed |
 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-129 |
+| Sprint | sprint-130 |
 | Total Tasks | 3 |
 | Completed | 3 |
 | Tech Debt | 0 |
 | No-Go | 0 |
 | Duration | 14dk 43sn |
-| Coverage | 29.8% |
+| Coverage | 89.33% |
