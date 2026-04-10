@@ -151,7 +151,12 @@
       "Bash(sh -n /home/alperen/deckent-dev/.tasks/.worker-direct-test.sh)",
       "Bash(docker rm:*)",
       "Bash(echo \"CLI start launched in background, PID: $!\")",
-      "Bash(awk '{print $9, $5}')"
+      "Bash(awk '{print $9, $5}')",
+      "Bash(awk '$1 > 1500')",
+      "Bash(awk '{print $1, $2}')",
+      "Bash(awk '$1 > 1500 {count++} END {print \"Files >1500 lines:\", count}')",
+      "mcp__deckent__deckent_config",
+      "Bash(stat -c '%Y %n' /home/alperen/deckent-dev/.tasks/*.hb)"
     ]
   },
   "outputStyle": "Explanatory"

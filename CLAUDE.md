@@ -72,13 +72,13 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-130 |
-| Total Tasks | 3 |
-| Completed | 3 |
+| Sprint | sprint-132 |
+| Total Tasks | 7 |
+| Completed | 7 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 14dk 43sn |
-| Coverage | 89.33% |
+| Duration | 17dk 45sn |
+| Coverage | 38.3% |
 
 ## Active Debt
 _No open tech debt._
@@ -86,6 +86,9 @@ _No open tech debt._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| doc-writer | 1 | 1 | 100% |
-| refactorer | 1 | 1 | 100% |
+| security-auditor | 1 | 1 | 100% |
+| performance-analyzer | 1 | 1 | 100% |
 | test-writer | 1 | 1 | 100% |
+| architect | 2 | 2 | 100% |
+| architecture-planner | 1 | 1 | 100% |
+| doc-writer | 1 | 1 | 100% |
