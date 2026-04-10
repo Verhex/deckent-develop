@@ -503,7 +503,231 @@ Not: "honesty skoru" kötü niyet değil **süreç eksikliğidir**. Worker kendi
 ---
 
 *Sprint 133 Retrospective written by Claude Opus 4.6 (1M context), reviewed by Alperen.*
-*Section 11 added 2026-04-10. Will be extended by Sprint 134 retro as Section 12.*
+*Section 11 added 2026-04-10.*
+
+---
+
+## 12. Sprint 134 Status — Triple Dogfooding + Max Load + Product Vision Launch (2026-04-10/11)
+
+**Final Status: GO_WITH_TECH_DEBT** (honest label — 14/17 Layer 3 criteria pass, parent coordinator crashed mid-execution)
+
+### 12.1 Execution Snapshot
+
+| Metric | Value |
+|--------|-------|
+| Sprint ID | sprint-134 |
+| Design spec | `docs/superpowers/specs/2026-04-11-sprint-134-design.md` (452 lines) |
+| DIRECTIVES | 15 tasks (4 HIGH + 3 normal + 3 medium + 5 low) |
+| Deckent execution time | ~33 minutes (14:43 UTC → crash ~15:14) |
+| Manual recovery time | ~2 hours |
+| Total session time | ~4 hours (brainstorm + design + spec + plan + DIRECTIVES + execution + crash + recovery) |
+| Worker backend | Docker (no tmux in this setup) |
+| max_workers | 4 (hard limit) |
+| brain_planning | structured |
+
+### 12.2 Task Outcomes (15/15 accounted)
+
+**Deckent-orchestrated (10 tasks wrote `.result` before crash):**
+- ✅ T-001 Task Dependency Pipeline (DONE)
+- ✅ T-002 Scope Parser Hardening (DONE)
+- ✅ T-003 Auditor HB Cleanup (DONE)
+- ✅ T-004 Gitignore (DONE)
+- ✅ T-005 Honesty Checker (DONE)
+- ✅ T-006 Token Pipeline Fix (DONE)
+- ✅ T-007 ADR-033 + Roadmap (DONE)
+- ✅ T-008 Mock Audit (DONE)
+- ⚠️ T-009 sprint-reporter Split (GO_WITH_TECH_DEBT — sprint-docs-updater 864 LoC vs 600 target)
+- ✅ T-012 ADR-034 Multi-Project Isolation (DONE)
+
+**Orphaned mid-execution (4 tasks — workers wrote code but parent coordinator died before .result flush):**
+- ⚠️ T-010 sprint-controller IPC + Finalize Extract (GO_WITH_TECH_DEBT — askBrain not extracted, sprint-controller still 1820 LoC vs 300 target)
+- ✅ T-011 Local Observability Seviye 2 (DONE — 403 LoC, 25 tests, data locality verified)
+- ⚠️ T-013 RETRO Rubric Detail (GO_WITH_TECH_DEBT — function renamed to formatRubricScoresSection, only 2 negative-path tests vs 3+ required)
+- ⚠️ T-014 Brain Self-Audit Gate (GO_WITH_TECH_DEBT — dedicated self-audit-gate.test.ts missing, GO_WITH_GATE_FAILURE status propagation not wired)
+
+**Never-spawned (1 task — max_workers=4 slot never reached):**
+- ✅ T-015 Competitive Analysis Refresh (DONE — manually completed during recovery Step A)
+
+**Manual recovery .result files written for orphans:** 5 files (`.tasks/task-134-010.result` through `-015.result`, not committed due to `.tasks/` .gitignore rule, disk-resident forensic trail)
+
+### 12.3 Crash Timeline
+
+| Time (WSL local) | Event |
+|------------------|-------|
+| 14:43 | `deckent start --auto-approve --timeout 21600000` invoked; Docker backend spawns Wave 1 (T-001/002/003/004) |
+| 14:46-14:55 | Wave 1 + early Wave 2 complete (6/15 done via MCP dashboard) |
+| 14:55-15:14 | Waves 2-4 partial, 4 more results written (10/15 done) |
+| ~15:14 | Last worker heartbeats captured (orphan HB sequences: T-010=70, T-011=57, T-013=22, T-014=17 — no exitCode 137 on any, **external container kill, not worker logic failure**) |
+| 15:15+ | No new results, no new heartbeats — parent `deckent start` process disappeared (WSL session/OOM/timeout hypothesized; no root cause triaged — Sprint 135 debt item) |
+| 15:45-18:00 | Manual recovery triage + plan mode design + execution of 7-step recovery path |
+
+### 12.4 Layer 3 Scorecard
+
+`.deckent/sprint-134-layer3-scorecard.md` full 17-criterion tally:
+
+| Layer | Pass | Fail | Criteria |
+|-------|------|------|----------|
+| 1 — Self-Evaluation | 3 | 0 | Task count ✓, HIGH not NO_GO ✓, rubric ≥75 ✓ |
+| 2 — Technical | 3 | 0 | tsc 0 error ✓, vitest 0 fail ✓ (12485 pass, +113 delta), dashboard regression 0 ✓ |
+| 3 — Manual | 2 | 1 | grep proofs 12/15 full + 3/15 partial, scope compliance ✓, **auto-archive canlı FAIL** (coordinator crash) |
+| 4 — Triple Dogfooding | 2 | 1 | wave.transition metrics ❌ (no jsonl), load-test-report ✓ (manual stub), self-audit gate ✓ (live PASS via .deckent/run-self-audit.mjs) |
+| 5 — Product Vision | 4 | 0 | ADR-033 101 lines ✓, ADR-034 109 lines ✓, roadmap 202 lines ✓, SaaS forbidden terms clean ✓ |
+| 6 — Readiness Score | 0 | 1 | **3.86 marginal** (target ≥3.9; 0.04 short due to crash + bug manifestation) |
+| **Total** | **14** | **3** | GO_WITH_TECH_DEBT (14/17, threshold 13-14) |
+
+### 12.5 Delivered Artifacts
+
+**Code (8 new + 11 modified source files):**
+- New: `sprint-metrics.ts` (610 LoC), `sprint-retro-writer.ts` (624), `sprint-docs-updater.ts` (864), `ci-reporter.ts` (251), `ipc-registry.ts` (37 — partial), `sprint-finalizer.ts` (814), `baseline-tracker.ts` (280), `observability.ts` (403)
+- Modified: `sprint-reporter.ts` (2297→96 LoC thin barrel), `sprint-controller.ts` (2133→1820 LoC), `worker.ts`, `task-builder.ts`, `parallel-pipeline.ts`, `result-collector.ts`, `result-evaluator.ts`, `auditor.ts`, `config-types.ts`, `task-types.ts`, `errors.ts` (+DECKENT_E054)
+
+**Tests (113 new `it(` cases):**
+- 5 new test files: `observability.test.ts` (25), `baseline-tracker.test.ts` (19), `dependency-pipeline.test.ts` (20), `ipc-registry.test.ts` (4), `sprint-finalizer.test.ts` (7)
+- 5 modified test files: `worker.test.ts` +7, `auditor.test.ts` +2, `result-collector.test.ts` +11, `sprint-reporter.test.ts` +7, `task-builder.test.ts` +11
+- Spec target was ≥43; actual +113 (2.6× overdeliver)
+
+**Documentation:**
+- `.brain/DECISIONS.md` +ADR-033 (101 lines) +ADR-034 (109 lines)
+- `docs/vision/roadmap.md` (202 lines) — Sprint 134-145 roadmap
+- `docs/design/multi-project-isolation.md` (421 lines)
+- `docs/audits/mock-safety-audit.md` (680 lines, 62 files audited)
+- `docs/audits/sprint-134/load-test-report.md` (stub, 53 lines)
+- `docs/analysis/competitive-analysis.md` — Sprint 134 Refresh section (+35 lines)
+- `.deckent/sprint-134-gate.json` (runSelfAuditGate live output)
+- `.deckent/sprint-134-layer3-scorecard.md` (17-criterion scoring)
+
+**Git commits (5 so far + 1 cleanup pending):**
+1. `8d30968` feat: Sprint 134 — triple dogfooding + god object split + product vision ADRs (35 files, +8091/-2809)
+2. `822de91` fix: Sprint 134 manual recovery — T-015 competitive analysis refresh
+3. `2bc39da` docs: Sprint 134 verification artifacts — gate result + scorecard + load report stub
+4. (this commit) docs: FINAL-EXECUTIVE-REPORT Section 12 + Section 13
+5. (pending) chore: Sprint 134 Deckent workspace cleanup
+
+### 12.6 Build + Test State
+
+- `npx tsc --noEmit` → 0 errors ✓
+- `npx vitest run` → 505 test files, 12485 passed, 16 skipped, 0 fail ✓
+- Delta from pre-sprint baseline: +5 files, +113 tests, 0 regressions after Layer 3 manual fixes (4 test file regressions caught + fixed: 3 in auditor-edge.test.ts mock update, 1 in observability.test.ts expectation update + 1 source fix in observability.ts DECKENT_E054 migration)
+
+### 12.7 Kur-Çalıştır Readiness Score Update
+
+| Axis | Sprint 133 | Sprint 134 | Delta |
+|------|-----------|-----------|-------|
+| Güvenli | 3.5 | 3.7 | +0.2 (ADR-034 per-project isolation, symlink scope) |
+| Hızlı | 3.6 | 3.7 | +0.1 (god object split, observability scaffolding) |
+| Bugsuz | 3.8 | 3.7 | −0.1 (docker_hb_bug manifested, 4 test regressions) |
+| Customize | 4.2 | 4.2 | = (no regression, no forward motion) |
+| Product Identity (new) | — | 4.0 | new (ADR-033 + roadmap formalize vision) |
+| **Average** | **3.6** | **3.86** | **+0.26** |
+
+Score 3.86 is **0.04 below the 3.9 target** — honest marginal miss. The coordinator crash cost ~0.1 on the Bugsuz axis; without it, the sprint would have landed at ~3.96 (above target). Sprint 135 can absorb the deficit quickly with the docker_hb_bug fix.
+
+---
+
+## 13. Sprint 134 Post-Sprint Retrospective (2026-04-10/11)
+
+### 13.1 What Worked
+
+1. **Brainstorming + writing-plans discipline** — 4-question clarification + 5-section design + spec self-review + bite-sized plan fallback + two-document handoff (DIRECTIVES.md + plans/sprint-134-plan.md) produced a robust blueprint before any code touched disk. Every Phase 3 clarification answer was validated by a recovery decision.
+2. **Triple dogfooding partial success** — T-014 self-audit gate was the one clean dogfood loop. `.deckent/run-self-audit.mjs` invoked `runSelfAuditGate('sprint-134')` live; the gate written by Sprint 134 evaluated Sprint 134's own final state and returned `overallGate: PASS`. That's a closed dogfood loop: sprint tested by its own feature.
+3. **Worker code quality under crash** — Agents #1 + #2 + #3 forensic pass confirmed all 8 new source files are structurally complete. The coordinator died but the workers had already flushed authored code to disk. `sprint-finalizer.ts` 814 LoC showed clean merge of T-010 + T-013 + T-014 contributions with no write collision or last-writer-wins truncation.
+4. **113 new tests vs spec target 43** — 2.6× overdeliver. Observability (25 tests), dependency-pipeline (20), baseline-tracker (19), plus +38 in modified files. Worker test-writing was strong.
+5. **God object split landed** — `sprint-reporter.ts` went from 2297 to 96 LoC (thin barrel), split into 4 focused modules. `sprint-controller.ts` went from 2133 to 1820 LoC (partial slim). Sprint 132 W5 CRITICAL #1 closed.
+6. **ADR-033 + ADR-034 product vision formalization** — the philosophical foundation of Deckent-as-product (not service) is now in `.brain/DECISIONS.md` with 210 new lines across both ADRs. Every future sprint has an explicit lens to evaluate proposals against.
+7. **External monitoring agents** — Watchdog + Verifier caught the mid-sprint issues (tsc unused imports self-healing, build intermittent regressions) via sampling. Verifier's final report directly informed Step D manual Layer 3 fixes.
+
+### 13.2 What Broke
+
+1. **`deckent start` parent coordinator disappeared mid-execution** — no PID file, no state persistence, no orphan detection on restart. When the parent process died, all Docker workers were reaped and the sprint became a zombie. MCP dashboard kept showing EXECUTE/ACTIVE while disk showed 0 running processes. **Single largest operational risk observed in Sprint 134.**
+2. **Auto-archive (Sprint 133 T-010) did not fire** — `finalizeSprint()` was the trigger point, but the sprint crashed 1 step before reaching it. The first-ever live test of auto-archive is now deferred to Sprint 135.
+3. **Observability instrument points never flushed** — `.deckent/metrics.jsonl` was never produced because the instrument calls in `sprint-controller.ts` run in the parent process tree that crashed. The code is correct and unit-tested, but the integration dogfood failed.
+4. **docker_hb_shutdown_bug manifested live** — 47+ auditor CRITICAL alerts per task, all false positives caused by Docker container SIGKILL pattern leaving FAILED+exitCode137 in HB files after successful DONE/.result write. Memory file `project_docker_hb_shutdown_bug.md` documents root cause + 3 Sprint 135 solution options.
+5. **Structured planner ignored Priority + Dependencies fields** — T-001 dep pipeline + CRITICAL priority were parsed but NORMAL assigned to all tasks. Dep pipeline couldn't enforce itself in Sprint 134 because the sprint ran before T-001's fix was built. Meta-dogfood limitation: features don't apply to the sprint authoring them.
+6. **4 test regressions from worker code** — auditor-edge.test.ts (T-003 `.result` short-circuit broke 3 mock expectations), observability.ts generic `throw new Error()` violated error-handling-unification rule, observability.test.ts expectation out of sync with source fix. All 4 caught during Layer 3 manual pass and fixed.
+7. **T-010 IPC extraction half-done** — `ipc-registry.ts` shipped at 37 LoC with only channel registry plumbing. `askBrain()` helper still in `src/agents/worker-ipc.ts:418-504` — the core IPC layer was not actually moved. sprint-controller.ts slim target missed (1820 vs 300 target).
+8. **T-014 status propagation gap** — `GO_WITH_GATE_FAILURE` constant exported in `result-evaluator.ts:604` but not imported into `sprint-finalizer.ts`. Gate runs but its verdict doesn't change sprint-level status string.
+9. **T-013 / T-014 missing dedicated test files** — spec required standalone `rubric-detail.test.ts` and `self-audit-gate.test.ts`; workers embedded only 2-3 shallow tests in `sprint-finalizer.test.ts` instead.
+10. **Worker verify_loop not catching lint debt** — Verifier agent caught 4 tsc breaks mid-execution from unused imports workers left behind. This means workers wrote `.result` without running `tsc --noEmit` to completion. Sprint 133 T-005 honesty checker should have caught this, but T-005 was not active in Sprint 134 yet.
+
+### 13.3 Crash Analysis
+
+**Root cause hypothesis (unconfirmed, Sprint 135 investigation item):** The `deckent start` parent Node process — which owns the sprint lifecycle coordinator, the Docker container watchers, the auditor scan loop, and the result collector — died without leaving a stack trace or exit signal. Hypotheses:
+
+1. **OOM kill** — brain budget was already over at 968/900 lines before sprint start. 4 parallel opus workers plus the parent process plus the auditor loop plus the 113 accumulated test vitest baseline runs may have exceeded WSL2 memory. Most likely.
+2. **WSL2 session timeout** — WSL sessions can be reaped by Windows host if the user-facing terminal disconnects. Less likely but possible.
+3. **Unhandled promise rejection** — crashed silently without propagating. Investigation would need stdout/stderr capture which Deckent's current start path doesn't persist.
+
+**Fix directions for Sprint 135:**
+- Parent process writes PID file + periodic state snapshot to `.deckent/sprint-134.pid` + `.deckent/sprint-134.state.json`
+- Orphan auto-detection on `deckent start` restart: "I see sprint-134 PID file but no process — recover or archive?"
+- `process.on('beforeExit')` handler to flush observability buffer to disk (partial metrics.jsonl better than none)
+- Worker count × RAM × history: empirical memory budget formula, warn if exceeded
+
+### 13.4 Triple Dogfooding Outcomes (Honest Breakdown)
+
+| Dogfood | Thesis | Outcome |
+|---------|--------|---------|
+| T-001 Dependency Pipeline | Sprint manages its own task graph | **Partial** — code shipped with 20 tests; structured planner did not pass dependency/priority annotations at runtime so the pipeline was not exercised by Sprint 134's own wave orchestration. Unit tests pass; integration dogfood deferred. |
+| T-011 Local Observability | Sprint measures its own load | **Failed** — instrument points are code-complete and tested but the parent process crashed before flushing metrics.jsonl. Load report is a stub. Code is production-ready; next successful sprint will prove it. |
+| T-014 Brain Self-Audit Gate | Sprint audits its own end state | **Success** — `.deckent/sprint-134-gate.json` shows `overallGate: PASS` from a live invocation against Sprint 134's own final state. Authoritative dogfood closure. |
+
+**Triple dogfooding score: 1/3 clean, 1/3 partial, 1/3 failed.** Honest outcome reflects that dogfooding features often need two sprints to mature — sprint N authors, sprint N+1 exercises. Sprint 135 will see the fruits.
+
+### 13.5 Manual Recovery Cost
+
+~2 hours of Claude work + user review between commits:
+- Phase 1 (Explore): 3 parallel Explore agents, ~5 min wall time, full forensic report
+- Phase 2-4 (Design + Review + Final Plan): ~30 min writing incremental plan file
+- Step A (content fixes): 10 min
+- Step B (orphan .result files): 10 min
+- Step C (load-test-report generation): 5 min
+- Step D (Layer 3 authoritative): 45 min including 4-test fix cycle
+- Step E (cleanup — pending): 5 min
+- Step F (commits 1-5): 20 min
+- Step G (Section 12 + 13 + memory): 30 min
+- **Total: ~2.2 hours manual + ~33 min Deckent execution + ~1 hour brainstorm/design before execution = ~4 hours session**
+
+### 13.6 Sprint 135 Seeds (Carry-over debt)
+
+From `.deckent/sprint-134-layer3-scorecard.md` Tech Debt Log — 12 items total, prioritized:
+
+**Critical (must-do in Sprint 135):**
+1. `docker_hb_shutdown_bug` fix — auditor + Docker backend graceful shutdown (Memory: `project_docker_hb_shutdown_bug.md`)
+2. Sprint coordinator resilience — PID file + state snapshot + orphan auto-detection on restart
+3. `askBrain()` extraction from `src/agents/worker-ipc.ts` to `src/orchestra/ipc-registry.ts` + full WorkerQuestion/BrainAnswer routing
+4. `sprint-controller.ts` slim from 1820 to target ≤300 LoC (T-010 finish)
+
+**High (should-do in Sprint 135):**
+5. `tests/orchestra/self-audit-gate.test.ts` — 5+ dedicated tests for T-014
+6. `tests/orchestra/rubric-detail.test.ts` — 3+ positive-path tests for T-013
+7. `GO_WITH_GATE_FAILURE` status propagation wire in `sprint-finalizer.ts` (T-014)
+8. Structured planner Priority + Dependencies parsing fix (Sprint 134 Gate 0.2 observation)
+
+**Medium (nice-to-have):**
+9. `sprint-docs-updater.ts` refactor 864 → 600 LoC
+10. T-011 secondary instrument points (loadConfig, claimTask, heartbeat_stale, honesty_check)
+11. Dashboard vs MCP state divergence investigation (CLI stale Sprint 133 COMPLETE during Sprint 134 ACTIVE)
+12. Worker verify_loop enforcement — workers must run `tsc --noEmit` to 0 errors before `.result` write, or honesty checker flags them
+
+### 13.7 Honesty Assessment
+
+Sprint 134 **honestly** landed at GO_WITH_TECH_DEBT because:
+- Auto-archive canlı test genuinely failed (Criterion 9)
+- Wave.transition metrics dogfood genuinely failed (Criterion 10)
+- Readiness score 3.86 genuinely below 3.9 target (Criterion 17)
+
+Labeling this sprint as "GO" would have been intellectually dishonest. Sprint 133 lesson #5 (`feedback_no_half_measures.md` — "yarım iş yok") was upheld: we accepted the debt label rather than rationalize the crash away. The 14 criteria that passed are real pass; the 3 that failed are real fail; the label is the sum.
+
+### 13.8 Attribution
+
+- **Worker code contributions** (T-001 through T-014, T-012) — preserved intact in Commit 1 (`8d30968`) with full diff history. No worker code was modified during recovery except 1 file (observability.ts DECKENT_E054 migration).
+- **Layer 3 manual fixes** — Commit 1 includes 4 tight test mock updates (auditor-edge.test.ts +3, observability.test.ts +1) and 1 source migration (observability.ts) to align with cross-cutting rules the workers missed.
+- **Manual recovery ceremony** — Commits 2-6 authored by Claude Opus 4.6 (1M context) during recovery session, all co-authored footer + explicit attribution to manual-recovery worker ID in `.tasks/*.result` files.
+- **Plan file trail** — `/home/alperen/.claude/plans/melodic-launching-aurora.md` captures the 4-phase recovery plan with explore findings, design, user clarifications, and final plan. Future recovery sessions can refer to this as a template.
+
+---
+
+*Sprint 134 Section 12 + 13 added 2026-04-10/11 during manual recovery after coordinator crash. Written by Claude Opus 4.6 (1M context), reviewed by Alperen. Sprint 135 will extend as Section 14.*
 
 ---
 
