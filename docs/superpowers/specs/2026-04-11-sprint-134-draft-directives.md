@@ -1,11 +1,14 @@
-# Sprint 134 Draft DIRECTIVES — Enterprise Roadmap Launch + God Object Split + Sprint 133 Follow-through
+# Sprint 134 Draft DIRECTIVES — Product Vision Launch + God Object Split + Sprint 133 Follow-through
 
 **Status:** DRAFT — not finalized. Will be brainstormed in new session and adapted.
 **Date drafted:** 2026-04-10 (end of Sprint 133 session)
+**Revised:** 2026-04-10 (post product-not-service vision declaration by Alperen)
 **Drafter:** Claude Opus 4.6 (1M context)
-**Theme:** Enterprise-readiness yolculuğunun ilk yapısal adımı. Sprint 133'te deferred god object split + Sprint 132 HIGH findings + Sprint 133 retrospektifinden çıkan 4 kritik aksiyon + enterprise roadmap ADR ailesi.
+**Theme:** Kur-çalıştır yolculuğunun ilk yapısal adımı. Sprint 133'te deferred god object split + Sprint 132 HIGH findings + Sprint 133 retrospektifinden çıkan 4 kritik aksiyon + **product-not-service vision ADR ailesi**.
 
-**Target Enterprise-Readiness Score:** 3.6/5 → **3.9-4.0/5** (+0.3-0.4)
+**DOKUNULAMAZ VİZYON:** Deckent bir üründür, SaaS değildir. OpenClaw gibi "kur çalıştır". Açık kaynak, ücretsiz, herkese her yerde. Ref: `project_vision_product_not_service.md`. "Enterprise readiness" bu lens altında **kur-çalıştır readiness** anlamına gelir.
+
+**Target Kur-Çalıştır Readiness Score:** 3.6/5 → **3.9-4.0/5** (+0.3-0.4)
 
 ---
 
@@ -142,44 +145,49 @@ These baseline numbers MUST be recorded in `.deckent/sprint-134-baseline.json` b
 
 ---
 
-### HIGH — Enterprise Roadmap Foundation (3 tasks)
+### HIGH — Product Vision Foundation (3 tasks, REVISED post vision declaration)
 
-### Task 8: ADR-033 Enterprise Roadmap
+### Task 8: ADR-033 Product Vision + Kur-Çalıştır Roadmap
 - Model: sonnet
 - Effort: normal
 - Agent: architecture-planner
 - Skills: documentation-writer, system-architect
-- Files: .brain/DECISIONS.md, docs/enterprise/roadmap.md (new)
-- Scope: .brain/, docs/enterprise/
+- Files: .brain/DECISIONS.md, docs/vision/roadmap.md (new)
+- Scope: .brain/, docs/vision/
 
-**Description:** God-level enterprise ready + milyonlarca kullanıcı hedefinin ilk formal kayıt:
-- **ADR-033**: Enterprise Roadmap — 12 boyut (multi-tenant, horizontal scale, observability, auth federation, rate limiting, audit log, backup, migration, compliance, distribution, cloud-hosted, incident response)
-- Her boyut için Sprint hedef aralığı (134-145)
-- `docs/enterprise/roadmap.md` — genişletilmiş versiyon, Gantt benzeri
+**Description:** "Product, not service" felsefesini formal ADR olarak kaydet + kur-çalıştır yolculuk haritası:
+- **ADR-033**: Product Vision — dokunulamaz 4 prensip (product not service, kur-çalıştır kolay, açık kaynak ücretsiz, herkese her yerde). `project_vision_product_not_service.md`'nin formal hali.
+- **Kaldırılan / yasak boyutlar:** SaaS, cloud-hosted, paywall, enterprise edition, SOC2, oncall
+- **Korunan / güçlendirilen boyutlar:** observability (local), god object split, task dependency, distribution, wizard, local model, i18n, cross-platform
+- Her boyut için Sprint hedef aralığı (134-145), rakip karşılaştırma (Devin KARŞI, OpenHands MÜTTEFİK, OpenClaw REFERANS)
+- `docs/vision/roadmap.md` — genişletilmiş versiyon, halka açık pazarlama dili
 
-**Test:** Doküman task, test gerekmiyor. `.brain/DECISIONS.md`'de ADR-033 mevcut + ≥80 satır, `docs/enterprise/roadmap.md` ≥200 satır.
+**Test:** Doküman task. `.brain/DECISIONS.md`'de ADR-033 ≥100 satır, `docs/vision/roadmap.md` ≥200 satır. 4 prensip explicit listed.
 
 ---
 
-### Task 9: ADR-034 Multi-Tenant Architecture Plan
+### Task 9: ADR-034 Multi-Project Isolation (NOT SaaS Multi-Tenant)
 - Model: opus
 - Effort: normal
 - Agent: architect
 - Skills: system-architect, security-specialist
-- Files: .brain/DECISIONS.md, docs/enterprise/multi-tenant-design.md (new)
-- Scope: .brain/, docs/enterprise/
+- Files: .brain/DECISIONS.md, docs/design/multi-project-isolation.md (new)
+- Scope: .brain/, docs/design/
 
-**Description:** Tek-projeden çoklu-projeye geçiş mimarisi:
-- Tenant isolation stratejisi (process, container, namespace)
-- Credential izolasyonu (Sprint 133'te AES-256-GCM eklendi, şimdi per-tenant key yönetimi)
-- Scope enforcement (Sprint 132'deki symlink bypass ve Docker RW bulgularını ele al)
-- Database/state izolasyonu (.deckent/, .brain/, .tasks/ per-tenant)
+**Description:** **KRİTİK AYIRIM:** Bu task SaaS multi-tenant DEĞİL. "Bir kullanıcının aynı makinede birden fazla projesi arasında güvenlik" anlamına gelir.
+- Tek kullanıcının birden fazla projesi arası scope enforcement
+- Credential izolasyonu per-project (Sprint 133 AES-256-GCM'in per-project key'i)
+- Global state paylaşımının denetimi (hangi config paylaşılır, hangi proje-özgü)
+- `.deckent/`, `.brain/`, `.tasks/` per-project izolasyonu (zaten var, formalize)
+- Symlink scope bypass fix (Sprint 132 W1 MEDIUM #10)
 
-**Test:** Doküman task. ADR-034 ≥100 satır, multi-tenant-design.md ≥250 satır.
+**Anti-pattern:** "10.000 tenantın paylaştığı sunucu" senaryosu — bunu YAPMA.
+
+**Test:** Doküman task + opsiyonel küçük kod refactor (symlink çözümleme). ADR-034 ≥100 satır, multi-project-isolation.md ≥250 satır.
 
 ---
 
-### Task 10: Basic Observability Iskelesi (OpenTelemetry-Ready)
+### Task 10: Basic Local Observability Iskelesi
 - Model: opus
 - Effort: medium
 - Agent: architect
@@ -187,14 +195,16 @@ These baseline numbers MUST be recorded in `.deckent/sprint-134-baseline.json` b
 - Files: src/core/observability.ts (new), src/orchestra/sprint-controller.ts (instrument), src/api/server.ts (instrument)
 - Scope: src/core/, src/orchestra/, src/api/
 
-**Description:** OpenTelemetry'ye hazır (ama bağımlılık eklemeden) lightweight observability katmanı:
+**Description:** Kullanıcının kendi gözlemi için lightweight local observability. **Bizim telemetri topladığımız anlamına gelmez** — her şey kullanıcı makinesinde kalır, dışarı veri gitmez (zaten `telemetry_enabled: false` default).
 - `metric(name, value, tags)` counter/gauge helper
 - `trace(operation, fn)` span wrapper
 - `structuredLog(level, message, context)` pino-compatible format
 - Key sprint operasyonları instrumenı (spawnWorkers, waitForResults, evaluateResult, loadConfig)
-- Metric'ler JSON dosyaya yazılır (.deckent/metrics.jsonl) — Sprint 135'te Prometheus/OTLP exporter eklenir
+- Metric'ler kullanıcının kendi makinesinde JSON dosyaya yazılır (`.deckent/metrics.jsonl`)
+- Sprint 135'te **opsiyonel** Prometheus/OTLP exporter (kullanıcı kendi Grafana'sına bağlarsa)
+- OpenTelemetry dependency **şu an eklenmez** — node:perf_hooks kullanılır
 
-**Test:** 6+ test (metric increment, trace wrap, structured log format, instrument integration)
+**Test:** 6+ test (metric increment, trace wrap, structured log format, instrument integration, data-locality verification)
 
 ---
 
@@ -231,6 +241,21 @@ These baseline numbers MUST be recorded in `.deckent/sprint-134-baseline.json` b
 - Recommend fix pattern: namespace import + lazy getter (skill-sandbox pattern)
 
 **Test:** Audit task, test gerekmiyor. Rapor ≥100 satır, en az 10 dosya taranmış, bulgular kategorize.
+
+---
+
+---
+
+## Vision-Aligned Additional Candidates (Sprint 135'e taşınabilir)
+
+Bu task'lar Sprint 134'e sığmaz ama "kur-çalıştır" hedefinin kritik parçaları — Sprint 135 draft'ı için ön-liste:
+
+- **ADR-035 Distribution Strategy** — npm public publish + Docker Hub image + Homebrew formula + curl install.sh. Sprint 136 execution.
+- **Install wizard overhaul** — `deckent init` interactive flow, sıfır programcı kullanıcı bile kurabilsin. Wizard adımları: (1) proje türü seç, (2) provider seç (Claude/Codex/Gemini/local Ollama), (3) ilk DIRECTIVES şablonu seç, (4) hazır.
+- **Ollama / local model adapter** — `providers/ollama.ts` + `ModelRegistry` entry. Maliyet 0$/ay opsiyonu. Sprint 135 target.
+- **i18n wave 2** — es, fr, de, zh, ja dilleri için çeviri iskelesi + topluluk katkı yolu. Sprint 137+.
+- **Cross-platform parity audit** — Windows native, macOS ARM, Linux distro matrix test raporu. Sprint 137+.
+- **OpenClaw install benchmark** — rakip referans model. "OpenClaw 30 saniyede kuruluyor, Deckent kaç saniyede?" ölçümü. Sprint 134 retro için input.
 
 ---
 
@@ -279,9 +304,10 @@ Sprint 134 şu koşullarda **GO**:
 3. `vitest run` → test count ≥ 12372 + Sprint 134 yeni testler, 0 fail
 4. Baseline karşılaştırması: worker honesty violation = 0
 5. Enterprise-Readiness Score: 3.6 → ≥3.9
-6. ADR-033 + ADR-034 + ADR-035 (varsa) yazıldı
+6. ADR-033 (Product Vision) + ADR-034 (Multi-Project Isolation) yazıldı, 4 dokunulamaz prensip explicit
 7. `sprint-reporter.ts` 4 parçaya bölündü, tüm eski testler geçiyor
 8. **Auto-archive canlı çalıştı** — DIRECTIVES.md Sprint 134 sonunda `.brain/archive/DIRECTIVES-sprint-134.md`'ye taşındı (133-010'un ilk gerçek testi)
+9. **Hiçbir SaaS/paywall/enterprise-edition referansı yok** — rapor + ADR'lar "product not service" lens'iyle yazıldı
 
 ---
 
