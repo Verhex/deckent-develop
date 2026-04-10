@@ -245,7 +245,41 @@ Bu analiz, Deckent projesinin kendi kendini değerlendirmesidir. Aşağıdaki ö
 
 ---
 
-*Rapor tarihi: 2026-04-10*
+## Sprint 134 Refresh — Product-Not-Service Manifesto (2026-04-11)
+
+Sprint 134, Deckent'in rakipler arasındaki konumunu **felsefi olarak** resmileştirdi. Bu sprint'te yazılan ADR-033 (Product Vision) ve ADR-034 (Multi-Project Isolation), Deckent'in artık "araç mı, hizmet mi" sorusuna net bir cevap verdiğini ortaya koyar: **Deckent bir üründür, SaaS değildir**. Kurulur, çalıştırılır, biter. OpenClaw gibi `docker-compose up`, veya `npx deckent init && deckent start` gibi iki komutla kullanıma hazır olur.
+
+### Dört Dokunulamaz Prensip (ADR-033'ten)
+
+1. **Product, not service** — Biz hizmet sağlayıcı değiliz, biz hizmetin (yazılımın) kendisiyiz. Managed Deckent yok, cloud-hosted variant yok.
+2. **Kur çalıştır kolay** — OpenClaw seviyesinde sadelik hedefi: en fazla iki komutluk kurulum.
+3. **Açık kaynak ve ücretsiz** — MIT/Apache 2.0 permissive lisans. Enterprise edition yok, paywall yok, premium feature yok.
+4. **Herkes için, herkese, her yerde** — Dil bariyeri (TR+EN+i18n), platform bariyeri (Linux/Mac/Win/WSL/Docker/ARM), provider bariyeri (Claude/Codex/Gemini + local model Ollama), cüzdan bariyeri (local model → 0$/ay) düşürülür.
+
+### Rakip Yeniden Pozisyonlama (Sprint 134 sonrası)
+
+| Rakip | Model | Deckent Pozisyonu | Neden |
+|-------|-------|-------------------|-------|
+| Devin (Cognition) | SaaS, kapalı, ~$500/ay | **KARŞI** | Felsefe tam zıt — hizmet satışı + bulut kilit |
+| OpenHands | Open-source, self-hosted | **MÜTTEFİK** | Aynı açık kaynak + self-host değerleri |
+| Cursor Agents | IDE eklentisi, kapalı | **KARŞI** | IDE-bound, closed-source, abonelik gerekir |
+| Copilot Cowork | Microsoft servisi | **KARŞI** | Büyük şirket servisi, veri dışarı gider |
+| **OpenClaw** | Open-source, Docker | **REFERANS MODEL** | Kur-çalıştır UX hedefi için altın standart |
+| Aider | Open-source, CLI | **MÜTTEFİK** | Aynı açık + CLI + basitlik ruhu |
+
+### Deckent'in Benzersiz Değeri
+
+**OpenClaw'un kur-çalıştır kolaylığı + OpenHands'in open-source ruhu + Deckent'in sprint orchestration + self-learning döngüsü.** Üç rakibin güçlü yanları tek bir üründe, hiçbir rakibin paylaşmadığı "sprint lifecycle + brain/worker ayrımı + rubric grading + temp agent promotion" kombinasyonu ile.
+
+### Sprint 134 Çıkarımı
+
+Rakip tablosu artık Nisan 2026'nın ötesine bakıyor: **rakip tablosu iki sütunda anlam kazanıyor — "servis mi satıyor" / "ürün mü satıyor"**. Deckent "ürün mü" kategorisinde OpenClaw ve OpenHands ile birlikte duruyor; "servis mi" kategorisindeki Devin/Cursor/Copilot farklı bir oyun oynuyor. Deckent bu ayrımdan çekinmiyor — **iki pazarda değil, tek pazarda** oynayacak: açık kaynak, kur-çalıştır, milyonlarca bağımsız kurulum, bizim sunucumuz 0 kullanıcı taşır.
+
+Referanslar: `.brain/DECISIONS.md` ADR-033 (Product Vision) + ADR-034 (Multi-Project Isolation), `docs/vision/roadmap.md` (Sprint 134-145 yol haritası), `project_vision_product_not_service.md` (kaynak karar).
+
+---
+
+*Rapor tarihi: 2026-04-10 (ilk sürüm), 2026-04-11 (Sprint 134 refresh)*
 *Analiz kapsamı: 6 otonom AI coding aracı (Devin, OpenHands, OpenClaw, Cursor Agents, Copilot Cowork, Deckent)*
 *Veri kaynakları: GitHub, resmi dokümanlar, SWE-bench sonuçları, web araştırması, kod doğrulaması*
 *Doğrulama: Deckent kod tabanı — 21 MCP tool, 16 built-in agent, 21 built-in skill, 130+ sprint, 89.33% coverage*
