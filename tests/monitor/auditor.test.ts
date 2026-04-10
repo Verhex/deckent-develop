@@ -99,7 +99,11 @@ describe('scanHeartbeats', () => {
   });
 
   it('detects stale agent (>120s)', () => {
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      // .tasks dir exists, .hb files exist, but NO .result file for this task
+      return !p.endsWith('.result');
+    });
     mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
 
     const staleTimestamp = new Date(Date.now() - 200_000).toISOString();
@@ -185,7 +189,11 @@ describe('scanHeartbeats', () => {
   });
 
   it('timestamp 121 seconds old is marked as stale (>120s threshold)', () => {
-    mockedExistsSync.mockReturnValue(true);
+    mockedExistsSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      // .tasks dir exists, .hb files exist, but NO .result file for this task
+      return !p.endsWith('.result');
+    });
     mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
 
     const staleTimestamp = new Date(Date.now() - 121_000).toISOString();
@@ -240,6 +248,66 @@ describe('scanHeartbeats', () => {
 
     const result = scanHeartbeats('/project');
     expect(result.heartbeats).toHaveLength(1);
+    expect(result.staleAgents).toHaveLength(0);
+    expect(result.alerts).toHaveLength(0);
+  });
+
+  it('skips stale check when .result file exists (cleanup_delay_ms scenario)', () => {
+    // Simulates the window between writeResult() and finalizeHeartbeat() delay deletion:
+    // .result file is written, but .hb file hasn't been deleted yet (cleanup_delay_ms > 0).
+    // Auditor should NOT generate false positive stale alerts in this window.
+    mockedExistsSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      // .hb file exists (not yet deleted), .result file also exists
+      return p.endsWith('.hb') || p.endsWith('.result') || p.endsWith('.tasks');
+    });
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+
+    const staleTimestamp = new Date(Date.now() - 300_000).toISOString(); // 5 minutes old
+    const hb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'EXECUTING' as never,
+      currentAction: 'running', timestamp: staleTimestamp, filesChangedCount: 2, sequence: 3,
+    };
+
+    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.heartbeats).toHaveLength(1);
+    // No stale agents or alerts when .result file exists
+    expect(result.staleAgents).toHaveLength(0);
+    expect(result.alerts).toHaveLength(0);
+  });
+
+  it('other active workers are not affected by completed task heartbeat cleanup', () => {
+    mockedExistsSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      // task-002 has .result file (completed), task-001 does not
+      if (p.endsWith('task-002.result')) return true;
+      if (p.endsWith('.hb') || p === '/project/.tasks') return true;
+      return false;
+    });
+    mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
+
+    const freshTimestamp = new Date().toISOString();
+    const staleTimestamp = new Date(Date.now() - 300_000).toISOString();
+
+    const activeHb: Heartbeat = {
+      workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
+      currentAction: 'coding', timestamp: freshTimestamp, filesChangedCount: 1, sequence: 2,
+    };
+    const completedHb: Heartbeat = {
+      workerId: 'w2', taskId: 'task-002', status: 'EXECUTING' as never,
+      currentAction: 'old', timestamp: staleTimestamp, filesChangedCount: 5, sequence: 10,
+    };
+
+    mockedReadFileSync
+      .mockReturnValueOnce(JSON.stringify(activeHb) as never)
+      .mockReturnValueOnce(JSON.stringify(completedHb) as never);
+
+    const result = scanHeartbeats('/project');
+    expect(result.heartbeats).toHaveLength(2);
+    // Active worker (task-001) has fresh heartbeat — no stale alert
+    // Completed worker (task-002) has .result file — skipped by auditor
     expect(result.staleAgents).toHaveLength(0);
     expect(result.alerts).toHaveLength(0);
   });

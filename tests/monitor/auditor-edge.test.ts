@@ -88,11 +88,13 @@ function makeLock(filePath: string, workerId: string, acquiredAt: string): LockI
 
 describe('scanHeartbeats — edge cases', () => {
   it('multiple stale agents produce separate violations and alerts each', () => {
-    // existsSync: true for .tasks/ dir, but false for .brain/ so that debugLog's
-    // appendToErrorsFile exits early and does NOT consume extra readFileSync mock slots.
+    // existsSync: true for .tasks/ dir, but false for .brain/ (debugLog early exit)
+    // and false for .result files (T-003 fix: .result short-circuit must not fire here).
     mockedExistsSync.mockImplementation((p: unknown) => {
       const path = String(p);
-      return !path.includes('.brain');
+      if (path.includes('.brain')) return false;
+      if (path.endsWith('.result')) return false;
+      return true;
     });
     mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
 
@@ -114,7 +116,12 @@ describe('scanHeartbeats — edge cases', () => {
   });
 
   it('all heartbeats malformed JSON → empty heartbeats, no stale', () => {
-    mockedExistsSync.mockReturnValue(true);
+    // .tasks dir exists but .result files do not (T-003 fix: don't short-circuit stale check)
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('.result')) return false;
+      return true;
+    });
     mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
 
     mockedReadFileSync
@@ -157,11 +164,19 @@ describe('scanHeartbeats — edge cases', () => {
   });
 
   it('stale detail string contains elapsed seconds and task ID', () => {
-    mockedExistsSync.mockReturnValue(true);
+    // .tasks dir exists, .result and task.json do not (T-003 fix: stale check proceeds).
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('.result')) return false;
+      return true;
+    });
     mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
 
     const stale = new Date(Date.now() - 300_000).toISOString(); // 300s
-    mockedReadFileSync.mockReturnValue(JSON.stringify(makeHb('w-agent', 'task-001', stale)) as never);
+    mockedReadFileSync
+      .mockReturnValueOnce(JSON.stringify(makeHb('w-agent', 'task-001', stale)) as never)
+      // T-003 fix: auditor reads task-<id>.json to check completion — simulate missing
+      .mockImplementationOnce(() => { throw new Error('ENOENT'); });
 
     const result = scanHeartbeats('/project');
 

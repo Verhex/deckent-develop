@@ -20,17 +20,17 @@ import {
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
-  Task, TaskResult, TaskScope, Sprint, SprintMetrics,
+  Task, TaskResult, TaskScope, Sprint,
   AgentInfo, ResolvedConfig,
   BrainContext, SprintSizeRecommendation,
   BrainPlanningMode, PlannerResult, ProviderName,
 } from '../core/types.js';
 
 import {
-  BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE, SPRINTS_DIR,
+  BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE,
   RETRO_FILE, PROJECT_IDENTITY_FILE, TASK_FILE_EXTENSIONS,
-  LOCKS_DIR, JOBS_DIR, DECISIONS_LOG_DIR,
+  LOCKS_DIR, DECISIONS_LOG_DIR,
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
@@ -104,38 +104,42 @@ import {
   waitForResults as waitForResultsImpl,
   resolveAgentPrompt,
   resolveSkillPrompts,
-  buildResultsMap,
 } from './result-collector.js';
 
 // Re-export for backward compatibility (previously defined in this file)
 export { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 
-// ─── Worker IPC ───────────────────────────────────────────────────
-import { ChannelRegistry } from '../agents/worker-ipc.js';
-import type { WorkerChannel } from '../agents/worker-ipc.js';
+// ─── Worker IPC (extracted to ipc-registry.ts) ───────────────────
 
 // ─── Agent Pool & Selection ──────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
 import { selectAgent } from '../core/agent-selector.js';
 import { routeTaskV2 } from '../core/routing-engine.js';
-import type { UserOverride, TaskDNA } from '../core/routing-types.js';
+import type { UserOverride } from '../core/routing-types.js';
 
 // ─── Rollback (used by sprint-phases.ts — re-export kept for brain.ts backward compat) ──
 
 // ─── Sub-module imports (used by orchestrator) ────────────────────
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, buildWorkerPrompt, plannerTaskToParams } from './task-builder.js';
-import { runDecay } from './debt-manager.js';
-import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity, buildAgentPerformance, archiveDirectives } from './sprint-reporter.js';
-import { getRecentSprintStats } from './result-evaluator.js';
+import { ParallelPipelineManager } from './parallel-pipeline.js';
+export { DependencyCycleError } from './parallel-pipeline.js';
+// runDecay: moved to sprint-finalizer.ts imports
+// writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs, updateProjectIdentity,
+// buildAgentPerformance, archiveDirectives: moved to sprint-finalizer.ts imports
+// getRecentSprintStats: moved to sprint-finalizer.ts imports
 import { validateWorkerCoverage } from './coverage-validator.js';
 
-// ─── Plugin Hooks ─────────────────────────────────────────────────
-import { loadPluginHooks, runHooks, clearHooks } from '../core/plugin-hooks.js';
-import type { AfterSprintContext } from '../core/plugin-hooks.js';
+// ─── Baseline Tracker (Sprint 134 — honesty verification) ───────
+import { captureVitestBaseline, writeBaseline } from './baseline-tracker.js';
 
-// ─── Rich Output ──────────────────────────────────────────────────
-import { formatRichSprintSummary } from '../cli/helpers/sprint-summary-rich.js';
+// ─── Observability (Sprint 134 — local metrics) ─────────────────
+import { metric, trace, structuredLog, initObservability } from '../core/observability.js';
+
+// ─── Plugin Hooks ─────────────────────────────────────────────────
+import { loadPluginHooks, clearHooks } from '../core/plugin-hooks.js';
+
+// ─── Rich Output (moved to sprint-finalizer.ts) ──────────────────
 // ─── Sprint Phases (extracted phase functions) ──────────────────────
 import {
   runPlanPhase, runSpawnPhase, runEvaluatePhase,
@@ -286,38 +290,10 @@ export function interruptActiveSprint(): void {
   try { releaseSprintLock(projectRoot); } catch (e) { debugLog('interruptActiveSprint:releaseSprintLock', e); }
 }
 
-// ═══ IPC Channel Registry ══════════════════════════════════════════
-
-/**
- * Module-level registry that maps taskId -> WorkerChannel.
- * Populated when workers are spawned via child_process.fork (subprocess backend).
- * tmux-based workers do not populate this registry -- they use file-based heartbeats.
- */
-const _channelRegistry = new ChannelRegistry();
-
-/**
- * Returns the module-level ChannelRegistry (used by Brain and tests).
- * @internal Used only within orchestra/ — not part of the public API surface.
- */
-export function getChannelRegistry(): ChannelRegistry {
-  return _channelRegistry;
-}
-
-/**
- * Register a WorkerChannel for a given taskId.
- * @internal Used only within orchestra/ — not part of the public API surface.
- */
-export function registerWorkerChannel(taskId: string, channel: WorkerChannel): void {
-  _channelRegistry.register(taskId, channel);
-}
-
-/**
- * Unregister and close the WorkerChannel for a given taskId.
- * @internal Used only within orchestra/ — not part of the public API surface.
- */
-export function unregisterWorkerChannel(taskId: string): void {
-  _channelRegistry.remove(taskId);
-}
+// ═══ IPC Channel Registry (extracted to ipc-registry.ts) ═══════════
+// Re-export for backward compatibility — all implementation in ipc-registry.ts
+export { getChannelRegistry, registerWorkerChannel, unregisterWorkerChannel } from './ipc-registry.js';
+import { getChannelRegistry } from './ipc-registry.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -931,8 +907,26 @@ export function spawnWorkers(
 
   const systemProfile = getSystemProfile();
   const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
-  const activeTasks = sprint.tasks.slice(0, maxWorkers);
-  const queuedTasks = sprint.tasks.slice(maxWorkers);
+
+  // Dependency pipeline guard: when enabled, only spawn tasks whose dependencies are all DONE
+  let activeTasks: Task[];
+  let queuedTasks: Task[];
+  if (config.dependency_pipeline_enabled) {
+    const doneTasks = new Set(
+      sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
+    );
+    const eligibleTasks = sprint.tasks.filter(t => {
+      if (t.status !== TaskStatus.PENDING) return false;
+      if (!t.dependencies || t.dependencies.length === 0) return true;
+      return t.dependencies.every(dep => doneTasks.has(dep));
+    });
+    activeTasks = eligibleTasks.slice(0, maxWorkers);
+    queuedTasks = eligibleTasks.slice(maxWorkers);
+  } else {
+    // Legacy behavior: spawn in order, no dependency or status check
+    activeTasks = sprint.tasks.slice(0, maxWorkers);
+    queuedTasks = sprint.tasks.slice(maxWorkers);
+  }
 
   // Pre-check: do any active tasks need tmux (uses isTmuxProvider helper)?
   if (!backend) {
@@ -944,6 +938,10 @@ export function spawnWorkers(
       ensureSession();
     }
   }
+
+  // Observability: wave start metric
+  const waveId = config.dependency_pipeline_enabled ? 'dep-pipeline' : 'legacy';
+  metric('wave.start', 0, { wave: waveId, count: String(activeTasks.length) });
 
   for (const task of activeTasks) {
     const agentPrompt = resolveAgentPrompt(projectRoot, task);
@@ -1022,6 +1020,117 @@ export function spawnWorkers(
 // moved to sprint-utils.ts, re-exported above
 
 /**
+ * Re-evaluate and spawn tasks that are now eligible because their dependencies are DONE.
+ * Called after a task completes (finalizeTaskResult) when dependency_pipeline_enabled is true.
+ * Each respawn event can optionally emit a wave.transition metric via the provided callback.
+ * @returns Array of newly spawned task IDs
+ */
+export function respawnEligibleTasks(
+  projectRoot: string,
+  sprint: Sprint,
+  config: ResolvedConfig,
+  spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
+  onWaveTransition?: (durationMs: number, fromWave: string, toWave: string) => void,
+): string[] {
+  if (!config.dependency_pipeline_enabled) return [];
+
+  const waveStart = Date.now();
+
+  const doneTasks = new Set(
+    sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
+  );
+
+  // Find tasks that are PENDING and whose deps are now all DONE
+  const nowEligible = sprint.tasks.filter(t => {
+    if (t.status !== TaskStatus.PENDING) return false;
+    if (!t.dependencies || t.dependencies.length === 0) return false;
+    return t.dependencies.every(dep => doneTasks.has(dep));
+  });
+
+  if (nowEligible.length === 0) return [];
+
+  // Count currently executing tasks to respect maxWorkers
+  const systemProfile = getSystemProfile();
+  const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
+  const currentlyExecuting = sprint.tasks.filter(
+    t => t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED || t.status === TaskStatus.TESTING,
+  ).length;
+  const slotsAvailable = Math.max(0, maxWorkers - currentlyExecuting);
+
+  const toSpawn = nowEligible.slice(0, slotsAvailable);
+  if (toSpawn.length === 0) return [];
+
+  const backend = spawnOpts?.spawnBackend;
+
+  for (const task of toSpawn) {
+    const agentPrompt = resolveAgentPrompt(projectRoot, task);
+    const taskSkillPrompts = resolveSkillPrompts(projectRoot, task);
+    const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts);
+    const writeTargets = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
+    const allowedTools = writeTargets.length > 0
+      ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
+      : 'Read,Write,Edit,Bash,Glob,Grep';
+
+    const taskProvider = resolveTaskProvider(task);
+
+    if (backend) {
+      backend.spawn(task.id, task.model, prompt, {
+        allowedTools,
+        autoApprove: spawnOpts?.autoApprove ?? false,
+        projectDir: projectRoot,
+      });
+    } else if (!isTmuxProvider(taskProvider)) {
+      const adapter = getProviderAdapterForTask(taskProvider);
+      if (adapter) {
+        adapter.spawn(task.id, task.model, prompt, {
+          allowedTools,
+          autoApprove: spawnOpts?.autoApprove ?? false,
+          projectDir: projectRoot,
+        });
+      }
+    } else {
+      spawnWorker(task.id, task.model, prompt, projectRoot, {
+        allowedTools,
+        autoApprove: spawnOpts?.autoApprove ?? false,
+      });
+    }
+
+    task.status = TaskStatus.EXECUTING;
+    try {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+        JSON.stringify(task, null, 2),
+        'utf-8',
+      );
+    } catch (e) { debugLog('respawnEligibleTasks:writeTaskFile', e); }
+  }
+
+  const waveDuration = Date.now() - waveStart;
+  // Observability: wave transition metric
+  metric('wave.transition', waveDuration, { from_wave: 'dep-wait', to_wave: `wave-${toSpawn.length}` });
+  if (onWaveTransition) {
+    try {
+      onWaveTransition(waveDuration, 'dep-wait', `wave-${toSpawn.length}`);
+    } catch (e) { debugLog('respawnEligibleTasks:onWaveTransition', e); }
+  }
+
+  debugLog('respawnEligibleTasks', `Spawned ${toSpawn.length} newly eligible tasks: ${toSpawn.map(t => t.id).join(', ')}`);
+  return toSpawn.map(t => t.id);
+}
+
+/**
+ * Validate task dependencies using topological sort.
+ * Throws DependencyCycleError (DECKENT_E049) if circular dependencies are detected.
+ * @returns ExecutionWave[] for informational purposes
+ */
+export function validateTaskDependencies(tasks: Task[]): import('./parallel-pipeline.js').ExecutionWave[] {
+  const pipeline = new ParallelPipelineManager();
+  return pipeline.createPipeline(
+    tasks.map(t => ({ id: t.id, dependencies: t.dependencies ?? [] })),
+  );
+}
+
+/**
  * Route all sprint tasks to providers using the TaskRouter.
  * Sets task.provider, task.assignedAgent, and task.assignedSkills based on routing decisions.
  * Exported for testability — called from runSprint Phase 1.5.
@@ -1062,7 +1171,9 @@ export async function waitForResults(
   queue?: Task[],
   spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
 ): Promise<TaskResult[]> {
-  return waitForResultsImpl(projectRoot, sprint, timeoutMs, queue, spawnOpts, _channelRegistry);
+  return trace('wait_results', () =>
+    waitForResultsImpl(projectRoot, sprint, timeoutMs, queue, spawnOpts, getChannelRegistry()),
+  );
 }
 
 // isDocTask: moved to sprint-utils.ts, re-exported above
@@ -1076,6 +1187,8 @@ export async function waitForResults(
  * @returns The evaluation outcome
  */
 export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
+  const evalStart = Date.now();
+  try {
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
   if (result.selfAssessment === 'GO_WITH_TECH_DEBT') return TaskEvaluation.GO_WITH_TECH_DEBT;
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
@@ -1095,6 +1208,9 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
 
   if (result.coverage < coverageThreshold) return TaskEvaluation.GO_WITH_TECH_DEBT;
   return TaskEvaluation.DONE;
+  } finally {
+    metric('eval.duration_ms', Date.now() - evalStart, { taskId: task.id });
+  }
 }
 
 // isStaleTaskFile: moved to sprint-utils.ts, re-exported above
@@ -1186,473 +1302,14 @@ export function cleanup(projectRoot: string, sprint: Sprint, spawnBackend?: Spaw
   clearHooks();
 }
 
-// ═══ Finalize Sprint ══════════════════════════════════════════════
+// ═══ Finalize Sprint (extracted to sprint-finalizer.ts) ═══════════
+// Re-export for backward compatibility — all implementation in sprint-finalizer.ts
+export { finalizeSprint, applyAdaptiveThresholds, runHonestyCheck, writeRubricDetail, runSelfAuditGate } from './sprint-finalizer.js';
+export type { FinalizeSprintOptions, SelfAuditResult } from './sprint-finalizer.js';
 
-/**
- * Options for finalizeSprint.
- */
-export interface FinalizeSprintOptions {
-  /** Skip decay phase */
-  skipDecay?: boolean;
-  /** Skip plugin hooks */
-  skipHooks?: boolean;
-  /** Resolved config (used for updateProjectDocs) */
-  config?: ResolvedConfig;
-}
+// applyAdaptiveThresholds: moved to sprint-finalizer.ts, re-exported above
 
-// ─── Adaptive Thresholds ────────────────────────────────────────────
-
-/**
- * Auto-adjust agent_min_score and coverage_threshold based on recent sprint stats.
- * Reads .brain/sprints/ files, computes NO_GO rate and avg coverage,
- * then writes updated values to .deckent/config.json and appends a note to RETRO.md.
- *
- * Rules:
- * - NO_GO rate > no_go_threshold → agent_min_score decremented (min 1)
- * - NO_GO rate < 10% → agent_min_score incremented (max 10)
- * - avg coverage < 70% → coverage_threshold lowered to avg
- * - Requires min_samples sprints before any adjustment
- */
-export function applyAdaptiveThresholds(projectRoot: string, config: ResolvedConfig): void {
-  const ac = config.adaptive_config;
-  const stats = getRecentSprintStats(projectRoot, ac.coverage_lookback);
-
-  if (stats.sprintCount < ac.min_samples) {
-    debugLog('applyAdaptiveThresholds', `Not enough sprints (${stats.sprintCount}/${ac.min_samples}) — skipping`);
-    return;
-  }
-
-  const changes: string[] = [];
-  const configPath = join(projectRoot, '.deckent', 'config.json');
-  const rawCfg: Record<string, unknown> = readJsonSafe<Record<string, unknown>>(configPath) ?? {};
-
-  // Adjust agent_min_score based on NO_GO rate
-  const currentScore = config.agent_min_score;
-  let newScore = currentScore;
-  if (stats.avgNoGoRate > ac.no_go_threshold && currentScore > 1) {
-    newScore = currentScore - 1;
-  } else if (stats.avgNoGoRate < 0.1 && currentScore < 10) {
-    newScore = currentScore + 1;
-  }
-  if (newScore !== currentScore) {
-    rawCfg['agent_min_score'] = newScore;
-    changes.push(`agent_min_score ${currentScore} => ${newScore} (NO_GO rate: ${(stats.avgNoGoRate * 100).toFixed(1)}%)`);
-    debugLog('applyAdaptiveThresholds', changes.at(-1));
-  }
-
-  // Adjust coverage_threshold based on avg coverage
-  const currentCoverage = config.coverage_threshold;
-  if (stats.avgCoverage < 70 && stats.avgCoverage > 0) {
-    const newCoverage = Math.round(stats.avgCoverage);
-    if (newCoverage !== currentCoverage) {
-      rawCfg['coverage_threshold'] = newCoverage;
-      changes.push(`coverage_threshold ${currentCoverage} => ${newCoverage} (avg coverage: ${stats.avgCoverage.toFixed(1)}%)`);
-      debugLog('applyAdaptiveThresholds', changes.at(-1));
-    }
-  }
-
-  if (changes.length === 0) return;
-
-  // Write updated config
-  writeFileSync(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
-
-  // Append adaptive notes to RETRO.md
-  try {
-    const retroPath = join(projectRoot, BRAIN_DIR, RETRO_FILE);
-    const retroContent = readFileSafe(retroPath) ?? '';
-    const adaptiveLines = changes.map(c => `- Adaptive: ${c}`).join('\n') + '\n';
-    writeFileSync(retroPath, retroContent + adaptiveLines);
-  } catch (e) { debugLog('applyAdaptiveThresholds:retroAppend', e); }
-}
-
-/**
- * Run ALL post-sprint finalization actions. This function is idempotent-safe:
- * calling it multiple times with the same data won't corrupt state (MEMORY.md
- * may get duplicate entries if sprint learnings already exist, but trimming
- * keeps it within budget).
- *
- * Actions performed:
- * 1. Calculate metrics from evaluations + results
- * 2. Write sprint log to .brain/sprints/sprint-NNN.md
- * 3. Update MEMORY.md with sprint learnings (trimMemoryWithHeader)
- * 4. Write RETRO.md (writeRetrospective)
- * 5. Update PROJECT-IDENTITY.md "Current State" section
- * 6. Update last_sprint_id in .deckent/config.json
- * 7. Run decay if over budget
- * 8. Run afterSprint plugin hooks
- * 9. Update project docs (doc-updaters registry)
- *
- * @param projectRoot - Project root directory
- * @param sprint - The completed sprint (must have tasks populated)
- * @param evaluations - Map of task ID to evaluation result
- * @param results - Array of worker task results
- * @param opts - Optional finalization settings
- * @returns The computed sprint metrics
- */
-export async function finalizeSprint(
-  projectRoot: string,
-  sprint: Sprint,
-  evaluations: Map<string, TaskEvaluation>,
-  results: TaskResult[],
-  opts?: FinalizeSprintOptions,
-): Promise<SprintMetrics> {
-  // Build O(1) lookup index from results array — eliminates O(n²) linear scans
-  const resultsMap = buildResultsMap(results);
-
-  // 1. Calculate metrics
-  const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
-  const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
-  sprint.metrics = metrics;
-
-  // 2. Write sprint log
-  try {
-    writeSprintLog(projectRoot, sprint, metrics, evaluations);
-  } catch (e) { debugLog('finalizeSprint:writeSprintLog', e); }
-
-  // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
-  debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
-  try {
-    // Build skillMap from tasks for Skill Performance table in RETRO.md
-    const skillMap = new Map<string, string[]>();
-    for (const task of sprint.tasks) {
-      if (task.assignedSkills && task.assignedSkills.length > 0) {
-        skillMap.set(task.id, task.assignedSkills);
-      }
-    }
-    writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
-  } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
-
-  // 5. Update PROJECT-IDENTITY.md
-  try {
-    // Count total sprints from .brain/sprints/ directory
-    const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
-    let totalSprints = 1;
-    try {
-      if (existsSync(sprintsPath)) {
-        totalSprints = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).length;
-      }
-    } catch (e) { debugLog('finalizeSprint:countSprints', e); }
-    updateProjectIdentity(projectRoot, sprint.id, metrics, totalSprints);
-  } catch (e) { debugLog('finalizeSprint:updateProjectIdentity', e); }
-
-  // 6. Update last_sprint_id in config
-  try {
-    updateLastSprintId(projectRoot, sprint.id);
-  } catch (e) { debugLog('finalizeSprint:updateLastSprintId', e); }
-
-  // 7. Run decay if over budget
-  if (!opts?.skipDecay) {
-    try {
-      runDecay(projectRoot, sprint.id);
-    } catch (e) { debugLog('finalizeSprint:runDecay', e); }
-  }
-
-  // 8. Run afterSprint plugin hooks
-  if (!opts?.skipHooks) {
-    try {
-      await runHooks('afterSprint', {
-        hook: 'afterSprint',
-        sprint,
-        projectRoot,
-      } satisfies AfterSprintContext);
-    } catch (e) { debugLog('finalizeSprint:afterSprintHook', e); }
-  }
-
-  // 8b. Update agent/skill stats
-  const routingVersion = (opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined;
-
-  if (routingVersion !== 'v2') {
-    // V1: Write stats directly to agent.json and skill manifest files (legacy behavior)
-    try {
-      const poolManager = new AgentPoolManager(projectRoot);
-      const skillPoolManager = new SkillPoolManager(projectRoot);
-      for (const task of sprint.tasks) {
-        const evaluation = evaluations.get(task.id);
-        if (!evaluation) continue;
-        const taskResult = resultsMap.get(task.id);
-        const coverage = taskResult?.coverage ?? 0;
-
-        // Update agent stats
-        const agentId = task.assignedAgent;
-        if (agentId) {
-          poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
-        }
-
-        // Update skill stats
-        if (task.assignedSkills) {
-          for (const skillId of task.assignedSkills) {
-            skillPoolManager.updateSkillStats(skillId, evaluation, coverage, sprint.id);
-          }
-        }
-      }
-    } catch (e) { debugLog('finalizeSprint:updateAgentSkillStats', e); }
-  } else {
-    // V2: Record outcomes to learnings.json (single source of truth)
-    // Agent.json manifests are NOT touched — stats live in learnings.json only
-    try {
-      const { OutcomeTracker } = await import('./outcome-tracker.js');
-      const { assessQuality } = await import('./quality-assessor.js');
-      const tracker = new OutcomeTracker(projectRoot);
-
-      for (const task of sprint.tasks) {
-        const evaluation = evaluations.get(task.id);
-        if (!evaluation) continue;
-        const taskResult = resultsMap.get(task.id);
-
-        // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
-        let qualityScore: number | undefined;
-        if (taskResult) {
-          try {
-            const quality = assessQuality(task, taskResult, evaluation as unknown as string);
-            qualityScore = quality.overall;
-          } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
-        }
-
-        tracker.recordOutcome({
-          taskId: task.id,
-          sprintId: sprint.id,
-          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
-          agentId: task.assignedAgent ?? null,
-          skillIds: task.assignedSkills ?? [],
-          evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-          coverage: taskResult?.coverage ?? 0,
-          qualityScore,
-          routingVersion: 'v2',
-        });
-      }
-      debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
-
-      // 8d. Evolve routing rules from accumulated data
-      try {
-        const { RuleEvolver } = await import('./rule-evolver.js');
-        const evolver = new RuleEvolver(tracker, projectRoot);
-        const evolution = evolver.evolveRules();
-        if (evolution.newRules.length > 0) {
-          debugLog('finalizeSprint:rule-evolution', `${evolution.newRules.length} new rules evolved`);
-          // Persist evolved rules in learnings AND standalone file
-          tracker.saveEvolvedRules(evolution.newRules);
-          evolver.saveRules(evolution.newRules);
-        }
-      } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
-
-      // 8d2. Sync V2 learnings → agent.json / manifest.json (so Dashboard/CLI see real stats)
-      try {
-        const poolManager = new AgentPoolManager(projectRoot);
-        const skillPoolManager = new SkillPoolManager(projectRoot);
-        const learnings = tracker.getLearnings();
-
-        for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
-          // Compute average coverage from task results for this agent
-          const agentTasks = sprint.tasks.filter(t => t.assignedAgent === agentId);
-          let avgCov = 0;
-          if (agentTasks.length > 0) {
-            const totalCov = agentTasks.reduce((sum, t) => {
-              const r = resultsMap.get(t.id);
-              return sum + (r?.coverage ?? 0);
-            }, 0);
-            avgCov = totalCov / agentTasks.length;
-          }
-
-          // Build cumulative stats from learnings performance data
-          const agent = poolManager.getAgent(agentId);
-          if (agent) {
-            const stats = agent.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' };
-            stats.totalUses = perf.totalTasks;
-            stats.successRate = perf.successRate;
-            // Blend historical avg coverage with current sprint coverage
-            if (avgCov > 0 && agentTasks.length > 0) {
-              const prevTotal = stats.totalUses - agentTasks.length;
-              stats.avgCoverage = prevTotal > 0
-                ? ((stats.avgCoverage * prevTotal) + (avgCov * agentTasks.length)) / stats.totalUses
-                : avgCov;
-            }
-            stats.lastUsedInSprint = sprint.id;
-            agent.stats = stats;
-            poolManager.saveAgent(agent);
-          }
-        }
-
-        for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
-          const skill = skillPoolManager.getSkill(skillId);
-          if (skill) {
-            const stats = skill.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '', successCount: 0 };
-            stats.totalUses = perf.totalTasks;
-            stats.successRate = perf.successRate;
-            stats.successCount = perf.successCount;
-            stats.lastUsedInSprint = sprint.id;
-            skill.stats = stats;
-            skillPoolManager.saveSkill(skill);
-          }
-        }
-
-        debugLog('finalizeSprint:syncStatsToManifests', `Synced ${Object.keys(learnings.agentPerformance).length} agents, ${Object.keys(learnings.skillPerformance).length} skills to manifest files`);
-      } catch (e) { debugLog('finalizeSprint:syncStatsToManifests', e); }
-
-      // 8e. Evaluate promotions/demotions
-      try {
-        const { PromotionPipeline } = await import('./promotion-pipeline.js');
-        const pipeline = new PromotionPipeline(projectRoot);
-        const promotions = pipeline.evaluatePromotions(tracker);
-        const demotions = pipeline.evaluateDemotions(tracker);
-        for (const p of promotions.filter(r => r.action === 'promote')) {
-          debugLog('finalizeSprint:promotion', `${p.entityType} '${p.entityId}': ${p.reason}`);
-          try {
-            pipeline.promote(p.entityId, p.entityType);
-          } catch (promoteErr) {
-            debugLog('finalizeSprint:promotion', `Failed to promote ${p.entityType} '${p.entityId}': ${promoteErr}`);
-          }
-        }
-        for (const d of demotions.filter(r => r.action === 'demote')) {
-          debugLog('finalizeSprint:demotion', `${d.entityType} '${d.entityId}': ${d.reason}`);
-          try {
-            pipeline.demote(d.entityId, d.entityType);
-          } catch (demoteErr) {
-            debugLog('finalizeSprint:demotion', `Failed to demote ${d.entityType} '${d.entityId}': ${demoteErr}`);
-          }
-        }
-      } catch (e) { debugLog('finalizeSprint:promotionDemotion', e); }
-    } catch (err) {
-      debugLog('finalizeSprint:v2-learning', `V2 learning pipeline failed: ${err}`);
-    }
-  }
-
-  // 9. Update project docs
-  if (opts?.config) {
-    try {
-      updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, opts.config);
-    } catch (e) { debugLog('finalizeSprint:updateProjectDocs', e); }
-  }
-
-  // 10. Rich output (non-fatal — sprint completes even if formatting fails)
-  try {
-    const gitDiff = spawnSync('git', ['diff', '--stat', 'HEAD~1'], { encoding: 'utf-8', cwd: projectRoot }).stdout;
-    // output_mode lives on DeckentConfig (raw), not ResolvedConfig — access via cast
-    const rawConfig = opts?.config as Record<string, unknown> | undefined;
-    const outputMode = (rawConfig?.['output_mode'] as string) ?? 'normal';
-    const richInput = { id: sprint.id, number: sprint.number, tasks: sprint.tasks.map(t => ({ id: t.id, title: t.title })), metrics: sprint.metrics ? { ...sprint.metrics } : undefined };
-    // Build agent performance data for the performance table
-    const agentRows = buildAgentPerformance(sprint, evaluations, results);
-    const agentPerf = agentRows.map(row => ({
-      agentId: row.agent,
-      totalTasks: row.tasks,
-      doneTasks: row.done,
-      successRate: row.tasks > 0 ? Math.round((row.done / row.tasks) * 100) : 0,
-    }));
-    // Extract learnings from evaluation results (task notes from results)
-    const learnings = results
-      .filter(r => r.notes && r.notes.trim().length > 0)
-      .map(r => r.notes as string)
-      .slice(0, 5);
-    const richOutput = formatRichSprintSummary(
-      richInput,
-      evaluations,
-      { gitDiff, agentPerf, learnings, outputMode: outputMode as 'quiet' | 'normal' | 'verbose' },
-    );
-    if (richOutput) console.log(richOutput);
-  } catch (e) { debugLog('finalizeSprint:richOutput', e); }
-
-  // 11. Adaptive thresholds: auto-adjust agent_min_score + coverage_threshold based on recent sprints
-  if (opts?.config?.adaptive_thresholds) {
-    try {
-      applyAdaptiveThresholds(projectRoot, opts.config);
-    } catch (err) {
-      debugLog('finalizeSprint:adaptive', `Adaptive threshold update failed: ${err}`);
-    }
-  }
-
-  // 12. Archive DIRECTIVES.md (auto_archive_directives config flag, default true)
-  try {
-    const rawCfg = opts?.config as Record<string, unknown> | undefined;
-    const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;
-    if (autoArchive) {
-      archiveDirectives(projectRoot, sprint.id);
-    } else {
-      debugLog('finalizeSprint:archiveDirectives', 'Skipped — auto_archive_directives=false');
-    }
-  } catch (e) { debugLog('finalizeSprint:archiveDirectives', e); }
-
-  // 13. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
-  try {
-    const jobsDir = join(projectRoot, JOBS_DIR);
-    mkdirSync(jobsDir, { recursive: true });
-
-    // Build agent breakdown
-    const agentBreakdown: Record<string, number> = {};
-    for (const task of sprint.tasks) {
-      const agent = task.assignedAgent ?? 'generic';
-      agentBreakdown[agent] = (agentBreakdown[agent] ?? 0) + 1;
-    }
-    const agentParts = Object.entries(agentBreakdown).map(([a, c]) => `${a}(${c})`).join(', ');
-
-    // Format duration
-    const durationMs = metrics.durationMs;
-    const mins = Math.floor(durationMs / 60000);
-    const secs = Math.floor((durationMs % 60000) / 1000);
-    const durationStr = mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
-
-    // completedTasks already includes TECH_DEBT (see calculateMetrics), so use it directly
-    const donePure = metrics.completedTasks - metrics.techDebtTasks;
-    const summary = `Sprint ${sprint.id} tamamlandı (${durationStr}) — ${metrics.completedTasks}/${metrics.totalTasks} task başarılı: ${donePure} DONE, ${metrics.techDebtTasks} TECH_DEBT, ${metrics.noGoTasks} NO_GO | Agent: ${agentParts}`;
-
-    // Build rich evaluations with per-task details from results
-    const richEvaluations: Record<string, {
-      evaluation: string;
-      title: string;
-      agent: string;
-      skills: string[];
-      reason: string;
-      filesChanged: string[];
-      linesAdded: number;
-      linesRemoved: number;
-      testsPassed: boolean;
-      coverage: number;
-      selfAssessment: string;
-      techDebtDetail: string;
-    }> = {};
-    for (const [taskId, evaluation] of evaluations) {
-      const taskResult = resultsMap.get(taskId);
-      const task = sprint.tasks.find(t => t.id === taskId);
-      const isTechDebt = evaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
-      richEvaluations[taskId] = {
-        evaluation,
-        title: task?.title ?? '',
-        agent: task?.assignedAgent ?? 'generic',
-        skills: task?.assignedSkills ?? [],
-        reason: taskResult?.notes ?? '',
-        filesChanged: taskResult?.filesChanged ?? [],
-        linesAdded: taskResult?.linesAdded ?? 0,
-        linesRemoved: taskResult?.linesRemoved ?? 0,
-        testsPassed: taskResult?.testsPassed ?? false,
-        coverage: taskResult?.coverage ?? 0,
-        selfAssessment: taskResult?.selfAssessment ?? evaluation,
-        techDebtDetail: isTechDebt ? (taskResult?.notes ?? '') : '',
-      };
-    }
-
-    const jobFile = join(jobsDir, `${sprint.id}.json`);
-    const jobData = {
-      status: 'COMPLETE',
-      sprintId: sprint.id,
-      summary,
-      completedAt: new Date().toISOString(),
-      metrics: {
-        totalTasks: metrics.totalTasks,
-        done: donePure,
-        techDebt: metrics.techDebtTasks,
-        noGo: metrics.noGoTasks,
-        duration: durationStr,
-        durationMs: metrics.durationMs,
-      },
-      agentBreakdown,
-      evaluations: richEvaluations,
-    };
-    writeFileSync(jobFile, JSON.stringify(jobData, null, 2) + '\n');
-    debugLog('finalizeSprint:jobSummary', `Job summary written to ${jobFile}`);
-  } catch (e) { debugLog('finalizeSprint:jobSummary', e); }
-
-  return metrics;
-}
-
+// finalizeSprint: moved to sprint-finalizer.ts, re-exported above
 /**
  * Master orchestrator: runs a complete sprint lifecycle through all phases
  * (PLAN, SPAWN, EXECUTE, EVALUATE, FIX, RETRO, DECAY, CLEANUP).
@@ -1755,6 +1412,10 @@ export async function runSprint(
   // Rollback enabled by default (unless explicitly disabled via opts.rollback === false)
   const rollbackEnabled = opts?.rollback !== false;
 
+  // Initialize local observability (Sprint 134)
+  initObservability(projectRoot);
+  structuredLog('info', 'Sprint starting', { sprintPhase: 'INIT' });
+
   // Load plugin hooks at sprint start (non-fatal)
   try {
     await loadPluginHooks(projectRoot);
@@ -1815,6 +1476,17 @@ export async function runSprint(
 
   // Persist sprint state for crash recovery
   writeSprintState(projectRoot, sprint);
+
+  // Phase 1.9: Capture pre-sprint test baseline for honesty verification (non-fatal)
+  try {
+    const captured = captureVitestBaseline(projectRoot);
+    if (captured) {
+      writeBaseline(projectRoot, sprint.id, captured);
+      debugLog('runSprint:baseline', `Pre-sprint baseline captured: pass=${captured.pass} fail=${captured.fail} files=${captured.files}`);
+    } else {
+      debugLog('runSprint:baseline', 'Could not capture pre-sprint baseline (vitest parse failed or unavailable)');
+    }
+  } catch (e) { debugLog('runSprint:baseline', e); }
 
   // Phase 2: SPAWN (1 retry with diagnostic hints)
   const { taskQueue, scanInterval: initialScanInterval } = runSpawnPhase(
@@ -2024,7 +1696,7 @@ export function pauseSprint(
 
       // Send PAUSE via IPC if a channel is registered for this task (subprocess backend)
       // For tmux backend (no IPC channel), kill the worker to stop execution.
-      const channel = _channelRegistry.get(task.id);
+      const channel = getChannelRegistry().get(task.id);
       if (channel) {
         try { channel.pause(); } catch (e) { debugLog('pauseSprint:channelPause', e); }
       } else {
@@ -2112,7 +1784,7 @@ export function resumeSprint(
 
       // Send RESUME via IPC if a channel is registered for this task (subprocess backend).
       // Tmux workers were killed on pause and must be re-spawned by the caller.
-      const channel = _channelRegistry.get(task.id);
+      const channel = getChannelRegistry().get(task.id);
       if (channel) {
         try { channel.resume(); } catch (e) { debugLog('resumeSprint:channelResume', e); }
       }

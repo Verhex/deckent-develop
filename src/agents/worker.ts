@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, openSync, closeSync, constants as fsConstants } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, openSync, closeSync, realpathSync, constants as fsConstants } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join, normalize, sep } from 'node:path';
 import { TaskStatus, AgentStatus } from '../core/types.js';
@@ -323,36 +323,41 @@ export function writeResult(projectRoot: string, result: TaskResult): void {
 }
 
 /**
- * Write a final DONE heartbeat for a completed task.
- * Updates the existing heartbeat file with status DONE and a fresh timestamp,
- * preventing the auditor from flagging it as stale after task completion.
+ * Remove the heartbeat file for a completed task.
+ * Called by writeResult to perform task-level heartbeat cleanup, eliminating
+ * false-positive stale heartbeat alerts from the auditor after task completion.
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - Task ID whose .hb file should be removed
+ * @param cleanupDelayMs - Milliseconds to wait before deleting (0 = immediate).
+ *   When > 0, deletion is scheduled via setTimeout. Use 0 for synchronous cleanup.
  */
-export function finalizeHeartbeat(projectRoot: string, taskId: string): void {
+export function finalizeHeartbeat(projectRoot: string, taskId: string, cleanupDelayMs = 0): void {
   const hbPath = heartbeatFilePath(projectRoot, taskId);
-  let workerId = `worker-${taskId}`;
 
-  // Read existing heartbeat to preserve workerId
-  if (existsSync(hbPath)) {
-    try {
-      const existing = JSON.parse(readFileSync(hbPath, 'utf-8')) as Heartbeat;
-      if (existing.workerId) {
-        workerId = existing.workerId;
+  const doCleanup = (): void => {
+    if (existsSync(hbPath)) {
+      try {
+        unlinkSync(hbPath);
+      } catch {
+        // File may already be removed by auditor cleanup or another process — non-fatal
       }
-    } catch {
-      // Corrupted heartbeat — use default workerId
     }
-  }
+  };
 
-  const hb = createHeartbeat(
-    workerId,
-    taskId,
-    AgentStatus.DONE,
-    'Task completed',
-    undefined,
-    undefined,
-    undefined,
-  );
-  writeHeartbeat(projectRoot, hb);
+  if (cleanupDelayMs <= 0) {
+    doCleanup();
+  } else {
+    setTimeout(doCleanup, cleanupDelayMs);
+  }
+}
+
+/**
+ * @deprecated Use finalizeHeartbeat (now deletes .hb on task completion).
+ * Kept for backward compatibility — delegates to finalizeHeartbeat.
+ */
+export function writeFinishedHeartbeat(projectRoot: string, taskId: string): void {
+  finalizeHeartbeat(projectRoot, taskId, 0);
 }
 
 export function updateTaskStatus(
@@ -701,20 +706,46 @@ export function runCompilationLoop(
   return { success: false, attempts: maxRetries, errors: lastErrors };
 }
 
-export function isWithinScope(filePath: string, scope: TaskScope): boolean {
+export function isWithinScope(filePath: string, scope: TaskScope, projectRoot?: string): boolean {
   const normalizedFile = normalize(filePath).split(sep).join('/');
+
+  // When projectRoot is provided, resolve symlinks to prevent scope bypass (ADR-034)
+  let resolvedFile = normalizedFile;
+  if (projectRoot) {
+    const absolutePath = join(projectRoot, normalizedFile);
+    try {
+      const realPath = realpathSync(absolutePath);
+      const projectRealPath = realpathSync(projectRoot);
+      const projectPrefix = projectRealPath + '/';
+      if (realPath.startsWith(projectPrefix)) {
+        resolvedFile = realPath.slice(projectPrefix.length).split(sep).join('/');
+      } else if (realPath === projectRealPath) {
+        resolvedFile = normalizedFile;
+      } else {
+        // Resolved path is outside project root — scope violation
+        return false;
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        // ELOOP = circular symlink — deny access
+        if (code === 'ELOOP') return false;
+        // ENOENT = file doesn't exist yet (new file creation) — fall through to normal check
+      }
+    }
+  }
 
   for (const dir of scope.directories) {
     const normalizedDir = normalize(dir).split(sep).join('/');
     const dirWithSlash = normalizedDir.endsWith('/') ? normalizedDir : `${normalizedDir}/`;
-    if (normalizedFile.startsWith(dirWithSlash) || normalizedFile === normalizedDir) {
+    if (resolvedFile.startsWith(dirWithSlash) || resolvedFile === normalizedDir) {
       return true;
     }
   }
 
   for (const f of scope.filesWrite) {
     const normalizedWrite = normalize(f).split(sep).join('/');
-    if (normalizedFile === normalizedWrite) {
+    if (resolvedFile === normalizedWrite) {
       return true;
     }
   }

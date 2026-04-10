@@ -422,6 +422,14 @@ registry.set('DECKENT_E053', {
   howToFix: ['Use an integer between 1 and 5'],
 });
 
+registry.set('DECKENT_E054', {
+  message: 'observability not initialized',
+  suggestion: 'Call initObservability(projectRoot) before using metric/trace/structuredLog',
+  whatHappened: 'A caller tried to read the metrics path before the observability library was initialized for a project root.',
+  why: 'Observability state is lazy — it must be bound to a project root via initObservability() at sprint startup.',
+  howToFix: ['Call initObservability(projectRoot) once at sprint bootstrap', 'Or pass an explicit projectRoot to getMetricsPath(projectRoot)'],
+});
+
 // ─── Agent Error Codes (DECKENT_E060-E079) ──────────────────────────
 
 registry.set('DECKENT_E060', {

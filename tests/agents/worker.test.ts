@@ -27,12 +27,13 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
+  realpathSync: vi.fn(),
   openSync: vi.fn(() => 42),
   closeSync: vi.fn(),
   constants: { O_WRONLY: 1, O_CREAT: 64, O_EXCL: 128 },
 }));
 
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
@@ -40,6 +41,7 @@ const mockedExistsSync = vi.mocked(existsSync);
 const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedReaddirSync = vi.mocked(readdirSync);
+const mockedRealpathSync = vi.mocked(realpathSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -315,8 +317,10 @@ describe('writeResult', () => {
 
     writeResult('/project', result);
 
-    // result file + updateTaskStatus writes task JSON + finalizeHeartbeat writes .hb
-    expect(mockedWriteFileSync).toHaveBeenCalledTimes(3);
+    // result file + updateTaskStatus writes task JSON (finalizeHeartbeat now deletes .hb, not writes)
+    expect(mockedWriteFileSync).toHaveBeenCalledTimes(2);
+    // finalizeHeartbeat should delete .hb file
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-001.hb'));
   });
 
   it('sets task status to DONE for selfAssessment DONE', () => {
@@ -331,8 +335,8 @@ describe('writeResult', () => {
       coverage: 90, selfAssessment: 'DONE', notes: '',
     });
 
-    // Task status write is second-to-last (last is heartbeat DONE)
-    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 2]!;
+    // Task status write is last (finalizeHeartbeat now deletes .hb, not writes)
+    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 1]!;
     const writtenTask = JSON.parse(taskWriteCall[1] as string) as Task;
     expect(writtenTask.status).toBe(TaskStatus.DONE);
   });
@@ -349,8 +353,8 @@ describe('writeResult', () => {
       coverage: 0, selfAssessment: 'NO_GO', notes: 'Failed',
     });
 
-    // Task status write is second-to-last (last is heartbeat DONE)
-    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 2]!;
+    // Task status write is last (finalizeHeartbeat now deletes .hb, not writes)
+    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 1]!;
     const writtenTask = JSON.parse(taskWriteCall[1] as string) as Task;
     expect(writtenTask.status).toBe(TaskStatus.NO_GO);
   });
@@ -367,8 +371,8 @@ describe('writeResult', () => {
       coverage: 85, selfAssessment: 'GO_WITH_TECH_DEBT', notes: 'Minor gaps',
     });
 
-    // Task status write is second-to-last (last is heartbeat DONE)
-    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 2]!;
+    // Task status write is last (finalizeHeartbeat now deletes .hb, not writes)
+    const taskWriteCall = mockedWriteFileSync.mock.calls[mockedWriteFileSync.mock.calls.length - 1]!;
     const writtenTask = JSON.parse(taskWriteCall[1] as string) as Task;
     expect(writtenTask.status).toBe(TaskStatus.DONE);
   });
@@ -377,45 +381,47 @@ describe('writeResult', () => {
 // ─── finalizeHeartbeat ──────────────────────────────────────────────
 
 describe('finalizeHeartbeat', () => {
-  it('writes DONE heartbeat with fresh timestamp', () => {
-    const existingHb = {
-      workerId: 'w-074-001',
-      taskId: '001',
-      status: AgentStatus.EXECUTING,
-      currentAction: 'coding',
-      timestamp: '2026-03-29T00:00:00.000Z',
-      filesChangedCount: 3,
-      sequence: 5,
-      progress: 30,
-    };
+  it('deletes .hb file when it exists (immediate cleanup)', () => {
     mockedExistsSync.mockReturnValue(true);
-    mockedReadFileSync.mockReturnValue(JSON.stringify(existingHb) as never);
 
     finalizeHeartbeat('/project', '001');
 
-    // Should write a heartbeat file
-    const writeCalls = mockedWriteFileSync.mock.calls;
-    expect(writeCalls.length).toBeGreaterThanOrEqual(1);
-
-    const lastCall = writeCalls[writeCalls.length - 1]!;
-    const written = JSON.parse(lastCall[1] as string) as { workerId: string; status: string; taskId: string };
-    expect(written.status).toBe(AgentStatus.DONE);
-    expect(written.workerId).toBe('w-074-001');
-    expect(written.taskId).toBe('001');
+    // Should delete the .hb file, not write a new one
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-001.hb'));
+    expect(mockedWriteFileSync).not.toHaveBeenCalled();
   });
 
-  it('uses default workerId when no existing heartbeat', () => {
+  it('is a no-op when .hb file does not exist', () => {
     mockedExistsSync.mockReturnValue(false);
 
-    finalizeHeartbeat('/project', '042');
+    // Should not throw and not call unlink (nothing to delete)
+    expect(() => finalizeHeartbeat('/project', '042')).not.toThrow();
+    expect(mockedUnlinkSync).not.toHaveBeenCalled();
+    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+  });
 
-    const writeCalls = mockedWriteFileSync.mock.calls;
-    expect(writeCalls.length).toBeGreaterThanOrEqual(1);
+  it('calls cleanup immediately when cleanupDelayMs is 0', () => {
+    mockedExistsSync.mockReturnValue(true);
 
-    const lastCall = writeCalls[writeCalls.length - 1]!;
-    const written = JSON.parse(lastCall[1] as string) as { workerId: string; status: string };
-    expect(written.status).toBe(AgentStatus.DONE);
-    expect(written.workerId).toBe('worker-042');
+    finalizeHeartbeat('/project', '007', 0);
+
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-007.hb'));
+  });
+
+  it('schedules delayed cleanup when cleanupDelayMs > 0', () => {
+    vi.useFakeTimers();
+    mockedExistsSync.mockReturnValue(true);
+
+    finalizeHeartbeat('/project', '008', 5000);
+
+    // Not deleted yet
+    expect(mockedUnlinkSync).not.toHaveBeenCalled();
+
+    // Advance timer past the delay
+    vi.advanceTimersByTime(5000);
+
+    expect(mockedUnlinkSync).toHaveBeenCalledWith(expect.stringContaining('task-008.hb'));
+    vi.useRealTimers();
   });
 });
 
@@ -526,6 +532,75 @@ describe('isWithinScope', () => {
 
   it('returns false for prefix overlap (src/core-extra/)', () => {
     expect(isWithinScope('src/core-extra/file.ts', scope)).toBe(false);
+  });
+
+  // ─── Symlink-Aware Scope Enforcement (ADR-034) ─────────────────────
+
+  describe('symlink-aware scope (ADR-034)', () => {
+    const symlinkScope: TaskScope = {
+      directories: ['src/core/'],
+      filesRead: [],
+      filesWrite: ['src/index.ts'],
+    };
+    const projectRoot = '/home/user/project-a';
+
+    it('allows symlink whose target is within scope', () => {
+      // src/core/link.ts -> /home/user/project-a/src/core/real.ts (in scope)
+      mockedRealpathSync.mockImplementation((p: unknown) => {
+        const ps = String(p);
+        if (ps === '/home/user/project-a/src/core/link.ts') return '/home/user/project-a/src/core/real.ts';
+        if (ps === '/home/user/project-a') return '/home/user/project-a';
+        return ps;
+      });
+      expect(isWithinScope('src/core/link.ts', symlinkScope, projectRoot)).toBe(true);
+    });
+
+    it('denies symlink whose target is outside scope (sibling project)', () => {
+      // src/core/stolen.ts -> /home/user/project-b/src/secret.ts (out of project root)
+      mockedRealpathSync.mockImplementation((p: unknown) => {
+        const ps = String(p);
+        if (ps === '/home/user/project-a/src/core/stolen.ts') return '/home/user/project-b/src/secret.ts';
+        if (ps === '/home/user/project-a') return '/home/user/project-a';
+        return ps;
+      });
+      expect(isWithinScope('src/core/stolen.ts', symlinkScope, projectRoot)).toBe(false);
+    });
+
+    it('denies recursive symlink (ELOOP)', () => {
+      mockedRealpathSync.mockImplementation((p: unknown) => {
+        const ps = String(p);
+        if (ps === '/home/user/project-a/src/core/cycle.ts') {
+          const err = new Error('ELOOP: too many levels of symbolic links') as NodeJS.ErrnoException;
+          err.code = 'ELOOP';
+          throw err;
+        }
+        if (ps === '/home/user/project-a') return '/home/user/project-a';
+        return ps;
+      });
+      expect(isWithinScope('src/core/cycle.ts', symlinkScope, projectRoot)).toBe(false);
+    });
+
+    it('falls through to normal check on ENOENT (new file creation)', () => {
+      // File doesn't exist yet — realpathSync throws ENOENT
+      mockedRealpathSync.mockImplementation((p: unknown) => {
+        const ps = String(p);
+        if (ps === '/home/user/project-a/src/core/new-file.ts') {
+          const err = new Error('ENOENT: no such file or directory') as NodeJS.ErrnoException;
+          err.code = 'ENOENT';
+          throw err;
+        }
+        if (ps === '/home/user/project-a') return '/home/user/project-a';
+        return ps;
+      });
+      // src/core/ is in scope, so normal check passes
+      expect(isWithinScope('src/core/new-file.ts', symlinkScope, projectRoot)).toBe(true);
+    });
+
+    it('works without projectRoot (backward compatible)', () => {
+      // No projectRoot — no realpathSync called
+      expect(isWithinScope('src/core/types.ts', symlinkScope)).toBe(true);
+      expect(isWithinScope('src/api/routes.ts', symlinkScope)).toBe(false);
+    });
   });
 });
 

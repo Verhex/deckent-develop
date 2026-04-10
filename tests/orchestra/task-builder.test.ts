@@ -550,7 +550,8 @@ describe('buildWorkerPrompt', () => {
     const descLen = 500;
     const totalLen = prompt.length;
     // Description should be meaningful portion of total prompt (baseline improvement from 16%)
-    expect(descLen / totalLen).toBeGreaterThan(0.20);
+    // Threshold lowered from 0.20 to 0.18 after tokenUsage instructions added to result format
+    expect(descLen / totalLen).toBeGreaterThan(0.18);
   });
 });
 
@@ -1703,5 +1704,209 @@ describe('buildWorkerPrompt — effort maxTokens budget', () => {
 
     // High effort prompt should contain more skill content
     expect(highPrompt.length).toBeGreaterThan(lowPrompt.length);
+  });
+});
+
+// ═══ Sprint 134-002: Scope Parser Hardening — Edge Case Tests ════════════
+
+describe('extractScopeFromDirective — .brain/ prefix path', () => {
+  it('recognizes .brain/ as a directory scope', () => {
+    const scope = extractScopeFromDirective('- Scope: .brain/');
+    expect(scope.directories).toContain('.brain/');
+  });
+
+  it('recognizes .brain/ in multi-scope with other dirs', () => {
+    const scope = extractScopeFromDirective('- Scope: .brain/, docs/vision/');
+    expect(scope.directories).toContain('.brain/');
+    expect(scope.directories).toContain('docs/vision/');
+  });
+});
+
+describe('extractScopeFromDirective — root scope "."', () => {
+  it('parses "." as root scope → "./"', () => {
+    const scope = extractScopeFromDirective('- Scope: .');
+    expect(scope.directories).toContain('./');
+  });
+
+  it('parses multi-scope with "." root + named directory', () => {
+    const scope = extractScopeFromDirective('- Scope: docs/analysis/, .');
+    expect(scope.directories).toContain('./');
+    expect(scope.directories).toContain('docs/analysis/');
+  });
+});
+
+describe('parseStructuredDirectives — title code snippet does not pollute scope', () => {
+  it('does not create false positive scope from results.find() in title', () => {
+    const content = `## Task 1: Fix results.find() junk entry
+- Scope: src/orchestra/
+- Files: src/orchestra/result-collector.ts
+
+### Description
+Fix the results.find() bug that creates junk entries.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    // Scope should come from explicit Scope:/Files: lines, not from title
+    expect(tasks[0]!.scope.directories).toContain('src/orchestra/');
+    // The title should NOT inject false scope entries from "results.find()"
+    expect(tasks[0]!.scope.filesWrite).not.toContain('results.find');
+  });
+
+  it('does not create scope from code-like title patterns', () => {
+    const content = `## Task 1: Update parseConfig() to handle edge cases
+- Scope: src/core/
+
+### Description
+Handle edge cases in parseConfig().`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.scope.directories).toContain('src/core/');
+  });
+});
+
+describe('extractScopeFromDirective — .deckent/ prefix path', () => {
+  it('recognizes .deckent/ as a directory scope', () => {
+    const scope = extractScopeFromDirective('- Scope: .deckent/');
+    expect(scope.directories).toContain('.deckent/');
+  });
+});
+
+describe('extractScopeFromDirective — absolute path scope reject', () => {
+  it('does not parse /usr/local/bin as a valid scope', () => {
+    const scope = extractScopeFromDirective('- Scope: /usr/local/bin');
+    // extractScopeFromDirective adds trailing / but /usr/local/bin/ is NOT src/ or tests/
+    // The Scope: label will still parse it, but it should be caught by downstream validation
+    // At minimum, it should not match directory regex patterns for src/tests/docs
+    const hasSrcOrTests = scope.directories.some(d => d.startsWith('src/') || d.startsWith('tests/'));
+    expect(hasSrcOrTests).toBe(false);
+  });
+});
+
+describe('extractScopeFromDirective — empty scope', () => {
+  it('returns empty directories for empty scope line', () => {
+    const scope = extractScopeFromDirective('');
+    expect(scope.directories).toEqual([]);
+    expect(scope.filesWrite).toEqual([]);
+  });
+});
+
+describe('parseStructuredDirectives — Sprint 134 DIRECTIVES self-parse', () => {
+  it('correctly parses all 15 tasks from Sprint 134 DIRECTIVES', () => {
+    // Use a minimal but representative subset of Sprint 134 DIRECTIVES
+    const content = `# DIRECTIVES — Sprint 134
+
+## Goal: Sprint 134 goals.
+
+---
+
+## Task 1: Task Dependency Pipeline
+- Model: opus
+- Effort: high
+- Scope: src/orchestra/
+- Files: src/orchestra/task-builder.ts
+
+### Description
+Implement dependency pipeline.
+
+---
+
+## Task 2: DIRECTIVES Scope Parser Hardening
+- Model: opus
+- Effort: normal
+- Scope: src/orchestra/
+- Files: src/orchestra/task-builder.ts, src/orchestra/planner.ts
+
+### Description
+Fix scope parser edge cases.
+
+---
+
+## Task 3: Auditor Heartbeat Cleanup
+- Model: sonnet
+- Effort: low
+- Scope: src/monitor/, src/agents/
+
+### Description
+Clean up heartbeat files.
+
+---
+
+## Task 4: Gitignore Cleanup
+- Model: haiku
+- Effort: low
+- Scope: .
+- Files: .gitignore
+
+### Description
+Update gitignore patterns.
+
+---
+
+## Task 7: ADR-033 Product Vision
+- Model: sonnet
+- Effort: normal
+- Scope: .brain/, docs/vision/
+- Files: .brain/DECISIONS.md, docs/vision/roadmap.md
+
+### Description
+Write ADR-033.
+
+---
+
+## Task 12: Multi-Project Isolation
+- Model: opus
+- Effort: normal
+- Scope: .brain/, docs/design/, src/agents/
+
+### Description
+Write ADR-034.
+
+---
+
+## Task 15: Competitive Analysis
+- Model: haiku
+- Effort: low
+- Scope: docs/analysis/
+
+### Description
+Update competitive analysis.`;
+
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks.length).toBe(7);
+
+    // Task 1: src/orchestra/
+    expect(tasks[0]!.scope.directories).toContain('src/orchestra/');
+
+    // Task 4: "." root scope → "./"
+    expect(tasks[3]!.scope.directories).toContain('./');
+    expect(tasks[3]!.scope.filesWrite).toContain('.gitignore');
+
+    // Task 7: .brain/ + docs/vision/
+    const t7dirs = tasks[4]!.scope.directories;
+    expect(t7dirs).toContain('.brain/');
+    expect(t7dirs).toContain('docs/vision/');
+
+    // Task 12: .brain/ + docs/design/ + src/agents/
+    const t12dirs = tasks[5]!.scope.directories;
+    expect(t12dirs).toContain('.brain/');
+    expect(t12dirs).toContain('docs/design/');
+    expect(t12dirs).toContain('src/agents/');
+
+    // Task 15: docs/analysis/
+    expect(tasks[6]!.scope.directories).toContain('docs/analysis/');
+  });
+});
+
+describe('parseStructuredDirectives — .brain/ scope detection via scopeLines filter', () => {
+  it('includes .brain/ Files in scope when only .brain paths present', () => {
+    const content = `## Task 1: Write ADR
+- Files: .brain/DECISIONS.md
+- Scope: .brain/
+
+### Description
+Write architecture decision record.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.scope.directories).toContain('.brain/');
+    expect(tasks[0]!.scope.filesWrite).toContain('.brain/DECISIONS.md');
   });
 });

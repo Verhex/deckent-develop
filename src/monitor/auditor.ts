@@ -70,6 +70,10 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000
     // Skip stale check for heartbeats with DONE status — worker already completed
     if (hb.status === AgentStatus.DONE) continue;
 
+    // Skip stale check when a .result file exists — task completed (heartbeat cleanup may be delayed)
+    const resultFilePath = join(tasksDir, `task-${hb.taskId}.result`);
+    if (existsSync(resultFilePath)) continue;
+
     const parsedTime = new Date(hb.timestamp).getTime();
     if (isNaN(parsedTime)) continue; // malformed timestamp — skip, do not mark as stale
     const elapsed = currentTime - parsedTime;

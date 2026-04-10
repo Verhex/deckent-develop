@@ -31,6 +31,8 @@ import {
   waitForResults,
   handleWorkerQuestion,
   checkWorkerQuestions,
+  estimateTokenUsage,
+  enrichResultTokenUsage,
 } from '../../src/orchestra/result-collector.js';
 import {
   writeQuestionFile,
@@ -305,5 +307,253 @@ describe('checkWorkerQuestions', () => {
     const answered = checkWorkerQuestions(tmpDir, taskIds, collectedIds);
 
     expect(answered).toHaveLength(0);
+  });
+});
+
+// ═══ Token Usage Pipeline ════════════════════════════════════════════
+
+function makeResult(overrides: Partial<TaskResult> & { taskId: string }): TaskResult {
+  return {
+    workerId: `w-${overrides.taskId}`,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: true,
+    coverage: 80,
+    selfAssessment: 'DONE',
+    notes: '',
+    ...overrides,
+  };
+}
+
+describe('estimateTokenUsage', () => {
+  it('estimates token usage from task estimatedTokens and result linesAdded', () => {
+    const task = makeTask('tok-001');
+    task.estimatedTokens = 5000;
+    task.provider = 'claude';
+    task.model = 'opus';
+    const result = makeResult({ taskId: 'tok-001', linesAdded: 100, linesRemoved: 20 });
+
+    const usage = estimateTokenUsage(task, result);
+
+    expect(usage.inputTokens).toBe(5000);
+    expect(usage.outputTokens).toBe(1500); // 100 * 15
+    expect(usage.cacheReadTokens).toBe(20000); // 5000 * 4
+    expect(usage.provider).toBe('claude');
+    expect(usage.model).toBe('opus');
+  });
+
+  it('falls back when task has no estimatedTokens', () => {
+    const task = makeTask('tok-002');
+    task.provider = 'codex';
+    task.model = 'gpt-5';
+    const result = makeResult({ taskId: 'tok-002', linesAdded: 50, linesRemoved: 10 });
+
+    const usage = estimateTokenUsage(task, result);
+
+    // inputTokens = max((50+10)*10, 1000) = max(600, 1000) = 1000
+    expect(usage.inputTokens).toBe(1000);
+    expect(usage.outputTokens).toBe(750); // 50 * 15
+    expect(usage.provider).toBe('codex');
+    expect(usage.model).toBe('gpt-5');
+  });
+
+  it('uses forceModel over model when both present', () => {
+    const task = makeTask('tok-003');
+    task.model = 'sonnet';
+    task.forceModel = 'opus';
+    const result = makeResult({ taskId: 'tok-003', linesAdded: 10, linesRemoved: 0 });
+
+    const usage = estimateTokenUsage(task, result);
+
+    expect(usage.model).toBe('opus');
+  });
+
+  it('ensures minimum outputTokens of 500', () => {
+    const task = makeTask('tok-004');
+    task.estimatedTokens = 2000;
+    const result = makeResult({ taskId: 'tok-004', linesAdded: 0, linesRemoved: 0 });
+
+    const usage = estimateTokenUsage(task, result);
+
+    expect(usage.outputTokens).toBe(500);
+  });
+});
+
+describe('enrichResultTokenUsage', () => {
+  it('enriches result that has no tokenUsage', () => {
+    const task = makeTask('enr-001');
+    task.estimatedTokens = 8000;
+    task.provider = 'claude';
+    task.model = 'sonnet';
+    const result = makeResult({ taskId: 'enr-001', linesAdded: 200, linesRemoved: 50 });
+
+    expect(result.tokenUsage).toBeUndefined();
+    enrichResultTokenUsage(result, task);
+
+    expect(result.tokenUsage).toBeDefined();
+    expect(result.tokenUsage!.inputTokens).toBe(8000);
+    expect(result.tokenUsage!.outputTokens).toBe(3000); // 200 * 15
+    expect(result.tokenUsage!.provider).toBe('claude');
+    expect(result.tokenUsage!.model).toBe('sonnet');
+  });
+
+  it('does not overwrite existing tokenUsage', () => {
+    const task = makeTask('enr-002');
+    task.estimatedTokens = 8000;
+    const existing = { inputTokens: 999, outputTokens: 111, cacheReadTokens: 555, provider: 'gemini' as const, model: 'gemini-2.5-pro' as const };
+    const result = makeResult({ taskId: 'enr-002', tokenUsage: existing });
+
+    enrichResultTokenUsage(result, task);
+
+    expect(result.tokenUsage).toBe(existing); // reference equality — untouched
+    expect(result.tokenUsage!.inputTokens).toBe(999);
+  });
+
+  it('does nothing when task is undefined', () => {
+    const result = makeResult({ taskId: 'enr-003' });
+
+    enrichResultTokenUsage(result, undefined);
+
+    expect(result.tokenUsage).toBeUndefined();
+  });
+
+  it('preserves provider field for multi-provider sprints', () => {
+    const task1 = makeTask('enr-004');
+    task1.provider = 'claude';
+    task1.model = 'opus';
+    task1.estimatedTokens = 5000;
+
+    const task2 = makeTask('enr-005');
+    task2.provider = 'codex';
+    task2.model = 'gpt-5';
+    task2.estimatedTokens = 3000;
+
+    const task3 = makeTask('enr-006');
+    task3.provider = 'gemini';
+    task3.model = 'gemini-2.5-pro';
+    task3.estimatedTokens = 4000;
+
+    const r1 = makeResult({ taskId: 'enr-004', linesAdded: 100, linesRemoved: 10 });
+    const r2 = makeResult({ taskId: 'enr-005', linesAdded: 80, linesRemoved: 5 });
+    const r3 = makeResult({ taskId: 'enr-006', linesAdded: 60, linesRemoved: 20 });
+
+    enrichResultTokenUsage(r1, task1);
+    enrichResultTokenUsage(r2, task2);
+    enrichResultTokenUsage(r3, task3);
+
+    expect(r1.tokenUsage!.provider).toBe('claude');
+    expect(r2.tokenUsage!.provider).toBe('codex');
+    expect(r3.tokenUsage!.provider).toBe('gemini');
+  });
+});
+
+describe('waitForResults — token enrichment integration', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* noop */ }
+  });
+
+  it('enriches collected results with estimated tokenUsage', async () => {
+    const task = makeTask('int-001');
+    task.estimatedTokens = 10000;
+    task.provider = 'claude';
+    task.model = 'opus';
+    const sprint = makeSprint([task]);
+
+    const result: TaskResult = {
+      taskId: 'int-001',
+      workerId: 'w-int-001',
+      filesChanged: ['src/foo.ts'],
+      linesAdded: 150,
+      linesRemoved: 30,
+      testsPassed: true,
+      coverage: 90,
+      selfAssessment: 'DONE',
+      notes: 'Completed',
+    };
+    writeFileSync(join(tmpDir, '.tasks', 'task-int-001.result'), JSON.stringify(result), 'utf-8');
+
+    const results = await waitForResults(tmpDir, sprint, 5000);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.tokenUsage).toBeDefined();
+    expect(results[0]!.tokenUsage!.inputTokens).toBe(10000);
+    expect(results[0]!.tokenUsage!.outputTokens).toBe(2250); // 150 * 15
+    expect(results[0]!.tokenUsage!.model).toBe('opus');
+    expect(results[0]!.tokenUsage!.provider).toBe('claude');
+  });
+
+  it('does not overwrite worker-reported tokenUsage during collection', async () => {
+    const task = makeTask('int-002');
+    task.estimatedTokens = 10000;
+    const sprint = makeSprint([task]);
+
+    const workerReported = { inputTokens: 15420, outputTokens: 3200, cacheReadTokens: 89000, provider: 'claude' as const, model: 'opus' as const };
+    const result: TaskResult = {
+      taskId: 'int-002',
+      workerId: 'w-int-002',
+      filesChanged: ['src/bar.ts'],
+      linesAdded: 100,
+      linesRemoved: 20,
+      testsPassed: true,
+      coverage: 95,
+      selfAssessment: 'DONE',
+      notes: 'With token data',
+      tokenUsage: workerReported,
+    };
+    writeFileSync(join(tmpDir, '.tasks', 'task-int-002.result'), JSON.stringify(result), 'utf-8');
+
+    const results = await waitForResults(tmpDir, sprint, 5000);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.tokenUsage!.inputTokens).toBe(15420); // original, not estimated
+    expect(results[0]!.tokenUsage!.outputTokens).toBe(3200);
+    expect(results[0]!.tokenUsage!.cacheReadTokens).toBe(89000);
+  });
+
+  it('enriches 12 tasks and total tokens > 0', async () => {
+    const tasks: Task[] = [];
+    for (let i = 1; i <= 12; i++) {
+      const t = makeTask(`bulk-${String(i).padStart(3, '0')}`);
+      t.estimatedTokens = 3000 + i * 500;
+      t.provider = 'claude';
+      t.model = 'sonnet';
+      tasks.push(t);
+    }
+    const sprint = makeSprint(tasks);
+
+    for (const t of tasks) {
+      const r: TaskResult = {
+        taskId: t.id,
+        workerId: `w-${t.id}`,
+        filesChanged: [],
+        linesAdded: 50 + Math.floor(Math.random() * 100),
+        linesRemoved: 10,
+        testsPassed: true,
+        coverage: 80,
+        selfAssessment: 'DONE',
+        notes: '',
+      };
+      writeFileSync(join(tmpDir, '.tasks', `task-${t.id}.result`), JSON.stringify(r), 'utf-8');
+    }
+
+    const results = await waitForResults(tmpDir, sprint, 5000);
+
+    expect(results).toHaveLength(12);
+    const totalInput = results.reduce((sum, r) => sum + (r.tokenUsage?.inputTokens ?? 0), 0);
+    const totalOutput = results.reduce((sum, r) => sum + (r.tokenUsage?.outputTokens ?? 0), 0);
+    expect(totalInput).toBeGreaterThan(0);
+    expect(totalOutput).toBeGreaterThan(0);
+    // All should have provider preserved
+    for (const r of results) {
+      expect(r.tokenUsage?.provider).toBe('claude');
+      expect(r.tokenUsage?.model).toBe('sonnet');
+    }
   });
 });

@@ -36,6 +36,7 @@ import {
   formatSkillPerformanceTable,
   formatTokenCount,
   buildTokenUsageSection,
+  formatRubricScoresSection,
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
@@ -3182,5 +3183,117 @@ describe('formatHumanRetro — Token Usage section', () => {
     });
 
     expect(retro).not.toContain('## Token Usage');
+  });
+});
+
+// ─── formatRubricScoresSection ────────────────────────────────────────
+
+describe('formatRubricScoresSection', () => {
+  it('returns empty array when results is undefined', () => {
+    const sprint = makeSprint();
+    const result = formatRubricScoresSection(sprint, undefined);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when no results have rubricScores', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001' })] });
+    const results: TaskResult[] = [
+      { taskId: '001', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 95, selfAssessment: 'DONE', notes: '' },
+    ];
+    const output = formatRubricScoresSection(sprint, results);
+    expect(output).toEqual([]);
+  });
+
+  it('formats correct table structure for a task with rubric scores', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001', title: 'My Feature Task' })] });
+    const results: TaskResult[] = [
+      {
+        taskId: '001', workerId: 'w1', filesChanged: [], linesAdded: 10, linesRemoved: 0,
+        testsPassed: true, coverage: 90, selfAssessment: 'DONE', notes: '',
+        rubricScores: { correctness: 90, test_coverage: 85, scope_compliance: 100, documentation: 70 },
+      },
+    ];
+    const lines = formatRubricScoresSection(sprint, results);
+    const table = lines.join('\n');
+
+    expect(table).toContain('### Rubric Scores');
+    expect(table).toContain('| Task | Correctness | Coverage | Scope | Docs | Avg |');
+    expect(table).toContain('90');
+    expect(table).toContain('85');
+    expect(table).toContain('100');
+    expect(table).toContain('70');
+    // avg = (90+85+100+70)/4 = 86.25 → 86
+    expect(table).toContain('86');
+    expect(table).toContain('Sprint Avg');
+  });
+
+  it('shows N/A for undefined rubric score dimensions', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001' })] });
+    const results: TaskResult[] = [
+      {
+        taskId: '001', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0,
+        testsPassed: true, coverage: 80, selfAssessment: 'DONE', notes: '',
+        rubricScores: { correctness: 80 },
+      },
+    ];
+    const lines = formatRubricScoresSection(sprint, results);
+    const table = lines.join('\n');
+
+    expect(table).toContain('N/A');
+    expect(table).toContain('80');
+  });
+
+  it('calculates sprint average from multiple tasks', () => {
+    const sprint = makeSprint({
+      tasks: [
+        makeTask({ id: '001', title: 'Task One' }),
+        makeTask({ id: '002', title: 'Task Two' }),
+      ],
+    });
+    const results: TaskResult[] = [
+      {
+        taskId: '001', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0,
+        testsPassed: true, coverage: 80, selfAssessment: 'DONE', notes: '',
+        rubricScores: { correctness: 80, test_coverage: 80, scope_compliance: 80, documentation: 80 },
+      },
+      {
+        taskId: '002', workerId: 'w2', filesChanged: [], linesAdded: 0, linesRemoved: 0,
+        testsPassed: true, coverage: 60, selfAssessment: 'DONE', notes: '',
+        rubricScores: { correctness: 60, test_coverage: 60, scope_compliance: 60, documentation: 60 },
+      },
+    ];
+    const lines = formatRubricScoresSection(sprint, results);
+    const table = lines.join('\n');
+
+    // Task avgs: 80 and 60 → sprint avg = 70
+    expect(table).toContain('**70**');
+    expect(table).toContain('Sprint Avg');
+  });
+
+  it('is included in formatHumanRetro output when rubric scores are present', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001' })] });
+    const evaluations = new Map([['001', TaskEvaluation.DONE]]);
+    const results: TaskResult[] = [
+      {
+        taskId: '001', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0,
+        testsPassed: true, coverage: 90, selfAssessment: 'DONE', notes: '',
+        rubricScores: { correctness: 95, test_coverage: 90, scope_compliance: 100, documentation: 85 },
+      },
+    ];
+    const retro = formatHumanRetro({ sprint, evaluations, metrics: makeMetrics(), results });
+
+    expect(retro).toContain('### Rubric Scores');
+    expect(retro).toContain('| Task | Correctness | Coverage | Scope | Docs | Avg |');
+  });
+
+  it('omits rubric section from formatHumanRetro when no rubric scores exist', () => {
+    const sprint = makeSprint({ tasks: [makeTask({ id: '001' })] });
+    const evaluations = new Map([['001', TaskEvaluation.DONE]]);
+    const results: TaskResult[] = [
+      { taskId: '001', workerId: 'w1', filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: true, coverage: 80, selfAssessment: 'DONE', notes: '' },
+    ];
+    const retro = formatHumanRetro({ sprint, evaluations, metrics: makeMetrics(), results });
+
+    expect(retro).not.toContain('### Rubric Scores');
   });
 });

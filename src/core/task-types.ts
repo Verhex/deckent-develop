@@ -306,6 +306,15 @@ export interface TaskResult {
   feedbackLoop?: FeedbackLoop;
   /** Token usage data from the worker's LLM interaction */
   tokenUsage?: TokenUsage;
+  /** Rubric scores from evaluateWithRubric() — per-dimension quality scores */
+  rubricScores?: {
+    correctness?: number;
+    test_coverage?: number;
+    scope_compliance?: number;
+    documentation?: number;
+  };
+  /** Brain's final evaluation decision for this task */
+  evaluationDecision?: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
 }
 
 // ─── TaskPlan ────────────────────────────────────────────────────────

@@ -1,7 +1,25 @@
-import { ErrorRegistry } from '../core/errors.js';
+import { DeckentError } from '../core/errors.js';
 // ─── Parallel Pipeline Manager ─────────────────────────────────────────────
 // Topological sort of tasks into execution waves based on dependencies.
 // Wave 0: no deps, Wave 1: depends only on wave 0, etc.
+
+/**
+ * Named error class for circular dependency detection.
+ * Extends DeckentError with code DECKENT_E049 for unified error handling.
+ * Includes task IDs involved in the cycle.
+ */
+export class DependencyCycleError extends DeckentError {
+  public readonly taskIds: string[];
+  constructor(taskIds: string[]) {
+    super(
+      'DECKENT_E049',
+      `Circular dependency detected among tasks: ${taskIds.join(', ')}`,
+      'Review task dependencies to remove cycles',
+    );
+    this.name = 'DependencyCycleError';
+    this.taskIds = taskIds;
+  }
+}
 
 export interface ExecutionWave {
   waveIndex: number;
@@ -64,7 +82,7 @@ export class ParallelPipelineManager {
       if (waveTaskIds.length === 0) {
         // Remaining tasks all have unresolved deps -> circular dependency
         const unresolved = [...inDegree.keys()].filter(id => !resolved.has(id));
-        throw ErrorRegistry.createError('DECKENT_E049', { message: `Circular dependency detected among tasks: ${unresolved.join(', ')}` });
+        throw new DependencyCycleError(unresolved);
       }
 
       // Sort for deterministic output

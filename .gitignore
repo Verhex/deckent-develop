@@ -29,6 +29,9 @@ coverage/
 !.deckent/plugins/.gitkeep
 .deckent/jobs/
 .deckent/usage/
+.deckent/cache/
+.deckent/sprint-*-baseline.json
+.deckent/metrics.jsonl
 
 # Environment
 .env

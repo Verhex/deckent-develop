@@ -295,6 +295,8 @@ export interface ResolvedConfig {
   };
   /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s) */
   cleanup_delay_ms?: number;
+  /** Enable task dependency pipeline — only spawn tasks whose deps are DONE. Default: false */
+  dependency_pipeline_enabled?: boolean;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

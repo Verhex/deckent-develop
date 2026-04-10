@@ -119,6 +119,8 @@ export interface ParsedDirectiveTask {
   forceSkills?: string[];
   excludeAgent?: string[];
   excludeSkills?: string[];
+  /** Task dependency IDs parsed from "- Dependencies: 134-005, 134-007" */
+  dependencies?: string[];
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
@@ -159,6 +161,21 @@ export function parseSkillsDirective(line: string | undefined): {
     forceSkills: include.length > 0 ? include : undefined,
     excludeSkills: exclude.length > 0 ? exclude : undefined,
   };
+}
+
+/**
+ * Parse a Dependencies: directive line into an array of task IDs.
+ * Supports: "Dependencies: 134-005, 134-007" or "- Dependencies: 134-005"
+ * Returns undefined if no dependencies line or empty.
+ */
+export function parseDependenciesDirective(line: string | undefined): string[] | undefined {
+  if (!line) return undefined;
+
+  const value = line.replace(/.*Dependencies:\s*/i, '').trim();
+  if (!value || value.toLowerCase() === 'none') return undefined;
+
+  const parts = value.split(',').map(s => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : undefined;
 }
 
 function now(): string {
@@ -230,8 +247,8 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const directories: string[] = [];
   const filesWrite: string[] = [];
 
-  // BUG-25: Explicit Files: and Scope: label parsing (highest priority)
-  const filesLabelMatch = line.match(/(?:^|\n)\s*-?\s*Files?:\s*(.+)/im);
+  // BUG-25: Explicit Files:/Dosya: and Scope:/Kapsam: label parsing (highest priority)
+  const filesLabelMatch = line.match(/(?:^|\n)\s*-?\s*(?:Files?|Dosya)\s*:\s*(.+)/im);
   if (filesLabelMatch?.[1]) {
     const files = filesLabelMatch[1].split(',').map(f => f.trim()).filter(Boolean);
     for (const f of files) {
@@ -243,7 +260,7 @@ export function extractScopeFromDirective(line: string): TaskScope {
     }
   }
 
-  const scopeLabelMatch = line.match(/(?:^|\n)\s*-?\s*Scope:\s*(.+)/im);
+  const scopeLabelMatch = line.match(/(?:^|\n)\s*-?\s*(?:Scope|Kapsam)\s*:\s*(.+)/im);
   if (scopeLabelMatch?.[1]) {
     const scopes = scopeLabelMatch[1].split(',').map(s => s.trim()).filter(Boolean);
     for (const s of scopes) {
@@ -373,11 +390,19 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const title = titleLine.trim().replace(/^-\s+/, '');
     if (!title) continue;
 
-    // Collect all scope-related lines (Dosya:, Kapsam:, file paths)
-    const scopeLines = lines.filter(l =>
-      l.includes('Dosya:') || l.includes('Kapsam:') || l.includes('- Kapsam') ||
-      /\bsrc\/|tests\//.test(l),
-    );
+    // Collect all scope-related lines (Dosya:, Kapsam:, Files:, Scope:, file paths)
+    // Exclude the title line to prevent code snippets in titles (e.g. "results.find()")
+    // from creating false positive scope matches
+    const scopeLines = lines.filter(l => {
+      // Skip the title line — it may contain code snippets that look like paths
+      if (l === titleLine) return false;
+      // Explicit label lines (highest priority)
+      if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(l)) return true;
+      // Directory-like paths that extractScopeFromDirective can parse
+      if (/\bsrc\/|tests\/|docs\/|scripts\//.test(l)) return true;
+      if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(l)) return true;
+      return false;
+    });
     const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
       const extracted = extractScopeFromDirective(scopeLine);
       return {
@@ -432,8 +457,12 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const skillsLine = lines.find(l => /^[\s-]*Skills:\s*/i.test(l.trim()));
     const { forceSkills, excludeSkills } = parseSkillsDirective(skillsLine);
 
+    // Extract optional Dependencies: line (e.g., "- Dependencies: 134-005, 134-007")
+    const depsLine = lines.find(l => /^[\s-]*Dependencies:\s*/i.test(l.trim()));
+    const dependencies = parseDependenciesDirective(depsLine);
+
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills });
+    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies });
   }
   return tasks;
 }
@@ -479,11 +508,13 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
 
         const allLines = [line, ...subLines];
 
-        // Extract scope from all lines
-        const scopeLines = allLines.filter(l =>
-          l.includes('Dosya:') || l.includes('Kapsam:') || l.includes('Scope:') || l.includes('Files:') ||
-          /\bsrc\/|tests\//.test(l),
-        );
+        // Extract scope from all lines (match all patterns extractScopeFromDirective supports)
+        const scopeLines = allLines.filter(l => {
+          if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(l)) return true;
+          if (/\bsrc\/|tests\/|docs\/|scripts\//.test(l)) return true;
+          if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(l)) return true;
+          return false;
+        });
         const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
           const extracted = extractScopeFromDirective(scopeLine);
           return {
@@ -525,6 +556,10 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         const skillsLineBullet = allLines.find(l => /Skills:\s*/i.test(l));
         const { forceSkills: forceSkillsBullet, excludeSkills: excludeSkillsBullet } = parseSkillsDirective(skillsLineBullet);
 
+        // Extract Dependencies override
+        const depsLineBullet = allLines.find(l => /Dependencies:\s*/i.test(l));
+        const dependenciesBullet = parseDependenciesDirective(depsLineBullet);
+
         const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
         tasks.push({
           title,
@@ -537,6 +572,7 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           forceAgent: forceAgentBullet,
           forceSkills: forceSkillsBullet,
           excludeSkills: excludeSkillsBullet,
+          dependencies: dependenciesBullet,
         });
 
         i = j;
@@ -731,6 +767,8 @@ Update periodically: increment sequence, refresh timestamp via new Date().toISOS
 
 ## Result File
 Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
+Include tokenUsage in your result JSON: { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${task.provider ?? 'claude'}", "model": "${task.model}" }.
+If you cannot determine exact token counts, omit the tokenUsage field — the brain will estimate it.
 The result file is REQUIRED — without it your work cannot be evaluated.
 
 CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.`;

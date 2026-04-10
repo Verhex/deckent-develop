@@ -484,6 +484,217 @@ Dil konfigürasyonu: `.deckent/config.json`'da `"language": "tr"` veya `"en"`. `
 
 ---
 
+## ADR-033: Product Vision — Product Not Service
+
+**Status:** ACCEPTED
+
+**Date:** 2026-04-11
+
+**Context:**
+Deckent, Sprint 134 itibarıyla kritik bir kavramsal dönüm noktasına ulaştı. 130+ sprint sürecinde organik büyüme, zaman zaman "SaaS platform" ya da "kurumsal servis" yönünde baskı yarattı: cloud deployment fikirleri, paywall tartışmaları, enterprise tier düşünceleri, SOC2 sertifikasyonu önerileri. Bu baskıların tamamı tek bir tutarsızlık kaynağından besleniyor:
+
+**Deckent'in ne olduğu hiçbir zaman formal olarak kayıt altına alınmamıştı.**
+
+Kullanıcı deneyimi gözlemleri:
+- Yeni geliştirici `npx deckent init && deckent start` ile <5 dakikada sprint başlatabilmeli
+- Kurulum, lisans, bulut hesabı, API anahtarı, ödeme bilgisi gerektirmemeli
+- Deckent offline çalışabilmeli (Claude Code local session ile)
+- Her proje kendi `.deckent/` dizinine sahip — veri hiçbir yerde paylaşılmıyor
+
+Sprint 133 post-mortem'de "product-not-service" ifadesi üç ayrı bağlamda kullanıldı ve herhangi bir şekilde formalize edilmedi. Sprint 134 DIRECTIVES bu boşluğu kapatmak için T-007'yi "DOKUNULAMAZ VİZYON" olarak işaretledi.
+
+Referans bellek: `.claude/projects/-home-alperen-deckent-dev/memory/project_vision_product_not_service.md`
+
+**Decision:**
+Deckent bir **üründür (product)**, **servis değildir (not service)**.
+
+Bu kararın dört dokunulamaz prensibi:
+
+1. **Product, not service** — Deckent bulutta yaşamaz. Kullanıcının makinesinde çalışır. Bir API endpoint'e bağımlı değildir. Sunucu yoktur, uptime SLA'sı yoktur, oncall ekibi yoktur.
+
+2. **Kur-çalıştır kolay** — `npx deckent init && deckent start` iki komutla tam işlevsel bir sprint orkestrasyon sistemi kurulur. Kurulum friction'ı sıfıra yakın olmalıdır. Wizard, interaktif setup, README-first onboarding.
+
+3. **Açık kaynak, ücretsiz** — Deckent'in hiçbir özelliği ödeme duvarının arkasında olamaz. Tüm core özellikler MIT lisansı altında. Topluluk katkısı teşvik edilir. Fiyatlandırma modeli yoktur.
+
+4. **Herkese, her yerde** — macOS, Linux, WSL2, Docker, CI ortamları. Dil engeli yoktur (TR/EN i18n). Bant genişliği kısıtlı ortamlarda çalışır. Local model desteği roadmap'te.
+
+**Kaldırılan / Yasak Boyutlar:**
+
+Bu karar aşağıdaki yönlerin Deckent roadmap'inden kalıcı olarak çıkarıldığını ilan eder:
+
+| Boyut | Neden Yasak |
+|-------|-------------|
+| SaaS model | Sunucu bağımlılığı yaratır, product kimliğiyle çelişir |
+| Cloud-hosted deployment | Kullanıcı verisini dışarı taşır, gizlilik ilkesini kırar |
+| Paywall / premium tier | Açık kaynak taahhüdüyle uyumsuz |
+| Enterprise edition | İki kod tabanı yaratır, topluluk bölünmesine yol açar |
+| SOC2 / ISO 27001 sertifikasyonu | Kurumsal servis modeli gerektirir, ürün kimliğiyle çelişir |
+| Oncall / SLA / uptime monitoring | Servis sorumluluğu gerektirir — ürün mimarisinde geçersiz |
+| Multi-tenant cloud infrastructure | ADR-034 ile net ayrım: multi-project ≠ multi-tenant SaaS |
+| Subscription billing | Ödeme altyapısı = servis olmak demektir |
+| Vendor lock-in | Belirli bir bulut sağlayıcısına bağımlılık kabul edilemez |
+
+**Korunan / Güçlendirilen Boyutlar:**
+
+Bu karar aşağıdaki yönlerin öncelikli geliştirme alanları olduğunu teyit eder:
+
+| Boyut | Gerekçe |
+|-------|---------|
+| Local observability | Kullanıcı kendi sprint metriklerini kendi makinesinde görür (T-011) |
+| God object split | Modüler, anlaşılabilir kod = ürün kalitesi (T-009, T-010) |
+| Task dependency pipeline | Gerçek orkestrasyon zekası, ürün değer önerisi (T-001) |
+| Distribution | `npx deckent` — sıfır kurulum, her yerde çalışır |
+| Setup wizard | İlk deneyim mükemmel olmalı — kur-çalıştır hedefi |
+| Local model support | Offline-first, API key gerektirmeyen sprint modu (roadmap) |
+| i18n / TR-EN | Ürün her kullanıcıya kendi dilinde konuşur |
+| Cross-platform | macOS + Linux + WSL2 + Docker = herkese her yerde |
+| Açık kaynak ekosistemi | OpenHands, Aider, OpenClaw ile ittifak — değer paylaşımı |
+
+**Consequences (+):**
+
+- Tüm mühendislik kararları net bir lens üzerinden geçer: "Bu özellik local product deneyimini mi güçlendiriyor?"
+- Roadmap tartışmalarında "SaaS yapalım mı?" sorusu geçerliliğini yitirir — ADR-033 referans gösterilir
+- Katkıda bulunanlar ürün kimliğini anlar, yanlış yönlü PR'lar azalır
+- OpenHands ve Aider gibi open-source CLI araçlarla ekosistem uyumu artar
+- Kullanıcı trust'ı: veri asla dışarı çıkmıyor, garantisi var
+
+**Consequences (-):**
+
+- Gelecekte kurumsal gelir modeli kurmak isteyenler için kapı kapalı
+- Hosting hizmeti sunmak isteyen community fork'ları bu ADR'a aykırı davranır
+- "Managed Deckent cloud" gibi ticari girişimlerin core repo'ya merge edilmesi reddedilir
+- SaaS rakiplerine karşı "anında erişim" avantajı kaybolur (kurulum gerekir, kayıt yok)
+
+**Alternatives Considered:**
+
+- **Freemium SaaS** — Ücretsiz tier + premium bulut özellikleri. Reddedildi: iki kimlik yaratır, açık kaynak taahhüdünü sulandırır.
+- **Enterprise self-hosted** — Kurumsal lisans, on-prem deployment. Reddedildi: farklı destek altyapısı gerektirir, topluluktan kopuş başlar.
+- **Hibrit model** — Core açık kaynak, bulut senkronizasyon eklentisi. Reddedildi: "her şey local" ilkesini kırar, veri akışı gizlilik sorusu yaratır.
+- **Platform agnostik (karar erteleme)** — Şimdilik karar verme, her iki yöne açık kal. Reddedildi: belirsizlik mühendislik maliyeti yaratır, yanlış yönlü feature'lar birikmesine neden olur.
+
+**References:**
+
+- Sprint 134 DIRECTIVES — "DOKUNULAMAZ VİZYON" bölümü
+- `.claude/projects/-home-alperen-deckent-dev/memory/project_vision_product_not_service.md`
+- ADR-034: Multi-Project Isolation (kardeş ADR — multi-project ≠ SaaS multi-tenant)
+- ADR-010: Minimal Dependencies (bağımlılık minimizasyonu, product kimliğiyle uyumlu)
+- `docs/vision/roadmap.md` — Halka açık yol haritası, product vizyonu pazarlama diliyle
+- OpenClaw GitHub — kur-çalıştır referans implementasyon
+- Sprint 134 design spec: `docs/superpowers/specs/2026-04-11-sprint-134-design.md`
+- ADR-008: Module Import Rules — brain/worker sınır disiplini tek-kod-tabanı product kimliğini güçlendirir (SaaS servis katmanına ihtiyaç bırakmaz, community fork'lar aynı sınırları korur)
+
+---
+
+## ADR-034: Multi-Project Isolation — Per-Project Security Boundaries
+
+**Status:** ACCEPTED
+
+**Date:** 2026-04-11
+
+**Context:**
+
+Deckent, tek bir kullanıcının aynı makinesinde birden fazla proje orkestre etmesini destekler. Her proje kendi `.deckent/`, `.brain/`, `.tasks/` dizinlerine sahiptir ve bu izolasyon fiilen var olsa da hiçbir zaman formal olarak tanımlanmamıştır.
+
+**KRİTİK AYIRIM: multi-project ≠ SaaS multi-tenant.**
+
+Bu ADR, aynı kullanıcının aynı makinede yan yana çalıştırdığı birden fazla proje arasındaki izolasyonu tanımlar. 10.000 tenant'ın paylaştığı bir sunucu senaryosu (SaaS multi-tenant) Deckent'in kapsamı dışındadır ve ADR-033 tarafından kalıcı olarak yasaklanmıştır.
+
+Sprint 132 Week 1 güvenlik denetimi şu bulguları ortaya çıkardı:
+- MEDIUM #10: Worker scope check'i symlink'leri takip etmiyor — `fs.realpath()` ile resolve edilmiş hedef path'in scope içinde olduğu doğrulanmıyor
+- LOW #4: Sibling project dizinlerine erişim denetimi yalnızca scope matcher'a dayanıyor — scope dışı proje dosyalarına symlink oluşturularak bypass edilebilir
+- LOW #7: Global `~/.deckent/config.json` hangi alanların paylaşıldığını, hangilerinin proje-özgü olduğunu belgelemiyor
+
+Sprint 133'te implementasyonu tamamlanan AES-256-GCM per-project credential encryption bu izolasyonun temelini güçlendirdi; ancak scope bypass ve global state paylaşım kuralları formal olarak tanımlanmamıştı.
+
+Tehdit modeli:
+1. **Sibling project scope bypass** — Proje A'daki worker, `../proje-b/src/secret.ts` yoluna symlink oluşturup scope check'i geçerek Proje B'nin kaynak koduna erişir
+2. **Credential leakage** — Global config'deki proje-özgü API anahtarları yanlışlıkla sibling proje tarafından okunur
+3. **Global state pollution** — Bir proje'nin `.deckent/config.json` değişikliği global config'i etkiler, diğer projelerin davranışını değiştirir
+4. **Symlink cycle DoS** — Recursive symlink'ler scope resolver'ı sonsuz döngüye sokar
+
+**Decision:**
+
+Deckent multi-project izolasyonu şu dört katmandan oluşur:
+
+### Katman 1: Per-Project Directory Isolation (Mevcut, Formalize Ediliyor)
+
+Her proje kendi bağımsız dizin yapısına sahiptir:
+- `.deckent/` — proje konfigürasyonu, agent/skill pool, metric data
+- `.brain/` — karar kayıtları, bellek, retrospektif, desenler
+- `.tasks/` — sprint task dosyaları, heartbeat, result, lock
+- `.locks/` — file lock dosyaları
+
+Bu dizinler arasında cross-reference yoktur. Bir projenin `.brain/MEMORY.md`'si yalnızca o projenin sprint geçmişini içerir.
+
+### Katman 2: Per-Project Credential Encryption
+
+Sprint 133'te implementasyonu tamamlanan sistem:
+- Her proje `.deckent/credentials.enc` dosyasına AES-256-GCM ile şifrelenmiş credential'lar saklar
+- Encryption key per-project `projectRoot` path hash'inden türetilir
+- Sibling proje'nin `.deckent/credentials.enc` dosyası farklı key ile şifrelenmiştir — çapraz okuma başarısız olur
+- Decryption yalnızca proje dizini context'inde gerçekleşir
+
+### Katman 3: Symlink-Aware Scope Enforcement
+
+`isWithinScope()` fonksiyonu symlink-aware hale getirilir:
+- `fs.realpathSync()` ile path resolve edilir — symlink hedef dosyanın gerçek konumu belirlenir
+- Resolve edilmiş path scope matcher'a verilir
+- Symlink hedefi scope dışındaysa → `ScopeViolationError` fırlatılır
+- Recursive symlink (cycle) tespit edilirse → `ScopeViolationError` fırlatılır (`ELOOP` error code)
+
+### Katman 4: Global vs Project-Specific Config Boundary
+
+`~/.deckent/config.json` (global) ile `.deckent/config.json` (proje) arasında net ayrım:
+
+| Alan | Scope | Paylaşım Kuralı |
+|------|-------|------------------|
+| `brain_provider`, `worker_provider` | Global OR Project | Proje override'ı tercih edilir |
+| `max_workers` | Global OR Project | Proje override'ı tercih edilir |
+| `brain_planning` | Global OR Project | Proje override'ı tercih edilir |
+| `min_tier`, `mode_preset` | Global OR Project | Proje override'ı tercih edilir |
+| `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Environment | İşletim sistemi env var, config'de saklanmaz |
+| `telemetry_enabled` | Hard-coded FALSE | ADR-033 gereği her zaman false |
+| `verify_loop` | Project | Proje-özgü, global default true |
+| `auto_archive_directives` | Project | Proje-özgü |
+| Agent/skill pool | Project | Per-project `.deckent/agents/`, `.deckent/skills/` |
+| Sprint history | Project | Per-project `.brain/sprints/` |
+
+API anahtarları config dosyalarında saklanmaz — environment variable olarak iletilir. Bu, global config'in credential leakage vektörü olmasını engeller.
+
+**Consequences (+):**
+
+- Symlink scope bypass güvenlik açığı kapatılır (Sprint 132 MEDIUM #10)
+- Per-project izolasyon kuralları formal ve test edilebilir hale gelir
+- Global vs project config boundary belgelenir — yeni alan eklenirken hangi scope'a ait olduğu açıktır
+- Credential isolation zaten AES-256-GCM ile sağlanıyor — bu ADR formalize eder
+- "multi-project ≠ multi-tenant" ayrımı netleşir — yanlış yönlü PR'lar önlenir
+
+**Consequences (-):**
+
+- `isWithinScope()` artık `fs.realpathSync()` çağrısı yapar — her scope check'te bir disk I/O ekstra
+- `realpathSync()` symlink hedefi silinmişse hata fırlatır — hata yönetimi gerekir
+- Recursive symlink tespiti `ELOOP` error code'una dayanır — farklı OS'lerde davranış farkı olabilir
+- Global config boundary kuralları yeni alan eklendiğinde güncellenmeli — yoksa belirsiz paylaşım kuralı oluşur
+
+**Alternatives Considered:**
+
+- **Sandboxed worker process** — Her worker'ı chroot/namespace ile izole et. Reddedildi: aşırı karmaşıklık, cross-platform uyumsuzluk (macOS chroot sınırlı), Deckent ürün kimliğiyle orantısız.
+- **Yalnızca path normalization** — `path.normalize()` ile `..` segmentlerini çöz, symlink'leri ignore et. Reddedildi: hardlink ve symlink bypass'ı hâlâ mümkün.
+- **Worker-level filesystem virtualization** — Sanal dosya sistemi katmanı. Reddedildi: Node.js native fs API uyumsuz, performans maliyeti yüksek.
+- **Yalnızca dökümantasyon** — İzolasyon kurallarını belgeleyip enforce etme. Reddedildi: güvenlik açığı açık kalır, audit bulgusu kapatılmaz.
+- **Docker isolation per project** — Her projeyi ayrı container'da çalıştır. Reddedildi: Docker dependency = kurulum friction, ADR-033'ün "kur-çalıştır" ilkesiyle çelişir.
+
+**References:**
+
+- Sprint 132 Week 1 güvenlik denetimi — MEDIUM #10 (symlink scope bypass)
+- Sprint 133 credential encryption implementasyonu (AES-256-GCM per-project)
+- ADR-033: Product Vision — Product Not Service (multi-tenant yasağı)
+- ADR-004: 3-Layer Config Merge (global vs project config mekanizması)
+- `src/agents/worker.ts:isWithinScope()` — symlink-aware scope check implementasyonu
+- `docs/design/multi-project-isolation.md` — detaylı tasarım dokümanı ve test stratejisi
+
+---
+
 ## NOTE: Büyük Dosya Split Analizi (Sprint 130)
 
 - sprint-controller.ts (2133 satır) — Split önerisi: sprint-lifecycle.ts (faz yönetimi) + sprint-orchestrator.ts (worker koordinasyonu)

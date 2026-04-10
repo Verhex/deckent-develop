@@ -586,6 +586,31 @@ export function evaluateWithRubric(
   };
 }
 
+// ─── Honesty Violation Flag ─────────────────────────────────────────
+
+/**
+ * Honesty violation flag constant.
+ * Used by sprint-reporter to annotate tasks where the worker claimed
+ * "pre-existing failures" but the baseline comparison proved otherwise.
+ */
+export const HONESTY_VIOLATION = 'HONESTY_VIOLATION' as const;
+
+/**
+ * Gate failure status constant.
+ * Used when brain self-audit gate (tsc/vitest/honesty/observability) fails.
+ * Sprint status becomes GO_WITH_GATE_FAILURE instead of plain DONE.
+ * Propagated to retro for visibility.
+ */
+export const GO_WITH_GATE_FAILURE = 'GO_WITH_GATE_FAILURE' as const;
+
+/**
+ * Checks if a task result's notes contain honesty-trigger patterns
+ * (claims about pre-existing or unrelated failures).
+ * Re-exported from baseline-tracker for convenience.
+ */
+export { containsHonestyTrigger, checkWorkerHonesty } from './baseline-tracker.js';
+export type { HonestyCheckResult, TestBaseline, BaselineComparison } from './baseline-tracker.js';
+
 /** Parse NO_GO rate and coverage from a sprint log markdown table */
 function parseSprintStats(content: string): { noGoRate: number; coverage: number } | null {
   const lines = content.split('\n');

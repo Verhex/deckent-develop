@@ -7,6 +7,9 @@
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// ─── Observability (Sprint 134) ───────────────────────────────────
+import { metric } from '../core/observability.js';
+
 // ─── Core Types ────────────────────────────────────────────────────
 import type {
   Task, TaskResult, Sprint,
@@ -27,7 +30,7 @@ import {
   writeAnswerFile,
   getQuestionPath,
 } from '../agents/worker-ipc.js';
-import type { BrainAnswer, WorkerQuestion } from '../core/task-types.js';
+import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -51,6 +54,46 @@ export function buildResultsMap(results: TaskResult[]): Map<string, TaskResult> 
     map.set(r.taskId, r);
   }
   return map;
+}
+
+// ═══ Token Usage Enrichment ═══════════════════════════════════════
+
+/**
+ * Estimate token usage for a task result when the worker did not report it.
+ * Uses task.estimatedTokens (prompt input) and result.linesAdded/linesRemoved
+ * to build a heuristic TokenUsage object.
+ *
+ * Heuristic: inputTokens ≈ estimatedTokens (prompt size),
+ * outputTokens ≈ linesAdded * 15 (avg tokens per generated line),
+ * cacheReadTokens ≈ inputTokens * 4 (Claude typically cache-reads ~4x prompt).
+ */
+export function estimateTokenUsage(task: Task, result: TaskResult): TokenUsage {
+  const inputTokens = task.estimatedTokens ?? Math.max((result.linesAdded + result.linesRemoved) * 10, 1000);
+  const outputTokens = Math.max(result.linesAdded * 15, 500);
+  const cacheReadTokens = Math.round(inputTokens * 4);
+  const provider = task.provider as TokenUsage['provider'];
+  const model = (task.forceModel ?? task.model) as TokenUsage['model'];
+
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
+  };
+}
+
+/**
+ * Enrich a TaskResult with tokenUsage data if missing.
+ * If the result already has tokenUsage, it is left unchanged.
+ * Otherwise, a heuristic estimate is generated from the task metadata.
+ * Mutates the result in place for efficiency.
+ */
+export function enrichResultTokenUsage(result: TaskResult, task: Task | undefined): void {
+  if (result.tokenUsage) return; // worker already reported — keep as-is
+  if (!task) return; // no task metadata — cannot estimate
+
+  result.tokenUsage = estimateTokenUsage(task, result);
 }
 
 // ═══ Exported Functions ═══════════════════════════════════════════
@@ -151,10 +194,12 @@ export async function waitForResults(
   let lastProgressLog = startTime;
   const results: TaskResult[] = [];
   const taskIds = new Set(sprint.tasks.map(t => t.id));
+  const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
 
   const collectResults = (): string[] => {
+    const collectStart = Date.now();
     const newlyCollected: string[] = [];
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
@@ -162,9 +207,11 @@ export async function waitForResults(
       if (existsSync(resultPath)) {
         const result = readJsonSafe<TaskResult>(resultPath);
         if (result) {
+          enrichResultTokenUsage(result, taskMap.get(taskId));
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
+          metric('result.collected', 1, { taskId });
           continue;
         }
       }
@@ -194,6 +241,9 @@ export async function waitForResults(
         collected.add(taskId);
         newlyCollected.push(taskId);
       }
+    }
+    if (newlyCollected.length > 0) {
+      metric('collect.batch', newlyCollected.length, { duration_ms: String(Date.now() - collectStart) });
     }
     return newlyCollected;
   };
@@ -318,6 +368,7 @@ export async function waitForResults(
     if (existsSync(resultPath)) {
       const result = readJsonSafe<TaskResult>(resultPath);
       if (result) {
+        enrichResultTokenUsage(result, taskMap.get(taskId));
         results.push(result);
         collected.add(taskId);
       }
