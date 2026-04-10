@@ -68,8 +68,8 @@ describe('README.md', () => {
     expect(content).toContain('## Comparison');
     expect(content).toContain('Cursor');
     expect(content).toContain('Devin');
-    expect(content).toContain('Aider');
-    expect(content).toContain('Claude Code (solo)');
+    expect(content).toContain('OpenHands');
+    expect(content).toContain('OpenClaw');
   });
 
   it('contains Requirements section', () => {

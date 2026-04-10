@@ -126,7 +126,7 @@ describe('API auth with token', () => {
 
     const res = await request(api, '/api/start', 'POST', { autoApprove: true });
     expect(res.status).toBe(401);
-    expect(JSON.parse(res.body).error).toContain('Unauthorized');
+    expect(JSON.parse(res.body).error).toContain('authentication required');
   });
 
   it('POST /api/set-directives without token returns 401', async () => {
@@ -149,25 +149,30 @@ describe('API auth with token', () => {
     expect(body.success).toBe(true);
   });
 
-  it('POST with wrong token returns 401', async () => {
+  it('POST with wrong token returns 403', async () => {
     api = createHttpServer(PROJECT_ROOT, 0, undefined, TOKEN);
     await new Promise<void>((r) => api.server.once('listening', r));
 
     const res = await request(api, '/api/start', 'POST', {}, {
       'Authorization': 'Bearer wrong-token',
     });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 
-  it('GET endpoints work without auth even when token is configured', async () => {
+  it('GET endpoints require auth when token is configured (health endpoint excepted)', async () => {
     api = createHttpServer(PROJECT_ROOT, 0, undefined, TOKEN);
     await new Promise<void>((r) => api.server.once('listening', r));
 
-    // GET /api/doctor should work without token
+    // GET /api/doctor without token should be rejected (auth enforced per DIRECTIVES Sprint 133 Task 3)
     const res = await request(api, '/api/doctor');
-    expect(res.status).toBe(200);
-    const body = JSON.parse(res.body);
-    expect(body.ok).toBe(true);
+    expect(res.status).toBe(401);
+    expect(JSON.parse(res.body).error).toContain('authentication required');
+
+    // But with valid token it should work
+    const okRes = await request(api, '/api/doctor', 'GET', undefined, {
+      'Authorization': `Bearer ${TOKEN}`,
+    });
+    expect(okRes.status).toBe(200);
   });
 
   it('POST endpoints work without auth when no token is configured', async () => {

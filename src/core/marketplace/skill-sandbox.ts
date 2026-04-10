@@ -2,14 +2,7 @@
 // Security validation and quarantine system for skills from the marketplace.
 // Two-pass scanning: regex (fast, all files) + AST (accurate, .ts/.js only).
 
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs';
+import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 
@@ -212,22 +205,22 @@ const BUILTIN_TRUSTED_SKILLS = new Set([
 // ─── Filesystem abstraction for testing ──────────────────────────────────────
 
 export interface SkillSandboxFS {
-  existsSync: typeof existsSync;
-  mkdirSync: typeof mkdirSync;
-  readdirSync: typeof readdirSync;
-  readFileSync: typeof readFileSync;
-  renameSync: typeof renameSync;
-  writeFileSync: typeof writeFileSync;
+  existsSync: typeof fs.existsSync;
+  mkdirSync: typeof fs.mkdirSync;
+  readdirSync: typeof fs.readdirSync;
+  readFileSync: typeof fs.readFileSync;
+  renameSync: typeof fs.renameSync;
+  writeFileSync: typeof fs.writeFileSync;
 }
 
 const defaultFS: SkillSandboxFS = {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-};
+  get existsSync() { return fs.existsSync; },
+  get mkdirSync() { return fs.mkdirSync; },
+  get readdirSync() { return fs.readdirSync; },
+  get readFileSync() { return fs.readFileSync; },
+  get renameSync() { return fs.renameSync; },
+  get writeFileSync() { return fs.writeFileSync; },
+} as SkillSandboxFS;
 
 // ─── SkillSandbox ────────────────────────────────────────────────────────────
 
