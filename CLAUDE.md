@@ -72,23 +72,28 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-133 |
-| Total Tasks | 12 |
-| Completed | 12 |
-| Tech Debt | 4 |
+| Sprint | sprint-134 |
+| Total Tasks | 15 |
+| Completed | 11 DONE + 4 GO_WITH_TECH_DEBT |
+| Tech Debt | 12 carry-over items |
 | No-Go | 0 |
-| Duration | 27dk 21sn |
+| Duration | ~33dk Deckent + ~2.2h manual recovery |
+| Status | GO_WITH_TECH_DEBT (14/17 Layer 3 criteria) |
+| Tests | 12485 pass, 16 skipped, 0 fail (+113 vs baseline) |
 | Coverage | 8.3% |
 
 ## Active Debt
-_No open tech debt._
+**Sprint 135 carry-over (12 items, 4 P0 — see `.deckent/sprint-134-layer3-scorecard.md`):**
+- P0: docker_hb_shutdown_bug fix, sprint coordinator resilience, T-010 askBrain extraction + sprint-controller slim, structured planner Priority/Dependencies parsing
+- P1: dedicated self-audit-gate.test.ts, dedicated rubric-detail.test.ts, GO_WITH_GATE_FAILURE status propagation wire, worker verify_loop enforcement
+- P2: sprint-docs-updater.ts 864→600 LoC, T-011 secondary instrument points, dashboard vs MCP state divergence, brain memory budget enforcement
 
-## Agent Performance
-| Agent | Tasks | Done | Success |
-|-------|-------|------|--------|
-| security-auditor | 3 | 3 | 100% |
-| api-builder | 1 | 1 | 100% |
-| performance-analyzer | 3 | 3 | 100% |
-| architect | 2 | 2 | 100% |
-| test-writer | 1 | 1 | 100% |
-| doc-writer | 2 | 2 | 100% |
+## Agent Performance (Sprint 134)
+| Agent | Tasks | Done | Tech Debt | Note |
+|-------|-------|------|-----------|------|
+| architect | 5 | 3 | 2 | T-001/T-005/T-011 DONE; T-010/T-014 GO_WITH_TECH_DEBT |
+| refactorer | 4 | 3 | 1 | T-003/T-004/T-010 DONE; T-009 GO_WITH_TECH_DEBT (864 LoC over) |
+| bug-fixer | 2 | 2 | 0 | T-002/T-006 DONE |
+| architecture-planner | 1 | 1 | 0 | T-007 ADR-033 + roadmap.md |
+| code-reviewer | 1 | 1 | 0 | T-008 mock audit (62 files) |
+| doc-writer | 2 | 1 | 1 | T-015 manually completed; T-013 GO_WITH_TECH_DEBT |
