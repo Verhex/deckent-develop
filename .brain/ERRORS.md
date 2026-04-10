@@ -1,4 +1,3 @@
-| 2026-04-10T07:49:20.279Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
 | 2026-04-10T07:49:20.279Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
 | 2026-04-10T07:49:20.280Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
 | 2026-04-10T07:49:20.281Z | planSprint:learning-bonuses | Loaded 8 learning bonuses from previous sprints |
@@ -198,3 +197,4 @@
 | 2026-04-10T08:10:42.363Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-132.json |
 | 2026-04-10T08:10:42.363Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
 | 2026-04-10T08:10:42.365Z | docker-backend:exit | taskId=132-007 exitCode=0 |
+| 2026-04-10T08:25:15.281Z | killAllSessions:killSession | error connecting to /tmp/tmux-1000/default (No such file or directory) |
