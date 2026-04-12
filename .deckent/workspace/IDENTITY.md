@@ -21,7 +21,7 @@ Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-134 (closed GO_WITH_TECH_DEBT) |
+| Sprint | sprint-135 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -29,4 +29,3 @@ Features: Sprint Timeout Reform, Heartbeat Daemon, Human Checkpoints, Checkpoint
 | Agents | 16 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
-| Kur-Çalıştır Readiness Score | 3.86/5 (Sprint 134) |

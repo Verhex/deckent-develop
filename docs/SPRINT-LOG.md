@@ -3361,3 +3361,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 133-012: Marketplace [EXPERIMENTAL] Işaretleme (DONE)
 
 ---
+## Sprint 135 — sprint-135
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-12
+**Duration:** 3654s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 14 |
+| Tech Debt | 4 |
+| No-Go | 3 |
+| Coverage | NaN% |
+| Duration | 3653595ms |
+
+### Tasks
+
+- 135-001: Sprint Coordinator Resilience — PID + State Snapshot + Orphan Detection (DONE)
+- 135-002: Auditor HB+Result Reconciliation (Docker Bug Defensive Fix) (DONE)
+- 135-003: Docker Backend Graceful Shutdown (Docker Bug Offensive Root Cause Fix) (GO_WITH_TECH_DEBT)
+- 135-004: askBrain() Extraction Finish — Conservative Move + Re-Export Shim (NO_GO)
+- 135-005: Structured Planner Priority + Dependencies Parsing (GO_WITH_TECH_DEBT)
+- 135-006: Self-Audit Gate Dedicated Tests (DONE)
+- 135-007: Rubric Detail Positive-Path Tests (DONE)
+- 135-008: GO_WITH_GATE_FAILURE Status Propagation Wire (GO_WITH_TECH_DEBT)
+- 135-009: Worker Verify Loop Enforcement (DONE)
+- 135-010: sprint-docs-updater.ts Refactor 864 → 600 LoC (DONE)
+- 135-011: Secondary Observability Instrument Points (DONE)
+- 135-012: Dashboard vs MCP State Divergence Fix (NO_GO)
+- 135-013: Brain Memory Budget Enforcement + Config Sync (GO_WITH_TECH_DEBT)
+
+---

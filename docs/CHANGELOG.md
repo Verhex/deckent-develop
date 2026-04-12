@@ -6,6 +6,31 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint135] - 2026-04-12
+
+### Added
+
+- Sprint Coordinator Resilience — PID + State Snapshot + Orphan Detection
+- Self-Audit Gate Dedicated Tests
+- Rubric Detail Positive-Path Tests
+- Worker Verify Loop Enforcement
+- sprint-docs-updater.ts Refactor 864 → 600 LoC
+- Secondary Observability Instrument Points
+
+### Changed
+
+- Docker Backend Graceful Shutdown (Docker Bug Offensive Root Cause Fix) (completed with tech debt)
+- Structured Planner Priority + Dependencies Parsing (completed with tech debt)
+- GO_WITH_GATE_FAILURE Status Propagation Wire (completed with tech debt)
+- Brain Memory Budget Enforcement + Config Sync (completed with tech debt)
+
+### Fixed
+
+- Auditor HB+Result Reconciliation (Docker Bug Defensive Fix)
+
+
+_Tasks: 17 total, 14 done, 4 tech debt, 3 no-go_
+
 ## [0.4.0-beta.1-sprint133] - 2026-04-10
 
 ### Added

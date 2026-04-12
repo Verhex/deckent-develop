@@ -1,8 +1,8 @@
 {
   "mode": "performance",
-  "language": "en",
+  "language": "tr",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-133",
+  "last_sprint_id": "sprint-135",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -54,7 +54,7 @@
   "auth_mode": "subscription",
   "fix_phase_enabled": true,
   "max_fix_retries": 2,
-  "memory_budget": 600,
+  "memory_budget": 900,
   "decay_after_sprints": 5,
   "patterns_enabled": true,
   "project_identity_enabled": true,

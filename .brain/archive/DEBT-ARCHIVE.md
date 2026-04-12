@@ -179,3 +179,7 @@
 | debt-133-004 | Tech debt from 133-004: loadConfig() module-level cache implemented. Changes: (1 | 133-004 | sprint-133 | NORMAL | 0 | true | sprint-133 | 2026-04-10T09:22:23.722Z |
 | debt-133-006 | Tech debt from 133-006: 4 ADR yazıldı (ADR-029 through ADR-032), her biri ≥50 sa | 133-006 | sprint-133 | NORMAL | 0 | true | sprint-133 | 2026-04-10T09:22:34.448Z |
 | debt-133-008 | Tech debt from 133-008: Competitive analysis fully updated for April 2026. Chang | 133-008 | sprint-133 | NORMAL | 0 | true | sprint-133 | 2026-04-10T09:22:41.091Z |
+| debt-135-003 | Tech debt from 135-003: Docker graceful shutdown offensive root cause fix implem | 135-003 | sprint-135 | NORMAL | 0 | true | sprint-135 | 2026-04-12T19:01:44.316Z |
+| debt-135-005 | Tech debt from 135-005: parseStructuredDirectives() and parseBulletOrNumberedTas | 135-005 | sprint-135 | NORMAL | 0 | true | sprint-135 | 2026-04-12T19:01:52.377Z |
+| debt-135-008 | Tech debt from 135-008: GO_WITH_GATE_FAILURE status propagation wire implemented | 135-008 | sprint-135 | NORMAL | 0 | true | sprint-135 | 2026-04-12T19:02:00.086Z |
+| debt-135-013 | Tech debt from 135-013: Brain Memory Budget Enforcement + Config Sync tamamlandı | 135-013 | sprint-135 | NORMAL | 0 | true | sprint-135 | 2026-04-12T19:02:20.486Z |
