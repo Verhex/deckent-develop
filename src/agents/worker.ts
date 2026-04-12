@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, openSync, closeSync, realpathSync, constants as fsConstants } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { join, normalize, sep } from 'node:path';
 import { TaskStatus, AgentStatus } from '../core/types.js';
 import type {
@@ -304,6 +305,13 @@ export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat): void 
   writeFileSync(path, JSON.stringify(heartbeat, null, 2), 'utf-8');
 }
 
+/**
+ * Write a task result to disk and update task status.
+ *
+ * **Verify Loop Gate:** Callers MUST run `enforceVerifyLoop()` before calling this function.
+ * If `enforceVerifyLoop` returns `{ok: false}`, the caller should set `result.selfAssessment = 'NO_GO'`
+ * with the failure reason in `result.notes` before writing the result.
+ */
 export function writeResult(projectRoot: string, result: TaskResult): void {
   ensureDir(join(projectRoot, TASKS_DIR));
   const path = resultFilePath(projectRoot, result.taskId);
@@ -917,6 +925,84 @@ export function appendWorkerLog(
   appendFileSync(logPath, entry, 'utf-8');
 }
 
+// ─── Graceful Shutdown ─────────────────────────────────────────────
+
+/** Self-assessment values that indicate a successfully completed task */
+const DONE_SET = new Set(['DONE', 'GO_WITH_TECH_DEBT']);
+
+/**
+ * Finalize heartbeat on graceful shutdown (SIGTERM).
+ *
+ * When a Docker container receives SIGTERM (via `docker stop`), this function
+ * checks if the worker already wrote a successful `.result` file. If so, it
+ * overwrites the heartbeat with status "DONE" and exitCode 0 — preventing
+ * the auditor from reporting a false "FAILED exitCode 137" alert.
+ *
+ * Fail-safe: if `.result` doesn't exist, is unparseable, or has a non-success
+ * selfAssessment, the heartbeat is left untouched (honest FAILED state).
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - Task ID whose heartbeat should be finalized
+ * @returns true if heartbeat was finalized as DONE, false otherwise
+ */
+export function finalizeHeartbeatOnShutdown(projectRoot: string, taskId: string): boolean {
+  const resPath = resultFilePath(projectRoot, taskId);
+
+  // No result file → leave HB untouched (honest FAILED)
+  if (!existsSync(resPath)) return false;
+
+  try {
+    const raw = readFileSync(resPath, 'utf-8');
+    // safe: result files written by writeResult with TaskResult shape; SyntaxError handled below
+    const result = JSON.parse(raw) as { selfAssessment?: string };
+
+    if (!result.selfAssessment || !DONE_SET.has(result.selfAssessment)) {
+      // Result exists but is NO_GO or unknown → leave HB untouched
+      return false;
+    }
+
+    // Result is DONE or GO_WITH_TECH_DEBT → finalize HB as DONE
+    const hbPath = heartbeatFilePath(projectRoot, taskId);
+    writeFileSync(hbPath, JSON.stringify({
+      workerId: `docker-${taskId}`,
+      taskId,
+      status: 'DONE',
+      exitCode: 0,
+      sequence: 99,
+      timestamp: new Date().toISOString(),
+      backend: 'docker',
+      note: 'Finalized on SIGTERM — result already written',
+    }, null, 2), 'utf-8');
+
+    return true;
+  } catch {
+    // JSON parse error or fs error → fail-safe: leave HB untouched
+    return false;
+  }
+}
+
+// ─── SIGTERM Handler Registration ──────────────────────────────────
+
+/**
+ * Register a SIGTERM handler that finalizes heartbeat on graceful shutdown.
+ * Called at worker startup when running inside a Docker container.
+ * Reads DECKENT_TASK_ID and DECKENT_PROJECT_ROOT from environment variables.
+ */
+function registerSigtermHandler(): void {
+  const taskId = process.env['DECKENT_TASK_ID'];
+  const projectRoot = process.env['DECKENT_PROJECT_ROOT'];
+
+  if (!taskId || !projectRoot) return; // Not running as a Deckent worker
+
+  process.on('SIGTERM', () => {
+    finalizeHeartbeatOnShutdown(projectRoot, taskId);
+    process.exit(0);
+  });
+}
+
+// Auto-register when this module is loaded in a Docker worker context
+registerSigtermHandler();
+
 // ─── Feedback Loop Helpers ──────────────────────────────────────────
 
 /** Create a fresh FeedbackLoop tracker with zero counts */
@@ -1025,4 +1111,96 @@ export function aggregateFeedbackLoops(results: TaskResult[]): {
     tasksWithRetries,
     tasksFirstPassSuccess,
   };
+}
+
+// ─── Enforce Verify Loop (Async Gate) ──────────────────────────────
+
+/** Verify loop gate timeout per command (ms) */
+const VERIFY_LOOP_TIMEOUT_MS = 300_000;
+
+/** Max retry attempts for enforceVerifyLoop */
+const VERIFY_LOOP_MAX_ATTEMPTS = 3;
+
+/** Result of the enforce verify loop gate */
+export interface VerifyLoopResult {
+  ok: boolean;
+  reason?: string;
+  attempts: number;
+}
+
+/**
+ * Enforce a mandatory verify loop gate before writing a task result.
+ *
+ * Runs `tsc --noEmit` and `npx vitest run <scope>` up to 3 times.
+ * If both pass on any attempt, writes a `.verify-ran` marker file and returns ok=true.
+ * If all 3 attempts fail, returns ok=false with the last failure reason.
+ * On timeout (300s per command), returns ok=false immediately (infrastructure failure, no retry).
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - Task ID for marker file
+ * @param scope - Test scope directories (e.g. ['src/agents/', 'src/orchestra/'])
+ * @returns Promise resolving to VerifyLoopResult
+ */
+export async function enforceVerifyLoop(
+  projectRoot: string,
+  taskId: string,
+  scope: string | string[],
+): Promise<VerifyLoopResult> {
+  // Lazy import to avoid breaking mocks that don't define exec
+  const { exec: execFn } = await import('node:child_process');
+  const execAsync = promisify(execFn);
+  const scopeArg = Array.isArray(scope) ? scope.join(' ') : scope;
+  let lastReason = '';
+
+  for (let attempt = 1; attempt <= VERIFY_LOOP_MAX_ATTEMPTS; attempt++) {
+    // Step 1: tsc --noEmit
+    try {
+      await execAsync('npx tsc --noEmit', {
+        cwd: projectRoot,
+        timeout: VERIFY_LOOP_TIMEOUT_MS,
+      });
+    } catch (err: unknown) {
+      const isTimeout = err instanceof Error && 'killed' in err && (err as { killed: boolean }).killed;
+      if (isTimeout) {
+        return { ok: false, reason: 'tsc --noEmit timeout (infrastructure failure)', attempts: attempt };
+      }
+      const stderr = err instanceof Error && 'stderr' in err ? String((err as { stderr: unknown }).stderr) : '';
+      const stdout = err instanceof Error && 'stdout' in err ? String((err as { stdout: unknown }).stdout) : '';
+      lastReason = `tsc --noEmit failed (attempt ${attempt}/${VERIFY_LOOP_MAX_ATTEMPTS}): ${(stderr || stdout).slice(0, 500)}`;
+      continue;
+    }
+
+    // Step 2: vitest run <scope>
+    const vitestCmd = scopeArg ? `npx vitest run ${scopeArg}` : 'npx vitest run';
+    try {
+      await execAsync(vitestCmd, {
+        cwd: projectRoot,
+        timeout: VERIFY_LOOP_TIMEOUT_MS,
+      });
+    } catch (err: unknown) {
+      const isTimeout = err instanceof Error && 'killed' in err && (err as { killed: boolean }).killed;
+      if (isTimeout) {
+        return { ok: false, reason: `vitest run timeout (infrastructure failure)`, attempts: attempt };
+      }
+      const stderr = err instanceof Error && 'stderr' in err ? String((err as { stderr: unknown }).stderr) : '';
+      const stdout = err instanceof Error && 'stdout' in err ? String((err as { stdout: unknown }).stdout) : '';
+      lastReason = `vitest run failed (attempt ${attempt}/${VERIFY_LOOP_MAX_ATTEMPTS}): ${(stderr || stdout).slice(0, 500)}`;
+      continue;
+    }
+
+    // Both passed — write marker and return success
+    const markerPath = join(projectRoot, TASKS_DIR, `task-${taskId}.verify-ran`);
+    ensureDir(join(projectRoot, TASKS_DIR));
+    writeFileSync(markerPath, JSON.stringify({
+      taskId,
+      timestamp: new Date().toISOString(),
+      attempts: attempt,
+      tsc: 'PASS',
+      vitest: 'PASS',
+    }, null, 2), 'utf-8');
+
+    return { ok: true, attempts: attempt };
+  }
+
+  return { ok: false, reason: lastReason, attempts: VERIFY_LOOP_MAX_ATTEMPTS };
 }

@@ -604,6 +604,49 @@ export const HONESTY_VIOLATION = 'HONESTY_VIOLATION' as const;
 export const GO_WITH_GATE_FAILURE = 'GO_WITH_GATE_FAILURE' as const;
 
 /**
+ * Honesty violation flag for missing verify-ran marker.
+ * Flagged when a worker's notes contain phrases like "pre-existing" or "unrelated"
+ * (claiming failures are not their fault) but the `.verify-ran` marker file is absent,
+ * meaning the worker never actually ran the verify loop to confirm.
+ */
+export const HONESTY_VIOLATION_NO_VERIFY_MARKER = 'HONESTY_VIOLATION_NO_VERIFY_MARKER' as const;
+
+/** Patterns in notes that indicate a worker is claiming failures are not their fault */
+const VERIFY_MARKER_HONESTY_PATTERNS = [
+  /pre-existing/i,
+  /unrelated/i,
+];
+
+/**
+ * Check whether a task result should be flagged for HONESTY_VIOLATION_NO_VERIFY_MARKER.
+ *
+ * Returns the flag string if the result's notes match honesty-trigger patterns
+ * (claims about "pre-existing" or "unrelated" failures) AND the `.verify-ran` marker
+ * file does not exist for this task. Returns null otherwise.
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - Task ID to check for verify-ran marker
+ * @param notes - Worker's result notes string
+ * @returns HONESTY_VIOLATION_NO_VERIFY_MARKER flag or null
+ */
+export function checkVerifyMarkerHonesty(
+  projectRoot: string,
+  taskId: string,
+  notes: string,
+): typeof HONESTY_VIOLATION_NO_VERIFY_MARKER | null {
+  if (!notes || notes.length === 0) return null;
+
+  const hasHonestyPhrase = VERIFY_MARKER_HONESTY_PATTERNS.some(p => p.test(notes));
+  if (!hasHonestyPhrase) return null;
+
+  // Check if verify-ran marker exists
+  const markerPath = join(projectRoot, '.tasks', `task-${taskId}.verify-ran`);
+  if (existsSync(markerPath)) return null;
+
+  return HONESTY_VIOLATION_NO_VERIFY_MARKER;
+}
+
+/**
  * Checks if a task result's notes contain honesty-trigger patterns
  * (claims about pre-existing or unrelated failures).
  * Re-exported from baseline-tracker for convenience.

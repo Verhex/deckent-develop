@@ -5,6 +5,7 @@ import {
   enrichScopeWithTestFiles,
   parseStructuredDirectives,
   parseBulletOrNumberedTasks,
+  parsePriorityDirective,
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
@@ -1908,5 +1909,153 @@ Write architecture decision record.`;
     expect(tasks).toHaveLength(1);
     expect(tasks[0]!.scope.directories).toContain('.brain/');
     expect(tasks[0]!.scope.filesWrite).toContain('.brain/DECISIONS.md');
+  });
+});
+
+// ═══ parsePriorityDirective ════════════════════════════════════════
+
+describe('parsePriorityDirective', () => {
+  it('parses "- Priority: CRITICAL" → "CRITICAL"', () => {
+    expect(parsePriorityDirective('- Priority: CRITICAL')).toBe('CRITICAL');
+  });
+
+  it('parses "- Priority: HIGH" → "HIGH"', () => {
+    expect(parsePriorityDirective('- Priority: HIGH')).toBe('HIGH');
+  });
+
+  it('parses "- Priority: NORMAL" → "NORMAL"', () => {
+    expect(parsePriorityDirective('- Priority: NORMAL')).toBe('NORMAL');
+  });
+
+  it('parses "- Priority: LOW" → "LOW"', () => {
+    expect(parsePriorityDirective('- Priority: LOW')).toBe('LOW');
+  });
+
+  it('returns undefined for missing line', () => {
+    expect(parsePriorityDirective(undefined)).toBeUndefined();
+  });
+
+  it('returns undefined for empty value', () => {
+    expect(parsePriorityDirective('- Priority: ')).toBeUndefined();
+  });
+
+  it('returns undefined for invalid priority value', () => {
+    expect(parsePriorityDirective('- Priority: URGENT')).toBeUndefined();
+  });
+
+  it('is case-insensitive for the label and normalizes value to uppercase', () => {
+    expect(parsePriorityDirective('- priority: critical')).toBe('CRITICAL');
+    expect(parsePriorityDirective('  Priority: high')).toBe('HIGH');
+  });
+});
+
+// ═══ parseStructuredDirectives — Priority parsing ═════════════════
+
+describe('parseStructuredDirectives — priority parsing', () => {
+  it('parses Priority: CRITICAL from structured task block', () => {
+    const content = `## Task 1: Critical Fix
+- Priority: CRITICAL
+- Files: src/core/config.ts
+- Scope: src/core/
+
+### Description
+Fix critical bug.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.priority).toBe('CRITICAL');
+  });
+
+  it('parses Priority: HIGH from structured task block', () => {
+    const content = `## Task 1: Important Feature
+- Priority: HIGH
+- Files: src/core/types.ts
+- Scope: src/core/
+
+### Description
+Add important feature.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.priority).toBe('HIGH');
+  });
+
+  it('returns undefined priority when Priority line is missing (default NORMAL)', () => {
+    const content = `## Task 1: Normal Task
+- Files: src/core/config.ts
+- Scope: src/core/
+
+### Description
+Regular task with no priority specified.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]!.priority).toBeUndefined();
+  });
+
+  it('parses multiple tasks with different priorities', () => {
+    const content = `## Task 1: Critical Fix
+- Priority: CRITICAL
+- Files: src/core/config.ts
+
+### Description
+Critical fix.
+
+---
+
+## Task 2: Normal Task
+- Files: src/core/types.ts
+
+### Description
+Normal task.
+
+---
+
+## Task 3: Low Priority
+- Priority: LOW
+- Files: src/core/utils.ts
+
+### Description
+Low priority cleanup.`;
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks).toHaveLength(3);
+    expect(tasks[0]!.priority).toBe('CRITICAL');
+    expect(tasks[1]!.priority).toBeUndefined();
+    expect(tasks[2]!.priority).toBe('LOW');
+  });
+
+  it('Sprint 135 DIRECTIVES self-parse: correct priority distribution (5 CRITICAL + 4 HIGH + 4 NORMAL)', () => {
+    const { readFileSync } = require('node:fs');
+    const { resolve } = require('node:path');
+    const directivesPath = resolve(__dirname, '../../DIRECTIVES.md');
+    const content = readFileSync(directivesPath, 'utf-8');
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks.length).toBe(13);
+
+    const criticalCount = tasks.filter(t => t.priority === 'CRITICAL').length;
+    const highCount = tasks.filter(t => t.priority === 'HIGH').length;
+    const normalCount = tasks.filter(t => t.priority === 'NORMAL').length;
+    const undefinedCount = tasks.filter(t => t.priority === undefined).length;
+
+    // Sprint 135 DIRECTIVES: 5 CRITICAL (T-001..T-005), 4 HIGH (T-006..T-009), 4 NORMAL (T-010..T-013)
+    expect(criticalCount).toBe(5);
+    expect(highCount).toBe(4);
+    // Tasks without Priority line → undefined (they are the NORMAL ones)
+    expect(normalCount).toBe(4);
+  });
+
+  it('Sprint 135 DIRECTIVES self-parse: dependencies correctly parsed', () => {
+    const { readFileSync } = require('node:fs');
+    const { resolve } = require('node:path');
+    const directivesPath = resolve(__dirname, '../../DIRECTIVES.md');
+    const content = readFileSync(directivesPath, 'utf-8');
+    const tasks = parseStructuredDirectives(content);
+    expect(tasks.length).toBe(13);
+
+    // T-006 (index 5) has "- Dependencies: 135-001"
+    expect(tasks[5]!.dependencies).toEqual(['135-001']);
+
+    // T-011 (index 10) has "- Dependencies: 135-001"
+    expect(tasks[10]!.dependencies).toEqual(['135-001']);
+
+    // T-001 (index 0) has no Dependencies line
+    expect(tasks[0]!.dependencies).toBeUndefined();
   });
 });

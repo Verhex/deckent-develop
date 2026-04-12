@@ -829,9 +829,9 @@ describe('extended config validation', () => {
 import { CONFIG_METADATA, listConfigByCategory } from '../../src/core/config.js';
 
 describe('memory config defaults', () => {
-  it('default config has memory_budget=600', () => {
+  it('default config has memory_budget=900', () => {
     const config = getDefaultConfig();
-    expect(config.memory_budget).toBe(600);
+    expect(config.memory_budget).toBe(900);
   });
 
   it('default config has decay_after_sprints=5', () => {
@@ -1002,7 +1002,7 @@ describe('listConfigByCategory', () => {
 describe('loadConfig resolves new fields', () => {
   it('resolved config includes memory_budget from defaults', async () => {
     const config = await loadConfig('/test/project');
-    expect(config.memory_budget).toBe(600);
+    expect(config.memory_budget).toBe(900);
   });
 
   it('resolved config includes fix_phase_enabled from defaults', async () => {

@@ -23,6 +23,7 @@ import { ALL_MODELS, PROVIDER_MODEL_MAP } from './types.js';
 import type { ProviderName } from './types.js';
 import { MODE_PRESETS } from './mode-presets.js';
 import type { ModelStrategy } from './mode-presets.js';
+import { metric } from './observability.js';
 
 // ─── Default Auto Docs Config ───────────────────────────────────────
 export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
@@ -431,7 +432,7 @@ export function createDefaultConfig(): DeckentConfig {
     reroute_on_tech_debt: false,
     sprint_timeout_minutes: 0,
     // Memory
-    memory_budget: 600,
+    memory_budget: 900,
     decay_after_sprints: 5,
     patterns_enabled: true,
     project_identity_enabled: true,
@@ -515,6 +516,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   if (!forceReload && cachedConfig !== null && cachedProjectRoot === root) {
     const currentMtime = getConfigMtime(root);
     if (currentMtime === cacheStamp) {
+      metric('config.cache', 1, { result: 'hit' });
       return cachedConfig;
     }
   }
@@ -672,6 +674,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   cacheStamp = getConfigMtime(root);
   cachedProjectRoot = root;
 
+  metric('config.cache', 1, { result: 'miss' });
   return resolved;
 }
 

@@ -82,7 +82,7 @@ describe('DockerSpawnBackend', () => {
   });
 
   describe('kill', () => {
-    it('should kill and remove the Docker container', () => {
+    it('should use docker stop --time=10 for graceful shutdown', () => {
       mockSpawnSync.mockReturnValue({
         stdout: '',
         stderr: '',
@@ -94,15 +94,42 @@ describe('DockerSpawnBackend', () => {
 
       backend.kill('001-001');
 
-      // docker kill + docker rm -f
+      // docker stop --time=10 (graceful) + docker rm -f (cleanup)
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['kill', 'deckent-w-001-001'],
+        ['stop', '--time=10', 'deckent-w-001-001'],
         expect.any(Object),
       );
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
         ['rm', '-f', 'deckent-w-001-001'],
+        expect.any(Object),
+      );
+    });
+
+    it('should fallback to docker kill when docker stop fails', () => {
+      // First call (docker stop) fails, second call (docker kill) succeeds, third (docker rm) succeeds
+      mockSpawnSync
+        .mockReturnValueOnce({
+          stdout: '', stderr: 'stop failed', status: 1,
+          signal: null, pid: 1, output: [],
+        } as any)
+        .mockReturnValue({
+          stdout: '', stderr: '', status: 0,
+          signal: null, pid: 1, output: [],
+        } as any);
+
+      backend.kill('001-001');
+
+      // Should call docker stop first, then fallback to docker kill
+      expect(mockSpawnSync).toHaveBeenCalledWith(
+        'docker',
+        ['stop', '--time=10', 'deckent-w-001-001'],
+        expect.any(Object),
+      );
+      expect(mockSpawnSync).toHaveBeenCalledWith(
+        'docker',
+        ['kill', 'deckent-w-001-001'],
         expect.any(Object),
       );
     });

@@ -6,6 +6,7 @@ import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
 import { readLatestJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStatusResponse, wrapResponse, type StatusData } from '../helpers/format.js';
+import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 
 function buildProgressBar(done: number, total: number, width = 10): string {
   if (total <= 0) return '\u2591'.repeat(width);
@@ -95,6 +96,9 @@ export function registerStatusTool(server: McpServer): void {
 
       const latestJob = readLatestJobState(root);
 
+      // Use canonical sprint-state.json as single source of truth for sprintId
+      const canonicalSprintId = getCurrentSprintId(root);
+
       if (!existsSync(dashPath)) {
         // Part C: when .tasks/ files are unavailable but job is COMPLETE with task data,
         // surface completed sprint results from the job file
@@ -102,8 +106,8 @@ export function registerStatusTool(server: McpServer): void {
           const completedData = {
             active: false,
             completed: true,
-            message: `Sprint ${latestJob.sprintId ?? ''} completed.`,
-            sprintId: latestJob.sprintId,
+            message: `Sprint ${canonicalSprintId ?? latestJob.sprintId ?? ''} completed.`,
+            sprintId: canonicalSprintId ?? latestJob.sprintId,
             completedAt: latestJob.completedAt,
             job: latestJob,
           };
@@ -118,7 +122,12 @@ export function registerStatusTool(server: McpServer): void {
             }],
           };
         }
-        const noSprintData = { active: false, message: 'No active sprint.', job: latestJob };
+        const noSprintData = {
+          active: false,
+          message: 'No active sprint.',
+          sprintId: canonicalSprintId,
+          job: latestJob,
+        };
         if (json) {
           return { content: [{ type: 'text' as const, text: JSON.stringify(noSprintData) }] };
         }
@@ -141,7 +150,10 @@ export function registerStatusTool(server: McpServer): void {
         const total = progress?.total ?? 0;
         const agents = state['agents'] as unknown[] | undefined;
         const alerts = state['alerts'] as unknown[] | undefined;
-        const sprint = state['sprint'] as { startedAt?: string } | undefined;
+        const sprint = state['sprint'] as { id?: string; startedAt?: string } | undefined;
+
+        // Prefer canonical sprint-state.json sprintId over potentially stale .dashboard sprint.id
+        const resolvedSprintId = canonicalSprintId ?? sprint?.id;
 
         const progressBar = buildProgressBar(done, total);
         const eta = computeEta(done, total, sprint?.startedAt);
@@ -164,6 +176,9 @@ export function registerStatusTool(server: McpServer): void {
 
         const rawData = {
           ...state,
+          // Override sprint.id with canonical source-of-truth value so dashboard
+          // and MCP always report the same sprint, even when .dashboard is stale.
+          sprint: sprint ? { ...sprint, id: resolvedSprintId } : { id: resolvedSprintId },
           job: latestJob,
           completedTasks,
           progressBar,

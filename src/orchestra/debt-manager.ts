@@ -1,6 +1,6 @@
 // ─── Debt Management ───────────────────────────────────────────────
 // Extracted from brain.ts — debt resolution, escalation, cross-dependencies
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskStatus, TaskEvaluation, DebtPriority } from '../core/types.js';
 import type {
@@ -334,6 +334,73 @@ export function archiveResolvedDebt(projectRoot: string): number {
 
 // ═══ Decay ═════════════════════════════════════════════════════════
 
+/**
+ * Files in .brain/ that are permanent and must never be decayed.
+ * These are excluded from the "decayable" line count used for budget decisions.
+ */
+export const DECAY_EXEMPT = new Set(['DECISIONS.md', 'PROJECT-IDENTITY.md']);
+
+/**
+ * Result of a brain budget audit — shows decayable vs permanent line accounting.
+ */
+export interface BrainBudgetAudit {
+  /** Lines in decayable files (MEMORY.md, DEBT.md, PATTERNS.md, sprint logs, etc.) */
+  decayableLines: number;
+  /** Lines in permanent exempt files (DECISIONS.md, PROJECT-IDENTITY.md) */
+  permanentLines: number;
+  /** Total lines across all .brain/ files */
+  totalLines: number;
+  /** Budget status: OK if decayable <= budget, OVER otherwise */
+  status: 'OK' | 'OVER';
+}
+
+/**
+ * Audit .brain/ directory against memory budget.
+ * Separates permanent (DECAY_EXEMPT) files from decayable files for accurate accounting.
+ * @param projectRoot - Project root directory
+ * @param budget - Memory budget in lines (default 900)
+ * @returns Audit result with decayable/permanent/total counts and status
+ */
+export function auditBrainBudget(projectRoot: string, budget = 900): BrainBudgetAudit {
+  const brainPath = join(projectRoot, BRAIN_DIR);
+  if (!existsSync(brainPath)) {
+    return { decayableLines: 0, permanentLines: 0, totalLines: 0, status: 'OK' };
+  }
+
+  let decayableLines = 0;
+  let permanentLines = 0;
+
+  const entries = readdirSync(brainPath);
+  for (const entry of entries) {
+    if (entry === 'archive' || entry === 'sprints') continue;
+    const filePath = join(brainPath, entry);
+    try {
+      const stat = statSync(filePath);
+      if (!stat.isFile()) continue;
+      const lines = readFileSync(filePath, 'utf-8').split('\n').length;
+      if (DECAY_EXEMPT.has(entry)) {
+        permanentLines += lines;
+      } else {
+        decayableLines += lines;
+      }
+    } catch { /* skip unreadable entries */ }
+  }
+
+  // Sprint logs are decayable
+  const sprintsPath = join(brainPath, 'sprints');
+  if (existsSync(sprintsPath)) {
+    for (const file of readdirSync(sprintsPath)) {
+      try {
+        decayableLines += readFileSync(join(sprintsPath, file), 'utf-8').split('\n').length;
+      } catch { /* skip */ }
+    }
+  }
+
+  const totalLines = decayableLines + permanentLines;
+  const status = decayableLines > budget ? 'OVER' : 'OK';
+  return { decayableLines, permanentLines, totalLines, status };
+}
+
 export interface RunDecayOptions {
   memoryBudget?: number;
   decaySprints?: number;
@@ -360,7 +427,10 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   let removedPatternCount = 0;
   const archivedSprints: string[] = [];
 
-  const shouldRun = opts?.force || linesBefore > budget;
+  // Use decayable-only line count for budget decision (DECAY_EXEMPT files excluded).
+  // Also check total linesBefore > budget for backward compatibility with existing callers.
+  const audit = auditBrainBudget(projectRoot, budget);
+  const shouldRun = opts?.force || linesBefore > budget || audit.status === 'OVER';
   if (!shouldRun) {
     return { linesBefore, linesAfter: linesBefore, archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0 };
   }

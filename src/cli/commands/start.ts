@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
+import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -214,6 +215,35 @@ export function registerStart(program: Command): void {
             print('Sandbox mode: no changes to stash. Running sprint on clean state.');
           }
           // Continue with sprint in sandbox mode (does not abort)
+        }
+
+        // ─── Orphan Detection (Sprint 135 — coordinator resilience) ──
+        if (!opts.force) {
+          // Check all PID files for orphaned sprints
+          const pidSprintIds = listPidFiles(root);
+          // Also check last_sprint_id from config
+          const lastSprintId = (config as unknown as Record<string, unknown>).last_sprint_id as string | undefined;
+          if (lastSprintId && !pidSprintIds.includes(lastSprintId)) {
+            pidSprintIds.push(lastSprintId);
+          }
+          for (const sid of pidSprintIds) {
+            const orphan = detectOrphan(root, sid);
+            if (orphan) {
+              if (opts.autoApprove) {
+                // Auto-archive: move orphan artifacts to .brain/archive/
+                archiveOrphan(root, orphan);
+                print(`Orphan sprint ${sid} (PID ${orphan.pid}) auto-archived.`);
+              } else {
+                printError(new Error(
+                  `Orphan sprint detected: ${sid} (PID ${orphan.pid} is dead). ` +
+                  'Run with --auto-approve to auto-archive, or use --force to skip this check.',
+                ));
+                if (sandboxState) restoreSandbox(root, sandboxState);
+                process.exitCode = 2;
+                return;
+              }
+            }
+          }
         }
 
         // ─── Sprint Lock Check ─────────────────────────────────────

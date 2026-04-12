@@ -252,10 +252,11 @@ describe('scanHeartbeats', () => {
     expect(result.alerts).toHaveLength(0);
   });
 
-  it('skips stale check when .result file exists (cleanup_delay_ms scenario)', () => {
+  it('skips stale check when .result file exists with successful selfAssessment (cleanup_delay_ms scenario)', () => {
     // Simulates the window between writeResult() and finalizeHeartbeat() delay deletion:
     // .result file is written, but .hb file hasn't been deleted yet (cleanup_delay_ms > 0).
     // Auditor should NOT generate false positive stale alerts in this window.
+    // shouldReportStale() reconciles HB with .result content (DONE/GO_WITH_TECH_DEBT suppresses alert).
     mockedExistsSync.mockImplementation((path: unknown) => {
       const p = String(path);
       // .hb file exists (not yet deleted), .result file also exists
@@ -268,12 +269,17 @@ describe('scanHeartbeats', () => {
       workerId: 'w1', taskId: 'task-001', status: 'EXECUTING' as never,
       currentAction: 'running', timestamp: staleTimestamp, filesChangedCount: 2, sequence: 3,
     };
+    const doneResult = { taskId: 'task-001', selfAssessment: 'DONE', notes: 'completed' };
 
-    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+    mockedReadFileSync.mockImplementation((filePath: unknown) => {
+      const p = String(filePath);
+      if (p.endsWith('.result')) return JSON.stringify(doneResult) as never;
+      return JSON.stringify(hb) as never;
+    });
 
     const result = scanHeartbeats('/project');
     expect(result.heartbeats).toHaveLength(1);
-    // No stale agents or alerts when .result file exists
+    // No stale agents or alerts when .result file exists with DONE selfAssessment
     expect(result.staleAgents).toHaveLength(0);
     expect(result.alerts).toHaveLength(0);
   });
@@ -299,15 +305,20 @@ describe('scanHeartbeats', () => {
       workerId: 'w2', taskId: 'task-002', status: 'EXECUTING' as never,
       currentAction: 'old', timestamp: staleTimestamp, filesChangedCount: 5, sequence: 10,
     };
+    const doneResult = { taskId: 'task-002', selfAssessment: 'DONE', notes: 'completed' };
 
-    mockedReadFileSync
-      .mockReturnValueOnce(JSON.stringify(activeHb) as never)
-      .mockReturnValueOnce(JSON.stringify(completedHb) as never);
+    mockedReadFileSync.mockImplementation((filePath: unknown) => {
+      const p = String(filePath);
+      if (p.endsWith('task-002.result')) return JSON.stringify(doneResult) as never;
+      if (p.includes('task-001.hb')) return JSON.stringify(activeHb) as never;
+      if (p.includes('task-002.hb')) return JSON.stringify(completedHb) as never;
+      throw new Error('ENOENT');
+    });
 
     const result = scanHeartbeats('/project');
     expect(result.heartbeats).toHaveLength(2);
     // Active worker (task-001) has fresh heartbeat — no stale alert
-    // Completed worker (task-002) has .result file — skipped by auditor
+    // Completed worker (task-002) has .result file with DONE — skipped by shouldReportStale
     expect(result.staleAgents).toHaveLength(0);
     expect(result.alerts).toHaveLength(0);
   });

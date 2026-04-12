@@ -121,6 +121,8 @@ export interface ParsedDirectiveTask {
   excludeSkills?: string[];
   /** Task dependency IDs parsed from "- Dependencies: 134-005, 134-007" */
   dependencies?: string[];
+  /** Task priority parsed from "- Priority: CRITICAL" (default: undefined → NORMAL) */
+  priority?: TaskPriority;
 }
 
 // ═══ Functions ════════════════════════════════════════════════════
@@ -176,6 +178,22 @@ export function parseDependenciesDirective(line: string | undefined): string[] |
 
   const parts = value.split(',').map(s => s.trim()).filter(Boolean);
   return parts.length > 0 ? parts : undefined;
+}
+
+const VALID_PRIORITIES: readonly string[] = ['CRITICAL', 'HIGH', 'NORMAL', 'LOW'];
+
+/**
+ * Parse a Priority: directive line into a TaskPriority value.
+ * Supports: "- Priority: CRITICAL", "Priority: HIGH", etc.
+ * Returns undefined if no priority line or invalid value (caller defaults to "NORMAL").
+ */
+export function parsePriorityDirective(line: string | undefined): TaskPriority | undefined {
+  if (!line) return undefined;
+
+  const value = line.replace(/.*Priority:\s*/i, '').trim().toUpperCase();
+  if (!value) return undefined;
+
+  return VALID_PRIORITIES.includes(value) ? value as TaskPriority : undefined;
 }
 
 function now(): string {
@@ -461,8 +479,12 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const depsLine = lines.find(l => /^[\s-]*Dependencies:\s*/i.test(l.trim()));
     const dependencies = parseDependenciesDirective(depsLine);
 
+    // Extract optional Priority: line (e.g., "- Priority: CRITICAL")
+    const priorityLine = lines.find(l => /^[\s-]*Priority:\s*/i.test(l.trim()));
+    const parsedPriority = parsePriorityDirective(priorityLine);
+
     const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
-    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies });
+    tasks.push({ title, description: block.trim(), scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority });
   }
   return tasks;
 }
@@ -560,6 +582,10 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         const depsLineBullet = allLines.find(l => /Dependencies:\s*/i.test(l));
         const dependenciesBullet = parseDependenciesDirective(depsLineBullet);
 
+        // Extract Priority override
+        const priorityLineBullet = allLines.find(l => /Priority:\s*/i.test(l));
+        const parsedPriorityBullet = parsePriorityDirective(priorityLineBullet);
+
         const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
         tasks.push({
           title,
@@ -573,6 +599,7 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           forceSkills: forceSkillsBullet,
           excludeSkills: excludeSkillsBullet,
           dependencies: dependenciesBullet,
+          priority: parsedPriorityBullet,
         });
 
         i = j;

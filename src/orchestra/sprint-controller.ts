@@ -133,6 +133,12 @@ import { validateWorkerCoverage } from './coverage-validator.js';
 // ─── Baseline Tracker (Sprint 134 — honesty verification) ───────
 import { captureVitestBaseline, writeBaseline } from './baseline-tracker.js';
 
+// ─── PID Manager (Sprint 135 — coordinator resilience) ──────────
+import {
+  writePid, clearPid, writeStateSnapshot,
+} from './sprint-pid-manager.js';
+import type { SprintStateSnapshot } from './sprint-pid-manager.js';
+
 // ─── Observability (Sprint 134 — local metrics) ─────────────────
 import { metric, trace, structuredLog, initObservability } from '../core/observability.js';
 
@@ -1421,6 +1427,11 @@ export async function runSprint(
     await loadPluginHooks(projectRoot);
   } catch (e) { debugLog('runSprint:loadPluginHooks', e); }
 
+  // ─── PID Manager (Sprint 135 — coordinator resilience) ────────
+  // We don't have sprintId yet (generated in PLAN phase), so we defer
+  // writePid to after PLAN. Snapshot interval and beforeExit cleanup
+  // are set up after PLAN phase below.
+
   // ─── Sprint Lock ──────────────────────────────────────────────────
   // Acquire sprint lock to prevent concurrent sprints on the same project.
   // Uses PID-based locking: stale locks (dead PIDs) are auto-cleared.
@@ -1454,6 +1465,47 @@ export async function runSprint(
 
   // Register active sprint for SIGINT interrupt cleanup
   setActiveSprint(projectRoot, sprint, spawnBackend);
+
+  // ─── PID + Snapshot Setup (Sprint 135) ────────────────────────
+  // Write PID file so orphan detection can find us if we crash
+  try {
+    writePid(projectRoot, sprint.id);
+  } catch (e) { debugLog('runSprint:writePid', e); }
+
+  // Periodic state snapshot (every 30s) for crash recovery diagnostics
+  let snapshotInterval: ReturnType<typeof setInterval> | null = null;
+  const writePeriodicSnapshot = (): void => {
+    try {
+      const snap: SprintStateSnapshot = {
+        sprintId: sprint.id,
+        pid: process.pid,
+        startedAt: sprint.startedAt ?? new Date().toISOString(),
+        currentWave: 0, // updated by phases if needed
+        taskStatuses: Object.fromEntries(sprint.tasks.map(t => [t.id, t.status])),
+        metricsJsonlSize: 0,
+        lastHeartbeat: new Date().toISOString(),
+      };
+      // Try to get metrics.jsonl size
+      try {
+        const metricsPath = join(projectRoot, '.deckent', 'metrics.jsonl');
+        if (existsSync(metricsPath)) {
+          snap.metricsJsonlSize = readFileSync(metricsPath, 'utf-8').split('\n').filter(Boolean).length;
+        }
+      } catch { /* non-fatal */ }
+      writeStateSnapshot(projectRoot, sprint.id, snap);
+    } catch (e) { debugLog('runSprint:writeStateSnapshot', e); }
+  };
+
+  // Write initial snapshot immediately, then every 30s
+  writePeriodicSnapshot();
+  snapshotInterval = setInterval(writePeriodicSnapshot, 30_000);
+
+  // beforeExit handler: flush observability + write final snapshot
+  const beforeExitHandler = (): void => {
+    try { writePeriodicSnapshot(); } catch { /* best effort */ }
+    try { clearPid(projectRoot, sprint.id); } catch { /* best effort */ }
+  };
+  process.on('beforeExit', beforeExitHandler);
 
   // Phase 1.5: Route tasks to providers via Connector or registry (non-fatal)
   try {
@@ -1580,6 +1632,18 @@ export async function runSprint(
   const evaluations = new Map<string, TaskEvaluation>();
   await runEvaluatePhase(projectRoot, sprint, results, evaluations, config.coverage_threshold);
 
+  // ─── Honesty Check Metrics (Sprint 135 — secondary observability) ──
+  // Emit metric for each result that triggers honesty-pattern detection
+  // (notes containing "pre-existing" or "unrelated"). delta = 1 per flagged task.
+  {
+    const HONESTY_PATTERNS = [/pre-existing/i, /unrelated/i];
+    for (const r of results) {
+      if (r.notes && HONESTY_PATTERNS.some(p => p.test(r.notes))) {
+        metric('honesty.check', 1, { taskId: r.taskId });
+      }
+    }
+  }
+
   // Rollback check: if rollback is enabled and all tasks are NO_GO, trigger rollback
   runRollbackCheck(projectRoot, sprint, evaluations, rollbackEnabled, safetyPoint);
 
@@ -1636,6 +1700,12 @@ export async function runSprint(
 
   // Clear sprint state file after successful completion
   clearSprintState(projectRoot);
+
+  // ─── PID Cleanup (Sprint 135) ─────────────────────────────────
+  // Stop snapshot interval, remove beforeExit handler, clear PID file
+  if (snapshotInterval) clearInterval(snapshotInterval);
+  process.removeListener('beforeExit', beforeExitHandler);
+  try { clearPid(projectRoot, sprint.id); } catch { /* non-fatal */ }
 
   updateDashboard(projectRoot, {
     sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },

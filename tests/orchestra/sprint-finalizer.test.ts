@@ -54,6 +54,7 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/result-evaluator.js', () => ({
+  GO_WITH_GATE_FAILURE: 'GO_WITH_GATE_FAILURE',
   getRecentSprintStats: vi.fn().mockReturnValue({
     sprintCount: 0,
     avgNoGoRate: 0,
@@ -106,8 +107,10 @@ import {
   runHonestyCheck,
   writeRubricDetail,
   runSelfAuditGate,
+  applyGateStatus,
 } from '../../src/orchestra/sprint-finalizer.js';
 import type { FinalizeSprintOptions, SelfAuditResult } from '../../src/orchestra/sprint-finalizer.js';
+import { GO_WITH_GATE_FAILURE } from '../../src/orchestra/result-evaluator.js';
 
 describe('sprint-finalizer — hook stubs', () => {
   describe('runHonestyCheck', () => {
@@ -169,6 +172,28 @@ describe('sprint-finalizer — hook stubs', () => {
         skipHooks: false,
       };
       expect(opts.skipDecay).toBe(true);
+    });
+  });
+
+  describe('applyGateStatus', () => {
+    it('should return GO_WITH_GATE_FAILURE when gate is GATE_FAILURE', () => {
+      const gate = { overallGate: 'GATE_FAILURE' as const };
+      const result = applyGateStatus('DONE', gate);
+      expect(result).toBe(GO_WITH_GATE_FAILURE);
+    });
+
+    it('should leave status unchanged when gate is PASS', () => {
+      const gate = { overallGate: 'PASS' as const };
+      const result = applyGateStatus('DONE', gate);
+      expect(result).toBe('DONE');
+    });
+
+    it('should leave status unchanged when gate is WARNING (metrics missing is not fail)', () => {
+      // WARNING is not a valid overallGate value in SelfAuditResult (only PASS|GATE_FAILURE),
+      // but the helper must not break if passed an unknown string via cast
+      const gate = { overallGate: 'WARNING' as unknown as 'PASS' | 'GATE_FAILURE' };
+      const result = applyGateStatus('GO_WITH_TECH_DEBT', gate);
+      expect(result).toBe('GO_WITH_TECH_DEBT');
     });
   });
 });

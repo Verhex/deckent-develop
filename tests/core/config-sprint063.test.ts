@@ -70,7 +70,7 @@ describe('autoMigrateOnLoad — loadConfig integration', () => {
     const { config, addedFields } = migrateConfigInMemory(minimal);
     expect(addedFields.length).toBeGreaterThan(0);
     expect(addedFields).toContain('memory_budget');
-    expect(config.memory_budget).toBe(600);
+    expect(config.memory_budget).toBe(900);
   });
 
   it('needsMigration returns false for already-complete config', () => {

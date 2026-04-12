@@ -119,6 +119,7 @@ vi.mock('../../src/orchestra/debt-manager.js', () => ({
   resolveDebt: vi.fn(),
   runDecay: vi.fn(),
   decay: vi.fn(),
+  auditBrainBudget: vi.fn().mockReturnValue({ decayableLines: 1000, permanentLines: 200, totalLines: 1200, status: 'OVER' }),
 }));
 
 vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
@@ -392,7 +393,7 @@ describe('finalizeSprint', () => {
 
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
 
-    expect(vi.mocked(runDecay)).toHaveBeenCalledWith(PROJECT_ROOT, 'sprint-042');
+    expect(vi.mocked(runDecay)).toHaveBeenCalledWith(PROJECT_ROOT, 'sprint-042', { force: true, memoryBudget: 900 });
   });
 
   it('should skip decay when skipDecay option is true', async () => {

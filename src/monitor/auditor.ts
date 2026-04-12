@@ -22,11 +22,43 @@ import {
 } from '../core/constants.js';
 
 import { readJsonSafe } from '../core/utils.js';
+import { metric } from '../core/observability.js';
+
+// ─── Constants ─────────────────────────────────────────────────────
+
+/** Self-assessment values that indicate a successfully completed task. */
+export const DONE_SET = new Set(['DONE', 'GO_WITH_TECH_DEBT']);
 
 // ─── Internal Helpers ───────────────────────────────────────────────
 
 function now(): string {
   return new Date().toISOString();
+}
+
+/**
+ * Determines whether a stale heartbeat should be reported as a CRITICAL alert.
+ *
+ * Returns `false` (suppress alert) when:
+ *  - The task's `.result` file exists, is valid JSON, and its `selfAssessment`
+ *    is in DONE_SET (DONE or GO_WITH_TECH_DEBT).
+ *
+ * Returns `true` (report alert) in all other cases:
+ *  - No `.result` file → normal stale
+ *  - `.result` with selfAssessment NO_GO → honest failure, should alert
+ *  - Malformed JSON → fail-safe, should alert
+ *
+ * Defensive fix for Sprint 134 Docker bug: containers SIGKILL'd after task
+ * completion wrote "FAILED exitCode 137" to HB, causing 47 false CRITICAL alerts.
+ */
+export function shouldReportStale(projectRoot: string, taskId: string, _hbContent?: unknown): boolean {
+  const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+  if (!existsSync(resultPath)) return true;
+
+  const result = readJsonSafe<{ selfAssessment?: string }>(resultPath);
+  if (result?.selfAssessment && DONE_SET.has(result.selfAssessment)) {
+    return false; // Task completed successfully — suppress stale alert
+  }
+  return true; // selfAssessment is NO_GO, missing, or malformed JSON — honest alert
 }
 
 // ─── Public API ─────────────────────────────────────────────────────
@@ -70,14 +102,15 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000
     // Skip stale check for heartbeats with DONE status — worker already completed
     if (hb.status === AgentStatus.DONE) continue;
 
-    // Skip stale check when a .result file exists — task completed (heartbeat cleanup may be delayed)
-    const resultFilePath = join(tasksDir, `task-${hb.taskId}.result`);
-    if (existsSync(resultFilePath)) continue;
-
     const parsedTime = new Date(hb.timestamp).getTime();
     if (isNaN(parsedTime)) continue; // malformed timestamp — skip, do not mark as stale
     const elapsed = currentTime - parsedTime;
     if (elapsed > heartbeatTimeoutMs) {
+      // Reconcile HB with .result file: suppress stale alert if task completed successfully
+      // (DONE or GO_WITH_TECH_DEBT). NO_GO results still trigger honest alerts.
+      // Defensive fix for Sprint 134 Docker bug (SIGKILL → HB "FAILED exitCode 137" + 47 false alerts).
+      if (!shouldReportStale(projectRoot, hb.taskId, hb)) continue;
+
       // Check if the worker's task is already completed (DONE or NO_GO).
       // Completed workers stop updating heartbeats — this is expected, not a real stale agent.
       const taskFilePath = join(tasksDir, `task-${hb.taskId}.json`);
@@ -100,6 +133,7 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000
           detail: `Heartbeat stale for ${Math.round(elapsed / 1000)}s (task: ${hb.taskId})`,
           timestamp: now(),
         });
+        metric('hb.stale', 1, { taskId: hb.taskId });
         alerts.push(
           createAlert(
             AlertLevel.CRITICAL,

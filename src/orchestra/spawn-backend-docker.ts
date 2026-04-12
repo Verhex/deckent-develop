@@ -163,6 +163,10 @@ export class DockerSpawnBackend implements SpawnBackend {
       '-w', CONTAINER_WORKSPACE,
     ];
 
+    // Pass Deckent worker context env vars (for SIGTERM handler in worker.ts)
+    dockerArgs.push('-e', `DECKENT_TASK_ID=${taskId}`);
+    dockerArgs.push('-e', `DECKENT_PROJECT_ROOT=${CONTAINER_WORKSPACE}`);
+
     // Pass API keys if available (for Codex/Gemini providers)
     const envKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_DEBUG'];
     for (const key of envKeys) {
@@ -211,14 +215,29 @@ export class DockerSpawnBackend implements SpawnBackend {
   }
 
   /**
-   * Kill a running worker container.
+   * Gracefully stop a running worker container.
+   *
+   * Uses `docker stop --time=10` to send SIGTERM first, giving the worker
+   * 10 seconds to finalize heartbeat and clean up. After the grace period,
+   * Docker automatically sends SIGKILL as fallback.
+   *
+   * This fixes the Sprint 134 bug where `docker kill` (SIGKILL) caused
+   * exitCode 137 and 47 false "FAILED" heartbeat alerts.
    */
   kill(taskId: string): void {
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
-    debugLog('docker-backend:kill', `taskId=${taskId}`);
+    debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=10)`);
 
     try {
-      spawnSync('docker', ['kill', containerName], { encoding: 'utf-8', timeout: 10_000 });
+      // Graceful: SIGTERM + 10s grace period, then automatic SIGKILL fallback
+      const stopResult = spawnSync('docker', ['stop', '--time=10', containerName], {
+        encoding: 'utf-8', timeout: 15_000, // 15s > 10s grace to avoid race
+      });
+      if (stopResult.status !== 0) {
+        // Fallback: force kill if stop failed (container may already be gone)
+        debugLog('docker-backend:stop-failed', `Falling back to docker kill: ${stopResult.stderr?.trim()}`);
+        spawnSync('docker', ['kill', containerName], { encoding: 'utf-8', timeout: 10_000 });
+      }
     } catch (e) { debugLog('docker-backend:kill-error', e); }
 
     try {
@@ -259,16 +278,41 @@ export class DockerSpawnBackend implements SpawnBackend {
       const exitCode = parseInt(data.toString().trim(), 10);
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
 
-      // Update heartbeat to DONE/FAILED
+      // Determine heartbeat status: check .result file for reconciliation
+      // If .result exists with DONE/GO_WITH_TECH_DEBT, treat as DONE regardless of exitCode
+      // This prevents false "FAILED exitCode 137" alerts when container was SIGKILL'd
+      // after worker already wrote a successful result
+      let hbStatus: string = exitCode === 0 ? 'DONE' : 'FAILED';
+      let hbExitCode = exitCode;
+
+      if (exitCode !== 0) {
+        const resultPath = join(tasksDir, `task-${taskId}.result`);
+        try {
+          if (existsSync(resultPath)) {
+            const raw = readFileSync(resultPath, 'utf-8');
+            // safe: result files written by writeResult with TaskResult shape
+            const result = JSON.parse(raw) as { selfAssessment?: string };
+            if (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+              hbStatus = 'DONE';
+              hbExitCode = 0;
+              debugLog('docker-backend:reconcile', `taskId=${taskId} exitCode=${exitCode} but .result=${result.selfAssessment} → HB DONE`);
+            }
+          }
+        } catch {
+          // JSON parse fail or fs error → keep honest FAILED status
+        }
+      }
+
+      // Update heartbeat
       const hbPath = join(tasksDir, `task-${taskId}.hb`);
       try {
         writeFileSync(hbPath, JSON.stringify({
           workerId: `docker-${taskId}`,
           taskId,
-          status: exitCode === 0 ? 'DONE' : 'FAILED',
+          status: hbStatus,
           sequence: 99,
           timestamp: new Date().toISOString(),
-          exitCode,
+          exitCode: hbExitCode,
           backend: 'docker',
         }, null, 2), 'utf-8');
       } catch (e) { debugLog('docker-backend:hb-update', e); }

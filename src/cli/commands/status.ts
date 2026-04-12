@@ -7,6 +7,7 @@ import { print, printError, formatDashboard, formatTable, formatHumanStatus, for
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -222,7 +223,8 @@ export function registerStatus(program: Command): void {
       if (!existsSync(dashPath)) {
         const tasks = loadTaskFiles(root);
         if (tasks.length > 0) {
-          const sprintId = detectSprintId(tasks);
+          // Use canonical sprint-state.json as source of truth; fall back to task file scan
+          const sprintId = getCurrentSprintId(root) ?? detectSprintId(tasks);
           if (opts.json) {
             const standaloneData = {
               standalone: true,

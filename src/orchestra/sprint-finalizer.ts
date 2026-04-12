@@ -42,7 +42,7 @@ import {
 } from './sprint-reporter.js';
 
 // ─── Result Evaluator ─────────────────────────────────────────────
-import { getRecentSprintStats } from './result-evaluator.js';
+import { getRecentSprintStats, GO_WITH_GATE_FAILURE } from './result-evaluator.js';
 
 // ─── Baseline Tracker ─────────────────────────────────────────────
 import {
@@ -54,7 +54,7 @@ import {
 import { buildResultsMap } from './result-collector.js';
 
 // ─── Debt Manager ─────────────────────────────────────────────────
-import { runDecay } from './debt-manager.js';
+import { runDecay, auditBrainBudget } from './debt-manager.js';
 
 // ─── Agent/Skill Pool ─────────────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -351,6 +351,21 @@ export async function runSelfAuditGate(
 }
 
 
+// ═══ Gate Status Propagation ══════════════════════════════════════
+
+/**
+ * Apply self-audit gate result to sprint status.
+ * If gate fails (GATE_FAILURE), overrides currentStatus with GO_WITH_GATE_FAILURE.
+ * PASS and WARNING gates leave status unchanged.
+ */
+export function applyGateStatus(currentStatus: string, gate: Pick<SelfAuditResult, 'overallGate'>): string {
+  if (gate.overallGate === 'GATE_FAILURE') {
+    return GO_WITH_GATE_FAILURE;
+  }
+  return currentStatus;
+}
+
+
 // ═══ Adaptive Thresholds ══════════════════════════════════════════
 
 /**
@@ -500,10 +515,17 @@ export async function finalizeSprint(
     updateLastSprintId(projectRoot, sprint.id);
   } catch (e) { debugLog('finalizeSprint:updateLastSprintId', e); }
 
-  // 7. Run decay if over budget
+  // 7. Run decay if over budget (uses auditBrainBudget for decayable-only accounting)
   if (!opts?.skipDecay) {
     try {
-      runDecay(projectRoot, sprint.id);
+      const memBudget = opts?.config?.memory_budget ?? 900;
+      const budgetAudit = auditBrainBudget(projectRoot, memBudget);
+      if (budgetAudit.status === 'OVER') {
+        debugLog('finalizeSprint:runDecay', `Brain budget OVER: ${budgetAudit.decayableLines} decayable lines > ${memBudget} budget (${budgetAudit.permanentLines} permanent exempt)`);
+        runDecay(projectRoot, sprint.id, { force: true, memoryBudget: memBudget });
+      } else {
+        runDecay(projectRoot, sprint.id, { memoryBudget: memBudget });
+      }
     } catch (e) { debugLog('finalizeSprint:runDecay', e); }
   }
 
@@ -710,6 +732,38 @@ export async function finalizeSprint(
     );
     if (richOutput) console.log(richOutput);
   } catch (e) { debugLog('finalizeSprint:richOutput', e); }
+
+  // 10b. Self-audit gate: run tsc + vitest + honesty checks, propagate status
+  try {
+    const gateResult = await runSelfAuditGate(sprint.id, projectRoot);
+    const currentStatus = sprint.status ?? '';
+    const newStatus = applyGateStatus(currentStatus, gateResult);
+    if (newStatus !== currentStatus) {
+      sprint.status = newStatus as Sprint['status'];
+      debugLog('finalizeSprint:selfAuditGate', `Status updated: ${currentStatus} → ${newStatus}`);
+    }
+    // Append Gate Failure section to RETRO.md if gate failed
+    if (gateResult.overallGate === 'GATE_FAILURE') {
+      try {
+        const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
+        const existing = existsSync(retroPath) ? readFileSync(retroPath, 'utf-8') : '';
+        if (!existing.includes('### Gate Failure')) {
+          const errors: string[] = [];
+          if (gateResult.tsc.status === 'FAIL') errors.push(...gateResult.tsc.errors.slice(0, 5));
+          if (gateResult.vitest.status === 'FAIL') errors.push(`vitest: ${gateResult.vitest.delta.fail} failing tests`);
+          if (gateResult.honesty.violations > 0) errors.push(`honesty violations: ${gateResult.honesty.flaggedTasks.join(', ')}`);
+          const gateSection = [
+            '',
+            '### Gate Failure',
+            `Self-audit gate failed for sprint ${sprint.id}. Status: ${GO_WITH_GATE_FAILURE}.`,
+            '',
+            ...errors.map(e => `- ${e}`),
+          ].join('\n') + '\n';
+          writeFileSync(retroPath, existing + gateSection, 'utf-8');
+        }
+      } catch (e) { debugLog('finalizeSprint:gateRetroAppend', e); }
+    }
+  } catch (e) { debugLog('finalizeSprint:selfAuditGate', `Gate check failed: ${e}`); }
 
   // 11. Adaptive thresholds: auto-adjust agent_min_score + coverage_threshold based on recent sprints
   if (opts?.config?.adaptive_thresholds) {
