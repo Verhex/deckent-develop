@@ -72,12 +72,12 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-135 |
-| Total Tasks | 17 |
-| Completed | 14 |
-| Tech Debt | 4 |
+| Sprint | sprint-136 |
+| Total Tasks | 10 |
+| Completed | 7 |
+| Tech Debt | 6 |
 | No-Go | 3 |
-| Duration | 60dk 53sn |
+| Duration | 55dk 13sn |
 | Coverage | NaN% |
 
 ## Active Debt

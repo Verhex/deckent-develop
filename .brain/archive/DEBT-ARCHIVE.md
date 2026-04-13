@@ -183,3 +183,9 @@
 | debt-135-005 | Tech debt from 135-005: parseStructuredDirectives() and parseBulletOrNumberedTas | 135-005 | sprint-135 | NORMAL | 0 | true | sprint-135 | 2026-04-12T19:01:52.377Z |
 | debt-135-008 | Tech debt from 135-008: GO_WITH_GATE_FAILURE status propagation wire implemented | 135-008 | sprint-135 | NORMAL | 0 | true | sprint-135 | 2026-04-12T19:02:00.086Z |
 | debt-135-013 | Tech debt from 135-013: Brain Memory Budget Enforcement + Config Sync tamamlandı | 135-013 | sprint-135 | NORMAL | 0 | true | sprint-135 | 2026-04-12T19:02:20.486Z |
+| debt-136-001 | Tech debt from 136-001: 5 target test files (start-sandbox, start, i18n-integrat | 136-001 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:00:25.031Z |
+| debt-136-003 | Tech debt from 136-003: Brain Spurious NO_GO Evaluation Reconciliation implement | 136-003 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:00:32.271Z |
+| debt-136-004 | Tech debt from 136-004: gate.json wiring implemented. Added `import { promises a | 136-004 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:00:42.021Z |
+| debt-136-005 | Tech debt from 136-005: Wired generateLoadReport() into finalizeSprint() in spri | 136-005 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:00:48.893Z |
+| debt-136-009 | Tech debt from 136-009: Added rubric requirement to test-writer agent systemProm | 136-009 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:00:55.957Z |
+| debt-136-010 | Tech debt from 136-010: Wrote comprehensive unit tests for sprint-docs-helpers.t | 136-010 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:01:01.385Z |

@@ -6,6 +6,21 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint136] - 2026-04-13
+
+
+### Changed
+
+- 5 Test Regression Fix (Sprint 136 Opener) (completed with tech debt)
+- Brain Spurious NO_GO Evaluation Reconciliation (Sprint 135 N9) (completed with tech debt)
+- `.deckent/sprint-NNN-gate.json` Output Wiring (Sprint 135 N5) (completed with tech debt)
+- `load-test-report.md` Auto-Generation (Sprint 135 N6) (completed with tech debt)
+- Rubric Field Null Fix for Test-Writer Tasks (Sprint 135 N7) (completed with tech debt)
+- sprint-docs-helpers.ts Test Coverage (Sprint 135 T-010 Debt) (completed with tech debt)
+
+
+_Tasks: 10 total, 6 done, 6 tech debt, 4 no-go_
+
 ## [0.4.0-beta.1-sprint135] - 2026-04-12
 
 ### Added

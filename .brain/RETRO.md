@@ -1,80 +1,86 @@
-# Sprint sprint-135 Retrospective
+# Sprint sprint-136 Retrospective
 
 ## Summary
-Completed 14/17 tasks in 1h 0m.
+Completed 6/10 tasks in 55 minutes 14s.
 
 ## Highlights
-- 10 tasks completed on first try
+- 7 tasks completed on first try
 - No boundary violations detected
 
 ## Issues
-- Task 135-004 (askBrain() Extraction Finish — Conservative Move + Re-Export Shim) failed — Docker worker exited without writing result file
-- Task 135-012 (Dashboard vs MCP State Divergence Fix) failed — Created src/monitor/sprint-state.ts with getCurrentSprint...
+- Task 136-002 (Async I/O İlk Kademe (Hot Path fs.promises Migration)) failed — Docker worker exited without writing result file
+- Task 136-006 (T-005 Dep Pipeline Canlı Dogfood Rerun (Sprint 135 Chicken-Egg)) failed — Fix A (sprint-controller.ts): Added 'priority?' and 'depe...
+- Task 136-007 (ErrorRegistry Lint Rule Enforcement) failed — Docker worker exited without writing result file
+- Task 136-008 (sprint-controller.ts Full Slim (Sprint 134 T-010 Final)) failed — Docker worker exited without writing result file
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 14/17 |
-| New test files | 12 |
-| Code changes | +1874 / -340 |
-| Sprint time | 1h 0m |
-| NO_GO rate | 18% (3/17) |
+| Tasks completed | 6/10 |
+| New test files | 7 |
+| Code changes | +1372 / -25 |
+| Sprint time | 55 minutes 14s |
+| NO_GO rate | 40% (4/10) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| bug-fixer | 5 | 4 | 3 | 1 | 0% |
-| architect | 4 | 4 | 1 | 0 | 22% |
-| refactorer | 2 | 1 | 0 | 1 | 0% |
-| test-writer | 2 | 2 | 0 | 0 | 95% |
+| refactorer | 4 | 1 | 1 | 3 | 0% |
+| bug-fixer | 3 | 3 | 3 | 0 | 0% |
+| test-writer | 2 | 1 | 1 | 1 | 100% |
+| architect | 1 | 1 | 1 | 0 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| typescript-expert | 12 | 10 | 4 | 2 | 10% |
-| testing-expert | 5 | 5 | 1 | 0 | 61% |
-| system-architect | 3 | 2 | 1 | 1 | 0% |
-| docker-expert | 1 | 1 | 1 | 0 | 0% |
-| code-simplifier | 1 | 1 | 0 | 0 | 0% |
-| performance-optimizer | 1 | 1 | 0 | 0 | 0% |
+| typescript-expert | 9 | 5 | 5 | 4 | 0% |
+| system-architect | 4 | 1 | 1 | 3 | 0% |
+| testing-expert | 3 | 2 | 2 | 1 | 100% |
+| performance-optimizer | 1 | 0 | 0 | 1 | 0% |
 
 ## Token Usage
 | Task | Model | Input | Output | Cache Read | Total |
 |------|-------|-------|--------|------------|-------|
-| 135-003 | opus | 2.2K | 2.1K | 8.6K | 12.8K |
-| 135-002 | opus | 2.9K | 500 | 11.5K | 14.9K |
-| 135-004 | opus | 2.4K | 500 | 9.4K | 12.3K |
-| 135-007 | haiku | 1.8K | 5.7K | 7.4K | 14.9K |
-| 135-006 | sonnet | 2.4K | 6.5K | 9.7K | 18.6K |
-| 135-005 | opus | undefined | undefined | 0 | NaN |
-| 135-008 | sonnet | undefined | undefined | 0 | NaN |
-| 135-009 | opus | 85.0K | 12.0K | 45.0K | 142.0K |
-| 135-010 | sonnet | 1.9K | 5.2K | 7.4K | 14.5K |
-| 135-011 | sonnet | 2.3K | 870 | 9.3K | 12.5K |
-| 135-012 | sonnet | 2.1K | 1.5K | 8.5K | 12.2K |
-| 135-013 | opus | 2.7K | 1.2K | 10.9K | 14.8K |
-| **Total** | — | NaN | NaN | 127.7K | NaN |
+| 136-003 | opus | 45.0K | 8.0K | 120.0K | 173.0K |
+| 136-001 | opus | 3.2K | 500 | 12.7K | 16.4K |
+| 136-004 | sonnet | 2.1K | 500 | 8.5K | 11.1K |
+| 136-005 | sonnet | 2.2K | 500 | 8.6K | 11.3K |
+| 136-007 | sonnet | 2.3K | 500 | 9.3K | 12.1K |
+| 136-002 | opus | 2.4K | 500 | 9.7K | 12.6K |
+| 136-006 | sonnet | 2.6K | 705 | 10.4K | 13.7K |
+| 136-010 | haiku | 45.0K | 8.0K | 0 | 53.0K |
+| 136-008 | opus | 2.3K | 500 | 9.2K | 12.0K |
+| 136-009 | haiku | 1.9K | 500 | 7.6K | 10.0K |
+| **Total** | — | 109.0K | 20.2K | 195.9K | 325.1K |
 
-### Rubric Scores (sprint-135)
+### Rubric Scores (sprint-136)
 | Task | Correctness | Coverage | Scope | Docs | Avg |
 |------|-------------|----------|-------|------|-----|
-| 135-003 — Docker Backend Graceful Shutdo | 95 | 90 | 100 | 80 | 91 |
-| 135-005 — Structured Planner Priority +  | 100 | 95 | 100 | 80 | 94 |
-| 135-009 — Worker Verify Loop Enforcement | 100 | 85 | 100 | 90 | 94 |
-| 135-010 — sprint-docs-updater.ts Refacto | 100 | 90 | 100 | 85 | 94 |
-| 135-011 — Secondary Observability Instru | 95 | 90 | 100 | 85 | 93 |
-| 135-012 — Dashboard vs MCP State Diverge | 100 | 95 | 100 | 90 | 96 |
-| 135-013 — Brain Memory Budget Enforcemen | 95 | 85 | 100 | 80 | 90 |
-| **Sprint Avg** | — | — | — | — | **93** |
+| 136-003 — Brain Spurious NO_GO Evaluatio | 95 | 90 | 100 | 85 | 93 |
+| 136-001 — 5 Test Regression Fix (Sprint  | 100 | 95 | 100 | 85 | 95 |
+| 136-004 — `.deckent/sprint-NNN-gate.json | 100 | 90 | 100 | 85 | 94 |
+| 136-005 — `load-test-report.md` Auto-Gen | 97 | 90 | 100 | 85 | 93 |
+| 136-006 — T-005 Dep Pipeline Canlı Dogfo | 98 | 92 | 100 | 85 | 94 |
+| 136-010 — sprint-docs-helpers.ts Test Co | 98 | 100 | 100 | 95 | 98 |
+| 136-009 — Rubric Field Null Fix for Test | 92 | 90 | 100 | 88 | 93 |
+| **Sprint Avg** | — | — | — | — | **94** |
 
 ## Learnings
-- Docker Backend Graceful Shutdown (Docker Bug Offensive Root Cause Fix): completed with tech debt — Docker graceful shutdown offensive root cause fix implemented. Changes: (1) spawn-backend-docker.ts kill() method: docker kill → docker stop --time=10
-- askBrain() Extraction Finish — Conservative Move + Re-Export Shim: failed — Docker worker exited without writing result file
-- Structured Planner Priority + Dependencies Parsing: completed with tech debt — parseStructuredDirectives() and parseBulletOrNumberedTasks() now parse '- Priority: CRITICAL|HIGH|NORMAL|LOW' lines. New exported function parsePriori
-- GO_WITH_GATE_FAILURE Status Propagation Wire: completed with tech debt — GO_WITH_GATE_FAILURE status propagation wire implemented:
-1. Added `import { getRecentSprintStats, GO_WITH_GATE_FAILURE } from './result-evaluator.js'
-- Dashboard vs MCP State Divergence Fix: failed — Created src/monitor/sprint-state.ts with getCurrentSprintId() that reads .deckent/sprint-state.json (source 1: sprint-active.json, source 2: sprint-st
-- Brain Memory Budget Enforcement + Config Sync: completed with tech debt — Brain Memory Budget Enforcement + Config Sync tamamlandı. (1) DECAY_EXEMPT constant: DECISIONS.md ve PROJECT-IDENTITY.md kalıcı dosyaları decay'den mu
+- 5 Test Regression Fix (Sprint 136 Opener): completed with tech debt — 5 target test files (start-sandbox, start, i18n-integration, docker-backend, error-handling-unification) all pass (262 tests pass, 9 skip). Fixes appl
+- Async I/O İlk Kademe (Hot Path fs.promises Migration): failed — Docker worker exited without writing result file
+- Brain Spurious NO_GO Evaluation Reconciliation (Sprint 135 N9): completed with tech debt — Brain Spurious NO_GO Evaluation Reconciliation implemented. Added tryCodeVerifiedDone() helper to result-evaluator.ts with full DI support for testing
+- `.deckent/sprint-NNN-gate.json` Output Wiring (Sprint 135 N5): completed with tech debt — gate.json wiring implemented. Added `import { promises as fsPromises } from 'node:fs'` to sprint-finalizer.ts. Inside the 10b self-audit gate block (f
+- `load-test-report.md` Auto-Generation (Sprint 135 N6): completed with tech debt — Wired generateLoadReport() into finalizeSprint() in sprint-finalizer.ts. Added import of generateLoadReport from core/observability.js. Hook runs afte
+- T-005 Dep Pipeline Canlı Dogfood Rerun (Sprint 135 Chicken-Egg): failed — Fix A (sprint-controller.ts): Added 'priority?' and 'dependencies?' fields to directiveSources type annotation (line 505). Changed hardcoded 'priority
+- ErrorRegistry Lint Rule Enforcement: failed — Docker worker exited without writing result file
+- sprint-controller.ts Full Slim (Sprint 134 T-010 Final): failed — Docker worker exited without writing result file
+- Rubric Field Null Fix for Test-Writer Tasks (Sprint 135 N7): completed with tech debt — Added rubric requirement to test-writer agent systemPrompt and worker prompt building in task-builder.ts. Fixed test threshold in task-builder.test.ts
+- sprint-docs-helpers.ts Test Coverage (Sprint 135 T-010 Debt): completed with tech debt — Wrote comprehensive unit tests for sprint-docs-helpers.ts module. 61 test cases covering all 8 exported functions: buildSprintLogLines (8 tests), gene
 - Recurring pattern (3451x): stale_heartbeat
+
+### Gate Failure
+Self-audit gate failed for sprint sprint-136. Status: GO_WITH_GATE_FAILURE.
+
+- vitest: 41 failing tests

@@ -2,14 +2,14 @@
   "mode": "performance",
   "language": "tr",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-135",
+  "last_sprint_id": "sprint-136",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
       "brain_model": "opus",
       "default_model": "opus",
       "haiku_allowed": false,
-      "max_workers": 4,
+      "max_workers": 3,
       "brain_planning": "structured"
     },
     "balanced": {

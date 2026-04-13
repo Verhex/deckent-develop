@@ -1,11 +1,3 @@
-## Sprint sprint-128 Learnings
-- Rubric-Based Grading Doğrulaması: DONE — Sistem tam implemente, 85/85 test geçti. evaluateWithRubric() hem EVALUATE hem FIX fazında kullanılıyor.
-- Worker Question Mechanism Doğrulaması: GO_WITH_TECH_DEBT — IPC + file-based fallback çalışıyor, 63/63 test geçti. askBrain() hybrid approach.
-- deckent_explain MCP Tool Doğrulaması: DONE — Tool tam çalışıyor, 43 test geçti. debt-125-003-fix resolved.
-- DEBT.md Parse Hatası Düzeltmesi: DONE — JSON.parse(debtRaw) → parseDebtTable(debtRaw) değiştirildi. 5 yeni test, 278 toplam geçti.
-- Evaluator Tutarlılık Reformu: DONE — sprint-phases.ts zaten evaluateWithRubric() kullanıyor. evaluateResult() @deprecated yapıldı. 5 yeni test.
-- FIX Fazı Map Mutation Doğrulaması: DONE — sprint-phases.ts satır 510-512 doğru çalışıyor, bug yok. 5 yeni test yazıldı.
-- Documentation Sync: NO_GO — Docker worker timeout. debt-125-004-fix manuel kapatıldı.
 ## Sprint sprint-129 Learnings
 ## Sprint sprint-132 Learnings
 ## Sprint sprint-133 Learnings
@@ -23,3 +15,14 @@
 1. Added `import { getRecentSprintStats, GO_WITH_GATE_FAILURE 
 - Dashboard vs MCP State Divergence Fix: NO_GO — Created src/monitor/sprint-state.ts with getCurrentSprintId() that reads .deckent/sprint-state.json (source 1: sprint-ac
 - Brain Memory Budget Enforcement + Config Sync: GO_WITH_TECH_DEBT — Brain Memory Budget Enforcement + Config Sync tamamlandı. (1) DECAY_EXEMPT constant: DECISIONS.md ve PROJECT-IDENTITY.md
+## Sprint sprint-136 Learnings
+- 5 Test Regression Fix (Sprint 136 Opener): GO_WITH_TECH_DEBT — 5 target test files (start-sandbox, start, i18n-integration, docker-backend, error-handling-unification) all pass (262 t
+- Async I/O İlk Kademe (Hot Path fs.promises Migration): NO_GO — Docker worker exited without writing result file
+- Brain Spurious NO_GO Evaluation Reconciliation (Sprint 135 N9): GO_WITH_TECH_DEBT — Brain Spurious NO_GO Evaluation Reconciliation implemented. Added tryCodeVerifiedDone() helper to result-evaluator.ts wi
+- `.deckent/sprint-NNN-gate.json` Output Wiring (Sprint 135 N5): GO_WITH_TECH_DEBT — gate.json wiring implemented. Added `import { promises as fsPromises } from 'node:fs'` to sprint-finalizer.ts. Inside th
+- `load-test-report.md` Auto-Generation (Sprint 135 N6): GO_WITH_TECH_DEBT — Wired generateLoadReport() into finalizeSprint() in sprint-finalizer.ts. Added import of generateLoadReport from core/ob
+- T-005 Dep Pipeline Canlı Dogfood Rerun (Sprint 135 Chicken-Egg): NO_GO — Fix A (sprint-controller.ts): Added 'priority?' and 'dependencies?' fields to directiveSources type annotation (line 505
+- ErrorRegistry Lint Rule Enforcement: NO_GO — Docker worker exited without writing result file
+- sprint-controller.ts Full Slim (Sprint 134 T-010 Final): NO_GO — Docker worker exited without writing result file
+- Rubric Field Null Fix for Test-Writer Tasks (Sprint 135 N7): GO_WITH_TECH_DEBT — Added rubric requirement to test-writer agent systemPrompt and worker prompt building in task-builder.ts. Fixed test thr
+- sprint-docs-helpers.ts Test Coverage (Sprint 135 T-010 Debt): GO_WITH_TECH_DEBT — Wrote comprehensive unit tests for sprint-docs-helpers.ts module. 61 test cases covering all 8 exported functions: build

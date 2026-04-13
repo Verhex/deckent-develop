@@ -3395,3 +3395,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 135-013: Brain Memory Budget Enforcement + Config Sync (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 136 — sprint-136
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-13
+**Duration:** 3314s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 6 |
+| Tech Debt | 6 |
+| No-Go | 4 |
+| Coverage | NaN% |
+| Duration | 3313568ms |
+
+### Tasks
+
+- 136-001: 5 Test Regression Fix (Sprint 136 Opener) (GO_WITH_TECH_DEBT)
+- 136-002: Async I/O İlk Kademe (Hot Path fs.promises Migration) (NO_GO)
+- 136-003: Brain Spurious NO_GO Evaluation Reconciliation (Sprint 135 N9) (GO_WITH_TECH_DEBT)
+- 136-004: `.deckent/sprint-NNN-gate.json` Output Wiring (Sprint 135 N5) (GO_WITH_TECH_DEBT)
+- 136-005: `load-test-report.md` Auto-Generation (Sprint 135 N6) (GO_WITH_TECH_DEBT)
+- 136-006: T-005 Dep Pipeline Canlı Dogfood Rerun (Sprint 135 Chicken-Egg) (NO_GO)
+- 136-007: ErrorRegistry Lint Rule Enforcement (NO_GO)
+- 136-008: sprint-controller.ts Full Slim (Sprint 134 T-010 Final) (NO_GO)
+- 136-009: Rubric Field Null Fix for Test-Writer Tasks (Sprint 135 N7) (GO_WITH_TECH_DEBT)
+- 136-010: sprint-docs-helpers.ts Test Coverage (Sprint 135 T-010 Debt) (GO_WITH_TECH_DEBT)
+
+---
