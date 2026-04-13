@@ -4,7 +4,7 @@
 // Sprint 076: God Object Split Phase 3
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // ─── Observability (Sprint 134) ───────────────────────────────────
@@ -102,7 +102,7 @@ export function enrichResultTokenUsage(result: TaskResult, task: Task | undefine
  * Combines PROMPT.md (if exists) with systemPrompt + expertise from agent.json.
  * Returns undefined if the agent is 'generic' or no prompt material can be found.
  */
-export function resolveAgentPrompt(projectRoot: string, task: Task): string | undefined {
+export async function resolveAgentPrompt(projectRoot: string, task: Task): Promise<string | undefined> {
   const agentId = task.assignedAgent;
   if (!agentId || agentId === 'generic') return undefined;
 
@@ -114,7 +114,7 @@ export function resolveAgentPrompt(projectRoot: string, task: Task): string | un
   ];
   for (const p of promptPaths) {
     try {
-      promptMd = readFileSync(p, 'utf-8');
+      promptMd = await readFile(p, 'utf-8');
       break;
     } catch (e) { debugLog('resolveAgentPrompt:readFile', e); }
   }
@@ -128,7 +128,7 @@ export function resolveAgentPrompt(projectRoot: string, task: Task): string | un
   ];
   for (const p of agentJsonPaths) {
     try {
-      const raw = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
+      const raw = JSON.parse(await readFile(p, 'utf-8')) as Record<string, unknown>;
       systemPrompt = raw['systemPrompt'] as string | undefined;
       expertise = Array.isArray(raw['expertise']) ? (raw['expertise'] as string[]).join(', ') : '';
       break;
@@ -148,17 +148,17 @@ export function resolveAgentPrompt(projectRoot: string, task: Task): string | un
  * Resolve SKILL.md content for all skills assigned to a task.
  * Returns an array of { name, content } for each loadable skill.
  */
-export function resolveSkillPrompts(
+export async function resolveSkillPrompts(
   projectRoot: string,
   task: Task,
-): Array<{ name: string; content: string }> {
+): Promise<Array<{ name: string; content: string }>> {
   const skillIds = task.assignedSkills;
   if (!skillIds || skillIds.length === 0) return [];
   const results: Array<{ name: string; content: string }> = [];
   for (const skillId of skillIds) {
     const skillPath = join(projectRoot, '.deckent', 'skills', skillId, 'SKILL.md');
     try {
-      const content = readFileSync(skillPath, 'utf-8');
+      const content = await readFile(skillPath, 'utf-8');
       results.push({ name: skillId, content });
     } catch (e) { debugLog('resolveSkillPrompts:readSkillFile', e); }
   }
@@ -197,13 +197,14 @@ export async function waitForResults(
   const collected = new Set<string>();
   const remainingQueue: Task[] = queue ? [...queue] : [];
 
-  const collectResults = (): string[] => {
+  const collectResults = async (): Promise<string[]> => {
     const collectStart = Date.now();
     const newlyCollected: string[] = [];
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
       const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-      if (existsSync(resultPath)) {
+      const resultExists = await stat(resultPath).then(() => true, () => false);
+      if (resultExists) {
         const result = readJsonSafe<TaskResult>(resultPath);
         if (result) {
           enrichResultTokenUsage(result, taskMap.get(taskId));
@@ -216,7 +217,8 @@ export async function waitForResults(
       }
       // Check for .timeout marker — worker exceeded time limit
       const timeoutPath = join(projectRoot, TASKS_DIR, `task-${taskId}.timeout`);
-      if (existsSync(timeoutPath)) {
+      const timeoutExists = await stat(timeoutPath).then(() => true, () => false);
+      if (timeoutExists) {
         const syntheticResult: TaskResult = {
           taskId,
           workerId: `w-${taskId}`,
@@ -230,7 +232,7 @@ export async function waitForResults(
         };
         // Write synthetic result to disk so evaluate phase can also read it
         try {
-          writeFileSync(
+          await writeFile(
             join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
             JSON.stringify(syntheticResult, null, 2),
             'utf-8',
@@ -249,7 +251,7 @@ export async function waitForResults(
 
   const queueBackend = spawnOpts?.spawnBackend;
 
-  const processQueue = (completedTaskIds: string[]): void => {
+  const processQueue = async (completedTaskIds: string[]): Promise<void> => {
     for (const taskId of completedTaskIds) {
       if (remainingQueue.length === 0) break;
       // Kill completed worker (clean up slot)
@@ -259,8 +261,8 @@ export async function waitForResults(
       } catch (e) { debugLog('processQueue:killWorker', e); }
       const nextTask = remainingQueue.shift(); // length > 0 checked above
       if (!nextTask) break;
-      const queueAgentPrompt = resolveAgentPrompt(projectRoot, nextTask);
-      const queueSkillPrompts = resolveSkillPrompts(projectRoot, nextTask);
+      const queueAgentPrompt = await resolveAgentPrompt(projectRoot, nextTask);
+      const queueSkillPrompts = await resolveSkillPrompts(projectRoot, nextTask);
       const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
       const writeTargets = ['.tasks/', ...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
       const allowedTools = writeTargets.length > 0
@@ -285,8 +287,8 @@ export async function waitForResults(
     }
   };
 
-  const initiallyCollected = collectResults();
-  processQueue(initiallyCollected);
+  const initiallyCollected = await collectResults();
+  await processQueue(initiallyCollected);
   if (collected.size === taskIds.size) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
@@ -344,8 +346,8 @@ export async function waitForResults(
       ipcWakeupPromise = makeIpcWakeupPromise();
       // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
-      const newlyCollected = collectResults();
-      processQueue(newlyCollected);
+      const newlyCollected = await collectResults();
+      await processQueue(newlyCollected);
       if (collected.size === taskIds.size) break;
       // Check for pending worker questions and auto-answer them
       checkWorkerQuestions(projectRoot, taskIds, collected);
@@ -364,7 +366,8 @@ export async function waitForResults(
   for (const taskId of taskIds) {
     if (collected.has(taskId)) continue;
     const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-    if (existsSync(resultPath)) {
+    const finalExists = await stat(resultPath).then(() => true, () => false);
+    if (finalExists) {
       const result = readJsonSafe<TaskResult>(resultPath);
       if (result) {
         enrichResultTokenUsage(result, taskMap.get(taskId));

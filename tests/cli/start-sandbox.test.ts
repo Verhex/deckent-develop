@@ -33,9 +33,10 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   setupWatchWindow: vi.fn(),
 }));
 
-vi.mock('../../src/core/constants.js', () => ({
-  TMUX_SESSION_NAME: 'deckent',
-}));
+vi.mock('../../src/core/constants.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/constants.js')>();
+  return { ...actual, TMUX_SESSION_NAME: 'deckent' };
+});
 
 vi.mock('../../src/core/provider.js', () => ({
   bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [], defaultProvider: null }),

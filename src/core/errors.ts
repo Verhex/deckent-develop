@@ -430,6 +430,14 @@ registry.set('DECKENT_E054', {
   howToFix: ['Call initObservability(projectRoot) once at sprint bootstrap', 'Or pass an explicit projectRoot to getMetricsPath(projectRoot)'],
 });
 
+registry.set('DECKENT_E055', {
+  message: 'sprint coordinator already running',
+  suggestion: 'Stop the existing sprint first with: deckent kill --all',
+  whatHappened: 'A new coordinator was started for a sprint that already has a live coordinator process.',
+  why: 'Only one coordinator process can run per sprint to prevent state corruption.',
+  howToFix: ['Stop the existing sprint: deckent kill --all', 'Or wait for the current sprint to finish', 'If the process is stale, delete .deckent/pids/<sprintId>.pid'],
+});
+
 // ─── Agent Error Codes (DECKENT_E060-E079) ──────────────────────────
 
 registry.set('DECKENT_E060', {

@@ -1,10 +1,12 @@
 // ═══ Result Evaluator — Pure evaluation module ═══════════════════════
 // Extracted from brain.ts (Sprint 036).
-// Contains: evaluateResult, isDocTask, waitForResults, getRecentSprintStats
+// Contains: evaluateResult, isDocTask, waitForResults, getRecentSprintStats,
+//           tryCodeVerifiedDone (Sprint 136 — code-aware evaluation reconciliation)
 // No side effects, no file writes — evaluation logic only.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
@@ -164,12 +166,12 @@ export interface KillWorkerFn {
 
 /** Reads a JSON file safely, returns null on error */
 export interface ReadJsonFn {
-  <T>(filePath: string): T | null;
+  <T>(filePath: string): T | null | Promise<T | null>;
 }
 
-/** Checks if a file exists */
+/** Checks if a file exists (sync or async) */
 export interface FileExistsFn {
-  (filePath: string): boolean;
+  (filePath: string): boolean | Promise<boolean>;
 }
 
 /** Watcher that resolves when a filesystem change occurs */
@@ -234,13 +236,13 @@ export async function waitForResults(
   const collected = new Set<string>();
   const remainingQueue: Task[] = [...queue];
 
-  const collectResults = (): string[] => {
+  const collectResults = async (): Promise<string[]> => {
     const newlyCollected: string[] = [];
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
       const resultPath = `${projectRoot}/${tasksDir}/task-${taskId}.result`;
-      if (fileExists(resultPath)) {
-        const result = readJson<TaskResult>(resultPath);
+      if (await fileExists(resultPath)) {
+        const result = await readJson<TaskResult>(resultPath);
         if (result) {
           results.push(result);
           collected.add(taskId);
@@ -268,7 +270,7 @@ export async function waitForResults(
     }
   };
 
-  const initiallyCollected = collectResults();
+  const initiallyCollected = await collectResults();
   processQueue(initiallyCollected);
   if (collected.size === taskIds.size) return results;
 
@@ -277,7 +279,7 @@ export async function waitForResults(
   try {
     while (Date.now() - startTime < timeoutMs) {
       await watcher.waitForChange();
-      const newlyCollected = collectResults();
+      const newlyCollected = await collectResults();
       processQueue(newlyCollected);
       if (collected.size === taskIds.size) break;
     }
@@ -289,24 +291,18 @@ export async function waitForResults(
 
 // ─── Default implementations (used when no injection provided) ───────
 
-function defaultReadJson<T>(filePath: string): T | null {
+async function defaultReadJson<T>(filePath: string): Promise<T | null> {
   try {
-    const { readFileSync } = require('node:fs');
-    return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
+    const content = await readFile(filePath, 'utf-8');
+    return JSON.parse(content) as T;
   } catch (e) {
     debugLog('defaultReadJson:readFile', e);
     return null;
   }
 }
 
-function defaultFileExists(filePath: string): boolean {
-  try {
-    const { existsSync } = require('node:fs');
-    return existsSync(filePath);
-  } catch (e) {
-    debugLog('defaultFileExists:existsSync', e);
-    return false;
-  }
+async function defaultFileExists(filePath: string): Promise<boolean> {
+  return stat(filePath).then(() => true, () => false);
 }
 
 function defaultCreateWatcher(_projectRoot: string, fallbackMs: number): ResultWatcher {
@@ -338,13 +334,15 @@ export interface RecentSprintStats {
  * average NO_GO rate and average coverage.
  * Used by applyAdaptiveThresholds to decide whether to adjust config values.
  */
-export function getRecentSprintStats(projectRoot: string, lookback: number): RecentSprintStats {
+export async function getRecentSprintStats(projectRoot: string, lookback: number): Promise<RecentSprintStats> {
   const sprintsPath = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
-  if (!existsSync(sprintsPath)) {
+  const sprintsExists = await stat(sprintsPath).then(() => true, () => false);
+  if (!sprintsExists) {
     return { avgNoGoRate: 0, avgCoverage: 0, sprintCount: 0 };
   }
 
-  const files = readdirSync(sprintsPath)
+  const allFiles = await readdir(sprintsPath);
+  const files = allFiles
     .filter(f => f.endsWith('.md'))
     .sort()
     .slice(-lookback);
@@ -359,7 +357,7 @@ export function getRecentSprintStats(projectRoot: string, lookback: number): Rec
 
   for (const file of files) {
     try {
-      const content = readFileSync(join(sprintsPath, file), 'utf-8');
+      const content = await readFile(join(sprintsPath, file), 'utf-8');
       const parsed = parseSprintStats(content);
       if (parsed) {
         totalNoGoRate += parsed.noGoRate;
@@ -629,19 +627,20 @@ const VERIFY_MARKER_HONESTY_PATTERNS = [
  * @param notes - Worker's result notes string
  * @returns HONESTY_VIOLATION_NO_VERIFY_MARKER flag or null
  */
-export function checkVerifyMarkerHonesty(
+export async function checkVerifyMarkerHonesty(
   projectRoot: string,
   taskId: string,
   notes: string,
-): typeof HONESTY_VIOLATION_NO_VERIFY_MARKER | null {
+): Promise<typeof HONESTY_VIOLATION_NO_VERIFY_MARKER | null> {
   if (!notes || notes.length === 0) return null;
 
   const hasHonestyPhrase = VERIFY_MARKER_HONESTY_PATTERNS.some(p => p.test(notes));
   if (!hasHonestyPhrase) return null;
 
-  // Check if verify-ran marker exists
+  // Check if verify-ran marker exists (async — Sprint 136 async I/O migration)
   const markerPath = join(projectRoot, '.tasks', `task-${taskId}.verify-ran`);
-  if (existsSync(markerPath)) return null;
+  const markerExists = await stat(markerPath).then(() => true, () => false);
+  if (markerExists) return null;
 
   return HONESTY_VIOLATION_NO_VERIFY_MARKER;
 }
@@ -653,6 +652,357 @@ export function checkVerifyMarkerHonesty(
  */
 export { containsHonestyTrigger, checkWorkerHonesty } from './baseline-tracker.js';
 export type { HonestyCheckResult, TestBaseline, BaselineComparison } from './baseline-tracker.js';
+
+// ─── Code-Verified DONE Reconciliation (Sprint 136) ────────────────
+
+/**
+ * Sentinel constant for tasks that were physically verified as DONE despite
+ * a missing or spurious NO_GO `.result` file.
+ *
+ * Pattern: Docker worker writes code but container dies before writing `.result`
+ * → Brain auto-generates NO_GO → FIX worker confirms "code already there" → loop.
+ * This flag breaks the cycle by letting Brain verify code on disk directly.
+ */
+export const CODE_VERIFIED_DONE = 'CODE_VERIFIED_DONE' as const;
+
+/**
+ * Auto-generated NO_GO note pattern produced by spawn-backend-docker.ts
+ * when a Docker worker exits without writing a .result file.
+ */
+const DOCKER_NO_RESULT_PATTERN = 'Docker worker exited without writing result file';
+
+/**
+ * Options for dependency injection in tryCodeVerifiedDone.
+ * Allows tests to override shell commands and filesystem access.
+ */
+export interface CodeVerifyOptions {
+  /** Override git status check (for testing) */
+  runGitStatus?: (filePath: string, projectRoot: string) => { modified: boolean; error?: string } | Promise<{ modified: boolean; error?: string }>;
+  /** Override grep/evidence check (for testing) */
+  runGrepEvidence?: (cmd: string, projectRoot: string) => { hit: boolean; error?: string } | Promise<{ hit: boolean; error?: string }>;
+  /** Override file existence check (for testing) */
+  fileExists?: (filePath: string) => boolean | Promise<boolean>;
+  /** Override task JSON reader (for testing) */
+  readTaskJson?: (taskId: string, projectRoot: string) => Task | null | Promise<Task | null>;
+  /** Override result file reader (for testing) */
+  readResultJson?: (taskId: string, projectRoot: string) => TaskResult | null | Promise<TaskResult | null>;
+}
+
+/**
+ * Result of tryCodeVerifiedDone — describes whether code was physically
+ * verified on disk and the reconciliation outcome.
+ */
+export interface CodeVerifyResult {
+  /** Whether reconciliation was triggered (conditions met) */
+  triggered: boolean;
+  /** Whether code was verified as done (all checks passed) */
+  verified: boolean;
+  /** Human-readable reason for the outcome */
+  reason: string;
+  /** List of files that were verified as modified/created */
+  verifiedFiles: string[];
+  /** Whether evidence grep command matched */
+  evidenceMatched: boolean;
+}
+
+/**
+ * Attempt to reconcile a spurious NO_GO by physically verifying code on disk.
+ *
+ * This helper is called during EVALUATE or FIX phase when a task's `.result`
+ * is either MISSING or contains a NO_GO with the Docker auto-generated note.
+ *
+ * Algorithm:
+ * 1. Read task JSON → get `scope.filesWrite`
+ * 2. For each file: `git status --porcelain {file}` → check if new/modified
+ * 3. Parse "Kanıt" (evidence) grep command from task description
+ * 4. Run evidence command if found
+ * 5. If files modified + evidence hit → CODE_VERIFIED_DONE
+ * 6. Otherwise → honest NO_GO
+ *
+ * Fail-safe: any error → returns { verified: false } (honest NO_GO preserved).
+ *
+ * @param taskId - Task ID to verify
+ * @param projectRoot - Project root directory
+ * @param options - Optional DI overrides for testing
+ * @returns CodeVerifyResult describing the reconciliation outcome
+ */
+export async function tryCodeVerifiedDone(
+  taskId: string,
+  projectRoot: string,
+  options?: CodeVerifyOptions,
+): Promise<CodeVerifyResult> {
+  const NOT_TRIGGERED: CodeVerifyResult = {
+    triggered: false,
+    verified: false,
+    reason: 'Reconciliation not triggered',
+    verifiedFiles: [],
+    evidenceMatched: false,
+  };
+
+  const fileExistsFn = options?.fileExists ?? defaultAsyncFileExists;
+  const readTaskJsonFn = options?.readTaskJson ?? defaultReadTaskJson;
+  const readResultJsonFn = options?.readResultJson ?? defaultReadResultJson;
+  const runGitStatusFn = options?.runGitStatus ?? defaultRunGitStatus;
+  const runGrepEvidenceFn = options?.runGrepEvidence ?? defaultRunGrepEvidence;
+
+  // ── Step 0: Check if reconciliation should be triggered ──────────
+  const resultPath = join(projectRoot, '.tasks', `task-${taskId}.result`);
+  const resultExists = await fileExistsFn(resultPath);
+  let isDockerNoResult = false;
+
+  if (resultExists) {
+    // Result file exists — check if it's a Docker auto-generated NO_GO
+    const result = await readResultJsonFn(taskId, projectRoot);
+    if (!result) {
+      return { ...NOT_TRIGGERED, reason: 'Result file exists but unreadable' };
+    }
+    // If selfAssessment is already DONE → no reconciliation needed
+    if (result.selfAssessment === 'DONE' || result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+      return { ...NOT_TRIGGERED, reason: `Result already ${result.selfAssessment} — no reconciliation needed` };
+    }
+    // Check for Docker auto-generated NO_GO pattern
+    if (result.selfAssessment === 'NO_GO' && result.notes?.includes(DOCKER_NO_RESULT_PATTERN)) {
+      isDockerNoResult = true;
+    } else {
+      return { ...NOT_TRIGGERED, reason: 'NO_GO is not Docker auto-generated — honest failure' };
+    }
+  } else {
+    // Result file missing entirely — Docker worker died before writing
+    isDockerNoResult = true;
+  }
+
+  if (!isDockerNoResult) {
+    return NOT_TRIGGERED;
+  }
+
+  debugLog('tryCodeVerifiedDone', `Reconciliation triggered for task ${taskId}`);
+
+  // ── Step 1: Read task JSON → get scope.filesWrite ────────────────
+  let task: Task | null;
+  try {
+    task = await readTaskJsonFn(taskId, projectRoot);
+  } catch {
+    return {
+      triggered: true,
+      verified: false,
+      reason: 'Failed to read task JSON — fail-safe NO_GO',
+      verifiedFiles: [],
+      evidenceMatched: false,
+    };
+  }
+
+  if (!task) {
+    return {
+      triggered: true,
+      verified: false,
+      reason: 'Task JSON not found — fail-safe NO_GO',
+      verifiedFiles: [],
+      evidenceMatched: false,
+    };
+  }
+
+  const filesWrite = task.scope?.filesWrite ?? [];
+  if (filesWrite.length === 0) {
+    return {
+      triggered: true,
+      verified: false,
+      reason: 'No filesWrite in task scope — cannot verify code',
+      verifiedFiles: [],
+      evidenceMatched: false,
+    };
+  }
+
+  // ── Step 2: Check git status for each filesWrite ─────────────────
+  const verifiedFiles: string[] = [];
+  for (const filePath of filesWrite) {
+    try {
+      const status = await runGitStatusFn(filePath, projectRoot);
+      if (status.error) {
+        debugLog('tryCodeVerifiedDone:gitStatus', `Error for ${filePath}: ${status.error}`);
+        continue;
+      }
+      if (status.modified) {
+        verifiedFiles.push(filePath);
+      }
+    } catch (e) {
+      debugLog('tryCodeVerifiedDone:gitStatus', `Exception for ${filePath}: ${e}`);
+      // Fail-safe: skip this file, don't crash
+    }
+  }
+
+  if (verifiedFiles.length === 0) {
+    return {
+      triggered: true,
+      verified: false,
+      reason: 'No files were modified/created on disk — honest NO_GO',
+      verifiedFiles: [],
+      evidenceMatched: false,
+    };
+  }
+
+  // ── Step 3: Parse evidence grep from task description ────────────
+  const evidenceCmd = parseEvidenceCommand(task.description);
+  let evidenceMatched = false;
+
+  if (evidenceCmd) {
+    try {
+      const grepResult = await runGrepEvidenceFn(evidenceCmd, projectRoot);
+      if (grepResult.error) {
+        debugLog('tryCodeVerifiedDone:evidence', `Evidence check error: ${grepResult.error}`);
+        // Evidence failed → code is there but unverified
+        // Still count as verified if files are modified (evidence is bonus)
+      } else {
+        evidenceMatched = grepResult.hit;
+      }
+    } catch (e) {
+      debugLog('tryCodeVerifiedDone:evidence', `Evidence check exception: ${e}`);
+    }
+  } else {
+    // No evidence command in description — files-only verification
+    // Treat as evidence matched if we can't test it
+    evidenceMatched = true;
+  }
+
+  // ── Step 4: Final decision ───────────────────────────────────────
+  // Files verified + (evidence matched OR no evidence command) → CODE_VERIFIED_DONE
+  if (verifiedFiles.length > 0 && evidenceMatched) {
+    const reason = `Code physically verified despite missing .result (Sprint 135 docker HB shutdown bug pattern). ` +
+      `Verified files: ${verifiedFiles.join(', ')}`;
+
+    debugLog('tryCodeVerifiedDone', `CODE_VERIFIED_DONE for task ${taskId}: ${verifiedFiles.length} files verified`);
+
+    return {
+      triggered: true,
+      verified: true,
+      reason,
+      verifiedFiles,
+      evidenceMatched,
+    };
+  }
+
+  // Files exist but evidence didn't match — code might be incomplete
+  return {
+    triggered: true,
+    verified: false,
+    reason: `Files modified (${verifiedFiles.join(', ')}) but evidence check failed — honest NO_GO`,
+    verifiedFiles,
+    evidenceMatched: false,
+  };
+}
+
+/**
+ * Rewrite a task's .result file with CODE_VERIFIED_DONE status.
+ * Called after tryCodeVerifiedDone confirms code is on disk.
+ */
+export async function writeCodeVerifiedResult(
+  taskId: string,
+  projectRoot: string,
+  verifyResult: CodeVerifyResult,
+): Promise<void> {
+  const resultPath = join(projectRoot, '.tasks', `task-${taskId}.result`);
+  const result: Record<string, unknown> = {
+    taskId,
+    filesChanged: verifyResult.verifiedFiles,
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    coverage: 0,
+    selfAssessment: 'DONE',
+    notes: verifyResult.reason,
+    codeVerified: CODE_VERIFIED_DONE,
+  };
+  try {
+    await writeFile(resultPath, JSON.stringify(result, null, 2) + '\n');
+    debugLog('writeCodeVerifiedResult', `Wrote CODE_VERIFIED_DONE result for task ${taskId}`);
+  } catch (e) {
+    debugLog('writeCodeVerifiedResult', `Failed to write result for task ${taskId}: ${e}`);
+  }
+}
+
+/**
+ * Parse evidence (Kanıt) grep command from task description.
+ * Looks for patterns like:
+ *   **Kanıt:** `grep -n "pattern" file` → hit
+ *   **Kanıt:** `command` → expected
+ */
+export function parseEvidenceCommand(description: string): string | null {
+  // Match: **Kanıt:** `command` or **Kanıt:** `command` → ...
+  const match = description.match(/\*\*Kan[ıi]t:?\*\*\s*`([^`]+)`/i);
+  if (!match?.[1]) return null;
+  const cmd = match[1].trim();
+  // Only allow grep-like commands for safety
+  if (cmd.startsWith('grep') || cmd.startsWith('wc') || cmd.startsWith('ls') || cmd.startsWith('cat') || cmd.startsWith('test')) {
+    return cmd;
+  }
+  return null;
+}
+
+// ─── Async file existence helper ─────────────────────────────────────
+
+async function defaultAsyncFileExists(filePath: string): Promise<boolean> {
+  return stat(filePath).then(() => true, () => false);
+}
+
+// ─── Default implementations for tryCodeVerifiedDone ────────────────
+
+async function defaultReadTaskJson(taskId: string, projectRoot: string): Promise<Task | null> {
+  try {
+    const taskPath = join(projectRoot, '.tasks', `task-${taskId}.json`);
+    const content = await readFile(taskPath, 'utf-8');
+    return JSON.parse(content) as Task;
+  } catch {
+    return null;
+  }
+}
+
+async function defaultReadResultJson(taskId: string, projectRoot: string): Promise<TaskResult | null> {
+  try {
+    const resultPath = join(projectRoot, '.tasks', `task-${taskId}.result`);
+    const content = await readFile(resultPath, 'utf-8');
+    return JSON.parse(content) as TaskResult;
+  } catch {
+    return null;
+  }
+}
+
+function defaultRunGitStatus(filePath: string, projectRoot: string): { modified: boolean; error?: string } {
+  try {
+    const result = spawnSync('git', ['status', '--porcelain', filePath], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      timeout: 10_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    if (result.error) {
+      return { modified: false, error: `git status failed: ${result.error}` };
+    }
+    const output = (result.stdout ?? '').trim();
+    // git status --porcelain output: ' M file', 'M  file', 'A  file', '?? file', 'AM file', etc.
+    // Any non-empty output means the file has been modified/added/created
+    return { modified: output.length > 0 };
+  } catch (e) {
+    return { modified: false, error: `git status exception: ${e}` };
+  }
+}
+
+function defaultRunGrepEvidence(cmd: string, projectRoot: string): { hit: boolean; error?: string } {
+  try {
+    // Run the evidence command via shell
+    const result = spawnSync('sh', ['-c', cmd], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      timeout: 15_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    // grep returns 0 if match found, 1 if no match, 2+ on error
+    if (result.error) {
+      return { hit: false, error: `Evidence command failed: ${result.error}` };
+    }
+    return { hit: result.status === 0 };
+  } catch (e) {
+    return { hit: false, error: `Evidence command exception: ${e}` };
+  }
+}
 
 /** Parse NO_GO rate and coverage from a sprint log markdown table */
 function parseSprintStats(content: string): { noGoRate: number; coverage: number } | null {

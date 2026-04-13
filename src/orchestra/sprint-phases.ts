@@ -230,13 +230,13 @@ export async function runPlanPhase(
  * start auditor scan loop.
  * @throws {BrainError} When spawn fails after retry
  */
-export function runSpawnPhase(
+export async function runSpawnPhase(
   projectRoot: string,
   sprint: Sprint,
   config: ResolvedConfig,
   opts: RunSprintOptions | undefined,
   spawnBackend: SpawnBackend | undefined,
-): SpawnPhaseResult {
+): Promise<SpawnPhaseResult> {
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let taskQueue: Task[] = [];
   let spawnAttempts = 0;
@@ -245,7 +245,7 @@ export function runSpawnPhase(
     try {
       sprint.phase = SprintPhase.SPAWN;
       writeSprintState(projectRoot, sprint);
-      taskQueue = spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+      taskQueue = await spawnWorkers(projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
       sprint.status = SprintStatus.ACTIVE;
       writeSprintState(projectRoot, sprint);
       try {
@@ -497,7 +497,7 @@ export async function runFixPhase(
       }
 
       const fixSprint: Sprint = { ...sprint, tasks: fixTasks, workers: fixTasks.map(t => `w-${t.id}`) };
-      spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+      await spawnWorkers(projectRoot, fixSprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
       const fixPhaseTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
         ?? opts?.fixPhaseTimeoutMs
         ?? 600_000;

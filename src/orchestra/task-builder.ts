@@ -796,6 +796,7 @@ Update periodically: increment sequence, refresh timestamp via new Date().toISOS
 Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
 Include tokenUsage in your result JSON: { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${task.provider ?? 'claude'}", "model": "${task.model}" }.
 If you cannot determine exact token counts, omit the tokenUsage field — the brain will estimate it.
+REQUIRED: Include rubricScores field with 4 integer keys (0-100): correctness, test_coverage, scope_compliance, documentation. Example: "rubricScores": { "correctness": 95, "test_coverage": 90, "scope_compliance": 100, "documentation": 85 }
 The result file is REQUIRED — without it your work cannot be evaluated.
 
 CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.`;

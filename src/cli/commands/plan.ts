@@ -98,7 +98,7 @@ export function registerPlan(program: Command): void {
         if (asDraft) {
           const confirmed = await promptConfirm('Approve this plan?');
           if (confirmed) {
-            confirmDraftTasks(root, sprint);
+            await confirmDraftTasks(root, sprint);
             print(getMessage('plan.approved', lang));
           } else {
             print(getMessage('plan.rejected', lang));

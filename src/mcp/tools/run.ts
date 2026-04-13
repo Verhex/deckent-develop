@@ -66,8 +66,8 @@ export function registerRunTool(server: McpServer): void {
         writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2) + '\n');
 
         // Build worker prompt with agent/skill context
-        const agentPrompt = resolveAgentPrompt(root, task as Task);
-        const skillPrompts = resolveSkillPrompts(root, task as Task);
+        const agentPrompt = await resolveAgentPrompt(root, task as Task);
+        const skillPrompts = await resolveSkillPrompts(root, task as Task);
         const prompt = buildWorkerPrompt(task as Task, agentPrompt, skillPrompts);
 
         // Spawn worker via config-aware backend (docker/tmux/subprocess/auto)

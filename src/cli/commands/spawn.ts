@@ -108,8 +108,8 @@ export function registerSpawn(program: Command): void {
         }
 
         // Build rich prompt
-        const agentPrompt = resolveAgentPrompt(root, task);
-        const skillPrompts = resolveSkillPrompts(root, task);
+        const agentPrompt = await resolveAgentPrompt(root, task);
+        const skillPrompts = await resolveSkillPrompts(root, task);
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
 
         // Derive scope-based allowedTools for boundary enforcement

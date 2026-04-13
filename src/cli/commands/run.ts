@@ -268,8 +268,8 @@ export function registerRun(program: Command): void {
 
       try {
         // Resolve agent and skill prompts if available (task may have assignedAgent/assignedSkills)
-        const agentPrompt = resolveAgentPrompt(root, task as Task);
-        const skillPrompts = resolveSkillPrompts(root, task as Task);
+        const agentPrompt = await resolveAgentPrompt(root, task as Task);
+        const skillPrompts = await resolveSkillPrompts(root, task as Task);
 
         // Spawn worker via config-aware backend
         const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);

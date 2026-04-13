@@ -935,3 +935,242 @@ describe('evaluateWithRubric — Bash unavailable integration', () => {
     expect(evaluation.decision).not.toBe('NO_GO');
   });
 });
+
+// ─── tryCodeVerifiedDone (Sprint 136 — Code-Aware Reconciliation) ───
+
+import {
+  tryCodeVerifiedDone,
+  parseEvidenceCommand,
+  CODE_VERIFIED_DONE,
+  writeCodeVerifiedResult,
+} from '../../src/orchestra/result-evaluator.js';
+import type { CodeVerifyOptions } from '../../src/orchestra/result-evaluator.js';
+
+describe('tryCodeVerifiedDone', () => {
+  const DOCKER_NO_RESULT_NOTE = 'Docker worker exited without writing result file';
+
+  /**
+   * Helper: build CodeVerifyOptions with full DI overrides.
+   * By default: result file does NOT exist, task has filesWrite, git shows modified.
+   */
+  function makeVerifyOptions(overrides: Partial<{
+    resultExists: boolean;
+    resultJson: TaskResult | null;
+    taskJson: Task | null;
+    gitModified: Record<string, boolean>;
+    gitError: string | undefined;
+    grepHit: boolean;
+    grepError: string | undefined;
+    fileExistsOverride: (p: string) => boolean;
+  }> = {}): CodeVerifyOptions {
+    const resultExists = overrides.resultExists ?? false;
+    const resultJson = overrides.resultJson ?? null;
+    const taskJson = overrides.taskJson !== undefined ? overrides.taskJson : makeTask(['src/orchestra/'], {
+      scope: {
+        directories: ['src/orchestra/'],
+        filesRead: [],
+        filesWrite: ['src/orchestra/sprint-finalizer.ts', 'src/orchestra/result-evaluator.ts'],
+      },
+      description: '**Kanıt:** `grep -n "tryCodeVerifiedDone" src/orchestra/result-evaluator.ts` → hit.',
+    });
+    const gitModified = overrides.gitModified ?? {
+      'src/orchestra/sprint-finalizer.ts': true,
+      'src/orchestra/result-evaluator.ts': true,
+    };
+
+    return {
+      fileExists: overrides.fileExistsOverride ?? ((p: string) => {
+        if (p.endsWith('.result')) return resultExists;
+        return true;
+      }),
+      readTaskJson: () => taskJson,
+      readResultJson: () => resultJson,
+      runGitStatus: (filePath: string) => ({
+        modified: gitModified[filePath] ?? false,
+        error: overrides.gitError,
+      }),
+      runGrepEvidence: () => ({
+        hit: overrides.grepHit ?? true,
+        error: overrides.grepError,
+      }),
+    };
+  }
+
+  it('returns CODE_VERIFIED_DONE when result missing + code modified + evidence grep hit', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: false,
+      grepHit: true,
+    });
+
+    const result = await tryCodeVerifiedDone('135-001', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(true);
+    expect(result.verifiedFiles).toContain('src/orchestra/sprint-finalizer.ts');
+    expect(result.verifiedFiles).toContain('src/orchestra/result-evaluator.ts');
+    expect(result.evidenceMatched).toBe(true);
+    expect(result.reason).toContain('Code physically verified');
+  });
+
+  it('returns honest NO_GO when result is NO_GO + no files modified', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: true,
+      resultJson: makeResult({
+        selfAssessment: 'NO_GO',
+        notes: DOCKER_NO_RESULT_NOTE,
+      }),
+      gitModified: {
+        'src/orchestra/sprint-finalizer.ts': false,
+        'src/orchestra/result-evaluator.ts': false,
+      },
+    });
+
+    const result = await tryCodeVerifiedDone('135-004', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('No files were modified');
+  });
+
+  it('returns honest NO_GO when files modified but evidence grep misses', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: false,
+      grepHit: false,
+    });
+
+    const result = await tryCodeVerifiedDone('135-012', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('evidence check failed');
+    expect(result.evidenceMatched).toBe(false);
+  });
+
+  it('skips reconciliation when result is already DONE', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: true,
+      resultJson: makeResult({
+        selfAssessment: 'DONE',
+        notes: 'Completed successfully',
+      }),
+    });
+
+    const result = await tryCodeVerifiedDone('136-001', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(false);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('already DONE');
+  });
+
+  it('returns fail-safe honest NO_GO on git status error', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: false,
+      gitError: 'fatal: not a git repository',
+      gitModified: {},
+    });
+
+    // Override runGitStatus to return error for all files
+    opts.runGitStatus = () => ({
+      modified: false,
+      error: 'fatal: not a git repository',
+    });
+
+    const result = await tryCodeVerifiedDone('135-001', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('No files were modified');
+  });
+
+  it('skips reconciliation when NO_GO is not Docker auto-generated', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: true,
+      resultJson: makeResult({
+        selfAssessment: 'NO_GO',
+        notes: 'tsc --noEmit failed with 5 errors',
+      }),
+    });
+
+    const result = await tryCodeVerifiedDone('136-002', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(false);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('not Docker auto-generated');
+  });
+
+  it('handles missing task JSON gracefully', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: false,
+      taskJson: null,
+    });
+
+    const result = await tryCodeVerifiedDone('999-999', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('Task JSON not found');
+  });
+
+  it('handles empty filesWrite array gracefully', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: false,
+      taskJson: makeTask(['src/'], {
+        scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      }),
+    });
+
+    const result = await tryCodeVerifiedDone('136-005', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('No filesWrite');
+  });
+
+  it('verifies CODE_VERIFIED_DONE when no evidence command in description (files-only)', async () => {
+    const opts = makeVerifyOptions({
+      resultExists: false,
+      taskJson: makeTask(['src/orchestra/'], {
+        scope: {
+          directories: ['src/orchestra/'],
+          filesRead: [],
+          filesWrite: ['src/orchestra/foo.ts'],
+        },
+        description: 'Simple task without evidence section.',
+      }),
+      gitModified: { 'src/orchestra/foo.ts': true },
+    });
+
+    const result = await tryCodeVerifiedDone('136-006', '/tmp/project', opts);
+
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(true);
+    expect(result.evidenceMatched).toBe(true); // no evidence → treated as matched
+  });
+});
+
+describe('parseEvidenceCommand', () => {
+  it('extracts grep command from Kanıt pattern', () => {
+    const desc = '**Kanıt:** `grep -n "tryCodeVerifiedDone" src/orchestra/result-evaluator.ts` → hit.';
+    expect(parseEvidenceCommand(desc)).toBe('grep -n "tryCodeVerifiedDone" src/orchestra/result-evaluator.ts');
+  });
+
+  it('returns null for non-grep commands (safety)', () => {
+    const desc = '**Kanıt:** `rm -rf /` → gone.';
+    expect(parseEvidenceCommand(desc)).toBeNull();
+  });
+
+  it('returns null when no Kanıt section present', () => {
+    const desc = 'This task has no evidence section.';
+    expect(parseEvidenceCommand(desc)).toBeNull();
+  });
+
+  it('handles wc command', () => {
+    const desc = '**Kanıt:** `wc -l src/file.ts` → ≥100';
+    expect(parseEvidenceCommand(desc)).toBe('wc -l src/file.ts');
+  });
+
+  it('handles ls command', () => {
+    const desc = '**Kanıt:** `ls docs/file.md` → exists';
+    expect(parseEvidenceCommand(desc)).toBe('ls docs/file.md');
+  });
+});

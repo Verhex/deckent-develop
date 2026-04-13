@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { DECKENT_DIR, BRAIN_DIR } from '../core/constants.js';
+import { ErrorRegistry } from '../core/errors.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -66,10 +67,9 @@ export function writePid(root: string, sprintId: string): void {
   if (existsSync(filePath)) {
     const existingPid = readPid(root, sprintId);
     if (existingPid !== null && isProcessAlive(existingPid)) {
-      throw new Error(
-        `Sprint ${sprintId} already has a live coordinator (PID ${existingPid}). ` +
-        'Cannot start a new coordinator for the same sprint.',
-      );
+      throw ErrorRegistry.createError('DECKENT_E055', {
+        message: `Sprint ${sprintId} already has a live coordinator (PID ${existingPid}). Cannot start a new coordinator for the same sprint.`,
+      });
     }
     // Old process is dead — safe to overwrite
   }

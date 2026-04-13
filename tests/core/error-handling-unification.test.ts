@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { DeckentError, ErrorRegistry } from '../../src/core/errors.js';
 
 // ─── Registry: CLI Error Codes (E020–E039) ─────────────────────────
@@ -637,5 +640,107 @@ describe('Error handling completeness', () => {
     }
 
     expect(() => scanDir(coreDir)).not.toThrow();
+  });
+});
+
+// ─── check-error-handling.mjs lint script tests ─────────────────────
+
+describe('check-error-handling.mjs lint script', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `deckent-lint-test-${Date.now()}`);
+    mkdirSync(join(tmpDir, 'src', 'orchestra'), { recursive: true });
+    mkdirSync(join(tmpDir, 'tests', 'core'), { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(tmpDir)) {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('scanFile: detects throw new Error( as a violation', async () => {
+    const { scanFile } = await import('../../scripts/check-error-handling.mjs');
+    const filePath = join(tmpDir, 'test-violation.ts');
+    writeFileSync(filePath, `
+export function doWork(): void {
+  throw new Error('something went wrong');
+}
+`);
+    const violations = scanFile(filePath);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].line).toBe(3);
+    expect(violations[0].content).toContain('throw new Error(');
+    expect(violations[0].file).toBe(filePath);
+  });
+
+  it('scanFile: allows throw new DeckentError( — no violation', async () => {
+    const { scanFile } = await import('../../scripts/check-error-handling.mjs');
+    const filePath = join(tmpDir, 'test-clean.ts');
+    writeFileSync(filePath, `
+import { DeckentError } from '../core/errors.js';
+export function doWork(): void {
+  throw new DeckentError('DECKENT_E040', 'pipeline empty');
+}
+`);
+    const violations = scanFile(filePath);
+    expect(violations).toHaveLength(0);
+  });
+
+  it('runCheck: returns violations when throw new Error( found in orchestra dir', async () => {
+    const { runCheck } = await import('../../scripts/check-error-handling.mjs');
+    const orchFile = join(tmpDir, 'src', 'orchestra', 'bad-module.ts');
+    writeFileSync(orchFile, `throw new Error('bad usage');\n`);
+    const { violations, filesScanned } = runCheck(tmpDir);
+    expect(violations).toHaveLength(1);
+    expect(filesScanned).toBeGreaterThan(0);
+    expect(violations[0].content).toContain('throw new Error(');
+  });
+
+  it('runCheck: exit-0-clean — no violations in clean orchestra dir', async () => {
+    const { runCheck } = await import('../../scripts/check-error-handling.mjs');
+    const orchFile = join(tmpDir, 'src', 'orchestra', 'good-module.ts');
+    writeFileSync(orchFile, `
+import { DeckentError } from '../../core/errors.js';
+export function run() {
+  throw new DeckentError('DECKENT_E050', 'stash failed');
+}
+`);
+    const { violations, filesScanned } = runCheck(tmpDir);
+    expect(violations).toHaveLength(0);
+    expect(filesScanned).toBe(1);
+  });
+
+  it('formatViolations: returns empty string when no violations', async () => {
+    const { formatViolations } = await import('../../scripts/check-error-handling.mjs');
+    const result = formatViolations([]);
+    expect(result).toBe('');
+  });
+
+  it('formatViolations: includes file path, line number and fix suggestion', async () => {
+    const { formatViolations } = await import('../../scripts/check-error-handling.mjs');
+    const violations = [
+      { file: '/workspace/src/orchestra/foo.ts', line: 42, content: "throw new Error('oops')" },
+    ];
+    const result = formatViolations(violations, '/workspace');
+    expect(result).toContain('src/orchestra/foo.ts:42');
+    expect(result).toContain('DeckentError');
+    expect(result).toContain('1 violation');
+  });
+
+  it('collectTsFiles: only collects .ts files, skips node_modules', async () => {
+    const { collectTsFiles } = await import('../../scripts/check-error-handling.mjs');
+    writeFileSync(join(tmpDir, 'src', 'orchestra', 'a.ts'), '');
+    writeFileSync(join(tmpDir, 'src', 'orchestra', 'b.ts'), '');
+    writeFileSync(join(tmpDir, 'src', 'orchestra', 'c.js'), ''); // not .ts
+    mkdirSync(join(tmpDir, 'src', 'orchestra', 'node_modules', 'pkg'), { recursive: true });
+    writeFileSync(join(tmpDir, 'src', 'orchestra', 'node_modules', 'pkg', 'd.ts'), '');
+    const files = collectTsFiles(join(tmpDir, 'src', 'orchestra'));
+    const names = files.map(f => f.split('/').pop());
+    expect(names).toContain('a.ts');
+    expect(names).toContain('b.ts');
+    expect(names).not.toContain('c.js');
+    expect(names).not.toContain('d.ts'); // inside node_modules
   });
 });

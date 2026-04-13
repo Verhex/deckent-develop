@@ -27,6 +27,12 @@ vi.mock('node:fs', () => ({
   appendFileSync: vi.fn(),
 }));
 
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn().mockResolvedValue('{}'),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  mkdir: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
@@ -1009,12 +1015,12 @@ describe('spawnWorkers — provider routing', () => {
     });
   });
 
-  it('spawns Claude tasks via tmux (backward compat, no backend)', () => {
+  it('spawns Claude tasks via tmux (backward compat, no backend)', async () => {
     const task = makeTask({ id: '001-001', model: 'opus' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockedEnsureSession).toHaveBeenCalled();
     expect(mockedSpawnWorker).toHaveBeenCalledWith(
@@ -1025,13 +1031,13 @@ describe('spawnWorkers — provider routing', () => {
     expect(mockGeminiAdapter.spawn).not.toHaveBeenCalled();
   });
 
-  it('spawns Claude tasks via SpawnBackend when provided', () => {
+  it('spawns Claude tasks via SpawnBackend when provided', async () => {
     const mockBackend = { name: 'test', spawn: vi.fn(), kill: vi.fn(), list: vi.fn().mockReturnValue([]) };
     const task = makeTask({ id: '001-001', model: 'sonnet' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
 
     expect(mockBackend.spawn).toHaveBeenCalledWith(
       '001-001', 'sonnet', expect.any(String),
@@ -1041,12 +1047,12 @@ describe('spawnWorkers — provider routing', () => {
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
 
-  it('routes codex task to CodexAdapter.spawn', () => {
+  it('routes codex task to CodexAdapter.spawn', async () => {
     const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockCodexAdapter.spawn).toHaveBeenCalledWith(
       '002-001', 'o3', expect.any(String),
@@ -1055,12 +1061,12 @@ describe('spawnWorkers — provider routing', () => {
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
 
-  it('routes gemini task to GeminiAdapter.spawn', () => {
+  it('routes gemini task to GeminiAdapter.spawn', async () => {
     const task = makeTask({ id: '003-001', model: 'gemini-2.5-pro', provider: 'gemini' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockGeminiAdapter.spawn).toHaveBeenCalledWith(
       '003-001', 'gemini-2.5-pro', expect.any(String),
@@ -1069,12 +1075,12 @@ describe('spawnWorkers — provider routing', () => {
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
 
-  it('infers codex provider from o3 model (no explicit provider)', () => {
+  it('infers codex provider from o3 model (no explicit provider)', async () => {
     const task = makeTask({ id: '002-002', model: 'o3' }); // no provider field
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockCodexAdapter.spawn).toHaveBeenCalledWith(
       '002-002', 'o3', expect.any(String),
@@ -1082,12 +1088,12 @@ describe('spawnWorkers — provider routing', () => {
     );
   });
 
-  it('infers gemini provider from gemini-2.5-flash model', () => {
+  it('infers gemini provider from gemini-2.5-flash model', async () => {
     const task = makeTask({ id: '003-002', model: 'gemini-2.5-flash' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockGeminiAdapter.spawn).toHaveBeenCalledWith(
       '003-002', 'gemini-2.5-flash', expect.any(String),
@@ -1095,14 +1101,14 @@ describe('spawnWorkers — provider routing', () => {
     );
   });
 
-  it('handles mixed sprint: Claude + Codex + Gemini tasks', () => {
+  it('handles mixed sprint: Claude + Codex + Gemini tasks', async () => {
     const claudeTask = makeTask({ id: '001-001', model: 'opus' });
     const codexTask = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const geminiTask = makeTask({ id: '003-001', model: 'gemini-2.5-pro', provider: 'gemini' });
     const sprint = makeSprint({ tasks: [claudeTask, codexTask, geminiTask] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     // Claude via tmux
     expect(mockedEnsureSession).toHaveBeenCalled();
@@ -1122,22 +1128,22 @@ describe('spawnWorkers — provider routing', () => {
     );
   });
 
-  it('does not call ensureSession when no Claude tasks exist', () => {
+  it('does not call ensureSession when no Claude tasks exist', async () => {
     const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockedEnsureSession).not.toHaveBeenCalled();
   });
 
-  it('no provider field defaults to claude for Claude models', () => {
+  it('no provider field defaults to claude for Claude models', async () => {
     const task = makeTask({ id: '001-001', model: 'haiku' }); // no provider, Claude model
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockedEnsureSession).toHaveBeenCalled();
     expect(mockedSpawnWorker).toHaveBeenCalledWith(
@@ -1145,7 +1151,7 @@ describe('spawnWorkers — provider routing', () => {
     );
   });
 
-  it('returns queued tasks beyond max_workers', () => {
+  it('returns queued tasks beyond max_workers', async () => {
     const tasks = [
       makeTask({ id: '001-001', model: 'opus' }),
       makeTask({ id: '001-002', model: 'opus' }),
@@ -1156,18 +1162,18 @@ describe('spawnWorkers — provider routing', () => {
     const sprint = makeSprint({ tasks });
     const config = makeConfig(); // maxWorkers = 4
 
-    const queued = spawnWorkers('/tmp/test', sprint, config);
+    const queued = await spawnWorkers('/tmp/test', sprint, config);
 
     expect(queued).toHaveLength(1);
     expect(queued[0].id).toBe('001-005');
   });
 
-  it('updates dashboard with provider info in currentAction', () => {
+  it('updates dashboard with provider info in currentAction', async () => {
     const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     expect(mockedUpdateDashboard).toHaveBeenCalled();
     const dashCall = mockedUpdateDashboard.mock.calls[0];
@@ -1175,7 +1181,7 @@ describe('spawnWorkers — provider routing', () => {
     expect(agents[0].currentAction).toBe('Starting [codex]');
   });
 
-  it('passes allowedTools with scope directories to adapter', () => {
+  it('passes allowedTools with scope directories to adapter', async () => {
     const task = makeTask({
       id: '002-001', model: 'o3', provider: 'codex',
       scope: { directories: ['src/test/'], filesRead: [], filesWrite: ['src/test/file.ts'] },
@@ -1183,24 +1189,24 @@ describe('spawnWorkers — provider routing', () => {
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config);
+    await spawnWorkers('/tmp/test', sprint, config);
 
     const spawnCall = mockCodexAdapter.spawn.mock.calls[0];
     expect(spawnCall[3].allowedTools).toBe('Read,Write(.tasks/,src/test/,src/test/file.ts),Edit(.tasks/,src/test/,src/test/file.ts),Bash,Glob,Grep');
   });
 
-  it('passes autoApprove option to non-Claude adapter', () => {
+  it('passes autoApprove option to non-Claude adapter', async () => {
     const task = makeTask({ id: '002-001', model: 'o3', provider: 'codex' });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config, { autoApprove: true });
+    await spawnWorkers('/tmp/test', sprint, config, { autoApprove: true });
 
     const spawnCall = mockCodexAdapter.spawn.mock.calls[0];
     expect(spawnCall[3].autoApprove).toBe(true);
   });
 
-  it('gracefully handles missing provider adapter (not registered)', () => {
+  it('gracefully handles missing provider adapter (not registered)', async () => {
     mockedProviderRegistry.getProvider.mockImplementation(() => {
       throw new Error('Provider not found');
     });
@@ -1209,7 +1215,7 @@ describe('spawnWorkers — provider routing', () => {
     const config = makeConfig();
 
     // Should not throw — gracefully skips
-    expect(() => spawnWorkers('/tmp/test', sprint, config)).not.toThrow();
+    await expect(spawnWorkers('/tmp/test', sprint, config)).resolves.not.toThrow();
   });
 });
 
@@ -1966,22 +1972,22 @@ describe('spawnWorkers — task status update to EXECUTING', () => {
     mockedListWorkers.mockReturnValue([] as unknown as ReturnType<typeof listWorkers>);
   });
 
-  it('updates task.status to EXECUTING after spawning via SpawnBackend', () => {
+  it('updates task.status to EXECUTING after spawning via SpawnBackend', async () => {
     const task = makeTask({ id: '001-001', model: 'sonnet', status: TaskStatus.PENDING });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
 
     expect(task.status).toBe(TaskStatus.EXECUTING);
   });
 
-  it('writes task JSON with EXECUTING status to disk after spawn', () => {
+  it('writes task JSON with EXECUTING status to disk after spawn', async () => {
     const task = makeTask({ id: '001-001', model: 'sonnet', status: TaskStatus.PENDING });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test', sprint, config, { spawnBackend: mockBackend });
 
     const writeCalls = mockedWriteFileSync.mock.calls;
     const taskWriteCall = writeCalls.find(call =>

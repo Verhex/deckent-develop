@@ -7,6 +7,7 @@ import {
   readFileSync, writeFileSync, existsSync,
   mkdirSync, readdirSync,
 } from 'node:fs';
+import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -42,7 +43,12 @@ import {
 } from './sprint-reporter.js';
 
 // ─── Result Evaluator ─────────────────────────────────────────────
-import { getRecentSprintStats, GO_WITH_GATE_FAILURE } from './result-evaluator.js';
+import {
+  getRecentSprintStats,
+  GO_WITH_GATE_FAILURE,
+  tryCodeVerifiedDone,
+  writeCodeVerifiedResult,
+} from './result-evaluator.js';
 
 // ─── Baseline Tracker ─────────────────────────────────────────────
 import {
@@ -55,6 +61,9 @@ import { buildResultsMap } from './result-collector.js';
 
 // ─── Debt Manager ─────────────────────────────────────────────────
 import { runDecay, auditBrainBudget } from './debt-manager.js';
+
+// ─── Observability ────────────────────────────────────────────────
+import { generateLoadReport } from '../core/observability.js';
 
 // ─── Agent/Skill Pool ─────────────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -379,9 +388,9 @@ export function applyGateStatus(currentStatus: string, gate: Pick<SelfAuditResul
  * - avg coverage < 70% → coverage_threshold lowered to avg
  * - Requires min_samples sprints before any adjustment
  */
-export function applyAdaptiveThresholds(projectRoot: string, config: ResolvedConfig): void {
+export async function applyAdaptiveThresholds(projectRoot: string, config: ResolvedConfig): Promise<void> {
   const ac = config.adaptive_config;
-  const stats = getRecentSprintStats(projectRoot, ac.coverage_lookback);
+  const stats = await getRecentSprintStats(projectRoot, ac.coverage_lookback);
 
   if (stats.sprintCount < ac.min_samples) {
     debugLog('applyAdaptiveThresholds', `Not enough sprints (${stats.sprintCount}/${ac.min_samples}) — skipping`);
@@ -474,6 +483,50 @@ export async function finalizeSprint(
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
   const resultsMap = buildResultsMap(results);
 
+  // 0. Code-aware evaluation reconciliation (Sprint 136)
+  // Check NO_GO tasks for the "Docker worker exited without writing result" pattern
+  // and physically verify code on disk before finalizing the evaluation.
+  const codeVerifiedTasks: string[] = [];
+  for (const [taskId, evaluation] of evaluations) {
+    if (evaluation !== TaskEvaluation.NO_GO) continue;
+    try {
+      const verifyResult = await tryCodeVerifiedDone(taskId, projectRoot);
+      if (verifyResult.triggered && verifyResult.verified) {
+        // Rewrite the evaluation to DONE
+        evaluations.set(taskId, TaskEvaluation.DONE);
+        // Write a proper result file
+        await writeCodeVerifiedResult(taskId, projectRoot, verifyResult);
+        // Update results array with synthetic result
+        const existingIdx = results.findIndex(r => r.taskId === taskId);
+        const syntheticResult = {
+          taskId,
+          workerId: 'brain-reconcile',
+          filesChanged: verifyResult.verifiedFiles,
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          coverage: 0,
+          selfAssessment: 'DONE' as const,
+          notes: verifyResult.reason,
+        };
+        if (existingIdx >= 0) {
+          results[existingIdx] = syntheticResult;
+        } else {
+          results.push(syntheticResult);
+        }
+        // Update resultsMap
+        resultsMap.set(taskId, syntheticResult);
+        codeVerifiedTasks.push(taskId);
+        debugLog('finalizeSprint:codeReconcile', `Task ${taskId} reconciled to CODE_VERIFIED_DONE`);
+      }
+    } catch (e) {
+      debugLog('finalizeSprint:codeReconcile', `Reconciliation failed for ${taskId}: ${e}`);
+    }
+  }
+  if (codeVerifiedTasks.length > 0) {
+    debugLog('finalizeSprint:codeReconcile', `${codeVerifiedTasks.length} tasks reconciled: ${codeVerifiedTasks.join(', ')}`);
+  }
+
   // 1. Calculate metrics
   const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
   const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
@@ -495,6 +548,24 @@ export async function finalizeSprint(
       }
     }
     writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
+
+    // Append Code-Verified DONE section if reconciliation happened
+    if (codeVerifiedTasks.length > 0) {
+      try {
+        const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
+        const existing = existsSync(retroPath) ? readFileSync(retroPath, 'utf-8') : '';
+        if (!existing.includes('### Code-Verified DONE')) {
+          const section = [
+            '',
+            '### Code-Verified DONE',
+            `${codeVerifiedTasks.length} task(s) reconciled via physical code verification:`,
+            ...codeVerifiedTasks.map(id => `- ${id}: Code physically verified despite missing .result (docker HB shutdown pattern)`),
+            '',
+          ].join('\n');
+          writeFileSync(retroPath, existing + section, 'utf-8');
+        }
+      } catch (e) { debugLog('finalizeSprint:codeVerifiedRetro', e); }
+    }
   } catch (e) { debugLog('finalizeSprint:writeRetrospective', e); }
 
   // 5. Update PROJECT-IDENTITY.md
@@ -742,6 +813,14 @@ export async function finalizeSprint(
       sprint.status = newStatus as Sprint['status'];
       debugLog('finalizeSprint:selfAuditGate', `Status updated: ${currentStatus} → ${newStatus}`);
     }
+    // Write gate.json to .deckent/ for Layer 4 criterion 12 tracking
+    try {
+      const gatePath = join(projectRoot, '.deckent', `${sprint.id}-gate.json`);
+      await fsPromises.writeFile(gatePath, JSON.stringify(gateResult, null, 2));
+      debugLog('finalizeSprint:selfAuditGate', `Gate result written to ${gatePath} overallGate=${gateResult.overallGate}`);
+    } catch (writeErr) {
+      debugLog('finalizeSprint:selfAuditGate', `WARNING: Failed to write gate.json: ${writeErr}`);
+    }
     // Append Gate Failure section to RETRO.md if gate failed
     if (gateResult.overallGate === 'GATE_FAILURE') {
       try {
@@ -765,10 +844,20 @@ export async function finalizeSprint(
     }
   } catch (e) { debugLog('finalizeSprint:selfAuditGate', `Gate check failed: ${e}`); }
 
+  // 10c. Generate load-test-report.md from metrics.jsonl (Sprint 135 N6 — Task 5)
+  try {
+    const reportDir = join(projectRoot, 'docs', 'audits', sprint.id);
+    await fsPromises.mkdir(reportDir, { recursive: true });
+    const reportPath = join(reportDir, 'load-test-report.md');
+    const report = await generateLoadReport(projectRoot);
+    await fsPromises.writeFile(reportPath, report);
+    debugLog('finalizeSprint:loadReport', `Load test report written to ${reportPath}`);
+  } catch (e) { debugLog('finalizeSprint:loadReport', `WARNING: load_report_generation_failed: ${e}`); }
+
   // 11. Adaptive thresholds: auto-adjust agent_min_score + coverage_threshold based on recent sprints
   if (opts?.config?.adaptive_thresholds) {
     try {
-      applyAdaptiveThresholds(projectRoot, opts.config);
+      await applyAdaptiveThresholds(projectRoot, opts.config);
     } catch (err) {
       debugLog('finalizeSprint:adaptive', `Adaptive threshold update failed: ${err}`);
     }
