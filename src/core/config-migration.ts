@@ -5,8 +5,17 @@
  * Preserves existing values — only adds missing fields with their defaults.
  */
 
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  copyFileSync,
+  readdirSync,
+  unlinkSync,
+} from 'node:fs';
+import { dirname, basename } from 'node:path';
 import { createDefaultConfig } from './config.js';
+import { structuredLog } from './observability.js';
 import type { DeckentConfig } from './types.js';
 import type { ModelTier } from './model-equivalence.js';
 import type { ProviderName } from './task-types.js';
@@ -257,11 +266,76 @@ export function migrateConfig(
 
   writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
 
+  try {
+    const pruned = pruneConfigBackups(configPath, 3);
+    if (pruned.length > 0) {
+      structuredLog('info', 'config_backups_pruned', {
+        configPath,
+        kept: 3,
+        removed: pruned.length,
+      });
+    }
+  } catch (e) {
+    structuredLog('warn', 'config_backups_prune_failed', {
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
   return {
     migrated: true,
     addedFields: missingFields,
     backupPath,
   };
+}
+
+/**
+ * Rotate timestamped config backups, keeping only the newest `keepCount`.
+ * The legacy timestamp-less `{basename}.bak` snapshot is preserved — the
+ * regex requires an ISO-8601 date suffix.
+ */
+export function pruneConfigBackups(
+  configPath: string,
+  keepCount: number = 3,
+): string[] {
+  const dir = dirname(configPath);
+  const base = basename(configPath);
+  const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^${escapedBase}\\.bak\\.\\d{4}-\\d{2}-\\d{2}T`);
+
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch (e) {
+    structuredLog('warn', 'prune_backups_readdir_failed', {
+      dir,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return [];
+  }
+
+  const backups = entries.filter((name) => pattern.test(name)).sort().reverse();
+
+  if (backups.length <= keepCount) {
+    return [];
+  }
+
+  const toDelete = backups.slice(keepCount);
+  const deleted: string[] = [];
+
+  for (const name of toDelete) {
+    const fullPath = `${dir}/${name}`;
+    try {
+      unlinkSync(fullPath);
+      deleted.push(fullPath);
+    } catch (e) {
+      structuredLog('warn', 'prune_backups_unlink_failed', {
+        path: fullPath,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  return deleted;
 }
 
 /**
