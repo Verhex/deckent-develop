@@ -20,6 +20,15 @@ vi.mock('node:fs', () => ({
   renameSync: vi.fn(),
 }));
 
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn().mockRejectedValue(new Error('ENOENT')),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  stat: vi.fn().mockRejectedValue(new Error('ENOENT')),
+  access: vi.fn().mockRejectedValue(new Error('ENOENT')),
+  unlink: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
@@ -75,6 +84,7 @@ vi.mock('../../src/core/provider.js', () => ({
 }));
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
+import { stat as fspStat, writeFile as fspWriteFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
 import { resetDashboard, updateDashboard, detectDeadlocks, startScanLoop, writeScanToDashboard } from '../../src/monitor/auditor.js';
@@ -104,6 +114,8 @@ const mockedWriteScanToDashboard = vi.mocked(writeScanToDashboard);
 const mockedCountBrainLines = vi.mocked(countBrainLines);
 const mockedUpdateTaskStatus = vi.mocked(updateTaskStatus);
 const mockedReleaseAllLocks = vi.mocked(releaseAllLocks);
+const mockedFspStat = vi.mocked(fspStat);
+const mockedFspWriteFile = vi.mocked(fspWriteFile);
 
 import {
   readContext, createTask,
@@ -201,6 +213,9 @@ beforeEach(() => {
   mockedCountBrainLines.mockReturnValue(100);
   mockedCallBrainPlanner.mockReturnValue(null);
   mockedStatSync.mockReturnValue({ mtimeMs: Date.now(), isDirectory: () => false, isFile: () => true, size: 0 } as never);
+  // Reset async fs mocks (node:fs/promises) — stat defaults to ENOENT (file not found)
+  mockedFspStat.mockRejectedValue(new Error('ENOENT'));
+  mockedFspWriteFile.mockResolvedValue(undefined);
 });
 
 // ═══ Tests ═══════════════════════════════════════════════════════════
@@ -485,8 +500,8 @@ describe('planSprint', () => {
   it('writes task JSON files to .tasks/', async () => {
     const sprint = await planSprint(ROOT, config, makeContext('Do X'), recommendation);
     expect(sprint.tasks.length).toBeGreaterThan(0);
-    expect(mockedWriteFileSync).toHaveBeenCalled();
-    const writeCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('task-'));
+    // sprint-planner.ts uses async writeFile (node:fs/promises) for task JSON files
+    const writeCall = mockedFspWriteFile.mock.calls.find(c => String(c[0]).includes('task-'));
     expect(writeCall).toBeDefined();
   });
 
@@ -707,22 +722,23 @@ describe('planSprint', () => {
 });
 
 describe('confirmDraftTasks', () => {
-  it('changes DRAFT tasks to PENDING', () => {
+  it('changes DRAFT tasks to PENDING', async () => {
     const sprint = makeSprint({
       tasks: [makeTask({ status: TaskStatus.DRAFT }), makeTask({ id: '001-002', status: TaskStatus.DRAFT })],
     });
-    confirmDraftTasks(ROOT, sprint);
+    await confirmDraftTasks(ROOT, sprint);
     expect(sprint.tasks[0]?.status).toBe(TaskStatus.PENDING);
     expect(sprint.tasks[1]?.status).toBe(TaskStatus.PENDING);
-    expect(mockedWriteFileSync).toHaveBeenCalledTimes(2);
+    // confirmDraftTasks uses async writeFile (node:fs/promises)
+    expect(mockedFspWriteFile).toHaveBeenCalledTimes(2);
   });
 
-  it('skips non-DRAFT tasks', () => {
+  it('skips non-DRAFT tasks', async () => {
     const sprint = makeSprint({
       tasks: [makeTask({ status: TaskStatus.PENDING })],
     });
-    confirmDraftTasks(ROOT, sprint);
-    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+    await confirmDraftTasks(ROOT, sprint);
+    expect(mockedFspWriteFile).not.toHaveBeenCalled();
   });
 });
 
@@ -752,35 +768,35 @@ describe('spawnWorkers', () => {
   const config = makeConfig();
   const sprint = makeSprint();
 
-  it('calls ensureSession first', () => {
-    spawnWorkers(ROOT, sprint, config);
+  it('calls ensureSession first', async () => {
+    await spawnWorkers(ROOT, sprint, config);
     expect(mockedEnsureSession).toHaveBeenCalledTimes(1);
   });
 
-  it('does NOT call startAuditor (scan loop runs in-process)', () => {
-    spawnWorkers(ROOT, sprint, config);
+  it('does NOT call startAuditor (scan loop runs in-process)', async () => {
+    await spawnWorkers(ROOT, sprint, config);
     // startAuditor is no longer imported — spawnWorkers only calls ensureSession + spawnWorker
     expect(mockedEnsureSession).toHaveBeenCalled();
   });
 
-  it('spawns one worker per task', () => {
+  it('spawns one worker per task', async () => {
     const multiSprint = makeSprint({
       tasks: [makeTask({ id: '001-001' }), makeTask({ id: '001-002' })],
     });
-    spawnWorkers(ROOT, multiSprint, config);
+    await spawnWorkers(ROOT, multiSprint, config);
     expect(mockedSpawnWorker).toHaveBeenCalledTimes(2);
   });
 
-  it('includes task id in worker prompt', () => {
-    spawnWorkers(ROOT, sprint, config);
+  it('includes task id in worker prompt', async () => {
+    await spawnWorkers(ROOT, sprint, config);
     const call = mockedSpawnWorker.mock.calls[0];
     expect(call?.[0]).toBe('001-001');
     expect(call?.[2]).toContain('001-001');
     expect(call?.[2]).toContain('.tasks/task-001-001.result');
   });
 
-  it('updates dashboard after spawning', () => {
-    spawnWorkers(ROOT, sprint, config);
+  it('updates dashboard after spawning', async () => {
+    await spawnWorkers(ROOT, sprint, config);
     expect(mockedUpdateDashboard).toHaveBeenCalledTimes(1);
   });
 });
@@ -790,6 +806,7 @@ describe('waitForResults', () => {
     const sprint = makeSprint();
     mockedExistsSync.mockReturnValue(true);
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
+    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
 
     const results = await waitForResults(ROOT, sprint, 1000);
     expect(results).toHaveLength(1);
@@ -819,6 +836,7 @@ describe('waitForResults', () => {
     const sprint = makeSprint({ tasks: [makeTask(), task2] });
 
     mockedExistsSync.mockReturnValue(true);
+    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReadFileSync.mockImplementation((path: unknown) => {
       const p = String(path);
       if (p.includes('001-001.result')) return JSON.stringify(makeResult());
@@ -834,8 +852,9 @@ describe('waitForResults', () => {
     const task2 = makeTask({ id: '001-002' });
     const sprint = makeSprint({ tasks: [makeTask(), task2] });
 
-    mockedExistsSync.mockImplementation((path: unknown) => {
-      return String(path).includes('001-001.result');
+    mockedFspStat.mockImplementation((path: unknown) => {
+      if (String(path).includes('001-001.result')) return Promise.resolve({ isFile: () => true } as never);
+      return Promise.reject(new Error('ENOENT'));
     });
     mockedReadFileSync.mockImplementation((path: unknown) => {
       if (String(path).includes('001-001.result')) return JSON.stringify(makeResult());
@@ -850,6 +869,7 @@ describe('waitForResults', () => {
   it('does not include duplicates', async () => {
     const sprint = makeSprint();
     mockedExistsSync.mockReturnValue(true);
+    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
 
     const results = await waitForResults(ROOT, sprint, 1000);
@@ -860,10 +880,11 @@ describe('waitForResults', () => {
     vi.useFakeTimers();
     const sprint = makeSprint();
     let callCount = 0;
-    // First existsSync call returns false, subsequent return true
-    mockedExistsSync.mockImplementation(() => {
+    // First stat call rejects (not found), subsequent resolve
+    mockedFspStat.mockImplementation(() => {
       callCount++;
-      return callCount > 1;
+      if (callCount > 2) return Promise.resolve({ isFile: () => true } as never);
+      return Promise.reject(new Error('ENOENT'));
     });
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
 
@@ -1501,8 +1522,9 @@ describe('runSprint', () => {
     });
     mockedSpawnSync.mockReturnValue(spawnOk);
 
-    // Phase 3: waitForResults
+    // Phase 3: waitForResults — stat (node:fs/promises) is used by result-collector
     mockedExistsSync.mockReturnValue(true);
+    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReaddirSync.mockReturnValue([] as never);
   }
 
@@ -1592,6 +1614,8 @@ describe('runSprint', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReaddirSync.mockReturnValue([] as never);
     mockedSpawnSync.mockReturnValue(spawnOk);
+    // Phase 3: waitForResults uses fs/promises.stat to detect result files
+    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
 
     await runSprint(ROOT, config, { autoApprove: true });
     // spawnWorker should have been called with autoApprove: true
@@ -1662,26 +1686,26 @@ describe('spawnWorkers — autoApprove flag (DEBT-005)', () => {
   const config = makeConfig();
   const sprint = makeSprint();
 
-  it('passes autoApprove: false by default (not haiku_allowed)', () => {
+  it('passes autoApprove: false by default (not haiku_allowed)', async () => {
     const haikuConfig = makeConfig({
       activeModeConfig: { ...makeConfig().activeModeConfig, haiku_allowed: true },
     });
-    spawnWorkers(ROOT, sprint, haikuConfig);
+    await spawnWorkers(ROOT, sprint, haikuConfig);
     const call = mockedSpawnWorker.mock.calls[0];
     const opts = call?.[4] as { autoApprove?: boolean } | undefined;
     // haiku_allowed should NOT propagate to autoApprove
     expect(opts?.autoApprove).toBe(false);
   });
 
-  it('passes autoApprove: true when spawnOpts.autoApprove is true', () => {
-    spawnWorkers(ROOT, sprint, config, { autoApprove: true });
+  it('passes autoApprove: true when spawnOpts.autoApprove is true', async () => {
+    await spawnWorkers(ROOT, sprint, config, { autoApprove: true });
     const call = mockedSpawnWorker.mock.calls[0];
     const opts = call?.[4] as { autoApprove?: boolean } | undefined;
     expect(opts?.autoApprove).toBe(true);
   });
 
-  it('passes autoApprove: false when spawnOpts.autoApprove is false', () => {
-    spawnWorkers(ROOT, sprint, config, { autoApprove: false });
+  it('passes autoApprove: false when spawnOpts.autoApprove is false', async () => {
+    await spawnWorkers(ROOT, sprint, config, { autoApprove: false });
     const call = mockedSpawnWorker.mock.calls[0];
     const opts = call?.[4] as { autoApprove?: boolean } | undefined;
     expect(opts?.autoApprove).toBe(false);
@@ -1948,6 +1972,7 @@ describe('runSprint scan loop integration (Sprint 14)', () => {
     });
     mockedSpawnSync.mockReturnValue(spawnOk);
     mockedExistsSync.mockReturnValue(true);
+    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReaddirSync.mockReturnValue([] as never);
   }
 
@@ -1974,10 +1999,10 @@ describe('runSprint scan loop integration (Sprint 14)', () => {
     clearInterval(fakeInterval);
   });
 
-  it('spawnWorkers does not import startAuditor', () => {
+  it('spawnWorkers does not import startAuditor', async () => {
     // startAuditor is no longer in the tmux mock — if it were called, it would throw
     const sprint = makeSprint();
-    expect(() => spawnWorkers(ROOT, sprint, config)).not.toThrow();
+    await expect(spawnWorkers(ROOT, sprint, config)).resolves.not.toThrow();
     expect(mockedEnsureSession).toHaveBeenCalled();
   });
 });
@@ -1996,6 +2021,7 @@ describe('runSprint dashboard reset (Sprint 15)', () => {
     });
     mockedSpawnSync.mockReturnValue(spawnOk);
     mockedExistsSync.mockReturnValue(true);
+    mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReaddirSync.mockReturnValue([] as never);
   }
 

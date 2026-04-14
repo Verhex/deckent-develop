@@ -262,69 +262,69 @@ describe('spawnWorkers — initial batch and queue return', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('spawns only max_workers tasks when tasks > max_workers', () => {
+  it('spawns only max_workers tasks when tasks > max_workers', async () => {
     const tasks = Array.from({ length: 10 }, (_, i) => makeTask(`001-00${i + 1}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config);
 
     expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(3);
   });
 
-  it('returns the remaining queued tasks when tasks > max_workers', () => {
+  it('returns the remaining queued tasks when tasks > max_workers', async () => {
     const tasks = Array.from({ length: 5 }, (_, i) => makeTask(`001-00${i + 1}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    const queue = spawnWorkers(root, sprint, config);
+    const queue = await spawnWorkers(root, sprint, config);
 
     expect(queue.length).toBe(2);
     expect(queue[0].id).toBe('001-004');
     expect(queue[1].id).toBe('001-005');
   });
 
-  it('returns empty queue when tasks <= max_workers', () => {
+  it('returns empty queue when tasks <= max_workers', async () => {
     const tasks = [makeTask('001-001'), makeTask('001-002')];
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    const queue = spawnWorkers(root, sprint, config);
+    const queue = await spawnWorkers(root, sprint, config);
 
     expect(queue.length).toBe(0);
     expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(2);
   });
 
-  it('dashboard progress.total equals all tasks (not just active workers)', () => {
+  it('dashboard progress.total equals all tasks (not just active workers)', async () => {
     const tasks = Array.from({ length: 8 }, (_, i) => makeTask(`001-00${i + 1}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config);
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(8);
     expect(dashboard.progress.active).toBe(3);
   });
 
-  it('dashboard progress.total equals all tasks when tasks == max_workers', () => {
+  it('dashboard progress.total equals all tasks when tasks == max_workers', async () => {
     const tasks = [makeTask('001-001'), makeTask('001-002'), makeTask('001-003')];
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config);
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(3);
     expect(dashboard.progress.active).toBe(3);
   });
 
-  it('spawns all tasks and returns empty queue when tasks == max_workers', () => {
+  it('spawns all tasks and returns empty queue when tasks == max_workers', async () => {
     const tasks = Array.from({ length: 3 }, (_, i) => makeTask(`001-00${i + 1}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 3);
 
-    const queue = spawnWorkers(root, sprint, config);
+    const queue = await spawnWorkers(root, sprint, config);
 
     expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(3);
     expect(queue.length).toBe(0);

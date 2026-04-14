@@ -428,9 +428,10 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   const archivedSprints: string[] = [];
 
   // Use decayable-only line count for budget decision (DECAY_EXEMPT files excluded).
-  // Also check total linesBefore > budget for backward compatibility with existing callers.
+  // audit.status === 'OVER' means decayableLines > budget (exempt files are NOT counted).
+  // linesBefore > budget is kept for backward compatibility but should not gate decay alone.
   const audit = auditBrainBudget(projectRoot, budget);
-  const shouldRun = opts?.force || linesBefore > budget || audit.status === 'OVER';
+  const shouldRun = opts?.force || audit.status === 'OVER';
   if (!shouldRun) {
     return { linesBefore, linesAfter: linesBefore, archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0 };
   }
@@ -478,8 +479,10 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
   }
 
   // 4. Memory archive — trim old sections
+  // Re-audit after steps 1-3 to get updated decayable count (patterns/debt removed above).
+  const auditMid = auditBrainBudget(projectRoot, budget);
   const memoryPath = join(brainPath, MEMORY_FILE);
-  if (existsSync(memoryPath) && countBrainLines(projectRoot) > budget) {
+  if (existsSync(memoryPath) && auditMid.decayableLines > budget) {
     const content = readFileSafe(memoryPath);
     const currentNum = getSprintNumber(sprintId);
     const lines = content.split('\n');
@@ -498,8 +501,10 @@ export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayO
     writeFileSync(memoryPath, kept.join('\n'), 'utf-8');
   }
 
-  // 5. Last resort — smart truncation: preserve sprint headers, trim detail content
-  if (countBrainLines(projectRoot) > budget) {
+  // 5. Last resort — smart truncation: preserve sprint headers, trim detail content.
+  // Check only eligible (decayable) lines so exempt files don't block this gate.
+  const auditFinal = auditBrainBudget(projectRoot, budget);
+  if (auditFinal.decayableLines > budget) {
     const memContent = readFileSafe(join(brainPath, MEMORY_FILE));
     // E) Improved truncation: keep headers + recent content, trim old section details
     const trimmedContent = smartTrimMemory(memContent);

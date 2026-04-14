@@ -643,6 +643,55 @@ describe('Error handling completeness', () => {
   });
 });
 
+// ─── check-error-handling.mjs: npm run lint:errors process-level tests ─────
+
+describe('npm run lint:errors — process-level invocation', () => {
+  it('exits 0 when src/orchestra has no throw new Error( violations', () => {
+    const { execSync } = require('node:child_process');
+    let exitCode = 0;
+    let stdout = '';
+    try {
+      stdout = execSync('npm run lint:errors', { stdio: 'pipe', cwd: process.cwd() }).toString();
+    } catch (err: unknown) {
+      exitCode = (err as { status?: number }).status ?? 1;
+    }
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain('OK');
+  });
+
+  it('exits non-zero when a violation is detected via script invocation', async () => {
+    const { execSync } = require('node:child_process');
+    const { writeFileSync, mkdirSync, rmSync, existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { tmpdir } = await import('node:os');
+
+    // Create a fake project root with a violating orchestra file
+    const fakeRoot = join(tmpdir(), `deckent-lint-proc-test-${Date.now()}`);
+    mkdirSync(join(fakeRoot, 'src', 'orchestra'), { recursive: true });
+    writeFileSync(join(fakeRoot, 'src', 'orchestra', 'bad.ts'), `throw new Error('violation');\n`);
+
+    let exitCode = 0;
+    try {
+      // Run the script directly with node, pointing it at the fake root via cwd isn't enough
+      // since the script uses __dirname-relative ROOT. Pass root via env isn't supported,
+      // so we call runCheck() via a small inline script.
+      execSync(
+        `node -e "
+import { runCheck } from './scripts/check-error-handling.mjs';
+const r = runCheck('${fakeRoot.replace(/\\/g, '\\\\')}');
+process.exit(r.violations.length > 0 ? 1 : 0);
+"`,
+        { stdio: 'pipe', cwd: process.cwd() },
+      );
+    } catch (err: unknown) {
+      exitCode = (err as { status?: number }).status ?? 1;
+    } finally {
+      if (existsSync(fakeRoot)) rmSync(fakeRoot, { recursive: true, force: true });
+    }
+    expect(exitCode).toBe(1);
+  });
+});
+
 // ─── check-error-handling.mjs lint script tests ─────────────────────
 
 describe('check-error-handling.mjs lint script', () => {

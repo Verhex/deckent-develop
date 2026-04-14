@@ -127,6 +127,72 @@ vi.mock('../../src/agents/worker-ipc.js', () => ({
   })),
 }));
 
+// Sprint-spawner dependencies (extracted from sprint-controller in Sprint 136)
+vi.mock('../../src/orchestra/task-builder.js', () => ({
+  buildWorkerPrompt: vi.fn().mockReturnValue('mock worker prompt'),
+  createTask: vi.fn(),
+  extractScopeFromDirective: vi.fn(),
+  parseStructuredDirectives: vi.fn(),
+  plannerTaskToParams: vi.fn(),
+  resolveWorkerEffort: vi.fn(),
+}));
+
+vi.mock('../../src/core/config.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/config.js')>();
+  return {
+    ...actual,
+    resolveEffectiveWorkers: vi.fn().mockImplementation((config: { activeModeConfig?: { max_workers?: number } }) => {
+      return config?.activeModeConfig?.max_workers ?? 4;
+    }),
+  };
+});
+
+vi.mock('../../src/core/system-profile.js', () => ({
+  getSystemProfile: vi.fn().mockReturnValue({ cpuCores: 4, memoryGB: 16, platform: 'linux' }),
+}));
+
+vi.mock('../../src/orchestra/sprint-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/sprint-utils.js')>();
+  return {
+    ...actual,
+    now: vi.fn().mockReturnValue('2026-03-16T00:00:00.000Z'),
+    writeSprintState: vi.fn(),
+    clearSprintState: vi.fn(),
+    readSprintState: vi.fn(),
+    detectOrphanWorkers: vi.fn().mockReturnValue([]),
+  };
+});
+
+vi.mock('../../src/orchestra/task-router.js', () => ({
+  routeTask: vi.fn().mockReturnValue({ provider: 'claude', agent: 'generic', skills: [] }),
+}));
+
+vi.mock('../../src/orchestra/parallel-pipeline.js', () => ({
+  ParallelPipelineManager: vi.fn().mockImplementation(() => ({
+    createPipeline: vi.fn().mockReturnValue([]),
+  })),
+  DependencyCycleError: class DependencyCycleError extends Error {},
+}));
+
+vi.mock('../../src/core/observability.js', () => ({
+  metric: vi.fn(),
+  trace: vi.fn((_name: string, fn: () => unknown) => fn()),
+  structuredLog: vi.fn(),
+  initObservability: vi.fn(),
+}));
+
+// Result collector mock (resolveAgentPrompt + resolveSkillPrompts now live here)
+vi.mock('../../src/orchestra/result-collector.js', () => ({
+  waitForResults: vi.fn().mockResolvedValue([]),
+  resolveAgentPrompt: vi.fn().mockResolvedValue(undefined),
+  resolveSkillPrompts: vi.fn().mockResolvedValue([]),
+  buildResultsMap: vi.fn().mockReturnValue(new Map()),
+  estimateTokenUsage: vi.fn().mockReturnValue({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' }),
+  enrichResultTokenUsage: vi.fn(),
+  handleWorkerQuestion: vi.fn(),
+  checkWorkerQuestions: vi.fn().mockReturnValue([]),
+}));
+
 // Sub-module mocks
 vi.mock('../../src/orchestra/model-selector.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/orchestra/model-selector.js')>();
@@ -308,12 +374,12 @@ describe('getDefaultProvider', () => {
 });
 
 describe('spawnWorkers with SpawnBackend', () => {
-  it('uses provided spawnBackend.spawn() for each task', () => {
+  it('uses provided spawnBackend.spawn() for each task', async () => {
     const backend = makeMockBackend();
     const sprint = makeSprint();
     const config = makeConfig();
 
-    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+    await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 
     expect(backend.spawn).toHaveBeenCalledOnce();
     expect(backend.spawn).toHaveBeenCalledWith(
@@ -324,42 +390,42 @@ describe('spawnWorkers with SpawnBackend', () => {
     );
   });
 
-  it('does NOT call ensureSession when spawnBackend is provided', () => {
+  it('does NOT call ensureSession when spawnBackend is provided', async () => {
     const backend = makeMockBackend();
     const sprint = makeSprint();
     const config = makeConfig();
 
-    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+    await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 
     expect(ensureSession).not.toHaveBeenCalled();
   });
 
-  it('does NOT call spawnWorker (tmux) when spawnBackend is provided', () => {
+  it('does NOT call spawnWorker (tmux) when spawnBackend is provided', async () => {
     const backend = makeMockBackend();
     const sprint = makeSprint();
     const config = makeConfig();
 
-    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+    await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 
     expect(spawnWorker).not.toHaveBeenCalled();
   });
 
-  it('uses legacy tmux path when no spawnBackend provided', () => {
+  it('uses legacy tmux path when no spawnBackend provided', async () => {
     const sprint = makeSprint();
     const config = makeConfig();
 
-    spawnWorkers(ROOT, sprint, config);
+    await spawnWorkers(ROOT, sprint, config);
 
     expect(ensureSession).toHaveBeenCalledOnce();
     expect(spawnWorker).toHaveBeenCalledOnce();
   });
 
-  it('passes autoApprove to spawnBackend', () => {
+  it('passes autoApprove to spawnBackend', async () => {
     const backend = makeMockBackend();
     const sprint = makeSprint();
     const config = makeConfig();
 
-    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend, autoApprove: true });
+    await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend, autoApprove: true });
 
     expect(backend.spawn).toHaveBeenCalledWith(
       expect.any(String),
@@ -369,13 +435,13 @@ describe('spawnWorkers with SpawnBackend', () => {
     );
   });
 
-  it('passes allowedTools derived from task scope', () => {
+  it('passes allowedTools derived from task scope', async () => {
     const backend = makeMockBackend();
     const task = makeTask({ scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/foo.ts'] } });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
-    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+    await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 
     expect(backend.spawn).toHaveBeenCalledWith(
       expect.any(String),
@@ -385,7 +451,7 @@ describe('spawnWorkers with SpawnBackend', () => {
     );
   });
 
-  it('handles multiple tasks up to maxWorkers', () => {
+  it('handles multiple tasks up to maxWorkers', async () => {
     const backend = makeMockBackend();
     const tasks = [
       makeTask({ id: '001-001' }),
@@ -395,7 +461,7 @@ describe('spawnWorkers with SpawnBackend', () => {
     const sprint = makeSprint({ tasks });
     const config = makeConfig({ activeModeConfig: { max_workers: 2, brain_model: 'opus', default_model: 'sonnet', haiku_allowed: false } });
 
-    const queued = spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+    const queued = await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 
     expect(backend.spawn).toHaveBeenCalledTimes(2);
     expect(queued).toHaveLength(1);
@@ -499,12 +565,12 @@ describe('SpawnBackendFactory re-export', () => {
     expect(typeof SpawnBackendFactory.create).toBe('function');
   });
 
-  it('spawnWorkers with spawnBackend does not call SpawnBackendFactory.create', () => {
+  it('spawnWorkers with spawnBackend does not call SpawnBackendFactory.create', async () => {
     const backend = makeMockBackend();
     const sprint = makeSprint();
     const config = makeConfig();
 
-    spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
+    await spawnWorkers(ROOT, sprint, config, { spawnBackend: backend });
 
     // Factory should NOT be called — backend was provided directly
     expect(SpawnBackendFactory.create).not.toHaveBeenCalled();

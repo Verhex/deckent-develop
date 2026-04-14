@@ -324,55 +324,55 @@ describe('spawnWorkers — max_workers limits concurrent spawn only', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('with 14 tasks and max_workers=8, spawns exactly 8 workers', () => {
+  it('with 14 tasks and max_workers=8, spawns exactly 8 workers', async () => {
     const tasks = Array.from({ length: 14 }, (_, i) => makeTask(`001-${String(i + 1).padStart(3, '0')}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config);
 
     expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(8);
   });
 
-  it('with 14 tasks and max_workers=8, returns 6 queued tasks', () => {
+  it('with 14 tasks and max_workers=8, returns 6 queued tasks', async () => {
     const tasks = Array.from({ length: 14 }, (_, i) => makeTask(`001-${String(i + 1).padStart(3, '0')}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    const queue = spawnWorkers(root, sprint, config);
+    const queue = await spawnWorkers(root, sprint, config);
 
     expect(queue.length).toBe(6);
   });
 
-  it('with 20 tasks and max_workers=8, returns 12 queued tasks', () => {
+  it('with 20 tasks and max_workers=8, returns 12 queued tasks', async () => {
     const tasks = Array.from({ length: 20 }, (_, i) => makeTask(`001-${String(i + 1).padStart(3, '0')}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    const queue = spawnWorkers(root, sprint, config);
+    const queue = await spawnWorkers(root, sprint, config);
 
     expect(queue.length).toBe(12);
     expect(vi.mocked(spawnWorker)).toHaveBeenCalledTimes(8);
   });
 
-  it('dashboard progress.total = all 14 tasks (not just active 8)', () => {
+  it('dashboard progress.total = all 14 tasks (not just active 8)', async () => {
     const tasks = Array.from({ length: 14 }, (_, i) => makeTask(`001-${String(i + 1).padStart(3, '0')}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config);
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(14);
     expect(dashboard.progress.active).toBe(8);
   });
 
-  it('dashboard progress.total = all 20 tasks when max_workers=8', () => {
+  it('dashboard progress.total = all 20 tasks when max_workers=8', async () => {
     const tasks = Array.from({ length: 20 }, (_, i) => makeTask(`001-${String(i + 1).padStart(3, '0')}`));
     const sprint = makeSprint(tasks);
     const config = makeConfig(root, 8);
 
-    spawnWorkers(root, sprint, config);
+    await spawnWorkers(root, sprint, config);
 
     const dashboard = JSON.parse(readFileSync(join(root, DASHBOARD_FILE), 'utf-8'));
     expect(dashboard.progress.total).toBe(20);

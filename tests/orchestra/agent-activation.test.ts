@@ -121,36 +121,36 @@ describe('Agent Activation', () => {
   // ─── B) Worker agent context injection ─────────────────────────────────
 
   describe('resolveAgentPrompt with systemPrompt fallback', () => {
-    it('returns systemPrompt from agent.json when no PROMPT.md exists', () => {
+    it('returns systemPrompt from agent.json when no PROMPT.md exists', async () => {
       const prompt = 'You are a specialized test agent for unit testing.';
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', prompt));
       const task = makeTask({ assignedAgent: 'test-agent' });
-      const result = resolveAgentPrompt(tmpDir, task);
+      const result = await resolveAgentPrompt(tmpDir, task);
       expect(result).toContain(prompt);
     });
 
-    it('includes expertise in the resolved prompt', () => {
+    it('includes expertise in the resolved prompt', async () => {
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'You are a test agent.'));
       const task = makeTask({ assignedAgent: 'test-agent' });
-      const result = resolveAgentPrompt(tmpDir, task);
+      const result = await resolveAgentPrompt(tmpDir, task);
       expect(result).toContain('Expertise:');
       expect(result).toContain('testing');
     });
 
-    it('combines systemPrompt + expertise + PROMPT.md when all exist', () => {
+    it('combines systemPrompt + expertise + PROMPT.md when all exist', async () => {
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'From agent.json'));
       const promptDir = path.join(tmpDir, '.deckent', 'agents', 'test-agent');
       fs.writeFileSync(path.join(promptDir, 'PROMPT.md'), 'From PROMPT.md', 'utf-8');
       const task = makeTask({ assignedAgent: 'test-agent' });
-      const result = resolveAgentPrompt(tmpDir, task);
+      const result = await resolveAgentPrompt(tmpDir, task);
       expect(result).toContain('From agent.json');
       expect(result).toContain('Expertise:');
       expect(result).toContain('From PROMPT.md');
     });
 
-    it('returns undefined for generic agent', () => {
+    it('returns undefined for generic agent', async () => {
       const task = makeTask({ assignedAgent: 'generic' });
-      const result = resolveAgentPrompt(tmpDir, task);
+      const result = await resolveAgentPrompt(tmpDir, task);
       expect(result).toBeUndefined();
     });
   });
@@ -158,25 +158,25 @@ describe('Agent Activation', () => {
   // ─── B2) forceModel does NOT bypass agent selection ─────────────────────
 
   describe('forceModel agent bypass removed', () => {
-    it('resolveAgentPrompt works when task has forceModel and assignedAgent', () => {
+    it('resolveAgentPrompt works when task has forceModel and assignedAgent', async () => {
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'Specialized prompt'));
       const task = makeTask({ assignedAgent: 'test-agent', forceModel: 'opus' } as Partial<Task>);
-      const result = resolveAgentPrompt(tmpDir, task);
+      const result = await resolveAgentPrompt(tmpDir, task);
       expect(result).toContain('Specialized prompt');
     });
 
-    it('resolveAgentPrompt returns undefined only for generic, not for forceModel tasks', () => {
+    it('resolveAgentPrompt returns undefined only for generic, not for forceModel tasks', async () => {
       writeAgentJson(tmpDir, 'bug-fixer', makeAgentDef('bug-fixer', 'Fix bugs'));
       const task = makeTask({ assignedAgent: 'bug-fixer', forceModel: 'sonnet' } as Partial<Task>);
-      const result = resolveAgentPrompt(tmpDir, task);
+      const result = await resolveAgentPrompt(tmpDir, task);
       expect(result).toBeDefined();
       expect(result).toContain('Fix bugs');
     });
 
-    it('agent prompt includes expertise even with forceModel', () => {
+    it('agent prompt includes expertise even with forceModel', async () => {
       writeAgentJson(tmpDir, 'test-agent', makeAgentDef('test-agent', 'Agent prompt'));
       const task = makeTask({ assignedAgent: 'test-agent', forceModel: 'haiku' } as Partial<Task>);
-      const result = resolveAgentPrompt(tmpDir, task);
+      const result = await resolveAgentPrompt(tmpDir, task);
       expect(result).toContain('Expertise:');
       expect(result).toContain('testing');
     });
