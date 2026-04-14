@@ -1,0 +1,21 @@
+`★ Insight ─────────────────────────────────────`
+**Bug özeti ve fix stratejisi:**
+
+1. **Kök neden:** `runDecay()` içinde `shouldRun = linesBefore > budget` kullanıyordu — `linesBefore` TOTAL satır (exempt dahil). `DECISIONS.md` 702 satır ile total 1204 olsa da, decayable sadece 502 satır olduğunda `audit.status` zaten `OVER` döndürüyordu. Asıl bug step 4 ve 5'te: `countBrainLines() > budget` guard'ları total'e bakıyordu, exempt dosyalar bu guard'ları kalıcı olarak "true" tutuyordu, trim sonsuz döngüye girebiliyordu ya da MEMORY.md gereksiz trim ediliyordu.
+
+2. **Fix:** Üç lokasyon değişti — hepsi `countBrainLines()` yerine `auditBrainBudget().decayableLines` kullanıyor. Bu sayede exempt dosyalar (DECISIONS.md, PROJECT-IDENTITY.md) decay kararlarını etkilemiyor.
+
+3. **Test tasarımı:** `auditBrainBudget` birimi doğrudan test edildi (5 senaryo), `runDecay` entegrasyon testleri exempt-aware mantığını doğruluyor (5 senaryo). Kritik regresyon senaryosu: exempt 702 + eligible 500, budget 300 → decay tetiklenmeli.
+`─────────────────────────────────────────────────`
+
+Görev tamamlandı. İşte özet:
+
+**Değiştirilmiş dosyalar:**
+- `src/orchestra/debt-manager.ts` — `runDecay()` içinde 3 yer fix edildi:
+  - `shouldRun`: `linesBefore > budget` kaldırıldı → sadece `audit.status === 'OVER'` (decayableLines kontrolü)
+  - Step 4: `countBrainLines() > budget` → `auditMid.decayableLines > budget`
+  - Step 5: `countBrainLines() > budget` → `auditFinal.decayableLines > budget`
+
+- `tests/orchestra/memory-decay.test.ts` (yeni) — 10 test: 5 `auditBrainBudget` birimi + 5 `runDecay` entegrasyon
+
+**Sonuç:** 32 decay testi pass, TypeScript hata yok. Pre-existing 115 fail Task 137-001 kapsamında, bu fix tarafından üretilmedi.

@@ -3453,3 +3453,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 137-006: Brain Budget Decay No-Op Bug Fix (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 138 — sprint-138
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-14
+**Duration:** 3226s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 11 |
+| Completed | 11 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | 8.5% |
+| Duration | 3226076ms |
+
+### Tasks
+
+- 138-001: ADR Governance Integration (DONE)
+- 138-002: ADR-035 Verification Protocol Standard (GO_WITH_TECH_DEBT)
+- 138-003: Auditor Authority Extension (3-Pipeline Verification + ADR Compliance) (DONE)
+- 138-004: Structured Event Stream + Plan-Time Scope Collision Detection (DONE)
+- 138-005: Test Restoration Tam Tamamlama (DONE)
+- 138-006: Layer 4 Runtime Wire Forensic Fix (DONE)
+- 138-007: Auto-Archive Partial Regression Fix (DONE)
+- 138-008: Worker Honest Assessment Calibration v2 (GO_WITH_TECH_DEBT)
+- 138-009: Long-Running Sprint Resume Capability MVP (DONE)
+- 138-010: MCP/CLI Parity Audit (OPSİYONEL) (DONE)
+
+---

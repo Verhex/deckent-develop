@@ -1,0 +1,115 @@
+{
+  "id": "137-003",
+  "title": "gate.json + load-report.md Runtime Wire Restore",
+  "description": "gate.json + load-report.md Runtime Wire Restore\n- Model: sonnet\n- Effort: normal\n- Priority: HIGH\n- Dependencies: 137-002\n- Skills: typescript-expert\n- Files: src/orchestra/sprint-finalizer.ts, src/core/observability.ts, tests/orchestra/sprint-finalizer.test.ts\n- Scope: src/orchestra/, src/core/, tests/orchestra/\n\n### Description\nSprint 136 Task 4 (gate.json) ve Task 5 (load-report.md) kod yazıldı ama Task 8 refactor finalizeSprint call path'ini değiştirdi, runtime wire koptu. Runtime kanıt: Sprint 136 tamamlandı ama `.deckent/sprint-136-gate.json` + `docs/audits/sprint-136/load-test-report.md` oluşmadı.\n\n**Fix:**\n1. `finalizeSprint()` yeni path'inde doğru yerleri bul (`runSelfAuditGate()` sonrası + decay öncesi)\n2. `fsPromises.writeFile(join(projectRoot, '.deckent', \\`sprint-${sprintId}-gate.json\\`), JSON.stringify(gateResult, null, 2))`\n3. `generateLoadReport()` çağrısı → `docs/audits/sprint-${sprintId}/load-test-report.md` path'ine yaz\n4. Fail-safe: write fail → warning log, sprint finalize'ı bloklamaz\n\n**Dependency gerekçesi:** Task 137-002 ile aynı dosyaya (`sprint-finalizer.ts`) yazar. Paralel spawn edilirse file lock collision veya merge conflict riski. Sequential execution zorunlu.\n\n**Kanıt:**\n- `grep -n \"sprint-\\${sprintId}-gate.json\" src/orchestra/sprint-finalizer.ts` → hit\n- `grep -n \"generateLoadReport\" src/orchestra/sprint-finalizer.ts` → hit\n- Sprint 137 finalize sonrası `.deckent/sprint-137-gate.json` + `docs/audits/sprint-137/load-test-report.md` **runtime oluşmalı**\n\n**Test:** 3+ test:\n1. gate.json write integration (mock filesystem)\n2. load-report.md write integration\n3. Fail-safe: write throw → warning + finalize devam\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "HIGH",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/core/",
+      "tests/orchestra/",
+      "docs/audits/sprint-136/",
+      "docs/audits/",
+      "docs/audits/sprint-137/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-finalizer.ts",
+      "src/core/observability.ts",
+      "tests/orchestra/sprint-finalizer.test.ts",
+      "load-report.md",
+      "docs/audits/sprint-136/load-test-report.md",
+      "gate.json",
+      "sprint-136-gate.json",
+      "load-test-report.md",
+      "docs/audits/sprint-137/load-test-report.md",
+      "sprint-137-gate.json"
+    ]
+  },
+  "dependencies": [
+    "137-002"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep -n \"sprint-\\${sprintId}-gate.json\" src/orchestra/sprint-finalizer.ts` → hit; `grep -n \"generateLoadReport\" src/orchestra/sprint-finalizer.ts` → hit",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-137",
+  "provider": "claude",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-14T05:09:15.197Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.87
+      },
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.31
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.25
+        },
+        {
+          "name": "core",
+          "weight": 0.13
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 10,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.2,
+          "tests/": 0.1,
+          "docs/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.1
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2056,
+  "updatedAt": "2026-04-14T05:34:50.708Z"
+}

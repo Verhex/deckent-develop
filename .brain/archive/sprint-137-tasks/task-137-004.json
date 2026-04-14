@@ -1,0 +1,100 @@
+{
+  "id": "137-004",
+  "title": "ErrorRegistry Lint Script Wire",
+  "description": "ErrorRegistry Lint Script Wire\n- Model: sonnet\n- Effort: low\n- Priority: HIGH\n- Dependencies: 137-001\n- Skills: devops-engineer, ci-testing\n- Files: scripts/check-error-handling.mjs, package.json, tests/core/error-handling-unification.test.ts\n- Scope: scripts/, tests/core/\n\n### Description\nSprint 136 Task 7 NO_GO aldı ama `scripts/check-error-handling.mjs` fiziken yazıldı. Eksik:\n1. `package.json` `\"scripts\": { ..., \"lint:errors\": \"node scripts/check-error-handling.mjs\" }` entry\n2. Test invoke: `child_process.execSync('npm run lint:errors', { stdio: 'pipe' })` → exit 0 assertion\n3. **Opsiyonel:** `src/orchestra/` içinde `throw new Error` kullanımı varsa DECKENT_E0XX migration. **Migration sadece tüm test'ler pass ediyorsa yapılır, scope creep yasak — migration yaparken test kırarsa vazgeç.**\n\n**Dependency gerekçesi:** Task 137-001 test restoration bitmeden `tests/core/error-handling-unification.test.ts` baseline bilinmez (Sprint 136 kısmen fix edildi). Sequential.\n\n**Kanıt:**\n- `npm run lint:errors` → exit 0\n- `grep \"lint:errors\" package.json` → hit\n- `npx vitest run tests/core/error-handling-unification.test.ts` → 0 fail\n\n**Test:** 2+ test:\n1. Script invoke + exit 0 assertion\n2. Rule violation detection (intentional failing fixture → exit !=0)\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "HIGH",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "tests/core/",
+      "scripts/",
+      "src/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "scripts/check-error-handling.mjs",
+      "package.json",
+      "tests/core/error-handling-unification.test.ts"
+    ]
+  },
+  "dependencies": [
+    "137-001"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep \"lint:errors\" package.json` → hit; `npx vitest run tests/core/error-handling-unification.test.ts` → 0 fail",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-137",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "devops-engineer",
+    "ci-testing"
+  ],
+  "createdAt": "2026-04-14T05:09:15.197Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.79
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.33
+        },
+        {
+          "name": "scripts",
+          "weight": 0.33
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.17
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "scripts/": 0.33,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "scripts/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-14T05:34:54.138Z"
+}

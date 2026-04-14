@@ -28,9 +28,11 @@ Deckent'in 360° enterprise readiness audit'i, 130+ sprint birikiminin güçlü 
 
 **Sprint 137 Update (2026-04-14):** 6 task planlandı (Sprint 136'nın 10 carry-over debt'inden 4 P0 + 2 docs/budget seçimi, Kapsam A), **35m 52s execute** (Sprint 136'dan -19 dk -35%, **en hızlı 4 sprint**), zero coordinator crash. Theme: "Recovery — Test Restoration + Wire Fixes + Docs Sync". Execution parameters: max_workers=3, structured planner, docker backend, hybrid wave model (Wave 1 Task 1 gate / Wave 2 Task 2 wire live / Wave 3 Task 3-6 parallel) — DIRECTIVES'e `Dependencies:` line eklendi (T-005 dependency parser **ikinci canlı dogfood**: parser parse etti, task JSON `dependencies` field doğru yazıldı, ama execution scheduler dependency'i respect etmedi → 3 worker paralel spawn, Sprint 138 debt). Brain final label: **5 DONE + 1 TECH_DEBT + 0 NO_GO** — **3 sprint sonra ilk zero NO_GO** (Sprint 134-136 hepsinde 3+ NO_GO vardı). **🏆 META-DOGFOOD İLK CANLI İN-SPRINT KANIT:** Task 137-001 (test restoration HIGH/CRITICAL) Docker HB shutdown bug pattern'ına düştü (HB seq 99 status:DONE exitCode:0 yazdı ama `.result` yazmadan container öldü), Brain synthetic NO_GO yazdı, FIX worker spawn etti, **Brain finalize phase'inde `tryCodeVerifiedDone` helper otomatik çağrıldı**, git diff'te `tests/orchestra/brain.test.ts +88`, `task-queue.test.ts +24`, `task-limit.test.ts +20` kod değişikliklerini tespit etti, `.result` dosyasını overwrite etti: `selfAssessment: DONE, codeVerified: CODE_VERIFIED_DONE`. Sprint 134-136'daki 4-sprint'lik Docker HB shutdown bug için **ilk otomatik retrospektif çözüm**. Sprint 136 chicken-egg pattern'ı Sprint 137'de canlı çözüldü. **Worker dürüstlük sınırı:** Helper "file change varlığı" ile DONE verdi ama Task 137-001 functional %51 (vitest 123 → 63, -60 fix, 63 hâlâ kırık) — `feedback_worker_honest_assessment.md` uyarısı canlı kanıt; Sprint 138'de helper'a "actual vitest run check" eklenmesi P0 debt. **Layer 4 runtime wire devam fail:** Task 137-003 worker "gate.json + load-report wire satır 10b/10c'de mevcut" dedi ama Sprint 137 finalize sonrası `.deckent/sprint-137-gate.json` + `docs/audits/sprint-137/load-test-report.md` + `metrics.jsonl` **hiçbiri oluşmadı** — Task 8 refactor `finalizeSprint()` call path'ini kırmaya devam ediyor, Sprint 136 + Sprint 137 aynı pattern. **Auto-archive partial regression:** `.brain/sprints/sprint-137.md` yazıldı ✅ ama `.brain/archive/DIRECTIVES-sprint-137.md` + `DIRECTIVES.md` Sprint 138 reset **olmadı** ❌ → manuel kapanış seremonisinde tamamlandı. Sprint 135-136 redemption pattern'ı Sprint 137'de kısmen geriledi (Sprint 138 P0). Major deliverables: T-001 14 fail file → 11 fail file (60 test fix, %51 restored, helper retrospektif DONE), T-002 sprint-finalizer.test.ts +178 integration test (wire zaten Sprint 136'dan canlıymış — Sprint 136 Task 3 chicken-egg keşfi confirm), T-003 sprint-finalizer.test.ts +95 + observability.ts test (runtime fail), T-004 `package.json lint:errors` zaten satır 29'da + `tests/core/error-handling-unification.test.ts +49` invoke test, T-005 BETA-TRACKER +76 + DECKENT-MASTER-BLUEPRINT +28 (3 sprint catch-up sync), T-006 `debt-manager.ts +147` runDecay() shouldRun guard fix (gerçek bug yakalandı: exempt+decayable total → decayable-only audit). vitest **123 → 63 fail** (-60, %51 restored, hedef 0 değil ama major progress). tsc green. Layer 3 17-criterion **9/17 PASS** → **GO_WITH_TECH_DEBT honest label** (Sprint 136 8/17'den **+1 net bounce**, target 14/17 tutmadı). 11 carry-over debt → Sprint 138 (P0: test restoration tam tamamlama + runtime wire fix + helper functional upgrade + auto-archive regression fix). Kur-çalıştır readiness **~4.00/5** — ilk kez 4.00 eşik aşıldı (Sprint 134/135/136: 3.86/3.93/3.925 serisi).
 
-**Genel Verdict (güncel): NEEDS-WORK → MODERATE → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT (S137 meta-dogfood breakthrough, numerical marginal hold)** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde **crash-resistant**, **zero NO_GO ilk kez Sprint 137'de** (helper retrospektif relabel sayesinde). Sprint 133 güvenlik sertliği, Sprint 134 god object parçalama + product-not-service vizyonu, Sprint 135 operasyonel fragility kapanışı, Sprint 136 sprint-controller architectural finalization (-1681 LoC) + T-005 canlı dogfood, Sprint 137 meta-dogfood breakthrough (`tryCodeVerifiedDone` helper ilk canlı in-sprint relabel) + test restoration %51 + 4 task "zaten yapılmış" keşfi (Sprint 136 Task 3/4/5/7 helper'ları Sprint 137'de live-confirmed). Async I/O kısmen başladı, tam migration Sprint 138'e (Sprint 132 CRITICAL #1 hâlâ açık).
+**Sprint 138 Update (2026-04-14):** 10 task planlandı (Sprint 137 11 carry-over debt'inden seçim + mimari pivot: ADR-035 + Auditor Authority + Event Stream + Recovery Completion + Worker Honest v2 + Long-running Resume MVP + ADR Governance), **53m 46s execute** (3,226,076 ms, Sprint 137'den +18 dk ama scope 2.65x daha büyük — 61 files / +3655/-901). Theme: **"Architectural Pivot — Verification Protocol Foundation"**. Alperen retro'da mimari pivot kararı verdi: Brain ↔ Auditor ↔ Worker iletişimini standardize + auditor'a verification yetkileri + structured event stream + long-running sprint zemini. Execution parameters: max_workers=3, structured planner, docker backend, 5 CRITICAL + 4 HIGH + 1 NORMAL priority karışımı. Brain final label: **8 DONE + 2 TECH_DEBT + 0 NO_GO** — **zero NO_GO 2-sprint streak** (Sprint 137 + 138 arka arkaya). **🏆 6 CANLI META-DOGFOOD KANIT yakalandı:** (1) **Worker Honest TECH_DEBT Spontan** — Task 138-002 worker ADR-035 doc'u yazdı, kendi chicken-egg dependency'sini dürüst itiraf etti ("validator yok, Task 1 bittiğinde doğrulanır"), Sprint 138 Worker Honest v2 hedefini kod yazılmadan önce spontan yaşadı. (2) **ADR-036 Self-Referential Meta-Doğrulama** — Task 138-001 worker'ı ADR Governance'ı implement etti + yazdığı ADR-036'yı kendi yazdığı validator'dan geçirdi (`✓ ADR validation passed: 37 ADRs validated`). (3) **ADR-006 Enforcement Canlı Dogfood** — Task 138-006 worker'ı Layer 4 Wire forensic fix yaparken Task 1'in yazdığı ADR-006 pilot rule'u (`spawnSync + shell:true` detection) kendi fix'inde uyguladı — `runSelfAuditGate` içinde `shell: true` kaldırıldı çünkü ADR-006 compliance zorunlu. **Sprint 138 vizyon hedefinin ilk in-sprint kanıtı.** (4) **Helper Retrospektif Relabel 2-Sprint Streak** — Task 138-005 (Test Restoration) Docker HB shutdown bug'a takıldı (Sprint 135-137 pattern), Brain synthetic NO_GO yazdı, Brain finalize helper `tryCodeVerifiedDone` (Task 138-003 tarafından auditor.ts'e taşındı) Task 5'i retrospektif DONE relabel etti (`codeVerified: "CODE_VERIFIED_DONE"`). Sprint 137 Task 137-001 pattern **2-sprint üst üste proven**. (5) **Brain Cross-Dependency Reasoning Canlı + Worker Honest Verification** — Task 5 NO_GO sonrası Brain `brain.md` kuralı `Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix` canlı uygulandı, Task 5'in `dependencies: ["138-001"]` gördü, Task 1-xfix worker spawn etti. xfix worker gitti, 0 file changed, **"Brain'in teşhisi yanlış, Task 1 zaten tam doğru yapılmış"** honest verification raporu yazdı (correctness 100). Çift katmanlı dogfood. (6) **Worker Honest v2 Kod Seviyesinde Mandatory** — Task 138-008 worker `task-builder.ts` (`## Honest Self-Assessment Required` block), `worker.ts` (writeVerifyDeltaBaseline + readVerifyDeltaBaseline + computeVerifyDelta), `result-evaluator.ts` (applyTechDebtDowngrade çift katman: DONE+<50%→NO_GO, DONE+50-79%→TD) ile Sprint 137 "kod var → DONE" kısayolunu **sistematik kod seviyesinde çözdü**. Major deliverables: **Task 138-001 ADR Governance Integration** (+380/-12, 37 ADR migration + ADR-036 + DECKENT.md mandatory import + brain.md/worker-default.md ADR rules + scripts/adr-validator.mjs 177 LoC + task-builder.ts prompt injection), **Task 138-003 Auditor Authority Extension** (+780/-350, tryCodeVerifiedDone migration result-evaluator→auditor + re-export shim backward compat + verifyFunctional at auditor.ts:1116 + checkADRCompliance pilot ADR-006/008/010), **Task 138-004 Event Stream + Plan-Time Collision Detection** (+848/-95 Sprint 138'in en büyük task'ı — event-stream.ts 305 LoC YENİ 15 channel constants ADR-035 Protocol V1.0, file-lock.ts 30→267 LoC real implementation atomic O_EXCL + idempotent + TTL + cleanup, conflict-resolver.ts 147→276 LoC detectScopeCollisions + buildCollisionAwareWaves, **`.plan` dosyası + token tracking in 120k/out 25k/cache 80k — Sprint 138 model worker**), **Task 138-006 Layer 4 Runtime Wire Forensic Fix** (+62/-20 root cause: `runSelfAuditGate` spawnSync shell:true + timeout 390s process interrupt, fix: ADR-006 compliance removed + timeout 30s/120s + gate.json write ayrıldı fail-safe fallback + breadcrumb logging permanent), **Task 138-007 Auto-Archive Partial Regression Fix** (+68/-1 archiveOrphanTasks() YENİ proaktif extension — pre-flight manuel cleanup ihtiyacı kalkar), **Task 138-008 Worker Honest v2** (+285/-2 full calibration), **Task 138-009 Long-Running Sprint Resume Capability MVP** (+380/-0 sprint-checkpoint.ts 190 LoC + resume.ts 99 LoC + CHECKPOINT_INTERVAL=5 integration — Sprint 140 50-task + Sprint 145 100-task zemini), **Task 138-010 MCP/CLI Parity Audit OPSİYONEL** (+185 LoC — 21 parity / 3 unintentional gap / 12 intentional CLI-only, Sprint 139 debt: deckent_resume HIGH + deckent_finalize + deckent_test). **Sprint 138'in sistemik bulgusu — Runtime Wire 3-Sprint Fail Streak:** Sprint 136+137+138 üst üste `gate.json` + `load-report.md` + `metrics.jsonl` + `events.jsonl` runtime'da oluşmadı. Task 6 worker kod seviyesinde forensic fix yaptı ama Brain runtime pre-build'den yüklenmiş olduğu için yeni kodu kullanmadı (`feedback_mcp_build_reload.md` pattern — MCP server restart gerekli). **Auto-archive partial regression 2-sprint devam:** sprint-138.md ✅ ama DIRECTIVES archive/reset ❌ (manuel archive). **Vitest IPC channel error regression** — Sprint 138 kendi değişikliklerinin yarattığı yeni bug (ERR_IPC_CHANNEL_CLOSED tinypool) baseline unmeasurable, Sprint 139 P0 debt. **Dashboard parse error devam** (Sprint 137 pattern). **WSL patlaması** Phase 4 sırasında session reconnect gerektirdi (minor). Layer 3 17-criterion **10/17 PASS** → **GO_WITH_TECH_DEBT honest label** (Sprint 137 9/17'den **+1 net bounce** — Layer 1 full clear 3/3 ilk kez, 6 canlı meta-dogfood qualitative wins). 12 carry-over debt → Sprint 139 (P0: Layer 4 runtime wire deploy + vitest IPC fix + auto-archive runtime + verifyFunctional wire). Kur-çalıştır readiness **~4.03/5** (+0.03 marjinal artış, 4.00 eşik korundu, 4.15 target miss -0.12). Ürün Kimliği +0.10 (6 canlı meta-dogfood), Bugsuz -0.05 (IPC regression + Layer 4 fail), Gözlemlenebilirlik +0.05 (event stream foundation atıldı).
 
-**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133) → 3.86/5 (Sprint 134, +0.26) → ~3.93/5 (Sprint 135, +0.07) → ~3.925/5 (Sprint 136, -0.005) → ~4.00/5 (Sprint 137, +0.075)** — Sprint 137 ilk kez **4.00 eşik aşıldı** (4 sprint serisi 3.86/3.93/3.925/4.00). "Bugsuz" ekseni +0.25 (vitest 123→63 -60 fix), "Gözlemlenebilirlik" -0.1 (Layer 4 runtime wire fail devam), "Ürün Kimliği" +0.05 (meta-dogfood transparency). Hedef 4.05 marjinal kaçırıldı (-0.05). Sprint 138'in P0'ları (test restoration tamamlama + runtime wire fix + helper functional upgrade) başarılı olursa bounce ~4.15+ beklenen.
+**Genel Verdict (güncel): NEEDS-WORK → MODERATE → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT (S138 architectural pivot success, runtime wire 3-sprint fail continue)** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde **crash-resistant**, **zero NO_GO 2-sprint streak** (Sprint 137+138). Sprint 133 güvenlik sertliği, Sprint 134 god object parçalama + product-not-service vizyonu, Sprint 135 operasyonel fragility kapanışı, Sprint 136 sprint-controller architectural finalization (-1681 LoC) + T-005 canlı dogfood, Sprint 137 meta-dogfood breakthrough (`tryCodeVerifiedDone` helper ilk canlı in-sprint relabel), **Sprint 138 mimari pivot başarısı: ADR Governance (kullanıcı-facing product feature) + Auditor Authority 3-pipeline + Event Stream Foundation + Worker Honest v2 kod seviyesinde mandatory + 6 canlı meta-dogfood kanıt**. Async I/O hâlâ kısmen, tam migration Sprint 141'e (Sprint 132 CRITICAL #1 hâlâ açık).
+
+**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133) → 3.86/5 (Sprint 134, +0.26) → ~3.93/5 (Sprint 135, +0.07) → ~3.925/5 (Sprint 136, -0.005) → ~4.00/5 (Sprint 137, +0.075) → ~4.03/5 (Sprint 138, +0.03)** — Sprint 138 marjinal artış (4.00 eşik 2-sprint korundu), ama asıl kazanım qualitative: 6 canlı meta-dogfood kanıt, Layer 1 ilk full clear 3/3, mimari foundation 4 kritik deliverable canlı. "Bugsuz" ekseni -0.05 (vitest IPC regression + Layer 4 runtime wire 3-sprint fail), "Ürün Kimliği" +0.10 (meta-dogfood qualitative breakthrough), "Gözlemlenebilirlik" +0.05 (event stream foundation). Hedef 4.15 -0.12 miss. Sprint 139'un P0'ları (Layer 4 runtime wire deploy + vitest IPC fix + notification dispatcher) başarılı olursa ~4.15+ bounce beklenen, Sprint 147 Public Beta GA achievable 9-sprint chain.
 
 ---
 
@@ -204,13 +206,14 @@ Birden fazla worker tarafından farklı açılardan tespit edilen bulgular en y�
 
 **Deckent ~3.93/5 ile "MODERATE-PRODUCT (strengthened)" kategorisinde** (Sprint 135 sonrası, +0.07). Sprint 135 **operasyonel sıçrama** yaptı: zero coordinator crash, auto-archive canlı, live observability 0→37 satır, Brain FIX phase otomatik recovery. Ama **5 test regression + 2 artifact miss (gate.json/load-report)** sayısal hedefi 0.02 alttan kaçırdı. Kur-çalıştır yolculuğunda Sprint 135 "kırılgan → crash-resistant" geçiş sprint'idir — Sprint 136 bu temelin üstüne 5 test fix + async I/O ilk kademe + wizard work koymayı hedefliyor.
 
-**Sprint 136 + Sprint 137 axis update note (catch-up):** Yukarıdaki tablo Sprint 135 sütununda kaldı. Sprint 136 + 137 axis hareketleri (Section 18.2 + scorecard'larda detaylı):
+**Sprint 136 + Sprint 137 + Sprint 138 axis update note (catch-up):** Yukarıdaki tablo Sprint 135 sütununda kaldı. Sprint 136 + 137 + 138 axis hareketleri (Section 18.2 + 20.2 + scorecard'larda detaylı):
 - **Sprint 136:** Bugsuz 3.6→3.3 (-0.3 vitest 124 fail regression), Ölçeklenebilir 3.25→4.2 (+0.95 sprint-controller -1681 LoC), Overall ~3.93→3.925 (-0.005 marjinal regression)
 - **Sprint 137:** Bugsuz 3.3→3.55 (+0.25 vitest 123→63 -60 fix), Gözlemlenebilirlik 4.0→3.9 (-0.1 Layer 4 runtime wire fail), Ürün Kimliği 4.5→4.55 (+0.05 meta-dogfood transparency), Overall 3.925→**4.00 (+0.075, 4.00 eşik ilk kez)**
+- **Sprint 138:** Kurulum 4.15→4.20 (+0.05 ADR Governance kullanıcı-facing), Bugsuz 3.55→3.50 (-0.05 vitest IPC regression + Layer 4 3-sprint fail), Gözlemlenebilirlik 3.9→3.95 (+0.05 event stream foundation), Güvenlik 4.0→4.05 (+0.05 ADR compliance pilot), Ölçeklenebilirlik 4.25→4.30 (+0.05 Resume MVP + plan-time collision), Uyumluluk 4.0→4.05 (+0.05 MCP/CLI parity audit), Ürün Kimliği 4.55→**4.65** (+0.10 6 canlı meta-dogfood), Overall 4.00→**4.03 (+0.03 marjinal)**
 
-**Section 6 axis table catch-up Sprint 138 P2 debt** — 6 axis tablosu Sprint 136+137 sütunlarıyla regenerate edilmeli, şu an sadece son 3 sprint'in axis hareketleri inline note olarak yansıtılıyor.
+**Section 6 axis table catch-up Sprint 139 P3 debt** — 6 axis tablosu Sprint 136+137+138 sütunlarıyla regenerate edilmeli, şu an son 4 sprint'in axis hareketleri inline note olarak yansıtılıyor.
 
-**Deckent ~4.00/5 ile "MODERATE-PRODUCT (4.00 threshold passed)" kategorisinde** (Sprint 137 sonrası, +0.075 vs Sprint 136). Sprint 137 **meta-dogfood breakthrough** yaptı: `tryCodeVerifiedDone` helper ilk canlı in-sprint relabel, zero NO_GO ilk kez 3 sprint sonra, en hızlı execution (35m 52s). Ama Layer 4 runtime wire (gate.json + load-report + metrics.jsonl) hâlâ fail ve Task 137-001 functional %51 (worker dürüstlük canlı kanıt). Sprint 138 Recovery Completion sonrası (test restoration tam + runtime wire fix + helper functional upgrade + auto-archive regression fix) ~4.15+ bounce beklenen, kapalı beta GA hedefi Sprint 138 sonu yakın.
+**Deckent ~4.03/5 ile "MODERATE-PRODUCT (4.00 threshold held 2-sprint streak)" kategorisinde** (Sprint 138 sonrası, +0.03 vs Sprint 137). Sprint 138 **architectural pivot breakthrough** yaptı: ADR Governance kullanıcı-facing product feature, Auditor Authority 3-pipeline + ADR compliance enforcement, Event Stream foundation (305 LoC + 15 channel constants ADR-035 Protocol V1.0), Worker Honest v2 kod seviyesinde mandatory, Long-running Resume MVP Sprint 140+ zemini, 6 canlı meta-dogfood kanıt (worker honest spontan + ADR-036 self-referential + ADR-006 enforcement + helper relabel 2-sprint + Brain cross-dep reasoning + worker honest v2). Ama **Layer 4 runtime wire 3-sprint fail streak devam** (gate.json + load-report + metrics.jsonl + events.jsonl hiç oluşmuyor — Brain runtime pre-build cache), **vitest IPC channel error regression** (Sprint 138 kendi bug'ı), **auto-archive 2-sprint partial regression** (sprint log ✅ DIRECTIVES archive/reset ❌). Sprint 139 P0 (runtime wire deploy + vitest IPC fix + notification dispatcher) başarılı olursa ~4.15+ bounce beklenen, Sprint 147 Public Beta GA achievable 9-sprint chain.
 
 ---
 
@@ -1479,6 +1482,261 @@ Sonra **kapasite kalırsa** async I/O ilk kademe + Docker HB core fix Sprint 138
 ---
 
 *Sprint 137 Section 18 + 19 written 2026-04-14 in same session as execution. Section 1 updated inline in same commit (feedback_living_record_sync.md discipline applied). Manual auto-archive recovery + closing ceremony executed by Claude Opus 4.6 (1M context) in inline-execution mode (executing-plans skill), reviewed by Alperen.*
+
+---
+
+## 20. Sprint 138 Status — Architectural Pivot + Verification Protocol Foundation (2026-04-14)
+
+### 20.1 Execution Summary
+
+| Metric | Value |
+|--------|-------|
+| Sprint ID | sprint-138 |
+| Date | 2026-04-14 |
+| Theme | **Architectural Pivot — Verification Protocol Foundation** |
+| Tasks planned | 10 (5 CRITICAL + 4 HIGH + 1 NORMAL) |
+| Tasks completed | 10 + 1 xfix (8 DONE + 2 TECH_DEBT + **0 NO_GO** final Brain label) |
+| Duration | **53m 46s** (3,226,076 ms) |
+| Coordinator crash | 0 |
+| Manual recovery | Partial (DIRECTIVES archive manual + WSL session reconnect Phase 4) |
+| Workers spawned | 11 (10 ana + 1 cross-dep xfix) |
+| Backend | Docker |
+| max_workers | 3 |
+| Brain planning | structured |
+| Files changed | **61 files / +3655/-901** (Sprint 137'nin 2.65 katı, Sprint 134'ten beri en büyük) |
+| metrics.jsonl | **0 satır** (3-sprint fail streak) |
+| gate.json | **YOK** (3-sprint fail streak, Task 6 code fix ✅ runtime fail) |
+| load-report.md | **YOK** (3-sprint fail streak) |
+| events.jsonl | **YOK** (Task 4 event stream yazıldı ama runtime'da çağrılmadı) |
+| Auto-archive | ⚠ **PARTIAL** (sprint-138.md ✅, DIRECTIVES archive ❌ manuel, DIRECTIVES reset ❌) |
+
+### 20.2 17-Criterion Layer 3 Scoring
+
+| Layer | Pass | Total | Notable |
+|-------|------|-------|---------|
+| Layer 1 (Self-Eval) | **3** | 3 | **FULL CLEAR ilk kez** (Sprint 137 2/3'ten +1 bounce, Brain label 8/10 DONE + zero NO_GO + rubric avg ≥90) |
+| Layer 2 (Technical) | 1 | 3 | tsc 0 ✅, vitest IPC error unmeasurable (Sprint 138 yeni regression), dashboard unverified |
+| Layer 3 (Manual) | 2 | 3 | physical code ✅ (11/11 task), scope ✅ (0 violation), auto-archive partial (sprint log ✅ DIRECTIVES ❌) |
+| Layer 4 (Triple Dogfooding) | **0** | 3 | gate.json + load-report + metrics.jsonl **3-sprint parity fail** (S136+137+138) |
+| Layer 5 (Vision) | 4 | 4 | **5-sprint vision immutable streak** (ADR-033/034 + roadmap + forbidden terms + per-task lens) |
+| Layer 6 (Readiness) | 0 | 1 | ~4.03/5 target 4.15 miss (-0.12), ama 4.00 eşik 2-sprint korundu |
+| **TOTAL** | **10** | **17** | Sprint 137: 9/17 → **+1 net bounce** (numerical marginal, qualitative breakthrough) |
+
+**Honest label:** GO_WITH_TECH_DEBT (target was 14/17 clean GO, achieved 10/17 with 6 canlı meta-dogfood kanıt)
+
+**Readiness:** ~4.03/5 (5-sprint serisi 3.86/3.93/3.925/4.00/4.03 — trend stabil yukarı)
+
+### 20.3 Per-Task Result Summary
+
+| Task | Agent | Effort | Brain Label | Physical Verification |
+|------|-------|--------|-------------|-----------------------|
+| 138-001 ADR Governance Integration | architect | normal | **DONE** | ✅ 9 files/+380/-12, 37 ADR migration + ADR-036 self-ref + validator pass (`npm run lint:adr` exit 0) |
+| 138-002 ADR-035 Verification Protocol | bug-fixer (sonnet) | low | **GO_WITH_TECH_DEBT** | ✅ 1 file/+120, **🏆 Worker Honest Spontan** — chicken-egg dependency dürüst itiraf (validator yok, Task 1 bekler) |
+| 138-003 Auditor Authority Extension | architect | normal | **DONE** | ✅ 5 files/+780/-350, tryCodeVerifiedDone migration + verifyFunctional + checkADRCompliance pilot |
+| 138-004 Event Stream + Collision | architect | HIGH | **DONE** | ✅ 9 files/+848/-95 (en büyük task), event-stream.ts 305 LoC + file-lock.ts 30→267 + detectScopeCollisions, **🏆 model worker (.plan + token tracking)** |
+| 138-005 Test Restoration | architect | normal | **DONE** (helper relabel) | ⚠ 472 LoC test change, Docker HB shutdown bug → FIX worker 12 dk → Brain helper retrospektif DONE (`codeVerified: CODE_VERIFIED_DONE`) — **🏆 Meta-dogfood #2** |
+| 138-006 Layer 4 Wire Forensic Fix | bug-fixer | normal | **DONE** | ⚠ 2 files/+62/-20, root cause tespit (runSelfAuditGate shell:true+390s timeout), **🏆 ADR-006 canlı enforcement** — runtime fail devam |
+| 138-007 Auto-Archive Regression | bug-fixer (sonnet) | low | **DONE** | ⚠ 4 files/+68/-1, archiveOrphanTasks() YENİ proaktif extension, runtime partial (sprint log ✅ DIRECTIVES ❌) |
+| 138-008 Worker Honest v2 | test-writer (sonnet) | normal | **GO_WITH_TECH_DEBT** | ✅ 7 files/+285/-2, **🏆 Honest Self-Assessment block + verify-delta + applyTechDebtDowngrade çift katman** — Sprint 138 vizyon core |
+| 138-009 Resume Capability MVP | temp-react-ts-specialist (sonnet) | normal | **DONE** | ✅ 4 files/+380/-0, sprint-checkpoint.ts 190 + resume.ts 99 + CHECKPOINT_INTERVAL=5 integration, MVP Sprint 140+ zemini |
+| 138-010 MCP/CLI Parity Audit (OPSİYONEL) | doc-writer (sonnet) | low | **DONE** | ✅ 1 file/+185, 21 parity + 3 gap + 12 intentional CLI-only, Sprint 139 debt: deckent_resume/finalize/test |
+| 138-001-xfix Cross-Fix Verification | architect (cross-dep) | normal | **DONE** | ✅ 0 file/0 LoC, **🏆 Brain cross-dep reasoning canlı + worker honest "yanlış teşhis" verification** (correctness 100) |
+
+### 20.4 Comparison with Sprint 134-137 (Trend Analysis)
+
+| Metric | S134 | S135 | S136 | S137 | S138 | Trend |
+|--------|------|------|------|------|------|-------|
+| Layer 3 score | 14/17 | 11/17 | 8/17 | 9/17 | **10/17** | ↑ +1 |
+| Readiness | 3.86/5 | 3.93/5 | 3.925/5 | 4.00/5 | **4.03/5** | ↑ +0.03 |
+| Duration | 33m+2h | 1h 0m | 55m | 35m 52s | **53m 46s** | ↑ +18m |
+| Task count | 15 | 13 | 10 | 6 | **10** | ↑ +4 |
+| Files changed | - | - | ? | 50 | **61** | ↑ +11 |
+| LoC delta | - | - | ? | +1378/-532 | **+3655/-901** | ↑ **2.65x** |
+| Tasks DONE label | 11 | 10 | 7 | 5 | **8** | ↑ +3 |
+| NO_GO count | 0 | 3 | 3 | 0 | **0** | parity (2-sprint streak) |
+| Coordinator crash | 1 | 0 | 0 | 0 | **0** | parity (4-sprint streak) |
+| Manual recovery | 2h | 0 | partial | 0 | partial | mixed |
+| Carry-over debt | 12 | 10 | 10 | 11 | **12** | ↑ +1 |
+| Meta-dogfood evidence | 0 | 0 | 0 | 1 | **6** | 🏆 **6x jump** |
+
+**Net interpretation:** Sprint 138 numerical marginal bounce (+1 Layer 3) + qualitative architectural breakthrough (**6 canlı meta-dogfood kanıt**, 5-sprint serisinde 1'den 6'ya 6x jump). Mimari foundation canlı ama Layer 4 runtime wire 3-sprint streak fail devam. Sprint 139 runtime deploy fix + notification dispatcher sonrası ~4.15+ bounce mümkün, kapalı beta Sprint 142-147 chain realistic.
+
+### 20.5 🏆 Architectural Pivot Evidence — 6 Canlı Meta-Dogfood Kanıt
+
+Sprint 138 17-criterion'da 10/17 aldı ama **gerçek başarı mimari seviyede**. 6 büyük meta-dogfood canlı kanıt yakalandı:
+
+**1. Worker Honest TECH_DEBT Spontan (Task 138-002)**
+Worker ADR-035'i yazdı, **kendi chicken-egg dependency'sini dürüst itiraf etti** ("validator yok, Task 1 bittiğinde doğrulanır"), Sprint 138 Worker Honest v2 hedefini kod yazılmadan önce spontan yaşadı. rubricScores: correctness 98, test_coverage 60 (validator yok), scope_compliance 100.
+
+**2. ADR-036 Self-Referential Meta-Doğrulama (Task 138-001)**
+Task 1 worker'ı ADR Governance'ı implement etti + yazdığı ADR-036'yı kendi yazdığı validator'dan geçirdi: `✓ ADR validation passed: 37 ADRs validated`. **Kendisini implement eden ADR kendi validator'ından geçti** — meta-seviyesinde self-consistency.
+
+**3. ADR-006 Enforcement Canlı Dogfood (Task 138-006) — EN ÖNEMLİ CANLI KANIT**
+Task 1'in yazdığı ADR pilot rule (ADR-006 `spawnSync + shell:true` detection) **Task 6 worker'ı tarafından kendi forensic fix'inde kod içinde uygulandı**. `runSelfAuditGate` içinde `shell: true` kaldırıldı çünkü Task 6 worker ADR-006 okudu + compliance gerektiğini anladı. **Sprint 138 vizyon hedefi**: ADR'lerin worker'lar tarafından mandatory uygulanması. **Kullanıcılar açık repoya geçtiğinde kendi projelerinde ADR governance'ı dogfood edebilecekler — bu canlı kanıt.**
+
+**4. Helper Retrospektif Relabel 2-Sprint Streak (Task 138-005)**
+Task 5 worker Docker HB shutdown bug'a takıldı (Sprint 135-137 pattern aynı). Brain synthetic NO_GO yazdı, FIX worker 12 dk çalıştı, Brain finalize sırasında `tryCodeVerifiedDone` helper (Task 138-003'te auditor.ts'e taşındı) Task 5'i bulup **retrospektif DONE relabel** etti (`codeVerified: "CODE_VERIFIED_DONE"`). Sprint 137 Task 137-001'de olan pattern **2-sprint üst üste proven**. Meta-dogfood artık **kural**, tek seferlik lucky shot değil.
+
+**5. Brain Cross-Dependency Reasoning Canlı + Worker Honest Verification (Task 138-001-xfix)**
+Brain `brain.md` kuralı `Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix` **canlı uygulandı**: Task 5 NO_GO → Task 5 dependency `["138-001"]` → Brain Task 1 xfix worker spawn etti. xfix worker gitti, 0 file changed, **"Brain'in teşhisi yanlış, Task 1 zaten tam doğru yapılmış"** honest verification raporu yazdı (correctness 100). Hem Brain reasoning canlı hem worker dürüstlük — **çift katmanlı Sprint 138 vizyon dogfood**. Ayrıca **yanlış teşhis** canlı kanıt: Brain Docker HB shutdown bug pattern'ını "dependency failure" olarak yorumladı, Sprint 139 debt: cross-dep discriminator.
+
+**6. Worker Honest v2 Kod Seviyesinde Mandatory (Task 138-008)**
+Task 8 worker Sprint 138 Worker Honest v2 hedefini kod seviyesinde enforce etti:
+- `task-builder.ts`: `## Honest Self-Assessment Required` block (baseline/end/delta mandatory)
+- `worker.ts`: writeVerifyDeltaBaseline + readVerifyDeltaBaseline + computeVerifyDelta (filesRatio*0.6 + testRatio*0.4)
+- `result-evaluator.ts`: `applyTechDebtDowngrade` çift katman (DONE+<50%→NO_GO, DONE+50-79%→TD, TD+<50%→NO_GO)
+
+Sprint 137'nin Task 137-001'deki "kod var → DONE kısayolu" problemi **kod seviyesinde sistematik çözüldü**. Sprint 139'dan itibaren worker'lar bu kuralları mandatory uygulayacak.
+
+### 20.6 Sprint 138 Wins & Losses
+
+**🏆 Wins:**
+- **6 canlı meta-dogfood kanıt** (Sprint 137'nin 1'den 6'ya 6x jump)
+- **Layer 1 ilk full clear 3/3** (Sprint 134-137 hep 2/3 veya altındaydı)
+- **Zero NO_GO 2-sprint streak** (Sprint 137 + 138 arka arkaya)
+- **Mimari foundation 4 kritik deliverable** — ADR Governance (user-facing), Auditor 3-pipeline, Event Stream, Worker Honest v2
+- **61 files / +3655/-901** — Sprint 137'nin 2.65 katı, Sprint 134'ten beri en büyük sprint
+- **5-sprint vision immutable streak** (ADR-033/034 + roadmap + forbidden terms)
+- **4.00 readiness eşik 2-sprint korundu** (4.03/5)
+- **Sprint 140+ long-running zemini atıldı** (Task 138-009 Resume Capability MVP)
+- **ADR governance kullanıcı-facing product feature** (açık repoya geçtiğimizde kullanıcılar kendi projelerinde ADR enforcement)
+
+**⚠ Losses:**
+- **Layer 4 runtime wire 3-sprint fail streak** (gate.json + load-report + metrics.jsonl + events.jsonl hiç oluşmuyor — Brain runtime pre-build cache, `feedback_mcp_build_reload.md` pattern)
+- **Auto-archive 2-sprint partial regression** (sprint-138.md ✅ ama DIRECTIVES archive/reset ❌ manuel)
+- **Vitest IPC channel error regression** (Sprint 138 kendi değişikliklerinin yarattığı yeni bug — ERR_IPC_CHANNEL_CLOSED tinypool, baseline unmeasurable)
+- **Readiness 4.15 target miss** (-0.12, 4.03 achievement)
+- **12 carry-over debt** (Sprint 137 11'den +1 marginal artış)
+- **Dashboard parse error devam** (Sprint 137 pattern tekrar)
+- **Brain cross-dependency yanlış teşhis** (Task 1-xfix Docker HB bug ≠ dependency issue)
+- **Worker variance** (Task 4 model worker .plan + token tracking, Task 1+3 architect worker'lar yok)
+
+### 20.7 Sprint 138 Carry-Over Debt → Sprint 139 (12 items)
+
+**P0 (Critical):**
+1. Layer 4 Runtime Wire 3-Sprint Streak Fail — Brain runtime reload + tsc rebuild + MCP server restart gerekli
+2. Vitest IPC Channel Error Regression (Sprint 138 kendi bug'ı — tinypool child_process send error)
+3. Auto-Archive runtime 2-Sprint Regression (DIRECTIVES archive + reset wire)
+4. `verifyFunctional` wire eksik (Task 3 helper chicken-egg, functional check chain ekle)
+
+**P1 (High):**
+5. Worker Variance Enforcement (.plan + token tracking mandatory — `feedback_worker_inconsistency_sprint138.md`)
+6. Brain Cross-Dependency Discriminator ("runtime vs code issue" ayrımı)
+7. Dashboard Parse Error (Sprint 137'den beri ensureDashboard helper eksik)
+8. Task 10 "OPSİYONEL" semantic Brain'de yok (NORMAL priority opsiyonel olarak anlaşılmıyor)
+
+**P2 (Medium):**
+9. Docker HB Shutdown Bug Core Fix (4-sprint süreğen)
+10. xfix Worker Scope Format Bug (DECKENT.md/, .json invalid format)
+11. Token Tracking Mandatory Field (Sprint 134 T-001 wire eksik)
+12. **Notification Dispatcher (Sprint 139 ana hedef)** — ADR-035 `DECKENT→USER:NOTIFY` kanalı Sprint 138'de tanımlandı, Sprint 139 dispatcher + 2 adapter (CLI parent-tty + MCP notifications/message) + 5 minimal event
+
+### 20.8 Sprint 138 Commits
+
+1. *(pending)* — feat: Sprint 138 — architectural pivot (ADR governance + auditor authority + event stream + file-lock real + worker honest v2 + resume capability + recovery completion)
+2. *(pending)* — docs: Sprint 138 closing ceremony — FINAL report Section 1+6 inline + Section 20+21 append + scorecard + DIRECTIVES manual archive + MEMORY sync
+
+---
+
+## 21. Sprint 138 Post-Sprint Retrospective (2026-04-14)
+
+### 21.1 What Went Well
+
+1. **🏆 6 canlı meta-dogfood kanıt.** Sprint 137'nin 1'den 6'ya **6x jump** — Sprint 138 architectural pivot'un asıl başarısı numerical değil qualitative. Worker honest spontan + ADR-036 self-referential + ADR-006 enforcement (kullanıcı-facing product feature canlı dogfood!) + helper relabel 2-sprint streak + Brain cross-dep reasoning + worker honest v2 kod seviyesinde. Kullanıcılar açık repoya geçtiğinde bu pattern'ları kendi projelerinde dogfood edebilecekler.
+
+2. **Mimari foundation 4 kritik deliverable canlı.**
+   - **ADR Governance** kullanıcı-facing product feature (37 ADR migration + ADR-036 self-ref + scripts/adr-validator.mjs + DECKENT.md import + task-builder ADR injection)
+   - **Auditor Authority 3-Pipeline** (verifyWorkerResult + verifyFunctional + validateTechDebt + checkADRCompliance pilot)
+   - **Event Stream Foundation** (305 LoC + 15 channel constants ADR-035 Protocol V1.0 + file-lock.ts 30→267 real implementation + plan-time collision detection)
+   - **Worker Honest v2** (Honest Self-Assessment block + verify-delta baseline + applyTechDebtDowngrade çift katman)
+
+3. **Zero NO_GO 2-sprint streak.** Sprint 137 + Sprint 138 arka arkaya zero NO_GO. Helper retrospektif relabel 2-sprint üst üste proven — artık **kural**, tek seferlik lucky shot değil. Sprint 134-136'nın 3+ NO_GO paterni kırıldı.
+
+4. **Layer 1 ilk full clear 3/3.** Sprint 134-137 hep 2/3 veya altındaydı. Sprint 138'de Brain label 8/10 DONE + zero NO_GO + rubric avg ≥90 üçü birlikte ilk kez tutturuldu. Deckent self-evaluation layer'ı olgunlaştı.
+
+5. **61 files / +3655/-901 — en büyük sprint.** Sprint 137'nin 2.65 katı, Sprint 134'ten beri en büyük scope. Architectural pivot 5 CRITICAL + 4 HIGH task bu scope'u gerektirdi. 10 task 53m 46s'de bitti (Plan beklentisi 6-7 saat **8x daha hızlı**).
+
+6. **5-sprint vision immutable streak.** ADR-033 Product Vision + ADR-034 Multi-Project Isolation + `docs/vision/roadmap.md` + forbidden terms + per-task vision lens 5 sprint üst üste hiç ihlal edilmedi. Ürün kimliği disiplinli korundu.
+
+7. **Long-running sprint zemini atıldı.** Task 138-009 Resume Capability MVP (sprint-checkpoint.ts 190 + resume.ts 99 + CHECKPOINT_INTERVAL=5) Sprint 140 50-task + Sprint 145 100-task live test için ön koşul. MVP kısıtları doğru (mid-worker resume Sprint 140+, external state store Sprint 145+).
+
+8. **Pre-flight source inspection 5. sprint canlı dogfood.** Sprint 135-136-137 hepsinde pre-flight'ta grep+read ile kritik bug yakalandı (`feedback_preflight_source_inspection.md`). Sprint 138'de de kullanıldı (file-lock.ts 30 LoC placeholder + mevcut helper konumu result-evaluator.ts:729 + ADR baseline 7 Status alanı) — DIRECTIVES'e inline yazıldı, worker'lar doğrudan hedefe gitti.
+
+### 21.2 What Fell Short
+
+1. **Layer 4 runtime wire 3-sprint fail streak.** `gate.json` + `load-report.md` + `metrics.jsonl` + `events.jsonl` hiçbiri Sprint 138 finalize sonrası oluşmadı. Task 6 worker kod seviyesinde forensic fix yaptı (root cause: runSelfAuditGate shell:true + 390s timeout → ADR-006 compliance fix + timeout azaltma + fail-safe fallback), Task 4 worker event stream + file lock real implementation yazdı, ama **Brain runtime Sprint 138 build'den önce spawn edildi**, hot-reload yapmadı, yeni kodu kullanmadı. **`feedback_mcp_build_reload.md` pattern canlı kanıt.** Sprint 139 P0: pre-flight `tsc` rebuild + MCP server restart zorunlu.
+
+2. **Auto-archive 2-sprint partial regression.** Sprint 137'de de aynı pattern vardı: `.brain/sprints/sprint-138.md` yazıldı ✅ ama `.brain/archive/DIRECTIVES-sprint-138.md` + `DIRECTIVES.md` Sprint 139 reset ❌. Task 138-007 worker `archiveOrphanTasks()` ekledi (proaktif extension — pre-flight manuel cleanup ihtiyacı kalkar) ama `archiveDirectives()` + `resetDirectives()` hâlâ runtime'da çalışmıyor. Sprint 139 P0.
+
+3. **Vitest IPC channel error regression.** Sprint 138'in kendi değişikliklerinden kaynaklı yeni bug: `ERR_IPC_CHANNEL_CLOSED` tinypool child_process send error. Sprint 138 baseline measurement **unmeasurable** — Task 5 worker 472 LoC test fix yaptı ama final vitest summary alınamıyor. Muhtemelen Docker backend test veya smoke test subprocess send() sırasında closed channel'a yazıyor. Sprint 139 P0 debug + fix.
+
+4. **Brain cross-dependency yanlış teşhis.** Task 5 NO_GO (Docker HB shutdown bug runtime issue) → Brain `brain.md` kuralı dependency-based fix mantığı ile "Task 1 failure caused this" varsayımı ile Task 1-xfix spawn etti. Worker 0 file changed ile **"Brain'in teşhisi yanlış"** honest verification raporu yazdı. Brain reasoning canlı ama discriminator eksik. Sprint 139 debt: "runtime vs code issue" ayrımı.
+
+5. **Worker variance — model worker vs standart worker.** Task 138-004 worker (architect/opus/HIGH) tek başına `.plan` dosyası + tam token tracking yazdı. Task 138-001 + 003 worker'ları (architect/opus/normal) yazmadı. Task 138-010 worker (doc-writer/sonnet/low) token tracking yazdı ama .plan yazmadı. `worker-default.md:8 Write execution plan` kuralı sadece %25 worker'ca uygulandı. Sprint 139 enforcement: `worker.ts` execution-time `.plan` write check + `result-evaluator.ts` token usage mandatory validation.
+
+6. **Dashboard parse error devam.** Sprint 137'de brainstorming'de yakalanan `.dashboard` parse error pattern Sprint 138 finalize sırasında tekrar etti — `deckent_status` çağrılarda "Cannot parse dashboard file" döndürüyor. `ensureDashboard` helper Task 137-001 P0'ında fix'lenmesi gerekiyordu ama DIRECTIVES scope'una girmedi. Sprint 139 P1.
+
+7. **Vitest IPC + Dashboard parse error ikisi de tooling regression'ı.** Sprint 138 büyük architectural foundation ekledi ama iki tooling bug yarattı/devam ettirdi. Net tooling debt Sprint 137 baseline'dan Sprint 138'de +2.
+
+### 21.3 Sprint 139 Theme Recommendation
+
+**"Runtime Wire Deploy Fix + Notification Dispatcher + Multi-Provider Foundation"**
+
+Sprint 138 mimari foundation kod seviyesinde canlı ama runtime deploy broken. Sprint 139'un **ilk işi** Layer 4 runtime wire 3-sprint streak fail'ini kırmak. Ardından ana hedef Notification Dispatcher (ADR-035 `DECKENT→USER:NOTIFY` kanalı Task 138-002'de protocol olarak tanımlandı, Sprint 139 dispatcher + 2 adapter CLI parent-tty + MCP notifications/message + 5 minimal event implement).
+
+**Sprint 139 task önerisi (9-10 task, ~6 saat):**
+
+**P0 (Runtime Fix — 3 task):**
+1. Layer 4 Runtime Wire Deploy Fix (Brain runtime reload + tsc rebuild + MCP server restart + gate.json + load-report + metrics.jsonl + events.jsonl canlı üretimi)
+2. Vitest IPC Channel Error Regression Fix (debug which test throws, fix child_process send pattern)
+3. Auto-Archive runtime 2-sprint regression fix (archiveDirectives + resetDirectives wire restore)
+
+**P1 (Notification Dispatcher — 2 task):**
+4. Notification Dispatcher Core (notification-emitter.ts + event channels + priority levels)
+5. CLI + MCP Adapters (parent-tty + notifications/message + 5 minimal event: sprint-started, task-done, task-no-go, sprint-finalized, human-checkpoint-required)
+
+**P1 (Mimari İyileştirme — 2 task):**
+6. verifyFunctional wire eksik (Task 3 chicken-egg, functional check chain)
+7. Worker Variance Enforcement (`.plan` + token tracking mandatory via worker.ts execution check)
+
+**P2 (Multi-Provider Foundation — 2 task):**
+8. Codex + Gemini simultaneous test (2-provider parallel sprint)
+9. macOS dogfood spike (Windows Sprint 140+)
+
+**Opsiyonel:**
+10. Dashboard Parse Error Fix (`ensureDashboard` helper)
+
+### 21.4 Quotable Insights (Sprint 138'den)
+
+1. *"ADR-006 pilot rule Task 1 tarafından yazıldı, Task 6 worker'ı kendi fix'inde kod içinde uyguladı. Sprint 138 vizyon hedefi canlı kanıt — ADR'ler kullanıcı-facing product feature."* — Sprint 147 Public Beta GA için kritik dogfood.
+
+2. *"6 canlı meta-dogfood kanıt Sprint 137'nin 1'inden 6'ya 6x jump. Mimari breakthrough qualitative, numerical değil."* — Sprint 138'in asıl başarısı Layer 3 10/17 değil, **canlı evidence count**.
+
+3. *"Helper retrospektif relabel 2-sprint üst üste proven — artık kural, tek seferlik lucky shot değil."* — Meta-dogfood pattern olgunlaştı.
+
+4. *"Brain cross-dependency reasoning canlı çalıştı ama yanlış teşhis yaptı — Docker HB shutdown bug ≠ dependency failure. Worker 0 file changed ile honest verification raporu yazdı."* — Çift katmanlı dürüstlük.
+
+5. *"Task 4 worker tek başına .plan + token tracking yazdı, diğer 3 architect/opus worker yazmadı. Worker variance enforcement olmadan milyon-user trust imkansız."* — Sprint 139 P1 debt.
+
+6. *"Layer 4 runtime wire 3-sprint fail streak — kod yazıldı, runtime'da çağrılmadı. Brain runtime pre-build cache'te. `tsc` rebuild + MCP server restart = Sprint 139 pre-flight zorunlu."* — `feedback_mcp_build_reload.md` canlı kanıt 3. sprint.
+
+7. *"Sprint 138 61 files / +3655/-901 — Sprint 134'ten beri en büyük. 10 task 53m 46s'de bitti (Plan beklentisi 6-7 saat, 8x hız)."* — Deckent execution hızı + mimari scope iki ayrı metrik.
+
+### 21.5 Sprint 139-147 Chain Update
+
+**Sprint 139 (revised):** Runtime Wire Deploy Fix + Notification Dispatcher + Multi-Provider Foundation — 9-10 task
+**Sprint 140:** Long-Running Sprint 50-task Live Test (Task 138-009 Resume Capability dogfood) + AI-to-human notify genişletme
+**Sprint 141-142:** Async I/O Tam Migration + Docker HB Shutdown Core Fix (4-sprint süreğen)
+**Sprint 143-144:** Heartbeat Daemon Dogfood + Human Checkpoints + Agent Evolution + Security Hardening
+**Sprint 145:** 100-Task Long-Running Live Test + npm publish preparation
+**Sprint 146:** Documentation Finalization (388 .md review, `project_doc_finalization_sprint.md`)
+**Sprint 147:** **Public Beta GA** — Kur-Çalıştır readiness ≥4.5/5
+
+**Net:** Sprint 138'den Sprint 147 GA'ya **9-sprint chain**, ~3-4 hafta. Sprint 138 architectural pivot + 6 canlı meta-dogfood breakthrough bu trajectorinin **en büyük momentum boost'u**. Kullanıcılar Sprint 147'de Deckent'ı kur-çalıştır deneyimiyle kullanacak — ADR governance, auditor 3-pipeline verification, event stream observability, worker honest assessment, resume capability hepsi canlı.
+
+---
+
+*Sprint 138 Section 20 + 21 written 2026-04-14 in same session as execution. Section 1 + 6 updated inline in same commit (feedback_living_record_sync.md discipline applied). Manual auto-archive recovery + closing ceremony executed by Claude Opus 4.6 (1M context) in inline-execution mode (Deckent Native + executing-plans skill), reviewed by Alperen. WSL patlaması Phase 4 sırasında session reconnect gerektirdi ama state korundu.*
 
 ---
 

@@ -1,66 +1,76 @@
-# Sprint sprint-137 Retrospective
+# Sprint sprint-138 Retrospective
 
 ## Summary
-Completed 6/6 tasks in 35 minutes 53s.
+Completed 11/11 tasks in 53 minutes 46s.
 
 ## Highlights
-- 6 tasks completed on first try
+- 10 tasks completed on first try
 - No boundary violations detected
-- NO_GO rate improved from 40% to 0%
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 6/6 |
-| New test files | 6 |
-| Code changes | +523 / -19 |
-| Sprint time | 35 minutes 53s |
-| NO_GO rate | 0% (0/6) |
-| Coverage | 14.9% |
+| Tasks completed | 11/11 |
+| New test files | 12 |
+| Code changes | +3108 / -480 |
+| Sprint time | 53 minutes 46s |
+| NO_GO rate | 0% (0/11) |
+| Coverage | 8.5% |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| architect | 3 | 3 | 0 | 0 | 0% |
-| bug-fixer | 1 | 1 | 1 | 0 | 0% |
-| doc-writer | 1 | 1 | 0 | 0 | 89% |
-| test-writer | 1 | 1 | 0 | 0 | 0% |
+| architect | 4 | 4 | 0 | 0 | 0% |
+| bug-fixer | 3 | 3 | 1 | 0 | 0% |
+| doc-writer | 1 | 1 | 0 | 0 | 0% |
+| temp-react-ts-specialist | 1 | 1 | 0 | 0 | 0% |
+| test-writer | 1 | 1 | 1 | 0 | 85% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| typescript-expert | 4 | 4 | 1 | 0 | 0% |
-| testing-expert | 3 | 3 | 1 | 0 | 0% |
-| devops-engineer | 1 | 1 | 0 | 0 | 0% |
-| ci-testing | 1 | 1 | 0 | 0 | 0% |
-| documentation-writer | 1 | 1 | 0 | 0 | 89% |
+| typescript-expert | 8 | 8 | 1 | 0 | 14% |
+| testing-expert | 4 | 4 | 1 | 0 | 21% |
+| documentation-writer | 3 | 3 | 1 | 0 | 0% |
+| system-architect | 1 | 1 | 0 | 0 | 0% |
 
 ## Token Usage
 | Task | Model | Input | Output | Cache Read | Total |
 |------|-------|-------|--------|------------|-------|
-| 137-002 | opus | 2.5K | 2.7K | 10.1K | 15.3K |
-| 137-004 | sonnet | 3.4K | 675 | 13.5K | 17.5K |
-| 137-003 | sonnet | 2.1K | 1.4K | 8.2K | 11.7K |
-| 137-005 | sonnet | 1.8K | 870 | 7.2K | 9.9K |
-| 137-006 | sonnet | 2.9K | 2.2K | 11.7K | 16.8K |
-| **Total** | — | 12.7K | 7.8K | 50.7K | 71.3K |
+| 138-002 | sonnet | undefined | undefined | 0 | NaN |
+| 138-003 | opus | 3.1K | 11.7K | 12.4K | 27.2K |
+| 138-001 | opus | 3.0K | 5.7K | 12.0K | 20.7K |
+| 138-004 | opus | 120.0K | 25.0K | 80.0K | 225.0K |
+| 138-006 | opus | 2.2K | 930 | 8.7K | 11.8K |
+| 138-007 | sonnet | 2.2K | 1.0K | 8.6K | 11.8K |
+| 138-010 | sonnet | 28.4K | 3.2K | 0 | 31.6K |
+| 138-008 | sonnet | 2.6K | 4.3K | 10.5K | 17.4K |
+| 138-009 | sonnet | 1.2K | 5.7K | 5.0K | 11.9K |
+| **Total** | — | NaN | NaN | 137.2K | NaN |
 
-### Rubric Scores (sprint-137)
+### Rubric Scores (sprint-138)
 | Task | Correctness | Coverage | Scope | Docs | Avg |
 |------|-------------|----------|-------|------|-----|
-| 137-002 — tryCodeVerifiedDone Wire + In- | 95 | 92 | 100 | 85 | 93 |
-| 137-004 — ErrorRegistry Lint Script Wire | 100 | 90 | 100 | 85 | 94 |
-| 137-003 — gate.json + load-report.md Run | 95 | 90 | 100 | 85 | 93 |
-| 137-005 — BETA-TRACKER + BLUEPRINT Sprin | 98 | 90 | 100 | 97 | 96 |
-| 137-006 — Brain Budget Decay No-Op Bug F | 95 | 90 | 100 | 80 | 91 |
-| **Sprint Avg** | — | — | — | — | **93** |
+| 138-002 — ADR-035 Verification Protocol  | 98 | 60 | 100 | 97 | 89 |
+| 138-003 — Auditor Authority Extension (3 | 95 | 90 | 100 | 85 | 93 |
+| 138-001 — ADR Governance Integration | 95 | 90 | 100 | 95 | 95 |
+| 138-004 — Structured Event Stream + Plan | 95 | 92 | 100 | 85 | 93 |
+| 138-006 — Layer 4 Runtime Wire Forensic  | 90 | 85 | 100 | 80 | 89 |
+| 138-007 — Auto-Archive Partial Regressio | 90 | 85 | 100 | 80 | 89 |
+| 138-010 — MCP/CLI Parity Audit (OPSİYONE | 95 | 70 | 100 | 95 | 90 |
+| 138-008 — Worker Honest Assessment Calib | 95 | 90 | 95 | 88 | 92 |
+| 138-009 — Long-Running Sprint Resume Cap | 95 | 90 | 100 | 88 | 93 |
+| **Sprint Avg** | — | — | — | — | **91** |
 
 ## Learnings
-- Brain Budget Decay No-Op Bug Fix: completed with tech debt — Fixed brain budget decay no-op bug in runDecay() (debt-manager.ts). Root cause: shouldRun guard used total linesBefore (exempt+decayable) instead of d
-- Recurring pattern (3451x): stale_heartbeat
+- ADR-035 Verification Protocol Standard: completed with tech debt — ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol Standard başarıyla .brain/DECISIONS.md dosyasına eklendi. 15 kanal kodu, mesaj formatı (JSON pr
+- Worker Honest Assessment Calibration v2: completed with tech debt — Worker Honest Assessment Calibration v2 tamamlandı. 3 alt-iş uygulandı:
+
+1. Alt-iş A (task-builder.ts): buildWorkerPrompt() sonuna 'Honest Self-Assess
+- Recurring pattern (3454x): stale_heartbeat
 
 ### Code-Verified DONE
 1 task(s) reconciled via physical code verification:
-- 137-001: Code physically verified despite missing .result (docker HB shutdown pattern)
+- 138-005: Code physically verified despite missing .result (docker HB shutdown pattern)

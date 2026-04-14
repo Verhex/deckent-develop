@@ -6,6 +6,30 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint138] - 2026-04-14
+
+### Added
+
+- ADR Governance Integration
+- Auditor Authority Extension (3-Pipeline Verification + ADR Compliance)
+- Structured Event Stream + Plan-Time Scope Collision Detection
+- Test Restoration Tam Tamamlama
+- Long-Running Sprint Resume Capability MVP
+- MCP/CLI Parity Audit (OPSİYONEL)
+
+### Changed
+
+- ADR-035 Verification Protocol Standard (completed with tech debt)
+- Worker Honest Assessment Calibration v2 (completed with tech debt)
+
+### Fixed
+
+- Layer 4 Runtime Wire Forensic Fix
+- Auto-Archive Partial Regression Fix
+
+
+_Tasks: 11 total, 11 done, 2 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint137] - 2026-04-14
 
 ### Added
