@@ -3426,3 +3426,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 136-010: sprint-docs-helpers.ts Test Coverage (Sprint 135 T-010 Debt) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 137 — sprint-137
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-14
+**Duration:** 2153s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 14.9% |
+| Duration | 2152662ms |
+
+### Tasks
+
+- 137-001: Brain Test Suite Post-Refactor Restoration (DONE)
+- 137-002: tryCodeVerifiedDone Wire + In-Sprint Dogfood (DONE)
+- 137-003: gate.json + load-report.md Runtime Wire Restore (DONE)
+- 137-004: ErrorRegistry Lint Script Wire (DONE)
+- 137-005: BETA-TRACKER + BLUEPRINT Sprint 134-136 Sync (DONE)
+- 137-006: Brain Budget Decay No-Op Bug Fix (GO_WITH_TECH_DEBT)
+
+---

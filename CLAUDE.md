@@ -70,18 +70,18 @@ When acting as Worker: @.claude/rules/worker-default.md
 @.deckent/workspace/IDENTITY.md
 
 ## Sprint Metrics
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-136 |
-| Total Tasks | 10 |
-| Completed | 7 |
-| Tech Debt | 6 |
-| No-Go | 3 |
-| Duration | 55dk 13sn |
-| Coverage | NaN% |
+| Sprint | sprint-137 |
+| Toplam Task | 6 |
+| Tamamlanan | 6 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Süre | 35dk 52sn |
+| Coverage | 14.9% |
 
 ## Active Debt
-_No open tech debt._
+_Açık teknik borç yok._
 
 ## Agent Performance (Sprint 134)
 | Agent | Tasks | Done | Tech Debt | Note |
@@ -94,9 +94,9 @@ _No open tech debt._
 | doc-writer | 2 | 1 | 1 | T-015 manually completed; T-013 GO_WITH_TECH_DEBT |
 
 ## Agent Performance
-| Agent | Tasks | Done | Success |
+| Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| architect | 4 | 4 | 100% |
-| bug-fixer | 5 | 4 | 80% |
-| refactorer | 2 | 1 | 50% |
-| test-writer | 2 | 2 | 100% |
+| architect | 3 | 3 | 100% |
+| test-writer | 1 | 1 | 100% |
+| doc-writer | 1 | 1 | 100% |
+| bug-fixer | 1 | 1 | 100% |

@@ -189,3 +189,4 @@
 | debt-136-005 | Tech debt from 136-005: Wired generateLoadReport() into finalizeSprint() in spri | 136-005 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:00:48.893Z |
 | debt-136-009 | Tech debt from 136-009: Added rubric requirement to test-writer agent systemProm | 136-009 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:00:55.957Z |
 | debt-136-010 | Tech debt from 136-010: Wrote comprehensive unit tests for sprint-docs-helpers.t | 136-010 | sprint-136 | NORMAL | 0 | true | sprint-136 | 2026-04-13T20:01:01.385Z |
+| debt-137-006 | Tech debt from 137-006: Fixed brain budget decay no-op bug in runDecay() (debt-m | 137-006 | sprint-137 | NORMAL | 0 | true | sprint-137 | 2026-04-14T05:35:02.002Z |

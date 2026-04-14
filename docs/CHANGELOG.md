@@ -6,6 +6,23 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint137] - 2026-04-14
+
+### Added
+
+- Brain Test Suite Post-Refactor Restoration
+- tryCodeVerifiedDone Wire + In-Sprint Dogfood
+- gate.json + load-report.md Runtime Wire Restore
+- ErrorRegistry Lint Script Wire
+- BETA-TRACKER + BLUEPRINT Sprint 134-136 Sync
+
+### Changed
+
+- Brain Budget Decay No-Op Bug Fix (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 1 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint136] - 2026-04-13
 
 

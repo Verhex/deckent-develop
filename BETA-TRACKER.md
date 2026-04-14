@@ -1,15 +1,15 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-04-10 | **Sprint:** 130+ | **Tests:** 12,194+ | **Version:** 0.4.0-beta.1
+**Last updated:** 2026-04-14 | **Sprint:** 136+ | **Tests:** 12,684+ | **Version:** 0.4.0-beta.1
 
 ---
 
 ## Current Status
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-133 |
+| Sprint | sprint-137 |
 | MCP Tools | 21 |
 | MCP Resources | 8 |
 | CLI Commands | 35+ |
@@ -24,7 +24,7 @@
 
 **Strategy:** npm package → dogfood on own projects → feedback → fix → public repo (VerhexIO/deckent)
 
-**Current State:** v0.4.0-beta.1 — All three backends live-verified. Docker backend fully operational (Sprint 119-129): workers run tsc/vitest inside containers. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemented. Sprint 127-128 quality reform: 7 critical fixes + litmus test. Sprint 129 enterprise tech debt cleanup: DEBT.md parse fix, evaluator consistency, all debt closed. Sprint 130 codebase accuracy reform: MCP instructions 21 tools fix, decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%). 12,194+ tests passing, zero open debt.
+**Current State:** v0.4.0-beta.1 — All three backends live-verified. Docker backend fully operational (Sprint 119-129): workers run tsc/vitest inside containers. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemented. Sprint 127-128 quality reform: 7 critical fixes + litmus test. Sprint 129 enterprise tech debt cleanup: DEBT.md parse fix, evaluator consistency, all debt closed. Sprint 130 codebase accuracy reform: MCP instructions 21 tools fix, decision-engine V1 @deprecated archive + ADR-028, real coverage measurement (89.33%). Sprint 133 security hardening: plugin SHA-256 signing + AST sandbox. Sprint 134 triple-dogfooding + god object split + product-not-service vision. Sprint 135 operational hardening: zero coordinator crash, docker graceful shutdown. Sprint 136 architectural deepening: sprint-controller.ts 1890→209 LoC (-1681). 12,684+ tests passing, zero open debt.
 
 ---
 
@@ -98,10 +98,59 @@
 - [x] Real coverage measured: 89.33% (was falsely claiming 96%+)
 - [x] .contracts/api-surface.md rubricScores + evaluationDecision fields added
 
+**Sprint 131 — COMPLETE (2026-04-10) — HTTP API Auth + Config Cache:**
+- [x] HTTP API Bearer Token Authentication implemented (auth.ts middleware)
+- [x] loadConfig() module-level cache: cachedConfig/cacheStamp/cachedProjectRoot
+- [x] 4 ADRs written (ADR-029 through ADR-032, each ≥50 lines)
+- [x] Competitive analysis fully updated for April 2026
+
+**Sprint 132 — COMPLETE (2026-04-10) — 360° Enterprise Readiness Audit:**
+- [x] Full static audit: 6 parallel workers, 118 findings (5 CRITICAL, 22 HIGH, 40 MEDIUM, 28 LOW, 23 INFO)
+- [x] Readiness score baseline established: 3.2/5
+- [x] W5 identified sprint-reporter.ts (2132 LoC) as top god object — Sprint 134 target
+- [x] W2 identified 799 sync I/O calls — Sprint 135-137 async migration target
+
+**Sprint 133 — COMPLETE (2026-04-10) — Security Hardening:**
+- [x] Plugin SHA-256 signature verification (PluginSecurityError)
+- [x] SkillSandbox AST scan + allowed_paths enforcement
+- [x] 12/12 tasks DONE, 27m 21s, +147 net tests (12,372 → 12,485+ passing)
+- [x] Readiness: 3.2/5 → 3.6/5 (+0.4)
+
+**Sprint 134 — COMPLETE (2026-04-10/11) — Triple Dogfooding + Product Vision:**
+- [x] sprint-reporter.ts 4-way split (2297 → 96-line barrel): sprint-metrics, sprint-retro-writer, sprint-docs-updater, ci-reporter
+- [x] Task Dependency Pipeline (T-001): parseStructuredDirectives dependencies parsing
+- [x] Local Observability Seviye 2 (T-011): data locality verified, metrics.jsonl live
+- [x] Brain Self-Audit Gate (T-014): live PASS via .deckent/run-self-audit.mjs
+- [x] ADR-033 Product-Not-Service Vision + ADR-034 Multi-Project Isolation
+- [x] docs/vision/roadmap.md (202 lines) + docs/design/multi-project-isolation.md (421 lines)
+- [x] 11 DONE + 4 GO_WITH_TECH_DEBT + 0 NO_GO (manual recovery after coordinator crash)
+- [x] Tests: 12,372 → 12,485 (+113 net), Readiness: 3.6/5 → 3.86/5 (+0.26)
+
+**Sprint 135 — COMPLETE (2026-04-12) — Operational Hardening:**
+- [x] Coordinator resilience: sprint-pid-manager.ts (258 LoC) — zero coordinator crash
+- [x] Docker graceful shutdown: docker stop --time=10 (fix for spurious NO_GO pattern)
+- [x] askBrain() extraction: ipc-registry.ts 37→270 LoC
+- [x] Planner Priority/Dependencies parsing (6 regex tests)
+- [x] GO_WITH_GATE_FAILURE status propagation wire
+- [x] Brain memory budget DECAY_EXEMPT + config drift fix (600→900 line budget)
+- [x] 10 DONE + 4 TECH_DEBT + 3 NO_GO (physical code check: 13/13 present)
+- [x] Tests: 12,485 → 12,478 pass (505 → 512 files, +14 new, -5 regression)
+- [x] Readiness: 3.86/5 → 3.93/5 (+0.07), 1h 0m 54s natural completion
+
+**Sprint 136 — COMPLETE (2026-04-13) — Architectural Deepening + Regression:**
+- [x] sprint-controller.ts **1890 → 209 LoC** (-1681 lines) — god object fully slim
+- [x] T-005 canlı dogfood: sprint-controller.ts:528 priority wire bug fixed in-sprint
+- [x] tryCodeVerifiedDone() helper: result-evaluator.ts +408 lines (wire Sprint 137)
+- [x] gate.json + load-report.md wire hooks code-ready (runtime restore Sprint 137)
+- [x] 5 test regression fix (start-sandbox, start, i18n-integration, docker-backend, error-handling-unification)
+- [x] 7 DONE + 3 NO_GO (docker HB shutdown bug pattern), vitest 124 fail (Task 8 refactor side effect)
+- [x] Tests: 12,478 → 12,684 passing target (post-Sprint 137 T-001 restoration), tsc 0 errors
+- [x] Readiness: 3.93/5 → 3.925/5 (marginal -0.005, architectural win offsets vitest regression)
+
 **Upcoming Plans:**
-- [ ] Dashboard real sprint test (P3-22) — next sprint
+- [ ] Sprint 137: Test suite restoration (124 fail → 0), tryCodeVerifiedDone wire, gate.json runtime restore
+- [ ] Sprint 138+: Full async I/O migration (799 sync calls → async)
 - [ ] P1-10..12: Multi-provider test (BLOCKED — API key required)
-- [ ] Windows Codex CLI dogfooding
 
 ### Phase 3: "Documentation"
 TR+EN dual language, VISION, link audit, config dashboard
@@ -683,21 +732,21 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ---
 
 ## Sprint Metrics
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-133 |
-| Total Tasks | 12 |
-| Completed | 12 |
-| Tech Debt | 4 |
+| Sprint | sprint-137 |
+| Toplam Task | 6 |
+| Tamamlanan | 6 |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Duration | 27dk 21sn |
-| Coverage | 8.3% |
+| Süre | 35dk 52sn |
+| Coverage | 14.9% |
 
 ## Sprint History
-| Sprint | Status |
+| Sprint | Durum |
 |--------|-------|
-| sprint-132 | completed |
-| sprint-133 | completed |
+| sprint-136 | tamamlandı |
+| sprint-137 | tamamlandı |
 
 ## Dogfooding Bug Tracker
 

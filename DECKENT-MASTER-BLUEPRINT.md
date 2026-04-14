@@ -5,15 +5,15 @@
 ---
 
 ## Live Metrics
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-133 |
-| Total Tasks | 12 |
-| Completed | 12 |
-| Tech Debt | 4 |
+| Sprint | sprint-137 |
+| Toplam Task | 6 |
+| Tamamlanan | 6 |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Duration | 27dk 21sn |
-| Coverage | 8.3% |
+| Süre | 35dk 52sn |
+| Coverage | 14.9% |
 
 # TABLE OF CONTENTS
 
@@ -2015,6 +2015,12 @@ Full directive: `docs/directives/sprint-034.md`
 | 075 | 12196 | 96%+ | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2. 5/5 done |
 | 076 | 12196 | 96%+ | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3. 4/4 done |
 | 077 | 12196 | 96%+ | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme. 3/3 done |
+| 078-130 | 12194 | 89.33% | Blueprint sync, i18n, dashboard UX, MCP parity (21 tools), multi-provider, ModelRegistry (13 models), self-dogfooding, god-object split, codebase accuracy reform. 12,194 tests, real coverage 89.33%. |
+| 131-132 | 12372 | 89.33% | HTTP API auth, loadConfig cache, 4 ADRs (029-032). Sprint 132 360° enterprise audit: 118 findings (5 CRITICAL/22 HIGH), readiness baseline 3.2/5. |
+| 133 | 12485 | 89.33% | Security hardening: plugin SHA-256 signing + SkillSandbox AST scan. 12/12 tasks DONE, 27m 21s, +147 net tests. Readiness: 3.2 → 3.6/5. |
+| 134 | 12485 | 89.33% | Triple dogfooding + product vision. sprint-reporter.ts 4-way split (2297→96 LoC barrel). Task Dependency Pipeline live. Brain Self-Audit Gate. ADR-033/034 Product-Not-Service. 11 DONE + 4 TECH_DEBT. Readiness: 3.6 → 3.86/5 (+0.26). |
+| 135 | 12478 | 89.33% | Operational hardening. Coordinator resilience (sprint-pid-manager.ts). Docker graceful shutdown. askBrain IPC registry. Planner priority+dependencies parsing. Brain budget DECAY_EXEMPT. Zero coordinator crash, 1h 0m 54s natural completion. Readiness: 3.86 → 3.93/5 (+0.07). |
+| sprint-136 | 12684 | 89.33% | Architectural deepening. sprint-controller.ts 1890→209 LoC (-1681). T-005 priority wire dogfood fix. tryCodeVerifiedDone() helper (+408 LoC). gate.json+load-report wire code-ready. 7 DONE + 3 NO_GO. Test restoration Sprint 137 P0. Readiness: 3.93 → 3.925/5. |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -2079,6 +2085,14 @@ Full directive: `docs/directives/sprint-034.md`
 **Self-dogfooding milestone (Sprint 073):** Deckent used its own sprint system to fix 100 test regressions (43+16+9+23+3 → 0 fail). test-writer agent completed 5/5 tasks in 17m 41s. Proved the orchestration system can reliably fix its own codebase.
 
 **God Object split milestone (Sprint 072-076):** sprint-controller.ts systematically decomposed across 3 phases: Faz 1 (Sprint 072) extracted 7 phase functions to sprint-phases.ts, Faz 2 (Sprint 075) extracted sprint-utils.ts, Faz 3 (Sprint 076) extracted result-collector.ts (233 lines). Brain.ts remains a thin re-export layer.
+
+**Security hardening milestone (Sprint 133):** Plugin system secured with SHA-256 signature verification (PluginSecurityError). SkillSandbox AST-based analysis with allowed_paths enforcement. 12/12 tasks DONE in 27m 21s, +147 net tests. Readiness score jumped from 3.2/5 to 3.6/5.
+
+**Product-not-service vision milestone (Sprint 134):** sprint-reporter.ts 4-way split (2297→96 LoC thin barrel): sprint-metrics, sprint-retro-writer, sprint-docs-updater, ci-reporter. Task Dependency Pipeline live: parseStructuredDirectives parses dependencies. Brain Self-Audit Gate via .deckent/run-self-audit.mjs. ADR-033 Product Vision + ADR-034 Multi-Project Isolation. Parent coordinator crashed mid-sprint; manual recovery preserved all worker contributions. Readiness: 3.6→3.86/5.
+
+**Operational hardening milestone (Sprint 135):** Zero coordinator crash achieved — sprint-pid-manager.ts (258 LoC) provides crash-resistant coordination. Docker graceful shutdown (stop --time=10) resolves spurious NO_GO pattern. askBrain IPC registry: ipc-registry.ts 37→270 LoC. Planner now parses priority and dependencies from DIRECTIVES. Brain memory budget DECAY_EXEMPT for permanent records (DECISIONS.md, PROJECT-IDENTITY.md). Sprint completed in 1h 0m 54s natural (vs Sprint 134's 2h 33m manual recovery). Readiness: 3.86→3.93/5.
+
+**Architectural finalization milestone (sprint-136):** sprint-controller.ts reduced from 1890→209 LoC (-1681 lines) — the most significant single-sprint structural reduction in project history. New modules: sprint-spawner.ts + sprint-phases.ts. T-005 chicken-egg resolved via in-sprint dogfood: hardcoded 'priority: NORMAL' bug found and fixed in sprint-controller.ts:528. tryCodeVerifiedDone() helper added (+408 LoC result-evaluator.ts) for spurious NO_GO recovery (active Sprint 137). gate.json + load-report.md write hooks code-ready; runtime restore Sprint 137. Test suite: 124 test failures (all in tests/orchestra/) from Task 8 refactor side effect — Sprint 137 P0. Readiness: 3.93→3.925/5.
 
 **Provider Architecture (Sprint 38):**
 ```
