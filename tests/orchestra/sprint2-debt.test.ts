@@ -23,6 +23,16 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  statSync: vi.fn(),
+  watch: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn().mockRejectedValue(new Error('mock')),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  stat: vi.fn().mockRejectedValue(new Error('ENOENT')),
+  readdir: vi.fn().mockResolvedValue([]),
+  mkdir: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -40,6 +50,9 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 vi.mock('../../src/monitor/auditor.js', () => ({
   updateDashboard: vi.fn(),
   detectDeadlocks: vi.fn().mockReturnValue([]),
+  resetDashboard: vi.fn(),
+  startScanLoop: vi.fn().mockReturnValue(null),
+  writeScanToDashboard: vi.fn(),
 }));
 
 vi.mock('../../src/agents/worker.js', () => ({
@@ -47,15 +60,75 @@ vi.mock('../../src/agents/worker.js', () => ({
   releaseAllLocks: vi.fn(),
 }));
 
+vi.mock('../../src/core/utils.js', () => ({
+  debugLog: vi.fn(),
+  readFileSafe: vi.fn().mockReturnValue(''),
+  readJsonSafe: vi.fn().mockReturnValue(null),
+  readJsonSafeAsync: vi.fn().mockResolvedValue(null),
+  countBrainLines: vi.fn().mockReturnValue(100),
+  getNextSprintId: vi.fn().mockReturnValue('sprint-001'),
+  updateLastSprintId: vi.fn(),
+  parseSprintNumber: vi.fn().mockReturnValue(1),
+  shouldRemoveResolvedDebt: vi.fn().mockReturnValue(false),
+  parseDebtTable: vi.fn().mockReturnValue([]),
+  generateDebtTable: vi.fn().mockReturnValue(''),
+  ensureDeckentImport: vi.fn(),
+  formatDate: vi.fn().mockReturnValue(''),
+  formatDuration: vi.fn().mockReturnValue(''),
+  formatRelativeTime: vi.fn().mockReturnValue(''),
+}));
+
+vi.mock('../../src/orchestra/planner.js', () => ({
+  callBrainPlanner: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('../../src/core/provider.js', () => ({
+  providerRegistry: {
+    getDefault: vi.fn().mockReturnValue({
+      name: 'claude',
+      buildCommand: vi.fn().mockReturnValue('claude --model opus /dev/null'),
+      isAvailable: vi.fn().mockResolvedValue(true),
+    }),
+    registerProvider: vi.fn(),
+    getProvider: vi.fn(),
+    listProviders: vi.fn().mockReturnValue([]),
+    hasProvider: vi.fn().mockReturnValue(false),
+  },
+  ProviderAdapter: class {},
+}));
+
+vi.mock('../../src/orchestra/result-watcher.js', () => ({
+  createResultWatcher: vi.fn().mockReturnValue({
+    waitForChange: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn(),
+  }),
+}));
+
+vi.mock('../../src/core/observability.js', () => ({
+  metric: vi.fn(),
+  trace: vi.fn((_name: string, fn: () => unknown) => fn()),
+  structuredLog: vi.fn(),
+  initObservability: vi.fn(),
+  resetObservability: vi.fn(),
+}));
+
+vi.mock('../../src/orchestra/ipc-registry.js', () => ({
+  getChannelRegistry: vi.fn().mockReturnValue(new Map()),
+  registerWorkerChannel: vi.fn(),
+  unregisterWorkerChannel: vi.fn(),
+  handleWorkerQuestion: vi.fn(),
+  checkWorkerQuestions: vi.fn(),
+}));
+
 import { existsSync, readFileSync } from 'node:fs';
-import {
-  waitForResults,
-  buildWorkerPrompt,
-  extractScopeFromDirective,
-} from '../../src/orchestra/brain.js';
+import { stat } from 'node:fs/promises';
+// Sprint 138: Import directly from sub-modules to avoid brain.js massive import chain (OOM)
+import { waitForResults } from '../../src/orchestra/sprint-controller.js';
+import { buildWorkerPrompt, extractScopeFromDirective } from '../../src/orchestra/task-builder.js';
 
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedReadFileSync = vi.mocked(readFileSync);
+const mockedStat = vi.mocked(stat);
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -128,12 +201,25 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    // Default: stat rejects (file not found) — mimics no result files present
+    mockedStat.mockRejectedValue(new Error('ENOENT'));
     mockedExistsSync.mockReturnValue(false);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  // Helper to make stat resolve for specific paths (file exists)
+  function mockStatForPaths(...patterns: string[]) {
+    mockedStat.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (patterns.some(pat => p.includes(pat))) {
+        return Promise.resolve({} as any); // stat success = file exists
+      }
+      return Promise.reject(new Error('ENOENT'));
+    });
+  }
 
   // ── Promise contract ────────────────────────────────────────────
 
@@ -168,12 +254,12 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
   it('collects results on first pass without polling when all files exist', async () => {
     const sprint = makeSprint(['001-001']);
     const result = makeTaskResult('001-001');
-    mockedExistsSync.mockReturnValue(true);
+    // stat resolves = file exists; readFileSync returns JSON
+    mockStatForPaths('task-001-001.result');
     mockedReadFileSync.mockReturnValue(JSON.stringify(result) as never);
 
     const promise = waitForResults('/root', sprint, 60_000);
-    // Do NOT advance timers — first pass should find result synchronously
-    await Promise.resolve(); // flush microtasks only
+    await vi.runAllTimersAsync();
     const results = await promise;
     expect(results).toHaveLength(1);
     expect(results[0]?.taskId).toBe('001-001');
@@ -185,9 +271,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
     const sprint = makeSprint(['001-001', '001-002']);
     const result1 = makeTaskResult('001-001');
 
-    mockedExistsSync.mockImplementation((path: unknown) =>
-      typeof path === 'string' && path.includes('task-001-001.result'),
-    );
+    mockStatForPaths('task-001-001.result');
     mockedReadFileSync.mockReturnValue(JSON.stringify(result1) as never);
 
     const promise = waitForResults('/root', sprint, 1);
@@ -204,17 +288,15 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
     const sprint = makeSprint(['001-001']);
     const result = makeTaskResult('001-001');
 
-    let found = false;
-    mockedExistsSync.mockImplementation(() => found);
     mockedReadFileSync.mockReturnValue(JSON.stringify(result) as never);
 
     const promise = waitForResults('/root', sprint, 60_000);
 
     // Before first poll interval result is absent
-    await vi.advanceTimersByTimeAsync(14_000);
+    await vi.advanceTimersByTimeAsync(4_000);
     // Make result available then advance past poll interval
-    found = true;
-    await vi.advanceTimersByTimeAsync(2_000); // crosses 15 000 ms boundary
+    mockStatForPaths('task-001-001.result');
+    await vi.advanceTimersByTimeAsync(6_000); // crosses watcher fallback boundary
 
     const results = await promise;
     expect(results).toHaveLength(1);
@@ -226,13 +308,6 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
     const result1 = makeTaskResult('001-001');
     const result2 = makeTaskResult('001-002');
 
-    let task2Found = false;
-    mockedExistsSync.mockImplementation((path: unknown) => {
-      if (typeof path !== 'string') return false;
-      if (path.includes('task-001-001.result')) return true;
-      if (path.includes('task-001-002.result')) return task2Found;
-      return false;
-    });
     mockedReadFileSync.mockImplementation((path: unknown) => {
       if (typeof path === 'string' && path.includes('task-001-002.result')) {
         return JSON.stringify(result2) as never;
@@ -240,12 +315,16 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
       return JSON.stringify(result1) as never;
     });
 
+    // First: only task 001-001 result exists
+    mockStatForPaths('task-001-001.result');
+
     const promise = waitForResults('/root', sprint, 60_000);
 
     // task1 found on first pass, task2 not yet
-    await vi.advanceTimersByTimeAsync(1_000);
-    task2Found = true;
-    await vi.advanceTimersByTimeAsync(15_000); // past second poll
+    await vi.advanceTimersByTimeAsync(3_000);
+    // Make task2 available
+    mockStatForPaths('task-001-001.result', 'task-001-002.result');
+    await vi.advanceTimersByTimeAsync(6_000); // past second poll
 
     const results = await promise;
     expect(results).toHaveLength(2);
@@ -257,10 +336,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
 
   it('skips tasks whose result files contain invalid JSON', async () => {
     const sprint = makeSprint(['001-001']);
-    mockedExistsSync.mockImplementation((p: string) => {
-      if (typeof p === 'string' && p.endsWith('.timeout')) return false;
-      return p.toString().endsWith('.result');
-    });
+    mockStatForPaths('task-001-001.result');
     mockedReadFileSync.mockReturnValue('{ broken json' as never);
 
     const promise = waitForResults('/root', sprint, 1);
@@ -271,10 +347,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
 
   it('skips tasks whose result files throw on read', async () => {
     const sprint = makeSprint(['001-001']);
-    mockedExistsSync.mockImplementation((p: string) => {
-      if (typeof p === 'string' && p.endsWith('.timeout')) return false;
-      return p.toString().endsWith('.result');
-    });
+    mockStatForPaths('task-001-001.result');
     mockedReadFileSync.mockImplementation(() => { throw new Error('EACCES'); });
 
     const promise = waitForResults('/root', sprint, 1);
@@ -286,7 +359,7 @@ describe('DEBT-004: waitForResults — async polling contract', () => {
   it('does not count the same task result twice', async () => {
     const sprint = makeSprint(['001-001']);
     const result = makeTaskResult('001-001');
-    mockedExistsSync.mockReturnValue(true);
+    mockStatForPaths('task-001-001.result');
     mockedReadFileSync.mockReturnValue(JSON.stringify(result) as never);
 
     const promise = waitForResults('/root', sprint, 30_000);

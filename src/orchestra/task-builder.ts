@@ -1,6 +1,8 @@
 // ─── Task Creation & Directive Parsing ─────────────────────────────
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
   PlannerTask, ProviderName,
@@ -695,9 +697,30 @@ export function truncateAtParagraph(content: string, maxLen: number): string {
 }
 
 /**
+ * Load ADR content from .brain/DECISIONS.md for worker prompt injection.
+ * Returns truncated content (max 3000 chars) or empty string on failure.
+ */
+export function loadADRContent(projectRoot?: string): string {
+  try {
+    const root = projectRoot ?? process.cwd();
+    const adrPath = join(root, '.brain', 'DECISIONS.md');
+    const content = readFileSync(adrPath, 'utf8');
+    // Truncate to keep prompt size manageable
+    const maxLen = 3000;
+    if (content.length <= maxLen) return content;
+    const truncated = content.slice(0, maxLen);
+    const lastNewline = truncated.lastIndexOf('\n');
+    return (lastNewline > maxLen * 0.5 ? truncated.slice(0, lastNewline) : truncated) + '\n\n[... truncated — full ADR list in .brain/DECISIONS.md]';
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Build the full prompt string that will be sent to a worker agent.
  * Includes agent context block (if assigned), skill context block (if skills assigned),
- * task details, scope instructions, heartbeat format, and result file format.
+ * ADR context (mandatory architecture rules), task details, scope instructions,
+ * heartbeat format, and result file format.
  * @param task - The task the worker will execute
  * @param agentPrompt - Optional specialized agent prompt to prepend
  * @param skillPrompts - Optional skill context blocks to include
@@ -754,7 +777,13 @@ export function buildWorkerPrompt(
     ? task.scope.filesWrite.map(f => `  - ${f}`).join('\n')
     : '  - (determined by your task scope)';
 
-  const prompt = `${agentBlock}${skillBlock}You are a Deckent worker agent.
+  // ADR context injection: mandatory architecture rules for worker compliance
+  const adrContent = loadADRContent();
+  const adrBlock = adrContent
+    ? `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${adrContent}\n\n`
+    : '';
+
+  const prompt = `${agentBlock}${skillBlock}${adrBlock}You are a Deckent worker agent.
 See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.
 
 ## Your Task
@@ -799,7 +828,18 @@ If you cannot determine exact token counts, omit the tokenUsage field — the br
 REQUIRED: Include rubricScores field with 4 integer keys (0-100): correctness, test_coverage, scope_compliance, documentation. Example: "rubricScores": { "correctness": 95, "test_coverage": 90, "scope_compliance": 100, "documentation": 85 }
 The result file is REQUIRED — without it your work cannot be evaluated.
 
-CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.`;
+CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.
+
+## Honest Self-Assessment Required
+Before writing .result with selfAssessment: DONE, you MUST verify:
+1. Baseline state: what was the test/code state before your work?
+2. End state: what is it now?
+3. Delta: how much of the task did you ACTUALLY complete?
+
+If <80%, write GO_WITH_TECH_DEBT with specific gap.
+If <50%, write NO_GO with explanation.
+"DONE" means functional outcome matches task spec fully.
+"Code written" ≠ "DONE".`;
 
   // Estimate prompt token size and write to task
   try {

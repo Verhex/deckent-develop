@@ -1298,15 +1298,16 @@ describe('sprint-controller provider decoupling', () => {
 
   it('isTmuxProvider is the single source of truth for tmux routing', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    // Sprint 136: isTmuxProvider moved to sprint-spawner.ts
     const source = actualFs.readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-spawner.ts', import.meta.url),
       'utf-8',
     );
     // isTmuxProvider should be used in routing logic
     expect(source).toContain('isTmuxProvider(');
     // Should appear in spawnWorkers and cleanup
     const isTmuxCount = (source.match(/isTmuxProvider\(/g) ?? []).length;
-    expect(isTmuxCount).toBeGreaterThanOrEqual(3); // definition + 2+ usages
+    expect(isTmuxCount).toBeGreaterThanOrEqual(3); // import + 2+ usages
   });
 
   it('resolveTaskProvider tries registry default before hardcoded fallback', async () => {
@@ -1327,10 +1328,11 @@ describe('Task Router wiring in sprint-controller', () => {
     vi.clearAllMocks();
   });
 
-  it('sprint-controller imports routeTask from task-router', async () => {
+  it('sprint-controller imports routeTask from task-router (via sprint-spawner)', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    // Sprint 136: routeTask import moved to sprint-spawner.ts
     const source = actualFs.readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-spawner.ts', import.meta.url),
       'utf-8',
     );
     expect(source).toContain("import { routeTask } from './task-router.js'");
@@ -1343,10 +1345,10 @@ describe('Task Router wiring in sprint-controller', () => {
       'utf-8',
     );
     // After sprint-phases extraction: planSprint is called via runPlanPhase,
-    // routeSprintTasks and runSpawnPhase remain in runSprint within sprint-controller.ts.
-    // Verify the order: runPlanPhase → routeSprintTasks → runSpawnPhase
+    // routeSprintTasksImpl and runSpawnPhase remain in runSprint within sprint-controller.ts.
+    // Verify the order: runPlanPhase → routeSprintTasksImpl → runSpawnPhase
     const planIdx = source.indexOf('runPlanPhase(');
-    const routeIdx = source.indexOf('routeSprintTasks(sprint.tasks, config, availableProviders)');
+    const routeIdx = source.indexOf('routeSprintTasksImpl(sprint.tasks, config, availableProviders)');
     const spawnIdx = source.indexOf('runSpawnPhase(');
     expect(planIdx).toBeGreaterThan(-1);
     expect(routeIdx).toBeGreaterThan(-1);
@@ -1366,8 +1368,9 @@ describe('Task Router wiring in sprint-controller', () => {
 
   it('routing phase sets task.provider from router output', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    // Sprint 136: routeSprintTasks moved to sprint-spawner.ts
     const source = actualFs.readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-spawner.ts', import.meta.url),
       'utf-8',
     );
     expect(source).toContain('task.provider = routing.provider');
@@ -1375,8 +1378,9 @@ describe('Task Router wiring in sprint-controller', () => {
 
   it('routing phase sets task.assignedAgent when router returns non-generic', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    // Sprint 136: routeSprintTasks moved to sprint-spawner.ts
     const source = actualFs.readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-spawner.ts', import.meta.url),
       'utf-8',
     );
     expect(source).toContain("routing.agent !== 'generic'");
@@ -1385,8 +1389,9 @@ describe('Task Router wiring in sprint-controller', () => {
 
   it('routing phase sets task.assignedSkills when router returns skills', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    // Sprint 136: routeSprintTasks moved to sprint-spawner.ts
     const source = actualFs.readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-spawner.ts', import.meta.url),
       'utf-8',
     );
     expect(source).toContain('routing.skills.length > 0');
@@ -1399,8 +1404,9 @@ describe('Task Router wiring in sprint-controller', () => {
       new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
       'utf-8',
     );
-    // The routeTask call is inside a try block with a non-fatal catch
-    expect(source).toContain('Router failure is non-fatal');
+    // The routeSprintTasksImpl call is inside a try block with a non-fatal catch
+    expect(source).toContain('routeSprintTasksImpl(sprint.tasks, config, availableProviders)');
+    expect(source).toContain("debugLog('runSprint:routeSprintTasks'");
   });
 
   it('routeTask mock returns correct default shape', () => {
@@ -1753,13 +1759,15 @@ describe('routeSprintTasks — Router + Connector integration', () => {
     expect(source).toContain('providerRegistry.listProviders()');
   });
 
-  it('routeSprintTasks is exported from sprint-controller', async () => {
+  it('routeSprintTasks is exported from sprint-controller (via re-export)', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
     const source = actualFs.readFileSync(
       new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
       'utf-8',
     );
-    expect(source).toContain('export function routeSprintTasks(');
+    // Sprint 136: routeSprintTasks is re-exported from sprint-spawner.ts
+    expect(source).toContain('routeSprintTasks');
+    expect(source).toContain("from './sprint-spawner.js'");
   });
 });
 

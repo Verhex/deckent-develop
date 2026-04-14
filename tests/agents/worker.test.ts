@@ -16,6 +16,11 @@ import {
   finalizeHeartbeat,
   TaskClaimError,
   LockError,
+  writeVerifyDeltaBaseline,
+  readVerifyDeltaBaseline,
+  computeVerifyDelta,
+  VERIFY_DELTA_DONE_THRESHOLD,
+  VERIFY_DELTA_NO_GO_THRESHOLD,
 } from '../../src/agents/worker.js';
 import { AgentStatus, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskPlan, TaskResult, TaskScope, LockInfo } from '../../src/core/types.js';
@@ -625,6 +630,170 @@ describe('readWorkerLog', () => {
     const result = readWorkerLog('/project', 'task-002');
     expect(result).toBeNull();
     expect(mockedReadFileSync).not.toHaveBeenCalled();
+  });
+});
+
+// ─── writeVerifyDeltaBaseline ────────────────────────────────────────
+
+describe('writeVerifyDeltaBaseline', () => {
+  it('writes .verify-delta.json with correct fields', () => {
+    mockedExistsSync.mockReturnValue(true);
+
+    const baseline = writeVerifyDeltaBaseline('/project', '001', 3, 5);
+
+    expect(baseline.taskId).toBe('001');
+    expect(baseline.filesChangedBaseline).toBe(3);
+    expect(baseline.testFailBaseline).toBe(5);
+    expect(baseline.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(mockedWriteFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('task-001.verify-delta.json'),
+      expect.stringContaining('"filesChangedBaseline": 3'),
+      'utf-8',
+    );
+  });
+
+  it('defaults testFailCount to 0 when omitted', () => {
+    mockedExistsSync.mockReturnValue(true);
+
+    const baseline = writeVerifyDeltaBaseline('/project', '002', 0);
+
+    expect(baseline.testFailBaseline).toBe(0);
+  });
+
+  it('creates .tasks/ directory if missing', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    writeVerifyDeltaBaseline('/project', '003', 2);
+
+    expect(mockedMkdirSync).toHaveBeenCalled();
+  });
+});
+
+// ─── readVerifyDeltaBaseline ─────────────────────────────────────────
+
+describe('readVerifyDeltaBaseline', () => {
+  it('returns VerifyDeltaBaseline when file exists', () => {
+    const baseline = {
+      taskId: '001',
+      timestamp: '2026-04-14T10:00:00.000Z',
+      filesChangedBaseline: 3,
+      testFailBaseline: 5,
+    };
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(baseline) as never);
+
+    const result = readVerifyDeltaBaseline('/project', '001');
+    expect(result).toEqual(baseline);
+  });
+
+  it('returns null when file does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = readVerifyDeltaBaseline('/project', '999');
+    expect(result).toBeNull();
+  });
+
+  it('returns null on JSON parse error', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('not-valid-json' as never);
+
+    const result = readVerifyDeltaBaseline('/project', '001');
+    expect(result).toBeNull();
+  });
+});
+
+// ─── computeVerifyDelta ──────────────────────────────────────────────
+
+describe('computeVerifyDelta', () => {
+  const baseline = {
+    taskId: '001',
+    timestamp: '2026-04-14T10:00:00.000Z',
+    filesChangedBaseline: 0,
+    testFailBaseline: 10,
+  };
+
+  beforeEach(() => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(baseline) as never);
+  });
+
+  it('returns null when baseline file does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = computeVerifyDelta('/project', '001', 5, 0);
+    expect(result).toBeNull();
+  });
+
+  it('recommends DONE when completion >= 80% threshold', () => {
+    // 5 files changed (from 0 baseline), expected 5, and 10 fails fixed
+    const result = computeVerifyDelta('/project', '001', 5, 0, 5);
+
+    expect(result).not.toBeNull();
+    expect(result!.recommendedAssessment).toBe('DONE');
+    expect(result!.completionRatio).toBeGreaterThanOrEqual(VERIFY_DELTA_DONE_THRESHOLD);
+  });
+
+  it('recommends GO_WITH_TECH_DEBT for 50-79% completion', () => {
+    // Only 2 of 10 test failures fixed (0 files from 0 baseline, expected 5)
+    // testRatio = 8/10 = 0.8, filesRatio = 2/5 = 0.4
+    // completionRatio = 0.4*0.6 + 0.8*0.4 = 0.24 + 0.32 = 0.56 → TECH_DEBT
+    const baseline2 = { ...baseline, testFailBaseline: 10 };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(baseline2) as never);
+
+    const result = computeVerifyDelta('/project', '001', 2, 2, 5);
+
+    expect(result).not.toBeNull();
+    expect(result!.recommendedAssessment).toBe('GO_WITH_TECH_DEBT');
+    expect(result!.completionRatio).toBeGreaterThanOrEqual(VERIFY_DELTA_NO_GO_THRESHOLD);
+    expect(result!.completionRatio).toBeLessThan(VERIFY_DELTA_DONE_THRESHOLD);
+  });
+
+  it('recommends NO_GO when completion < 50% (Sprint 137 regression scenario)', () => {
+    // Sprint 137 scenario: worker wrote DONE but only 47/123 tests fixed (38%)
+    // Simulate: 0 files changed, 0 test fixes out of 76 needed
+    const lowBaseline = { ...baseline, testFailBaseline: 76, filesChangedBaseline: 0 };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(lowBaseline) as never);
+
+    // 0 files changed, still 76 test fails → very low completion
+    const result = computeVerifyDelta('/project', '001', 0, 76, 10);
+
+    expect(result).not.toBeNull();
+    expect(result!.recommendedAssessment).toBe('NO_GO');
+    expect(result!.completionRatio).toBeLessThan(VERIFY_DELTA_NO_GO_THRESHOLD);
+  });
+
+  it('penalizes newly introduced test failures', () => {
+    // Baseline: 0 fails. End state: 5 new fails introduced → testRatio = 0
+    const cleanBaseline = { ...baseline, testFailBaseline: 0, filesChangedBaseline: 0 };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(cleanBaseline) as never);
+
+    const result = computeVerifyDelta('/project', '001', 3, 5, 5);
+
+    // testRatio = 0 (new failures introduced), filesRatio = 3/5 = 0.6
+    // completionRatio = 0.6*0.6 + 0*0.4 = 0.36 → NO_GO
+    expect(result).not.toBeNull();
+    expect(result!.completionRatio).toBeLessThan(VERIFY_DELTA_NO_GO_THRESHOLD);
+    expect(result!.recommendedAssessment).toBe('NO_GO');
+  });
+
+  it('populates endState with actual values and timestamp', () => {
+    const result = computeVerifyDelta('/project', '001', 5, 0, 5);
+
+    expect(result!.endState.filesChangedActual).toBe(5);
+    expect(result!.endState.testFailActual).toBe(0);
+    expect(result!.endState.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('uses filesChangedActual as denominator when expectedFilesChangedCount is omitted', () => {
+    // When no expected count, denominator = max(filesChangedActual, 1)
+    // All test fails fixed → testRatio=1, filesRatio = newFiles/actual
+    const noFailBaseline = { ...baseline, testFailBaseline: 0 };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(noFailBaseline) as never);
+
+    const result = computeVerifyDelta('/project', '001', 5, 0);
+
+    // filesRatio = 5/5 = 1.0, testRatio = 1 (no fails) → DONE
+    expect(result!.recommendedAssessment).toBe('DONE');
   });
 });
 

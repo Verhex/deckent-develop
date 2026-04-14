@@ -31,6 +31,13 @@
 - 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
 - Registration: `claude mcp add deckent -- npx deckent mcp`
 
+## Mandatory Architecture Rules
+@.brain/DECISIONS.md
+
+## Architecture Decision Records
+- `.brain/DECISIONS.md` = **ADR** (Architecture Decision Record) — project governance, MADR v3 hibrit format, mandatory read for all agents
+- `.deckent/decisions/*.json` = **SDL** (Sprint Decision Log) — tactical decisions, audit trail, optional
+
 ## Context
 @DIRECTIVES.md
 @.brain/MEMORY.md

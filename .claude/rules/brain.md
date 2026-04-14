@@ -3,6 +3,9 @@ paths: [".tasks/*", ".brain/*", ".contracts/*"]
 ---
 # Brain Rules
 - Always read DIRECTIVES.md first
+- Always read .brain/DECISIONS.md — ADR compliance is mandatory
+- If a worker output violates an accepted ADR → NO_GO + require ADR amendment proposal
+- New architectural decisions MUST be recorded as ADRs in .brain/DECISIONS.md
 - Always check usage before planning
 - Plan mode required before execution
 - Write sprint plan as task JSON files in `.tasks/`

@@ -39,16 +39,20 @@ import { readFileSafe } from './sprint-utils.js';
 import {
   writeRetrospective, writeSprintLog, calculateMetrics,
   updateProjectDocs, updateProjectIdentity,
-  buildAgentPerformance, archiveDirectives,
+  buildAgentPerformance, archiveDirectives, archiveOrphanTasks,
 } from './sprint-reporter.js';
 
 // ─── Result Evaluator ─────────────────────────────────────────────
 import {
   getRecentSprintStats,
   GO_WITH_GATE_FAILURE,
+} from './result-evaluator.js';
+
+// ─── Auditor (code verification — migrated Sprint 138) ────────────
+import {
   tryCodeVerifiedDone,
   writeCodeVerifiedResult,
-} from './result-evaluator.js';
+} from '../monitor/auditor.js';
 
 // ─── Baseline Tracker ─────────────────────────────────────────────
 import {
@@ -63,7 +67,7 @@ import { buildResultsMap } from './result-collector.js';
 import { runDecay, auditBrainBudget } from './debt-manager.js';
 
 // ─── Observability ────────────────────────────────────────────────
-import { generateLoadReport } from '../core/observability.js';
+import { generateLoadReport, initObservability } from '../core/observability.js';
 
 // ─── Agent/Skill Pool ─────────────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -217,10 +221,9 @@ export async function runSelfAuditGate(
       ? options.runTsc(root)
       : spawnSync('npx', ['tsc', '--noEmit'], {
           cwd: root,
-          timeout: 90_000,
+          timeout: 30_000,
           stdio: ['pipe', 'pipe', 'pipe'],
           encoding: 'utf-8',
-          shell: true,
         });
 
     if (tscRun.status === 0) {
@@ -245,10 +248,9 @@ export async function runSelfAuditGate(
       ? options.runVitest(root)
       : spawnSync('npx', ['vitest', 'run', '--reporter=basic'], {
           cwd: root,
-          timeout: 300_000,
+          timeout: 120_000,
           stdio: ['pipe', 'pipe', 'pipe'],
           encoding: 'utf-8',
-          shell: true,
         });
 
     const vitestOutput = ((vitestRun.stdout ?? '') + (vitestRun.stderr ?? '')).trim();
@@ -480,6 +482,9 @@ export async function finalizeSprint(
   results: TaskResult[],
   opts?: FinalizeSprintOptions,
 ): Promise<SprintMetrics> {
+  // Ensure observability is initialized (idempotent — safe to call multiple times)
+  initObservability(projectRoot);
+
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
   const resultsMap = buildResultsMap(results);
 
@@ -777,6 +782,7 @@ export async function finalizeSprint(
   }
 
   // 10. Rich output (non-fatal — sprint completes even if formatting fails)
+  debugLog('finalizeSprint:breadcrumb', 'Step 10 (richOutput) — entering');
   try {
     const gitDiff = spawnSync('git', ['diff', '--stat', 'HEAD~1'], { encoding: 'utf-8', cwd: projectRoot }).stdout;
     // output_mode lives on DeckentConfig (raw), not ResolvedConfig — access via cast
@@ -805,46 +811,60 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:richOutput', e); }
 
   // 10b. Self-audit gate: run tsc + vitest + honesty checks, propagate status
+  debugLog('finalizeSprint:breadcrumb', 'Step 10b (selfAuditGate) — entering');
+  let gateResult: SelfAuditResult | null = null;
   try {
-    const gateResult = await runSelfAuditGate(sprint.id, projectRoot);
+    gateResult = await runSelfAuditGate(sprint.id, projectRoot);
+    debugLog('finalizeSprint:selfAuditGate', `Gate completed: overallGate=${gateResult.overallGate}`);
     const currentStatus = sprint.status ?? '';
     const newStatus = applyGateStatus(currentStatus, gateResult);
     if (newStatus !== currentStatus) {
       sprint.status = newStatus as Sprint['status'];
       debugLog('finalizeSprint:selfAuditGate', `Status updated: ${currentStatus} → ${newStatus}`);
     }
-    // Write gate.json to .deckent/ for Layer 4 criterion 12 tracking
+  } catch (e) {
+    debugLog('finalizeSprint:selfAuditGate', `Gate check failed (will write fallback gate.json): ${e}`);
+    // Produce a fallback gate result so gate.json is always written
+    gateResult = {
+      tsc: { status: 'FAIL', errors: [`Gate execution failed: ${e}`] },
+      vitest: { status: 'FAIL', delta: { files: 0, pass: 0, fail: 0, skipped: 0 } },
+      honesty: { violations: 0, flaggedTasks: [] },
+      observability: { metricsJsonlExists: false, lineCount: 0 },
+      overallGate: 'GATE_FAILURE',
+    };
+  }
+  // Write gate.json to .deckent/ — ALWAYS (even on gate failure or fallback)
+  try {
+    const gatePath = join(projectRoot, '.deckent', `${sprint.id}-gate.json`);
+    await fsPromises.writeFile(gatePath, JSON.stringify(gateResult, null, 2));
+    debugLog('finalizeSprint:selfAuditGate', `Gate result written to ${gatePath} overallGate=${gateResult.overallGate}`);
+  } catch (writeErr) {
+    debugLog('finalizeSprint:selfAuditGate', `WARNING: Failed to write gate.json: ${writeErr}`);
+  }
+  // Append Gate Failure section to RETRO.md if gate failed
+  if (gateResult.overallGate === 'GATE_FAILURE') {
     try {
-      const gatePath = join(projectRoot, '.deckent', `${sprint.id}-gate.json`);
-      await fsPromises.writeFile(gatePath, JSON.stringify(gateResult, null, 2));
-      debugLog('finalizeSprint:selfAuditGate', `Gate result written to ${gatePath} overallGate=${gateResult.overallGate}`);
-    } catch (writeErr) {
-      debugLog('finalizeSprint:selfAuditGate', `WARNING: Failed to write gate.json: ${writeErr}`);
-    }
-    // Append Gate Failure section to RETRO.md if gate failed
-    if (gateResult.overallGate === 'GATE_FAILURE') {
-      try {
-        const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-        const existing = existsSync(retroPath) ? readFileSync(retroPath, 'utf-8') : '';
-        if (!existing.includes('### Gate Failure')) {
-          const errors: string[] = [];
-          if (gateResult.tsc.status === 'FAIL') errors.push(...gateResult.tsc.errors.slice(0, 5));
-          if (gateResult.vitest.status === 'FAIL') errors.push(`vitest: ${gateResult.vitest.delta.fail} failing tests`);
-          if (gateResult.honesty.violations > 0) errors.push(`honesty violations: ${gateResult.honesty.flaggedTasks.join(', ')}`);
-          const gateSection = [
-            '',
-            '### Gate Failure',
-            `Self-audit gate failed for sprint ${sprint.id}. Status: ${GO_WITH_GATE_FAILURE}.`,
-            '',
-            ...errors.map(e => `- ${e}`),
-          ].join('\n') + '\n';
-          writeFileSync(retroPath, existing + gateSection, 'utf-8');
-        }
-      } catch (e) { debugLog('finalizeSprint:gateRetroAppend', e); }
-    }
-  } catch (e) { debugLog('finalizeSprint:selfAuditGate', `Gate check failed: ${e}`); }
+      const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
+      const existing = existsSync(retroPath) ? readFileSync(retroPath, 'utf-8') : '';
+      if (!existing.includes('### Gate Failure')) {
+        const errors: string[] = [];
+        if (gateResult.tsc.status === 'FAIL') errors.push(...gateResult.tsc.errors.slice(0, 5));
+        if (gateResult.vitest.status === 'FAIL') errors.push(`vitest: ${gateResult.vitest.delta.fail} failing tests`);
+        if (gateResult.honesty.violations > 0) errors.push(`honesty violations: ${gateResult.honesty.flaggedTasks.join(', ')}`);
+        const gateSection = [
+          '',
+          '### Gate Failure',
+          `Self-audit gate failed for sprint ${sprint.id}. Status: ${GO_WITH_GATE_FAILURE}.`,
+          '',
+          ...errors.map(e => `- ${e}`),
+        ].join('\n') + '\n';
+        writeFileSync(retroPath, existing + gateSection, 'utf-8');
+      }
+    } catch (e) { debugLog('finalizeSprint:gateRetroAppend', e); }
+  }
 
   // 10c. Generate load-test-report.md from metrics.jsonl (Sprint 135 N6 — Task 5)
+  debugLog('finalizeSprint:breadcrumb', 'Step 10c (loadReport) — entering');
   try {
     const reportDir = join(projectRoot, 'docs', 'audits', sprint.id);
     await fsPromises.mkdir(reportDir, { recursive: true });
@@ -853,6 +873,8 @@ export async function finalizeSprint(
     await fsPromises.writeFile(reportPath, report);
     debugLog('finalizeSprint:loadReport', `Load test report written to ${reportPath}`);
   } catch (e) { debugLog('finalizeSprint:loadReport', `WARNING: load_report_generation_failed: ${e}`); }
+
+  debugLog('finalizeSprint:breadcrumb', 'Step 10c (loadReport) — done');
 
   // 11. Adaptive thresholds: auto-adjust agent_min_score + coverage_threshold based on recent sprints
   if (opts?.config?.adaptive_thresholds) {
@@ -864,6 +886,7 @@ export async function finalizeSprint(
   }
 
   // 12. Archive DIRECTIVES.md (auto_archive_directives config flag, default true)
+  debugLog('finalizeSprint:breadcrumb', 'Step 12 (archiveDirectives) — entering');
   try {
     const rawCfg = opts?.config as Record<string, unknown> | undefined;
     const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;
@@ -874,7 +897,15 @@ export async function finalizeSprint(
     }
   } catch (e) { debugLog('finalizeSprint:archiveDirectives', e); }
 
+  // 12b. Archive orphan task files from .tasks/ to .brain/archive/sprint-NNN-tasks/
+  debugLog('finalizeSprint:breadcrumb', 'Step 12b (archiveOrphanTasks) — entering');
+  try {
+    const count = archiveOrphanTasks(projectRoot, sprint.id);
+    debugLog('finalizeSprint:archiveOrphanTasks', `Archived ${count} orphan task files`);
+  } catch (e) { debugLog('finalizeSprint:archiveOrphanTasks', e); }
+
   // 13. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
+  debugLog('finalizeSprint:breadcrumb', 'Step 13 (jobSummary) — entering');
   try {
     const jobsDir = join(projectRoot, JOBS_DIR);
     mkdirSync(jobsDir, { recursive: true });

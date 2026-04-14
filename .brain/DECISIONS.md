@@ -2,11 +2,15 @@
 
 ## ADR-001: TypeScript + ESM
 
+**Status:** accepted
+
 **Decision:** Use TypeScript with `"type": "module"` (ESM) as the project foundation.
 **Context:** Deckent is a Node.js CLI tool. ESM is the modern standard, supported by Node 18+.
 **Consequence:** All imports must use `.js` extensions. CommonJS interop via `esModuleInterop`.
 
 ## ADR-002: Node16 Module Resolution
+
+**Status:** accepted
 
 **Decision:** Use `"module": "Node16"` and `"moduleResolution": "Node16"` in tsconfig.
 **Context:** TypeScript 5.2+ requires these to match. Node16 resolution enforces `.js` extensions and `package.json` exports.
@@ -14,11 +18,15 @@
 
 ## ADR-003: vitest over Jest
 
+**Status:** accepted
+
 **Decision:** Use vitest for testing.
 **Context:** Native ESM support, faster startup, v8 coverage provider, compatible API.
 **Consequence:** Tests in `tests/` directory, `vitest.config.ts` at root.
 
 ## ADR-004: 3-Layer Config Merge
+
+**Status:** accepted
 
 **Decision:** Config loads in 3 layers: hardcoded defaults → `~/.deckent/config.json` → `.deckent/config.json`.
 **Context:** Users need global defaults (plan type, language) and per-project overrides.
@@ -26,11 +34,17 @@
 
 ## ADR-005: Synchronous I/O
 
+**Status:** deprecated
+
+> **Note:** Sprint 132 CRITICAL #1 — Senkron I/O hot path performans sorunlarına yol açtı. Yeni modüller async I/O kullanmalıdır.
+
 **Decision:** Wave 2 modülleri (tmux, auditor, worker) senkron I/O kullanır.
 **Context:** tmux komutları <100ms, lock dosyaları <1KB, auditor 30s cycle'da birkaç küçük JSON okur. Async overhead gereksiz.
 **Consequence:** Tüm fonksiyonlar senkron. Gelecekte performans sorunları çıkarsa async'e geçilebilir.
 
 ## ADR-006: spawnSync Security Pattern
+
+**Status:** accepted
 
 **Decision:** Tüm shell komutları `spawnSync(binary, [...args])` ile çalıştırılır, shell interpretation yok.
 **Context:** Command injection riski sıfıra indirilmeli. Prompt ve diğer kullanıcı girdileri argument array olarak geçer.
@@ -38,11 +52,15 @@
 
 ## ADR-007: SpawnOptions Interface
 
+**Status:** accepted
+
 **Decision:** `SpawnOptions { allowedTools?: string; autoApprove?: boolean }` tmux modülünde tanımlanır.
 **Context:** Blueprint 15 gereği her ajan `--allowedTools` ile kısıtlanır. `autoApprove` ise `--dangerously-skip-permissions` ekler.
 **Consequence:** Brain, worker scope'una göre allowedTools string'i hesaplar. SpawnOptions her spawn fonksiyonuna opsiyonel parametre olarak geçer.
 
 ## ADR-008: Brain Merkezi Import — Tek Yönlü Bağımlılık
+
+**Status:** accepted
 
 **Decision:** Brain, projede diğer modülleri (tmux, auditor, worker) import eden TEK modüldür. Diğer modüller brain'i import etmez.
 **Context:** Döngüsel import'lar Node.js ESM'de tanımsız davranışa yol açar. Brain orkestratör rolünde — tmux/auditor/worker'ı çağırır ama onlar brain'den bağımsız çalışır.
@@ -50,11 +68,15 @@
 
 ## ADR-009: DEBT.md Markdown Tablo Formatı
 
+**Status:** accepted
+
 **Decision:** DEBT.md, 9 kolonlu markdown tablo formatında tutulur. Brain `parseDebtTable`/`generateDebtTable` ile programatik okuma/yazma yapar.
 **Context:** DebtItem interface'inin tüm alanlarını (id, description, originTaskId, originSprintId, priority, sprintsOpen, resolved, resolvedInSprintId, createdAt) saklamalıyız. JSON yerine markdown tercih edildi çünkü git diff'lerde okunabilir.
 **Consequence:** Tablo parse'ı `|` split + `slice(1,-1)` ile yapılır. Boş kolon değerleri korunur. Yeni kolon eklemek parse/generate'i güncellemeyi gerektirir.
 
 ## ADR-010: Tek Runtime Dependency — commander.js
+
+**Status:** accepted
 
 **Decision:** CLI tek runtime dependency olarak `commander@^13.0.0` kullanır. chalk, inquirer, picocolors gibi ek kütüphaneler eklenmez.
 **Context:** Deckent CLI minimal footprint hedefler. Node 18+ built-in'leri (readline/promises, Unicode support) çoğu ihtiyacı karşılar. Renk desteği modern terminallerde Unicode ile sağlanabilir.
@@ -62,17 +84,23 @@
 
 ## ADR-011: node:readline/promises — Built-in Prompt
 
+**Status:** accepted
+
 **Decision:** İnteraktif prompt'lar (text, select, confirm) için `node:readline/promises` modülü kullanılır.
 **Context:** `inquirer` (1.2MB) veya `prompts` (200KB) eklemek yerine Node 18+ built-in API yeterli. Basit wrapper'lar (`promptText`, `promptSelect`, `promptConfirm`) tüm init wizard ihtiyacını karşılıyor.
 **Consequence:** Rich UI (autocomplete, fuzzy search) yok. Gerekirse Phase 3 TUI'da `ink` veya `blessed` eklenebilir.
 
 ## ADR-012: register\<Name\>(program) Pattern
 
+**Status:** accepted
+
 **Decision:** Her CLI komutu kendi dosyasında tanımlanır ve `register<Name>(program: Command): void` fonksiyonu export eder.
 **Context:** Tek dosyada tüm komutları tanımlamak bakım zorluğu yaratır. Ayrı dosyalar bağımsız test, kolay ekleme/çıkarma sağlar.
 **Consequence:** `src/cli/commands/` dizininde 16 dosya. Entry point (`index.ts`) 16 register çağrısı yapar. Yeni komut eklemek: dosya oluştur + index.ts'e import + register ekle.
 
 ## ADR-013: DECKENT.md Adapter Pattern (Sprint 15)
+
+**Status:** accepted
 
 **Context:** CLAUDE.md'yi init sırasında overwrite etmek kullanıcı değişikliklerini kaybettiriyordu.
 
@@ -86,6 +114,8 @@
 
 ## ADR-014: .deck Secret File System (Sprint 044)
 
+**Status:** accepted
+
 **Context:** Provider API key'leri .env'de tutmak proje .env dosyasıyla çakışıyordu. Kullanıcının mevcut .env içeriği DECKENT_ prefix'li key'lerle kirleniyor, .gitignore yönetimi karmaşıklaşıyordu.
 
 **Decision:** Ayrı `.deck` dosyası oluşturuldu. DECKENT_ prefix'li key'ler bu dosyada tutulur. Init sırasında `.deck` otomatik olarak `.gitignore`'a eklenir.
@@ -93,6 +123,8 @@
 **Consequence:** Worker'lar `.deck` içeriğini görmez. Brain sadece gerekli key'leri task scope'una göre inject eder. Kullanıcının .env dosyası hiç dokunulmaz.
 
 ## ADR-015: TaskRouter Module — 6-level routing (Sprint 044)
+
+**Status:** accepted
 
 **Context:** Task → provider atama mantığı sprint-controller'da inline'dı ve genişletilemezdi. Yeni routing kuralı eklemek sprint-controller'ı her seferinde değiştirmeyi gerektiriyordu.
 
@@ -102,6 +134,8 @@
 
 ## ADR-016: Connector Module — provider lifecycle (Sprint 044)
 
+**Status:** accepted
+
 **Context:** Provider'ların sağlık durumu sadece bootstrap'ta kontrol ediliyordu. Sprint sırasında provider düşerse tespit edilemiyordu.
 
 **Decision:** `Connector` class ile runtime health check, lazy init ve auditor entegrasyonu sağlandı. Her provider bağlantısı Connector üzerinden yönetilir.
@@ -109,6 +143,8 @@
 **Consequence:** Sprint sırasında provider düşerse auditor tespit eder ve alert üretir. Lazy init sayesinde kullanılmayan provider'lar başlatılmaz. Connector, provider sağlık metriklerini `.dashboard`'a yazar.
 
 ## ADR-017: MCP-Native Provider Adapters (Sprint 045)
+
+**Status:** accepted
 
 **Context:** Codex/Gemini adapter'ları mock komutlar kullanıyordu. Gerçek CLI davranışı test edilemiyordu.
 
@@ -118,6 +154,8 @@
 
 ## ADR-018: Multi-Environment Config Generation (Sprint 046)
 
+**Status:** accepted
+
 **Context:** Her IDE/ortam farklı config dosyası bekliyor. Codex, Gemini, Cursor, VS Code farklı format ve yol tercihlerine sahip.
 
 **Decision:** Ortam başına config generator: Codex → `config.toml`, Gemini → `settings.json`, Cursor → `mcp.json`. `deckent init --all-envs` tüm ortamları tek seferde hazırlar.
@@ -125,6 +163,8 @@
 **Consequence:** Kullanıcı tek komutla tüm IDE entegrasyonlarını kurar. Her generator bağımsız modül, yeni ortam eklemek kolaylaşır. Mevcut config'ler üzerine yazılmaz, `writeIfNotExists` prensibi korunur.
 
 ## ADR-019: Language-Agnostic Worker Verify (Sprint 046)
+
+**Status:** accepted
 
 **Context:** Worker verify loop sadece `tsc --noEmit` ve `vitest run` çalıştırıyordu. TypeScript dışı projelerde Deckent kullanılamıyordu.
 
@@ -134,6 +174,8 @@
 
 ## ADR-020: Rich Sprint Output — 7-section summary (Sprint 044)
 
+**Status:** accepted
+
 **Context:** Sprint sonuç çıktısı tek satır metric'ti. Kullanıcı kaç task tamamlandı, hangi dosyalar değişti, ne öğrenildi gibi bilgilere erişemiyordu.
 
 **Decision:** 7 bölümlü rich output: Header, Results, Changes, Tests, Agents, Learnings, Next Steps. ANSI renk desteği ve `NO_COLOR` env var desteği eklendi.
@@ -142,6 +184,8 @@
 
 ## ADR-021: Kraken ASCII Brand Identity (Sprint 044)
 
+**Status:** accepted
+
 **Context:** Deckent'in görsel bir kimliği yoktu. CLI araçlarında ilk izlenim önemli.
 
 **Decision:** Kraken ASCII mascot: teal gövde (#4db8a4), gold DECKENT yazısı (#c4a855), dim tagline. `deckent --version` ve `deckent init` komutlarında splash gösterilir.
@@ -149,6 +193,10 @@
 **Consequence:** Marka tanınırlığı artar. `NO_COLOR` veya `CI` env var varsa splash atlanır. ASCII art sabit string olarak `src/cli/splash.ts`'de tutulur, runtime üretilmez.
 
 ## ADR-022: CLI/MCP Feature Parity — Tek Yapı, Çoklu Ortam (Sprint 067)
+
+**Status:** superseded
+
+**Superseded by:** ADR-022 v2 (Sprint 085)
 
 **Context:** CLI'da 33+ komut, MCP'de 16 tool + 9 resource var. CLI'da olan bazı özellikler (spawn, attach, watch, agent, skill, plugin, onboard, upgrade, explain, finalize, dashboard, web, serve, archive-debt, quick-start, test-run, skill-marketplace) MCP tarafında yok. Kullanıcılar CLI'dan MCP'ye geçtiğinde özellik kaybı yaşıyor. Ayrıca MCP tool'ları ile CLI komutları farklı kod yolları kullanıyor — CLI doğrudan fonksiyon çağırırken, MCP HTTP/stdio üzerinden wrapper çalıştırıyor. Bu tutarsızlık hata kaynağı.
 
@@ -167,6 +215,8 @@
 
 ## ADR-023: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072)
 
+**Status:** accepted
+
 **Context:** Plan tier isimleri Claude'a özgüydü: `max_plan`, `max5x_plan`, `pro_plan`. Bu isimler Codex ve Gemini kullanıcıları için anlamsızdı. Provider-agnostic bir CLI olarak Deckent, belirli bir sağlayıcıya atıfta bulunmamalı.
 
 **Decision:** Tier isimleri genelleştirildi:
@@ -181,6 +231,8 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 
 ## ADR-024: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072)
 
+**Status:** accepted
+
 **Context:** `sprint-controller.ts` 1300+ satıra büyüdü ve 8 sprint fazının tamamını içeriyordu. Bu durum bakım güçlüğü, yüksek cognitive load ve bağımsız test yazımını zorlaştırıyordu. Sprint 036'daki brain.ts split'inin ardından sprint-controller da god object haline geldi.
 
 **Decision:** Sprint fazları `sprint-phases.ts` adlı yeni dosyaya çıkarıldı. `runSprint()` içindeki 7 faz fonksiyonu extract edildi:
@@ -193,6 +245,8 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 
 ## ADR-025: Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076)
 
+**Status:** accepted
+
 **Context:** Kullanıcı Ctrl+C yaptığında veya process SIGINT aldığında, çalışan sprint aniden sonlanıyordu. Worker'lar temizlenmeden çıkıyor, task dosyaları yarım kalıyor, tmux sessionlar arka planda çalışmaya devam ediyordu. Bu durum .tasks/ dizininde stale heartbeat ve kilit dosyalarına yol açıyordu.
 
 **Decision:** `entry.ts` içindeki SIGINT handler genişletildi:
@@ -203,6 +257,8 @@ Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". E
 **Consequence:** Ctrl+C sonrası temiz state bırakılır. Sprint INTERRUPTED olarak işaretlenir, review komutu bu durumu gösterir. Worker'lar SIGTERM sinyali alır ve kendi .hb dosyalarını DONE olarak işaretleyebilir. `deckent cleanup` sonrasında orphan dosya kalmaz.
 
 ## ADR-026: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076)
+
+**Status:** accepted
 
 **Context:** `sprint-controller.ts` zamanla god object haline geldi (1300+ satır). Sprint 036'da brain.ts split'i yapılmıştı ama sprint-controller yeniden şişti. Test ve bakım güçlüğü arttı.
 
@@ -216,6 +272,10 @@ Her fazda backward compatibility sprint-controller re-export layer üzerinden ko
 **Consequence:** `sprint-controller.ts` orchestration koordinatörü rolüne döndü — iş mantığı bağımsız modüllerde. orchestra/ modül sayısı 37'den 47'ye çıktı. Her yeni modül bağımsız unit test kapsamı kazandı. Kademeli split stratejisi büyük refactor riskini minimize etti.
 
 ## ADR-022: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar (Updated Sprint 085)
+
+**Status:** accepted
+
+**Supersedes:** ADR-022 v1 (Sprint 067)
 
 **Context:** Sprint 085'te MCP tool parametreleştirilmesi tamamlandı. `deckent_init`, `deckent_start`, `deckent_status`, `deckent_doctor`, `deckent_retro`, `deckent_history` araçlarına CLI karşılıkları olanyla eşit parametreler eklendi. Ayrıca `deckent_agent_list` ve `deckent_skill_list` araçları CLI-only olan `deckent agent list` ve `deckent skill list` komutlarını MCP'ye getirdi.
 
@@ -242,6 +302,8 @@ MCP-only komutlar yoktur — tüm MCP araçlarının CLI karşılığı mevcuttu
 
 ## ADR-027: Hybrid Spawn Backend (Sprint 123)
 
+**Status:** accepted
+
 **Decision:** Hibrit backend desteği DEFERRED. Mevcut tek-backend modeli yeterli. `SpawnBackendFactory` docker → tmux → subprocess fallback zinciriyle TEK bir backend seçer; hibrit mod (worker Docker'da, auditor subprocess olarak) implementasyona alınmayacak.
 
 **Context:** Auditor scan loop `sprint-controller.ts` içinde in-process olarak çalışır — tmux/subprocess/docker backend'lerinden tamamen bağımsızdır. Worker'lar backend üzerinden spawn edilirken auditor dosya sistemi üzerinden `.hb` heartbeat dosyalarını okur. Auditor'ın backend seçimiyle hiçbir doğrudan bağlantısı olmadığından, hibrit mod için ayrı bir mekanizma gerekmez. Worker isolation Docker container'larıyla sağlanmaktadır.
@@ -249,6 +311,8 @@ MCP-only komutlar yoktur — tüm MCP araçlarının CLI karşılığı mevcuttu
 **Consequence(s):** Hibrit backend implementasyonu yapılmayacak. Auditor zaten backend-agnostic olduğundan ek değişiklik gerektirmez. Gelecekte auditor'ın ayrı bir process olarak çalıştırılması gerekirse (örn. distributed sprint execution), bu ADR revisit edilecek ve hibrit mod tekrar değerlendirilecek.
 
 ## ADR-028: Decision-Engine V1 → V2 Routing Migration
+
+**Status:** accepted
 
 **Context:** Sprint 031'de keyword-based DecisionOrchestrator tasarlandı (6-step pipeline). Sprint 066'da intent-based V2 routing engine (routeTaskV2) ile değiştirildi.
 
@@ -700,3 +764,176 @@ API anahtarları config dosyalarında saklanmaz — environment variable olarak 
 - sprint-controller.ts (2133 satır) — Split önerisi: sprint-lifecycle.ts (faz yönetimi) + sprint-orchestrator.ts (worker koordinasyonu)
 - sprint-reporter.ts (2132 satır) — Split önerisi: retro-writer.ts (retrospektif) + performance-reporter.ts (metrik)
 - **Status:** Gelecek sprint'te değerlendirilecek — bu sprint'te sadece belgelendi.
+
+## ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard (Sprint 138)
+
+**Status:** accepted
+
+**Date:** 2026-04-14
+
+**Context:**
+
+Sprint 137 meta-dogfood analizi kritik bir iletişim sorununu ortaya koydu: Task 137-001 worker `status: DONE exitCode: 0` bildirdi, ancak vitest 53 fail test bıraktı. Worker "kod var" → DONE kısayolu. Bu sapmanın temel nedeni, Brain ↔ Worker ↔ Auditor arasındaki mesaj akışının formal bir protokole sahip olmamasıydı — her bileşen kendi dosya formatını üretiyordu (.hb heartbeat, .result, git diff çıktısı) ama bu mesajlar versiyonlanmış, kanonik, parse edilebilir değildi.
+
+Sorunlar:
+
+1. **Doğrulama eksikliği:** Worker `DONE` bildirdiğinde Auditor bağımsız doğrulama yapamıyordu. Auditor sadece `.result` dosyasının varlığını kontrol ediyor, içeriğinin doğruluğunu değil.
+2. **Kanal belirsizliği:** `WORKER→BRAIN` yönünde sadece `.result` dosyası vardı; `WORKER→AUDITOR` doğrudan iletişim kanalı yoktu.
+3. **Replay edilemezlik:** Sprint sonunda hangi olayların hangi sırada yaşandığını reconstruct etmek imkânsızdı. `.hb` timestamp'leri kaba granülaritede, `.result` tek snapshot.
+4. **Mesaj versiyonlaması yok:** Yeni alan eklendiğinde eski consumer'lar uyumsuz hale geliyordu. Örn. Sprint 136 `rubricScores` alanı eski Brain evaluate kodunu bozdu.
+
+Sprint 138 bu sorunu formal mesaj protokolü ile çözer. Dosya tabanlı state (`.hb`, `.result`) geriye dönük uyumluluk için Sprint 142'ye kadar devam eder, ancak event stream kanonik truth olur.
+
+**Decision:**
+
+Brain ↔ Worker ↔ Auditor iletişimi için versiyonlanmış mesaj protokolü (Protocol Version 1.0). Append-only event stream (`.deckent/sprint-NNN-events.jsonl`) tüm mesajları sıralı olarak kaydeder. Dosya tabanlı state paralel devam eder (fail-safe fallback), ancak event stream kanonik gerçek kabul edilir.
+
+### Mesaj Formatı
+
+```json
+{
+  "timestamp": "2026-04-14T10:00:00.000Z",
+  "sequence": 42,
+  "protocol_version": "1.0",
+  "source": "worker | brain | auditor | deckent",
+  "target": "brain | worker | auditor | user | *",
+  "channel": "CHANNEL_CODE",
+  "payload": {}
+}
+```
+
+- `sequence`: sprint başından itibaren monoton artan tam sayı, 1'den başlar
+- `protocol_version`: sabit "1.0" (Sprint 138), yeni majör değişiklikler 2.0 olacak
+- `target: "*"`: broadcast mesaj (tüm consumer'lar dinler)
+- `payload`: kanal koduna göre değişir, JSON object, forward-compatible (ekstra alanlar ignore edilir)
+
+### Kanal Kodları (15 adet, Protocol Version 1.0)
+
+**Brain ↔ Worker Kanalları:**
+| Kanal | Kaynak | Hedef | Açıklama |
+|-------|--------|-------|----------|
+| `BRAIN→WORKER:TASK_ASSIGN` | brain | worker | Task atama, scope + model + skills payload'ı |
+| `WORKER→BRAIN:HEARTBEAT` | worker | brain | Periyodik canlılık sinyali (30s interval) |
+| `WORKER→BRAIN:RESULT` | worker | brain | Task sonucu (selfAssessment, filesChanged, rubricScores) |
+| `WORKER→BRAIN:QUESTION` | worker | brain | Checkpoint/blocker sorusu |
+| `BRAIN→WORKER:ANSWER` | brain | worker | Checkpoint cevabı veya blocker çözümü |
+
+**Worker ↔ Auditor Kanalları:**
+| Kanal | Kaynak | Hedef | Açıklama |
+|-------|--------|-------|----------|
+| `WORKER→AUDITOR:CODE_VERIFY_REQUEST` | worker | auditor | Worker result'ını bağımsız doğrulama talebi |
+| `AUDITOR→BRAIN:VERIFICATION_RESULT` | auditor | brain | Doğrulama sonucu: PASS \| DOWNGRADE \| FAIL |
+| `AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED` | auditor | brain | İki worker aynı dosyaya yazıyor, plan-time bypass |
+| `AUDITOR→BRAIN:ADR_VIOLATION` | auditor | brain | Pilot ADR kural ihlali (ADR-006, ADR-008, ADR-010) |
+| `AUDITOR→BRAIN:GATE_COMPUTED` | auditor | brain | Sprint gate hesaplandı (PASS \| WARNING \| FAIL) |
+| `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN` | auditor | brain | load-test-report.md yazıldı |
+
+**Broadcast / Sprint Kanalları:**
+| Kanal | Kaynak | Hedef | Açıklama |
+|-------|--------|-------|----------|
+| `BRAIN→*:METRIC_EMITTED` | brain | * | Sprint metric noktası (coverage, duration, worker count) |
+| `BRAIN→WORKER:FIX_REQUEST` | brain | worker | NO_GO sonrası fix yeniden deneği |
+| `BRAIN→*:SPRINT_PHASE_CHANGE` | brain | * | Faz geçişi (PLAN→SPAWN→EXECUTE→...) |
+
+**User Notification (Sprint 139 Seed):**
+| Kanal | Kaynak | Hedef | Açıklama |
+|-------|--------|-------|----------|
+| `DECKENT→USER:NOTIFY` | deckent | user | Kullanıcıya bildirim (Sprint 139 dispatcher, Sprint 138'de sadece tanımlı) |
+
+### Backward Compatibility Roadmap
+
+| Sprint | Durum |
+|--------|-------|
+| Sprint 138 | `.hb` + `.result` dosyaları **paralel devam eder**, event stream ek katman |
+| Sprint 139-140 | Event stream primary, file-based secondary |
+| Sprint 140+ | File-based **soft-deprecated** (consumer'lar event stream'e migrate edilir) |
+| Sprint 142 | File-based **removed** (sadece event stream) |
+
+### Fail-Safe Davranış
+
+Event stream write başarısız olursa (disk tam, permission hata) → `console.warn` + file-based fallback. Sprint asla event stream I/O hatası nedeniyle durmamalı.
+
+**Consequences (+):**
+
+- Sprint sonunda tüm olaylar replay edilebilir → post-mortem analiz mümkün
+- Auditor `WORKER→AUDITOR:CODE_VERIFY_REQUEST` ile aktif doğrulayıcı rolüne geçer (Sprint 137 kısayol kapatılır)
+- `SCOPE_COLLISION_DETECTED` plan-time saptanabilir → manual wave barrier ihtiyacı azalır
+- Protocol versiyonlaması → breaking change'ler kontrollü, consumer'lar protocol_version'ı okur
+- `DECKENT→USER:NOTIFY` kanalı Sprint 139 dispatcher'a temiz extension point sağlar
+
+**Consequences (-):**
+
+- Her olay için disk I/O artışı — `.jsonl` append performance testi gerekebilir
+- `sequence` monotonicity multi-worker concurrent write'ta race condition riski — atomik increment gerekir (file lock veya process-level counter)
+- Event stream büyüyebilir — Sprint 143'te rotation/cleanup mekanizması düşünülmeli
+- Sprint 142 file-based remove, legacy consumer'lar için migration burden
+
+**Alternatives Considered:**
+
+- **gRPC/Protobuf:** Tip güvenli, binary verimli. Reddedildi — schema compiler toolchain bağımlılığı, Node.js subprocess'lerde kurulum karmaşıklığı, Deckent "kur-çalıştır" ilkesiyle çelişiyor (ADR-010).
+- **WebSocket:** Gerçek zamanlı, bidirektional. Reddedildi — Docker backend'de port mapping karmaşıklığı, Worker container'ların WebSocket server'a erişimi garanti değil, HTTP API zaten var.
+- **Redis Pub/Sub:** Yüksek throughput, kanıtlı. Reddedildi — ADR-010 tek runtime dependency ilkesi ihlali, ADR-033 "kur-çalıştır" product vizyonuyla çelişiyor, Redis kurulu olmayan makinelerde sıfır fallback.
+- **SQLite:** ACID garantili, structured query. Reddedildi — dosya tabanlı append'den daha karmaşık, basit olmak Deckent kimliğinin temelidir, WAL mode multi-writer complexity ekler.
+- **Mevcut dosya tabanlı devam:** Değişiklik yok, `.hb` + `.result` yeterli. Reddedildi — Sprint 137 meta-dogfood canlı kanıtı: file-based state functional doğrulama yapmıyor, replay imkânsız.
+
+**References:**
+
+- Sprint 137 Task 137-001 retrospektif — worker DONE kısayolu canlı kanıtı
+- Sprint 138 design spec: `docs/superpowers/specs/2026-04-14-sprint-138-architectural-pivot-design.md` Section 6
+- Sprint 138 plan: `docs/superpowers/plans/2026-04-14-sprint-138-architectural-pivot-plan.md`
+- ADR-008: Brain Merkezi Import — mesaj akışı sınır disiplini
+- ADR-010: Minimal Dependencies — Redis/SQLite reddetme gerekçesi
+- ADR-033: Product Vision — WebSocket/Redis reddetme gerekçesi (kur-çalıştır)
+- `src/orchestra/event-stream.ts` — Sprint 138 Task 4 implementasyonu
+- `src/monitor/auditor.ts` — Sprint 138 Task 3 Auditor Authority Extension
+- `.deckent/sprint-138-events.jsonl` — canlı runtime event log
+
+---
+
+## ADR-036: ADR Governance Integration — Mandatory Architecture Decision Enforcement
+
+**Status:** accepted
+
+**Date:** 2026-04-14
+
+**Context:**
+
+Deckent 135+ sprint boyunca `.brain/DECISIONS.md` dosyasında mimari kararları (ADR) kayıt altına aldı. Ancak bu ADR'ler yalnızca bilgilendirme amaçlıydı — brain veya worker'lar tarafından aktif olarak okunmuyor, uyumluluk kontrol edilmiyordu. Açık kaynak repoya geçişle birlikte kullanıcılar kendi `.brain/DECISIONS.md` dosyalarını yazıp Deckent'tan enforce ettirmeyi bekleyecek.
+
+Sorunlar:
+1. ADR format standardize değildi — bazı ADR'lerde Status alanı vardı, bazılarında yoktu
+2. Worker prompt'larında ADR bilgisi yoktu — worker'lar mimari kısıtlamalardan habersiz çalışıyordu
+3. ADR yaşam döngüsü (accepted → deprecated → superseded) takip edilemiyordu
+4. ADR governance CI pipeline'a entegre değildi — format hataları build'de yakalanmıyordu
+
+**Decision:**
+
+ADR governance'ı kullanıcı-facing ürün özelliğine dönüştürmek. 5 bileşen:
+
+1. **MADR v3 Hibrit Format:** Tüm ADR'lere zorunlu `**Status:**` alanı eklendi. Geçerli değerler: accepted, deprecated, superseded, proposed, rejected. Parantezli açıklama desteklenir (örn. `accepted (Sprint 131)`).
+
+2. **Mandatory Read Wiring:** DECKENT.md'ye `@.brain/DECISIONS.md` referansı eklendi. brain.md ve worker-default.md kurallarına ADR compliance zorunluluğu eklendi.
+
+3. **Worker Prompt ADR Injection:** `buildWorkerPrompt()` fonksiyonu `.brain/DECISIONS.md` içeriğini worker prompt'una enjekte eder. Worker'lar mimari kısıtlamaları bilir, ihlal durumunda NO_GO + ADR amendment proposal yazar.
+
+4. **Validator Script:** `scripts/adr-validator.mjs` — format doğrulama, status enum kontrolü, duplicate ID tespiti. `npm run lint:adr` ile CI'da çalıştırılır.
+
+5. **ADR/SDL Naming Split:** `.brain/DECISIONS.md` = ADR (kalıcı mimari kararlar), `.deckent/decisions/*.json` = SDL (sprint taktik kararları).
+
+**Consequences (+):**
+- Worker'lar her sprint'te mimari kısıtlamaları bilir — bilinçsiz ihlaller azalır
+- `npm run lint:adr` CI pipeline'da format tutarlılığını garanti eder
+- Kullanıcılar kendi projelerinde ADR governance'ı kurabilir
+- MADR v3 standardıyla uyumlu format — topluluk alışkanlıklarıyla uyum
+
+**Consequences (-):**
+- Worker prompt boyutu ADR injection ile büyür (~3000 char ek)
+- Validator basit regex-based — karmaşık markdown edge case'leri gözden kaçabilir
+- ADR enforcement runtime'da değil, compile-time'da — aktif kod analizi yok
+
+**References:**
+- Sprint 138 Task 138-001 implementasyonu
+- `scripts/adr-validator.mjs` — validator script
+- `src/orchestra/task-builder.ts:loadADRContent()` — prompt injection
+- ADR-013: DECKENT.md Adapter Pattern — mandatory read wiring pattern
+- MADR v3: https://adr.github.io/madr/

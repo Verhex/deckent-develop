@@ -14,6 +14,17 @@ import {
   startScanLoop,
   writeScanToDashboard,
   deduplicateAlerts,
+  // Sprint 138 — migrated + new exports
+  CODE_VERIFIED_DONE,
+  tryCodeVerifiedDone,
+  writeCodeVerifiedResult,
+  parseEvidenceCommand,
+  inferAffectedTests,
+  verifyFunctional,
+  validateTechDebt,
+  verifyWorkerResult,
+  parseADRs,
+  checkADRCompliance,
 } from '../../src/monitor/auditor.js';
 import { AlertLevel, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
@@ -1405,3 +1416,263 @@ function makeTask(id: string, dependencies: string[]): Task {
     status: TaskStatus.PENDING,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Sprint 138 — Migration + New Features Tests
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('tryCodeVerifiedDone (migration regression)', () => {
+  it('should return NOT_TRIGGERED when result is already DONE', async () => {
+    const result = await tryCodeVerifiedDone('001', '/tmp/test', {
+      fileExists: async () => true,
+      readResultJson: async () => ({
+        taskId: '001',
+        workerId: 'w-001',
+        filesChanged: [],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: true,
+        coverage: 90,
+        selfAssessment: 'DONE' as const,
+        notes: 'All good',
+      }),
+    });
+    expect(result.triggered).toBe(false);
+    expect(result.reason).toContain('already DONE');
+  });
+
+  it('should verify code on disk for Docker NO_GO pattern', async () => {
+    const result = await tryCodeVerifiedDone('002', '/tmp/test', {
+      fileExists: async (p: string) => p.endsWith('.result'),
+      readResultJson: async () => ({
+        taskId: '002',
+        workerId: 'w-002',
+        filesChanged: [],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: false,
+        coverage: 0,
+        selfAssessment: 'NO_GO' as const,
+        notes: 'Docker worker exited without writing result file',
+      }),
+      readTaskJson: async () => ({
+        ...makeTask('002', []),
+        description: '**Kanıt:** `grep "hello" src/test.ts` → hit',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/test.ts'] },
+      }),
+      runGitStatus: async () => ({ modified: true }),
+      runGrepEvidence: async () => ({ hit: true }),
+    });
+    expect(result.triggered).toBe(true);
+    expect(result.verified).toBe(true);
+    expect(result.verifiedFiles).toContain('src/test.ts');
+  });
+});
+
+describe('CODE_VERIFIED_DONE constant', () => {
+  it('exports the sentinel value', () => {
+    expect(CODE_VERIFIED_DONE).toBe('CODE_VERIFIED_DONE');
+  });
+});
+
+describe('parseEvidenceCommand', () => {
+  it('parses grep command from Kanıt line', () => {
+    const cmd = parseEvidenceCommand('**Kanıt:** `grep -n "hello" src/test.ts` → hit');
+    expect(cmd).toBe('grep -n "hello" src/test.ts');
+  });
+
+  it('returns null for disallowed commands', () => {
+    const cmd = parseEvidenceCommand('**Kanıt:** `rm -rf /` → dangerous');
+    expect(cmd).toBeNull();
+  });
+
+  it('returns null when no Kanıt line exists', () => {
+    const cmd = parseEvidenceCommand('Just some description without evidence');
+    expect(cmd).toBeNull();
+  });
+});
+
+describe('inferAffectedTests', () => {
+  it('maps src files to test paths', () => {
+    const tests = inferAffectedTests(['src/core/config.ts', 'src/monitor/auditor.ts']);
+    expect(tests).toEqual([
+      'tests/core/config.test.ts',
+      'tests/monitor/auditor.test.ts',
+    ]);
+  });
+
+  it('skips non-src files', () => {
+    const tests = inferAffectedTests(['docs/README.md', 'package.json']);
+    expect(tests).toEqual([]);
+  });
+
+  it('skips test files', () => {
+    const tests = inferAffectedTests(['src/core/config.test.ts']);
+    expect(tests).toEqual([]);
+  });
+});
+
+describe('verifyFunctional', () => {
+  it('returns PASS when no affected tests exist', async () => {
+    const result = await verifyFunctional('001', '/tmp/test', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: ['docs/README.md'],
+      linesAdded: 10,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: '',
+    });
+    expect(result.verdict).toBe('PASS');
+    expect(result.reason).toContain('No affected test files');
+  });
+});
+
+describe('validateTechDebt', () => {
+  it('passes when notes explain tech debt', async () => {
+    const result = await validateTechDebt('001', '/tmp/test', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: ['src/core/config.ts'],
+      linesAdded: 50,
+      linesRemoved: 10,
+      testsPassed: true,
+      coverage: 80,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      notes: 'Coverage is at 80% instead of target 90% due to complex async edge cases that need dedicated integration tests',
+    });
+    expect(result.verdict).toBe('PASS');
+  });
+
+  it('downgrades to NO_GO when notes are empty', async () => {
+    const result = await validateTechDebt('001', '/tmp/test', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: ['src/core/config.ts'],
+      linesAdded: 50,
+      linesRemoved: 10,
+      testsPassed: true,
+      coverage: 80,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      notes: '',
+    });
+    expect(result.verdict).toBe('DOWNGRADE');
+    expect(result.newStatus).toBe('NO_GO');
+  });
+});
+
+describe('verifyWorkerResult (3-pipeline dispatch)', () => {
+  it('dispatches NO_GO to tryCodeVerifiedDone pipeline', async () => {
+    const result = await verifyWorkerResult('001', '/tmp/test', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      coverage: 0,
+      selfAssessment: 'NO_GO',
+      notes: 'Some real failure',
+    });
+    // Should go through tryCodeVerifiedDone pipeline and fail (no Docker pattern)
+    expect(result.verdict).toBe('FAIL');
+  });
+
+  it('dispatches GO_WITH_TECH_DEBT to validateTechDebt pipeline', async () => {
+    const result = await verifyWorkerResult('001', '/tmp/test', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: ['src/core/config.ts'],
+      linesAdded: 50,
+      linesRemoved: 10,
+      testsPassed: true,
+      coverage: 80,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      notes: 'Coverage at 80% — async edge cases need dedicated integration tests for full coverage',
+    });
+    expect(result.verdict).toBe('PASS');
+  });
+
+  it('dispatches DONE to verifyFunctional pipeline', async () => {
+    const result = await verifyWorkerResult('001', '/tmp/test', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: ['docs/README.md'],
+      linesAdded: 10,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'Updated docs',
+    });
+    expect(result.verdict).toBe('PASS');
+  });
+});
+
+describe('parseADRs', () => {
+  it('parses ADR entries from DECISIONS.md content', () => {
+    const content = `# Decisions
+
+## ADR-001: Use TypeScript
+**Status:** accepted
+**Decision:** Use TypeScript for all source code.
+
+## ADR-005: Synchronous I/O
+**Status:** deprecated
+**Decision:** Use synchronous I/O for simplicity.
+
+## ADR-010: Minimal Dependencies
+**Status:** accepted
+**Decision:** Keep runtime dependencies minimal.
+`;
+    const adrs = parseADRs(content);
+    expect(adrs).toHaveLength(3);
+    expect(adrs[0]!.id).toBe('ADR-001');
+    expect(adrs[0]!.status).toBe('accepted');
+    expect(adrs[1]!.id).toBe('ADR-005');
+    expect(adrs[1]!.status).toBe('deprecated');
+    expect(adrs[2]!.id).toBe('ADR-010');
+    expect(adrs[2]!.status).toBe('accepted');
+  });
+});
+
+describe('checkADRCompliance', () => {
+  it('detects ADR-006 violation (spawnSync with shell:true)', () => {
+    // Mock DECISIONS.md
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('DECISIONS.md')) {
+        return `## ADR-006: Safe Spawn\n**Status:** accepted\n**Decision:** Always use array args.`;
+      }
+      if (p.includes('src/bad-file.ts')) {
+        return `const r = spawnSync('cmd', { shell: true });`;
+      }
+      return '';
+    });
+    mockedExistsSync.mockReturnValue(true);
+
+    const violations = checkADRCompliance('/tmp/test', ['src/bad-file.ts']);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.adrId).toBe('ADR-006');
+    expect(violations[0]!.severity).toBe('error');
+  });
+
+  it('returns no violations for clean files', () => {
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('DECISIONS.md')) {
+        return `## ADR-006: Safe Spawn\n**Status:** accepted\n**Decision:** Always use array args.`;
+      }
+      if (p.includes('src/good-file.ts')) {
+        return `const r = spawnSync('cmd', ['arg1']);`;
+      }
+      return '';
+    });
+    mockedExistsSync.mockReturnValue(true);
+
+    const violations = checkADRCompliance('/tmp/test', ['src/good-file.ts']);
+    expect(violations).toHaveLength(0);
+  });
+});

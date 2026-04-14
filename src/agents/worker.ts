@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, openSync, closeSync, realpathSync, constants as fsConstants } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync, realpathSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join, normalize, sep } from 'node:path';
@@ -13,10 +13,22 @@ import type {
   FeedbackLoop,
   VerifyTestsResult,
 } from '../core/types.js';
-import { TASKS_DIR, LOCKS_DIR } from '../core/constants.js';
+import { TASKS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { redactSensitive } from '../cli/helpers/output.js';
 import { detectFullStack, STACK_COMMANDS } from '../core/stack-detector.js';
+
+// ─── Lock Operations (delegated to core/file-lock.ts) ──────────────
+// Sprint 138: Lock logic migrated to core for plan-time collision detection.
+// Re-exported here for backward compatibility.
+import {
+  acquireLock as _coreLock,
+  releaseLock as _coreRelease,
+  checkLock as _coreCheck,
+  releaseAllLocks as _coreReleaseAll,
+} from '../core/file-lock.js';
+
+export { LockError } from '../core/file-lock.js';
 
 // ─── Error Classes ──────────────────────────────────────────────────
 
@@ -27,15 +39,7 @@ export class TaskClaimError extends Error {
   }
 }
 
-export class LockError extends Error {
-  constructor(
-    message: string,
-    public readonly filePath: string,
-  ) {
-    super(message);
-    this.name = 'LockError';
-  }
-}
+// LockError re-exported from core/file-lock.ts above
 
 export class ScopeViolationError extends Error {
   constructor(
@@ -66,10 +70,6 @@ function resultFilePath(projectRoot: string, taskId: string): string {
   return join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
 }
 
-function lockFilePathFor(projectRoot: string, filePath: string): string {
-  const lockName = filePath.replace(/[/\\]/g, '__') + '.lock';
-  return join(projectRoot, LOCKS_DIR, lockName);
-}
 
 function now(): string {
   return new Date().toISOString();
@@ -170,106 +170,40 @@ export function writeTaskPlan(projectRoot: string, plan: TaskPlan): void {
   writeFileSync(path, JSON.stringify(plan, null, 2), 'utf-8');
 }
 
+/**
+ * Acquire a file lock — delegates to core/file-lock.ts.
+ * @deprecated Import from '../core/file-lock.js' instead.
+ */
 export function acquireLock(
   projectRoot: string,
   filePath: string,
   workerId: string,
   taskId: string,
 ): LockInfo {
-  ensureDir(join(projectRoot, LOCKS_DIR));
-  const lockPath = lockFilePathFor(projectRoot, filePath);
-
-  // Check existing lock
-  if (existsSync(lockPath)) {
-    try {
-      // safe: lock files always written by acquireLock with LockInfo shape
-      const existing = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
-      if (existing.ownerWorkerId === workerId) {
-        // Idempotent — same worker already holds the lock
-        return existing;
-      }
-      throw new LockError(
-        `File ${filePath} is locked by ${existing.ownerWorkerId}`,
-        filePath,
-      );
-    } catch (err) {
-      if (err instanceof LockError) throw err;
-      // Corrupted lock file — overwrite
-    }
-  }
-
-  const lockInfo: LockInfo = {
-    filePath,
-    ownerWorkerId: workerId,
-    acquiredAt: now(),
-    taskId,
-  };
-
-  // Atomic lock creation — O_EXCL ensures only one process can create
-  const data = JSON.stringify(lockInfo, null, 2);
-  try {
-    const fd = openSync(lockPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL);
-    writeFileSync(fd, data, 'utf-8');
-    closeSync(fd);
-  } catch (err: unknown) {
-    // EEXIST = another worker created the lock between our check and create
-    // safe: 'code' in err confirms property exists; NodeJS.ErrnoException extends Error with code
-    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
-      // Re-read to get the actual owner
-      try {
-        // safe: lock file written by acquireLock with LockInfo shape
-        const actual = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
-        throw new LockError(`File ${filePath} is locked by ${actual.ownerWorkerId}`, filePath);
-      } catch (innerErr) {
-        if (innerErr instanceof LockError) throw innerErr;
-        throw new LockError(`File ${filePath} is locked by another worker`, filePath);
-      }
-    }
-    throw err;
-  }
-  return lockInfo;
+  return _coreLock(projectRoot, filePath, workerId, taskId);
 }
 
+/**
+ * Release a file lock — delegates to core/file-lock.ts.
+ * @deprecated Import from '../core/file-lock.js' instead.
+ */
 export function releaseLock(
   projectRoot: string,
   filePath: string,
   workerId: string,
 ): void {
-  const lockPath = lockFilePathFor(projectRoot, filePath);
-
-  if (!existsSync(lockPath)) return; // No-op if no lock
-
-  try {
-    // safe: lock file written by acquireLock with LockInfo shape
-    const existing = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
-    if (existing.ownerWorkerId !== workerId) {
-      throw new LockError(
-        `Cannot release lock on ${filePath}: owned by ${existing.ownerWorkerId}, not ${workerId}`,
-        filePath,
-      );
-    }
-  } catch (err) {
-    if (err instanceof LockError) throw err;
-    // Corrupted lock — allow deletion
-  }
-
-  unlinkSync(lockPath);
+  return _coreRelease(projectRoot, filePath, workerId);
 }
 
+/**
+ * Check if a file is locked — delegates to core/file-lock.ts.
+ * @deprecated Import from '../core/file-lock.js' instead.
+ */
 export function checkLock(
   projectRoot: string,
   filePath: string,
 ): LockInfo | null {
-  const lockPath = lockFilePathFor(projectRoot, filePath);
-
-  if (!existsSync(lockPath)) return null;
-
-  try {
-    // safe: lock file written by acquireLock with LockInfo shape
-    return JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
-  } catch {
-    return null;
-  }
+  return _coreCheck(projectRoot, filePath);
 }
 
 export function createHeartbeat(
@@ -383,32 +317,15 @@ export function updateTaskStatus(
   return task;
 }
 
+/**
+ * Release all locks owned by a specific worker — delegates to core/file-lock.ts.
+ * @deprecated Import from '../core/file-lock.js' instead.
+ */
 export function releaseAllLocks(
   projectRoot: string,
   workerId: string,
 ): number {
-  const locksDir = join(projectRoot, LOCKS_DIR);
-
-  if (!existsSync(locksDir)) return 0;
-
-  const files = readdirSync(locksDir).filter((f) => f.endsWith('.lock'));
-  let released = 0;
-
-  for (const file of files) {
-    const lockPath = join(locksDir, file);
-    try {
-      // safe: lock file written by acquireLock with LockInfo shape
-      const lock = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
-      if (lock.ownerWorkerId === workerId) {
-        unlinkSync(lockPath);
-        released++;
-      }
-    } catch {
-      // Skip corrupted lock files
-    }
-  }
-
-  return released;
+  return _coreReleaseAll(projectRoot, workerId);
 }
 
 export function readWorkerLog(projectRoot: string, taskId: string): string | null {
@@ -1203,4 +1120,162 @@ export async function enforceVerifyLoop(
   }
 
   return { ok: false, reason: lastReason, attempts: VERIFY_LOOP_MAX_ATTEMPTS };
+}
+
+// ─── Verify Delta (Honest Assessment Calibration) ──────────────────
+
+/** The minimum completion ratio (0–1) required to claim DONE status */
+export const VERIFY_DELTA_DONE_THRESHOLD = 0.8;
+
+/** Completion ratio below this threshold triggers automatic NO_GO downgrade */
+export const VERIFY_DELTA_NO_GO_THRESHOLD = 0.5;
+
+/** Snapshot written at task start to record baseline state */
+export interface VerifyDeltaBaseline {
+  taskId: string;
+  timestamp: string;
+  filesChangedBaseline: number;
+  testFailBaseline: number;
+}
+
+/** Computed delta between baseline and end state */
+export interface VerifyDeltaResult {
+  taskId: string;
+  baseline: VerifyDeltaBaseline;
+  endState: {
+    filesChangedActual: number;
+    testFailActual: number;
+    timestamp: string;
+  };
+  /** 0–1 ratio of completion based on files-changed delta vs expected */
+  completionRatio: number;
+  /** Recommended self-assessment derived from completionRatio */
+  recommendedAssessment: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  reason: string;
+}
+
+/**
+ * Write a verify-delta baseline snapshot at task start.
+ * Records current filesChanged count and test failure count for comparison at end.
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - Task ID for delta file naming
+ * @param filesChangedCount - Current count of changed files (start of task)
+ * @param testFailCount - Current count of failing tests (start of task, 0 if unknown)
+ */
+export function writeVerifyDeltaBaseline(
+  projectRoot: string,
+  taskId: string,
+  filesChangedCount: number,
+  testFailCount = 0,
+): VerifyDeltaBaseline {
+  const baseline: VerifyDeltaBaseline = {
+    taskId,
+    timestamp: new Date().toISOString(),
+    filesChangedBaseline: filesChangedCount,
+    testFailBaseline: testFailCount,
+  };
+  ensureDir(join(projectRoot, TASKS_DIR));
+  const deltaPath = join(projectRoot, TASKS_DIR, `task-${taskId}.verify-delta.json`);
+  writeFileSync(deltaPath, JSON.stringify(baseline, null, 2), 'utf-8');
+  return baseline;
+}
+
+/**
+ * Read a previously written verify-delta baseline.
+ * Returns null if not found.
+ */
+export function readVerifyDeltaBaseline(
+  projectRoot: string,
+  taskId: string,
+): VerifyDeltaBaseline | null {
+  const deltaPath = join(projectRoot, TASKS_DIR, `task-${taskId}.verify-delta.json`);
+  if (!existsSync(deltaPath)) return null;
+  try {
+    const raw = readFileSync(deltaPath, 'utf-8');
+    return JSON.parse(raw) as VerifyDeltaBaseline;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compute verify-delta and recommend a self-assessment.
+ *
+ * If no baseline file exists, returns null (delta computation not possible).
+ * Otherwise computes completionRatio from files-changed delta and test-fail delta,
+ * then maps to DONE / GO_WITH_TECH_DEBT / NO_GO.
+ *
+ * Scoring:
+ * - completionRatio >= VERIFY_DELTA_DONE_THRESHOLD (0.8) → DONE
+ * - completionRatio >= VERIFY_DELTA_NO_GO_THRESHOLD (0.5) → GO_WITH_TECH_DEBT
+ * - completionRatio < VERIFY_DELTA_NO_GO_THRESHOLD → NO_GO
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - Task ID
+ * @param filesChangedActual - Actual count of files changed at end of task
+ * @param testFailActual - Actual count of failing tests at end (0 = all pass)
+ * @param expectedFilesChangedCount - Expected file changes from task scope (used as denominator)
+ */
+export function computeVerifyDelta(
+  projectRoot: string,
+  taskId: string,
+  filesChangedActual: number,
+  testFailActual: number,
+  expectedFilesChangedCount?: number,
+): VerifyDeltaResult | null {
+  const baseline = readVerifyDeltaBaseline(projectRoot, taskId);
+  if (!baseline) return null;
+
+  // Compute completion based on files actually changed relative to expected
+  // If expectedFilesChangedCount is given, use it as denominator.
+  // Otherwise use max(filesChangedActual, 1) as a proxy.
+  const denominator = expectedFilesChangedCount != null && expectedFilesChangedCount > 0
+    ? expectedFilesChangedCount
+    : Math.max(filesChangedActual, 1);
+
+  // Files-changed delta (how many new files were touched beyond baseline)
+  const newFilesChanged = Math.max(filesChangedActual - baseline.filesChangedBaseline, 0);
+  const filesRatio = Math.min(newFilesChanged / denominator, 1);
+
+  // Test-fail improvement: if baseline had failures, compute fix ratio
+  const testBaselineFails = baseline.testFailBaseline;
+  let testRatio = 1; // Default: assume tests are fine if no baseline fails
+  if (testBaselineFails > 0) {
+    const testFixed = Math.max(testBaselineFails - testFailActual, 0);
+    testRatio = testFixed / testBaselineFails;
+  } else if (testFailActual > 0) {
+    // Introduced new failures → penalize
+    testRatio = 0;
+  }
+
+  // Combined ratio: 60% weight on file changes, 40% on test improvement
+  const completionRatio = filesRatio * 0.6 + testRatio * 0.4;
+
+  let recommendedAssessment: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  let reason: string;
+
+  if (completionRatio >= VERIFY_DELTA_DONE_THRESHOLD) {
+    recommendedAssessment = 'DONE';
+    reason = `completion ${Math.round(completionRatio * 100)}% >= ${VERIFY_DELTA_DONE_THRESHOLD * 100}% threshold`;
+  } else if (completionRatio >= VERIFY_DELTA_NO_GO_THRESHOLD) {
+    recommendedAssessment = 'GO_WITH_TECH_DEBT';
+    reason = `completion ${Math.round(completionRatio * 100)}% < ${VERIFY_DELTA_DONE_THRESHOLD * 100}% DONE threshold`;
+  } else {
+    recommendedAssessment = 'NO_GO';
+    reason = `completion ${Math.round(completionRatio * 100)}% < ${VERIFY_DELTA_NO_GO_THRESHOLD * 100}% minimum threshold`;
+  }
+
+  return {
+    taskId,
+    baseline,
+    endState: {
+      filesChangedActual,
+      testFailActual,
+      timestamp: new Date().toISOString(),
+    },
+    completionRatio,
+    recommendedAssessment,
+    reason,
+  };
 }

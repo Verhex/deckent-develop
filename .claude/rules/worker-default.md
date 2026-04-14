@@ -3,6 +3,8 @@ paths: ["src/**", "tests/**"]
 ---
 # Worker Rules
 - Read your task file first (`.tasks/task-XXX.json`)
+- Read .brain/DECISIONS.md — all accepted ADRs are mandatory constraints
+- If your implementation would violate an accepted ADR → stop, write NO_GO, propose ADR amendment
 - Write execution plan to `.tasks/task-XXX.plan` before coding
 - Check `.locks/` before writing any file
 - Update heartbeat (`.tasks/task-XXX.hb`) on every file change

@@ -59,6 +59,13 @@ import { routeTask } from './task-router.js';
 // ─── Observability ──────────────────────────────────────────────
 import { metric } from '../core/observability.js';
 
+// ─── Collision Detection (Sprint 138 ADR-035) ──────────────────
+import { detectScopeCollisions } from './conflict-resolver.js';
+import { writeEvent, CHANNELS, getCurrentSprintId, readSequence } from './event-stream.js';
+
+// ─── Sprint Checkpoint (Sprint 138 Long-Running Resume) ─────────
+import { writeCheckpoint } from './sprint-checkpoint.js';
+
 // ═══ Exported Functions ════════════════════════════════════════════
 
 /**
@@ -82,6 +89,24 @@ export async function spawnWorkers(
 
   const systemProfile = getSystemProfile();
   const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
+
+  // ─── Plan-Time Collision Detection (Sprint 138 ADR-035) ───────
+  const pendingTasks = sprint.tasks.filter(t => t.status === TaskStatus.PENDING);
+  const collisionResult = detectScopeCollisions(pendingTasks);
+  if (collisionResult.collisionCount > 0) {
+    const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+    for (const [file, writers] of collisionResult.collisions) {
+      writeEvent(
+        projectRoot, sprintId, 'auditor', 'brain',
+        CHANNELS.SCOPE_COLLISION_DETECTED,
+        { taskIds: writers, files: [file], detectedAt: 'plan-time' },
+      );
+      debugLog('spawnWorkers:collision', `File "${file}" written by tasks: ${writers.join(', ')}`);
+    }
+    metric('collision.detected', collisionResult.collisionCount, {
+      pairs: String(collisionResult.collidingPairs.length),
+    });
+  }
 
   // Dependency pipeline guard: when enabled, only spawn tasks whose dependencies are all DONE
   let activeTasks: Task[];
@@ -278,6 +303,18 @@ export async function respawnEligibleTasks(
     } catch (e) { debugLog('respawnEligibleTasks:onWaveTransition', e); }
   }
 
+  // ─── Checkpoint every N=5 completed tasks (Sprint 138 Long-Running Resume) ──
+  const CHECKPOINT_INTERVAL = 5;
+  const terminalCount = sprint.tasks.filter(t =>
+    t.status === TaskStatus.DONE || t.status === TaskStatus.NO_GO,
+  ).length;
+  if (terminalCount > 0 && terminalCount % CHECKPOINT_INTERVAL === 0) {
+    const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+    const eventOffset = readSequence(projectRoot, sprintId);
+    writeCheckpoint(projectRoot, sprint, eventOffset);
+    debugLog('respawnEligibleTasks:checkpoint', `Checkpoint written at ${terminalCount} completed tasks`);
+  }
+
   debugLog('respawnEligibleTasks', `Spawned ${toSpawn.length} newly eligible tasks: ${toSpawn.map(t => t.id).join(', ')}`);
   return toSpawn.map(t => t.id);
 }
@@ -314,3 +351,7 @@ export function routeSprintTasks(
     if (routing.skills.length > 0) task.assignedSkills = routing.skills;
   }
 }
+
+// ─── Re-exports for external consumers ────────────────────────────
+export { detectScopeCollisions, buildCollisionAwareWaves } from './conflict-resolver.js';
+export type { CollisionResult, CollisionMap } from './conflict-resolver.js';

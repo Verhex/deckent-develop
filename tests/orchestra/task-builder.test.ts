@@ -9,6 +9,7 @@ import {
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
+  loadADRContent,
   DirectiveTaskSchema,
   DirectiveSchema,
   validateDirective,
@@ -541,8 +542,9 @@ describe('buildWorkerPrompt', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     const lines = prompt.split('\n').length;
-    // Original was ~150 lines, target is ~80 lines
-    expect(lines).toBeLessThan(100);
+    // Original was ~150 lines, target was ~80 lines
+    // ADR injection adds ~60-80 lines of mandatory architecture rules
+    expect(lines).toBeLessThan(200);
   });
 
   it('task description ratio is higher in shorter prompt', () => {
@@ -551,8 +553,9 @@ describe('buildWorkerPrompt', () => {
     const descLen = 500;
     const totalLen = prompt.length;
     // Description should be meaningful portion of total prompt (baseline improvement from 16%)
-    // Threshold lowered from 0.20 to 0.18 after tokenUsage instructions, then to 0.17 after rubricScores requirement
-    expect(descLen / totalLen).toBeGreaterThan(0.17);
+    // Threshold lowered from 0.20 to 0.18 after tokenUsage instructions, then to 0.17 after rubricScores,
+    // then to 0.05 after ADR injection (~3000 char ADR content added to prompt)
+    expect(descLen / totalLen).toBeGreaterThan(0.05);
   });
 });
 
@@ -1674,7 +1677,7 @@ describe('buildWorkerPrompt — effort maxTokens budget', () => {
     ]);
     // Low effort truncates at ~1000 chars per skill
     expect(prompt).toContain('typescript-expert');
-    const skillSectionMatch = prompt.match(/--- typescript-expert ---\n([\s\S]*?)(?=\n\nYou are|$)/);
+    const skillSectionMatch = prompt.match(/--- typescript-expert ---\n([\s\S]*?)(?=\n\n===|$)/);
     if (skillSectionMatch) {
       const skillContent = skillSectionMatch[1] ?? '';
       // Should be truncated to ~1000 chars, not the full 2000
@@ -2086,5 +2089,75 @@ Old-style task without any Priority line.`;
     expect(tasks).toHaveLength(1);
     // Parser returns undefined → sprint-controller defaults to 'NORMAL'
     expect(tasks[0]!.priority).toBeUndefined();
+  });
+});
+
+// ─── loadADRContent ─────────────────────────────────────────────────────
+
+describe('loadADRContent', () => {
+  it('returns content from .brain/DECISIONS.md when it exists', () => {
+    const content = loadADRContent(process.cwd());
+    expect(content).toBeTruthy();
+    expect(content).toContain('ADR-001');
+  });
+
+  it('returns empty string for non-existent project root', () => {
+    const content = loadADRContent('/nonexistent/path/that/does/not/exist');
+    expect(content).toBe('');
+  });
+
+  it('truncates content to reasonable size', () => {
+    const content = loadADRContent(process.cwd());
+    // Should be truncated to ~3000 chars max + truncation notice
+    expect(content.length).toBeLessThanOrEqual(3200);
+  });
+});
+
+// ─── buildWorkerPrompt ADR injection ────────────────────────────────────
+
+describe('buildWorkerPrompt — ADR injection', () => {
+  it('includes ADR content in generated prompt', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    // ADR block should be present (from real .brain/DECISIONS.md)
+    expect(prompt).toContain('Mandatory Architecture Rules');
+  });
+});
+
+// ─── buildWorkerPrompt — Honest Self-Assessment injection ────────────────────
+
+describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
+  it('includes Honest Self-Assessment section in prompt', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('Honest Self-Assessment Required');
+  });
+
+  it('includes the 80% GO_WITH_TECH_DEBT threshold instruction', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('<80%');
+    expect(prompt).toContain('GO_WITH_TECH_DEBT');
+  });
+
+  it('includes the 50% NO_GO threshold instruction', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('<50%');
+    expect(prompt).toContain('NO_GO');
+  });
+
+  it('includes the delta verification instructions (baseline/end/delta)', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('Baseline state');
+    expect(prompt).toContain('End state');
+    expect(prompt).toContain('Delta');
+  });
+
+  it('clarifies that "Code written" ≠ "DONE"', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('"Code written"');
   });
 });

@@ -1,5 +1,6 @@
 // ─── Conflict Resolver ──────────────────────────────────────────────────────
 // Detects and resolves file-level conflicts between parallel worker results.
+// Sprint 138: Added plan-time scope collision detection (ADR-035).
 
 export type ConflictType = 'same_file_write' | 'scope_overlap' | 'test_interference';
 export type ConflictStrategy = 'last_writer_wins' | 'first_writer_wins' | 'manual';
@@ -144,4 +145,132 @@ export class ConflictResolver {
   private _isTestFile(file: string): boolean {
     return /\.(test|spec)\.(ts|js|tsx|jsx)$/.test(file) || file.includes('__tests__');
   }
+}
+
+// ═══ Plan-Time Scope Collision Detection ══════════════════════════════
+// Sprint 138 — Task 004 (ADR-035)
+// Detects file write collisions BEFORE tasks run, builds collision-aware waves.
+
+import type { Task } from '../core/types.js';
+import { ParallelPipelineManager } from './parallel-pipeline.js';
+import type { ExecutionWave } from './parallel-pipeline.js';
+import { debugLog } from '../core/utils.js';
+
+/** Map of file path → array of task IDs that write to it (only files with 2+ writers). */
+export type CollisionMap = Map<string, string[]>;
+
+/** Collision detection result with metadata. */
+export interface CollisionResult {
+  collisions: CollisionMap;
+  collisionCount: number;
+  collidingPairs: Array<[string, string]>;
+}
+
+/**
+ * Detect scope collisions among tasks at plan-time.
+ * Returns files written by 2+ tasks and the colliding task pairs.
+ */
+export function detectScopeCollisions(tasks: Task[]): CollisionResult {
+  const fileWriters: Map<string, string[]> = new Map();
+
+  for (const task of tasks) {
+    if (!task.scope?.filesWrite) continue;
+
+    for (const file of task.scope.filesWrite) {
+      const normalized = file.trim();
+      if (!normalized) continue;
+
+      const writers = fileWriters.get(normalized) ?? [];
+      writers.push(task.id);
+      fileWriters.set(normalized, writers);
+    }
+  }
+
+  // Filter to only collisions (2+ writers)
+  const collisions: CollisionMap = new Map();
+  for (const [file, writers] of fileWriters) {
+    if (writers.length >= 2) {
+      collisions.set(file, writers);
+    }
+  }
+
+  // Build unique collision pairs
+  const collidingPairs: Array<[string, string]> = [];
+  const seenPairs = new Set<string>();
+  for (const writers of collisions.values()) {
+    for (let i = 0; i < writers.length; i++) {
+      for (let j = i + 1; j < writers.length; j++) {
+        const wi = writers[i]!;
+        const wj = writers[j]!;
+        const pair = [wi, wj].sort().join(':');
+        if (!seenPairs.has(pair)) {
+          seenPairs.add(pair);
+          collidingPairs.push([wi, wj]);
+        }
+      }
+    }
+  }
+
+  return { collisions, collisionCount: collisions.size, collidingPairs };
+}
+
+/**
+ * Build collision-aware execution waves via augmented topological sort.
+ *
+ * Strategy:
+ * 1. Start with dependency-based topological sort
+ * 2. Add synthetic dependency edges for colliding tasks
+ *    (lower ID → higher ID within each pair)
+ * 3. Re-run topological sort with augmented edges
+ * 4. Respect maxWorkers limit per wave
+ */
+export function buildCollisionAwareWaves(
+  tasks: Task[],
+  maxWorkers: number,
+): ExecutionWave[] {
+  if (tasks.length === 0) return [];
+
+  const { collidingPairs } = detectScopeCollisions(tasks);
+
+  // Build augmented dependency list
+  const taskDeps = new Map<string, string[]>();
+  for (const task of tasks) {
+    taskDeps.set(task.id, [...(task.dependencies ?? [])]);
+  }
+
+  // Add collision edges: lower ID task first, higher depends on it
+  for (const [a, b] of collidingPairs) {
+    const sorted = [a, b].sort();
+    const first = sorted[0]!;
+    const second = sorted[1]!;
+    const secondDeps = taskDeps.get(second);
+    if (secondDeps && !secondDeps.includes(first)) {
+      secondDeps.push(first);
+      debugLog('conflict-resolver', `Collision edge: ${second} → ${first} (shared file write)`);
+    }
+  }
+
+  // Topological sort with augmented deps
+  const pipeline = new ParallelPipelineManager();
+  const pipelineTasks = tasks.map(t => ({
+    id: t.id,
+    dependencies: taskDeps.get(t.id) ?? [],
+  }));
+
+  const rawWaves = pipeline.createPipeline(pipelineTasks);
+
+  // Split waves that exceed maxWorkers
+  const waves: ExecutionWave[] = [];
+  for (const wave of rawWaves) {
+    if (wave.taskIds.length <= maxWorkers) {
+      waves.push({ waveIndex: waves.length, taskIds: wave.taskIds });
+    } else {
+      for (let i = 0; i < wave.taskIds.length; i += maxWorkers) {
+        const chunk = wave.taskIds.slice(i, i + maxWorkers);
+        waves.push({ waveIndex: waves.length, taskIds: chunk });
+      }
+    }
+  }
+
+  return waves;
 }

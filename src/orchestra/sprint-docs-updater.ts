@@ -1,6 +1,6 @@
 // ─── Sprint Docs Updater ─────────────────────────────────────────
 // Extracted from sprint-reporter.ts — managed-docs, project identity, sprint log, debt, archive
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync } from 'node:fs';
 import { execSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
@@ -561,4 +561,59 @@ export function archiveDirectives(projectRoot: string, sprintId: string): void {
 
   writeFileSync(directivesPath, buildDirectivesPlaceholder(sprintId, archiveFileName, nextNum));
   debugLog('archiveDirectives', `Archived ${DIRECTIVES_FILE} → ${archivePath}`);
+}
+
+// ═══ Orphan Task Archive ═══════════════════════════════════════════
+
+/**
+ * Archive orphan task files from `.tasks/` to `.brain/archive/sprint-NNN-tasks/`.
+ * Collects all task-NNN-* files (*.json, *.hb, *.result, *.plan, *.verify-delta.json)
+ * belonging to the given sprint and moves them to the archive directory.
+ * This prevents stale task files from accumulating across sprints.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - The completed sprint ID (e.g. 'sprint-138')
+ * @returns Number of files archived
+ */
+export function archiveOrphanTasks(projectRoot: string, sprintId: string): number {
+  const tasksDir = join(projectRoot, '.tasks');
+  if (!existsSync(tasksDir)) {
+    debugLog('archiveOrphanTasks', `.tasks/ not found — skipping`);
+    return 0;
+  }
+
+  const sprintNum = extractSprintNumber(sprintId);
+  if (sprintNum === null) {
+    debugLog('archiveOrphanTasks', `Cannot extract sprint number from ${sprintId} — skipping`);
+    return 0;
+  }
+
+  // Match files belonging to this sprint: task-NNN-*.* where NNN = sprintNum
+  const prefix = `task-${sprintNum}-`;
+  const taskFiles = readdirSync(tasksDir).filter(f => f.startsWith(prefix));
+
+  if (taskFiles.length === 0) {
+    debugLog('archiveOrphanTasks', `No orphan task files for ${sprintId}`);
+    return 0;
+  }
+
+  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, `${sprintId}-tasks`);
+  mkdirSync(archiveDir, { recursive: true });
+
+  let count = 0;
+  for (const file of taskFiles) {
+    try {
+      const src = join(tasksDir, file);
+      const dest = join(archiveDir, file);
+      copyFileSync(src, dest);
+      // Remove original after successful copy
+      unlinkSync(src);
+      count++;
+    } catch (e) {
+      debugLog('archiveOrphanTasks', `Failed to archive ${file}: ${e}`);
+    }
+  }
+
+  debugLog('archiveOrphanTasks', `Archived ${count} task files to ${archiveDir}`);
+  return count;
 }

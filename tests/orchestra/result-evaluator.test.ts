@@ -12,6 +12,9 @@ import {
   scoreDocumentation,
   evaluateWithRubric,
   DEFAULT_RUBRIC,
+  applyTechDebtDowngrade,
+  TECH_DEBT_DOWNGRADE_DONE_THRESHOLD,
+  TECH_DEBT_DOWNGRADE_NO_GO_THRESHOLD,
 } from '../../src/orchestra/result-evaluator.js';
 import type {
   WaitableSprint,
@@ -1172,5 +1175,76 @@ describe('parseEvidenceCommand', () => {
   it('handles ls command', () => {
     const desc = '**Kanıt:** `ls docs/file.md` → exists';
     expect(parseEvidenceCommand(desc)).toBe('ls docs/file.md');
+  });
+});
+
+// ─── applyTechDebtDowngrade ────────────────────────────────────────────
+
+describe('applyTechDebtDowngrade', () => {
+  const baseResult = { selfAssessment: 'DONE', filesChanged: ['src/a.ts'], notes: 'done' };
+
+  it('returns DONE unchanged when no verify-delta ratio provided', () => {
+    const result = applyTechDebtDowngrade('DONE', baseResult, undefined);
+    expect(result.decision).toBe('DONE');
+    expect(result.downgraded).toBe(false);
+    expect(result.completionRatio).toBeNull();
+  });
+
+  it('returns GO_WITH_TECH_DEBT unchanged when no verify-delta ratio provided', () => {
+    const result = applyTechDebtDowngrade('GO_WITH_TECH_DEBT', baseResult, undefined);
+    expect(result.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(result.downgraded).toBe(false);
+  });
+
+  it('never downgrades NO_GO (always respected)', () => {
+    const result = applyTechDebtDowngrade('NO_GO', baseResult, 0.95);
+    expect(result.decision).toBe('NO_GO');
+    expect(result.downgraded).toBe(false);
+  });
+
+  it('preserves DONE when completion >= DONE threshold', () => {
+    const result = applyTechDebtDowngrade('DONE', baseResult, TECH_DEBT_DOWNGRADE_DONE_THRESHOLD);
+    expect(result.decision).toBe('DONE');
+    expect(result.downgraded).toBe(false);
+  });
+
+  it('downgrades DONE → GO_WITH_TECH_DEBT when completion 50-79%', () => {
+    // Sprint 137 scenario: worker reported DONE but ~60% completion
+    const result = applyTechDebtDowngrade('DONE', baseResult, 0.6);
+    expect(result.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(result.downgraded).toBe(true);
+    expect(result.reason).toContain('verify-delta');
+    expect(result.completionRatio).toBe(0.6);
+  });
+
+  it('downgrades DONE → NO_GO when completion < 50% (Sprint 137 regression catch)', () => {
+    // Sprint 137: 39% functional completion should have been NO_GO
+    const result = applyTechDebtDowngrade('DONE', baseResult, 0.39);
+    expect(result.decision).toBe('NO_GO');
+    expect(result.downgraded).toBe(true);
+    expect(result.reason).toContain(String(TECH_DEBT_DOWNGRADE_NO_GO_THRESHOLD * 100));
+  });
+
+  it('escalates GO_WITH_TECH_DEBT → NO_GO when completion < 50%', () => {
+    const result = applyTechDebtDowngrade('GO_WITH_TECH_DEBT', baseResult, 0.3);
+    expect(result.decision).toBe('NO_GO');
+    expect(result.downgraded).toBe(true);
+    expect(result.reason).toContain('escalated to NO_GO');
+  });
+
+  it('preserves GO_WITH_TECH_DEBT when completion >= 50%', () => {
+    const result = applyTechDebtDowngrade('GO_WITH_TECH_DEBT', baseResult, 0.65);
+    expect(result.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(result.downgraded).toBe(false);
+  });
+
+  it('includes completionRatio in result when provided', () => {
+    const result = applyTechDebtDowngrade('DONE', baseResult, 0.75);
+    expect(result.completionRatio).toBe(0.75);
+  });
+
+  it('exports threshold constants with expected values', () => {
+    expect(TECH_DEBT_DOWNGRADE_DONE_THRESHOLD).toBe(0.8);
+    expect(TECH_DEBT_DOWNGRADE_NO_GO_THRESHOLD).toBe(0.5);
   });
 });

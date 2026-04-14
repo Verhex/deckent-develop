@@ -26,6 +26,7 @@
     "build:all": "tsc && npm run build:dashboard",
     "postbuild": "npm run build:dashboard",
     "lint": "tsc --noEmit",
+    "lint:adr": "node scripts/adr-validator.mjs",
     "lint:errors": "node scripts/check-error-handling.mjs",
     "clean": "rm -rf dist",
     "validate:publish": "npx tsx scripts/validate-publish.ts",
