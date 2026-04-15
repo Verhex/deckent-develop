@@ -16,14 +16,14 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-assets.mjs",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:dashboard": "vitest run --config vitest.dashboard.config.ts",
     "build:dashboard": "cd src/dashboard && npx vite build --outDir ../../dist/dashboard",
-    "build:all": "tsc && npm run build:dashboard",
+    "build:all": "tsc && node scripts/copy-assets.mjs && npm run build:dashboard",
     "postbuild": "npm run build:dashboard",
     "lint": "tsc --noEmit",
     "lint:adr": "node scripts/adr-validator.mjs",
