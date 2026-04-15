@@ -25,9 +25,10 @@ export const DASHBOARD_FILE = '.dashboard' as const;
 
 // ─── Memory Files (relative to BRAIN_DIR) ────────────────────────────
 export const ERRORS_FILE = 'ERRORS.md' as const;
-export const ERRORS_MAX_LINES = 200 as const;
+export const ERRORS_MAX_LINES = 600 as const; // Sprint 140 pre-flight: 200→600 (3x)
 export const MEMORY_FILE = 'MEMORY.md' as const;
 export const DECISIONS_FILE = 'DECISIONS.md' as const;
+export const DECISIONS_MAX_LINES = 1200 as const; // Sprint 140 pre-flight: explicit cap (ADR governance, 37+ ADR canlı)
 export const DEBT_FILE = 'DEBT.md' as const;
 export const PATTERNS_FILE = 'PATTERNS.md' as const;
 export const RETRO_FILE = 'RETRO.md' as const;
@@ -42,10 +43,15 @@ export const DIRECTIVES_FILE = 'DIRECTIVES.md' as const;
 export const DECKENT_FILE = 'DECKENT.md' as const;
 
 // ─── Memory Limits ───────────────────────────────────────────────────
-export const MEMORY_MAX_LINES = 300 as const;
-export const PATTERNS_MAX_LINES = 150 as const;
-export const RETRO_MAX_LINES = 120 as const;
-export const SPRINT_LOG_MAX_LINES = 100 as const;
+// Sprint 140 pre-flight: Self-Analysis Ayna Sprint için 5000 satır toplam budget
+// hedefi (Sprint 139 öncesi 900 satır toplam). Her kategori 3-5x büyütüldü.
+// Motivasyon: 400-1000 task read-only analysis sprint'inde worker raporları
+// .deckent/sprint-140-analysis/ altına yazılacak ama brain özet + cross-ref
+// .brain/ altına aktarılacak, 900 satır budget 5.5x yetersiz.
+export const MEMORY_MAX_LINES = 1500 as const;       // 300→1500 (5x)
+export const PATTERNS_MAX_LINES = 800 as const;      // 150→800 (5.3x)
+export const RETRO_MAX_LINES = 400 as const;         // 120→400 (3.3x)
+export const SPRINT_LOG_MAX_LINES = 500 as const;    // 100→500 (5x)
 
 // ─── Task File Extensions ────────────────────────────────────────────
 export const TASK_FILE_EXTENSIONS = ['.json', '.plan', '.hb', '.result', '.paused', '.log'] as const;
@@ -94,7 +100,11 @@ export const LOCK_TIMEOUT_MS = 30_000 as const;
 
 // ─── Memory Budget (deprecated — prefer config: memory_budget, decay_after_sprints) ──
 /** @deprecated Use config.memory_budget instead. Kept for backward compat & tests. */
-export const BRAIN_TOTAL_LINE_BUDGET = 900 as const;
+// Sprint 140 pre-flight: 900→5000 (5.5x). MEMORY 1500 + PATTERNS 800 + RETRO 400
+// + SPRINT_LOG 500 + ERRORS 600 + DECISIONS 1200 = 5000 toplam hedef.
+export const BRAIN_TOTAL_LINE_BUDGET = 5000 as const;
 /** @deprecated Use config.decay_after_sprints instead. Kept for backward compat & tests. */
-export const MEMORY_DECAY_SPRINTS = 8 as const;
-export const PATTERN_DECAY_SPRINTS = 12 as const;
+// Sprint 140 pre-flight: 8→20 (2.5x), self-analysis sprint'i büyük hacim üretecek,
+// decay'i yavaşlat ki analiz raporları hemen silinmesin.
+export const MEMORY_DECAY_SPRINTS = 20 as const;
+export const PATTERN_DECAY_SPRINTS = 25 as const;

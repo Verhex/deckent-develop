@@ -163,7 +163,10 @@
       "Bash(echo \"Watchdog PID: $!\")",
       "Bash(kill 218393)",
       "Bash(echo \"=== tsc exit: $? ===\")",
-      "Bash(awk '{print $9, $6, $7, $8}')"
+      "Bash(awk '{print $9, $6, $7, $8}')",
+      "Bash(awk -F'/' '{print $\\(NF-1\\)}')",
+      "Bash(xargs -I '{}' bash -c 'd={}; c=$\\(find \"$d\" -name \"*.ts\" ! -name \"*.test.ts\" -type f | wc -l\\); echo \"$c $\\(basename $d\\)\"')",
+      "Bash(xargs -I '{}' bash -c 'd={}; c=$\\(find \"$d\" -name \"*.test.ts\" -type f | wc -l\\); echo \"$c $\\(basename $d\\)\"')"
     ]
   },
   "outputStyle": "Explanatory"

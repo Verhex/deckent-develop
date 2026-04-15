@@ -432,8 +432,8 @@ export function createDefaultConfig(): DeckentConfig {
     reroute_on_tech_debt: false,
     sprint_timeout_minutes: 0,
     // Memory
-    memory_budget: 900,
-    decay_after_sprints: 5,
+    memory_budget: 5000, // Sprint 140 pre-flight: 900→5000 (Self-Analysis Ayna Sprint)
+    decay_after_sprints: 20, // Sprint 140 pre-flight: 5→20 (self-analysis raporları hemen silinmesin)
     patterns_enabled: true,
     project_identity_enabled: true,
     // Auditor
