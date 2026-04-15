@@ -15,6 +15,14 @@ vi.mock('node:fs', () => ({
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn(),
   releaseAllLocks: vi.fn().mockReturnValue(0),
+  createWorkerStateMachine: vi.fn(() => ({
+    transition: vi.fn(),
+    canTransition: vi.fn(() => true),
+    getState: vi.fn(() => 'SPAWNING'),
+    stop: vi.fn(),
+  })),
+  removeWorkerStateMachine: vi.fn(() => true),
+  isWorkerStoppable: vi.fn(() => true),
 }));
 
 vi.mock('../../src/core/utils.js', async (importOriginal) => {

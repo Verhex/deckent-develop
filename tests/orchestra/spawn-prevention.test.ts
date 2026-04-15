@@ -64,6 +64,14 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn(),
   releaseAllLocks: vi.fn().mockReturnValue(0),
+  createWorkerStateMachine: vi.fn(() => ({
+    transition: vi.fn(),
+    canTransition: vi.fn(() => true),
+    getState: vi.fn(() => 'SPAWNING'),
+    stop: vi.fn(),
+  })),
+  removeWorkerStateMachine: vi.fn(() => true),
+  isWorkerStoppable: vi.fn(() => true),
 }));
 
 vi.mock('../../src/orchestra/planner.js', () => ({
@@ -343,13 +351,13 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     mockedGetProviderAdapterForTask.mockReturnValue(null);
   });
 
-  it('should call backend.spawn when SpawnBackend is provided', () => {
+  it('should call backend.spawn when SpawnBackend is provided', async () => {
     const task = makeTask();
     const sprint = makeSprint([task]);
     const config = makeConfig();
     const mockBackend = makeMockBackend();
 
-    spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
 
     expect(mockBackend.spawn).toHaveBeenCalledTimes(1);
     expect(mockBackend.spawn).toHaveBeenCalledWith(
@@ -363,31 +371,31 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     );
   });
 
-  it('should NOT call legacy tmux spawnWorker when backend is provided', () => {
+  it('should NOT call legacy tmux spawnWorker when backend is provided', async () => {
     const task = makeTask();
     const sprint = makeSprint([task]);
     const config = makeConfig();
     const mockBackend = makeMockBackend();
 
-    spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
 
     // Legacy tmux path should never be reached
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
 
-  it('should NOT call ensureSession when backend is provided', () => {
+  it('should NOT call ensureSession when backend is provided', async () => {
     const task = makeTask();
     const sprint = makeSprint([task]);
     const config = makeConfig();
     const mockBackend = makeMockBackend();
 
-    spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
 
     // ensureSession is only called when backend is absent and tmux tasks exist
     expect(mockedEnsureSession).not.toHaveBeenCalled();
   });
 
-  it('should NOT call adapter spawn when backend is provided (non-tmux provider)', () => {
+  it('should NOT call adapter spawn when backend is provided (non-tmux provider)', async () => {
     // Even if the task provider is non-tmux (Codex), backend takes priority
     mockedResolveTaskProvider.mockReturnValue('codex');
     mockedIsTmuxProvider.mockReturnValue(false);
@@ -400,7 +408,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     const config = makeConfig();
     const mockBackend = makeMockBackend();
 
-    spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
 
     // Backend path wins — adapter should NOT be called
     expect(mockBackend.spawn).toHaveBeenCalledTimes(1);
@@ -408,7 +416,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
 
-  it('should fall back to legacy tmux when no backend is provided (Claude provider)', () => {
+  it('should fall back to legacy tmux when no backend is provided (Claude provider)', async () => {
     // No backend → isTmuxProvider returns true → legacy tmux path
     mockedIsTmuxProvider.mockReturnValue(true);
 
@@ -416,13 +424,13 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     const sprint = makeSprint([task]);
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test-project', sprint, config);
+    await spawnWorkers('/tmp/test-project', sprint, config);
 
     expect(mockedSpawnWorker).toHaveBeenCalledTimes(1);
     expect(mockedEnsureSession).toHaveBeenCalledTimes(1);
   });
 
-  it('should use adapter when no backend and provider is non-tmux', () => {
+  it('should use adapter when no backend and provider is non-tmux', async () => {
     mockedResolveTaskProvider.mockReturnValue('codex');
     mockedIsTmuxProvider.mockReturnValue(false);
 
@@ -439,14 +447,14 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     const sprint = makeSprint([task]);
     const config = makeConfig();
 
-    spawnWorkers('/tmp/test-project', sprint, config);
+    await spawnWorkers('/tmp/test-project', sprint, config);
 
     // Adapter path — not legacy tmux, not backend
     expect(mockAdapter.spawn).toHaveBeenCalledTimes(1);
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
 
-  it('should spawn multiple tasks through backend without leaking to legacy', () => {
+  it('should spawn multiple tasks through backend without leaking to legacy', async () => {
     const tasks = [
       makeTask({ id: 'task-a' }),
       makeTask({ id: 'task-b' }),
@@ -456,7 +464,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     const config = makeConfig();
     const mockBackend = makeMockBackend();
 
-    spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
+    await spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
 
     expect(mockBackend.spawn).toHaveBeenCalledTimes(3);
     expect(mockedSpawnWorker).not.toHaveBeenCalled();

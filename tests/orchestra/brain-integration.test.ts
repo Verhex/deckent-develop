@@ -46,6 +46,14 @@ vi.mock('../../src/agents/worker.js', () => ({
   acquireLock: vi.fn(),
   releaseLock: vi.fn(),
   writeResult: vi.fn(),
+  createWorkerStateMachine: vi.fn(() => ({
+    transition: vi.fn(),
+    canTransition: vi.fn(() => true),
+    getState: vi.fn(() => 'SPAWNING'),
+    stop: vi.fn(),
+  })),
+  removeWorkerStateMachine: vi.fn(() => true),
+  isWorkerStoppable: vi.fn(() => true),
 }));
 
 // ─── Direct sub-module imports ──────────────────────────────────────

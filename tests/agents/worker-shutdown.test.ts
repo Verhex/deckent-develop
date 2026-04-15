@@ -13,6 +13,10 @@ vi.mock('node:fs', () => ({
   appendFileSync: vi.fn(),
   openSync: vi.fn(() => 42),
   closeSync: vi.fn(),
+  // Sprint 139 Task 13 Docker HB Core Fix: atomicWriteFileSync uses fsyncSync + renameSync
+  fsyncSync: vi.fn(),
+  renameSync: vi.fn(),
+  statSync: vi.fn(() => ({ size: 0 })),
   constants: { O_WRONLY: 1, O_CREAT: 64, O_EXCL: 128 },
 }));
 

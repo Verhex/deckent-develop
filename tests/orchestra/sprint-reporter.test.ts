@@ -40,6 +40,7 @@ import {
 } from '../../src/orchestra/sprint-reporter.js';
 import { TaskEvaluation, SprintPhase, SprintStatus, DebtPriority } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, SprintMetrics, DebtItem, SprintResult, ResolvedConfig, PatternEntry } from '../../src/core/types.js';
+import { MEMORY_MAX_LINES, SPRINT_LOG_MAX_LINES } from '../../src/core/constants.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────
 
@@ -324,15 +325,15 @@ describe('writeRetrospective', () => {
   it('trims MEMORY.md when it exceeds MEMORY_MAX_LINES', () => {
     const memPath = join(tmpDir, '.brain', 'MEMORY.md');
     mkdirSync(join(tmpDir, '.brain'), { recursive: true });
-    // Fill with 300 lines (MEMORY_MAX_LINES)
-    const bigContent = Array.from({ length: 300 }, (_, i) => `line-${i}`).join('\n');
+    // Fill with exactly MEMORY_MAX_LINES lines so appending more triggers trim
+    const bigContent = Array.from({ length: MEMORY_MAX_LINES }, (_, i) => `line-${i}`).join('\n');
     writeFileSync(memPath, bigContent, 'utf-8');
     const sprint = makeSprint();
     const evals = new Map([[sprint.tasks[0].id, TaskEvaluation.NO_GO]]);
     writeRetrospective(tmpDir, sprint, evals, makeMetrics());
     const content = readFileSync(memPath, 'utf-8');
     const lineCount = content.split('\n').length;
-    expect(lineCount).toBeLessThanOrEqual(300);
+    expect(lineCount).toBeLessThanOrEqual(MEMORY_MAX_LINES);
   });
 
   it('handles sprint with no tasks', () => {
@@ -433,14 +434,18 @@ describe('writeSprintLog', () => {
     expect(content).toContain('| 001: Solo Task | generic | - | DONE |');
   });
 
-  it('truncates output to SPRINT_LOG_MAX_LINES (100 lines)', () => {
-    // Create a sprint with many tasks so output would exceed 100 lines
-    const tasks = Array.from({ length: 150 }, (_, i) => makeTask({ id: `${i + 1}`.padStart(3, '0'), title: `Task ${i + 1}` }));
+  it('truncates output to SPRINT_LOG_MAX_LINES', () => {
+    // Create enough tasks to guarantee we exceed the sprint log budget.
+    // Each task row adds roughly 1 line plus some header overhead.
+    const taskCount = SPRINT_LOG_MAX_LINES + 100;
+    const tasks = Array.from({ length: taskCount }, (_, i) =>
+      makeTask({ id: `${i + 1}`.padStart(4, '0'), title: `Task ${i + 1}` }),
+    );
     const sprint = makeSprint({ tasks });
     writeSprintLog(tmpDir, sprint, makeMetrics());
     const content = readFileSync(join(tmpDir, '.brain', 'sprints', 'sprint-001.md'), 'utf-8');
     const lineCount = content.split('\n').length;
-    expect(lineCount).toBeLessThanOrEqual(100);
+    expect(lineCount).toBeLessThanOrEqual(SPRINT_LOG_MAX_LINES);
   });
 
   it('handles sprint with no tasks gracefully', () => {

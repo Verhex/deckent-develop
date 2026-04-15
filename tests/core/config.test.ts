@@ -829,14 +829,14 @@ describe('extended config validation', () => {
 import { CONFIG_METADATA, listConfigByCategory } from '../../src/core/config.js';
 
 describe('memory config defaults', () => {
-  it('default config has memory_budget=900', () => {
+  it('default config has memory_budget=5000 (Sprint 140 pre-flight 5.5x increase)', () => {
     const config = getDefaultConfig();
-    expect(config.memory_budget).toBe(900);
+    expect(config.memory_budget).toBe(5000);
   });
 
-  it('default config has decay_after_sprints=5', () => {
+  it('default config has decay_after_sprints=20 (Sprint 140 pre-flight 4x increase)', () => {
     const config = getDefaultConfig();
-    expect(config.decay_after_sprints).toBe(5);
+    expect(config.decay_after_sprints).toBe(20);
   });
 
   it('default config has patterns_enabled=true', () => {
@@ -1000,9 +1000,9 @@ describe('listConfigByCategory', () => {
 });
 
 describe('loadConfig resolves new fields', () => {
-  it('resolved config includes memory_budget from defaults', async () => {
+  it('resolved config includes memory_budget from defaults (Sprint 140 pre-flight)', async () => {
     const config = await loadConfig('/test/project');
-    expect(config.memory_budget).toBe(900);
+    expect(config.memory_budget).toBe(5000);
   });
 
   it('resolved config includes fix_phase_enabled from defaults', async () => {

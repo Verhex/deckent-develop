@@ -55,9 +55,13 @@ describe('auditor pattern queue — pop() eviction behavior', () => {
     vi.clearAllMocks();
   });
 
+  // Each pattern serializes to ~7 lines of pretty JSON; overflow count keeps
+  // the test stable regardless of how PATTERNS_MAX_LINES evolves over time.
+  const OVERFLOW_PATTERN_COUNT = Math.ceil(PATTERNS_MAX_LINES / 3);
+
   it('retains highest-occurrence patterns when truncating', () => {
-    // Create 30 patterns — serialized JSON will exceed PATTERNS_MAX_LINES (80)
-    const manyPatterns: PatternEntry[] = Array.from({ length: 30 }, (_, i) =>
+    // Create enough patterns so serialized JSON exceeds PATTERNS_MAX_LINES.
+    const manyPatterns: PatternEntry[] = Array.from({ length: OVERFLOW_PATTERN_COUNT }, (_, i) =>
       makePattern(`pattern-${i}`, i + 1),
     );
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(manyPatterns));
@@ -65,14 +69,14 @@ describe('auditor pattern queue — pop() eviction behavior', () => {
     detectPatterns('/project', [makeViolation('file_outside_scope')], 'sprint-036');
 
     const written = getWrittenPatterns();
-    // Highest occurrence value in input is 30 — it must survive truncation
+    // The highest occurrence value in input must survive truncation.
     const maxOccurrence = Math.max(...written.map(p => p.occurrences));
-    expect(maxOccurrence).toBeGreaterThanOrEqual(30);
+    expect(maxOccurrence).toBeGreaterThanOrEqual(OVERFLOW_PATTERN_COUNT);
   });
 
   it('removes lowest-occurrence patterns first during truncation', () => {
     // Create enough patterns to trigger truncation
-    const manyPatterns: PatternEntry[] = Array.from({ length: 30 }, (_, i) =>
+    const manyPatterns: PatternEntry[] = Array.from({ length: OVERFLOW_PATTERN_COUNT }, (_, i) =>
       makePattern(`pattern-${i}`, i + 1),
     );
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(manyPatterns));
@@ -87,8 +91,7 @@ describe('auditor pattern queue — pop() eviction behavior', () => {
   });
 
   it('result fits within PATTERNS_MAX_LINES after truncation', () => {
-    // 30 patterns guaranteed to overflow 80 lines
-    const manyPatterns: PatternEntry[] = Array.from({ length: 30 }, (_, i) =>
+    const manyPatterns: PatternEntry[] = Array.from({ length: OVERFLOW_PATTERN_COUNT }, (_, i) =>
       makePattern(`pattern-${i}`, i + 1),
     );
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(manyPatterns));
@@ -103,7 +106,7 @@ describe('auditor pattern queue — pop() eviction behavior', () => {
 
   it('never removes all patterns — at least one entry survives truncation', () => {
     // Even with extremely large patterns list, at least 1 must survive
-    const manyPatterns: PatternEntry[] = Array.from({ length: 50 }, (_, i) =>
+    const manyPatterns: PatternEntry[] = Array.from({ length: OVERFLOW_PATTERN_COUNT }, (_, i) =>
       makePattern(`very-long-pattern-name-that-takes-many-lines-${i}`, i + 1),
     );
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(manyPatterns));
@@ -115,7 +118,7 @@ describe('auditor pattern queue — pop() eviction behavior', () => {
   });
 
   it('no truncation occurs when pattern count is within limits', () => {
-    // 3 patterns — well within 80-line budget
+    // Only a handful of patterns — well within PATTERNS_MAX_LINES budget
     const fewPatterns: PatternEntry[] = [
       makePattern('stale_heartbeat', 5),
       makePattern('stale_lock', 3),
@@ -134,7 +137,7 @@ describe('auditor pattern queue — pop() eviction behavior', () => {
 
   it('truncation is stable — equal-occurrence patterns not erroneously removed', () => {
     // All patterns have the same occurrence count
-    const equalPatterns: PatternEntry[] = Array.from({ length: 30 }, (_, i) =>
+    const equalPatterns: PatternEntry[] = Array.from({ length: OVERFLOW_PATTERN_COUNT }, (_, i) =>
       makePattern(`pattern-${i}`, 10),
     );
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(equalPatterns));
@@ -150,9 +153,9 @@ describe('auditor pattern queue — pop() eviction behavior', () => {
   });
 
   it('patterns with higher occurrences are ordered before lower-occurrence ones after truncation', () => {
-    // 25 patterns with varying occurrences — after truncation highest should come first
-    const manyPatterns: PatternEntry[] = Array.from({ length: 25 }, (_, i) =>
-      makePattern(`pattern-${i}`, (25 - i) * 2), // decreasing: 50, 48, 46...
+    // Varied occurrences — after truncation highest should come first
+    const manyPatterns: PatternEntry[] = Array.from({ length: OVERFLOW_PATTERN_COUNT }, (_, i) =>
+      makePattern(`pattern-${i}`, (OVERFLOW_PATTERN_COUNT - i) * 2), // decreasing
     );
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(manyPatterns));
 

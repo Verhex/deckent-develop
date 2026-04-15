@@ -114,7 +114,7 @@ describe('migrateConfigInMemory', () => {
     expect(addedFields.length).toBeGreaterThan(0);
     expect(addedFields).toContain('memory_budget');
     // Default value should match createDefaultConfig()
-    expect(config.memory_budget).toBe(900);
+    expect(config.memory_budget).toBe(5000);
     expect(config.scan_interval).toBe(30);
   });
 
@@ -197,7 +197,7 @@ describe('migrateConfig', () => {
 
       // Verify migrated file has new fields
       const migrated = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
-      expect(migrated['memory_budget']).toBe(900);
+      expect(migrated['memory_budget']).toBe(5000);
       expect(migrated['scan_interval']).toBe(30);
       // Legacy mode name migrated to canonical name
       expect(migrated['mode']).toBe('performance');

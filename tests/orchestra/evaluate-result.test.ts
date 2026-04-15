@@ -33,6 +33,14 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn().mockImplementation((_root: string, _id: string, _status: string) => ({})),
   releaseAllLocks: vi.fn().mockReturnValue(0),
+  createWorkerStateMachine: vi.fn(() => ({
+    transition: vi.fn(),
+    canTransition: vi.fn(() => true),
+    getState: vi.fn(() => 'SPAWNING'),
+    stop: vi.fn(),
+  })),
+  removeWorkerStateMachine: vi.fn(() => true),
+  isWorkerStoppable: vi.fn(() => true),
 }));
 
 import { evaluateResult, isDocTask } from '../../src/orchestra/brain.js';

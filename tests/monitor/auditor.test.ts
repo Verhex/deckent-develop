@@ -42,7 +42,7 @@ import {
 } from '../../src/monitor/auditor.js';
 import { AlertLevel, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
-import { AUDITOR_SCAN_INTERVAL_MS } from '../../src/core/constants.js';
+import { AUDITOR_SCAN_INTERVAL_MS, PATTERNS_MAX_LINES } from '../../src/core/constants.js';
 
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
@@ -774,8 +774,10 @@ describe('detectPatterns', () => {
   });
 
   it('truncates when exceeding PATTERNS_MAX_LINES', () => {
-    // Create many existing patterns to exceed limit
-    const manyPatterns = Array.from({ length: 50 }, (_, i) => ({
+    // Each pattern serializes to ~7 lines of JSON (pretty-printed with 2-space indent).
+    // To reliably exceed PATTERNS_MAX_LINES we create 2x the budget worth of patterns.
+    const patternCount = Math.ceil(PATTERNS_MAX_LINES / 3);
+    const manyPatterns = Array.from({ length: patternCount }, (_, i) => ({
       pattern: `pattern-${i}`,
       occurrences: 1,
       firstDetectedInSprint: 's1',
@@ -789,9 +791,12 @@ describe('detectPatterns', () => {
     ], 'sprint-2');
 
     expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
-    // Should have removed oldest entries to fit within limit
+    // Should have removed oldest entries to fit within PATTERNS_MAX_LINES budget
     const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string) as unknown[];
-    expect(written.length).toBeLessThanOrEqual(50);
+    expect(written.length).toBeLessThan(patternCount + 1);
+    // Serialized output must fit within the line budget
+    const lineCount = JSON.stringify(written, null, 2).split('\n').length;
+    expect(lineCount).toBeLessThanOrEqual(PATTERNS_MAX_LINES);
   });
 });
 

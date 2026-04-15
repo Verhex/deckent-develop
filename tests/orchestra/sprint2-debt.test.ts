@@ -58,6 +58,14 @@ vi.mock('../../src/monitor/auditor.js', () => ({
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn(),
   releaseAllLocks: vi.fn(),
+  createWorkerStateMachine: vi.fn(() => ({
+    transition: vi.fn(),
+    canTransition: vi.fn(() => true),
+    getState: vi.fn(() => 'SPAWNING'),
+    stop: vi.fn(),
+  })),
+  removeWorkerStateMachine: vi.fn(() => true),
+  isWorkerStoppable: vi.fn(() => true),
 }));
 
 vi.mock('../../src/core/utils.js', () => ({

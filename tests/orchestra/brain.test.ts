@@ -5,6 +5,7 @@ import {
 import type {
   Task, TaskResult, Sprint, SprintMetrics, DebtItem, ResolvedConfig, PatternEntry,
 } from '../../src/core/types.js';
+import { MEMORY_MAX_LINES, SPRINT_LOG_MAX_LINES } from '../../src/core/constants.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
@@ -60,6 +61,14 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 vi.mock('../../src/agents/worker.js', () => ({
   updateTaskStatus: vi.fn().mockImplementation((_root: string, _id: string, _status: string) => ({})),
   releaseAllLocks: vi.fn().mockReturnValue(0),
+  createWorkerStateMachine: vi.fn(() => ({
+    transition: vi.fn(),
+    canTransition: vi.fn(() => true),
+    getState: vi.fn(() => 'SPAWNING'),
+    stop: vi.fn(),
+  })),
+  removeWorkerStateMachine: vi.fn(() => true),
+  isWorkerStoppable: vi.fn(() => true),
 }));
 
 vi.mock('../../src/orchestra/planner.js', () => ({
@@ -1214,15 +1223,15 @@ describe('writeRetrospective', () => {
     expect(memCall![1]).toContain('Existing');
   });
 
-  it('respects 300-line MEMORY limit', () => {
-    const bigMemory = Array.from({ length: 320 }, (_, i) => `Line ${i}`).join('\n');
+  it('respects MEMORY_MAX_LINES limit', () => {
+    const bigMemory = Array.from({ length: MEMORY_MAX_LINES + 20 }, (_, i) => `Line ${i}`).join('\n');
     mockedReadFileSync.mockReturnValue(bigMemory);
     const evals = new Map([['001-001', TaskEvaluation.NO_GO]]);
 
     writeRetrospective(ROOT, makeSprint(), evals, metrics);
     const memCall = mockedWriteFileSync.mock.calls.find(c => String(c[0]).includes('MEMORY'));
     const lines = (memCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(300);
+    expect(lines.length).toBeLessThanOrEqual(MEMORY_MAX_LINES);
   });
 });
 
@@ -1252,14 +1261,18 @@ describe('writeSprintLog', () => {
     expect(mockedMkdirSync).toHaveBeenCalled();
   });
 
-  it('respects 100-line limit', () => {
-    const manyTasks = Array.from({ length: 200 }, (_, i) => makeTask({ id: `001-${String(i).padStart(3, '0')}` }));
+  it('respects SPRINT_LOG_MAX_LINES limit', () => {
+    // Generate enough tasks so the raw output definitely exceeds the budget.
+    const taskCount = SPRINT_LOG_MAX_LINES + 100;
+    const manyTasks = Array.from({ length: taskCount }, (_, i) =>
+      makeTask({ id: `001-${String(i).padStart(4, '0')}` }),
+    );
     const sprint = makeSprint({ tasks: manyTasks });
     writeSprintLog(ROOT, sprint, metrics);
 
     const writeCall = mockedWriteFileSync.mock.calls[0];
     const lines = (writeCall![1] as string).split('\n');
-    expect(lines.length).toBeLessThanOrEqual(100);
+    expect(lines.length).toBeLessThanOrEqual(SPRINT_LOG_MAX_LINES);
   });
 });
 
