@@ -13,6 +13,9 @@ import { runDoctorChecks } from './doctor.js';
 import { print, printError, formatSprintSummary, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import { promptConfirm } from '../helpers/prompt.js';
+import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
+import { estimateSprintCost, formatEstimate, type TaskCostInput } from '../../core/cost-calculator.js';
 import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -305,8 +308,79 @@ export function registerStart(program: Command): void {
             count: String(sprint.tasks.length),
             model: config.activeModeConfig.brain_model,
           }));
+
+          // ─── COST ESTIMATE (User Safety Shield — Sprint 141) ──────
+          try {
+            initCostConfig(root);
+            const costConfig = loadCostConfig(root);
+            const costTasks: TaskCostInput[] = sprint.tasks.map((t) => ({
+              id: t.id,
+              model: t.model,
+              estimatedInputTokens: t.estimatedTokens ?? 2700,
+              estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
+              effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+            }));
+            const estimate = estimateSprintCost(costTasks, costConfig);
+            print(formatEstimate(estimate));
+          } catch (err) {
+            print(`⚠ Cost estimate unavailable: ${err instanceof Error ? err.message : String(err)}`);
+          }
+
           print(getMessage('start.dry_run_complete', lang));
           return;
+        }
+
+        // ─── PRE-SPRINT COST GATE (User Safety Shield — Sprint 141) ─
+        // Runs before spawn — prevents Sprint 140 $42 disaster from repeating.
+        if (!opts.force) {
+          try {
+            initCostConfig(root);
+            const costConfig = loadCostConfig(root);
+            const context = readContext(root);
+            const recommendation: SprintSizeRecommendation = {
+              size: 'full',
+              maxWorkers: typeof config.activeModeConfig.max_workers === 'number' ? config.activeModeConfig.max_workers : 4,
+              modelConstraint: null,
+              reason: 'Cost gate pre-plan',
+            };
+            const planForCost = await planSprint(root, config, context, recommendation);
+            const costTasks: TaskCostInput[] = planForCost.tasks.map((t) => ({
+              id: t.id,
+              model: t.model,
+              estimatedInputTokens: t.estimatedTokens ?? 2700,
+              estimatedOutputTokens: t.effort === 'high' ? 4000 : t.effort === 'low' ? 500 : 1500,
+              effort: t.effort as 'low' | 'normal' | 'high' | undefined,
+            }));
+            const estimate = estimateSprintCost(costTasks, costConfig);
+            print(formatEstimate(estimate));
+
+            // Budget block
+            if (!estimate.withinBudget) {
+              if (sandboxState) restoreSandbox(root, sandboxState);
+              printError(new Error(
+                `Sprint cost $${estimate.costRealistic.toFixed(2)} exceeds budget $${estimate.budgetUsd.toFixed(2)}. ` +
+                `Override with --force or update cost_limits.sprint_max_usd in .deckent/cost-config.json.`,
+              ));
+              process.exitCode = 1;
+              return;
+            }
+
+            // Auto-confirm threshold
+            const autoConfirmBelow = costConfig.cost_limits.auto_confirm_below_usd ?? 2;
+            if (estimate.costRealistic > autoConfirmBelow) {
+              const confirmed = await promptConfirm(
+                `\nProceed with sprint at ~$${estimate.costRealistic.toFixed(2)}?`,
+                false,
+              );
+              if (!confirmed) {
+                print('Sprint cancelled by user.');
+                if (sandboxState) restoreSandbox(root, sandboxState);
+                return;
+              }
+            }
+          } catch (err) {
+            print(`⚠ Cost gate unavailable (proceeding anyway): ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
 
         // Set up watch window before runSprint blocks

@@ -35,6 +35,7 @@ import { registerHeartbeat } from './commands/heartbeat.js';
 import { registerCheckpoint } from './commands/checkpoint.js';
 import { registerDocs } from './commands/docs.js';
 import { registerOutput } from './commands/output.js';
+import { registerCostCommand } from './commands/cost.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -91,6 +92,7 @@ export function buildProgram(): Command {
   registerCheckpoint(program);
   registerDocs(program);
   registerOutput(program);
+  registerCostCommand(program);
 
   return program;
 }

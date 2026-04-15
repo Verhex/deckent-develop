@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://deckent.dev/schemas/cost-config.json",
+  "title": "Deckent Cost Config Schema",
+  "description": "Parametric multi-provider cost management configuration. User-editable, LiteLLM JSON superset. Zero hard-code in Deckent source.",
+  "type": "object",
+  "required": ["_version", "providers", "cost_limits", "update_config"],
+  "properties": {
+    "_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Schema version"
+    },
+    "_last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp (ISO 8601)"
+    },
+    "_update_source": {
+      "type": "string",
+      "description": "Source of last update (litellm, openrouter, bundled, manual)"
+    },
+    "_user_notes": {
+      "type": "string",
+      "description": "User manual notes, preserved across updates"
+    },
+    "providers": {
+      "type": "object",
+      "description": "Multi-provider pricing and capabilities",
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "type": "object",
+          "required": ["enabled", "billing_modes_supported", "models"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "billing_modes_supported": {
+              "type": "array",
+              "items": { "enum": ["api", "subscription", "free_tier"] },
+              "minItems": 1
+            },
+            "default_billing_mode": {
+              "enum": ["api", "subscription", "free_tier"]
+            },
+            "api_endpoint": {
+              "type": "string",
+              "format": "uri"
+            },
+            "models": {
+              "type": "object",
+              "patternProperties": {
+                "^[a-z][a-z0-9_.-]*$": {
+                  "$ref": "#/definitions/model"
+                }
+              }
+            },
+            "rate_limits": {
+              "type": "object",
+              "patternProperties": {
+                "^tier_[1-9][0-9]*$": {
+                  "type": "object",
+                  "properties": {
+                    "rpm": { "type": "number", "minimum": 0 },
+                    "itpm": { "type": "number", "minimum": 0 },
+                    "otpm": { "type": "number", "minimum": 0 }
+                  }
+                }
+              }
+            },
+            "subscription_tracking": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "enum": ["cccost_interceptor", "admin_api", "none"]
+                },
+                "supported": { "type": "boolean" },
+                "path": { "type": "string" },
+                "reason": { "type": "string" },
+                "risk_level": { "enum": ["low", "medium", "high"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "cost_limits": {
+      "type": "object",
+      "required": ["sprint_max_usd", "daily_max_usd"],
+      "properties": {
+        "sprint_max_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Hard cap per sprint in USD"
+        },
+        "daily_max_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Hard cap per day in USD"
+        },
+        "monthly_max_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "auto_confirm_below_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Auto-proceed without user confirmation below this threshold"
+        },
+        "alert_thresholds": {
+          "type": "object",
+          "properties": {
+            "warning_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+            "critical_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+            "block_percent": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "update_config": {
+      "type": "object",
+      "required": ["sources_priority"],
+      "properties": {
+        "sources_priority": {
+          "type": "array",
+          "items": { "enum": ["litellm", "openrouter", "bundled"] },
+          "minItems": 1
+        },
+        "litellm_url": { "type": "string", "format": "uri" },
+        "openrouter_url": { "type": "string", "format": "uri" },
+        "validation_delta_percent": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Warn if pricing changes >X% between sources"
+        },
+        "cache_duration_hours": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "definitions": {
+    "model": {
+      "type": "object",
+      "required": ["input_cost_per_token", "output_cost_per_token", "max_input_tokens"],
+      "properties": {
+        "input_cost_per_token": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.01,
+          "description": "Per-token (NOT per-MTok). Unit safety: max 0.01 prevents 1,000,000x errors."
+        },
+        "output_cost_per_token": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.01
+        },
+        "cache_creation_input_token_cost": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 0.01,
+          "description": "5-minute cache write cost per token (null if not supported)"
+        },
+        "cache_creation_input_token_cost_above_1hr": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 0.01,
+          "description": "1-hour extended cache write cost per token (null if not supported)"
+        },
+        "cache_read_input_token_cost": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 0.01
+        },
+        "max_input_tokens": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "max_output_tokens": {
+          "type": "number",
+          "minimum": 1
+        },
+        "supports_prompt_caching": { "type": "boolean" },
+        "supports_reasoning": { "type": "boolean" },
+        "supports_vision": { "type": "boolean" },
+        "supports_tool_choice": { "type": "boolean" },
+        "deckent_tier": {
+          "enum": ["economy", "standard", "premium", "premium_plus"]
+        },
+        "deckent_aliases": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "enabled": { "type": "boolean" },
+        "_source": { "type": "string" },
+        "_verified_at": { "type": "string" }
+      }
+    }
+  }
+}

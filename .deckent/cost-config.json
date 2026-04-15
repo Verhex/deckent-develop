@@ -1,0 +1,326 @@
+{
+  "_version": "1.0",
+  "_last_updated": "2026-04-15T15:23:48.373Z",
+  "_update_source": "bundled",
+  "_user_notes": "Bundled baseline — ADR-033 offline-first, npx deckent zero-setup works. Run `deckent config update-pricing` for latest. All values verified from LiteLLM JSON + Anthropic docs + OpenAI pricing + Gemini docs 2026-04-15.",
+  "providers": {
+    "anthropic": {
+      "enabled": true,
+      "billing_modes_supported": [
+        "api",
+        "subscription"
+      ],
+      "default_billing_mode": "subscription",
+      "api_endpoint": "https://api.anthropic.com",
+      "models": {
+        "claude-opus-4-6": {
+          "input_cost_per_token": 0.000005,
+          "output_cost_per_token": 0.000025,
+          "cache_creation_input_token_cost": 0.00000625,
+          "cache_creation_input_token_cost_above_1hr": 0.00001,
+          "cache_read_input_token_cost": 5e-7,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [
+            "opus",
+            "opus-4-6"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        },
+        "claude-sonnet-4-6": {
+          "input_cost_per_token": 0.000003,
+          "output_cost_per_token": 0.000015,
+          "cache_creation_input_token_cost": 0.00000375,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 3e-7,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 64000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": false,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [
+            "sonnet",
+            "sonnet-4-6"
+          ],
+          "enabled": true,
+          "_source": "anthropic-docs",
+          "_verified_at": "2026-04-15",
+          "_notes": "Sonnet 4.6 upgraded to 1M context in 2026 (was 200K in Sonnet 4.5). Does not support 1h extended cache."
+        },
+        "claude-haiku-4-5": {
+          "input_cost_per_token": 0.000001,
+          "output_cost_per_token": 0.000005,
+          "cache_creation_input_token_cost": 0.00000125,
+          "cache_creation_input_token_cost_above_1hr": 0.000002,
+          "cache_read_input_token_cost": 1e-7,
+          "max_input_tokens": 200000,
+          "max_output_tokens": 64000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": false,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "economy",
+          "deckent_aliases": [
+            "haiku",
+            "haiku-4-5"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        }
+      },
+      "rate_limits": {
+        "tier_1": {
+          "rpm": 50,
+          "itpm": 30000,
+          "otpm": 8000
+        },
+        "tier_2": {
+          "rpm": 1000,
+          "itpm": 450000,
+          "otpm": 90000
+        },
+        "tier_3": {
+          "rpm": 2000,
+          "itpm": 800000,
+          "otpm": 160000
+        },
+        "tier_4": {
+          "rpm": 4000,
+          "itpm": 2000000,
+          "otpm": 400000
+        }
+      },
+      "subscription_tracking": {
+        "method": "cccost_interceptor",
+        "supported": true,
+        "path": "~/.claude/projects/{mangled-cwd}/{sessionId}.usage.json",
+        "risk_level": "medium",
+        "reason": "Claude Max/Pro subscription. Fetch interceptor hooks Claude Code Node.js process. SDK version compatibility required."
+      }
+    },
+    "openai": {
+      "enabled": true,
+      "billing_modes_supported": [
+        "api"
+      ],
+      "default_billing_mode": "api",
+      "api_endpoint": "https://api.openai.com",
+      "models": {
+        "gpt-5": {
+          "input_cost_per_token": 0.00000125,
+          "output_cost_per_token": 0.00001,
+          "cache_creation_input_token_cost": null,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 1.25e-7,
+          "max_input_tokens": 272000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [
+            "gpt-5",
+            "gpt5"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15",
+          "_notes": "OpenAI auto-caches (no explicit cache_control needed). Reasoning tokens billed at output rate, folded into output_tokens."
+        },
+        "gpt-5-mini": {
+          "input_cost_per_token": 2.5e-7,
+          "output_cost_per_token": 0.000002,
+          "cache_creation_input_token_cost": null,
+          "cache_read_input_token_cost": 2.5e-8,
+          "max_input_tokens": 272000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [
+            "gpt-5-mini",
+            "gpt5-mini"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        },
+        "gpt-5-nano": {
+          "input_cost_per_token": 5e-8,
+          "output_cost_per_token": 4e-7,
+          "cache_creation_input_token_cost": null,
+          "cache_read_input_token_cost": 5e-9,
+          "max_input_tokens": 272000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": false,
+          "supports_vision": false,
+          "deckent_tier": "economy",
+          "deckent_aliases": [
+            "gpt-5-nano"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        },
+        "o3": {
+          "input_cost_per_token": 0.00001,
+          "output_cost_per_token": 0.00004,
+          "cache_read_input_token_cost": 0.0000025,
+          "max_input_tokens": 200000,
+          "max_output_tokens": 100000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "deckent_tier": "premium_plus",
+          "deckent_aliases": [
+            "o3"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        }
+      },
+      "rate_limits": {
+        "tier_1": {
+          "rpm": 500,
+          "itpm": 30000,
+          "otpm": 0
+        },
+        "tier_2": {
+          "rpm": 5000,
+          "itpm": 450000,
+          "otpm": 0
+        },
+        "tier_3": {
+          "rpm": 10000,
+          "itpm": 800000,
+          "otpm": 0
+        }
+      },
+      "subscription_tracking": {
+        "method": "none",
+        "supported": false,
+        "reason": "ChatGPT Plus/Pro/Enterprise is web UI access. API billing is separate. Architectural impossibility — use API key for cost tracking."
+      }
+    },
+    "google": {
+      "enabled": true,
+      "billing_modes_supported": [
+        "api",
+        "free_tier"
+      ],
+      "default_billing_mode": "api",
+      "api_endpoint": "https://generativelanguage.googleapis.com",
+      "models": {
+        "gemini-3-1-pro-preview": {
+          "input_cost_per_token": 0.000002,
+          "output_cost_per_token": 0.000012,
+          "cache_creation_input_token_cost": null,
+          "cache_read_input_token_cost": 2e-7,
+          "max_input_tokens": 2000000,
+          "max_output_tokens": 64000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": false,
+          "supports_vision": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [
+            "gemini-3.1-pro",
+            "gemini-3-pro"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        },
+        "gemini-2-5-pro": {
+          "input_cost_per_token": 0.00000125,
+          "output_cost_per_token": 0.00001,
+          "cache_read_input_token_cost": 1.25e-7,
+          "max_input_tokens": 2000000,
+          "max_output_tokens": 64000,
+          "supports_prompt_caching": true,
+          "supports_vision": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [
+            "gemini-2.5-pro"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        },
+        "gemini-2-5-flash": {
+          "input_cost_per_token": 3e-7,
+          "output_cost_per_token": 0.0000025,
+          "cache_read_input_token_cost": 3e-8,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 64000,
+          "supports_prompt_caching": true,
+          "supports_vision": true,
+          "deckent_tier": "economy",
+          "deckent_aliases": [
+            "gemini-2.5-flash"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15",
+          "_notes": "Free tier: 15 RPM, 1M TPM, 1500 RPD"
+        },
+        "gemini-2-0-flash": {
+          "input_cost_per_token": 1e-7,
+          "output_cost_per_token": 4e-7,
+          "cache_read_input_token_cost": 2.5e-8,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 8192,
+          "supports_prompt_caching": true,
+          "supports_vision": true,
+          "deckent_tier": "economy",
+          "deckent_aliases": [
+            "gemini-2.0-flash"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-04-15"
+        }
+      },
+      "subscription_tracking": {
+        "method": "none",
+        "supported": false,
+        "reason": "Gemini Advanced is web/mobile subscription. API billing through Google Cloud is separate. Architectural impossibility — use API key for cost tracking."
+      }
+    }
+  },
+  "cost_limits": {
+    "sprint_max_usd": 3.5,
+    "daily_max_usd": 50,
+    "monthly_max_usd": 500,
+    "auto_confirm_below_usd": 2,
+    "alert_thresholds": {
+      "warning_percent": 50,
+      "critical_percent": 75,
+      "block_percent": 100
+    }
+  },
+  "update_config": {
+    "sources_priority": [
+      "litellm",
+      "openrouter",
+      "bundled"
+    ],
+    "litellm_url": "https://raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json",
+    "openrouter_url": "https://openrouter.ai/api/v1/models",
+    "validation_delta_percent": 5,
+    "cache_duration_hours": 24
+  }
+}
