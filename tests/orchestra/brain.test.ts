@@ -19,6 +19,17 @@ vi.mock('node:fs', () => ({
   statSync: vi.fn(),
   appendFileSync: vi.fn(),
   renameSync: vi.fn(),
+  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
+  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
+  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
+  promises: {
+    readFile: vi.fn(async () => ''),
+    writeFile: vi.fn(async () => undefined),
+    mkdir: vi.fn(async () => undefined),
+    appendFile: vi.fn(async () => undefined),
+    access: vi.fn(async () => undefined),
+    stat: vi.fn(async () => ({ size: 0 })),
+  },
 }));
 
 vi.mock('node:fs/promises', () => ({
