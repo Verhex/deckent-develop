@@ -8,6 +8,7 @@ import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
+import { formatStatus, resolveOutputMode } from '../../core/output-formatter.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -16,6 +17,7 @@ interface StatusOpts {
   raw?: boolean;
   noColor?: boolean;
   graph?: boolean;
+  mode?: string;
 }
 
 /**
@@ -231,6 +233,7 @@ export function registerStatus(program: Command): void {
     .option('--verbose', 'Show detailed agent and skill assignment info')
     .option('--no-color', 'Disable colored output')
     .option('--graph', 'Display dependency graph as Mermaid diagram')
+    .option('--mode <mode>', 'Output render mode: explainatory | standart | verbose | json')
     .action((opts: StatusOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
@@ -355,19 +358,39 @@ export function registerStatus(program: Command): void {
           const tasks = loadTaskFiles(root);
           const meta = readSprintMeta(root, state.sprint.id);
           const ci = readCIData(root, state.sprint.id);
-          output(formatHumanStatus({
-            dashboard: state,
-            tasks,
-            sprintTitle: meta.title,
-            sprintStartedAt: meta.startedAt,
-            projectRoot: root,
-            verbose: opts.verbose,
-            ciBaseline: ci.baseline,
-            ciReport: ci.report,
-          }));
-          if (opts.verbose) {
-            output(formatAgentAssignments(tasks, true));
-            output(formatSkillAssignments(tasks, true));
+
+          // --mode flag: use output-formatter if mode is specified
+          if (opts.mode) {
+            const resolvedMode = resolveOutputMode(opts.mode);
+            const formatterData = {
+              sprintId: state.sprint.id,
+              phase: state.sprint.phase as string | undefined,
+              totalTasks: state.progress?.total ?? tasks.length,
+              completedTasks: state.progress?.done ?? 0,
+              failedTasks: tasks.filter(t => (t.status as string) === 'NO_GO').length,
+              techDebtTasks: tasks.filter(t => ((t as unknown as Record<string, unknown>)['evaluationDecision'] as string) === 'GO_WITH_TECH_DEBT').length,
+              activeWorkers: state.agents?.length ?? 0,
+            };
+            output(formatStatus(formatterData, resolvedMode));
+            if (opts.verbose) {
+              output(formatAgentAssignments(tasks, true));
+              output(formatSkillAssignments(tasks, true));
+            }
+          } else {
+            output(formatHumanStatus({
+              dashboard: state,
+              tasks,
+              sprintTitle: meta.title,
+              sprintStartedAt: meta.startedAt,
+              projectRoot: root,
+              verbose: opts.verbose,
+              ciBaseline: ci.baseline,
+              ciReport: ci.report,
+            }));
+            if (opts.verbose) {
+              output(formatAgentAssignments(tasks, true));
+              output(formatSkillAssignments(tasks, true));
+            }
           }
         }
       } catch (error) {

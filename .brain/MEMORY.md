@@ -32,3 +32,4 @@
 - Worker Honest Assessment Calibration v2: GO_WITH_TECH_DEBT — Worker Honest Assessment Calibration v2 tamamlandı. 3 alt-iş uygulandı:
 
 1. Alt-iş A (task-builder.ts): buildWorkerPromp
+## Sprint sprint-139 Learnings

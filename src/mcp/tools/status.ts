@@ -9,6 +9,141 @@ import { formatStatusResponse, wrapResponse, type StatusData } from '../helpers/
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { readDashboardSafe } from '../../monitor/dashboard-manager.js';
 import { debugLog } from '../../core/utils.js';
+import { formatStatus, resolveOutputMode, type OutputMode } from '../../core/output-formatter.js';
+
+/**
+ * Read the last N events from the event stream JSONL file.
+ * File-system based to avoid ADR-008 import cycle (status.ts must not import orchestra/).
+ */
+function readEventStreamTail(
+  projectRoot: string,
+  sprintId: string,
+  maxLines = 20,
+): unknown[] {
+  const filePath = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  if (!existsSync(filePath)) return [];
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const lines = raw.split('\n').filter(l => l.trim().length > 0);
+    const tail = maxLines > 0 ? lines.slice(-maxLines) : lines;
+    return tail.map(line => {
+      try { return JSON.parse(line) as unknown; }
+      catch { return null; }
+    }).filter(Boolean);
+  } catch (e) {
+    debugLog('status.ts:eventstream-read-error', e);
+    return [];
+  }
+}
+
+/**
+ * Read worker output snapshot for a task (last N lines from output file).
+ * File-system based to avoid ADR-008 import cycle.
+ */
+function readLastOutputs(
+  projectRoot: string,
+  sprintId: string,
+  maxLines = 10,
+): Record<string, string[]> {
+  const outputDir = join(projectRoot, DECKENT_DIR, `${sprintId}-outputs`);
+  if (!existsSync(outputDir)) return {};
+  try {
+    const entries = readdirSync(outputDir);
+    const result: Record<string, string[]> = {};
+    for (const f of entries) {
+      if (!f.endsWith('.out')) continue;
+      const taskId = f.replace(/^task-/, '').replace(/\.out$/, '');
+      try {
+        const content = readFileSync(join(outputDir, f), 'utf-8');
+        const allLines = content.split('\n').filter(l => l.trim().length > 0);
+        result[taskId] = maxLines > 0 ? allLines.slice(-maxLines) : allLines;
+      } catch {
+        // Skip unreadable files
+      }
+    }
+    return result;
+  } catch (e) {
+    debugLog('status.ts:lastoutputs-read-error', e);
+    return {};
+  }
+}
+
+/**
+ * Read metric snapshot from .deckent/sprint-NNN-metrics.jsonl.
+ * Returns last metric entry per name.
+ * File-system based to avoid ADR-008 import cycle.
+ */
+function readMetricSnapshot(
+  projectRoot: string,
+  sprintId: string,
+): Record<string, unknown> {
+  const filePath = join(projectRoot, DECKENT_DIR, `${sprintId}-metrics.jsonl`);
+  if (!existsSync(filePath)) return {};
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const lines = raw.split('\n').filter(l => l.trim().length > 0);
+    const snapshot: Record<string, unknown> = {};
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as { name?: string; value?: unknown };
+        if (entry.name) snapshot[entry.name] = entry.value;
+      } catch { /* skip */ }
+    }
+    return snapshot;
+  } catch (e) {
+    debugLog('status.ts:metrics-read-error', e);
+    return {};
+  }
+}
+
+/**
+ * Compute phase countdown in seconds from current phase timestamp.
+ * Returns null if no phase data available.
+ */
+function computePhaseCountdown(
+  state: Record<string, unknown>,
+): { phase: string; elapsedSec: number } | null {
+  const phase = state['phase'] as string | undefined;
+  const phaseStartedAt = state['phaseStartedAt'] as string | undefined;
+  if (!phase || !phaseStartedAt) return null;
+  try {
+    const elapsed = Math.floor((Date.now() - new Date(phaseStartedAt).getTime()) / 1000);
+    return { phase, elapsedSec: elapsed };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build backend breakdown: counts of workers per backend type.
+ * Reads from .tasks/*.json agent provider fields.
+ */
+function buildBackendBreakdown(root: string): Record<string, number> {
+  const breakdown: Record<string, number> = {};
+  try {
+    const tasksDir = join(root, TASKS_DIR);
+    if (!existsSync(tasksDir)) return breakdown;
+    const entries = readdirSync(tasksDir);
+    const files = (Array.isArray(entries) ? entries : []).filter(
+      f => typeof f === 'string' && f.startsWith('task-') && f.endsWith('.json'),
+    );
+    for (const f of files) {
+      try {
+        const data = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as {
+          provider?: string;
+          status?: string;
+        };
+        if (data.status === 'EXECUTING' || data.status === 'CLAIMED') {
+          const prov = data.provider ?? 'unknown';
+          breakdown[prov] = (breakdown[prov] ?? 0) + 1;
+        }
+      } catch { /* skip */ }
+    }
+  } catch {
+    // ignore
+  }
+  return breakdown;
+}
 
 /**
  * Loads the persisted dependency graph for the given sprint from disk.
@@ -125,9 +260,10 @@ export function registerStatusTool(server: McpServer): void {
       inputSchema: z.object({
         json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption.'),
         verbose: z.boolean().optional().default(false).describe('Include verbose details: full agent assignment map, skill assignments, and per-task agent/skill breakdown.'),
+        outputMode: z.enum(['explainatory', 'standart', 'verbose', 'json']).optional().describe('Render mode for formatted output: explainatory (emoji + Türkçe insight blocks), standart (markdown table), verbose (full snapshot with timestamps), json (raw JSON). Defaults to standart.'),
       }),
     },
-    async ({ json, verbose }) => {
+    async ({ json, verbose, outputMode }) => {
       const root = process.cwd();
       const dashPath = join(root, DASHBOARD_FILE);
 
@@ -231,6 +367,22 @@ export function registerStatusTool(server: McpServer): void {
         ? loadDepGraphFiles(root, resolvedSprintId)
         : null;
 
+      // Rich output fields (Sprint 139 T-047): always include when sprintId available
+      const eventStreamTail = resolvedSprintId
+        ? readEventStreamTail(root, resolvedSprintId, 20)
+        : [];
+
+      const lastOutputs = resolvedSprintId
+        ? readLastOutputs(root, resolvedSprintId, 10)
+        : {};
+
+      const metricSnapshot = resolvedSprintId
+        ? readMetricSnapshot(root, resolvedSprintId)
+        : {};
+
+      const phaseCountdown = computePhaseCountdown(state);
+      const backendBreakdown = buildBackendBreakdown(root);
+
       const verboseFields = verbose ? {
         phase: state['phase'],
         workerDetails: agents,
@@ -251,11 +403,45 @@ export function registerStatusTool(server: McpServer): void {
         alertSummary,
         agentAssignments,
         skillAssignments,
+        // Rich output fields (Sprint 139 T-047)
+        eventStreamTail,
+        lastOutputs,
+        metricSnapshot,
+        phaseCountdown,
+        backendBreakdown,
         ...verboseFields,
       };
 
       if (json) {
         return { content: [{ type: 'text' as const, text: JSON.stringify(rawData) }] };
+      }
+
+      // Resolve output mode — outputMode param overrides config default
+      const resolvedMode: OutputMode = outputMode
+        ? resolveOutputMode(outputMode)
+        : resolveOutputMode();
+
+      // If outputMode is explainatory/verbose/standart, use output-formatter for rich rendering
+      if (resolvedMode !== 'standart') {
+        const formatterData = {
+          sprintId: resolvedSprintId,
+          phase: (state['phase'] as string | undefined),
+          totalTasks: total,
+          completedTasks: done,
+          failedTasks: 0,
+          activeWorkers: agents?.length ?? 0,
+        };
+        const formattedOutput = formatStatus(formatterData, resolvedMode);
+        const enrichedState = enrichResponse('status', rawData);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              ...wrapResponse(enrichedState, formattedOutput),
+              _outputMode: resolvedMode,
+            }),
+          }],
+        };
       }
 
       const enrichedState = enrichResponse('status', rawData);

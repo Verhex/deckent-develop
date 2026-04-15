@@ -34,6 +34,7 @@ import { registerSetDirectives } from './commands/set-directives.js';
 import { registerHeartbeat } from './commands/heartbeat.js';
 import { registerCheckpoint } from './commands/checkpoint.js';
 import { registerDocs } from './commands/docs.js';
+import { registerOutput } from './commands/output.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -89,6 +90,7 @@ export function buildProgram(): Command {
   registerHeartbeat(program);
   registerCheckpoint(program);
   registerDocs(program);
+  registerOutput(program);
 
   return program;
 }

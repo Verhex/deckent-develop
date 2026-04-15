@@ -5,6 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { DECKENT_VERSION } from '../core/constants.js';
 import { registerTools } from './tools/index.js';
 import { registerResources } from './resources/index.js';
+import { McpNotificationAdapter } from '../core/notify-adapters/mcp-adapter.js';
 
 export const DECKENT_MCP_INSTRUCTIONS = `
 Deckent is an AI agent orchestration CLI that runs multi-agent sprints inside your project.
@@ -77,6 +78,9 @@ Sprint stuck → deckent_kill → deckent_cleanup → deckent_doctor
 Config issue → deckent_config read → deckent_config set key value
 `.trim();
 
+/** MCP notification adapter — bound to the server after creation. */
+export let mcpNotifyAdapter: McpNotificationAdapter | null = null;
+
 export function createServer(): McpServer {
   const server = new McpServer(
     { name: 'deckent', version: DECKENT_VERSION },
@@ -85,6 +89,9 @@ export function createServer(): McpServer {
 
   registerTools(server);
   registerResources(server);
+
+  // Bind MCP notification adapter to this server instance
+  mcpNotifyAdapter = new McpNotificationAdapter(server);
 
   return server;
 }

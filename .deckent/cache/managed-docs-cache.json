@@ -1,8 +1,8 @@
 {
   "claude-md": {
     "entryHash": "563cd2e0183dcbf2516c298e16ede86d8bd0e504",
-    "fileHash": "27cc5f5f0fb1906248c34a503e6c43578fa8b7e0",
-    "updatedAt": "2026-04-10T09:24:33.662Z"
+    "fileHash": "f6d6f66b9a4be8e96243ced8f80470f2a7401eff",
+    "updatedAt": "2026-04-15T09:17:07.594Z"
   },
   "vision-en": {
     "entryHash": "31df015efba2366c173d683f33954c994f95ff5e",
@@ -16,8 +16,8 @@
   },
   "beta-tracker-en": {
     "entryHash": "47b504bf6dca11d5b7b02a79f672319fdafb3d80",
-    "fileHash": "8f2fd567b2597d9c29f17dc753aa154fd99fc219",
-    "updatedAt": "2026-04-10T09:24:33.705Z"
+    "fileHash": "f382c4efe2b096fbaabdac9820cfbd453473b729",
+    "updatedAt": "2026-04-15T09:17:07.607Z"
   },
   "beta-tracker-tr": {
     "entryHash": "053bf19c5cd903e7dbd1f36d41b4996ed17c703f",
@@ -26,12 +26,12 @@
   },
   "identity-md": {
     "entryHash": "a8b61073605d0b66f7ee4aabd91d72d61a3aa128",
-    "fileHash": "aeb625e0151992a70fb4ef108747470a3eb38076",
-    "updatedAt": "2026-04-10T09:24:33.728Z"
+    "fileHash": "aa9808543dab471f0918ea2ea3ec6727392b08ba",
+    "updatedAt": "2026-04-15T09:17:07.609Z"
   },
   "blueprint-md": {
     "entryHash": "82d6655b7effe3c7067cb356a446c0f25bb17cdb",
-    "fileHash": "1dbac69406d8036087d89b112888f8987fe109c3",
-    "updatedAt": "2026-04-10T09:24:33.733Z"
+    "fileHash": "b0d3275be04bb0975907080da59d875204e76fe8",
+    "updatedAt": "2026-04-15T09:17:07.615Z"
   }
 }

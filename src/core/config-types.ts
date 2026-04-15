@@ -102,6 +102,13 @@ export interface DeckentConfig {
   output_mode?: 'quiet' | 'normal' | 'verbose';
   /** Output theme (default: 'default') */
   output_theme?: 'default' | 'minimal' | 'rich';
+  /** Output render mode for formatStatus() dispatcher.
+   *  'explainatory' — emoji + multi-line + Türkçe + ★ Insight blocks (default)
+   *  'standart'     — minimal single-line summary + markdown table
+   *  'verbose'      — full worker output stream + timestamps + metric snapshot
+   *  'json'         — JSON.stringify
+   */
+  output_render_mode?: 'explainatory' | 'standart' | 'verbose' | 'json';
 
   // ─── Skill-Based Provider Routing ──────────────────────────────────
   /** Skill-based provider routing overrides */
