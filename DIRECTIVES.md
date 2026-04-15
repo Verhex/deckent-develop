@@ -1,479 +1,742 @@
-# DIRECTIVES — Sprint 138: Architectural Pivot — Verification Protocol Foundation
+# DIRECTIVES — Sprint 140: Operasyonel Disiplin + Recovery Mechanisms
 
-> Sprint 138 mimari pivot: Brain ↔ Auditor ↔ Worker iletişim standardizasyonu (ADR-035 + Auditor Authority + Event Stream + Plan-Time Collision Detection) + Sprint 137 recovery completion (test restoration + Layer 4 wire + auto-archive + worker honest v2) + vizyon foundation (Long-running resume MVP + ADR Governance).
+> Sprint 140 odak: Sprint 139 catastrophic lesson'ları guard rail'lere çevir. 5 P0 (MCP disconnect fix + auto-archive live-sprint guard + Layer 4 runtime wire 4-sprint streak kırma + task file restoration + panic kill runtime guard) + Sprint 139 debt liquidation + crown jewel runtime deploy. Zero manual recovery streak yeniden başla.
 
 ## Referanslar
-- Spec: `docs/superpowers/specs/2026-04-14-sprint-138-architectural-pivot-design.md` (commit `c9c69f1`, 1290 satır)
-- Plan: `docs/superpowers/plans/2026-04-14-sprint-138-architectural-pivot-plan.md` (commit `58ddadd`, 1150 satır)
-- Sprint 137 scorecard: `.deckent/sprint-137-layer3-scorecard.md` (9/17 baseline)
-- Sprint 137 archive: `.brain/archive/DIRECTIVES-sprint-137.md`
-- Sprint 137 retrospektif: `.brain/RETRO.md`
-- Brain memory: `.brain/MEMORY.md`
+- Sprint 139 manuel scorecard: `.deckent/sprint-139-layer3-scorecard.md` (8 bölüm, disk-evidence based)
+- Sprint 139 kapanış memory: `project_sprint139_completed.md`
+- Sprint 140 preflight memory: `project_sprint140_preflight.md`
+- MCP disconnect investigation: `project_mcp_disconnect_investigation.md`
+- Kill approval rule (MUTLAK): `feedback_deckent_kill_approval_required.md`
+- Brain memory: `.brain/MEMORY.md` + `.brain/DECISIONS.md` (ADR-037 RBAC + ADR-038 Dead Code + ADR-039 Self-Modifying Sprint 139 canlı)
 
-## Goal: Brain ↔ Auditor ↔ Worker iletişimini standardize etmek (ADR-035 protocol), auditor'a verification yetkileri vermek (3-pipeline), structured event stream + plan-time scope collision detection eklemek, Sprint 137 11 carry-over debt'ini temizlemek, long-running sprint zemini atmak. Hedef: Layer 3 9/17 → ≥14/17, readiness 4.00 → ≥4.15, vitest 53 → 0, clean GO.
+## Goal: Sprint 139'un delivered +5462 LoC crown jewel kodunu runtime'a deploy et, 4-sprint Layer 4 wire streak'ini kır, MCP disconnect bug'ını çöz, auto-archive catastrophic regression'ı guard rail'e çevir, task file restoration mekanizması kur, panic kill runtime guard ekle. Hedef: Layer 3 ≥13/17, readiness ≥4.10, vitest 0 fail, clean GO, zero manual recovery yeniden başla.
 
-## Pre-flight Bulguları (2026-04-14)
-- **vitest baseline:** 8 fail file / 53 fail tests / 12652 pass (Plan'da yazılan 63'ten +10 daha iyi)
-- **`.brain/DECISIONS.md`:** 702 satır, 35 ADR başlık, **7 Status alanı mevcut** (Plan'da yazılan 0'dan +7 — Sprint 130-131 ADR'lerinde Status zaten var, Task 0 idempotent kalmalı)
-- **`src/core/file-lock.ts`:** 30 satır, observability facade (`claimTaskLock` + `acquireLock` re-export), real implementation **YOK** — Task 3 ~200 LoC genişletecek
-- **`src/orchestra/result-evaluator.ts`:** 1033 satır, `tryCodeVerifiedDone` helper satır **729**'da export edilmiş, `sprint-finalizer.ts:493`'ten çağrılıyor — Task 2 helper'ı `auditor.ts`'e taşıyacak
-- **`src/monitor/auditor.ts`:** 650 satır (Task 2 hedef ~950)
-- **`src/orchestra/sprint-finalizer.ts`:** 957 satır (Task 5+6 modify hedef)
-- **`src/agents/worker.ts`:** 1206 satır (Task 7 verify loop sertleştirme)
-- **`src/orchestra/sprint-spawner.ts`:** 316 satır (Task 3 collision detection hedef)
-- **`.locks/` dir:** boş (runtime'da hiç lock alınmıyor — Task 3 dolduracak)
-- **`.tasks/`:** Sprint 137 28 orphan dosya `.brain/archive/sprint-137-tasks/`'a manuel taşındı, `sprint-state.json` reset (Sprint 138 başlamaya hazır)
+## Pre-flight Notları (Sprint 140 session başlangıcında doldurulacak)
+- vitest baseline: TBD (Sprint 139 orphan cleanup sonrası)
+- `.brain/DECISIONS.md` ADR count: 39 (Sprint 139 ADR-037 RBAC + ADR-038 Dead Code + ADR-039 Self-Modifying 3 yeni ADR)
+- `.tasks/` orphan: 1 JSON + 50 result (Sprint 139 artığı — Task 140-015 cleanup)
+- `.dashboard` stuck state "EVALUATE/EVALUATING" (Sprint 139 stuck kalıntısı)
+- `src/core/notification-dispatcher.ts` untracked YENİ (Sprint 139 Task 41)
+- `src/orchestra/self-modifying-detector.ts` untracked YENİ (Sprint 139 Task 52)
+- `src/cli/commands/output.ts` untracked YENİ (Sprint 139 Task 47)
+- Git status 46 modified + 21 untracked (Sprint 139 + Sprint 140 Phase 9 commit candidate)
 
 ---
 
-## Task 1: ADR Governance Integration
+## Task 1: MCP Disconnect Fix — Background Sprint Runner Separation
+- Model: opus
+- Effort: high
+- Priority: CRITICAL
+- Dependencies: yok
+- Skills: typescript-expert, system-architect
+- Files: src/orchestra/sprint-runner-entry.ts (YENİ), src/mcp/tools/start.ts, src/mcp/tools/status.ts, src/mcp/server.ts, tests/mcp/start-detached.test.ts (YENİ)
+- Scope: src/orchestra/, src/mcp/, tests/mcp/
+
+### Description
+
+Sprint 139 t+~80dk Deckent MCP server Claude Code istemcisinden disconnect oldu canlı kanıt. Root cause: `src/mcp/tools/start.ts:111` fire-and-forget `runSprint(...).then(...)` aynı stdio MCP server process içinde kalıyor. 2-3 saat boyunca heavy sync I/O (Sprint 132 auditi 799 sync I/O), Docker subprocess stdio pipe buffer'lar, GC duraklamaları event loop'u starvation'a sokuyor. Claude Code istemcisi heartbeat timeout ile bağlantıyı kesiyor.
+
+**Alt-iş A: Sprint Runner Entry Point (`src/orchestra/sprint-runner-entry.ts` YENİ ~150 LoC)**
+```typescript
+#!/usr/bin/env node
+// Entry point for detached sprint runner process.
+// Usage: node dist/orchestra/sprint-runner-entry.js <projectRoot> <jobId>
+import { runSprint } from './brain.js';
+import { loadConfig } from '../core/config.js';
+import { bootstrapProviders } from '../core/provider.js';
+import { writeJobState, buildTaskSummaries } from '../mcp/tools/job-runner.js';
+
+async function main() {
+  const [root, jobId] = process.argv.slice(2);
+  const config = await loadConfig(root);
+  const bootstrap = await bootstrapProviders(config, root);
+  const startedAt = new Date().toISOString();
+  try {
+    const sprint = await runSprint(root, config, { autoApprove: true, connector: bootstrap?.connector });
+    // Write COMPLETE jobState
+    const tasks = buildTaskSummaries(root, sprint.tasks);
+    writeJobState(root, { jobId, status: 'COMPLETE', startedAt, completedAt: new Date().toISOString(), sprintId: sprint.id, tasks });
+    process.exit(0);
+  } catch (err) {
+    writeJobState(root, { jobId, status: 'FAILED', startedAt, completedAt: new Date().toISOString(), error: err.message });
+    process.exit(1);
+  }
+}
+main();
+```
+
+**Alt-iş B: `src/mcp/tools/start.ts` Fire-and-forget → Detached Spawn**
+- Line 111 `runSprint(...).then(...)` → `child_process.spawn('node', [path.join(root, 'dist/orchestra/sprint-runner-entry.js'), root, jobId], { detached: true, stdio: 'ignore' })` + `.unref()`
+- MCP tool jobId döner <2s, sprint runner ayrı process'te bağımsız yaşar
+
+**Alt-iş C: `src/mcp/tools/status.ts` Process Liveness Check**
+- jobState okuma + `ps -p <pid>` kontrolü (opsiyonel, jobState status alanı zaten yeterli)
+- Sprint 138 Task 9 `sprint-checkpoint.ts` infrastructure compat
+
+**Alt-iş D: MCP Server Heartbeat (Opsiyonel Bonus)**
+- `src/mcp/server.ts`'ye periodic 30s no-op notification ekle (detached runner'la iletişim değil, client keepalive sinyali)
+
+**Kanıt:**
+- `ls src/orchestra/sprint-runner-entry.ts` → YENİ
+- `grep "spawn\|detached" src/mcp/tools/start.ts` → hit
+- Sprint 140 execute 2+ saat MCP bağlantısı kopmadan tamamlanmalı
+- `ps aux | grep sprint-runner-entry` → background process canlı Sprint 140 execute sırasında
+- `deckent_start` çağrısı wall-clock <2s döner
+
+**Test:** 5+ test (spawn integration, detach unref, jobState write roundtrip, MCP server survive under load, Sprint 138 checkpoint compat)
+
+---
+
+## Task 2: Auto-Archive Live-Sprint Guard (ADR-039 Self-Modifying Detector Entegre — Sprint 139 Lesson)
 - Model: opus
 - Effort: normal
 - Priority: CRITICAL
 - Dependencies: yok
-- Skills: typescript-expert, documentation-writer
-- Files: .brain/DECISIONS.md, DECKENT.md, .claude/rules/brain.md, .claude/rules/worker-default.md, src/orchestra/task-builder.ts, scripts/adr-validator.mjs, tests/scripts/adr-validator.test.ts, tests/orchestra/task-builder.test.ts
-- Scope: .brain/, DECKENT.md, .claude/rules/, scripts/, src/orchestra/task-builder.ts, tests/scripts/, tests/orchestra/task-builder.test.ts
-
-### Description
-
-Sprint 138'in **gerçek başlangıcı**. ADR governance kullanıcı-facing product feature olur (açık repoya geçtiğimizde kullanıcılar kendi `.brain/DECISIONS.md` yazıp Deckent'tan zorla uygulatmayı bekler). 5 alt-iş:
-
-**Alt-iş A: ADR Format Audit & Migration (MADR v3 hibrit)**
-35 ADR'ye `**Status:**` alanı ekle (Title sonrası, Decision öncesi). Default `accepted`. Mevcut 7 Status alanı zaten var (Sprint 130-131), idempotent (script Status zaten varsa dokunmaz). Explicit exception:
-- ADR-005 "Synchronous I/O" → `Status: deprecated` + Sprint 132 CRITICAL #1 notu
-- ADR-022 ilk entry (sat ~151) → `Status: superseded`, `Superseded by: ADR-022 v2 (Sprint 085)`
-- ADR-022 ikinci entry (sat ~218) → `Status: accepted`, `Supersedes: ADR-022 v1 (Sprint 067)`
-
-MADR v3 hibrit format: zorunlu (Title, Status, Decision, Context, Consequence) + opsiyonel serbest (Alternatives, Cost, Security, Superseded by, References).
-
-**Alt-iş B: Mandatory Read Wiring (DECKENT.md only — ADR-013 pattern)**
-`DECKENT.md`'ye `## Mandatory Architecture Rules\n@.brain/DECISIONS.md` ekle. CLAUDE.md'ye **EKLEME** (ADR-013 DECKENT.md Adapter Pattern: provider-specific dosyalar zaten DECKENT.md'yi import eder, multi-provider consistency).
-
-`.claude/rules/brain.md` + `.claude/rules/worker-default.md` ADR mandatory read + violation rule ekle (NO_GO + yeni ADR proposal).
-
-`src/orchestra/task-builder.ts` worker prompt template'e ADR content injection (`readFileSync('.brain/DECISIONS.md')` → prompt).
-
-**Alt-iş C: Parser + Validator Script (`scripts/adr-validator.mjs` ~150-200 LoC)**
-Markdown parse, structure validation, status enum check, duplicate ID detect, status transition. Exit codes: 0/1/2. `package.json` `lint:adr` script ekle.
-
-**Alt-iş D: ADR Naming Split**
-- `.brain/DECISIONS.md` = ADR (Architecture Decision Record, project governance, MADR v3, mandatory)
-- `.deckent/decisions/*.json` = SDL (Sprint Decision Log, tactical, audit trail, opsiyonel)
-DECKENT.md'ye kısa açıklama ekle.
-
-**Alt-iş E: ADR-036 Self-Referential**
-Task 0'ın kendisini dokümante eden yeni ADR (kullanıcılar kendi projelerinde ADR workflow'unu anlamak için). Meta-doğrulama: ADR-036 yazıldıktan sonra `npm run lint:adr` ADR-036'yı onaylamalı (kendi validator'ından geçer).
-
-**Kanıt:**
-- `grep -c "^\*\*Status:\*\*" .brain/DECISIONS.md` → ≥36 (35 migrate + 1 yeni ADR-036)
-- `grep "^## ADR-005" -A5 .brain/DECISIONS.md` → `Status: deprecated`
-- `grep "^## ADR-022" .brain/DECISIONS.md | wc -l` → 2
-- `grep "^## ADR-036" .brain/DECISIONS.md` → hit
-- `grep "@\.brain/DECISIONS" DECKENT.md` → 1 hit
-- `npm run lint:adr` → exit 0
-- `npx vitest run tests/scripts/adr-validator.test.ts tests/orchestra/task-builder.test.ts` → 0 fail
-
-**Test:** 6+ test (validator parse, missing field, invalid status, duplicate ID, task-builder ADR injection, ADR-036 self-pass)
-
----
-
-## Task 2: ADR-035 Verification Protocol Standard
-- Model: sonnet
-- Effort: low
-- Priority: CRITICAL
-- Dependencies: 138-001
-- Skills: documentation-writer
-- Files: .brain/DECISIONS.md
-- Scope: .brain/
-
-### Description
-
-ADR-035 Brain ↔ Worker ↔ Auditor mesaj protokolü için tek kaynak. **Salt dokümantasyon task'ı** — kod değişikliği yok, Task 3+4 bu ADR'yi implement eder. Task 1'in MADR v3 hibrit format'ını **kullan**.
-
-**ADR-035 içeriği:**
-- Status: accepted
-- Decision: Brain ↔ Worker ↔ Auditor iletişim versiyonlanmış mesaj protokolü. Dosya tabanlı state (`.hb`, `.result`) paralel devam eder ama event stream **kanonik truth** olur. Append-only, parseable, fail-safe fallback.
-- Protocol Version 1.0 — 15 kanal kodu (Section 6 Task 138-001 spec):
-  - `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:HEARTBEAT`, `WORKER→BRAIN:RESULT`, `WORKER→BRAIN:QUESTION`, `BRAIN→WORKER:ANSWER`
-  - `WORKER→AUDITOR:CODE_VERIFY_REQUEST`, `AUDITOR→BRAIN:VERIFICATION_RESULT`, `AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED`, `AUDITOR→BRAIN:ADR_VIOLATION`, `AUDITOR→BRAIN:GATE_COMPUTED`, `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN`
-  - `BRAIN→*:METRIC_EMITTED`, `BRAIN→WORKER:FIX_REQUEST`, `BRAIN→*:SPRINT_PHASE_CHANGE`
-  - `DECKENT→USER:NOTIFY` (Sprint 139 dispatcher için protocol seed, Sprint 138'de sadece tanımlı)
-- Message format JSON: `{timestamp, sequence, protocol_version: "1.0", source, target, channel, payload}`
-- Backward compat: Sprint 138'de file-based paralel, Sprint 140+ soft-deprecate, Sprint 142'de removed
-- Alternatives considered: gRPC/Protobuf (overkill), WebSocket (Docker complexity), Redis (vision contradiction), SQLite (basit değil)
-
-**Kanıt:**
-- `grep "^## ADR-035" .brain/DECISIONS.md` → hit
-- `grep "DECKENT→USER:NOTIFY" .brain/DECISIONS.md` → hit (Sprint 139 prep)
-- `node scripts/adr-validator.mjs` → exit 0 (Task 1 validator Task 2 output'unu onaylamalı — **ilk canlı dogfood**)
-
-**Test:** Yok (salt doc, validator otomatik)
-
----
-
-## Task 3: Auditor Authority Extension (3-Pipeline Verification + ADR Compliance)
-- Model: opus
-- Effort: normal
-- Priority: CRITICAL
-- Dependencies: 138-002
 - Skills: typescript-expert, testing-expert
-- Files: src/monitor/auditor.ts, src/orchestra/result-evaluator.ts, src/orchestra/sprint-finalizer.ts, tests/monitor/auditor.test.ts, tests/orchestra/result-evaluator.test.ts
-- Scope: src/monitor/, src/orchestra/, tests/monitor/, tests/orchestra/
+- Files: src/orchestra/sprint-finalizer.ts, src/agents/worker.ts, src/orchestra/self-modifying-detector.ts, tests/orchestra/auto-archive-guard.test.ts (YENİ)
+- Scope: src/orchestra/, src/agents/, tests/orchestra/
 
 ### Description
 
-Auditor passive scanner → active verifier. 4 alt-iş.
+Sprint 139 Task 3 Auto-Archive Regression Fix worker dogfood'unda **canlı sprint sırasında** archive çalıştırdı, 51 task JSON sildi, sprint stuck oldu. Task 3 worker sonnet 2h+ EXECUTING, spec'teki 3-adım archive mantığını canlı sprint context'inde çalıştırdı.
 
-**Alt-iş A: tryCodeVerifiedDone Helper Migration**
-Mevcut: `src/orchestra/result-evaluator.ts:729 export function tryCodeVerifiedDone(...)`. Çağrı: `src/orchestra/sprint-finalizer.ts:493 const verifyResult = await tryCodeVerifiedDone(taskId, projectRoot)`. 
+**3-katman guard:**
 
-Sprint 138'de:
-1. `tryCodeVerifiedDone()` + tüm helper functions `result-evaluator.ts` → `auditor.ts`'e taşı
-2. `result-evaluator.ts` 1033 → ~750 LoC (-280 helper extraction)
-3. `auditor.ts` 650 → ~950 LoC (+300)
-4. `sprint-finalizer.ts:49` import path update: `from '../monitor/auditor.js'`
-5. **Sprint 137 meta-dogfood regression test zorunlu** — helper hâlâ canlı çalışmalı (Task 137-001 retrospektif relabel pattern)
-
-**Alt-iş B: 3-Pipeline Verification (KILLER FEATURE)**
+**Alt-iş A: `sprint-finalizer.ts` Archive Gate**
 ```typescript
-export async function verifyWorkerResult(taskId, projectRoot, result): Promise<VerificationResult> {
-  switch (result.selfAssessment) {
-    case 'NO_GO': return await tryCodeVerifiedDone(taskId, projectRoot);
-    case 'GO_WITH_TECH_DEBT': return await validateTechDebt(taskId, projectRoot, result);
-    case 'DONE': return await verifyFunctional(taskId, projectRoot, result);
+export async function archiveSprint(projectRoot, sprintId) {
+  const state = readSprintState(projectRoot);
+  if (state.phase !== 'RETRO' && state.phase !== 'CLEANUP') {
+    throw new ArchiveGateError(`Archive rejected: sprint phase is ${state.phase}, expected RETRO or CLEANUP`);
   }
-}
-
-async function verifyFunctional(taskId, projectRoot, result): Promise<VerificationResult> {
-  const affectedTests = inferAffectedTests(result.filesChanged);
-  if (affectedTests.length === 0) return { verdict: 'PASS', reason: 'no tests' };
-  const vitestResult = await runVitestOnFiles(affectedTests);
-  if (vitestResult.fail === 0) return { verdict: 'PASS', reason: 'all tests pass' };
-  return { verdict: 'DOWNGRADE', newStatus: 'GO_WITH_TECH_DEBT', reason: `${vitestResult.fail} tests still failing` };
+  // ... actual archive
 }
 ```
 
-**Sprint 137 canlı kanıt:** Task 137-001 worker `status: DONE` dedi, helper `CODE_VERIFIED_DONE` flag bastı, ama vitest 63 fail kaldı. Sprint 138'de `verifyFunctional` bu kısayolu kırar — file existence yerine **functional runtime check**.
-
-**Alt-iş C: ADR Compliance Check (Pilot)**
+**Alt-iş B: `worker.ts` Dogfood Guard**
 ```typescript
-export async function checkADRCompliance(projectRoot, changedFiles): Promise<ADRViolation[]> {
-  const adrs = parseADRs('.brain/DECISIONS.md');
-  return adrs.filter(a => a.status === 'accepted' && a.enforcementRule)
-    .map(adr => checkRule(adr.enforcementRule, changedFiles, projectRoot))
-    .filter(Boolean);
+// worker file write hook
+if (isLiveSprint(projectRoot) && isArchiveFilesystemOp(filesChanged)) {
+  writeResult({ selfAssessment: 'NO_GO', notes: 'Dogfood guard: archive filesystem op during live sprint' });
+  process.exit(1);
 }
 ```
-Pilot ADR'ler (Sprint 138 sadece 3-5):
-- ADR-006 `spawnSync + array args` → rule: grep `spawnSync.*shell.*true`
-- ADR-008 Brain merkezi import → rule: grep `from.*brain` `src/orchestra/tmux.ts src/monitor/auditor.ts src/agents/worker.ts`
-- ADR-010 Tek runtime dependency → rule: package.json dependencies count check
 
-**Alt-iş D: Event Stream Hook Point (Task 4 koordineli)**
-```typescript
-import { writeEvent } from '../orchestra/event-stream.js'; // Task 4'te oluşacak
-writeEvent(projectRoot, {
-  source: 'auditor', target: 'brain',
-  channel: 'AUDITOR→BRAIN:VERIFICATION_RESULT',
-  payload: { taskId, verdict, status, reason },
-});
-```
+**Alt-iş C: `self-modifying-detector.ts` Runtime Enforce (Sprint 139 Task 52 canlı)**
+Sprint 139 Task 52 `src/orchestra/self-modifying-detector.ts` YENİ dosya canlı. Sprint 140'ta runtime enforcement pipeline deploy: task-in-progress dogfood auto-archive pattern detection, Brain alarm + alert, worker graceful abort.
 
 **Kanıt:**
-- `grep -n "tryCodeVerifiedDone" src/monitor/auditor.ts` → hit
-- `grep -n "tryCodeVerifiedDone" src/orchestra/result-evaluator.ts` → **miss** (helper taşındı)
-- `grep -n "verifyFunctional" src/monitor/auditor.ts` → hit
-- `grep -n "checkADRCompliance" src/monitor/auditor.ts` → hit
-- Sprint 138 execute sırasında: ≥1 task'ın `DONE → TECH_DEBT downgrade` canlı yakalanmalı (functional check kanıtı)
+- `grep "archiveGate\|ArchiveGateError" src/orchestra/sprint-finalizer.ts` → hit
+- `grep "isLiveSprint\|dogfood guard" src/agents/worker.ts` → hit
+- Sprint 140 Task 2 dogfood test: canlı sprint'te archive denemesi → NO_GO + alarm
+- `.brain/archive/retro-sprint-140.md` içerik doğru Sprint 140 retrosu (Sprint 139 regression fix)
 
-**Test:** 7+ test (helper migration regression, verifyFunctional happy path, partial fail downgrade, no affected tests edge, 3-pipeline dispatch, ADR-006 violation detect, no violation happy path)
+**Test:** 4+ test (live-sprint archive reject, dogfood guard NO_GO, finalize gate pass correct phase, ADR-039 detector trigger)
 
 ---
 
-## Task 4: Structured Event Stream + Plan-Time Scope Collision Detection
-- Model: opus
-- Effort: high
-- Priority: HIGH
-- Dependencies: 138-003
-- Skills: typescript-expert, testing-expert
-- Files: src/orchestra/event-stream.ts, src/core/file-lock.ts, src/orchestra/conflict-resolver.ts, src/orchestra/sprint-spawner.ts, src/agents/worker.ts, src/monitor/auditor.ts, tests/orchestra/event-stream.test.ts, tests/core/file-lock.test.ts, tests/orchestra/sprint-spawner.test.ts
-- Scope: src/orchestra/, src/core/, src/monitor/, src/agents/, tests/
-
-### Description
-
-Sprint 138'in **teknik omurgası** (high effort). 5 alt-iş.
-
-**Pre-flight bulgu:** `src/core/file-lock.ts` şu an 30 satır, sadece `claimTaskLock` (observability wrapper) + `acquireLock` re-export. Real implementation `worker.ts:173`'te. Plan-time'da çağrılmıyor (`.locks/` boş).
-
-**Alt-iş A: Event Stream (`src/orchestra/event-stream.ts` ~200 LoC, YENİ DOSYA)**
-```typescript
-export interface DeckentEvent {
-  timestamp: string;
-  sequence: number;
-  protocol_version: '1.0';
-  source: 'brain' | 'worker' | 'auditor' | string;
-  target: string;
-  channel: string;
-  payload: unknown;
-}
-export function writeEvent(projectRoot, event): void  // append .deckent/sprint-NNN-events.jsonl
-export function readEvents(projectRoot, filter?): DeckentEvent[]
-export function reconstructState(projectRoot, sprintId): SprintState
-```
-Fail-safe: write fail → console.warn + file-based fallback. Backward compat: `.hb/.result` paralel devam.
-
-**Alt-iş B: File Lock Real Implementation (`src/core/file-lock.ts` 30 → ~200 LoC)**
-```typescript
-export interface LockInfo { filePath, ownerWorkerId, acquiredAt, taskId, ttl? }
-export function acquireLock(projectRoot, filePath, ownerWorkerId, taskId): LockInfo | null
-export function releaseLock(projectRoot, lockInfo): void
-export function checkLocks(projectRoot): LockInfo[]
-export function clearStaleLocks(projectRoot, maxAgeMs): number
-```
-Mevcut `worker.ts:173 acquireLock` core'a delegate eder (worker logic sadece çağırır). Mevcut `claimTaskLock` (observability wrapper) korunur.
-
-**Alt-iş C: Plan-Time Scope Collision Detection (`sprint-spawner.ts`)**
-```typescript
-export function detectScopeCollisions(tasks: Task[]): CollisionMap
-export function buildCollisionAwareWaves(tasks: Task[], maxWorkers: number): Wave[]
-```
-Topological sort with collision edges + Dependencies field (Sprint 137 parser).
-
-**Meta-dogfood beklentisi:** Sprint 138 DIRECTIVES'te Task 5 + Task 6 ikisi de `sprint-finalizer.ts`'e yazar. Brain `detectScopeCollisions()` bunu yakalar → Task 5 Wave 3, Task 6 Wave 4 otomatik. **Manuel wave barrier ihtiyacı ortadan kalkar.** Eğer canlı çalışıyorsa Sprint 138'in **ikinci meta-dogfood canlı kanıt**.
-
-**Alt-iş D: Runtime Lock + Event Write Hook**
-- `worker.ts`: file write öncesi `acquireLock()` + event write (`WORKER→BRAIN:FILE_LOCK_ACQUIRED`)
-- `auditor.ts`: scan loop'ta lock state event (`AUDITOR→BRAIN:LOCK_STATE_SNAPSHOT`)
-
-**Alt-iş E: Collision Event Integration**
-Collision detection → event stream'e yaz (`AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED`).
-
-**Kanıt:**
-- `wc -l src/core/file-lock.ts` → ≥150 (30'dan büyüdü)
-- `ls src/orchestra/event-stream.ts` → mevcut (yeni)
-- `grep -n "detectScopeCollisions" src/orchestra/sprint-spawner.ts` → hit
-- `grep -n "acquireLock" src/orchestra/sprint-spawner.ts` → hit (plan-time çağrı)
-- `ls .locks/` Sprint 138 execute sırasında dolu
-- `ls .deckent/sprint-138-events.jsonl` runtime mevcut
-- `wc -l .deckent/sprint-138-events.jsonl` → ≥50
-- `grep "SCOPE_COLLISION_DETECTED" .deckent/sprint-138-events.jsonl` → hit (**ikinci meta-dogfood canlı kanıt**)
-
-**Test:** 10+ test (event roundtrip, state reconstruct, fail-safe, file lock acquire, collision, stale cleanup, detectScopeCollisions same file, non-collision, buildCollisionAwareWaves topological, Docker bind mount integration)
-
----
-
-## Task 5: Test Restoration Tam Tamamlama
+## Task 3: Layer 4 Runtime Wire Deploy (4-Sprint Streak Kırma)
 - Model: opus
 - Effort: normal
 - Priority: CRITICAL
-- Dependencies: 138-001
-- Skills: testing-expert, typescript-expert
-- Files: tests/orchestra/runsprint-debt-integration.test.ts, tests/orchestra/brain-rollback.test.ts, tests/orchestra/sprint2-debt.test.ts, tests/orchestra/sprint-controller.test.ts, tests/orchestra/dependency-pipeline.test.ts, tests/orchestra/agent-activation.test.ts, tests/orchestra/brain-provider.test.ts, tests/orchestra/spawn-prevention.test.ts, tests/orchestra/plan-improvements.test.ts, tests/orchestra/brain.test.ts, tests/e2e/docker-backend.test.ts, tests/docs/jsdoc.test.ts
-- Scope: tests/orchestra/, tests/e2e/, tests/docs/
-
-### Description
-
-**Pre-flight baseline:** vitest 8 fail file / 53 fail tests / 12652 pass (Plan'ın 63'ten +10 daha iyi). Sprint 137 Task 137-001 worker + FIX worker 60 test fix yaptı (123 → 53). Sprint 138'de kalan 53 temizlenir.
-
-**Strateji:** Sprint 137 Task 137-001 worker'ın yazdığı fix pattern'ı (brain.test.ts mock update — barrel re-export path) diğer dosyalara uygula. Worker `npx vitest run <dosya>` ile fail sebebini okur, pattern match, fix.
-
-**Hedef:** 53 → 0, 12652 → ≥12721, 8 fail file → 0.
-
-**Kanıt:** `npx vitest run --reporter=basic 2>&1 | tail -5` → `Test Files X passed (513)`, `Tests 0 failed | 12721+ passed`
-
-**Test:** Baseline = kanıt
-
----
-
-## Task 6: Layer 4 Runtime Wire Forensic Fix
-- Model: opus
-- Effort: normal
-- Priority: CRITICAL
-- Dependencies: 138-004
+- Dependencies: yok
 - Skills: typescript-expert
 - Files: src/orchestra/sprint-finalizer.ts, src/core/observability.ts, tests/orchestra/sprint-finalizer.test.ts
 - Scope: src/orchestra/, src/core/, tests/orchestra/
 
 ### Description
 
-Sprint 136-137 üst üste **3-sprint runtime fail**. Worker "wire satır 10b/10c'de mevcut" diyor ama runtime artifact 0/3 (gate.json + load-report + metrics.jsonl).
+Sprint 136-139 = **4 sprint boyunca** Layer 4 runtime wire fail (gate.json + metrics.jsonl + load-test-report.md hiçbiri yazılmadı). Kod seviyesinde DONE, runtime seviyesinde dead code.
 
-**Forensic hipotezler:**
-1. `finalizeSprint()` erken exit (koşul return hook'tan önce)
-2. Hook path broken (Task 8 refactor import chain kırık — Sprint 136 sprint-controller slim yan etkisi)
-3. Silently swallowed error (try-catch eat without rethrow)
+Sprint 138 Task 6 forensic analiz breadcrumb logging ekledi ama deploy olmadı veya runtime'da silently swallowed. Sprint 139'da task-139-001.json silinmesiyle Task 1 cascade fail oldu.
 
 **Fix yaklaşımı:**
-1. Step 1: `finalizeSprint()` call path'ine breadcrumb logging ekle (her hook çağrısı öncesi/sonrası `console.log`)
-2. Step 2: Sprint 138 dry-run veya test ile runtime'da hangi adım eksikse görülür
-3. Step 3: Doğru hipotez bulunur, fix uygulanır
-4. Step 4: Breadcrumb logging permanent kalır (debug için)
+1. `finalizeSprint()` call path'inde her hook çağrısı öncesi/sonrası `console.log('[BREADCRUMB] step-X')` (permanent)
+2. Sprint 140 dry-run ile runtime'da hangi adım eksikse canlı gözlem
+3. Doğru hipotez bulun, fix uygulanır
+4. Event stream write integration: `AUDITOR→BRAIN:GATE_COMPUTED`, `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN`, `BRAIN→*:METRIC_EMITTED`
 
-**Event stream integration (Task 4 sonrası):**
-- gate.json write event stream'e: `AUDITOR→BRAIN:GATE_COMPUTED`
-- load-report write event stream'e: `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN`
-- metrics emit event stream'e: `BRAIN→*:METRIC_EMITTED`
-
-**Kanıt (Sprint 138 finalize sonrası):**
-- `.deckent/sprint-138-gate.json` runtime mevcut, `overallGate === "PASS" or "WARNING"`
-- `docs/audits/sprint-138/load-test-report.md` runtime mevcut
-- `.deckent/sprint-138-metrics.jsonl` ≥30 satır (canlı veri)
+**Kanıt (Sprint 140 finalize sonrası):**
+- `.deckent/sprint-140-gate.json` runtime mevcut, `overallGate === "PASS" or "WARNING"`
+- `.deckent/sprint-140-metrics.jsonl` ≥30 satır canlı veri
+- `docs/audits/sprint-140/load-test-report.md` runtime mevcut
 - Event stream'de 3 event: `GATE_COMPUTED`, `LOAD_REPORT_WRITTEN`, `METRIC_EMITTED`
 
-**Test:** 4+ test (gate.json runtime write, load-report runtime write, metrics integration, fail-safe error swallow)
+**Test:** 5+ test (runtime gate write, runtime metrics write, runtime load-report, event emit, fail-safe error swallow)
 
 ---
 
-## Task 7: Auto-Archive Partial Regression Fix
-- Model: sonnet
-- Effort: low
-- Priority: HIGH
-- Dependencies: 138-006
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-docs-helpers.ts, tests/orchestra/sprint-finalizer.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-
-### Description
-
-Sprint 137'de auto-archive partial regression: `.brain/sprints/sprint-137.md` ✅ ama `.brain/archive/DIRECTIVES-sprint-137.md` ❌ ve `DIRECTIVES.md` Sprint 138 reset ❌ (manuel yapıldı). Sprint 135-136 redemption pattern Sprint 137'de geriledi.
-
-**Root cause hipotezi:** Sprint 136 Task 8 sprint-controller refactor yan etkisi, archive hook erken exit veya import chain broken. Task 6 Layer 4 wire fix ile aynı dosya (sprint-finalizer.ts) — bu yüzden Task 7 `Dependencies: 138-006` (Task 6 sonrası sequential cross-wave).
-
-**Fix: Otomatik 3-adım**
-1. `.brain/sprints/sprint-138.md` write ✅ (zaten çalışıyor)
-2. `.brain/archive/DIRECTIVES-sprint-138.md` write ❌ → fix
-3. `DIRECTIVES.md` Sprint 139 template reset ❌ → fix
-
-**Pre-flight not:** Sprint 137 orphan `.tasks/` dosyaları manuel `.brain/archive/sprint-137-tasks/`'a taşındı. Bu da auto-archive'ın kapsamı olmalı (Sprint 138 cleanup `.tasks/` orphan'ları otomatik archive etmeli).
-
-**Kanıt (Sprint 138 finalize sonrası):**
-- `.brain/sprints/sprint-138.md` ✅ (zaten çalışıyor)
-- `.brain/archive/DIRECTIVES-sprint-138.md` ✅ (yeni fix)
-- `DIRECTIVES.md` Sprint 139 template ✅ (yeni fix, `head -5 DIRECTIVES.md` Sprint 139 hazırlanıyor)
-- (bonus) `.tasks/task-138-*.*` orphan'lar archive edilir veya temizlenir
-
-**Test:** 3+ test (sprint log write, DIRECTIVES archive write, DIRECTIVES reset)
-
----
-
-## Task 8: Worker Honest Assessment Calibration v2
+## Task 4: Task File Restoration Mechanism (Git-Snapshot Journal + `.tasks/backup/`)
 - Model: sonnet
 - Effort: normal
-- Priority: HIGH
-- Dependencies: 138-003
-- Skills: typescript-expert, testing-expert
-- Files: src/agents/worker.ts, src/orchestra/task-builder.ts, src/orchestra/result-evaluator.ts, tests/agents/worker.test.ts
-- Scope: src/agents/, src/orchestra/, tests/
-
-### Description
-
-Sprint 137 canlı kanıt (`feedback_worker_honest_assessment.md`): Task 137-001 worker `status: DONE exitCode: 0` yazdı ama %39 functional (47/123 fix). Worker'lar "kod var → DONE" kısayolu. Sprint 138 kalibre.
-
-**Alt-iş A: Worker Prompt Template Baseline Diff Instruction**
-`src/orchestra/task-builder.ts`'e worker prompt'a eklenir:
-```
-## Honest Self-Assessment Required
-Before writing .result with selfAssessment: DONE, you MUST verify:
-1. Baseline state: what was the test/code state before your work?
-2. End state: what is it now?
-3. Delta: how much of the task did you ACTUALLY complete?
-
-If <80%, write GO_WITH_TECH_DEBT with specific gap.
-If <50%, write NO_GO with explanation.
-"DONE" means functional outcome matches task spec fully.
-"Code written" ≠ "DONE".
-```
-
-**Alt-iş B: Worker Verify Loop Sertleştirme (`worker.ts enforceVerifyLoop()`)**
-- Test command auto-detect (vitest/jest)
-- Baseline delta: start'ta filesChanged baseline count, end'de actual count
-- Delta < 80% → auto TECH_DEBT downgrade
-- `.tasks/{id}.verify-delta.json` kanıt dosyası
-
-**Alt-iş C: result-evaluator.ts TECH_DEBT Downgrade Logic (Çift Katman)**
-Task 3 `verifyFunctional` zaten partial → TECH_DEBT downgrade. Task 8 bu logic'i `result-evaluator.ts`'a **çift katman** olarak ekler (Auditor + Brain redundancy).
-
-**Pre-flight not:** Task 8 Task 3 (Auditor Authority API) kullanır → Wave 4'te (Wave 2 tam bittikten sonra). `Dependencies: 138-003` (Task 3 değil — Task 4 = 138-004 = Event Stream, Task 3 = 138-003 = Auditor Authority).
-
-**Kanıt:**
-- `grep "Honest Self-Assessment" src/orchestra/task-builder.ts` → hit
-- `grep "verify-delta" src/agents/worker.ts` → hit
-- Sprint 138 execute sırasında: ≥1 task'ın `DONE → TECH_DEBT downgrade` canlı yakalanmalı (Task 3 verifyFunctional + Task 8 verify-delta birlikte)
-- result dosyalarında rubricScores honest scoring (file existence değil functional %)
-
-**Test:** 5+ test (prompt injection, verify loop baseline, downgrade, full completion, 0% NO_GO)
-
----
-
-## Task 9: Long-Running Sprint Resume Capability MVP
-- Model: sonnet
-- Effort: normal
-- Priority: HIGH
+- Priority: CRITICAL
 - Dependencies: yok
-- Skills: typescript-expert, system-architect
-- Files: src/orchestra/sprint-checkpoint.ts, src/orchestra/sprint-spawner.ts, src/cli/commands/resume.ts, tests/orchestra/sprint-checkpoint.test.ts
+- Skills: typescript-expert
+- Files: src/orchestra/task-journal.ts (YENİ), src/orchestra/sprint-spawner.ts, src/cli/commands/recover.ts (YENİ), tests/orchestra/task-journal.test.ts (YENİ)
 - Scope: src/orchestra/, src/cli/, tests/orchestra/
 
 ### Description
 
-Sprint 140 (50-task) + Sprint 145 (100-task) zemini. MVP: sprint yarıda kalsa state'ten devam.
+Sprint 139 Task 3 catastrophic regression 51 task JSON sildi. Brain EVALUATE phase task file not found → fatal exception → stuck. Manuel recovery (Seçenek C) gerekti.
 
-**Alt-iş A: Checkpoint Write (`src/orchestra/sprint-checkpoint.ts` ~150 LoC, YENİ)**
+**Fix: Task Journal + Restoration CLI**
+
+**Alt-iş A: `src/orchestra/task-journal.ts` (YENİ ~150 LoC)**
 ```typescript
-export interface SprintCheckpoint {
-  sprintId: string; checkpointNumber: number; timestamp: string;
-  completedTasks: string[]; pendingTasks: string[];
-  activeWorkers: WorkerState[]; brainPhase: SprintPhase;
-  eventStreamOffset: number;
+export function journalTaskWrite(projectRoot, taskId, beforeContent): void {
+  const backupDir = join(projectRoot, '.tasks/backup', sprintId);
+  mkdirSync(backupDir, { recursive: true });
+  const snapshotPath = join(backupDir, `task-${taskId}-${Date.now()}.json`);
+  writeFileSync(snapshotPath, beforeContent);
 }
-export function writeCheckpoint(projectRoot, state): void
-export function readCheckpoint(projectRoot, sprintId): SprintCheckpoint | null
+export function restoreTasks(projectRoot, sprintId): number {
+  // Restore all .tasks/task-*.json from .tasks/backup/sprint-NNN/
+}
 ```
 
-**Alt-iş B: Resume Command (`src/cli/commands/resume.ts`)**
-```typescript
-program.command('resume <sprintId>').action(async (sprintId) => {
-  const checkpoint = readCheckpoint(projectRoot, sprintId);
-  if (!checkpoint) exit(1);
-  await startSprint({ resumeFrom: checkpoint });
-});
+**Alt-iş B: `sprint-spawner.ts` Journal Hook**
+Her task JSON write öncesi `journalTaskWrite()` çağır.
+
+**Alt-iş C: `src/cli/commands/recover.ts` (YENİ)**
+```bash
+deckent recover sprint-140  # Restore all task JSON from backup
 ```
-
-**Alt-iş C: Integration with Spawner**
-`sprint-spawner.ts`: her N=5 task DONE/TD/NO_GO sonrası checkpoint write.
-
-**Scope constraint (MVP, Sprint 138):**
-- ✅ Checkpoint write
-- ✅ Basic resume command
-- ✅ Worker state restoration basic (running kill, pending respawn)
-- ❌ Mid-worker resume (Sprint 140+)
-- ❌ Heartbeat daemon integration (Sprint 140+)
-- ❌ External state store (Sprint 145+)
 
 **Kanıt:**
-- `ls src/orchestra/sprint-checkpoint.ts src/cli/commands/resume.ts`
-- `.deckent/sprint-138-checkpoint.json` runtime mevcut (en az 1 checkpoint)
+- `ls .tasks/backup/sprint-140/` runtime dolu
+- Sprint 140'ta yapay destruction test: 10 task JSON sil, `deckent recover sprint-140` → %100 restore
+- `grep journalTaskWrite src/orchestra/sprint-spawner.ts` → hit
 
-**Test:** 3+ test (write+read roundtrip, resume from middle, fresh start fallback)
+**Test:** 4+ test (journal write, restore full, restore partial, malformed journal skip)
 
 ---
 
-## Task 10: MCP/CLI Parity Audit (OPSİYONEL)
+## Task 5: Panic Kill Runtime Guard (CLI/MCP Layer Confirmation Token)
+- Model: sonnet
+- Effort: normal
+- Priority: CRITICAL
+- Dependencies: yok
+- Skills: typescript-expert, security-specialist
+- Files: src/mcp/tools/kill.ts, src/mcp/tools/cleanup.ts, src/cli/commands/kill.ts, src/cli/commands/cleanup.ts, tests/mcp/kill-guard.test.ts (YENİ)
+- Scope: src/mcp/, src/cli/, tests/mcp/
+
+### Description
+
+Sprint 139 t+3dk koordinatör panic kill incident canlı kanıt. Memory rule `feedback_deckent_kill_approval_required.md` yazıldı ama runtime enforcement yok — sadece disiplin bazlı.
+
+**Fix: Runtime confirmation token**
+
+**Alt-iş A: MCP kill/cleanup Guard**
+```typescript
+// src/mcp/tools/kill.ts
+inputSchema: z.object({
+  target: z.enum(['all', 'worker']),
+  confirm: z.string().describe('Confirmation token: "yes-destroy-<sprintId>" or empty to reject'),
+  ...
+}),
+async ({ target, confirm }) => {
+  const expected = `yes-destroy-${currentSprintId}`;
+  if (confirm !== expected) {
+    return { error: `Confirmation token required. Pass confirm: "${expected}" to proceed.` };
+  }
+  // ... kill
+}
+```
+
+**Alt-iş B: CLI kill/cleanup Guard**
+`--confirm yes-destroy-sprint-NNN` flag zorunlu. Yoksa reject.
+
+**Alt-iş C: Live Sprint Cleanup Guard**
+`deckent_cleanup` canlı sprint phase !== CLEANUP/DONE ise reddet (sprint-state.json check).
+
+**Kanıt:**
+- `deckent_kill --all` onaysız çağrılırsa "Confirmation token required" hatası
+- `deckent_kill --all --confirm yes-destroy-sprint-140` geçer
+- Sprint 140 pre-flight test: yanlış token ile kill denemesi reddedilir
+
+**Test:** 4+ test (no token reject, wrong token reject, correct token accept, live-sprint cleanup guard)
+
+---
+
+## Task 6: Docker HB Shutdown Bug Runtime Deploy (Task 13 Sprint 139 Cascade Fix)
+- Model: opus
+- Effort: normal
+- Priority: HIGH
+- Dependencies: 140-003
+- Skills: typescript-expert, testing-expert
+- Files: src/agents/worker.ts (verify deploy), src/orchestra/spawn-backend-docker.ts (verify deploy), tests/e2e/docker-hb-shutdown.test.ts
+- Scope: src/agents/, src/orchestra/, tests/e2e/
+
+### Description
+
+Sprint 139 Task 13 Docker HB Core Fix kod canlı (`grep atomicWriteFileSync src/agents/worker.ts` → 10 hit, SIGTERM fsync handler, 15s grace period). Ama Task 1 cascade wire eksik olduğu için runtime deploy olmadı → Sprint 139'da 5 NO_GO organic Docker HB shutdown.
+
+**Fix:**
+- Runtime deploy doğrulama (manual E2E)
+- Sprint 140 Task 6 E2E regression test: docker worker SIGTERM → `.result` atomic write → `.hb` DONE status → parent Brain evaluate success
+- Sprint 140 execute sırasında **0 organic Docker HB bug NO_GO** hedefi
+
+**Kanıt:**
+- `tests/e2e/docker-hb-shutdown.test.ts` 5+ test canlı
+- Sprint 140 execute 0 "Docker worker exited without writing result file" NO_GO
+
+**Test:** 5+ E2E (SIGTERM fsync, 15s grace, atomic rename, parent HB read, reject unclean shutdown)
+
+---
+
+## Task 7: Event Stream Runtime Emit Enforce
+- Model: sonnet
+- Effort: normal
+- Priority: HIGH
+- Dependencies: 140-003
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/event-stream.ts, src/agents/worker.ts, src/monitor/auditor.ts, tests/orchestra/event-stream.test.ts
+- Scope: src/orchestra/, src/agents/, src/monitor/, tests/orchestra/
+
+### Description
+
+Sprint 139 events.jsonl 35 satır (beklenen 200+). Task 41 hook kod canlı (`src/core/notification-dispatcher.ts` + `src/core/notify-adapters/`) ama runtime emit Task 1 cascade'e bağımlıydı.
+
+**Fix:**
+- Sprint 140 Task 7: 15 ADR-035 V1.0 kanalının runtime emit wiring
+- `worker.ts` 5 kanal (HEARTBEAT, RESULT, QUESTION, CODE_VERIFY_REQUEST, FILE_LOCK_ACQUIRED)
+- `auditor.ts` 5 kanal (VERIFICATION_RESULT, SCOPE_COLLISION, ADR_VIOLATION, GATE_COMPUTED, LOAD_REPORT_WRITTEN)
+- `brain` 5 kanal (TASK_ASSIGN, ANSWER, FIX_REQUEST, METRIC_EMITTED, SPRINT_PHASE_CHANGE)
+
+**Kanıt:**
+- Sprint 140 finalize'de events.jsonl ≥200 satır
+- 15 kanalın tamamı en az 1 kez emit olmalı
+- `grep -c "channel" .deckent/sprint-140-events.jsonl` ≥200
+
+**Test:** 3+ test (worker emit, auditor emit, brain emit, roundtrip)
+
+---
+
+## Task 8: ADR-037 Runtime Authority Enforcement Deploy
+- Model: opus
+- Effort: normal
+- Priority: HIGH
+- Dependencies: 140-003
+- Skills: typescript-expert
+- Files: src/core/authority-matrix.ts, src/agents/worker.ts, src/monitor/auditor.ts, tests/core/authority-matrix.test.ts
+- Scope: src/core/, src/agents/, src/monitor/, tests/core/
+
+### Description
+
+Sprint 139 Task 35 +1050 LoC ADR-037 Runtime Authority Enforcement kod canlı. Sprint 140'ta runtime pipeline deploy + scope check integration + test coverage + dogfood.
+
+**Kanıt:**
+- Sprint 140'ta bir worker scope dışı dosyaya yazma denemesi → Brain `SCOPE_VIOLATION` alert + NO_GO
+- `grep checkAuthority src/core/authority-matrix.ts` → hit
+
+**Test:** 6+ test (brain authority, auditor read-only, worker scope, violation alert, event emit, per-role matrix)
+
+---
+
+## Task 9: Sprint-State.json Lifecycle Update Gap Fix
+- Model: sonnet
+- Effort: low
+- Priority: HIGH
+- Dependencies: yok
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-controller.ts, src/orchestra/sprint-phases.ts, src/core/sprint-state.ts, tests/orchestra/sprint-state.test.ts
+- Scope: src/orchestra/, src/core/, tests/orchestra/
+
+### Description
+
+Sprint 139 sprint-state.json 06:17'den beri hiç güncellenmedi (EXECUTE → EVALUATE transition yazmadı). Brain phase transition write guarantee eksik. Her phase transition sonrası `writeSprintState()` atomic write + fsync ekle.
+
+**Fix:**
+- `sprint-phases.ts` her faz başlangıcında + sonunda `writeSprintState({ phase, status, updatedAt })` çağır
+- Atomic write pattern (temp → fsync → rename)
+- Event stream emit: `BRAIN→*:SPRINT_PHASE_CHANGE`
+
+**Kanıt:**
+- Sprint 140 execute sırasında `.deckent/sprint-state.json` updatedAt her 1-5 dk güncellenmeli
+- Phase geçişleri event stream'de izlenebilir
+
+**Test:** 4+ test (phase transition write, atomic, fsync, event emit)
+
+---
+
+## Task 10: Retro Sprint-ID Regression Fix
+- Model: sonnet
+- Effort: low
+- Priority: HIGH
+- Dependencies: yok
+- Skills: typescript-expert
+- Files: src/orchestra/sprint-reporter.ts, tests/orchestra/sprint-reporter.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+
+Sprint 139 `.brain/archive/retro-sprint-139.md` içeriği **Sprint 138 retrosu** (sprint-id context confusion). `sprint-reporter.ts` retro writer sprint-id param propagation bug.
+
+**Fix:**
+- `writeRetroMarkdown()` sprint-id param explicit, template interpolation doğru scope'ta
+- Test coverage: farklı sprint-id'lerle retro yazımı ve içerik doğrulama
+
+**Kanıt:**
+- Sprint 140 retro `.brain/archive/retro-sprint-140.md` içeriği Sprint 140 metrikleri + Sprint 140 task'ları + Sprint 140 learnings
+
+**Test:** 3+ test (sprint-id interpolation, full retro roundtrip, no cross-contamination)
+
+---
+
+## Task 11: Notification Dispatcher Runtime Deploy
+- Model: sonnet
+- Effort: normal
+- Priority: HIGH
+- Dependencies: 140-007
+- Skills: typescript-expert
+- Files: src/core/notification-dispatcher.ts (verify), src/core/notify-adapters/mcp-adapter.ts (verify), src/core/notify-adapters/cli-adapter.ts (verify), src/mcp/server.ts, src/cli/commands/start.ts, tests/core/notification-dispatcher.test.ts
+- Scope: src/core/, src/mcp/, src/cli/, tests/core/
+
+### Description
+
+Sprint 139 Task 41 Notification Dispatcher kod canlı untracked YENİ dosyalar (`src/core/notification-dispatcher.ts` + `src/core/notify-adapters/`). Sprint 140'ta runtime deploy: MCP channel `notifications/message` + CLI channel parent-tty + Event Stream `DECKENT→USER:NOTIFY` emit.
+
+**Kanıt:**
+- Sprint 140 execute sırasında en az 5 user notification olay gerçekleşir
+- MCP server'da `notifications/message` emit edilir (gözlenebilir)
+- CLI parent-tty'de notification satırı yazılır
+
+**Test:** 5+ test (dispatcher core, MCP adapter, CLI adapter, event emit, filter/throttle)
+
+---
+
+## Task 12: Rich Output CLI Command Wire-Up
 - Model: sonnet
 - Effort: low
 - Priority: NORMAL
 - Dependencies: yok
-- Skills: documentation-writer
-- Files: docs/audits/sprint-138/mcp-cli-parity-report.md
-- Scope: docs/audits/sprint-138/
+- Skills: typescript-expert
+- Files: src/cli/index.ts, src/cli/commands/output.ts (verify), tests/cli/commands/output.test.ts (verify)
+- Scope: src/cli/, tests/cli/
 
 ### Description
 
-ADR-022 enforcement check. Her CLI komutunun MCP tool eşdeğeri var mı? Eksiklik listesi + Sprint 139 debt candidate'ları.
+Sprint 139 Task 47 Rich Output CLI (output.ts, output-collector.ts, output-formatter.ts) untracked YENİ. Sprint 140'ta `src/cli/index.ts` register + dogfood.
 
-**Opsiyonel:** Kapasite kalırsa. Sprint 138 6-7 saat hard cap, Task 1-9 bitince Task 10 eklenir. Drop edilebilir.
+**Kanıt:** `npx deckent output <taskId> --tail 50` canlı çalışır
 
-**Kanıt:** `ls docs/audits/sprint-138/mcp-cli-parity-report.md` (eğer yapıldıysa)
+**Test:** 3+ test (register, --tail flag, --follow flag, --json output)
 
-**Test:** Yok (audit-only)
+---
+
+## Task 13: Sprint 139 Orphan Cleanup (Manuel Finalize Artifacts)
+- Model: haiku
+- Effort: low
+- Priority: NORMAL
+- Dependencies: yok
+- Skills: devops-engineer
+- Files: .tasks/, .dashboard, .deckent/sprint-state.json
+- Scope: .tasks/, .deckent/
+
+### Description
+
+Sprint 139'dan kalıntılar:
+- 1 task-139-*.json (diğer 51 silinmiş) — archive veya delete
+- 50 task-139-*.result — archive
+- `.dashboard` stuck state "EVALUATE/EVALUATING" — reset
+- `.deckent/sprint-state.json` stale EXECUTE/06:17 — reset to Sprint 140 INIT
+
+**Alt-iş A: `.brain/archive/sprint-139-tasks/` dizinine taşı**
+**Alt-iş B: `.dashboard` Sprint 140 template (empty EVALUATE durumunu temizle)**
+**Alt-iş C: `.deckent/sprint-state.json` Sprint 140 INIT**
+
+**Kanıt:** `.tasks/` boş (Sprint 139 artığı yok), `.dashboard` Sprint 140 template
+
+**Test:** Yok (cleanup ops)
+
+---
+
+## Task 14: ADR-039 Self-Modifying Detector Runtime Validation
+- Model: opus
+- Effort: normal
+- Priority: HIGH
+- Dependencies: 140-002
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/self-modifying-detector.ts, tests/orchestra/self-modifying-detector.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+
+**NOT:** ADR numara düzeltmesi — Sprint 139 Task 51 ADR-038 değil **ADR-039** olarak yazıldı (ADR-038 = Dead Code Disposition, Task 36-39 quartet). Self-Modifying Task Detection **ADR-039**'dur.
+
+Sprint 139 Task 51 + 52 ADR-039 Self-Modifying Task Detection kod canlı (`src/orchestra/self-modifying-detector.ts` 163 LoC YENİ). Sprint 140 Task 2 Auto-Archive Guard ile entegre + runtime detector deploy + canlı dogfood test.
+
+**Wave rescheduling:** Bu task önceden Wave 5'teydi ama Task 2 (Auto-Archive Guard) ile sequential bağımlılık nedeniyle **Wave 2'ye taşındı** (Task 2 ile paralel çalışır).
+
+**Kanıt:**
+- Sprint 140 dogfood test: meta-modify task (DIRECTIVES.md veya sprint-finalizer.ts modify) → detector trigger → Brain alert
+- ADR numara tutarlılığı: `.brain/DECISIONS.md` ADR-038 Dead Code + ADR-039 Self-Modifying ayrı başlık
+- Integration test: Task 2 Auto-Archive Guard Task 14 detector'ını import ederek canlı dogfood test'i çalıştırır
+
+**Test:** 5+ test (detector pattern match, live-sprint dogfood trigger, alert event emit, false positive filter, Task 2 entegrasyon)
+
+---
+
+## Task 15: Pre-flight Memory Sync Verification (Observer Discipline)
+- Model: haiku
+- Effort: low
+- Priority: NORMAL
+- Dependencies: yok
+- Skills: documentation-writer
+- Files: scripts/preflight-memory-check.mjs (YENİ), tests/scripts/preflight-memory-check.test.ts
+- Scope: scripts/, tests/scripts/
+
+### Description
+
+Sprint 139'un ilk 3 dakikasında koordinatör `feedback_deckent_kill_approval_required.md` okumadı ve panic kill yaptı. Sprint 140'ta pre-flight memory check script'i: koordinatör session başlangıcında 5 zorunlu memory dosyasını okuduğunu kanıtlar.
+
+**Script:**
+```javascript
+// scripts/preflight-memory-check.mjs
+const REQUIRED = [
+  'feedback_deckent_kill_approval_required.md',
+  'feedback_deckent_native_execution_rule.md',
+  'feedback_living_record_sync.md',
+  'project_sprint<N-1>_completed.md',
+  'project_sprint<N>_preflight.md',
+];
+// Check stat access time, log to .deckent/preflight-log.jsonl
+```
+
+**Kanıt:** Sprint 140 pre-flight'ta script çalışır, log yazılır
+
+**Test:** 3+ test (all read pass, missing file warn, log format)
+
+---
+
+## Task 16: E2E Test Harness Worker-Spawn Guard (YENİ — Alperen Direktifi 2026-04-15)
+- Model: opus
+- Effort: normal
+- Priority: CRITICAL
+- Dependencies: yok
+- Skills: typescript-expert, testing-expert
+- Files: tests/e2e/sprint-lifecycle.test.ts, vitest.config.ts, src/orchestra/sprint-spawner.ts, tests/e2e/helpers/workspace-isolation.ts (YENİ), tests/e2e/.gitignore (YENİ)
+- Scope: tests/e2e/, src/orchestra/, vitest.config.ts
+
+### Description
+
+**Alperen direktifi (Sprint 139 commit öncesi tespit, 2026-04-15):** E2E test `.test-e2e-sprint-*` pattern'ı sprint execution sırasında çalıştığında worker kilitleme riski, gereksiz yük ve orphan dizin birikmesi. Sprint 139'dan sonra `.test-e2e-sprint-{pid}` formatında **10 boş dizin birikmiş** — kanıt: `ls /home/alperen/deckent-dev/.test-e2e-sprint-*`.
+
+**Root cause:** `tests/e2e/sprint-lifecycle.test.ts:17` `const TEST_ROOT = path.join(process.cwd(), '.test-e2e-sprint-' + process.pid);` her test run'ı yeni pid ile geçici workspace yaratıyor, temizlenmeyenler birikmiş. Worker'lar sprint execute sırasında bu test'leri `vitest run` çağrısıyla çalıştırıyor → worker-in-worker stress.
+
+**3-katman fix:**
+
+**Alt-iş A: Vitest Config Environment Guard**
+`vitest.config.ts`'ye `VITEST_SKIP_E2E_SPRINT` env var check ekle. Sprint execution sırasında env var set edilir → e2e/sprint-*.test.ts dosyaları skip edilir. Sprint 140'tan itibaren `sprint-spawner.ts` worker spawn öncesi `VITEST_SKIP_E2E_SPRINT=1` process.env'e inject eder.
+
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    exclude: [
+      ...(process.env.VITEST_SKIP_E2E_SPRINT ? ['tests/e2e/sprint-lifecycle.test.ts'] : []),
+    ],
+  },
+});
+```
+
+**Alt-iş B: Workspace Isolation + Auto-Cleanup**
+`tests/e2e/helpers/workspace-isolation.ts` (YENİ) — `createTestWorkspace()` + `cleanupTestWorkspace()` helper. `os.tmpdir()` içinde yaratır (proje root'a değil), afterEach/afterAll hook'larda zorunlu cleanup. `tests/e2e/sprint-lifecycle.test.ts:17` helper kullanacak şekilde güncellenir.
+
+**Alt-iş C: `.gitignore` Safety Net**
+`tests/e2e/.gitignore` ve proje root `.gitignore` `.test-e2e-sprint-*` pattern eklenir. Mevcut orphan dizinler Task 13 cleanup ile silinir.
+
+**Alt-iş D: Sprint-spawner worker env injection**
+`src/orchestra/sprint-spawner.ts` worker spawn için `env: { ...process.env, VITEST_SKIP_E2E_SPRINT: '1' }` — worker'lar sprint execute sırasında E2E sprint test'lerini çalıştıramaz.
+
+**Kanıt:**
+- `ls .test-e2e-sprint-*` Sprint 140 sonunda boş (orphan yok, yeni yaratılmıyor)
+- `VITEST_SKIP_E2E_SPRINT=1 npx vitest run tests/e2e/sprint-lifecycle.test.ts` → 0 test run
+- `grep VITEST_SKIP_E2E_SPRINT src/orchestra/sprint-spawner.ts` → hit (worker env injection)
+- `os.tmpdir()` içinde workspace yaratılıyor (proje root'a değil)
+
+**Test:** 4+ test (env var skip, workspace isolation tmp dir, auto-cleanup afterAll, sprint-spawner env injection)
+
+---
+
+## Task 17: `.prompt` Cleanup Discipline + Worker-Fix Naming (YENİ — Alperen Direktifi 2026-04-15)
+- Model: sonnet
+- Effort: normal
+- Priority: HIGH
+- Dependencies: yok
+- Skills: typescript-expert
+- Files: src/orchestra/spawn-backend-docker.ts, src/orchestra/sprint-docs-updater.ts, src/orchestra/sprint-finalizer.ts, tests/orchestra/prompt-cleanup.test.ts (YENİ)
+- Scope: src/orchestra/, tests/orchestra/
+
+### Description
+
+**Alperen direktifi (2026-04-15):** `.prompt-*` dosyaları sprint cleanup'ında **silinmemeli, sprint sonuna kadar kalmalı**. Worker-fix vs initial worker ayrımı prompt dosya başlığında açıklamayla eşlemeli ama UUID format devam etmeli.
+
+**Mevcut durum (Sprint 138 Task 7 `sprint-docs-updater.ts:606-607` + `spawn-backend-docker.ts:81-85`):**
+- Hash-based naming: `.prompt-{taskId}-{hash}.txt` (initial), `.prompt-{taskId}-{hash}-fix.txt` (fix retry — `isPriorityFix` flag) ✅
+- Sprint 138 archive logic var: `sprint-docs-updater.ts:607 filter(f => f.startsWith('.prompt-'))` ✅
+- **Ama Sprint 139'da canlı kanıt:** `.tasks/.prompt-test-docker-816479-adc6973fcb27a168.txt` **tek dosya kaldı** — archive çalışmamış, Sprint 139 cascade'inden etkilenmiş
+
+**Alt-iş A: Cleanup Gate — Sprint Finalize'da Archive, Mid-Sprint Korunur**
+`sprint-finalizer.ts`'ye archive trigger. Canlı sprint sırasında (phase !== CLEANUP) `.prompt-*` dosyaları **asla silinmez**. Sadece sprint CLEANUP phase'inde `.tasks/archive/sprint-{sprintId}/` dizinine taşınır (mevcut sprint-docs-updater.ts logic'i audit + wire edilir).
+
+**Alt-iş B: Worker-Fix Naming Genişletme**
+Mevcut `fixSuffix` (`-fix` sabit) → daha zengin suffix şeması:
+- `.prompt-{taskId}-{hash}.txt` — initial worker
+- `.prompt-{taskId}-{hash}-fix1.txt` — ilk fix retry
+- `.prompt-{taskId}-{hash}-fix2.txt` — ikinci fix retry
+- `.prompt-{taskId}-{hash}-dep-{dep-taskId}.txt` — cross-dependency fix (Sprint 136 T-006 canlı senaryo)
+UUID/hash format korundu, sadece semantic suffix genişletildi.
+
+**Alt-iş C: Prompt Manifest**
+`.tasks/.prompt-manifest-{sprintId}.jsonl` (YENİ) — her spawn yazma işleminde append satır: `{taskId, promptFile, purpose: 'initial'|'fix1'|'dep-fix', timestamp, agent, skills}`. Post-mortem analiz için traceability.
+
+**Kanıt:**
+- Sprint 140 execute sırasında `.tasks/.prompt-*.txt` dosyaları korundu (mid-sprint cleanup yok)
+- Sprint 140 CLEANUP phase'inde `.tasks/archive/sprint-140/.prompt-*.txt` dosyaları taşındı
+- `ls .tasks/.prompt-*` Sprint 140 finalize sonrası boş
+- `.tasks/.prompt-manifest-sprint-140.jsonl` runtime yazılmış
+- `grep fix1\|fix2 src/orchestra/spawn-backend-docker.ts` → hit
+
+**Test:** 4+ test (mid-sprint persistence, finalize archive, fix suffix naming, prompt manifest append)
+
+---
+
+## Task 18: `.deckent/` Directory Groupby + Archive Strategy (YENİ — Alperen Direktifi 2026-04-15)
+- Model: opus
+- Effort: normal
+- Priority: HIGH
+- Dependencies: yok
+- Skills: typescript-expert, devops-engineer
+- Files: src/core/deckent-workspace-rules.ts (YENİ), src/orchestra/sprint-finalizer.ts, scripts/deckent-cleanup.mjs (YENİ), .deckent/README.md (YENİ), tests/core/workspace-rules.test.ts (YENİ)
+- Scope: src/core/, src/orchestra/, scripts/, .deckent/, tests/core/
+
+### Description
+
+**Alperen direktifi (2026-04-15):** `.deckent/` dizini çöplüğe dönüyor, her sprint dosyalar birikiyor. JSON/mjs/jsonl dosyaların ne işe yaradığı gruplanabilir, arşivlenebilir. Hem manuel hem otomatik cleanup kurallar.
+
+**Mevcut durum (disk audit 2026-04-15 `.deckent/` kök):**
+
+| Kategori | Dosya | Amaç | Tavsiye |
+|----------|-------|------|---------|
+| **Config (kalıcı)** | config.json, project-stack.json, docs.json, ci-baseline.json | Runtime config | `.deckent/config/` |
+| **Config backup** | config.json.bak × 4 | Eski config state | `.deckent/config/backups/` + otomatik rotation (keep last 5) |
+| **Runtime state** | sprint-state.json, safety-point.json, provider-cache.json, features-manifest.json | Live sprint runtime | `.deckent/runtime/` |
+| **Event stream** | sprint-139-events.jsonl, sprint-139-seq | Per-sprint events | `.deckent/sprints/sprint-NNN/events.jsonl` |
+| **Metrics** | metrics.jsonl (140K) | Cumulative metrics | `.deckent/metrics/metrics-YYYY-MM.jsonl` (monthly rotation) |
+| **Sprint gate** | sprint-134-gate.json | Per-sprint finalize | `.deckent/sprints/sprint-134/gate.json` |
+| **Sprint scorecard** | sprint-134..139-layer3-scorecard.md (×6, 116K) | Per-sprint audit | `.deckent/sprints/sprint-NNN/scorecard.md` |
+| **Session starter** | sprint-139-session-starter.md | Per-sprint doc | `.deckent/sprints/sprint-NNN/session-starter.md` |
+| **Ad-hoc scripts** | generate-load-report.mjs, run-self-audit.mjs | Manuel util | `scripts/` (dışına taşı, bunlar runtime değil tool) |
+| **Orphan** | sprint-137-verifier-log.md | Tek sprint debug | archive edilmeli |
+
+**4 alt-iş:**
+
+**Alt-iş A: Workspace Rules Modülü (`src/core/deckent-workspace-rules.ts` YENİ ~200 LoC)**
+```typescript
+export interface WorkspaceRule {
+  pattern: RegExp;          // dosya adı eşleşme
+  category: 'config' | 'runtime' | 'sprint' | 'metrics' | 'scripts' | 'orphan';
+  targetDir: string;         // taşınacak hedef
+  retentionPolicy?: 'keep-last-N' | 'monthly' | 'per-sprint' | 'forever';
+  maxCount?: number;         // keep-last-N için
+}
+export const DECKENT_WORKSPACE_RULES: WorkspaceRule[] = [
+  { pattern: /^config\.json\.bak/, category: 'config', targetDir: 'config/backups', retentionPolicy: 'keep-last-N', maxCount: 5 },
+  { pattern: /^sprint-\d+-events\.jsonl$/, category: 'sprint', targetDir: 'sprints/sprint-NNN', retentionPolicy: 'per-sprint' },
+  // ... 12+ rule
+];
+export function applyWorkspaceRules(deckentRoot: string, dryRun: boolean): MoveOp[];
+```
+
+**Alt-iş B: Sprint Finalize Auto-Groupby**
+`sprint-finalizer.ts` CLEANUP phase'inde `applyWorkspaceRules(deckentRoot, false)` çağır. Per-sprint dosyalar otomatik `.deckent/sprints/sprint-NNN/` altına taşınır. Config backup rotation otomatik keep-last-5.
+
+**Alt-iş C: Manuel Cleanup Script (`scripts/deckent-cleanup.mjs` YENİ ~150 LoC)**
+```bash
+node scripts/deckent-cleanup.mjs --dry-run   # preview moves
+node scripts/deckent-cleanup.mjs --execute   # apply
+node scripts/deckent-cleanup.mjs --archive sprint-138  # archive specific sprint
+```
+Sprint 140 pre-flight'ta bir kez manuel çalıştırılır: mevcut Sprint 134-139 scorecard'lar + gate.json'lar + events.jsonl dosyalar retroaktif olarak `.deckent/sprints/sprint-NNN/` altına taşınır.
+
+**Alt-iş D: `.deckent/README.md` (YENİ)**
+Dizin yapısı + retention policy + cleanup rules dokümantasyonu. Alperen'in sonraki sprint'te bakmak istediğinde net referans. Sprint 140 Task 12 Rich Output ile uyumlu.
+
+**Hedef `.deckent/` dizin yapısı (post-Task 18):**
+```
+.deckent/
+├── README.md                    # Dizin yapısı + rules
+├── config/
+│   ├── config.json              # runtime config
+│   ├── project-stack.json
+│   ├── docs.json
+│   └── backups/                 # keep-last-5
+│       └── config.json.bak.*
+├── runtime/
+│   ├── sprint-state.json
+│   ├── safety-point.json
+│   └── provider-cache.json
+├── metrics/
+│   └── metrics-2026-04.jsonl    # monthly rotation
+├── sprints/
+│   ├── sprint-134/
+│   │   ├── scorecard.md
+│   │   └── gate.json
+│   ├── sprint-139/
+│   │   ├── scorecard.md
+│   │   ├── events.jsonl
+│   │   ├── session-starter.md
+│   │   └── layer3-scorecard.md
+│   └── sprint-140/              # gelecek
+├── archive/                     # Task 13 cleanup target
+└── agents/ skills/ plugins/ cache/ jobs/ usage/ decisions/ pids/ workspace/ i18n/ routing/
+```
+
+**Kanıt:**
+- `ls .deckent/ 2>&1 | wc -l` Sprint 140 sonrası ≤15 (şu an 33+)
+- `.deckent/README.md` mevcut
+- `.deckent/sprints/sprint-140/scorecard.md` Sprint 140 finalize sonrası oraya yazılı
+- `ls .deckent/config/backups/ | wc -l` ≤5 (rotation çalışıyor)
+- `node scripts/deckent-cleanup.mjs --dry-run` → çıktı "N moves pending"
+
+**Test:** 6+ test (workspace rules parse, apply rules dry-run, keep-last-N rotation, per-sprint groupby, manual cleanup script, README render)
+
+---
+
+## Wave Layout (Sprint 140 Plan-Time Recommendation — 18 task)
+
+**Wave 1 (Paralel P0 Foundation, 4 worker):** Task 1 (MCP), Task 3 (Layer 4), Task 4 (Task Restoration), Task 16 (E2E Harness Guard)
+**Wave 2 (P0 Completion + Detector Validation, 3 worker):** Task 2 (Auto-Archive Guard), Task 5 (Kill Guard), Task 14 (ADR-039 Detector Validation — Wave 5'ten taşındı, Task 2 ile paralel)
+**Wave 3 (Runtime Deploy, 3 worker):** Task 6 (Docker HB), Task 7 (Event Stream), Task 8 (Authority Runtime)
+**Wave 4 (Quality Debt + Workspace Hygiene, 4 worker):** Task 9 (Sprint State), Task 10 (Retro), Task 11 (Notification), Task 17 (.prompt Discipline)
+**Wave 5 (Finalize + Groupby, 4 worker):** Task 12 (Rich Output), Task 13 (Orphan Cleanup), Task 15 (Pre-flight), Task 18 (.deckent/ Groupby)
+
+**Toplam: 18 task, tahmini 10-11 saat hard cap**
+
+**Wave rescheduling notları:**
+- Task 14 (ADR-039 Detector Validation) Wave 5 → Wave 2 taşındı — Task 2 (Auto-Archive Guard) ile Task 14 sequential bağımlılık, aynı wave paralel çalışır
+- Task 16 (E2E Harness Guard) Wave 1'e eklendi — P0 foundation kategori, MCP/Layer 4/Task Restoration ile bağımsız paralel
+- Task 17 (.prompt Discipline) Wave 4'e eklendi — Sprint-state + Retro + Notification ile quality debt kategori
+- Task 18 (.deckent/ Groupby) Wave 5'e eklendi — Rich Output + Orphan Cleanup + Pre-flight ile finalize kategori
+
+---
+
+## Hedef Metrikleri (Sprint 140 — 18 task)
+
+| Metrik | Sprint 139 | Sprint 140 Hedef |
+|--------|-----------|------------------|
+| Task sayısı | 52 | **18** (keskin düşüş, guard rail + hygiene odaklı) |
+| Task throughput | %96 | ≥%95 |
+| NO_GO rate | %18 | ≤%5 |
+| Layer 3 skor | 9/17 | ≥13/17 |
+| Readiness | ~4.03 | ≥4.10 |
+| Zero manual recovery | ❌ | ✅ (yeniden başla) |
+| Layer 4 runtime wire | ❌ | ✅ (4-sprint streak kır) |
+| MCP stability | ❌ | ✅ (2+ saat kopma yok) |
+| Crown jewels | 13 | ≥8 (guard rail odaklı) |
+| Süre | ~3h (stuck) | ≤11h hard cap |
+| `.test-e2e-sprint-*` orphan | 10 birikmiş | 0 (Task 16 guard) |
+| `.prompt-*` cleanup discipline | partial | full (Task 17 mid-sprint korunur, finalize'da archive) |
+| `.deckent/` kök dosya | 33+ | ≤15 (Task 18 groupby) |

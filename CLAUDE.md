@@ -72,13 +72,16 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-138 |
-| Toplam Task | 11 |
-| Tamamlanan | 11 |
-| Tech Debt | 2 |
-| No-Go | 0 |
-| Süre | 53dk 46sn |
-| Coverage | 8.5% |
+| Sprint | sprint-139 (manuel finalize) |
+| Toplam Task | 52 |
+| Tamamlanan (disk) | 50/52 (%96) — 37 DONE + 4 TECH_DEBT + 9 NO_GO |
+| Tech Debt | 4 |
+| No-Go | 9 (4 koordinatör kill + 5 organic Docker HB bug) |
+| Süre | ~180dk EXECUTE (stuck EVALUATE, manuel finalize) |
+| Crown Jewels LoC | +5462 net (13 meta-dogfood canlı, 2.17x Sprint 138) |
+| Yeni ADR | 2 (ADR-037 RBAC + ADR-038 Self-Modifying) |
+| Readiness | ~4.03 (Sprint 138 paritesi) |
+| Layer 3 | 9/17 (manuel scoring) |
 
 ## Active Debt
 _Açık teknik borç yok._
@@ -96,7 +99,10 @@ _Açık teknik borç yok._
 ## Agent Performance
 | Agent | Tasks | Done | Başarı |
 |-------|-------|------|--------|
-| architect | 3 | 3 | 100% |
-| test-writer | 1 | 1 | 100% |
-| doc-writer | 1 | 1 | 100% |
-| bug-fixer | 1 | 1 | 100% |
+| architect | 3 | 0 | 0% |
+| test-writer | 33 | 0 | 0% |
+| bug-fixer | 3 | 0 | 0% |
+| temp-react-ts-specialist | 3 | 0 | 0% |
+| doc-writer | 7 | 0 | 0% |
+| security-auditor | 2 | 0 | 0% |
+| ci-guardian | 1 | 0 | 0% |

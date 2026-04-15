@@ -6,6 +6,15 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint139] - 2026-04-15
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint138] - 2026-04-14
 
 ### Added
