@@ -66,8 +66,13 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run orchestra tests
-        run: npx vitest run tests/orchestra/
-        timeout-minutes: 5
+        # Orchestra suite is large (~118 test files) — historical OOM on default
+        # 2GB heap. Bumped to 8GB + forks pool (isolated workers, no shared state).
+        # See Sprint 141 CI fix: pre-existing Sprint 139 regression.
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: npx vitest run tests/orchestra/ --pool=forks
+        timeout-minutes: 10
 
   test-cli:
     name: Tests — CLI

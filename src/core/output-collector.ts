@@ -13,7 +13,16 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKENT_DIR } from './constants.js';
+import { DeckentError } from './errors.js';
 import { debugLog } from './utils.js';
+
+/** Output collector specific error type (error-handling unification rule compliance). */
+export class OutputCollectorError extends DeckentError {
+  constructor(message: string) {
+    super('OUTPUT_COLLECTOR_ERROR', message);
+    this.name = 'OutputCollectorError';
+  }
+}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -77,7 +86,7 @@ export class CircularBuffer {
   private totalDropped = 0;
 
   constructor(capacity: number) {
-    if (capacity <= 0) throw new Error('CircularBuffer capacity must be positive');
+    if (capacity <= 0) throw new OutputCollectorError('CircularBuffer capacity must be positive');
     this.capacity = capacity;
   }
 
@@ -228,7 +237,7 @@ export class OutputCollector {
    */
   collect(opts: CollectOptions): void {
     if (this.disposed) {
-      throw new Error('OutputCollector has been disposed');
+      throw new OutputCollectorError('OutputCollector has been disposed');
     }
 
     const { workerId, backend, taskId, containerName, tmuxTarget, maxLines } = opts;
@@ -240,10 +249,10 @@ export class OutputCollector {
 
     // Validate backend-specific options
     if (backend === 'docker' && !containerName) {
-      throw new Error('containerName is required for Docker backend');
+      throw new OutputCollectorError('containerName is required for Docker backend');
     }
     if (backend === 'tmux' && !tmuxTarget) {
-      throw new Error('tmuxTarget is required for tmux backend');
+      throw new OutputCollectorError('tmuxTarget is required for tmux backend');
     }
 
     const capacity = maxLines ?? DEFAULT_MAX_LINES;

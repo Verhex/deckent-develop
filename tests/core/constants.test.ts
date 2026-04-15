@@ -110,25 +110,25 @@ describe('Memory limits', () => {
     }
   });
 
-  it('MEMORY_MAX_LINES === 300 (Sprint 067 increase)', () => {
-    expect(MEMORY_MAX_LINES).toBe(300);
+  it('MEMORY_MAX_LINES === 1500 (Sprint 140 pre-flight 5x increase)', () => {
+    expect(MEMORY_MAX_LINES).toBe(1500);
   });
 
-  it('RETRO_MAX_LINES === 120 (Sprint 067 increase)', () => {
-    expect(RETRO_MAX_LINES).toBe(120);
+  it('RETRO_MAX_LINES === 400 (Sprint 140 pre-flight 3.3x increase)', () => {
+    expect(RETRO_MAX_LINES).toBe(400);
   });
 
-  it('SPRINT_LOG_MAX_LINES === 100 (Sprint 067 increase)', () => {
-    expect(SPRINT_LOG_MAX_LINES).toBe(100);
+  it('SPRINT_LOG_MAX_LINES === 500 (Sprint 140 pre-flight 5x increase)', () => {
+    expect(SPRINT_LOG_MAX_LINES).toBe(500);
   });
 
-  it('BRAIN_TOTAL_LINE_BUDGET === 900 (Sprint 067 increase)', () => {
-    expect(BRAIN_TOTAL_LINE_BUDGET).toBe(900);
+  it('BRAIN_TOTAL_LINE_BUDGET === 5000 (Sprint 140 pre-flight 5.5x increase)', () => {
+    expect(BRAIN_TOTAL_LINE_BUDGET).toBe(5000);
   });
 
-  it('MEMORY_DECAY_SPRINTS === 8, PATTERN_DECAY_SPRINTS === 12 (Sprint 067 increase)', () => {
-    expect(MEMORY_DECAY_SPRINTS).toBe(8);
-    expect(PATTERN_DECAY_SPRINTS).toBe(12);
+  it('MEMORY_DECAY_SPRINTS === 20, PATTERN_DECAY_SPRINTS === 25 (Sprint 140 pre-flight 2.5x/2x increase)', () => {
+    expect(MEMORY_DECAY_SPRINTS).toBe(20);
+    expect(PATTERN_DECAY_SPRINTS).toBe(25);
   });
 
   it('BRAIN_TOTAL_LINE_BUDGET >= sum of individual limits', () => {

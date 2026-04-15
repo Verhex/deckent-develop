@@ -15,6 +15,7 @@
 
 import {
   findModel,
+  CostConfigError,
   type CostConfig,
   type ModelPricing,
   type BillingMode,
@@ -134,7 +135,7 @@ const EFFORT_OUTPUT_DEFAULTS: Record<'low' | 'normal' | 'high', number> = {
 function safeCost(tokens: number, costPerToken: number | null | undefined, label: string): number {
   if (costPerToken == null || costPerToken === 0) return 0;
   if (costPerToken > 0.01) {
-    throw new Error(
+    throw new CostConfigError(
       `Cost unit error in ${label}: ${costPerToken} > 0.01 threshold. ` +
         `Suspected per-MTok value used as per-token. Cost config loader should have caught this.`,
     );
