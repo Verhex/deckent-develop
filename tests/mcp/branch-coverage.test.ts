@@ -144,7 +144,7 @@ describe('MCP Branch Coverage', () => {
 
       expect(result.isError).toBe(true);
       expect(data.active).toBe(false);
-      expect(data.message).toBe('Cannot parse dashboard file.');
+      expect(data.message).toMatch(/dashboard read error/i);
     });
   });
 

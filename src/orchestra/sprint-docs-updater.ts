@@ -1,6 +1,6 @@
 // ─── Sprint Docs Updater ─────────────────────────────────────────
 // Extracted from sprint-reporter.ts — managed-docs, project identity, sprint log, debt, archive
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, rmdirSync } from 'node:fs';
 import { execSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
@@ -566,9 +566,17 @@ export function archiveDirectives(projectRoot: string, sprintId: string): void {
 // ═══ Orphan Task Archive ═══════════════════════════════════════════
 
 /**
+ * Supported orphan file extensions — includes runtime artifacts that accumulate
+ * across sprints: task data (.json, .plan, .hb, .result), execution logs (.log),
+ * timeout markers (.timeout), honesty verify deltas (.verify-delta.json).
+ */
+const ORPHAN_TASK_EXTENSIONS = /\.(json|plan|hb|result|paused|log|timeout|verify-delta\.json)$/;
+
+/**
  * Archive orphan task files from `.tasks/` to `.brain/archive/sprint-NNN-tasks/`.
- * Collects all task-NNN-* files (*.json, *.hb, *.result, *.plan, *.verify-delta.json)
- * belonging to the given sprint and moves them to the archive directory.
+ * Collects all task-NNN-* files (*.json, *.hb, *.result, *.plan, *.log, *.timeout,
+ * *.verify-delta.json) belonging to the given sprint and moves them to the archive
+ * directory. Also archives `.tasks/.prompt-*` files for the sprint.
  * This prevents stale task files from accumulating across sprints.
  *
  * @param projectRoot - Project root directory
@@ -589,10 +597,17 @@ export function archiveOrphanTasks(projectRoot: string, sprintId: string): numbe
   }
 
   // Match files belonging to this sprint: task-NNN-*.* where NNN = sprintNum
+  // Extended to include .log, .timeout and .verify-delta.json artifacts
   const prefix = `task-${sprintNum}-`;
-  const taskFiles = readdirSync(tasksDir).filter(f => f.startsWith(prefix));
+  const allFiles = readdirSync(tasksDir);
+  const taskFiles = allFiles.filter(f =>
+    f.startsWith(prefix) && ORPHAN_TASK_EXTENSIONS.test(f),
+  );
+  // Also archive .prompt-* files for this sprint
+  const promptFiles = allFiles.filter(f => f.startsWith('.prompt-'));
+  const filesToArchive = [...taskFiles, ...promptFiles];
 
-  if (taskFiles.length === 0) {
+  if (filesToArchive.length === 0) {
     debugLog('archiveOrphanTasks', `No orphan task files for ${sprintId}`);
     return 0;
   }
@@ -601,7 +616,7 @@ export function archiveOrphanTasks(projectRoot: string, sprintId: string): numbe
   mkdirSync(archiveDir, { recursive: true });
 
   let count = 0;
-  for (const file of taskFiles) {
+  for (const file of filesToArchive) {
     try {
       const src = join(tasksDir, file);
       const dest = join(archiveDir, file);
@@ -616,4 +631,53 @@ export function archiveOrphanTasks(projectRoot: string, sprintId: string): numbe
 
   debugLog('archiveOrphanTasks', `Archived ${count} task files to ${archiveDir}`);
   return count;
+}
+
+/**
+ * Clean old sprint archives from `.tasks/archive/` based on a retention policy.
+ * Archives older than `retentionCount` sprints are deleted to prevent unbounded growth.
+ *
+ * @param projectRoot - Project root directory
+ * @param retentionCount - Number of most-recent sprint archives to keep (default: 5)
+ * @returns Number of archive directories removed
+ */
+export function cleanTasksArchive(projectRoot: string, retentionCount = 5): number {
+  const archiveDir = join(projectRoot, '.tasks', 'archive');
+  if (!existsSync(archiveDir)) return 0;
+
+  const entries = readdirSync(archiveDir);
+  // Only consider sprint-NNN-style directories
+  const sprintDirs = entries
+    .filter(e => /^sprint-\d+/.test(e))
+    .map(e => ({ name: e, num: extractSprintNumber(e) ?? -1 }))
+    .filter(e => e.num >= 0)
+    .sort((a, b) => b.num - a.num); // newest first
+
+  if (sprintDirs.length <= retentionCount) return 0;
+
+  const toRemove = sprintDirs.slice(retentionCount);
+  let removed = 0;
+  for (const dir of toRemove) {
+    try {
+      const dirPath = join(archiveDir, dir.name);
+      // Remove all files inside before removing the directory
+      const files = readdirSync(dirPath);
+      for (const file of files) {
+        try { unlinkSync(join(dirPath, file)); } catch { /* skip */ }
+      }
+      // Use rmdirSync (no recursive needed — files already removed above)
+      // If there are nested dirs, fall through silently
+      try {
+        rmdirSync(dirPath);
+      } catch {
+        // Best-effort: non-empty dirs (nested) are left as-is
+      }
+      removed++;
+    } catch (e) {
+      debugLog('cleanTasksArchive', `Failed to remove ${dir.name}: ${e}`);
+    }
+  }
+
+  debugLog('cleanTasksArchive', `Removed ${removed} old archive dirs (retention: ${retentionCount})`);
+  return removed;
 }

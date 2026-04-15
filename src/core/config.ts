@@ -474,6 +474,8 @@ export function createDefaultConfig(): DeckentConfig {
     routing_engine: 'v2',
     // Cleanup delay: wait before deleting .tasks/ files (ms)
     cleanup_delay_ms: 180_000,
+    // Sprint checkpoint interval: how many terminal tasks before writing a checkpoint
+    sprint_checkpoint_interval: 5,
   };
 }
 
@@ -667,6 +669,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     cleanup_delay_ms: config.cleanup_delay_ms,
     // AI planner timeout
     ai_planner_timeout: config.ai_planner_timeout,
+    // Sprint checkpoint interval
+    sprint_checkpoint_interval: config.sprint_checkpoint_interval,
   };
 
   // ─── Update cache ───────────────────────────────────────────────────

@@ -2,6 +2,31 @@
 
 Complete reference for Deckent worker agents. Read this before starting any task.
 
+## .plan File
+
+Write `.tasks/task-{id}.plan` BEFORE starting any code changes. This is your execution plan:
+
+```markdown
+# Task {id}: {title}
+
+## Approach
+- Describe your strategy for completing this task
+- List the files you will modify and why
+
+## Files to Modify
+- `src/path/to/file.ts` — what changes and why
+
+## Expected Outcome
+- What the end state should look like
+```
+
+Why it matters:
+- **Auditability:** Brain/Auditor can verify understanding before execution
+- **Debugging:** Failed tasks reveal whether the failure was in understanding or execution
+- **Accountability:** Forces think-before-code, reduces scope creep
+
+Missing `.plan` triggers a soft warning in the result file (`planWarning: 'missing'`).
+
 ## Heartbeat File
 
 Create `.tasks/task-{id}.hb` BEFORE starting work, update periodically:

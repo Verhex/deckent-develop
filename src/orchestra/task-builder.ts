@@ -793,9 +793,10 @@ ${task.id}: ${task.title} — ${task.description}
 
 ## What To Do
 1. Read the task scope carefully — understand what files you may touch
-2. Write the code changes described above
-3. Document: update relevant docs if your changes affect them
-4. Report: write your result file to .tasks/task-${task.id}.result
+2. Write your execution plan to .tasks/task-${task.id}.plan BEFORE coding — outline your approach, files to modify, and expected changes
+3. Write the code changes described above
+4. Document: update relevant docs if your changes affect them
+5. Report: write your result file to .tasks/task-${task.id}.result
 
 ## CRITICAL VERIFY STEPS (DO NOT SKIP)
 You MUST run these commands before marking your task as done:
@@ -823,8 +824,13 @@ Update periodically: increment sequence, refresh timestamp via new Date().toISOS
 
 ## Result File
 Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
-Include tokenUsage in your result JSON: { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${task.provider ?? 'claude'}", "model": "${task.model}" }.
-If you cannot determine exact token counts, omit the tokenUsage field — the brain will estimate it.
+MUST include tokenUsage with ALL four fields: { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${task.provider ?? 'claude'}", "model": "${task.model}" }.
+  - inputTokens: your best estimate of prompt/input tokens consumed (REQUIRED — use 0 only if truly unknown)
+  - outputTokens: your best estimate of completion/output tokens produced (REQUIRED — use 0 only if truly unknown)
+  - cacheReadTokens: cache read tokens if applicable (optional, default 0)
+  - provider: MUST be "${task.provider ?? 'claude'}" (hardcoded for this task)
+  - model: MUST be "${task.model}" (hardcoded for this task)
+Sprint 140 will reject results with missing tokenUsage as NO_GO. Partial tokenUsage (missing provider/model) generates warnings in Sprint 139.
 REQUIRED: Include rubricScores field with 4 integer keys (0-100): correctness, test_coverage, scope_compliance, documentation. Example: "rubricScores": { "correctness": 95, "test_coverage": 90, "scope_compliance": 100, "documentation": 85 }
 The result file is REQUIRED — without it your work cannot be evaluated.
 

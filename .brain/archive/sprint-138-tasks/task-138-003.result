@@ -1,0 +1,23 @@
+{
+  "taskId": "138-003",
+  "workerId": "w-138-003",
+  "filesChanged": [
+    "src/monitor/auditor.ts",
+    "src/orchestra/result-evaluator.ts",
+    "src/orchestra/sprint-finalizer.ts",
+    "tests/monitor/auditor.test.ts",
+    "tests/orchestra/sprint-finalizer.test.ts"
+  ],
+  "linesAdded": 780,
+  "linesRemoved": 350,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Auditor Authority Extension — 4 alt-iş tamamlandı:\n\nAlt-iş A: tryCodeVerifiedDone + tüm helper fonksiyonlar result-evaluator.ts → auditor.ts'e taşındı. result-evaluator.ts'te re-export bırakıldı (backward compat). sprint-finalizer.ts doğrudan auditor.ts'ten import ediyor.\n\nAlt-iş B: 3-Pipeline Verification (verifyWorkerResult, verifyFunctional, validateTechDebt, inferAffectedTests, runVitestOnFiles) — worker self-assessment'ına göre 3 farklı doğrulama pipeline'ı. DONE → fonksiyonel test, GO_WITH_TECH_DEBT → notes kalite kontrolü, NO_GO → tryCodeVerifiedDone.\n\nAlt-iş C: ADR Compliance Check — parseADRs(), checkADRCompliance() ile pilot 3 ADR rule (ADR-006 spawnSync shell:true, ADR-008 Brain import, ADR-010 dependency count).\n\nAlt-iş D: Event Stream Hook Point — emitVerificationEvent() fail-safe, event-stream.ts yoksa debugLog fallback.\n\ntsc --noEmit: 0 hata (benim dosyalarımda). Tek mevcut hata event-stream.ts:253 (Task 4 scope'u).\nvitest: 219/219 test geçti (auditor 94 + result-evaluator 99 + sprint-finalizer 26).\nYeni testler: 14 yeni test eklendi (migration regression, parseEvidenceCommand, inferAffectedTests, verifyFunctional, validateTechDebt, verifyWorkerResult 3-pipeline dispatch, parseADRs, checkADRCompliance violation/clean).",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

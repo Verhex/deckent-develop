@@ -673,6 +673,71 @@ export function applyTechDebtDowngrade(
   return { decision: originalDecision, downgraded: false, reason: null, completionRatio: ratio };
 }
 
+// ─── Token Usage Validation ─────────────────────────────────────────
+
+/**
+ * Result of validating tokenUsage on a TaskResult.
+ * Sprint 139: soft warning mode — warnings are emitted but do not affect evaluation.
+ * Sprint 140: warnings will become hard NO_GO.
+ */
+export interface TokenUsageValidationResult {
+  /** Whether all required token usage fields are present and valid */
+  isComplete: boolean;
+  /** Human-readable warning messages for missing/invalid fields */
+  warnings: string[];
+  /** Whether tokenUsage was entirely absent */
+  tokenUsageMissing: boolean;
+}
+
+/**
+ * Validate that a TaskResult's tokenUsage contains all required fields.
+ *
+ * Required fields (Sprint 139 soft warning, Sprint 140 hard NO_GO):
+ * - tokenUsage itself must be present
+ * - inputTokens: number >= 0
+ * - outputTokens: number >= 0
+ * - provider: non-empty string
+ * - model: non-empty string
+ *
+ * @param result - The task result to validate
+ * @returns Validation result with warnings (soft — does not affect evaluation)
+ */
+export function validateTokenUsage(result: TaskResult): TokenUsageValidationResult {
+  const warnings: string[] = [];
+
+  if (!result.tokenUsage) {
+    return {
+      isComplete: false,
+      warnings: ['tokenUsage field is missing — Sprint 140 will reject as NO_GO'],
+      tokenUsageMissing: true,
+    };
+  }
+
+  const { tokenUsage } = result;
+
+  if (typeof tokenUsage.inputTokens !== 'number' || tokenUsage.inputTokens < 0) {
+    warnings.push('tokenUsage.inputTokens is missing or invalid (must be a non-negative number)');
+  }
+
+  if (typeof tokenUsage.outputTokens !== 'number' || tokenUsage.outputTokens < 0) {
+    warnings.push('tokenUsage.outputTokens is missing or invalid (must be a non-negative number)');
+  }
+
+  if (!tokenUsage.provider || typeof tokenUsage.provider !== 'string') {
+    warnings.push('tokenUsage.provider is missing (must be "claude", "codex", or "gemini")');
+  }
+
+  if (!tokenUsage.model || typeof tokenUsage.model !== 'string') {
+    warnings.push('tokenUsage.model is missing (must be a valid model identifier)');
+  }
+
+  return {
+    isComplete: warnings.length === 0,
+    warnings,
+    tokenUsageMissing: false,
+  };
+}
+
 // ─── Honesty Violation Flag ─────────────────────────────────────────
 
 /**
@@ -681,6 +746,240 @@ export function applyTechDebtDowngrade(
  * "pre-existing failures" but the baseline comparison proved otherwise.
  */
 export const HONESTY_VIOLATION = 'HONESTY_VIOLATION' as const;
+
+// ─── Failure Classifier (Runtime vs Code Discriminator) ─────────────
+// Sprint 138 Task 1-xfix: Brain "Task 5 NO_GO → Task 1 dependency failure"
+// was a false diagnosis. The actual cause was a Docker HB shutdown bug (runtime
+// issue). Discriminating runtime failures from code failures prevents cascade
+// blocking on transient infrastructure problems.
+
+/** Classification of a task failure: infrastructure or code quality */
+export type FailureCategory = 'RUNTIME' | 'CODE' | 'AMBIGUOUS';
+
+/** Input to classifyFailure — subset of task + result + optional raw errors */
+export interface FailureContext {
+  /** Worker exit code, if available (e.g. 137 = SIGKILL) */
+  exitCode?: number;
+  /** Worker's self-assessment notes or any other error message text */
+  notes?: string;
+  /** Raw error output captured from the worker process */
+  errorOutput?: string;
+  /** Task result selfAssessment (if worker wrote a result file) */
+  selfAssessment?: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+  /** Whether the worker produced a result file at all */
+  resultFilePresent?: boolean;
+}
+
+/** Result of classifyFailure() */
+export interface FailureClassification {
+  /** Primary failure category */
+  category: FailureCategory;
+  /** Signals that contributed to this classification */
+  signals: string[];
+  /** Human-readable reason string */
+  reason: string;
+}
+
+/**
+ * RUNTIME failure signal patterns.
+ *
+ * These patterns indicate infrastructure problems (Docker/container lifecycle,
+ * OOM kill, network/timeout, process supervisor issues) rather than code quality.
+ * A task that fails for runtime reasons should be RETRIED without cascading
+ * a NO_GO block to its dependents.
+ */
+const RUNTIME_PATTERNS: readonly RegExp[] = [
+  /docker\s+worker\s+exited\s+without\s+writing\s+result/i,
+  /container\s+lifecycle/i,
+  /no\s+such\s+container/i,
+  /oomkilled/i,
+  /container\s+(exited|died|stopped)/i,
+  /heartbeat\s+(daemon\s+)?shutdown/i,
+  /hb\s+shutdown/i,
+  /worker\s+process\s+killed/i,
+  /sigkill/i,
+  /network\s+(timeout|error|unreachable)/i,
+  /connection\s+refused/i,
+  /econnrefused/i,
+  /spawn\s+enoent/i,
+  /backend\s+(error|failure)/i,
+  /tmux\s+(session|window)\s+not\s+found/i,
+  /subprocess\s+exited\s+unexpectedly/i,
+];
+
+/**
+ * CODE failure signal patterns.
+ *
+ * These patterns indicate genuine code quality problems. A task failing
+ * for code reasons should cascade-block its dependents (Task 30) and
+ * trigger spawnFixWorker.
+ */
+const CODE_PATTERNS: readonly RegExp[] = [
+  /tsc\s+(error|--noEmit|type\s+error)/i,
+  /typescript\s+(error|compilation\s+failed)/i,
+  /type\s+error/i,
+  /test\s+(fail|failure|failed)/i,
+  /vitest.*fail/i,
+  /jest.*fail/i,
+  /\d+\s+test(s)?\s+fail/i,
+  /scope\s+violation/i,
+  /files?\s+outside\s+(scope|allowed|scope\.directories)/i,
+  /assertion\s+(error|fail)/i,
+  /syntax\s+error/i,
+  /import\s+(error|resolution\s+fail)/i,
+  /module\s+not\s+found/i,
+  /cannot\s+find\s+module/i,
+  /build\s+(fail|error)/i,
+  /lint\s+(error|fail)/i,
+];
+
+/**
+ * Classify a task failure as RUNTIME, CODE, or AMBIGUOUS.
+ *
+ * Decision logic:
+ * - exitCode 137 → RUNTIME (SIGKILL — kernel OOM or Docker stop)
+ * - no result file + any runtime pattern → RUNTIME
+ * - code patterns detected → CODE
+ * - runtime patterns detected but no code patterns → RUNTIME
+ * - mixed signals or no signals → AMBIGUOUS
+ *
+ * @param ctx - Failure context (exit code, notes, error output, result presence)
+ * @returns FailureClassification with category, contributing signals, and reason
+ */
+export function classifyFailure(ctx: FailureContext): FailureClassification {
+  const signals: string[] = [];
+  const runtimeSignals: string[] = [];
+  const codeSignals: string[] = [];
+
+  // ── Hard rule: exitCode 137 = SIGKILL (OOM kill or Docker stop) ─────
+  if (ctx.exitCode === 137) {
+    runtimeSignals.push('exitCode=137 (SIGKILL)');
+  }
+
+  // ── Hard rule: missing result file is usually a runtime issue ────────
+  if (ctx.resultFilePresent === false) {
+    runtimeSignals.push('no result file written');
+  }
+
+  // ── Scan text fields for signal patterns ─────────────────────────────
+  const textToScan = [ctx.notes ?? '', ctx.errorOutput ?? ''].join(' ');
+
+  for (const pattern of RUNTIME_PATTERNS) {
+    if (pattern.test(textToScan)) {
+      runtimeSignals.push(`runtime pattern: ${pattern.source}`);
+    }
+  }
+
+  for (const pattern of CODE_PATTERNS) {
+    if (pattern.test(textToScan)) {
+      codeSignals.push(`code pattern: ${pattern.source}`);
+    }
+  }
+
+  signals.push(...runtimeSignals, ...codeSignals);
+
+  // ── Classification decision ──────────────────────────────────────────
+  const hasRuntime = runtimeSignals.length > 0;
+  const hasCode = codeSignals.length > 0;
+
+  if (hasRuntime && !hasCode) {
+    return {
+      category: 'RUNTIME',
+      signals,
+      reason: `Infrastructure failure detected (${runtimeSignals.length} runtime signal(s)). Retry without cascade.`,
+    };
+  }
+
+  if (hasCode && !hasRuntime) {
+    return {
+      category: 'CODE',
+      signals,
+      reason: `Code quality failure detected (${codeSignals.length} code signal(s)). Cascade-block dependents and spawn fix worker.`,
+    };
+  }
+
+  if (hasCode && hasRuntime) {
+    return {
+      category: 'AMBIGUOUS',
+      signals,
+      reason: `Mixed signals (${runtimeSignals.length} runtime, ${codeSignals.length} code). Retry without cascade (risk-taking).`,
+    };
+  }
+
+  // No signals detected at all
+  return {
+    category: 'AMBIGUOUS',
+    signals,
+    reason: 'No identifiable failure signals. Retry without cascade (risk-taking).',
+  };
+}
+
+/**
+ * Determine the cascade action for a failed task based on its failure category.
+ *
+ * Decision table (Alperen Q1 risk-taking):
+ * - RUNTIME  → retry=true,  cascade=false  (transient infra — retry without blocking dependents)
+ * - CODE     → retry=false, cascade=true   (real code bug — block dependents + spawn fix worker)
+ * - AMBIGUOUS → retry=true, cascade=false  (risk-taking: assume infra until proven otherwise)
+ */
+export interface CascadeDecision {
+  /** Whether the task should be retried */
+  shouldRetry: boolean;
+  /** Whether dependent tasks should be cascade-blocked */
+  shouldCascade: boolean;
+  /** Whether a fix worker should be spawned (only for CODE failures) */
+  spawnFixWorker: boolean;
+  /** Failure category that drove this decision */
+  category: FailureCategory;
+  /** Human-readable explanation */
+  reason: string;
+}
+
+/**
+ * Determine retry and cascade behaviour for a failed task.
+ *
+ * This is the cross-dependency discriminator entry point.
+ * Upstream callers (sprint-spawner, result-collector) call this after
+ * evaluateWithRubric() returns NO_GO, then use the returned CascadeDecision
+ * to decide whether to block dependents.
+ *
+ * @param taskId - ID of the failed task
+ * @param ctx - Failure context used to classify the failure
+ * @returns CascadeDecision specifying retry, cascade and fix-worker behaviour
+ */
+export function decideCascadeAction(taskId: string, ctx: FailureContext): CascadeDecision {
+  const classification = classifyFailure(ctx);
+
+  switch (classification.category) {
+    case 'RUNTIME':
+      return {
+        shouldRetry: true,
+        shouldCascade: false,
+        spawnFixWorker: false,
+        category: 'RUNTIME',
+        reason: `Task ${taskId} failed due to runtime/infrastructure issue — retry without cascading block to dependents.`,
+      };
+
+    case 'CODE':
+      return {
+        shouldRetry: false,
+        shouldCascade: true,
+        spawnFixWorker: true,
+        category: 'CODE',
+        reason: `Task ${taskId} failed due to code quality issue — cascade-block dependents and spawn fix worker.`,
+      };
+
+    case 'AMBIGUOUS':
+    default:
+      return {
+        shouldRetry: true,
+        shouldCascade: false,
+        spawnFixWorker: false,
+        category: 'AMBIGUOUS',
+        reason: `Task ${taskId} has ambiguous failure — retry without cascade (risk-taking per Alperen Q1 guidance).`,
+      };
+  }
+}
 
 /**
  * Gate failure status constant.

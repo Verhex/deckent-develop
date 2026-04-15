@@ -1,0 +1,119 @@
+{
+  "id": "138-004",
+  "title": "Structured Event Stream + Plan-Time Scope Collision Detection",
+  "description": "Structured Event Stream + Plan-Time Scope Collision Detection\n- Model: opus\n- Effort: high\n- Priority: HIGH\n- Dependencies: 138-003\n- Skills: typescript-expert, testing-expert\n- Files: src/orchestra/event-stream.ts, src/core/file-lock.ts, src/orchestra/conflict-resolver.ts, src/orchestra/sprint-spawner.ts, src/agents/worker.ts, src/monitor/auditor.ts, tests/orchestra/event-stream.test.ts, tests/core/file-lock.test.ts, tests/orchestra/sprint-spawner.test.ts\n- Scope: src/orchestra/, src/core/, src/monitor/, src/agents/, tests/\n\n### Description\n\nSprint 138'in **teknik omurgası** (high effort). 5 alt-iş.\n\n**Pre-flight bulgu:** `src/core/file-lock.ts` şu an 30 satır, sadece `claimTaskLock` (observability wrapper) + `acquireLock` re-export. Real implementation `worker.ts:173`'te. Plan-time'da çağrılmıyor (`.locks/` boş).\n\n**Alt-iş A: Event Stream (`src/orchestra/event-stream.ts` ~200 LoC, YENİ DOSYA)**\n```typescript\nexport interface DeckentEvent {\n  timestamp: string;\n  sequence: number;\n  protocol_version: '1.0';\n  source: 'brain' | 'worker' | 'auditor' | string;\n  target: string;\n  channel: string;\n  payload: unknown;\n}\nexport function writeEvent(projectRoot, event): void  // append .deckent/sprint-NNN-events.jsonl\nexport function readEvents(projectRoot, filter?): DeckentEvent[]\nexport function reconstructState(projectRoot, sprintId): SprintState\n```\nFail-safe: write fail → console.warn + file-based fallback. Backward compat: `.hb/.result` paralel devam.\n\n**Alt-iş B: File Lock Real Implementation (`src/core/file-lock.ts` 30 → ~200 LoC)**\n```typescript\nexport interface LockInfo { filePath, ownerWorkerId, acquiredAt, taskId, ttl? }\nexport function acquireLock(projectRoot, filePath, ownerWorkerId, taskId): LockInfo | null\nexport function releaseLock(projectRoot, lockInfo): void\nexport function checkLocks(projectRoot): LockInfo[]\nexport function clearStaleLocks(projectRoot, maxAgeMs): number\n```\nMevcut `worker.ts:173 acquireLock` core'a delegate eder (worker logic sadece çağırır). Mevcut `claimTaskLock` (observability wrapper) korunur.\n\n**Alt-iş C: Plan-Time Scope Collision Detection (`sprint-spawner.ts`)**\n```typescript\nexport function detectScopeCollisions(tasks: Task[]): CollisionMap\nexport function buildCollisionAwareWaves(tasks: Task[], maxWorkers: number): Wave[]\n```\nTopological sort with collision edges + Dependencies field (Sprint 137 parser).\n\n**Meta-dogfood beklentisi:** Sprint 138 DIRECTIVES'te Task 5 + Task 6 ikisi de `sprint-finalizer.ts`'e yazar. Brain `detectScopeCollisions()` bunu yakalar → Task 5 Wave 3, Task 6 Wave 4 otomatik. **Manuel wave barrier ihtiyacı ortadan kalkar.** Eğer canlı çalışıyorsa Sprint 138'in **ikinci meta-dogfood canlı kanıt**.\n\n**Alt-iş D: Runtime Lock + Event Write Hook**\n- `worker.ts`: file write öncesi `acquireLock()` + event write (`WORKER→BRAIN:FILE_LOCK_ACQUIRED`)\n- `auditor.ts`: scan loop'ta lock state event (`AUDITOR→BRAIN:LOCK_STATE_SNAPSHOT`)\n\n**Alt-iş E: Collision Event Integration**\nCollision detection → event stream'e yaz (`AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED`).\n\n**Kanıt:**\n- `wc -l src/core/file-lock.ts` → ≥150 (30'dan büyüdü)\n- `ls src/orchestra/event-stream.ts` → mevcut (yeni)\n- `grep -n \"detectScopeCollisions\" src/orchestra/sprint-spawner.ts` → hit\n- `grep -n \"acquireLock\" src/orchestra/sprint-spawner.ts` → hit (plan-time çağrı)\n- `ls .locks/` Sprint 138 execute sırasında dolu\n- `ls .deckent/sprint-138-events.jsonl` runtime mevcut\n- `wc -l .deckent/sprint-138-events.jsonl` → ≥50\n- `grep \"SCOPE_COLLISION_DETECTED\" .deckent/sprint-138-events.jsonl` → hit (**ikinci meta-dogfood canlı kanıt**)\n\n**Test:** 10+ test (event roundtrip, state reconstruct, fail-safe, file lock acquire, collision, stale cleanup, detectScopeCollisions same file, non-collision, buildCollisionAwareWaves topological, Docker bind mount integration)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "HIGH",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/core/",
+      "src/agents/",
+      "src/monitor/",
+      "tests/orchestra/",
+      "tests/core/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/event-stream.ts",
+      "src/core/file-lock.ts",
+      "src/orchestra/conflict-resolver.ts",
+      "src/orchestra/sprint-spawner.ts",
+      "src/agents/worker.ts",
+      "src/monitor/auditor.ts",
+      "tests/orchestra/event-stream.test.ts",
+      "tests/core/file-lock.test.ts",
+      "tests/orchestra/sprint-spawner.test.ts",
+      "worker.ts"
+    ]
+  },
+  "dependencies": [
+    "138-003"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `wc -l src/core/file-lock.ts` → ≥150 (30'dan büyüdü); `ls src/orchestra/event-stream.ts` → mevcut (yeni)",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-138",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-14T09:56:52.624Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.67
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.41
+        },
+        {
+          "name": "core",
+          "weight": 0.24
+        },
+        {
+          "name": "agents",
+          "weight": 0.12
+        },
+        {
+          "name": "monitor",
+          "weight": 0.12
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 10,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.6,
+          "tests/": 0.3
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.3
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-14T10:39:11.492Z"
+}

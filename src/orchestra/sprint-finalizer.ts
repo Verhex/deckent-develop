@@ -32,15 +32,15 @@ import {
 // ─── Core — utils ─────────────────────────────────────────────────
 import { parseDebtTable, updateLastSprintId, debugLog } from '../core/utils.js';
 
-// ─── Sprint Utilities ─────────────────────────────────────────────
-import { readFileSafe } from './sprint-utils.js';
-
 // ─── Sprint Reporter ──────────────────────────────────────────────
 import {
   writeRetrospective, writeSprintLog, calculateMetrics,
   updateProjectDocs, updateProjectIdentity,
   buildAgentPerformance, archiveDirectives, archiveOrphanTasks,
 } from './sprint-reporter.js';
+
+// ─── Sprint Docs Updater (direct — cleanTasksArchive not re-exported via sprint-reporter) ──
+import { cleanTasksArchive } from './sprint-docs-updater.js';
 
 // ─── Result Evaluator ─────────────────────────────────────────────
 import {
@@ -79,6 +79,9 @@ import type { AfterSprintContext } from '../core/plugin-hooks.js';
 
 // ─── Rich Output ──────────────────────────────────────────────────
 import { formatRichSprintSummary } from '../cli/helpers/sprint-summary-rich.js';
+
+// ─── Event Stream (Brain event hooks — Sprint 139 Task 042) ───────
+import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 
 
 // ═══ Types ════════════════════════════════════════════════════════
@@ -128,7 +131,8 @@ export async function writeRubricDetail(
   if (scoredResults.length === 0) return false;
 
   const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-  const existing = existsSync(retroPath) ? readFileSync(retroPath, 'utf-8') : '';
+  // Async read — Sprint 139 async migration
+  const existing = await fsPromises.readFile(retroPath, 'utf-8').catch(() => '');
 
   // Avoid duplicate injection
   if (existing.includes('### Rubric Scores')) return false;
@@ -163,7 +167,8 @@ export async function writeRubricDetail(
   }
 
   try {
-    writeFileSync(retroPath, existing + tableLines.join('\n') + '\n', 'utf-8');
+    // Async write — Sprint 139 async migration
+    await fsPromises.writeFile(retroPath, existing + tableLines.join('\n') + '\n', 'utf-8');
     return true;
   } catch (e) {
     debugLog('writeRubricDetail:write', e);
@@ -298,23 +303,24 @@ export async function runSelfAuditGate(
     const flaggedTasks: string[] = [];
     try {
       const tasksDir = join(root, '.tasks');
-      if (existsSync(tasksDir)) {
-        const resultFiles = readdirSync(tasksDir).filter(f => f.endsWith('.result'));
-        for (const file of resultFiles) {
-          try {
-            const raw = readFileSync(join(tasksDir, file), 'utf-8');
-            const result = JSON.parse(raw) as { taskId?: string; notes?: string };
-            if (result.notes && containsHonestyTrigger(result.notes)) {
-              const taskBaseline = readBaseline(root, sprintId);
-              if (taskBaseline) {
-                const currentCapture = captureVitestBaseline(root, 180_000);
-                if (currentCapture && currentCapture.fail > taskBaseline.fail) {
-                  flaggedTasks.push(result.taskId ?? file);
-                }
+      // Async readdir — Sprint 139 async migration
+      const tasksDirFiles = await fsPromises.readdir(tasksDir).catch(() => [] as string[]);
+      const resultFiles = tasksDirFiles.filter(f => f.endsWith('.result'));
+      for (const file of resultFiles) {
+        try {
+          // Async readFile — Sprint 139 async migration
+          const raw = await fsPromises.readFile(join(tasksDir, file), 'utf-8');
+          const result = JSON.parse(raw) as { taskId?: string; notes?: string };
+          if (result.notes && containsHonestyTrigger(result.notes)) {
+            const taskBaseline = readBaseline(root, sprintId);
+            if (taskBaseline) {
+              const currentCapture = captureVitestBaseline(root, 180_000);
+              if (currentCapture && currentCapture.fail > taskBaseline.fail) {
+                flaggedTasks.push(result.taskId ?? file);
               }
             }
-          } catch { /* skip unparseable result files */ }
-        }
+          }
+        } catch { /* skip unparseable result files */ }
       }
     } catch (e) {
       debugLog('runSelfAuditGate:honesty', `scan failed: ${e}`);
@@ -326,18 +332,15 @@ export async function runSelfAuditGate(
   }
   debugLog('runSelfAuditGate:honesty', `violations=${honestyResult.violations}`);
 
-  // ── Step 4: Observability — metrics.jsonl check ─────────────────
+  // ── Step 4: Observability — metrics.jsonl check (async) ─────────
   const metricsPath = options?.metricsJsonlPath ?? join(root, '.deckent', 'metrics.jsonl');
   let observabilityResult: SelfAuditResult['observability'];
-  if (existsSync(metricsPath)) {
-    try {
-      const content = readFileSync(metricsPath, 'utf-8');
-      const lineCount = content.split('\n').filter(l => l.trim().length > 0).length;
-      observabilityResult = { metricsJsonlExists: true, lineCount };
-    } catch {
-      observabilityResult = { metricsJsonlExists: true, lineCount: 0 };
-    }
-  } else {
+  // Async readFile — Sprint 139 async migration (replaces existsSync + readFileSync)
+  try {
+    const content = await fsPromises.readFile(metricsPath, 'utf-8');
+    const lineCount = content.split('\n').filter(l => l.trim().length > 0).length;
+    observabilityResult = { metricsJsonlExists: true, lineCount };
+  } catch {
     observabilityResult = { metricsJsonlExists: false, lineCount: 0 };
     debugLog('runSelfAuditGate:observability', 'WARNING: metrics.jsonl not found');
   }
@@ -401,9 +404,10 @@ export async function applyAdaptiveThresholds(projectRoot: string, config: Resol
 
   const changes: string[] = [];
   const configPath = join(projectRoot, '.deckent', 'config.json');
-  const rawCfg: Record<string, unknown> = (() => {
+  // Async config read — Sprint 139 async migration
+  const rawCfg: Record<string, unknown> = await (async () => {
     try {
-      return JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+      return JSON.parse(await fsPromises.readFile(configPath, 'utf-8')) as Record<string, unknown>;
     } catch {
       return {};
     }
@@ -436,15 +440,15 @@ export async function applyAdaptiveThresholds(projectRoot: string, config: Resol
 
   if (changes.length === 0) return;
 
-  // Write updated config
-  writeFileSync(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
+  // Async write updated config — Sprint 139 async migration
+  await fsPromises.writeFile(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
 
-  // Append adaptive notes to RETRO.md
+  // Async append adaptive notes to RETRO.md — Sprint 139 async migration
   try {
     const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-    const retroContent = readFileSafe(retroPath) ?? '';
+    const retroContent = await fsPromises.readFile(retroPath, 'utf-8').catch(() => '');
     const adaptiveLines = changes.map(c => `- Adaptive: ${c}`).join('\n') + '\n';
-    writeFileSync(retroPath, retroContent + adaptiveLines);
+    await fsPromises.writeFile(retroPath, retroContent + adaptiveLines);
   } catch (e) { debugLog('applyAdaptiveThresholds:retroAppend', e); }
 }
 
@@ -484,6 +488,17 @@ export async function finalizeSprint(
 ): Promise<SprintMetrics> {
   // Ensure observability is initialized (idempotent — safe to call multiple times)
   initObservability(projectRoot);
+
+  // ─── SPRINT_PHASE_CHANGE: EXECUTE → EVALUATE ────────────────────
+  // Brain broadcasts faz geçişini event stream'e yazar.
+  // Tüm consumer'lar (auditor, dashboard, CLI) bu event'i okuyarak
+  // sprint'in EVALUATE fazına girdiğini anlar (ADR-035 broadcast kanalı).
+  const sprintIdForEvents = getCurrentSprintId(projectRoot) ?? sprint.id;
+  writeEvent(
+    projectRoot, sprintIdForEvents, 'brain', '*',
+    CHANNELS.SPRINT_PHASE_CHANGE,
+    { fromPhase: 'EXECUTE', toPhase: 'EVALUATE', sprintId: sprint.id, timestamp: new Date().toISOString() },
+  );
 
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
   const resultsMap = buildResultsMap(results);
@@ -532,15 +547,42 @@ export async function finalizeSprint(
     debugLog('finalizeSprint:codeReconcile', `${codeVerifiedTasks.length} tasks reconciled: ${codeVerifiedTasks.join(', ')}`);
   }
 
-  // 1. Calculate metrics
-  const freshDebt = parseDebtTable(readFileSafe(join(projectRoot, BRAIN_DIR, DEBT_FILE)) ?? '');
+  // 1. Calculate metrics (async DEBT_FILE read — Sprint 139 async migration)
+  const debtContent = await fsPromises.readFile(join(projectRoot, BRAIN_DIR, DEBT_FILE), 'utf-8').catch(() => '');
+  const freshDebt = parseDebtTable(debtContent);
   const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
   sprint.metrics = metrics;
+
+  // ─── METRIC_EMITTED: sprint summary metrics ──────────────────────
+  // Emitted in parallel with metrics.jsonl so Auditor and Dashboard
+  // get structured metric data without parsing the JSONL file.
+  // ADR-035: BRAIN→*:METRIC_EMITTED is a broadcast channel.
+  writeEvent(
+    projectRoot, sprintIdForEvents, 'brain', '*',
+    CHANNELS.METRIC_EMITTED,
+    {
+      name: 'sprint.summary',
+      sprintId: sprint.id,
+      totalTasks: metrics.totalTasks,
+      completedTasks: metrics.completedTasks,
+      techDebtTasks: metrics.techDebtTasks,
+      noGoTasks: metrics.noGoTasks,
+      durationMs: metrics.durationMs,
+      coveragePercent: metrics.coveragePercent,
+    },
+  );
 
   // 2. Write sprint log
   try {
     writeSprintLog(projectRoot, sprint, metrics, evaluations);
   } catch (e) { debugLog('finalizeSprint:writeSprintLog', e); }
+
+  // ─── SPRINT_PHASE_CHANGE: EVALUATE → RETRO ──────────────────────
+  writeEvent(
+    projectRoot, sprintIdForEvents, 'brain', '*',
+    CHANNELS.SPRINT_PHASE_CHANGE,
+    { fromPhase: 'EVALUATE', toPhase: 'RETRO', sprintId: sprint.id, timestamp: new Date().toISOString() },
+  );
 
   // 3 + 4. Write RETRO.md and update MEMORY.md (writeRetrospective does both)
   debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
@@ -554,11 +596,12 @@ export async function finalizeSprint(
     }
     writeRetrospective(projectRoot, sprint, evaluations, metrics, undefined, skillMap.size > 0 ? skillMap : undefined, results);
 
-    // Append Code-Verified DONE section if reconciliation happened
+    // Append Code-Verified DONE section if reconciliation happened (async)
     if (codeVerifiedTasks.length > 0) {
       try {
         const retroPath = join(projectRoot, BRAIN_DIR, 'RETRO.md');
-        const existing = existsSync(retroPath) ? readFileSync(retroPath, 'utf-8') : '';
+        // Async read + write — Sprint 139 async migration
+        const existing = await fsPromises.readFile(retroPath, 'utf-8').catch(() => '');
         if (!existing.includes('### Code-Verified DONE')) {
           const section = [
             '',
@@ -567,7 +610,7 @@ export async function finalizeSprint(
             ...codeVerifiedTasks.map(id => `- ${id}: Code physically verified despite missing .result (docker HB shutdown pattern)`),
             '',
           ].join('\n');
-          writeFileSync(retroPath, existing + section, 'utf-8');
+          await fsPromises.writeFile(retroPath, existing + section, 'utf-8');
         }
       } catch (e) { debugLog('finalizeSprint:codeVerifiedRetro', e); }
     }
@@ -838,6 +881,23 @@ export async function finalizeSprint(
     const gatePath = join(projectRoot, '.deckent', `${sprint.id}-gate.json`);
     await fsPromises.writeFile(gatePath, JSON.stringify(gateResult, null, 2));
     debugLog('finalizeSprint:selfAuditGate', `Gate result written to ${gatePath} overallGate=${gateResult.overallGate}`);
+
+    // ─── GATE_COMPUTED event (ADR-035 — AUDITOR→BRAIN:GATE_COMPUTED) ───
+    // Brain emits on behalf of the self-audit gate (finalizeSprint is in-process auditor role).
+    // Event stream source is 'auditor' to match ADR-037 authority matrix.
+    writeEvent(
+      projectRoot, sprintIdForEvents, 'auditor', 'brain',
+      CHANNELS.GATE_COMPUTED,
+      {
+        sprintId: sprint.id,
+        overallGate: gateResult.overallGate,
+        tscStatus: gateResult.tsc.status,
+        vitestFail: gateResult.vitest.delta.fail,
+        vitestPass: gateResult.vitest.delta.pass,
+        honestyViolations: gateResult.honesty.violations,
+        observabilityOk: gateResult.observability.metricsJsonlExists,
+      },
+    );
   } catch (writeErr) {
     debugLog('finalizeSprint:selfAuditGate', `WARNING: Failed to write gate.json: ${writeErr}`);
   }
@@ -872,6 +932,15 @@ export async function finalizeSprint(
     const report = await generateLoadReport(projectRoot);
     await fsPromises.writeFile(reportPath, report);
     debugLog('finalizeSprint:loadReport', `Load test report written to ${reportPath}`);
+
+    // ─── LOAD_REPORT_WRITTEN event (ADR-035 — AUDITOR→BRAIN:LOAD_REPORT_WRITTEN) ─
+    // Emitted after the report is successfully written to disk so consumers
+    // know the file is ready to read without polling.
+    writeEvent(
+      projectRoot, sprintIdForEvents, 'auditor', 'brain',
+      CHANNELS.LOAD_REPORT_WRITTEN,
+      { sprintId: sprint.id, reportPath, timestamp: new Date().toISOString() },
+    );
   } catch (e) { debugLog('finalizeSprint:loadReport', `WARNING: load_report_generation_failed: ${e}`); }
 
   debugLog('finalizeSprint:breadcrumb', 'Step 10c (loadReport) — done');
@@ -903,6 +972,13 @@ export async function finalizeSprint(
     const count = archiveOrphanTasks(projectRoot, sprint.id);
     debugLog('finalizeSprint:archiveOrphanTasks', `Archived ${count} orphan task files`);
   } catch (e) { debugLog('finalizeSprint:archiveOrphanTasks', e); }
+
+  // 12c. Apply .tasks/archive/ retention policy — remove archives beyond retention limit
+  debugLog('finalizeSprint:breadcrumb', 'Step 12c (cleanTasksArchive) — entering');
+  try {
+    const removed = cleanTasksArchive(projectRoot);
+    debugLog('finalizeSprint:cleanTasksArchive', `Removed ${removed} old .tasks/archive/ dirs`);
+  } catch (e) { debugLog('finalizeSprint:cleanTasksArchive', e); }
 
   // 13. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
   debugLog('finalizeSprint:breadcrumb', 'Step 13 (jobSummary) — entering');
@@ -983,6 +1059,15 @@ export async function finalizeSprint(
     writeFileSync(jobFile, JSON.stringify(jobData, null, 2) + '\n');
     debugLog('finalizeSprint:jobSummary', `Job summary written to ${jobFile}`);
   } catch (e) { debugLog('finalizeSprint:jobSummary', e); }
+
+  // ─── SPRINT_PHASE_CHANGE: RETRO → CLEANUP ───────────────────────
+  // Final phase transition — sprint lifecycle complete.
+  // Consumer: auditor marks sprint as finalized, dashboard shows COMPLETE.
+  writeEvent(
+    projectRoot, sprintIdForEvents, 'brain', '*',
+    CHANNELS.SPRINT_PHASE_CHANGE,
+    { fromPhase: 'RETRO', toPhase: 'CLEANUP', sprintId: sprint.id, timestamp: new Date().toISOString() },
+  );
 
   return metrics;
 }

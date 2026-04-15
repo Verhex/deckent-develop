@@ -2,7 +2,7 @@ import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DashboardState, Task } from '../../core/types.js';
-import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
+import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -15,6 +15,22 @@ interface StatusOpts {
   verbose?: boolean;
   raw?: boolean;
   noColor?: boolean;
+  graph?: boolean;
+}
+
+/**
+ * Load Mermaid dependency graph from disk.
+ * File-system based to avoid ADR-008 import cycle (status.ts must not import orchestra/).
+ * Returns null if no persisted graph exists.
+ */
+export function loadDepGraphForSprint(root: string, sprintId: string): string | null {
+  const mmdPath = join(root, DECKENT_DIR, `${sprintId}-depgraph.mmd`);
+  if (!existsSync(mmdPath)) return null;
+  try {
+    return readFileSync(mmdPath, 'utf-8');
+  } catch {
+    return null;
+  }
 }
 
 interface SprintMeta {
@@ -214,10 +230,30 @@ export function registerStatus(program: Command): void {
     .option('--raw', 'Show legacy raw dashboard (box format)')
     .option('--verbose', 'Show detailed agent and skill assignment info')
     .option('--no-color', 'Disable colored output')
+    .option('--graph', 'Display dependency graph as Mermaid diagram')
     .action((opts: StatusOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const lang = getLangFromRoot(root);
+
+      // --graph: display Mermaid dependency graph (reads .deckent/sprint-NNN-depgraph.mmd)
+      // Checked before dashboard existence so it works even when no dashboard is active.
+      if (opts.graph) {
+        const sprintId = getCurrentSprintId(root);
+        if (!sprintId) {
+          output('No active sprint found — cannot display dependency graph.');
+          return;
+        }
+        const mmd = loadDepGraphForSprint(root, sprintId);
+        if (!mmd) {
+          output(`No dependency graph found for ${sprintId}.\nRun a sprint with dependencies to generate the graph.`);
+          return;
+        }
+        output(`\n--- Dependency Graph (${sprintId}) ---\n`);
+        output(mmd);
+        output('\n--- End of Dependency Graph ---');
+        return;
+      }
 
       // (A) Standalone mode: if no dashboard, try task files
       if (!existsSync(dashPath)) {

@@ -1,0 +1,1 @@
+{"taskId":"138-005-fix","workerId":"docker-138-005-fix","filesChanged":[],"linesAdded":0,"linesRemoved":0,"testsPassed":false,"coverage":0,"selfAssessment":"NO_GO","notes":"Docker worker exited without writing result file"}

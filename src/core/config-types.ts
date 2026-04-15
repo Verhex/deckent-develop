@@ -218,6 +218,8 @@ export interface DeckentConfig {
     confidenceThreshold?: number;
     maxSkillsDefault?: number;
   };
+  /** How many terminal tasks (DONE/NO_GO) before writing a checkpoint. Default: 5. */
+  sprint_checkpoint_interval?: number;
 
   // ─── Plugin Security ──────────────────────────────────────────────
   /** Require valid SHA-256 signature for plugin hook modules (default: false).
@@ -297,6 +299,10 @@ export interface ResolvedConfig {
   cleanup_delay_ms?: number;
   /** Enable task dependency pipeline — only spawn tasks whose deps are DONE. Default: false */
   dependency_pipeline_enabled?: boolean;
+  /** How many terminal tasks (DONE/NO_GO) must complete before a checkpoint is written.
+   * Lower values → more frequent checkpoints → safer for long sprints.
+   * Default: 5. Sprint 139 override: 3. */
+  sprint_checkpoint_interval?: number;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

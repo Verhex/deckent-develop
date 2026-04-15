@@ -63,8 +63,114 @@ import { metric } from '../core/observability.js';
 import { detectScopeCollisions } from './conflict-resolver.js';
 import { writeEvent, CHANNELS, getCurrentSprintId, readSequence } from './event-stream.js';
 
+// ─── Dependency Scheduler (Sprint 139 Task 028 + 029) ───────────
+import {
+  buildDependencyGraph,
+  enforceWaveDependency,
+  applyFailureCascade,
+  unblockDependents,
+} from './dependency-scheduler.js';
+
 // ─── Sprint Checkpoint (Sprint 138 Long-Running Resume) ─────────
 import { writeCheckpoint } from './sprint-checkpoint.js';
+
+// ─── Worker Lifecycle State Machine (Sprint 139 Task 015) ────────
+import {
+  createWorkerStateMachine,
+  getWorkerStateMachine,
+  getAllWorkerStates,
+  isWorkerStoppable,
+  removeWorkerStateMachine,
+  type WorkerLifecycleState,
+} from '../agents/worker.js';
+
+// ─── Runtime vs Code Discriminator (Sprint 139 Task 024) ─────────
+import {
+  decideCascadeAction,
+  type FailureContext,
+  type CascadeDecision,
+} from './result-evaluator.js';
+
+// ═══ Scope Path Utilities ══════════════════════════════════════════
+
+/**
+ * ADR-013 protected paths — workers must NEVER write these files.
+ * CLAUDE.md and DECKENT.md are adapter files managed exclusively by Brain/init.
+ */
+const ADR013_PROTECTED_PATHS = new Set(['CLAUDE.md', 'DECKENT.md']);
+
+/**
+ * File extension pattern — matches bare extension entries like `.json`, `.ts`, `.md`.
+ * Must have NO path separators (so `.tasks/` is not matched), and the dot must be followed
+ * by only short word characters typical of file extensions (max 5 chars).
+ * Examples that match (invalid scope entries): `.json`, `.ts`, `.md`, `.mjs`
+ * Examples that do NOT match (valid): `.tasks/`, `.deckent/`, `.tasks`, `src/core/`
+ */
+const EXTENSION_ONLY_RE = /^\.[a-z]{1,5}$/i;
+
+/**
+ * Normalize a single scope path:
+ * - Trims whitespace
+ * - Rejects bare file-extension entries (e.g. `.json`, `.ts`, `.md`) — not valid paths
+ * - Removes trailing slash ONLY from file paths (basename has a non-leading-dot extension)
+ *   e.g. `DECKENT.md/` → `DECKENT.md`, but `src/core/` stays `src/core/`, `.tasks/` stays `.tasks/`
+ * - Rejects ADR-013 protected paths (`CLAUDE.md`, `DECKENT.md`)
+ *
+ * @returns The normalized path, or null if the path should be excluded
+ */
+export function normalizeScopePath(rawPath: string): string | null {
+  const trimmed = rawPath.trim();
+  if (!trimmed) return null;
+
+  // Reject bare extension entries like ".json", ".ts" — they have no slash and match
+  // the extension pattern. Must check trimmed (not without-slash) to avoid catching ".tasks/".
+  if (EXTENSION_ONLY_RE.test(trimmed)) return null;
+
+  // Compute the basename (without trailing slash) for extension detection
+  const basenameForCheck = trimmed.replace(/\/$/, '').split('/').pop() ?? '';
+
+  // Remove trailing slash only when the basename looks like a file:
+  // it has an extension (dot that is NOT the first character of the basename).
+  // This keeps directory entries like `src/core/`, `.tasks/`, `.deckent/` unchanged.
+  const hasFileExtension = basenameForCheck.includes('.') && !basenameForCheck.startsWith('.');
+  const normalized = (trimmed.endsWith('/') && hasFileExtension)
+    ? trimmed.slice(0, -1)
+    : trimmed;
+
+  // Compute final basename for ADR-013 check
+  const basename = normalized.replace(/\/$/, '').split('/').pop() ?? normalized;
+
+  // Reject ADR-013 protected adapter files (full basename match)
+  if (ADR013_PROTECTED_PATHS.has(basename)) return null;
+
+  return normalized;
+}
+
+/**
+ * Build and normalize the list of write targets for a worker's --allowedTools scope.
+ * Applies path normalization rules: trailing slash removal on files, extension-only
+ * path rejection, and ADR-013 protected path exclusion.
+ *
+ * Always prepends `.tasks/` so workers can write heartbeat and result files.
+ *
+ * @param task - The task whose scope is being resolved
+ * @returns Deduplicated, normalized write target paths
+ */
+export function buildAllowedWriteTargets(task: Pick<Task, 'scope'>): string[] {
+  const raw = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const path of raw) {
+    const normalized = normalizeScopePath(path);
+    if (normalized !== null && !seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  }
+
+  return result;
+}
 
 // ═══ Exported Functions ════════════════════════════════════════════
 
@@ -147,12 +253,36 @@ export async function spawnWorkers(
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
     const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts);
     const model = task.model;
-    const writeTargets = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
+    const writeTargets = buildAllowedWriteTargets(task);
     const allowedTools = writeTargets.length > 0
       ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
       : 'Read,Write,Edit,Bash,Glob,Grep';
 
     const taskProvider = resolveTaskProvider(task);
+
+    // ─── Worker State Machine init (Sprint 139) ─────────────────
+    const wid = `w-${task.id}`;
+    const sm = createWorkerStateMachine(wid);
+    // SPAWNING → STARTING (backend spawn call is about to happen)
+    sm.transition('STARTING');
+
+    // ─── TASK_ASSIGN event (Brain → Worker, Protocol 1.0) ────────
+    // Emitted before spawn so the event stream records task intent
+    // even if the spawn process fails (observable pre-condition state).
+    const sprintIdForAssign = getCurrentSprintId(projectRoot) ?? sprint.id;
+    writeEvent(
+      projectRoot, sprintIdForAssign, 'brain', 'worker',
+      CHANNELS.TASK_ASSIGN,
+      {
+        taskId: task.id,
+        workerId: wid,
+        model: task.model,
+        agent: task.assignedAgent ?? 'generic',
+        skills: task.assignedSkills ?? [],
+        scope: { directories: task.scope?.directories ?? [], filesWrite: task.scope?.filesWrite ?? [] },
+        provider: resolveTaskProvider(task),
+      },
+    );
 
     // Single spawn path — NEVER spawn the same task twice.
     if (backend) {
@@ -176,6 +306,17 @@ export async function spawnWorkers(
         autoApprove: spawnOpts?.autoApprove ?? false,
       });
     }
+
+    // STARTING → EXECUTING (spawn call succeeded)
+    sm.transition('EXECUTING');
+
+    // Emit lifecycle state to event stream
+    const sprintIdForEvent = getCurrentSprintId(projectRoot) ?? sprint.id;
+    writeEvent(
+      projectRoot, sprintIdForEvent, 'worker', 'brain',
+      CHANNELS.HEARTBEAT,
+      { workerId: wid, taskId: task.id, lifecycleState: sm.state },
+    );
 
     // Update task status to EXECUTING and persist to disk
     task.status = TaskStatus.EXECUTING;
@@ -232,11 +373,25 @@ export async function respawnEligibleTasks(
     sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
   );
 
-  const nowEligible = sprint.tasks.filter(t => {
-    if (t.status !== TaskStatus.PENDING) return false;
-    if (!t.dependencies || t.dependencies.length === 0) return false;
-    return t.dependencies.every(dep => doneTasks.has(dep));
-  });
+  // Build dependency graph for enforcement (Sprint 139 Task 028)
+  const graph = buildDependencyGraph(sprint.tasks, /* includeCollisions */ true);
+  const pendingIds = sprint.tasks
+    .filter(t => t.status === TaskStatus.PENDING)
+    .map(t => t.id);
+
+  const enforcement = enforceWaveDependency(graph, pendingIds, doneTasks);
+
+  // Emit blocked events to event stream
+  const sprintIdForDeps = getCurrentSprintId(projectRoot) ?? sprint.id;
+  for (const [blockedId, unresolvedDeps] of enforcement.reasons) {
+    writeEvent(
+      projectRoot, sprintIdForDeps, 'brain', 'worker',
+      'BRAIN→WORKER:DEPENDENCY_BLOCKED',
+      { taskId: blockedId, unresolvedDeps, reason: 'dependencies not yet DONE' },
+    );
+  }
+
+  const nowEligible = sprint.tasks.filter(t => enforcement.eligible.includes(t.id));
 
   if (nowEligible.length === 0) return [];
 
@@ -256,7 +411,7 @@ export async function respawnEligibleTasks(
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);
     const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
     const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts);
-    const writeTargets = ['.tasks/', ...task.scope.directories, ...task.scope.filesWrite].filter(Boolean);
+    const writeTargets = buildAllowedWriteTargets(task);
     const allowedTools = writeTargets.length > 0
       ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
       : 'Read,Write,Edit,Bash,Glob,Grep';
@@ -303,8 +458,26 @@ export async function respawnEligibleTasks(
     } catch (e) { debugLog('respawnEligibleTasks:onWaveTransition', e); }
   }
 
-  // ─── Checkpoint every N=5 completed tasks (Sprint 138 Long-Running Resume) ──
-  const CHECKPOINT_INTERVAL = 5;
+  // ─── METRIC_EMITTED: wave respawn metrics ────────────────────────
+  // Emit a METRIC_EMITTED event so Auditor/Dashboard can track wave progress
+  // without polling the file system. Written in parallel with metrics.jsonl.
+  const sprintIdForMetric = getCurrentSprintId(projectRoot) ?? sprint.id;
+  writeEvent(
+    projectRoot, sprintIdForMetric, 'brain', '*',
+    CHANNELS.METRIC_EMITTED,
+    {
+      name: 'wave.respawn',
+      value: toSpawn.length,
+      durationMs: waveDuration,
+      spawnedTaskIds: toSpawn.map(t => t.id),
+      totalDone: sprint.tasks.filter(t => t.status === TaskStatus.DONE).length,
+      totalPending: sprint.tasks.filter(t => t.status === TaskStatus.PENDING).length,
+    },
+  );
+
+  // ─── Checkpoint every N completed tasks (Sprint 138 Long-Running Resume) ──
+  // Sprint 139 override: sprint_checkpoint_interval=3 (default 5) for higher-risk sprints
+  const CHECKPOINT_INTERVAL = config.sprint_checkpoint_interval ?? 5;
   const terminalCount = sprint.tasks.filter(t =>
     t.status === TaskStatus.DONE || t.status === TaskStatus.NO_GO,
   ).length;
@@ -352,6 +525,275 @@ export function routeSprintTasks(
   }
 }
 
+// ─── State-Aware Worker Stop (Sprint 139 Task 015) ──────────────
+
+/**
+ * Stop a worker only if it's in a stoppable lifecycle state.
+ *
+ * This prevents the "No such container" race condition from Sprint 138:
+ * worker writes DONE → container exits → Brain calls docker stop → container gone → error.
+ *
+ * @param taskId - Task ID (used to derive worker ID: `w-${taskId}`)
+ * @param backend - Spawn backend with kill() method
+ * @returns Object with `stopped` flag and the worker's lifecycle state
+ */
+export function stopWorkerIfStoppable(
+  taskId: string,
+  backend: SpawnBackend | undefined,
+): { stopped: boolean; state: WorkerLifecycleState | 'UNKNOWN' } {
+  const wid = `w-${taskId}`;
+
+  if (!isWorkerStoppable(wid)) {
+    // getAllWorkerStates().get() returns undefined if worker was already cleaned up
+    const existingSm = getAllWorkerStates().get(wid);
+    const currentState = existingSm?.state ?? 'UNKNOWN' as const;
+    debugLog('stopWorkerIfStoppable:skip', `worker ${wid} in ${currentState} — skip stop`);
+    return { stopped: false, state: currentState };
+  }
+
+  const sm = getWorkerStateMachine(wid);
+
+  // Transition to ERROR before stopping (worker is being forcefully terminated)
+  if (sm.canTransition('ERROR')) {
+    sm.transition('ERROR');
+  }
+
+  if (backend) {
+    backend.kill(taskId);
+  }
+
+  // Transition to EXITED after stop
+  if (sm.canTransition('EXITED')) {
+    sm.transition('EXITED');
+  }
+
+  // Cleanup state machine from registry
+  removeWorkerStateMachine(wid);
+
+  debugLog('stopWorkerIfStoppable:done', `worker ${wid} stopped and cleaned up`);
+  return { stopped: true, state: 'EXITED' };
+}
+
+/**
+ * Transition a worker's lifecycle state and emit to event stream.
+ * Convenience wrapper used by Brain/result-collector when processing worker heartbeats.
+ *
+ * @param projectRoot - Project root for event stream
+ * @param taskId - Task ID
+ * @param newState - Target lifecycle state
+ * @returns true if transition succeeded, false if invalid
+ */
+export function transitionWorkerState(
+  projectRoot: string,
+  taskId: string,
+  newState: WorkerLifecycleState,
+): boolean {
+  const wid = `w-${taskId}`;
+  const sm = getWorkerStateMachine(wid);
+
+  if (!sm.canTransition(newState)) {
+    debugLog('transitionWorkerState:invalid', `${wid}: ${sm.state} → ${newState} not allowed`);
+    return false;
+  }
+
+  sm.transition(newState);
+
+  const sprintId = getCurrentSprintId(projectRoot);
+  if (sprintId) {
+    writeEvent(
+      projectRoot, sprintId, 'worker', 'brain',
+      CHANNELS.HEARTBEAT,
+      { workerId: wid, taskId, lifecycleState: sm.state },
+    );
+  }
+
+  return true;
+}
+
+// ─── Runtime vs Code Discriminator — Cross-Dep Action (Sprint 139 Task 024) ─
+
+/**
+ * Evaluate a failed task and emit the correct cross-dependency action to the event stream.
+ *
+ * This is the entry point for the Runtime vs Code Discriminator in the spawner.
+ * Called after a task is evaluated as NO_GO, before deciding whether to:
+ *   - Retry the task (RUNTIME / AMBIGUOUS)
+ *   - Cascade-block its dependents (CODE)
+ *   - Spawn a fix worker (CODE)
+ *
+ * The classification and decision are emitted to the event stream so the
+ * Auditor can observe and Brain can reconcile cascades.
+ *
+ * @param projectRoot - Project root for event stream writes
+ * @param taskId - ID of the failed task
+ * @param ctx - Failure context (exitCode, notes, errorOutput, resultFilePresent)
+ * @returns CascadeDecision — callers use shouldRetry, shouldCascade, spawnFixWorker
+ */
+export function evaluateFailureCascade(
+  projectRoot: string,
+  taskId: string,
+  ctx: FailureContext,
+): CascadeDecision {
+  const decision = decideCascadeAction(taskId, ctx);
+
+  const sprintId = getCurrentSprintId(projectRoot);
+  if (sprintId) {
+    writeEvent(
+      projectRoot, sprintId, 'brain', 'brain',
+      CHANNELS.FIX_REQUEST,
+      {
+        taskId,
+        failureCategory: decision.category,
+        shouldRetry: decision.shouldRetry,
+        shouldCascade: decision.shouldCascade,
+        spawnFixWorker: decision.spawnFixWorker,
+        reason: decision.reason,
+        signals: (ctx.notes ?? '').slice(0, 200),
+      },
+    );
+  }
+
+  debugLog('evaluateFailureCascade', `task ${taskId}: ${decision.category} → retry=${decision.shouldRetry} cascade=${decision.shouldCascade}`);
+
+  return decision;
+}
+
+// ─── Cascade Application Wire (Sprint 139 Task 029) ─────────────────────────
+
+/**
+ * Apply cascade blocking to a sprint after a task fails.
+ *
+ * Integrates evaluateFailureCascade (Task 024 discriminator) with
+ * applyFailureCascade (Task 029 scheduler). Respects Alperen's Q1 risk-taking:
+ *   - CODE failure → cascade block PENDING dependents → PAUSED
+ *   - RUNTIME / AMBIGUOUS → no cascade (retry path, no blocking)
+ *
+ * Each PENDING → PAUSED transition is written to the event stream via
+ * SCOPE_COLLISION_DETECTED channel (re-used as blocking signal) so the
+ * Auditor can track blocked tasks.
+ *
+ * @param projectRoot - Project root for event stream writes
+ * @param sprint - Sprint with tasks to potentially block
+ * @param failedTaskId - Task evaluated as NO_GO
+ * @param ctx - Failure context for classification
+ * @returns CascadeDecision and list of newly blocked task IDs
+ */
+export function applyCascadeToSprint(
+  projectRoot: string,
+  sprint: Sprint,
+  failedTaskId: string,
+  ctx: FailureContext,
+): { decision: CascadeDecision; blockedTaskIds: string[] } {
+  const decision = evaluateFailureCascade(projectRoot, failedTaskId, ctx);
+
+  if (!decision.shouldCascade) {
+    // RUNTIME or AMBIGUOUS: no cascade, retry path
+    return { decision, blockedTaskIds: [] };
+  }
+
+  // CODE failure: build graph and cascade-block transitive dependents
+  const graph = buildDependencyGraph(sprint.tasks, /* includeCollisions */ false);
+  const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+
+  const cascadeResult = applyFailureCascade(graph, failedTaskId, sprint.tasks, {
+    shouldCascade: decision.shouldCascade,
+    failureCategory: decision.category,
+    onTransition: (event) => {
+      // Write each BLOCKED transition to event stream
+      writeEvent(
+        projectRoot, sprintId, 'auditor', 'brain',
+        CHANNELS.SCOPE_COLLISION_DETECTED, // repurposed as cascade block signal
+        {
+          transition: event.transition,
+          taskId: event.taskId,
+          triggerTaskId: event.triggerTaskId,
+          failureCategory: event.failureCategory,
+          fromStatus: event.fromStatus,
+          toStatus: event.toStatus,
+          blockedBy: failedTaskId,
+        },
+      );
+    },
+  });
+
+  debugLog(
+    'applyCascadeToSprint',
+    `Cascade applied: ${failedTaskId} (CODE) → ${cascadeResult.totalBlocked} tasks blocked`,
+  );
+
+  return { decision, blockedTaskIds: cascadeResult.blockedTaskIds };
+}
+
+/**
+ * Apply unblocking to a sprint after a previously failed task is resolved.
+ *
+ * When a fix worker resolves a failed task (status → DONE), PAUSED dependents
+ * whose all dependencies are now satisfied are re-enabled (PAUSED → PENDING).
+ * Each UNBLOCKED transition is written to the event stream.
+ *
+ * @param projectRoot - Project root for event stream writes
+ * @param sprint - Sprint with tasks to potentially unblock
+ * @param resolvedTaskId - Task that was just resolved (DONE)
+ * @returns List of task IDs that were unblocked (PAUSED → PENDING)
+ */
+export function applyUnblockToSprint(
+  projectRoot: string,
+  sprint: Sprint,
+  resolvedTaskId: string,
+): string[] {
+  const graph = buildDependencyGraph(sprint.tasks, /* includeCollisions */ false);
+  const doneTasks = new Set(
+    sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
+  );
+  const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+
+  const unblockResult = unblockDependents(graph, resolvedTaskId, sprint.tasks, doneTasks, (event) => {
+    // ─── DEPENDENCY_UNBLOCKED: separate channel from BLOCKED ──────
+    // ADR-037: Brain broadcasts unblock events so workers can resume
+    // and Auditor can track the full BLOCKED→UNBLOCKED lifecycle.
+    writeEvent(
+      projectRoot, sprintId, 'brain', 'worker',
+      'BRAIN→WORKER:DEPENDENCY_UNBLOCKED',
+      {
+        transition: event.transition,
+        taskId: event.taskId,
+        triggerTaskId: event.triggerTaskId,
+        fromStatus: event.fromStatus,
+        toStatus: event.toStatus,
+        unblockedBy: resolvedTaskId,
+      },
+    );
+  });
+
+  debugLog(
+    'applyUnblockToSprint',
+    `Unblocked ${unblockResult.totalUnblocked} tasks after ${resolvedTaskId} resolved`,
+  );
+
+  return unblockResult.unblockedTaskIds;
+}
+
 // ─── Re-exports for external consumers ────────────────────────────
 export { detectScopeCollisions, buildCollisionAwareWaves } from './conflict-resolver.js';
 export type { CollisionResult, CollisionMap } from './conflict-resolver.js';
+export type { FailureContext, CascadeDecision, FailureClassification, FailureCategory } from './result-evaluator.js';
+
+// ─── Dependency Scheduler re-exports (Sprint 139 Task 028 + 029) ──
+export {
+  buildDependencyGraph,
+  enforceWaveDependency,
+  cascadeBlockDependents,
+  unblockDependents,
+  applyFailureCascade,
+} from './dependency-scheduler.js';
+export type {
+  DependencyGraph,
+  DependencyWave,
+  EnforcementResult,
+  CascadeResult,
+  UnblockResult,
+  CascadeBlockOptions,
+  ApplyFailureCascadeResult,
+  CascadeTransitionEvent,
+  CascadeEventCallback,
+} from './dependency-scheduler.js';

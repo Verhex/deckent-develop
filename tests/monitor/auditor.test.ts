@@ -25,6 +25,20 @@ import {
   verifyWorkerResult,
   parseADRs,
   checkADRCompliance,
+  // Sprint 139 — cache invalidation + multi-signal stale detection
+  readHeartbeatCached,
+  clearHeartbeatCache,
+  getHeartbeatCacheSize,
+  isWorkerProcessAlive,
+  isWorkerStale,
+  // Sprint 139 Task 016 — orphan HB cleanup
+  detectOrphans,
+  cleanupOrphanHBs,
+  // Sprint 139 Task 032 — dependency violation alert
+  detectDependencyViolations,
+  // Sprint 139 Task 043 — event hook real wire
+  emitVerificationEvent,
+  emitADRViolationEvent,
 } from '../../src/monitor/auditor.js';
 import { AlertLevel, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
@@ -37,14 +51,33 @@ vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
   appendFileSync: vi.fn(),
   unlinkSync: vi.fn(),
+  statSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
-import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
+vi.mock('../../src/orchestra/event-stream.js', () => ({
+  writeEvent: vi.fn(),
+  readEvents: vi.fn().mockReturnValue([]),
+  CHANNELS: {
+    VERIFICATION_RESULT: 'AUDITOR→BRAIN:VERIFICATION_RESULT',
+    ADR_VIOLATION: 'AUDITOR→BRAIN:ADR_VIOLATION',
+    GATE_COMPUTED: 'AUDITOR→BRAIN:GATE_COMPUTED',
+    LOAD_REPORT_WRITTEN: 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
+    SCOPE_COLLISION_DETECTED: 'AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED',
+    DEPENDENCY_VIOLATION: 'AUDITOR→BRAIN:DEPENDENCY_VIOLATION',
+    ORPHAN_HB_DETECTED: 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED',
+    AUTHORITY_VIOLATION: 'AUDITOR→BRAIN:AUTHORITY_VIOLATION',
+  },
+}));
+
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, renameSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { writeEvent } from '../../src/orchestra/event-stream.js';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedReaddirSync = vi.mocked(readdirSync);
@@ -52,11 +85,19 @@ const mockedExistsSync = vi.mocked(existsSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
 const mockedUnlinkSync = vi.mocked(unlinkSync);
 const mockedSpawnSync = vi.mocked(spawnSync);
+const mockedStatSync = vi.mocked(statSync);
+const mockedMkdirSync = vi.mocked(mkdirSync);
+const mockedWriteEvent = vi.mocked(writeEvent);
+const mockedRenameSync = vi.mocked(renameSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedExistsSync.mockReturnValue(false);
   mockedReaddirSync.mockReturnValue([] as never);
+  // Sprint 139: Default statSync mock — returns a fresh mtime so readHeartbeatCached works
+  mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
+  // Sprint 139: Clear heartbeat cache between tests to avoid state leakage
+  clearHeartbeatCache();
 });
 
 describe('createAlert', () => {
@@ -1674,5 +1715,1201 @@ describe('checkADRCompliance', () => {
 
     const violations = checkADRCompliance('/tmp/test', ['src/good-file.ts']);
     expect(violations).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Sprint 139 — Heartbeat Cache Invalidation + Multi-Signal Stale Detection
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('readHeartbeatCached', () => {
+  const hbPath = '/project/.tasks/task-001.hb';
+  const sampleHb: Heartbeat = {
+    workerId: 'w-001',
+    taskId: '001',
+    status: 'CODING' as never,
+    currentAction: 'writing',
+    timestamp: new Date().toISOString(),
+    filesChangedCount: 1,
+    sequence: 5,
+    progress: 50,
+  };
+
+  it('reads from disk on first access and caches result', () => {
+    mockedStatSync.mockReturnValue({ mtimeMs: 1000 } as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(sampleHb));
+
+    const result = readHeartbeatCached(hbPath);
+    expect(result).toEqual(sampleHb);
+    expect(getHeartbeatCacheSize()).toBe(1);
+    expect(mockedReadFileSync).toHaveBeenCalledOnce();
+  });
+
+  it('returns cached value when mtime unchanged', () => {
+    // First read — populate cache
+    mockedStatSync.mockReturnValue({ mtimeMs: 1000 } as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(sampleHb));
+    readHeartbeatCached(hbPath);
+
+    // Reset call count
+    mockedReadFileSync.mockClear();
+
+    // Second read — same mtime, should hit cache
+    const result = readHeartbeatCached(hbPath);
+    expect(result).toEqual(sampleHb);
+    expect(mockedReadFileSync).not.toHaveBeenCalled();
+  });
+
+  it('re-reads from disk when mtime changes', () => {
+    // First read — populate cache
+    mockedStatSync.mockReturnValue({ mtimeMs: 1000 } as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(sampleHb));
+    readHeartbeatCached(hbPath);
+
+    // mtime changed — should re-read
+    const updatedHb = { ...sampleHb, sequence: 10, currentAction: 'testing' };
+    mockedStatSync.mockReturnValue({ mtimeMs: 2000 } as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(updatedHb));
+
+    const result = readHeartbeatCached(hbPath);
+    expect(result).toEqual(updatedHb);
+    expect(result?.sequence).toBe(10);
+  });
+
+  it('returns null and clears cache when file does not exist', () => {
+    mockedStatSync.mockImplementation(() => { throw new Error('ENOENT'); });
+
+    const result = readHeartbeatCached(hbPath);
+    expect(result).toBeNull();
+    expect(getHeartbeatCacheSize()).toBe(0);
+  });
+
+  it('returns null and clears cache when file is malformed JSON', () => {
+    mockedStatSync.mockReturnValue({ mtimeMs: 3000 } as never);
+    mockedReadFileSync.mockReturnValue('not json');
+
+    const result = readHeartbeatCached(hbPath);
+    expect(result).toBeNull();
+    expect(getHeartbeatCacheSize()).toBe(0);
+  });
+
+  it('clearHeartbeatCache empties the cache', () => {
+    mockedStatSync.mockReturnValue({ mtimeMs: 1000 } as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(sampleHb));
+    readHeartbeatCached(hbPath);
+    expect(getHeartbeatCacheSize()).toBe(1);
+
+    clearHeartbeatCache();
+    expect(getHeartbeatCacheSize()).toBe(0);
+  });
+});
+
+describe('isWorkerProcessAlive', () => {
+  it('detects running Docker container', () => {
+    const hb: Heartbeat = {
+      workerId: 'w-001', taskId: '001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 1, progress: 50,
+      backend: 'docker',
+    };
+
+    mockedSpawnSync.mockReturnValue({
+      stdout: 'deckent-w-001\n', stderr: '', status: 0, signal: null,
+      pid: 1, output: [], error: undefined,
+    } as never);
+
+    expect(isWorkerProcessAlive(hb)).toBe(true);
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      'docker',
+      ['ps', '--filter', 'name=deckent-w-001', '--format', '{{.Names}}'],
+      expect.objectContaining({ timeout: 5_000 }),
+    );
+  });
+
+  it('returns false for stopped Docker container', () => {
+    const hb: Heartbeat = {
+      workerId: 'w-002', taskId: '002', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 1, progress: 50,
+      backend: 'docker',
+    };
+
+    mockedSpawnSync.mockReturnValue({
+      stdout: '', stderr: '', status: 0, signal: null,
+      pid: 1, output: [], error: undefined,
+    } as never);
+
+    expect(isWorkerProcessAlive(hb)).toBe(false);
+  });
+
+  it('detects active tmux session', () => {
+    const hb: Heartbeat = {
+      workerId: 'w-003', taskId: '003', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 1, progress: 50,
+      backend: 'tmux',
+    };
+
+    mockedSpawnSync.mockReturnValue({
+      stdout: '', stderr: '', status: 0, signal: null,
+      pid: 1, output: [], error: undefined,
+    } as never);
+
+    expect(isWorkerProcessAlive(hb)).toBe(true);
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      'tmux',
+      ['has-session', '-t', 'w-003'],
+      expect.objectContaining({ timeout: 5_000 }),
+    );
+  });
+
+  it('returns false for dead tmux session', () => {
+    const hb: Heartbeat = {
+      workerId: 'w-004', taskId: '004', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 1, progress: 50,
+      backend: 'tmux',
+    };
+
+    mockedSpawnSync.mockReturnValue({
+      stdout: '', stderr: 'session not found', status: 1, signal: null,
+      pid: 1, output: [], error: undefined,
+    } as never);
+
+    expect(isWorkerProcessAlive(hb)).toBe(false);
+  });
+
+  it('returns false for subprocess backend (conservative)', () => {
+    const hb: Heartbeat = {
+      workerId: 'w-005', taskId: '005', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 1, progress: 50,
+      backend: 'subprocess',
+    };
+
+    expect(isWorkerProcessAlive(hb)).toBe(false);
+    // Should not call spawnSync for subprocess
+    expect(mockedSpawnSync).not.toHaveBeenCalled();
+  });
+
+  it('returns false when backend is undefined', () => {
+    const hb: Heartbeat = {
+      workerId: 'w-006', taskId: '006', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 1, progress: 50,
+    };
+
+    expect(isWorkerProcessAlive(hb)).toBe(false);
+  });
+
+  it('returns false when spawnSync throws', () => {
+    const hb: Heartbeat = {
+      workerId: 'w-007', taskId: '007', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 1, progress: 50,
+      backend: 'docker',
+    };
+
+    mockedSpawnSync.mockImplementation(() => { throw new Error('spawn failed'); });
+
+    expect(isWorkerProcessAlive(hb)).toBe(false);
+  });
+});
+
+describe('isWorkerStale', () => {
+  const projectRoot = '/project';
+
+  function makeHb(overrides: Partial<Heartbeat> = {}): Heartbeat {
+    return {
+      workerId: 'w-001', taskId: '001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: new Date().toISOString(),
+      filesChangedCount: 0, sequence: 5, progress: 50,
+      ...overrides,
+    };
+  }
+
+  it('returns false (not stale) when HB timestamp is fresh', () => {
+    const hb = makeHb(); // fresh timestamp
+    mockedExistsSync.mockReturnValue(false);
+
+    // Fresh HB → not stale, no secondary signals needed
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(false);
+  });
+
+  it('returns false (not stale) when HB is fresh AND result exists', () => {
+    const hb = makeHb();
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify({ selfAssessment: 'DONE' }));
+
+    // Fresh HB → not stale (primary signal sufficient)
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(false);
+  });
+
+  it('returns false (not stale) when HB is stale but result DONE', () => {
+    const staleTimestamp = new Date(Date.now() - 300_000).toISOString(); // 5min ago
+    const hb = makeHb({ timestamp: staleTimestamp, backend: 'docker' });
+
+    // .result exists with DONE — secondary signal A suppresses stale
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify({ selfAssessment: 'DONE' }));
+
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(false);
+  });
+
+  it('returns false (not stale) when HB is stale but container running', () => {
+    const staleTimestamp = new Date(Date.now() - 300_000).toISOString();
+    const hb = makeHb({ timestamp: staleTimestamp, backend: 'docker' });
+
+    // No .result file
+    mockedExistsSync.mockReturnValue(false);
+
+    // Docker container running — secondary signal B suppresses stale
+    mockedSpawnSync.mockReturnValue({
+      stdout: 'deckent-w-001\n', stderr: '', status: 0, signal: null,
+      pid: 1, output: [], error: undefined,
+    } as never);
+
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(false);
+  });
+
+  it('returns true (stale) when all 3 signals indicate dead', () => {
+    const staleTimestamp = new Date(Date.now() - 300_000).toISOString();
+    const hb = makeHb({ timestamp: staleTimestamp });
+
+    mockedExistsSync.mockReturnValue(false); // no .result
+    // No backend → isWorkerProcessAlive returns false
+
+    // 0 signals → stale
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(true);
+  });
+
+  it('returns true for malformed timestamp', () => {
+    const hb = makeHb({ timestamp: 'not-a-date' });
+
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(true);
+  });
+
+  it('Sprint 138 false positive regression: DONE result suppresses stale', () => {
+    // Simulate Sprint 138 pattern: worker finished but HB is old
+    const staleTimestamp = new Date(Date.now() - 600_000).toISOString(); // 10min ago
+    const hb = makeHb({ timestamp: staleTimestamp, backend: 'tmux' });
+
+    // .result file exists with GO_WITH_TECH_DEBT (in DONE_SET)
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify({ selfAssessment: 'GO_WITH_TECH_DEBT' }));
+
+    // tmux session dead — doesn't matter, result file signals completion
+    mockedSpawnSync.mockReturnValue({
+      stdout: '', stderr: '', status: 1, signal: null,
+      pid: 1, output: [], error: undefined,
+    } as never);
+
+    // Signal A (result DONE_SET) → not stale despite HB being old
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(false);
+  });
+
+  it('returns true (stale) when HB stale + result NO_GO + no process', () => {
+    const staleTimestamp = new Date(Date.now() - 600_000).toISOString();
+    const hb = makeHb({ timestamp: staleTimestamp, backend: 'tmux' });
+
+    // .result exists but NO_GO → not in DONE_SET
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(JSON.stringify({ selfAssessment: 'NO_GO' }));
+
+    // tmux session dead
+    mockedSpawnSync.mockReturnValue({
+      stdout: '', stderr: '', status: 1, signal: null,
+      pid: 1, output: [], error: undefined,
+    } as never);
+
+    // No secondary signals alive → genuinely stale
+    expect(isWorkerStale(hb, projectRoot, 120_000)).toBe(true);
+  });
+
+  it('considers sequence progression via hbPath cache', () => {
+    const staleTimestamp = new Date(Date.now() - 300_000).toISOString();
+    const hbPath = '/project/.tasks/task-001.hb';
+
+    // Pre-populate cache with older sequence
+    mockedStatSync.mockReturnValue({ mtimeMs: 1000 } as never);
+    const oldHb = makeHb({ sequence: 3, timestamp: staleTimestamp });
+    mockedReadFileSync.mockReturnValue(JSON.stringify(oldHb));
+    readHeartbeatCached(hbPath); // cache with sequence=3
+
+    // Now check newer HB (sequence=5 > cached sequence=3)
+    const newHb = makeHb({ sequence: 5, timestamp: staleTimestamp });
+    mockedExistsSync.mockReturnValue(false); // no .result
+
+    // Signal C: sequence progression → not stale (any secondary signal is enough)
+    expect(isWorkerStale(newHb, projectRoot, 120_000, hbPath)).toBe(false);
+  });
+});
+
+describe('scanHeartbeats with cache (Sprint 139 integration)', () => {
+  it('uses cached heartbeats and multi-signal detection', () => {
+    const freshTimestamp = new Date().toISOString();
+    const hb: Heartbeat = {
+      workerId: 'w-001', taskId: '001', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: freshTimestamp,
+      filesChangedCount: 1, sequence: 5, progress: 50,
+    };
+
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+    mockedStatSync.mockReturnValue({ mtimeMs: 1000 } as never);
+    mockedReadFileSync.mockReturnValue(JSON.stringify(hb));
+
+    const result = scanHeartbeats('/project');
+    expect(result.heartbeats).toHaveLength(1);
+    expect(result.heartbeats[0]).toEqual(hb);
+  });
+
+  it('does not produce false positive stale alert when result DONE', () => {
+    const staleTimestamp = new Date(Date.now() - 300_000).toISOString();
+    const hb: Heartbeat = {
+      workerId: 'w-002', taskId: '002', status: 'CODING' as never,
+      currentAction: 'writing', timestamp: staleTimestamp,
+      filesChangedCount: 1, sequence: 3, progress: 80,
+    };
+
+    mockedReaddirSync.mockReturnValue(['task-002.hb'] as never);
+    mockedStatSync.mockReturnValue({ mtimeMs: 1000 } as never);
+
+    // existsSync: true for tasksDir, true for result file
+    mockedExistsSync.mockReturnValue(true);
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('.hb')) return JSON.stringify(hb);
+      if (p.includes('.result')) return JSON.stringify({ selfAssessment: 'DONE' });
+      if (p.includes('.json')) return JSON.stringify({ status: 'DONE' });
+      return '';
+    });
+
+    // Fresh result DONE → 1 signal (result). HB stale → 0 signal. No backend → 0 signal.
+    // Total 1 signal → stale=true, but shouldReportStale → false (DONE result) → skip
+    const result = scanHeartbeats('/project');
+
+    // Should NOT have any CRITICAL stale alert for this worker
+    const criticalAlerts = result.alerts.filter(
+      a => a.level === 'CRITICAL' && a.message.includes('w-002'),
+    );
+    expect(criticalAlerts).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Sprint 139 — Task 016: Orphan HB Cleanup
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('detectOrphans', () => {
+  it('returns empty when no .hb files exist', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return [] as never;
+      return [] as never;
+    });
+
+    const result = detectOrphans('/project', new Set(['001', '002']));
+
+    expect(result.orphanTaskIds).toEqual([]);
+    expect(result.orphanHBPaths).toEqual([]);
+  });
+
+  it('returns empty when all HB task IDs are in active set', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
+
+    const result = detectOrphans('/project', new Set(['001', '002']));
+
+    expect(result.orphanTaskIds).toEqual([]);
+    expect(result.orphanHBPaths).toEqual([]);
+  });
+
+  it('detects orphan HB when task ID is not in active set', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-999.hb'] as never);
+
+    const result = detectOrphans('/project', new Set(['001']));
+
+    expect(result.orphanTaskIds).toEqual(['999']);
+    expect(result.orphanHBPaths).toHaveLength(1);
+    expect(result.orphanHBPaths[0]).toContain('task-999.hb');
+  });
+
+  it('detects multiple orphans', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([
+      'task-001.hb', 'task-old1.hb', 'task-old2.hb',
+    ] as never);
+
+    const result = detectOrphans('/project', new Set(['001']));
+
+    expect(result.orphanTaskIds).toHaveLength(2);
+    expect(result.orphanTaskIds).toContain('old1');
+    expect(result.orphanTaskIds).toContain('old2');
+  });
+
+  it('auto-discovers active task IDs from disk when not provided', () => {
+    mockedExistsSync.mockReturnValue(true);
+    // readdirSync: first call for json files, second call for hb files
+    mockedReaddirSync
+      .mockReturnValueOnce(['task-001.json', 'task-002.json'] as never) // json scan
+      .mockReturnValueOnce(['task-001.hb', 'task-orphan.hb'] as never);   // hb scan
+
+    const result = detectOrphans('/project'); // no activeTaskIds → auto-discovery
+
+    expect(result.orphanTaskIds).toEqual(['orphan']);
+    expect(result.orphanHBPaths[0]).toContain('task-orphan.hb');
+  });
+
+  it('returns empty result when .tasks dir does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = detectOrphans('/project', new Set(['001']));
+
+    expect(result.orphanTaskIds).toEqual([]);
+    expect(result.orphanHBPaths).toEqual([]);
+  });
+});
+
+describe('cleanupOrphanHBs', () => {
+  beforeEach(() => {
+    mockedMkdirSync.mockReturnValue(undefined as never);
+    mockedRenameSync.mockReturnValue(undefined as never);
+  });
+
+  it('returns zero counts when no orphans exist', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
+
+    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['001']));
+
+    expect(result.orphanCount).toBe(0);
+    expect(result.archived).toEqual([]);
+    expect(result.locksReleased).toEqual([]);
+    expect(mockedRenameSync).not.toHaveBeenCalled();
+  });
+
+  it('archives orphan HB files to .brain/archive/{sprintId}-orphan-hb/', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.locks')) return [] as never;    // no locks
+      // .tasks dir scan (for orphan detect and active worker IDs)
+      return ['task-001.hb', 'task-orphan.hb'] as never;
+    });
+
+    // readFileSync for active worker HB after archive (remaining HBs)
+    mockedReadFileSync.mockReturnValue(
+      JSON.stringify({ workerId: 'w-001' }) as never,
+    );
+
+    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['001']));
+
+    expect(result.orphanCount).toBe(1);
+    expect(result.archived).toHaveLength(1);
+    expect(result.archived[0]).toContain('task-orphan.hb');
+
+    // mkdirSync called for archive dir
+    expect(mockedMkdirSync).toHaveBeenCalledWith(
+      expect.stringContaining('sprint-139-orphan-hb'),
+      expect.objectContaining({ recursive: true }),
+    );
+    // renameSync called to move file
+    expect(mockedRenameSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues processing other orphans when one rename fails', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.locks')) return [] as never;
+      return ['task-001.hb', 'task-orphanA.hb', 'task-orphanB.hb'] as never;
+    });
+    mockedReadFileSync.mockReturnValue(
+      JSON.stringify({ workerId: 'w-001' }) as never,
+    );
+
+    // First rename fails, second succeeds
+    mockedRenameSync
+      .mockImplementationOnce(() => { throw new Error('ENOENT'); })
+      .mockReturnValueOnce(undefined as never);
+
+    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['001']));
+
+    // orphanCount = 2 detected; archived = 1 (one failed)
+    expect(result.orphanCount).toBe(2);
+    expect(result.archived).toHaveLength(1); // only the one that succeeded
+  });
+
+  it('releases locks for orphan workers via clearOrphanLocks integration', () => {
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      // .tasks exists, .locks exists
+      return !path.includes('nonexistent');
+    });
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.locks')) {
+        return ['src__orphan-worker__file.ts.lock'] as never;
+      }
+      if (d.includes('.tasks')) {
+        return ['task-001.hb', 'task-orphan.hb'] as never;
+      }
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('.lock')) {
+        return JSON.stringify({
+          filePath: 'src/orphan-worker/file.ts',
+          ownerWorkerId: 'w-orphan',
+          acquiredAt: new Date().toISOString(),
+          taskId: 'orphan',
+        }) as never;
+      }
+      // Active worker HB
+      return JSON.stringify({ workerId: 'w-001' }) as never;
+    });
+
+    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['001']));
+
+    // Lock for w-orphan should be released (not in active set)
+    expect(result.locksReleased).toHaveLength(1);
+    expect(result.locksReleased[0]).toBe('src/orphan-worker/file.ts');
+  });
+});
+
+// ─── Sprint 139 Task 032: Dependency Violation Detection ─────────────
+
+describe('detectDependencyViolations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedExistsSync.mockReturnValue(false);
+    mockedReaddirSync.mockReturnValue([] as never);
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
+    clearHeartbeatCache();
+  });
+
+  it('returns empty array when tasks directory does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when no HB files exist', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([] as never);
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toEqual([]);
+  });
+
+  it('detects violation when worker is executing before dep is DONE', () => {
+    // Arrange: worker w-002 is EXECUTING task 002, which depends on task 001 (still PENDING)
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('.tasks')) return true;
+      return false;
+    });
+
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return ['task-002.hb'] as never;
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('task-002.hb')) {
+        return JSON.stringify({
+          workerId: 'w-002',
+          taskId: '002',
+          status: 'EXECUTING',
+          timestamp: new Date().toISOString(),
+          sequence: 1,
+        }) as never;
+      }
+      if (p.includes('task-002.json')) {
+        return JSON.stringify({
+          id: '002',
+          dependencies: ['001'],
+          status: 'EXECUTING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      if (p.includes('task-001.json')) {
+        return JSON.stringify({
+          id: '001',
+          dependencies: [],
+          status: 'PENDING', // Not done yet!
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      return '{}' as never;
+    });
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      workerId: 'w-002',
+      taskId: '002',
+      unresolvedDeps: ['001'],
+    });
+    expect(result[0]?.depStatuses?.['001']).toBe('PENDING');
+  });
+
+  it('does NOT flag violation when dep is DONE (status DONE)', () => {
+    // Arrange: task 002 depends on task 001 which is DONE
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      return path.includes('.tasks');
+    });
+
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return ['task-002.hb'] as never;
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('task-002.hb')) {
+        return JSON.stringify({
+          workerId: 'w-002',
+          taskId: '002',
+          status: 'EXECUTING',
+          timestamp: new Date().toISOString(),
+          sequence: 1,
+        }) as never;
+      }
+      if (p.includes('task-002.json')) {
+        return JSON.stringify({
+          id: '002',
+          dependencies: ['001'],
+          status: 'EXECUTING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      if (p.includes('task-001.json')) {
+        return JSON.stringify({
+          id: '001',
+          dependencies: [],
+          status: 'DONE', // Done!
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      return '{}' as never;
+    });
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('does NOT flag violation when dep has a DONE .result file', () => {
+    // Arrange: dep task JSON shows PENDING but .result shows DONE selfAssessment
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      // .tasks dir exists, dep result file exists
+      if (path.endsWith('task-001.result')) return true;
+      if (path.includes('.tasks') && !path.includes('task-')) return true;
+      return path.includes('.tasks');
+    });
+
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return ['task-002.hb'] as never;
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('task-002.hb')) {
+        return JSON.stringify({
+          workerId: 'w-002',
+          taskId: '002',
+          status: 'EXECUTING',
+          timestamp: new Date().toISOString(),
+          sequence: 1,
+        }) as never;
+      }
+      if (p.includes('task-002.json')) {
+        return JSON.stringify({
+          id: '002',
+          dependencies: ['001'],
+          status: 'EXECUTING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      if (p.includes('task-001.json')) {
+        return JSON.stringify({
+          id: '001',
+          dependencies: [],
+          status: 'PENDING', // JSON shows pending but result says DONE
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      if (p.includes('task-001.result')) {
+        return JSON.stringify({
+          taskId: '001',
+          selfAssessment: 'GO_WITH_TECH_DEBT', // GO_WITH_TECH_DEBT counts as done
+        }) as never;
+      }
+      return '{}' as never;
+    });
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('does NOT flag violation for workers with non-executing statuses (e.g., DONE)', () => {
+    // Arrange: worker's HB shows DONE status
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      return String(p).includes('.tasks');
+    });
+
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return ['task-002.hb'] as never;
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('task-002.hb')) {
+        return JSON.stringify({
+          workerId: 'w-002',
+          taskId: '002',
+          status: 'DONE', // Worker already completed
+          timestamp: new Date().toISOString(),
+          sequence: 5,
+        }) as never;
+      }
+      return '{}' as never;
+    });
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('does NOT flag violation for tasks with no dependencies', () => {
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      return String(p).includes('.tasks');
+    });
+
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return ['task-001.hb'] as never;
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('task-001.hb')) {
+        return JSON.stringify({
+          workerId: 'w-001',
+          taskId: '001',
+          status: 'EXECUTING',
+          timestamp: new Date().toISOString(),
+          sequence: 2,
+        }) as never;
+      }
+      if (p.includes('task-001.json')) {
+        return JSON.stringify({
+          id: '001',
+          dependencies: [], // No deps
+          status: 'EXECUTING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      return '{}' as never;
+    });
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('handles multiple violations across multiple workers', () => {
+    // Arrange: Two workers both violating dependency order
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      return String(p).includes('.tasks');
+    });
+
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return ['task-002.hb', 'task-003.hb'] as never;
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('task-002.hb')) {
+        return JSON.stringify({
+          workerId: 'w-002', taskId: '002', status: 'EXECUTING',
+          timestamp: new Date().toISOString(), sequence: 1,
+        }) as never;
+      }
+      if (p.includes('task-003.hb')) {
+        return JSON.stringify({
+          workerId: 'w-003', taskId: '003', status: 'CLAIMING',
+          timestamp: new Date().toISOString(), sequence: 1,
+        }) as never;
+      }
+      if (p.includes('task-002.json')) {
+        return JSON.stringify({
+          id: '002', dependencies: ['001'], status: 'EXECUTING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      if (p.includes('task-003.json')) {
+        return JSON.stringify({
+          id: '003', dependencies: ['001', '002'], status: 'CLAIMING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      if (p.includes('task-001.json')) {
+        return JSON.stringify({
+          id: '001', dependencies: [], status: 'PENDING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      return '{}' as never;
+    });
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toHaveLength(2);
+    const task2Violation = result.find(v => v.taskId === '002');
+    const task3Violation = result.find(v => v.taskId === '003');
+    expect(task2Violation?.unresolvedDeps).toContain('001');
+    expect(task3Violation?.unresolvedDeps).toContain('001');
+  });
+
+  it('includes timestamp in violation result', () => {
+    mockedExistsSync.mockImplementation((p: unknown) => {
+      return String(p).includes('.tasks');
+    });
+
+    mockedReaddirSync.mockImplementation((dir: unknown) => {
+      const d = String(dir);
+      if (d.includes('.tasks')) return ['task-002.hb'] as never;
+      return [] as never;
+    });
+
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.includes('task-002.hb')) {
+        return JSON.stringify({
+          workerId: 'w-002', taskId: '002', status: 'EXECUTING',
+          timestamp: new Date().toISOString(), sequence: 1,
+        }) as never;
+      }
+      if (p.includes('task-002.json')) {
+        return JSON.stringify({
+          id: '002', dependencies: ['001'], status: 'EXECUTING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      if (p.includes('task-001.json')) {
+        return JSON.stringify({
+          id: '001', dependencies: [], status: 'PENDING',
+          scope: { directories: [], filesRead: [], filesWrite: [] },
+        }) as never;
+      }
+      return '{}' as never;
+    });
+
+    const result = detectDependencyViolations('/project', 'sprint-139');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('runScanCycle includes dependencyViolations in result', () => {
+    // Arrange: clean sprint (no files) — just verify the field is present
+    mockedExistsSync.mockReturnValue(false);
+    mockedSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' } as never);
+
+    const result = runScanCycle('/project', 'sprint-139');
+
+    expect(result).toHaveProperty('dependencyViolations');
+    expect(Array.isArray(result.dependencyViolations)).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Event Hook Real Wire Tests (Sprint 139 — Task 043)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('emitVerificationEvent (real wire)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls writeEvent with VERIFICATION_RESULT channel', () => {
+    // Arrange
+    const payload = { taskId: '001', verdict: 'PASS', reason: 'all tests pass' };
+
+    // Act
+    emitVerificationEvent('/project', 'sprint-139', payload);
+
+    // Assert
+    expect(mockedWriteEvent).toHaveBeenCalledWith(
+      '/project',
+      'sprint-139',
+      'auditor',
+      'brain',
+      'AUDITOR→BRAIN:VERIFICATION_RESULT',
+      payload,
+    );
+  });
+
+  it('does not throw if writeEvent throws (fail-safe)', () => {
+    // Arrange
+    mockedWriteEvent.mockImplementationOnce(() => { throw new Error('disk full'); });
+
+    // Act + Assert: no throw
+    expect(() =>
+      emitVerificationEvent('/project', 'sprint-139', {
+        taskId: '002', verdict: 'FAIL', reason: 'tests failed',
+      }),
+    ).not.toThrow();
+  });
+
+  it('passes status field when provided', () => {
+    // Arrange
+    const payload = { taskId: '003', verdict: 'DOWNGRADE', status: 'GO_WITH_TECH_DEBT', reason: 'partial' };
+
+    // Act
+    emitVerificationEvent('/project', 'sprint-139', payload);
+
+    // Assert: status is forwarded in payload
+    expect(mockedWriteEvent).toHaveBeenCalledWith(
+      '/project', 'sprint-139', 'auditor', 'brain',
+      'AUDITOR→BRAIN:VERIFICATION_RESULT',
+      expect.objectContaining({ status: 'GO_WITH_TECH_DEBT' }),
+    );
+  });
+});
+
+describe('emitADRViolationEvent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls writeEvent with ADR_VIOLATION channel when violations exist', () => {
+    // Arrange
+    const violations = [{
+      adrId: 'ADR-006',
+      adrTitle: 'spawnSync Security Pattern',
+      violation: 'File src/foo.ts matches forbidden pattern',
+      severity: 'error' as const,
+    }];
+
+    // Act
+    emitADRViolationEvent('/project', 'sprint-139', violations, ['src/foo.ts']);
+
+    // Assert
+    expect(mockedWriteEvent).toHaveBeenCalledWith(
+      '/project',
+      'sprint-139',
+      'auditor',
+      'brain',
+      'AUDITOR→BRAIN:ADR_VIOLATION',
+      expect.objectContaining({
+        violationCount: 1,
+        violations: expect.arrayContaining([
+          expect.objectContaining({ adrId: 'ADR-006' }),
+        ]),
+        changedFiles: ['src/foo.ts'],
+      }),
+    );
+  });
+
+  it('does NOT call writeEvent when violations list is empty', () => {
+    // Act
+    emitADRViolationEvent('/project', 'sprint-139', [], []);
+
+    // Assert
+    expect(mockedWriteEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not throw if writeEvent throws (fail-safe)', () => {
+    // Arrange
+    mockedWriteEvent.mockImplementationOnce(() => { throw new Error('I/O error'); });
+    const violations = [{
+      adrId: 'ADR-008',
+      adrTitle: 'Brain Merkezi Import',
+      violation: 'Circular import detected',
+      severity: 'error' as const,
+    }];
+
+    // Act + Assert: no throw
+    expect(() =>
+      emitADRViolationEvent('/project', 'sprint-139', violations, ['src/monitor/auditor.ts']),
+    ).not.toThrow();
+  });
+});
+
+describe('verifyWorkerResult — event hook integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default fs setup — no task files
+    mockedExistsSync.mockReturnValue(false);
+    mockedReaddirSync.mockReturnValue([] as never);
+  });
+
+  it('emits VERIFICATION_RESULT event when sprintId is provided', async () => {
+    // Act
+    await verifyWorkerResult('001', '/project', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'All done',
+    }, 'sprint-139');
+
+    // Assert: writeEvent called with VERIFICATION_RESULT
+    expect(mockedWriteEvent).toHaveBeenCalledWith(
+      '/project',
+      'sprint-139',
+      'auditor',
+      'brain',
+      'AUDITOR→BRAIN:VERIFICATION_RESULT',
+      expect.objectContaining({ taskId: '001' }),
+    );
+  });
+
+  it('does NOT emit event when sprintId is omitted (backward compat)', async () => {
+    // Act
+    await verifyWorkerResult('001', '/project', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'All done',
+    });
+    // No sprintId → no writeEvent call
+
+    // Assert
+    expect(mockedWriteEvent).not.toHaveBeenCalled();
+  });
+
+  it('still returns correct verdict when event write fails', async () => {
+    // Arrange: writeEvent throws
+    mockedWriteEvent.mockImplementationOnce(() => { throw new Error('no space'); });
+
+    // Act
+    const result = await verifyWorkerResult('001', '/project', {
+      taskId: '001',
+      workerId: 'w-001',
+      filesChanged: ['docs/README.md'],
+      linesAdded: 5,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 0,
+      selfAssessment: 'DONE',
+      notes: 'docs update',
+    }, 'sprint-139');
+
+    // Assert: verdict is still correct despite event failure
+    expect(result.verdict).toBe('PASS');
+  });
+});
+
+describe('checkADRCompliance — event hook integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('emits ADR_VIOLATION event when sprintId provided and violation found', () => {
+    // Arrange: DECISIONS.md with ADR-006 accepted, file with violation
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('DECISIONS.md')) {
+        return `## ADR-006: spawnSync Security Pattern\n**Status:** accepted\n**Decision:** Use spawnSync.\n` as never;
+      }
+      if (path.includes('src/bad.ts')) {
+        return `spawnSync('cmd', { shell: true });\n` as never;
+      }
+      if (path.includes('package.json')) {
+        return JSON.stringify({ dependencies: { commander: '^13' } }) as never;
+      }
+      return '' as never;
+    });
+
+    // Act
+    const violations = checkADRCompliance('/project', ['src/bad.ts'], 'sprint-139');
+
+    // Assert: violations found + event emitted
+    expect(violations.length).toBeGreaterThan(0);
+    expect(mockedWriteEvent).toHaveBeenCalledWith(
+      '/project', 'sprint-139', 'auditor', 'brain',
+      'AUDITOR→BRAIN:ADR_VIOLATION',
+      expect.objectContaining({ violationCount: expect.any(Number) }),
+    );
+  });
+
+  it('does NOT emit event when no violations found', () => {
+    // Arrange: clean file — no pattern match
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('DECISIONS.md')) {
+        return `## ADR-006: spawnSync Security Pattern\n**Status:** accepted\n**Decision:** Use spawnSync.\n` as never;
+      }
+      if (path.includes('src/good.ts')) {
+        return `spawnSync('cmd', ['--arg']);\n` as never;  // safe pattern
+      }
+      return '' as never;
+    });
+
+    // Act
+    const violations = checkADRCompliance('/project', ['src/good.ts'], 'sprint-139');
+
+    // Assert: no violations → no event
+    expect(violations).toHaveLength(0);
+    expect(mockedWriteEvent).not.toHaveBeenCalled();
+  });
+
+  it('does NOT emit event when sprintId is omitted', () => {
+    // Arrange: file with violation but no sprintId
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('DECISIONS.md')) {
+        return `## ADR-006: spawnSync\n**Status:** accepted\n` as never;
+      }
+      if (path.includes('src/violation.ts')) {
+        return `spawnSync('cmd', { shell: true });\n` as never;
+      }
+      return '' as never;
+    });
+
+    // Act: no sprintId
+    checkADRCompliance('/project', ['src/violation.ts']);
+
+    // Assert: no event written
+    expect(mockedWriteEvent).not.toHaveBeenCalled();
   });
 });

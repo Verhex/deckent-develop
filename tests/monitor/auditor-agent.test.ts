@@ -3,6 +3,7 @@ import {
   detectPatterns,
   scanHeartbeats,
   checkBoundaryViolations,
+  clearHeartbeatCache,
 } from '../../src/monitor/auditor.js';
 import type { BoundaryViolation, PatternEntry, TaskScope } from '../../src/core/types.js';
 
@@ -13,22 +14,26 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readdirSync: vi.fn(() => []),
   mkdirSync: vi.fn(),
+  statSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
 }));
 
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedReaddirSync = vi.mocked(readdirSync);
+const mockedStatSync = vi.mocked(statSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedExistsSync.mockReturnValue(false);
+  mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
+  clearHeartbeatCache();
 });
 
 // ─── detectPatterns with agent context ──────────────────────────────────

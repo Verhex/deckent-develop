@@ -1,0 +1,63 @@
+{
+  "taskId": "139-034",
+  "sprintId": "sprint-139",
+  "steps": [
+    {
+      "step": 1,
+      "name": "routing-step-1",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Intent: documentation (confidence: 0.79)"
+    },
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Agent 'devops-engineer' excluded: Excluded by rule"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Agent 'security-auditor' excluded: Excluded by rule"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Agent 'test-writer' excluded: Excluded by rule"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'doc-writer' (score=10, rules=[rule(score=10)])"
+    },
+    {
+      "step": 6,
+      "name": "routing-step-6",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 7,
+      "name": "routing-step-7",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [documentation-writer, system-architect]"
+    }
+  ],
+  "decidedAt": "2026-04-15T06:15:19.439Z"
+}

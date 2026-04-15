@@ -300,15 +300,53 @@ MCP-only komutlar yoktur — tüm MCP araçlarının CLI karşılığı mevcuttu
 - Parametre parity: tüm MCP araçları CLI komutlarıyla aynı giriş/çıkış şemasını kullanır
 - Altyapı komutları (attach, web, serve, plugin) sadece CLI'da tutulur, MCP'de eksik kalır intentional olarak
 
-## ADR-027: Hybrid Spawn Backend (Sprint 123)
+## ADR-027: Hybrid Spawn Backend (Sprint 123, Revisited Sprint 139)
 
 **Status:** accepted
 
-**Decision:** Hibrit backend desteği DEFERRED. Mevcut tek-backend modeli yeterli. `SpawnBackendFactory` docker → tmux → subprocess fallback zinciriyle TEK bir backend seçer; hibrit mod (worker Docker'da, auditor subprocess olarak) implementasyona alınmayacak.
+**Decision:** Hibrit backend desteği **kalıcı olarak reddedildi** (Option B: reject). Mevcut tek-backend modeli yeterli ve Sprint 139 backend parity çalışması bu kararı güçlendirdi. `SpawnBackendFactory` docker → tmux → subprocess fallback zinciriyle TEK bir backend seçer; hibrit mod (worker Docker'da, auditor subprocess olarak) implementasyona alınmayacak.
 
-**Context:** Auditor scan loop `sprint-controller.ts` içinde in-process olarak çalışır — tmux/subprocess/docker backend'lerinden tamamen bağımsızdır. Worker'lar backend üzerinden spawn edilirken auditor dosya sistemi üzerinden `.hb` heartbeat dosyalarını okur. Auditor'ın backend seçimiyle hiçbir doğrudan bağlantısı olmadığından, hibrit mod için ayrı bir mekanizma gerekmez. Worker isolation Docker container'larıyla sağlanmaktadır.
+**Context (Sprint 123 — Özgün):** Auditor scan loop `sprint-controller.ts` içinde in-process olarak çalışır — tmux/subprocess/docker backend'lerinden tamamen bağımsızdır. Worker'lar backend üzerinden spawn edilirken auditor dosya sistemi üzerinden `.hb` heartbeat dosyalarını okur. Auditor'ın backend seçimiyle hiçbir doğrudan bağlantısı olmadığından, hibrit mod için ayrı bir mekanizma gerekmez. Worker isolation Docker container'larıyla sağlanmaktadır.
 
-**Consequence(s):** Hibrit backend implementasyonu yapılmayacak. Auditor zaten backend-agnostic olduğundan ek değişiklik gerektirmez. Gelecekte auditor'ın ayrı bir process olarak çalıştırılması gerekirse (örn. distributed sprint execution), bu ADR revisit edilecek ve hibrit mod tekrar değerlendirilecek.
+**Sprint 139 Revisit Analizi:**
+
+Sprint 139'da 3 backend'in (Docker, subprocess, tmux) E2E test coverage'ı tamamlandı ve aşağıdaki bulgular elde edildi:
+
+1. **ADR-035 Event Stream (Sprint 138) hibrit gereksinimini ortadan kaldırıyor:** `.deckent/sprint-NNN-events.jsonl` append-only event stream tüm backend'lerin üzerinde ortak iletişim kanalı sağlıyor. Worker hangi backend'de çalışırsa çalışsın, auditor event stream'den okuyarak bağımsız doğrulama yapabiliyor. "Auditor'ın ayrı process olarak çalışması" senaryosu event stream sayesinde zaten çözüldü.
+
+2. **3-backend parity (Sprint 139 Task 17-19):** Docker, subprocess ve tmux backend'lerinin her biri kendi E2E test suite'ine sahip. Her backend `SpawnBackend` arayüzünü tam olarak implement ediyor. Hybrid senaryosu için gereken "farklı backend'lerin birbirini tamamlaması" ihtiyacı yok — her backend zaten tam özellikli.
+
+3. **Hibrit senaryosunun anlamsızlığı:** "Worker Docker'da, auditor subprocess olarak" senaryosu ADR-035 sonrasında gereksiz:
+   - Auditor zaten in-process (sprint-controller içinde)
+   - Event stream file-based olduğundan tüm backend'ler transparently mesaj üretiyor
+   - Docker worker'lar shared `.tasks/` volume üzerinden heartbeat ve event yazıyor
+
+4. **Complexity cost vs benefit:** Hibrit backend implementasyonu `SpawnBackend` interface'ini genişletmeyi, multi-backend lifecycle yönetimi eklemeyi ve `SpawnBackendFactory` sinyal koordinasyonu yazmayı gerektirir — zero user-visible benefit karşılığında ~400 LoC complexity.
+
+5. **Product vision uyumu (ADR-033):** "Kur-çalıştır" prensibi konfigürasyon complexity'sini minimumda tutar. Kullanıcının "hangi backend'i ne için kullanayım?" sorusuna cevap vermek zorunda kalması ürün deneyimini kırar.
+
+**Karar Rationale (Alperen'e Sunulan):**
+
+| Seçenek | Değerlendirme | Karar |
+|---------|--------------|-------|
+| **Option A:** Sprint 140'ta hybrid implement et | ADR-035 event stream zaten bu ihtiyacı karşılıyor; ek complexity getirir, net fayda yok | **Reddedildi** |
+| **Option B:** Kalıcı olarak reddet (tek backend at a time) | Mevcut model çalışıyor, test coverage tam, event stream entegrasyonu sorunsuz | **Kabul edildi** |
+| **Option C:** Yeniden ertele | 3. deferred → kararsızlık işareti; net karar verilmeli | **Reddedildi** |
+
+**Consequence(s):**
+- Hibrit backend implementasyonu yapılmayacak — kalıcı karar.
+- `SpawnBackendFactory` tek-backend-seçer semantiğini korur.
+- Event stream (ADR-035) hibrit senaryosunun gerçek ihtiyacını (cross-backend observability) doldurdu.
+- Sprint 140'ta backend ile ilgili çalışma olursa: mevcut 3 backend'in stabilizasyonu ve edge case fix'i üzerine yoğunlaşılır, hibrit mod değil.
+- Distributed sprint execution ihtiyacı doğarsa (Sprint 145+), bu ADR revisit edilmeli ve event stream üzerine inşa edilen lightweight coordinator pattern değerlendirilmeli.
+
+**References:**
+- Sprint 123 özgün deferred kararı
+- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol — event stream hibrit ihtiyacı ortadan kaldırdı
+- Sprint 139 Task 17: Docker E2E tests
+- Sprint 139 Task 18: Tmux E2E tests
+- Sprint 139 Task 19: Subprocess E2E tests (DONE — 33 test, 1.2s)
+- ADR-033: Product Vision — complexity minimization principle
 
 ## ADR-028: Decision-Engine V1 → V2 Routing Migration
 
@@ -937,3 +975,420 @@ ADR governance'ı kullanıcı-facing ürün özelliğine dönüştürmek. 5 bile
 - `src/orchestra/task-builder.ts:loadADRContent()` — prompt injection
 - ADR-013: DECKENT.md Adapter Pattern — mandatory read wiring pattern
 - MADR v3: https://adr.github.io/madr/
+
+---
+
+## ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
+
+**Status:** accepted
+
+**Date:** 2026-04-15
+
+**Context:**
+
+Deckent'in üç temel bileşeni — Brain (orkestratör), Auditor (doğrulayıcı), Worker (uygulayıcı) — Sprint 138'e kadar örtük güven (implicit trust) modeliyle çalışıyordu. Yetki sınırları `.claude/rules/*.md` dosyalarında doğal dil kuralları olarak tanımlı, ancak bu kurallar:
+
+1. **Enforceable değildi:** Worker'ın scope dışına yazması yalnızca post-hoc `git diff` ile tespit ediliyordu. Brain'in `src/**`'e doğrudan müdahalesi engelleyen mekanizma yoktu. Auditor'ın kaynak kod yazmasını engelleyen tek şey doğal dil talimatıydı.
+
+2. **Formal olarak tanımlı değildi:** ADR-008 Brain merkezi import kuralını, ADR-034 per-project izolasyonu, ADR-035 mesaj protokolünü tanımlıyordu — ama bu üç ADR'nin kesişiminde oluşan "kim neyi yapabilir?" sorusu hiçbir yerde tek tablo olarak cevaplanmıyordu.
+
+3. **Enterprise ölçeğe hazır değildi:** Milyon kullanıcı hedefiyle (Q3 2026 vizyonu), bir bileşenin yetkisini aştığında ne olacağının deterministik, denetlenebilir, versiyonlanmış bir protokolü yoktu. NIST SP 800-162 (ABAC) ve RBAC standartları referans alınmalıydı.
+
+4. **Sprint 137-138 canlı kanıtları:**
+   - Sprint 137 Task 137-001: Worker `DONE` bildirdi, vitest 53 fail — worker kendi doğrulama yetkisini aşıyordu (self-assessment = judge of own work).
+   - Sprint 138 Task 138-003: Auditor Authority Extension 3-Pipeline ile auditor aktif doğrulayıcı oldu, ama bu yetki genişlemesi formal RBAC kaydı olmadan yapıldı.
+   - Sprint 138 Task 138-004: Event stream kanal kodları (ADR-035) "source" ve "target" alanlarıyla örtük role bilgisi taşıyor, ama hangi kanalı kimin kullanabileceği tanımlı değil.
+
+5. **Tehdit modeli (ADR-034'ü genişletir):**
+   - **Privilege escalation:** Worker'ın `.brain/DECISIONS.md`'yi değiştirerek kendi scope kurallarını gevşetmesi
+   - **Lateral movement:** Worker A'nın Worker B'nin task dosyalarını okuması/yazması
+   - **Audit bypass:** Brain'in auditor verification'ı atlayarak doğrudan GO kararı vermesi
+   - **Role confusion:** Auditor'ın kaynak kodu yazması (audit bağımsızlığını bozar)
+
+**Decision:**
+
+Brain, Auditor ve Worker bileşenleri için formal Role-Based Access Control (RBAC) authority matrix tanımlanır. Bu matrix, Protocol Version 1.0 (ADR-035) üzerine inşa edilir ve her bileşenin dosya sistemi erişim hakları, event stream kanal kullanım hakları ve sprint yaşam döngüsü eylem yetkilerini belirler.
+
+### Temel Prensipler
+
+1. **Least Privilege (En Az Yetki):** Her bileşen yalnızca görevini yerine getirmek için gereken minimum yetkilere sahiptir. Ek yetki açıkça tanımlanmalı ve bu ADR'de kayıt altına alınmalıdır.
+
+2. **Separation of Duties (Görev Ayrılığı):** Aynı bileşen hem uygulayıcı hem denetleyici olamaz. Worker kod yazar, Auditor doğrular, Brain karar verir. Bu üçlü hiçbir bileşende birleşmez.
+
+3. **Auditability (Denetlenebilirlik):** Her yetki kullanımı event stream'e (ADR-035) kaydedilir. Yetkisiz erişim girişimleri `SCOPE_VIOLATION` olayı olarak loglanır.
+
+4. **Fail-Closed (Kapalı Hata):** Yetki doğrulaması başarısız olursa varsayılan karar "erişim yok" olur. Açıkça izin verilmeyen her eylem yasaklanmış kabul edilir.
+
+### Brain Authority Matrix
+
+Brain, sprint orkestratörüdür. Planlama, karar verme ve koordinasyon yetkilerine sahiptir.
+
+**Dosya Sistemi — YAZMA İZNİ:**
+
+| Yol Pattern | İzin | Gerekçe |
+|-------------|------|---------|
+| `.tasks/*` | ✅ WRITE | Task JSON oluşturma, durum güncelleme, sprint yönetimi |
+| `.deckent/config.json` | ✅ WRITE | Konfigürasyon güncelleme (config set komutu) |
+| `.deckent/sprint-state.json` | ✅ WRITE | Sprint faz geçişi, aktif sprint kaydı |
+| `.deckent/sprint-*-events.jsonl` | ✅ APPEND | Event stream yazma (yalnızca append, overwrite yasak) |
+| `.deckent/sprint-*-checkpoint.json` | ✅ WRITE | Checkpoint yazma (resume capability) |
+| `.deckent/sprint-*-metrics.jsonl` | ✅ APPEND | Metrik noktaları kaydetme |
+| `.deckent/cache/*` | ✅ WRITE | Managed-docs cache, build cache |
+| `.brain/MEMORY.md` | ✅ WRITE | Sprint öğrenimleri kaydetme (max 300 satır) |
+| `.brain/RETRO.md` | ✅ WRITE | Retrospektif yazma (overwrite, max 120 satır) |
+| `.brain/DEBT.md` | ✅ WRITE | Teknik borç tablosu yönetimi |
+| `.brain/PATTERNS.md` | ✅ WRITE | Desen kayıtları güncelleme |
+| `.brain/sprints/sprint-*.md` | ✅ WRITE | Sprint log dosyaları (max 80 satır) |
+| `.brain/archive/*` | ✅ WRITE | Sprint arşivleme (DIRECTIVES, tasks) |
+
+**Dosya Sistemi — YAZMA YASAĞI:**
+
+| Yol Pattern | İzin | Gerekçe |
+|-------------|------|---------|
+| `src/**` | ❌ DENY | Brain kaynak kodu yazmaz — ADR-038 istisnası hariç (gelecek ADR) |
+| `tests/**` | ❌ DENY | Brain test yazmaz — worker görevi |
+| `.brain/DECISIONS.md` | ❌ DENY | ADR'ler yalnızca insan (Alperen) veya ADR governance süreci ile değişir |
+| `docs/vision/roadmap.md` | ❌ DENY | Vizyon dokümanı yalnızca insan tarafından güncellenir |
+| `.dashboard` | ❌ DENY | Auditor'ın münhasır yazma alanı |
+| `.locks/*` | ❌ DENY | Lock yönetimi auditor + worker sorumluluğu |
+
+**Sprint Yaşam Döngüsü Eylemleri:**
+
+| Eylem | İzin | Koşul |
+|-------|------|-------|
+| Task oluşturma (PLAN fazı) | ✅ | DIRECTIVES.md okunmuş olmalı |
+| Worker spawn | ✅ | SPAWN fazı aktif olmalı |
+| Worker kill | ✅ | Timeout veya NO_GO sonrası |
+| GO / NO_GO / GO_WITH_TECH_DEBT label | ✅ | EVALUATE fazı aktif olmalı |
+| Cross-dependency fix spawn | ✅ | FIX fazı aktif, bağımlılık analizi tamamlanmış |
+| Auditor doğrulamasını atlama | ❌ | Brain, auditor verification sonuçlarını beklemek ZORUNDADIR |
+| Kendi kararını doğrulama | ❌ | Self-audit gate (Sprint 134 T-014) auditor tarafından kontrol edilir |
+
+**Event Stream Kanal Hakları (ADR-035 V1.0):**
+
+| Kanal | Hak | Rol |
+|-------|-----|-----|
+| `BRAIN→WORKER:TASK_ASSIGN` | ✅ EMIT | Kaynak |
+| `BRAIN→WORKER:ANSWER` | ✅ EMIT | Kaynak |
+| `BRAIN→WORKER:FIX_REQUEST` | ✅ EMIT | Kaynak |
+| `BRAIN→*:METRIC_EMITTED` | ✅ EMIT | Kaynak |
+| `BRAIN→*:SPRINT_PHASE_CHANGE` | ✅ EMIT | Kaynak |
+| `WORKER→BRAIN:*` | ✅ CONSUME | Hedef |
+| `AUDITOR→BRAIN:*` | ✅ CONSUME | Hedef |
+| `WORKER→AUDITOR:*` | ❌ | Ne kaynak ne hedef |
+| `DECKENT→USER:NOTIFY` | ❌ | Deckent CLI katmanı sorumlu |
+
+### Auditor Authority Matrix
+
+Auditor, bağımsız doğrulayıcıdır. Gözlemleme, doğrulama ve raporlama yetkilerine sahiptir. Kaynak kodu ASLA yazmaz.
+
+**Dosya Sistemi — YAZMA İZNİ:**
+
+| Yol Pattern | İzin | Gerekçe |
+|-------------|------|---------|
+| `.dashboard` | ✅ WRITE | Sprint durumu dashboard'u (30s scan cycle'da overwrite) |
+| `.deckent/sprint-*-gate.json` | ✅ WRITE | Sprint gate hesaplama sonucu |
+| `.deckent/sprint-*-events.jsonl` | ✅ APPEND | Event stream'e doğrulama sonuçları yazma |
+| `docs/audits/*` | ✅ WRITE | Audit raporları, load-test raporları |
+| `.brain/PATTERNS.md` | ✅ APPEND | Yeni pattern ekleme (mevcut içerik korunur, yalnızca append) |
+
+**Dosya Sistemi — OKUMA İZNİ:**
+
+| Yol Pattern | İzin | Gerekçe |
+|-------------|------|---------|
+| `.tasks/*.hb` | ✅ READ | Worker heartbeat kontrolü (stale detection) |
+| `.tasks/*.result` | ✅ READ | Worker sonuç doğrulaması |
+| `.tasks/*.json` | ✅ READ | Task tanımı okuma (scope doğrulama) |
+| `.locks/*` | ✅ READ + WRITE | Stale lock tespiti ve temizleme (>5 min) |
+| `src/**` | ✅ READ | Kod analizi, ADR compliance kontrolü (sadece okuma!) |
+| `tests/**` | ✅ READ | Test sonuç doğrulaması |
+| `.brain/DECISIONS.md` | ✅ READ | ADR compliance kontrolü |
+| `git diff --stat` | ✅ EXEC | Boundary violation tespiti |
+
+**Dosya Sistemi — YAZMA YASAĞI:**
+
+| Yol Pattern | İzin | Gerekçe |
+|-------------|------|---------|
+| `src/**` | ❌ DENY | Auditor kaynak kodu ASLA yazmaz — audit bağımsızlığı |
+| `tests/**` | ❌ DENY | Auditor test yazmaz — bağımsızlık ilkesi |
+| `.tasks/*.json` | ❌ DENY | Task tanımı değiştirme yetkisi yok — Brain münhasır |
+| `.brain/MEMORY.md` | ❌ DENY | Bellek yönetimi Brain sorumluluğu |
+| `.brain/RETRO.md` | ❌ DENY | Retrospektif yazma Brain sorumluluğu |
+| `.brain/DECISIONS.md` | ❌ DENY | ADR değişikliği governance süreci gerektirir |
+| `.deckent/sprint-state.json` | ❌ DENY | Sprint faz geçişi Brain sorumluluğu |
+
+**Sprint Yaşam Döngüsü Eylemleri:**
+
+| Eylem | İzin | Koşul |
+|-------|------|-------|
+| Verification 3-pipeline (`verifyWorkerResult`) | ✅ | Worker `.result` dosyası mevcut |
+| Functional verification (`verifyFunctional`) | ✅ | EXECUTE veya EVALUATE fazı |
+| Tech debt validation (`validateTechDebt`) | ✅ | Worker GO_WITH_TECH_DEBT bildirdi |
+| ADR compliance check (`checkADRCompliance`) | ✅ | Pilot ADR'ler (ADR-006, ADR-008, ADR-010) |
+| Sprint gate hesaplama (`GATE_COMPUTED`) | ✅ | EVALUATE fazı tamamlandı |
+| PASS / DOWNGRADE / FAIL verdict | ✅ | 3-pipeline sonucu |
+| GO / NO_GO label kararı | ❌ | Brain münhasır — auditor yalnızca verdict önerir |
+| Worker spawn / kill | ❌ | Brain münhasır |
+| Task oluşturma / değiştirme | ❌ | Brain münhasır |
+
+**Event Stream Kanal Hakları (ADR-035 V1.0):**
+
+| Kanal | Hak | Rol |
+|-------|-----|-----|
+| `AUDITOR→BRAIN:VERIFICATION_RESULT` | ✅ EMIT | Kaynak |
+| `AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED` | ✅ EMIT | Kaynak |
+| `AUDITOR→BRAIN:ADR_VIOLATION` | ✅ EMIT | Kaynak |
+| `AUDITOR→BRAIN:GATE_COMPUTED` | ✅ EMIT | Kaynak |
+| `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN` | ✅ EMIT | Kaynak |
+| `WORKER→AUDITOR:CODE_VERIFY_REQUEST` | ✅ CONSUME | Hedef |
+| `BRAIN→*:SPRINT_PHASE_CHANGE` | ✅ CONSUME | Broadcast dinleyici |
+| `BRAIN→*:METRIC_EMITTED` | ✅ CONSUME | Broadcast dinleyici |
+| `BRAIN→WORKER:*` | ❌ | Ne kaynak ne hedef |
+| `WORKER→BRAIN:*` | ❌ | Ne kaynak ne hedef (Brain'e ait) |
+
+### Worker Authority Matrix
+
+Worker, görev uygulayıcısıdır. Atanan task scope'u içinde kaynak kodu yazar, test çalıştırır ve sonuç raporlar.
+
+**Dosya Sistemi — YAZMA İZNİ:**
+
+| Yol Pattern | İzin | Koşul |
+|-------------|------|-------|
+| `scope.filesWrite` (task JSON'dan) | ✅ WRITE | Yalnızca atanan task'ın scope.filesWrite listesindeki dosyalar |
+| `scope.directories` (task JSON'dan) | ✅ WRITE | Yalnızca atanan task'ın scope.directories içindeki yeni dosyalar |
+| `.tasks/task-{ownId}.hb` | ✅ WRITE | Kendi heartbeat dosyası |
+| `.tasks/task-{ownId}.result` | ✅ WRITE | Kendi sonuç dosyası |
+| `.tasks/task-{ownId}.plan` | ✅ WRITE | Kendi yürütme planı |
+| `.tasks/task-{ownId}.verify-delta.json` | ✅ WRITE | Honest assessment kanıt dosyası |
+| `.locks/{ownScope}` | ✅ WRITE | Kendi scope'undaki dosyalar için lock alma/bırakma |
+
+**Dosya Sistemi — OKUMA İZNİ:**
+
+| Yol Pattern | İzin | Koşul |
+|-------------|------|-------|
+| `.tasks/task-{ownId}.json` | ✅ READ | Kendi task tanımı |
+| `scope.filesRead` (task JSON'dan) | ✅ READ | Task scope'undaki okuma listesi |
+| `.brain/DECISIONS.md` | ✅ READ | ADR compliance kontrolü (zorunlu okuma — ADR-036) |
+| `.locks/*` | ✅ READ | File lock kontrolü (yazma öncesi) |
+| `DIRECTIVES.md` | ✅ READ | Sprint hedefleri bağlamı |
+
+**Dosya Sistemi — YAZMA YASAĞI:**
+
+| Yol Pattern | İzin | Gerekçe |
+|-------------|------|---------|
+| `.tasks/task-{otherId}.*` | ❌ DENY | Başka worker'ın dosyalarına erişim yasak — lateral movement engeli |
+| `.brain/DECISIONS.md` | ❌ DENY | ADR değişikliği governance süreci gerektirir — privilege escalation engeli |
+| `.brain/MEMORY.md` | ❌ DENY | Brain münhasır |
+| `.brain/RETRO.md` | ❌ DENY | Brain münhasır |
+| `.deckent/sprint-state.json` | ❌ DENY | Sprint durumu Brain münhasır |
+| `.dashboard` | ❌ DENY | Auditor münhasır |
+| `docs/audits/*` | ❌ DENY | Auditor münhasır |
+| Scope dışı `src/**` | ❌ DENY | Scope violation — auditor `git diff --stat` ile tespit eder |
+
+**Sprint Yaşam Döngüsü Eylemleri:**
+
+| Eylem | İzin | Koşul |
+|-------|------|-------|
+| Task claim (PENDING → CLAIMED) | ✅ | Task kendisine atanmış olmalı |
+| Kod yazma | ✅ | Scope dahilinde |
+| Test çalıştırma (`tsc --noEmit`, `vitest run`) | ✅ | Verify loop (max 3 attempt) |
+| Self-assessment yazma | ✅ | Honest assessment kuralları geçerli (ADR-035 V1.0 honest block) |
+| Checkpoint question (`WORKER→BRAIN:QUESTION`) | ✅ | Blocker durumunda |
+| Başka worker'ı spawn/kill | ❌ | Brain münhasır |
+| Sprint faz değiştirme | ❌ | Brain münhasır |
+| GO / NO_GO kararı | ❌ | Brain münhasır — worker yalnızca self-assessment yazar |
+| Verification çalıştırma | ❌ | Auditor münhasır — worker kendi çalışmasını judge edemez |
+
+**Event Stream Kanal Hakları (ADR-035 V1.0):**
+
+| Kanal | Hak | Rol |
+|-------|-----|-----|
+| `WORKER→BRAIN:HEARTBEAT` | ✅ EMIT | Kaynak |
+| `WORKER→BRAIN:RESULT` | ✅ EMIT | Kaynak |
+| `WORKER→BRAIN:QUESTION` | ✅ EMIT | Kaynak |
+| `WORKER→AUDITOR:CODE_VERIFY_REQUEST` | ✅ EMIT | Kaynak |
+| `BRAIN→WORKER:TASK_ASSIGN` | ✅ CONSUME | Hedef |
+| `BRAIN→WORKER:ANSWER` | ✅ CONSUME | Hedef |
+| `BRAIN→WORKER:FIX_REQUEST` | ✅ CONSUME | Hedef |
+| `BRAIN→*:SPRINT_PHASE_CHANGE` | ✅ CONSUME | Broadcast dinleyici |
+| `AUDITOR→BRAIN:*` | ❌ | Ne kaynak ne hedef (Brain'e ait) |
+| `BRAIN→*:METRIC_EMITTED` | ❌ | Worker metrik tüketmez |
+
+### Cross-Role Interaction Rules (Çapraz Rol Kuralları)
+
+**Kural 1: Separation of Assessment and Verification**
+Worker self-assessment yazar (DONE / GO_WITH_TECH_DEBT / NO_GO). Auditor bağımsız olarak doğrular (PASS / DOWNGRADE / FAIL). Brain her iki sonucu değerlendirerek nihai GO / NO_GO kararı verir. Hiçbir bileşen hem uygulayıcı hem doğrulayıcı olamaz.
+
+**Kural 2: No Direct Worker-to-Worker Communication**
+Worker'lar birbirleriyle doğrudan iletişim kuramaz. Tüm koordinasyon Brain üzerinden yapılır. Worker A'nın Worker B'nin çıktısına ihtiyacı varsa, Brain dependency resolution yapar (FIX fazı, cross-dep priority).
+
+**Kural 3: Auditor Independence**
+Auditor hiçbir koşulda kaynak kodu (src/**, tests/**) yazmaz. Bu kural ADR-037'nin "dokunulamaz" maddesidir. Auditor bağımsızlığı kırılırsa self-audit mekanizması anlamsızlaşır.
+
+**Kural 4: Brain Orchestration Boundary**
+Brain planlama, koordinasyon ve karar verme yapar. Doğrudan kaynak kod üretimi yapmaz (src/** yazma yasağı). Brain'in kodu etkilemesi gereken durumlarda worker spawn eder. İstisna: gelecek ADR-038 meta-refactoring capability (şu an tanımlı değil, bu ADR'de referans olarak belirtilmiştir).
+
+**Kural 5: Event Stream Integrity**
+Her bileşen yalnızca kendi kanal haklarında belirtilen kanalları kullanabilir. Event stream append-only'dir — mevcut event'ler değiştirilemez veya silinemez. Event stream bozulması durumunda file-based fallback devreye girer (ADR-035 backward compatibility).
+
+### Enforcement Mekanizması
+
+**Katman 1 — Compile-Time (Static)**
+- `npm run lint:adr` ADR-037 authority matrix'ini parse eder ve scope kurallarını doğrular
+- Worker prompt injection (ADR-036) authority matrix'i worker'a bildirir
+- `isWithinScope()` fonksiyonu (ADR-034) symlink-aware dosya erişim kontrolü yapar
+
+**Katman 2 — Runtime (Dynamic)**
+- Auditor 30s scan cycle: `git diff --stat` ile scope violation tespiti
+- Event stream `source` alanı doğrulaması: yanlış source ile yazılan event → `SCOPE_VIOLATION` alert
+- File lock çakışma tespiti: aynı dosyaya iki worker yazarsa → `SCOPE_COLLISION_DETECTED` event
+
+**Katman 3 — Post-Hoc (Audit Trail)**
+- Event stream replay: sprint sonunda tüm yetki kullanımları reconstruct edilebilir
+- `.deckent/sprint-*-gate.json`: sprint gate hesaplamasında authority violation sayısı raporlanır
+- `docs/audits/sprint-*/`: her sprint'in audit raporu authority matrix compliance içerir
+
+### Versioning & Evolution
+
+Bu RBAC matrix Protocol Version 1.0 ile birlikte tanımlanmıştır. Değişiklikler:
+
+| Değişiklik Türü | Gereksinim |
+|-----------------|------------|
+| Yeni yetki ekleme (izin genişletme) | Bu ADR'ye amendment + `npm run lint:adr` geçmeli |
+| Yetki kaldırma (izin daraltma) | Bu ADR'ye amendment + etkilenen bileşen testleri güncellenmeli |
+| Yeni rol ekleme | Yeni ADR (ADR-037 bu ADR'yi supersede eder) |
+| Kanal hakkı değişikliği | ADR-035 ve bu ADR birlikte güncellenmeli |
+
+**Consequences (+):**
+
+- Her bileşenin yetki sınırları tek tablo olarak okunabilir — onboarding kolaylığı
+- Privilege escalation vektörleri (worker → `.brain/DECISIONS.md` yazma) formal olarak kapatılır
+- Audit trail event stream üzerinden reconstruct edilebilir — post-mortem analiz mümkün
+- Enterprise-ready RBAC pattern: NIST SP 800-162 prensiplerine uyumlu (least privilege, separation of duties, fail-closed)
+- Yeni bileşen eklendiğinde (örn. Notifier, Scheduler) authority matrix genişletme pattern'ı belirli
+- Sprint 137/138 canlı kanıtlarından türetilen kurallar — teorik değil, gerçek ihlallerden öğrenilmiş
+
+**Consequences (-):**
+
+- Authority matrix bakımı gerektirir — her yeni dosya pattern'ı veya kanal eklenmesinde güncellenmeli
+- Runtime enforcement henüz tam değil (Sprint 139 scope) — şu an compile-time + audit trail ağırlıklı
+- Matrix karmaşıklığı yeni katkıda bulunanlar için başlangıçta zorlayıcı olabilir
+- File-system level enforcement (OS capability) implementasyonu yok — güven modeli hâlâ process-level
+
+**Alternatives Considered:**
+
+- **Implicit trust (örtük güven):** Sprint 138'e kadarki model. Reddedildi: Sprint 137 canlı kanıtı gösterdi ki worker self-assessment güvenilmez, formal boundary'ler gerekli.
+- **OS-level capability model (Linux capabilities, seccomp):** Her bileşen ayrı process, OS-level file permission. Reddedildi: cross-platform uyumsuzluk (macOS seccomp yok), Docker backend'de container-in-container karmaşıklığı, ADR-033 "kur-çalıştır" ilkesiyle çelişir.
+- **CI lint-only enforcement:** Authority matrix'i yalnızca CI pipeline'da kontrol et, runtime'da enforce etme. Reddedildi: runtime violation'lar CI'da yakalanamaz, post-hoc tespit yetersiz (Sprint 137 kanıtı).
+- **Centralized policy engine (OPA/Rego):** Policy-as-code engine. Reddedildi: ADR-010 tek runtime dependency ilkesi ihlali, kur-çalıştır friction'ı artırır, Deckent'in mevcut ölçeği için overkill.
+- **Per-sprint dynamic RBAC:** Her sprint'te farklı yetki matrisi. Reddedildi: öngörülemezlik yaratır, debug zorlaştırır, authority matrix'in sabit olması güvenlik garantisi verir.
+
+**References:**
+
+- NIST SP 800-162: Guide to Attribute Based Access Control (ABAC) Definition and Considerations — least privilege, separation of duties prensipleri
+- ADR-008: Brain Merkezi Import — tek yönlü bağımlılık (import boundary = authority boundary temeli)
+- ADR-034: Multi-Project Isolation — per-project security boundaries (symlink-aware scope enforcement)
+- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard V1.0 — event stream kanal kodları
+- ADR-036: ADR Governance Integration — mandatory read wiring, validator enforcement
+- Sprint 137 Task 137-001 retrospektif — worker self-assessment güvenilmezlik kanıtı
+- Sprint 138 Task 138-003 — Auditor Authority Extension 3-Pipeline implementasyonu
+- Sprint 134 T-014 — Brain Self-Audit Gate
+- `.claude/rules/brain.md`, `.claude/rules/auditor.md`, `.claude/rules/worker-default.md` — mevcut doğal dil yetki kuralları (bu ADR ile formalize edildi)
+- `src/agents/worker.ts:isWithinScope()` — runtime scope check implementasyonu
+- `src/monitor/auditor.ts:verifyWorkerResult()` — 3-pipeline verification implementasyonu
+
+---
+
+## ADR-038: Dead Code Disposition — Sprint 139 Audit Results
+
+**Status:** accepted
+
+**Date:** 2026-04-15
+
+**Context:**
+
+Sprint 139 Dead Code Audit (Task 139-037 `scripts/dead-code-audit.mjs`) 11 modülü analiz etti ve 4 kategoride sınıflandırdı: Dead (6 modül, ~1042 LoC), Dormant/ADR-protected (4 modül, ~495 LoC), Active (1 modül — false positive). Audit, Sprint 132'deki güvenlik denetiminden gelen şüphelileri ve ADR-028 koruması altındaki V1 decision engine ekosistemini kapsadı.
+
+Sorun: 1042 satır dead code bakım maliyeti yaratıyor (tsc derleme süresi, IDE noise, yeni katkıda bulunanlar için kafa karışıklığı). Ancak bazı dead modüller gelecek roadmap öğeleriyle (distributed execution Sprint 145+, ML-driven routing) doğrudan ilişkili — acele silme değerli mimari bilgiyi kaybettirir.
+
+**Decision:**
+
+Sprint 139 dead code audit sonuçları için 4 kademeli disposition kararı:
+
+### Kademe 1: Remove (Sprint 140 Adım 4)
+
+Aşağıdaki modüller **tamamen silinecek** (kaynak + test dosyaları):
+
+| Modül | LoC | Gerekçe |
+|-------|-----|---------|
+| `src/orchestra/learning-decay.ts` | 151 | Deprecated learning sistemiyle bağlı, V2 routing farklı decay mekanizması kullanıyor. Pattern basit — gerekirse 30 dakikada yeniden yazılır. |
+| `src/orchestra/learning-migration.ts` | 229 | Hardcoded keyword-to-taskType mapping, eski veri formatı migrasyonu. Yeni learning sistemi kurulursa sıfırdan tasarlanmalı. |
+| `src/orchestra/batch-stats.ts` | 141 | Queue + delayed batch write pattern'ı jenerik. Gerekirse `node:stream` veya basit buffer ile yeniden implement edilir. Mevcut implementation 0 consumer. |
+
+**Toplam:** 3 modül, ~521 LoC silme, 3 test dosyası silme.
+
+**Rollback planı:** `git revert` ile tek commit geri alınır. Silme öncesi son commit hash'i `docs/audits/sprint-139/dead-code-decisions.md`'de kayıt altına alınır.
+
+### Kademe 2: Defer (Sprint 145+ Değerlendirme)
+
+Aşağıdaki modüller **silinmeyecek** — gelecek roadmap öğeleriyle doğrudan ilişkili:
+
+| Modül | LoC | Gelecek Bağlantı | Yeniden Değerlendirme |
+|-------|-----|-------------------|----------------------|
+| `src/orchestra/combination-scorer.ts` | 101 | ML-driven routing scoring, outcome-tracker entegrasyonu | Sprint 145 (routing evolution) |
+| `src/orchestra/handoff-protocol.ts` | 152 | Distributed execution, multi-task artifact exchange | Sprint 145 (distributed sprint) |
+| `src/orchestra/brain-context.ts` | 268 | Context-aware planner enrichment, planner.ts entegrasyonu | Sprint 142 (planner evolution) |
+
+**Toplam:** 3 modül, ~521 LoC korunacak. Test dosyaları da korunur.
+
+Bu modüller `@deprecated` JSDoc tag'i ile işaretlenecek ve dosya başına `// DEFERRED: ADR-038, reassess Sprint 145` yorumu eklenecek. Sprint 145'te yeniden değerlendirilecek — ya revive edilecek (dogfood + test), ya da silinecek.
+
+**Rollback planı:** `@deprecated` tag kaldırılır, modül aktif routing'e bağlanır.
+
+### Kademe 3: Deprecate + Warning (ADR-028 Amendment — Sprint 142+)
+
+ADR-028 koruması altındaki 4 dormant modül statüsü değişmiyor:
+
+| Modül | LoC | ADR-028 Statüsü |
+|-------|-----|------------------|
+| `src/orchestra/decision-engine.ts` | 170 | Korunuyor — V1 referans |
+| `src/orchestra/decision-replay.ts` | 150 | Korunuyor — audit tool |
+| `src/orchestra/decision-steps/agent-step.ts` | 83 | Korunuyor — V1 step |
+| `src/orchestra/decision-steps/scope-step.ts` | 92 | Korunuyor — V1 step |
+
+**Toplam:** 4 modül, ~495 LoC — ADR-028 amendment gerektirir, Sprint 142+ değerlendirilecek.
+
+Bu ADR, ADR-028'in removal'ını TALEP ETMİYOR — yalnızca Sprint 142'de reassessment öneriyor. V2 routing engine 10+ sprint boyunca stabil çalıştığında, V1 referans değerinin devam edip etmediği yeniden değerlendirilmeli.
+
+### Kademe 4: False Positive Düzeltme
+
+`src/orchestra/parallel-pipeline.ts` dead code olarak **yanlış raporlanmıştır**. Modül 4 src/ dosyası tarafından aktif olarak import edilmektedir (`sprint-spawner.ts`, `sprint-controller.ts`, `conflict-resolver.ts`). Rapordaki "0 import" yalnızca `PipelineTask` type export'u için geçerlidir — modülün kendisi kritik altyapıdır. Dead code raporundan çıkarılmalıdır.
+
+**Consequences (+):**
+
+- 521 LoC dead code güvenle silinecek (Sprint 140 Adım 4) — derleme süresi ve IDE noise azalır
+- 521 LoC yüksek değerli kod korunacak — gelecek roadmap öğeleri için yatırım kaybı önlenir
+- Her karar formal gerekçe, risk değerlendirmesi ve rollback planı ile belgelenmiştir
+- False positive (parallel-pipeline) düzeltilerek audit doğruluğu artırılmıştır
+- ADR-028 dormant modülleri Sprint 142'de reassessment'a takvimlenmiştir
+
+**Consequences (-):**
+
+- Deferred modüller (521 LoC) bakım yükü devam eder — `@deprecated` tag + periodic reassessment gerektirir
+- Sprint 145 reassessment'ta modüllerin hâlâ relevant olup olmadığı belirsiz — roadmap değişebilir
+- ADR-028 dormant modüller artık 15+ sprint boyunca untouched — reference value tartışmalı
+
+**Alternatives Considered:**
+
+- **Tümünü sil:** 1042 LoC + 495 LoC = ~1537 LoC silme. Reddedildi: combination-scorer ve handoff-protocol'ün yeniden yazım maliyeti yüksek, mimari bilgi kaybı.
+- **Hiçbirini silme:** Tüm dead code korunsun. Reddedildi: learning-decay/migration/batch-stats gerçekten değersiz, bakım maliyeti artıyor.
+- **Tümünü deprecate:** `@deprecated` işaretle, silme erteleme. Reddedildi: learning-decay/migration/batch-stats için deprecation gereksiz — doğrudan silme daha temiz.
+- **Monorepo archive:** Dead kodu `packages/archive/` dizinine taşı. Reddedildi: ADR-010 minimal dependency, monorepo yapısı yok.
+
+**References:**
+
+- Sprint 139 Task 139-037: `scripts/dead-code-audit.mjs` — audit tool
+- Sprint 139 Task 139-037: `docs/audits/sprint-139/dead-code-report.md` — audit raporu
+- ADR-028: Decision-Engine V1 → V2 Routing Migration — dormant modül koruması
+- ADR-033: Product Vision — bakım maliyeti minimizasyonu
+- `docs/audits/sprint-139/dead-code-decisions.md` — detaylı decision matrix

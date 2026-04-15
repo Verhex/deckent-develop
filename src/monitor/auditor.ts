@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, renameSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join, normalize } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -21,16 +21,180 @@ import {
   DASHBOARD_FILE,
   PATTERNS_FILE,
   PATTERNS_MAX_LINES,
+  ARCHIVE_DIR,
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { metric } from '../core/observability.js';
 import { writeEvent, CHANNELS } from '../orchestra/event-stream.js';
+import { clearOrphanLocks } from '../core/file-lock.js';
+import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 
 // ─── Constants ─────────────────────────────────────────────────────
 
 /** Self-assessment values that indicate a successfully completed task. */
 export const DONE_SET = new Set(['DONE', 'GO_WITH_TECH_DEBT']);
+
+// ─── Heartbeat Cache (Sprint 139 — mtime-based invalidation) ────────
+
+/** Cached heartbeat entry with filesystem mtime for invalidation */
+export interface HeartbeatCacheEntry {
+  hb: Heartbeat;
+  mtimeMs: number;
+  /** Monotonically increasing sequence from last read */
+  lastSequence: number;
+}
+
+/** Module-level heartbeat cache keyed by file path */
+const heartbeatCache = new Map<string, HeartbeatCacheEntry>();
+
+/**
+ * Read a heartbeat file with mtime-based cache invalidation.
+ * Returns cached HB if file mtime hasn't changed, otherwise re-reads from disk.
+ * Sprint 139 fix: eliminates false-positive stale alerts caused by unnecessary re-parsing.
+ */
+export function readHeartbeatCached(hbPath: string): Heartbeat | null {
+  try {
+    const st = statSync(hbPath);
+    const mtimeMs = st.mtimeMs;
+
+    const cached = heartbeatCache.get(hbPath);
+    if (cached && cached.mtimeMs === mtimeMs) {
+      return cached.hb;
+    }
+
+    // mtime changed or not cached — re-read
+    const hb = readJsonSafe<Heartbeat>(hbPath);
+    if (!hb) {
+      heartbeatCache.delete(hbPath);
+      return null;
+    }
+
+    heartbeatCache.set(hbPath, {
+      hb,
+      mtimeMs,
+      lastSequence: hb.sequence ?? 0,
+    });
+    return hb;
+  } catch {
+    // File doesn't exist or stat failed — remove from cache
+    heartbeatCache.delete(hbPath);
+    return null;
+  }
+}
+
+/** Clear the heartbeat cache (for testing or sprint cleanup) */
+export function clearHeartbeatCache(): void {
+  heartbeatCache.clear();
+}
+
+/** Get cache size (for testing) */
+export function getHeartbeatCacheSize(): number {
+  return heartbeatCache.size;
+}
+
+// ─── Backend-Agnostic Process Check (Sprint 139) ────────────────────
+
+/** Check if a worker process/container is still running based on its backend */
+export function isWorkerProcessAlive(hb: Heartbeat): boolean {
+  const backend = hb.backend;
+  const workerId = hb.workerId;
+
+  try {
+    switch (backend) {
+      case 'docker': {
+        // Docker: check if container named deckent-<workerId> is running
+        const result = spawnSync('docker', [
+          'ps', '--filter', `name=deckent-${workerId}`, '--format', '{{.Names}}',
+        ], {
+          encoding: 'utf-8',
+          timeout: 5_000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        return (result.stdout ?? '').trim().length > 0;
+      }
+      case 'tmux': {
+        // tmux: check if session exists
+        const result = spawnSync('tmux', ['has-session', '-t', workerId], {
+          encoding: 'utf-8',
+          timeout: 5_000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        return result.status === 0;
+      }
+      case 'subprocess': {
+        // Subprocess: check PID if available in workerId pattern w-NNN-NNN
+        // Fallback: cannot verify without PID — assume unknown
+        return false; // conservative: subprocess PID not stored in HB
+      }
+      default:
+        // Unknown backend — cannot determine, return false (conservative)
+        return false;
+    }
+  } catch {
+    // Any error in process check — fail-safe, assume not alive
+    return false;
+  }
+}
+
+// ─── Multi-Signal Stale Detection (Sprint 139) ──────────────────────
+
+/**
+ * Multi-signal stale detection: checks multiple signals to determine if a worker is alive.
+ *
+ * Logic:
+ * - If HB timestamp is fresh (within timeout) → NOT stale (single signal sufficient)
+ * - If HB timestamp is stale → check secondary signals:
+ *   - Signal A: .result file exists with successful selfAssessment (DONE/GO_WITH_TECH_DEBT)
+ *   - Signal B: Process/container is still running (backend-agnostic)
+ *   - Signal C: Monotonic sequence increased since last cache read
+ *   If ANY secondary signal is active → NOT stale (suppress false positive)
+ *
+ * Sprint 139 fix for Sprint 138 false positive stale alert pattern.
+ */
+export function isWorkerStale(
+  hb: Heartbeat,
+  projectRoot: string,
+  heartbeatTimeoutMs: number,
+  hbPath?: string,
+): boolean {
+  const currentTime = Date.now();
+  const parsedTime = new Date(hb.timestamp).getTime();
+  if (isNaN(parsedTime)) return true; // malformed timestamp → stale
+
+  // Primary signal: HB timestamp freshness — if fresh, worker is alive
+  const elapsed = currentTime - parsedTime;
+  if (elapsed <= heartbeatTimeoutMs) {
+    return false; // Fresh heartbeat — definitively not stale
+  }
+
+  // HB timestamp is stale — check secondary signals to prevent false positives
+
+  // Signal A: .result file exists with successful assessment → worker finished
+  const resultPath = join(projectRoot, TASKS_DIR, `task-${hb.taskId}.result`);
+  if (existsSync(resultPath)) {
+    const result = readJsonSafe<{ selfAssessment?: string }>(resultPath);
+    if (result?.selfAssessment && DONE_SET.has(result.selfAssessment)) {
+      return false; // Task completed successfully — not stale, just finished
+    }
+  }
+
+  // Signal B: Process/container is still running
+  if (isWorkerProcessAlive(hb)) {
+    return false; // Process alive — worker is running, just slow to update HB
+  }
+
+  // Signal C: Monotonic sequence check — sequence increased since last read
+  if (hbPath) {
+    const cached = heartbeatCache.get(hbPath);
+    if (cached && (hb.sequence ?? 0) > cached.lastSequence) {
+      return false; // Sequence progressed — worker is active
+    }
+  }
+
+  // All secondary signals negative → genuinely stale
+  return true;
+}
 
 // ─── Internal Helpers ───────────────────────────────────────────────
 
@@ -97,7 +261,9 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000
   const currentTime = Date.now();
 
   for (const file of files) {
-    const hb = readJsonSafe<Heartbeat>(join(tasksDir, file));
+    const hbPath = join(tasksDir, file);
+    // Sprint 139: Use mtime-cached reader to avoid re-parsing unchanged HB files
+    const hb = readHeartbeatCached(hbPath);
     if (!hb) continue;
 
     heartbeats.push(hb);
@@ -105,50 +271,108 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000
     // Skip stale check for heartbeats with DONE status — worker already completed
     if (hb.status === AgentStatus.DONE) continue;
 
+    // Sprint 139: Multi-signal stale detection replaces simple elapsed-time check
+    // Checks HB freshness + .result existence + process/container alive + sequence monotonicity
+    if (!isWorkerStale(hb, projectRoot, heartbeatTimeoutMs, hbPath)) {
+      continue; // Worker is alive by multi-signal consensus — skip stale reporting
+    }
+
+    // Worker is stale by multi-signal check — apply existing reconciliation layers
     const parsedTime = new Date(hb.timestamp).getTime();
-    if (isNaN(parsedTime)) continue; // malformed timestamp — skip, do not mark as stale
+    if (isNaN(parsedTime)) continue; // malformed timestamp — skip
     const elapsed = currentTime - parsedTime;
-    if (elapsed > heartbeatTimeoutMs) {
-      // Reconcile HB with .result file: suppress stale alert if task completed successfully
-      // (DONE or GO_WITH_TECH_DEBT). NO_GO results still trigger honest alerts.
-      // Defensive fix for Sprint 134 Docker bug (SIGKILL → HB "FAILED exitCode 137" + 47 false alerts).
-      if (!shouldReportStale(projectRoot, hb.taskId, hb)) continue;
 
-      // Check if the worker's task is already completed (DONE or NO_GO).
-      // Completed workers stop updating heartbeats — this is expected, not a real stale agent.
-      const taskFilePath = join(tasksDir, `task-${hb.taskId}.json`);
-      const task = readJsonSafe<Task>(taskFilePath);
-      const isCompleted = task?.status === TaskStatus.DONE || task?.status === TaskStatus.NO_GO;
+    // Reconcile HB with .result file: suppress stale alert if task completed successfully
+    // (DONE or GO_WITH_TECH_DEBT). NO_GO results still trigger honest alerts.
+    // Defensive fix for Sprint 134 Docker bug (SIGKILL → HB "FAILED exitCode 137" + 47 false alerts).
+    if (!shouldReportStale(projectRoot, hb.taskId, hb)) continue;
 
-      if (isCompleted) {
-        // Downgrade to WARNING — worker finished its task, stale heartbeat is expected
-        alerts.push(
-          createAlert(
-            AlertLevel.WARNING,
-            `Stale heartbeat from completed worker: ${hb.workerId} (task: ${hb.taskId}, status: ${task?.status})`,
-            hb.workerId,
-          ),
-        );
-      } else {
-        staleAgents.push({
-          type: 'stale_heartbeat',
-          agentId: hb.workerId,
-          detail: `Heartbeat stale for ${Math.round(elapsed / 1000)}s (task: ${hb.taskId})`,
-          timestamp: now(),
-        });
-        metric('hb.stale', 1, { taskId: hb.taskId });
-        alerts.push(
-          createAlert(
-            AlertLevel.CRITICAL,
-            `Stale agent detected: ${hb.workerId} (task: ${hb.taskId})`,
-            hb.workerId,
-          ),
-        );
-      }
+    // Check if the worker's task is already completed (DONE or NO_GO).
+    // Completed workers stop updating heartbeats — this is expected, not a real stale agent.
+    const taskFilePath = join(tasksDir, `task-${hb.taskId}.json`);
+    const task = readJsonSafe<Task>(taskFilePath);
+    const isCompleted = task?.status === TaskStatus.DONE || task?.status === TaskStatus.NO_GO;
+
+    if (isCompleted) {
+      // Downgrade to WARNING — worker finished its task, stale heartbeat is expected
+      alerts.push(
+        createAlert(
+          AlertLevel.WARNING,
+          `Stale heartbeat from completed worker: ${hb.workerId} (task: ${hb.taskId}, status: ${task?.status})`,
+          hb.workerId,
+        ),
+      );
+    } else {
+      staleAgents.push({
+        type: 'stale_heartbeat',
+        agentId: hb.workerId,
+        detail: `Heartbeat stale for ${Math.round(elapsed / 1000)}s (task: ${hb.taskId})`,
+        timestamp: now(),
+      });
+      metric('hb.stale', 1, { taskId: hb.taskId });
+      alerts.push(
+        createAlert(
+          AlertLevel.CRITICAL,
+          `Stale agent detected: ${hb.workerId} (task: ${hb.taskId})`,
+          hb.workerId,
+        ),
+      );
     }
   }
 
   return { heartbeats, staleAgents, alerts };
+}
+
+// ─── Authority Enforcement (Sprint 139 Task 035, ADR-037) ─────────
+
+/**
+ * Run authority checks for all active workers based on boundary violations.
+ * Soft enforcement: violations emit warnings + event stream entries.
+ */
+export function runAuthorityChecks(
+  projectRoot: string,
+  currentSprintId: string,
+  workerScopes: Map<string, TaskScope>,
+  boundaryViolations: BoundaryViolation[],
+): Alert[] {
+  const alerts: Alert[] = [];
+
+  for (const violation of boundaryViolations) {
+    if (violation.type !== 'file_outside_scope') continue;
+
+    const filePath = violation.detail.replace('File outside scope: ', '');
+    const workerId = violation.agentId;
+
+    const scope = workerScopes.get(workerId);
+    const result = checkAuthority({
+      role: 'worker',
+      action: 'write',
+      target: filePath,
+      taskId: workerId,
+      scopeDirectories: scope?.directories,
+      scopeFilesWrite: scope?.filesWrite,
+    });
+
+    if (!result.allowed) {
+      alerts.push(
+        createAlert(
+          AlertLevel.WARNING,
+          `[ADR-037 soft] Authority violation: worker ${workerId} attempted to write ${filePath} — ${result.reason}`,
+          workerId,
+        ),
+      );
+
+      // Emit to event stream for audit trail
+      emitAuthorityViolation(projectRoot, currentSprintId, {
+        role: 'worker',
+        action: 'write',
+        target: filePath,
+        taskId: workerId,
+      }, result);
+    }
+  }
+
+  return alerts;
 }
 
 export function checkBoundaryViolations(
@@ -460,6 +684,8 @@ export interface ScanResult {
   violations: BoundaryViolation[];
   alerts: Alert[];
   locks: LockInfo[];
+  /** Dependency order violations detected in this scan cycle (Sprint 139) */
+  dependencyViolations?: DependencyViolation[];
 }
 
 export function runScanCycle(
@@ -490,13 +716,26 @@ export function runScanCycle(
     }
     const deadlocks = detectDeadlocks(tasks);
 
+    // Sprint 139: Dependency violation detection — workers executing before deps are done
+    const depViolations = detectDependencyViolations(projectRoot, currentSprintId);
+
+    // Sprint 139 Task 035: Authority enforcement check (ADR-037, soft mode)
+    const authorityAlerts = runAuthorityChecks(projectRoot, currentSprintId, workerScopes, boundaryViolations);
+    const depAlerts: Alert[] = depViolations.map(v =>
+      createAlert(
+        AlertLevel.WARNING,
+        `Dependency violation: worker ${v.workerId} (task ${v.taskId}) executing before deps done: ${v.unresolvedDeps.join(', ')}`,
+        v.workerId,
+      ),
+    );
+
     const allViolations = [
       ...hbResult.staleAgents,
       ...boundaryViolations,
       ...lockResult.staleLocks,
       ...deadlocks,
     ];
-    const allAlerts = [...hbResult.alerts, ...lockResult.alerts];
+    const allAlerts = [...hbResult.alerts, ...lockResult.alerts, ...depAlerts, ...authorityAlerts];
 
     // Detect patterns from violations
     detectPatterns(projectRoot, allViolations, currentSprintId);
@@ -527,6 +766,7 @@ export function runScanCycle(
       violations: allViolations,
       alerts: allAlerts,
       locks: lockResult.locks,
+      dependencyViolations: depViolations,
     };
   } catch {
     return {
@@ -534,6 +774,7 @@ export function runScanCycle(
       violations: [],
       alerts: [],
       locks: [],
+      dependencyViolations: [],
     };
   }
 }
@@ -1175,27 +1416,49 @@ export async function validateTechDebt(
  * Pipeline 1 (NO_GO): tryCodeVerifiedDone — check if code exists despite NO_GO
  * Pipeline 2 (GO_WITH_TECH_DEBT): validateTechDebt — check notes quality
  * Pipeline 3 (DONE): verifyFunctional — run affected tests
+ *
+ * Sprint 139: emits AUDITOR→BRAIN:VERIFICATION_RESULT to event stream after verification.
+ * @param sprintId - Active sprint ID for event stream routing. If omitted, event is skipped.
  */
 export async function verifyWorkerResult(
   taskId: string,
   projectRoot: string,
   result: TaskResult,
+  sprintId?: string,
 ): Promise<VerificationResult> {
+  let verification: VerificationResult;
+
   switch (result.selfAssessment) {
     case 'NO_GO': {
       const codeVerify = await tryCodeVerifiedDone(taskId, projectRoot);
       if (codeVerify.triggered && codeVerify.verified) {
-        return { verdict: 'PASS', reason: `CODE_VERIFIED_DONE: ${codeVerify.reason}` };
+        verification = { verdict: 'PASS', reason: `CODE_VERIFIED_DONE: ${codeVerify.reason}` };
+      } else {
+        verification = { verdict: 'FAIL', reason: `Honest NO_GO: ${codeVerify.reason}` };
       }
-      return { verdict: 'FAIL', reason: `Honest NO_GO: ${codeVerify.reason}` };
+      break;
     }
     case 'GO_WITH_TECH_DEBT':
-      return validateTechDebt(taskId, projectRoot, result);
+      verification = await validateTechDebt(taskId, projectRoot, result);
+      break;
     case 'DONE':
-      return verifyFunctional(taskId, projectRoot, result);
+      verification = await verifyFunctional(taskId, projectRoot, result);
+      break;
     default:
-      return { verdict: 'FAIL', reason: `Unknown selfAssessment: ${result.selfAssessment}` };
+      verification = { verdict: 'FAIL', reason: `Unknown selfAssessment: ${result.selfAssessment}` };
   }
+
+  // Emit VERIFICATION_RESULT event (ADR-035, channel: AUDITOR→BRAIN:VERIFICATION_RESULT)
+  if (sprintId) {
+    emitVerificationEvent(projectRoot, sprintId, {
+      taskId,
+      verdict: verification.verdict,
+      status: verification.newStatus,
+      reason: verification.reason,
+    });
+  }
+
+  return verification;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1286,10 +1549,14 @@ const PILOT_ADR_RULES: Map<string, ADREnforcementRule> = new Map([
 /**
  * Check ADR compliance for changed files against pilot enforcement rules.
  * Returns violations found.
+ *
+ * Sprint 139: emits AUDITOR→BRAIN:ADR_VIOLATION to event stream when violations exist.
+ * @param sprintId - Active sprint ID for event stream routing. If omitted, event is skipped.
  */
 export function checkADRCompliance(
   projectRoot: string,
   changedFiles: string[],
+  sprintId?: string,
 ): ADRViolation[] {
   const violations: ADRViolation[] = [];
   let decisionsContent: string;
@@ -1355,40 +1622,380 @@ export function checkADRCompliance(
     }
   }
 
+  // Emit ADR_VIOLATION event if violations found (Sprint 139 real wire)
+  if (sprintId && violations.length > 0) {
+    emitADRViolationEvent(projectRoot, sprintId, violations, changedFiles);
+  }
+
   return violations;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Event Stream Hook Point (Sprint 138 — Task 4 coordination)
+// Event Stream Hook Points (Sprint 139 — Real Wire)
+// Replaces Sprint 138 fallback mode (require() CommonJS pattern removed).
+// All 5 channels now use writeEvent() directly per ADR-035 V1.0.
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Write a verification event to the event stream.
- * Fail-safe: if event-stream module is not available (Task 4 not yet merged),
- * falls back to debugLog.
+ * Write a VERIFICATION_RESULT event to the event stream.
+ * Sprint 138 fallback (require+appendFileSync) replaced with writeEvent().
+ * Fail-safe: write failure never crashes the caller.
  */
 export function emitVerificationEvent(
   projectRoot: string,
+  sprintId: string,
   payload: { taskId: string; verdict: string; status?: string; reason: string },
 ): void {
   try {
-    // Dynamic import attempt — Task 4 will create event-stream.ts
-    // Until then, this is a no-op with debug logging
-    const eventFile = join(projectRoot, '.deckent', 'sprint-events.jsonl');
-    const event = {
-      timestamp: new Date().toISOString(),
-      source: 'auditor',
-      target: 'brain',
-      channel: 'AUDITOR→BRAIN:VERIFICATION_RESULT',
+    writeEvent(
+      projectRoot,
+      sprintId,
+      'auditor',
+      'brain',
+      CHANNELS.VERIFICATION_RESULT,
       payload,
-    };
-    try {
-      const { appendFileSync } = require('node:fs') as typeof import('node:fs');
-      appendFileSync(eventFile, JSON.stringify(event) + '\n');
-    } catch {
-      debugLog('emitVerificationEvent', `Event stream write failed (Task 4 pending): ${JSON.stringify(payload)}`);
-    }
+    );
   } catch {
     // Fail-safe — never crash on event emission
+    debugLog('emitVerificationEvent', `writeEvent failed for ${JSON.stringify(payload)}`);
   }
+}
+
+/**
+ * Write an ADR_VIOLATION event to the event stream.
+ * Called by checkADRCompliance when violations are found.
+ */
+export function emitADRViolationEvent(
+  projectRoot: string,
+  sprintId: string,
+  violations: ADRViolation[],
+  changedFiles: string[],
+): void {
+  if (violations.length === 0) return;
+  try {
+    writeEvent(
+      projectRoot,
+      sprintId,
+      'auditor',
+      'brain',
+      CHANNELS.ADR_VIOLATION,
+      {
+        violationCount: violations.length,
+        violations: violations.map(v => ({
+          adrId: v.adrId,
+          adrTitle: v.adrTitle,
+          violation: v.violation,
+          severity: v.severity,
+        })),
+        changedFiles,
+      },
+    );
+  } catch {
+    // Fail-safe
+    debugLog('emitADRViolationEvent', `writeEvent failed for ${violations.length} violations`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Orphan HB Cleanup (Sprint 139 — Task 016)
+// Coordinator restart recovery: Brain crash → new Brain → old worker HB files orphan.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Result of an orphan HB detection scan. */
+export interface OrphanHBResult {
+  /** Task IDs found in .tasks/*.hb that are NOT in the active sprint task list */
+  orphanTaskIds: string[];
+  /** Full paths to orphan HB files */
+  orphanHBPaths: string[];
+}
+
+/**
+ * Detect orphan heartbeat files.
+ *
+ * A heartbeat is "orphan" when its task ID does not appear in any
+ * currently active task JSON file (i.e., the coordinator crashed and
+ * was restarted with a fresh task list, leaving old .hb files behind).
+ *
+ * Sprint 134 canlı kanıt: Brain crash → yeni Brain → eski worker HB dosyaları orphan.
+ *
+ * @param projectRoot - Project root directory
+ * @param activeTaskIds - Set of task IDs belonging to the current sprint.
+ *   If omitted, the function reads all `.tasks/task-*.json` files to build
+ *   the active set (auto-discovery mode for Brain boot use).
+ */
+export function detectOrphans(
+  projectRoot: string,
+  activeTaskIds?: Set<string>,
+): OrphanHBResult {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  const orphanTaskIds: string[] = [];
+  const orphanHBPaths: string[] = [];
+
+  if (!existsSync(tasksDir)) {
+    return { orphanTaskIds, orphanHBPaths };
+  }
+
+  // Build active task ID set from disk if not provided (auto-discovery)
+  let activeTasks: Set<string>;
+  if (activeTaskIds) {
+    activeTasks = activeTaskIds;
+  } else {
+    activeTasks = new Set<string>();
+    const jsonFiles = readdirSync(tasksDir).filter(
+      (f) => f.startsWith('task-') && f.endsWith('.json'),
+    );
+    for (const f of jsonFiles) {
+      const taskId = f.replace(/^task-/, '').replace(/\.json$/, '');
+      activeTasks.add(taskId);
+    }
+  }
+
+  // Scan all HB files — any whose task ID is absent from active set is an orphan
+  const hbFiles = readdirSync(tasksDir).filter((f) => f.endsWith('.hb'));
+  for (const hbFile of hbFiles) {
+    // task-{id}.hb → id
+    const taskId = hbFile.replace(/^task-/, '').replace(/\.hb$/, '');
+    if (!activeTasks.has(taskId)) {
+      orphanTaskIds.push(taskId);
+      orphanHBPaths.push(join(tasksDir, hbFile));
+    }
+  }
+
+  return { orphanTaskIds, orphanHBPaths };
+}
+
+/**
+ * Clean up orphan HB files.
+ *
+ * For each orphan task:
+ * 1. Moves the .hb file to `.brain/archive/sprint-NNN-orphan-hb/`
+ * 2. Releases any file locks held by the orphan worker (via clearOrphanLocks)
+ * 3. Emits `AUDITOR→BRAIN:ORPHAN_HB_DETECTED` event to the event stream
+ *
+ * Fail-safe: any I/O error for a single orphan is logged and skipped —
+ * other orphans are still processed.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint ID (used for archive directory name and event stream)
+ * @param activeTaskIds - Optional set of active task IDs (passed to detectOrphans)
+ */
+export function cleanupOrphanHBs(
+  projectRoot: string,
+  sprintId: string,
+  activeTaskIds?: Set<string>,
+): {
+  archived: string[];
+  locksReleased: string[];
+  orphanCount: number;
+} {
+  const { orphanTaskIds, orphanHBPaths } = detectOrphans(projectRoot, activeTaskIds);
+
+  if (orphanTaskIds.length === 0) {
+    return { archived: [], locksReleased: [], orphanCount: 0 };
+  }
+
+  // Prepare archive directory: .brain/archive/{sprintId}-orphan-hb/
+  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, `${sprintId}-orphan-hb`);
+  try {
+    mkdirSync(archiveDir, { recursive: true });
+  } catch {
+    // If archive dir cannot be created, we still attempt lock cleanup and event emit
+  }
+
+  const archived: string[] = [];
+
+  // 1. Archive each orphan HB file
+  for (const hbPath of orphanHBPaths) {
+    try {
+      const fileName = hbPath.split('/').pop() ?? hbPath.split('\\').pop() ?? hbPath;
+      const dest = join(archiveDir, fileName);
+      renameSync(hbPath, dest);
+      archived.push(hbPath);
+      debugLog('auditor:cleanupOrphanHBs', `Archived orphan HB: ${hbPath} → ${dest}`);
+    } catch {
+      // Non-fatal: log and continue
+      debugLog('auditor:cleanupOrphanHBs', `Failed to archive orphan HB: ${hbPath}`);
+    }
+  }
+
+  // 2. Build set of active worker IDs from active task HB files (post-cleanup)
+  //    and release locks whose owner is not in the active set
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  const activeWorkerIds = new Set<string>();
+  if (existsSync(tasksDir)) {
+    const remainingHBFiles = readdirSync(tasksDir).filter((f) => f.endsWith('.hb'));
+    for (const f of remainingHBFiles) {
+      const hbPath = join(tasksDir, f);
+      const hb = readJsonSafe<{ workerId?: string }>(hbPath);
+      if (hb?.workerId) activeWorkerIds.add(hb.workerId);
+    }
+  }
+  // Also add worker IDs from orphan HBs so we know which ones to purge
+  // (already moved — we get their IDs from the task IDs, but they're gone from disk)
+  const locksReleased = clearOrphanLocks(projectRoot, activeWorkerIds);
+
+  // 3. Emit event to stream
+  try {
+    writeEvent(
+      projectRoot, sprintId, 'auditor', 'brain',
+      CHANNELS.ORPHAN_HB_DETECTED,
+      {
+        orphanCount: orphanTaskIds.length,
+        archivedCount: archived.length,
+        locksReleasedCount: locksReleased.length,
+        orphanTaskIds,
+        locksReleased,
+      },
+    );
+  } catch {
+    // Fail-safe — event stream write must not crash cleanup
+  }
+
+  metric('orphan_hb.detected', orphanTaskIds.length, { sprintId });
+
+  return { archived, locksReleased, orphanCount: orphanTaskIds.length };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Dependency Violation Alert (Sprint 139 — Task 032)
+// Detects workers executing before their declared dependencies are done.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** A dependency violation: worker started before its dep was completed. */
+export interface DependencyViolation {
+  /** Worker ID that violated dependency order */
+  workerId: string;
+  /** Task ID being executed by the violating worker */
+  taskId: string;
+  /** Dependency task IDs that are not yet DONE */
+  unresolvedDeps: string[];
+  /** Status of each unresolved dependency (for context) */
+  depStatuses: Record<string, string>;
+  /** ISO timestamp of detection */
+  timestamp: string;
+}
+
+/**
+ * Detect workers that are executing before their declared dependencies are done.
+ *
+ * Algorithm:
+ * 1. Read all active heartbeats (.hb files with EXECUTING/CLAIMING status)
+ * 2. For each active worker, read its task JSON to get `dependencies`
+ * 3. Read each dep task JSON and check its status
+ * 4. If any dep is not DONE or GO_WITH_TECH_DEBT → violation
+ * 5. Emit AUDITOR→BRAIN:DEPENDENCY_VIOLATION event to event stream
+ *
+ * Note: DONE_SET (DONE, GO_WITH_TECH_DEBT) is treated as "dependency satisfied".
+ * A dep with NO_GO triggers cascade blocking (handled in sprint-spawner), not here.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint ID (for event stream)
+ * @returns List of dependency violations detected
+ */
+export function detectDependencyViolations(
+  projectRoot: string,
+  sprintId: string,
+): DependencyViolation[] {
+  const violations: DependencyViolation[] = [];
+  const tasksDir = join(projectRoot, TASKS_DIR);
+
+  if (!existsSync(tasksDir)) return violations;
+
+  // Step 1: Collect all active heartbeats
+  const hbFiles = readdirSync(tasksDir).filter(f => f.endsWith('.hb'));
+
+  for (const hbFile of hbFiles) {
+    const hbPath = join(tasksDir, hbFile);
+    const hb = readJsonSafe<Heartbeat>(hbPath);
+    if (!hb) continue;
+
+    // Only check actively-executing workers
+    const activeStatuses = new Set([
+      'EXECUTING', 'CLAIMING', 'CLAIMED', 'TESTING', 'DOCUMENTING',
+    ]);
+    if (!activeStatuses.has(hb.status ?? '')) continue;
+
+    // Step 2: Read task JSON for this worker
+    const taskId = hb.taskId;
+    const taskPath = join(tasksDir, `task-${taskId}.json`);
+    const task = readJsonSafe<Task>(taskPath);
+    if (!task || !task.dependencies || task.dependencies.length === 0) continue;
+
+    // Step 3: Check each dependency
+    const unresolvedDeps: string[] = [];
+    const depStatuses: Record<string, string> = {};
+
+    for (const depId of task.dependencies) {
+      const depTaskPath = join(tasksDir, `task-${depId}.json`);
+      const depTask = readJsonSafe<Task>(depTaskPath);
+
+      if (!depTask) {
+        // Dep task file missing — check if .result exists (may have been archived)
+        const depResultPath = join(tasksDir, `task-${depId}.result`);
+        if (existsSync(depResultPath)) {
+          const depResult = readJsonSafe<{ selfAssessment?: string }>(depResultPath);
+          const assessment = depResult?.selfAssessment ?? 'UNKNOWN';
+          depStatuses[depId] = assessment;
+          if (!DONE_SET.has(assessment)) {
+            unresolvedDeps.push(depId);
+          }
+        } else {
+          // Dep completely unknown — conservative: not a violation (task may be pre-sprint)
+          depStatuses[depId] = 'UNKNOWN';
+        }
+        continue;
+      }
+
+      const depStatus = depTask.status ?? 'UNKNOWN';
+      depStatuses[depId] = depStatus;
+
+      // DONE and NO_GO are terminal states. We only flag if dep is still pending/executing.
+      // A DONE dep (either status DONE or having a DONE result) is satisfied.
+      // Check result file too: worker may have finished but task JSON not yet updated
+      const depResultPath = join(tasksDir, `task-${depId}.result`);
+      if (existsSync(depResultPath)) {
+        const depResult = readJsonSafe<{ selfAssessment?: string }>(depResultPath);
+        const assessment = depResult?.selfAssessment ?? '';
+        if (DONE_SET.has(assessment)) {
+          depStatuses[depId] = assessment;
+          continue; // Dep completed successfully — satisfied
+        }
+      }
+
+      // Check task status for terminal completion states
+      if (depTask.status === TaskStatus.DONE) continue; // satisfied
+
+      // Not done yet — violation
+      unresolvedDeps.push(depId);
+    }
+
+    if (unresolvedDeps.length === 0) continue;
+
+    const violation: DependencyViolation = {
+      workerId: hb.workerId,
+      taskId,
+      unresolvedDeps,
+      depStatuses,
+      timestamp: now(),
+    };
+    violations.push(violation);
+
+    // Step 4: Emit to event stream (fail-safe)
+    try {
+      writeEvent(
+        projectRoot, sprintId, 'auditor', 'brain',
+        'AUDITOR→BRAIN:DEPENDENCY_VIOLATION',
+        {
+          workerId: hb.workerId,
+          taskId,
+          unresolvedDeps,
+          depStatuses,
+        },
+      );
+    } catch {
+      // Event stream write must not break detection loop
+    }
+  }
+
+  return violations;
 }

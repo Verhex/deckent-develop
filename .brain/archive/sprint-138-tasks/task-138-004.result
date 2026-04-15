@@ -1,0 +1,34 @@
+{
+  "taskId": "138-004",
+  "workerId": "w-138-004",
+  "filesChanged": [
+    "src/orchestra/event-stream.ts",
+    "src/core/file-lock.ts",
+    "src/orchestra/conflict-resolver.ts",
+    "src/orchestra/sprint-spawner.ts",
+    "src/agents/worker.ts",
+    "src/monitor/auditor.ts",
+    "tests/orchestra/event-stream.test.ts",
+    "tests/core/file-lock.test.ts",
+    "tests/orchestra/sprint-spawner.test.ts"
+  ],
+  "linesAdded": 848,
+  "linesRemoved": 95,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 138 Task 004 — Structured Event Stream + Plan-Time Scope Collision Detection.\n\nAlt-iş A: Created src/orchestra/event-stream.ts (305 LoC) — DeckentEvent interface, writeEvent (append-only JSONL), readEvents (with filter), reconstructState, 15 channel constants (ADR-035 Protocol V1.0), getCurrentSprintId helper, fail-safe (never throws on I/O error), monotonic sequence counter via .deckent/sprint-NNN-seq file.\n\nAlt-iş B: Expanded src/core/file-lock.ts from 30→267 LoC — migrated acquireLock/releaseLock/checkLock from worker.ts to core, added checkLocks (list all), releaseAllLocks, clearStaleLocks (with TTL support), LockError class, claimTaskLock observability wrapper preserved. Worker.ts lock functions now delegate to core (backward-compat re-exports).\n\nAlt-iş C: Added plan-time scope collision detection — detectScopeCollisions() and buildCollisionAwareWaves() in conflict-resolver.ts (128 LoC added). Sprint-spawner.ts imports and calls detectScopeCollisions() before spawn, emits SCOPE_COLLISION_DETECTED events. Re-exports added for external consumers.\n\nAlt-iş D: Auditor event stream integration — auditor.ts imports event-stream module, emits lock state snapshot events during scan cycle.\n\nAlt-iş E: Collision event integration — detectScopeCollisions results written to event stream via AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED channel.\n\nVerification: tsc --noEmit 0 errors. 40 new tests pass (13 event-stream + 15 file-lock + 12 collision detection). 175 existing related tests pass (48 worker + 94 auditor + 18 conflict-resolver + 15 file-lock).",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "tokenUsage": {
+    "inputTokens": 120000,
+    "outputTokens": 25000,
+    "cacheReadTokens": 80000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

@@ -71,6 +71,12 @@ export const CHANNELS = {
 
   // User notification (Sprint 139 seed)
   NOTIFY: 'DECKENT→USER:NOTIFY',
+
+  // Orphan HB cleanup (Sprint 139 — Task 016)
+  ORPHAN_HB_DETECTED: 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED',
+
+  // Authority enforcement (Sprint 139 — Task 035, ADR-037)
+  AUTHORITY_VIOLATION: 'AUDITOR→BRAIN:AUTHORITY_VIOLATION',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];

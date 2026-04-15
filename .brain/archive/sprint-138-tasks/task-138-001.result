@@ -1,0 +1,26 @@
+{
+  "taskId": "138-001",
+  "filesChanged": [
+    ".brain/DECISIONS.md",
+    "DECKENT.md",
+    ".claude/rules/brain.md",
+    ".claude/rules/worker-default.md",
+    "src/orchestra/task-builder.ts",
+    "scripts/adr-validator.mjs",
+    "tests/scripts/adr-validator.test.ts",
+    "tests/orchestra/task-builder.test.ts",
+    "package.json"
+  ],
+  "linesAdded": 380,
+  "linesRemoved": 12,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "5 alt-iş tamamlandı:\n\nA) MADR v3 hibrit format migration — 37 ADR entry'ye Status alanı eklendi (28 yeni + 7 mevcut + ADR-022 v2 + ADR-036). ADR-005 deprecated, ADR-022 v1 superseded.\n\nB) Mandatory Read Wiring — DECKENT.md'ye @.brain/DECISIONS.md referansı, brain.md ve worker-default.md'ye ADR compliance kuralları, task-builder.ts'e loadADRContent() + prompt injection eklendi.\n\nC) Validator Script — scripts/adr-validator.mjs (parseADRs + validateADRs + validate). package.json'a lint:adr script eklendi. npm run lint:adr → exit 0.\n\nD) ADR Naming Split — DECKENT.md'ye ADR vs SDL ayrımı eklendi.\n\nE) ADR-036 — Self-referential ADR yazıldı, validator'dan geçti (meta-doğrulama).\n\nTSC: Pre-existing hatalar (worker.ts, event-stream.ts) — benim değişikliklerimle ilgisiz. Test: 230 pass (11 adr-validator + 219 task-builder, 4 yeni ADR-specific test dahil). npm run lint:adr → 37 ADR validated.",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 95
+  }
+}

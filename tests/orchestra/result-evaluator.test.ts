@@ -15,10 +15,14 @@ import {
   applyTechDebtDowngrade,
   TECH_DEBT_DOWNGRADE_DONE_THRESHOLD,
   TECH_DEBT_DOWNGRADE_NO_GO_THRESHOLD,
+  validateTokenUsage,
+  classifyFailure,
+  decideCascadeAction,
 } from '../../src/orchestra/result-evaluator.js';
 import type {
   WaitableSprint,
   ResultWatcher,
+  FailureContext,
 } from '../../src/orchestra/result-evaluator.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -1246,5 +1250,218 @@ describe('applyTechDebtDowngrade', () => {
   it('exports threshold constants with expected values', () => {
     expect(TECH_DEBT_DOWNGRADE_DONE_THRESHOLD).toBe(0.8);
     expect(TECH_DEBT_DOWNGRADE_NO_GO_THRESHOLD).toBe(0.5);
+  });
+});
+
+// ─── validateTokenUsage() ─────────────────────────────────────────────
+
+describe('validateTokenUsage', () => {
+  it('returns isComplete=true and no warnings for a fully populated tokenUsage', () => {
+    const result = makeResult({
+      tokenUsage: { inputTokens: 1500, outputTokens: 300, cacheReadTokens: 0, provider: 'claude', model: 'sonnet' },
+    });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(true);
+    expect(validation.warnings).toHaveLength(0);
+    expect(validation.tokenUsageMissing).toBe(false);
+  });
+
+  it('warns when tokenUsage is entirely absent', () => {
+    const result = makeResult({ tokenUsage: undefined });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(false);
+    expect(validation.tokenUsageMissing).toBe(true);
+    expect(validation.warnings).toHaveLength(1);
+    expect(validation.warnings[0]).toMatch(/missing/i);
+  });
+
+  it('warns when inputTokens is missing', () => {
+    const result = makeResult({
+      tokenUsage: { inputTokens: undefined as unknown as number, outputTokens: 300, provider: 'claude', model: 'sonnet' },
+    });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(false);
+    expect(validation.warnings.some(w => w.includes('inputTokens'))).toBe(true);
+  });
+
+  it('warns when outputTokens is missing', () => {
+    const result = makeResult({
+      tokenUsage: { inputTokens: 1500, outputTokens: undefined as unknown as number, provider: 'claude', model: 'sonnet' },
+    });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(false);
+    expect(validation.warnings.some(w => w.includes('outputTokens'))).toBe(true);
+  });
+
+  it('warns when provider is missing', () => {
+    const result = makeResult({
+      tokenUsage: { inputTokens: 1500, outputTokens: 300, provider: undefined, model: 'sonnet' },
+    });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(false);
+    expect(validation.warnings.some(w => w.includes('provider'))).toBe(true);
+  });
+
+  it('warns when model is missing', () => {
+    const result = makeResult({
+      tokenUsage: { inputTokens: 1500, outputTokens: 300, provider: 'claude', model: undefined },
+    });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(false);
+    expect(validation.warnings.some(w => w.includes('model'))).toBe(true);
+  });
+
+  it('accumulates multiple warnings when several fields are missing', () => {
+    const result = makeResult({
+      tokenUsage: { inputTokens: 1500, outputTokens: 300 },
+    });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(false);
+    expect(validation.warnings.length).toBeGreaterThanOrEqual(2);
+    expect(validation.tokenUsageMissing).toBe(false);
+  });
+
+  it('accepts cacheReadTokens as optional — complete even without it', () => {
+    const result = makeResult({
+      tokenUsage: { inputTokens: 1500, outputTokens: 300, provider: 'claude', model: 'opus' },
+    });
+    const validation = validateTokenUsage(result);
+    expect(validation.isComplete).toBe(true);
+    expect(validation.warnings).toHaveLength(0);
+  });
+
+  it('does not affect evaluation decision — soft warning only', () => {
+    // validateTokenUsage is informational only; the result with missing tokenUsage
+    // still evaluates to DONE if other criteria pass (Sprint 139 soft mode)
+    const result = makeResult({ tokenUsage: undefined });
+    const task = makeTask(['src/']);
+    const evalResult = evaluateWithRubric(result, task);
+    const validation = validateTokenUsage(result);
+    // Both can co-exist: evaluation DONE but tokenUsage has warnings
+    expect(validation.tokenUsageMissing).toBe(true);
+    expect(['DONE', 'GO_WITH_TECH_DEBT']).toContain(evalResult.decision);
+  });
+});
+
+// ─── classifyFailure() — Runtime vs Code Discriminator ─────────────
+
+describe('classifyFailure (runtime-vs-code discriminator)', () => {
+  it('classifies exitCode 137 as RUNTIME', () => {
+    const ctx: FailureContext = { exitCode: 137 };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('RUNTIME');
+    expect(result.signals).toContain('exitCode=137 (SIGKILL)');
+  });
+
+  it('classifies Docker HB shutdown note as RUNTIME', () => {
+    const ctx: FailureContext = {
+      notes: 'Docker worker exited without writing result file',
+      resultFilePresent: false,
+    };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('RUNTIME');
+    expect(result.signals.some(s => s.includes('no result file written'))).toBe(true);
+  });
+
+  it('classifies tsc error notes as CODE', () => {
+    const ctx: FailureContext = {
+      notes: 'tsc error: Type string is not assignable to type number',
+      selfAssessment: 'NO_GO',
+      resultFilePresent: true,
+    };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('CODE');
+    expect(result.signals.length).toBeGreaterThan(0);
+  });
+
+  it('classifies test failure output as CODE', () => {
+    const ctx: FailureContext = {
+      notes: '15 tests failed in result-evaluator.test.ts',
+      errorOutput: 'vitest found 15 fail',
+      resultFilePresent: true,
+    };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('CODE');
+  });
+
+  it('classifies mixed runtime+code signals as AMBIGUOUS', () => {
+    const ctx: FailureContext = {
+      exitCode: 137,
+      notes: 'tsc error found, but also container exited',
+      resultFilePresent: false,
+    };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('AMBIGUOUS');
+  });
+
+  it('returns AMBIGUOUS when no signals detected', () => {
+    const ctx: FailureContext = {
+      notes: 'Worker finished with unknown issue',
+      resultFilePresent: true,
+    };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('AMBIGUOUS');
+    expect(result.reason).toContain('No identifiable failure signals');
+  });
+
+  it('classifies "no such container" as RUNTIME', () => {
+    const ctx: FailureContext = {
+      errorOutput: 'Error: No such container: deckent-w-139-005',
+      resultFilePresent: false,
+    };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('RUNTIME');
+  });
+
+  it('classifies scope violation notes as CODE', () => {
+    const ctx: FailureContext = {
+      notes: 'Auditor detected scope violation: files outside scope.directories',
+      resultFilePresent: true,
+    };
+    const result = classifyFailure(ctx);
+    expect(result.category).toBe('CODE');
+  });
+});
+
+// ─── decideCascadeAction() ───────────────────────────────────────────
+
+describe('decideCascadeAction (cross-dep cascade logic)', () => {
+  it('RUNTIME → retry=true, cascade=false, no fix worker', () => {
+    const ctx: FailureContext = { exitCode: 137, resultFilePresent: false };
+    const decision = decideCascadeAction('139-005', ctx);
+    expect(decision.shouldRetry).toBe(true);
+    expect(decision.shouldCascade).toBe(false);
+    expect(decision.spawnFixWorker).toBe(false);
+    expect(decision.category).toBe('RUNTIME');
+  });
+
+  it('CODE → retry=false, cascade=true, spawn fix worker', () => {
+    const ctx: FailureContext = {
+      notes: '5 tests failed, tsc error: Type error in worker.ts',
+      resultFilePresent: true,
+    };
+    const decision = decideCascadeAction('139-010', ctx);
+    expect(decision.shouldRetry).toBe(false);
+    expect(decision.shouldCascade).toBe(true);
+    expect(decision.spawnFixWorker).toBe(true);
+    expect(decision.category).toBe('CODE');
+  });
+
+  it('AMBIGUOUS → retry=true, cascade=false, no fix worker', () => {
+    const ctx: FailureContext = {
+      notes: 'Something went wrong but unclear what',
+      resultFilePresent: true,
+    };
+    const decision = decideCascadeAction('139-015', ctx);
+    expect(decision.shouldRetry).toBe(true);
+    expect(decision.shouldCascade).toBe(false);
+    expect(decision.spawnFixWorker).toBe(false);
+    expect(decision.category).toBe('AMBIGUOUS');
+  });
+
+  it('includes taskId in reason string', () => {
+    const ctx: FailureContext = { exitCode: 137 };
+    const decision = decideCascadeAction('task-xyz', ctx);
+    expect(decision.reason).toContain('task-xyz');
   });
 });

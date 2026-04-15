@@ -2,11 +2,48 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
+import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { readLatestJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStatusResponse, wrapResponse, type StatusData } from '../helpers/format.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
+import { readDashboardSafe } from '../../monitor/dashboard-manager.js';
+import { debugLog } from '../../core/utils.js';
+
+/**
+ * Loads the persisted dependency graph for the given sprint from disk.
+ * File-system based to avoid ADR-008 import cycle (status.ts must not import orchestra/).
+ * Returns null if no graph is persisted yet (sprint has no dep data).
+ */
+function loadDepGraphFiles(
+  projectRoot: string,
+  sprintId: string,
+): { format: 'mermaid'; content: string; json: unknown } | null {
+  const mmdPath = join(projectRoot, DECKENT_DIR, `${sprintId}-depgraph.mmd`);
+  const jsonPath = join(projectRoot, DECKENT_DIR, `${sprintId}-depgraph.json`);
+  if (!existsSync(mmdPath) && !existsSync(jsonPath)) return null;
+
+  let content = '';
+  let json: unknown = null;
+
+  if (existsSync(mmdPath)) {
+    try {
+      content = readFileSync(mmdPath, 'utf-8');
+    } catch (e) {
+      debugLog('status.ts:depgraph-mmd-read-error', e);
+    }
+  }
+  if (existsSync(jsonPath)) {
+    try {
+      json = JSON.parse(readFileSync(jsonPath, 'utf-8'));
+    } catch (e) {
+      debugLog('status.ts:depgraph-json-read-error', e);
+    }
+  }
+
+  if (!content && !json) return null;
+  return { format: 'mermaid', content, json };
+}
 
 function buildProgressBar(done: number, total: number, width = 10): string {
   if (total <= 0) return '\u2591'.repeat(width);
@@ -140,76 +177,21 @@ export function registerStatusTool(server: McpServer): void {
         };
       }
 
-      try {
-        const content = readFileSync(dashPath, 'utf-8');
-        // safe: dashboard file written by updateDashboard; accessing as Record for selective field reads
-        const state = JSON.parse(content) as Record<string, unknown>;
-        // safe: optional chaining + nullish coalescing guard every access — no crash on missing fields
-        const progress = state['progress'] as { done?: number; total?: number } | undefined;
-        const done = progress?.done ?? 0;
-        const total = progress?.total ?? 0;
-        const agents = state['agents'] as unknown[] | undefined;
-        const alerts = state['alerts'] as unknown[] | undefined;
-        const sprint = state['sprint'] as { id?: string; startedAt?: string } | undefined;
+      // Use readDashboardSafe for validated read with auto-repair (Sprint 139 T-010)
+      const dashResult = readDashboardSafe(root);
 
-        // Prefer canonical sprint-state.json sprintId over potentially stale .dashboard sprint.id
-        const resolvedSprintId = canonicalSprintId ?? sprint?.id;
+      if (!dashResult.valid) {
+        // Log real error details instead of swallowing them (Fix A)
+        const errorDetail = dashResult.error ?? 'unknown dashboard read error';
+        debugLog('status.ts:dashboard-parse-error', errorDetail);
 
-        const progressBar = buildProgressBar(done, total);
-        const eta = computeEta(done, total, sprint?.startedAt);
-        const workerSummary = `${agents?.length ?? 0} active`;
-        const alertSummary = `${alerts?.length ?? 0} alert${(alerts?.length ?? 0) === 1 ? '' : 's'}`;
-
-        const { agentAssignments, skillAssignments } = loadAgentSkillAssignments(root);
-
-        // Part B: when job is COMPLETE expose task summaries as top-level field
-        const completedTasks = latestJob?.status === 'COMPLETE' && latestJob.tasks?.length
-          ? latestJob.tasks
-          : undefined;
-
-        // verbose: include extra diagnostic fields beyond the standard set
-        const verboseFields = verbose ? {
-          phase: state['phase'],
-          workerDetails: agents,
-          allAlerts: alerts,
-        } : {};
-
-        const rawData = {
-          ...state,
-          // Override sprint.id with canonical source-of-truth value so dashboard
-          // and MCP always report the same sprint, even when .dashboard is stale.
-          sprint: sprint ? { ...sprint, id: resolvedSprintId } : { id: resolvedSprintId },
+        const errData = {
+          error: true,
+          active: false,
+          message: `Dashboard read error: ${errorDetail}`,
+          repaired: dashResult.repaired,
           job: latestJob,
-          completedTasks,
-          progressBar,
-          eta,
-          workerSummary,
-          alertSummary,
-          agentAssignments,
-          skillAssignments,
-          ...verboseFields,
         };
-
-        if (json) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify(rawData) }] };
-        }
-
-        const enrichedState = enrichResponse('status', rawData);
-
-        const summary = formatStatusResponse({
-          sprint: sprint as StatusData['sprint'],
-          progress: progress as StatusData['progress'],
-          agents: agents as StatusData['agents'],
-          alerts: alerts as StatusData['alerts'],
-          eta,
-          active: true,
-        });
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enrichedState, summary)) }],
-        };
-      } catch {
-        const errData = { error: true, active: false, message: 'Cannot parse dashboard file.', job: latestJob };
         const summary = formatStatusResponse(errData);
         return {
           content: [{
@@ -219,6 +201,77 @@ export function registerStatusTool(server: McpServer): void {
           isError: true,
         };
       }
+
+      // Dashboard file is valid — extract fields for display
+      const state = dashResult.state as unknown as Record<string, unknown>;
+      const progress = state['progress'] as { done?: number; total?: number } | undefined;
+      const done = progress?.done ?? 0;
+      const total = progress?.total ?? 0;
+      const agents = state['agents'] as unknown[] | undefined;
+      const alerts = state['alerts'] as unknown[] | undefined;
+      const sprint = state['sprint'] as { id?: string; startedAt?: string } | undefined;
+
+      // Prefer canonical sprint-state.json sprintId over potentially stale .dashboard sprint.id
+      const resolvedSprintId = canonicalSprintId ?? sprint?.id;
+
+      const progressBar = buildProgressBar(done, total);
+      const eta = computeEta(done, total, sprint?.startedAt);
+      const workerSummary = `${agents?.length ?? 0} active`;
+      const alertSummary = `${alerts?.length ?? 0} alert${(alerts?.length ?? 0) === 1 ? '' : 's'}`;
+
+      const { agentAssignments, skillAssignments } = loadAgentSkillAssignments(root);
+
+      // Part B: when job is COMPLETE expose task summaries as top-level field
+      const completedTasks = latestJob?.status === 'COMPLETE' && latestJob.tasks?.length
+        ? latestJob.tasks
+        : undefined;
+
+      // verbose: include extra diagnostic fields beyond the standard set
+      const depGraph = verbose && resolvedSprintId
+        ? loadDepGraphFiles(root, resolvedSprintId)
+        : null;
+
+      const verboseFields = verbose ? {
+        phase: state['phase'],
+        workerDetails: agents,
+        allAlerts: alerts,
+        ...(depGraph ? { dependencyGraph: depGraph } : {}),
+      } : {};
+
+      const rawData = {
+        ...state,
+        // Override sprint.id with canonical source-of-truth value so dashboard
+        // and MCP always report the same sprint, even when .dashboard is stale.
+        sprint: sprint ? { ...sprint, id: resolvedSprintId } : { id: resolvedSprintId },
+        job: latestJob,
+        completedTasks,
+        progressBar,
+        eta,
+        workerSummary,
+        alertSummary,
+        agentAssignments,
+        skillAssignments,
+        ...verboseFields,
+      };
+
+      if (json) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify(rawData) }] };
+      }
+
+      const enrichedState = enrichResponse('status', rawData);
+
+      const summary = formatStatusResponse({
+        sprint: sprint as StatusData['sprint'],
+        progress: progress as StatusData['progress'],
+        agents: agents as StatusData['agents'],
+        alerts: alerts as StatusData['alerts'],
+        eta,
+        active: true,
+      });
+
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(enrichedState, summary)) }],
+      };
     },
   );
 }

@@ -1,7 +1,6 @@
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { DASHBOARD_FILE } from '../../core/constants.js';
+import { readDashboardSafe } from '../../monitor/dashboard-manager.js';
+import { debugLog } from '../../core/utils.js';
 
 export function registerDashboardResource(server: McpServer): void {
   server.registerResource(
@@ -14,22 +13,19 @@ export function registerDashboardResource(server: McpServer): void {
     },
     async (uri) => {
       const root = process.cwd();
-      const dashPath = join(root, DASHBOARD_FILE);
+      const result = readDashboardSafe(root);
 
-      let text: string;
-      if (!existsSync(dashPath)) {
-        text = JSON.stringify({ active: false });
-      } else {
-        try {
-          text = readFileSync(dashPath, 'utf-8');
-          JSON.parse(text); // validate JSON
-        } catch {
-          text = JSON.stringify({ active: false, error: 'Cannot parse dashboard' });
-        }
+      if (!result.valid && result.error) {
+        debugLog('dashboard-resource:parse-error', result.error);
       }
 
+      // Return the state (either valid from file, or default from merge/missing)
+      const output = result.valid
+        ? { ...result.state, active: true }
+        : { active: false, error: result.error, repaired: result.repaired };
+
       return {
-        contents: [{ uri: uri.href, text, mimeType: 'application/json' }],
+        contents: [{ uri: uri.href, text: JSON.stringify(output), mimeType: 'application/json' }],
       };
     },
   );

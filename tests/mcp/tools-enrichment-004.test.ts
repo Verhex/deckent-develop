@@ -21,6 +21,7 @@ vi.mock('../../src/core/config.js', () => ({
 vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
   ensureDeckentImport: vi.fn(),
+  debugLog: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({

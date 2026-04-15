@@ -54,7 +54,7 @@ Each sprint is approximately 30-60 minutes of Deckent orchestrating its own deve
 | **136** | Local Model Support (Phase 1) | Ollama provider adapter, local model registry entries, tier mapping for llama-3.3/qwen2.5/mistral, offline sprint capability, no-internet test suite | Planned |
 | **137** | Cross-Platform Hardening | Windows native support (non-WSL), Docker backend stability, CI runner first-class support (GitHub Actions, GitLab CI, CircleCI), path normalization across platforms | Planned |
 | **138** | Distribution + Package Quality | `npm publish` automation, provenance attestation, SBOM generation, signed releases, `npx` zero-install verification matrix, homebrew tap draft | Planned |
-| **139** | MCP Tool Completeness | Full MCP tool parity with CLI, resource subscription model, streaming status updates, IDE extension protocol improvements | Planned |
+| **139** | MCP Tool Completeness + Backend Parity | Full MCP tool parity with CLI, resource subscription model, streaming status updates, IDE extension protocol improvements, Docker/tmux/subprocess E2E test coverage, ADR-027 hybrid backend revisit (permanently rejected — event stream covers the need) | Planned |
 | **140** | Observability Level 3 | Web-based local dashboard (no cloud), metrics history, sprint comparison charts, agent performance trends, cost tracking per sprint | Planned |
 | **141** | i18n Expansion | Japanese (JA), German (DE), Spanish (ES) support — `patternsByLang` expansion, locale-aware reports, community translation workflow | Planned |
 | **142** | Multi-Project Workspace | Per-project isolation refinements (ADR-034 implementation depth), global config inheritance, workspace manifest, `deckent ls` across projects | Planned |

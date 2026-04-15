@@ -227,7 +227,7 @@ describe('MCP Resources — Comprehensive Suite', () => {
       const parsed = JSON.parse(result.contents[0]!.text);
       expect(parsed.active).toBe(false);
       expect(parsed.error).toBeDefined();
-      expect(parsed.error).toContain('Cannot parse dashboard');
+      expect(parsed.error).toContain('JSON parse error');
     });
 
     it('returns correct mimeType in contents', async () => {

@@ -1,0 +1,263 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "generatedAt": "2026-04-15T10:00:00.000Z",
+    "generatedBy": "task-139-038",
+    "sprintId": "sprint-139",
+    "description": "Feature usage manifest — categorizes Deckent features by activity level based on code analysis and sprint history. Categories: active (used every sprint), lightly_used (exists but infrequent), dormant (implemented but not wired into sprint lifecycle), dead (deprecated/superseded).",
+    "usageWindow": "last-10-sprints",
+    "sourceAnalysis": {
+      "sprintsChecked": ["sprint-132", "sprint-133", "sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "methodology": "import-graph traversal + grep frequency + @deprecated markers + sprint log review"
+    }
+  },
+  "active": [
+    {
+      "id": "sprint-controller",
+      "label": "Sprint Controller — Core Orchestrator",
+      "files": ["src/orchestra/sprint-controller.ts", "src/orchestra/sprint-phases.ts", "src/orchestra/sprint-lifecycle.ts"],
+      "description": "Central orchestrator for PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP lifecycle. Used every sprint.",
+      "evidenceSprints": ["sprint-132", "sprint-133", "sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "high"
+    },
+    {
+      "id": "task-builder",
+      "label": "Task Builder — Worker Prompt Builder + Directive Parser",
+      "files": ["src/orchestra/task-builder.ts"],
+      "description": "Builds worker prompts (ADR injection Sprint 138), parses DIRECTIVES scope/model/effort/skills/agent overrides. Called by brain every sprint during PLAN phase.",
+      "evidenceSprints": ["sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "high"
+    },
+    {
+      "id": "result-evaluator",
+      "label": "Result Evaluator — GO/NO-GO/TECH_DEBT Decision Engine",
+      "files": ["src/orchestra/result-evaluator.ts"],
+      "description": "Evaluates task results with rubric scoring, CODE_VERIFIED_DONE logic, and TECH_DEBT downgrade. Central to EVALUATE phase. Used every sprint.",
+      "evidenceSprints": ["sprint-132", "sprint-133", "sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "high"
+    },
+    {
+      "id": "auditor",
+      "label": "Auditor — 30s Scan Loop + 3-Pipeline Verification",
+      "files": ["src/monitor/auditor.ts"],
+      "description": "In-process auditor: scans heartbeats, git diff boundary violations, stale locks, verifyWorkerResult 3-pipeline (Sprint 138), ADR compliance checks, authority matrix enforcement (Sprint 139 T-035).",
+      "evidenceSprints": ["sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "high"
+    },
+    {
+      "id": "tmux-backend",
+      "label": "Tmux Backend — Worker Spawn via tmux Sessions",
+      "files": ["src/orchestra/tmux.ts"],
+      "description": "Default worker spawn backend using tmux sessions. Used in all sprints unless docker/subprocess backend explicitly configured.",
+      "evidenceSprints": ["sprint-132", "sprint-133", "sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "medium"
+    },
+    {
+      "id": "docker-backend",
+      "label": "Docker Backend — Container-Based Worker Isolation",
+      "files": ["src/orchestra/spawn-backend-docker.ts"],
+      "description": "Docker container-based worker spawn backend. Sprint 139 target backend for CI pipeline and isolation. E2E tested in Sprint 135 (graceful shutdown) and Sprint 139 (T-017 backend parity).",
+      "evidenceSprints": ["sprint-135", "sprint-138", "sprint-139"],
+      "importCount": "medium"
+    },
+    {
+      "id": "subprocess-backend",
+      "label": "Subprocess Backend — Direct Process Worker Spawn",
+      "files": ["src/orchestra/spawn-backend.ts"],
+      "description": "Non-tmux subprocess backend for environments without tmux. Sprint 139 T-019 confirmed 33 E2E tests, 1.2s runtime.",
+      "evidenceSprints": ["sprint-135", "sprint-138", "sprint-139"],
+      "importCount": "medium"
+    },
+    {
+      "id": "fix-phase",
+      "label": "Brain FIX Phase — Failed Task Retry Orchestration",
+      "files": ["src/orchestra/sprint-phases.ts", "src/orchestra/sprint-spawner.ts"],
+      "description": "Retries NO_GO tasks in FIX phase with cross-dependency priority. Wired in sprint-phases.ts runFixPhase(). Used whenever a sprint has NO_GO tasks.",
+      "evidenceSprints": ["sprint-135", "sprint-136", "sprint-137", "sprint-138"],
+      "importCount": "medium"
+    },
+    {
+      "id": "dependency-scheduler",
+      "label": "Dependency Scheduler — Topological Wave Ordering",
+      "files": ["src/orchestra/dependency-scheduler.ts"],
+      "description": "DependencyGraph with Kahn's algorithm for sprint task wave ordering. Sprint 139 T-028/T-029/T-030. Supersedes ParallelPipelineManager for dependency resolution. Called by sprint-spawner enforceWaveDependency() every sprint cycle.",
+      "evidenceSprints": ["sprint-139"],
+      "importCount": "medium"
+    },
+    {
+      "id": "event-stream",
+      "label": "Event Stream — ADR-035 Structured Event Log",
+      "files": ["src/orchestra/event-stream.ts"],
+      "description": "Append-only .deckent/sprint-NNN-events.jsonl event log. Protocol V1.0 with 15 channel codes. Primary communication channel Brain↔Worker↔Auditor (Sprint 138 T-004). Integrated with authority-enforcer, dependency-scheduler, auditor.",
+      "evidenceSprints": ["sprint-138", "sprint-139"],
+      "importCount": "high"
+    },
+    {
+      "id": "sprint-checkpoint",
+      "label": "Sprint Checkpoint — Resume Capability (Sprint 138 MVP)",
+      "files": ["src/orchestra/sprint-checkpoint.ts", "src/cli/commands/resume.ts"],
+      "description": "Writes checkpoint every N=5 tasks. Resume command restores sprint state. Sprint 138 T-009 MVP. Wired into sprint-spawner (writes checkpoint on task completion).",
+      "evidenceSprints": ["sprint-138", "sprint-139"],
+      "importCount": "medium"
+    },
+    {
+      "id": "routing-engine-v2",
+      "label": "Routing Engine V2 — Intent-Based Task Router",
+      "files": ["src/core/routing-engine.ts", "src/core/intent-classifier.ts", "src/core/activation-engine.ts"],
+      "description": "V2 intent-based routing: routeTaskV2(), confidence scoring, agent/skill/provider assignment. Used every sprint via task-router.ts.",
+      "evidenceSprints": ["sprint-132", "sprint-133", "sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "high"
+    },
+    {
+      "id": "sprint-retro-reporter",
+      "label": "Sprint Retrospective + Reporter",
+      "files": ["src/orchestra/sprint-reporter.ts", "src/orchestra/sprint-retro-writer.ts", "src/orchestra/sprint-metrics.ts"],
+      "description": "Writes RETRO.md, MEMORY.md sprint learnings, 7-section rich sprint output, token usage section. Called in RETRO phase every sprint.",
+      "evidenceSprints": ["sprint-132", "sprint-133", "sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "high"
+    },
+    {
+      "id": "authority-enforcer",
+      "label": "Authority Enforcer — ADR-037 RBAC Runtime Enforcement",
+      "files": ["src/orchestra/authority-enforcer.ts"],
+      "description": "Runtime RBAC authority matrix enforcement (Sprint 139 T-035). Checks file-system path and event-stream channel permissions per role (brain/auditor/worker). Soft enforcement mode (Sprint 139). Integrated with auditor.ts runAuthorityChecks().",
+      "evidenceSprints": ["sprint-139"],
+      "importCount": "medium"
+    },
+    {
+      "id": "model-registry",
+      "label": "Model Registry — 13 Models, 3 Providers, Tier Routing",
+      "files": ["src/core/model-registry.ts", "src/core/model-equivalence.ts", "src/core/mode-presets.ts"],
+      "description": "Single source of truth for model tiers (premium_plus/premium/standard/economy). Provider-agnostic routing. Used by task-router.ts every sprint.",
+      "evidenceSprints": ["sprint-132", "sprint-133", "sprint-134", "sprint-135", "sprint-136", "sprint-137", "sprint-138", "sprint-139"],
+      "importCount": "high"
+    }
+  ],
+  "lightly_used": [
+    {
+      "id": "archive-debt",
+      "label": "Archive Debt — CLI Debt Rotation Command",
+      "files": ["src/cli/commands/archive-debt.ts"],
+      "description": "CLI-only command (no MCP equivalent — ADR-022 parity gap). Rotates resolved DEBT.md entries to archive. Rarely called — only when debt table grows large.",
+      "parityGap": "CLI-only, no MCP tool",
+      "lastKnownUse": "manual",
+      "importCount": "low"
+    },
+    {
+      "id": "skill-marketplace",
+      "label": "Skill Marketplace — Skill Discovery + Installation",
+      "files": ["src/cli/commands/skill-marketplace.ts"],
+      "description": "Sub-command of 'deckent skill'. Lists/installs skills from marketplace. CLI-only. Infrequently used — mostly during project setup or skill exploration.",
+      "parityGap": "CLI-only, no MCP tool",
+      "lastKnownUse": "setup-time",
+      "importCount": "low"
+    },
+    {
+      "id": "managed-docs",
+      "label": "Managed Docs — Sprint Lifecycle Doc Auto-Update",
+      "files": ["src/orchestra/managed-docs/"],
+      "description": "ADR-029 template-based doc generation. Updates user-configured markdown docs after each sprint. Requires .deckent/docs.json to be configured — opt-in. Only active in projects with docs.json.",
+      "parityGap": "opt-in, many projects never configure it",
+      "lastKnownUse": "sprint-131",
+      "importCount": "low"
+    },
+    {
+      "id": "promotion-pipeline",
+      "label": "Agent/Skill Evolution Pipeline — Promotion/Demotion",
+      "files": ["src/orchestra/promotion-pipeline.ts", "src/orchestra/temp-skill-generator.ts"],
+      "description": "Evaluates temp agents/skills for promotion to permanent pool. Called in sprint-finalizer evaluatePromotions(). Temp skill generation in sprint-planner. Active but rarely triggers promotions in practice.",
+      "lastKnownUse": "sprint-133",
+      "importCount": "low"
+    },
+    {
+      "id": "mcp-parity-gaps",
+      "label": "MCP/CLI Parity Gaps — CLI-Only Commands",
+      "files": ["src/cli/commands/attach.ts", "src/cli/commands/spawn.ts", "src/cli/commands/watch.ts", "src/cli/commands/dashboard.ts", "src/cli/commands/web.ts", "src/cli/commands/serve.ts", "src/cli/commands/upgrade.ts", "src/cli/commands/onboard.ts", "src/cli/commands/plugin.ts", "src/cli/commands/test-run.ts", "src/cli/commands/quick-start.ts", "src/cli/commands/finalize.ts"],
+      "description": "ADR-022: CLI commands without MCP equivalents. Infrastructure/UI commands (attach, spawn, watch, dashboard, web, serve) are intentionally CLI-only. Setup commands (upgrade, onboard) also CLI-only. test-run, finalize, quick-start infrequently used.",
+      "parityGap": "intentional (ADR-022) or lightly used",
+      "importCount": "low"
+    },
+    {
+      "id": "rollback",
+      "label": "Rollback — Sprint Rollback on All-NO_GO",
+      "files": ["src/orchestra/rollback.ts"],
+      "description": "Triggered only when all sprint tasks are NO_GO and rollback_policy is configured. Rarely activates in practice. Config-gated feature.",
+      "lastKnownUse": "config-gated",
+      "importCount": "low"
+    }
+  ],
+  "dormant": [
+    {
+      "id": "heartbeat-daemon",
+      "label": "Heartbeat Daemon — Background Proactive Heartbeat Tasks",
+      "files": ["src/orchestra/heartbeat-daemon.ts", "src/cli/commands/heartbeat.ts"],
+      "description": "CLI command 'deckent heartbeat' runs HEARTBEAT.md tasks on interval. HeartbeatDaemon class implemented. NOT wired into sprint-controller — requires manual deckent heartbeat invocation. No auto-start in sprint lifecycle.",
+      "blockedBy": "no sprint-controller auto-wiring",
+      "roadmap": "Sprint 140+ per IDENTITY.md",
+      "importCount": "zero-external"
+    },
+    {
+      "id": "human-checkpoint-cli",
+      "label": "Human Checkpoint — Sprint Pause for Human Approval",
+      "files": ["src/cli/commands/checkpoint.ts", "src/orchestra/sprint-lifecycle.ts"],
+      "description": "Sprint 135 checkpoint approval system. Pause sprint and wait for human deckent checkpoint approve/reject. Partially wired in sprint-lifecycle waitForHumanApproval(). Not configured by default — requires CHECKPOINT_INTERVAL to be set.",
+      "blockedBy": "opt-in config, rarely set",
+      "lastActiveSprint": "sprint-138 (CHECKPOINT_INTERVAL=5 for resume test)",
+      "importCount": "low"
+    },
+    {
+      "id": "shared-memory",
+      "label": "Shared Memory — Cross-Worker In-Memory Context",
+      "files": ["src/orchestra/shared-memory.ts"],
+      "description": "SharedMemory class for cross-worker data sharing within a sprint. Zero external imports outside its own file. Not wired into sprint worker spawn or task execution pipeline.",
+      "blockedBy": "no integration point in worker prompt or spawn",
+      "importCount": "zero-external"
+    },
+    {
+      "id": "handoff-protocol",
+      "label": "Handoff Protocol — Worker State Handoff",
+      "files": ["src/orchestra/handoff-protocol.ts"],
+      "description": "Worker state handoff protocol for task transfer between workers. Zero external imports. Not connected to sprint lifecycle.",
+      "blockedBy": "no integration point",
+      "importCount": "zero-external"
+    },
+    {
+      "id": "multi-agent-pipeline",
+      "label": "Multi-Agent Pipeline — Collaborative Task Execution",
+      "files": ["src/orchestra/multi-agent.ts"],
+      "description": "MultiAgentPipeline class for coordinated multi-agent task execution with shared context. Only referenced in its own file (internal usage) and agent-types.ts interface. Not connected to sprint-controller task dispatch.",
+      "blockedBy": "no sprint integration",
+      "importCount": "zero-external"
+    },
+    {
+      "id": "ecosystem-intelligence",
+      "label": "Ecosystem Intelligence — Skill Activation Persistence",
+      "files": ["src/orchestra/ecosystem-intelligence.ts"],
+      "description": "analyzeNewSkill + persistSkillActivation called from CLI 'deckent skill add' workflow. Lightly connected but ecosystem analysis not used in sprint planning or routing decisions.",
+      "blockedBy": "analysis output not consumed by routing-engine-v2",
+      "importCount": "low"
+    }
+  ],
+  "dead": [
+    {
+      "id": "decision-orchestrator-v1",
+      "label": "Decision Orchestrator V1 — Keyword-Based Routing (Deprecated)",
+      "files": ["src/orchestra/decision-engine.ts", "src/orchestra/decision-steps/", "src/orchestra/decision-logger.ts", "src/orchestra/decision-replay.ts"],
+      "description": "Sprint 031 V1 keyword-based routing. Explicitly @deprecated since Sprint 066. NOT used in production sprint execution — comment in source: 'DecisionOrchestrator is only used by test suites'. Superseded by routeTaskV2() intent-based engine (ADR-028). decision-logger.ts still consumed by V2 for logging.",
+      "deprecatedSince": "Sprint 066",
+      "supersededBy": "routing-engine-v2 (routeTaskV2)",
+      "adrRef": "ADR-028",
+      "note": "4 source files + 38 tests maintained as reference implementation per ADR-028. decision-logger.ts retained for V2 logging.",
+      "importCount": "test-only"
+    },
+    {
+      "id": "parallel-pipeline-manager-standalone",
+      "label": "ParallelPipelineManager — Legacy Wave Builder (Superseded)",
+      "files": ["src/orchestra/parallel-pipeline.ts"],
+      "description": "Original topological wave builder. Still imported by sprint-spawner.ts for validateTaskDependencies() wrapper function. Core DependencyCycleError class still used. However, primary dependency/wave logic superseded by dependency-scheduler.ts (Sprint 139 T-028/T-029/T-030) which uses Kahn's algorithm with collision-awareness and event stream integration.",
+      "supersededBy": "dependency-scheduler (DependencyGraph, enforceWaveDependency)",
+      "note": "DependencyCycleError and validateTaskDependencies() still in use as thin wrappers. Full parallel pipeline execution path dead — new code uses dependency-scheduler directly.",
+      "importCount": "wrapper-only"
+    }
+  ]
+}

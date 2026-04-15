@@ -434,9 +434,9 @@ describe('buildWorkerPrompt', () => {
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('## What To Do');
     expect(prompt).toContain('1. Read the task scope carefully');
-    expect(prompt).toContain('2. Write the code changes');
-    expect(prompt).toContain('3. Document:');
-    expect(prompt).toContain('4. Report: write your result file');
+    expect(prompt).toContain('Write the code changes');
+    expect(prompt).toContain('Document:');
+    expect(prompt).toContain('Report: write your result file');
     expect(prompt).toContain('## CRITICAL VERIFY STEPS');
     expect(prompt).toContain('tsc --noEmit');
     expect(prompt).toContain('npx vitest run');
@@ -556,6 +556,29 @@ describe('buildWorkerPrompt', () => {
     // Threshold lowered from 0.20 to 0.18 after tokenUsage instructions, then to 0.17 after rubricScores,
     // then to 0.05 after ADR injection (~3000 char ADR content added to prompt)
     expect(descLen / totalLen).toBeGreaterThan(0.05);
+  });
+
+  it('includes MUST-level token tracking instruction in result file section', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('MUST include tokenUsage');
+    expect(prompt).toContain('inputTokens');
+    expect(prompt).toContain('outputTokens');
+    expect(prompt).toContain('provider');
+  });
+
+  it('embeds correct provider and model in token tracking instruction', () => {
+    const task = makeTask({ provider: 'codex', model: 'gpt-4.1' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('"provider": "codex"');
+    expect(prompt).toContain('"model": "gpt-4.1"');
+  });
+
+  it('mentions Sprint 140 hard NO_GO consequence for missing tokenUsage', () => {
+    const task = makeTask();
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('Sprint 140');
+    expect(prompt).toContain('NO_GO');
   });
 });
 
@@ -2159,5 +2182,16 @@ describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('"Code written"');
+  });
+
+  it('includes .plan file instruction in "What To Do" section', () => {
+    const task = makeTask({ id: '139-021' });
+    const prompt = buildWorkerPrompt(task);
+    expect(prompt).toContain('.plan BEFORE coding');
+    expect(prompt).toContain('task-139-021.plan');
+    // .plan step should come before "Write the code changes" step
+    const planIndex = prompt.indexOf('.plan BEFORE coding');
+    const codeIndex = prompt.indexOf('Write the code changes');
+    expect(planIndex).toBeLessThan(codeIndex);
   });
 });

@@ -1,5 +1,6 @@
 // ═══ Sprint Checkpoint Tests ══════════════════════════════════════════
 // Tests for write/read roundtrip, resume state derivation, and fallback.
+// Sprint 139 Task 030: dep graph resume restore tests added.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdirSync, rmSync, existsSync } from 'node:fs';
@@ -11,10 +12,16 @@ import {
   readCheckpoint,
   hasCheckpoint,
   getResumableTasks,
+  restoreDepGraph,
+  persistDependencyGraph,
 } from '../../src/orchestra/sprint-checkpoint.js';
 import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
+import {
+  buildDependencyGraph,
+  enforceWaveDependency,
+} from '../../src/orchestra/dependency-scheduler.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -239,6 +246,158 @@ describe('writeCheckpoint edge cases', () => {
     const sprint = makeMinimalSprint([makeMinimalTask('001')]);
     // This may succeed or fail depending on OS behavior, but should NOT throw
     expect(() => writeCheckpoint(badRoot, sprint, 0)).not.toThrow();
+    rmSync(root, { recursive: true, force: true });
+  });
+});
+
+// ═══ Task 030: Dep Graph Resume Integration ═══════════════════════════
+
+function makeTasksWithDeps() {
+  return [
+    makeMinimalTask('001', TaskStatus.DONE),
+    makeMinimalTask('002', TaskStatus.PENDING),
+    makeMinimalTask('003', TaskStatus.PENDING),
+  ] as Task[];
+}
+
+describe('writeCheckpoint with dep graph (Task 030)', () => {
+  it('embeds depGraph in checkpoint when graph provided', () => {
+    const root = makeTempDir();
+    const taskList = makeTasksWithDeps();
+    // Attach dependency: 002 and 003 depend on 001
+    taskList[1]!.dependencies = ['001'];
+    taskList[2]!.dependencies = ['001'];
+
+    const sprint = makeMinimalSprint(taskList);
+    const graph = buildDependencyGraph(taskList, false);
+
+    const written = writeCheckpoint(root, sprint, 10, graph);
+
+    expect(written).not.toBeNull();
+    expect(written!.depGraph).toBeDefined();
+    expect(written!.depGraph!.sprintId).toBe('sprint-138');
+    expect(written!.depGraph!.hasCycle).toBe(false);
+    expect(written!.depGraph!.waves).toHaveLength(2);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('depGraph embedded in checkpoint persists to disk and is readable', () => {
+    const root = makeTempDir();
+    const taskList = makeTasksWithDeps();
+    taskList[1]!.dependencies = ['001'];
+
+    const sprint = makeMinimalSprint(taskList);
+    const graph = buildDependencyGraph(taskList, false);
+
+    writeCheckpoint(root, sprint, 20, graph);
+
+    const read = readCheckpoint(root, 'sprint-138');
+    expect(read).not.toBeNull();
+    expect(read!.depGraph).toBeDefined();
+    expect(read!.depGraph!.sprintId).toBe('sprint-138');
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('checkpoint without graph has no depGraph field (backward compat)', () => {
+    const root = makeTempDir();
+    const sprint = makeMinimalSprint([makeMinimalTask('001', TaskStatus.DONE)]);
+
+    const written = writeCheckpoint(root, sprint, 0);  // no graph arg
+    expect(written!.depGraph).toBeUndefined();
+
+    const read = readCheckpoint(root, 'sprint-138');
+    expect(read!.depGraph).toBeUndefined();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('writes separate depgraph.json + .mmd files when graph provided', () => {
+    const root = makeTempDir();
+    const taskList = makeTasksWithDeps();
+    const sprint = makeMinimalSprint(taskList);
+    const graph = buildDependencyGraph(taskList, false);
+
+    writeCheckpoint(root, sprint, 5, graph);
+
+    const jsonExists = existsSync(join(root, '.deckent', 'sprint-138-depgraph.json'));
+    const mmdExists = existsSync(join(root, '.deckent', 'sprint-138-depgraph.mmd'));
+    expect(jsonExists).toBe(true);
+    expect(mmdExists).toBe(true);
+    rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe('restoreDepGraph (Task 030)', () => {
+  it('restores graph from embedded checkpoint.depGraph', () => {
+    const root = makeTempDir();
+    const taskList = makeTasksWithDeps();
+    taskList[1]!.dependencies = ['001'];
+    taskList[2]!.dependencies = ['001'];
+
+    const sprint = makeMinimalSprint(taskList);
+    const graph = buildDependencyGraph(taskList, false);
+    const written = writeCheckpoint(root, sprint, 10, graph);
+
+    const restored = restoreDepGraph(root, written!);
+
+    expect(restored).not.toBeNull();
+    expect(restored!.hasCycle).toBe(false);
+    expect(restored!.waveAssignment.get('001')).toBe(0);
+    expect(restored!.waveAssignment.get('002')).toBe(1);
+    expect(restored!.waveAssignment.get('003')).toBe(1);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('restored graph enforces correct wave ordering on resume', () => {
+    const root = makeTempDir();
+    const taskList = makeTasksWithDeps();
+    taskList[1]!.dependencies = ['001'];
+
+    const sprint = makeMinimalSprint(taskList);
+    const graph = buildDependencyGraph(taskList, false);
+    const written = writeCheckpoint(root, sprint, 10, graph);
+
+    const restored = restoreDepGraph(root, written!)!;
+
+    // Resume enforcement: 001 is completed, 002 should now be eligible
+    const result = enforceWaveDependency(
+      restored,
+      ['002'],
+      new Set(['001']),
+    );
+    expect(result.eligible).toEqual(['002']);
+    expect(result.blocked).toHaveLength(0);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('falls back to separate depgraph.json when embedded graph missing', () => {
+    const root = makeTempDir();
+    const taskList = makeTasksWithDeps();
+    taskList[1]!.dependencies = ['001'];
+
+    const sprint = makeMinimalSprint(taskList);
+    const graph = buildDependencyGraph(taskList, false);
+
+    // Write checkpoint without embedded graph
+    const written = writeCheckpoint(root, sprint, 0);  // no graph
+    expect(written!.depGraph).toBeUndefined();
+
+    // Manually persist graph separately (simulating separate write)
+    persistDependencyGraph(root, 'sprint-138', graph);
+
+    const restored = restoreDepGraph(root, written!);
+    expect(restored).not.toBeNull();
+    expect(restored!.waveAssignment.get('001')).toBe(0);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('returns null when no graph available (caller must rebuild)', () => {
+    const root = makeTempDir();
+    const sprint = makeMinimalSprint([makeMinimalTask('001')]);
+
+    const written = writeCheckpoint(root, sprint, 0);  // no graph
+    // No depgraph files exist
+    const restored = restoreDepGraph(root, written!);
+    expect(restored).toBeNull();
     rmSync(root, { recursive: true, force: true });
   });
 });

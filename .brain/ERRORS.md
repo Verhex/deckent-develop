@@ -1,200 +1,200 @@
-| 2026-04-14T09:56:52.648Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T09:56:52.648Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T09:56:52.649Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T09:56:52.649Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T09:56:52.649Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T09:56:52.650Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T09:57:12.594Z | readJsonSafeAsync | ENOENT: no such file or directory, open '/tmp/deckent-home/.deckent/config.json' |
-| 2026-04-14T10:01:03.636Z | docker-backend:spawn | taskId=138-001 container=deckent-w-138-001 model=opus |
-| 2026-04-14T10:01:04.049Z | docker-backend:spawn-ok | taskId=138-001 containerId=b944eb6d0cc9 |
-| 2026-04-14T10:01:04.121Z | docker-backend:spawn | taskId=138-002 container=deckent-w-138-002 model=sonnet |
-| 2026-04-14T10:01:04.482Z | docker-backend:spawn-ok | taskId=138-002 containerId=e9b305006aeb |
-| 2026-04-14T10:01:04.558Z | docker-backend:spawn | taskId=138-003 container=deckent-w-138-003 model=opus |
-| 2026-04-14T10:01:05.006Z | docker-backend:spawn-ok | taskId=138-003 containerId=12e86a42a4ec |
-| 2026-04-14T10:05:00.355Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-14T10:05:05.361Z | docker-backend:kill | taskId=138-002 (graceful stop --time=10) |
-| 2026-04-14T10:05:08.028Z | docker-backend:exit | taskId=138-002 exitCode=0 |
-| 2026-04-14T10:05:08.229Z | docker-backend:spawn | taskId=138-004 container=deckent-w-138-004 model=opus |
-| 2026-04-14T10:05:08.555Z | docker-backend:spawn-ok | taskId=138-004 containerId=d8dd6e8d62bb |
-| 2026-04-14T10:06:06.602Z | waitForResults:progress | Sprint devam ediyor — 1/10 task tamamlandı (5dk) |
-| 2026-04-14T10:10:47.661Z | docker-backend:kill | taskId=138-003 (graceful stop --time=10) |
-| 2026-04-14T10:11:01.241Z | docker-backend:exit | taskId=138-003 exitCode=137 |
-| 2026-04-14T10:11:01.242Z | docker-backend:reconcile | taskId=138-003 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-14T10:11:01.444Z | docker-backend:spawn | taskId=138-005 container=deckent-w-138-005 model=opus |
-| 2026-04-14T10:11:01.735Z | docker-backend:spawn-ok | taskId=138-005 containerId=e057736ee020 |
-| 2026-04-14T10:11:06.743Z | waitForResults:progress | Sprint devam ediyor — 2/10 task tamamlandı (10dk) |
-| 2026-04-14T10:11:30.816Z | docker-backend:kill | taskId=138-001 (graceful stop --time=10) |
-| 2026-04-14T10:11:41.322Z | docker-backend:exit | taskId=138-001 exitCode=137 |
-| 2026-04-14T10:11:41.322Z | docker-backend:reconcile | taskId=138-001 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-14T10:11:41.565Z | docker-backend:spawn | taskId=138-006 container=deckent-w-138-006 model=opus |
-| 2026-04-14T10:11:41.917Z | docker-backend:spawn-ok | taskId=138-006 containerId=d2dfdf11a8be |
-| 2026-04-14T10:16:13.161Z | waitForResults:progress | Sprint devam ediyor — 3/10 task tamamlandı (15dk) |
-| 2026-04-14T10:17:51.787Z | docker-backend:kill | taskId=138-004 (graceful stop --time=10) |
-| 2026-04-14T10:18:05.334Z | docker-backend:exit | taskId=138-004 exitCode=137 |
-| 2026-04-14T10:18:05.335Z | docker-backend:reconcile | taskId=138-004 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-14T10:18:05.551Z | docker-backend:spawn | taskId=138-007 container=deckent-w-138-007 model=sonnet |
-| 2026-04-14T10:18:05.870Z | docker-backend:spawn-ok | taskId=138-007 containerId=e3dbca05432f |
-| 2026-04-14T10:21:17.291Z | waitForResults:progress | Sprint devam ediyor — 4/10 task tamamlandı (20dk) |
-| 2026-04-14T10:23:45.885Z | docker-backend:kill | taskId=138-006 (graceful stop --time=10) |
-| 2026-04-14T10:23:59.704Z | docker-backend:exit | taskId=138-006 exitCode=137 |
-| 2026-04-14T10:23:59.704Z | docker-backend:reconcile | taskId=138-006 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-14T10:23:59.913Z | docker-backend:spawn | taskId=138-008 container=deckent-w-138-008 model=sonnet |
-| 2026-04-14T10:24:00.228Z | docker-backend:spawn-ok | taskId=138-008 containerId=18a952563d77 |
-| 2026-04-14T10:24:02.334Z | docker-backend:exit | taskId=138-007 exitCode=0 |
-| 2026-04-14T10:24:05.232Z | docker-backend:kill | taskId=138-007 (graceful stop --time=10) |
-| 2026-04-14T10:24:05.300Z | docker-backend:stop-failed | Falling back to docker kill: Error response from daemon: No such container: deckent-w-138-007 |
-| 2026-04-14T10:24:05.435Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-14T10:24:05.436Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
-| 2026-04-14T10:24:05.507Z | docker-backend:spawn | taskId=138-009 container=deckent-w-138-009 model=sonnet |
-| 2026-04-14T10:24:05.825Z | docker-backend:spawn-ok | taskId=138-009 containerId=a34a517e6ff4 |
-| 2026-04-14T10:26:18.666Z | waitForResults:progress | Sprint devam ediyor — 6/10 task tamamlandı (25dk) |
-| 2026-04-14T10:31:20.261Z | waitForResults:progress | Sprint devam ediyor — 6/10 task tamamlandı (30dk) |
-| 2026-04-14T10:33:03.924Z | docker-backend:kill | taskId=138-005 (graceful stop --time=10) |
-| 2026-04-14T10:33:05.126Z | docker-backend:exit | taskId=138-005 exitCode=0 |
-| 2026-04-14T10:33:06.175Z | docker-backend:spawn | taskId=138-010 container=deckent-w-138-010 model=sonnet |
-| 2026-04-14T10:33:06.837Z | docker-backend:spawn-ok | taskId=138-010 containerId=1e2b367070d1 |
-| 2026-04-14T10:34:45.317Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-14T10:34:53.620Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-14T10:35:05.362Z | docker-backend:exit | taskId=138-010 exitCode=0 |
-| 2026-04-14T10:36:24.118Z | waitForResults:progress | Sprint devam ediyor — 8/10 task tamamlandı (35dk) |
-| 2026-04-14T10:38:10.106Z | docker-backend:exit | taskId=138-008 exitCode=0 |
-| 2026-04-14T10:38:10.967Z | runEvaluatePhase:start | totalTasks=10 collectedResults=10 collectedIds=[138-002,138-003,138-001,138-004,138-006,138-007,138-005,138-010,138-008,138-009] |
-| 2026-04-14T10:38:37.625Z | runEvaluatePhase:task | task=138-001 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-04-14T10:38:37.641Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:38:37.641Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:38:37.642Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:38:37.643Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:38:37.643Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:38:37.644Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:38:37.644Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:38:37.645Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:38:37.645Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:38:37.645Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:38:37.646Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:38:46.220Z | runEvaluatePhase:task | task=138-002 selfAssessment=GO_WITH_TECH_DEBT evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-04-14T10:38:46.230Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:38:46.232Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:38:46.233Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:38:46.234Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:38:46.235Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:38:46.238Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:38:46.239Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:38:46.239Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:38:46.241Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:38:46.242Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:38:46.243Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:39:00.085Z | runEvaluatePhase:task | task=138-003 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-14T10:39:00.086Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:39:00.087Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:39:00.087Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:39:00.087Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:39:00.088Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:39:00.088Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:39:00.088Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:39:00.089Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:39:00.089Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:39:00.089Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:39:00.090Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:39:11.490Z | runEvaluatePhase:task | task=138-004 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-14T10:39:11.492Z | runEvaluatePhase:task | task=138-005 selfAssessment=NO_GO evaluation=NO_GO testsPassed=false |
-| 2026-04-14T10:39:11.494Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:39:11.495Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:39:11.495Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:39:11.496Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:39:11.496Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:39:11.496Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:39:11.497Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:39:11.498Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:39:11.499Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:39:11.499Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:39:11.499Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:39:19.225Z | runEvaluatePhase:task | task=138-006 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-14T10:39:19.227Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:39:19.228Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:39:19.229Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:39:19.229Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:39:19.230Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:39:19.230Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:39:19.231Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:39:19.231Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:39:19.232Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:39:19.232Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:39:19.232Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:39:38.232Z | runEvaluatePhase:task | task=138-007 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-14T10:39:58.610Z | runEvaluatePhase:task | task=138-008 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-04-14T10:39:58.616Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:39:58.617Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:39:58.617Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:39:58.617Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:39:58.618Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:39:58.623Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:39:58.624Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:39:58.624Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:39:58.624Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:39:58.624Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:39:58.625Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:40:21.513Z | runEvaluatePhase:task | task=138-009 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-14T10:40:21.516Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:40:21.516Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:40:21.517Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:40:21.518Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:40:21.518Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:40:21.519Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:40:21.519Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:40:21.522Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:40:21.523Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:40:21.523Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:40:21.524Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:40:33.764Z | runEvaluatePhase:task | task=138-010 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-14T10:40:33.768Z | runEvaluatePhase:done | evaluations.size=10 keys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010] |
-| 2026-04-14T10:40:33.888Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-14T10:40:33.888Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-14T10:40:33.888Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-14T10:40:33.888Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-14T10:40:33.889Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-14T10:40:33.894Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-14T10:40:33.895Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-14T10:40:33.898Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-14T10:40:33.899Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-14T10:40:33.900Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-14T10:40:33.904Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-14T10:40:33.929Z | mid-sprint-adapter:shouldReroute | Rerouting: agent undefined→architect, skills []→[testing-expert,react-specialist,typescript-expert] (attempt 1/3) |
-| 2026-04-14T10:40:33.931Z | mid-sprint-adapter:apply | Task 138-005-fix rerouted → agent=architect, skills=[testing-expert, react-specialist, typescript-expert] |
-| 2026-04-14T10:40:34.120Z | docker-backend:spawn | taskId=138-001-xfix container=deckent-w-138-001-xfix model=opus |
-| 2026-04-14T10:40:34.769Z | docker-backend:spawn-ok | taskId=138-001-xfix containerId=93d64693e201 |
-| 2026-04-14T10:40:34.930Z | docker-backend:exit | taskId=138-009 exitCode=0 |
-| 2026-04-14T10:40:35.756Z | docker-backend:spawn | taskId=138-005-fix container=deckent-w-138-005-fix model=opus |
-| 2026-04-14T10:40:36.614Z | docker-backend:spawn-ok | taskId=138-005-fix containerId=a9f3550ae6c8 |
-| 2026-04-14T10:45:37.483Z | docker-backend:exit | taskId=138-001-xfix exitCode=0 |
-| 2026-04-14T10:45:38.107Z | waitForResults:progress | Sprint devam ediyor — 1/2 task tamamlandı (5dk) |
-| 2026-04-14T10:50:38.603Z | waitForResults:progress | Sprint devam ediyor — 1/2 task tamamlandı (10dk) |
-| 2026-04-14T10:50:38.638Z | tryCodeVerifiedDone | Reconciliation triggered for task 138-005 |
-| 2026-04-14T10:50:38.716Z | tryCodeVerifiedDone | CODE_VERIFIED_DONE for task 138-005: 2 files verified |
-| 2026-04-14T10:50:38.719Z | writeCodeVerifiedResult | Wrote CODE_VERIFIED_DONE result for task 138-005 |
-| 2026-04-14T10:50:38.720Z | finalizeSprint:codeReconcile | Task 138-005 reconciled to CODE_VERIFIED_DONE |
-| 2026-04-14T10:50:38.720Z | finalizeSprint:codeReconcile | 1 tasks reconciled: 138-005 |
-| 2026-04-14T10:50:38.728Z | finalizeSprint:preRetro | evaluations.size=11 keys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.731Z | buildAgentPerformance | task=138-001 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.731Z | buildAgentPerformance | task=138-002 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.732Z | buildAgentPerformance | task=138-003 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.732Z | buildAgentPerformance | task=138-004 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.732Z | buildAgentPerformance | task=138-005 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.733Z | buildAgentPerformance | task=138-006 agent=bug-fixer ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.733Z | buildAgentPerformance | task=138-007 agent=bug-fixer ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.734Z | buildAgentPerformance | task=138-008 agent=test-writer ev=GO_WITH_TECH_DEBT evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.734Z | buildAgentPerformance | task=138-009 agent=temp-react-ts-specialist ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:50:38.734Z | buildAgentPerformance | task=138-010 agent=doc-writer ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:16.885Z | finalizeSprint:routing-outcomes | Recorded 10 routing outcomes to learnings.json |
-| 2026-04-14T10:52:16.895Z | finalizeSprint:rule-evolution | 4 new rules evolved |
-| 2026-04-14T10:52:16.898Z | rule-evolver:saveRules | 4 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-04-14T10:52:17.018Z | finalizeSprint:syncStatsToManifests | Synced 12 agents, 12 skills to manifest files |
-| 2026-04-14T10:52:17.166Z | buildAgentPerformance | task=138-001 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.166Z | buildAgentPerformance | task=138-002 agent=bug-fixer ev=GO_WITH_TECH_DEBT evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.167Z | buildAgentPerformance | task=138-003 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.167Z | buildAgentPerformance | task=138-004 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.167Z | buildAgentPerformance | task=138-005 agent=architect ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.170Z | buildAgentPerformance | task=138-006 agent=bug-fixer ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.172Z | buildAgentPerformance | task=138-007 agent=bug-fixer ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.173Z | buildAgentPerformance | task=138-008 agent=test-writer ev=GO_WITH_TECH_DEBT evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.173Z | buildAgentPerformance | task=138-009 agent=temp-react-ts-specialist ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
-| 2026-04-14T10:52:17.174Z | buildAgentPerformance | task=138-010 agent=doc-writer ev=DONE evalMapSize=11 evalKeys=[138-001,138-002,138-003,138-004,138-005,138-006,138-007,138-008,138-009,138-010,138-001-xfix] |
+| 2026-04-15T08:12:41.567Z | docker-backend:spawn-ok | taskId=139-036 containerId=25d5f1b44bba |
+| 2026-04-15T08:13:08.703Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:13:08.703Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:13:08.712Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:13:10.530Z | docker-backend:kill | taskId=139-034 (graceful stop --time=10) |
+| 2026-04-15T08:13:26.103Z | docker-backend:exit | taskId=139-034 exitCode=137 |
+| 2026-04-15T08:13:26.103Z | docker-backend:reconcile | taskId=139-034 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-15T08:13:26.491Z | docker-backend:spawn | taskId=139-037 container=deckent-w-139-037 model=opus |
+| 2026-04-15T08:13:31.850Z | docker-backend:spawn-ok | taskId=139-037 containerId=85d438493bc3 |
+| 2026-04-15T08:13:36.864Z | waitForResults:progress | Sprint devam ediyor — 34/52 task tamamlandı (116dk) |
+| 2026-04-15T08:13:41.637Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:13:41.638Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:13:41.645Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:14:11.637Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:14:11.638Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:14:11.639Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:14:45.964Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:14:45.964Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:14:45.965Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:15:18.897Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:15:18.898Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:15:18.898Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:15:51.832Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:15:51.832Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:15:51.833Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:15:56.477Z | docker-backend:kill | taskId=139-035 (graceful stop --time=10) |
+| 2026-04-15T08:16:10.595Z | docker-backend:exit | taskId=139-035 exitCode=137 |
+| 2026-04-15T08:16:10.595Z | docker-backend:reconcile | taskId=139-035 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-15T08:16:10.878Z | docker-backend:spawn | taskId=139-038 container=deckent-w-139-038 model=sonnet |
+| 2026-04-15T08:16:11.312Z | docker-backend:spawn-ok | taskId=139-038 containerId=528c301d4282 |
+| 2026-04-15T08:16:24.767Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:16:24.767Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:16:24.769Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:16:57.705Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:16:57.705Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:16:57.706Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:17:27.704Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:17:27.704Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:17:27.705Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:18:02.025Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:18:02.027Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:18:02.028Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:18:34.960Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:18:34.962Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:18:34.964Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:18:41.187Z | docker-backend:kill | taskId=139-036 (graceful stop --time=10) |
+| 2026-04-15T08:18:53.364Z | docker-backend:exit | taskId=139-036 exitCode=0 |
+| 2026-04-15T08:18:53.611Z | docker-backend:spawn | taskId=139-039 container=deckent-w-139-039 model=opus |
+| 2026-04-15T08:18:53.935Z | docker-backend:spawn-ok | taskId=139-039 containerId=65d447d88a18 |
+| 2026-04-15T08:18:53.938Z | waitForResults:progress | Sprint devam ediyor — 36/52 task tamamlandı (121dk) |
+| 2026-04-15T08:19:07.896Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:19:07.897Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:19:07.897Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:19:40.832Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:19:40.833Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:19:40.833Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:20:13.764Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:20:13.765Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:20:13.765Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:20:46.700Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:20:46.700Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:20:46.701Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:20:51.037Z | docker-backend:kill | taskId=139-038 (graceful stop --time=10) |
+| 2026-04-15T08:21:01.470Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/temp-react-ts-specialist/PROMPT.md' |
+| 2026-04-15T08:21:01.470Z | docker-backend:exit | taskId=139-038 exitCode=137 |
+| 2026-04-15T08:21:01.471Z | docker-backend:reconcile | taskId=139-038 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-15T08:21:01.605Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/temp-react-ts-specialist/PROMPT.md' |
+| 2026-04-15T08:21:01.678Z | docker-backend:spawn | taskId=139-040 container=deckent-w-139-040 model=opus |
+| 2026-04-15T08:21:01.993Z | docker-backend:spawn-ok | taskId=139-040 containerId=aff8af9f57dd |
+| 2026-04-15T08:21:19.634Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:21:19.636Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:21:19.636Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:21:52.569Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:21:52.569Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:21:52.570Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:21:58.699Z | readJsonSafe | Unexpected end of JSON input |
+| 2026-04-15T08:22:03.705Z | docker-backend:kill | taskId=139-037 (graceful stop --time=10) |
+| 2026-04-15T08:22:16.835Z | docker-backend:exit | taskId=139-037 exitCode=0 |
+| 2026-04-15T08:22:17.052Z | docker-backend:spawn | taskId=139-041 container=deckent-w-139-041 model=sonnet |
+| 2026-04-15T08:22:17.403Z | docker-backend:spawn-ok | taskId=139-041 containerId=d2c140ddaf4c |
+| 2026-04-15T08:22:25.507Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:22:25.507Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:22:25.508Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:22:25.509Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-041.json' |
+| 2026-04-15T08:22:58.439Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:22:58.439Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:22:58.440Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:23:31.376Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:23:31.376Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:23:31.377Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:24:01.281Z | waitForResults:progress | Sprint devam ediyor — 38/52 task tamamlandı (126dk) |
+| 2026-04-15T08:24:04.311Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:24:04.312Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:24:04.312Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:24:37.243Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:24:37.244Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:24:37.244Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:25:07.243Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:25:07.243Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:25:07.244Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:25:40.178Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:25:40.179Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:25:40.180Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:26:13.115Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:26:13.115Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:26:13.116Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:26:46.047Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:26:46.048Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:26:46.048Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:27:18.991Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:27:18.994Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:27:18.996Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:27:28.607Z | docker-backend:kill | taskId=139-039 (graceful stop --time=10) |
+| 2026-04-15T08:27:43.102Z | docker-backend:exit | taskId=139-039 exitCode=137 |
+| 2026-04-15T08:27:43.104Z | docker-backend:reconcile | taskId=139-039 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-15T08:27:43.762Z | docker-backend:spawn | taskId=139-042 container=deckent-w-139-042 model=sonnet |
+| 2026-04-15T08:27:44.480Z | docker-backend:spawn-ok | taskId=139-042 containerId=95b9082ee52f |
+| 2026-04-15T08:27:51.920Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:27:51.921Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:27:51.929Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:28:24.852Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:28:24.852Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:28:24.854Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:28:59.174Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:28:59.174Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:28:59.175Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:29:01.811Z | waitForResults:progress | Sprint devam ediyor — 39/52 task tamamlandı (131dk) |
+| 2026-04-15T08:29:29.247Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:29:29.313Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:29:29.336Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:29:59.220Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:29:59.241Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:29:59.245Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:30:30.580Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:30:30.586Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:30:30.590Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:31:03.506Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:31:03.506Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:31:03.508Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:31:36.944Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:31:37.118Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:31:37.175Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:32:09.383Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:32:09.384Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:32:09.385Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:32:42.326Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:32:42.338Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:32:42.339Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:34:02.540Z | waitForResults:progress | Sprint devam ediyor — 39/52 task tamamlandı (136dk) |
+| 2026-04-15T08:34:21.134Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:34:21.135Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:34:21.135Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:34:54.067Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:34:54.069Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:34:54.079Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:35:27.000Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:35:27.001Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:35:27.002Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:35:35.084Z | docker-backend:kill | taskId=139-041 (graceful stop --time=10) |
+| 2026-04-15T08:35:45.954Z | docker-backend:exit | taskId=139-041 exitCode=137 |
+| 2026-04-15T08:35:45.955Z | docker-backend:reconcile | taskId=139-041 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-15T08:35:46.242Z | docker-backend:spawn | taskId=139-043 container=deckent-w-139-043 model=sonnet |
+| 2026-04-15T08:35:46.971Z | docker-backend:spawn-ok | taskId=139-043 containerId=7ca6797ec7d0 |
+| 2026-04-15T08:35:59.937Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:35:59.938Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:35:59.938Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:36:32.872Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:36:32.873Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:36:32.874Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:37:02.873Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:37:02.873Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:37:02.874Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:37:35.809Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:37:35.810Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:37:35.811Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:38:08.742Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:38:08.742Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:38:08.743Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:38:41.699Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:38:41.710Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:38:41.729Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:39:07.071Z | waitForResults:progress | Sprint devam ediyor — 40/52 task tamamlandı (141dk) |
+| 2026-04-15T08:39:14.617Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:39:14.617Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:39:14.620Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:39:47.549Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:39:47.549Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:39:47.551Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:40:20.489Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:40:20.491Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:40:20.504Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:40:53.419Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:40:53.419Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:40:53.421Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:41:26.359Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:41:26.360Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:41:26.360Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |
+| 2026-04-15T08:41:59.291Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-002.json' |
+| 2026-04-15T08:41:59.292Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-004.json' |
+| 2026-04-15T08:41:59.293Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-139-006.json' |

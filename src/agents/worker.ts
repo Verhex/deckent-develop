@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, unlinkSync, mkdirSync, realpathSync, openSync, closeSync, fsyncSync, renameSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join, normalize, sep } from 'node:path';
@@ -17,6 +17,8 @@ import { TASKS_DIR } from '../core/constants.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { redactSensitive } from '../cli/helpers/output.js';
 import { detectFullStack, STACK_COMMANDS } from '../core/stack-detector.js';
+import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
+import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
 
 // ─── Lock Operations (delegated to core/file-lock.ts) ──────────────
 // Sprint 138: Lock logic migrated to core for plan-time collision detection.
@@ -233,24 +235,74 @@ export function createHeartbeat(
   };
 }
 
-export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat): void {
+export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat, sprintId?: string): void {
   ensureDir(join(projectRoot, TASKS_DIR));
   const path = heartbeatFilePath(projectRoot, heartbeat.taskId);
   writeFileSync(path, JSON.stringify(heartbeat, null, 2), 'utf-8');
+
+  // ADR-035: Emit WORKER→BRAIN:HEARTBEAT event to event stream (fail-safe)
+  const sid = sprintId ?? getCurrentSprintId(projectRoot);
+  if (sid) {
+    writeEvent(projectRoot, sid, 'worker', 'brain', CHANNELS.HEARTBEAT, {
+      workerId: heartbeat.workerId,
+      taskId: heartbeat.taskId,
+      sequence: heartbeat.sequence,
+      phase: heartbeat.status,
+      state: heartbeat.currentAction,
+    });
+  }
+}
+
+/**
+ * Atomically write data to a file with fsync guarantee.
+ *
+ * Uses the temp-file + fsync + rename pattern:
+ * 1. Write to `<path>.tmp` (crash-safe: original untouched)
+ * 2. fsyncSync forces OS buffer to disk (survives SIGKILL after this point)
+ * 3. renameSync atomically replaces old file (POSIX atomic rename)
+ *
+ * This eliminates the 5-sprint Docker exit-137 bug where writeFileSync data
+ * stayed in OS buffer cache and was lost when SIGKILL arrived after SIGTERM
+ * grace period expired.
+ */
+export function atomicWriteFileSync(filePath: string, data: string): void {
+  const tmpPath = `${filePath}.tmp`;
+  writeFileSync(tmpPath, data, 'utf-8');
+  // Force OS buffer → disk. After fsyncSync returns, data survives power loss / SIGKILL.
+  const fd = openSync(tmpPath, 'r');
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  // POSIX atomic rename: either old file or new file exists, never partial.
+  renameSync(tmpPath, filePath);
 }
 
 /**
  * Write a task result to disk and update task status.
  *
+ * Uses atomic write (temp + fsync + rename) to guarantee the .result file
+ * survives Docker SIGKILL (exit 137) after SIGTERM grace period expires.
+ *
  * **Verify Loop Gate:** Callers MUST run `enforceVerifyLoop()` before calling this function.
  * If `enforceVerifyLoop` returns `{ok: false}`, the caller should set `result.selfAssessment = 'NO_GO'`
  * with the failure reason in `result.notes` before writing the result.
  */
-export function writeResult(projectRoot: string, result: TaskResult): void {
+export function writeResult(projectRoot: string, result: TaskResult, sprintId?: string): void {
   ensureDir(join(projectRoot, TASKS_DIR));
+
+  // Soft warning: check if .plan file was written before result
+  const planPath = planFilePath(projectRoot, result.taskId);
+  if (!existsSync(planPath)) {
+    console.warn(`[deckent] WARNING: task ${result.taskId} — .plan file missing. Workers should write .tasks/task-{id}.plan before coding.`);
+    (result as TaskResult & { planWarning?: string }).planWarning = 'missing';
+  }
+
   const path = resultFilePath(projectRoot, result.taskId);
   // tokenUsage is included in result when available — serialized automatically via JSON.stringify
-  writeFileSync(path, JSON.stringify(result, null, 2), 'utf-8');
+  // Atomic write: temp file → fsync → rename (crash-safe, survives SIGKILL)
+  atomicWriteFileSync(path, JSON.stringify(result, null, 2));
 
   // Update task status based on self-assessment
   const newStatus: TaskStatus =
@@ -262,6 +314,24 @@ export function writeResult(projectRoot: string, result: TaskResult): void {
 
   // Write final heartbeat with DONE status so auditor does not flag as stale
   finalizeHeartbeat(projectRoot, result.taskId);
+
+  // ADR-035: Emit WORKER→BRAIN:RESULT event to event stream (fail-safe)
+  const sid = sprintId ?? getCurrentSprintId(projectRoot);
+  if (sid) {
+    writeEvent(projectRoot, sid, 'worker', 'brain', CHANNELS.RESULT, {
+      taskId: result.taskId,
+      selfAssessment: result.selfAssessment,
+      filesChanged: result.filesChanged,
+      rubricScores: result.rubricScores,
+    });
+
+    // ADR-035: Emit WORKER→AUDITOR:CODE_VERIFY_REQUEST — request independent verification
+    writeEvent(projectRoot, sid, 'worker', 'auditor', CHANNELS.CODE_VERIFY_REQUEST, {
+      taskId: result.taskId,
+      filesChanged: result.filesChanged,
+      evidence: result.notes ?? '',
+    });
+  }
 }
 
 /**
@@ -678,6 +748,89 @@ export function isWithinScope(filePath: string, scope: TaskScope, projectRoot?: 
   return false;
 }
 
+// ─── Authority Check (Sprint 139 Task 035, ADR-037) ────────────────
+
+/**
+ * Check whether a worker file write is permitted by the authority matrix.
+ * Sprint 139: Soft enforcement — logs warning but allows the write to proceed.
+ *
+ * @param filePath - Relative file path being written
+ * @param scope - Task scope from task JSON
+ * @param projectRoot - Project root directory
+ * @param taskId - Worker's task ID
+ * @param sprintId - Current sprint ID (for event stream)
+ * @param isSelfModifyingSprint - ADR-038 exception flag
+ * @returns true if permitted (always true in soft mode), false would block in hard mode
+ */
+export function checkWorkerAuthority(
+  filePath: string,
+  scope: TaskScope,
+  projectRoot: string,
+  taskId: string,
+  sprintId?: string,
+  isSelfModifyingSprint = false,
+): boolean {
+  const result = checkAuthority({
+    role: 'worker',
+    action: 'write',
+    target: filePath,
+    taskId,
+    scopeDirectories: scope.directories,
+    scopeFilesWrite: scope.filesWrite,
+    isSelfModifyingSprint,
+  });
+
+  if (!result.allowed) {
+    console.warn(`[deckent] [ADR-037 soft] Worker ${taskId}: authority violation writing ${filePath} — ${result.reason}`);
+
+    // Emit to event stream if sprint context is available
+    if (sprintId) {
+      emitAuthorityViolation(projectRoot, sprintId, {
+        role: 'worker',
+        action: 'write',
+        target: filePath,
+        taskId,
+        scopeDirectories: scope.directories,
+        scopeFilesWrite: scope.filesWrite,
+        isSelfModifyingSprint,
+      }, result);
+    }
+
+    // Sprint 139: Soft enforcement — allow the write to proceed
+    return true;
+  }
+
+  return true;
+}
+
+// ─── Worker Event Emitters (ADR-035) ───────────────────────────────
+
+/**
+ * Emit a WORKER→BRAIN:QUESTION event to the event stream.
+ * Use when the worker is blocked and needs Brain's guidance.
+ *
+ * @param projectRoot - Project root directory
+ * @param taskId - Worker's current task ID
+ * @param question - The question or blocker description
+ * @param context - Optional additional context about the blocker
+ * @param sprintId - Optional sprint ID (auto-detected from sprint-state.json if omitted)
+ */
+export function emitWorkerQuestion(
+  projectRoot: string,
+  taskId: string,
+  question: string,
+  context?: string,
+  sprintId?: string,
+): void {
+  const sid = sprintId ?? getCurrentSprintId(projectRoot);
+  if (!sid) return;
+  writeEvent(projectRoot, sid, 'worker', 'brain', CHANNELS.QUESTION, {
+    taskId,
+    question,
+    context: context ?? '',
+  });
+}
+
 // ─── Worker Log Formatting ──────────────────────────────────────────
 
 /** Action types for worker log entries */
@@ -848,15 +1001,41 @@ export function appendWorkerLog(
 const DONE_SET = new Set(['DONE', 'GO_WITH_TECH_DEBT']);
 
 /**
+ * Ensure a .result file is fsync'd to disk.
+ *
+ * If the .result file exists but was written via plain writeFileSync (pre-Sprint 139
+ * code path, or shell EXIT trap fallback), its data may still be in OS buffer cache.
+ * This function forces it to disk so it survives a subsequent SIGKILL.
+ *
+ * @returns true if fsync succeeded, false if file missing or error
+ */
+export function fsyncResultFile(projectRoot: string, taskId: string): boolean {
+  const resPath = resultFilePath(projectRoot, taskId);
+  if (!existsSync(resPath)) return false;
+  try {
+    const fd = openSync(resPath, 'r');
+    try {
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Finalize heartbeat on graceful shutdown (SIGTERM).
  *
- * When a Docker container receives SIGTERM (via `docker stop`), this function
- * checks if the worker already wrote a successful `.result` file. If so, it
- * overwrites the heartbeat with status "DONE" and exitCode 0 — preventing
- * the auditor from reporting a false "FAILED exitCode 137" alert.
+ * When a Docker container receives SIGTERM (via `docker stop`), this function:
+ * 1. Fsync's the .result file to disk (survives subsequent SIGKILL)
+ * 2. Checks if the worker wrote a successful .result — if so, overwrites HB as DONE
+ * 3. Uses atomicWriteFileSync for HB to guarantee disk persistence
  *
- * Fail-safe: if `.result` doesn't exist, is unparseable, or has a non-success
- * selfAssessment, the heartbeat is left untouched (honest FAILED state).
+ * This is the core fix for the 5-sprint Docker exit-137 bug (Sprint 134-138).
+ * Previously, .result data stayed in OS buffer cache and was lost when SIGKILL
+ * arrived after the SIGTERM grace period expired.
  *
  * @param projectRoot - Project root directory
  * @param taskId - Task ID whose heartbeat should be finalized
@@ -864,6 +1043,10 @@ const DONE_SET = new Set(['DONE', 'GO_WITH_TECH_DEBT']);
  */
 export function finalizeHeartbeatOnShutdown(projectRoot: string, taskId: string): boolean {
   const resPath = resultFilePath(projectRoot, taskId);
+
+  // Step 1: Fsync .result to disk even if we can't parse it
+  // This ensures that whatever the worker wrote survives SIGKILL
+  fsyncResultFile(projectRoot, taskId);
 
   // No result file → leave HB untouched (honest FAILED)
   if (!existsSync(resPath)) return false;
@@ -879,8 +1062,9 @@ export function finalizeHeartbeatOnShutdown(projectRoot: string, taskId: string)
     }
 
     // Result is DONE or GO_WITH_TECH_DEBT → finalize HB as DONE
+    // Use atomicWriteFileSync to guarantee HB survives SIGKILL too
     const hbPath = heartbeatFilePath(projectRoot, taskId);
-    writeFileSync(hbPath, JSON.stringify({
+    const hbData = JSON.stringify({
       workerId: `docker-${taskId}`,
       taskId,
       status: 'DONE',
@@ -888,8 +1072,9 @@ export function finalizeHeartbeatOnShutdown(projectRoot: string, taskId: string)
       sequence: 99,
       timestamp: new Date().toISOString(),
       backend: 'docker',
-      note: 'Finalized on SIGTERM — result already written',
-    }, null, 2), 'utf-8');
+      note: 'Finalized on SIGTERM — result fsynced to disk',
+    }, null, 2);
+    atomicWriteFileSync(hbPath, hbData);
 
     return true;
   } catch {
@@ -901,9 +1086,12 @@ export function finalizeHeartbeatOnShutdown(projectRoot: string, taskId: string)
 // ─── SIGTERM Handler Registration ──────────────────────────────────
 
 /**
- * Register a SIGTERM handler that finalizes heartbeat on graceful shutdown.
+ * Register a SIGTERM handler that finalizes heartbeat and flushes result on graceful shutdown.
  * Called at worker startup when running inside a Docker container.
  * Reads DECKENT_TASK_ID and DECKENT_PROJECT_ROOT from environment variables.
+ *
+ * Sprint 139 fix: the handler now fsync's the .result file before exiting,
+ * ensuring data survives the SIGKILL that Docker sends after the grace period.
  */
 function registerSigtermHandler(): void {
   const taskId = process.env['DECKENT_TASK_ID'];
@@ -912,6 +1100,9 @@ function registerSigtermHandler(): void {
   if (!taskId || !projectRoot) return; // Not running as a Deckent worker
 
   process.on('SIGTERM', () => {
+    // Fsync .result to disk first — this is the critical fix.
+    // Even if finalizeHeartbeatOnShutdown fails, the .result is safe.
+    fsyncResultFile(projectRoot, taskId);
     finalizeHeartbeatOnShutdown(projectRoot, taskId);
     process.exit(0);
   });
@@ -1278,4 +1469,201 @@ export function computeVerifyDelta(
     recommendedAssessment,
     reason,
   };
+}
+
+// ─── Worker Lifecycle State Machine (Sprint 139 Task 015) ────────────
+
+/**
+ * Worker lifecycle states — ordered progression from spawn to exit.
+ * Each state has a well-defined set of valid transitions.
+ *
+ * State flow:
+ *   SPAWNING → STARTING → EXECUTING → TESTING → WRITING_RESULT → DONE → EXITED
+ *                                   ↘ VERIFYING → TESTING (loop)
+ *                         (any) ──→ ERROR → EXITED
+ *                         (any) ──→ ORPHAN
+ */
+export type WorkerLifecycleState =
+  | 'SPAWNING'
+  | 'STARTING'
+  | 'EXECUTING'
+  | 'VERIFYING'
+  | 'TESTING'
+  | 'WRITING_RESULT'
+  | 'DONE'
+  | 'EXITED'
+  | 'ERROR'
+  | 'ORPHAN';
+
+/** Valid state transitions — key is current state, value is array of allowed next states */
+export const VALID_TRANSITIONS: Readonly<Record<WorkerLifecycleState, readonly WorkerLifecycleState[]>> = {
+  SPAWNING: ['STARTING', 'ERROR', 'ORPHAN'],
+  STARTING: ['EXECUTING', 'ERROR', 'ORPHAN'],
+  EXECUTING: ['VERIFYING', 'TESTING', 'WRITING_RESULT', 'ERROR', 'ORPHAN'],
+  VERIFYING: ['TESTING', 'EXECUTING', 'WRITING_RESULT', 'ERROR', 'ORPHAN'],
+  TESTING: ['EXECUTING', 'VERIFYING', 'WRITING_RESULT', 'ERROR', 'ORPHAN'],
+  WRITING_RESULT: ['DONE', 'ERROR', 'ORPHAN'],
+  DONE: ['EXITED'],
+  EXITED: [],
+  ERROR: ['EXITED'],
+  ORPHAN: [],
+};
+
+/** States in which the worker is actively running and can be stopped */
+export const STOPPABLE_STATES: ReadonlySet<WorkerLifecycleState> = new Set([
+  'SPAWNING', 'STARTING', 'EXECUTING', 'VERIFYING', 'TESTING', 'WRITING_RESULT',
+]);
+
+/** States that indicate the worker has finished (no docker stop needed) */
+export const TERMINAL_STATES: ReadonlySet<WorkerLifecycleState> = new Set([
+  'DONE', 'EXITED', 'ERROR', 'ORPHAN',
+]);
+
+export class InvalidStateTransitionError extends Error {
+  constructor(
+    public readonly from: WorkerLifecycleState,
+    public readonly to: WorkerLifecycleState,
+    public readonly workerId: string,
+  ) {
+    super(`Invalid worker state transition: ${from} → ${to} (worker ${workerId})`);
+    this.name = 'InvalidStateTransitionError';
+  }
+}
+
+/**
+ * Worker lifecycle state machine tracker.
+ * Tracks the current state and validates transitions.
+ * Each worker instance gets one tracker — created at spawn time.
+ */
+export class WorkerStateMachine {
+  private _state: WorkerLifecycleState;
+  private readonly _workerId: string;
+  private readonly _history: Array<{ from: WorkerLifecycleState; to: WorkerLifecycleState; timestamp: string }> = [];
+
+  constructor(workerId: string, initialState: WorkerLifecycleState = 'SPAWNING') {
+    this._workerId = workerId;
+    this._state = initialState;
+  }
+
+  /** Current lifecycle state */
+  get state(): WorkerLifecycleState { return this._state; }
+
+  /** Worker ID this state machine tracks */
+  get workerId(): string { return this._workerId; }
+
+  /** Full transition history */
+  get history(): ReadonlyArray<{ from: WorkerLifecycleState; to: WorkerLifecycleState; timestamp: string }> {
+    return this._history;
+  }
+
+  /**
+   * Transition to a new state.
+   * @throws InvalidStateTransitionError if the transition is not allowed
+   */
+  transition(to: WorkerLifecycleState): void {
+    const allowed = VALID_TRANSITIONS[this._state];
+    if (!allowed.includes(to)) {
+      throw new InvalidStateTransitionError(this._state, to, this._workerId);
+    }
+    const from = this._state;
+    this._state = to;
+    this._history.push({ from, to, timestamp: new Date().toISOString() });
+  }
+
+  /** Check if a transition to the given state would be valid */
+  canTransition(to: WorkerLifecycleState): boolean {
+    return VALID_TRANSITIONS[this._state].includes(to);
+  }
+
+  /** Whether the worker is in a state where docker stop / kill is appropriate */
+  get isStoppable(): boolean {
+    return STOPPABLE_STATES.has(this._state);
+  }
+
+  /** Whether the worker has reached a terminal state */
+  get isTerminal(): boolean {
+    return TERMINAL_STATES.has(this._state);
+  }
+
+  /**
+   * Force-set state without validation (for ORPHAN recovery).
+   * Should only be used by Brain when detecting stale workers.
+   */
+  forceState(state: WorkerLifecycleState): void {
+    const from = this._state;
+    this._state = state;
+    this._history.push({ from, to: state, timestamp: new Date().toISOString() });
+  }
+
+  /** Serialize to plain object for heartbeat / event stream payload */
+  toJSON(): { workerId: string; state: WorkerLifecycleState; history: Array<{ from: WorkerLifecycleState; to: WorkerLifecycleState; timestamp: string }> } {
+    return {
+      workerId: this._workerId,
+      state: this._state,
+      history: [...this._history],
+    };
+  }
+}
+
+// ─── Global Worker State Registry ────────────────────────────────────
+
+const _workerStates = new Map<string, WorkerStateMachine>();
+
+/**
+ * Get or create a state machine for a worker.
+ * If the worker already has a state machine, return it.
+ * Otherwise create a new one in SPAWNING state.
+ */
+export function getWorkerStateMachine(workerId: string): WorkerStateMachine {
+  let sm = _workerStates.get(workerId);
+  if (!sm) {
+    sm = new WorkerStateMachine(workerId);
+    _workerStates.set(workerId, sm);
+  }
+  return sm;
+}
+
+/**
+ * Create a fresh state machine for a worker, replacing any existing one.
+ * Used at spawn time to ensure clean state.
+ */
+export function createWorkerStateMachine(workerId: string, initialState: WorkerLifecycleState = 'SPAWNING'): WorkerStateMachine {
+  const sm = new WorkerStateMachine(workerId, initialState);
+  _workerStates.set(workerId, sm);
+  return sm;
+}
+
+/**
+ * Remove a worker's state machine from the registry.
+ * Called after the worker has fully exited and been cleaned up.
+ */
+export function removeWorkerStateMachine(workerId: string): boolean {
+  return _workerStates.delete(workerId);
+}
+
+/**
+ * Check if a worker is in a stoppable state (safe to call docker stop).
+ * Returns false if the worker has no state machine (already cleaned up)
+ * or is in a terminal state (DONE, EXITED, ERROR, ORPHAN).
+ */
+export function isWorkerStoppable(workerId: string): boolean {
+  const sm = _workerStates.get(workerId);
+  if (!sm) return false;
+  return sm.isStoppable;
+}
+
+/**
+ * Get all tracked worker state machines.
+ * Useful for Brain to inspect all worker states.
+ */
+export function getAllWorkerStates(): ReadonlyMap<string, WorkerStateMachine> {
+  return _workerStates;
+}
+
+/**
+ * Clear the entire worker state registry.
+ * Used in tests and sprint cleanup.
+ */
+export function clearWorkerStateRegistry(): void {
+  _workerStates.clear();
 }

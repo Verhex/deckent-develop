@@ -1,0 +1,111 @@
+{
+  "id": "138-003",
+  "title": "Auditor Authority Extension (3-Pipeline Verification + ADR Compliance)",
+  "description": "Auditor Authority Extension (3-Pipeline Verification + ADR Compliance)\n- Model: opus\n- Effort: normal\n- Priority: CRITICAL\n- Dependencies: 138-002\n- Skills: typescript-expert, testing-expert\n- Files: src/monitor/auditor.ts, src/orchestra/result-evaluator.ts, src/orchestra/sprint-finalizer.ts, tests/monitor/auditor.test.ts, tests/orchestra/result-evaluator.test.ts\n- Scope: src/monitor/, src/orchestra/, tests/monitor/, tests/orchestra/\n\n### Description\n\nAuditor passive scanner → active verifier. 4 alt-iş.\n\n**Alt-iş A: tryCodeVerifiedDone Helper Migration**\nMevcut: `src/orchestra/result-evaluator.ts:729 export function tryCodeVerifiedDone(...)`. Çağrı: `src/orchestra/sprint-finalizer.ts:493 const verifyResult = await tryCodeVerifiedDone(taskId, projectRoot)`. \n\nSprint 138'de:\n1. `tryCodeVerifiedDone()` + tüm helper functions `result-evaluator.ts` → `auditor.ts`'e taşı\n2. `result-evaluator.ts` 1033 → ~750 LoC (-280 helper extraction)\n3. `auditor.ts` 650 → ~950 LoC (+300)\n4. `sprint-finalizer.ts:49` import path update: `from '../monitor/auditor.js'`\n5. **Sprint 137 meta-dogfood regression test zorunlu** — helper hâlâ canlı çalışmalı (Task 137-001 retrospektif relabel pattern)\n\n**Alt-iş B: 3-Pipeline Verification (KILLER FEATURE)**\n```typescript\nexport async function verifyWorkerResult(taskId, projectRoot, result): Promise<VerificationResult> {\n  switch (result.selfAssessment) {\n    case 'NO_GO': return await tryCodeVerifiedDone(taskId, projectRoot);\n    case 'GO_WITH_TECH_DEBT': return await validateTechDebt(taskId, projectRoot, result);\n    case 'DONE': return await verifyFunctional(taskId, projectRoot, result);\n  }\n}\n\nasync function verifyFunctional(taskId, projectRoot, result): Promise<VerificationResult> {\n  const affectedTests = inferAffectedTests(result.filesChanged);\n  if (affectedTests.length === 0) return { verdict: 'PASS', reason: 'no tests' };\n  const vitestResult = await runVitestOnFiles(affectedTests);\n  if (vitestResult.fail === 0) return { verdict: 'PASS', reason: 'all tests pass' };\n  return { verdict: 'DOWNGRADE', newStatus: 'GO_WITH_TECH_DEBT', reason: `${vitestResult.fail} tests still failing` };\n}\n```\n\n**Sprint 137 canlı kanıt:** Task 137-001 worker `status: DONE` dedi, helper `CODE_VERIFIED_DONE` flag bastı, ama vitest 63 fail kaldı. Sprint 138'de `verifyFunctional` bu kısayolu kırar — file existence yerine **functional runtime check**.\n\n**Alt-iş C: ADR Compliance Check (Pilot)**\n```typescript\nexport async function checkADRCompliance(projectRoot, changedFiles): Promise<ADRViolation[]> {\n  const adrs = parseADRs('.brain/DECISIONS.md');\n  return adrs.filter(a => a.status === 'accepted' && a.enforcementRule)\n    .map(adr => checkRule(adr.enforcementRule, changedFiles, projectRoot))\n    .filter(Boolean);\n}\n```\nPilot ADR'ler (Sprint 138 sadece 3-5):\n- ADR-006 `spawnSync + array args` → rule: grep `spawnSync.*shell.*true`\n- ADR-008 Brain merkezi import → rule: grep `from.*brain` `src/orchestra/tmux.ts src/monitor/auditor.ts src/agents/worker.ts`\n- ADR-010 Tek runtime dependency → rule: package.json dependencies count check\n\n**Alt-iş D: Event Stream Hook Point (Task 4 koordineli)**\n```typescript\nimport { writeEvent } from '../orchestra/event-stream.js'; // Task 4'te oluşacak\nwriteEvent(projectRoot, {\n  source: 'auditor', target: 'brain',\n  channel: 'AUDITOR→BRAIN:VERIFICATION_RESULT',\n  payload: { taskId, verdict, status, reason },\n});\n```\n\n**Kanıt:**\n- `grep -n \"tryCodeVerifiedDone\" src/monitor/auditor.ts` → hit\n- `grep -n \"tryCodeVerifiedDone\" src/orchestra/result-evaluator.ts` → **miss** (helper taşındı)\n- `grep -n \"verifyFunctional\" src/monitor/auditor.ts` → hit\n- `grep -n \"checkADRCompliance\" src/monitor/auditor.ts` → hit\n- Sprint 138 execute sırasında: ≥1 task'ın `DONE → TECH_DEBT downgrade` canlı yakalanmalı (functional check kanıtı)\n\n**Test:** 7+ test (helper migration regression, verifyFunctional happy path, partial fail downgrade, no affected tests edge, 3-pipeline dispatch, ADR-006 violation detect, no violation happy path)\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/monitor/",
+      "src/orchestra/",
+      "tests/monitor/",
+      "tests/orchestra/",
+      "src/agents/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/monitor/auditor.ts",
+      "src/orchestra/result-evaluator.ts",
+      "src/orchestra/sprint-finalizer.ts",
+      "tests/monitor/auditor.test.ts",
+      "tests/orchestra/result-evaluator.test.ts",
+      "DECISIONS.md",
+      "src/orchestra/tmux.ts",
+      "src/agents/worker.ts"
+    ]
+  },
+  "dependencies": [
+    "138-002"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep -n \"tryCodeVerifiedDone\" src/monitor/auditor.ts` → hit; `grep -n \"tryCodeVerifiedDone\" src/orchestra/result-evaluator.ts` → **miss** (helper taşındı)",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-138",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-14T09:56:52.624Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing",
+          "security",
+          "config"
+        ],
+        "confidence": 0.58
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.46
+        },
+        {
+          "name": "monitor",
+          "weight": 0.31
+        },
+        {
+          "name": "agents",
+          "weight": 0.15
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.43
+        },
+        {
+          "type": "create",
+          "weight": 0.29
+        },
+        {
+          "type": "modify",
+          "weight": 0.29
+        }
+      ],
+      "complexity": {
+        "fileCount": 8,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.63,
+          "tests/": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 3108,
+  "updatedAt": "2026-04-14T10:39:00.085Z"
+}

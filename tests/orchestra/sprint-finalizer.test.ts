@@ -142,8 +142,35 @@ vi.mock('../../src/core/observability.js', () => ({
   TELEMETRY_ENABLED: false,
 }));
 
+// ─── Event Stream Mock (Sprint 139 Task 042 — Brain event hooks) ──
+vi.mock('../../src/orchestra/event-stream.js', () => ({
+  writeEvent: vi.fn().mockReturnValue(null),
+  getCurrentSprintId: vi.fn().mockReturnValue('sprint-139'),
+  readSequence: vi.fn().mockReturnValue(0),
+  CHANNELS: {
+    TASK_ASSIGN: 'BRAIN→WORKER:TASK_ASSIGN',
+    HEARTBEAT: 'WORKER→BRAIN:HEARTBEAT',
+    RESULT: 'WORKER→BRAIN:RESULT',
+    QUESTION: 'WORKER→BRAIN:QUESTION',
+    ANSWER: 'BRAIN→WORKER:ANSWER',
+    CODE_VERIFY_REQUEST: 'WORKER→AUDITOR:CODE_VERIFY_REQUEST',
+    VERIFICATION_RESULT: 'AUDITOR→BRAIN:VERIFICATION_RESULT',
+    SCOPE_COLLISION_DETECTED: 'AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED',
+    ADR_VIOLATION: 'AUDITOR→BRAIN:ADR_VIOLATION',
+    GATE_COMPUTED: 'AUDITOR→BRAIN:GATE_COMPUTED',
+    LOAD_REPORT_WRITTEN: 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
+    METRIC_EMITTED: 'BRAIN→*:METRIC_EMITTED',
+    FIX_REQUEST: 'BRAIN→WORKER:FIX_REQUEST',
+    SPRINT_PHASE_CHANGE: 'BRAIN→*:SPRINT_PHASE_CHANGE',
+    NOTIFY: 'DECKENT→USER:NOTIFY',
+    ORPHAN_HB_DETECTED: 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED',
+    AUTHORITY_VIOLATION: 'AUDITOR→BRAIN:AUTHORITY_VIOLATION',
+  },
+}));
+
 import * as nodeFsMod from 'node:fs';
 import * as observabilityMod from '../../src/core/observability.js';
+import * as eventStreamMod from '../../src/orchestra/event-stream.js';
 
 import {
   runHonestyCheck,
@@ -802,5 +829,277 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
       const opts = call[2] as { shell?: boolean } | undefined;
       expect(opts?.shell).not.toBe(true);
     }
+  });
+});
+
+// ═══ Brain Event Hook Points — Sprint 139 Task 042 ═══════════════
+// Tests for the 4 event hook points added to finalizeSprint:
+//   SPRINT_PHASE_CHANGE (EXECUTE→EVALUATE, EVALUATE→RETRO, RETRO→CLEANUP)
+//   METRIC_EMITTED (sprint.summary after metrics calculation)
+//   GATE_COMPUTED (after gate.json is written)
+//   LOAD_REPORT_WRITTEN (after load-test-report.md is written)
+
+describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
+  beforeEach(() => {
+    vi.mocked(eventStreamMod.writeEvent).mockClear();
+    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn>; readFile: ReturnType<typeof vi.fn> } };
+    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
+    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
+    fsMod.promises.readFile.mockReset().mockResolvedValue('');
+  });
+
+  // ─── SPRINT_PHASE_CHANGE ─────────────────────────────────────────
+
+  it('emits SPRINT_PHASE_CHANGE EXECUTE→EVALUATE at the start of finalizeSprint', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
+    );
+    expect(phaseChangeCalls.length).toBeGreaterThanOrEqual(1);
+
+    // First SPRINT_PHASE_CHANGE must be EXECUTE→EVALUATE
+    const executeToEvaluate = phaseChangeCalls.find(call => {
+      const payload = call[5] as { fromPhase?: string; toPhase?: string };
+      return payload.fromPhase === 'EXECUTE' && payload.toPhase === 'EVALUATE';
+    });
+    expect(executeToEvaluate).toBeDefined();
+    expect(executeToEvaluate![2]).toBe('brain');    // source
+    expect(executeToEvaluate![3]).toBe('*');         // target (broadcast)
+  });
+
+  it('emits SPRINT_PHASE_CHANGE EVALUATE→RETRO before writing RETRO.md', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
+    );
+
+    const evaluateToRetro = phaseChangeCalls.find(call => {
+      const payload = call[5] as { fromPhase?: string; toPhase?: string };
+      return payload.fromPhase === 'EVALUATE' && payload.toPhase === 'RETRO';
+    });
+    expect(evaluateToRetro).toBeDefined();
+    expect(evaluateToRetro![2]).toBe('brain');
+  });
+
+  it('emits SPRINT_PHASE_CHANGE RETRO→CLEANUP at the end of finalizeSprint', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
+    );
+
+    const retroToCleanup = phaseChangeCalls.find(call => {
+      const payload = call[5] as { fromPhase?: string; toPhase?: string };
+      return payload.fromPhase === 'RETRO' && payload.toPhase === 'CLEANUP';
+    });
+    expect(retroToCleanup).toBeDefined();
+    expect(retroToCleanup![2]).toBe('brain');
+  });
+
+  it('emits all 3 SPRINT_PHASE_CHANGE events in correct order', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const phaseChangeCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'BRAIN→*:SPRINT_PHASE_CHANGE',
+    );
+    // At least 3 phase changes: EXECUTE→EVALUATE, EVALUATE→RETRO, RETRO→CLEANUP
+    expect(phaseChangeCalls.length).toBeGreaterThanOrEqual(3);
+
+    const phases = phaseChangeCalls.map(call => {
+      const payload = call[5] as { fromPhase?: string; toPhase?: string };
+      return `${payload.fromPhase}→${payload.toPhase}`;
+    });
+    const executeIdx = phases.indexOf('EXECUTE→EVALUATE');
+    const retroIdx = phases.indexOf('EVALUATE→RETRO');
+    const cleanupIdx = phases.indexOf('RETRO→CLEANUP');
+
+    expect(executeIdx).toBeGreaterThanOrEqual(0);
+    expect(retroIdx).toBeGreaterThan(executeIdx);
+    expect(cleanupIdx).toBeGreaterThan(retroIdx);
+  });
+
+  // ─── METRIC_EMITTED ─────────────────────────────────────────────
+
+  it('emits METRIC_EMITTED with sprint.summary after metrics calculation', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const metricCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'BRAIN→*:METRIC_EMITTED',
+    );
+    expect(metricCalls.length).toBeGreaterThanOrEqual(1);
+
+    const summaryEvent = metricCalls.find(call => {
+      const payload = call[5] as { name?: string };
+      return payload.name === 'sprint.summary';
+    });
+    expect(summaryEvent).toBeDefined();
+    expect(summaryEvent![2]).toBe('brain');
+    expect(summaryEvent![3]).toBe('*');
+
+    const payload = summaryEvent![5] as {
+      totalTasks: number;
+      completedTasks: number;
+      techDebtTasks: number;
+      noGoTasks: number;
+      durationMs: number;
+      sprintId: string;
+    };
+    expect(payload.sprintId).toBe('sprint-139');
+    expect(typeof payload.totalTasks).toBe('number');
+    expect(typeof payload.completedTasks).toBe('number');
+    expect(typeof payload.durationMs).toBe('number');
+  });
+
+  it('METRIC_EMITTED payload includes coveragePercent field', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const metricCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'BRAIN→*:METRIC_EMITTED',
+    );
+    const summaryPayload = metricCalls.find(call => {
+      const p = call[5] as { name?: string };
+      return p.name === 'sprint.summary';
+    })?.[5] as Record<string, unknown>;
+
+    expect(summaryPayload).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(summaryPayload, 'coveragePercent')).toBe(true);
+  });
+
+  // ─── GATE_COMPUTED ───────────────────────────────────────────────
+
+  it('emits GATE_COMPUTED after gate.json is written', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const gateComputedCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'AUDITOR→BRAIN:GATE_COMPUTED',
+    );
+    expect(gateComputedCalls.length).toBeGreaterThanOrEqual(1);
+
+    const call = gateComputedCalls[0];
+    expect(call[2]).toBe('auditor');  // source
+    expect(call[3]).toBe('brain');    // target
+
+    const payload = call[5] as { sprintId: string; overallGate: string };
+    expect(payload.sprintId).toBe('sprint-139');
+    expect(['PASS', 'GATE_FAILURE']).toContain(payload.overallGate);
+  });
+
+  it('GATE_COMPUTED payload includes tscStatus and vitestFail fields', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const gateComputedCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'AUDITOR→BRAIN:GATE_COMPUTED',
+    );
+    const payload = gateComputedCalls[0][5] as {
+      tscStatus: string;
+      vitestFail: number;
+      vitestPass: number;
+      honestyViolations: number;
+      observabilityOk: boolean;
+    };
+    expect(['PASS', 'FAIL']).toContain(payload.tscStatus);
+    expect(typeof payload.vitestFail).toBe('number');
+    expect(typeof payload.vitestPass).toBe('number');
+    expect(typeof payload.honestyViolations).toBe('number');
+  });
+
+  it('GATE_COMPUTED is NOT emitted when gate.json write fails', async () => {
+    // When writeFile throws, the GATE_COMPUTED event inside the try block is also skipped
+    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
+    fsMod.promises.writeFile.mockRejectedValue(new Error('EACCES: permission denied'));
+
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    // The gate.json write failed, so GATE_COMPUTED inside that try block was not reached
+    const gateComputedCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'AUDITOR→BRAIN:GATE_COMPUTED',
+    );
+    expect(gateComputedCalls.length).toBe(0);
+  });
+
+  // ─── LOAD_REPORT_WRITTEN ─────────────────────────────────────────
+
+  it('emits LOAD_REPORT_WRITTEN after load-test-report.md is written', async () => {
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+    vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce('# Load Report\n\n## Wave Timeline\n\nNo data.\n');
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const loadReportCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
+    );
+    expect(loadReportCalls.length).toBeGreaterThanOrEqual(1);
+
+    const call = loadReportCalls[0];
+    expect(call[2]).toBe('auditor');
+    expect(call[3]).toBe('brain');
+
+    const payload = call[5] as { sprintId: string; reportPath: string };
+    expect(payload.sprintId).toBe('sprint-139');
+    expect(payload.reportPath).toContain('load-test-report.md');
+    expect(payload.reportPath).toContain('sprint-139');
+  });
+
+  it('LOAD_REPORT_WRITTEN is NOT emitted when generateLoadReport fails', async () => {
+    vi.mocked(observabilityMod.generateLoadReport).mockRejectedValueOnce(new Error('Disk full'));
+
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const loadReportCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
+      call => call[4] === 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
+    );
+    // generateLoadReport threw, so the event was not emitted
+    expect(loadReportCalls.length).toBe(0);
+  });
+
+  // ─── Fail-safe: writeEvent returning null does NOT crash finalizeSprint ──
+
+  it('writeEvent returning null (I/O failure) does not crash finalizeSprint (fail-safe)', async () => {
+    // Real writeEvent never throws — it swallows errors and returns null.
+    // Simulate the fail-safe path by having the mock always return null.
+    vi.mocked(eventStreamMod.writeEvent).mockReturnValue(null);
+
+    const sprint = makeSprint('sprint-139');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    // Should resolve despite all writeEvent calls returning null
+    const metrics = await finalizeSprint(
+      '/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true },
+    );
+    expect(metrics).toBeDefined();
+    expect(typeof metrics.totalTasks).toBe('number');
   });
 });

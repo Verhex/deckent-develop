@@ -286,7 +286,7 @@ describe('registerStatusTool', () => {
       const tool = await getStatusTool();
       const result = await tool.handler({});
       const parsed = JSON.parse(result.content[0]!.text);
-      expect(parsed.message).toMatch(/cannot parse/i);
+      expect(parsed.message).toMatch(/dashboard read error|json parse error/i);
     });
 
     it('includes job state in parse error response', async () => {

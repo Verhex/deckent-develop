@@ -174,9 +174,113 @@ describe('event-stream', () => {
 
   // ─── Channel constants ─────────────────────────────────────────
 
-  it('should export all 15 ADR-035 channel codes', () => {
-    expect(Object.keys(CHANNELS)).toHaveLength(15);
+  it('should export all ADR-035 channel codes (15 base + extensions)', () => {
+    // 15 ADR-035 base + ORPHAN_HB_DETECTED (Sprint 139 Task 016) + AUTHORITY_VIOLATION (Sprint 139 Task 035)
+    expect(Object.keys(CHANNELS).length).toBeGreaterThanOrEqual(15);
     expect(CHANNELS.TASK_ASSIGN).toBe('BRAIN→WORKER:TASK_ASSIGN');
     expect(CHANNELS.NOTIFY).toBe('DECKENT→USER:NOTIFY');
+    expect(CHANNELS.AUTHORITY_VIOLATION).toBe('AUDITOR→BRAIN:AUTHORITY_VIOLATION');
+  });
+
+  // ─── Sprint 139 Task 041: Worker Event Hook Point channels ────────
+
+  it('should have HEARTBEAT channel for WORKER→BRAIN communication', () => {
+    expect(CHANNELS.HEARTBEAT).toBe('WORKER→BRAIN:HEARTBEAT');
+  });
+
+  it('should have RESULT channel for WORKER→BRAIN communication', () => {
+    expect(CHANNELS.RESULT).toBe('WORKER→BRAIN:RESULT');
+  });
+
+  it('should have QUESTION channel for WORKER→BRAIN communication', () => {
+    expect(CHANNELS.QUESTION).toBe('WORKER→BRAIN:QUESTION');
+  });
+
+  it('should have CODE_VERIFY_REQUEST channel for WORKER→AUDITOR communication', () => {
+    expect(CHANNELS.CODE_VERIFY_REQUEST).toBe('WORKER→AUDITOR:CODE_VERIFY_REQUEST');
+  });
+
+  it('should write HEARTBEAT event with correct payload structure', () => {
+    const event = writeEvent(testRoot, sprintId, 'worker', 'brain', CHANNELS.HEARTBEAT, {
+      workerId: 'w-139-001',
+      taskId: '139-001',
+      sequence: 5,
+      phase: 'EXECUTING',
+      state: 'Writing src/foo.ts',
+    });
+
+    expect(event).not.toBeNull();
+    expect(event!.source).toBe('worker');
+    expect(event!.target).toBe('brain');
+    expect(event!.channel).toBe(CHANNELS.HEARTBEAT);
+
+    const payload = event!.payload as Record<string, unknown>;
+    expect(payload.workerId).toBe('w-139-001');
+    expect(payload.taskId).toBe('139-001');
+    expect(payload.sequence).toBe(5);
+    expect(payload.phase).toBe('EXECUTING');
+  });
+
+  it('should write RESULT event with selfAssessment and filesChanged', () => {
+    const event = writeEvent(testRoot, sprintId, 'worker', 'brain', CHANNELS.RESULT, {
+      taskId: '139-002',
+      selfAssessment: 'DONE',
+      filesChanged: ['src/core/config.ts'],
+      rubricScores: { correctness: 90, test_coverage: 85, scope_compliance: 100, documentation: 70 },
+    });
+
+    expect(event).not.toBeNull();
+    expect(event!.channel).toBe(CHANNELS.RESULT);
+
+    const payload = event!.payload as Record<string, unknown>;
+    expect(payload.selfAssessment).toBe('DONE');
+    expect(payload.filesChanged).toEqual(['src/core/config.ts']);
+    expect(payload.rubricScores).toMatchObject({ correctness: 90 });
+  });
+
+  it('should write QUESTION event with question and context', () => {
+    const event = writeEvent(testRoot, sprintId, 'worker', 'brain', CHANNELS.QUESTION, {
+      taskId: '139-003',
+      question: 'Should I touch src/core/config.ts?',
+      context: 'The task scope says src/agents/ only',
+    });
+
+    expect(event).not.toBeNull();
+    expect(event!.channel).toBe(CHANNELS.QUESTION);
+
+    const payload = event!.payload as Record<string, unknown>;
+    expect(payload.question).toBe('Should I touch src/core/config.ts?');
+    expect(payload.context).toBeDefined();
+  });
+
+  it('should write CODE_VERIFY_REQUEST event for auditor', () => {
+    const event = writeEvent(testRoot, sprintId, 'worker', 'auditor', CHANNELS.CODE_VERIFY_REQUEST, {
+      taskId: '139-004',
+      filesChanged: ['src/agents/worker.ts'],
+      evidence: 'tsc passed, vitest passed',
+    });
+
+    expect(event).not.toBeNull();
+    expect(event!.source).toBe('worker');
+    expect(event!.target).toBe('auditor');
+    expect(event!.channel).toBe(CHANNELS.CODE_VERIFY_REQUEST);
+
+    const payload = event!.payload as Record<string, unknown>;
+    expect(payload.filesChanged).toContain('src/agents/worker.ts');
+  });
+
+  it('worker event sequence should be monotonically increasing across all 4 hook types', () => {
+    writeEvent(testRoot, sprintId, 'worker', 'brain', CHANNELS.HEARTBEAT, { taskId: 'T1', sequence: 1 });
+    writeEvent(testRoot, sprintId, 'worker', 'brain', CHANNELS.HEARTBEAT, { taskId: 'T1', sequence: 2 });
+    writeEvent(testRoot, sprintId, 'worker', 'brain', CHANNELS.RESULT, { taskId: 'T1', selfAssessment: 'DONE' });
+    writeEvent(testRoot, sprintId, 'worker', 'auditor', CHANNELS.CODE_VERIFY_REQUEST, { taskId: 'T1' });
+
+    const events = readEvents(testRoot, sprintId, { source: 'worker' });
+    expect(events).toHaveLength(4);
+
+    // Sequences must be strictly increasing
+    for (let i = 1; i < events.length; i++) {
+      expect(events[i]!.sequence).toBeGreaterThan(events[i - 1]!.sequence);
+    }
   });
 });

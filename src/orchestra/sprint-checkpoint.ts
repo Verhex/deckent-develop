@@ -1,6 +1,7 @@
 // ═══ Sprint Checkpoint ════════════════════════════════════════════════
 // Sprint state persistence for long-running sprint resume capability.
 // MVP: write/read checkpoint — resume from middle of sprint.
+// Sprint 139 Task 030: dep graph embedded in checkpoint for resume restore.
 // Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
 // Sprint 145+ will add external state store.
 
@@ -12,6 +13,14 @@ import { debugLog } from '../core/utils.js';
 import type { Sprint, SprintPhase } from '../core/types.js';
 import type { Task } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
+import type { SerializedDependencyGraph } from './dependency-scheduler.js';
+import {
+  persistDependencyGraph,
+  loadDependencyGraph,
+  deserializeDependencyGraph,
+  serializeDependencyGraph,
+} from './dependency-scheduler.js';
+import type { DependencyGraph } from './dependency-scheduler.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -26,6 +35,9 @@ export interface WorkerState {
 /**
  * Sprint checkpoint — persisted state for resume capability.
  * Written every N=5 task completions (DONE/GO_WITH_TECH_DEBT/NO_GO).
+ *
+ * Sprint 139 Task 030: `depGraph` field embeds the serialized dependency graph
+ * so that resume can restore topological ordering without re-computing from scratch.
  */
 export interface SprintCheckpoint {
   /** Sprint identifier (e.g. "sprint-138") */
@@ -44,6 +56,13 @@ export interface SprintCheckpoint {
   brainPhase: SprintPhase;
   /** Event stream sequence offset — used to resume from this point */
   eventStreamOffset: number;
+  /**
+   * Serialized dependency graph (Task 030).
+   * Embedded so resume can restore topological ordering from checkpoint alone,
+   * without re-reading all task files and re-running Kahn's algorithm.
+   * Optional for backward compatibility with Sprint 138 checkpoints.
+   */
+  depGraph?: SerializedDependencyGraph;
 }
 
 // ─── Paths ───────────────────────────────────────────────────────────
@@ -86,11 +105,17 @@ function incrementCheckpointCounter(projectRoot: string, sprintId: string): numb
 /**
  * Write a checkpoint for the given sprint state.
  * Fail-safe: write errors are logged but do not crash the sprint.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprint - Current sprint state
+ * @param eventStreamOffset - Current event stream sequence number
+ * @param graph - Optional dependency graph to embed (Task 030: sprint resume restore)
  */
 export function writeCheckpoint(
   projectRoot: string,
   sprint: Sprint,
   eventStreamOffset: number,
+  graph?: DependencyGraph,
 ): SprintCheckpoint | null {
   try {
     mkdirSync(join(projectRoot, DECKENT_DIR), { recursive: true });
@@ -124,6 +149,13 @@ export function writeCheckpoint(
       brainPhase: sprint.phase,
       eventStreamOffset,
     };
+
+    // Task 030: embed serialized dep graph if provided
+    if (graph) {
+      checkpoint.depGraph = serializeDependencyGraph(graph, sprint.id);
+      // Also persist separate JSON + Mermaid files for human inspection
+      persistDependencyGraph(projectRoot, sprint.id, graph);
+    }
 
     const filePath = checkpointPath(projectRoot, sprint.id);
     writeFileSync(filePath, JSON.stringify(checkpoint, null, 2), 'utf-8');
@@ -179,6 +211,50 @@ export function getResumableTasks(
 export function hasCheckpoint(projectRoot: string, sprintId: string): boolean {
   return existsSync(checkpointPath(projectRoot, sprintId));
 }
+
+// ─── Dep Graph Resume (Task 030) ─────────────────────────────────────
+
+/**
+ * Restore a DependencyGraph from a checkpoint.
+ *
+ * Priority order:
+ * 1. Embedded `checkpoint.depGraph` — fastest, no extra I/O
+ * 2. Separate `.deckent/sprint-NNN-depgraph.json` file — fallback
+ * 3. `null` — caller must rebuild graph from tasks
+ *
+ * @param projectRoot - Project root directory
+ * @param checkpoint - Sprint checkpoint containing optional embedded graph
+ * @returns Restored DependencyGraph, or null if not available
+ */
+export function restoreDepGraph(
+  projectRoot: string,
+  checkpoint: SprintCheckpoint,
+): DependencyGraph | null {
+  // Priority 1: use embedded graph from checkpoint
+  if (checkpoint.depGraph) {
+    try {
+      const graph = deserializeDependencyGraph(checkpoint.depGraph);
+      debugLog('sprint-checkpoint:restoreDepGraph', `Restored from embedded checkpoint #${checkpoint.checkpointNumber}`);
+      return graph;
+    } catch (e) {
+      debugLog('sprint-checkpoint:restoreDepGraph:warn', `Embedded graph malformed, trying file fallback: ${String(e)}`);
+    }
+  }
+
+  // Priority 2: load from separate depgraph.json file
+  const graph = loadDependencyGraph(projectRoot, checkpoint.sprintId);
+  if (graph) {
+    debugLog('sprint-checkpoint:restoreDepGraph', `Restored from depgraph.json for ${checkpoint.sprintId}`);
+    return graph;
+  }
+
+  // Priority 3: caller must rebuild
+  debugLog('sprint-checkpoint:restoreDepGraph', `No graph available for ${checkpoint.sprintId} — caller must rebuild`);
+  return null;
+}
+
+// Re-export persistence utilities so callers don't need to import dependency-scheduler directly
+export { persistDependencyGraph, loadDependencyGraph } from './dependency-scheduler.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

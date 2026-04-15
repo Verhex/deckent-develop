@@ -26,6 +26,14 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
   runDecay: vi.fn(),
 }));
 
+vi.mock('../../../src/orchestra/spawn-backend-docker.js', () => ({
+  archivePromptFiles: vi.fn().mockReturnValue({ archived: 0, cleaned: 0 }),
+}));
+
+vi.mock('../../../src/orchestra/sprint-docs-updater.js', () => ({
+  cleanTasksArchive: vi.fn().mockReturnValue(0),
+}));
+
 vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
@@ -38,6 +46,8 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { cleanup, runDecay } from '../../../src/orchestra/brain.js';
+import { archivePromptFiles } from '../../../src/orchestra/spawn-backend-docker.js';
+import { cleanTasksArchive } from '../../../src/orchestra/sprint-docs-updater.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { countBrainLines } from '../../../src/core/utils.js';
 import { registerCleanup } from '../../../src/cli/commands/cleanup.js';
@@ -501,5 +511,134 @@ describe('cleanup i18n integration', () => {
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     // Turkish: 'Arşivlendi: {sprints}'
     expect(calls.some(c => String(c).includes('Arşivlendi'))).toBe(true);
+  });
+});
+
+// ─── E) Prompt Archive Integration ────────────────────────────────────────
+
+describe('cleanup E) prompt archive (isolated)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(spawnSync).mockReturnValue({ status: 0 } as any);
+    vi.mocked(archivePromptFiles).mockReturnValue({ archived: 0, cleaned: 0 });
+    process.exitCode = undefined;
+  });
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it('E) calls archivePromptFiles with sprint ID from sprint-state.json', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('sprint-state'));
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('sprint-state')) return JSON.stringify({ sprintId: 'sprint-042' });
+      return '';
+    });
+    vi.mocked(cleanup).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    expect(archivePromptFiles).toHaveBeenCalledWith(
+      expect.stringContaining('.tasks'),
+      'sprint-042',
+      expect.any(Number),
+    );
+  });
+
+  it('E) prints archived count when prompt files were archived', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(archivePromptFiles).mockReturnValue({ archived: 52, cleaned: 0 });
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('52') && String(c).includes('archive'))).toBe(true);
+  });
+
+  it('E) prints cleaned count when old archives were removed', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(archivePromptFiles).mockReturnValue({ archived: 0, cleaned: 15 });
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('15') && String(c).toLowerCase().includes('removed'))).toBe(true);
+  });
+
+  it('E) reads prompt_archive_retention from config (default 5)', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('config.json'));
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      if (String(p).includes('config.json')) return JSON.stringify({ prompt_archive_retention: 3 });
+      return '';
+    });
+    vi.mocked(cleanup).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    expect(archivePromptFiles).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      3, // custom retention value from config
+    );
+  });
+
+  it('E) dry-run shows prompts will be archived not deleted', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('.tasks'));
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-001.json', '.prompt-139-001-abc123.txt', '.prompt-139-002-def456-fix.txt',
+    ] as any);
+    await runCommand(['cleanup', '--dry-run']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    // dry-run must say "archive" not "delete" for prompt files
+    expect(calls.some(c => String(c).includes('archive'))).toBe(true);
+    // prompt count should appear
+    expect(calls.some(c => String(c).includes('2') && String(c).includes('prompt file(s)'))).toBe(true);
+  });
+});
+
+// ─── F) Cleanup Discipline Extension ─────────────────────────────────────
+
+describe('cleanup F) .timeout and retention policy (isolated)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(spawnSync).mockReturnValue({ status: 0 } as any);
+    vi.mocked(archivePromptFiles).mockReturnValue({ archived: 0, cleaned: 0 });
+    vi.mocked(cleanTasksArchive).mockReturnValue(0);
+    process.exitCode = undefined;
+  });
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it('F) dry-run includes .timeout files in task file count', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('.tasks'));
+    vi.mocked(readdirSync).mockReturnValue([
+      'task-001.json', 'task-001.hb', 'task-001.result',
+      'task-001.log', 'task-001.timeout',
+    ] as any);
+    await runCommand(['cleanup', '--dry-run']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    // All 5 files match the extended pattern including .timeout
+    expect(calls.some(c => String(c).includes('5 task file(s)'))).toBe(true);
+  });
+
+  it('F) dry-run prints retention policy info', async () => {
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('.tasks'));
+    vi.mocked(readdirSync).mockReturnValue([] as any);
+    await runCommand(['cleanup', '--dry-run']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).toLowerCase().includes('retention'))).toBe(true);
+  });
+
+  it('F) calls cleanTasksArchive with retention count after normal cleanup', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    await runCommand(['cleanup']);
+    expect(cleanTasksArchive).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Number),
+    );
+  });
+
+  it('F) prints removed count when old archive dirs were cleaned', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(cleanup).mockImplementation(() => {});
+    vi.mocked(cleanTasksArchive).mockReturnValue(3);
+    await runCommand(['cleanup']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    expect(calls.some(c => String(c).includes('3') && String(c).toLowerCase().includes('archive'))).toBe(true);
   });
 });

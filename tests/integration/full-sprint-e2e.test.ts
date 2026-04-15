@@ -6,7 +6,7 @@ import { DecisionOrchestrator } from '../../src/orchestra/decision-engine.js';
 import { PatternRecorder } from '../../src/orchestra/pattern-recorder.js';
 import type { LearningEntry } from '../../src/orchestra/pattern-recorder.js';
 import { PatternReader } from '../../src/orchestra/pattern-reader.js';
-import { CombinationScorer } from '../../src/orchestra/combination-scorer.js';
+
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { AgentPool, AgentDefinition } from '../../src/core/agent-types.js';
@@ -662,132 +662,6 @@ describe('Full Sprint E2E Integration', () => {
     });
   });
 
-  // ─── Combination Scoring After Sprint ─────────────────────────
-
-  describe('CombinationScorer after full sprint', () => {
-    it('scores successful combinations positively', () => {
-      const ctx = makeFullContext();
-      const orch = new DecisionOrchestrator(ctx);
-      const recorder = new PatternRecorder(tmpDir);
-
-      // Record 3 successful security tasks
-      for (let i = 0; i < 3; i++) {
-        const task = makeSprintTasks()[0]!;
-        const decision = orch.decide(task);
-        recorder.record({
-          taskType: decision.analysis.type,
-          agent: decision.agent?.id ?? null,
-          skills: decision.skills.map(s => s.id),
-          model: decision.model,
-          effort: decision.effort,
-          evaluation: 'DONE',
-          coverage: 92,
-          durationMs: 280000,
-          sprintId: 'sprint-033',
-          recordedAt: new Date().toISOString(),
-        });
-      }
-
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-      const secDecision = orch.decide(makeSprintTasks()[0]!);
-
-      const result = scorer.score(
-        secDecision.analysis.type,
-        secDecision.agent?.id ?? null,
-        secDecision.skills.map(s => s.id),
-        secDecision.model,
-      );
-
-      expect(result.score).toBeGreaterThan(0);
-      expect(result.recommendation).toBe('use');
-    });
-
-    it('scores failed combinations negatively', () => {
-      const ctx = makeFullContext();
-      const orch = new DecisionOrchestrator(ctx);
-      const recorder = new PatternRecorder(tmpDir);
-
-      // Record 2 failed security tasks
-      for (let i = 0; i < 2; i++) {
-        const task = makeSprintTasks()[0]!;
-        const decision = orch.decide(task);
-        recorder.record({
-          taskType: decision.analysis.type,
-          agent: decision.agent?.id ?? null,
-          skills: decision.skills.map(s => s.id),
-          model: decision.model,
-          effort: decision.effort,
-          evaluation: 'NO_GO',
-          coverage: 10,
-          durationMs: 50000,
-          sprintId: 'sprint-033',
-          recordedAt: new Date().toISOString(),
-        });
-      }
-
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-      const secDecision = orch.decide(makeSprintTasks()[0]!);
-
-      const result = scorer.score(
-        secDecision.analysis.type,
-        secDecision.agent?.id ?? null,
-        secDecision.skills.map(s => s.id),
-        secDecision.model,
-      );
-
-      expect(result.score).toBeLessThan(0);
-      expect(result.recommendation).toBe('avoid');
-    });
-
-    it('returns neutral for unknown task type', () => {
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-
-      const result = scorer.score('devops', 'unknown-agent', ['unknown-skill'], 'opus');
-
-      expect(result.recommendation).toBe('neutral');
-      expect(result.confidence).toBe(0);
-    });
-
-    it('confidence increases with more samples', () => {
-      const ctx = makeFullContext();
-      const orch = new DecisionOrchestrator(ctx);
-      const recorder = new PatternRecorder(tmpDir);
-
-      for (let i = 0; i < 5; i++) {
-        const task = makeSprintTasks()[0]!;
-        const decision = orch.decide(task);
-        recorder.record({
-          taskType: decision.analysis.type,
-          agent: decision.agent?.id ?? null,
-          skills: decision.skills.map(s => s.id),
-          model: decision.model,
-          effort: decision.effort,
-          evaluation: 'DONE',
-          coverage: 90,
-          durationMs: 300000,
-          sprintId: 'sprint-033',
-          recordedAt: new Date().toISOString(),
-        });
-      }
-
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-      const secDecision = orch.decide(makeSprintTasks()[0]!);
-
-      const result = scorer.score(
-        secDecision.analysis.type,
-        secDecision.agent?.id ?? null,
-        secDecision.skills.map(s => s.id),
-        secDecision.model,
-      );
-
-      expect(result.confidence).toBe(1);
-    });
-  });
-
   // ─── Full E2E: Decision -> Record -> Query -> Score ────────────
 
   describe('Full E2E lifecycle', () => {
@@ -823,16 +697,7 @@ describe('Full Sprint E2E Integration', () => {
       const securityCombos = reader.getSuccessfulCombinations('security');
       expect(securityCombos.length).toBeGreaterThan(0);
 
-      // Step 3: Score combinations
-      const scorer = new CombinationScorer(reader);
-      const secDecision = decisions[0]!;
-      const score = scorer.score(
-        secDecision.analysis.type,
-        secDecision.agent?.id ?? null,
-        secDecision.skills.map(s => s.id),
-        secDecision.model,
-      );
-      expect(score.score).toBeGreaterThan(0);
+      // Step 3: CombinationScorer removed (dead code audit Sprint 139)
     });
 
     it('multi-sprint learning accumulates correctly', () => {
@@ -918,19 +783,11 @@ describe('Full Sprint E2E Integration', () => {
         recordedAt: new Date().toISOString(),
       });
 
+      // Verify patterns were recorded (CombinationScorer removed in Sprint 139)
       const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-      const secDecision = orch.decide(task);
-
-      const result = scorer.score(
-        secDecision.analysis.type,
-        secDecision.agent?.id ?? null,
-        secDecision.skills.map(s => s.id),
-        secDecision.model,
-      );
-
-      // 3 successes and 1 failure: net should still be positive but less confident
-      expect(result.confidence).toBeGreaterThan(0);
+      const combos = reader.getSuccessfulCombinations('security');
+      // 3 successes recorded, so at least 1 successful combo expected
+      expect(combos.length).toBeGreaterThan(0);
     });
 
     it('refactor task gets no specialized agent when no refactor agent in pool', () => {

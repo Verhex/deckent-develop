@@ -19,6 +19,7 @@ import {
   writeScanToDashboard,
   startScanLoop,
   deduplicateAlerts,
+  clearHeartbeatCache,
 } from '../../src/monitor/auditor.js';
 import { AlertLevel, TaskStatus, AgentStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
@@ -29,13 +30,14 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   writeFileSync: vi.fn(),
   appendFileSync: vi.fn(),
+  statSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const mockedReadFileSync = vi.mocked(readFileSync);
@@ -43,11 +45,14 @@ const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
 const mockedSpawnSync = vi.mocked(spawnSync);
+const mockedStatSync = vi.mocked(statSync);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedExistsSync.mockReturnValue(false);
   mockedReaddirSync.mockReturnValue([] as never);
+  mockedStatSync.mockReturnValue({ mtimeMs: Date.now() } as never);
+  clearHeartbeatCache();
 });
 
 // ─── Helpers ────────────────────────────────────────────────────────

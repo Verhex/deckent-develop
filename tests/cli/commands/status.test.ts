@@ -27,9 +27,14 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
+vi.mock('../../../src/monitor/sprint-state.js', () => ({
+  getCurrentSprintId: vi.fn().mockReturnValue(null),
+}));
+
 import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { print, printError, formatDashboard, formatHumanStatus, formatStandaloneStatus } from '../../../src/cli/helpers/output.js';
-import { registerStatus } from '../../../src/cli/commands/status.js';
+import { registerStatus, loadDepGraphForSprint } from '../../../src/cli/commands/status.js';
+import { getCurrentSprintId } from '../../../src/monitor/sprint-state.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -281,5 +286,138 @@ describe('status command (isolated)', () => {
     expect(formatHumanStatus).toHaveBeenCalledWith(expect.objectContaining({
       sprintTitle: expect.stringContaining('CLI Perfection Wave'),
     }));
+  });
+});
+
+// ─── --graph flag tests (Task 139-031) ───────────────────────────────────────
+
+const sampleMmd = `graph TD
+  t_139_001["139-001 (W0)"]
+  t_139_002["139-002 (W1)"]
+  t_139_001 --> t_139_002`;
+
+describe('status --graph flag (Task 139-031)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+    // Default for graph tests: active sprint
+    vi.mocked(getCurrentSprintId).mockReturnValue('sprint-139');
+  });
+
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it('registers --graph option on status command', () => {
+    const program = new Command();
+    registerStatus(program);
+    const cmd = program.commands.find(c => c.name() === 'status');
+    expect(cmd).toBeDefined();
+    expect(cmd!.options.some(o => o.long === '--graph')).toBe(true);
+  });
+
+  it('prints Mermaid diagram when --graph is provided and depgraph exists', async () => {
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      return String(p).endsWith('.mmd');
+    });
+    vi.mocked(readFileSync).mockReturnValue(sampleMmd);
+    vi.mocked(getCurrentSprintId).mockReturnValue('sprint-139');
+
+    await runCommand(['status', '--graph']);
+    expect(vi.mocked(print)).toHaveBeenCalledWith(
+      expect.stringContaining('graph TD'),
+    );
+  });
+
+  it('prints "no dependency graph" message when depgraph does not exist', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(getCurrentSprintId).mockReturnValue('sprint-139');
+
+    await runCommand(['status', '--graph']);
+    expect(vi.mocked(print)).toHaveBeenCalledWith(
+      expect.stringContaining('No dependency graph found'),
+    );
+  });
+
+  it('prints "no active sprint" when getCurrentSprintId returns null', async () => {
+    vi.mocked(getCurrentSprintId).mockReturnValue(null);
+    vi.mocked(existsSync).mockReturnValue(false);
+
+    await runCommand(['status', '--graph']);
+    expect(vi.mocked(print)).toHaveBeenCalledWith(
+      expect.stringContaining('No active sprint'),
+    );
+  });
+
+  it('Mermaid output includes sprint-specific header', async () => {
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      return String(p).endsWith('.mmd');
+    });
+    vi.mocked(readFileSync).mockReturnValue(sampleMmd);
+    vi.mocked(getCurrentSprintId).mockReturnValue('sprint-139');
+
+    await runCommand(['status', '--graph']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    const hasSprintRef = calls.some(c => String(c).includes('sprint-139'));
+    expect(hasSprintRef).toBe(true);
+  });
+
+  it('Mermaid output includes task nodes with wave notation', async () => {
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      return String(p).endsWith('.mmd');
+    });
+    vi.mocked(readFileSync).mockReturnValue(sampleMmd);
+
+    await runCommand(['status', '--graph']);
+    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
+    const hasMmd = calls.some(c => String(c).includes('(W0)') || String(c).includes('(W1)'));
+    expect(hasMmd).toBe(true);
+  });
+});
+
+// ─── loadDepGraphForSprint unit tests ────────────────────────────────────────
+
+describe('loadDepGraphForSprint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns null when mmd file does not exist', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const result = loadDepGraphForSprint('/root', 'sprint-139');
+    expect(result).toBeNull();
+  });
+
+  it('returns file content when mmd file exists', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(sampleMmd);
+    const result = loadDepGraphForSprint('/root', 'sprint-139');
+    expect(result).toBe(sampleMmd);
+  });
+
+  it('returns null when readFileSync throws', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('EACCES: permission denied'); });
+    const result = loadDepGraphForSprint('/root', 'sprint-139');
+    expect(result).toBeNull();
+  });
+
+  it('constructs correct mmd path using sprint-NNN-depgraph.mmd pattern', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('graph TD');
+    loadDepGraphForSprint('/my/project', 'sprint-042');
+    expect(vi.mocked(readFileSync)).toHaveBeenCalledWith(
+      expect.stringContaining('sprint-042-depgraph.mmd'),
+      'utf-8',
+    );
+  });
+
+  it('checks path inside .deckent directory', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('graph TD');
+    loadDepGraphForSprint('/project', 'sprint-001');
+    expect(vi.mocked(existsSync)).toHaveBeenCalledWith(
+      expect.stringContaining('.deckent'),
+    );
   });
 });

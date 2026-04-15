@@ -4,7 +4,7 @@
 // Results collected via shared .tasks/ volume mount.
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
@@ -78,8 +78,11 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
 
     // Write prompt to shared .tasks/ volume
+    // Hash-based naming: .prompt-{taskId}-{hash} for initial workers,
+    // .prompt-{taskId}-{hash}-fix for fix/retry workers (isPriorityFix flag)
     const promptId = randomBytes(8).toString('hex');
-    const promptFileName = `.prompt-${promptId}.txt`;
+    const fixSuffix = opts?.isPriorityFix ? '-fix' : '';
+    const promptFileName = `.prompt-${taskId}-${promptId}${fixSuffix}.txt`;
     const promptHostPath = join(tasksDir, promptFileName);
     writeFileSync(promptHostPath, prompt, 'utf-8');
 
@@ -116,15 +119,23 @@ export class DockerSpawnBackend implements SpawnBackend {
     const scriptFileName = `.worker-${taskId}.sh`;
     const scriptHostPath = join(tasksDir, scriptFileName);
     const hbContainerPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.hb`;
+    // Sprint 139: fsync_file helper ensures data hits disk before SIGKILL arrives.
+    // Uses dd + sync as POSIX-portable fsync (no Python/perl dependency in Alpine).
     const scriptContent = [
       '#!/bin/sh',
       `RFILE="${resultPath}"`,
       `HBFILE="${hbContainerPath}"`,
+      // POSIX-portable fsync: copy file to itself via dd conv=fsync
+      // This forces OS buffer cache → disk. Survives SIGKILL after return.
+      'fsync_file() { [ -f "$1" ] && dd if="$1" of="$1.fsync" bs=4096 conv=fsync 2>/dev/null && mv "$1.fsync" "$1" 2>/dev/null; }',
       // Ensure session-env exists (Claude CLI requires it)
       `mkdir -p "${containerHome}/.claude" 2>/dev/null || true`,
       `touch "${containerHome}/.claude/session-env" 2>/dev/null || true`,
-      // EXIT trap: guarantees .result file is ALWAYS written, even if Claude crashes
-      `trap '[ -f "$RFILE" ] || echo '"'"'${fallbackJson}'"'"' > "$RFILE"; kill $HB_PID 2>/dev/null' EXIT`,
+      // EXIT trap: guarantees .result file is ALWAYS written + fsync'd, even if Claude crashes
+      // Sprint 139: added fsync_file call to force disk write before container dies
+      `trap '[ -f "$RFILE" ] || echo '"'"'${fallbackJson}'"'"' > "$RFILE"; fsync_file "$RFILE"; fsync_file "$HBFILE"; kill $HB_PID 2>/dev/null' EXIT`,
+      // SIGTERM trap: on graceful stop, fsync .result immediately (before grace period expires)
+      `trap 'fsync_file "$RFILE"; fsync_file "$HBFILE"; exit 0' TERM`,
       // Heartbeat update loop (every 15s) — prevents false stale alerts
       `( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$SEQ,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$HBFILE"; done ) &`,
       'HB_PID=$!',
@@ -217,21 +228,24 @@ export class DockerSpawnBackend implements SpawnBackend {
   /**
    * Gracefully stop a running worker container.
    *
-   * Uses `docker stop --time=10` to send SIGTERM first, giving the worker
-   * 10 seconds to finalize heartbeat and clean up. After the grace period,
-   * Docker automatically sends SIGKILL as fallback.
+   * Sprint 139 fix: increased grace period from 10s to 15s and added post-stop
+   * result file verification. The sequence:
+   * 1. `docker stop --time=15` sends SIGTERM → worker's trap runs fsync_file
+   * 2. If .result exists after stop, verify it's readable (fsync confirmation)
+   * 3. If .result missing + non-zero exit, write fallback NO_GO result
+   * 4. Remove container
    *
-   * This fixes the Sprint 134 bug where `docker kill` (SIGKILL) caused
-   * exitCode 137 and 47 false "FAILED" heartbeat alerts.
+   * This closes the 5-sprint exit-137 bug: even if SIGKILL fires after 15s,
+   * the SIGTERM trap has already fsync'd .result to disk.
    */
   kill(taskId: string): void {
     const containerName = `${CONTAINER_PREFIX}${taskId}`;
-    debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=10)`);
+    debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=15)`);
 
     try {
-      // Graceful: SIGTERM + 10s grace period, then automatic SIGKILL fallback
-      const stopResult = spawnSync('docker', ['stop', '--time=10', containerName], {
-        encoding: 'utf-8', timeout: 15_000, // 15s > 10s grace to avoid race
+      // Graceful: SIGTERM + 15s grace period (Sprint 139: was 10s, now 15s)
+      const stopResult = spawnSync('docker', ['stop', '--time=15', containerName], {
+        encoding: 'utf-8', timeout: 20_000, // 20s > 15s grace to avoid race
       });
       if (stopResult.status !== 0) {
         // Fallback: force kill if stop failed (container may already be gone)
@@ -240,11 +254,35 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
     } catch (e) { debugLog('docker-backend:kill-error', e); }
 
+    // Post-stop verification: ensure .result was persisted to disk
+    this.verifyResultAfterStop(taskId);
+
     try {
       spawnSync('docker', ['rm', '-f', containerName], { encoding: 'utf-8', timeout: 10_000 });
     } catch (e) { debugLog('docker-backend:rm-error', e); }
 
     this.containers.delete(taskId);
+  }
+
+  /**
+   * Verify .result file exists and is readable after container stop.
+   * If the file exists, fsync it from host side as belt-and-suspenders.
+   * If missing, log a warning (monitorContainer EXIT trap should have written fallback).
+   */
+  private verifyResultAfterStop(taskId: string): void {
+    const resultPath = join(this.projectDir, TASKS_DIR, `task-${taskId}.result`);
+    try {
+      if (existsSync(resultPath)) {
+        // Belt-and-suspenders: fsync from host side to ensure container writes are flushed
+        const fd = openSync(resultPath, 'r');
+        try { fsyncSync(fd); } finally { closeSync(fd); }
+        debugLog('docker-backend:post-stop-verify', `taskId=${taskId} .result verified + fsynced`);
+      } else {
+        debugLog('docker-backend:post-stop-verify', `taskId=${taskId} .result MISSING after stop — EXIT trap should write fallback`);
+      }
+    } catch (e) {
+      debugLog('docker-backend:post-stop-verify-error', `taskId=${taskId} ${e}`);
+    }
   }
 
   /**
@@ -278,6 +316,16 @@ export class DockerSpawnBackend implements SpawnBackend {
       const exitCode = parseInt(data.toString().trim(), 10);
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
 
+      // Sprint 139: fsync .result from host side before reading
+      // Container's fsync_file trap may have run, but belt-and-suspenders from host
+      const resultPath = join(tasksDir, `task-${taskId}.result`);
+      try {
+        if (existsSync(resultPath)) {
+          const fd = openSync(resultPath, 'r');
+          try { fsyncSync(fd); } finally { closeSync(fd); }
+        }
+      } catch { /* fsync best-effort — continue with reconciliation */ }
+
       // Determine heartbeat status: check .result file for reconciliation
       // If .result exists with DONE/GO_WITH_TECH_DEBT, treat as DONE regardless of exitCode
       // This prevents false "FAILED exitCode 137" alerts when container was SIGKILL'd
@@ -286,7 +334,6 @@ export class DockerSpawnBackend implements SpawnBackend {
       let hbExitCode = exitCode;
 
       if (exitCode !== 0) {
-        const resultPath = join(tasksDir, `task-${taskId}.result`);
         try {
           if (existsSync(resultPath)) {
             const raw = readFileSync(resultPath, 'utf-8');
@@ -318,7 +365,6 @@ export class DockerSpawnBackend implements SpawnBackend {
       } catch (e) { debugLog('docker-backend:hb-update', e); }
 
       // If no .result file and exit != 0, write timeout marker
-      const resultPath = join(tasksDir, `task-${taskId}.result`);
       const timeoutPath = join(tasksDir, `task-${taskId}.timeout`);
       if (!existsSync(resultPath) && exitCode !== 0 && !existsSync(timeoutPath)) {
         writeFileSync(timeoutPath, `container_exit_${exitCode}`, 'utf-8');
@@ -343,12 +389,15 @@ export class DockerSpawnBackend implements SpawnBackend {
 
       this.containers.delete(taskId);
 
-      // Cleanup prompt + worker script files
+      // NOTE: .prompt-* files are intentionally NOT deleted here.
+      // Sprint 137 Alperen request: persist prompt files for analysis until sprint end.
+      // Prompt files are archived by archivePromptFiles() during sprint cleanup/finalize.
+      // Worker script (.worker-*.sh) files ARE cleaned up — they contain no useful debug info.
       try {
-        const tmpFiles = require('node:fs').readdirSync(tasksDir) as string[];
+        const tmpFiles = readdirSync(tasksDir) as string[];
         for (const f of tmpFiles) {
-          if ((f.startsWith('.prompt-') && f.endsWith('.txt')) || (f.startsWith('.worker-') && f.endsWith('.sh'))) {
-            // Only cleanup if no other container is running
+          if (f.startsWith('.worker-') && f.endsWith('.sh')) {
+            // Only cleanup worker scripts if no other container is running
             if (this.containers.size === 0) {
               try { unlinkSync(join(tasksDir, f)); } catch { /* ok */ }
             }
@@ -373,4 +422,71 @@ export function isDockerAvailable(): boolean {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   return result.status === 0;
+}
+
+// ─── Prompt File Archive ───────────────────────────────────────────────────
+
+/**
+ * Archive .prompt-* files from .tasks/ into .tasks/archive/sprint-{sprintId}/.
+ *
+ * Called during sprint finalize/cleanup — prompt files persist during the sprint
+ * for analysis, then are moved to the archive directory on completion.
+ *
+ * @param tasksDir  Absolute path to .tasks/ directory
+ * @param sprintId  Sprint identifier (e.g. "sprint-139")
+ * @param retentionSprints  How many past sprint archives to keep (default 5)
+ */
+export function archivePromptFiles(
+  tasksDir: string,
+  sprintId: string,
+  retentionSprints = 5,
+): { archived: number; cleaned: number } {
+  let archived = 0;
+  let cleaned = 0;
+
+  if (!existsSync(tasksDir)) return { archived, cleaned };
+
+  // Create archive directory for this sprint
+  const archiveDir = join(tasksDir, 'archive', sprintId);
+  mkdirSync(archiveDir, { recursive: true });
+
+  // Move all .prompt-* files to archive
+  try {
+    const files = readdirSync(tasksDir) as string[];
+    for (const f of files) {
+      if (f.startsWith('.prompt-') && f.endsWith('.txt')) {
+        const src = join(tasksDir, f);
+        const dst = join(archiveDir, f);
+        try {
+          renameSync(src, dst);
+          archived++;
+        } catch { /* skip files that can't be moved */ }
+      }
+    }
+  } catch { /* ok — tasksDir may be empty */ }
+
+  // Apply retention policy: remove old sprint archives beyond retentionSprints
+  if (retentionSprints > 0) {
+    const archiveRoot = join(tasksDir, 'archive');
+    try {
+      const sprintDirs = (readdirSync(archiveRoot) as string[])
+        .filter(d => d.startsWith('sprint-'))
+        .sort(); // alphabetical sort = chronological for sprint-NNN format
+      const toRemove = sprintDirs.slice(0, Math.max(0, sprintDirs.length - retentionSprints));
+      for (const dir of toRemove) {
+        const dirPath = join(archiveRoot, dir);
+        try {
+          // Remove all files in the old archive sprint dir
+          const oldFiles = readdirSync(dirPath) as string[];
+          for (const f of oldFiles) {
+            try { unlinkSync(join(dirPath, f)); cleaned++; } catch { /* ok */ }
+          }
+          // Remove the now-empty directory
+          rmdirSync(dirPath);
+        } catch { /* ok */ }
+      }
+    } catch { /* archive root may not exist yet */ }
+  }
+
+  return { archived, cleaned };
 }

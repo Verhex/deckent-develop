@@ -1,0 +1,51 @@
+{
+  "id": "138-001-xfix",
+  "title": "Cross-fix: ADR Governance Integration",
+  "description": "Cross-dependency fix: 138-005 (NO_GO) depends on 138-001",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Cross-dependency: 138-005 failed, may be caused by 138-001",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/scripts/",
+      "tests/orchestra/",
+      ".brain/",
+      "DECKENT.md/",
+      ".claude/rules/",
+      "scripts/",
+      "src/orchestra/task-builder.ts/",
+      "tests/orchestra/task-builder.test.ts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".brain/DECISIONS.md",
+      "DECKENT.md",
+      ".claude/rules/brain.md",
+      ".claude/rules/worker-default.md",
+      "src/orchestra/task-builder.ts",
+      "scripts/adr-validator.mjs",
+      "tests/scripts/adr-validator.test.ts",
+      "tests/orchestra/task-builder.test.ts",
+      "DECISIONS.md",
+      "brain.md",
+      "worker-default.md",
+      "CLAUDE.md",
+      ".json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `grep -c \"^\\*\\*Status:\\*\\*\" .brain/DECISIONS.md` → ≥36 (35 migrate + 1 yeni ADR-036); `grep \"^## ADR-005\" -A5 .brain/DECISIONS.md` → `Status: deprecated`",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-138",
+  "isPriorityFix": true,
+  "fixForTaskId": "138-001",
+  "createdAt": "2026-04-14T10:40:33.795Z",
+  "estimatedTokens": 10,
+  "updatedAt": "2026-04-14T10:50:38.611Z"
+}

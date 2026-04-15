@@ -6,7 +6,7 @@ import { DecisionOrchestrator } from '../../src/orchestra/decision-engine.js';
 import { PatternRecorder } from '../../src/orchestra/pattern-recorder.js';
 import type { LearningEntry } from '../../src/orchestra/pattern-recorder.js';
 import { PatternReader } from '../../src/orchestra/pattern-reader.js';
-import { CombinationScorer } from '../../src/orchestra/combination-scorer.js';
+
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { AgentPool } from '../../src/core/agent-types.js';
@@ -395,60 +395,6 @@ describe('Decision Engine Integration', () => {
     });
   });
 
-  // ─── CombinationScorer Integration ─────────────────────────────
-
-  describe('CombinationScorer Integration', () => {
-    it('scores a successful combination positively', () => {
-      const recorder = new PatternRecorder(tmpDir);
-      recorder.record(makeLearningEntry({ evaluation: 'DONE', coverage: 90 }));
-      recorder.record(makeLearningEntry({ evaluation: 'DONE', coverage: 85 }));
-      recorder.record(makeLearningEntry({ evaluation: 'DONE', coverage: 92 }));
-
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-
-      const result = scorer.score('security', 'security-auditor', ['security-specialist'], 'opus');
-      expect(result.score).toBeGreaterThan(0);
-      expect(result.recommendation).toBe('use');
-    });
-
-    it('scores a failed combination negatively', () => {
-      const recorder = new PatternRecorder(tmpDir);
-      recorder.record(makeLearningEntry({ evaluation: 'NO_GO', coverage: 10 }));
-      recorder.record(makeLearningEntry({ evaluation: 'NO_GO', coverage: 15 }));
-
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-
-      const result = scorer.score('security', 'security-auditor', ['security-specialist'], 'opus');
-      expect(result.score).toBeLessThan(0);
-      expect(result.recommendation).toBe('avoid');
-    });
-
-    it('returns neutral for unknown combination', () => {
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-
-      const result = scorer.score('security', 'unknown-agent', ['unknown-skill'], 'opus');
-      expect(result.recommendation).toBe('neutral');
-      expect(result.confidence).toBe(0);
-    });
-
-    it('confidence increases with sample size', () => {
-      const recorder = new PatternRecorder(tmpDir);
-      // Record 5 entries to get confidence = min(1, 5/5) = 1
-      for (let i = 0; i < 5; i++) {
-        recorder.record(makeLearningEntry({ evaluation: 'DONE', coverage: 90 }));
-      }
-
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-
-      const result = scorer.score('security', 'security-auditor', ['security-specialist'], 'opus');
-      expect(result.confidence).toBe(1);
-    });
-  });
-
   // ─── End-to-End: Decision + Learning + Scoring ────────────────
 
   describe('End-to-End: Decision -> Learning -> Scoring', () => {
@@ -483,15 +429,7 @@ describe('Decision Engine Integration', () => {
       const combos = reader.getSuccessfulCombinations('security');
       expect(combos.length).toBeGreaterThan(0);
 
-      // Step 4: Score the combination
-      const scorer = new CombinationScorer(reader);
-      const score = scorer.score(
-        decision.analysis.type,
-        decision.agent?.id ?? null,
-        decision.skills.map(s => s.id),
-        decision.model,
-      );
-      expect(score.score).toBeGreaterThan(0);
+      // Step 4: CombinationScorer removed (dead code audit Sprint 139)
     });
 
     it('decision for test task selects test-writer agent', () => {

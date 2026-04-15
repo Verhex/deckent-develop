@@ -92,5 +92,6 @@
   "lock_stale_threshold": 300,
   "claude_backend": "tmux",
   "rubric_max_retries": 0,
-  "max_workers": 4
+  "max_workers": 4,
+  "sprint_checkpoint_interval": 3
 }

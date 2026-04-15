@@ -1,5 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { archivePromptFiles } from '../../orchestra/spawn-backend-docker.js';
+import { cleanTasksArchive } from '../../orchestra/sprint-docs-updater.js';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
@@ -60,18 +62,20 @@ export function registerCleanup(program: Command): void {
         const locksDir = join(root, LOCKS_DIR);
         // A) Single readdirSync pass — eliminates double scan
         const allTaskFiles = existsSync(tasksDir) ? (readdirSync(tasksDir) as string[]) : [];
-        const taskFiles = allTaskFiles.filter(f => /\.(json|plan|hb|result|paused|log)$/.test(f));
+        const taskFiles = allTaskFiles.filter(f => /\.(json|plan|hb|result|paused|log|timeout)$/.test(f));
         const promptFiles = allTaskFiles.filter(f => f.startsWith('.prompt-'));
         const lockFiles = existsSync(locksDir) ? (readdirSync(locksDir) as string[]) : [];
 
+        print('[dry-run] Would archive:');
+        for (const f of promptFiles) print(`  prompt → archive: ${f}`);
         print('[dry-run] Would delete:');
         for (const f of taskFiles) print(`  task: ${f}`);
         for (const f of lockFiles) print(`  lock: ${f}`);
-        for (const f of promptFiles) print(`  prompt: ${f}`);
-        print(`  ${taskFiles.length} task file(s)`);
+        print(`  ${taskFiles.length} task file(s) (includes .log, .timeout artifacts)`);
         print(`  ${lockFiles.length} lock file(s)`);
-        print(`  ${promptFiles.length} prompt file(s)`);
+        print(`  ${promptFiles.length} prompt file(s) → archived to .tasks/archive/`);
         print('  tmux session: deckent-orchestra');
+        print('  .tasks/archive/ retention policy will be applied');
         print('\nRun without --dry-run to execute.');
         return;
       }
@@ -81,12 +85,14 @@ export function registerCleanup(program: Command): void {
         // Read memory config from project config (sync)
         let decayMemoryBudget = 900;
         let decayAfterSprints = 8;
+        let promptArchiveRetention = 5;
         try {
           const cfgPath = join(root, PROJECT_CONFIG_PATH);
           if (existsSync(cfgPath)) {
-            const rawCfg = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { memory_budget?: number; decay_after_sprints?: number };
+            const rawCfg = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { memory_budget?: number; decay_after_sprints?: number; prompt_archive_retention?: number };
             if (typeof rawCfg.memory_budget === 'number') decayMemoryBudget = rawCfg.memory_budget;
             if (typeof rawCfg.decay_after_sprints === 'number') decayAfterSprints = rawCfg.decay_after_sprints;
+            if (typeof rawCfg.prompt_archive_retention === 'number') promptArchiveRetention = rawCfg.prompt_archive_retention;
           }
         } catch { /* use defaults */ }
         if (opts.decay) {
@@ -168,6 +174,23 @@ export function registerCleanup(program: Command): void {
         };
 
         cleanup(root, sprint);
+
+        // E) Archive .prompt-* files to .tasks/archive/sprint-{id}/ before deleting
+        // Prompt files persist during sprint for analysis — archived on cleanup with retention policy
+        const archiveSprintId = sprintId ?? `sprint-${sprintNumber || Date.now()}`;
+        const archiveResult = archivePromptFiles(tasksDir, archiveSprintId, promptArchiveRetention);
+        if (archiveResult.archived > 0) {
+          print(`Archived ${archiveResult.archived} prompt file(s) → .tasks/archive/${archiveSprintId}/`);
+        }
+        if (archiveResult.cleaned > 0) {
+          print(`Removed ${archiveResult.cleaned} prompt file(s) from old archive (retention: ${promptArchiveRetention} sprints)`);
+        }
+
+        // F) Apply .tasks/archive/ retention policy — remove sprint archive dirs beyond retention limit
+        const tasksArchiveCleaned = cleanTasksArchive(root, promptArchiveRetention);
+        if (tasksArchiveCleaned > 0) {
+          print(`Removed ${tasksArchiveCleaned} old .tasks/archive/ dir(s) (retention: ${promptArchiveRetention} sprints)`);
+        }
 
         // C) Kill only this project's tmux session — not a hardcoded global name
         const sessionName = getProjectSessionName(root);

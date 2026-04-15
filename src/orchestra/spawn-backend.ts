@@ -59,6 +59,8 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
   autoApprove?: boolean;
   /** Log file path override (for subprocess backend) */
   logPath?: string;
+  /** Whether this is a fix/retry spawn — adds -fix suffix to prompt filename */
+  isPriorityFix?: boolean;
 }
 
 // ─── SpawnBackendError ────────────────────────────────────────────────────────

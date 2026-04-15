@@ -12,6 +12,7 @@ import {
   checkLocks,
   releaseAllLocks,
   clearStaleLocks,
+  clearOrphanLocks,
   LockError,
 } from '../../src/core/file-lock.js';
 
@@ -178,5 +179,58 @@ describe('file-lock', () => {
 
   it('should return 0 when no locks directory exists', () => {
     expect(clearStaleLocks(testRoot, 300_000)).toBe(0);
+  });
+
+  // ─── clearOrphanLocks ─────────────────────────────────────────
+
+  it('clearOrphanLocks: returns empty when no locks directory exists', () => {
+    const released = clearOrphanLocks(testRoot, new Set(['w-001']));
+    expect(released).toEqual([]);
+  });
+
+  it('clearOrphanLocks: returns empty when all locks belong to active workers', () => {
+    acquireLock(testRoot, 'src/a.ts', 'w-001', '001');
+    acquireLock(testRoot, 'src/b.ts', 'w-002', '002');
+
+    const released = clearOrphanLocks(testRoot, new Set(['w-001', 'w-002']));
+    expect(released).toEqual([]);
+    // Both locks still exist
+    expect(checkLock(testRoot, 'src/a.ts')).not.toBeNull();
+    expect(checkLock(testRoot, 'src/b.ts')).not.toBeNull();
+  });
+
+  it('clearOrphanLocks: releases locks for dead workers', () => {
+    acquireLock(testRoot, 'src/a.ts', 'w-001', '001');
+    acquireLock(testRoot, 'src/dead.ts', 'w-dead', 'dead-001');
+
+    // Only w-001 is active; w-dead is not
+    const released = clearOrphanLocks(testRoot, new Set(['w-001']));
+
+    expect(released).toHaveLength(1);
+    expect(released[0]).toBe('src/dead.ts');
+    // w-001's lock untouched
+    expect(checkLock(testRoot, 'src/a.ts')).not.toBeNull();
+    // w-dead's lock removed
+    expect(checkLock(testRoot, 'src/dead.ts')).toBeNull();
+  });
+
+  it('clearOrphanLocks: releases all locks when active set is empty', () => {
+    acquireLock(testRoot, 'src/x.ts', 'w-001', '001');
+    acquireLock(testRoot, 'src/y.ts', 'w-002', '002');
+
+    const released = clearOrphanLocks(testRoot, new Set());
+    expect(released).toHaveLength(2);
+    expect(checkLocks(testRoot)).toHaveLength(0);
+  });
+
+  it('clearOrphanLocks: skips corrupted lock files gracefully', () => {
+    // Create a corrupted lock file manually
+    const locksDir = join(testRoot, '.locks');
+    mkdirSync(locksDir, { recursive: true });
+    writeFileSync(join(locksDir, 'corrupt.lock'), 'not json', 'utf-8');
+
+    // Should not throw — corrupted file is skipped
+    const released = clearOrphanLocks(testRoot, new Set());
+    expect(released).toEqual([]);
   });
 });

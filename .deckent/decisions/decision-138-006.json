@@ -1,0 +1,39 @@
+{
+  "taskId": "138-006",
+  "sprintId": "sprint-138",
+  "steps": [
+    {
+      "step": 1,
+      "name": "routing-step-1",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Intent: bugfix (confidence: 0.67)"
+    },
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'bug-fixer' (score=12, rules=[rule(score=10)])"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 3 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {},
+      "output": {},
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [typescript-expert]"
+    }
+  ],
+  "decidedAt": "2026-04-14T09:56:52.637Z"
+}

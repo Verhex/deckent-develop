@@ -6,7 +6,7 @@ import { DecisionOrchestrator } from '../../src/orchestra/decision-engine.js';
 import { PatternRecorder } from '../../src/orchestra/pattern-recorder.js';
 import type { LearningEntry } from '../../src/orchestra/pattern-recorder.js';
 import { PatternReader } from '../../src/orchestra/pattern-reader.js';
-import { CombinationScorer } from '../../src/orchestra/combination-scorer.js';
+
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { AgentPool, AgentDefinition } from '../../src/core/agent-types.js';
@@ -448,20 +448,6 @@ describe('Error Recovery Integration', () => {
       const results = reader.queryPatterns({});
 
       expect(results).toEqual([]);
-    });
-
-    it('CombinationScorer handles corrupted learning data gracefully', () => {
-      // Write corrupt data
-      const learningDir = path.join(tmpDir, '.brain', 'learning');
-      fs.writeFileSync(path.join(learningDir, 'sprint-033.json'), 'not json at all', 'utf-8');
-
-      const reader = new PatternReader(tmpDir);
-      const scorer = new CombinationScorer(reader);
-
-      const result = scorer.score('code', null, [], 'sonnet');
-
-      expect(result.recommendation).toBe('neutral');
-      expect(result.confidence).toBe(0);
     });
 
     it('listSprints returns empty for corrupted learning directory', () => {

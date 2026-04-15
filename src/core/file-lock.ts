@@ -249,6 +249,38 @@ export function clearStaleLocks(
   return removed;
 }
 
+/**
+ * Release all locks whose owner worker ID is NOT in the given active worker set.
+ * Used during coordinator restart recovery to clean up locks from dead workers.
+ * Returns the list of released lock file paths.
+ */
+export function clearOrphanLocks(
+  projectRoot: string,
+  activeWorkerIds: Set<string>,
+): string[] {
+  const locksDir = join(projectRoot, LOCKS_DIR);
+  if (!existsSync(locksDir)) return [];
+
+  const files = readdirSync(locksDir).filter(f => f.endsWith('.lock'));
+  const released: string[] = [];
+
+  for (const file of files) {
+    const lockPath = join(locksDir, file);
+    try {
+      const lock = JSON.parse(readFileSync(lockPath, 'utf-8')) as LockInfo;
+      if (!activeWorkerIds.has(lock.ownerWorkerId)) {
+        unlinkSync(lockPath);
+        released.push(lock.filePath);
+        debugLog('file-lock:clearOrphanLocks', `Released orphan lock: ${lock.filePath} (dead worker: ${lock.ownerWorkerId})`);
+      }
+    } catch {
+      // Skip corrupted or already-deleted lock files
+    }
+  }
+
+  return released;
+}
+
 // ─── Observability Wrapper ───────────────────────────────────────
 
 /**

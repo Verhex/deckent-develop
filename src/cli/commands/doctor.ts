@@ -877,6 +877,49 @@ export function runDoctorChecks(root: string, providerNames?: string[], spawnBac
   };
 }
 
+export interface PreFlightCheckResult {
+  name: string;
+  passed: boolean;
+  required: boolean;
+  message: string;
+  durationMs?: number;
+}
+
+export interface PreFlightResult {
+  passed: boolean;
+  abortSprint: boolean;
+  checks: PreFlightCheckResult[];
+}
+
+/**
+ * Run pre-flight health check by invoking the pre-flight script as a child process.
+ * Returns structured result suitable for --json output or spawn-gate decisions.
+ */
+export function runPreFlightHealthCheck(root: string): PreFlightResult {
+  // Resolve script path relative to project root (works at both dev and dist time)
+  const scriptPath = join(root, 'scripts', 'pre-flight-health-check.mjs');
+
+  const result = spawnSync('node', [scriptPath, '--json', '--root', root, '--skip-tests'], {
+    encoding: 'utf-8',
+    cwd: root,
+    timeout: 120_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const output = result.stdout?.trim() ?? '';
+  if (output) {
+    try {
+      return JSON.parse(output) as PreFlightResult;
+    } catch { /* fall through to fallback */ }
+  }
+  // Fallback: parse basic doctor checks
+  const doctorResult = runDoctorChecks(root);
+  return {
+    passed: doctorResult.ok,
+    abortSprint: !doctorResult.ok,
+    checks: doctorResult.checks.map(c => ({ name: c.name, passed: c.passed, required: c.required, message: c.message })),
+  };
+}
+
 export function registerDoctor(program: Command): void {
   program
     .command('doctor')
@@ -884,7 +927,8 @@ export function registerDoctor(program: Command): void {
     .option('--profile', 'Show system profile information')
     .option('--legacy', 'Use legacy output format')
     .option('--json', 'Output results as JSON')
-    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean }) => {
+    .option('--pre-flight', 'Run pre-flight health check before sprint spawn (stricter gates)')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -904,6 +948,35 @@ export function registerDoctor(program: Command): void {
         }
       } catch { /* use default */ }
       const result = runDoctorChecks(root, activeProviderNames, spawnBackend);
+
+      // --pre-flight: run extended pre-flight check and exit with abort signal
+      if (opts.preFlight) {
+        const preFlightResult = runPreFlightHealthCheck(root);
+        if (opts.json) {
+          print(JSON.stringify(preFlightResult, null, 2));
+          process.exitCode = preFlightResult.abortSprint ? 1 : 0;
+          return;
+        }
+        // Human-readable pre-flight output
+        print('\nPre-flight Health Check');
+        print('─'.repeat(50));
+        for (const check of preFlightResult.checks) {
+          const icon = check.passed ? '[PASS]' : (check.required ? '[FAIL]' : '[WARN]');
+          const dur = check.durationMs != null ? ` (${check.durationMs}ms)` : '';
+          print(`${icon} ${check.name}: ${check.message}${dur}`);
+        }
+        print('─'.repeat(50));
+        if (preFlightResult.abortSprint) {
+          const failedCount = preFlightResult.checks.filter(c => c.required && !c.passed).length;
+          print(`\nPre-flight FAILED — ${failedCount} required check(s) failed. Sprint aborted.`);
+          process.exitCode = 1;
+        } else {
+          const warnCount = preFlightResult.checks.filter(c => !c.passed).length;
+          const warnNote = warnCount > 0 ? ` (${warnCount} warning(s))` : '';
+          print(`\nPre-flight PASSED${warnNote} — sprint can proceed.`);
+        }
+        return;
+      }
 
       if (opts.json) {
         const jsonOutput: Record<string, unknown> = {
