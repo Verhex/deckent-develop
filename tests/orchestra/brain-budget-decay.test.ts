@@ -85,184 +85,151 @@ function makeDebtItem(overrides: Partial<DebtItem> = {}): DebtItem {
 // ─── archiveResolvedDebt ─────────────────────────────────────────────
 
 describe('archiveResolvedDebt', () => {
+  // archiveResolvedDebt now uses MemoryStore DB instead of file I/O.
+  // It opens the store, queries getByType('debt'), filters resolved entries,
+  // and returns the count of resolved entries.
+
+  /** Helper: make existsSync return true for the memory.db path */
+  function enableMemoryDb(): void {
+    vi.mocked(existsSync).mockImplementation((p: unknown) =>
+      String(p).includes('memory.db') ? true : false,
+    );
+  }
+
+  /** Helper: make a MemoryEntryV2-like row for getByType results */
+  function makeDbDebtEntry(id: string, status: 'active' | 'resolved'): Record<string, unknown> {
+    return {
+      id, type: 'debt', title: id, content: '', source: 'test',
+      status, priority: 'normal', sprint_id: null, sprint_num: 0,
+      metadata: '{}', tag_text: '', summary: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    };
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
     vi.mocked(existsSync).mockReturnValue(false);
   });
 
-  it('returns 0 when DEBT.md is empty/missing', () => {
+  it('returns 0 when DB is missing', () => {
+    // existsSync returns false → getMemoryStore returns null → 0
     const count = archiveResolvedDebt('/root');
     expect(count).toBe(0);
-    expect(writeFileSync).not.toHaveBeenCalled();
   });
 
   it('returns 0 when no resolved items exist', () => {
-    const items = [
-      makeDebtItem({ id: 'debt-001', resolved: false }),
-      makeDebtItem({ id: 'debt-002', resolved: false }),
-    ];
-    vi.mocked(readFileSync).mockReturnValue(generateDebtTable(items));
+    enableMemoryDb();
+    mockMemStore.getByType.mockReturnValue([
+      makeDbDebtEntry('debt-001', 'active'),
+      makeDbDebtEntry('debt-002', 'active'),
+    ]);
     const count = archiveResolvedDebt('/root');
     expect(count).toBe(0);
-    expect(writeFileSync).not.toHaveBeenCalled();
   });
 
-  it('archives all resolved items and returns count', () => {
-    const items = [
-      makeDebtItem({ id: 'debt-001', resolved: true, resolvedInSprintId: 'sprint-059' }),
-      makeDebtItem({ id: 'debt-002', resolved: true, resolvedInSprintId: 'sprint-060' }),
-      makeDebtItem({ id: 'debt-003', resolved: false }),
-    ];
-    vi.mocked(readFileSync).mockReturnValue(generateDebtTable(items));
+  it('returns count of all resolved items', () => {
+    enableMemoryDb();
+    mockMemStore.getByType.mockReturnValue([
+      makeDbDebtEntry('debt-001', 'resolved'),
+      makeDbDebtEntry('debt-002', 'resolved'),
+      makeDbDebtEntry('debt-003', 'active'),
+    ]);
 
     const count = archiveResolvedDebt('/root');
     expect(count).toBe(2);
-
-    // Should have written archive and updated DEBT.md
-    const writeCalls = vi.mocked(writeFileSync).mock.calls;
-    expect(writeCalls.length).toBe(2);
-
-    // Archive write: contains all resolved items
-    const archiveWrite = writeCalls.find(c => (c[0] as string).includes('DEBT-ARCHIVE'));
-    expect(archiveWrite).toBeDefined();
-    const archived = parseDebtTable(archiveWrite![1] as string);
-    expect(archived).toHaveLength(2);
-    expect(archived.map(d => d.id)).toContain('debt-001');
-    expect(archived.map(d => d.id)).toContain('debt-002');
   });
 
-  it('keeps only open items in DEBT.md after archiving', () => {
-    const items = [
-      makeDebtItem({ id: 'debt-open', resolved: false }),
-      makeDebtItem({ id: 'debt-resolved', resolved: true, resolvedInSprintId: 'sprint-059' }),
-    ];
-    vi.mocked(readFileSync).mockReturnValue(generateDebtTable(items));
-
-    archiveResolvedDebt('/root');
-
-    const writeCalls = vi.mocked(writeFileSync).mock.calls;
-    const debtWrite = writeCalls.find(c => (c[0] as string).includes('DEBT.md'));
-    expect(debtWrite).toBeDefined();
-    const remaining = parseDebtTable(debtWrite![1] as string);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]!.id).toBe('debt-open');
-    expect(remaining[0]!.resolved).toBe(false);
-  });
-
-  it('merges with existing DEBT-ARCHIVE.md without duplicates', () => {
-    const existingArchived = [
-      makeDebtItem({ id: 'debt-old', resolved: true, resolvedInSprintId: 'sprint-050' }),
-    ];
-    const currentDebt = [
-      makeDebtItem({ id: 'debt-new', resolved: true, resolvedInSprintId: 'sprint-060' }),
-      makeDebtItem({ id: 'debt-old', resolved: true, resolvedInSprintId: 'sprint-050' }), // duplicate
-    ];
-
-    vi.mocked(existsSync).mockImplementation((p: unknown) =>
-      String(p).includes('DEBT-ARCHIVE') ? true : false,
-    );
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      if (String(p).includes('DEBT-ARCHIVE')) return generateDebtTable(existingArchived);
-      if (String(p).includes('DEBT.md')) return generateDebtTable(currentDebt);
-      throw new Error('ENOENT');
-    });
+  it('returns 0 when DB has only active debt', () => {
+    enableMemoryDb();
+    mockMemStore.getByType.mockReturnValue([
+      makeDbDebtEntry('debt-open', 'active'),
+    ]);
 
     const count = archiveResolvedDebt('/root');
-    expect(count).toBe(2); // both resolved items counted
-
-    const archiveWrite = vi.mocked(writeFileSync).mock.calls.find(c =>
-      (c[0] as string).includes('DEBT-ARCHIVE'),
-    );
-    expect(archiveWrite).toBeDefined();
-    const archived = parseDebtTable(archiveWrite![1] as string);
-    // Only 2 unique items (deduplication of 'debt-old')
-    expect(archived).toHaveLength(2);
-    const ids = archived.map(d => d.id);
-    expect(ids).toContain('debt-old');
-    expect(ids).toContain('debt-new');
+    expect(count).toBe(0);
   });
 
-  it('creates archive directory if it does not exist', () => {
-    const items = [
-      makeDebtItem({ id: 'debt-001', resolved: true, resolvedInSprintId: 'sprint-059' }),
-    ];
-    vi.mocked(readFileSync).mockReturnValue(generateDebtTable(items));
-    vi.mocked(existsSync).mockReturnValue(false);
-
-    archiveResolvedDebt('/root');
-
-    expect(mkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('archive'),
-      expect.objectContaining({ recursive: true }),
-    );
-  });
-
-  it('handles all resolved items (empty DEBT.md after archive)', () => {
-    const items = [
-      makeDebtItem({ id: 'debt-001', resolved: true, resolvedInSprintId: 'sprint-059' }),
-      makeDebtItem({ id: 'debt-002', resolved: true, resolvedInSprintId: 'sprint-059' }),
-    ];
-    vi.mocked(readFileSync).mockReturnValue(generateDebtTable(items));
+  it('counts resolved entries correctly with mixed statuses', () => {
+    enableMemoryDb();
+    mockMemStore.getByType.mockReturnValue([
+      makeDbDebtEntry('debt-new', 'resolved'),
+      makeDbDebtEntry('debt-old', 'resolved'),
+      makeDbDebtEntry('debt-active', 'active'),
+    ]);
 
     const count = archiveResolvedDebt('/root');
     expect(count).toBe(2);
+  });
 
-    const debtWrite = vi.mocked(writeFileSync).mock.calls.find(c =>
-      (c[0] as string).includes('DEBT.md'),
-    );
-    expect(debtWrite).toBeDefined();
-    // Empty table (no data rows)
-    const remaining = parseDebtTable(debtWrite![1] as string);
-    expect(remaining).toHaveLength(0);
+  it('closes the store after querying', () => {
+    enableMemoryDb();
+    mockMemStore.getByType.mockReturnValue([
+      makeDbDebtEntry('debt-001', 'resolved'),
+    ]);
+
+    archiveResolvedDebt('/root');
+
+    expect(mockMemStore.close).toHaveBeenCalled();
+  });
+
+  it('handles all resolved items (returns full count)', () => {
+    enableMemoryDb();
+    mockMemStore.getByType.mockReturnValue([
+      makeDbDebtEntry('debt-001', 'resolved'),
+      makeDbDebtEntry('debt-002', 'resolved'),
+    ]);
+
+    const count = archiveResolvedDebt('/root');
+    expect(count).toBe(2);
   });
 });
 
 // ─── runDecay with archiveResolvedDebt ──────────────────────────────
 
-describe('runDecay — archiveResolvedDebt integration', () => {
+describe('runDecay — MemoryStore DB integration', () => {
+  // runDecay now uses MemoryStore DB. It opens the store, checks totalCount
+  // against the budget, calls store.decay() if over budget or force=true,
+  // and returns { linesBefore, linesAfter, removedDebtCount: 0, ... }.
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(countBrainLines).mockReturnValue(700); // over budget
+    vi.mocked(countBrainLines).mockReturnValue(700);
     vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
     vi.mocked(existsSync).mockReturnValue(false);
   });
 
-  it('archives resolved debt during decay run', () => {
-    const items = [
-      makeDebtItem({ id: 'debt-resolved', resolved: true, resolvedInSprintId: 'sprint-059' }),
-      makeDebtItem({ id: 'debt-open', resolved: false }),
-    ];
+  it('calls store.decay when force=true and returns counts', () => {
+    // Enable DB path
     vi.mocked(existsSync).mockImplementation((p: unknown) =>
-      String(p).includes('DEBT.md') ? false : false, // no archive yet
+      String(p).includes('memory.db') ? true : false,
     );
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      if (String(p).includes('DEBT.md') && !String(p).includes('ARCHIVE')) {
-        return generateDebtTable(items);
-      }
-      throw new Error('ENOENT');
-    });
+    mockMemStore.totalCount
+      .mockReturnValueOnce(100)  // totalBefore
+      .mockReturnValueOnce(80);  // totalAfter
+    mockMemStore.decay.mockReturnValue(undefined);
 
     const result = runDecay('/root', 'sprint-061', { force: true });
 
-    expect(result.removedDebtCount).toBe(1);
-    // Archive write should have happened
-    const archiveWrite = vi.mocked(writeFileSync).mock.calls.find(c =>
-      (c[0] as string).includes('DEBT-ARCHIVE'),
-    );
-    expect(archiveWrite).toBeDefined();
+    expect(mockMemStore.decay).toHaveBeenCalledWith(61, 8); // sprintNum=61, default decaySprints=8
+    expect(result.linesBefore).toBe(100);
+    expect(result.linesAfter).toBe(80);
+    expect(result.removedDebtCount).toBe(0); // DB decay doesn't separately track debt removal
   });
 
-  it('returns removedDebtCount=0 when no resolved debt', () => {
-    const items = [makeDebtItem({ id: 'debt-open', resolved: false })];
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      if (String(p).includes('DEBT.md') && !String(p).includes('ARCHIVE')) {
-        return generateDebtTable(items);
-      }
-      throw new Error('ENOENT');
-    });
+  it('skips decay when under budget and force=false', () => {
+    vi.mocked(existsSync).mockImplementation((p: unknown) =>
+      String(p).includes('memory.db') ? true : false,
+    );
+    mockMemStore.totalCount.mockReturnValue(50); // under budget (default 900)
 
-    const result = runDecay('/root', 'sprint-061', { force: true });
+    const result = runDecay('/root', 'sprint-061');
+
+    expect(mockMemStore.decay).not.toHaveBeenCalled();
+    expect(result.linesBefore).toBe(50);
+    expect(result.linesAfter).toBe(50);
     expect(result.removedDebtCount).toBe(0);
   });
 });

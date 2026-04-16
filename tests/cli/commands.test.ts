@@ -99,6 +99,16 @@ vi.mock('../../src/core/plugin.js', () => ({
   },
 }));
 
+// ── MemoryStore mock for DB-first doctor checks ─────────────────────
+const mockCmdMemStore = {
+  totalCount: vi.fn().mockReturnValue(0),
+  getByType: vi.fn().mockReturnValue([]),
+  close: vi.fn(),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockCmdMemStore),
+}));
+
 // ─── Static Imports (after mocks) ──────────────────────────────────
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
@@ -290,7 +300,16 @@ describe('doctor command', () => {
 
   it('reports brain budget over limit', async () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
-    vi.mocked(countBrainLines).mockReturnValue(950);
+    // DB-first: existsSync must return true for the memory.db path so
+    // getMemoryEntryCount opens the store, and totalCount returns 950.
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      const s = String(p);
+      if (s.includes('memory.db')) return true;
+      // Return true for workspace/.deckent checks so doctor doesn't fail earlier
+      if (s.includes('.deckent') || s.includes('.brain') || s.includes('DIRECTIVES')) return true;
+      return false;
+    });
+    mockCmdMemStore.totalCount.mockReturnValue(950);
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('950/900');
     expect(stdout()).toContain('OVER BUDGET');
