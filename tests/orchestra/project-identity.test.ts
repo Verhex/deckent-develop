@@ -358,21 +358,19 @@ describe('Decay exclusion (PROJECT-IDENTITY.md is never decayed)', () => {
 });
 
 describe('readContext includes projectIdentity', () => {
-  it('should load projectIdentity from PROJECT-IDENTITY.md', async () => {
-    // readContext is in sprint-controller.ts — we test it via integration
+  it('should load projectIdentity from DB when memory.db exists', async () => {
     const { readContext } = await import('../../src/orchestra/sprint-controller.js');
+    const { MemoryStore } = await import('../../src/core/memory-store.js');
     const root = makeTmpRoot();
 
-    // Create required files
     writeFileSync(join(root, 'DIRECTIVES.md'), '# Test', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'MEMORY.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'RETRO.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'PATTERNS.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'DECISIONS.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'DEBT.md'), '', 'utf-8');
 
+    // Create real DB with identity entry
+    const dbPath = join(root, BRAIN_DIR, 'memory.db');
+    const store = new MemoryStore(dbPath);
     const identityContent = generateProjectIdentity({ projectName: 'ctx-test', sprintId: 'sprint-003' });
-    writeFileSync(join(root, BRAIN_DIR, PROJECT_IDENTITY_FILE), identityContent, 'utf-8');
+    store.insert({ id: 'identity-1', type: 'identity', title: 'Project Identity', content: identityContent, source: 'brain', status: 'active', priority: 'normal', tags: [] });
+    store.close();
 
     const context = readContext(root);
     expect(context.projectIdentity).toContain('ctx-test');
@@ -381,19 +379,20 @@ describe('readContext includes projectIdentity', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('should return empty string when PROJECT-IDENTITY.md missing', async () => {
+  it('should return undefined when no identity entry in DB', async () => {
     const { readContext } = await import('../../src/orchestra/sprint-controller.js');
+    const { MemoryStore } = await import('../../src/core/memory-store.js');
     const root = makeTmpRoot();
 
     writeFileSync(join(root, 'DIRECTIVES.md'), '# Test', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'MEMORY.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'RETRO.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'PATTERNS.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'DECISIONS.md'), '', 'utf-8');
-    writeFileSync(join(root, BRAIN_DIR, 'DEBT.md'), '', 'utf-8');
+
+    // Create empty DB (no identity entry)
+    const dbPath = join(root, BRAIN_DIR, 'memory.db');
+    const store = new MemoryStore(dbPath);
+    store.close();
 
     const context = readContext(root);
-    expect(context.projectIdentity).toBe('');
+    expect(context.projectIdentity).toBeUndefined();
 
     rmSync(root, { recursive: true, force: true });
   });

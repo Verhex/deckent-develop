@@ -28,9 +28,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
-vi.mock('../../../src/core/utils.js', () => ({
-  countBrainLines: vi.fn().mockReturnValue(50),
-}));
+vi.mock('../../../src/core/utils.js', () => ({}));
 
 vi.mock('../../../src/core/system-profile.js', () => ({
   getSystemProfile: vi.fn().mockReturnValue({
@@ -84,6 +82,16 @@ vi.mock('../../../src/core/constants.js', () => ({
   DEBT_TABLE_HEADER: '| ID',
   PROJECT_CONFIG_PATH: '.deckent/config.json',
   BRAIN_TOTAL_LINE_BUDGET: 600,
+  MEMORY_DB_FILE: 'memory.db',
+}));
+
+const mockMemoryStore = {
+  totalCount: vi.fn().mockReturnValue(50),
+  getByType: vi.fn().mockReturnValue([]),
+  close: vi.fn(),
+};
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemoryStore),
 }));
 
 import { readFileSync, existsSync, readdirSync, accessSync } from 'node:fs';
@@ -91,7 +99,7 @@ import { spawnSync } from 'node:child_process';
 import { platform } from 'node:os';
 import { print, formatDoctorResult } from '../../../src/cli/helpers/output.js';
 import { resolveProjectRoot } from '../../../src/cli/helpers/process.js';
-import { countBrainLines } from '../../../src/core/utils.js';
+// countBrainLines removed — doctor.ts now uses MemoryStore
 import { getSystemProfile } from '../../../src/core/system-profile.js';
 import { detectSubscription } from '../../../src/core/subscription.js';
 import {
@@ -136,7 +144,7 @@ describe('registerDoctor', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('# Directives content' as unknown as ReturnType<typeof readFileSync>);
   });
 
@@ -214,7 +222,7 @@ describe('runDoctorChecks', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('# Directives content' as unknown as ReturnType<typeof readFileSync>);
   });
 
@@ -341,7 +349,7 @@ describe('formatDoctorResult (output.ts helper)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue('content' as unknown as ReturnType<typeof readFileSync>);
-    vi.mocked(countBrainLines).mockReturnValue(100);
+    mockMemoryStore.totalCount.mockReturnValue(100);
     const result = runDoctorChecks('/mock/root');
     for (const check of result.checks) {
       expect(check).toHaveProperty('name');
@@ -359,7 +367,7 @@ describe('formatDoctorResult (output.ts helper)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue('content' as unknown as ReturnType<typeof readFileSync>);
-    vi.mocked(countBrainLines).mockReturnValue(100);
+    mockMemoryStore.totalCount.mockReturnValue(100);
     const result = runDoctorChecks('/mock/root');
     const tmuxCheck = result.checks.find(c => c.name === 'tmux');
     expect(tmuxCheck!.passed).toBe(false);
@@ -374,7 +382,7 @@ describe('formatDoctorResult (output.ts helper)', () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue('content' as unknown as ReturnType<typeof readFileSync>);
-    vi.mocked(countBrainLines).mockReturnValue(100);
+    mockMemoryStore.totalCount.mockReturnValue(100);
     const result = runDoctorChecks('/mock/root');
     const gitCheck = result.checks.find(c => c.name === 'git');
     expect(gitCheck!.passed).toBe(true);
@@ -444,7 +452,7 @@ describe('--profile flag', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
   });
 
@@ -496,7 +504,7 @@ describe('error handling', () => {
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('content' as unknown as ReturnType<typeof readFileSync>);
   });
 
@@ -556,7 +564,7 @@ describe('error handling', () => {
 
   it('brain budget over 900 — check passes=false with decay hint', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
-    vi.mocked(countBrainLines).mockReturnValue(950);
+    mockMemoryStore.totalCount.mockReturnValue(950);
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Brain Budget');
     expect(check!.passed).toBe(false);
@@ -573,7 +581,7 @@ describe('exit code', () => {
     vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
   });
 
@@ -607,7 +615,7 @@ describe('i18n integration', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
   });
 
@@ -751,7 +759,7 @@ describe('checkPlatform', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
     const result = runDoctorChecks('/mock/root');
     // Platform check is not required — ok still true when other required checks pass
@@ -2065,7 +2073,7 @@ describe('runDoctorChecks - includes new checks', () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 1, signal: null, output: [] } as ReturnType<typeof spawnSync>);
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
-    vi.mocked(countBrainLines).mockReturnValue(50);
+    mockMemoryStore.totalCount.mockReturnValue(50);
     vi.mocked(readFileSync).mockReturnValue('# Directives content' as unknown as ReturnType<typeof readFileSync>);
     vi.mocked(accessSync).mockReturnValue(undefined);
     vi.mocked(isDeckFileCommitted).mockReturnValue(false);

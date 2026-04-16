@@ -11,6 +11,23 @@ vi.mock('node:fs', () => ({
   statSync: vi.fn().mockReturnValue({ size: 0 }),
 }));
 
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
+  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
+  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
+}));
+
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { registerArchiveDebt } from '../../../src/cli/commands/archive-debt.js';
 
@@ -62,6 +79,9 @@ async function runCommand(): Promise<string> {
 describe('archive-debt command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset MemoryStore mock to default empty returns
+    mockMemStore.getByType.mockReturnValue([]);
+    mockMemStore.getById.mockReturnValue(null);
     captureOutput();
   });
 
@@ -120,7 +140,7 @@ describe('archive-debt command', () => {
       makeRow('debt-002', 'Remove me', 'true', 'sprint-002'),
       makeRow('debt-003', 'Keep me too', 'false'),
     ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     await runCommand();
@@ -140,7 +160,7 @@ describe('archive-debt command', () => {
       makeRow('debt-001', 'Unresolved', 'false'),
       makeRow('debt-002', 'Resolved', 'true', 'sprint-003'),
     ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     const output = await runCommand();
@@ -158,7 +178,7 @@ describe('archive-debt command', () => {
       makeRow('debt-002', 'Resolved 2', 'true', 'sprint-003'),
       makeRow('debt-003', 'Active', 'false'),
     ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     const output = await runCommand();
@@ -175,7 +195,7 @@ describe('archive-debt command', () => {
       makeRow('debt-001', 'Resolved 1', 'true', 'sprint-002'),
       makeRow('debt-002', 'Resolved 2', 'true', 'sprint-003'),
     ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     const output = await runCommand();
@@ -195,7 +215,7 @@ describe('archive-debt command', () => {
 
   it('creates archive file with table header when it does not exist', async () => {
     const content = buildDebtContent([makeRow('debt-001', 'Resolved', 'true', 'sprint-002')]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     await runCommand();
@@ -208,8 +228,8 @@ describe('archive-debt command', () => {
 
   it('does not recreate archive header when file already exists', async () => {
     const content = buildDebtContent([makeRow('debt-001', 'Resolved', 'true', 'sprint-002')]);
-    // Both DEBT.md and DEBT-ARCHIVE.md exist
-    mockExistsSync.mockReturnValue(true);
+    // Both DEBT.md and DEBT-ARCHIVE.md exist, but not memory.db (use file fallback)
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     await runCommand();
@@ -222,7 +242,7 @@ describe('archive-debt command', () => {
 
   it('creates archive directory with recursive flag', async () => {
     const content = buildDebtContent([makeRow('debt-001', 'Resolved', 'true', 'sprint-002')]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     await runCommand();
@@ -240,7 +260,7 @@ describe('archive-debt command', () => {
       '| debt-bad | Only two cols |',
       makeRow('debt-001', 'Resolved', 'true', 'sprint-002'),
     ]);
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     const output = await runCommand();
@@ -253,7 +273,7 @@ describe('archive-debt command', () => {
       SEPARATOR,
       makeRow('debt-001', 'Resolved', 'true', 'sprint-002'),
     ].join('\n');
-    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE'));
+    mockExistsSync.mockImplementation((p: unknown) => !String(p).includes('DEBT-ARCHIVE') && !String(p).includes('memory.db'));
     mockReadFileSync.mockReturnValue(content);
 
     const output = await runCommand();

@@ -17,8 +17,14 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn().mockReturnValue({ status: 0 }),
 }));
 
-vi.mock('../../../src/core/utils.js', () => ({
-  countBrainLines: vi.fn().mockReturnValue(100),
+vi.mock('../../../src/core/utils.js', () => ({}));
+
+const mockCleanupMemStore = {
+  totalCount: vi.fn().mockReturnValue(100),
+  close: vi.fn(),
+};
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockCleanupMemStore),
 }));
 
 vi.mock('../../../src/orchestra/brain.js', () => ({
@@ -49,7 +55,7 @@ import { cleanup, runDecay } from '../../../src/orchestra/brain.js';
 import { archivePromptFiles } from '../../../src/orchestra/spawn-backend-docker.js';
 import { cleanTasksArchive } from '../../../src/orchestra/sprint-docs-updater.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
-import { countBrainLines } from '../../../src/core/utils.js';
+// countBrainLines removed — cleanup.ts now uses MemoryStore
 import { registerCleanup } from '../../../src/cli/commands/cleanup.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -184,9 +190,9 @@ describe('cleanup command (isolated)', () => {
 
   // Budget warning after cleanup
   it('shows budget warning when .brain/ exceeds budget after cleanup', async () => {
-    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('memory.db'));
     vi.mocked(cleanup).mockImplementation(() => {});
-    vi.mocked(countBrainLines).mockReturnValue(1000); // over 900 budget
+    mockCleanupMemStore.totalCount.mockReturnValue(1000); // over 900 budget
     await runCommand(['cleanup']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('deckent cleanup --decay'))).toBe(true);
@@ -195,7 +201,7 @@ describe('cleanup command (isolated)', () => {
   it('does not show budget warning when .brain/ is within budget', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(cleanup).mockImplementation(() => {});
-    vi.mocked(countBrainLines).mockReturnValue(400); // under 900 budget
+    mockCleanupMemStore.totalCount.mockReturnValue(400); // under 900 budget
     await runCommand(['cleanup']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.some(c => String(c).includes('deckent cleanup --decay'))).toBe(false);

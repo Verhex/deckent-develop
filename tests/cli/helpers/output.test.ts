@@ -13,11 +13,26 @@ import {
 import type { HumanStatusInput } from '../../../src/cli/helpers/output.js';
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from '../../../src/core/types.js';
 import type { DashboardState, DoctorResult, Sprint, AgentRole, Task } from '../../../src/core/types.js';
-import { countBrainLines } from '../../../src/core/utils.js';
-
-vi.mock('../../../src/core/utils.js', () => ({
-  countBrainLines: vi.fn(),
+// countBrainLines removed — output.ts now uses MemoryStore
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn().mockImplementation((p: unknown) => {
+      // Return true for memory.db path so MemoryStore mock is used
+      if (String(p).includes('memory.db')) return true;
+      return actual.existsSync(p as string);
+    }),
+  };
+});
+const mockOutputMemStore = {
+  totalCount: vi.fn().mockReturnValue(0),
+  close: vi.fn(),
+};
+vi.mock('../../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockOutputMemStore),
 }));
+vi.mock('../../../src/core/utils.js', () => ({}));
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -598,28 +613,28 @@ describe('formatHumanStatus — stale dashboard warning', () => {
 
 // ─── formatHumanStatus — budget check via countBrainLines (C) ────────
 
-describe('formatHumanStatus — budget check via countBrainLines', () => {
+describe('formatHumanStatus — budget check via MemoryStore', () => {
   beforeEach(() => {
-    vi.mocked(countBrainLines).mockReset();
+    mockOutputMemStore.totalCount.mockReset();
   });
 
-  it('shows Budget OK when lines are below warning zone', () => {
-    vi.mocked(countBrainLines).mockReturnValue(300);
+  it('shows Budget OK when entries are below warning zone', () => {
+    mockOutputMemStore.totalCount.mockReturnValue(300);
     const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
     const result = formatHumanStatus(input);
     expect(result).toContain('Budget: 300/600 lines (OK)');
   });
 
-  it('shows Budget warning percentage when lines exceed 80% of max', () => {
-    vi.mocked(countBrainLines).mockReturnValue(500); // 500 > 480 (600 * 0.8)
+  it('shows Budget warning percentage when entries exceed 80% of max', () => {
+    mockOutputMemStore.totalCount.mockReturnValue(500); // 500 > 480 (600 * 0.8)
     const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
     const result = formatHumanStatus(input);
     expect(result).toContain('500/600 lines');
     expect(result).toMatch(/\d+%/);
   });
 
-  it('shows Budget OVER with cleanup hint when lines exceed max', () => {
-    vi.mocked(countBrainLines).mockReturnValue(650); // 650 > 600
+  it('shows Budget OVER with cleanup hint when entries exceed max', () => {
+    mockOutputMemStore.totalCount.mockReturnValue(650); // 650 > 600
     const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
     const result = formatHumanStatus(input);
     expect(result).toContain('OVER');

@@ -45,6 +45,23 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   };
 });
 
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
+  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
+  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
+}));
+
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { countBrainLines, parseDebtTable, generateDebtTable } from '../../src/core/utils.js';
 import { archiveResolvedDebt, runDecay } from '../../src/orchestra/debt-manager.js';

@@ -12,10 +12,19 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
 }));
 
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn(), upsert: vi.fn(), softDelete: vi.fn(),
+  totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]),
+  restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
 vi.mock('../../../src/core/memory-store.js', () => ({
-  MemoryStore: class MockMemoryStore {
-    constructor() { throw new Error('mock: no DB in tests'); }
-  },
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -90,6 +99,9 @@ function createMockServer(): MockServer {
 describe('MCP Resources — Comprehensive Suite', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset MemoryStore mock to default empty returns after clearAllMocks
+    mockMemStore.getByType.mockReturnValue([]);
+    mockMemStore.getById.mockReturnValue(null);
   });
 
   // ── config resource ────────────────────────────────────────────────
@@ -263,20 +275,16 @@ describe('MCP Resources — Comprehensive Suite', () => {
       expect(cfg.mimeType).toBe('application/json');
     });
 
-    it('parses debt table and returns JSON array', async () => {
+    it('returns debt entries from DB as JSON array', async () => {
       const { registerDebtResource } = await import('../../../src/mcp/resources/debt.js');
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
-      const debtMd = `# Tech Debt
-| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
-|---|---|---|---|---|---|---|---|---|
-| debt-001 | Missing tests | 6-001 | sprint-006 | HIGH | 1 | false |  | 2026-03-17 |
-| debt-002 | Unused import | 6-002 | sprint-006 | NORMAL | 2 | true | sprint-007 | 2026-03-16 |
-`;
-
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(debtMd);
+      mockMemStore.getByType.mockReturnValue([
+        { id: 'debt-001', type: 'debt', title: 'Missing tests', content: '', source: 'brain', summary: null, status: 'active', priority: 'high', sprint_id: 'sprint-006', sprint_num: 6, tag_text: '', metadata: JSON.stringify({ originTaskId: '6-001', originSprintId: 'sprint-006', sprintsOpen: 1 }), created_at: '2026-03-17', updated_at: '', deleted_at: null },
+        { id: 'debt-002', type: 'debt', title: 'Unused import', content: '', source: 'brain', summary: null, status: 'resolved', priority: 'normal', sprint_id: 'sprint-006', sprint_num: 6, tag_text: '', metadata: JSON.stringify({ originTaskId: '6-002', originSprintId: 'sprint-006', sprintsOpen: 2, resolvedInSprintId: 'sprint-007' }), created_at: '2026-03-16', updated_at: '', deleted_at: null },
+      ]);
 
       const handler = mock.resources.get('debt')!.handler;
       const result = await handler(new URL('deckent://debt'));
@@ -327,14 +335,10 @@ describe('MCP Resources — Comprehensive Suite', () => {
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
-      const debtMd = `# Tech Debt
-| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
-|---|---|---|---|---|---|---|---|---|
-| debt-003 | Security hole | 9-001 | sprint-009 | CRITICAL | 5 | false |  | 2026-03-20 |
-`;
-
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(debtMd);
+      mockMemStore.getByType.mockReturnValue([
+        { id: 'debt-003', type: 'debt', title: 'Security hole', content: '', source: 'brain', summary: null, status: 'active', priority: 'critical', sprint_id: 'sprint-009', sprint_num: 9, tag_text: '', metadata: JSON.stringify({ originTaskId: '9-001', originSprintId: 'sprint-009', sprintsOpen: 5 }), created_at: '2026-03-20', updated_at: '', deleted_at: null },
+      ]);
 
       const handler = mock.resources.get('debt')!.handler;
       const result = await handler(new URL('deckent://debt'));
@@ -417,14 +421,15 @@ describe('MCP Resources — Comprehensive Suite', () => {
       expect(cfg.mimeType).toBe('text/markdown');
     });
 
-    it('returns MEMORY.md content', async () => {
+    it('returns memory entries from DB', async () => {
       const { registerMemoryResource } = await import('../../../src/mcp/resources/memory.js');
       const mock = createMockServer();
       registerMemoryResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
-      const content = '# Learned Patterns\n\n- spawnSync is safe from injection\n- readJsonSafe returns null on error\n';
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(content);
+      mockMemStore.getByType.mockReturnValue([
+        { id: 'mem-1', type: 'memory', title: 'Learned Patterns', content: '- spawnSync is safe from injection\n- readJsonSafe returns null on error', source: 'brain', summary: null, status: 'active', priority: 'normal', sprint_id: null, sprint_num: 0, tag_text: '', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
+      ]);
 
       const handler = mock.resources.get('memory')!.handler;
       const result = await handler(new URL('deckent://memory'));
@@ -473,14 +478,16 @@ describe('MCP Resources — Comprehensive Suite', () => {
       expect(cfg.mimeType).toBe('text/markdown');
     });
 
-    it('returns RETRO.md content when file exists', async () => {
+    it('returns retro content from DB when DB exists', async () => {
       const { registerRetroResource } = await import('../../../src/mcp/resources/retro.js');
       const mock = createMockServer();
       registerRetroResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
       const content = '# Sprint Retro\n\n## What went well\n- Fast delivery\n';
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(content);
+      mockMemStore.getByType.mockReturnValue([
+        { id: 'retro-1', type: 'retro', title: 'Sprint Retro', content, source: 'brain', summary: null, status: 'active', priority: 'normal', sprint_id: null, sprint_num: 0, tag_text: '', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
+      ]);
 
       const handler = mock.resources.get('retro')!.handler;
       const result = await handler(new URL('deckent://retro'));

@@ -12,10 +12,14 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
 }));
 
+const mockMcpMemStore = {
+  getByType: vi.fn().mockReturnValue([]),
+  getById: vi.fn().mockReturnValue(null),
+  close: vi.fn(),
+  totalCount: vi.fn().mockReturnValue(0),
+};
 vi.mock('../../src/core/memory-store.js', () => ({
-  MemoryStore: class MockMemoryStore {
-    constructor() { throw new Error('mock: no DB in tests'); }
-  },
+  MemoryStore: vi.fn().mockImplementation(() => mockMcpMemStore),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -30,7 +34,6 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
   return {
     ...actual,
-    countBrainLines: vi.fn().mockReturnValue(100),
     ensureDeckentImport: vi.fn(),
   };
 });
@@ -163,7 +166,11 @@ describe('MCP Resources', () => {
       registerMemoryResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue('# Learned Patterns\n- Pattern A');
+      // MemoryStore returns memory entries
+      mockMcpMemStore.getByType.mockImplementation((type: string) => {
+        if (type === 'memory') return [{ id: 'm1', type: 'memory', title: 'Learned Patterns', content: '- Pattern A', status: 'active', metadata: '{}', created_at: '', updated_at: '', deleted_at: null }];
+        return [];
+      });
 
       const handler = mock.resources.get('memory')!.handler;
       const result = await handler(new URL('deckent://memory'));
@@ -186,20 +193,19 @@ describe('MCP Resources', () => {
   });
 
   describe('deckent://debt', () => {
-    it('parses debt table', async () => {
+    it('parses debt from MemoryStore', async () => {
       const { registerDebtResource } = await import('../../src/mcp/resources/debt.js');
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
-      const debtMd = `# Tech Debt
-| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
-|---|---|---|---|---|---|---|---|---|
-| debt-001 | Missing tests | 6-001 | sprint-006 | HIGH | 1 | false |  | 2026-03-17 |
-| debt-002 | Unused import | 6-002 | sprint-006 | NORMAL | 2 | true | sprint-007 | 2026-03-16 |
-`;
-
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(debtMd);
+      mockMcpMemStore.getByType.mockImplementation((type: string) => {
+        if (type === 'debt') return [
+          { id: 'debt-001', type: 'debt', title: 'Missing tests', content: 'x', source: 'brain', status: 'active', priority: 'high', sprint_id: 'sprint-006', sprint_num: 6, metadata: JSON.stringify({ originTaskId: '6-001', originSprintId: 'sprint-006', sprintsOpen: 1 }), tag_text: 'debt', created_at: '2026-03-17', updated_at: '2026-03-17', deleted_at: null },
+          { id: 'debt-002', type: 'debt', title: 'Unused import', content: 'x', source: 'brain', status: 'resolved', priority: 'normal', sprint_id: 'sprint-006', sprint_num: 6, metadata: JSON.stringify({ originTaskId: '6-002', originSprintId: 'sprint-006', sprintsOpen: 2, resolvedInSprintId: 'sprint-007' }), tag_text: 'debt', created_at: '2026-03-16', updated_at: '2026-03-16', deleted_at: null },
+        ];
+        return [];
+      });
 
       const handler = mock.resources.get('debt')!.handler;
       const result = await handler(new URL('deckent://debt'));

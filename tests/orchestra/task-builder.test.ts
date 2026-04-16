@@ -9,7 +9,7 @@ import {
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
-  loadADRContent,
+  // loadADRContent removed — now uses MemoryStore queryRelevantADRs
   DirectiveTaskSchema,
   DirectiveSchema,
   validateDirective,
@@ -1700,12 +1700,8 @@ describe('buildWorkerPrompt — effort maxTokens budget', () => {
     ]);
     // Low effort truncates at ~1000 chars per skill
     expect(prompt).toContain('typescript-expert');
-    const skillSectionMatch = prompt.match(/--- typescript-expert ---\n([\s\S]*?)(?=\n\n===|$)/);
-    if (skillSectionMatch) {
-      const skillContent = skillSectionMatch[1] ?? '';
-      // Should be truncated to ~1000 chars, not the full 2000
-      expect(skillContent.length).toBeLessThanOrEqual(1100);
-    }
+    // The full 2000-char content should NOT appear verbatim — truncation applied
+    expect(prompt).not.toContain(longSkillContent);
   });
 
   it('normal effort uses 1500 token budget (unchanged from default)', () => {
@@ -2115,35 +2111,18 @@ Old-style task without any Priority line.`;
   });
 });
 
-// ─── loadADRContent ─────────────────────────────────────────────────────
-
-describe('loadADRContent', () => {
-  it('returns content from .brain/DECISIONS.md when it exists', () => {
-    const content = loadADRContent(process.cwd());
-    expect(content).toBeTruthy();
-    expect(content).toContain('ADR-001');
-  });
-
-  it('returns empty string for non-existent project root', () => {
-    const content = loadADRContent('/nonexistent/path/that/does/not/exist');
-    expect(content).toBe('');
-  });
-
-  it('truncates content to reasonable size', () => {
-    const content = loadADRContent(process.cwd());
-    // Should be truncated to ~3000 chars max + truncation notice
-    expect(content.length).toBeLessThanOrEqual(3200);
-  });
-});
+// ─── loadADRContent — REMOVED ─────────────────────────────────────────
+// loadADRContent was deleted; ADR injection now uses MemoryStore queryRelevantADRs
 
 // ─── buildWorkerPrompt ADR injection ────────────────────────────────────
 
 describe('buildWorkerPrompt — ADR injection', () => {
-  it('includes ADR content in generated prompt', () => {
+  it('includes worker prompt structure even without DB-sourced ADRs', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    // ADR block should be present (from real .brain/DECISIONS.md)
-    expect(prompt).toContain('Mandatory Architecture Rules');
+    // Without a real MemoryStore DB, queryRelevantADRs returns empty.
+    // The prompt should still be well-formed.
+    expect(prompt).toContain('Deckent worker agent');
   });
 });
 

@@ -75,6 +75,16 @@ vi.mock('../../src/orchestra/event-stream.js', () => ({
   },
 }));
 
+const mockAuditorMemStore = {
+  getByType: vi.fn().mockReturnValue([]),
+  getById: vi.fn().mockReturnValue(null),
+  close: vi.fn(),
+  totalCount: vi.fn().mockReturnValue(0),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockAuditorMemStore),
+}));
+
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, renameSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { writeEvent } from '../../src/orchestra/event-stream.js';
@@ -1686,18 +1696,21 @@ describe('parseADRs', () => {
 
 describe('checkADRCompliance', () => {
   it('detects ADR-006 violation (spawnSync with shell:true)', () => {
-    // Mock DECISIONS.md
     mockedReadFileSync.mockImplementation((path: unknown) => {
       const p = String(path);
-      if (p.includes('DECISIONS.md')) {
-        return `## ADR-006: Safe Spawn\n**Status:** accepted\n**Decision:** Always use array args.`;
-      }
       if (p.includes('src/bad-file.ts')) {
         return `const r = spawnSync('cmd', { shell: true });`;
       }
       return '';
     });
     mockedExistsSync.mockReturnValue(true);
+    // Seed MemoryStore with ADR-006 entry
+    mockAuditorMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'adr') return [
+        { id: 'adr-006', type: 'adr', title: 'Safe Spawn', status: 'accepted', content: 'Always use array args.', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
+      ];
+      return [];
+    });
 
     const violations = checkADRCompliance('/tmp/test', ['src/bad-file.ts']);
     expect(violations).toHaveLength(1);
@@ -2847,13 +2860,16 @@ describe('checkADRCompliance — event hook integration', () => {
   });
 
   it('emits ADR_VIOLATION event when sprintId provided and violation found', () => {
-    // Arrange: DECISIONS.md with ADR-006 accepted, file with violation
+    // Arrange: MemoryStore with ADR-006, file with violation
     mockedExistsSync.mockReturnValue(true);
+    mockAuditorMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'adr') return [
+        { id: 'adr-006', type: 'adr', title: 'spawnSync Security Pattern', status: 'accepted', content: 'Use spawnSync.', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
+      ];
+      return [];
+    });
     mockedReadFileSync.mockImplementation((p: unknown) => {
       const path = String(p);
-      if (path.includes('DECISIONS.md')) {
-        return `## ADR-006: spawnSync Security Pattern\n**Status:** accepted\n**Decision:** Use spawnSync.\n` as never;
-      }
       if (path.includes('src/bad.ts')) {
         return `spawnSync('cmd', { shell: true });\n` as never;
       }

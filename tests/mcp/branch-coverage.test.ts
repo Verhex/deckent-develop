@@ -12,10 +12,18 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
 }));
 
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn(), upsert: vi.fn(), softDelete: vi.fn(),
+  totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]),
+  restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
 vi.mock('../../src/core/memory-store.js', () => ({
-  MemoryStore: class MockMemoryStore {
-    constructor() { throw new Error('mock: no DB in tests'); }
-  },
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -132,6 +140,8 @@ function createMockServer(): MockServer {
 describe('MCP Branch Coverage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMemStore.getByType.mockReturnValue([]);
+    mockMemStore.getById.mockReturnValue(null);
   });
 
   // ─── status.ts: JSON parse error path (catch block lines 32-40) ───
@@ -178,19 +188,15 @@ describe('MCP Branch Coverage', () => {
       expect(items).toHaveLength(0);
     });
 
-    it('handles dash resolvedInSprintId (cols[7] is "-")', async () => {
+    it('handles undefined resolvedInSprintId from DB entry', async () => {
       const { registerDebtResource } = await import('../../src/mcp/resources/debt.js');
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
-      const debtMd = `# Tech Debt
-| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
-|---|---|---|---|---|---|---|---|---|
-| debt-001 | Some issue | 7-001 | sprint-007 | NORMAL | 1 | false | - | 2026-03-17 |
-`;
-
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(debtMd);
+      mockMemStore.getByType.mockReturnValue([
+        { id: 'debt-001', type: 'debt', title: 'Some issue', content: '', source: 'brain', summary: null, status: 'active', priority: 'normal', sprint_id: 'sprint-007', sprint_num: 7, tag_text: '', metadata: JSON.stringify({ originTaskId: '7-001', originSprintId: 'sprint-007', sprintsOpen: 1 }), created_at: '2026-03-17', updated_at: '', deleted_at: null },
+      ]);
 
       const handler = mock.resources.get('debt')!.handler;
       const result = await handler(new URL('deckent://debt'));
@@ -214,26 +220,21 @@ describe('MCP Branch Coverage', () => {
       expect(items).toHaveLength(0);
     });
 
-    it('includes rows with empty IDs (shared parseDebtTable does not filter)', async () => {
+    it('returns all DB entries including those with empty fields', async () => {
       const { registerDebtResource } = await import('../../src/mcp/resources/debt.js');
       const mock = createMockServer();
       registerDebtResource(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
 
-      const debtMd = `# Tech Debt
-| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
-|---|---|---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |  |  |
-| debt-001 | Real item | 7-001 | sprint-007 | HIGH | 1 | false | - | 2026-03-17 |
-`;
-
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readFileSync).mockReturnValue(debtMd);
+      mockMemStore.getByType.mockReturnValue([
+        { id: '', type: 'debt', title: '', content: '', source: 'brain', summary: null, status: 'active', priority: 'normal', sprint_id: null, sprint_num: 0, tag_text: '', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
+        { id: 'debt-001', type: 'debt', title: 'Real item', content: '', source: 'brain', summary: null, status: 'active', priority: 'high', sprint_id: 'sprint-007', sprint_num: 7, tag_text: '', metadata: JSON.stringify({ originTaskId: '7-001', originSprintId: 'sprint-007', sprintsOpen: 1 }), created_at: '2026-03-17', updated_at: '', deleted_at: null },
+      ]);
 
       const handler = mock.resources.get('debt')!.handler;
       const result = await handler(new URL('deckent://debt'));
       const items = JSON.parse(result.contents[0]!.text);
 
-      // Shared parseDebtTable includes all rows with 9+ columns
       expect(items).toHaveLength(2);
       expect(items[1].id).toBe('debt-001');
     });

@@ -44,6 +44,23 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   };
 });
 
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
+  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
+  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
+}));
+
+
 import {
   readFileSync,
   writeFileSync,
@@ -76,93 +93,51 @@ describe('auditBrainBudget', () => {
     expect(audit.status).toBe('OK');
   });
 
-  it('correctly separates exempt vs decayable files', () => {
-    vi.mocked(existsSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      return path.includes('.brain') && !path.includes('sprints');
-    });
-    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.endsWith('.brain')) {
-        return ['DECISIONS.md', 'PROJECT-IDENTITY.md', 'MEMORY.md', 'DEBT.md'] as unknown as ReturnType<typeof readdirSync>;
-      }
-      return [] as unknown as ReturnType<typeof readdirSync>;
-    });
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as ReturnType<typeof statSync>);
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.includes('DECISIONS.md')) return 'x\n'.repeat(702).trimEnd();
-      if (path.includes('PROJECT-IDENTITY.md')) return 'x\n'.repeat(50).trimEnd();
-      if (path.includes('MEMORY.md')) return 'x\n'.repeat(200).trimEnd();
-      if (path.includes('DEBT.md')) return 'x\n'.repeat(100).trimEnd();
-      throw new Error('ENOENT');
+  it('correctly separates exempt vs decayable entries', () => {
+    // Enable DB path
+    vi.mocked(existsSync).mockImplementation((p: unknown) => String(p).includes('memory.db'));
+    // Total: 1052 entries; identity: 50, adr: 702 → exempt 752, decayable 300
+    mockMemStore.totalCount.mockReturnValue(1052);
+    mockMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'identity') return Array(50).fill({ id: 'id', type: 'identity' });
+      if (type === 'adr') return Array(702).fill({ id: 'adr', type: 'adr' });
+      return [];
     });
 
     const audit = auditBrainBudget('/root', 900);
-    // DECISIONS.md (702) + PROJECT-IDENTITY.md (50) are exempt
     expect(audit.permanentLines).toBe(752); // 702 + 50
-    // MEMORY.md (200) + DEBT.md (100) are decayable
-    expect(audit.decayableLines).toBe(300); // 200 + 100
+    expect(audit.decayableLines).toBe(300); // 1052 - 752
     expect(audit.totalLines).toBe(1052);
-    // decayableLines (300) == budget (900)? No — 300 <= 900 → OK
     expect(audit.status).toBe('OK');
   });
 
-  it('returns OVER when decayable lines exceed budget (exempt files must not falsely trip OVER)', () => {
-    vi.mocked(existsSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      return path.includes('.brain') && !path.includes('sprints');
-    });
-    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.endsWith('.brain')) {
-        return ['DECISIONS.md', 'MEMORY.md'] as unknown as ReturnType<typeof readdirSync>;
-      }
-      return [] as unknown as ReturnType<typeof readdirSync>;
-    });
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as ReturnType<typeof statSync>);
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      // Exempt file: 702 lines
-      if (path.includes('DECISIONS.md')) return 'x\n'.repeat(702).trimEnd();
-      // Decayable file: 500 lines (> budget 300)
-      if (path.includes('MEMORY.md')) return 'x\n'.repeat(500).trimEnd();
-      throw new Error('ENOENT');
+  it('returns OVER when decayable entries exceed budget', () => {
+    vi.mocked(existsSync).mockImplementation((p: unknown) => String(p).includes('memory.db'));
+    // Total: 1202; identity: 0, adr: 702 → exempt 702, decayable 500
+    mockMemStore.totalCount.mockReturnValue(1202);
+    mockMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'adr') return Array(702).fill({ id: 'adr', type: 'adr' });
+      return [];
     });
 
     const audit = auditBrainBudget('/root', 300);
     expect(audit.permanentLines).toBe(702);
     expect(audit.decayableLines).toBe(500);
-    // 500 > 300 → OVER
     expect(audit.status).toBe('OVER');
   });
 
-  it('returns OK when only exempt files exceed budget but decayable files do not', () => {
-    vi.mocked(existsSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      return path.includes('.brain') && !path.includes('sprints');
-    });
-    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.endsWith('.brain')) {
-        return ['DECISIONS.md', 'MEMORY.md'] as unknown as ReturnType<typeof readdirSync>;
-      }
-      return [] as unknown as ReturnType<typeof readdirSync>;
-    });
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as ReturnType<typeof statSync>);
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      // Exempt: 702 lines (way over budget)
-      if (path.includes('DECISIONS.md')) return 'x\n'.repeat(702).trimEnd();
-      // Decayable: 100 lines (under budget 300)
-      if (path.includes('MEMORY.md')) return 'x\n'.repeat(100).trimEnd();
-      throw new Error('ENOENT');
+  it('returns OK when only exempt entries exceed budget but decayable do not', () => {
+    vi.mocked(existsSync).mockImplementation((p: unknown) => String(p).includes('memory.db'));
+    // Total: 802; identity: 0, adr: 702 → exempt 702, decayable 100
+    mockMemStore.totalCount.mockReturnValue(802);
+    mockMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'adr') return Array(702).fill({ id: 'adr', type: 'adr' });
+      return [];
     });
 
     const audit = auditBrainBudget('/root', 300);
     expect(audit.permanentLines).toBe(702);
     expect(audit.decayableLines).toBe(100);
-    // 100 <= 300 → OK (exempt should NOT cause OVER)
     expect(audit.status).toBe('OK');
   });
 
@@ -184,41 +159,16 @@ describe('runDecay — exempt-aware budget', () => {
     vi.mocked(countBrainLines).mockReturnValue(100);
   });
 
-  it('triggers decay when eligible lines exceed budget even if total is high due to exempt files', () => {
-    // Scenario from DIRECTIVES: exempt 702 + eligible 500 = 1202 total, budget 300
-    // eligible (500) > budget (300) → decay MUST run
-    vi.mocked(existsSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      return path.includes('.brain') && !path.includes('sprints') && !path.includes('archive');
-    });
-    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.endsWith('.brain')) {
-        return ['DECISIONS.md', 'MEMORY.md'] as unknown as ReturnType<typeof readdirSync>;
-      }
-      return [] as unknown as ReturnType<typeof readdirSync>;
-    });
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as ReturnType<typeof statSync>);
-    // MEMORY.md has 500 lines so decayableLines (500) > budget (300) — step 4 guard must pass
-    const memoryContent = Array.from({ length: 500 }, (_, i) =>
-      i % 50 === 0 ? `## Sprint sprint-${100 + Math.floor(i / 50)} Learnings` : `- detail line ${i}`,
-    ).join('\n');
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.includes('DECISIONS.md')) return 'x\n'.repeat(702).trimEnd();
-      if (path.includes('MEMORY.md')) return memoryContent;
-      throw new Error('ENOENT');
-    });
-    vi.mocked(countBrainLines).mockReturnValue(1202);
+  it('triggers decay when total entries exceed budget', () => {
+    // Total 1202 > budget 300 → decay MUST run
+    vi.mocked(existsSync).mockImplementation((p: unknown) => String(p).includes('memory.db'));
+    mockMemStore.totalCount.mockReturnValueOnce(1202).mockReturnValueOnce(900); // before/after
 
     const result = runDecay('/root', 'sprint-137', { memoryBudget: 300 });
 
-    // shouldRun should be true — eligible lines (500) > budget (300)
+    // shouldRun should be true — totalBefore (1202) > budget (300)
     expect(result.linesBefore).toBe(1202);
-    // writeFileSync should have been called for MEMORY.md trimming (step 4 or step 5)
-    const writeCalls = vi.mocked(writeFileSync).mock.calls;
-    const memoryWrite = writeCalls.find(c => (c[0] as string).includes('MEMORY.md'));
-    expect(memoryWrite).toBeDefined();
+    expect(mockMemStore.decay).toHaveBeenCalled();
   });
 
   it('does NOT trigger decay when only exempt files cause total to exceed budget', () => {
@@ -280,32 +230,15 @@ describe('runDecay — exempt-aware budget', () => {
   });
 
   it('force option bypasses budget check and always runs decay', () => {
-    vi.mocked(existsSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      return path.includes('.brain') && !path.includes('sprints') && !path.includes('archive');
-    });
-    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.endsWith('.brain')) {
-        return ['MEMORY.md'] as unknown as ReturnType<typeof readdirSync>;
-      }
-      return [] as unknown as ReturnType<typeof readdirSync>;
-    });
-    vi.mocked(statSync).mockReturnValue({ isFile: () => true } as ReturnType<typeof statSync>);
-    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
-      const path = String(p);
-      if (path.includes('MEMORY.md')) return 'x\n'.repeat(10).trimEnd();
-      throw new Error('ENOENT');
-    });
-    vi.mocked(countBrainLines).mockReturnValue(10);
+    vi.mocked(existsSync).mockImplementation((p: unknown) => String(p).includes('memory.db'));
+    mockMemStore.totalCount.mockReturnValueOnce(10).mockReturnValueOnce(10); // before/after
 
     // Under budget but force=true → should attempt decay steps
     const result = runDecay('/root', 'sprint-137', { memoryBudget: 900, force: true });
 
     // force=true means decay ran — linesBefore captured correctly
     expect(result.linesBefore).toBe(10);
-    // No write expected if memory is short enough (step 4 guard: decayable <= budget)
-    // But the function ran (no early return) — result object should be returned
+    expect(mockMemStore.decay).toHaveBeenCalled();
     expect(result).toHaveProperty('archivedSprints');
   });
 

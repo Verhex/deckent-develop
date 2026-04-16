@@ -1848,12 +1848,15 @@ describe('writeRetrospective reads patterns and debt', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('includes pattern learnings in RETRO.md when PATTERNS.md has recurring patterns', () => {
+  it('includes pattern learnings in RETRO.md when DB has recurring patterns', async () => {
     const brainDir = join(tempDir, '.brain');
     mkdirSync(brainDir, { recursive: true });
-    writeFileSync(join(brainDir, 'PATTERNS.md'), JSON.stringify([
-      { pattern: 'Worker crash on large files', occurrences: 4, firstDetectedInSprint: 'sprint-038', lastDetectedInSprint: 'sprint-040', resolved: false },
-    ]));
+    const { MemoryStore } = await import('../../src/core/memory-store.js');
+    const dbPath = join(brainDir, 'memory.db');
+    const store = new MemoryStore(dbPath);
+    store.insert({ id: 'pat-1', type: 'pattern', title: 'Worker crash on large files', content: 'Worker crash on large files', source: 'auditor', status: 'active', priority: 'normal', tags: [], metadata: { occurrences: 4, firstDetectedInSprint: 'sprint-038', lastDetectedInSprint: 'sprint-040' } });
+    store.close();
+
     const sprint = makeSprint();
     const evals = new Map([['001', TaskEvaluation.DONE]]);
     const metrics = makeMetrics();
@@ -1862,14 +1865,15 @@ describe('writeRetrospective reads patterns and debt', () => {
     expect(retro).toContain('Worker crash on large files');
   });
 
-  it('includes debt learnings in RETRO.md when DEBT.md has open high debt', () => {
+  it('includes debt learnings in RETRO.md when DB has open high debt', async () => {
     const brainDir = join(tempDir, '.brain');
     mkdirSync(brainDir, { recursive: true });
-    writeFileSync(join(brainDir, 'DEBT.md'), [
-      '| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |',
-      '|----|-------------|------|--------|----------|------|----------|----------|---------|',
-      '| d1 | Unhandled edge case in planner | 039-001 | sprint-039 | HIGH | 2 | false | - | 2026-03-20T00:00:00Z |',
-    ].join('\n'));
+    const { MemoryStore } = await import('../../src/core/memory-store.js');
+    const dbPath = join(brainDir, 'memory.db');
+    const store = new MemoryStore(dbPath);
+    store.insert({ id: 'd1', type: 'debt', title: 'Unhandled edge case in planner', content: '', source: 'brain', status: 'active', priority: 'high', sprint_id: 'sprint-039', sprint_num: 39, tags: [], metadata: { originTaskId: '039-001', originSprintId: 'sprint-039', sprintsOpen: 2 } });
+    store.close();
+
     const sprint = makeSprint();
     const evals = new Map([['001', TaskEvaluation.DONE]]);
     const metrics = makeMetrics();

@@ -269,7 +269,7 @@ describe('D) Agent/Skill Selection Error Logging', () => {
   it('has per-task agent selection error handling with debugLog', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-planner.ts', import.meta.url),
       'utf-8',
     );
     // Outer catch for pool loading failure
@@ -283,7 +283,7 @@ describe('D) Agent/Skill Selection Error Logging', () => {
   it('has per-task skill selection error handling with debugLog', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-planner.ts', import.meta.url),
       'utf-8',
     );
     // Outer catch for pool loading failure
@@ -300,7 +300,7 @@ describe('C) Auto Mode >2x Task Safeguard', () => {
   it('has >2x safeguard with fallback (not just warning)', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-planner.ts', import.meta.url),
       'utf-8',
     );
     // Should set plannerResult = null (fallback) when >2x
@@ -313,7 +313,7 @@ describe('C) Auto Mode >2x Task Safeguard', () => {
   it('also has <1x safeguard for too few tasks', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync(
-      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      new URL('../../src/orchestra/sprint-planner.ts', import.meta.url),
       'utf-8',
     );
     // AI returned fewer tasks than directives — fallback

@@ -58,6 +58,23 @@ vi.mock('node:readline/promises', () => ({
   })),
 }));
 
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
+  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
+  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
+}));
+
+
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 
@@ -97,6 +114,8 @@ function setupProjectDir(root: string): void {
   writeFileSync(join(root, BRAIN_DIR, DEBT_FILE), `# Tech Debt\n\n${DEBT_TABLE_HEADER}\n`);
   writeFileSync(join(root, BRAIN_DIR, PATTERNS_FILE), '[]');
   writeFileSync(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
+  // Create memory.db stub so getMemoryStore() finds it and uses MemoryStore mock
+  writeFileSync(join(root, BRAIN_DIR, 'memory.db'), '');
 }
 
 function makeTestTask(id: string, overrides?: Partial<Task>): Task {
@@ -523,7 +542,7 @@ describe('Brain evaluation integration', () => {
     expect(checkLock(root, 'src/eval.ts')).toBeNull();
   });
 
-  it('handleEvaluation GO_WITH_TECH_DEBT writes DEBT.md', () => {
+  it('handleEvaluation GO_WITH_TECH_DEBT inserts debt entry in DB', () => {
     const task = makeTestTask('021', { assignedWorker: 'w-021', status: TaskStatus.CLAIMED });
     writeTaskFile(root, task);
 
@@ -531,8 +550,11 @@ describe('Brain evaluation integration', () => {
       notes: 'Minor style issues',
     }));
 
-    const debtContent = readFileSync(join(root, BRAIN_DIR, DEBT_FILE), 'utf-8');
-    expect(debtContent).toContain('debt-021');
+    // DB mock should have received insert for debt-021
+    expect(mockMemStore.insert).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'debt-021',
+      type: 'debt',
+    }));
   });
 
   it('handleEvaluation NO_GO creates fix task file', () => {
@@ -550,20 +572,21 @@ describe('Brain evaluation integration', () => {
     expect(fixTask.fixForTaskId).toBe('022');
   });
 
-  it('escalateDebt increments sprintsOpen and priority', () => {
-    // Write a debt table with one NORMAL item at sprintsOpen=1
-    const debtContent = [
-      DEBT_TABLE_HEADER,
-      '|---|---|---|---|---|---|---|---|---|',
-      '| debt-e01 | Test debt | task-e01 | sprint-001 | NORMAL | 1 | false |  | 2026-01-01 |',
-    ].join('\n');
-    writeFileSync(join(root, BRAIN_DIR, DEBT_FILE), debtContent);
+  it('escalateDebt calls upsert with incremented priority via DB', () => {
+    // Seed DB mock with an active debt entry at sprintsOpen=1 (will become 2 → HIGH at >=2)
+    mockMemStore.getByType.mockReturnValue([{
+      id: 'debt-e01', type: 'debt', title: 'Test debt', content: '', source: 'brain',
+      summary: null, status: 'active', priority: 'normal', sprint_id: 'sprint-001',
+      sprint_num: 1, tag_text: '', metadata: JSON.stringify({ sprintsOpen: 1 }),
+      created_at: '2026-01-01', updated_at: '', deleted_at: null,
+    }]);
 
     escalateDebt(root);
 
-    const updated = readFileSync(join(root, BRAIN_DIR, DEBT_FILE), 'utf-8');
-    expect(updated).toContain('HIGH');
-    expect(updated).toContain('2'); // sprintsOpen incremented
+    expect(mockMemStore.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ priority: 'high' }),
+      'brain',
+    );
   });
 });
 
@@ -601,10 +624,17 @@ describe('Sprint mini-cycle integration', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('readContext reads all brain files from real FS', () => {
+  it('readContext reads directives from FS and brain context from DB', () => {
     vi.mocked(spawnSync).mockReturnValue({
       status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
     } as ReturnType<typeof spawnSync>);
+
+    // Seed DB mock with memory and decisions entries
+    mockMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'memory') return [{ id: 'm1', type: 'memory', title: 'Learned Patterns', content: 'spawnSync safe', source: 'brain', summary: null, status: 'active', priority: 'normal', sprint_id: null, sprint_num: 0, tag_text: '', metadata: '{}', created_at: '', updated_at: '', deleted_at: null }];
+      if (type === 'adr') return [{ id: 'adr-1', type: 'adr', title: 'Architecture Decisions', content: 'ESM only', source: 'brain', summary: null, status: 'accepted', priority: 'normal', sprint_id: null, sprint_num: 0, tag_text: '', metadata: '{}', created_at: '', updated_at: '', deleted_at: null }];
+      return [];
+    });
 
     const context = readContext(root);
     expect(context.directives).toContain('Implement feature A');

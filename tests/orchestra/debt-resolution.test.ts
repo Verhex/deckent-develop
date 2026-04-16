@@ -16,9 +16,6 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
-  // Sprint 139 async I/O migration: sprint-finalizer and other modules use
-  // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
-  // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
   promises: {
     readFile: vi.fn(async () => ''),
     writeFile: vi.fn(async () => undefined),
@@ -27,6 +24,15 @@ vi.mock('node:fs', () => ({
     access: vi.fn(async () => undefined),
     stat: vi.fn(async () => ({ size: 0 })),
   },
+}));
+
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn(async () => ''),
+  writeFile: vi.fn(async () => undefined),
+  mkdir: vi.fn(async () => undefined),
+  appendFile: vi.fn(async () => undefined),
+  access: vi.fn(async () => undefined),
+  stat: vi.fn(async () => ({ size: 0 })),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -58,6 +64,23 @@ vi.mock('../../src/agents/worker.js', () => ({
   removeWorkerStateMachine: vi.fn(() => true),
   isWorkerStoppable: vi.fn(() => true),
 }));
+
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
+  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
+  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
+}));
+
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
@@ -105,93 +128,98 @@ function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
 
 // ─── resolveDebt() unit tests ───────────────────────────────────────
 
+/** Helper: create a mock DB entry for a debt item */
+function makeDbEntry(id: string, resolved: boolean, resolvedInSprintId?: string) {
+  return {
+    id, type: 'debt', title: 'Test debt', content: '', source: 'brain',
+    summary: null, status: resolved ? 'resolved' : 'active', priority: 'normal',
+    sprint_id: 'sprint-001', sprint_num: 1, tag_text: '', created_at: '2026-03-17T00:00:00.000Z',
+    updated_at: new Date().toISOString(), deleted_at: null,
+    metadata: JSON.stringify({ originTaskId: '001-001', originSprintId: 'sprint-001', sprintsOpen: 0, resolvedInSprintId }),
+  };
+}
+
 describe('resolveDebt', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Enable DB path so getMemoryStore() returns the mock store
+    mockedExistsSync.mockImplementation((p: unknown) => String(p).includes('memory.db'));
   });
 
   it('resolves an existing unresolved debt and returns true', () => {
-    const table = makeDebtTable([{ id: 'debt-001-001', resolved: false }]);
-    mockedReadFileSync.mockReturnValue(table);
-    mockedExistsSync.mockReturnValue(true);
+    mockMemStore.getById.mockReturnValue(makeDbEntry('debt-001-001', false));
 
     const result = resolveDebt(ROOT, 'debt-001-001', 'sprint-004');
 
     expect(result).toBe(true);
-    expect(mockedWriteFileSync).toHaveBeenCalledTimes(1);
-    const written = mockedWriteFileSync.mock.calls[0]![1] as string;
-    expect(written).toContain('| true |');
-    expect(written).toContain('| sprint-004 |');
+    expect(mockMemStore.upsert).toHaveBeenCalledTimes(1);
+    const input = mockMemStore.upsert.mock.calls[0]![0] as Record<string, unknown>;
+    expect(input.status).toBe('resolved');
+    const meta = input.metadata as Record<string, unknown>;
+    expect(meta.resolvedInSprintId).toBe('sprint-004');
   });
 
-  it('sets resolved: true and resolvedInSprintId in DEBT.md', () => {
-    const table = makeDebtTable([{ id: 'debt-002-003', resolved: false }]);
-    mockedReadFileSync.mockReturnValue(table);
-    mockedExistsSync.mockReturnValue(true);
+  it('sets resolved status and resolvedInSprintId via DB upsert', () => {
+    mockMemStore.getById.mockReturnValue(makeDbEntry('debt-002-003', false));
 
     resolveDebt(ROOT, 'debt-002-003', 'sprint-004');
 
-    const written = mockedWriteFileSync.mock.calls[0]![1] as string;
-    expect(written).toContain('debt-002-003');
-    expect(written).toContain('true');
-    expect(written).toContain('sprint-004');
+    const input = mockMemStore.upsert.mock.calls[0]![0] as Record<string, unknown>;
+    expect(input.id).toBe('debt-002-003');
+    expect(input.status).toBe('resolved');
+    const meta = input.metadata as Record<string, unknown>;
+    expect(meta.resolvedInSprintId).toBe('sprint-004');
   });
 
   it('returns false when debt ID is not found', () => {
-    const table = makeDebtTable([{ id: 'debt-001-001' }]);
-    mockedReadFileSync.mockReturnValue(table);
+    mockMemStore.getById.mockReturnValue(null);
 
     const result = resolveDebt(ROOT, 'debt-nonexistent', 'sprint-004');
 
     expect(result).toBe(false);
-    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+    expect(mockMemStore.upsert).not.toHaveBeenCalled();
   });
 
   it('returns false when debt is already resolved (idempotent)', () => {
-    const table = makeDebtTable([{ id: 'debt-001-001', resolved: true, resolvedInSprintId: 'sprint-003' }]);
-    mockedReadFileSync.mockReturnValue(table);
+    mockMemStore.getById.mockReturnValue(makeDbEntry('debt-001-001', true, 'sprint-003'));
 
     const result = resolveDebt(ROOT, 'debt-001-001', 'sprint-004');
 
     expect(result).toBe(false);
-    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+    expect(mockMemStore.upsert).not.toHaveBeenCalled();
   });
 
-  it('returns false when DEBT.md does not exist', () => {
-    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
+  it('returns false when DB does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
 
     const result = resolveDebt(ROOT, 'debt-001-001', 'sprint-004');
 
     expect(result).toBe(false);
-    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+    expect(mockMemStore.upsert).not.toHaveBeenCalled();
   });
 
-  it('does not modify other debt items', () => {
-    const table = makeDebtTable([
-      { id: 'debt-001-001', resolved: false, description: 'First debt' },
-      { id: 'debt-001-002', resolved: false, description: 'Second debt' },
-    ]);
-    mockedReadFileSync.mockReturnValue(table);
+  it('does not modify other debt items (only target is resolved)', () => {
+    mockMemStore.getById.mockImplementation((id: string) => {
+      if (id === 'debt-001-001') return makeDbEntry('debt-001-001', false);
+      if (id === 'debt-001-002') return makeDbEntry('debt-001-002', false);
+      return null;
+    });
 
     resolveDebt(ROOT, 'debt-001-001', 'sprint-004');
 
-    const written = mockedWriteFileSync.mock.calls[0]![1] as string;
-    // debt-001-002 should still be false
-    const lines = written.split('\n').filter(l => l.includes('debt-001-002'));
-    expect(lines.length).toBe(1);
-    expect(lines[0]).toContain('| false |');
+    // Only one upsert call for the target debt
+    expect(mockMemStore.upsert).toHaveBeenCalledTimes(1);
+    const input = mockMemStore.upsert.mock.calls[0]![0] as Record<string, unknown>;
+    expect(input.id).toBe('debt-001-001');
+    expect(input.status).toBe('resolved');
   });
 
-  it('calls mkdirSync to ensure .brain dir exists', () => {
-    const table = makeDebtTable([{ id: 'debt-001-001', resolved: false }]);
-    mockedReadFileSync.mockReturnValue(table);
+  it('closes the store after operation', () => {
+    mockMemStore.getById.mockReturnValue(makeDbEntry('debt-001-001', false));
 
     resolveDebt(ROOT, 'debt-001-001', 'sprint-004');
 
-    expect(mockedMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('.brain'),
-      { recursive: true },
-    );
+    expect(mockMemStore.close).toHaveBeenCalled();
   });
 });
 
@@ -244,149 +272,84 @@ describe('calculateMetrics with debt parameter', () => {
 describe('handleEvaluation + resolveDebt integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Enable DB path so getMemoryStore() returns the mock store
+    mockedExistsSync.mockImplementation((p: unknown) => String(p).includes('memory.db'));
   });
 
   it('DONE evaluation triggers debt resolution for task ID', () => {
-    // Setup: debt exists for task
-    const table = makeDebtTable([{ id: 'debt-004-001', resolved: false }]);
-    const readCalls: string[] = [];
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      readCalls.push(String(path));
-      if (String(path).includes('DEBT.md')) return table;
-      throw new Error('ENOENT');
-    });
-    mockedExistsSync.mockReturnValue(true);
+    mockMemStore.getById.mockReturnValue(makeDbEntry('debt-004-001', false));
 
     const task: Task = {
-      id: '004-001',
-      title: 'Test task',
-      description: 'Test',
-      model: 'sonnet',
-      effort: 'normal',
-      priority: 'NORMAL',
-      reason: 'Test',
-      scope: { directories: [], filesRead: [], filesWrite: [] },
-      dependencies: [],
+      id: '004-001', title: 'Test task', description: 'Test', model: 'sonnet',
+      effort: 'normal', priority: 'NORMAL', reason: 'Test',
+      scope: { directories: [], filesRead: [], filesWrite: [] }, dependencies: [],
       goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: '' },
-      status: 'PENDING' as Task['status'],
-      sprintId: 'sprint-004',
+      status: 'PENDING' as Task['status'], sprintId: 'sprint-004',
     };
-
     const result: TaskResult = {
-      taskId: '004-001',
-      workerId: 'w-004-001',
-      filesChanged: [],
-      linesAdded: 10,
-      linesRemoved: 0,
-      testsPassed: true,
-      coverage: 95,
-      selfAssessment: 'DONE',
-      notes: 'All good',
+      taskId: '004-001', workerId: 'w-004-001', filesChanged: [],
+      linesAdded: 10, linesRemoved: 0, testsPassed: true, coverage: 95,
+      selfAssessment: 'DONE', notes: 'All good',
     };
 
     handleEvaluation(ROOT, task, TaskEvaluation.DONE, result);
 
-    // handleEvaluation with DONE calls updateTaskStatus + releaseAllLocks
-    // After that, resolveDebt should be called by runSprint (not handleEvaluation itself)
-    // This test verifies handleEvaluation doesn't crash and resolveDebt works standalone
+    // Verify resolveDebt works standalone after handleEvaluation
     const resolved = resolveDebt(ROOT, 'debt-004-001', 'sprint-004');
     expect(resolved).toBe(true);
   });
 
   it('isPriorityFix + DONE resolves debt for fixForTaskId', () => {
-    const table = makeDebtTable([
-      { id: 'debt-003-001', resolved: false, description: 'Original debt' },
-    ]);
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      if (String(path).includes('DEBT.md')) return table;
-      throw new Error('ENOENT');
-    });
+    mockMemStore.getById.mockReturnValue(makeDbEntry('debt-003-001', false));
 
     const resolved = resolveDebt(ROOT, 'debt-003-001', 'sprint-004');
     expect(resolved).toBe(true);
 
-    const written = mockedWriteFileSync.mock.calls.find(
-      c => String(c[0]).includes('DEBT.md'),
-    );
-    expect(written).toBeDefined();
-    expect(String(written![1])).toContain('| true |');
-    expect(String(written![1])).toContain('| sprint-004 |');
+    const input = mockMemStore.upsert.mock.calls[0]![0] as Record<string, unknown>;
+    expect(input.status).toBe('resolved');
+    const meta = input.metadata as Record<string, unknown>;
+    expect(meta.resolvedInSprintId).toBe('sprint-004');
   });
 
-  it('NO_GO evaluation does not resolve debt', () => {
-    const table = makeDebtTable([{ id: 'debt-004-001', resolved: false }]);
-    mockedReadFileSync.mockImplementation((path: unknown) => {
-      if (String(path).includes('DEBT.md')) return table;
-      throw new Error('ENOENT');
-    });
-    mockedExistsSync.mockReturnValue(true);
-
+  it('NO_GO evaluation does not resolve debt via DB', () => {
     const task: Task = {
-      id: '004-001',
-      title: 'Test task',
-      description: 'Test',
-      model: 'sonnet',
-      effort: 'normal',
-      priority: 'NORMAL',
-      reason: 'Test',
-      scope: { directories: [], filesRead: [], filesWrite: [] },
-      dependencies: [],
+      id: '004-001', title: 'Test task', description: 'Test', model: 'sonnet',
+      effort: 'normal', priority: 'NORMAL', reason: 'Test',
+      scope: { directories: [], filesRead: [], filesWrite: [] }, dependencies: [],
       goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: '' },
-      status: 'PENDING' as Task['status'],
-      sprintId: 'sprint-004',
+      status: 'PENDING' as Task['status'], sprintId: 'sprint-004',
     };
-
     const result: TaskResult = {
-      taskId: '004-001',
-      workerId: 'w-004-001',
-      filesChanged: [],
-      linesAdded: 0,
-      linesRemoved: 0,
-      testsPassed: false,
-      coverage: 0,
-      selfAssessment: 'NO_GO',
-      notes: 'Build failed',
+      taskId: '004-001', workerId: 'w-004-001', filesChanged: [],
+      linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0,
+      selfAssessment: 'NO_GO', notes: 'Build failed',
     };
 
     handleEvaluation(ROOT, task, TaskEvaluation.NO_GO, result);
 
-    // DEBT.md should NOT have been written with resolved: true for this debt
-    // NO_GO creates a fix task, not resolves debt
-    const debtWrites = mockedWriteFileSync.mock.calls.filter(
-      c => String(c[0]).includes('DEBT.md'),
-    );
-    // handleEvaluation with NO_GO doesn't write to DEBT.md (it writes a fix task JSON)
-    for (const write of debtWrites) {
-      expect(String(write[1])).not.toContain('| debt-004-001 |');
-    }
+    // NO_GO creates a fix task, not resolves debt — no upsert with status='resolved'
+    const resolvedCalls = mockMemStore.upsert.mock.calls.filter((args: unknown[]) => {
+      const input = args[0] as Record<string, unknown>;
+      return input.status === 'resolved';
+    });
+    expect(resolvedCalls).toHaveLength(0);
   });
 
   it('resolveDebt handles multiple items and only resolves the target', () => {
-    const table = makeDebtTable([
-      { id: 'debt-001', resolved: false },
-      { id: 'debt-002', resolved: false },
-      { id: 'debt-003', resolved: false },
-    ]);
-    mockedReadFileSync.mockReturnValue(table);
+    mockMemStore.getById.mockImplementation((id: string) => {
+      if (id === 'debt-001') return makeDbEntry('debt-001', false);
+      if (id === 'debt-002') return makeDbEntry('debt-002', false);
+      if (id === 'debt-003') return makeDbEntry('debt-003', false);
+      return null;
+    });
 
     const r1 = resolveDebt(ROOT, 'debt-002', 'sprint-004');
     expect(r1).toBe(true);
 
-    const written = mockedWriteFileSync.mock.calls[0]![1] as string;
-    const lines = written.split('\n').filter(l => l.startsWith('|') && !l.startsWith('| ID') && !l.startsWith('|---'));
-    expect(lines.length).toBe(3);
-
-    // debt-001: still false
-    expect(lines[0]).toContain('| debt-001 |');
-    expect(lines[0]).toContain('| false |');
-
-    // debt-002: resolved
-    expect(lines[1]).toContain('| debt-002 |');
-    expect(lines[1]).toContain('| true |');
-    expect(lines[1]).toContain('| sprint-004 |');
-
-    // debt-003: still false
-    expect(lines[2]).toContain('| debt-003 |');
-    expect(lines[2]).toContain('| false |');
+    // Only one upsert call for debt-002
+    expect(mockMemStore.upsert).toHaveBeenCalledTimes(1);
+    const input = mockMemStore.upsert.mock.calls[0]![0] as Record<string, unknown>;
+    expect(input.id).toBe('debt-002');
+    expect(input.status).toBe('resolved');
   });
 });

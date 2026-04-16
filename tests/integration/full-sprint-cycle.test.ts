@@ -23,7 +23,7 @@ import {
   BRAIN_DIR, TASKS_DIR, LOCKS_DIR, DECKENT_DIR,
   DIRECTIVES_FILE, DASHBOARD_FILE,
   MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE, RETRO_FILE,
-  SPRINTS_DIR, DEBT_TABLE_HEADER,
+  SPRINTS_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE,
 } from '../../src/core/constants.js';
 
 // ─── Mocks: ONLY tmux, child_process ───────────────────────────────
@@ -49,6 +49,23 @@ vi.mock('node:child_process', () => ({
     status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
   }),
 }));
+
+// ── MemoryStore mock for DB-first code paths ─────────────────────
+const mockMemStore = {
+  getById: vi.fn().mockReturnValue(null),
+  getByType: vi.fn().mockReturnValue([]),
+  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
+  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
+  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
+  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
+}));
+
 
 import { spawnSync } from 'node:child_process';
 import { spawnWorker } from '../../src/orchestra/tmux.js';
@@ -79,6 +96,8 @@ function setupProjectDir(root: string): void {
   writeFileSync(join(root, BRAIN_DIR, DEBT_FILE), `# Tech Debt\n\n${DEBT_TABLE_HEADER}\n`);
   writeFileSync(join(root, BRAIN_DIR, PATTERNS_FILE), '[]');
   writeFileSync(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
+  // Create memory.db stub so getMemoryStore() finds it and uses MemoryStore mock
+  writeFileSync(join(root, BRAIN_DIR, MEMORY_DB_FILE), '');
 }
 
 function makeTestTask(id: string, sprintId: string, overrides?: Partial<Task>): Task {
@@ -264,7 +283,7 @@ describe('Full sprint cycle — GO_WITH_TECH_DEBT scenario', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('GO_WITH_TECH_DEBT updates DEBT.md', () => {
+  it('GO_WITH_TECH_DEBT inserts debt entry in DB', () => {
     const sprintId = 'sprint-003';
     const task = makeTestTask('003-001', sprintId, { assignedWorker: 'w-003-001' });
     writeTaskFile(root, task);
@@ -279,29 +298,48 @@ describe('Full sprint cycle — GO_WITH_TECH_DEBT scenario', () => {
 
     handleEvaluation(root, task, evaluation, result);
 
-    // DEBT.md should be updated
-    const debtContent = readFileSync(join(root, BRAIN_DIR, DEBT_FILE), 'utf-8');
-    expect(debtContent).toContain('debt-003-001');
-    expect(debtContent).toContain('NORMAL');
+    // DB should have insert call with debt entry
+    expect(mockMemStore.insert).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'debt-003-001',
+      type: 'debt',
+      status: 'active',
+      priority: 'normal',
+    }));
   });
 
-  it('debt escalation increments sprintsOpen', () => {
-    // First escalation: 0 → 1 (still NORMAL)
-    escalateDebt(root);
-    // Second escalation: 1 → 2 (NORMAL → HIGH at >=2)
+  it('debt escalation calls upsert with incremented sprintsOpen', () => {
+    // Seed DB with active debt entry
+    mockMemStore.getByType.mockReturnValue([{
+      id: 'debt-003-001', type: 'debt', title: 'debt', content: '', source: 'brain',
+      summary: null, status: 'active', priority: 'normal', sprint_id: 'sprint-003',
+      sprint_num: 3, tag_text: '', metadata: JSON.stringify({ sprintsOpen: 0 }),
+      created_at: '', updated_at: '', deleted_at: null,
+    }]);
+
     escalateDebt(root);
 
-    const debtContent = readFileSync(join(root, BRAIN_DIR, DEBT_FILE), 'utf-8');
-    expect(debtContent).toContain('HIGH');
+    expect(mockMemStore.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ priority: expect.any(String) }),
+      'brain',
+    );
   });
 
-  it('resolveDebt marks debt as resolved', () => {
+  it('resolveDebt marks debt as resolved in DB', () => {
+    // Seed DB with active debt entry
+    mockMemStore.getById.mockReturnValue({
+      id: 'debt-003-001', type: 'debt', title: 'debt', content: '', source: 'brain',
+      summary: null, status: 'active', priority: 'high', sprint_id: 'sprint-003',
+      sprint_num: 3, tag_text: '', metadata: JSON.stringify({ sprintsOpen: 2 }),
+      created_at: '', updated_at: '', deleted_at: null,
+    });
+
     const resolved = resolveDebt(root, 'debt-003-001', 'sprint-004');
     expect(resolved).toBe(true);
 
-    const debtContent = readFileSync(join(root, BRAIN_DIR, DEBT_FILE), 'utf-8');
-    expect(debtContent).toContain('true');
-    expect(debtContent).toContain('sprint-004');
+    expect(mockMemStore.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'resolved' }),
+      'brain',
+    );
   });
 
   it('calculateMetrics with debt counts resolved and open', () => {
@@ -338,54 +376,28 @@ describe('runDecay integration', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('force decay removes resolved debt', () => {
-    // Write a debt table with resolved items
-    const debtContent = [
-      DEBT_TABLE_HEADER,
-      '|---|---|---|---|---|---|---|---|---|',
-      '| debt-old | Resolved debt | t-1 | s-1 | NORMAL | 1 | true | s-2 | 2026-01-01 |',
-      '| debt-open | Open debt | t-2 | s-1 | HIGH | 2 | false | - | 2026-01-01 |',
-    ].join('\n');
-    writeFileSync(join(root, BRAIN_DIR, DEBT_FILE), debtContent);
+  it('force decay calls store.decay via DB', () => {
+    mockMemStore.totalCount.mockReturnValueOnce(1000).mockReturnValueOnce(500);
 
     const result = runDecay(root, 'sprint-010', { force: true });
-    expect(result.removedDebtCount).toBe(1);
-
-    // Open debt should remain
-    const updatedDebt = readFileSync(join(root, BRAIN_DIR, DEBT_FILE), 'utf-8');
-    expect(updatedDebt).toContain('debt-open');
-    expect(updatedDebt).not.toContain('debt-old');
+    expect(mockMemStore.decay).toHaveBeenCalled();
+    expect(result.linesBefore).toBe(1000);
   });
 
-  it('force decay removes resolved patterns', () => {
-    writeFileSync(join(root, BRAIN_DIR, PATTERNS_FILE), JSON.stringify([
-      { pattern: 'stale_heartbeat', resolved: true, occurrences: 1, firstDetectedInSprint: 's-1', lastDetectedInSprint: 's-1' },
-      { pattern: 'boundary_violation', resolved: false, occurrences: 2, firstDetectedInSprint: 's-1', lastDetectedInSprint: 's-2' },
-    ]));
+  it('force decay returns result with linesBefore and linesAfter', () => {
+    mockMemStore.totalCount.mockReturnValueOnce(800).mockReturnValueOnce(400);
 
     const result = runDecay(root, 'sprint-010', { force: true });
-    expect(result.removedPatternCount).toBe(1);
-
-    const patterns = JSON.parse(readFileSync(join(root, BRAIN_DIR, PATTERNS_FILE), 'utf-8'));
-    expect(patterns.length).toBe(1);
-    expect(patterns[0].pattern).toBe('boundary_violation');
+    expect(result.linesBefore).toBe(800);
+    expect(result.linesAfter).toBe(400);
   });
 
-  it('force decay archives old sprint logs', () => {
-    const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
-    writeFileSync(join(sprintsDir, 'sprint-001.md'), '# Sprint 1');
-    writeFileSync(join(sprintsDir, 'sprint-002.md'), '# Sprint 2');
-    writeFileSync(join(sprintsDir, 'sprint-003.md'), '# Sprint 3');
+  it('force decay always runs even when under budget', () => {
+    mockMemStore.totalCount.mockReturnValueOnce(10).mockReturnValueOnce(10);
 
     const result = runDecay(root, 'sprint-010', { force: true });
-    expect(result.archivedSprints.length).toBe(1);
-    expect(result.archivedSprints[0]).toBe('sprint-001.md');
-
-    // sprint-001 should be in archive, sprint-002 and sprint-003 should remain
-    const remainingFiles = readdirSync(sprintsDir).filter(f => f.endsWith('.md'));
-    expect(remainingFiles.length).toBe(2);
-    expect(remainingFiles).toContain('sprint-002.md');
-    expect(remainingFiles).toContain('sprint-003.md');
+    expect(mockMemStore.decay).toHaveBeenCalled();
+    expect(result.linesBefore).toBe(10);
   });
 
   it('no-op when force=false and under budget', () => {

@@ -41,13 +41,74 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
   return {
     ...actual,
-    countBrainLines: vi.fn().mockReturnValue(100),
   };
 });
 
+// ── MemoryStore mock ─────────────────────────────────────────────────
+// debt-manager now uses MemoryStore (DB-first) instead of file I/O for debt operations.
+const mockDbEntries = new Map<string, any>();
+const mockMemoryStore = {
+  getById: vi.fn((id: string) => mockDbEntries.get(id) ?? null),
+  getByType: vi.fn((type: string) => {
+    const results: any[] = [];
+    for (const e of mockDbEntries.values()) { if (e.type === type) results.push(e); }
+    return results;
+  }),
+  insert: vi.fn((input: any) => {
+    const entry = {
+      ...input,
+      metadata: JSON.stringify(input.metadata ?? {}),
+      tag_text: (input.tags ?? []).join(' '),
+      status: input.status ?? 'active',
+      priority: input.priority ?? 'normal',
+      sprint_id: input.sprint_id ?? null,
+      sprint_num: input.sprint_num ?? 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    };
+    mockDbEntries.set(input.id, entry);
+    return entry;
+  }),
+  upsert: vi.fn((input: any) => {
+    const entry = {
+      ...input,
+      metadata: JSON.stringify(input.metadata ?? {}),
+      tag_text: (input.tags ?? []).join(' '),
+      status: input.status ?? 'active',
+      priority: input.priority ?? 'normal',
+      sprint_id: input.sprint_id ?? null,
+      sprint_num: input.sprint_num ?? 0,
+      created_at: mockDbEntries.get(input.id)?.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    };
+    mockDbEntries.set(input.id, entry);
+    return entry;
+  }),
+  softDelete: vi.fn(),
+  totalCount: vi.fn(() => mockDbEntries.size),
+  countByType: vi.fn(),
+  decay: vi.fn(),
+  close: vi.fn(),
+  getRawDb: vi.fn(),
+  getRelationsFrom: vi.fn().mockReturnValue([]),
+  getRelationsTo: vi.fn().mockReturnValue([]),
+  getTagsForEntry: vi.fn().mockReturnValue([]),
+  getByTags: vi.fn().mockReturnValue([]),
+  getHistory: vi.fn().mockReturnValue([]),
+  restore: vi.fn(),
+  getSchemaVersion: vi.fn().mockReturnValue(1),
+};
+
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => mockMemoryStore),
+}));
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { updateTaskStatus, releaseAllLocks } from '../../src/agents/worker.js';
-import { countBrainLines, parseDebtTable, generateDebtTable } from '../../src/core/utils.js';
+import { parseDebtTable, generateDebtTable } from '../../src/core/utils.js';
+import { MEMORY_DB_FILE } from '../../src/core/constants.js';
 import {
   handleEvaluation,
   handleCrossDependencies,
@@ -112,11 +173,64 @@ function makeDebtItem(overrides: Partial<DebtItem> = {}): DebtItem {
   };
 }
 
+// ─── Shared reset ──────────────────────────────────────────────────
+function resetMocks() {
+  vi.clearAllMocks();
+  mockDbEntries.clear();
+  // Re-wire mockMemoryStore after clearAllMocks resets implementations
+  mockMemoryStore.getById.mockImplementation((id: string) => mockDbEntries.get(id) ?? null);
+  mockMemoryStore.getByType.mockImplementation((type: string) => {
+    const results: any[] = [];
+    for (const e of mockDbEntries.values()) { if (e.type === type) results.push(e); }
+    return results;
+  });
+  mockMemoryStore.insert.mockImplementation((input: any) => {
+    const entry = {
+      ...input,
+      metadata: JSON.stringify(input.metadata ?? {}),
+      tag_text: (input.tags ?? []).join(' '),
+      status: input.status ?? 'active',
+      priority: input.priority ?? 'normal',
+      sprint_id: input.sprint_id ?? null,
+      sprint_num: input.sprint_num ?? 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    };
+    mockDbEntries.set(input.id, entry);
+    return entry;
+  });
+  mockMemoryStore.upsert.mockImplementation((input: any) => {
+    const entry = {
+      ...input,
+      metadata: JSON.stringify(input.metadata ?? {}),
+      tag_text: (input.tags ?? []).join(' '),
+      status: input.status ?? 'active',
+      priority: input.priority ?? 'normal',
+      sprint_id: input.sprint_id ?? null,
+      sprint_num: input.sprint_num ?? 0,
+      created_at: mockDbEntries.get(input.id)?.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    };
+    mockDbEntries.set(input.id, entry);
+    return entry;
+  });
+  mockMemoryStore.totalCount.mockImplementation(() => mockDbEntries.size);
+  mockMemoryStore.close.mockImplementation(() => {});
+  mockMemoryStore.decay.mockImplementation(() => {});
+  // existsSync defaults: true for DB path, false otherwise
+  vi.mocked(existsSync).mockImplementation((p: any) => {
+    if (String(p).includes(MEMORY_DB_FILE)) return true;
+    return false;
+  });
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe('handleEvaluation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetMocks();
   });
 
   it('DONE: updates task status to DONE and releases locks', () => {
@@ -150,27 +264,27 @@ describe('handleEvaluation', () => {
     expect(releaseAllLocks).toHaveBeenCalledWith('/root', 'w-task-001');
   });
 
-  it('GO_WITH_TECH_DEBT: writes debt entry to DEBT.md', () => {
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+  it('GO_WITH_TECH_DEBT: writes debt entry via MemoryStore', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
     const task = makeTask();
     const result = makeTaskResult({ notes: 'tech debt note' });
     handleEvaluation('/root', task, TaskEvaluation.GO_WITH_TECH_DEBT, result);
-    expect(mkdirSync).toHaveBeenCalled();
-    expect(writeFileSync).toHaveBeenCalled();
-    const writtenContent = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    expect(writtenContent).toContain('debt-task-001');
+    expect(mockMemoryStore.insert).toHaveBeenCalled();
+    const insertArg = mockMemoryStore.insert.mock.calls[0]![0];
+    expect(insertArg.id).toBe('debt-task-001');
+    expect(insertArg.type).toBe('debt');
+    expect(mockMemoryStore.close).toHaveBeenCalled();
   });
 
-  it('GO_WITH_TECH_DEBT: appends to existing debt entries', () => {
-    const existingItem = makeDebtItem({ id: 'debt-existing' });
-    const existingContent = makeDebtTableContent([existingItem]);
-    vi.mocked(readFileSync).mockReturnValue(existingContent);
+  it('GO_WITH_TECH_DEBT: does not insert duplicate debt entry', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    // Simulate existing entry
+    mockMemoryStore.getById.mockReturnValueOnce({ id: 'debt-task-001', type: 'debt' });
     const task = makeTask();
     const result = makeTaskResult({ notes: 'another debt' });
     handleEvaluation('/root', task, TaskEvaluation.GO_WITH_TECH_DEBT, result);
-    const writtenContent = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    expect(writtenContent).toContain('debt-existing');
-    expect(writtenContent).toContain('debt-task-001');
+    expect(mockMemoryStore.insert).not.toHaveBeenCalled();
+    expect(mockMemoryStore.close).toHaveBeenCalled();
   });
 
   it('NO_GO: updates task status to NO_GO', () => {
@@ -212,7 +326,7 @@ describe('handleEvaluation', () => {
 
 describe('handleCrossDependencies', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetMocks();
   });
 
   it('returns empty array when no NO_GO tasks', () => {
@@ -323,59 +437,85 @@ describe('handleCrossDependencies', () => {
 
 describe('escalateDebt', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetMocks();
   });
 
-  it('does nothing when DEBT.md is empty/missing', () => {
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+  it('does nothing when no debt entries in DB', () => {
     escalateDebt('/root');
-    expect(writeFileSync).not.toHaveBeenCalled();
+    expect(mockMemoryStore.upsert).not.toHaveBeenCalled();
   });
 
   it('increments sprintsOpen for unresolved items', () => {
-    const item = makeDebtItem({ sprintsOpen: 0 });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    // Seed an active debt entry in the mock
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Some debt', content: 'desc',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: JSON.stringify({ sprintsOpen: 0 }),
+      tag_text: 'debt', created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(), deleted_at: null,
+    });
     escalateDebt('/root');
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.sprintsOpen).toBe(1);
+    expect(mockMemoryStore.upsert).toHaveBeenCalled();
+    const upsertArg = mockMemoryStore.upsert.mock.calls[0]![0];
+    expect(upsertArg.metadata.sprintsOpen).toBe(1);
   });
 
   it('escalates NORMAL to HIGH after 2 sprints open', () => {
-    const item = makeDebtItem({ sprintsOpen: 1, priority: DebtPriority.NORMAL });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Some debt', content: 'desc',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: JSON.stringify({ sprintsOpen: 1 }),
+      tag_text: 'debt', created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(), deleted_at: null,
+    });
     escalateDebt('/root');
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.priority).toBe(DebtPriority.HIGH);
-    expect(items[0]!.sprintsOpen).toBe(2);
+    const upsertArg = mockMemoryStore.upsert.mock.calls[0]![0];
+    expect(upsertArg.priority).toBe('high');
+    expect(upsertArg.metadata.sprintsOpen).toBe(2);
   });
 
   it('escalates to CRITICAL after 3+ sprints open', () => {
-    const item = makeDebtItem({ sprintsOpen: 2, priority: DebtPriority.HIGH });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Some debt', content: 'desc',
+      source: 'brain', status: 'active', priority: 'high',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: JSON.stringify({ sprintsOpen: 2 }),
+      tag_text: 'debt', created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(), deleted_at: null,
+    });
     escalateDebt('/root');
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.priority).toBe(DebtPriority.CRITICAL);
-    expect(items[0]!.sprintsOpen).toBe(3);
+    const upsertArg = mockMemoryStore.upsert.mock.calls[0]![0];
+    expect(upsertArg.priority).toBe('critical');
+    expect(upsertArg.metadata.sprintsOpen).toBe(3);
   });
 
   it('does not escalate resolved items', () => {
-    const item = makeDebtItem({ sprintsOpen: 5, resolved: true, priority: DebtPriority.NORMAL });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Some debt', content: 'desc',
+      source: 'brain', status: 'resolved', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: JSON.stringify({ sprintsOpen: 5 }),
+      tag_text: 'debt', created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(), deleted_at: null,
+    });
     escalateDebt('/root');
-    // Resolved items are skipped entirely — no write happens
-    expect(writeFileSync).not.toHaveBeenCalled();
+    expect(mockMemoryStore.upsert).not.toHaveBeenCalled();
   });
 
   it('does not re-escalate CRITICAL items', () => {
-    const item = makeDebtItem({ sprintsOpen: 5, priority: DebtPriority.CRITICAL });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Some debt', content: 'desc',
+      source: 'brain', status: 'active', priority: 'critical',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: JSON.stringify({ sprintsOpen: 5 }),
+      tag_text: 'debt', created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(), deleted_at: null,
+    });
     escalateDebt('/root');
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.priority).toBe(DebtPriority.CRITICAL);
+    const upsertArg = mockMemoryStore.upsert.mock.calls[0]![0];
+    expect(upsertArg.priority).toBe('critical');
   });
 });
 
@@ -383,45 +523,64 @@ describe('escalateDebt', () => {
 
 describe('resolveDebt', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetMocks();
   });
 
-  it('returns false when DEBT.md is empty/missing', () => {
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+  it('returns false when no debt entries in DB', () => {
     const result = resolveDebt('/root', 'debt-001', 'sprint-002');
     expect(result).toBe(false);
   });
 
   it('returns false when debt id not found', () => {
-    const item = makeDebtItem({ id: 'debt-999' });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-999', {
+      id: 'debt-999', type: 'debt', title: 'Other', content: 'x',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: '{}', tag_text: 'debt',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null,
+    });
     const result = resolveDebt('/root', 'debt-001', 'sprint-002');
     expect(result).toBe(false);
   });
 
   it('returns false when debt is already resolved', () => {
-    const item = makeDebtItem({ id: 'debt-001', resolved: true, resolvedInSprintId: 'sprint-001' });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Debt', content: 'x',
+      source: 'brain', status: 'resolved', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: JSON.stringify({ resolvedInSprintId: 'sprint-001' }),
+      tag_text: 'debt', created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(), deleted_at: null,
+    });
     const result = resolveDebt('/root', 'debt-001', 'sprint-002');
     expect(result).toBe(false);
   });
 
   it('marks debt as resolved and returns true', () => {
-    const item = makeDebtItem({ id: 'debt-001', resolved: false });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Debt', content: 'x',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: '{}', tag_text: 'debt',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null,
+    });
     const result = resolveDebt('/root', 'debt-001', 'sprint-002');
     expect(result).toBe(true);
-    expect(writeFileSync).toHaveBeenCalled();
+    expect(mockMemoryStore.upsert).toHaveBeenCalled();
   });
 
   it('writes resolvedInSprintId correctly', () => {
-    const item = makeDebtItem({ id: 'debt-001', resolved: false });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item]));
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Debt', content: 'x',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: '{}', tag_text: 'debt',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null,
+    });
     resolveDebt('/root', 'debt-001', 'sprint-005');
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.resolved).toBe(true);
-    expect(items[0]!.resolvedInSprintId).toBe('sprint-005');
+    const upsertArg = mockMemoryStore.upsert.mock.calls[0]![0];
+    expect(upsertArg.status).toBe('resolved');
+    expect(upsertArg.metadata.resolvedInSprintId).toBe('sprint-005');
   });
 });
 
@@ -429,104 +588,54 @@ describe('resolveDebt', () => {
 
 describe('runDecay', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(countBrainLines).mockReturnValue(100);
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
-    vi.mocked(existsSync).mockReturnValue(false);
+    resetMocks();
   });
 
   it('returns early (no decay) when below budget and no force', () => {
-    vi.mocked(countBrainLines).mockReturnValue(100); // under 900
+    // totalCount returns small number (under budget)
+    mockMemoryStore.totalCount.mockReturnValue(100);
     const result = runDecay('/root', 'sprint-001');
     expect(result.linesBefore).toBe(100);
     expect(result.linesAfter).toBe(100);
     expect(result.archivedSprints).toEqual([]);
     expect(result.removedDebtCount).toBe(0);
     expect(result.removedPatternCount).toBe(0);
-    expect(writeFileSync).not.toHaveBeenCalled();
+    expect(mockMemoryStore.decay).not.toHaveBeenCalled();
   });
 
   it('runs decay when force=true even under budget', () => {
-    vi.mocked(countBrainLines).mockReturnValue(100);
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    mockMemoryStore.totalCount.mockReturnValue(100);
     const result = runDecay('/root', 'sprint-001', { force: true });
-    // Should have run (didn't return early)
     expect(result.linesBefore).toBe(100);
+    expect(mockMemoryStore.decay).toHaveBeenCalled();
   });
 
   it('runs decay when over budget', () => {
-    vi.mocked(countBrainLines).mockReturnValue(1000); // over 900
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    mockMemoryStore.totalCount.mockReturnValueOnce(1000).mockReturnValue(800);
     const result = runDecay('/root', 'sprint-001');
     expect(result.linesBefore).toBe(1000);
+    expect(mockMemoryStore.decay).toHaveBeenCalled();
   });
 
-  it('removes resolved patterns from PATTERNS.json', () => {
-    vi.mocked(countBrainLines).mockReturnValue(1000);
-    // existsSync: true for PATTERNS file, false for sprints dir
-    vi.mocked(existsSync).mockImplementation((p: any) =>
-      String(p).includes('PATTERNS') ? true : false
-    );
-    const patterns: PatternEntry[] = [
-      { pattern: 'active', occurrences: 1, firstDetectedInSprint: 'sprint-001', lastDetectedInSprint: 'sprint-001', resolved: false },
-      { pattern: 'resolved', occurrences: 1, firstDetectedInSprint: 'sprint-001', lastDetectedInSprint: 'sprint-001', resolved: true },
-    ];
-    // readFileSync: return patterns JSON for PATTERNS path, throw for everything else
-    vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('PATTERNS')) return JSON.stringify(patterns);
-      throw new Error('ENOENT');
-    });
-    const result = runDecay('/root', 'sprint-005');
-    expect(result.removedPatternCount).toBe(1);
-    const patternsWrite = vi.mocked(writeFileSync).mock.calls.find(c =>
-      (c[0] as string).includes('PATTERNS')
-    );
-    expect(patternsWrite).toBeDefined();
-    const written = JSON.parse(patternsWrite![1] as string) as PatternEntry[];
-    expect(written).toHaveLength(1);
-    expect(written[0]!.pattern).toBe('active');
+  it('calls store.decay with correct sprint number', () => {
+    mockMemoryStore.totalCount.mockReturnValue(1000);
+    runDecay('/root', 'sprint-005', { force: true });
+    expect(mockMemoryStore.decay).toHaveBeenCalledWith(5, expect.any(Number));
   });
 
-  it('archives old sprint logs keeping last 2', () => {
-    vi.mocked(countBrainLines).mockReturnValue(1000);
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([
-      'sprint-001.md', 'sprint-002.md', 'sprint-003.md', 'sprint-004.md',
-    ] as any);
-    // readFileSync: return content for sprint files, throw for PATTERNS/DEBT
-    vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('sprint-')) return '# Sprint content';
-      throw new Error('ENOENT');
-    });
-    const result = runDecay('/root', 'sprint-005');
-    expect(result.archivedSprints).toHaveLength(2);
-    expect(result.archivedSprints).toContain('sprint-001.md');
-    expect(result.archivedSprints).toContain('sprint-002.md');
-    expect(unlinkSync).toHaveBeenCalledTimes(2);
-  });
-
-  it('removes resolved debt entries old enough', () => {
-    vi.mocked(countBrainLines).mockReturnValue(1000);
-    vi.mocked(existsSync).mockReturnValue(false);
-    const resolvedItem = makeDebtItem({
-      id: 'debt-old',
-      resolved: true,
-      resolvedInSprintId: 'sprint-001',
-    });
-    const activeItem = makeDebtItem({ id: 'debt-active', resolved: false });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([resolvedItem, activeItem]));
-    const result = runDecay('/root', 'sprint-010'); // 9 sprints later > 3 retention
-    expect(result.removedDebtCount).toBe(1);
-  });
-
-  it('returns correct linesBefore and linesAfter', () => {
-    vi.mocked(countBrainLines)
-      .mockReturnValueOnce(400)  // linesBefore
-      .mockReturnValue(250);     // subsequent calls
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+  it('returns totalCount before and after decay', () => {
+    mockMemoryStore.totalCount
+      .mockReturnValueOnce(400)   // linesBefore
+      .mockReturnValue(250);      // linesAfter
     const result = runDecay('/root', 'sprint-001', { force: true });
     expect(result.linesBefore).toBe(400);
     expect(result.linesAfter).toBe(250);
+  });
+
+  it('closes the store even on forced decay', () => {
+    mockMemoryStore.totalCount.mockReturnValue(100);
+    runDecay('/root', 'sprint-001', { force: true });
+    expect(mockMemoryStore.close).toHaveBeenCalled();
   });
 });
 
@@ -534,10 +643,7 @@ describe('runDecay', () => {
 
 describe('decay', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(countBrainLines).mockReturnValue(100);
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
-    vi.mocked(existsSync).mockReturnValue(false);
+    resetMocks();
   });
 
   it('is a function that can be called', () => {
@@ -558,28 +664,28 @@ describe('decay', () => {
 
 describe('Edge cases', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetMocks();
   });
 
   it('handleEvaluation: GO_WITH_TECH_DEBT truncates long notes to 80 chars', () => {
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    vi.mocked(existsSync).mockReturnValue(true);
     const task = makeTask();
     const longNotes = 'A'.repeat(200);
     const result = makeTaskResult({ notes: longNotes });
     handleEvaluation('/root', task, TaskEvaluation.GO_WITH_TECH_DEBT, result);
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.description.length).toBeLessThanOrEqual(80);
+    expect(mockMemoryStore.insert).toHaveBeenCalled();
+    const insertArg = mockMemoryStore.insert.mock.calls[0]![0];
+    expect(insertArg.title.length).toBeLessThanOrEqual(80);
   });
 
   it('handleEvaluation: GO_WITH_TECH_DEBT with empty sprintId uses empty string', () => {
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    vi.mocked(existsSync).mockReturnValue(true);
     const task = makeTask({ sprintId: undefined });
     const result = makeTaskResult({ notes: 'note' });
     handleEvaluation('/root', task, TaskEvaluation.GO_WITH_TECH_DEBT, result);
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.originSprintId).toBe('');
+    expect(mockMemoryStore.insert).toHaveBeenCalled();
+    const insertArg = mockMemoryStore.insert.mock.calls[0]![0];
+    expect(insertArg.metadata.originSprintId).toBe('');
   });
 
   it('handleCrossDependencies: empty sprint tasks returns empty array', () => {
@@ -617,165 +723,91 @@ describe('Edge cases', () => {
     expect(writeFileSync).not.toHaveBeenCalled();
   });
 
-  it('resolveDebt: handles DEBT.md with multiple items — only resolves the correct one', () => {
-    const item1 = makeDebtItem({ id: 'debt-001', resolved: false });
-    const item2 = makeDebtItem({ id: 'debt-002', resolved: false });
-    vi.mocked(readFileSync).mockReturnValue(makeDebtTableContent([item1, item2]));
+  it('resolveDebt: with multiple items — only resolves the correct one', () => {
+    mockDbEntries.set('debt-001', {
+      id: 'debt-001', type: 'debt', title: 'Debt 1', content: 'x',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: '{}', tag_text: 'debt',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null,
+    });
+    mockDbEntries.set('debt-002', {
+      id: 'debt-002', type: 'debt', title: 'Debt 2', content: 'x',
+      source: 'brain', status: 'active', priority: 'normal',
+      sprint_id: 'sprint-001', sprint_num: 1,
+      metadata: '{}', tag_text: 'debt',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null,
+    });
     resolveDebt('/root', 'debt-001', 'sprint-003');
-    const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-    const items = parseDebtTable(written);
-    expect(items[0]!.resolved).toBe(true);
-    expect(items[1]!.resolved).toBe(false);
+    expect(mockMemoryStore.upsert).toHaveBeenCalledTimes(1);
+    const upsertArg = mockMemoryStore.upsert.mock.calls[0]![0];
+    expect(upsertArg.id).toBe('debt-001');
+    expect(upsertArg.status).toBe('resolved');
   });
 
-  it('runDecay: no sprint files — archivedSprints is empty', () => {
-    vi.mocked(countBrainLines).mockReturnValue(400);
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([] as any);
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+  it('runDecay: under budget — archivedSprints is empty', () => {
+    mockMemoryStore.totalCount.mockReturnValue(100);
     const result = runDecay('/root', 'sprint-005');
     expect(result.archivedSprints).toEqual([]);
   });
 });
 
-// ─── F) Tolerant sprint number regex ────────────────────────────────
+// ─── F) Decay delegates to MemoryStore (DB-first) ─────────────────
 
-describe('runDecay: tolerant sprint number regex (F)', () => {
+describe('runDecay: MemoryStore delegation (F)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetMocks();
   });
 
-  it('matches "## Sprint 1-5 Özet" format for memory trimming', () => {
-    // Sprint number formats that were previously broken
-    vi.mocked(countBrainLines)
-      .mockReturnValueOnce(700)  // linesBefore > budget, trigger decay
-      .mockReturnValueOnce(700)  // still over budget, trigger memory trim
-      .mockReturnValue(400);     // after trim
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([] as any);
-    const memoryContent = [
-      '## Sprint 1-5 Özet',
-      '- sleepSync → async geçişi',
-      '## Sprint sprint-010 Learnings',
-      '- Recent learning here',
-    ].join('\n');
-    vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('MEMORY')) return memoryContent;
-      throw new Error('ENOENT');
-    });
-    // Should not throw — tolerant regex should match "Sprint 1-5"
-    expect(() => runDecay('/root', 'sprint-015', { force: true })).not.toThrow();
-  });
-
-  it('matches "## Sprint sprint-NNN Learnings" format', () => {
-    vi.mocked(countBrainLines)
-      .mockReturnValueOnce(700)
-      .mockReturnValueOnce(700)
-      .mockReturnValue(400);
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([] as any);
-    const memoryContent = [
-      '## Sprint sprint-001 Learnings',
-      '- Old learning',
-      '## Sprint sprint-010 Learnings',
-      '- Recent learning',
-    ].join('\n');
-    vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('MEMORY')) return memoryContent;
-      throw new Error('ENOENT');
-    });
-    expect(() => runDecay('/root', 'sprint-015', { force: true })).not.toThrow();
-  });
-});
-
-// ─── E) Smart truncation preserves headers ───────────────────────────
-
-describe('runDecay: smart truncation preserves sprint headers (E)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('does not truncate to bare 50 lines — preserves section context', () => {
-    // Over budget even after all other decay steps
-    vi.mocked(countBrainLines).mockReturnValue(1000);
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([] as any);
-
-    // Memory content with many sections
-    const sections = Array.from({ length: 10 }, (_, i) =>
-      `## Sprint ${i + 1} Özet\n- Learning item ${i + 1}\n- Another item ${i + 1}`,
-    );
-    const memoryContent = sections.join('\n');
-    vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('MEMORY')) return memoryContent;
-      throw new Error('ENOENT');
-    });
-
+  it('parses sprint number from sprint-015 format', () => {
+    mockMemoryStore.totalCount.mockReturnValue(1000);
     runDecay('/root', 'sprint-015', { force: true });
+    expect(mockMemoryStore.decay).toHaveBeenCalledWith(15, expect.any(Number));
+  });
 
-    const memWriteCalls = vi.mocked(writeFileSync).mock.calls.filter(c =>
-      (c[0] as string).includes('MEMORY'),
-    );
-    expect(memWriteCalls.length).toBeGreaterThan(0);
-    const written = memWriteCalls[memWriteCalls.length - 1]![1] as string;
-    // Should preserve at least one ## header
-    expect(written).toMatch(/^##/m);
+  it('parses sprint number from sprint-001 format', () => {
+    mockMemoryStore.totalCount.mockReturnValue(1000);
+    runDecay('/root', 'sprint-001', { force: true });
+    expect(mockMemoryStore.decay).toHaveBeenCalledWith(1, expect.any(Number));
   });
 });
 
-// ─── G) Archive .gitignore fix ───────────────────────────────────────
+// ─── E) Decay result shape ──────────────────────────────────────────
 
-describe('runDecay: archive directory git tracking (G)', () => {
+describe('runDecay: result shape (E)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetMocks();
   });
 
-  it('writes .gitignore negation file in archive directory when archiving sprints', () => {
-    vi.mocked(countBrainLines).mockReturnValue(1000);
-    vi.mocked(existsSync).mockImplementation((p: any) => {
-      // sprints dir exists, archive .gitignore does NOT exist yet
-      if (String(p).includes('archive') && String(p).includes('.gitignore')) return false;
-      return true;
-    });
-    vi.mocked(readdirSync).mockReturnValue([
-      'sprint-001.md', 'sprint-002.md', 'sprint-003.md',
-    ] as any);
-    vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('sprint-')) return '# Sprint content';
-      throw new Error('ENOENT');
-    });
+  it('returns zero counts from DB-first decay', () => {
+    mockMemoryStore.totalCount
+      .mockReturnValueOnce(1000)
+      .mockReturnValue(800);
+    const result = runDecay('/root', 'sprint-015', { force: true });
+    // DB-first runDecay returns removedDebtCount=0 and removedPatternCount=0
+    // because cleanup is handled internally by store.decay()
+    expect(result.removedDebtCount).toBe(0);
+    expect(result.removedPatternCount).toBe(0);
+    expect(result.archivedSprints).toEqual([]);
+  });
+});
 
-    runDecay('/root', 'sprint-005');
+// ─── G) Store close always called ───────────────────────────────────
 
-    const gitignoreWrite = vi.mocked(writeFileSync).mock.calls.find(c =>
-      (c[0] as string).includes('archive') && (c[0] as string).includes('.gitignore'),
-    );
-    expect(gitignoreWrite).toBeDefined();
-    // Content should include negation to allow files
-    expect(gitignoreWrite![1] as string).toContain('!*');
+describe('runDecay: store lifecycle (G)', () => {
+  beforeEach(() => {
+    resetMocks();
   });
 
-  it('does not overwrite .gitignore if it already exists', () => {
-    vi.mocked(countBrainLines).mockReturnValue(1000);
-    vi.mocked(existsSync).mockImplementation((p: any) => {
-      // archive .gitignore already exists
-      if (String(p).includes('archive') && String(p).includes('.gitignore')) return true;
-      return true;
-    });
-    vi.mocked(readdirSync).mockReturnValue([
-      'sprint-001.md', 'sprint-002.md', 'sprint-003.md',
-    ] as any);
-    vi.mocked(readFileSync).mockImplementation((p: any) => {
-      if (String(p).includes('sprint-')) return '# Sprint content';
-      throw new Error('ENOENT');
-    });
-
+  it('closes store after decay run', () => {
+    mockMemoryStore.totalCount.mockReturnValue(1000);
     runDecay('/root', 'sprint-005');
+    expect(mockMemoryStore.close).toHaveBeenCalled();
+  });
 
-    const gitignoreWrites = vi.mocked(writeFileSync).mock.calls.filter(c =>
-      (c[0] as string).includes('archive') && (c[0] as string).includes('.gitignore'),
-    );
-    // Should NOT write .gitignore again since it already exists
-    expect(gitignoreWrites).toHaveLength(0);
+  it('closes store even when under budget (early return)', () => {
+    mockMemoryStore.totalCount.mockReturnValue(100);
+    runDecay('/root', 'sprint-005');
+    expect(mockMemoryStore.close).toHaveBeenCalled();
   });
 });
