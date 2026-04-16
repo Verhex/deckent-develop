@@ -1579,14 +1579,9 @@ export function checkADRCompliance(
     }
   } catch { /* DB failed, fall through to V1 */ }
 
-  // V1 fallback: parse DECISIONS.md
+  // No DB or no ADR entries — skip compliance check
   if (adrs.length === 0) {
-    try {
-      const decisionsContent = readFileSync(join(projectRoot, BRAIN_DIR, 'DECISIONS.md'), 'utf-8');
-      adrs = parseADRs(decisionsContent);
-    } catch {
-      return violations; // No DB and no DECISIONS.md — skip
-    }
+    return violations;
   }
 
   for (const adr of adrs) {

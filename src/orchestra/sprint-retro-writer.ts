@@ -8,10 +8,10 @@ import type {
 } from '../core/types.js';
 import {
   BRAIN_DIR, MEMORY_FILE, RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES,
-  PATTERNS_FILE, DEBT_FILE, MEMORY_DB_FILE,
+  MEMORY_DB_FILE,
 } from '../core/constants.js';
 import { MemoryStore } from '../core/memory-store.js';
-import { debugLog, parseDebtTable } from '../core/utils.js';
+import { debugLog } from '../core/utils.js';
 import {
   formatDuration,
   formatAgentPerformanceTable,
@@ -408,18 +408,39 @@ export function writeRetrospective(
   // Read previous sprint metrics for comparison
   const previousMetrics = readPreviousSprintMetrics(projectRoot, sprint.id);
 
-  // Read patterns and debt for learnings
+  // Read patterns and debt for learnings (DB-first)
   let patterns: PatternEntry[] = [];
-  try {
-    const patternsRaw = readFileSafe(join(brainPath, PATTERNS_FILE));
-    if (patternsRaw) patterns = JSON.parse(patternsRaw);
-  } catch (e) { debugLog('writeRetrospective:parsePatterns', e); }
-
   let debt: DebtItem[] = [];
-  try {
-    const debtRaw = readFileSafe(join(brainPath, DEBT_FILE));
-    if (debtRaw) debt = parseDebtTable(debtRaw);
-  } catch (e) { debugLog('writeRetrospective:parseDebt', e); }
+  const dbPath = join(brainPath, MEMORY_DB_FILE);
+  if (existsSync(dbPath)) {
+    try {
+      const store = new MemoryStore(dbPath);
+      try {
+        const patternEntries = store.getByType('pattern');
+        patterns = patternEntries.map(p => ({
+          pattern: p.title,
+          occurrences: (JSON.parse(p.metadata || '{}') as Record<string, unknown>).occurrences as number ?? 1,
+          firstDetectedInSprint: p.sprint_id ?? '',
+          lastDetectedInSprint: p.sprint_id ?? '',
+          resolved: p.status === 'resolved',
+        }));
+        const debtEntries = store.getByType('debt').filter(d => d.status !== 'resolved');
+        debt = debtEntries.map(d => {
+          const meta = JSON.parse(d.metadata || '{}') as Record<string, unknown>;
+          return {
+            id: d.id,
+            description: d.title,
+            originTaskId: (meta.originTaskId as string) ?? '',
+            originSprintId: (meta.originSprintId as string) ?? d.sprint_id ?? '',
+            priority: (d.priority?.toUpperCase() ?? 'NORMAL') as DebtItem['priority'],
+            sprintsOpen: (meta.sprintsOpen as number) ?? 0,
+            resolved: false,
+            createdAt: d.created_at,
+          };
+        });
+      } finally { store.close(); }
+    } catch (e) { debugLog('writeRetrospective:readFromDB', e); }
+  }
 
   // Generate human-friendly RETRO content
   const retroContent = formatHumanRetro({
@@ -482,7 +503,6 @@ export function writeRetrospective(
   writeFileSync(memoryPath, trimmed, 'utf-8');
 
   // ─── DB dual-write: retro + memory entries ──────────────────
-  const dbPath = join(brainPath, MEMORY_DB_FILE);
   if (existsSync(dbPath)) {
     try {
       const store = new MemoryStore(dbPath);

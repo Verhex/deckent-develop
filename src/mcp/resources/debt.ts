@@ -1,9 +1,8 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { BRAIN_DIR, DEBT_FILE, MEMORY_DB_FILE } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import type { DebtItem } from '../../core/types.js';
-import { parseDebtTable } from '../../core/utils.js';
 import { MemoryStore } from '../../core/memory-store.js';
 
 export function registerDebtResource(server: McpServer): void {
@@ -18,7 +17,7 @@ export function registerDebtResource(server: McpServer): void {
     async (uri) => {
       const root = process.cwd();
 
-      // DB-first
+      // DB-first (only path)
       const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
       if (existsSync(dbPath)) {
         try {
@@ -41,19 +40,11 @@ export function registerDebtResource(server: McpServer): void {
             });
             return { contents: [{ uri: uri.href, text: JSON.stringify(items), mimeType: 'application/json' }] };
           } finally { store.close(); }
-        } catch { /* fall through to V1 */ }
+        } catch { /* DB error — return empty */ }
       }
 
-      // V1 fallback
-      const filePath = join(root, BRAIN_DIR, DEBT_FILE);
-      let items: DebtItem[] = [];
-      if (existsSync(filePath)) {
-        try {
-          const content = readFileSync(filePath, 'utf-8');
-          items = parseDebtTable(content);
-        } catch { /* empty array on parse error */ }
-      }
-      return { contents: [{ uri: uri.href, text: JSON.stringify(items), mimeType: 'application/json' }] };
+      // No DB available — return empty array
+      return { contents: [{ uri: uri.href, text: '[]', mimeType: 'application/json' }] };
     },
   );
 }

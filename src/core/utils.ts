@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { BRAIN_DIR, ARCHIVE_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, PROJECT_CONFIG_PATH, ERRORS_FILE, ERRORS_MAX_LINES } from './constants.js';
+import { BRAIN_DIR, SPRINTS_DIR, DEBT_TABLE_HEADER, DECKENT_FILE, PROJECT_CONFIG_PATH, ERRORS_FILE, ERRORS_MAX_LINES } from './constants.js';
 import type { DebtItem } from './types.js';
 import { DebtPriority } from './types.js';
 
@@ -99,33 +99,6 @@ export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> 
     debugLog('readJsonSafeAsync', e);
     return null;
   }
-}
-
-/**
- * Count total lines in .brain/ directory (excluding archive/).
- * Used by brain decay and doctor health checks.
- * @deprecated Memory V2 uses MemoryStore.totalCount() instead. Kept for V1 fallback compatibility.
- * @param projectRoot - Project root directory
- * @returns Total line count across all .brain/ files
- */
-export function countBrainLines(projectRoot: string): number {
-  const brainPath = join(projectRoot, BRAIN_DIR);
-  if (!existsSync(brainPath)) return 0;
-
-  let total = 0;
-  const entries = readdirSync(brainPath);
-  for (const entry of entries) {
-    if (entry === ARCHIVE_DIR || entry === SPRINTS_DIR) continue;
-    try { total += readFileSync(join(brainPath, entry), 'utf-8').split('\n').length; } catch (e) { debugLog('countBrainLines', e); }
-  }
-
-  const sprintsPath = join(brainPath, SPRINTS_DIR);
-  if (existsSync(sprintsPath)) {
-    for (const file of readdirSync(sprintsPath)) {
-      try { total += readFileSync(join(sprintsPath, file), 'utf-8').split('\n').length; } catch (e) { debugLog('countBrainLines:sprints', e); }
-    }
-  }
-  return total;
 }
 
 /**

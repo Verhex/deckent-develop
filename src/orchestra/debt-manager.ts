@@ -1,94 +1,55 @@
 // ─── Debt Management ───────────────────────────────────────────────
 // Extracted from brain.ts — debt resolution, escalation, cross-dependencies
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { TaskStatus, TaskEvaluation, DebtPriority } from '../core/types.js';
+import { TaskStatus, TaskEvaluation } from '../core/types.js';
 import type {
-  Task, TaskResult, Sprint, PatternEntry, DecayResult,
+  Task, TaskResult, Sprint, DecayResult,
 } from '../core/types.js';
 import {
-  BRAIN_DIR, TASKS_DIR, DEBT_FILE, PATTERNS_FILE,
-  SPRINTS_DIR, ARCHIVE_DIR, MEMORY_FILE,
+  BRAIN_DIR, TASKS_DIR,
+  MEMORY_DB_FILE,
   DEBT_HIGH_PRIORITY_SPRINTS, DEBT_CRITICAL_SPRINTS,
 } from '../core/constants.js';
-import { countBrainLines, parseDebtTable, generateDebtTable, readJsonSafe } from '../core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
+import { MemoryStore } from '../core/memory-store.js';
+import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
-function readFileSafe(filePath: string): string {
+/**
+ * Open the Memory V2 SQLite DB if it exists. Returns null when the DB
+ * file is absent (pure V1 project) or cannot be opened.
+ */
+function getMemoryStore(projectRoot: string): MemoryStore | null {
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
   try {
-    return readFileSync(filePath, 'utf-8');
-  } catch {
-    return '';
-  }
+    if (!existsSync(dbPath)) return null;
+    return new MemoryStore(dbPath);
+  } catch { return null; }
 }
 
 /**
- * E) Smart memory trim: preserve sprint section headers but trim detail lines
- * from older sections. Keeps section headers intact to preserve learning history,
- * only removes verbose detail lines when absolutely necessary.
+ * Convert a MemoryEntryV2 row back into a CreateEntryInput that can be
+ * passed to `store.upsert()`. Tags are NOT round-tripped here because
+ * upsert re-derives them; callers should supply tags separately if needed.
  */
-function smartTrimMemory(content: string, targetLines = 80): string {
-  const lines = content.split('\n');
-  if (lines.length <= targetLines) return content;
-
-  // Parse content into sections (by ## headers)
-  type Section = { header: string; lines: string[] };
-  const sections: Section[] = [];
-  let currentSection: Section | null = null;
-
-  for (const line of lines) {
-    if (line.startsWith('## ')) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { header: line, lines: [] };
-    } else if (currentSection) {
-      currentSection.lines.push(line);
-    } else {
-      // Lines before any header (preamble)
-      if (sections.length === 0) {
-        sections.push({ header: '', lines: [line] });
-      } else {
-        sections[0]!.lines.push(line);
-      }
-    }
-  }
-  if (currentSection) sections.push(currentSection);
-
-  // First pass: try to fit within target by trimming older sections' details
-  // Keep the last 3 sections fully, trim earlier ones to header only
-  const recentCount = 3;
-  const oldSections = sections.slice(0, Math.max(0, sections.length - recentCount));
-  const recentSections = sections.slice(Math.max(0, sections.length - recentCount));
-
-  const result: string[] = [];
-  // Old sections: keep header + first summary line only
-  for (const sec of oldSections) {
-    if (sec.header) result.push(sec.header);
-    // Keep first non-empty content line as a brief summary
-    const firstContent = sec.lines.find(l => l.trim().length > 0);
-    if (firstContent) result.push(firstContent);
-  }
-  // Recent sections: keep in full
-  for (const sec of recentSections) {
-    if (sec.header) result.push(sec.header);
-    result.push(...sec.lines);
-  }
-
-  // If still over target, trim trailing empty lines and fall back to last targetLines
-  const trimmed = result.join('\n').replace(/\n{3,}/g, '\n\n');
-  const trimmedLines = trimmed.split('\n');
-  if (trimmedLines.length > targetLines) {
-    // Last resort: keep last targetLines but try to start at a section boundary
-    const lastPortion = trimmedLines.slice(trimmedLines.length - targetLines);
-    // Find the first ## header in lastPortion to start cleanly
-    const firstHeader = lastPortion.findIndex(l => l.startsWith('## '));
-    if (firstHeader > 0) return lastPortion.slice(firstHeader).join('\n');
-    return lastPortion.join('\n');
-  }
-  return trimmed;
+function debtEntryToInput(entry: MemoryEntryV2): CreateEntryInput {
+  return {
+    id: entry.id,
+    type: entry.type,
+    title: entry.title,
+    content: entry.content,
+    source: entry.source,
+    summary: entry.summary ?? undefined,
+    status: entry.status,
+    priority: entry.priority,
+    sprint_id: entry.sprint_id ?? undefined,
+    sprint_num: entry.sprint_num,
+    tags: entry.tag_text ? entry.tag_text.split(' ').filter(Boolean) : [],
+    metadata: JSON.parse(entry.metadata || '{}') as Record<string, unknown>,
+  };
 }
-
 
 function now(): string {
   return new Date().toISOString();
@@ -118,7 +79,6 @@ export function handleEvaluation(
   evaluation: TaskEvaluation,
   result: TaskResult,
 ): void {
-  const brainPath = join(projectRoot, BRAIN_DIR);
   const workerId = task.assignedWorker ?? `w-${task.id}`;
 
   if (evaluation === TaskEvaluation.DONE) {
@@ -131,26 +91,31 @@ export function handleEvaluation(
     updateTaskStatus(projectRoot, task.id, TaskStatus.DONE);
     releaseAllLocks(projectRoot, workerId);
 
-    // Add debt item
-    const debtPath = join(brainPath, DEBT_FILE);
-    mkdirSync(brainPath, { recursive: true });
-    const existing = readFileSafe(debtPath);
-    const items = existing ? parseDebtTable(existing) : [];
     const debtId = `debt-${task.id}`;
-    if (items.some(d => d.id === debtId)) {
+
+    // ── Memory V2: DB-first ──────────────────────────────────────
+    const store = getMemoryStore(projectRoot);
+    if (store) {
+      try {
+        if (!store.getById(debtId)) {
+          store.insert({
+            id: debtId,
+            type: 'debt',
+            title: `Tech debt from ${task.id}: ${result.notes}`.slice(0, 80),
+            content: `Task ${task.id} evaluated as GO_WITH_TECH_DEBT. Notes: ${result.notes}`,
+            source: 'brain',
+            status: 'active',
+            priority: 'normal',
+            sprint_id: task.sprintId,
+            sprint_num: parseInt((task.sprintId ?? '').replace(/\D/g, ''), 10) || 0,
+            tags: ['debt', task.id],
+            metadata: { originTaskId: task.id, originSprintId: task.sprintId ?? '', sprintsOpen: 0 },
+          });
+        }
+      } finally { store.close(); }
       return;
     }
-    items.push({
-      id: debtId,
-      description: `Tech debt from ${task.id}: ${result.notes}`.slice(0, 80),
-      originTaskId: task.id,
-      originSprintId: task.sprintId ?? '',
-      priority: DebtPriority.NORMAL,
-      sprintsOpen: 0,
-      resolved: false,
-      createdAt: now(),
-    });
-    writeFileSync(debtPath, generateDebtTable(items), 'utf-8');
+    // No DB available — debt entry skipped (Memory V2 DB required)
     return;
   }
 
@@ -243,30 +208,27 @@ export function handleCrossDependencies(
  * @param projectRoot - Project root directory
  */
 export function escalateDebt(projectRoot: string): void {
-  const debtPath = join(projectRoot, BRAIN_DIR, DEBT_FILE);
-  const content = readFileSafe(debtPath);
-  if (!content) return;
-
-  const items = parseDebtTable(content);
-  let changed = false;
-
-  for (const item of items) {
-    if (item.resolved) continue;
-    item.sprintsOpen++;
-    if (item.sprintsOpen >= DEBT_CRITICAL_SPRINTS && item.priority !== DebtPriority.CRITICAL) {
-      item.priority = DebtPriority.CRITICAL;
-      changed = true;
-    } else if (item.sprintsOpen >= DEBT_HIGH_PRIORITY_SPRINTS && item.priority === DebtPriority.NORMAL) {
-      item.priority = DebtPriority.HIGH;
-      changed = true;
-    }
-    changed = true; // sprintsOpen always increments
+  // ── Memory V2: DB-first ────────────────────────────────────────
+  const store = getMemoryStore(projectRoot);
+  if (store) {
+    try {
+      const debts = store.getByType('debt').filter(d => d.status !== 'resolved');
+      for (const debt of debts) {
+        const meta = JSON.parse(debt.metadata || '{}') as Record<string, unknown>;
+        const sprintsOpen = (typeof meta.sprintsOpen === 'number' ? meta.sprintsOpen : 0) + 1;
+        let newPriority = debt.priority;
+        if (sprintsOpen >= DEBT_CRITICAL_SPRINTS && debt.priority !== 'critical') newPriority = 'critical';
+        else if (sprintsOpen >= DEBT_HIGH_PRIORITY_SPRINTS && debt.priority === 'normal') newPriority = 'high';
+        store.upsert({
+          ...debtEntryToInput(debt),
+          priority: newPriority,
+          metadata: { ...meta, sprintsOpen },
+        }, 'brain');
+      }
+    } finally { store.close(); }
+    return;
   }
-
-  if (changed) {
-    mkdirSync(join(projectRoot, BRAIN_DIR), { recursive: true });
-    writeFileSync(debtPath, generateDebtTable(items), 'utf-8');
-  }
+  // No DB available — escalation skipped
 }
 
 /**
@@ -277,17 +239,24 @@ export function escalateDebt(projectRoot: string): void {
  * @returns true if the item was found and resolved, false otherwise
  */
 export function resolveDebt(projectRoot: string, debtId: string, resolvedInSprintId: string): boolean {
-  const debtPath = join(projectRoot, BRAIN_DIR, DEBT_FILE);
-  const content = readFileSafe(debtPath);
-  if (!content) return false;
-  const items = parseDebtTable(content);
-  const item = items.find(d => d.id === debtId);
-  if (!item || item.resolved) return false;
-  item.resolved = true;
-  item.resolvedInSprintId = resolvedInSprintId;
-  mkdirSync(join(projectRoot, BRAIN_DIR), { recursive: true });
-  writeFileSync(debtPath, generateDebtTable(items), 'utf-8');
-  return true;
+  // ── Memory V2: DB-first ────────────────────────────────────────
+  const store = getMemoryStore(projectRoot);
+  if (store) {
+    try {
+      const entry = store.getById(debtId);
+      if (!entry || entry.status === 'resolved') return false;
+      const meta = JSON.parse(entry.metadata || '{}') as Record<string, unknown>;
+      store.upsert({
+        ...debtEntryToInput(entry),
+        status: 'resolved',
+        metadata: { ...meta, resolvedInSprintId },
+      }, 'brain');
+      return true;
+    } finally { store.close(); }
+  }
+
+  // No DB available — resolve skipped
+  return false;
 }
 
 // ═══ Archive ═══════════════════════════════════════════════════════
@@ -300,36 +269,21 @@ export function resolveDebt(projectRoot: string, debtId: string, resolvedInSprin
  * @returns Number of items archived
  */
 export function archiveResolvedDebt(projectRoot: string): number {
-  const brainPath = join(projectRoot, BRAIN_DIR);
-  const debtPath = join(brainPath, DEBT_FILE);
-  const content = readFileSafe(debtPath);
-  if (!content) return 0;
-
-  const items = parseDebtTable(content);
-  const resolvedItems = items.filter(d => d.resolved);
-  const openItems = items.filter(d => !d.resolved);
-
-  if (resolvedItems.length === 0) return 0;
-
-  const archiveDirPath = join(brainPath, ARCHIVE_DIR);
-  mkdirSync(archiveDirPath, { recursive: true });
-
-  const archivePath = join(archiveDirPath, 'DEBT-ARCHIVE.md');
-  let allArchived = resolvedItems;
-  if (existsSync(archivePath)) {
-    const archiveContent = readFileSafe(archivePath);
-    const existingItems = parseDebtTable(archiveContent);
-    // Merge without duplicates (by id)
-    const existingIds = new Set(existingItems.map(i => i.id));
-    const newItems = resolvedItems.filter(i => !existingIds.has(i.id));
-    allArchived = [...existingItems, ...newItems];
+  // ── Memory V2: DB-first ────────────────────────────────────────
+  // In V2 resolved debts are already soft-deleted via status='resolved'.
+  // "Archiving" in the DB sense means nothing needs to move — the entry
+  // stays in place and is excluded from active queries.  We just count
+  // how many are resolved for the caller's reporting.
+  const store = getMemoryStore(projectRoot);
+  if (store) {
+    try {
+      const resolved = store.getByType('debt').filter(d => d.status === 'resolved');
+      return resolved.length;
+    } finally { store.close(); }
   }
-  writeFileSync(archivePath, generateDebtTable(allArchived), 'utf-8');
 
-  // Update DEBT.md with only open items
-  writeFileSync(debtPath, generateDebtTable(openItems), 'utf-8');
-
-  return resolvedItems.length;
+  // No DB available — archive returns 0
+  return 0;
 }
 
 // ═══ Decay ═════════════════════════════════════════════════════════
@@ -362,43 +316,26 @@ export interface BrainBudgetAudit {
  * @returns Audit result with decayable/permanent/total counts and status
  */
 export function auditBrainBudget(projectRoot: string, budget = 900): BrainBudgetAudit {
-  const brainPath = join(projectRoot, BRAIN_DIR);
-  if (!existsSync(brainPath)) {
-    return { decayableLines: 0, permanentLines: 0, totalLines: 0, status: 'OK' };
-  }
-
-  let decayableLines = 0;
-  let permanentLines = 0;
-
-  const entries = readdirSync(brainPath);
-  for (const entry of entries) {
-    if (entry === 'archive' || entry === 'sprints') continue;
-    const filePath = join(brainPath, entry);
+  // ── Memory V2: DB-first ────────────────────────────────────────
+  const store = getMemoryStore(projectRoot);
+  if (store) {
     try {
-      const stat = statSync(filePath);
-      if (!stat.isFile()) continue;
-      const lines = readFileSync(filePath, 'utf-8').split('\n').length;
-      if (DECAY_EXEMPT.has(entry)) {
-        permanentLines += lines;
-      } else {
-        decayableLines += lines;
-      }
-    } catch { /* skip unreadable entries */ }
+      const total = store.totalCount();
+      // Identity entries map to DECAY_EXEMPT files in V1
+      const exempt = store.getByType('identity').length
+        + store.getByType('adr').length;
+      const decayable = total - exempt;
+      return {
+        status: decayable > budget ? 'OVER' : 'OK',
+        totalLines: total,
+        permanentLines: exempt,
+        decayableLines: decayable,
+      };
+    } finally { store.close(); }
   }
 
-  // Sprint logs are decayable
-  const sprintsPath = join(brainPath, 'sprints');
-  if (existsSync(sprintsPath)) {
-    for (const file of readdirSync(sprintsPath)) {
-      try {
-        decayableLines += readFileSync(join(sprintsPath, file), 'utf-8').split('\n').length;
-      } catch { /* skip */ }
-    }
-  }
-
-  const totalLines = decayableLines + permanentLines;
-  const status = decayableLines > budget ? 'OVER' : 'OK';
-  return { decayableLines, permanentLines, totalLines, status };
+  // No DB available — report OK (empty project)
+  return { decayableLines: 0, permanentLines: 0, totalLines: 0, status: 'OK' };
 }
 
 export interface RunDecayOptions {
@@ -419,100 +356,31 @@ export interface RunDecayOptions {
 export function runDecay(projectRoot: string, sprintId: string, opts?: RunDecayOptions): DecayResult {
   const budget = opts?.memoryBudget ?? 900;
   const decaySprints = opts?.decaySprints ?? 8;
-  const linesBefore = countBrainLines(projectRoot);
-  const brainPath = join(projectRoot, BRAIN_DIR);
 
-  // Track what we'll remove
-  let removedDebtCount = 0;
-  let removedPatternCount = 0;
-  const archivedSprints: string[] = [];
-
-  // Use decayable-only line count for budget decision (DECAY_EXEMPT files excluded).
-  // audit.status === 'OVER' means decayableLines > budget (exempt files are NOT counted).
-  // linesBefore > budget is kept for backward compatibility but should not gate decay alone.
-  const audit = auditBrainBudget(projectRoot, budget);
-  const shouldRun = opts?.force || audit.status === 'OVER';
-  if (!shouldRun) {
-    return { linesBefore, linesAfter: linesBefore, archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0 };
-  }
-
-  // 1. Remove resolved patterns
-  const patternsPath = join(brainPath, PATTERNS_FILE);
-  if (existsSync(patternsPath)) {
-    const raw = readJsonSafe<PatternEntry[] | { active?: PatternEntry[]; resolved?: PatternEntry[] }>(patternsPath);
-    if (raw) {
-      // Support both formats: plain array or { active, resolved } object
-      const patterns = Array.isArray(raw)
-        ? raw
-        : [...(raw.active ?? []), ...(raw.resolved ?? [])];
-      const resolved = patterns.filter(p => p.resolved);
-      removedPatternCount = resolved.length;
-      const active = patterns.filter(p => !p.resolved);
-      writeFileSync(patternsPath, JSON.stringify(active, null, 2), 'utf-8');
-    }
-  }
-
-  // 2. Archive resolved debt to .brain/archive/DEBT-ARCHIVE.md
-  removedDebtCount = archiveResolvedDebt(projectRoot);
-
-  // 3. Archive old sprint logs (keep last 2)
-  const sprintsPath = join(brainPath, SPRINTS_DIR);
-  if (existsSync(sprintsPath)) {
-    const archivePath = join(brainPath, ARCHIVE_DIR);
-    const sprintFiles = readdirSync(sprintsPath).filter(f => f.endsWith('.md')).sort();
-    const toArchive = sprintFiles.slice(0, Math.max(0, sprintFiles.length - 2));
-    if (toArchive.length > 0) {
-      mkdirSync(archivePath, { recursive: true });
-      // G) Ensure archive is tracked by git: write a .gitkeep so git tracks the directory
-      // and a local .gitignore negation to override any parent .gitignore that excludes it
-      const archiveGitignorePath = join(archivePath, '.gitignore');
-      if (!existsSync(archiveGitignorePath)) {
-        writeFileSync(archiveGitignorePath, '# This file ensures the archive directory is tracked by git\n!*\n', 'utf-8');
+  // ── Memory V2: DB-first ────────────────────────────────────────
+  const store = getMemoryStore(projectRoot);
+  if (store) {
+    try {
+      const currentNum = getSprintNumber(sprintId);
+      const totalBefore = store.totalCount();
+      const shouldRun = opts?.force || totalBefore > budget;
+      if (!shouldRun) {
+        return { linesBefore: totalBefore, linesAfter: totalBefore, archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0 };
       }
-      for (const file of toArchive) {
-        const content = readFileSync(join(sprintsPath, file), 'utf-8');
-        writeFileSync(join(archivePath, file), content, 'utf-8');
-        unlinkSync(join(sprintsPath, file));
-        archivedSprints.push(file);
-      }
-    }
+      store.decay(currentNum, decaySprints);
+      const totalAfter = store.totalCount();
+      return {
+        linesBefore: totalBefore,
+        linesAfter: totalAfter,
+        archivedSprints: [],
+        removedDebtCount: 0,
+        removedPatternCount: 0,
+      };
+    } finally { store.close(); }
   }
 
-  // 4. Memory archive — trim old sections
-  // Re-audit after steps 1-3 to get updated decayable count (patterns/debt removed above).
-  const auditMid = auditBrainBudget(projectRoot, budget);
-  const memoryPath = join(brainPath, MEMORY_FILE);
-  if (existsSync(memoryPath) && auditMid.decayableLines > budget) {
-    const content = readFileSafe(memoryPath);
-    const currentNum = getSprintNumber(sprintId);
-    const lines = content.split('\n');
-    const kept: string[] = [];
-    let currentSectionOld = false;
-
-    for (const line of lines) {
-      // F) More tolerant regex: matches "## Sprint sprint-NNN", "## Sprint NNN", "## Sprint N-M Özet", etc.
-      const sectionMatch = line.match(/^## Sprint (?:sprint-)?(\d+)/i);
-      if (sectionMatch?.[1]) {
-        const sectionNum = parseInt(sectionMatch[1], 10);
-        currentSectionOld = (currentNum - sectionNum) >= decaySprints;
-      }
-      if (!currentSectionOld) kept.push(line);
-    }
-    writeFileSync(memoryPath, kept.join('\n'), 'utf-8');
-  }
-
-  // 5. Last resort — smart truncation: preserve sprint headers, trim detail content.
-  // Check only eligible (decayable) lines so exempt files don't block this gate.
-  const auditFinal = auditBrainBudget(projectRoot, budget);
-  if (auditFinal.decayableLines > budget) {
-    const memContent = readFileSafe(join(brainPath, MEMORY_FILE));
-    // E) Improved truncation: keep headers + recent content, trim old section details
-    const trimmedContent = smartTrimMemory(memContent);
-    writeFileSync(join(brainPath, MEMORY_FILE), trimmedContent, 'utf-8');
-  }
-
-  const linesAfter = countBrainLines(projectRoot);
-  return { linesBefore, linesAfter, archivedSprints, removedDebtCount, removedPatternCount };
+  // No DB available — decay is a no-op
+  return { linesBefore: 0, linesAfter: 0, archivedSprints: [], removedDebtCount: 0, removedPatternCount: 0 };
 }
 
 /**

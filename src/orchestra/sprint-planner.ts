@@ -19,7 +19,7 @@ import {
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
-  Task, TaskScope, Sprint,
+  Task, TaskScope, Sprint, DebtItem,
   ResolvedConfig,
   BrainContext, SprintSizeRecommendation,
   BrainPlanningMode, PlannerResult, ProviderName,
@@ -27,12 +27,14 @@ import type {
 
 import {
   BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE,
-  MEMORY_FILE, DECISIONS_FILE, DEBT_FILE, PATTERNS_FILE,
-  RETRO_FILE, PROJECT_IDENTITY_FILE,
+  MEMORY_DB_FILE,
 } from '../core/constants.js';
 
+// ─── Memory V2 ───────────────────────────────────────────────────
+import { MemoryStore } from '../core/memory-store.js';
+
 // ─── Core — utils ─────────────────────────────────────────────────
-import { getNextSprintId, parseDebtTable, readJsonSafe, debugLog } from '../core/utils.js';
+import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import { readFileSafe, extractGoNogoCriteria } from './sprint-utils.js';
@@ -75,17 +77,72 @@ import { BrainError } from './sprint-lifecycle.js';
  */
 export function readContext(projectRoot: string): BrainContext {
   const brainPath = join(projectRoot, BRAIN_DIR);
+  const dbPath = join(brainPath, MEMORY_DB_FILE);
 
+  // Directives always from file (not in DB)
   const directives = readFileSafe(join(projectRoot, DIRECTIVES_FILE));
-  const memory = readFileSafe(join(brainPath, MEMORY_FILE));
-  const retro = readFileSafe(join(brainPath, RETRO_FILE));
-  const patterns = readFileSafe(join(brainPath, PATTERNS_FILE));
-  const decisions = readFileSafe(join(brainPath, DECISIONS_FILE));
-  const projectIdentity = readFileSafe(join(brainPath, PROJECT_IDENTITY_FILE));
 
-  const debtContent = readFileSafe(join(brainPath, DEBT_FILE));
-  const debt = debtContent ? parseDebtTable(debtContent) : [];
+  // Try DB-first for brain context
+  let memory = '';
+  let retro = '';
+  let patterns = '';
+  let decisions = '';
+  let projectIdentity: string | undefined;
+  let debt: DebtItem[] = [];
 
+  if (existsSync(dbPath)) {
+    try {
+      const store = new MemoryStore(dbPath);
+      try {
+        // Memory: concat all memory entries as markdown
+        const memEntries = store.getByType('memory');
+        memory = memEntries.map(e => `## ${e.title}\n${e.content}`).join('\n\n');
+
+        // Retro: latest retro entry
+        const retroEntries = store.getByType('retro');
+        retro = retroEntries.length > 0 ? retroEntries[0]!.content : '';
+
+        // Patterns: all active patterns as JSON string (backward compat)
+        const patternEntries = store.getByType('pattern');
+        patterns = patternEntries.length > 0
+          ? JSON.stringify(patternEntries.map(p => ({ pattern: p.title, resolved: p.status === 'resolved' })))
+          : '';
+
+        // Decisions: concat all accepted ADRs
+        const adrEntries = store.getByType('adr').filter(a => a.status === 'accepted');
+        decisions = adrEntries.map(a => `## ${a.id}: ${a.title}\n\n**Status:** ${a.status}\n\n${a.content}`).join('\n\n---\n\n');
+
+        // Project Identity
+        const idEntry = store.getByType('identity');
+        projectIdentity = idEntry.length > 0 ? idEntry[0]!.content : undefined;
+
+        // Debt: convert DB entries to DebtItem[]
+        const debtEntries = store.getByType('debt').filter(d => d.status !== 'resolved');
+        debt = debtEntries.map(d => {
+          const meta = JSON.parse(d.metadata || '{}');
+          return {
+            id: d.id,
+            description: d.title,
+            originTaskId: meta.originTaskId ?? '',
+            originSprintId: meta.originSprintId ?? d.sprint_id ?? '',
+            priority: (d.priority?.toUpperCase() ?? 'NORMAL') as DebtPriority,
+            sprintsOpen: meta.sprintsOpen ?? 0,
+            resolved: false,
+            resolvedInSprintId: undefined,
+            createdAt: d.created_at,
+          };
+        });
+      } finally {
+        store.close();
+      }
+    } catch {
+      // DB error — fall through to V1
+    }
+  }
+
+  // If DB didn't populate (no DB or error), fields remain as empty strings/arrays
+
+  // Existing tasks + git status (unchanged)
   const existingTasks: Task[] = [];
   const tasksDir = join(projectRoot, TASKS_DIR);
   if (existsSync(tasksDir)) {

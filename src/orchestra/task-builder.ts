@@ -1,7 +1,7 @@
 // ─── Task Creation & Directive Parsing ─────────────────────────────
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
@@ -700,30 +700,9 @@ export function truncateAtParagraph(content: string, maxLen: number): string {
 }
 
 /**
- * Load ADR content from .brain/DECISIONS.md for worker prompt injection.
- * Returns truncated content (max 3000 chars) or empty string on failure.
- * @deprecated Memory V2 uses queryRelevantADRs() instead. Kept as V1 fallback.
- */
-export function loadADRContent(projectRoot?: string): string {
-  try {
-    const root = projectRoot ?? process.cwd();
-    const adrPath = join(root, '.brain', 'DECISIONS.md');
-    const content = readFileSync(adrPath, 'utf8');
-    // Truncate to keep prompt size manageable
-    const maxLen = 3000;
-    if (content.length <= maxLen) return content;
-    const truncated = content.slice(0, maxLen);
-    const lastNewline = truncated.lastIndexOf('\n');
-    return (lastNewline > maxLen * 0.5 ? truncated.slice(0, lastNewline) : truncated) + '\n\n[... truncated — full ADR list in .brain/DECISIONS.md]';
-  } catch {
-    return '';
-  }
-}
-
-/**
  * Query relevant ADRs from Memory V2 DB for worker prompt injection.
  * Returns only accepted ADRs matching the task's scope and keywords.
- * Falls back to loadADRContent() if Memory V2 DB doesn't exist.
+ * Returns empty string if no DB available.
  */
 export function queryRelevantADRs(taskDescription: string, taskScope: string[], projectRoot?: string): string {
   const root = projectRoot ?? process.cwd();
@@ -731,7 +710,7 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
 
   try {
     if (!existsSync(dbPath)) {
-      return loadADRContent(root);
+      return '';
     }
 
     const store = new MemoryStore(dbPath);
@@ -748,7 +727,7 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
       });
 
       if (results.length === 0) {
-        return loadADRContent(root);
+        return '';
       }
 
       return results.map(r => `## ${r.entry.id}: ${r.entry.title}\n\n${r.entry.content}`).join('\n\n---\n\n');
@@ -756,7 +735,7 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
       store.close();
     }
   } catch {
-    return loadADRContent(root);
+    return '';
   }
 }
 
