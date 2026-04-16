@@ -29,6 +29,8 @@ import { metric } from '../core/observability.js';
 import { writeEvent, CHANNELS } from '../orchestra/event-stream.js';
 import { clearOrphanLocks } from '../core/file-lock.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
+import { MemoryStore } from '../core/memory-store.js';
+import { MEMORY_DB_FILE } from '../core/constants.js';
 
 // ─── Constants ─────────────────────────────────────────────────────
 
@@ -1559,14 +1561,33 @@ export function checkADRCompliance(
   sprintId?: string,
 ): ADRViolation[] {
   const violations: ADRViolation[] = [];
-  let decisionsContent: string;
-  try {
-    decisionsContent = readFileSync(join(projectRoot, BRAIN_DIR, 'DECISIONS.md'), 'utf-8');
-  } catch {
-    return violations; // No DECISIONS.md — skip compliance check
-  }
 
-  const adrs = parseADRs(decisionsContent);
+  // DB-first: load ADRs from MemoryStore
+  let adrs: ParsedADR[] = [];
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  try {
+    if (existsSync(dbPath)) {
+      const store = new MemoryStore(dbPath);
+      try {
+        const adrEntries = store.getByType('adr');
+        adrs = adrEntries.map(e => ({
+          id: e.id.replace(/^adr-/i, 'ADR-'),  // adr-006 → ADR-006 (match PILOT_ADR_RULES keys)
+          title: e.title,
+          status: e.status,
+        }));
+      } finally { store.close(); }
+    }
+  } catch { /* DB failed, fall through to V1 */ }
+
+  // V1 fallback: parse DECISIONS.md
+  if (adrs.length === 0) {
+    try {
+      const decisionsContent = readFileSync(join(projectRoot, BRAIN_DIR, 'DECISIONS.md'), 'utf-8');
+      adrs = parseADRs(decisionsContent);
+    } catch {
+      return violations; // No DB and no DECISIONS.md — skip
+    }
+  }
 
   for (const adr of adrs) {
     if (adr.status !== 'accepted') continue;
