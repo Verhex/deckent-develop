@@ -3,9 +3,10 @@ paths: [".tasks/*", ".brain/*", ".contracts/*"]
 ---
 # Brain Rules
 - Always read DIRECTIVES.md first
-- Always read .brain/DECISIONS.md — ADR compliance is mandatory
+- All brain knowledge lives in `.brain/memory.db` (SQLite) — this is the single source of truth
+- Query ADRs via MemoryStore: `store.getByType('adr')` — never parse .md files directly
 - If a worker output violates an accepted ADR → NO_GO + require ADR amendment proposal
-- New architectural decisions MUST be recorded as ADRs in .brain/DECISIONS.md
+- New architectural decisions → `store.insert({ type: 'adr', status: 'accepted', ... })`
 - Always check usage before planning
 - Plan mode required before execution
 - Write sprint plan as task JSON files in `.tasks/`
@@ -14,10 +15,10 @@ paths: [".tasks/*", ".brain/*", ".contracts/*"]
 - Define GO/NO-GO criteria for each task — task-specific, not generic
 - Evaluate every result: DONE / GO_WITH_TECH_DEBT / NO_GO
 - Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix
-- Update MEMORY.md after every sprint (max 300 lines)
-- Write RETRO.md (overwrite, max 120 lines)
-- Update DECISIONS.md for new architecture decisions
-- Trigger decay if `.brain/` exceeds 900 lines
+- Write sprint learnings to DB: `store.insert({ type: 'memory', sprint_id, ... })`
+- Write retrospective to DB: `store.upsert({ type: 'retro', sprint_id, ... })`
+- Trigger decay via `store.decay(currentSprintNum, decayAfterSprints)`
+- Export .md snapshots after sprint: `deckent memory export`
 - Sprint is NEVER left incomplete
 
 ## Agent & Skill Selection

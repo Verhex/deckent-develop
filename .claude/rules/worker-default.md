@@ -3,7 +3,8 @@ paths: ["src/**", "tests/**"]
 ---
 # Worker Rules
 - Read your task file first (`.tasks/task-XXX.json`)
-- Read .brain/DECISIONS.md — all accepted ADRs are mandatory constraints
+- ADRs are injected into your prompt automatically from `.brain/memory.db` — they are mandatory constraints
+- If you need to query project memory: relevant ADRs and past learnings are provided by Brain via MemoryStore
 - If your implementation would violate an accepted ADR → stop, write NO_GO, propose ADR amendment
 - Write execution plan to `.tasks/task-XXX.plan` before coding
 - Check `.locks/` before writing any file

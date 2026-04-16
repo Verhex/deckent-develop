@@ -41,13 +41,19 @@
   - manifest-migrator.ts: V1→V2 manifest migration for agents/skills
   - model-registry.ts: ModelRegistry class, 13 models, 3 providers, tier-based routing
   - mode-presets.ts: ModelStrategy, MODE_PRESETS (performance/balanced/economic/api)
+  - memory-store.ts: MemoryStore class — SQLite DB-first memory (CRUD, FTS5, tags, relations, decay, history)
+  - memory-query.ts: searchMemory() — dual-layer FTS5 search (original + turkishNormalize), buildAutoQuery()
+  - memory-normalize.ts: turkishNormalize() — i18n text normalization for FTS5 (TR/EN/DE %100)
+  - memory-types.ts: MemoryEntryV2, CreateEntryInput, MemoryQueryParams, MemorySearchResult interfaces
+  - memory-export.ts: DB → .md snapshot generation (summary, decisions, memory, debt)
+  - memory-import.ts: .md → DB migration parser (parseDecisionsMd, parseMemoryMd, parseDebtMd)
 - **agents/** — Worker execution, prompt engineering (16 modules)
   - worker.ts: task claim, file locking, heartbeat, result write
   - adaptive-agent.ts: runtime agent adaptation
 - **providers/** — Claude, Codex, Gemini adapters (5 modules)
 - **api/** — HTTP API server, SSE, rate limiting (3 modules)
-- **mcp/** — MCP server: 21 tools + 8 resources, stdio transport
-- **cli/** — 35+ commands, helpers, entry point
+- **mcp/** — MCP server: 22 tools + 8 resources, stdio transport
+- **cli/** — 40+ commands, helpers, entry point
 - **dashboard/** — React + Vite + Tailwind web dashboard
 
 ## Commands

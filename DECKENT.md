@@ -27,9 +27,20 @@
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 21 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint, docs, explain
+- 22 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint, docs, explain, **memory_query**
 - 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
 - Registration: `claude mcp add deckent -- npx deckent mcp`
+
+## Memory V2 — DB-First Architecture
+- **Storage:** SQLite (better-sqlite3) — single source of truth, .md files are generated exports
+- **Search:** FTS5 full-text search with dual-layer Turkish normalize (TR/EN/DE %100 recall)
+- **DB path:** `.brain/memory.db` (gitignored, rebuilt from exports)
+- **Exports:** `.brain/exports/summary.md`, `decisions.md`, `memory.md`, `debt.md` (git-tracked)
+- **Schema:** 5 tables (entries, tags, relations, entry_history, schema_version) + FTS5 virtual table
+- **Brain auto-query:** Task DNA → ilgili ADR/pattern/memory otomatik sorgulanır (PLAN, SPAWN, EVALUATE)
+- **CLI:** `deckent recall "sorgu"`, `deckent remember "not"`, `deckent memory rebuild|export|stats`
+- **MCP:** `deckent_memory_query` tool — cross-source hafıza arama
+- **Config:** `.deckent/config.json` → `memory.backend`, `memory.search`, `memory.decay_after_sprints`
 
 ## Mandatory Architecture Rules
 @.brain/exports/summary.md
@@ -179,6 +190,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 | `deckent_checkpoint` | Checkpoint approve/reject | Hayir | Hayir |
 | `deckent_docs` | Sprint lifecycle dokuman yonetimi (add/remove/list) | Hayir | Hayir |
 | `deckent_explain` | Sprint gecmisini ve sonuclarini acikla | Evet | Hayir |
+| `deckent_memory_query` | Proje hafizasinda cross-source arama (ADR, sprint, debt, pattern) | Evet | Hayir |
 
 ### Parametre Ornekleri
 
