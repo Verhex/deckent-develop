@@ -104,6 +104,7 @@ export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> 
 /**
  * Count total lines in .brain/ directory (excluding archive/).
  * Used by brain decay and doctor health checks.
+ * @deprecated Memory V2 uses MemoryStore.totalCount() instead. Kept for V1 fallback compatibility.
  * @param projectRoot - Project root directory
  * @returns Total line count across all .brain/ files
  */
@@ -224,6 +225,7 @@ export function shouldRemoveResolvedDebt(
  * Parse a DEBT.md markdown table into an array of DebtItem objects.
  * Expects a pipe-delimited table with columns: ID, Description, OriginTaskId,
  * OriginSprintId, Priority, SprintsOpen, Resolved, ResolvedInSprintId, CreatedAt.
+ * @deprecated Memory V2 stores debt in SQLite DB. Kept for V1 fallback and migration.
  * @param content - Raw markdown content containing the debt table
  * @returns Parsed debt items; returns empty array if no valid table found
  */
@@ -259,6 +261,7 @@ export function parseDebtTable(content: string): DebtItem[] {
 /**
  * Generate a pipe-delimited markdown table string from an array of DebtItem objects.
  * Produces a table with header, separator, and one row per item.
+ * @deprecated Memory V2 stores debt in SQLite DB. Kept for V1 fallback and migration.
  * @param items - Debt items to render as table rows
  * @returns Formatted markdown table string
  */

@@ -1,7 +1,7 @@
 // ─── Task Creation & Directive Parsing ─────────────────────────────
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
@@ -13,6 +13,9 @@ import { calculateModelScore } from './model-selector.js';
 import { debugLog } from '../core/utils.js';
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 import { TokenCounter } from '../core/token-counter.js';
+import { MemoryStore } from '../core/memory-store.js';
+import { searchMemory } from '../core/memory-query.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../core/constants.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 // ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
@@ -699,6 +702,7 @@ export function truncateAtParagraph(content: string, maxLen: number): string {
 /**
  * Load ADR content from .brain/DECISIONS.md for worker prompt injection.
  * Returns truncated content (max 3000 chars) or empty string on failure.
+ * @deprecated Memory V2 uses queryRelevantADRs() instead. Kept as V1 fallback.
  */
 export function loadADRContent(projectRoot?: string): string {
   try {
@@ -713,6 +717,46 @@ export function loadADRContent(projectRoot?: string): string {
     return (lastNewline > maxLen * 0.5 ? truncated.slice(0, lastNewline) : truncated) + '\n\n[... truncated — full ADR list in .brain/DECISIONS.md]';
   } catch {
     return '';
+  }
+}
+
+/**
+ * Query relevant ADRs from Memory V2 DB for worker prompt injection.
+ * Returns only accepted ADRs matching the task's scope and keywords.
+ * Falls back to loadADRContent() if Memory V2 DB doesn't exist.
+ */
+export function queryRelevantADRs(taskDescription: string, taskScope: string[], projectRoot?: string): string {
+  const root = projectRoot ?? process.cwd();
+  const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+
+  try {
+    if (!existsSync(dbPath)) {
+      return loadADRContent(root);
+    }
+
+    const store = new MemoryStore(dbPath);
+    try {
+      const keywords = taskDescription.split(/\s+/).filter(w => w.length > 3).slice(0, 10);
+      const scopeKeywords = taskScope.map(s => s.replace(/\//g, ' ')).join(' ');
+      const queryText = [...keywords, ...scopeKeywords.split(/\s+/)].filter(w => w.length > 2).join(' ');
+
+      const results = searchMemory(store, {
+        text: queryText || undefined,
+        type: ['adr'],
+        status: ['accepted'],
+        limit: 5,
+      });
+
+      if (results.length === 0) {
+        return loadADRContent(root);
+      }
+
+      return results.map(r => `## ${r.entry.id}: ${r.entry.title}\n\n${r.entry.content}`).join('\n\n---\n\n');
+    } finally {
+      store.close();
+    }
+  } catch {
+    return loadADRContent(root);
   }
 }
 
@@ -777,8 +821,10 @@ export function buildWorkerPrompt(
     ? task.scope.filesWrite.map(f => `  - ${f}`).join('\n')
     : '  - (determined by your task scope)';
 
-  // ADR context injection: mandatory architecture rules for worker compliance
-  const adrContent = loadADRContent();
+  // ADR context injection: query relevant ADRs from Memory V2 (falls back to V1)
+  const taskKeywords = task.description ?? task.title ?? '';
+  const taskDirs = task.scope?.directories ?? [];
+  const adrContent = queryRelevantADRs(taskKeywords, taskDirs);
   const adrBlock = adrContent
     ? `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${adrContent}\n\n`
     : '';
