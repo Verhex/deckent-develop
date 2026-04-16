@@ -12,6 +12,12 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
 }));
 
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: class MockMemoryStore {
+    constructor() { throw new Error('mock: no DB in tests'); }
+  },
+}));
+
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
