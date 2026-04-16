@@ -36,6 +36,9 @@ import { registerCheckpoint } from './commands/checkpoint.js';
 import { registerDocs } from './commands/docs.js';
 import { registerOutput } from './commands/output.js';
 import { registerCostCommand } from './commands/cost.js';
+import { registerRecall } from './commands/recall.js';
+import { registerRemember } from './commands/remember.js';
+import { registerMemory } from './commands/memory.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -93,6 +96,9 @@ export function buildProgram(): Command {
   registerDocs(program);
   registerOutput(program);
   registerCostCommand(program);
+  registerRecall(program);
+  registerRemember(program);
+  registerMemory(program);
 
   return program;
 }

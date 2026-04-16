@@ -13,6 +13,11 @@ coverage/
 .brain/RETRO.md
 .brain/DEBT.md
 .brain/PATTERNS.md
+
+# Memory V2 SQLite DB (binary, rebuilt from exports)
+.brain/memory.db
+.brain/memory.db-wal
+.brain/memory.db-shm
 .brain/sprints/
 .brain/archive/
 !.brain/archive/
