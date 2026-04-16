@@ -8,8 +8,9 @@ import type {
 } from '../core/types.js';
 import {
   BRAIN_DIR, MEMORY_FILE, RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES,
-  PATTERNS_FILE, DEBT_FILE,
+  PATTERNS_FILE, DEBT_FILE, MEMORY_DB_FILE,
 } from '../core/constants.js';
+import { MemoryStore } from '../core/memory-store.js';
 import { debugLog, parseDebtTable } from '../core/utils.js';
 import {
   formatDuration,
@@ -479,6 +480,48 @@ export function writeRetrospective(
   const memoryLines = newMemory.split('\n');
   const trimmed = trimMemoryWithHeader(memoryLines, MEMORY_MAX_LINES);
   writeFileSync(memoryPath, trimmed, 'utf-8');
+
+  // ─── DB dual-write: retro + memory entries ──────────────────
+  const dbPath = join(brainPath, MEMORY_DB_FILE);
+  if (existsSync(dbPath)) {
+    try {
+      const store = new MemoryStore(dbPath);
+      try {
+        // Write/update retro entry
+        const sprintNum = parseInt(sprint.id.replace(/\D/g, ''), 10) || 0;
+        store.upsert({
+          id: `retro-${sprint.id}`,
+          type: 'retro',
+          title: `Sprint ${sprint.id} Retrospective`,
+          content: retroContent,
+          source: 'brain',
+          sprint_id: sprint.id,
+          sprint_num: sprintNum,
+          tags: ['retro', sprint.id],
+        }, 'brain');
+
+        // Write memory/learning entries (one per sprint, skip if already exists)
+        const memId = `mem-${sprint.id}`;
+        if (!store.getById(memId)) {
+          const learningContent = learnings.join('\n');
+          store.insert({
+            id: memId,
+            type: 'memory',
+            title: `Sprint ${sprint.id} Learnings`,
+            content: learningContent,
+            source: 'brain',
+            sprint_id: sprint.id,
+            sprint_num: sprintNum,
+            tags: ['learning', sprint.id],
+          });
+        }
+      } finally {
+        store.close();
+      }
+    } catch {
+      // DB write failure is non-fatal — file write already succeeded
+    }
+  }
 }
 
 // ═══ Human-Friendly Sprint Complete ══════════════════════════════
