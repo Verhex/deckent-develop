@@ -153,15 +153,38 @@ export interface DeckentConfig {
   /** Bearer token for HTTP API authentication. Falls back to DECKENT_API_TOKEN env var. */
   api_auth_token?: string;
 
-  // ─── Memory ─────────────────────────────────────────────────────────
+  // ─── Memory (V1 — flat .md files) ───────────────────────────────────
+  /** @deprecated Use memory.backend instead. Kept for V1 backward compat. */
   /** Max lines in .brain/ directory (default: 600) */
   memory_budget?: number;
+  /** @deprecated Use memory.decay_after_sprints instead. Kept for V1 backward compat. */
   /** Decay entries older than N sprints (default: 5) */
   decay_after_sprints?: number;
   /** Enable pattern detection (default: true) */
   patterns_enabled?: boolean;
   /** Enable PROJECT-IDENTITY.md updates (default: true) */
   project_identity_enabled?: boolean;
+
+  // ─── Memory V2 ─────────────────────────────────────────────────────
+  /** Memory V2 configuration. If present, DB-first mode is active. */
+  memory?: {
+    /** Storage backend (default: 'sqlite') */
+    backend?: 'sqlite' | 'json';
+    /** Search mode (default: 'fts5') */
+    search?: 'fts5' | 'semantic' | 'hybrid';
+    /** Semantic search provider (requires search='semantic'|'hybrid') */
+    semantic_provider?: 'claude' | 'openai' | 'local' | null;
+    /** Soft-delete entries older than N sprints (default: 20) */
+    decay_after_sprints?: number;
+    /** Export .md snapshots from DB (default: true) */
+    export_md?: boolean;
+    /** When to trigger export (default: 'sprint_end') */
+    export_trigger?: 'sprint_end' | 'every_write' | 'manual';
+    /** User-defined entry types beyond built-in ones */
+    custom_types?: string[];
+    /** i18n keyword aliases for cross-language search */
+    keyword_aliases?: Record<string, string[]>;
+  };
 
   // ─── Auditor ────────────────────────────────────────────────────────
   /** Auditor scan interval in seconds (default: 30) */
