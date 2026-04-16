@@ -569,33 +569,84 @@ All queries < 10ms. Zero user intervention needed.
 
 ## 10. Migration Strategy
 
-### Phase 1: One-time migration
+### Phase 1: One-time migration (with verification gates)
 
 ```bash
-# Automatic during first deckent command after update
 scripts/migrate-brain-v2.mjs:
-  1. Parse DECISIONS.md → 39 ADR entries
-  2. Parse MEMORY.md → sprint-based memory entries
-  3. Parse DEBT.md → debt entries
-  4. Parse RETRO.md → retro entry
-  5. Parse PATTERNS.md → pattern entries
-  6. Read sprint logs → sprint entries
-  7. Read PROJECT-IDENTITY.md → identity entry (decay_exempt)
-  8. Insert all into memory.db
-  9. Generate .brain/exports/*.md
-  10. Update CLAUDE.md/DECKENT.md @ references
+
+  STEP 1 — INVENTORY (before touching anything)
+  1a. Count: ADRs in DECISIONS.md (by ## ADR- headers)
+  1b. Count: memory sections in MEMORY.md (by ## Sprint headers)
+  1c. Count: debt items in DEBT.md (table rows)
+  1d. Count: patterns in PATTERNS.md
+  1e. Count: sprint log files in sprints/
+  1f. SHA-256 hash every source .md file
+  1g. Inventory all @ references in CLAUDE.md, DECKENT.md, AGENTS.md,
+      DECKENT-MASTER-BLUEPRINT.md → save as migration-manifest.json
+  1h. Write migration-manifest.json to .brain/archive/pre-v2/
+
+  STEP 2 — BACKUP
+  2a. Copy all .brain/*.md to .brain/archive/pre-v2/ (originals preserved)
+  2b. Git commit: "chore: pre-v2 memory backup"
+
+  STEP 3 — PARSE + INSERT
+  3a. Parse DECISIONS.md → ADR entries (with relations for supersedes/deprecated)
+  3b. Parse MEMORY.md → sprint-based memory entries
+  3c. Parse DEBT.md → debt entries
+  3d. Parse RETRO.md → retro entry
+  3e. Parse PATTERNS.md → pattern entries
+  3f. Read sprint logs → sprint entries
+  3g. Read PROJECT-IDENTITY.md → identity entry (decay_exempt=1)
+  3h. Insert all into memory.db with turkishNormalize() on all text fields
+
+  STEP 4 — VERIFICATION GATE (must pass before continuing)
+  4a. Count verification: DB row counts per type == manifest counts from Step 1
+  4b. Sample verification: 10% random entries (min 5) → read back from DB →
+      compare content against original .md source → zero diff required
+  4c. Cross-reference check: no dangling relation.to_id
+  4d. FTS5 smoke test: 5 known queries must return expected results
+  4e. If ANY check fails → abort, print diff, exit 1 (no @ references changed)
+
+  STEP 5 — EXPORT
+  5a. Generate .brain/exports/*.md from DB
+  5b. Generate .brain/exports/summary.md (~3K chars context file)
+  5c. Roundtrip verify: export → reimport to temp DB → compare row counts + hashes
+
+  STEP 6 — REFERENCE SWAP
+  6a. For each @ reference in migration-manifest.json:
+      - Verify new target file (.brain/exports/summary.md) exists
+      - Verify new target contains equivalent summary content
+      - Replace @ reference
+  6b. Grep all .md for @.brain/ → verify zero dangling references
+  6c. Run deckent doctor → must pass
+
+  STEP 7 — FINAL REPORT
+  7a. Print migration summary: entries migrated, verification results, references swapped
+  7b. Git commit: "feat: Memory V2 migration — .brain/ → SQLite DB-first"
 ```
 
 ### Phase 2: Gradual source code migration
 
-Write points and read points migrated incrementally. Each module can be migrated independently because the DB API is self-contained.
+Write points and read points migrated incrementally. Each module can be migrated independently because the DB API is self-contained. Order:
+
+1. memory-store.ts + memory-types.ts (DB layer, no existing code changes)
+2. memory-normalize.ts (turkishNormalize, standalone)
+3. memory-query.ts (query builder, standalone)
+4. task-builder.ts refactor: loadADRContent() → db.queryFTS() (highest impact read point)
+5. debt-manager.ts refactor: parseDebtTable/runDecay → db.query/db.delete (biggest simplification)
+6. sprint-finalizer.ts + sprint-retro-writer.ts refactor: writeFileSync → db.insert/upsert
+7. auditor.ts + authority-enforcer.ts refactor: readFileSync → db.query
+8. MCP resources + CLI commands refactor (mechanical, low risk)
+9. memory-export.ts (export on sprint_end)
+10. CLI recall + remember commands + MCP memory_query tool
+11. Delete parse code: smartTrimMemory, parseDebtTable, countBrainLines, loadADRContent
 
 ### Rollback
 
 If memory.db is deleted or corrupted:
-1. .brain/exports/*.md files are git-tracked
-2. `deckent memory rebuild` reconstructs DB from exports
-3. Fallback: original .brain/*.md files still exist (not deleted during migration)
+1. .brain/exports/*.md files are git-tracked → `deckent memory rebuild` reconstructs DB
+2. .brain/archive/pre-v2/*.md files preserved → manual recovery possible
+3. Original .brain/*.md files exist until Alperen explicitly approves deletion (Success Criteria #17)
 
 ---
 
@@ -613,11 +664,27 @@ If memory.db is deleted or corrupted:
 
 ## 12. Success Criteria
 
+### Core Functionality
 1. Context loading reduced from ~104K chars to ~6.5K chars (97% reduction)
 2. `deckent recall "query"` returns relevant results in < 50ms
-3. All existing .brain/ data preserved after migration (zero information loss)
-4. Turkish I/İ/ı/i edge cases: 100% pass rate (20/20 proven)
-5. Brain auto-queries integrated at 6 lifecycle points
-6. .md exports regenerated correctly from DB
-7. All existing 12,485 tests continue to pass
-8. No parse code remains (smartTrimMemory, parseDebtTable, countBrainLines deleted)
+3. Turkish I/İ/ı/i edge cases: 100% pass rate (20/20 proven)
+4. Brain auto-queries integrated at 6 lifecycle points
+5. .md exports regenerated correctly from DB
+6. All existing 12,485 tests continue to pass
+7. No parse code remains (smartTrimMemory, parseDebtTable, countBrainLines deleted)
+
+### Data Migration Integrity (CRITICAL)
+8. **Complete transfer:** Every entry in existing .brain/ files has a corresponding entry in memory.db. Verified by count: number of ADRs in DECISIONS.md = number of type='adr' rows in DB. Same for memory sections, debt items, patterns, sprint logs.
+9. **Content fidelity:** Migrated content is byte-identical to source (no truncation, no encoding loss, no markdown corruption). Verified by SHA-256 hash comparison of original content vs DB content field for a random sample.
+10. **Independent sampling verification:** After migration, 10% random sample of entries (minimum 5, across all types) are read back from DB and diff'd against original .md source. Zero diff = pass. Any diff = migration bug, must fix before proceeding.
+11. **Cross-reference integrity:** All relations in the DB correspond to real entries (no dangling to_id references). Verified by: `SELECT r.* FROM relations r LEFT JOIN entries e ON r.to_id = e.id WHERE e.id IS NULL` = 0 rows.
+12. **Roundtrip verification:** DB → export → reimport → DB produces identical entry set. Verified by comparing row counts and content hashes before and after roundtrip.
+
+### Reference Migration (@ Flow Continuity)
+13. **@ reference audit:** Before changing any `@` reference in CLAUDE.md, DECKENT.md, AGENTS.md, or DECKENT-MASTER-BLUEPRINT.md, document every existing `@` reference and its target. Full inventory.
+14. **@ reference swap:** Each `@.brain/DECISIONS.md` and `@.brain/MEMORY.md` reference is replaced with `@.brain/exports/summary.md`. The new target file must exist and contain equivalent summary content before the swap.
+15. **Flow continuity verification:** After reference swap, verify that every tool/agent that previously read via `@` references still receives the information it needs. Test: run `deckent doctor` + `deckent help` + mock sprint plan phase — all must complete without "missing context" errors.
+16. **No orphan references:** grep all .md files for `@.brain/` patterns — every reference must point to an existing file. Zero dangling references.
+
+### Post-Migration .md Disposition
+17. **Original .md files are NOT deleted during migration.** They are moved to `.brain/archive/pre-v2/` as backup. Deletion decision is made separately by Alperen after verification criteria 8-16 all pass. This is a human decision, not an automated step.
