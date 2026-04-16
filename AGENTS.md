@@ -5,7 +5,7 @@
 
 ## Rules
 @DIRECTIVES.md
-@.brain/MEMORY.md
+@.brain/exports/summary.md
 
 ## Architecture
 - **orchestra/** — Sprint lifecycle, planning, evaluation, routing (63 modules)

@@ -32,7 +32,7 @@
 - Registration: `claude mcp add deckent -- npx deckent mcp`
 
 ## Mandatory Architecture Rules
-@.brain/DECISIONS.md
+@.brain/exports/summary.md
 
 ## Architecture Decision Records
 - `.brain/DECISIONS.md` = **ADR** (Architecture Decision Record) — project governance, MADR v3 hibrit format, mandatory read for all agents
@@ -40,7 +40,7 @@
 
 ## Context
 @DIRECTIVES.md
-@.brain/MEMORY.md
+@.brain/exports/summary.md
 @.contracts/api-surface.md
 
 ## Agent Roles

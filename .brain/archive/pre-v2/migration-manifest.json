@@ -1,0 +1,41 @@
+{
+  "files": {
+    "DECISIONS.md": {
+      "lines": 1506,
+      "bytes": 91708
+    },
+    "MEMORY.md": {
+      "lines": 35,
+      "bytes": 4282
+    },
+    "DEBT.md": {
+      "lines": 4,
+      "bytes": 539
+    },
+    "PATTERNS.md": {
+      "lines": 9,
+      "bytes": 177
+    },
+    "RETRO.md": {
+      "lines": 120,
+      "bytes": 5443
+    },
+    "PROJECT-IDENTITY.md": {
+      "lines": 118,
+      "bytes": 7641
+    }
+  },
+  "counts": {
+    "adrs": 40,
+    "memorySections": 7
+  },
+  "hashes": {
+    "DECISIONS.md": "87f8e1e3d7247c45b0bb75c555c5e02025033cec12650d545f8a03b25455c7b0",
+    "MEMORY.md": "e040b1607e0ac83fed3a912b2ba32ca488166a9887b597e8dcdc9ee89e8be0be",
+    "DEBT.md": "f817baa51be2a73f9464a0f7606782a1860706672c4527dd336177d155ddc830",
+    "PATTERNS.md": "1e3ae384e9e62d98363014b54a8c35f297227c766f8df0d65afd53e226831d13",
+    "RETRO.md": "21a631b7ef333374dadaa0efb9e08e375ebb3a15d2ad5f2434153d6096f06648",
+    "PROJECT-IDENTITY.md": "1ab8655c66bf6c3e4694b1138d9fe807dffd4a61fb42ffb0ebe948ebb4240c4e"
+  },
+  "refs": []
+}
