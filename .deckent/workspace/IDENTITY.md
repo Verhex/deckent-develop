@@ -21,10 +21,10 @@ Features: **Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize, 96% cont
 | Metrik | Değer |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-139 (manuel finalize GO_WITH_TECH_DEBT, next: sprint-140) |
+| Sprint | sprint-141 |
 | MCP Tools | 22 |
 | MCP Resources | 8 |
-| CLI Commands | 40+ |
+| CLI Commands | 41+ |
 | Dashboard Pages | 6 |
 | Agents | 16 built-in + 2 custom |
 | Skills | 21 built-in |

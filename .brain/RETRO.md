@@ -1,120 +1,172 @@
-# Sprint sprint-139 Retrospective
+# Sprint sprint-142 Retrospective
 
 ## Summary
-Completed 0/0 tasks in 3h 0m.
+Completed 44/49 tasks in 2h 54m.
 
 ## Highlights
-- 41 tasks completed on first try
+- 45 tasks completed on first try
 - No boundary violations detected
+- NO_GO rate improved from 17% to 10%
+
+## Issues
+- Task 142-027 (src/agents/ + src/providers/ + src/api/ + src/monitor/ + src/extensions/) failed — Docker worker exited without writing result file
+- Task 142-028 (src/dashboard/ batch 1 — Components) failed — Docker worker exited without writing result file
+- Task 142-037 (docs/ batch 2 — Remaining docs) failed — Read-only deep analysis of 83 markdown files across 10 do...
+- Task 142-048 (FINAL — God Analysis Aggregation Report) failed — Docker worker exited without writing result file
 
 ## Metrics
 | What | Value |
 |------|-------|
-| Tasks completed | 0/0 |
-| New test files | 44 |
-| Code changes | +14471 / -352 |
-| Sprint time | 3h 0m |
+| Tasks completed | 44/49 |
+| Code changes | +36470 / -0 |
+| Sprint time | 2h 54m |
+| NO_GO rate | 10% (5/49) |
 
 
 ## Agent Performance
 | Agent | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| test-writer | 33 | 0 | 0 | 0 | 20% |
-| doc-writer | 7 | 0 | 0 | 0 | 32% |
-| architect | 3 | 0 | 0 | 0 | 0% |
-| bug-fixer | 3 | 0 | 0 | 0 | 45% |
-| temp-react-ts-specialist | 3 | 0 | 0 | 0 | 0% |
-| security-auditor | 2 | 0 | 0 | 0 | 0% |
-| ci-guardian | 1 | 0 | 0 | 0 | 0% |
+| code-reviewer | 28 | 27 | 26 | 1 | 8% |
+| architect | 6 | 6 | 5 | 0 | 0% |
+| test-writer | 6 | 6 | 6 | 0 | 0% |
+| doc-writer | 2 | 1 | 1 | 1 | 0% |
+| frontend-designer | 2 | 1 | 1 | 1 | 0% |
+| architecture-planner | 1 | 0 | 0 | 1 | 0% |
+| devops-engineer | 1 | 1 | 1 | 0 | 0% |
+| refactorer | 1 | 1 | 1 | 0 | 0% |
+| security-auditor | 1 | 1 | 1 | 0 | 0% |
 
 
 ## Skill Performance
 | Skill | Tasks | Done | Debt | NoGo | Avg Coverage |
 |-------|-------|------|------|------|-------------|
-| typescript-expert | 43 | 0 | 0 | 0 | 22% |
-| testing-expert | 8 | 0 | 0 | 0 | 0% |
-| system-architect | 6 | 0 | 0 | 0 | 100% |
-| documentation-writer | 6 | 0 | 0 | 0 | 0% |
-| devops-engineer | 3 | 0 | 0 | 0 | 0% |
-| performance-optimizer | 1 | 0 | 0 | 0 | 0% |
-| docker-expert | 1 | 0 | 0 | 0 | 0% |
-| anthropic-sdk | 1 | 0 | 0 | 0 | 0% |
+| typescript-expert | 42 | 40 | 39 | 2 | 6% |
+| code-reviewer | 27 | 26 | 25 | 1 | 9% |
+| system-architect | 9 | 7 | 6 | 2 | 0% |
+| testing-expert | 7 | 7 | 7 | 0 | 0% |
+| documentation-writer | 4 | 2 | 2 | 2 | 0% |
+| security-specialist | 2 | 1 | 1 | 1 | 0% |
+| react-specialist | 2 | 1 | 1 | 1 | 0% |
+| devops-engineer | 1 | 1 | 1 | 0 | 0% |
+| code-simplifier | 1 | 1 | 1 | 0 | 0% |
+| performance-optimizer | 1 | 1 | 1 | 0 | 0% |
 
 ## Token Usage
 | Task | Model | Input | Output | Cache Read | Total |
 |------|-------|-------|--------|------------|-------|
-| 139-001 | opus | 2.1K | 500 | 8.4K | 11.0K |
-| 139-005 | sonnet | 18.5K | 2.8K | 45.0K | 66.3K |
-| 139-009 | sonnet | 18.5K | 2.8K | 45.0K | 66.3K |
-| 139-007 | sonnet | 757 | 500 | 3.0K | 4.3K |
-| 139-008 | sonnet | 1.7K | 500 | 6.7K | 8.8K |
-| 139-011 | sonnet | 1.6K | 1.4K | 6.6K | 9.7K |
-| 139-010 | opus | undefined | undefined | 0 | NaN |
-| 139-012 | sonnet | 2.5K | 5.1K | 10.2K | 17.8K |
-| 139-013 | opus | 2.7K | 5.7K | 10.6K | 19.0K |
-| 139-014 | opus | 1.7K | 13.7K | 6.7K | 22.1K |
-| 139-016 | sonnet | 1.7K | 2.9K | 6.7K | 11.3K |
-| 139-015 | opus | 1.7K | 5.7K | 6.7K | 14.1K |
-| 139-019 | opus | 2.3K | 5.8K | 9.3K | 17.5K |
-| 139-020 | sonnet | 1.7K | 780 | 6.8K | 9.3K |
-| 139-018 | opus | 2.4K | 5.2K | 9.5K | 17.1K |
-| 139-022 | sonnet | 18.5K | 2.8K | 45.0K | 66.3K |
-| 139-021 | opus | 1.8K | 3.8K | 7.1K | 12.7K |
-| 139-017 | sonnet | 2.6K | 7.0K | 10.2K | 19.8K |
-| 139-024 | sonnet | 2.1K | 3.4K | 8.3K | 13.8K |
-| 139-025 | sonnet | 1.6K | 1.7K | 6.5K | 9.8K |
-| 139-023 | sonnet | 18.5K | 2.8K | 42.0K | 63.3K |
-| 139-028 | opus | 1.7K | 9.3K | 6.9K | 17.9K |
-| 139-026 | sonnet | 42.0K | 4.8K | 95.0K | 141.8K |
-| 139-027 | sonnet | 1.9K | 500 | 7.7K | 10.2K |
-| 139-029 | sonnet | 1.7K | 500 | 6.6K | 8.8K |
-| 139-032 | sonnet | 1.6K | 2.6K | 6.4K | 10.6K |
-| 139-030 | sonnet | 1.7K | 5.4K | 6.6K | 13.7K |
-| 139-031 | sonnet | 1.6K | 2.6K | 6.6K | 10.8K |
-| 139-033 | sonnet | 698 | 525 | 2.8K | 4.0K |
-| 139-034 | opus | 1.8K | 4.8K | 7.1K | 13.7K |
-| 139-035 | opus | 1.9K | 15.8K | 7.4K | 25.0K |
-| 139-036 | sonnet | 1.9K | 8.2K | 7.4K | 17.5K |
-| 139-038 | sonnet | 18.5K | 4.2K | 45.0K | 67.7K |
-| 139-037 | opus | 1.6K | 9.4K | 6.5K | 17.5K |
-| 139-039 | opus | 1.7K | 5.5K | 6.9K | 14.2K |
-| 139-041 | sonnet | 1.7K | 2.2K | 6.6K | 10.5K |
-| 139-040 | opus | 824 | 500 | 3.3K | 4.6K |
-| 139-043 | sonnet | 1.6K | 2.9K | 6.5K | 11.0K |
-| 139-044 | sonnet | 1.8K | 4.0K | 7.2K | 13.0K |
-| 139-045 | opus | 2.6K | 16.3K | 10.3K | 29.2K |
-| 139-048 | sonnet | 18.5K | 2.8K | 42.0K | 63.3K |
-| 139-046 | sonnet | 1.7K | 5.2K | 6.7K | 13.5K |
-| 139-049 | sonnet | 1.6K | 5.2K | 6.4K | 13.2K |
-| 139-047 | sonnet | 1.7K | 7.8K | 6.7K | 16.2K |
-| 139-050 | opus | 2.4K | 11.7K | 9.6K | 23.7K |
-| 139-052 | sonnet | 1.8K | 4.2K | 7.3K | 13.3K |
-| 139-051 | opus | 2.5K | 7.6K | 9.9K | 20.0K |
-| **Total** | — | NaN | NaN | 641.8K | NaN |
+| 142-002 | opus | 45.0K | 12.0K | 30.0K | 87.0K |
+| 142-003 | opus | 85.0K | 18.0K | 45.0K | 148.0K |
+| 142-001 | opus | 85.0K | 18.0K | 45.0K | 148.0K |
+| 142-004 | opus | 85.0K | 12.0K | 50.0K | 147.0K |
+| 142-005 | opus | 45.0K | 18.0K | 30.0K | 93.0K |
+| 142-006 | opus | 85.0K | 12.0K | 45.0K | 142.0K |
+| 142-007 | opus | 45.0K | 18.0K | 32.0K | 95.0K |
+| 142-008 | opus | 85.0K | 18.0K | 45.0K | 148.0K |
+| 142-009 | opus | 45.0K | 12.0K | 180.0K | 237.0K |
+| 142-012 | opus | 45.0K | 12.0K | 30.0K | 87.0K |
+| 142-011 | opus | 95.0K | 18.0K | 45.0K | 158.0K |
+| 142-010 | opus | 85.0K | 22.0K | 45.0K | 152.0K |
+| 142-014 | opus | 45.0K | 18.0K | 35.0K | 98.0K |
+| 142-013 | opus | 45.0K | 18.0K | 30.0K | 93.0K |
+| 142-015 | opus | 45.0K | 12.0K | 35.0K | 92.0K |
+| 142-017 | opus | 85.0K | 12.0K | 0 | 97.0K |
+| 142-018 | opus | 85.0K | 18.0K | 45.0K | 148.0K |
+| 142-016 | opus | 85.0K | 18.0K | 45.0K | 148.0K |
+| 142-020 | opus | 45.0K | 12.0K | 35.0K | 92.0K |
+| 142-019 | opus | 85.0K | 18.0K | 45.0K | 148.0K |
+| 142-021 | opus | 45.0K | 12.0K | 30.0K | 87.0K |
+| 142-022 | opus | 45.0K | 12.0K | 30.0K | 87.0K |
+| 142-024 | opus | 85.0K | 18.0K | 45.0K | 148.0K |
+| 142-023 | opus | 45.0K | 12.0K | 30.0K | 87.0K |
+| 142-027 | opus | 1.7K | 500 | 6.7K | 8.8K |
+| 142-025 | opus | 45.0K | 12.0K | 80.0K | 137.0K |
+| 142-029 | opus | 85.0K | 12.0K | 45.0K | 142.0K |
+| 142-026 | opus | 95.0K | 18.0K | 45.0K | 158.0K |
+| 142-030 | opus | 45.0K | 12.0K | 0 | 57.0K |
+| 142-031 | opus | 350.0K | 45.0K | 200.0K | 595.0K |
+| 142-028 | opus | 2.1K | 500 | 8.2K | 10.8K |
+| 142-033 | opus | 350.0K | 25.0K | 180.0K | 555.0K |
+| 142-032 | opus | 180.0K | 25.0K | 95.0K | 300.0K |
+| 142-036 | opus | 180.0K | 12.0K | 50.0K | 242.0K |
+| 142-035 | opus | 250.0K | 35.0K | 180.0K | 465.0K |
+| 142-034 | opus | 450.0K | 35.0K | 200.0K | 685.0K |
+| 142-039 | opus | 85.0K | 12.0K | 250.0K | 347.0K |
+| 142-038 | opus | 85.0K | 15.0K | 45.0K | 145.0K |
+| 142-040 | opus | 35.0K | 8.0K | 0 | 43.0K |
+| 142-041 | opus | 85.0K | 12.0K | 45.0K | 142.0K |
+| 142-037 | opus | 350.0K | 45.0K | 180.0K | 575.0K |
+| 142-042 | opus | 45.0K | 12.0K | 85.0K | 142.0K |
+| 142-043 | opus | 85.0K | 12.0K | 45.0K | 142.0K |
+| 142-045 | opus | 45.0K | 12.0K | 80.0K | 137.0K |
+| 142-044 | opus | 280.0K | 45.0K | 120.0K | 445.0K |
+| 142-046 | opus | 85.0K | 12.0K | 45.0K | 142.0K |
+| 142-047 | opus | 95.0K | 12.0K | 45.0K | 152.0K |
+| 142-048 | opus | 1.9K | 500 | 7.5K | 9.9K |
+| **Total** | — | 4.9M | 799.5K | 3.1M | 8.7M |
 
-### Rubric Scores (sprint-139)
+### Rubric Scores (sprint-142)
 | Task | Correctness | Coverage | Scope | Docs | Avg |
 |------|-------------|----------|-------|------|-----|
-| 139-005 — askBrain() Extraction Finish ( | 100 | 92 | 100 | 88 | 95 |
-| 139-009 — ErrorRegistry Lint Rule Retros | 98 | 95 | 100 | 90 | 96 |
-| 139-011 — .dashboard File Format Stabili | 98 | 95 | 100 | 90 | 96 |
-| 139-010 — .dashboard Parse Error Root Ca | 95 | 92 | 100 | 85 | 93 |
-| 139-012 — Pre-flight Full Health Check D | 90 | 88 | 100 | 85 | 91 |
-| 139-013 — Docker HB Shutdown Bug Core Fi | 95 | 92 | 100 | 88 | 94 |
-| 139-014 — Auditor Cache Invalidation + l | 95 | 95 | 100 | 85 | 94 |
-| 139-016 — Orphan HB Cleanup Pattern | 95 | 90 | 100 | 85 | 93 |
-| 139-015 — Worker Lifecycle State Machine | 95 | 95 | 100 | 85 | 94 |
-| 139-019 — subprocess Backend Parity Test | 98 | 95 | 100 | 90 | 96 |
-| 139-020 — Hybrid Backend ADR-027 Revisit | 95 | 75 | 100 | 95 | 91 |
-| 139-018 — tmux Backend Parity Test (Spri | 90 | 85 | 95 | 80 | 88 |
-| 139-022 — Worker Token Tracking Mandator | 95 | 90 | 100 | 95 | 95 |
-| 139-021 — .plan Write Diagnostic + Seman | 95 | 90 | 100 | 95 | 95 |
-| 139-017 — Docker Backend Parity Test | 95 | 90 | 100 | 88 | 93 |
-| 139-024 — Runtime vs Code Issue Discrimi | 95 | 92 | 100 | 90 | 94 |
-| 139-025 — xfix Worker Scope Format Fix | 95 | 92 | 100 | 90 | 94 |
-| 139-023 — Worker Honest Self-Assessment  | 95 | 92 | 100 | 88 | 94 |
-| 139-028 — Chain Dependency Execution Sch | 95 | 95 | 100 | 85 | 94 |
-| 139-026 — .prompt Persistence + File Tra | 90 | 88 | 95 | 85 | 90 |
-| 139-032 — Dependency Violation Alert | 95 | 95 | 100 | 85 | 94 |
-| 139-030 — Dependency Graph Persistence + | 97 | 92 | 100 | 88 | 94 |
-| 139-031 — Dependency Chain Observability | 95 | 90 | 100 | 85 | 93 |
+| 142-002 — src/core/ batch 2 — Types + Ro | 95 | 90 | 100 | 95 | 95 |
+| 142-003 — src/core/ batch 3 — Agent + Sk | 98 | 95 | 100 | 97 | 98 |
+| 142-001 — src/core/ batch 1 — Memory V2  | 95 | 90 | 100 | 95 | 95 |
+| 142-004 — src/core/ batch 4 — Provider + | 95 | 95 | 100 | 95 | 96 |
+| 142-005 — src/core/ batch 5 — Utils + Se | 95 | 90 | 100 | 95 | 95 |
+| 142-006 — src/core/ batch 6 — Remaining  | 95 | 0 | 100 | 95 | 73 |
+| 142-007 — src/core/ batch 7 — Final core | 95 | 100 | 100 | 95 | 98 |
+| 142-008 — src/orchestra/ batch 1 — Brain | 97 | 95 | 100 | 98 | 98 |
+| 142-009 — src/orchestra/ batch 2 — Debt  | 95 | 90 | 100 | 95 | 95 |
+| 142-012 — src/orchestra/ batch 5 — Manag | 95 | 90 | 100 | 95 | 95 |
+| 142-011 — src/orchestra/ batch 4 — Event | 95 | 90 | 100 | 95 | 95 |
+| 142-010 — src/orchestra/ batch 3 — Task  | 95 | 0 | 100 | 95 | 73 |
+| 142-014 — src/orchestra/ batch 7 — Remai | 95 | 0 | 100 | 95 | 73 |
+| 142-013 — src/orchestra/ batch 6 — Doc u | 95 | 90 | 100 | 95 | 95 |
+| 142-015 — src/orchestra/ batch 8 — Final | 95 | 90 | 100 | 95 | 95 |
+| 142-017 — src/cli/ batch 1 — Memory V2 + | 95 | 90 | 100 | 95 | 95 |
+| 142-018 — src/cli/ batch 2 — Remaining c | 95 | 0 | 100 | 95 | 73 |
+| 142-016 — src/orchestra/ batch 9 — Final | 98 | 95 | 100 | 97 | 98 |
+| 142-020 — src/cli/ batch 4 — Final comma | 97 | 95 | 100 | 95 | 97 |
+| 142-019 — src/cli/ batch 3 — More comman | 95 | 90 | 100 | 95 | 95 |
+| 142-021 — src/cli/ batch 5 — Helpers + E | 95 | 90 | 100 | 95 | 95 |
+| 142-022 — src/cli/ batch 6 — Remaining h | 95 | 90 | 100 | 95 | 95 |
+| 142-024 — src/mcp/ batch 1 — Tools | 95 | 90 | 100 | 95 | 95 |
+| 142-023 — src/cli/ batch 7 — Final helpe | 95 | 90 | 100 | 95 | 95 |
+| 142-025 — src/mcp/ batch 2 — Tools remai | 95 | 100 | 100 | 95 | 98 |
+| 142-029 — src/dashboard/ batch 2 — Compo | 95 | 90 | 100 | 95 | 95 |
+| 142-026 — src/mcp/ batch 3 — Resources + | 95 | 90 | 100 | 95 | 95 |
+| 142-030 — tests/ batch 1 — core/ (119 do | 95 | 92 | 100 | 95 | 96 |
+| 142-031 — tests/ batch 2 — orchestra/ (1 | 95 | 92 | 100 | 95 | 96 |
+| 142-033 — tests/ batch 4 — mcp/ + api/ + | 95 | 92 | 100 | 95 | 96 |
+| 142-032 — tests/ batch 3 — cli/ (126 dos | 95 | 92 | 100 | 95 | 96 |
+| 142-036 — docs/ batch 1 — superpowers/ + | 95 | 100 | 100 | 95 | 98 |
+| 142-035 — tests/ batch 6 — agents/ + pro | 95 | 92 | 100 | 90 | 94 |
+| 142-034 — tests/ batch 5 — integration/  | 95 | 98 | 100 | 95 | 97 |
+| 142-039 — Root .md cross-validation — TU | 95 | 100 | 100 | 95 | 98 |
+| 142-038 — .brain/ state + Memory V2 DB c | 97 | 95 | 100 | 98 | 98 |
+| 142-040 — Root config — Dockerfile + .gi | 95 | 100 | 100 | 95 | 98 |
+| 142-041 — .claude/rules/ + .contracts/ + | 95 | 100 | 100 | 95 | 98 |
+| 142-037 — docs/ batch 2 — Remaining docs | 95 | 100 | 100 | 95 | 98 |
+| 142-042 — META — Architecture Graph + Ci | 95 | 100 | 100 | 95 | 98 |
+| 142-043 — META — Dead Code + Type Safety | 95 | 100 | 100 | 98 | 98 |
+| 142-045 — META — i18n + CLI/MCP Parity + | 95 | 0 | 100 | 95 | 73 |
+| 142-044 — META — Security + Performance | 95 | 100 | 100 | 95 | 98 |
+| 142-046 — META — Memory V2 Integrity Dee | 95 | 90 | 100 | 95 | 95 |
+| 142-047 — META — Error Handling + TODO/F | 95 | 100 | 100 | 95 | 98 |
+| **Sprint Avg** | — | — | — | — | **94** |
+
+## Learnings
+- src/core/ batch 1 — Memory V2 modulleri: completed with tech debt — Read-only deep analysis of 10 files completed. 10 per-file reports written to .deckent/sprint-god-analysis/src/core/. All reports follow the 16-sectio
+- src/core/ batch 2 — Types + Routing: completed with tech debt — Read-only deep analysis completed for 10 files in src/core/ batch 2 (Types + Routing). All 10 files analyzed with 16-section template. Key findings: (
+- src/core/ batch 4 — Provider + Model + Notification: completed with tech debt — Read-only deep analysis of 10 assigned files + 1 bonus (webhook.ts) = 11 analysis reports. All reports follow the 16-section template. Key findings:
+
+
+- src/core/ batch 5 — Utils + Security + Remaining: completed with tech debt — Read-only deep analysis completed for all 10 assigned files. Key findings:
+
+**P0 Findings:**
+- deck-file.ts: createDeckTemplate creates .deck file wit
+- src/core/ batch 6 — Remaining core files: completed with tech debt — Read-only deep analysis of 10 src/core/ files completed. All 10 reports written with 16-section template. Key findings: (1) ZERO any/@ts-ignore across
+- src/core/ batch 7 — Final core files: completed with tech debt — Read-only deep analysis of 13 source files completed. 13 per-file reports written, each ≥40 lines with full 16-section template. Key findings: (1) DEA
+- src/orchestra/ batch 1 — Brain + Sprint lifecycle: completed with tech debt — Read-only deep analysis of 6 sprint lifecycle core files completed. All 6 reports written with 16-section template, each ≥50 lines (115-140 lines per 
+- src/orchestra/ batch 2 — Debt + Result + Retro: completed with tech debt — Read-only deep analysis of 8 orchestra files (debt-manager, sprint-retro-writer, sprint-reporter, result-evaluator, result-collector, result-merger, r
+- src/orchestra/ batch 3 — Task + Routing + Spawn: completed with tech debt — Read-only deep analysis of 10 src/orchestra/ files (task-builder, task-router, task-analyzer, task-retry, planner, spawn-backend, spawn-backend-docker
+- src/orchestra/ batch 4 — Event stream + Pattern + Decision: completed with tech debt — Read-only deep analysis of 10 orchestra files completed. 10 per-file reports written using 16-section template. All reports ≥90 lines (exceeding ≥40 r
