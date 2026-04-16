@@ -7,15 +7,26 @@ import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../core/types.js';
 import {
-  TASKS_DIR, LOCKS_DIR,
+  TASKS_DIR, LOCKS_DIR, BRAIN_DIR, MEMORY_DB_FILE,
   TMUX_SESSION_NAME, PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
-import { countBrainLines } from '../../core/utils.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import { cleanup, runDecay } from '../../orchestra/brain.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+
+/** DB-first memory entry count — replaces legacy countBrainLines. */
+function getMemoryEntryCount(projectRoot: string): number {
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return 0;
+  try {
+    const store = new MemoryStore(dbPath);
+    try { return store.totalCount(); }
+    finally { store.close(); }
+  } catch { return 0; }
+}
 
 /** C) Read project-specific tmux session name from config — avoids killing other projects' sessions. */
 function getProjectSessionName(root: string): string {
@@ -207,7 +218,7 @@ export function registerCleanup(program: Command): void {
         }
 
         // Budget warning: check .brain/ size after cleanup
-        const brainLines = countBrainLines(root);
+        const brainLines = getMemoryEntryCount(root);
         if (brainLines > decayMemoryBudget) {
           print(`\nWarning: .brain/ has ${brainLines} lines (budget: ${decayMemoryBudget}). Run \`deckent cleanup --decay\` to reduce memory.`);
         }

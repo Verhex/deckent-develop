@@ -8,10 +8,10 @@ import type { DetectedProvider } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
   DECKENT_DIR, BRAIN_DIR, MEMORY_FILE, DEBT_FILE, DECISIONS_FILE,
-  DIRECTIVES_FILE, LOCKS_DIR, DEBT_TABLE_HEADER,
+  DIRECTIVES_FILE, LOCKS_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE,
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
-import { countBrainLines } from '../../core/utils.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
 import { print, formatDoctorResult, formatCIHealthSection } from '../helpers/output.js';
@@ -214,8 +214,19 @@ function checkDirectives(root: string): DoctorCheck {
   return { name: 'Directives', passed: true, message: 'DIRECTIVES.md found', required: false };
 }
 
+/** DB-first memory entry count — replaces legacy countBrainLines. */
+function getMemoryEntryCount(projectRoot: string): number {
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return 0;
+  try {
+    const store = new MemoryStore(dbPath);
+    try { return store.totalCount(); }
+    finally { store.close(); }
+  } catch { return 0; }
+}
+
 function checkBrainBudget(root: string, memoryBudget = 900): DoctorCheck {
-  const lines = countBrainLines(root);
+  const lines = getMemoryEntryCount(root);
   const passed = lines <= memoryBudget;
   return {
     name: 'Brain Budget',
@@ -1010,7 +1021,7 @@ export function registerDoctor(program: Command): void {
         print(formatDetectedProviders(providers));
       } else {
         // Human-friendly format — build Connector health results from detected providers
-        const brainLines = countBrainLines(root);
+        const brainLines = getMemoryEntryCount(root);
         const lastSprintId = getLastSprintId(root);
         const debtItems = countDebtItems(root);
         const connectorHealthResults = buildConnectorHealthResults(providers);

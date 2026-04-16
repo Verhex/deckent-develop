@@ -2,10 +2,22 @@ import { existsSync, readFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { TASKS_DIR, LOCKS_DIR, PROJECT_CONFIG_PATH } from '../../core/constants.js';
-import { countBrainLines, getNextSprintId } from '../../core/utils.js';
+import { TASKS_DIR, LOCKS_DIR, BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { getNextSprintId } from '../../core/utils.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import { runDecay } from '../../orchestra/brain.js';
 import { enrichResponse } from '../helpers/enrich.js';
+
+/** DB-first memory entry count — replaces legacy countBrainLines. */
+function getMemoryEntryCount(projectRoot: string): number {
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return 0;
+  try {
+    const store = new MemoryStore(dbPath);
+    try { return store.totalCount(); }
+    finally { store.close(); }
+  } catch { return 0; }
+}
 
 const TASK_EXTENSIONS = /\.(json|plan|hb|result|paused|log)$/;
 
@@ -73,7 +85,7 @@ export function registerCleanupTool(server: McpServer): void {
           const lockFiles = existsSync(locksDir)
             ? readdirSync(locksDir).filter((f) => f.endsWith('.lock'))
             : [];
-          const brainLines = countBrainLines(root);
+          const brainLines = getMemoryEntryCount(root);
           const wouldDecay = decay && brainLines > memoryBudget;
 
           const enriched = enrichResponse('cleanup', {

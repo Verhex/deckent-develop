@@ -1,7 +1,21 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { DashboardState, DoctorResult, Sprint, AgentInfo, Task, TaskResult } from '../../core/types.js';
 import { AgentStatus, SprintPhase } from '../../core/types.js';
 import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
-import { countBrainLines } from '../../core/utils.js';
+import { MemoryStore } from '../../core/memory-store.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+
+/** DB-first memory entry count — replaces legacy countBrainLines. */
+function getMemoryEntryCount(projectRoot: string): number {
+  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+  if (!existsSync(dbPath)) return 0;
+  try {
+    const store = new MemoryStore(dbPath);
+    try { return store.totalCount(); }
+    finally { store.close(); }
+  } catch { return 0; }
+}
 
 // ─── CI Types ────────────────────────────────────────────────────────
 
@@ -580,7 +594,7 @@ export function formatHumanStatus(input: HumanStatusInput): string {
   // ─── Budget Check (G) ──────────────────────────
   if (input.projectRoot) {
     try {
-      const brainLines = countBrainLines(input.projectRoot);
+      const brainLines = getMemoryEntryCount(input.projectRoot);
       const maxBudget = 600;
       if (brainLines > maxBudget) {
         lines.push('');

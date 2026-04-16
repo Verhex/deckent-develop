@@ -1,10 +1,11 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import { BRAIN_DIR, DEBT_FILE, ARCHIVE_DIR, DEBT_TABLE_HEADER } from '../../core/constants.js';
+import { BRAIN_DIR, DEBT_FILE, ARCHIVE_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE } from '../../core/constants.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { parseDebtTable, generateDebtTable } from '../../core/utils.js';
+import { MemoryStore } from '../../core/memory-store.js';
 import type { DebtItem } from '../../core/types.js';
 
 // ─── Rotation Config ────────────────────────────────────────────────
@@ -32,9 +33,32 @@ export function registerArchiveDebt(program: Command): void {
         return;
       }
 
-      const content = readFileSync(debtPath, 'utf-8');
-      // P) Use shared parseDebtTable from utils.ts
-      const rows = parseDebtTable(content);
+      // DB-first: read debt items from SQLite, fall back to file
+      const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+      let rows: DebtItem[];
+      if (existsSync(dbPath)) {
+        const store = new MemoryStore(dbPath);
+        try {
+          const entries = store.getByType('debt');
+          rows = entries.map(d => {
+            const meta = JSON.parse(d.metadata || '{}') as Record<string, unknown>;
+            return {
+              id: d.id,
+              description: d.title,
+              originTaskId: (meta.originTaskId as string) ?? '',
+              originSprintId: (meta.originSprintId as string) ?? d.sprint_id ?? '',
+              priority: (d.priority?.toUpperCase() ?? 'NORMAL') as DebtItem['priority'],
+              sprintsOpen: (meta.sprintsOpen as number) ?? 0,
+              resolved: d.status === 'resolved',
+              resolvedInSprintId: meta.resolvedInSprintId as string | undefined,
+              createdAt: d.created_at,
+            };
+          });
+        } finally { store.close(); }
+      } else {
+        const content = readFileSync(debtPath, 'utf-8');
+        rows = parseDebtTable(content);
+      }
 
       let resolved = rows.filter(r => r.resolved === true);
       const unresolved = rows.filter(r => r.resolved !== true);
@@ -112,7 +136,23 @@ export function registerArchiveDebt(program: Command): void {
         return;
       }
 
-      // Write unresolved items back to DEBT.md using shared generateDebtTable
+      // DB-first: mark resolved items in DB, fall back to file rewrite
+      if (existsSync(dbPath)) {
+        const store = new MemoryStore(dbPath);
+        try {
+          for (const item of resolved) {
+            const entry = store.getById(item.id);
+            if (entry) {
+              store.upsert({
+                id: entry.id, type: 'debt', title: entry.title, content: entry.content,
+                source: entry.source, status: 'resolved',
+                metadata: { ...JSON.parse(entry.metadata || '{}'), resolvedInSprintId: 'manual-archive' },
+              }, 'user');
+            }
+          }
+        } finally { store.close(); }
+      }
+      // Also update the file for backward compat
       writeFileSync(debtPath, generateDebtTable(unresolved), 'utf-8');
 
       // Append resolved items to archive
