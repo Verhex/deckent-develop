@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { fork } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../core/config.js';
@@ -130,6 +130,15 @@ export function registerStartTool(server: McpServer): void {
           stdio: 'ignore', // Don't inherit stdio — critical for MCP transport freedom
           cwd: root,
         });
+
+        // IPC cleanup: success case — remove orphan dir so .deckent/ stays tidy.
+        // Failure case keeps ipcDir for debugging; pre-flight cleaner sweeps later.
+        child.on('exit', (code) => {
+          if (code === 0) {
+            try { rmSync(ipcDir, { recursive: true, force: true }); } catch { /* best-effort */ }
+          }
+        });
+
         child.unref();
 
         const startData = {

@@ -38,6 +38,17 @@ coverage/
 .deckent/sprint-*-baseline.json
 .deckent/metrics.jsonl
 
+# Sprint ephemeral artifacts (IPC, events, checkpoints — regenerated each run)
+.deckent/sprint-*-ipc/
+.deckent/sprint-*-events.jsonl
+.deckent/sprint-*-seq
+.deckent/sprint-*-checkpoint-seq
+.deckent/sprint-*-checkpoint.json
+.deckent/sprint-*-gate.json
+.deckent/sprint-*-pre-archive.*
+.deckent/pids/
+.claude/scheduled_tasks.lock
+
 # Environment
 .env
 .env.*
