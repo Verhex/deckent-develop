@@ -231,7 +231,11 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx vitest run tests/core/ --reporter=default)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx vitest run tests/orchestra/ --reporter=default)",
       "Bash(kill -TERM 545491 545511 545524 545525 546086)",
-      "Bash(awk 'NR>=70 && NR<=90')"
+      "Bash(awk 'NR>=70 && NR<=90')",
+      "Bash(echo \"--- EXIT $? ---\")",
+      "Bash(awk '{print $1}')",
+      "Bash(echo \"exit: $?\")",
+      "Bash(xargs -0 -r git rm --cached)"
     ]
   },
   "outputStyle": "Explanatory"

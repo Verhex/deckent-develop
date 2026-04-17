@@ -1,0 +1,92 @@
+{
+  "id": "144-017",
+  "title": "Retro sprint-id Normalize",
+  "description": "Retro sprint-id Normalize\n- Model: opus\n- Effort: low\n- Agent: bug-fixer\n- Skills: typescript-expert\n- Files: src/orchestra/sprint-retro-writer.ts, src/core/memory-store.ts, tests/orchestra/sprint-retro-writer.test.ts\n- Scope: src/orchestra/, src/core/, tests/\n\n### Description\nCanonical `retro-sprint-NNN` id, alias `retro-latest` view query. `retro-latest` entry migrate edilir, sonra silinir.\n\n**Kanıt:** `sqlite3 .brain/memory.db \"SELECT id FROM entries WHERE type='retro'\"` → sprint-specific.\n**Test:** 6 test.\n\n---",
+  "model": "opus",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/core/",
+      "tests/orchestra/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-retro-writer.ts",
+      "src/core/memory-store.ts",
+      "tests/orchestra/sprint-retro-writer.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `sqlite3 .brain/memory.db \"SELECT id FROM entries WHERE type='retro'\"` → sprint-specific.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "low",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.72
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.57
+        },
+        {
+          "name": "core",
+          "weight": 0.29
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:09:36.438Z"
+}

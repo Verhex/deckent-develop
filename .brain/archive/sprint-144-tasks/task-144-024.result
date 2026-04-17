@@ -1,0 +1,26 @@
+{
+  "taskId": "144-024",
+  "filesChanged": [
+    "src/orchestra/ci-reporter.ts",
+    "tests/orchestra/sprint-reporter-ci.test.ts"
+  ],
+  "linesAdded": 36,
+  "linesRemoved": 8,
+  "testsPassed": true,
+  "coverage": 100,
+  "selfAssessment": "DONE",
+  "notes": "Fixed formatCiHealthSection crash when delta is undefined/partial. Changed delta parameter type to optional (delta?: { newTests?: number; regressions?: number; coverageDelta?: number }). Extracted coverageDelta, regressions, newTests to local variables with ?? 0 defaults. Added 3 new regression tests: (1) delta undefined → +0.0%, (2) delta empty object → all fields 0, (3) delta with only coverageDelta set → correct negative render. All 20 tests pass (17 existing + 3 new). tsc --noEmit clean.",
+  "tokenUsage": {
+    "inputTokens": 8500,
+    "outputTokens": 950,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

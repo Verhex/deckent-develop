@@ -1,0 +1,51 @@
+# Task 144-003: retro.ts Split (453 → 3 dosya)
+
+## Plan
+
+### Step 1: Create retro-parser.ts
+Extract all parsing functions and types:
+- `RichSprintSummary` interface
+- `AgentPerfRow` interface
+- `SkillPerfRow` interface
+- `SprintTrendEntry` interface
+- `parseRetroToRichSummary()`
+- `parseAgentPerformanceFromRetro()`
+- `parseSkillPerformanceFromRetro()`
+- `loadSprintTrend()` (uses parsers internally)
+- `loadPreviousRetro()` (private helper, used by router)
+
+### Step 2: Create retro-formatter.ts
+Extract all formatting functions + i18n labels:
+- `RETRO_LABELS` constant + `lbl()` helper
+- `formatRichSummary()`
+- `computeRetroDelta()`
+- `formatAgentPerfTable()`
+- `formatSkillPerfTable()`
+- `formatTrend()`
+
+### Step 3: Slim retro.ts to router only
+- Keep `registerRetro()` + `archiveCurrentRetro()`
+- Import from retro-parser.ts and retro-formatter.ts
+- Re-export all public types/functions for backward compatibility
+
+### Step 4: Update tests
+- Create tests/cli/retro-parser.test.ts with parser-specific tests
+- Create tests/cli/retro-formatter.test.ts with formatter-specific tests
+- Keep tests/cli/retro.test.ts as-is (empty dir — actual tests in tests/cli/commands/)
+- Existing tests in tests/cli/commands/ import from retro.js — barrel re-export keeps them working
+
+### Expected line counts
+- retro.ts: ~80 (router + archive + re-exports)
+- retro-parser.ts: ~180 (parsers + types + trend loader)
+- retro-formatter.ts: ~130 (formatters + i18n labels)
+
+### Backward Compatibility
+retro.ts re-exports everything so ALL existing imports continue to work:
+- tests/cli/commands/retro.test.ts
+- tests/cli/commands/retro-rich.test.ts
+- tests/cli/commands/retro-json.test.ts
+- tests/cli/commands/retro-parse-fix.test.ts
+- tests/cli/index.test.ts
+- tests/cli/commands.test.ts
+- tests/core/non-null-safety.test.ts
+- src/cli/index.ts

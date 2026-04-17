@@ -1,0 +1,28 @@
+{
+  "taskId": "144-006",
+  "filesChanged": [
+    "src/orchestra/heartbeat-daemon.ts",
+    "src/cli/commands/heartbeat.ts",
+    "tests/agents/auditor.test.ts",
+    "tests/unit/heartbeat-daemon.test.ts"
+  ],
+  "linesAdded": 380,
+  "linesRemoved": 185,
+  "testsPassed": true,
+  "coverage": 90,
+  "selfAssessment": "GO_WITH_TECH_DEBT",
+  "notes": "All sync I/O in heartbeat-daemon.ts converted to async (fs/promises + spawn). 16 sync calls → 0. Functions now return Promises. Tests: 21 new tests in tests/agents/auditor.test.ts + 8 updated in tests/unit/. Total 608 tests pass in scope. TECH DEBT: (1) src/cli/commands/heartbeat.ts modified (scope-adjacent, commander action→async) — necessary to prevent build breakage. (2) src/agents/auditor.ts is only 13 lines (re-export), no sync I/O to convert — task description mentioned '52 sync I/O' but actual auditor.ts has zero; the real sync I/O was in heartbeat-daemon.ts. (3) Full test suite has pre-existing OOM issue (sprint2-debt.test.ts) unrelated to this task.",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 65000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 90,
+    "test_coverage": 88,
+    "scope_compliance": 80,
+    "documentation": 85
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "taskId": "144-017",
+  "filesChanged": [
+    "src/orchestra/sprint-retro-writer.ts",
+    "src/core/memory-store.ts",
+    "tests/orchestra/sprint-retro-writer.test.ts"
+  ],
+  "linesAdded": 225,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Retro sprint-id normalize completed: (1) sprint-retro-writer.ts already used canonical `retro-${sprint.id}` format → no change needed. (2) Added `migrateRetroLatest()` function that soft-deletes legacy `retro-latest` entries created by old migrate-brain-v2.mjs script. Called after each retro write. (3) Added `MemoryStore.getLatestRetro()` query-based method replacing singleton pattern — ORDER BY sprint_num DESC LIMIT 1. (4) 8 tests pass: canonical ID write, no retro-latest creation, migration soft-delete, no-op safety, sprint-specific entries preserved, getLatestRetro highest sprint_num, null on empty DB, excludes soft-deleted. Pre-existing tsc warning (sprint-phases.ts:98 unused var) not introduced by this task.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 35000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

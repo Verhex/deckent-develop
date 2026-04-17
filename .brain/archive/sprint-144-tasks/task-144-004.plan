@@ -1,0 +1,28 @@
+{
+  "taskId": "144-004",
+  "workerId": "w-144-004",
+  "filesToCreate": [
+    "src/agents/worker-log.ts",
+    "src/agents/worker-verify.ts",
+    "src/agents/worker-lifecycle.ts",
+    "tests/agents/worker-log.test.ts",
+    "tests/agents/worker-verify.test.ts",
+    "tests/agents/worker-lifecycle.test.ts"
+  ],
+  "filesToModify": [
+    "src/agents/worker.ts",
+    "tests/agents/worker.test.ts"
+  ],
+  "executionSteps": [
+    "1. Create worker-log.ts: Extract WorkerLogAction type, ACTION_INDICATORS*, formatWorkerLog, formatScopeLog, formatTestLog, formatVerifyLog, formatDoneLog, appendWorkerLog, readWorkerLog",
+    "2. Create worker-verify.ts: Extract getVerifyCommands, isDocOnlyScope, parseVitestOutput, verifyTests, runTestVerifyLoop, MAX_TEST_RETRIES, verifyCompilation, runCompilationLoop, parseCompilationErrors, CompilationResult/LoopResult types, enforceVerifyLoop, VerifyLoopResult",
+    "3. Create worker-lifecycle.ts: Extract WorkerLifecycleState, VALID_TRANSITIONS, STOPPABLE_STATES, TERMINAL_STATES, InvalidStateTransitionError, WorkerStateMachine class, registry functions (get/create/remove/isStoppable/getAll/clear), verify-delta functions, atomicWriteFileSync, fsyncResultFile, finalizeHeartbeatOnShutdown, registerSigtermHandler, FeedbackLoop helpers (create/recordTsc/recordTest/calculateSelfHealingRate/aggregateFeedbackLoops)",
+    "4. Slim worker.ts: Keep core CRUD (readTask, claimTask, writeTaskPlan, updateTaskStatus, createHeartbeat, writeHeartbeat, writeResult, finalizeHeartbeat, isWithinScope, checkWorkerAuthority, emitWorkerQuestion, calculateProgress), error classes, path helpers. Re-export everything from sub-modules.",
+    "5. Delete 5 @deprecated delegates: acquireLock, releaseLock, checkLock, releaseAllLocks, writeFinishedHeartbeat — replace with direct re-exports from sub-modules or core/file-lock",
+    "6. Update external consumers: sprint-spawner, debt-manager, sprint-lifecycle — verify imports still resolve via re-exports",
+    "7. Split tests: Move verify/lifecycle/log tests to respective test files, keep core tests in worker.test.ts",
+    "8. Run tsc --noEmit + vitest, fix any issues"
+  ],
+  "testStrategy": "Split existing 1714 LoC test file into 4 files matching module boundaries. Add 15+ new module-specific tests.",
+  "documentationPlan": "No doc changes needed — internal module split only."
+}

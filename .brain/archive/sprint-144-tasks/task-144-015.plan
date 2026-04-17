@@ -1,0 +1,49 @@
+# Task 144-015: Event Stream Emit Wire
+
+## Objective
+Wire missing ADR-035 event emissions into Brain (sprint-controller), Worker (worker.ts), and Auditor (auditor.ts).
+
+## Analysis — What Already Exists
+- sprint-finalizer.ts: SPRINT_PHASE_CHANGE (3x), METRIC_EMITTED, GATE_COMPUTED, LOAD_REPORT_WRITTEN
+- sprint-spawner.ts: TASK_ASSIGN, HEARTBEAT, SCOPE_COLLISION_DETECTED, METRIC_EMITTED, FIX_REQUEST
+- worker.ts: HEARTBEAT (writeHeartbeat), RESULT+CODE_VERIFY_REQUEST (writeResult), QUESTION (emitWorkerQuestion)
+- auditor.ts: VERIFICATION_RESULT, ADR_VIOLATION, SCOPE_COLLISION_DETECTED, ORPHAN_HB_DETECTED, AUTHORITY_VIOLATION, DEPENDENCY_VIOLATION
+
+## Missing Event Emissions (7 gaps)
+
+### Brain Side (sprint-controller.ts + sprint-phases.ts)
+1. SPRINT_START — runSprint() start, after lock acquired
+2. SPRINT_END — runSprint() end, before return
+3. PHASE_TRANSITION: PLAN→SPAWN — runSpawnPhase() entry
+4. PHASE_TRANSITION: SPAWN→EXECUTE — sprint-controller.ts Phase 3 entry
+5. FIX_CYCLE start — runFixPhase() entry
+
+### Worker Side (worker.ts)
+6. TASK_CLAIM — claimTask() after successful claim
+7. VERIFY_FAIL — need new emitter function for verify loop failures
+
+### Auditor Side (auditor.ts)
+8. BOUNDARY_VIOLATION — checkBoundaryViolations() when violations found
+9. STALE_HEARTBEAT — scanHeartbeats() when stale detected
+
+## New CHANNELS Constants
+- SPRINT_START: 'BRAIN→*:SPRINT_START'
+- SPRINT_END: 'BRAIN→*:SPRINT_END'
+- FIX_CYCLE_START: 'BRAIN→*:FIX_CYCLE_START'
+- TASK_CLAIM: 'WORKER→BRAIN:TASK_CLAIM'
+- VERIFY_FAIL: 'WORKER→BRAIN:VERIFY_FAIL'
+- BOUNDARY_VIOLATION: 'AUDITOR→BRAIN:BOUNDARY_VIOLATION'
+- STALE_HEARTBEAT: 'AUDITOR→BRAIN:STALE_HEARTBEAT'
+
+## Files to Modify
+1. src/orchestra/event-stream.ts — add 7 new CHANNELS constants
+2. src/orchestra/sprint-controller.ts — add SPRINT_START/END + PLAN→SPAWN + SPAWN→EXECUTE events
+3. src/orchestra/sprint-phases.ts — add FIX_CYCLE_START event (scope: src/orchestra/)
+4. src/agents/worker.ts — add TASK_CLAIM event in claimTask(), add emitVerifyFail()
+5. src/monitor/auditor.ts — add BOUNDARY_VIOLATION + STALE_HEARTBEAT events
+6. tests/orchestra/event-stream-emit.test.ts — 12+ tests for all new emissions
+
+## Test Strategy
+- Tmpdir-based tests with writeEvent/readEvents roundtrip
+- Verify each new channel is emitted with correct source/target/payload
+- Test fail-safe behavior (no crash on write failure)

@@ -1,0 +1,89 @@
+{
+  "id": "144-009",
+  "title": "file-lock + deck-file + credentials (Security + Perf)",
+  "description": "file-lock + deck-file + credentials (Security + Perf)\n- Model: opus\n- Effort: normal\n- Agent: security-auditor\n- Skills: security-specialist, performance-optimizer\n- Files: src/core/file-lock.ts, src/core/deck-file.ts, src/core/credentials.ts, tests/core/file-lock.test.ts, tests/core/deck-file.test.ts, tests/core/credentials.test.ts\n- Scope: src/core/, tests/core/\n\n### Description\n**file-lock.ts:** path traversal sanitize (`.. → _`). **deck-file.ts:** `fs.writeFileSync(path, content, { mode: 0o600 })`. **credentials.ts:** `getMasterKey` cache (5min TTL + `invalidateMasterKeyCache()`).\n\n**Kanıt:** file-lock path traversal test PASS. `ls -la .deck/*` `-rw-------`. Cache hit rate ≥99%.\n**Test:** 10+ test.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/file-lock.ts",
+      "src/core/deck-file.ts",
+      "src/core/credentials.ts",
+      "tests/core/file-lock.test.ts",
+      "tests/core/deck-file.test.ts",
+      "tests/core/credentials.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** file-lock path traversal test PASS. `ls -la .deck/*` `-rw-------`. Cache hit rate ≥99%.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "security-auditor",
+  "forceSkills": [
+    "security-specialist",
+    "performance-optimizer"
+  ],
+  "assignedAgent": "security-auditor",
+  "assignedSkills": [
+    "security-specialist",
+    "performance-optimizer"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.86
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.75
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 6,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:08:51.264Z"
+}

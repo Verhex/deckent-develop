@@ -1,0 +1,30 @@
+# Task 144-019 Execution Plan: Rich Sprint Output (7-section summary)
+
+## Approach
+
+The task requires updating `src/cli/helpers/sprint-summary-rich.ts` to add ADR-020's
+7-section rich output via a new `formatRichSummary(data: RichSummaryData): string` function
+with proper TypeScript types and ANSI color support, then adding `--rich` flag to retro.ts.
+
+## Steps
+
+1. Analyze existing `sprint-summary-rich.ts` — it has `formatRichSprintSummary` which is different
+2. Add new `RichSummaryData` interface and `formatRichSummary` function with 7 sections:
+   - Section 1: Header/Overview (sprint ID, date, duration, phase)
+   - Section 2: Task Results (DONE/NO_GO/TECH_DEBT counts + per-task breakdown)
+   - Section 3: Agent/Skill Performance (utilization, success rates)
+   - Section 4: Dependency Map (DOT format graphviz graph)
+   - Section 5: Cost Breakdown (token usage, estimated cost per provider/model)
+   - Section 6: ADR Compliance Score (tasks that complied with ADR constraints)
+   - Section 7: Recommendations (next sprint suggestions)
+3. Update `src/cli/commands/retro.ts` to add `--rich` flag using `--sprint=NNN` to load data
+4. Write 8+ tests in `tests/cli/sprint-summary-rich.test.ts`
+5. Run tsc and vitest to verify
+
+## Key Design Decisions
+
+- New exported `RichSummaryData` interface separate from existing `RichSprintInput`
+- New `formatRichSummary(data: RichSummaryData): string` export
+- The `--rich` flag in retro.ts will parse RETRO.md + task files for data
+- ANSI colors respect NO_COLOR env var (reuse `isNoColor()` pattern)
+- DOT graph is plain text (graphviz format), no external deps needed

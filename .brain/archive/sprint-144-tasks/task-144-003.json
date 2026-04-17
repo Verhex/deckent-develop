@@ -1,0 +1,90 @@
+{
+  "id": "144-003",
+  "title": "retro.ts Split (453 → 3 dosya)",
+  "description": "retro.ts Split (453 → 3 dosya)\n- Model: opus\n- Effort: normal\n- Agent: refactorer\n- Skills: typescript-expert\n- Files: src/cli/commands/retro.ts, src/cli/commands/retro-parser.ts, src/cli/commands/retro-formatter.ts, tests/cli/retro.test.ts, tests/cli/retro-parser.test.ts, tests/cli/retro-formatter.test.ts\n- Scope: src/cli/commands/, tests/cli/\n\n### Description\nRETRO.md V1 parse kaldırılır → `store.getByType('retro')` (T-143-008 migration sonrası). Parser (sprint range query, relations T-143-007 cross-ref). Formatter (plain/JSON/markdown).\n\n**Kanıt:** `wc -l src/cli/commands/retro*.ts` her biri <200. V1 parse 0. `deckent retro --sprint=143` DB-first çalışıyor.\n**Test:** Split + 8 yeni.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/retro.ts",
+      "src/cli/commands/retro-parser.ts",
+      "src/cli/commands/retro-formatter.ts",
+      "tests/cli/retro.test.ts",
+      "tests/cli/retro-parser.test.ts",
+      "tests/cli/retro-formatter.test.ts",
+      ".ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `wc -l src/cli/commands/retro*.ts` her biri <200. V1 parse 0. `deckent retro --sprint=143` DB-first çalışıyor.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "refactorer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "refactorer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.89
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "create",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 7,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.43,
+          "tests/": 0.43
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.43
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1774,
+  "updatedAt": "2026-04-17T14:08:42.281Z"
+}

@@ -1,0 +1,36 @@
+# Task 144-002: doctor.ts Split (1102 → 3 dosya)
+
+## Execution Plan
+
+### Phase 1: Create doctor-checks.ts
+Extract all check functions:
+- checkPlatform, isRunningInWSL, checkNode, checkGit, checkTmux, checkClaude
+- checkWorkspace, checkBrainDir, checkDirectives, checkBrainBudget, checkDebt
+- checkStaleLocks, checkDeckSecurity, checkWritePermissions, checkGitignore, checkDocker
+- getMemoryEntryCount, runDoctorChecks, runPreFlightHealthCheck
+- DoctorCheck interface, PreFlightCheckResult, PreFlightResult interfaces
+- Helper functions: getLastSprintId, countDebtItems, countOpenDebtItems, readCIBaseline, readLatestCIReport, readAllCIReports
+
+### Phase 2: Create doctor-format.ts
+Extract all format/display functions:
+- formatHumanDoctor, formatSystemProfile, formatProviderHealthSection
+- formatConnectorHealthLines, getDeckFileStatus
+- getMemoryHealthLabel, getProviderSummary, getReadinessLabel
+- getProviderInstallHint, buildConnectorHealthResults, getProviderTips
+- capitalize, getProviderHint helper functions
+- HumanDoctorInput interface
+
+### Phase 3: Slim doctor.ts to router (<300 LoC)
+- Import from doctor-checks.ts and doctor-format.ts
+- Keep only registerDoctor function
+- Re-export all public API for backward compatibility
+
+### Phase 4: Create test files
+- tests/cli/doctor-checks.test.ts — check function unit tests
+- tests/cli/doctor-format.test.ts — format function unit tests
+- Update existing tests/cli/commands/doctor.test.ts import paths
+
+### Key Decisions:
+- Use re-export pattern in doctor.ts to maintain backward compat (17+ files import from doctor.ts)
+- DoctorCheck interface shared via doctor-checks.ts export
+- HumanDoctorInput interface in doctor-format.ts (depends on DoctorCheck from checks)

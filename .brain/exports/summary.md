@@ -45,6 +45,14 @@
 | adr-039 | Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-144 Learnings** (sprint-144): ## Sprint sprint-144 Learnings
+- worker.ts Split (1669 → 4 dosya): NO_GO — Worker timeout — process exceeded time lim...
+- **Sprint sprint-143 Learnings** (sprint-143): ## Sprint sprint-143 Learnings
+- Memory V2 Tam Migrasyon (ci-reporter + managed-docs): NO_GO — Docker worker exited w...
+- **Sprint sprint-142 Learnings** (sprint-142): ## Sprint sprint-142 Learnings
+- src/core/ batch 1 — Memory V2 modulleri: GO_WITH_TECH_DEBT — Read-only deep analysis...
+- **Sprint sprint-141 Learnings** (sprint-141): ## Sprint sprint-141 Learnings
+- src/orchestra/ Analysis (82 dosya): NO_GO — Docker worker exited without writing res...
 - **Sprint 139 Learnings** (sprint-139): ## Sprint sprint-139 Learnings
 - **Sprint 138 Learnings** (sprint-138): - ADR-035 Verification Protocol Standard: GO_WITH_TECH_DEBT — ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol ...
 - **Sprint 137 Learnings** (sprint-137): - Brain Budget Decay No-Op Bug Fix: GO_WITH_TECH_DEBT — Fixed brain budget decay no-op bug in runDecay() (debt-manage...
@@ -53,7 +61,6 @@
 - **Sprint 133 Learnings** (sprint-133): - HTTP API Bearer Token Auth: GO_WITH_TECH_DEBT — HTTP API Bearer Token Authentication implemented. Changes:
 
 1. NEW ...
-- **Sprint 132 Learnings** (sprint-132): 
 
 ## Active Technical Debt
 _No active technical debt._
@@ -61,4 +68,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 55 | Generated: 2026-04-16_
+_Total entries: 116 | Generated: 2026-04-17_

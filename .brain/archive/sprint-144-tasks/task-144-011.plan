@@ -1,0 +1,53 @@
+# Task 144-011 Execution Plan: i18n Temel CLI (5 komut TR/EN)
+
+## Analysis
+
+Current state:
+- `messages.ts` has full i18n infrastructure: `getMessage()`, `getLanguage()` (with LANG env detection)
+- `config-reader.ts` has `getLangFromConfig()` (config only, no env fallback)  
+- `status.ts` has duplicate `getLangFromRoot()` (local, no env fallback)
+- All 5 commands already use `getMessage()` with a lang variable
+
+Missing:
+1. `i18n.ts` — unified module that consolidates detectLang() and getMessages() API
+2. Commands don't use LANG env variable fallback properly:
+   - doctor.ts: uses getLangFromConfig() (no env fallback)
+   - status.ts: uses local getLangFromRoot() (no env fallback)
+   - start.ts: uses config.language (no env fallback)
+   - init.ts: uses detectSystemLanguage() from init-wizard.ts
+3. No `help.ts` command exists — need to check what "help" means here
+
+## Changes Planned
+
+### 1. Create `src/cli/helpers/i18n.ts`
+- Export `detectLang(root: string): string` — reads config first, then LANG env, then 'en'
+- Export `getMessages(lang: string)` — returns typed object with all messages for that lang
+- Re-export `getMessage` and `getLanguage` from messages.ts for convenience
+- This consolidates the scattered getLangFromConfig/getLangFromRoot/getLanguage
+
+### 2. Update `src/cli/helpers/config-reader.ts`
+- Make `getLangFromConfig` also fall back to `getLanguage()` from messages.ts (env detection)
+
+### 3. Update `src/cli/commands/status.ts`
+- Import and use `detectLang` from i18n.ts instead of local getLangFromRoot
+
+### 4. Update `src/cli/commands/doctor.ts`
+- Import `detectLang` from i18n.ts instead of `getLangFromConfig`
+
+### 5. Update `src/cli/commands/start.ts`
+- Wrap `config.language` with `getLanguage(config.language)` to enable env fallback
+
+### 6. Update `src/cli/commands/init.ts`
+- Already uses getMessage() and detectSystemLanguage — ensure LANG env used
+
+### 7. Create `tests/cli/i18n.test.ts` (12+ tests)
+- Test detectLang() with config, LANG env, LC_ALL env, fallback
+- Test getMessages() returns correct keys for TR/EN
+- Test TR/EN parity (all message keys have both translations)
+- Test LANG=tr_TR.UTF-8 detection
+- Integration-style tests for getMessage delegation
+
+## ADR Compliance
+- ADR-008: i18n.ts goes in cli/helpers/ ✓ 
+- ADR-010: No external i18n libs, plain TS ✓
+- ADR-012: registerXxx patterns preserved ✓

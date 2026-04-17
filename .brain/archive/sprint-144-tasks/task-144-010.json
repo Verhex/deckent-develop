@@ -1,0 +1,94 @@
+{
+  "id": "144-010",
+  "title": "Dockerfile Hardening",
+  "description": "Dockerfile Hardening\n- Model: sonnet\n- Effort: normal\n- Agent: devops-engineer\n- Skills: docker-expert, devops-engineer\n- Files: Dockerfile, .dockerignore, tests/docker/dockerfile.test.ts\n- Scope: Dockerfile, .dockerignore, tests/docker/\n\n### Description\nMulti-stage build (builder + runtime). `USER deckent` (UID 10001). HEALTHCHECK. `.dockerignore` tight. Image size <400MB.\n\n**Kanıt:** `docker run deckent:144 whoami` → `deckent`. Image size <400MB.\n**Test:** 5+ Docker integration test.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "tests/docker/",
+      "Dockerfile/",
+      ".dockerignore/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "Dockerfile",
+      ".dockerignore",
+      "tests/docker/dockerfile.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `docker run deckent:144 whoami` → `deckent`. Image size <400MB.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceAgent": "devops-engineer",
+  "forceSkills": [
+    "docker-expert",
+    "devops-engineer"
+  ],
+  "assignedAgent": "devops-engineer",
+  "assignedSkills": [
+    "docker-expert",
+    "devops-engineer"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.81
+      },
+      "domains": [
+        {
+          "name": "docker",
+          "weight": 0.33
+        },
+        {
+          "name": "Dockerfile",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:08:54.824Z"
+}

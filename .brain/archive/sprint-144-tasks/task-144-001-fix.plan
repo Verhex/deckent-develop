@@ -1,0 +1,21 @@
+# Task 144-001-fix: init.ts Split (1566 → 4 dosya)
+
+## Strategy
+Split monolithic init.ts into 4 focused modules:
+
+1. **init-templates.ts** (~560 LoC) — Pure template generators (DECKENT.md, DIRECTIVES.md, docs, BOOT.md)
+2. **init-wizard.ts** (~150 LoC) — Format helpers, wizard types, language detection
+3. **init-steps.ts** (~350 LoC) — Core init execution steps extracted from registerInit
+4. **init.ts** (~200 LoC) — Thin router with re-exports for backward compat
+
+## Execution Order
+1. Create init-templates.ts (pure functions, zero cross-deps)
+2. Create init-wizard.ts (pure functions, zero cross-deps)
+3. Create init-steps.ts (imports from templates + wizard)
+4. Refactor init.ts → thin router + re-exports
+5. Verify: tsc --noEmit + npx vitest run
+
+## Key Constraint
+- All existing public exports must be re-exported from init.ts
+- Tests import from init.ts → re-exports keep them working
+- ADR-012: registerInit(program) pattern preserved

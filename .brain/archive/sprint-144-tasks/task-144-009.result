@@ -1,0 +1,30 @@
+{
+  "taskId": "144-009",
+  "filesChanged": [
+    "src/core/file-lock.ts",
+    "src/core/deck-file.ts",
+    "src/core/credential-encryption.ts",
+    "tests/core/file-lock.test.ts",
+    "tests/core/deck-file.test.ts",
+    "tests/core/credentials.test.ts"
+  ],
+  "linesAdded": 95,
+  "linesRemoved": 5,
+  "testsPassed": true,
+  "coverage": 92,
+  "selfAssessment": "DONE",
+  "notes": "3 security/perf improvements implemented and tested:\n\n1. file-lock.ts: Path traversal sanitization — '..' segments replaced with '_' in lockFilePathFor() to prevent lock files being written outside .locks/ directory. 4 new tests.\n\n2. deck-file.ts: createDeckTemplate() now writes with mode 0o600 (owner read/write only) instead of default umask. 1 new test.\n\n3. credential-encryption.ts: getMasterKey() now caches results with 5-minute TTL. Cache is skipped for env-var based keys (which can change at runtime). invalidateMasterKeyCache() exported for testing and key rotation. 4 new tests.\n\nAll 114 tests in scope files PASS. tsc --noEmit clean. Full core/ suite: 121/123 pass (2 failures are pre-existing ölü dosya import errors from deleted orchestra modules, not related to this task).",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 30000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

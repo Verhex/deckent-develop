@@ -1,0 +1,40 @@
+# Task 144-026: archive-debt Test Suite MemoryStore Harness Rewrite
+
+## Problem
+Mevcut test, filesystem mock (vi.mock('node:fs')) kullanıyor. Ancak archive-debt komutu
+Memory V2 DB-first migration sonrası SQLite'dan okuyor. FS mock'ları DB yolunu kapsamıyor,
+testler gerçek proje DB'sinden okuma yapıyor veya kısa devre yollarına düşüyor.
+
+## Approach
+1. `vi.mock('node:fs')` kaldır → gerçek fs kullan (tmpdir içinde izole)
+2. `resolveProjectRoot` mock'la → tmpdir döndür
+3. `print` mock'la → çıktı yakalama
+4. Her test öncesi:
+   - tmpdir oluştur
+   - .brain/ dizini oluştur
+   - DEBT.md boş dosya oluştur (existsSync(debtPath) kontrolü için)
+   - MemoryStore ile :memory: yerine tmpdir/memory.db aç
+   - Test verilerini DB'ye insert et
+5. Her test sonrası:
+   - store.close()
+   - tmpdir temizle
+6. Test senaryoları:
+   - No DEBT.md → "No resolved debt items"
+   - DB var, tüm item'lar unresolved → "No resolved debt items"
+   - DB var, resolved item'lar → arşivle, unresolved kalsın
+   - DB var, tümü resolved → hepsini arşivle
+   - --dry-run → değişiklik yapma
+   - --count → sayıları göster
+   - --before filter → sprint filtreleme
+   - Arşiv dizini oluşturma
+   - DB upsert doğrulama (resolved item status = 'resolved')
+   - Malformed metadata → defensif davranış
+
+## Files
+- tests/cli/archive-debt.test.ts (REWRITE)
+
+## Expected
+- Tüm testler PASS
+- FS mock kaldırıldı
+- DB-first assertion'lar eklendi
+- "Sprint 144 debt" yorumu yok

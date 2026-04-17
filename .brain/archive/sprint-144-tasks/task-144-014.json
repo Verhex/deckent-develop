@@ -1,0 +1,96 @@
+{
+  "id": "144-014",
+  "title": "Docker HB Deploy Wire (Sprint 139 Fix Canlı)",
+  "description": "Docker HB Deploy Wire (Sprint 139 Fix Canlı)\n- Model: opus\n- Effort: normal\n- Agent: devops-engineer\n- Skills: docker-expert\n- Files: src/orchestra/spawn-backend-docker.ts, src/orchestra/heartbeat-daemon.ts, tests/docker/docker-hb.test.ts\n- Scope: src/orchestra/, tests/docker/\n\n### Description\nSprint 139 T-013 runtime wire: `atomicWriteFileSync` HB write. SIGTERM 15s grace + fsync + exit. Docker 10-e2e suite.\n\n**Kanıt:** Docker E2E 10/10 PASS. HB gap <5s.\n**Test:** 10 E2E.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/docker/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/orchestra/heartbeat-daemon.ts",
+      "tests/docker/docker-hb.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Docker E2E 10/10 PASS. HB gap <5s.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "devops-engineer",
+  "forceSkills": [
+    "docker-expert"
+  ],
+  "assignedAgent": "devops-engineer",
+  "assignedSkills": [
+    "docker-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.6
+        },
+        {
+          "name": "docker",
+          "weight": 0.4
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:09:18.626Z"
+}

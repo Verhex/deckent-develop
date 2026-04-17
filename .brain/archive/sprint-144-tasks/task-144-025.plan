@@ -1,0 +1,29 @@
+# Task 144-025: MCP Start Detached Fork Integration Test
+
+## Approach
+Test the detached fork + IPC file pattern introduced in Sprint 143 T-143-012.
+The MCP `deckent_start` tool now fork()s a detached child process and communicates
+via IPC files in `.deckent/<jobId>-ipc/`.
+
+## Test Strategy
+Integration tests that mock the heavy dependencies (loadConfig, brain, provider)
+but exercise the REAL fork(), IPC directory creation, and config file writing.
+
+## Test Cases (8+)
+1. IPC directory created at `.deckent/<jobId>-ipc/`
+2. IPC config.json written with correct SprintRunnerConfig schema
+3. config.json contains projectRoot, jobId, autoApprove=true
+4. config.json sandboxMode/timeoutMs forwarded from handler args
+5. fork() called with detached:true (mock child_process.fork)
+6. child.unref() called to free parent
+7. Concurrent starts produce different sessionId/jobId (unique IPC dirs)
+8. IPC config schema validation (all required fields present, correct types)
+9. IPC directory path follows `getIpcDir()` contract
+10. child fork receives correct runner path argument
+
+## Files
+- CREATE: tests/mcp/tools/start-detached-fork.integration.test.ts
+- MODIFY: tests/mcp/tools/start.test.ts (remove Sprint 144 debt comment)
+
+## Scope
+tests/mcp/ only — no src/ changes.

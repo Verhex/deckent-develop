@@ -1,0 +1,81 @@
+{
+  "id": "144-022",
+  "title": "Prompt Test Slot-Based Assertion Refactor (Sprint 143 Debt #1)",
+  "description": "Prompt Test Slot-Based Assertion Refactor (Sprint 143 Debt #1)\n- Model: sonnet\n- Effort: normal\n- Agent: test-writer\n- Skills: testing-expert\n- Files: tests/orchestra/task-builder.test.ts, tests/orchestra/task-builder-skill.test.ts\n- Scope: tests/orchestra/\n\n### Description\nSprint 143'te prompt boyut sınırı 200→450 zorla yükseltildi. Geçici patch. Slot-based assertion: `<DIRECTIVES>`, `<ADR>`, `<TASK>`, `<FILES>` slot'ları structural doğrula. Absolute description substring match. truncateAtParagraph budget+1 boundary defensif assertion. Sprint 144 debt yorumları temizle.\n\n**Kanıt:** `grep -n \"Sprint 144 debt\" tests/orchestra/task-builder*.test.ts` → 0. PASS.\n**Test:** Mevcut + 6 slot-based yeni assertion.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/orchestra/task-builder.test.ts",
+      "tests/orchestra/task-builder-skill.test.ts",
+      ".test",
+      "test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep -n \"Sprint 144 debt\" tests/orchestra/task-builder*.test.ts` → 0. PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceAgent": "test-writer",
+  "forceSkills": [
+    "testing-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.6
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:10:00.748Z"
+}

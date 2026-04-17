@@ -1,0 +1,97 @@
+{
+  "id": "144-001-fix",
+  "title": "Fix: init.ts Split (1566 → 4 dosya)",
+  "description": "Priority fix for NO_GO task 144-001. Notes: Docker worker exited without writing result file",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 144-001 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/init.ts",
+      "src/cli/commands/init-steps.ts",
+      "src/cli/commands/init-templates.ts",
+      "src/cli/commands/init-wizard.ts",
+      "tests/cli/init.test.ts",
+      "tests/cli/init-steps.test.ts",
+      "tests/cli/init-templates.test.ts",
+      "tests/cli/init-wizard.test.ts",
+      "init.ts",
+      ".ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `wc -l src/cli/commands/init*.ts` → her biri <400. `deckent init /tmp/test-144` happy path PASS (T-143-009 DB preload dahil).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "EXECUTING",
+  "sprintId": "sprint-144",
+  "isPriorityFix": true,
+  "fixForTaskId": "144-001",
+  "createdAt": "2026-04-17T14:08:30.977Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.75
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.83
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 10,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.4,
+          "tests/": 0.4
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.4
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "testing-expert",
+    "react-specialist",
+    "typescript-expert"
+  ],
+  "estimatedTokens": 3199
+}

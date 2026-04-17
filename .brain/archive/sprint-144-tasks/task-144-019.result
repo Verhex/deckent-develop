@@ -1,0 +1,27 @@
+{
+  "taskId": "144-019",
+  "filesChanged": [
+    "src/cli/helpers/sprint-summary-rich.ts",
+    "src/cli/commands/retro.ts",
+    "tests/cli/sprint-summary-rich.test.ts"
+  ],
+  "linesAdded": 627,
+  "linesRemoved": 3,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Added ADR-020 7-section rich summary to sprint-summary-rich.ts: new RichSummaryData interface + formatRichSummary() function with all 7 sections (§1 Header/Overview, §2 Task Results, §3 Agent/Skill Performance, §4 Dependency Map DOT, §5 Cost Breakdown, §6 ADR Compliance Score, §7 Recommendations). ANSI colors respect NO_COLOR env var. Added --rich and --sprint flags to retro.ts command. 32 tests pass (all 32).",
+  "tokenUsage": {
+    "inputTokens": 15000,
+    "outputTokens": 4000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

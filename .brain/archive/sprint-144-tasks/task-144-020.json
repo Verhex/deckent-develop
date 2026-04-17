@@ -1,0 +1,86 @@
+{
+  "id": "144-020",
+  "title": "Test — Memory V2 CLI (+40 test)",
+  "description": "Test — Memory V2 CLI (+40 test)\n- Model: opus\n- Effort: normal\n- Agent: test-writer\n- Skills: testing-expert\n- Files: tests/cli/recall.test.ts, tests/cli/remember.test.ts, tests/cli/memory.test.ts, tests/mcp/memory-query.test.ts\n- Scope: tests/cli/, tests/mcp/\n\n### Description\n4 kritik dosya 0 test → ≥10 test/dosya. recall.ts (mode=and|or, empty query, snippet, FTS5 error), remember.ts (insert, invalid type, relations, metadata), memory.ts (rebuild/export/stats), mcp/memory-query.ts.\n\n**Kanıt:** vitest +40 test PASS. Coverage ≥90%.\n**Test:** 40+ test.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/cli/",
+      "tests/mcp/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/cli/recall.test.ts",
+      "tests/cli/remember.test.ts",
+      "tests/cli/memory.test.ts",
+      "tests/mcp/memory-query.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** vitest +40 test PASS. Coverage ≥90%.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "test-writer",
+  "forceSkills": [
+    "testing-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.67
+        },
+        {
+          "name": "mcp",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 1
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 1
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:09:53.505Z"
+}

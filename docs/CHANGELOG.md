@@ -6,6 +6,36 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint144] - 2026-04-17
+
+### Added
+
+- init.ts Split (1566 → 4 dosya)
+- doctor.ts Split (1102 → 3 dosya)
+- retro.ts Split (453 → 3 dosya)
+- Auditor Async Scan Loop (52 Sync I/O Elimine)
+- file-lock + deck-file + credentials (Security + Perf)
+- Dockerfile Hardening
+- i18n Temel CLI (5 komut TR/EN)
+- redactSensitive CLI → core taşı (ADR-008)
+- Sprint-State Lifecycle (pid manager)
+- Orphan Cleanup (.tasks + locks) + Pre-flight
+
+### Changed
+
+- Event Stream Emit Wire (completed with tech debt)
+- Retro sprint-id Normalize (completed with tech debt)
+
+### Fixed
+
+- ADR-008 Cycle 2 Fix — core/session-interface.ts
+- Türkçe Locale Fix (.toLowerCase → .toLocaleLowerCase('tr-TR'))
+- Docker HB Deploy Wire (Sprint 139 Fix Canlı)
+- sprint2-debt.test.ts Memory Leak Fix (Sprint 143 Debt #7 — CI Blocker)
+
+
+_Tasks: 27 total, 24 done, 2 tech debt, 3 no-go_
+
 ## [0.4.0-beta.1-sprint143] - 2026-04-17
 
 ### Added

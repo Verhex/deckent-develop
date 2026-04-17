@@ -1,0 +1,62 @@
+# Task 144-022 Execution Plan
+
+## Objective
+Replace fragile absolute-size and ratio assertions in buildWorkerPrompt tests with
+slot-based structural assertions that verify prompt composition by section markers.
+
+## Problem Analysis
+
+### task-builder.test.ts issues (lines ~541-562):
+1. Line 549: `expect(lines).toBeLessThan(450)` — magic number raised from 200→450 as patch
+2. Line 561: `expect(descLen / totalLen).toBeGreaterThan(0.02)` — ratio almost meaningless (0.02 is trivial)
+3. "Sprint 144 debt" comments scattered in these tests
+
+### task-builder-skill.test.ts issues (lines ~78-82):
+1. Line 82: `expect(xCount).toBeLessThanOrEqual(1501)` — "+1 tolerance" comment + Sprint 144 debt comment
+   The truncation boundary test relies on fragile string slicing to extract the skill section.
+
+## Plan
+
+### 1. task-builder.test.ts — 2 tests to refactor + "Sprint 144 debt" comments to remove:
+
+#### Test at line 541: "prompt is significantly shorter than original (~80 lines target)"
+Replace line count assertion with:
+- Verify that all mandatory sections exist as slots (structural presence)
+- Keep it meaningful: check section order and existence, not raw line count
+
+#### Test at line 554: "task description ratio is higher in shorter prompt"
+Replace ratio check with:
+- `expect(prompt).toContain(task.description.slice(0, 50))` — absolute substring presence
+- Verify description appears within `## Your Task` section
+
+### 2. task-builder-skill.test.ts — 1 test to refactor + "Sprint 144 debt" comment to remove:
+
+#### Test at lines 66-82: truncation boundary
+Replace complex string slicing hack with:
+- Direct check that skill section contains ≤1501 X's
+- Use `prompt.indexOf('=== Skills ===')` and `prompt.indexOf('\n\n', skillStart + 1)` to find section end
+- Actually: just assert that the skill content is truncated within the skill entry itself
+
+## New Slot-Based Tests to Add (6 total)
+
+### In task-builder.test.ts (4 new tests in buildWorkerPrompt describe):
+
+1. **slot presence**: prompt contains all 4 mandatory section markers
+2. **slot order when agentPrompt**: Agent slot < Skills slot < ADR slot < task content
+3. **description absolute match**: task.description (or its start) appears verbatim in prompt
+4. **section boundaries**: each `##` section present with expected content
+
+### In task-builder-skill.test.ts (2 new tests):
+
+5. **truncateAtParagraph budget boundary**: strict ≤1500 chars for skill content
+6. **slot ordering with all three blocks**: agent + skills + ADR + task content in correct order
+
+## Files to Modify
+- tests/orchestra/task-builder.test.ts
+- tests/orchestra/task-builder-skill.test.ts
+
+## Constraints
+- Must NOT modify src/ files
+- Must remove all "Sprint 144 debt" comments
+- Must keep existing tests PASS (no regression)
+- Must add 6+ new slot-based assertion tests

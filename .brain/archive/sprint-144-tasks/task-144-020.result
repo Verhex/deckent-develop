@@ -1,0 +1,28 @@
+{
+  "taskId": "144-020",
+  "filesChanged": [
+    "tests/cli/recall.test.ts",
+    "tests/cli/remember.test.ts",
+    "tests/cli/memory.test.ts",
+    "tests/mcp/memory-query.test.ts"
+  ],
+  "linesAdded": 620,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 90,
+  "selfAssessment": "DONE",
+  "notes": "4 test files created from scratch with 49 tests total (task spec: 40+). recall.test.ts: 12 tests (basic query, OR/AND mode, type filter, sprint-min, limit, snippet, summary display). remember.test.ts: 10 tests (insert, custom type/tags/title, title truncation, source=user, special chars, unique IDs). memory.test.ts: 14 tests (stats: 3, export: 3, rebuild: 4, relations: 2 — covers all subcommands). mcp/memory-query.test.ts: 13 tests (FTS search, structured search, type/status/sprint filters, AND/OR mode, limit, relevance, snippets, Turkish normalization, soft-delete exclusion, tags_contain). All tests use real SQLite DB via tmpdir for accurate integration coverage. tsc --noEmit PASS, vitest PASS 49/49.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 30000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 80
+  }
+}

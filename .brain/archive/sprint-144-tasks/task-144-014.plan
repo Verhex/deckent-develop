@@ -1,0 +1,35 @@
+# Task 144-014: Docker HB Deploy Wire (Sprint 139 Fix Canlı)
+
+## Baseline
+- `spawn-backend-docker.ts` uses plain `writeFileSync` for HB writes (line 213, 356)
+- `atomicWriteFileSync` exists in `worker-lifecycle.ts` but is NOT wired into Docker backend
+- Docker backend script template already has `fsync_file` POSIX trap (Sprint 139)
+- heartbeat-daemon.ts uses async `writeFile` which is fine for daemon context
+- Existing tests in `tests/e2e/docker-hb-shutdown.test.ts` (21 tests)
+
+## Changes
+
+### 1. spawn-backend-docker.ts — Wire atomicWriteFileSync
+- Import `atomicWriteFileSync` from `../agents/worker-lifecycle.js`
+- Replace `writeFileSync(hbPath, ...)` with `atomicWriteFileSync(hbPath, ...)` at:
+  - Line 213: Initial HB write after container start
+  - Line 356: monitorContainer HB update on exit
+- Add host-side fsync for HB in `verifyResultAfterStop` (also fsync HB file)
+
+### 2. heartbeat-daemon.ts — Minor hardening
+- Already async, no atomicWrite needed
+- Add `atomicWriteFileAsync` pattern for HB file consistency if needed
+- Actually: heartbeat-daemon.ts is NOT about Docker HB — it's about HEARTBEAT.md tasks
+- Minimal change: ensure daemon PID file write is atomic
+
+### 3. tests/docker/docker-hb.test.ts — 10 E2E tests
+- Test atomicWriteFileSync HB wire in Docker backend
+- Test HB gap <5s (heartbeat interval verification)
+- Test SIGTERM grace period 15s
+- Test fsync_file script template
+- Test EXIT/TERM traps in script
+- Test host-side post-stop verification
+- Test reconciliation (exitCode != 0 but result DONE)
+- Test HB sequence increment
+- Test container script heartbeat loop interval
+- Test fallback result write

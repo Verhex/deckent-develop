@@ -1,0 +1,94 @@
+{
+  "id": "144-015",
+  "title": "Event Stream Emit Wire",
+  "description": "Event Stream Emit Wire\n- Model: opus\n- Effort: normal\n- Agent: architect\n- Skills: typescript-expert\n- Files: src/orchestra/event-stream.ts, src/orchestra/sprint-controller.ts, src/agents/worker.ts, src/agents/auditor.ts, tests/orchestra/event-stream-emit.test.ts\n- Scope: src/orchestra/, src/agents/, tests/\n\n### Description\nSprint 138 event-stream.ts foundation wire: Brain (PHASE_TRANSITION, SPRINT_START/END, FIX_CYCLE), Worker (TASK_CLAIM, HEARTBEAT, RESULT_WRITE, VERIFY_FAIL), Auditor (ADR_VIOLATION, BOUNDARY_VIOLATION, STALE_HEARTBEAT).\n\n**Kanıt:** `.deckent/sprint-144-events.jsonl` ≥200 event.\n**Test:** 10+ test.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/agents/",
+      "tests/orchestra/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/event-stream.ts",
+      "src/orchestra/sprint-controller.ts",
+      "src/agents/worker.ts",
+      "src/agents/auditor.ts",
+      "tests/orchestra/event-stream-emit.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `.deckent/sprint-144-events.jsonl` ≥200 event.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "architect",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.39
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.56
+        },
+        {
+          "name": "agents",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.8,
+          "tests/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:09:25.369Z"
+}

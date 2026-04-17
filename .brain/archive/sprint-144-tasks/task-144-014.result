@@ -1,0 +1,27 @@
+{
+  "taskId": "144-014",
+  "filesChanged": [
+    "src/orchestra/spawn-backend-docker.ts",
+    "src/orchestra/heartbeat-daemon.ts",
+    "tests/docker/docker-hb.test.ts"
+  ],
+  "linesAdded": 195,
+  "linesRemoved": 8,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 144 Docker HB Deploy Wire complete. Changes:\n1. spawn-backend-docker.ts: Added inline atomicWriteHb() helper (temp→fsync→rename pattern) — avoids orchestra→agents import per ADR-008. Both initial HB write (line 229) and monitor exit HB write (line 372) now use atomic writes instead of plain writeFileSync. verifyResultAfterStop now also fsyncs .hb file (was only .result before).\n2. heartbeat-daemon.ts: Added atomicWriteAsync() async helper for PID file writes. writePidFile() now uses atomic pattern.\n3. tests/docker/docker-hb.test.ts: 13 new tests covering atomic HB wire, SIGTERM 15s grace period, script template (fsync_file, EXIT/TERM traps), post-stop verification (both .result and .hb fsync), reconciliation logic, and heartbeat daemon PID hardening.\n\nAll 62 Docker-related tests pass (13 new + 28 dockerfile + 21 e2e/docker-hb-shutdown). tsc --noEmit clean.",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

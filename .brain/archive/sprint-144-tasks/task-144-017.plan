@@ -1,0 +1,31 @@
+# Task 144-017: Retro sprint-id Normalize
+
+## Problem
+- DB'de retro entry'leri tutarsız: `retro-sprint-NNN` (doğru) ve `retro-latest` (eski migration)
+- `retro-latest` sprint-specific değil, sprint_id=null, sprint_num=0
+
+## Plan
+
+### 1. sprint-retro-writer.ts
+- `writeRetrospective()` zaten `retro-${sprint.id}` kullanıyor (sprint.id = "sprint-NNN")
+  → Sonuç: `retro-sprint-NNN` — bu zaten canonical format, değişiklik gerekmez
+- `retro-latest` migration logic ekle: sprint sonrası eski `retro-latest` entry'yi tespit et ve sil
+- `migrateRetroLatest(store, sprintId, sprintNum)` helper fonksiyon
+
+### 2. memory-store.ts
+- `getLatestRetro()` convenience method ekle: type='retro' + ORDER BY sprint_num DESC LIMIT 1
+  → Bu, `retro-latest` alias yerine query-based "latest" sağlar
+
+### 3. tests/orchestra/sprint-retro-writer.test.ts (yeni dosya)
+- 6+ test:
+  1. writeRetrospective canonical `retro-sprint-NNN` ID ile yazar
+  2. retro-latest varsa migrate edilir (content kopyalanır, sprint-specific ID alır)
+  3. retro-latest migrate sonrası silinir
+  4. retro-latest yoksa hata olmaz (no-op)
+  5. getLatestRetro() en yüksek sprint_num'u döndürür
+  6. getLatestRetro() boş DB'de null döndürür
+
+## Files
+- src/orchestra/sprint-retro-writer.ts (migration logic)
+- src/core/memory-store.ts (getLatestRetro method)
+- tests/orchestra/sprint-retro-writer.test.ts (yeni, 6+ test)

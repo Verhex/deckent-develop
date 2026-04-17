@@ -1,0 +1,92 @@
+{
+  "id": "144-006",
+  "title": "Auditor Async Scan Loop (52 Sync I/O Elimine)",
+  "description": "Auditor Async Scan Loop (52 Sync I/O Elimine)\n- Model: opus\n- Effort: high\n- Agent: performance-analyzer\n- Skills: performance-optimizer, typescript-expert\n- Files: src/agents/auditor.ts, src/orchestra/heartbeat-daemon.ts, tests/agents/auditor.test.ts\n- Scope: src/agents/, src/orchestra/, tests/\n\n### Description\nTüm sync I/O async → `fs.promises.*`, `spawn` (stream-based). Parallel `Promise.all([...])`. 30s→<5s latency target (100 worker scenario).\n\n**Kanıt:** `npm run bench:auditor` <5s. `grep -n \"readFileSync\\|readdirSync\\|statSync\\|spawnSync\" src/agents/auditor.ts` → 0.\n**Test:** 15+ test (async path, benchmark, concurrent scan).\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/agents/",
+      "src/orchestra/",
+      "tests/agents/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/agents/auditor.ts",
+      "src/orchestra/heartbeat-daemon.ts",
+      "tests/agents/auditor.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npm run bench:auditor` <5s. `grep -n \"readFileSync\\|readdirSync\\|statSync\\|spawnSync\" src/agents/auditor.ts` → 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "performance-analyzer",
+  "forceSkills": [
+    "performance-optimizer",
+    "typescript-expert"
+  ],
+  "assignedAgent": "performance-analyzer",
+  "assignedSkills": [
+    "performance-optimizer",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "performance",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.73
+      },
+      "domains": [
+        {
+          "name": "agents",
+          "weight": 0.57
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.29
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.67
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:08:46.701Z"
+}

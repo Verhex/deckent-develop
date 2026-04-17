@@ -1,0 +1,99 @@
+{
+  "id": "144-001",
+  "title": "init.ts Split (1566 → 4 dosya)",
+  "description": "init.ts Split (1566 → 4 dosya)\n- Model: opus\n- Effort: high\n- Agent: refactorer\n- Skills: typescript-expert, system-architect\n- Files: src/cli/commands/init.ts, src/cli/commands/init-steps.ts, src/cli/commands/init-templates.ts, src/cli/commands/init-wizard.ts, tests/cli/init.test.ts, tests/cli/init-steps.test.ts, tests/cli/init-templates.test.ts, tests/cli/init-wizard.test.ts\n- Scope: src/cli/commands/, tests/cli/\n\n### Description\ninit.ts 1566 LoC monolit handler → 4 modül (her biri ≤400 LoC). Router (argument + flow, <200 LoC), steps (DB preload T-143-009 dahil, git init, config write, rule gen T-143-011 çağrısı), templates (CLAUDE/DECKENT/AGENTS/DIRECTIVES/BOOT), wizard (interactive prompts). tests/cli/init.test.ts (2270 LoC) 4 dosyaya bölünür.\n\n**Kanıt:** `wc -l src/cli/commands/init*.ts` → her biri <400. `deckent init /tmp/test-144` happy path PASS (T-143-009 DB preload dahil).\n**Test:** Mevcut 2270 LoC split + 10+ yeni unit test per modül (toplam 40+ test).\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/init.ts",
+      "src/cli/commands/init-steps.ts",
+      "src/cli/commands/init-templates.ts",
+      "src/cli/commands/init-wizard.ts",
+      "tests/cli/init.test.ts",
+      "tests/cli/init-steps.test.ts",
+      "tests/cli/init-templates.test.ts",
+      "tests/cli/init-wizard.test.ts",
+      "init.ts",
+      ".ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `wc -l src/cli/commands/init*.ts` → her biri <400. `deckent init /tmp/test-144` happy path PASS (T-143-009 DB preload dahil).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-144",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "refactorer",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "refactorer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.85
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.83
+        }
+      ],
+      "operations": [
+        {
+          "type": "configure",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 10,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.4,
+          "tests/": 0.4
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.4
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1827,
+  "updatedAt": "2026-04-17T14:08:30.977Z"
+}

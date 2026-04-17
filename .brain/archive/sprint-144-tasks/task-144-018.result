@@ -1,0 +1,29 @@
+{
+  "taskId": "144-018",
+  "filesChanged": [
+    "src/core/orphan-cleaner.ts",
+    "src/orchestra/sprint-finalizer.ts",
+    "src/orchestra/sprint-controller.ts",
+    "tests/core/orphan-cleaner.test.ts",
+    "tests/orchestra/preflight-cleanup.test.ts"
+  ],
+  "linesAdded": 480,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "coverage": 95,
+  "selfAssessment": "DONE",
+  "notes": "Post-finalize + pre-flight orphan cleanup implemented. New module src/core/orphan-cleaner.ts with two functions: postFinalizeCleanup (archives terminal tasks, preserves active, cleans stale locks) and preflightOrphanCleanup (moves previous sprint files to archive before PLAN phase, skips if live sprint pid detected). Wired into sprint-finalizer.ts (step 16) and sprint-controller.ts (after PLAN, before SPAWN). 18 tests passing (14 unit + 4 integration). tsc clean. No regressions introduced — 42 pre-existing failures unchanged.",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

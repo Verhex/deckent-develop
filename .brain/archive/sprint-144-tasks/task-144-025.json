@@ -1,0 +1,85 @@
+{
+  "id": "144-025",
+  "title": "MCP Start Detached Fork Integration Test (Sprint 143 Debt #5)",
+  "description": "MCP Start Detached Fork Integration Test (Sprint 143 Debt #5)\n- Model: opus\n- Effort: normal\n- Agent: test-writer\n- Skills: testing-expert\n- Files: tests/mcp/tools/start-detached-fork.integration.test.ts, tests/mcp/tools/start.test.ts\n- Scope: tests/mcp/\n\n### Description\nSprint 143 T-143-012 MCP `deckent_start` detached fork + IPC file pattern'ine geçti. Integration test eksikti. Gerçek `fork()` spawn, `.deckent/mcp-ipc/<sessionId>.json` inspect, `detached: true` doğrula, IPC schema validate, child exit sonrası cleanup, concurrent start farklı sessionId.\n\n**Kanıt:** PASS. `grep -n \"Sprint 144 debt\" tests/mcp/tools/start.test.ts` → 0.\n**Test:** 8+ integration test.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/mcp/tools/",
+      "tests/mcp/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/mcp/tools/start-detached-fork.integration.test.ts",
+      "tests/mcp/tools/start.test.ts",
+      ".json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** PASS. `grep -n \"Sprint 144 debt\" tests/mcp/tools/start.test.ts` → 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "test-writer",
+  "forceSkills": [
+    "testing-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "mcp",
+          "weight": 0.8
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.6
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.67
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.67
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:10:12.576Z"
+}

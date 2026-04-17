@@ -1,0 +1,11 @@
+{
+  "taskId": "144-004",
+  "workerId": "w-144-004",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": false,
+  "coverage": 0,
+  "selfAssessment": "NO_GO",
+  "notes": "Worker timeout — process exceeded time limit and was killed"
+}

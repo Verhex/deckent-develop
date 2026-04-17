@@ -3704,3 +3704,51 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 143-020: heartbeat-daemon execSync Beyaz Liste (DONE)
 
 ---
+## Sprint 144 — sprint-144
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-17
+**Duration:** 6444s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 27 |
+| Completed | 24 |
+| Tech Debt | 2 |
+| No-Go | 3 |
+| Coverage | 52.1% |
+| Duration | 6444059ms |
+
+### Tasks
+
+- 144-001: init.ts Split (1566 → 4 dosya) (DONE)
+- 144-002: doctor.ts Split (1102 → 3 dosya) (DONE)
+- 144-003: retro.ts Split (453 → 3 dosya) (DONE)
+- 144-004: worker.ts Split (1669 → 4 dosya) (NO_GO)
+- 144-005: ADR-008 Cycle 2 Fix — core/session-interface.ts (DONE)
+- 144-006: Auditor Async Scan Loop (52 Sync I/O Elimine) (DONE)
+- 144-007: Ölü Kod Silme Wave A (Agent + V1 Routing, 17 dosya, 2780 LoC) (NO_GO)
+- 144-008: Ölü Kod Silme Wave B (Orchestra Sahipsiz + Feature Flag, 12 dosya, 2139 LoC) (NO_GO)
+- 144-009: file-lock + deck-file + credentials (Security + Perf) (DONE)
+- 144-010: Dockerfile Hardening (DONE)
+- 144-011: i18n Temel CLI (5 komut TR/EN) (DONE)
+- 144-012: Türkçe Locale Fix (.toLowerCase → .toLocaleLowerCase('tr-TR')) (DONE)
+- 144-013: redactSensitive CLI → core taşı (ADR-008) (DONE)
+- 144-014: Docker HB Deploy Wire (Sprint 139 Fix Canlı) (DONE)
+- 144-015: Event Stream Emit Wire (GO_WITH_TECH_DEBT)
+- 144-016: Sprint-State Lifecycle (pid manager) (DONE)
+- 144-017: Retro sprint-id Normalize (GO_WITH_TECH_DEBT)
+- 144-018: Orphan Cleanup (.tasks + locks) + Pre-flight (DONE)
+- 144-019: Rich Sprint Output (7-section summary) (DONE)
+- 144-020: Test — Memory V2 CLI (+40 test) (DONE)
+- 144-021: Test — heartbeat-daemon + mid-sprint-adapter + ci-reporter (+24 test) (DONE)
+- 144-022: Prompt Test Slot-Based Assertion Refactor (Sprint 143 Debt #1) (DONE)
+- 144-023: sprint2-debt.test.ts Memory Leak Fix (Sprint 143 Debt #7 — CI Blocker) (DONE)
+- 144-024: formatCiHealthSection coverageDelta Defensif Default (Sprint 143 Debt #3) (DONE)
+- 144-025: MCP Start Detached Fork Integration Test (Sprint 143 Debt #5) (DONE)
+- 144-026: archive-debt Test Suite MemoryStore Harness Rewrite (Sprint 143 Debt #6) (DONE)
+- 144-027: sprint-reporter-ci DB-Write Coverage (Sprint 143 Debt #4) (DONE)
+
+---

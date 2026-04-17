@@ -1,0 +1,28 @@
+# Task 144-009 Execution Plan
+
+## Objective
+Security hardening + performance optimization for 3 core modules.
+
+## Changes
+
+### 1. file-lock.ts — Path Traversal Sanitization
+- In `lockFilePathFor()`: sanitize `..` segments → `_` before generating lock file name
+- This prevents attackers from writing lock files outside `.locks/` directory
+- Current code: `filePath.replace(/[/\\]/g, '__')` — does NOT handle `..`
+- Fix: add `..` → `_` replacement before the existing replace
+
+### 2. deck-file.ts — Restrictive File Permissions
+- `createDeckTemplate()`: add `{ mode: 0o600 }` to `writeFileSync` call
+- `ensureDeckGitignore()` when creating new .gitignore: add `{ mode: 0o644 }` (not sensitive but consistent)
+- .deck files contain secrets — must be owner-only readable
+
+### 3. credentials.ts (credential-encryption.ts) — getMasterKey Cache
+- Add module-level cache with 5-minute TTL in credential-encryption.ts
+- `getMasterKey()` → check cache first, return if valid
+- Export `invalidateMasterKeyCache()` for testing and key rotation
+- Cache structure: `{ key: Buffer, cachedAt: number }`
+
+### 4. Tests (10+ new)
+- file-lock: path traversal with `../../etc/passwd`, `..` in middle, repeated `..`
+- deck-file: verify 0o600 permissions on created .deck files
+- credentials: cache hit, cache miss, TTL expiry, invalidation

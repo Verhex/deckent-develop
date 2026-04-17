@@ -1,0 +1,96 @@
+{
+  "id": "144-002",
+  "title": "doctor.ts Split (1102 → 3 dosya)",
+  "description": "doctor.ts Split (1102 → 3 dosya)\n- Model: opus\n- Effort: high\n- Agent: refactorer\n- Skills: typescript-expert\n- Files: src/cli/commands/doctor.ts, src/cli/commands/doctor-checks.ts, src/cli/commands/doctor-format.ts, tests/cli/doctor.test.ts, tests/cli/doctor-checks.test.ts, tests/cli/doctor-format.test.ts\n- Scope: src/cli/commands/, tests/cli/\n\n### Description\nRouter (<300 LoC) + checks (memoryDb, adrs, gitignore T-143-003, fts5Integrity T-143-006, brainHealth, workers, docker, tsc, vitest, cost) + format (table/JSON/plain). DEBT.md V1 parse kaldırılır → `store.getByType('debt')` (Memory V2 migration). Her check typed `CheckResult`.\n\n**Kanıt:** `wc -l src/cli/commands/doctor*.ts` her biri <500. `grep -n \"readFileSync.*DEBT.md\" src/cli/commands/doctor*.ts` → 0.\n**Test:** Split + 20+ yeni (her check için ayrı).\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/doctor-checks.ts",
+      "src/cli/commands/doctor-format.ts",
+      "tests/cli/doctor.test.ts",
+      "tests/cli/doctor-checks.test.ts",
+      "tests/cli/doctor-format.test.ts",
+      "DEBT.md",
+      ".ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `wc -l src/cli/commands/doctor*.ts` her biri <500. `grep -n \"readFileSync.*DEBT.md\" src/cli/commands/doctor*.ts` → 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "refactorer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "refactorer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.79
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.8
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "document",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 8,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.38,
+          "tests/": 0.38
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.38
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1797,
+  "updatedAt": "2026-04-17T14:08:37.631Z"
+}

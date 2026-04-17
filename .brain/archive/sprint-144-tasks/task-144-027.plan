@@ -1,0 +1,18 @@
+# Task 144-027 Execution Plan
+## Goal
+Add DB-write coverage tests to tests/orchestra/sprint-reporter-ci.test.ts
+
+## Approach
+1. Import MemoryStore and appendCiHealthToRetro, runCiLearningAnalysis, appendCiLearningsToMemory from sprint-reporter.js
+2. Create a new describe block for "appendCiHealthToRetro — DB-write coverage"
+3. Use in-memory SQLite (:memory:) MemoryStore harness with beforeEach/afterEach
+4. Write 6 new DB-write assertion tests:
+   a. store.upsert is called for a valid CI report + store combo
+   b. Entry "twice" assertion: ci-report + learning = 2 entries when called together (via runCiLearningAnalysis)
+   c. DB content validate — entry title, type, content, tags match expected
+   d. Idempotency — calling appendCiHealthToRetro twice → still only 1 entry (getById returns existing, skip)
+   e. no-op without store — no crash when store is undefined
+   f. appendCiLearningsToMemory upsert — validates ci-learnings-latest entry
+
+## Files to modify
+- tests/orchestra/sprint-reporter-ci.test.ts (add ~100 lines)

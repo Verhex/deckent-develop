@@ -1,0 +1,99 @@
+{
+  "id": "144-018",
+  "title": "Orphan Cleanup (.tasks + locks) + Pre-flight",
+  "description": "Orphan Cleanup (.tasks + locks) + Pre-flight\n- Model: opus\n- Effort: normal\n- Agent: bug-fixer\n- Skills: typescript-expert\n- Files: src/core/orphan-cleaner.ts, src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-controller.ts, tests/core/orphan-cleaner.test.ts, tests/orchestra/preflight-cleanup.test.ts\n- Scope: src/orchestra/, src/core/, tests/\n\n### Description\n**Post-finalize:** Sprint bitiminde `.tasks/task-*.json` DONE/NO_GO archive. PENDING/EXECUTING korunur. `.locks/` stale (>5min) detection.\n**Pre-flight (Sprint 143 lesson 2026-04-17):** `deckent_start` → PLAN phase ÖNCESİ `preflightOrphanCleanup(root, currentSprintId)`. Current sprintId dışı task dosyaları `archive/sprint-<N>/` altına taşınır. Başka canlı sprint pid varsa SKIP.\n\n**Kanıt:** Sprint 144 sonrası `.tasks/` temiz. Sprint 145 start'ında pre-flight otomatik çalışıyor.\n**Test:** 12 test (4 post-finalize + 4 pre-flight + 4 integration).\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/orchestra/",
+      "tests/core/",
+      "tests/orchestra/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/orphan-cleaner.ts",
+      "src/orchestra/sprint-finalizer.ts",
+      "src/orchestra/sprint-controller.ts",
+      "tests/core/orphan-cleaner.test.ts",
+      "tests/orchestra/preflight-cleanup.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 144 sonrası `.tasks/` temiz. Sprint 145 start'ında pre-flight otomatik çalışıyor.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-144",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T12:33:02.733Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.72
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.5
+        },
+        {
+          "name": "core",
+          "weight": 0.4
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "delete",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.6,
+          "tests/": 0.4
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.4
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T14:09:45.009Z"
+}
