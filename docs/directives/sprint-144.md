@@ -240,16 +240,26 @@ Canonical `retro-sprint-NNN` id, alias `retro-latest` view query. `retro-latest`
 
 ---
 
-## Task 17: Orphan Cleanup (.tasks + locks)
+## Task 17: Orphan Cleanup (.tasks + locks) + Pre-flight
 - Model: opus | Effort: normal | Agent: bug-fixer | Skills: typescript-expert
-- Files: src/orchestra/sprint-finalizer.ts, src/core/orphan-cleaner.ts (yeni), tests/
+- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-controller.ts, src/core/orphan-cleaner.ts (yeni), tests/
 - Scope: src/orchestra/, src/core/, tests/
 
 ### Description
-Sprint bitiminde `.tasks/task-*.json` DONE/NO_GO archive. PENDING/EXECUTING korunur (T-143-013 uyumlu). `.locks/` stale (>5min) detection.
+**İki mod:** post-finalize (mevcut tasarım) + **pre-flight** (yeni, Sprint 143 lesson learned 2026-04-17).
 
-**Kanıt:** Sprint 144 sonrası `.tasks/` arşiv manifest + `.locks/` boş.
-**Test:** 8 test (safety: PENDING preserved).
+**Post-finalize:** Sprint bitiminde `.tasks/task-*.json` DONE/NO_GO archive. PENDING/EXECUTING korunur (T-143-013 uyumlu). `.locks/` stale (>5min) detection.
+
+**Pre-flight (yeni):** `deckent_start` → `runSprint()` PLAN phase ÖNCESİ `preflightOrphanCleanup(root, currentSprintId)` çağrısı. Current sprintId dışı tüm task dosyaları `archive/sprint-<N>/` altına grup halinde taşınır. Başka canlı sprint pid varsa SKIP (safety).
+
+**Sprint 143 kanıtı:** Sprint 142 manuel finalize sonrası 255 task dosyası `.tasks/` altında kaldı → Sprint 143 start ederken Alperen elle `mv` ile temizledi. Bu fix Sprint 145 start ederken canlı olacak (Sprint 144 biterken T-144-017 wire edilmiş olur).
+
+**Kanıt:**
+- Sprint 144 sonrası `.tasks/` arşiv manifest + `.locks/` boş
+- Sprint 145 start ederken pre-flight otomatik çalışıyor, Sprint 144 task'ları archive/sprint-144/'e taşınıyor
+- Başka canlı sprint pid active → pre-flight SKIP
+
+**Test:** 12 test (4 post-finalize: PENDING preserved, DONE archive, lock stale, happy + 4 pre-flight: orphan detect, archive move, safety skip, multi-orphan group + 4 integration).
 
 ---
 

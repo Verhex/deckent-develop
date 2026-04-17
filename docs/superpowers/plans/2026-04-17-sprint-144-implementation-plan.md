@@ -853,9 +853,17 @@ Migration: `retro-latest` entry'si (varsa) sprint-id'den doğru id'ye copy, sonr
 
 **Implementation Strategy:**
 
-Sprint bitiminde `.tasks/task-*.json` + `.locks/*.lock` orphan dosyalar temizlensin.
+**İki mod:** post-finalize (sprint sonu) + pre-flight (sprint başı — Sprint 143 lesson learned).
+
+Sprint bitiminde `.tasks/task-*.json` + `.locks/*.lock` orphan dosyalar temizlensin. Sprint başında da bir önceki sprint'ten kalan task dosyaları archive'a taşınsın.
 
 **Safety (Sprint 139 incident lesson):** Sadece DONE/NO_GO task'lar. PENDING/EXECUTING korunur. T-143-013 safeArchive ile uyumlu.
+
+**Pre-flight detay (Sprint 143 lesson, 2026-04-17):**
+- Sprint 142 manuel finalize sonrası 255 task dosyası `.tasks/` altında kaldı → Sprint 143 start ederken 142 + 143 karıştı (Alperen elle temizledi)
+- Fix: `deckent_start` → `runSprint()` → PLAN phase ÖNCESİ `preflightOrphanCleanup(root, currentSprintId)` çağrısı
+- Current sprintId dışı tüm task'lar `archive/sprint-<N>/` altına grup halinde taşınır
+- Başka canlı sprint varsa (pid check) SKIP — orphan olduğundan emin olmadan dokunma
 
 ```typescript
 // src/core/orphan-cleaner.ts
@@ -877,11 +885,57 @@ export async function cleanupOrphans(root: string, sprintId: string): Promise<Cl
 
   return { tasksRemoved: terminalTasks.length, locksRemoved: stale.length };
 }
+
+/**
+ * Pre-flight orphan cleanup (Sprint 143 lesson learned).
+ * Moves tasks from prior sprints to archive/ before current sprint PLAN phase.
+ */
+export async function preflightOrphanCleanup(root: string, currentSprintId: string): Promise<PreflightResult> {
+  // Safety: if other live sprint pid active → SKIP
+  const pidsDir = path.join(root, '.deckent', 'pids');
+  const livePids = await readLivePids(pidsDir);
+  const otherSprintLive = livePids.some(p => p.sprintId !== currentSprintId && isProcessAlive(p.pid));
+  if (otherSprintLive) {
+    debugLog.warn('preflight-cleanup', 'Other sprint live, SKIP preflight cleanup', { livePids });
+    return { skipped: true, reason: 'other_sprint_live' };
+  }
+
+  const tasksDir = path.join(root, '.tasks');
+  const allTaskFiles = await fs.promises.readdir(tasksDir);
+  const orphans: Record<string, string[]> = {};
+
+  for (const file of allTaskFiles) {
+    const match = file.match(/^task-(\d+)-/);
+    if (!match) continue;
+    const taskSprintNum = match[1];
+    const currentSprintNum = currentSprintId.replace('sprint-', '');
+    if (taskSprintNum !== currentSprintNum) {
+      (orphans[taskSprintNum] ??= []).push(file);
+    }
+  }
+
+  // Archive each orphan sprint group
+  for (const [sprintNum, files] of Object.entries(orphans)) {
+    const archiveDir = path.join(tasksDir, 'archive', `sprint-${sprintNum}`);
+    await fs.promises.mkdir(archiveDir, { recursive: true });
+    for (const file of files) {
+      await fs.promises.rename(path.join(tasksDir, file), path.join(archiveDir, file));
+    }
+    debugLog.info('preflight-cleanup', 'Archived orphan sprint', { sprintNum, fileCount: files.length });
+  }
+
+  return { skipped: false, orphansArchived: orphans };
+}
 ```
 
-**GO Criteria:** Sprint 144 sonrası `.tasks/` sadece arşiv manifest + `.locks/` boş.
+**Wire point:** `src/orchestra/sprint-controller.ts` `runSprint()` en başında (PLAN phase öncesi) `preflightOrphanCleanup(root, sprintId)` çağrısı. Sprint 144 canlı olunca Sprint 145 start ederken otomatik çalışacak.
 
-**Test:** 8 test (safety: PENDING korunuyor, DONE siliniyor).
+**GO Criteria:**
+- Sprint 144 sonrası `.tasks/` sadece arşiv manifest + `.locks/` boş
+- Sprint 145 start ederken pre-flight cleanup çalışıyor (Sprint 144 task'ları otomatik archive/sprint-144/'e taşınır)
+- Başka canlı sprint varken pre-flight SKIP (safety)
+
+**Test:** 12 test (4 post-finalize: PENDING korunuyor, DONE siliniyor, lock stale, happy path + 4 pre-flight: orphan detect, archive move, safety skip when other sprint live, multi-orphan-sprint group + 4 integration).
 
 ---
 
