@@ -6,6 +6,84 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint143] - 2026-04-17
+
+### Added
+
+- API Auth Default Secure
+- Relations Hibrit — Backfill + Write-time (Karar 3-C)
+- DECISIONS.md Archive + init.ts DB Preload
+- Sprint-Finalizer Hook (Karar 4-A)
+- Rule Generator (Karar 4-B, 3 Provider)
+- Auto-Archive Guard (Task 3 Regression Koruması)
+- Layer 4 Runtime Wire Deploy (ADR-006 Canlı Enforcement)
+- Task Restoration on Crash
+- Panic Kill Guard
+- E2E Harness (Chain Safety Foundation)
+
+### Changed
+
+- MCP Disconnect Fix (Background Sprint Runner) (completed with tech debt)
+
+### Fixed
+
+- Shell Injection Fix (tmux.ts)
+- Path Traversal Fix (checkpoint/docs/decision-logger)
+- .brain/memory.db Git Takip Fix
+- health-check.ts Dosya Yolu Uyuşmazlığı Fix
+- FTS5 Query Builder Fix (Karar 2-A)
+
+
+_Tasks: 20 total, 19 done, 1 tech debt, 1 no-go_
+
+## [0.4.0-beta.1-sprint142] - 2026-04-16
+
+### Added
+
+- src/core/ batch 3 — Agent + Skill pools
+- .claude/rules/ + .contracts/ + .deckent/config
+
+### Changed
+
+- src/core/ batch 1 — Memory V2 modulleri (completed with tech debt)
+- src/core/ batch 2 — Types + Routing (completed with tech debt)
+- src/core/ batch 4 — Provider + Model + Notification (completed with tech debt)
+- src/core/ batch 5 — Utils + Security + Remaining (completed with tech debt)
+- src/core/ batch 6 — Remaining core files (completed with tech debt)
+- src/core/ batch 7 — Final core files (completed with tech debt)
+- src/orchestra/ batch 1 — Brain + Sprint lifecycle (completed with tech debt)
+- src/orchestra/ batch 2 — Debt + Result + Retro (completed with tech debt)
+- src/orchestra/ batch 3 — Task + Routing + Spawn (completed with tech debt)
+- src/orchestra/ batch 4 — Event stream + Pattern + Decision (completed with tech debt)
+
+
+_Tasks: 49 total, 44 done, 42 tech debt, 5 no-go_
+
+## [0.4.0-beta.1-sprint141] - 2026-04-16
+
+### Added
+
+- src/core/ Analysis (78 dosya)
+- src/mcp/ Analysis (37 dosya)
+- src/dashboard/ Batch Analysis (44 dosya, batch)
+- .brain/ + .brain/exports/ + config Analysis
+- Root files + scripts/ Analysis
+- FINAL — Aggregation Report
+
+### Changed
+
+- src/cli/ Analysis (75 dosya) (completed with tech debt)
+- tests/ Category Analysis (28 kategori) (completed with tech debt)
+- docs/ Analysis (260 markdown) (completed with tech debt)
+- META — Architecture Graph + Circular Dependency (completed with tech debt)
+- META — Dead Code + Type Safety + Security (completed with tech debt)
+- META — ADR Compliance + CLI/MCP Parity + i18n (completed with tech debt)
+- META — Test Coverage Map + Performance + Error Handling + TODO inventory (completed with tech debt)
+- META — Memory V2 Integrity Verification (completed with tech debt)
+
+
+_Tasks: 18 total, 15 done, 8 tech debt, 3 no-go_
+
 ## [0.4.0-beta.1-sprint139] - 2026-04-15
 
 ### Added

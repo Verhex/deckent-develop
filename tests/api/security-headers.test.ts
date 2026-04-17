@@ -94,11 +94,8 @@ function request(
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
-// Note: Security headers middleware is NOT yet implemented in server.ts.
-// These tests verify the current behavior (no security headers) and document
-// what should be added when the feature is implemented.
 
-describe('Security Headers (not yet implemented)', () => {
+describe('Security Headers', () => {
   let api: HttpApi;
 
   beforeEach(() => {
@@ -106,65 +103,96 @@ describe('Security Headers (not yet implemented)', () => {
     _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
     mockReadJsonSafe.mockReturnValue(null);
+    // Enable auth bypass so we can test headers without token setup
+    process.env['DECKENT_API_AUTH_DISABLED'] = '1';
   });
 
   afterEach(async () => {
     if (api) await api.close();
+    delete process.env['DECKENT_API_AUTH_DISABLED'];
   });
 
-  describe('Current API response headers', () => {
+  describe('API response headers', () => {
     it('API responses include Content-Type: application/json', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/status');
       expect(res.headers['content-type']).toContain('application/json');
+      stderrSpy.mockRestore();
     });
 
     it('API responses include Access-Control-Allow-Origin', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/status');
       expect(res.headers['access-control-allow-origin']).toBeDefined();
+      stderrSpy.mockRestore();
     });
 
-    it('CORS preflight (OPTIONS) returns 200 with CORS headers', async () => {
+    it('CORS preflight (OPTIONS) returns 200 with CORS headers for localhost', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const res = await request(api, '/api/status', 'OPTIONS');
+      const res = await request(api, '/api/status', 'OPTIONS', undefined, {
+        'Origin': 'http://localhost:3100',
+      });
       expect(res.status).toBe(200);
       expect(res.headers['access-control-allow-methods']).toBeDefined();
       expect(res.headers['access-control-allow-headers']).toBeDefined();
+      stderrSpy.mockRestore();
+    });
+
+    it('CORS preflight rejects non-localhost origins', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      api = createHttpServer(PROJECT_ROOT, 0);
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status', 'OPTIONS', undefined, {
+        'Origin': 'https://attacker.com',
+      });
+      expect(res.status).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe('CORS origin not allowed');
+      stderrSpy.mockRestore();
     });
 
     it('unknown API routes return 404 with JSON error', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/nonexistent');
       expect(res.status).toBe(404);
       expect(res.headers['content-type']).toContain('application/json');
+      stderrSpy.mockRestore();
     });
 
     it('unsupported methods return 405', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/status', 'DELETE');
       expect(res.status).toBe(405);
+      stderrSpy.mockRestore();
     });
 
-    it('security headers (X-Content-Type-Options, X-Frame-Options, X-Request-Id) are not yet present', async () => {
+    it('security headers (X-Content-Type-Options, X-Frame-Options, CSP, HSTS) are present', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/status');
-      // These headers are planned for Sprint 050 Task 6 but not yet implemented
-      expect(res.headers['x-content-type-options']).toBeUndefined();
-      expect(res.headers['x-frame-options']).toBeUndefined();
-      expect(res.headers['x-request-id']).toBeUndefined();
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['x-frame-options']).toBe('DENY');
+      expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+      expect(res.headers['strict-transport-security']).toContain('max-age=');
+      stderrSpy.mockRestore();
     });
   });
 });

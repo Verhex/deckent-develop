@@ -1,0 +1,44 @@
+# Task 143-009: DECISIONS.md Archive + init.ts DB Preload
+
+## Plan
+
+### Step 1: Archive Script (scripts/archive-decisions-md.mjs)
+- Read `.brain/DECISIONS.md`
+- Create `.brain/archive/decisions-root-pre-sprint143/` dir
+- Copy DECISIONS.md there with SHA-256 hash verification file
+- Remove original DECISIONS.md
+
+### Step 2: ADR Seed Data (src/core/adr-seed.ts)
+- Export `ADR_SEED_DATA: CreateEntryInput[]` containing all 40 ADRs from DECISIONS.md
+- Export `IDENTITY_SEED: CreateEntryInput` for project identity entry
+- Each ADR: id, type='adr', title, content, status, source='import', decay_exempt=true
+
+### Step 3: Modify init.ts
+- Import MemoryStore and ADR_SEED_DATA
+- After brain dir creation (step 10), add DB preload:
+  - Create MemoryStore at `.brain/memory.db`
+  - Insert all ADR seeds + identity entry
+  - Only on fresh init (when DB doesn't exist yet)
+- Update template references: `@.brain/MEMORY.md` → `@.brain/exports/summary.md`
+
+### Step 4: Update .gitignore
+- Already has .brain/memory.db entries — verify they're correct
+- Add .brain/DECISIONS.md to gitignore (no longer tracked)
+
+### Step 5: Tests (tests/cli/init.test.ts)
+- Test: ADR seed data has ≥40 entries
+- Test: IDENTITY_SEED has correct structure
+- Test: Archive script output verification
+- Test: init.ts DB preload creates entries
+- Test: Template references updated (no @.brain/MEMORY.md)
+- Test: writeIfNotExists skips DECISIONS.md creation when removed
+
+### Step 6: Run archive script
+- Execute the archive to actually move DECISIONS.md
+
+## Files Changed
+- scripts/archive-decisions-md.mjs (new)
+- src/core/adr-seed.ts (new)
+- src/cli/commands/init.ts (modified)
+- .gitignore (modified if needed)
+- tests/cli/init.test.ts (new)

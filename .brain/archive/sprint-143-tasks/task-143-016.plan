@@ -1,0 +1,37 @@
+# Task 143-016: Panic Kill Guard — Execution Plan
+
+## Root Problem
+Runtime panics in workers trigger automatic kill operations without user confirmation.
+Alperen's feedback: worker kills MUST require user approval (feedback tartışmasız kural).
+
+## Approach
+1. Create `src/core/panic-guard.ts` — PanicGuard class that:
+   - Intercepts kill requests triggered by runtime panics
+   - Requires explicit user confirmation (default: block kill)
+   - `--force --user-explicit` CLI flag bypasses the guard
+   - Logs panic events to `.deckent/<sprint-id>-panic-*.json`
+   - Integrates with NotifyDispatcher for user notification
+
+2. Modify `src/cli/commands/kill.ts`:
+   - Add `--force` and `--user-explicit` flags
+   - When both flags present → bypass panic guard
+   - Normal kill path remains unchanged (CLI is user-initiated)
+
+3. Modify `src/orchestra/sprint-controller.ts`:
+   - Import and use PanicGuard for grace-period kills
+   - Grace-period worker kills go through panic guard check
+   - If guard blocks → log panic + notify, don't kill
+
+4. Write `tests/orchestra/panic-guard.test.ts` — 8+ tests
+
+## Files to Modify
+- NEW: src/core/panic-guard.ts
+- EDIT: src/orchestra/sprint-controller.ts
+- EDIT: src/cli/commands/kill.ts
+- NEW: tests/orchestra/panic-guard.test.ts
+
+## Key Design Decisions
+- PanicGuard is a standalone module (no circular deps)
+- Panic logs use ISO timestamp in filename for uniqueness
+- Guard defaults to BLOCK (safe default per Alperen's rule)
+- CLI kill is inherently user-initiated, so `--force --user-explicit` is for programmatic/panic kills

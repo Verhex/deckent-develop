@@ -1,0 +1,98 @@
+{
+  "id": "143-005",
+  "title": "health-check.ts Dosya Yolu Uyuşmazlığı Fix",
+  "description": "health-check.ts Dosya Yolu Uyuşmazlığı Fix\n- Model: opus\n- Effort: low\n- Skills: typescript-expert\n- Agent: bug-fixer\n- Files: src/orchestra/doc-updaters/health-check.ts, tests/orchestra/doc-updaters/health-check.test.ts\n- Scope: src/orchestra/doc-updaters/, tests/orchestra/doc-updaters/\n\n### Description\n`shouldRun()` ve `run()` fonksiyonlarında ortak `HEALTH_DOC_PATH` constant. Fix file path mismatch. `run()` dosya yoksa oluşturur.\n\n**Kanıt:** `ls -la docs/reference/health-check.md` var + içerik doğru.\n**Test:** 4 test.\n\n---",
+  "model": "opus",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/doc-updaters/",
+      "tests/orchestra/doc-updaters/",
+      "docs/reference/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/doc-updaters/health-check.ts",
+      "tests/orchestra/doc-updaters/health-check.test.ts",
+      "docs/reference/health-check.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `ls -la docs/reference/health-check.md` var + içerik doğru.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "low",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.67
+        },
+        {
+          "name": "docs",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.33,
+          "tests/": 0.33,
+          "docs/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:19:47.800Z"
+}

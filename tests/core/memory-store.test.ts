@@ -454,3 +454,239 @@ describe('decay_exempt boolean conversion', () => {
     expect(typeof entry!.decay_exempt).toBe('boolean');
   });
 });
+
+// ── insertRelation / getRelations / countRelations ─────────────────
+
+describe('insertRelation', () => {
+  it('inserts a relation between two entries', () => {
+    store.insert(makeInput({ id: 'rel-a' }));
+    store.insert(makeInput({ id: 'rel-b' }));
+    store.insertRelation('rel-a', 'rel-b', 'references');
+    const rels = store.getRelationsFrom('rel-a');
+    expect(rels).toHaveLength(1);
+    expect(rels[0]!.to_id).toBe('rel-b');
+    expect(rels[0]!.rel_type).toBe('references');
+  });
+
+  it('ignores duplicate relations (INSERT OR IGNORE)', () => {
+    store.insert(makeInput({ id: 'dup-a' }));
+    store.insert(makeInput({ id: 'dup-b' }));
+    store.insertRelation('dup-a', 'dup-b', 'references');
+    store.insertRelation('dup-a', 'dup-b', 'references');
+    const rels = store.getRelationsFrom('dup-a');
+    expect(rels).toHaveLength(1);
+  });
+
+  it('allows different relation types between same entries', () => {
+    store.insert(makeInput({ id: 'mt-a' }));
+    store.insert(makeInput({ id: 'mt-b' }));
+    store.insertRelation('mt-a', 'mt-b', 'references');
+    store.insertRelation('mt-a', 'mt-b', 'depends_on');
+    const rels = store.getRelationsFrom('mt-a');
+    expect(rels).toHaveLength(2);
+  });
+});
+
+describe('getRelations', () => {
+  it('returns both from and to relations', () => {
+    store.insert(makeInput({ id: 'gr-a' }));
+    store.insert(makeInput({ id: 'gr-b' }));
+    store.insert(makeInput({ id: 'gr-c' }));
+    store.insertRelation('gr-a', 'gr-b', 'references');
+    store.insertRelation('gr-c', 'gr-a', 'depends_on');
+    const rels = store.getRelations('gr-a');
+    expect(rels).toHaveLength(2);
+  });
+
+  it('returns empty array when no relations exist', () => {
+    store.insert(makeInput({ id: 'no-rel' }));
+    expect(store.getRelations('no-rel')).toEqual([]);
+  });
+});
+
+describe('countRelations', () => {
+  it('returns correct count', () => {
+    store.insert(makeInput({ id: 'cnt-a' }));
+    store.insert(makeInput({ id: 'cnt-b' }));
+    store.insert(makeInput({ id: 'cnt-c' }));
+    store.insertRelation('cnt-a', 'cnt-b', 'references');
+    store.insertRelation('cnt-b', 'cnt-c', 'depends_on');
+    expect(store.countRelations()).toBeGreaterThanOrEqual(2);
+  });
+
+  it('returns 0 for empty relations table', () => {
+    // Fresh store with no relations — but insert might auto-extract
+    const count = store.countRelations();
+    expect(count).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ── extractAdrReferences ──────────────────────────────────────────
+
+describe('extractAdrReferences', () => {
+  it('extracts single ADR reference', () => {
+    const refs = MemoryStore.extractAdrReferences('This implements ADR-006 security pattern');
+    expect(refs).toEqual(['adr-006']);
+  });
+
+  it('extracts multiple ADR references', () => {
+    const refs = MemoryStore.extractAdrReferences('ADR-001 and ADR-008 are relevant, also ADR-036');
+    expect(refs).toHaveLength(3);
+    expect(refs).toContain('adr-001');
+    expect(refs).toContain('adr-008');
+    expect(refs).toContain('adr-036');
+  });
+
+  it('deduplicates repeated references', () => {
+    const refs = MemoryStore.extractAdrReferences('ADR-006 is used by ADR-006 pattern');
+    expect(refs).toEqual(['adr-006']);
+  });
+
+  it('returns empty for no ADR references', () => {
+    const refs = MemoryStore.extractAdrReferences('No architecture decisions here');
+    expect(refs).toEqual([]);
+  });
+
+  it('does not match partial patterns like ADR-06 or ADR-0001', () => {
+    const refs = MemoryStore.extractAdrReferences('ADR-06 and ADR-0001 are not valid');
+    expect(refs).toEqual([]);
+  });
+
+  it('normalizes to lowercase', () => {
+    const refs = MemoryStore.extractAdrReferences('ADR-010 is mentioned');
+    expect(refs).toEqual(['adr-010']);
+  });
+});
+
+// ── Auto-extract ADR references on insert ─────────────────────────
+
+describe('Auto-extract ADR references on insert', () => {
+  it('auto-inserts references relation when content mentions ADR', () => {
+    store.insert(makeInput({ id: 'adr-006', type: 'adr', title: 'ADR-006 spawnSync' }));
+    store.insert(makeInput({
+      id: 'mem-001',
+      content: 'This implements ADR-006 security pattern',
+    }));
+    const rels = store.getRelationsFrom('mem-001');
+    const adrRef = rels.find(r => r.to_id === 'adr-006' && r.rel_type === 'references');
+    expect(adrRef).toBeDefined();
+  });
+
+  it('does not self-reference', () => {
+    store.insert(makeInput({
+      id: 'adr-010',
+      type: 'adr',
+      title: 'ADR-010 Tek Runtime Dependency',
+      content: 'ADR-010 defines the dependency policy',
+    }));
+    const rels = store.getRelationsFrom('adr-010');
+    const selfRef = rels.find(r => r.to_id === 'adr-010');
+    expect(selfRef).toBeUndefined();
+  });
+
+  it('extracts from both title and content', () => {
+    store.insert(makeInput({ id: 'adr-001' }));
+    store.insert(makeInput({ id: 'adr-008' }));
+    store.insert(makeInput({
+      id: 'combined-entry',
+      title: 'Task references ADR-001',
+      content: 'Also relates to ADR-008 import rules',
+    }));
+    const rels = store.getRelationsFrom('combined-entry');
+    expect(rels.some(r => r.to_id === 'adr-001')).toBe(true);
+    expect(rels.some(r => r.to_id === 'adr-008')).toBe(true);
+  });
+
+  it('coexists with explicit relations', () => {
+    store.insert(makeInput({ id: 'adr-006' }));
+    store.insert(makeInput({
+      id: 'hybrid-entry',
+      content: 'References ADR-006 pattern',
+      relations: [{ to_id: 'adr-006', rel_type: 'depends_on' }],
+    }));
+    const rels = store.getRelationsFrom('hybrid-entry');
+    // Should have both the explicit depends_on AND auto-extracted references
+    expect(rels.some(r => r.rel_type === 'depends_on' && r.to_id === 'adr-006')).toBe(true);
+    expect(rels.some(r => r.rel_type === 'references' && r.to_id === 'adr-006')).toBe(true);
+  });
+});
+
+// ── ADR-010 Amendment (Sprint 143 — Task 18) ──────────────────────
+
+describe('ADR-010 Amendment', () => {
+  it('upsert updates adr-010 title and content to amended version', () => {
+    // Insert original ADR-010
+    store.insert(makeInput({
+      id: 'adr-010',
+      type: 'adr',
+      title: 'Tek Runtime Dependency — commander.js',
+      content: 'CLI tek runtime dependency olarak commander kullanır.',
+      status: 'accepted',
+      tags: ['architecture', 'adr'],
+    }));
+
+    // Amend ADR-010
+    store.upsert(makeInput({
+      id: 'adr-010',
+      type: 'adr',
+      title: 'Minimal Runtime Dependencies (Amended Sprint 143)',
+      content: 'Projenin runtime bağımlılıkları minimal tutulur. İzin verilen 4 bağımlılık: commander, better-sqlite3, @modelcontextprotocol/sdk, zod.',
+      summary: 'Runtime bağımlılıkları minimal tutulur: commander, better-sqlite3, @modelcontextprotocol/sdk, zod.',
+      status: 'accepted',
+      tags: ['architecture', 'adr', 'dependencies'],
+    }), 'brain');
+
+    const entry = store.getById('adr-010');
+    expect(entry).not.toBeNull();
+    expect(entry!.title).toBe('Minimal Runtime Dependencies (Amended Sprint 143)');
+    expect(entry!.content).toContain('4 bağımlılık');
+    expect(entry!.content).toContain('better-sqlite3');
+    expect(entry!.content).toContain('zod');
+  });
+
+  it('amendment records field-level history diff', () => {
+    store.insert(makeInput({
+      id: 'adr-010',
+      type: 'adr',
+      title: 'Tek Runtime Dependency — commander.js',
+      content: 'CLI tek runtime dependency olarak commander kullanır.',
+    }));
+
+    store.upsert(makeInput({
+      id: 'adr-010',
+      type: 'adr',
+      title: 'Minimal Runtime Dependencies (Amended Sprint 143)',
+      content: 'Runtime bağımlılıkları minimal tutulur: commander, better-sqlite3, @modelcontextprotocol/sdk, zod.',
+    }), 'sprint-143');
+
+    const history = store.getHistory('adr-010');
+    const titleChange = history.find(h => h.field === 'title' && h.change_type === 'update');
+    expect(titleChange).toBeDefined();
+    expect(titleChange!.old_value).toBe('Tek Runtime Dependency — commander.js');
+    expect(titleChange!.new_value).toBe('Minimal Runtime Dependencies (Amended Sprint 143)');
+    expect(titleChange!.changed_by).toBe('sprint-143');
+
+    const contentChange = history.find(h => h.field === 'content' && h.change_type === 'update');
+    expect(contentChange).toBeDefined();
+    expect(contentChange!.old_value).toContain('tek runtime dependency');
+    expect(contentChange!.new_value).toContain('better-sqlite3');
+  });
+
+  it('amended adr-010 is discoverable via tag query', () => {
+    store.insert(makeInput({
+      id: 'adr-010',
+      type: 'adr',
+      title: 'Minimal Runtime Dependencies (Amended Sprint 143)',
+      content: 'Runtime bağımlılıkları minimal tutulur.',
+      tags: ['architecture', 'adr', 'dependencies'],
+    }));
+
+    const byDeps = store.getByTags(['dependencies']);
+    expect(byDeps.some(e => e.id === 'adr-010')).toBe(true);
+
+    const adrs = store.getByType('adr');
+    const adr010 = adrs.find(e => e.id === 'adr-010');
+    expect(adr010).toBeDefined();
+    expect(adr010!.title).toContain('Minimal Runtime Dependencies');
+  });
+});

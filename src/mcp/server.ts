@@ -16,7 +16,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Sprint Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (21)
+## Tools (22)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -38,14 +38,15 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_checkpoint: Approve or reject a checkpoint gate
 - deckent_docs: Sprint lifecycle document management (add/remove/list)
 - deckent_explain: Explain sprint history and results
+- deckent_memory_query: Search project memory across all sources (ADR, sprint, debt, pattern)
 
 ## Resources (8)
 - deckent://dashboard — Live sprint dashboard (agents, phases, alerts)
 - deckent://directives — Current DIRECTIVES.md content
-- deckent://memory — Brain memory (MEMORY.md) — sprint learnings
-- deckent://debt — Technical debt log (DEBT.md)
+- deckent://memory — Brain memory (exports/memory.md) — sprint learnings
+- deckent://debt — Technical debt register (exports/debt.md)
 - deckent://config — Current resolved configuration
-- deckent://retro — Last sprint retrospective (RETRO.md)
+- deckent://retro — Last sprint retrospective (DB-first, exported)
 - deckent://tasks — Active task list with status
 - deckent://agents — Registered agent pool with stats
 

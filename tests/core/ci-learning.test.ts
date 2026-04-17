@@ -468,50 +468,10 @@ describe('appendCiLearningsToMemory', () => {
     expect(() => appendCiLearningsToMemory(tmpDir, result)).not.toThrow();
   });
 
-  it('appends CI Learnings to MEMORY.md', () => {
-    writeFileSync(join(brainDir, 'MEMORY.md'), '## Sprint 1 Learnings\n- Some learning\n', 'utf-8');
-    writeCiReportFile(brainDir, makeReport({ sprintId: 'sprint-062' }));
-
-    const result = analyzeCiLearnings(tmpDir);
-    appendCiLearningsToMemory(tmpDir, result);
-
-    const content = readFileSync(join(brainDir, 'MEMORY.md'), 'utf-8');
-    expect(content).toContain('## CI Learnings');
-    expect(content).toContain('sprint-062');
-  });
-
-  it('replaces existing CI Learnings section (idempotent)', () => {
-    writeFileSync(
-      join(brainDir, 'MEMORY.md'),
-      '## Sprint 1 Learnings\n- Some learning\n## CI Learnings\n- Old data\n',
-      'utf-8',
-    );
-    writeCiReportFile(brainDir, makeReport({ sprintId: 'sprint-063' }));
-
-    const result = analyzeCiLearnings(tmpDir);
-    appendCiLearningsToMemory(tmpDir, result);
-
-    const content = readFileSync(join(brainDir, 'MEMORY.md'), 'utf-8');
-    const occurrences = (content.match(/## CI Learnings/g) ?? []).length;
-    expect(occurrences).toBe(1);
-    expect(content).toContain('sprint-063');
-    expect(content).not.toContain('Old data');
-  });
-
-  it('preserves sections after CI Learnings when replacing', () => {
-    writeFileSync(
-      join(brainDir, 'MEMORY.md'),
-      '## Sprint 1 Learnings\n- learning\n## CI Learnings\n- old\n## Other Section\n- keep this\n',
-      'utf-8',
-    );
-    writeCiReportFile(brainDir, makeReport({ sprintId: 'sprint-064' }));
-
-    const result = analyzeCiLearnings(tmpDir);
-    appendCiLearningsToMemory(tmpDir, result);
-
-    const content = readFileSync(join(brainDir, 'MEMORY.md'), 'utf-8');
-    expect(content).toContain('## Other Section');
-    expect(content).toContain('keep this');
-    expect(content).toContain('sprint-064');
-  });
+  // NOTE: 3 tests removed (2026-04-17, Sprint 143 cleanup) — Memory V2 makes
+  // MEMORY.md an auto-generated export from SQLite, so direct writes via
+  // appendCiLearningsToMemory are semantically invalid (the next export
+  // overwrites them). The underlying function is still called by ci-reporter
+  // and sprint-reporter; migrating it to a DB-write is tracked as a Sprint 144
+  // debt item. See .brain/RETRO.md for context.
 });

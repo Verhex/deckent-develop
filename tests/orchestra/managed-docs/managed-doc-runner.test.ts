@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { TaskEvaluation } from '../../../src/core/types.js';
+import { MemoryStore } from '../../../src/core/memory-store.js';
 import type { ResolvedConfig, Sprint, SprintMetrics } from '../../../src/core/types.js';
 import type { DocUpdateContext } from '../../../src/orchestra/doc-updaters/types.js';
 import { saveDocsConfig } from '../../../src/orchestra/managed-docs/docs-config.js';
-import { runManagedDocUpdates } from '../../../src/orchestra/managed-docs/managed-doc-runner.js';
+import { runManagedDocUpdates, buildStandaloneDocContext } from '../../../src/orchestra/managed-docs/managed-doc-runner.js';
 
 const TEST_ROOT = path.join(process.cwd(), '.test-managed-runner-' + process.pid);
 
@@ -148,5 +149,83 @@ describe('runManagedDocUpdates', () => {
     const results = runManagedDocUpdates(makeCtx());
     expect(results).toHaveLength(2);
     expect(results.every(r => r.updated)).toBe(true);
+  });
+});
+
+// ─── buildStandaloneDocContext — DB-first ─────────────────────────────────
+
+const DB_TEST_ROOT = path.join(process.cwd(), '.test-standalone-dbfirst-' + process.pid);
+
+function cleanupDb() {
+  if (fs.existsSync(DB_TEST_ROOT)) fs.rmSync(DB_TEST_ROOT, { recursive: true, force: true });
+}
+
+describe('buildStandaloneDocContext DB-first', () => {
+  beforeEach(() => {
+    cleanupDb();
+    fs.mkdirSync(path.join(DB_TEST_ROOT, '.deckent'), { recursive: true });
+    fs.mkdirSync(path.join(DB_TEST_ROOT, '.brain'), { recursive: true });
+  });
+  afterEach(cleanupDb);
+
+  it('reads latest sprint ID from DB when memory.db exists', () => {
+    // Create DB with sprint entries
+    const store = new MemoryStore(path.join(DB_TEST_ROOT, '.brain', 'memory.db'));
+    store.insert({
+      id: 'sprint-140', type: 'sprint', title: 'Sprint 140',
+      content: '15/18 tasks', sprint_id: 'sprint-140', sprint_num: 140,
+    });
+    store.insert({
+      id: 'sprint-141', type: 'sprint', title: 'Sprint 141',
+      content: '12/15 tasks', sprint_id: 'sprint-141', sprint_num: 141,
+    });
+
+    // Save docs config
+    saveDocsConfig(DB_TEST_ROOT, {
+      version: 1,
+      docs: [{ id: 'test', path: 'test.md', autoSections: ['Sprint Metrics'] }],
+    });
+
+    const ctx = buildStandaloneDocContext(DB_TEST_ROOT);
+    expect(ctx).not.toBeNull();
+    expect(ctx!.sprintResult.sprint.id).toBe('sprint-141');
+    expect(ctx!.store).toBeDefined();
+  });
+
+  it('returns standalone when no DB exists (V2: no file fallback)', () => {
+    // V2: without DB, sprint ID defaults to 'standalone' (no file-based fallback)
+    saveDocsConfig(DB_TEST_ROOT, {
+      version: 1,
+      docs: [{ id: 'test', path: 'test.md', autoSections: ['Sprint Metrics'] }],
+    });
+
+    const ctx = buildStandaloneDocContext(DB_TEST_ROOT);
+    expect(ctx).not.toBeNull();
+    expect(ctx!.sprintResult.sprint.id).toBe('standalone');
+  });
+
+  it('returns null when no docs config', () => {
+    const ctx = buildStandaloneDocContext(DB_TEST_ROOT);
+    expect(ctx).toBeNull();
+  });
+
+  it('passes store through to context for downstream generators', () => {
+    const store = new MemoryStore(path.join(DB_TEST_ROOT, '.brain', 'memory.db'));
+    store.insert({
+      id: 'sprint-142', type: 'sprint', title: 'Sprint 142',
+      content: '10/10', sprint_id: 'sprint-142', sprint_num: 142,
+    });
+
+    saveDocsConfig(DB_TEST_ROOT, {
+      version: 1,
+      docs: [{ id: 'test', path: 'test.md', autoSections: ['Sprint Metrics'] }],
+    });
+
+    const ctx = buildStandaloneDocContext(DB_TEST_ROOT);
+    expect(ctx!.store).toBeDefined();
+    // The store should be usable
+    const entries = ctx!.store!.getByType('sprint');
+    expect(entries.length).toBe(1);
+    expect(entries[0]!.sprint_id).toBe('sprint-142');
   });
 });

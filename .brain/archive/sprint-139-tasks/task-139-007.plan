@@ -1,0 +1,36 @@
+# Task 139-007: Async I/O İlk Kademe Retrospective
+
+## Hedef
+Sprint 132 audit'inde tespit edilen 799 senkron I/O çağrısından en kritik olanları async'e migrate etmek.
+
+## Analiz
+
+### result-collector.ts
+- Zaten async (readFile, stat, writeFile from 'node:fs/promises') ✅
+- readJsonSafe() hâlâ sync kullanıyor — ama bu core/utils.ts'de, scope dışı
+
+### task-builder.ts
+1. `loadADRContent()` — readFileSync (satır 707) → async migration için fonksiyon signature değiştirmek gerekir
+   - Bu fonksiyon `buildWorkerPrompt()` tarafından çağrılıyor (satır içi sync)
+   - Ciddi refactor gerektirir, caller chain'i async yapmak lazım — DEFER
+
+### sprint-finalizer.ts — ANA HEDEF
+Minimum 5 sync → async migration:
+1. `writeRubricDetail()` — existsSync + readFileSync + writeFileSync (satır 131, 166) → fsPromises.readFile + writeFile
+2. `applyAdaptiveThresholds()` — readFileSync + writeFileSync (satır 406, 440, 447) → fsPromises
+3. `runSelfAuditGate()` — readdirSync + readFileSync honesty check (satır 302-305) → fsPromises  
+4. `finalizeSprint()` step 5 — existsSync + readdirSync (satır 582-583) → fsPromises
+5. `finalizeSprint()` step 13 — mkdirSync + writeFileSync (satır 911, 983) → fsPromises
+6. RETRO.md append pattern — existsSync + readFileSync + writeFileSync (satır 561, 570, 848, 861) → fsPromises
+
+## Migration Stratejisi
+- fsPromises zaten import edilmiş (satır 10), sadece kullan
+- existsSync → try/catch with fsPromises.stat() veya fsPromises.access()
+- readFileSync → await fsPromises.readFile()
+- writeFileSync → await fsPromises.writeFile()
+- mkdirSync → await fsPromises.mkdir()
+- readdirSync → await fsPromises.readdir()
+
+## Kural
+- Yalnızca `src/orchestra/` scope'u dokunulacak
+- tsc clean + vitest regression-free

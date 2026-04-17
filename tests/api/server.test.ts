@@ -136,16 +136,22 @@ const sprintMd = `# sprint-001
 // ─── Tests ──────────────────────────────────────────────────────
 describe('createHttpServer', () => {
   let api: HttpApi;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
     mockReadJsonSafe.mockReturnValue(null);
+    // Auth bypass for non-auth-focused tests
+    process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
   });
 
   afterEach(async () => {
     if (api) await api.close();
+    delete process.env['DECKENT_API_AUTH_DISABLED'];
+    stderrSpy?.mockRestore();
   });
 
   it('starts and listens on given port', async () => {
@@ -1381,59 +1387,56 @@ describe('createHttpServer', () => {
     });
   });
 
-  // ─── Startup auth warning ────────────────────────────────────
-  describe('startup auth warning', () => {
-    let stderrSpy: ReturnType<typeof vi.spyOn>;
+  // ─── Startup auth info ────────────────────────────────────
+  describe('startup auth info', () => {
+    let stderrSpy2: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
+      stderrSpy2 = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     });
 
     afterEach(() => {
-      stderrSpy.mockRestore();
+      stderrSpy2.mockRestore();
     });
 
-    it('logs a warning to stderr when no token is configured', async () => {
+    it('logs an info message to stderr when no token is configured', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const calls = stderrSpy.mock.calls.map((c) => String(c[0]));
-      const warnCall = calls.find((s) => s.includes('[deckent:warn]'));
-      expect(warnCall).toBeDefined();
-      expect(warnCall).toContain('API server running without authentication');
+      const calls = stderrSpy2.mock.calls.map((c) => String(c[0]));
+      const infoCall = calls.find((s) => s.includes('[deckent:info]'));
+      expect(infoCall).toBeDefined();
+      expect(infoCall).toContain('No API token configured');
     });
 
-    it('does not log a warning when a token is configured', async () => {
+    it('does not log the info message when a token is configured', async () => {
       api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: 'secret-token' });
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const calls = stderrSpy.mock.calls.map((c) => String(c[0]));
-      const warnCall = calls.find((s) => s.includes('[deckent:warn]'));
-      expect(warnCall).toBeUndefined();
+      const calls = stderrSpy2.mock.calls.map((c) => String(c[0]));
+      const infoCall = calls.find((s) => s.includes('No API token configured'));
+      expect(infoCall).toBeUndefined();
     });
 
-    it('warning is logged exactly once at server creation, not per request', async () => {
+    it('info message is logged exactly once at server creation, not per request', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      // Make a couple of requests
-      await request(api, '/api/status');
-      await request(api, '/api/status');
-
-      const warnCalls = stderrSpy.mock.calls
+      const infoCalls = stderrSpy2.mock.calls
         .map((c) => String(c[0]))
-        .filter((s) => s.includes('[deckent:warn]'));
-      expect(warnCalls).toHaveLength(1);
+        .filter((s) => s.includes('[deckent:info]') && s.includes('No API token'));
+      expect(infoCalls).toHaveLength(1);
     });
 
-    it('warning message includes how to configure auth token', async () => {
+    it('info message includes how to configure auth token', async () => {
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));
 
-      const calls = stderrSpy.mock.calls.map((c) => String(c[0]));
-      const warnCall = calls.find((s) => s.includes('[deckent:warn]'));
-      expect(warnCall).toContain('DECKENT_API_TOKEN');
-      expect(warnCall).toContain('config.api_auth_token');
+      const calls = stderrSpy2.mock.calls.map((c) => String(c[0]));
+      const infoCall = calls.find((s) => s.includes('No API token configured'));
+      expect(infoCall).toContain('DECKENT_API_TOKEN');
+      expect(infoCall).toContain('config.api_auth_token');
     });
   });
 });
@@ -1564,15 +1567,21 @@ describe('Bearer token timing-safe auth (checkAuth)', () => {
     });
   }
 
+  let stderrSpyAuth: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
     mockReadJsonSafe.mockReturnValue(null);
+    delete process.env['DECKENT_API_AUTH_DISABLED'];
+    stderrSpyAuth = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
   });
 
   afterEach(async () => {
     if (api) await api.close();
+    delete process.env['DECKENT_API_AUTH_DISABLED'];
+    stderrSpyAuth?.mockRestore();
   });
 
   it('accepts valid token (exact match)', async () => {
@@ -1626,13 +1635,12 @@ describe('Bearer token timing-safe auth (checkAuth)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('allows all requests when no token configured (auth disabled)', async () => {
-    // No apiToken → backward-compatible open access
+  it('returns 401 when no token configured (secure by default)', async () => {
+    // No apiToken → secure by default, 401 for all API requests
     api = createHttpServer(PROJECT_ROOT, { port: 0 });
     await new Promise<void>((r) => api.server.once('listening', r));
 
     const res = await requestWithAuth(api, null);
-    // Should reach the handler and get 202 (not 401)
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(401);
   });
 });

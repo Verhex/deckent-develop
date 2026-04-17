@@ -184,7 +184,9 @@ export function registerKill(program: Command): void {
     .command('kill [taskId]')
     .description('Kill a running worker')
     .option('--all', 'Kill all active workers')
-    .action(async (taskId: string | undefined, opts: { all?: boolean }) => {
+    .option('--force', 'Force kill (bypass panic guard)')
+    .option('--user-explicit', 'Explicit user confirmation for panic kill override')
+    .action(async (taskId: string | undefined, opts: { all?: boolean; force?: boolean; userExplicit?: boolean }) => {
       const root = resolveProjectRoot();
       const config = await loadConfig(root).catch(() => ({ language: 'en' }));
       const lang = config.language ?? 'en';

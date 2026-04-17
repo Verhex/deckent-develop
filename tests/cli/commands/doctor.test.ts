@@ -108,7 +108,7 @@ import {
   getMemoryHealthLabel, getProviderSummary, getReadinessLabel,
   getDeckFileStatus, formatProviderHealthSection,
   getProviderInstallHint, buildConnectorHealthResults, formatConnectorHealthLines,
-  checkTmux, checkClaude, checkDeckSecurity, checkWritePermissions,
+  checkTmux, checkClaude, checkDeckSecurity, checkWritePermissions, checkGitignore,
 } from '../../../src/cli/commands/doctor.js';
 import type { HumanDoctorInput } from '../../../src/cli/commands/doctor.js';
 import type { HealthCheckResult } from '../../../src/orchestra/connector.js';
@@ -634,8 +634,8 @@ describe('i18n integration', () => {
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     const passedMsg = calls.find(c => String(c).includes('checks passed'));
     expect(passedMsg).toBeDefined();
-    // runDoctorChecks returns 14 checks total (including platform, Docker, .deck security, write permissions)
-    expect(String(passedMsg)).toMatch(/\/14/);
+    // runDoctorChecks returns 15 checks total (including platform, Docker, .deck security, write permissions, gitignore)
+    expect(String(passedMsg)).toMatch(/\/15/);
   });
 
   it('uses tr language when config has language=tr in legacy mode', async () => {
@@ -2102,5 +2102,55 @@ describe('runDoctorChecks - includes new checks', () => {
     expect(tmuxCheck?.required).toBe(false);
     // ok should still be true since tmux not required
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('checkGitignore', () => {
+  beforeEach(() => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(
+      '.brain/memory.db\n.brain/memory.db-shm\n.brain/memory.db-wal\n'
+    );
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as ReturnType<typeof spawnSync>);
+  });
+
+  it('passes when all files are gitignored and not tracked', () => {
+    const check = checkGitignore('/mock/root');
+    expect(check.passed).toBe(true);
+    expect(check.name).toBe('Gitignore');
+    expect(check.message).toContain('properly gitignored');
+  });
+
+  it('fails when a file is tracked by git', () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0, stdout: '.brain/memory.db\n', stderr: '', pid: 1, signal: null, output: [],
+    } as ReturnType<typeof spawnSync>);
+    const check = checkGitignore('/mock/root');
+    expect(check.passed).toBe(false);
+    expect(check.message).toContain('Tracked by git');
+    expect(check.message).toContain('git rm --cached');
+  });
+
+  it('fails when .gitignore is missing', () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const check = checkGitignore('/mock/root');
+    expect(check.passed).toBe(false);
+    expect(check.message).toContain('.gitignore not found');
+  });
+
+  it('fails when .gitignore entry is missing', () => {
+    vi.mocked(readFileSync).mockReturnValue(
+      '.brain/memory.db\n# no shm/wal entries\n'
+    );
+    const check = checkGitignore('/mock/root');
+    expect(check.passed).toBe(false);
+    expect(check.message).toContain('Missing from .gitignore');
+  });
+
+  it('is not a required check', () => {
+    const check = checkGitignore('/mock/root');
+    expect(check.required).toBe(false);
   });
 });

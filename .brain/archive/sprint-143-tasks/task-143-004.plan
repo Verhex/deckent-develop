@@ -1,0 +1,38 @@
+# Task 143-004: API Auth Default Secure — Execution Plan
+
+## Problem
+1. `bearerAuthMiddleware` in auth.ts: `if (!activeToken) return true` — no token = auth disabled (insecure default)
+2. server.ts `checkAuth`: `if (!token) return true` — same pattern
+3. No CORS origin restriction (only localhost but wildcard-like)
+4. No security headers (X-Content-Type-Options, X-Frame-Options, CSP, HSTS)
+
+## Approach
+
+### 1. auth.ts Changes
+- Remove `if (!activeToken) return true` from bearerAuthMiddleware
+- Add `DECKENT_API_AUTH_DISABLED=1` env check: if set → return true + stderr warning
+- Default: no token configured + no bypass env → 401 for all API requests
+
+### 2. server.ts Changes
+- Remove legacy `checkAuth` function (replaced by bearerAuthMiddleware)
+- Remove legacy fallback block in handleRequest
+- Add security headers middleware: X-Content-Type-Options, X-Frame-Options, CSP, HSTS
+- Tighten CORS: only allow localhost/127.0.0.1 origins (already mostly done, verify wildcard blocked)
+- Add security headers to sendJson and sendError responses
+- Update createHttpServer: warn on stderr when auth disabled via env bypass
+
+### 3. Tests
+- Missing token → 401 (no bypass env)
+- DECKENT_API_AUTH_DISABLED=1 → pass through + stderr warning
+- Valid token → 200
+- Invalid token → 403
+- CORS reject for non-localhost origin
+- Security headers present (X-Content-Type-Options, X-Frame-Options, CSP, HSTS)
+- Health endpoint still exempt
+- POST endpoints require auth
+
+## Files Modified
+- src/api/auth.ts — default secure + bypass env
+- src/api/server.ts — remove legacy checkAuth, add security headers
+- tests/api/server-auth.test.ts — update existing + add new tests
+- tests/api/security-headers.test.ts — update to expect headers present

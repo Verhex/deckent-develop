@@ -1,0 +1,25 @@
+{
+  "taskId": "139-021",
+  "workerId": "w-139-021",
+  "filesChanged": [
+    "docs/audits/sprint-139/plan-file-diagnostic.md",
+    "src/orchestra/task-builder.ts",
+    "src/agents/worker.ts",
+    "docs/worker-guide.md",
+    ".deckent/workspace/WORKER-GUIDE.md",
+    "tests/agents/worker.test.ts",
+    "tests/orchestra/task-builder.test.ts"
+  ],
+  "linesAdded": 252,
+  "linesRemoved": 5,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Diagnostic-first reframe completed. Root cause: buildWorkerPrompt() template lacked .plan instruction — only .claude/rules/worker-default.md contained it, making .plan writing non-deterministic (LLM context-dependent). Sprint 138: 8.3% plan coverage, Sprint 139: 22.7%. Fix: (1) Added .plan step to buildWorkerPrompt() 'What To Do' section as step 2, (2) Added soft warning in writeResult() — console.warn + planWarning flag when .plan missing, (3) Created docs/worker-guide.md with comprehensive .plan section, (4) Updated WORKER-GUIDE.md with .plan section, (5) Created docs/audits/sprint-139/plan-file-diagnostic.md with full forensic analysis. All 324 tests pass. 1 pre-existing tsc error in sprint-finalizer.ts (out of scope).",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 95
+  }
+}

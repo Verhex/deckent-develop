@@ -1,0 +1,90 @@
+{
+  "id": "143-017",
+  "title": "E2E Harness (Chain Safety Foundation)",
+  "description": "E2E Harness (Chain Safety Foundation)\n- Model: opus\n- Effort: normal\n- Skills: testing-expert, ci-testing\n- Agent: test-writer\n- Files: tests/e2e/sprint-lifecycle.e2e.test.ts (genişlet), tests/e2e/chain-safety.e2e.test.ts (yeni), scripts/run-e2e-harness.mjs\n- Scope: tests/e2e/, scripts/\n\n### Description\nChain safety gate E2E: 3-task mini-sprint → finalize → 5-check gate. PASS → auto-trigger-next. FAIL (cost>$100 subs-mode threshold, 3+ NO_GO) → abort-notify. `npm run e2e:chain`.\n\n**Kanıt:** `npm run e2e:chain` PASS + FAIL scenarios PASS.\n**Test:** 10+ E2E scenario\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/e2e/",
+      "scripts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/e2e/sprint-lifecycle.e2e.test.ts (genişlet)",
+      "tests/e2e/chain-safety.e2e.test.ts (yeni)",
+      "scripts/run-e2e-harness.mjs",
+      "tests/e2e/sprint-lifecycle.e2e.test.ts",
+      "tests/e2e/chain-safety.e2e.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npm run e2e:chain` PASS + FAIL scenarios PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "test-writer",
+  "forceSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "ci-testing"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "e2e",
+          "weight": 0.71
+        },
+        {
+          "name": "scripts",
+          "weight": 0.29
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "create",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.8,
+          "scripts/": 0.2
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.8
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:21:17.484Z"
+}

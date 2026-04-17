@@ -1,0 +1,27 @@
+`★ Insight ─────────────────────────────────────`
+- **ADR-008 compliance**: Event stream ve output dosyaları `readFileSync` ile doğrudan okundu — `orchestra/event-stream.ts` import edilmedi. Bu dosya sistemi tabanlı yaklaşım MCP tool'un bağımlılık kuralına tam uyuyor.
+- **output-formatter entegrasyonu**: `formatStatus(data, mode)` çağrısı CLI ve MCP'de `switch` yerine mevcut `resolveOutputMode()` helper üzerinden yönlendiriliyor — bu sayede future mode'lar otomatik olarak handle ediliyor.
+- **`--follow` mode tasarımı**: Byte offset takibi ile incremental output streaming — docker logs yerine dosya sistemi pollingi, tüm backend'lerle (docker/tmux/subprocess) çalışıyor.
+`─────────────────────────────────────────────────`
+
+Task tamamlandı. İşte özet:
+
+**Yapılanlar:**
+
+1. **`src/cli/commands/output.ts`** (YENİ, ~140 satır) — `npx deckent output <taskId>` komutu. `--tail N`, `--follow`, `--sprint-id`, `--json` destekli. Output dosyalarını `.deckent/sprint-NNN-outputs/task-NNN.out`'dan okur.
+
+2. **`src/mcp/tools/status.ts`** (genişletildi) — 6 zengin alan eklendi:
+   - `eventStreamTail` — son 20 event stream olayı
+   - `lastOutputs` — per-worker output snapshot'ları
+   - `metricSnapshot` — sprint metrics JSONL'den son değerler
+   - `phaseCountdown` — aktif faz süresi (saniye)
+   - `backendBreakdown` — provider başına aktif worker sayısı
+   - `outputMode` parametresi — `explainatory|standart|verbose|json`
+
+3. **`src/cli/commands/status.ts`** — `--mode <mode>` flag eklendi, `output-formatter.ts` entegre edildi.
+
+4. **`src/cli/index.ts`** — `registerOutput` eklendi.
+
+5. **85 test** geçiyor (20 output + 8 status-mode + 17 status-rich + mevcut 40), `tsc --noEmit` temiz.
+
+**Tech Debt:** `--watch` + `--mode` kombinasyonu (watch render loop `--mode`'u ignore ediyor), `--follow` byte offset yaklaşımı yaklaşık.

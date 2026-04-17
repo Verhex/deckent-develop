@@ -50,6 +50,17 @@ import { createHttpServer, type HttpApi } from '../../src/api/server.js';
 // ─── Helpers ────────────────────────────────────────────────────
 const PROJECT_ROOT = '/tmp/test-project';
 
+// Global auth bypass for non-auth-focused tests
+let _stderrSpy: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+  process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+  _stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+});
+afterEach(() => {
+  delete process.env['DECKENT_API_AUTH_DISABLED'];
+  _stderrSpy?.mockRestore();
+});
+
 function waitListening(api: HttpApi): Promise<void> {
   return new Promise<void>((r) => api.server.once('listening', r));
 }

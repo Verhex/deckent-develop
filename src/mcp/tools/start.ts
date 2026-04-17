@@ -1,19 +1,21 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { fork } from 'node:child_process';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../core/config.js';
-import { bootstrapProviders } from '../../core/provider.js';
-import { runSprint, BrainError, readContext, planSprint } from '../../orchestra/brain.js';
+import { readContext, planSprint, BrainError } from '../../orchestra/brain.js';
 import type { SprintSizeRecommendation } from '../../core/types.js';
-import { writeJobState, buildTaskSummaries } from './job-runner.js';
+import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
-
-function formatJobDuration(ms: number): string {
-  const mins = Math.floor(ms / 60000);
-  const secs = Math.floor((ms % 60000) / 1000);
-  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-}
+import {
+  getIpcDir,
+  IPC_CONFIG_FILE,
+  type SprintRunnerConfig,
+} from '../../orchestra/sprint-runner-entry.js';
 
 export function registerStartTool(server: McpServer): void {
   server.registerTool(
@@ -96,70 +98,39 @@ export function registerStartTool(server: McpServer): void {
           };
         }
 
-        // Bootstrap provider adapters before sprint operations
-        const bootstrap = await bootstrapProviders(config, root);
-
         const jobId = `sprint-${Date.now()}`;
         const startedAt = new Date().toISOString();
 
         writeJobState(root, { jobId, status: 'RUNNING', startedAt });
 
-        // Fire and forget — don't await. Sprint runs in background.
-        // autoApprove: true is immutable — workers MUST have full write permissions.
-        // CLI parity: CLI also hardcodes autoApprove: true (ignores --auto-approve flag).
-        // The schema param is accepted for debugging only; runtime always enforces true.
-        runSprint(root, config, { autoApprove: true, sandboxMode: sandbox, timeoutMs: timeout, connector: bootstrap?.connector }).then(sprint => {
-          const tasks = buildTaskSummaries(root, sprint.tasks);
-          const sm = sprint.metrics;
-          const duration = sm ? formatJobDuration(sm.durationMs) : '?';
-          const metrics = sm ? {
-            totalTasks: sm.totalTasks,
-            done: sm.completedTasks,
-            techDebt: sm.techDebtTasks,
-            noGo: sm.noGoTasks,
-            duration,
-          } : undefined;
+        // ─── Detached Sprint Runner (Sprint 143 — MCP Disconnect Fix) ──
+        // Instead of running runSprint() in-process (which blocks the MCP
+        // stdio event loop for long sprints), we fork a detached child process.
+        // This frees the MCP server's stdio transport immediately.
+        const ipcDir = getIpcDir(root, jobId);
+        mkdirSync(ipcDir, { recursive: true });
 
-          // Build agent breakdown: agentId → task count
-          const agentBreakdown: Record<string, number> = {};
-          for (const t of sprint.tasks) {
-            const agent = t.assignedAgent ?? 'generic';
-            agentBreakdown[agent] = (agentBreakdown[agent] ?? 0) + 1;
-          }
+        const runnerConfig: SprintRunnerConfig = {
+          projectRoot: root,
+          jobId,
+          autoApprove: true, // Immutable — workers MUST have full write permissions
+          sandboxMode: sandbox,
+          timeoutMs: timeout,
+        };
+        writeFileSync(join(ipcDir, IPC_CONFIG_FILE), JSON.stringify(runnerConfig, null, 2), 'utf-8');
 
-          // Build human-readable summary
-          const total = sm?.totalTasks ?? sprint.tasks.length;
-          const completed = sm?.completedTasks ?? 0; // DONE + GO_WITH_TECH_DEBT
-          const donePure = completed - (sm?.techDebtTasks ?? 0);
-          const techDebt = sm?.techDebtTasks ?? 0;
-          const noGo = sm?.noGoTasks ?? 0;
-          const agentParts = Object.entries(agentBreakdown).map(([a, c]) => `${a}(${c})`).join(', ');
-          const summary = `Sprint ${sprint.id} tamamlandı (${duration}) — ${completed}/${total} task: ${donePure} DONE, ${techDebt} TECH_DEBT, ${noGo} NO_GO | Agent: ${agentParts}`;
+        // Resolve the compiled runner entry point
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const runnerPath = join(__dirname, '..', '..', 'orchestra', 'sprint-runner-entry.js');
 
-          writeJobState(root, {
-            jobId,
-            status: 'COMPLETE',
-            startedAt,
-            completedAt: new Date().toISOString(),
-            sprintId: sprint.id,
-            tasks,
-            metrics,
-            summary,
-            agentBreakdown,
-          });
-        }).catch(err => {
-          const message = err instanceof BrainError
-            ? `Sprint failed at phase ${err.phase ?? 'unknown'}: ${err.message}`
-            : err instanceof Error ? err.message : String(err);
-
-          writeJobState(root, {
-            jobId,
-            status: 'FAILED',
-            startedAt,
-            completedAt: new Date().toISOString(),
-            error: message,
-          });
+        // Fork as detached child — unref() so MCP server can exit independently
+        const child = fork(runnerPath, [ipcDir], {
+          detached: true,
+          stdio: 'ignore', // Don't inherit stdio — critical for MCP transport freedom
+          cwd: root,
         });
+        child.unref();
 
         const startData = {
           success: true,

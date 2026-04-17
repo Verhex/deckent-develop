@@ -1,0 +1,27 @@
+{
+  "taskId": "143-019",
+  "filesChanged": [
+    "src/mcp/tools/help.ts",
+    "src/mcp/server.ts",
+    "tests/mcp/help.test.ts"
+  ],
+  "linesAdded": 87,
+  "linesRemoved": 8,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "1. help.ts TOOLS array: added 6 missing tools (agent_list, skill_list, checkpoint, docs, explain, memory_query) — now 22 total. 2. help.ts RESOURCES: updated V1 paths (.brain/MEMORY.md, .brain/DEBT.md, .brain/RETRO.md) to V2 paths (.brain/exports/). 3. server.ts DECKENT_MCP_INSTRUCTIONS: changed 'Tools (21)' to 'Tools (22)', added deckent_memory_query to tool list, updated resource descriptions to V2 paths. 4. Created tests/mcp/help.test.ts with 5 tests covering: tool count header, memory_query presence, V2 path verification, all 22 tool names, all 8 resource URIs. tsc --noEmit: 0 errors. vitest: 5/5 pass.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 30000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 90
+  }
+}

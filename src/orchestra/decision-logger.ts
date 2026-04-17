@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import type { DecisionLogEntry } from '../core/decision-types.js';
 import { DECISIONS_LOG_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import { validateTaskId, validateSprintId, validatePath } from '../core/validators.js';
 
 // ─── Persisted Decision Log ────────────────────────────────────────────────
 
@@ -35,7 +36,9 @@ export class DecisionLogger {
    * Get the file path for a task's decision log.
    */
   private getLogPath(taskId: string): string {
-    return path.join(this.getLogDir(), `decision-${taskId}.json`);
+    const dir = this.getLogDir();
+    const fileName = `decision-${taskId}.json`;
+    return validatePath(dir, fileName);
   }
 
   /**
@@ -52,6 +55,8 @@ export class DecisionLogger {
    * Log decision entries for a task.
    */
   log(sprintId: string, taskId: string, entries: DecisionLogEntry[]): void {
+    validateSprintId(sprintId);
+    validateTaskId(taskId);
     this.ensureDir();
     const record: PersistedDecisionLog = {
       taskId,
@@ -67,6 +72,7 @@ export class DecisionLogger {
    * Read decision log for a task. Returns null if not found.
    */
   readDecisionLog(taskId: string): { steps: DecisionLogEntry[]; decidedAt: string } | null {
+    validateTaskId(taskId);
     const filePath = this.getLogPath(taskId);
     if (!fs.existsSync(filePath)) {
       return null;
@@ -85,6 +91,7 @@ export class DecisionLogger {
    * List all task IDs with decision logs for a given sprint.
    */
   listDecisions(sprintId: string): string[] {
+    validateSprintId(sprintId);
     const dir = this.getLogDir();
     if (!fs.existsSync(dir)) {
       return [];

@@ -1,0 +1,20 @@
+# Task 143-018: ADR-010 Amendment (Karar 6-C)
+
+## Approach
+1. Update `src/core/adr-seed.ts` — modify adr-010 entry title/content/summary to reflect "Minimal runtime dependencies (Amended)"
+2. Add ADR-010 amendment test in `tests/core/memory-store.test.ts` — 3 tests:
+   - upsert adr-010 with amended content, verify title/content changed
+   - verify history records the amendment (field-level diff)
+   - verify the amended entry is searchable with "minimal runtime dependency" query
+
+## Files Modified
+- src/core/adr-seed.ts (adr-010 entry update)
+- tests/core/memory-store.test.ts (3 new tests)
+
+## Scope Concern
+- adr-seed.ts is in src/core/ ✓ (within scope)
+- However, task says "Files: src/core/memory-store.ts (insert amendment)" — the seed data lives in adr-seed.ts, not memory-store.ts directly. The upsert would happen at runtime. I'll update the seed AND add a test that demonstrates the upsert amendment flow.
+
+## Verification
+- tsc --noEmit
+- npx vitest run tests/core/memory-store.test.ts

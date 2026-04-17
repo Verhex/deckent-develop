@@ -3557,3 +3557,150 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 139-052: Cascade Block Dummy Failure Injection (Live Test) (PENDING)
 
 ---
+## Sprint 141 — sprint-141
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-16
+**Duration:** 4457s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 15 |
+| Tech Debt | 8 |
+| No-Go | 3 |
+| Coverage | 25.0% |
+| Duration | 4456659ms |
+
+### Tasks
+
+- 141-001: src/core/ Analysis (78 dosya) (DONE)
+- 141-002: src/orchestra/ Analysis (82 dosya) (NO_GO)
+- 141-003: src/cli/ Analysis (75 dosya) (GO_WITH_TECH_DEBT)
+- 141-004: src/mcp/ Analysis (37 dosya) (DONE)
+- 141-005: src/agents/ + src/providers/ + src/monitor/ + src/api/ + src/extensions/ Analysis (30 dosya) (NO_GO)
+- 141-006: src/dashboard/ Batch Analysis (44 dosya, batch) (DONE)
+- 141-007: tests/ Category Analysis (28 kategori) (GO_WITH_TECH_DEBT)
+- 141-008: docs/ Analysis (260 markdown) (GO_WITH_TECH_DEBT)
+- 141-009: .brain/ + .brain/exports/ + config Analysis (DONE)
+- 141-010: Root files + scripts/ Analysis (DONE)
+- 141-011: META — Architecture Graph + Circular Dependency (GO_WITH_TECH_DEBT)
+- 141-012: META — Dead Code + Type Safety + Security (GO_WITH_TECH_DEBT)
+- 141-013: META — ADR Compliance + CLI/MCP Parity + i18n (GO_WITH_TECH_DEBT)
+- 141-014: META — Test Coverage Map + Performance + Error Handling + TODO inventory (GO_WITH_TECH_DEBT)
+- 141-015: META — Memory V2 Integrity Verification (GO_WITH_TECH_DEBT)
+- 141-016: FINAL — Aggregation Report (DONE)
+
+---
+## Sprint 142 — sprint-142
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-16
+**Duration:** 10481s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 49 |
+| Completed | 44 |
+| Tech Debt | 42 |
+| No-Go | 5 |
+| Coverage | NaN% |
+| Duration | 10481457ms |
+
+### Tasks
+
+- 142-001: src/core/ batch 1 — Memory V2 modulleri (GO_WITH_TECH_DEBT)
+- 142-002: src/core/ batch 2 — Types + Routing (GO_WITH_TECH_DEBT)
+- 142-003: src/core/ batch 3 — Agent + Skill pools (DONE)
+- 142-004: src/core/ batch 4 — Provider + Model + Notification (GO_WITH_TECH_DEBT)
+- 142-005: src/core/ batch 5 — Utils + Security + Remaining (GO_WITH_TECH_DEBT)
+- 142-006: src/core/ batch 6 — Remaining core files (GO_WITH_TECH_DEBT)
+- 142-007: src/core/ batch 7 — Final core files (GO_WITH_TECH_DEBT)
+- 142-008: src/orchestra/ batch 1 — Brain + Sprint lifecycle (GO_WITH_TECH_DEBT)
+- 142-009: src/orchestra/ batch 2 — Debt + Result + Retro (GO_WITH_TECH_DEBT)
+- 142-010: src/orchestra/ batch 3 — Task + Routing + Spawn (GO_WITH_TECH_DEBT)
+- 142-011: src/orchestra/ batch 4 — Event stream + Pattern + Decision (GO_WITH_TECH_DEBT)
+- 142-012: src/orchestra/ batch 5 — Managed docs + Pattern + Remaining (GO_WITH_TECH_DEBT)
+- 142-013: src/orchestra/ batch 6 — Doc updaters + Sprint utils + Remaining (GO_WITH_TECH_DEBT)
+- 142-014: src/orchestra/ batch 7 — Remaining orchestra files (GO_WITH_TECH_DEBT)
+- 142-015: src/orchestra/ batch 8 — Final orchestra remaining (GO_WITH_TECH_DEBT)
+- 142-016: src/orchestra/ batch 9 — Final remaining orchestra (GO_WITH_TECH_DEBT)
+- 142-017: src/cli/ batch 1 — Memory V2 + Critical commands (GO_WITH_TECH_DEBT)
+- 142-018: src/cli/ batch 2 — Remaining commands (GO_WITH_TECH_DEBT)
+- 142-019: src/cli/ batch 3 — More commands (GO_WITH_TECH_DEBT)
+- 142-020: src/cli/ batch 4 — Final commands + helpers (GO_WITH_TECH_DEBT)
+- 142-021: src/cli/ batch 5 — Helpers + Entry (GO_WITH_TECH_DEBT)
+- 142-022: src/cli/ batch 6 — Remaining helpers + root (GO_WITH_TECH_DEBT)
+- 142-023: src/cli/ batch 7 — Final helpers (GO_WITH_TECH_DEBT)
+- 142-024: src/mcp/ batch 1 — Tools (GO_WITH_TECH_DEBT)
+- 142-025: src/mcp/ batch 2 — Tools remaining + Resources + Server (GO_WITH_TECH_DEBT)
+- 142-026: src/mcp/ batch 3 — Resources + Helpers + Server (GO_WITH_TECH_DEBT)
+- 142-027: src/agents/ + src/providers/ + src/api/ + src/monitor/ + src/extensions/ (NO_GO)
+- 142-028: src/dashboard/ batch 1 — Components (NO_GO)
+- 142-029: src/dashboard/ batch 2 — Components + Pages + Hooks + i18n + lib (GO_WITH_TECH_DEBT)
+- 142-030: tests/ batch 1 — core/ (119 dosya) (GO_WITH_TECH_DEBT)
+- 142-031: tests/ batch 2 — orchestra/ (118 dosya) (GO_WITH_TECH_DEBT)
+- 142-032: tests/ batch 3 — cli/ (126 dosya) (GO_WITH_TECH_DEBT)
+- 142-033: tests/ batch 4 — mcp/ + api/ + monitor/ (47 dosya) (GO_WITH_TECH_DEBT)
+- 142-034: tests/ batch 5 — integration/ + e2e/ + dashboard/ (52 dosya) (GO_WITH_TECH_DEBT)
+- 142-035: tests/ batch 6 — agents/ + providers/ + remaining (100 dosya) (GO_WITH_TECH_DEBT)
+- 142-036: docs/ batch 1 — superpowers/ + audits/ (GO_WITH_TECH_DEBT)
+- 142-037: docs/ batch 2 — Remaining docs (NO_GO)
+- 142-038: .brain/ state + Memory V2 DB canli dogrulama (GO_WITH_TECH_DEBT)
+- 142-039: Root .md cross-validation — TUTARLILIK DOGRULAMA (GO_WITH_TECH_DEBT)
+- 142-040: Root config — Dockerfile + .gitignore + package.json + tsconfig (GO_WITH_TECH_DEBT)
+- 142-041: .claude/rules/ + .contracts/ + .deckent/config (DONE)
+- 142-042: META — Architecture Graph + Circular Dependency + ADR-008 (GO_WITH_TECH_DEBT)
+- 142-043: META — Dead Code + Type Safety (GO_WITH_TECH_DEBT)
+- 142-044: META — Security + Performance (GO_WITH_TECH_DEBT)
+- 142-045: META — i18n + CLI/MCP Parity + Test Coverage Map (GO_WITH_TECH_DEBT)
+- 142-046: META — Memory V2 Integrity Deep Verification (GO_WITH_TECH_DEBT)
+- 142-047: META — Error Handling + TODO/FIXME Inventory (GO_WITH_TECH_DEBT)
+- 142-048: FINAL — God Analysis Aggregation Report (NO_GO)
+
+---
+## Sprint 143 — sprint-143
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-17
+**Duration:** 6295s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 20 |
+| Completed | 19 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | 14.2% |
+| Duration | 6294639ms |
+
+### Tasks
+
+- 143-001: Shell Injection Fix (tmux.ts) (DONE)
+- 143-002: Path Traversal Fix (checkpoint/docs/decision-logger) (DONE)
+- 143-003: .brain/memory.db Git Takip Fix (DONE)
+- 143-004: API Auth Default Secure (DONE)
+- 143-005: health-check.ts Dosya Yolu Uyuşmazlığı Fix (DONE)
+- 143-006: FTS5 Query Builder Fix (Karar 2-A) (DONE)
+- 143-007: Relations Hibrit — Backfill + Write-time (Karar 3-C) (DONE)
+- 143-008: Memory V2 Tam Migrasyon (ci-reporter + managed-docs) (NO_GO)
+- 143-009: DECISIONS.md Archive + init.ts DB Preload (DONE)
+- 143-010: Sprint-Finalizer Hook (Karar 4-A) (DONE)
+- 143-011: Rule Generator (Karar 4-B, 3 Provider) (DONE)
+- 143-012: MCP Disconnect Fix (Background Sprint Runner) (GO_WITH_TECH_DEBT)
+- 143-013: Auto-Archive Guard (Task 3 Regression Koruması) (DONE)
+- 143-014: Layer 4 Runtime Wire Deploy (ADR-006 Canlı Enforcement) (DONE)
+- 143-015: Task Restoration on Crash (DONE)
+- 143-016: Panic Kill Guard (DONE)
+- 143-017: E2E Harness (Chain Safety Foundation) (DONE)
+- 143-018: ADR-010 Amendment (Karar 6-C) (DONE)
+- 143-019: MCP help.ts + Server Instructions + Tool Count (DONE)
+- 143-020: heartbeat-daemon execSync Beyaz Liste (DONE)
+
+---

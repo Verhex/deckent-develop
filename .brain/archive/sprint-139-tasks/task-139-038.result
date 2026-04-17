@@ -1,0 +1,26 @@
+{
+  "taskId": "139-038",
+  "filesChanged": [
+    ".deckent/features-manifest.json",
+    "tests/core/features-manifest.test.ts"
+  ],
+  "linesAdded": 285,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Feature Usage Manifest (Dead Code Audit Step 2) tamamlandı.\n\n**Baseline:** .deckent/features-manifest.json mevcut değildi. tests/core/features-manifest.test.ts mevcut değildi.\n\n**Teslim edilenler:**\n\n1. `.deckent/features-manifest.json` — 4 kategori, 27 feature entry:\n   - **active** (15 entry): sprint-controller, task-builder, result-evaluator, auditor, tmux-backend, docker-backend, subprocess-backend, fix-phase, dependency-scheduler, event-stream, sprint-checkpoint, routing-engine-v2, sprint-retro-reporter, authority-enforcer, model-registry\n   - **lightly_used** (6 entry): archive-debt (CLI-only, no MCP parity), skill-marketplace, managed-docs (opt-in), promotion-pipeline, mcp-parity-gaps, rollback\n   - **dormant** (6 entry): heartbeat-daemon (zero-external imports, no sprint wiring), shared-memory (zero-external), handoff-protocol (zero-external), human-checkpoint-cli (opt-in config), multi-agent-pipeline (not wired to sprint-controller), ecosystem-intelligence (analysis output not consumed by routing)\n   - **dead** (2 entry): decision-orchestrator-v1 (@deprecated Sprint 066, ADR-028, test-only), parallel-pipeline-manager-standalone (superseded by dependency-scheduler Sprint 139)\n\n2. `tests/core/features-manifest.test.ts` — 22 test, 4 describe block:\n   - File existence (2 tests)\n   - Schema validation (6 tests): top-level keys, _meta fields, sourceAnalysis, category arrays, entry required fields, unique IDs\n   - Category membership (9 tests): count validation, specific feature presence, no-cross-category check\n   - Usage tracking (5 tests): evidenceSprints on active, supersededBy/deprecatedSince on dead, blockedBy/roadmap on dormant\n\n**Verify results:**\n- `tsc --noEmit`: pre-existing sprint-finalizer.ts:36 error (scope dışı, task 139-038 dokunmadı)\n- `npx vitest run tests/core/features-manifest.test.ts`: 22/22 PASS, 13ms\n\n**Dependency notu:** Task 139-037 sonucu henüz yok (EXECUTING durumunda). Manifest, Task 37 çıktısına değil doğrudan codebase analizi + import graph traversal + @deprecated marker grep + sprint log incelemesine dayanıyor. ADR-028 decision-orchestrator-v1 dead statüsü kaynağı: kaynak dosyada açık @deprecated yorum. ParallelPipelineManager dead statüsü: dependency-scheduler Sprint 139 T-028/T-029/T-030 ile fonksiyonel supersede.",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 4200,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

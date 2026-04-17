@@ -75,6 +75,12 @@ import {
 } from './sprint-pid-manager.js';
 import type { SprintStateSnapshot } from './sprint-pid-manager.js';
 
+// ─── Sprint Checkpoint (phase-transition auto-checkpoint) ────────
+import { writePhaseCheckpoint } from './sprint-checkpoint.js';
+
+// ─── Panic Guard ─────────────────────────────────────────────────
+import { PanicGuard } from '../core/panic-guard.js';
+
 // ─── Observability ──────────────────────────────────────────────
 import { metric, trace, structuredLog, initObservability } from '../core/observability.js';
 
@@ -331,11 +337,17 @@ export async function runSprint(
     if (captured) writeBaseline(projectRoot, sprint.id, captured);
   } catch (e) { debugLog('runSprint:baseline', e); }
 
+  // Phase-transition checkpoint: PLAN complete
+  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:plan', e); }
+
   // Phase 2: SPAWN
   const { taskQueue, scanInterval: initialScanInterval } = await runSpawnPhase(
     projectRoot, sprint, config, opts, spawnBackend,
   );
   let scanInterval = initialScanInterval;
+
+  // Phase-transition checkpoint: SPAWN complete
+  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:spawn', e); }
 
   // Phase 3: EXECUTE
   let results: TaskResult[] = [];
@@ -387,33 +399,66 @@ export async function runSprint(
           const lateResult = readJsonSafe<TaskResult>(resultPath);
           if (lateResult) results.push(lateResult);
         } else {
-          try {
-            if (spawnBackend) spawnBackend.kill(task.id);
-            else {
-              const { killWorker: kw } = await import('./tmux.js');
-              kw(task.id);
-            }
-          } catch (e) { debugLog('graceKill:killWorker', e); }
+          // Panic Guard: require user approval before killing workers
+          const panicGuard = new PanicGuard(projectRoot);
+          const decision = panicGuard.evaluate(
+            task.id,
+            task.assignedWorker ?? `w-${task.id}`,
+            sprint.id,
+            'grace_period_timeout',
+            undefined, // no force/userExplicit — default BLOCK
+            'Worker had heartbeat but failed to write result within grace period',
+          );
 
-          const syntheticResult: TaskResult = {
-            taskId: task.id,
-            workerId: task.assignedWorker ?? `w-${task.id}`,
-            filesChanged: [],
-            linesAdded: 0,
-            linesRemoved: 0,
-            testsPassed: false,
-            coverage: 0,
-            selfAssessment: 'NO_GO',
-            notes: 'Worker had heartbeat but failed to write result within grace period — killed',
-          };
-          try {
-            await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
-          } catch (e) { debugLog('graceKill:writeResult', e); }
-          results.push(syntheticResult);
+          if (decision === 'BLOCK') {
+            debugLog('graceKill:panicGuard', `Kill blocked for task ${task.id} — user approval required`);
+            const syntheticResult: TaskResult = {
+              taskId: task.id,
+              workerId: task.assignedWorker ?? `w-${task.id}`,
+              filesChanged: [],
+              linesAdded: 0,
+              linesRemoved: 0,
+              testsPassed: false,
+              coverage: 0,
+              selfAssessment: 'NO_GO',
+              notes: 'Worker had heartbeat but failed to write result within grace period — kill blocked by panic guard (user approval required)',
+            };
+            try {
+              await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
+            } catch (e) { debugLog('graceKill:writeResult', e); }
+            results.push(syntheticResult);
+          } else {
+            try {
+              if (spawnBackend) spawnBackend.kill(task.id);
+              else {
+                const { killWorker: kw } = await import('./tmux.js');
+                kw(task.id);
+              }
+            } catch (e) { debugLog('graceKill:killWorker', e); }
+
+            const syntheticResult: TaskResult = {
+              taskId: task.id,
+              workerId: task.assignedWorker ?? `w-${task.id}`,
+              filesChanged: [],
+              linesAdded: 0,
+              linesRemoved: 0,
+              testsPassed: false,
+              coverage: 0,
+              selfAssessment: 'NO_GO',
+              notes: 'Worker had heartbeat but failed to write result within grace period — killed (user-explicit override)',
+            };
+            try {
+              await writeFile(resultPath, JSON.stringify(syntheticResult, null, 2), 'utf-8');
+            } catch (e) { debugLog('graceKill:writeResult', e); }
+            results.push(syntheticResult);
+          }
         }
       }
     }
   } catch (e) { debugLog('graceKill:main', e); }
+
+  // Phase-transition checkpoint: EXECUTE complete
+  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:execute', e); }
 
   // Phase 4: EVALUATE
   const evaluations = new Map<string, TaskEvaluation>();
@@ -465,8 +510,14 @@ export async function runSprint(
     }
   }
 
+  // Phase-transition checkpoint: EVALUATE complete
+  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:evaluate', e); }
+
   // Phase 5: FIX
   await runFixPhase(projectRoot, sprint, evaluations, results, config, opts, routingVersionForFix, spawnBackend);
+
+  // Phase-transition checkpoint: FIX complete
+  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:fix', e); }
 
   // Phase 6+7: RETRO + DECAY
   await runRetroPhase(projectRoot, sprint, evaluations, results, config, opts?.testMode);

@@ -4,13 +4,13 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRAIN_DIR, DEBT_FILE, SPRINTS_DIR } from '../../core/constants.js';
 import { TaskEvaluation } from '../../core/types.js';
 import { AgentPoolManager } from '../../core/agent-pool.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
 import { modelRegistry } from '../../core/model-registry.js';
 import type { DocUpdateContext } from '../doc-updaters/types.js';
 import type { SectionGenerator } from './types.js';
+import type { MemoryEntryV2 } from '../../core/memory-types.js';
 
 // ─── i18n Strings ────────────────────────────────────────────────────────
 
@@ -171,19 +171,20 @@ register({
   },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
-    const debtPath = join(ctx.projectRoot, BRAIN_DIR, DEBT_FILE);
-    if (!existsSync(debtPath)) return s.noDebtRecord;
-    const content = readFileSync(debtPath, 'utf-8');
-    const lines = content.split('\n').filter(l => l.trim().startsWith('|') && !l.includes('---'));
-    const openLines = lines.filter(l => {
-      const cells = l.split('|').map(c => c.trim());
-      // Open column (index 6) should be "Yes" or similar
-      return cells[6]?.toLowerCase() === 'yes' || cells[6]?.toLowerCase() === 'evet';
-    });
-    if (openLines.length === 0) return s.noDebt;
-    // Return header + open items
-    const header = lines[0] ?? '';
-    return [header, '|---|---|---|---|---|---|---|---|---|', ...openLines.slice(0, 10)].join('\n');
+
+    // DB-first: read debt entries from MemoryStore (V2: DB is single source of truth)
+    if (!ctx.store) return s.noDebtRecord;
+
+    try {
+      const debtEntries = ctx.store.getByType('debt');
+      const openEntries = debtEntries.filter((e: MemoryEntryV2) =>
+        e.status === 'active' || e.status === 'accepted',
+      );
+      if (openEntries.length === 0) return s.noDebt;
+      return openEntries.slice(0, 10).map((e: MemoryEntryV2) => `- **${e.title}**: ${e.summary ?? e.content.slice(0, 100)}`).join('\n');
+    } catch {
+      return s.noDebt;
+    }
   },
 });
 
@@ -199,25 +200,25 @@ register({
   },
   generate(ctx: DocUpdateContext): string {
     const s = i18n(ctx);
-    const sprintsDir = join(ctx.projectRoot, BRAIN_DIR, SPRINTS_DIR);
-    if (!existsSync(sprintsDir)) return s.noHistory;
 
-    const files = readdirSync(sprintsDir)
-      .filter(f => f.endsWith('.md'))
-      .sort()
-      .slice(-10); // last 10 sprints
+    // DB-first: read sprint entries from MemoryStore (V2: DB is single source of truth)
+    if (!ctx.store) return s.noHistory;
 
-    if (files.length === 0) return s.noHistory;
-
-    const rows: string[] = [`| ${s.sprint} | ${s.status} |`, '|--------|-------|'];
-    for (const file of files) {
-      const name = file.replace('.md', '');
-      const content = readFileSync(join(sprintsDir, file), 'utf-8');
-      const taskMatch = content.match(/(\d+)\s*\/\s*(\d+)/);
-      const status = taskMatch ? `${taskMatch[1]}/${taskMatch[2]} task` : s.completed2;
-      rows.push(`| ${name} | ${status} |`);
+    try {
+      const sprintEntries = ctx.store.getByType('sprint');
+      if (sprintEntries.length === 0) return s.noHistory;
+      // Sort by sprint_num ascending, take last 10
+      const sorted = [...sprintEntries].sort((a, b) => a.sprint_num - b.sprint_num).slice(-10);
+      const rows: string[] = [`| ${s.sprint} | ${s.status} |`, '|--------|-------|'];
+      for (const entry of sorted) {
+        const taskMatch = entry.content.match(/(\d+)\s*\/\s*(\d+)/);
+        const status = taskMatch ? `${taskMatch[1]}/${taskMatch[2]} task` : s.completed2;
+        rows.push(`| ${entry.sprint_id ?? entry.id} | ${status} |`);
+      }
+      return rows.join('\n');
+    } catch {
+      return s.noHistory;
     }
-    return rows.join('\n');
   },
 });
 

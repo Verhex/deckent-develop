@@ -1,0 +1,30 @@
+# Task 143-019 Execution Plan
+
+## Objective
+Fix MCP help.ts TOOLS array (add 6 missing tools), server.ts tool count (21→22), and update V1 path references to V2.
+
+## Changes
+
+### 1. src/mcp/tools/help.ts
+- Add 6 missing tools to TOOLS array: agent_list, skill_list, checkpoint, docs, explain, memory_query
+- Update RESOURCES descriptions: V1 paths (.brain/MEMORY.md, .brain/DEBT.md, .brain/RETRO.md) → V2 paths (.brain/exports/)
+
+### 2. src/mcp/server.ts
+- Change "Tools (21)" → "Tools (22)" in DECKENT_MCP_INSTRUCTIONS
+- Add missing tool: deckent_memory_query to the tool list in instructions
+- Update resource descriptions: MEMORY.md → exports/memory.md, DEBT.md → exports/debt.md, RETRO.md → retro via DB
+- Remove V1 file path references
+
+### 3. tests/mcp/help.test.ts
+- Add/update tests to verify 22 tools in TOOLS array
+- Test that V1 paths are not present in RESOURCES
+- Test memory_query tool presence
+
+## Files
+- src/mcp/tools/help.ts (modify)
+- src/mcp/server.ts (modify)
+- tests/mcp/help.test.ts (create/modify)
+
+## Verify
+- tsc --noEmit
+- npx vitest run

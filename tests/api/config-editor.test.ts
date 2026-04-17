@@ -98,6 +98,17 @@ const mockCreateDefaultConfig = vi.mocked(createDefaultConfig);
 
 const PROJECT_ROOT = '/tmp/test-config-editor';
 
+// Global auth bypass for non-auth-focused tests
+let _stderrSpy: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+  process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+  _stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+});
+afterEach(() => {
+  delete process.env['DECKENT_API_AUTH_DISABLED'];
+  _stderrSpy?.mockRestore();
+});
+
 function request(
   api: HttpApi,
   path: string,

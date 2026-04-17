@@ -1,0 +1,11 @@
+`★ Insight ─────────────────────────────────────`
+**Güvenlik Katmanları:**
+1. **Whitelist yaklaşımı** (positive security model) — blacklist yerine sadece izin verilen komutları kabul etmek çok daha güvenli. Yeni bir saldırı vektörü keşfedilse bile, whitelist'te olmayan hiçbir şey çalıştırılamaz.
+2. **Shell metacharacter reddi** — `;`, `&`, `|`, `` ` ``, `$`, `(`, `)` gibi karakterler, tek bir komut zincirini birden fazla komuta dönüştürmek için kullanılır. Bunları reddetmek, command chaining/injection'ı engeller.
+3. **Defense in depth** — Hem whitelist HEM DE metachar kontrolü yapıyoruz. Birisi bypass edilse bile diğeri koruma sağlar.
+`─────────────────────────────────────────────────`
+
+**Task 143-020 tamamlandı.** Yapılan değişiklikler:
+
+- **`src/orchestra/heartbeat-daemon.ts`**: `validateCommand()` fonksiyonu eklendi — `ALLOWED_COMMANDS` beyaz listesi + shell metacharacter reddi + ValidationError entegrasyonu. `execSync` timeout'u 120s → 5s'e düşürüldü.
+- **`tests/orchestra/heartbeat-daemon.test.ts`**: 15 test (beyaz liste, 6 injection pattern, non-whitelisted, empty, null byte, path prefix).

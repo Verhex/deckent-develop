@@ -1,0 +1,15 @@
+# Task 139-044 Execution Plan
+
+## Hedef
+tests/e2e/event-stream-runtime.test.ts yaz:
+- Full pipeline test: writeEvent → read → reconstruct
+- 5+ integration test
+- 13+ farklı kanal kullanımını doğrula
+- Sprint simulation (50+ event, tüm lifecycle phases)
+
+## Yaklaşım
+1. Full sprint simulation: brain, worker, auditor rolleri simüle edilir
+2. writeEvent → readEvents → reconstructState tam pipeline testi
+3. Channel variety: 13+ distinct channel kullanılır
+4. Event count: gerçek sprint boyunca oluşacak event hacmini simüle et
+5. Fail-safe: io failure, malformed lines edge cases

@@ -8,11 +8,12 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { DECKENT_DIR } from '../core/constants.js';
+import { DECKENT_DIR, TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import type { Sprint, SprintPhase } from '../core/types.js';
 import type { Task } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
+import type { Heartbeat } from '../core/types.js';
 import type { SerializedDependencyGraph } from './dependency-scheduler.js';
 import {
   persistDependencyGraph,
@@ -255,6 +256,152 @@ export function restoreDepGraph(
 
 // Re-export persistence utilities so callers don't need to import dependency-scheduler directly
 export { persistDependencyGraph, loadDependencyGraph } from './dependency-scheduler.js';
+
+// ─── Stale Heartbeat Detection ──────────────────────────────────────
+
+/** Default stale threshold: 5 minutes in ms */
+export const STALE_HEARTBEAT_THRESHOLD_MS = 5 * 60 * 1000;
+
+/** Result of stale heartbeat check for a single worker. */
+export interface StaleWorkerInfo {
+  workerId: string;
+  taskId: string;
+  lastHeartbeat: string | null;
+  ageMs: number;
+  reason: 'no_heartbeat' | 'stale' | 'missing_file';
+}
+
+/**
+ * Read a heartbeat file and return parsed content.
+ * Returns null if file is missing or malformed.
+ */
+export function readHeartbeat(
+  projectRoot: string,
+  taskId: string,
+): Heartbeat | null {
+  const hbPath = join(projectRoot, TASKS_DIR, `task-${taskId}.hb`);
+  if (!existsSync(hbPath)) return null;
+  try {
+    const raw = readFileSync(hbPath, 'utf-8');
+    return JSON.parse(raw) as Heartbeat;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a heartbeat is stale (timestamp older than thresholdMs from now).
+ */
+export function isStaleHeartbeat(
+  hb: Heartbeat | null,
+  thresholdMs: number = STALE_HEARTBEAT_THRESHOLD_MS,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!hb) return true;
+  const hbTime = new Date(hb.timestamp).getTime();
+  if (Number.isNaN(hbTime)) return true;
+  return (nowMs - hbTime) > thresholdMs;
+}
+
+/**
+ * Detect stale workers from a checkpoint's activeWorkers list.
+ * Checks each active worker's heartbeat file — if missing or older than
+ * thresholdMs, the worker is considered stale and should be respawned.
+ *
+ * @returns Array of stale worker info (empty if all workers are fresh)
+ */
+export function detectStaleWorkers(
+  projectRoot: string,
+  checkpoint: SprintCheckpoint,
+  thresholdMs: number = STALE_HEARTBEAT_THRESHOLD_MS,
+  nowMs: number = Date.now(),
+): StaleWorkerInfo[] {
+  const stale: StaleWorkerInfo[] = [];
+
+  for (const worker of checkpoint.activeWorkers) {
+    const hb = readHeartbeat(projectRoot, worker.taskId);
+
+    if (!hb) {
+      stale.push({
+        workerId: worker.workerId,
+        taskId: worker.taskId,
+        lastHeartbeat: null,
+        ageMs: nowMs - new Date(worker.spawnedAt).getTime(),
+        reason: 'missing_file',
+      });
+      continue;
+    }
+
+    if (isStaleHeartbeat(hb, thresholdMs, nowMs)) {
+      const hbTime = new Date(hb.timestamp).getTime();
+      stale.push({
+        workerId: worker.workerId,
+        taskId: worker.taskId,
+        lastHeartbeat: hb.timestamp,
+        ageMs: Number.isNaN(hbTime) ? Infinity : nowMs - hbTime,
+        reason: 'stale',
+      });
+    }
+  }
+
+  return stale;
+}
+
+/**
+ * Convenience: write a checkpoint at a phase transition boundary.
+ * Wraps writeCheckpoint with phase-specific logging.
+ */
+export function writePhaseCheckpoint(
+  projectRoot: string,
+  sprint: Sprint,
+  phase: SprintPhase,
+  eventStreamOffset: number = 0,
+  graph?: DependencyGraph,
+): SprintCheckpoint | null {
+  debugLog('sprint-checkpoint:phaseTransition', `Phase ${String(phase)} → writing checkpoint`);
+  return writeCheckpoint(projectRoot, sprint, eventStreamOffset, graph);
+}
+
+/**
+ * Get tasks that need to be respawned on resume.
+ * Filters out DONE/NO_GO tasks and identifies tasks that were EXECUTING
+ * but whose workers are now stale (need respawn).
+ */
+export function getTasksForResume(
+  checkpoint: SprintCheckpoint,
+  allTasks: Task[],
+  projectRoot: string,
+  thresholdMs: number = STALE_HEARTBEAT_THRESHOLD_MS,
+): { pendingTasks: Task[]; staleExecutingTasks: Task[] } {
+  const completedSet = new Set(checkpoint.completedTasks);
+  const activeTaskIds = new Set(checkpoint.activeWorkers.map(w => w.taskId));
+
+  // Tasks never started
+  const pendingTasks = allTasks.filter(
+    t => !completedSet.has(t.id) && !activeTaskIds.has(t.id),
+  );
+
+  // Tasks that were executing but worker is now stale
+  const staleWorkers = detectStaleWorkers(projectRoot, checkpoint, thresholdMs);
+  const staleTaskIds = new Set(staleWorkers.map(w => w.taskId));
+  const staleExecutingTasks = allTasks.filter(
+    t => staleTaskIds.has(t.id) && !completedSet.has(t.id),
+  );
+
+  // Check if any "active" worker actually has a .result file now (completed during crash)
+  const resultCompletedIds = new Set<string>();
+  for (const worker of checkpoint.activeWorkers) {
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.result`);
+    if (existsSync(resultPath)) {
+      resultCompletedIds.add(worker.taskId);
+    }
+  }
+
+  return {
+    pendingTasks: pendingTasks.filter(t => !resultCompletedIds.has(t.id)),
+    staleExecutingTasks: staleExecutingTasks.filter(t => !resultCompletedIds.has(t.id)),
+  };
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

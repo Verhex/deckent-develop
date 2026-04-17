@@ -57,7 +57,8 @@ export function verifyBearerToken(
 /**
  * Bearer token authentication middleware for the HTTP API.
  *
- * - If no token is configured (config + env both empty), auth is **disabled** (backward-compatible).
+ * - Default secure: if no token configured → 401 for all non-exempt requests.
+ * - Explicit bypass: set DECKENT_API_AUTH_DISABLED=1 to disable auth (with stderr warning).
  * - Exempt paths (e.g. /health) always pass through.
  * - Missing/malformed token → 401 Unauthorized
  * - Wrong token → 403 Forbidden
@@ -66,17 +67,32 @@ export function bearerAuthMiddleware(config: AuthConfig) {
   const activeToken = resolveAuthToken(config.configToken);
   const exempt = new Set(config.exemptPaths ?? []);
 
+  // Check explicit auth bypass via env var
+  const authDisabled = process.env['DECKENT_API_AUTH_DISABLED'] === '1';
+  if (authDisabled) {
+    process.stderr.write(
+      '[deckent:security] WARNING: API authentication is DISABLED via DECKENT_API_AUTH_DISABLED=1. All requests will bypass auth. This is insecure — do NOT use in production.\n',
+    );
+  }
+
   return function authCheck(
     req: IncomingMessage,
     res: ServerResponse,
   ): boolean {
-    // If no token configured, auth is disabled (backward-compat)
-    if (!activeToken) return true;
+    // Explicit bypass via env var (development only)
+    if (authDisabled) return true;
 
     // Check exempt paths
     const url = req.url ?? '/';
     const path = url.split('?')[0] ?? url;
     if (exempt.has(path)) return true;
+
+    // No token configured → default deny (secure by default)
+    if (!activeToken) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'authentication required — configure DECKENT_API_TOKEN or set DECKENT_API_AUTH_DISABLED=1 to bypass' }));
+      return false;
+    }
 
     const result = verifyBearerToken(req, activeToken);
 

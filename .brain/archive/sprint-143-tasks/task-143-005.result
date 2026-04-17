@@ -1,0 +1,27 @@
+{
+  "taskId": "143-005",
+  "filesChanged": [
+    "src/orchestra/doc-updaters/health-check.ts",
+    "tests/orchestra/doc-updaters/health-check.test.ts"
+  ],
+  "linesAdded": 28,
+  "linesRemoved": 10,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Root cause: shouldRun() checked 'docs/reference/health-check.md' but run() used 'docs/HEALTH-CHECK.md'. Fix: extracted shared HEALTH_DOC_PATH constant used by both functions. Added file creation when missing (mkdirSync + writeFileSync with template). Updated tests: removed obsolete skipped_not_found test, added 3 new tests (file creation, path consistency, existing shouldRun behavior). 10/10 tests pass, tsc clean.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 4000,
+    "cacheReadTokens": 80000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { DecisionLogger } from '../../src/orchestra/decision-logger.js';
 import { createDecisionLogEntry } from '../../src/core/decision-types.js';
 import type { DecisionLogEntry } from '../../src/core/decision-types.js';
+import { ValidationError } from '../../src/core/validators.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -184,5 +185,61 @@ describe('DecisionLogger.listDecisions', () => {
     fs.writeFileSync(path.join(dir, 'other-file.txt'), 'hello', 'utf-8');
     const result = logger.listDecisions('sprint-031');
     expect(result).toEqual(['031-001']);
+  });
+});
+
+// ─── Path Traversal / Injection Prevention ────────────────────────────────────
+
+describe('DecisionLogger input validation', () => {
+  it('rejects path traversal in taskId via log()', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.log('sprint-031', '../../../etc/passwd', makeEntries(1))).toThrow(ValidationError);
+  });
+
+  it('rejects shell metachar in taskId via log()', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.log('sprint-031', '031-001; rm -rf /', makeEntries(1))).toThrow(ValidationError);
+  });
+
+  it('rejects invalid sprintId via log()', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.log('not-a-sprint', '031-001', makeEntries(1))).toThrow(ValidationError);
+  });
+
+  it('rejects path traversal in sprintId via log()', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.log('sprint-001/../../etc', '031-001', makeEntries(1))).toThrow(ValidationError);
+  });
+
+  it('rejects path traversal in taskId via readDecisionLog()', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.readDecisionLog('../../../etc/passwd')).toThrow(ValidationError);
+  });
+
+  it('rejects empty taskId via readDecisionLog()', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.readDecisionLog('')).toThrow(ValidationError);
+  });
+
+  it('rejects invalid sprintId via listDecisions()', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.listDecisions('../../etc')).toThrow(ValidationError);
+  });
+
+  it('rejects backtick injection in taskId', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.log('sprint-031', '`whoami`', makeEntries(1))).toThrow(ValidationError);
+  });
+
+  it('rejects null byte in taskId', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.log('sprint-031', '031-001\x00bad', makeEntries(1))).toThrow(ValidationError);
+  });
+
+  it('accepts valid inputs after validation', () => {
+    const logger = new DecisionLogger(TEST_ROOT);
+    expect(() => logger.log('sprint-031', '031-001', makeEntries(1))).not.toThrow();
+    expect(() => logger.readDecisionLog('031-001')).not.toThrow();
+    expect(() => logger.listDecisions('sprint-031')).not.toThrow();
   });
 });

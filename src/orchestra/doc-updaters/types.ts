@@ -1,4 +1,5 @@
 import type { ResolvedConfig, SprintResult } from '../../core/types.js';
+import type { MemoryStore } from '../../core/memory-store.js';
 export type { SprintResult } from '../../core/types.js';
 
 // ─── DocUpdater ─────────────────────────────────────────────────────
@@ -7,6 +8,8 @@ export interface DocUpdateContext {
   sprintResult: SprintResult;
   config: ResolvedConfig;
   isInternalProject: boolean;
+  /** Memory V2 DB store. When provided, generators use DB-first reads instead of .md files. */
+  store?: MemoryStore;
 }
 
 export interface DocUpdateResult {

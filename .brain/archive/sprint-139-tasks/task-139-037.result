@@ -1,0 +1,20 @@
+{
+  "taskId": "139-037",
+  "filesChanged": [
+    "scripts/dead-code-audit.mjs",
+    "docs/audits/sprint-139/dead-code-report.md",
+    "tests/scripts/dead-code-audit.test.ts"
+  ],
+  "linesAdded": 625,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Dead Code Audit Step 1 (READ-ONLY) tamamlandı. 3 ana dosya oluşturuldu:\n\n1. scripts/dead-code-audit.mjs (~496 LoC): findExports(), auditKnownSuspects(), findUnusedExports(), generateReport() fonksiyonları. 11 known suspect analizi + unused export sampling. --root ve --json flag desteği.\n\n2. docs/audits/sprint-139/dead-code-report.md: 4 kategorili rapor:\n   - Dead: 6 modül, ~1042 LoC (learning-decay, learning-migration, combination-scorer, handoff-protocol, batch-stats, brain-context)\n   - Dormant: 4 modül, ~495 LoC (decision-engine V1, ADR-028 ile korunuyor)\n   - Active: 1 modül (multi-agent.ts — araştırma agentı hatalıydı, gerçekte 2 importer var)\n   - 498 potansiyel kullanılmayan export (sampling)\n\n3. tests/scripts/dead-code-audit.test.ts: 14 test (4 findExports, 4 auditKnownSuspects, 3 generateReport, 3 script execution). Tümü geçiyor.\n\ntsc --noEmit: Mevcut hata sprint-finalizer.ts scope dışı (benim dosyalarım .mjs ve test — tsconfig dışında).\nvitest: 14/14 pass, scripts/ altındaki tüm 213 test pass.",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 95
+  }
+}

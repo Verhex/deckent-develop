@@ -1,0 +1,19 @@
+{
+  "taskId": "139-041",
+  "filesChanged": [
+    "src/agents/worker.ts",
+    "tests/agents/worker.test.ts",
+    "tests/orchestra/event-stream.test.ts"
+  ],
+  "linesAdded": 145,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "selfAssessment": "DONE",
+  "notes": "Worker Event Hook Points (ADR-035) implement edildi. 4 hook point eklendi: (1) writeHeartbeat → WORKER→BRAIN:HEARTBEAT (satır 246), (2) writeResult → WORKER→BRAIN:RESULT (satır 321), (3) writeResult → WORKER→AUDITOR:CODE_VERIFY_REQUEST (satır 329), (4) emitWorkerQuestion() → yeni exported fonksiyon → WORKER→BRAIN:QUESTION (satır 827). Tüm hook'lar fail-safe: sprintId bulunamazsa event yazılmaz, sprint durmaz. Geriye dönük uyumlu: writeHeartbeat/writeResult opsiyonel sprintId parametresi aldı. 138 test geçti (22 event-stream + 116 worker). Kanıt: grep -n 'writeEvent' src/agents/worker.ts → 4 hit (satır 246, 321, 329, 827).",
+  "rubricScores": {
+    "correctness": 97,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 88
+  }
+}

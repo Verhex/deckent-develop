@@ -20,6 +20,7 @@ import { registerSkillListTool } from './skill-list.js';
 import { registerCheckpointTool } from './checkpoint.js';
 import { registerDocsTool } from './docs.js';
 import { registerExplainTool } from './explain.js';
+import { registerMemoryQueryTool } from './memory-query.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -43,4 +44,5 @@ export function registerTools(server: McpServer): void {
   registerCheckpointTool(server);
   registerDocsTool(server);
   registerExplainTool(server);
+  registerMemoryQueryTool(server);
 }

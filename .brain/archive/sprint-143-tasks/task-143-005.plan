@@ -1,0 +1,16 @@
+# Task 143-005 Execution Plan
+
+## Root Cause
+`shouldRun()` checks `docs/reference/health-check.md` (correct path matching `targetFile`),
+but `run()` uses `docs/HEALTH-CHECK.md` (wrong path). This mismatch means `run()` never finds
+the file even when `shouldRun()` returns true.
+
+## Fix
+1. Extract a shared `HEALTH_DOC_PATH` constant = `'docs/reference/health-check.md'`
+2. Use `HEALTH_DOC_PATH` in both `shouldRun()` and `run()` to build the full path
+3. Add file creation logic in `run()` when file doesn't exist (generate minimal template)
+4. Update tests to cover: path consistency, file creation, normal update flow, no-changes case
+
+## Files
+- MODIFY: src/orchestra/doc-updaters/health-check.ts
+- MODIFY: tests/orchestra/doc-updaters/health-check.test.ts

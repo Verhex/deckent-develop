@@ -1,0 +1,100 @@
+{
+  "id": "143-001",
+  "title": "Shell Injection Fix (tmux.ts)",
+  "description": "Shell Injection Fix (tmux.ts)\n- Model: opus\n- Effort: high\n- Skills: security-specialist, typescript-expert\n- Agent: security-auditor\n- Files: src/orchestra/tmux.ts, src/core/validators.ts, tests/orchestra/tmux.test.ts, tests/core/validators.test.ts\n- Scope: src/orchestra/, src/core/, tests/\n\n### Description\n`taskId` regex `/^[\\w-]+$/` validate. Tüm `spawnSync` `shell: false` zorunlu. `validateTaskId()` + `ValidationError` class src/core/validators.ts'de. Her tmux public fonksiyonu validate çağrısı ile başlar.\n\n**Kanıt:** `grep -c \"shell: true\" src/orchestra/tmux.ts` → `0`\n**Test:** 7+ test (valid taskId + 6 injection attempt: shell metachar, null byte, empty, length>100, path traversal, URL encoded)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/core/",
+      "tests/orchestra/",
+      "tests/core/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/tmux.ts",
+      "src/core/validators.ts",
+      "tests/orchestra/tmux.test.ts",
+      "tests/core/validators.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep -c \"shell: true\" src/orchestra/tmux.ts` → `0`",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "security-auditor",
+  "forceSkills": [
+    "security-specialist",
+    "typescript-expert"
+  ],
+  "assignedAgent": "security-auditor",
+  "assignedSkills": [
+    "security-specialist",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.44
+        },
+        {
+          "name": "core",
+          "weight": 0.44
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.6
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2477,
+  "updatedAt": "2026-04-17T09:19:21.001Z"
+}

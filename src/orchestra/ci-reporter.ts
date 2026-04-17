@@ -1,10 +1,10 @@
 // ─── CI Reporter ─────────────────────────────────────────────────
 // Extracted from sprint-reporter.ts — CI baseline, health, trend, learning integration
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  BRAIN_DIR, MEMORY_FILE, RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES,
+  BRAIN_DIR,
 } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import {
@@ -13,7 +13,7 @@ import {
   writeCiLearnings,
   type CiLearningResult,
 } from '../core/ci-learning.js';
-import { trimMemoryWithHeader } from './sprint-retro-writer.js';
+import type { MemoryStore } from '../core/memory-store.js';
 
 // ═══ CI Health RETRO Integration ══════════════════════════════════
 
@@ -130,14 +130,12 @@ export function formatCiHealthSection(report: {
 }
 
 /**
- * Append a CI Health section to the existing RETRO.md file.
- * Reads the CI report for sprintId and appends a formatted markdown table.
- * Idempotent — skips if section already exists, retro file missing, or report not found.
+ * Append a CI Health section to DB retro entry.
+ * Upserts a 'retro' entry with CI Health content via MemoryStore.
+ * Requires store — no-op without it (V2: DB is single source of truth).
+ * Idempotent — skips if entry already exists or report not found.
  */
-export function appendCiHealthToRetro(projectRoot: string, sprintId: string): void {
-  const retroPath = join(projectRoot, BRAIN_DIR, RETRO_FILE);
-  if (!existsSync(retroPath)) return;
-
+export function appendCiHealthToRetro(projectRoot: string, sprintId: string, store?: MemoryStore): void {
   const reportPath = join(projectRoot, BRAIN_DIR, `ci-report-${sprintId}.json`);
   if (!existsSync(reportPath)) return;
 
@@ -158,42 +156,52 @@ export function appendCiHealthToRetro(projectRoot: string, sprintId: string): vo
   const ciSection = formatCiHealthSection(report);
   if (ciSection.length === 0) return;
 
-  const existing = readFileSync(retroPath, 'utf-8');
-  if (existing.includes('## CI Health')) return; // Already has CI section
+  // DB-first: upsert retro entry with CI Health content
+  if (!store) return; // V2: no store = no write (DB is single source of truth)
 
-  const combined = existing.trimEnd() + '\n' + ciSection.join('\n') + '\n';
-  const retroLines = combined.split('\n');
-  writeFileSync(
-    retroPath,
-    retroLines.slice(0, RETRO_MAX_LINES).join('\n'),
-    'utf-8',
-  );
+  try {
+    const retroId = `retro-ci-health-${sprintId}`;
+    const existing = store.getById(retroId);
+    if (existing) return; // Already exists — idempotent
+    store.upsert({
+      id: retroId,
+      type: 'retro',
+      title: `CI Health — ${sprintId}`,
+      content: ciSection.join('\n'),
+      source: 'brain',
+      sprint_id: sprintId,
+      sprint_num: parseInt(sprintId.replace(/\D/g, '') || '0', 10),
+      tags: ['ci-health', 'retro'],
+    }, 'ci-reporter');
+  } catch (e) {
+    debugLog('appendCiHealthToRetro:store', e);
+  }
 }
 
 // ═══ CI Learning Integration ══════════════════════════════════════
 
 /**
- * Run CI learning analysis and append CI Learnings section to MEMORY.md.
+ * Run CI learning analysis and append CI Learnings section to DB or MEMORY.md.
  * Called during sprint retrospective to capture cross-sprint CI insights.
  *
  * 1. Reads last N sprint CI reports
  * 2. Detects failure patterns
  * 3. Generates suggestions and config recommendations
  * 4. Writes ci-learnings.json to .brain/
- * 5. Appends CI Learnings section to MEMORY.md (idempotent)
+ * 5. Upserts CI Learnings to DB (when store provided) or appends to MEMORY.md (legacy)
  *
  * Non-fatal — errors are logged to stderr but never abort the sprint.
  */
-export function runCiLearningAnalysis(projectRoot: string, maxSprints = 5): CiLearningResult | null {
+export function runCiLearningAnalysis(projectRoot: string, maxSprints = 5, store?: MemoryStore): CiLearningResult | null {
   try {
     const result = analyzeCiLearnings(projectRoot, maxSprints);
 
     // Write analysis results to .brain/ci-learnings.json
     writeCiLearnings(projectRoot, result);
 
-    // Append CI Learnings section to MEMORY.md
+    // Append CI Learnings section to DB or MEMORY.md
     if (result.reports.length > 0) {
-      appendCiLearningsToMemory(projectRoot, result);
+      appendCiLearningsToMemory(projectRoot, result, store);
     }
 
     return result;
@@ -206,45 +214,29 @@ export function runCiLearningAnalysis(projectRoot: string, maxSprints = 5): CiLe
 }
 
 /**
- * Append CI Learnings section to MEMORY.md.
- * Replaces existing "## CI Learnings" section if present.
- * Idempotent — safe to call multiple times.
+ * Append CI Learnings to DB via MemoryStore.
+ * Requires store — no-op without it (V2: DB is single source of truth).
+ * Idempotent — safe to call multiple times (upsert by id).
  */
-export function appendCiLearningsToMemory(projectRoot: string, result: CiLearningResult): void {
-  const memoryPath = join(projectRoot, BRAIN_DIR, MEMORY_FILE);
-  if (!existsSync(memoryPath)) return;
-
+export function appendCiLearningsToMemory(_projectRoot: string, result: CiLearningResult, store?: MemoryStore): void {
   const ciSection = buildCiLearningsSection(result.reports, result.patterns);
   if (!ciSection) return;
 
-  const existing = readFileSync(memoryPath, 'utf-8');
+  // DB-first: upsert memory entry with CI Learnings content
+  if (!store) return; // V2: no store = no write (DB is single source of truth)
 
-  // Replace existing CI Learnings section
-  const ciLearningsHeader = '## CI Learnings';
-  if (existing.includes(ciLearningsHeader)) {
-    // Find the section and replace it
-    const headerIdx = existing.indexOf(ciLearningsHeader);
-    const beforeSection = existing.slice(0, headerIdx);
-
-    // Find end of section (next ## or end of file)
-    const afterHeaderStart = headerIdx + ciLearningsHeader.length;
-    const nextSectionMatch = existing.slice(afterHeaderStart).match(/\n## /);
-    const afterSection = nextSectionMatch
-      ? existing.slice(afterHeaderStart + (nextSectionMatch.index ?? existing.length))
-      : '';
-
-    const newContent = beforeSection.trimEnd() + '\n' + ciSection + '\n' + afterSection.trimStart();
-    const lines = newContent.split('\n');
-    const trimmed = trimMemoryWithHeader(lines, MEMORY_MAX_LINES);
-    writeFileSync(memoryPath, trimmed, 'utf-8');
-    return;
+  try {
+    store.upsert({
+      id: 'ci-learnings-latest',
+      type: 'memory',
+      title: 'CI Learnings',
+      content: ciSection,
+      source: 'brain',
+      tags: ['ci-learnings', 'memory'],
+    }, 'ci-reporter');
+  } catch (e) {
+    debugLog('appendCiLearningsToMemory:store', e);
   }
-
-  // Append at end
-  const newContent = existing.trimEnd() + '\n' + ciSection + '\n';
-  const lines = newContent.split('\n');
-  const trimmed = trimMemoryWithHeader(lines, MEMORY_MAX_LINES);
-  writeFileSync(memoryPath, trimmed, 'utf-8');
 }
 
 // Re-export CI learning types for consumers

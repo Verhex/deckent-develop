@@ -1,0 +1,20 @@
+# Task 143-020: heartbeat-daemon execSync Beyaz Liste
+
+## Approach
+1. Add `validateCommand()` function to `heartbeat-daemon.ts` with:
+   - ALLOWED_COMMANDS whitelist: ['ps', 'kill', 'wait', 'uptime', 'date']
+   - Shell metacharacter rejection regex: [;&|`$()]
+   - Import and reuse ValidationError from validators.ts
+2. Apply validateCommand() before every execSync call
+3. Reduce execSync timeout from 120s to 5s
+4. Write 6+ tests covering:
+   - Valid allowed commands pass
+   - Shell metacharacter rejection (;, &, |, `, $, (, ))
+   - Command not in whitelist rejected
+   - Empty command rejected
+   - Null byte injection rejected
+   - Integration: malicious HEARTBEAT.md lines are rejected
+
+## Files to modify
+- src/orchestra/heartbeat-daemon.ts (add validateCommand, apply to execSync)
+- tests/orchestra/heartbeat-daemon.test.ts (new file, 6+ tests)

@@ -62,15 +62,21 @@ const TOOLS: HelpToolInfo[] = [
   { name: 'deckent_kill', description: 'Kill a running worker by task ID or kill all workers', readOnly: false },
   { name: 'deckent_cleanup', description: 'Archive task files and release locks after sprint completes', readOnly: false },
   { name: 'deckent_help', description: 'Get runtime capabilities, project state, and next-step recommendation', readOnly: true },
+  { name: 'deckent_agent_list', description: 'List registered agents (built-in and project-specific)', readOnly: true },
+  { name: 'deckent_skill_list', description: 'List registered skills with manifest and sandbox info', readOnly: true },
+  { name: 'deckent_checkpoint', description: 'Approve or reject a checkpoint gate during sprint execution', readOnly: false },
+  { name: 'deckent_docs', description: 'Sprint lifecycle document management (add/remove/list)', readOnly: false },
+  { name: 'deckent_explain', description: 'Explain sprint history and results in natural language', readOnly: true },
+  { name: 'deckent_memory_query', description: 'Search project memory across all sources (ADR, sprint, debt, pattern)', readOnly: true },
 ];
 
 const RESOURCES: HelpResourceInfo[] = [
   { name: 'dashboard', uri: 'deckent://dashboard', description: 'Live sprint status: agents, progress, usage, alerts' },
   { name: 'directives', uri: 'deckent://directives', description: 'Current DIRECTIVES.md content — sprint goals and task definitions' },
-  { name: 'memory', uri: 'deckent://memory', description: 'Brain memory: learned patterns from past sprints (.brain/MEMORY.md)' },
-  { name: 'debt', uri: 'deckent://debt', description: 'Tech debt register: open and resolved items (.brain/DEBT.md)' },
+  { name: 'memory', uri: 'deckent://memory', description: 'Brain memory: sprint learnings and patterns (.brain/exports/memory.md)' },
+  { name: 'debt', uri: 'deckent://debt', description: 'Tech debt register: open and resolved items (.brain/exports/debt.md)' },
   { name: 'config', uri: 'deckent://config', description: 'Resolved Deckent configuration (merged defaults + global + project)' },
-  { name: 'retro', uri: 'deckent://retro', description: 'Latest sprint retrospective (.brain/RETRO.md)' },
+  { name: 'retro', uri: 'deckent://retro', description: 'Latest sprint retrospective (DB-first, exported to .brain/exports/)' },
   { name: 'tasks', uri: 'deckent://tasks', description: 'Current .tasks/ directory listing with task statuses' },
   { name: 'agents', uri: 'deckent://agents', description: 'Registered agents: built-in and project-specific (.deckent/agents/)' },
 ];

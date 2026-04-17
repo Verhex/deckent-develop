@@ -1,0 +1,27 @@
+{
+  "id": "139-dummy-inject",
+  "title": "Dummy Injection Task (Intentional NO_GO — Cascade Block Live Test)",
+  "description": "This task intentionally fails with NO_GO to trigger cascade blocking of its dependents. Created as part of Sprint 139 Task 139-052 cascade block live evidence test.",
+  "model": "haiku",
+  "effort": "low",
+  "priority": "LOW",
+  "reason": "Cascade block live test — intentional failure injection",
+  "scope": {
+    "directories": ["tests/integration/"],
+    "filesRead": [],
+    "filesWrite": ["tests/integration/cascade-block-live.test.ts"]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "N/A — this task is intentionally NO_GO",
+    "noGoCriteria": "Always — this task fails by design to test cascade blocking",
+    "techDebtAcceptable": "N/A"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-139",
+  "assignedAgent": "test-writer",
+  "assignedSkills": ["testing-expert"],
+  "provider": "claude",
+  "selfAssessment": "NO_GO",
+  "notes": "Intentional NO_GO for cascade block live test (Task 139-052)"
+}

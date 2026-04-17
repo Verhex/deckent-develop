@@ -1,0 +1,21 @@
+{
+  "taskId": "139-014",
+  "filesChanged": [
+    "src/monitor/auditor.ts",
+    "tests/monitor/auditor.test.ts",
+    "tests/monitor/auditor-agent.test.ts",
+    "tests/monitor/auditor-edge.test.ts"
+  ],
+  "linesAdded": 915,
+  "linesRemoved": 100,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 139 Auditor Cache Invalidation + Multi-Signal Stale Detection implemented with 3 components:\n\n(A) mtime-based cache invalidation: readHeartbeatCached() uses statSync().mtimeMs as cache key, re-reads only when file changes. clearHeartbeatCache() + getHeartbeatCacheSize() exposed for testing/cleanup.\n\n(B) Multi-signal stale detection: isWorkerStale() checks primary signal (HB timestamp freshness) first — if fresh, not stale. If stale, checks 3 secondary signals: Signal A (.result file with DONE/GO_WITH_TECH_DEBT), Signal B (process/container alive via backend check), Signal C (sequence monotonic increase). Any single secondary signal suppresses false positive.\n\n(C) Backend-agnostic process check: isWorkerProcessAlive() supports docker (docker ps --filter), tmux (tmux has-session -t), subprocess (conservative false). 5_000ms timeout on all process checks, fail-safe returns false.\n\nIntegration: scanHeartbeats() updated to use readHeartbeatCached + isWorkerStale instead of raw readJsonSafe + simple elapsed check. Existing test files (auditor-agent.test.ts, auditor-edge.test.ts) updated with statSync mock + clearHeartbeatCache to prevent regressions.\n\n252 monitor tests pass (9 test files), 528 MCP tests pass. No regressions. tsc --noEmit shows only pre-existing worker.ts error (outside scope).\n\n24 new tests covering: cache invalidation (6), backend process check (7), multi-signal stale detection (9), integration (2).",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

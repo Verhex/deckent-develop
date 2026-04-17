@@ -109,6 +109,14 @@ export interface EntryRelation {
   created_at: string;
 }
 
+/** Convenience type for relation insert operations. */
+export interface Relation {
+  from_id: string;
+  to_id: string;
+  rel_type: RelationType;
+  source?: 'auto-extract' | 'backfill' | 'finalizer' | 'user';
+}
+
 /** A change history record. */
 export interface EntryHistoryRecord {
   id: number;
@@ -145,6 +153,8 @@ export interface MemoryQueryParams {
   limit?: number;
   /** Minimum relevance score for FTS results (default: 0). */
   min_score?: number;
+  /** FTS5 token join mode: 'or' (default, broader recall) or 'and' (all tokens must match). */
+  mode?: 'and' | 'or';
 }
 
 /** A single search result with relevance score. */

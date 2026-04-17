@@ -1,0 +1,110 @@
+{
+  "id": "143-012",
+  "title": "MCP Disconnect Fix (Background Sprint Runner)",
+  "description": "MCP Disconnect Fix (Background Sprint Runner)\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Agent: architect\n- Files: src/orchestra/sprint-runner-entry.ts (yeni), src/cli/commands/start.ts, src/mcp/tools/start.ts, src/orchestra/sprint-controller.ts, tests/integration/mcp-sprint-isolation.test.ts\n- Scope: src/cli/, src/orchestra/, src/mcp/, tests/integration/\n\n### Description\n`sprint-runner-entry.ts` detached child process entry. MCP `deckent_start` detached spawn + `unref()` → MCP stdio serbest. IPC `.deckent/sprint-NNN-ipc/` fifo. Sprint 139 t+80dk disconnect incident çözümü.\n\n**Kanıt:** MCP server alive kalır (stdio blocked değil) 100-task sprint boyunca.\n**Test:** 8+ test (process isolation, stdio freedom, IPC bridge)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/cli/commands/",
+      "src/mcp/tools/",
+      "tests/integration/",
+      "src/cli/",
+      "src/mcp/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-runner-entry.ts (yeni)",
+      "src/cli/commands/start.ts",
+      "src/mcp/tools/start.ts",
+      "src/orchestra/sprint-controller.ts",
+      "tests/integration/mcp-sprint-isolation.test.ts",
+      "src/orchestra/sprint-runner-entry.ts",
+      "sprint-runner-entry.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** MCP server alive kalır (stdio blocked değil) 100-task sprint boyunca.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "architect",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.75
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.31
+        },
+        {
+          "name": "cli",
+          "weight": 0.23
+        },
+        {
+          "name": "mcp",
+          "weight": 0.23
+        },
+        {
+          "name": "integration",
+          "weight": 0.15
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 7,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.71,
+          "tests/": 0.14
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.14
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:20:49.067Z"
+}

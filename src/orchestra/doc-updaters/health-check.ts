@@ -1,31 +1,49 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { DocUpdater, DocUpdateContext, DocUpdateResult } from './types.js';
+
+const HEALTH_DOC_PATH = 'docs/reference/health-check.md';
 
 export const healthCheckUpdater: DocUpdater = {
   name: 'health-check',
   tier: 2,
   internal: true,
-  targetFile: 'docs/reference/health-check.md',
+  targetFile: HEALTH_DOC_PATH,
 
   shouldRun(ctx: DocUpdateContext): boolean {
     if (ctx.config.auto_docs?.tier2 === false) return false;
     if (!ctx.isInternalProject) return false;
-    return existsSync(join(ctx.projectRoot, 'docs', 'reference', 'health-check.md'));
+    return true;
   },
 
   run(ctx: DocUpdateContext): DocUpdateResult {
     const { projectRoot, sprintResult } = ctx;
     const { sprint, metrics } = sprintResult;
-    const healthCheckPath = join(projectRoot, 'docs', 'HEALTH-CHECK.md');
+    const healthCheckPath = join(projectRoot, HEALTH_DOC_PATH);
+    const date = new Date().toISOString().slice(0, 10);
 
     if (!existsSync(healthCheckPath)) {
-      return { file: this.targetFile, updated: false, reason: 'skipped_not_found' };
+      const dir = dirname(healthCheckPath);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      const initial = [
+        `# Deckent Health Check — Post-Sprint ${sprint.number}`,
+        '',
+        `*Last audit: ${date}*`,
+        '',
+        '| Metric | Value |',
+        '|--------|-------|',
+        `| Tests | ${metrics.totalTasks} |`,
+        `| Sprints | ${sprint.number} |`,
+        '',
+      ].join('\n');
+      writeFileSync(healthCheckPath, initial, 'utf-8');
+      return { file: this.targetFile, updated: true, reason: 'created' };
     }
 
     let content = readFileSync(healthCheckPath, 'utf-8');
     const original = content;
-    const date = new Date().toISOString().slice(0, 10);
 
     // Update metric table rows
     content = content.replace(

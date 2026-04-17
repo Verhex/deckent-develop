@@ -5,10 +5,28 @@
   "manifestVersion": 2,
   "activation": {
     "rules": [
-      { "when": { "intent.primary": "devops" }, "score": 10 },
-      { "when": { "domains": { "$contains": "infrastructure" } }, "score": 8 }
+      {
+        "when": {
+          "intent.primary": "devops"
+        },
+        "score": 10
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "infrastructure"
+          }
+        },
+        "score": 8
+      }
     ],
-    "exclude": [{ "when": { "intent.primary": "documentation" } }],
+    "exclude": [
+      {
+        "when": {
+          "intent.primary": "documentation"
+        }
+      }
+    ],
     "minScore": 5
   },
   "expertise": [
@@ -27,7 +45,7 @@
   ],
   "deniedTools": [],
   "preferredModel": "sonnet",
-  "effortMultiplier": 1.0,
+  "effortMultiplier": 1,
   "triggerKeywords": [
     "docker",
     "ci",
@@ -57,10 +75,10 @@
   "enabled": true,
   "source": "builtin",
   "stats": {
-    "totalUses": 0,
-    "successRate": 0,
+    "totalUses": 2,
+    "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": ""
+    "lastUsedInSprint": "sprint-143"
   },
   "systemPrompt": "You are a DevOps engineer specializing in CI/CD pipelines, Docker containerization, and deployment automation. Design GitHub Actions workflows with proper caching, matrix strategies, and conditional steps. Build Docker images with multi-stage builds, minimal base images (alpine/distroless), and proper layer caching. Implement deployment strategies (blue-green, canary, rolling) appropriate to the project's risk tolerance. Set up monitoring and alerting with actionable thresholds -- no alert fatigue. Always consider security in pipelines: pin action versions by SHA, use OIDC for cloud auth, scan images for vulnerabilities, and never expose secrets in logs. Reproducibility is paramount: builds must be deterministic, environments must be declarative."
 }

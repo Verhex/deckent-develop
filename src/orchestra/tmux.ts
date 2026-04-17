@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import type { ModelType } from '../core/types.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import { debugLog } from '../core/utils.js';
+import { validateTaskId } from '../core/validators.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
@@ -92,6 +93,11 @@ export function buildWorkerCommand(
     });
   }
 
+  // Validate taskId if provided — it gets interpolated into shell commands and file paths
+  if (taskId) {
+    validateTaskId(taskId);
+  }
+
   // Default: Claude CLI syntax (backward compat)
   // Use stdin redirection from file — no shell metacharacter risk
   let cmd = `claude -p - --model ${model}`;
@@ -150,6 +156,7 @@ export function spawnWorker(
   opts?: SpawnOptions,
   adapter?: ProviderAdapter,
 ): void {
+  validateTaskId(taskId);
   const windowName = workerWindowName(taskId);
   run([
     'new-window',
@@ -177,6 +184,7 @@ export function spawnWorker(
 }
 
 export function killWorker(taskId: string): void {
+  validateTaskId(taskId);
   const windowName = workerWindowName(taskId);
   run(['kill-window', '-t', `${TMUX_SESSION_NAME}:${windowName}`]);
 }
@@ -323,6 +331,7 @@ export function createWatchLayout(projectRoot: string): void {
 }
 
 export function attachToWorkerPane(taskId: string): void {
+  validateTaskId(taskId);
   const windowName = workerWindowName(taskId);
 
   // Check if worker window exists

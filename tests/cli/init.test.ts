@@ -1,0 +1,136 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+
+// ─── ADR Seed Data Tests ────────────────────────────────────────────────
+
+describe('ADR Seed Data (adr-seed.ts)', () => {
+  // Dynamic import to test the actual module
+  let ADR_SEED_DATA: Array<{ id: string; type: string; title: string; content: string; status: string; decay_exempt: boolean; tags: string[] }>;
+  let createIdentitySeed: (name: string) => { id: string; type: string; title: string; content: string };
+
+  beforeEach(async () => {
+    const mod = await import('../../src/core/adr-seed.js');
+    ADR_SEED_DATA = mod.ADR_SEED_DATA;
+    createIdentitySeed = mod.createIdentitySeed;
+  });
+
+  it('should have at least 40 ADR entries', () => {
+    expect(ADR_SEED_DATA.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it('every entry has required fields', () => {
+    for (const adr of ADR_SEED_DATA) {
+      expect(adr.id).toMatch(/^adr-\d{3}/);
+      expect(adr.type).toBe('adr');
+      expect(adr.title).toBeTruthy();
+      expect(adr.content).toBeTruthy();
+      expect(adr.decay_exempt).toBe(true);
+      expect(adr.tags).toContain('adr');
+    }
+  });
+
+  it('each ADR has a valid status', () => {
+    const validStatuses = ['accepted', 'deprecated', 'superseded', 'proposed', 'rejected'];
+    for (const adr of ADR_SEED_DATA) {
+      expect(validStatuses).toContain(adr.status);
+    }
+  });
+
+  it('ADR IDs are unique', () => {
+    const ids = ADR_SEED_DATA.map(a => a.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(ids.length);
+  });
+
+  it('contains known ADRs (spot check)', () => {
+    const ids = ADR_SEED_DATA.map(a => a.id);
+    expect(ids).toContain('adr-001'); // TypeScript + ESM
+    expect(ids).toContain('adr-010'); // Tek Runtime Dependency
+    expect(ids).toContain('adr-039'); // Self-Modifying Task Detection
+  });
+
+  it('ADR-005 is deprecated', () => {
+    const adr005 = ADR_SEED_DATA.find(a => a.id === 'adr-005');
+    expect(adr005).toBeDefined();
+    expect(adr005!.status).toBe('deprecated');
+  });
+
+  it('createIdentitySeed returns valid entry', () => {
+    const entry = createIdentitySeed('my-project');
+    expect(entry.id).toBe('identity-project');
+    expect(entry.type).toBe('identity');
+    expect(entry.title).toContain('my-project');
+    expect(entry.content).toContain('my-project');
+  });
+});
+
+// ─── Template Reference Tests ───────────────────────────────────────────
+
+describe('init.ts template references', () => {
+  it('DECKENT.md templates reference exports/summary.md, not MEMORY.md', async () => {
+    const initContent = readFileSync(
+      join(process.cwd(), 'src', 'cli', 'commands', 'init.ts'),
+      'utf-8',
+    );
+
+    // Find the two generateDeckentContent functions (TR and EN)
+    const trMatch = initContent.match(/function generateDeckentContentTR[\s\S]*?^}/m);
+    const enMatch = initContent.match(/function generateDeckentContentEN[\s\S]*?^}/m);
+
+    // Both TR and EN templates should use exports/summary.md
+    for (const match of [trMatch, enMatch]) {
+      expect(match).toBeTruthy();
+      if (match) {
+        expect(match[0]).not.toContain('@.brain/MEMORY.md');
+        expect(match[0]).toContain('@.brain/exports/summary.md');
+      }
+    }
+  });
+
+  it('init.ts does not create DECISIONS.md for new projects', () => {
+    const initContent = readFileSync(
+      join(process.cwd(), 'src', 'cli', 'commands', 'init.ts'),
+      'utf-8',
+    );
+
+    // The old line was: writeIfNotExists(join(root, BRAIN_DIR, DECISIONS_FILE), ...)
+    // Verify it's commented out or removed
+    const brainFilesSection = initContent.substring(
+      initContent.indexOf('// 10. Brain files'),
+      initContent.indexOf('// 10a.'),
+    );
+    expect(brainFilesSection).not.toContain('DECISIONS_FILE), \'# Architecture');
+  });
+});
+
+// ─── Archive Script Tests ───────────────────────────────────────────────
+
+describe('archive-decisions-md.mjs', () => {
+  const tmpRoot = join(tmpdir(), `deckent-archive-test-${Date.now()}`);
+  const brainDir = join(tmpRoot, '.brain');
+  const archiveDir = join(brainDir, 'archive', 'decisions-root-pre-sprint143');
+
+  beforeEach(() => {
+    mkdirSync(brainDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    // Cleanup
+    try {
+      const { rmSync } = require('node:fs');
+      rmSync(tmpRoot, { recursive: true, force: true });
+    } catch { /* best effort */ }
+  });
+
+  it('script file exists and is valid JavaScript', () => {
+    const scriptPath = join(process.cwd(), 'scripts', 'archive-decisions-md.mjs');
+    expect(existsSync(scriptPath)).toBe(true);
+
+    const content = readFileSync(scriptPath, 'utf-8');
+    expect(content).toContain('decisions-root-pre-sprint143');
+    expect(content).toContain('sha256');
+  });
+});

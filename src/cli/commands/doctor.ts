@@ -782,6 +782,40 @@ export function formatSystemProfile(profile: SystemProfile, subscription?: strin
 }
 
 /**
+ * Check that .brain/memory.db (and WAL/SHM) are gitignored and not tracked.
+ */
+export function checkGitignore(root: string): DoctorCheck {
+  const criticalFiles = ['.brain/memory.db', '.brain/memory.db-shm', '.brain/memory.db-wal'];
+
+  // Check .gitignore entries exist
+  const gitignorePath = join(root, '.gitignore');
+  if (!existsSync(gitignorePath)) {
+    return { name: 'Gitignore', passed: false, message: '.gitignore not found', required: false };
+  }
+  const gitignoreContent = readFileSync(gitignorePath, 'utf-8');
+  const gitignoreLines = gitignoreContent.split('\n').map(l => l.trim());
+  const missingEntries = criticalFiles.filter(f => !gitignoreLines.includes(f));
+  if (missingEntries.length > 0) {
+    return { name: 'Gitignore', passed: false, message: `Missing from .gitignore: ${missingEntries.join(', ')}`, required: false };
+  }
+
+  // Check none are tracked by git
+  const result = spawnSync('git', ['ls-files', ...criticalFiles], {
+    cwd: root,
+    encoding: 'utf-8',
+    timeout: 5_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const tracked = (result.stdout ?? '').trim();
+  if (tracked.length > 0) {
+    const trackedFiles = tracked.split('\n').join(', ');
+    return { name: 'Gitignore', passed: false, message: `Tracked by git: ${trackedFiles} — run: git rm --cached <file>`, required: false };
+  }
+
+  return { name: 'Gitignore', passed: true, message: 'memory.db files properly gitignored', required: false };
+}
+
+/**
  * Check write permissions for critical directories (.tasks/, .brain/).
  */
 export function checkWritePermissions(root: string): DoctorCheck {
@@ -880,7 +914,7 @@ export function runDoctorChecks(root: string, providerNames?: string[], spawnBac
     checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkDocker(spawnBackend), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
-    checkDeckSecurity(root), checkWritePermissions(root),
+    checkDeckSecurity(root), checkWritePermissions(root), checkGitignore(root),
   ];
   return {
     ok: checks.filter(c => c.required).every(c => c.passed),

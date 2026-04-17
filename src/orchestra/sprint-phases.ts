@@ -546,8 +546,11 @@ export async function runRetroPhase(
     try {
       sprint.status = SprintStatus.RETROSPECTIVE;
       sprint.phase = SprintPhase.RETRO;
+      // Dynamic import to avoid circular dep at module level
+      const { regenerateRules } = await import('../core/rule-generator.js');
       return await finalizeSprint(projectRoot, sprint, evaluations, results, {
         config,
+        onRuleRegen: async (root: string): Promise<void> => { await regenerateRules(root); },
       });
     } catch (err) {
       safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);

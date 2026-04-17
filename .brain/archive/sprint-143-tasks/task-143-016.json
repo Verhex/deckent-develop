@@ -1,0 +1,102 @@
+{
+  "id": "143-016",
+  "title": "Panic Kill Guard",
+  "description": "Panic Kill Guard\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Agent: bug-fixer\n- Files: src/core/panic-guard.ts (yeni), src/orchestra/sprint-controller.ts, src/cli/commands/kill.ts, tests/orchestra/panic-guard.test.ts\n- Scope: src/core/, src/orchestra/, src/cli/commands/, tests/orchestra/\n\n### Description\nRuntime panic → worker kill Alperen onayı gerekiyor (feedback tartışmasız kural). `deckent kill --force --user-explicit` bypass. Panic log `.deckent/<sprint-id>-panic-*.json`. Notification dispatcher entegrasyon.\n\n**Kanıt:** Runtime panic'te worker'lar kill edilmiyor (default). Force flag override PASS.\n**Test:** 8+ test\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/orchestra/",
+      "src/cli/commands/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/panic-guard.ts (yeni)",
+      "src/orchestra/sprint-controller.ts",
+      "src/cli/commands/kill.ts",
+      "tests/orchestra/panic-guard.test.ts",
+      "src/core/panic-guard.ts",
+      ".json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Runtime panic'te worker'lar kill edilmiyor (default). Force flag override PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "bug-fixer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "bug-fixer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "bugfix",
+        "secondary": [
+          "testing",
+          "config"
+        ],
+        "confidence": 0.56
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.4
+        },
+        {
+          "name": "core",
+          "weight": 0.3
+        },
+        {
+          "name": "cli",
+          "weight": 0.2
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 6,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.17
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.17
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:21:10.112Z"
+}

@@ -1,0 +1,47 @@
+# Task 143-015: Task Restoration on Crash — Execution Plan
+
+## Goal
+Phase transition auto-checkpoint + `deckent resume` crash recovery + stale heartbeat detection + DONE task skip.
+
+## Analysis
+
+### Current State
+- `sprint-checkpoint.ts`: writeCheckpoint/readCheckpoint/getResumableTasks/restoreDepGraph exist
+- Checkpoints written every N=5 completed tasks in `respawnEligibleTasks()` (sprint-spawner.ts)
+- `resume.ts`: basic CLI that reads checkpoint and calls runSprint() — does NOT use checkpoint to filter tasks
+- No phase-transition checkpoint writes exist
+- No stale heartbeat detection (>5min) exists
+- Resume doesn't respawn stale workers
+
+### Changes Required
+
+#### 1. sprint-checkpoint.ts — Add stale heartbeat detection + phase checkpoint helper
+- `isStaleHeartbeat(hbPath, thresholdMs)`: reads .hb file, checks timestamp age
+- `detectStaleWorkers(projectRoot, checkpoint, thresholdMs)`: scan activeWorkers against .hb files
+- `writePhaseCheckpoint(projectRoot, sprint, phase, eventStreamOffset, graph?)`: convenience for phase transitions
+
+#### 2. sprint-controller.ts — Phase transition auto-checkpoint
+- After each phase transition (PLAN→SPAWN, SPAWN→EXECUTE, EXECUTE→EVALUATE, etc.), call writePhaseCheckpoint()
+- Minimal changes: add import + 4-5 writeCheckpoint calls at phase boundaries
+
+#### 3. resume.ts — Enhanced crash recovery
+- Read checkpoint, detect stale heartbeats (>5min threshold)
+- Kill stale workers
+- Filter out DONE tasks from pending list
+- Re-spawn only PENDING + stale-EXECUTING tasks
+- Pass checkpoint context to runSprint via resumeContext option
+
+#### 4. tests/orchestra/task-restoration.test.ts — 15+ tests
+- Checkpoint write at phase transitions
+- Checkpoint read/restore
+- Stale heartbeat detection (fresh vs stale vs missing)
+- Resume skips DONE tasks
+- Resume detects stale workers
+- Idempotent checkpoint writes
+- Malformed heartbeat handling
+
+## Files Modified
+- src/orchestra/sprint-checkpoint.ts (add 3 functions ~60 LoC)
+- src/orchestra/sprint-controller.ts (add ~10 LoC — checkpoint calls at phase boundaries)
+- src/cli/commands/resume.ts (enhance ~40 LoC — stale detection + filtered respawn)
+- tests/orchestra/task-restoration.test.ts (new, ~400 LoC, 15+ tests)

@@ -543,8 +543,10 @@ describe('buildWorkerPrompt', () => {
     const prompt = buildWorkerPrompt(task);
     const lines = prompt.split('\n').length;
     // Original was ~150 lines, target was ~80 lines
-    // ADR injection adds ~60-80 lines of mandatory architecture rules
-    expect(lines).toBeLessThan(200);
+    // ADR injection (Sprint 138) adds ~170 lines of mandatory architecture rules
+    // Honest Assessment block + Event Stream hints (Sprint 138) add another ~30 lines
+    // Raised 200 → 450 (2026-04-17, Sprint 143) — Sprint 144 debt: slot-based assertion
+    expect(lines).toBeLessThan(450);
   });
 
   it('task description ratio is higher in shorter prompt', () => {
@@ -553,9 +555,10 @@ describe('buildWorkerPrompt', () => {
     const descLen = 500;
     const totalLen = prompt.length;
     // Description should be meaningful portion of total prompt (baseline improvement from 16%)
-    // Threshold lowered from 0.20 to 0.18 after tokenUsage instructions, then to 0.17 after rubricScores,
-    // then to 0.05 after ADR injection (~3000 char ADR content added to prompt)
-    expect(descLen / totalLen).toBeGreaterThan(0.05);
+    // Threshold lowered from 0.20 → 0.18 (tokenUsage), → 0.17 (rubricScores),
+    // → 0.05 (Sprint 138 ADR injection), → 0.02 (2026-04-17, Sprint 143 full ADR content grew to ~17K chars).
+    // Sprint 144 debt: replace ratio check with absolute description presence assertion.
+    expect(descLen / totalLen).toBeGreaterThan(0.02);
   });
 
   it('includes MUST-level token tracking instruction in result file section', () => {

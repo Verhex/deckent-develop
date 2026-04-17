@@ -7,7 +7,6 @@ import {
   readJsonSafe,
   readJsonSafeAsync,
   updateLastSprintId,
-  countBrainLines,
 } from '../../src/core/utils.js';
 
 const TMP = join(tmpdir(), 'utils-debug-test-' + process.pid);
@@ -109,26 +108,3 @@ describe('updateLastSprintId — silent catch behavior', () => {
   });
 });
 
-describe('countBrainLines — fallback behavior', () => {
-  it('returns 0 when .brain/ does not exist', () => {
-    expect(countBrainLines(TMP)).toBe(0);
-  });
-
-  it('counts lines in .brain/ files', () => {
-    const brainDir = join(TMP, '.brain');
-    mkdirSync(brainDir, { recursive: true });
-    writeFileSync(join(brainDir, 'MEMORY.md'), 'line1\nline2\nline3');
-    const lines = countBrainLines(TMP);
-    expect(lines).toBe(3);
-  });
-
-  it('skips subdirectories gracefully (no stderr when debug off)', () => {
-    const brainDir = join(TMP, '.brain');
-    const subDir = join(brainDir, 'subdir');
-    mkdirSync(subDir, { recursive: true });
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const lines = countBrainLines(TMP);
-    expect(lines).toBe(0);
-    expect(stderrSpy).not.toHaveBeenCalled();
-  });
-});

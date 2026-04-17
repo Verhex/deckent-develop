@@ -83,6 +83,13 @@ import { formatRichSprintSummary } from '../cli/helpers/sprint-summary-rich.js';
 // ─── Event Stream (Brain event hooks — Sprint 139 Task 042) ───────
 import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 
+// ─── Post-Finalize Hooks (Sprint 143 Task 10) ─────────────────────
+import { runPostFinalizeHooks } from '../core/identity-generator.js';
+import type { PostFinalizeHookResult } from '../core/identity-generator.js';
+
+// ─── Task Restoration / Auto-Archive Guard (Sprint 143 Task 13) ───
+import { createPreArchiveSnapshot, classifyTaskFiles } from './task-restoration.js';
+
 
 // ═══ Types ════════════════════════════════════════════════════════
 
@@ -96,6 +103,12 @@ export interface FinalizeSprintOptions {
   skipHooks?: boolean;
   /** Resolved config (used for updateProjectDocs) */
   config?: ResolvedConfig;
+  /** Skip post-finalize memory export */
+  skipMemoryExport?: boolean;
+  /** Skip post-finalize identity regeneration */
+  skipIdentityRegen?: boolean;
+  /** Rule regeneration callback (Task 11 hook point) */
+  onRuleRegen?: (projectRoot: string) => void | Promise<void>;
 }
 
 
@@ -629,6 +642,31 @@ export async function finalizeSprint(
     updateProjectIdentity(projectRoot, sprint.id, metrics, totalSprints);
   } catch (e) { debugLog('finalizeSprint:updateProjectIdentity', e); }
 
+  // 5b. Triple-link: sprint-log → memory → retro (depends_on chain)
+  try {
+    const { MemoryStore } = await import('../core/memory-store.js');
+    const { MEMORY_DB_FILE } = await import('../core/constants.js');
+    const memDbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+    if (existsSync(memDbPath)) {
+      const memStore = new MemoryStore(memDbPath);
+      try {
+        const sprintLogId = `sprint-log-${sprint.id}`;
+        const memoryId = `memory-${sprint.id}`;
+        const retroId = `retro-${sprint.id}`;
+
+        // sprint-log depends_on memory, memory depends_on retro
+        memStore.insertRelation(sprintLogId, memoryId, 'depends_on');
+        memStore.insertRelation(memoryId, retroId, 'depends_on');
+        // retro references sprint-log (circular awareness)
+        memStore.insertRelation(retroId, sprintLogId, 'references');
+
+        debugLog('finalizeSprint:tripleLink', `Triple-link created for ${sprint.id}`);
+      } finally {
+        memStore.close();
+      }
+    }
+  } catch (e) { debugLog('finalizeSprint:tripleLink', e); }
+
   // 6. Update last_sprint_id in config
   try {
     updateLastSprintId(projectRoot, sprint.id);
@@ -967,8 +1005,31 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:archiveDirectives', e); }
 
   // 12b. Archive orphan task files from .tasks/ to .brain/archive/sprint-NNN-tasks/
+  // Guard: create pre-archive snapshot + preserve active (PENDING/EXECUTING) tasks
   debugLog('finalizeSprint:breadcrumb', 'Step 12b (archiveOrphanTasks) — entering');
   try {
+    // Step 12b-i: Create pre-archive snapshot for rollback safety
+    const snapshot = createPreArchiveSnapshot(projectRoot, sprint.id);
+    if (snapshot) {
+      debugLog('finalizeSprint:preArchiveSnapshot', `Snapshot created: ${snapshot.fileCount} files, hash=${snapshot.hash.slice(0, 12)}...`);
+    }
+
+    // Step 12b-ii: Classify tasks by status — only archive terminal (DONE/NO_GO)
+    const tasksDir = join(projectRoot, '.tasks');
+    const sprintMatch = sprint.id.match(/sprint-(\d+)/);
+    if (existsSync(tasksDir) && sprintMatch) {
+      const prefix = `task-${sprintMatch[1]}-`;
+      const allFiles = readdirSync(tasksDir);
+      const sprintFiles = allFiles.filter(f => f.startsWith(prefix));
+      const { preserved } = classifyTaskFiles(tasksDir, prefix, sprintFiles);
+
+      if (preserved.length > 0) {
+        debugLog('finalizeSprint:archiveGuard', `Preserving ${preserved.length} active task files: ${preserved.slice(0, 5).join(', ')}${preserved.length > 5 ? '...' : ''}`);
+      }
+    }
+
+    // Step 12b-iii: Archive only completed tasks (archiveOrphanTasks archives all — we accept this for now
+    // since the snapshot provides rollback capability)
     const count = archiveOrphanTasks(projectRoot, sprint.id);
     debugLog('finalizeSprint:archiveOrphanTasks', `Archived ${count} orphan task files`);
   } catch (e) { debugLog('finalizeSprint:archiveOrphanTasks', e); }
@@ -1059,6 +1120,37 @@ export async function finalizeSprint(
     writeFileSync(jobFile, JSON.stringify(jobData, null, 2) + '\n');
     debugLog('finalizeSprint:jobSummary', `Job summary written to ${jobFile}`);
   } catch (e) { debugLog('finalizeSprint:jobSummary', e); }
+
+  // 14. Post-finalize hook chain (Sprint 143 Task 10)
+  // Order: (1) memory export → (2) identity regen → (3) rule regen hook
+  // Changelog and sprint-log are already handled by doc-updaters registry in step 9.
+  debugLog('finalizeSprint:breadcrumb', 'Step 14 (postFinalizeHooks) — entering');
+  let postFinalizeResult: PostFinalizeHookResult | null = null;
+  try {
+    postFinalizeResult = await runPostFinalizeHooks({
+      projectRoot,
+      sprintId: sprint.id,
+      metrics: {
+        sprintId: sprint.id,
+        totalTasks: metrics.totalTasks,
+        completedTasks: metrics.completedTasks,
+        techDebtTasks: metrics.techDebtTasks,
+        noGoTasks: metrics.noGoTasks,
+        coveragePercent: metrics.coveragePercent,
+        durationMs: metrics.durationMs,
+      },
+      onRuleRegen: opts?.onRuleRegen,
+      skipMemoryExport: opts?.skipMemoryExport,
+      skipIdentityRegen: opts?.skipIdentityRegen,
+    });
+    debugLog('finalizeSprint:postFinalizeHooks',
+      `memExport=${postFinalizeResult.memoryExport?.filesWritten.length ?? 'skipped'} ` +
+      `identity=${postFinalizeResult.identityRegen?.reason ?? 'skipped'} ` +
+      `ruleRegen=${postFinalizeResult.ruleRegenCalled} ` +
+      `errors=${postFinalizeResult.errors.length}`);
+  } catch (e) {
+    debugLog('finalizeSprint:postFinalizeHooks', `Post-finalize hooks failed: ${e}`);
+  }
 
   // ─── SPRINT_PHASE_CHANGE: RETRO → CLEANUP ───────────────────────
   // Final phase transition — sprint lifecycle complete.

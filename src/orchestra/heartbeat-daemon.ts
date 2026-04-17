@@ -10,12 +10,25 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { DECKENT_DIR, BRAIN_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import { ValidationError } from '../core/validators.js';
 
 // ─── Constants ─────────────────────────────────────────────────────
 
 const HEARTBEAT_FILE = 'HEARTBEAT.md';
 const HEARTBEAT_LOG = 'heartbeat-log.md';
 const PID_FILE = 'heartbeat.pid';
+
+/** Whitelist of allowed base commands for heartbeat execution */
+const ALLOWED_COMMANDS: ReadonlySet<string> = new Set([
+  'ps', 'kill', 'wait', 'uptime', 'date',
+  'tsc', 'npx', 'node', 'npm',
+]);
+
+/** Shell metacharacters that indicate injection attempts */
+const SHELL_METACHAR_REGEX = /[;&|`$()]/;
+
+/** Maximum timeout for heartbeat command execution (5 seconds) */
+const HEARTBEAT_EXEC_TIMEOUT = 5_000;
 
 const DEFAULT_HEARTBEAT_TEMPLATE = `# Heartbeat Tasks
 - [ ] tsc --noEmit
@@ -82,6 +95,48 @@ function formatTimestamp(): string {
   return new Date().toISOString();
 }
 
+// ─── Command Validation ───────────────────────────────────────────
+
+/**
+ * Validates a command string before execution.
+ * - Rejects empty commands and null bytes
+ * - Rejects shell metacharacters that enable injection (;&|`$())
+ * - Extracts the base command and checks it against ALLOWED_COMMANDS whitelist
+ *
+ * @param command - The raw command string from HEARTBEAT.md
+ * @returns The validated command string (unchanged)
+ * @throws {ValidationError} If the command fails any security check
+ */
+export function validateCommand(command: string): string {
+  if (!command || command.trim().length === 0) {
+    throw new ValidationError('Heartbeat command cannot be empty', 'INVALID_COMMAND');
+  }
+
+  if (command.includes('\0')) {
+    throw new ValidationError('Heartbeat command must not contain null bytes', 'INVALID_COMMAND');
+  }
+
+  if (SHELL_METACHAR_REGEX.test(command)) {
+    throw new ValidationError(
+      `Shell metacharacter detected in heartbeat command: "${command}"`,
+      'COMMAND_INJECTION',
+    );
+  }
+
+  // Extract the base command (first token, strip path prefixes)
+  const baseCommand = command.trim().split(/\s+/)[0]!;
+  const commandName = baseCommand.split('/').pop()!;
+
+  if (!ALLOWED_COMMANDS.has(commandName)) {
+    throw new ValidationError(
+      `Command not in whitelist: "${commandName}" (allowed: ${[...ALLOWED_COMMANDS].join(', ')})`,
+      'COMMAND_NOT_ALLOWED',
+    );
+  }
+
+  return command;
+}
+
 // ─── Core ──────────────────────────────────────────────────────────
 
 /**
@@ -113,17 +168,22 @@ export function runHeartbeat(projectRoot: string): HeartbeatRunResult {
     let success = false;
 
     try {
+      validateCommand(task.command);
       output = execSync(task.command, {
         cwd: projectRoot,
         encoding: 'utf-8',
-        timeout: 120_000,
+        timeout: HEARTBEAT_EXEC_TIMEOUT,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       success = true;
       result.passed++;
     } catch (err: unknown) {
-      const execErr = err as { stdout?: string; stderr?: string; message?: string };
-      output = execErr.stdout ?? execErr.stderr ?? execErr.message ?? 'Unknown error';
+      if (err instanceof ValidationError) {
+        output = `BLOCKED: ${err.message}`;
+      } else {
+        const execErr = err as { stdout?: string; stderr?: string; message?: string };
+        output = execErr.stdout ?? execErr.stderr ?? execErr.message ?? 'Unknown error';
+      }
       result.failed++;
       debugLog('heartbeat-daemon', err);
     }

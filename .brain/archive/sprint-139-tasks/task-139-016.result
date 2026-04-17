@@ -1,0 +1,22 @@
+{
+  "taskId": "139-016",
+  "filesChanged": [
+    "src/monitor/auditor.ts",
+    "src/core/file-lock.ts",
+    "src/orchestra/event-stream.ts",
+    "tests/monitor/auditor.test.ts",
+    "tests/core/file-lock.test.ts"
+  ],
+  "linesAdded": 195,
+  "linesRemoved": 3,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Task 139-016 Orphan HB Cleanup Pattern tamamlandı.\n\n1. src/orchestra/event-stream.ts: CHANNELS.ORPHAN_HB_DETECTED = 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED' kanalı eklendi.\n\n2. src/core/file-lock.ts: clearOrphanLocks(projectRoot, activeWorkerIds) fonksiyonu eklendi — aktif worker setinde olmayan tüm kilitleri serbest bırakır, salınan dosya yollarını döndürür.\n\n3. src/monitor/auditor.ts:\n   - detectOrphans(projectRoot, activeTaskIds?) — .tasks/*.hb dosyalarını aktif task ID setiyle karşılaştırır, orphan'ları tespit eder. Auto-discovery modu: activeTaskIds belirtilmezse .tasks/*.json dosyalarından okur.\n   - cleanupOrphanHBs(projectRoot, sprintId, activeTaskIds?) — 3 adım: (a) orphan HB dosyalarını .brain/archive/{sprintId}-orphan-hb/ dizinine taşır, (b) clearOrphanLocks() çağrısıyla ölü worker kilitlerini serbest bırakır, (c) ORPHAN_HB_DETECTED event'ini event stream'e yazar.\n   - Fail-safe: her adımda I/O hatası yakalanır, diğer orphan'lar işlenmeye devam eder.\n\n4. tests/monitor/auditor.test.ts: 11 yeni test eklendi (detectOrphans: 6, cleanupOrphanHBs: 5 — mock tabanlı).\n\n5. tests/core/file-lock.test.ts: 5 yeni test eklendi (clearOrphanLocks — gerçek dosya sistemi).\n\nBaseline: 272 test geçti (0 fail). TypeScript hataları önceden var olan 2 hatayla sınırlı (worker.ts:1476, sprint-finalizer.ts:36 — kapsam dışı).",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

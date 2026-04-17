@@ -1,0 +1,35 @@
+# Task 139-010: .dashboard Parse Error Root Cause Fix
+
+## Root Cause Analysis
+
+The `.dashboard` parse error is a "ghost pattern" since Sprint 137. Three distinct problems:
+
+1. **Error swallowing** (`status.ts:211`): The catch block returns a generic "Cannot parse dashboard file" message, discarding the actual error stack trace. This makes debugging impossible.
+
+2. **No repair mechanism**: When `.dashboard` is corrupt or has an unexpected schema, there's no self-healing. The system just keeps failing on every status call.
+
+3. **No validation**: The JSON is parsed as `Record<string, unknown>` with manual field access. No schema validation means any malformed data silently produces wrong output.
+
+## Fix Strategy
+
+### Fix A: Error Exposure (status.ts + dashboard.ts)
+- Replace bare `catch {}` with `catch (err)`
+- Log actual error with `debugLog('status.ts:dashboard-parse-error', err)`
+- Include error message in response for diagnostics
+
+### Fix B: Dashboard Manager (new dashboard-manager.ts)
+- `ensureDashboard(projectRoot)` — creates valid `.dashboard` if missing/corrupt
+- `readDashboardSafe(projectRoot)` — reads with validation, auto-repair on failure
+- `validateDashboardShape(data)` — schema shape check
+- `DASHBOARD_INITIAL_STATE` — canonical empty state constant
+
+### Fix C: Schema Validation
+- Type guard `isDashboardState(data)` for runtime validation
+- Shape checks for required fields: sprint, agents, progress, alerts, updatedAt
+
+## Files Changed
+- NEW: src/monitor/dashboard-manager.ts (~120 LoC)
+- MODIFY: src/mcp/tools/status.ts (error exposure + use readDashboardSafe)
+- MODIFY: src/mcp/resources/dashboard.ts (use readDashboardSafe)
+- MODIFY: src/monitor/index.ts (export new functions)
+- NEW: tests/monitor/dashboard-manager.test.ts (5+ tests)

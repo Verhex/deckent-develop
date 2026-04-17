@@ -1,0 +1,114 @@
+{
+  "id": "143-010",
+  "title": "Sprint-Finalizer Hook (Karar 4-A)",
+  "description": "Sprint-Finalizer Hook (Karar 4-A)\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Agent: architect\n- Files: src/orchestra/sprint-finalizer.ts, src/core/identity-generator.ts (yeni), src/orchestra/doc-updaters/registry.ts, changelog.ts, tests/orchestra/\n- Scope: src/orchestra/, src/core/, tests/orchestra/\n\n### Description\nSprint finalize sonu otomatik zincir: (1) `deckent memory export` → exports/* regenerate, (2) `PROJECT-IDENTITY.md` auto-regen (canlı metrikler), (3) `CHANGELOG.md` append, (4) `docs/SPRINT-LOG.md` append, (5) rule regen hook point (Task 11'den).\n\n**Kanıt:** Sprint 143 finalize sonrası exports/summary.md count = DB count. PROJECT-IDENTITY.md \"22 tools, 40 ADR, 41+ CLI\" güncel.\n**Test:** 10+ test (her hook adımı + idempotency)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/orchestra/",
+      "src/orchestra/",
+      "src/core/",
+      "src/orchestra/doc-updaters/",
+      "docs/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-finalizer.ts",
+      "src/core/identity-generator.ts (yeni)",
+      "src/orchestra/doc-updaters/registry.ts",
+      "changelog.ts",
+      "src/core/identity-generator.ts",
+      "PROJECT-IDENTITY.md",
+      "CHANGELOG.md",
+      "docs/SPRINT-LOG.md",
+      "tests/orchestra/sprint-finalizer.test.ts",
+      "tests/orchestra/doc-updaters/registry.test.ts",
+      "tests/core/identity-generator.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 143 finalize sonrası exports/summary.md count = DB count. PROJECT-IDENTITY.md \"22 tools, 40 ADR, 41+ CLI\" güncel.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "architect",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.79
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.44
+        },
+        {
+          "name": "core",
+          "weight": 0.25
+        },
+        {
+          "name": "docs",
+          "weight": 0.13
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "document",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 11,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.36,
+          "docs/": 0.09,
+          "tests/": 0.27
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.27
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:20:35.446Z"
+}

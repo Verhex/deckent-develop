@@ -254,3 +254,54 @@ describe('MockSpawnBackend', () => {
     expect(await backend.isAvailable()).toBe(true);
   });
 });
+
+// ─── Sprint Finalize → Chain Gate Integration ────────────────────────────
+
+describe('Sprint Lifecycle — Chain Gate Ready', () => {
+  it('finalized sprint produces metrics compatible with chain safety gate', async () => {
+    const tasks = [
+      makeTask({ id: '001-001', title: 'Task A' }),
+      makeTask({ id: '001-002', title: 'Task B' }),
+      makeTask({ id: '001-003', title: 'Task C' }),
+    ];
+    const sprint = makeSprint(tasks);
+
+    for (const task of tasks) {
+      fs.writeFileSync(path.join(TASKS_DIR, `task-${task.id}.json`), JSON.stringify(task, null, 2));
+    }
+
+    const backend = new MockSpawnBackend(TEST_ROOT, {
+      taskScenarios: {
+        '001-001': 'DONE',
+        '001-002': 'GO_WITH_TECH_DEBT',
+        '001-003': 'NO_GO',
+      },
+      delayMs: 30,
+    });
+
+    for (const task of tasks) {
+      backend.spawn(task.id, task.model, 'mock prompt');
+    }
+
+    const results = await waitForResults(TEST_ROOT, sprint, 10000);
+    const evaluations = new Map<string, TaskEvaluation>();
+    for (const r of results) evaluations.set(r.taskId, evaluateResult(r));
+
+    const metrics = calculateMetrics(sprint, evaluations, results);
+
+    // Metrics must contain all fields needed by chain safety gate
+    expect(metrics).toHaveProperty('totalTasks');
+    expect(metrics).toHaveProperty('completedTasks');
+    expect(metrics).toHaveProperty('techDebtTasks');
+    expect(metrics).toHaveProperty('noGoTasks');
+    expect(metrics).toHaveProperty('noGoRate');
+    expect(metrics).toHaveProperty('coveragePercent');
+
+    // noGoTasks is the key field for chain gate check #5
+    expect(metrics.noGoTasks).toBe(1);
+    // completedTasks includes DONE + TECH_DEBT
+    expect(metrics.completedTasks).toBe(2);
+    // Invariant: completed + noGo = total
+    expect(metrics.completedTasks + metrics.noGoTasks).toBe(metrics.totalTasks);
+  });
+});

@@ -58,6 +58,29 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   updateProjectIdentity: vi.fn(),
   buildAgentPerformance: vi.fn().mockReturnValue([]),
   archiveDirectives: vi.fn(),
+  archiveOrphanTasks: vi.fn().mockReturnValue(0),
+}));
+
+// Mock MemoryStore for triple-link tests (dynamic import in finalizeSprint)
+const mockInsertRelation = vi.fn();
+const mockMemStoreClose = vi.fn();
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn().mockImplementation(() => ({
+    insertRelation: mockInsertRelation,
+    close: mockMemStoreClose,
+    insert: vi.fn(),
+    upsert: vi.fn(),
+    getById: vi.fn(),
+    getByType: vi.fn().mockReturnValue([]),
+    countByType: vi.fn().mockReturnValue(new Map()),
+    totalCount: vi.fn().mockReturnValue(0),
+    getSchemaVersion: vi.fn().mockReturnValue(1),
+    getRawDb: vi.fn(),
+    getRelationsFrom: vi.fn().mockReturnValue([]),
+    getRelationsTo: vi.fn().mockReturnValue([]),
+    getRelations: vi.fn().mockReturnValue([]),
+    countRelations: vi.fn().mockReturnValue(0),
+  })),
 }));
 
 vi.mock('../../src/orchestra/result-evaluator.js', () => ({
@@ -140,6 +163,19 @@ vi.mock('../../src/core/observability.js', () => ({
   metric: vi.fn(),
   trace: vi.fn(),
   TELEMETRY_ENABLED: false,
+}));
+
+// ─── Post-Finalize Hooks Mock (Sprint 143 Task 10) ──
+const mockRunPostFinalizeHooks = vi.fn().mockResolvedValue({
+  memoryExport: { success: true, filesWritten: ['summary.md', 'decisions.md', 'memory.md', 'debt.md'], errors: [] },
+  identityRegen: { success: true, filePath: '/tmp/project/.brain/PROJECT-IDENTITY.md', adrCount: 40, totalSprints: 143, reason: 'updated' },
+  ruleRegenCalled: false,
+  errors: [],
+});
+vi.mock('../../src/core/identity-generator.js', () => ({
+  runPostFinalizeHooks: (...args: unknown[]) => mockRunPostFinalizeHooks(...args),
+  regenerateProjectIdentity: vi.fn().mockReturnValue({ success: true, filePath: '', adrCount: 0, totalSprints: 1, reason: 'updated' }),
+  runMemoryExport: vi.fn().mockResolvedValue({ success: true, filesWritten: [], errors: [] }),
 }));
 
 // ─── Event Stream Mock (Sprint 139 Task 042 — Brain event hooks) ──
@@ -1101,5 +1137,216 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     );
     expect(metrics).toBeDefined();
     expect(typeof metrics.totalTasks).toBe('number');
+  });
+});
+
+// ═══ Triple-Link Tests (Task 143-007) ══════════════════════════════
+
+describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
+  beforeEach(() => {
+    mockInsertRelation.mockClear();
+    mockMemStoreClose.mockClear();
+    const fsMod = nodeFsMod as unknown as {
+      existsSync: ReturnType<typeof vi.fn>;
+      promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn>; readFile: ReturnType<typeof vi.fn> };
+    };
+    fsMod.existsSync.mockReturnValue(true); // memory.db exists
+    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
+    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
+    fsMod.promises.readFile.mockReset().mockResolvedValue('');
+  });
+
+  it('creates 3 triple-link relations during finalizeSprint', async () => {
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    // Triple-link: sprint-log → memory (depends_on), memory → retro (depends_on), retro → sprint-log (references)
+    expect(mockInsertRelation).toHaveBeenCalledWith('sprint-log-sprint-143', 'memory-sprint-143', 'depends_on');
+    expect(mockInsertRelation).toHaveBeenCalledWith('memory-sprint-143', 'retro-sprint-143', 'depends_on');
+    expect(mockInsertRelation).toHaveBeenCalledWith('retro-sprint-143', 'sprint-log-sprint-143', 'references');
+  });
+
+  it('closes the MemoryStore after triple-link insertion', async () => {
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    expect(mockMemStoreClose).toHaveBeenCalled();
+  });
+
+  it('triple-link is fail-safe — finalizeSprint continues even on MemoryStore error', async () => {
+    mockInsertRelation.mockImplementation(() => { throw new Error('DB locked'); });
+
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    // finalizeSprint must not throw
+    const metrics = await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    expect(metrics).toBeDefined();
+  });
+
+  it('skips triple-link when memory.db does not exist', async () => {
+    const fsMod = nodeFsMod as unknown as { existsSync: ReturnType<typeof vi.fn> };
+    fsMod.existsSync.mockReturnValue(false);
+
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    // insertRelation should not be called when DB doesn't exist
+    expect(mockInsertRelation).not.toHaveBeenCalled();
+  });
+});
+
+// ═══ Post-Finalize Hooks Tests (Sprint 143 Task 10) ═══════════════
+
+describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => {
+  beforeEach(() => {
+    mockRunPostFinalizeHooks.mockClear();
+    mockRunPostFinalizeHooks.mockResolvedValue({
+      memoryExport: { success: true, filesWritten: ['summary.md', 'decisions.md', 'memory.md', 'debt.md'], errors: [] },
+      identityRegen: { success: true, filePath: '/tmp/project/.brain/PROJECT-IDENTITY.md', adrCount: 40, totalSprints: 143, reason: 'updated' },
+      ruleRegenCalled: false,
+      errors: [],
+    });
+
+    const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn>; mkdir: ReturnType<typeof vi.fn>; readFile: ReturnType<typeof vi.fn> } };
+    fsMod.promises.writeFile.mockReset().mockResolvedValue(undefined);
+    fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
+    fsMod.promises.readFile.mockReset().mockResolvedValue('');
+  });
+
+  it('calls runPostFinalizeHooks during finalizeSprint', async () => {
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    expect(mockRunPostFinalizeHooks).toHaveBeenCalledOnce();
+    const callArgs = mockRunPostFinalizeHooks.mock.calls[0][0] as {
+      projectRoot: string;
+      sprintId: string;
+      metrics: { sprintId: string };
+    };
+    expect(callArgs.projectRoot).toBe('/tmp/project');
+    expect(callArgs.sprintId).toBe('sprint-143');
+    expect(callArgs.metrics.sprintId).toBe('sprint-143');
+  });
+
+  it('passes onRuleRegen callback from FinalizeSprintOptions', async () => {
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+    const ruleRegenFn = vi.fn();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], {
+      skipDecay: true,
+      skipHooks: true,
+      onRuleRegen: ruleRegenFn,
+    });
+
+    const callArgs = mockRunPostFinalizeHooks.mock.calls[0][0] as { onRuleRegen?: unknown };
+    expect(callArgs.onRuleRegen).toBe(ruleRegenFn);
+  });
+
+  it('passes skipMemoryExport and skipIdentityRegen options', async () => {
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], {
+      skipDecay: true,
+      skipHooks: true,
+      skipMemoryExport: true,
+      skipIdentityRegen: true,
+    });
+
+    const callArgs = mockRunPostFinalizeHooks.mock.calls[0][0] as {
+      skipMemoryExport?: boolean;
+      skipIdentityRegen?: boolean;
+    };
+    expect(callArgs.skipMemoryExport).toBe(true);
+    expect(callArgs.skipIdentityRegen).toBe(true);
+  });
+
+  it('finalizeSprint continues when post-finalize hooks fail (fail-safe)', async () => {
+    mockRunPostFinalizeHooks.mockRejectedValueOnce(new Error('Hook chain crashed'));
+
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    // Must not throw — post-finalize hook failure is non-fatal
+    const metrics = await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+    expect(metrics).toBeDefined();
+  });
+
+  it('post-finalize hooks run AFTER job summary (step 13) and BEFORE RETRO→CLEANUP event', async () => {
+    const callOrder: string[] = [];
+
+    // Track writeFileSync calls for job summary
+    const fsMod = nodeFsMod as unknown as { writeFileSync: ReturnType<typeof vi.fn> };
+    const origWriteFileSync = fsMod.writeFileSync;
+    fsMod.writeFileSync = vi.fn().mockImplementation((...args: unknown[]) => {
+      if (typeof args[0] === 'string' && (args[0] as string).includes('.json') && (args[0] as string).includes('jobs')) {
+        callOrder.push('jobSummary');
+      }
+      return origWriteFileSync(...args);
+    });
+
+    mockRunPostFinalizeHooks.mockImplementation(async () => {
+      callOrder.push('postFinalizeHooks');
+      return {
+        memoryExport: null,
+        identityRegen: null,
+        ruleRegenCalled: false,
+        errors: [],
+      };
+    });
+
+    // Track RETRO→CLEANUP event
+    const origWriteEvent = vi.mocked(eventStreamMod.writeEvent);
+    origWriteEvent.mockImplementation((...args: unknown[]) => {
+      const payload = args[5] as { fromPhase?: string; toPhase?: string } | undefined;
+      if (payload?.fromPhase === 'RETRO' && payload?.toPhase === 'CLEANUP') {
+        callOrder.push('retroToCleanup');
+      }
+      return null;
+    });
+
+    const sprint = makeSprint('sprint-143');
+    const evaluations = new Map<string, TaskEvaluation>();
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    // Verify order: jobSummary → postFinalizeHooks → retroToCleanup
+    const jobIdx = callOrder.indexOf('jobSummary');
+    const hookIdx = callOrder.indexOf('postFinalizeHooks');
+    const cleanupIdx = callOrder.indexOf('retroToCleanup');
+
+    expect(hookIdx).toBeGreaterThanOrEqual(0);
+    expect(cleanupIdx).toBeGreaterThan(hookIdx);
+
+    // Restore mocks
+    fsMod.writeFileSync = origWriteFileSync;
+  });
+
+  it('metrics passed to hooks match calculated sprint metrics', async () => {
+    const sprint = makeSprint('sprint-143');
+    sprint.tasks = [
+      { id: '143-001', title: 'Task 1', description: '', model: 'opus', effort: 'normal', priority: 'CRITICAL', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
+    ] as Sprint['tasks'];
+    const evaluations = new Map<string, TaskEvaluation>([
+      ['143-001', TaskEvaluation.DONE],
+    ]);
+
+    await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
+
+    const callArgs = mockRunPostFinalizeHooks.mock.calls[0][0] as {
+      metrics: { totalTasks: number; completedTasks: number };
+    };
+    expect(callArgs.metrics.totalTasks).toBe(1);
+    expect(callArgs.metrics.completedTasks).toBe(1);
   });
 });

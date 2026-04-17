@@ -142,14 +142,35 @@ describe('Bearer Token Authentication', () => {
 
   // ─── Unit: bearerAuthMiddleware ──────────────────────────────
   describe('bearerAuthMiddleware()', () => {
-    it('passes through when no token configured', () => {
+    it('returns 401 when no token configured (secure by default)', () => {
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
       const check = bearerAuthMiddleware({ configToken: null });
       const req = { headers: {}, url: '/api/status' } as http.IncomingMessage;
-      const res = {} as http.ServerResponse;
+      let writtenStatus = 0;
+      let writtenBody = '';
+      const res = {
+        writeHead: (status: number) => { writtenStatus = status; },
+        end: (body: string) => { writtenBody = body; },
+      } as unknown as http.ServerResponse;
+      expect(check(req, res)).toBe(false);
+      expect(writtenStatus).toBe(401);
+      expect(writtenBody).toContain('authentication required');
+    });
+
+    it('passes through when DECKENT_API_AUTH_DISABLED=1', () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+      const check = bearerAuthMiddleware({ configToken: null });
+      const req = { headers: {}, url: '/api/status' } as http.IncomingMessage;
+      const res = {} as unknown as http.ServerResponse;
       expect(check(req, res)).toBe(true);
+      expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('WARNING'));
+      stderrSpy.mockRestore();
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
     });
 
     it('passes through for exempt paths', () => {
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
       const check = bearerAuthMiddleware({ configToken: 'secret', exemptPaths: ['/health'] });
       const req = { headers: {}, url: '/health' } as http.IncomingMessage;
       const res = {} as http.ServerResponse;
@@ -261,14 +282,66 @@ describe('Bearer Token Authentication', () => {
       stderrSpy.mockRestore();
     });
 
-    // ─── Integration: No token configured = auth disabled ────
-    it('all endpoints accessible when no token configured', async () => {
+    // ─── Integration: No token configured → 401 (secure default) ────
+    it('returns 401 when no token configured (secure by default)', async () => {
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status');
+      expect(res.status).toBe(401);
+      stderrSpy.mockRestore();
+    });
+
+    // ─── Integration: DECKENT_API_AUTH_DISABLED=1 bypass ────
+    it('bypasses auth when DECKENT_API_AUTH_DISABLED=1', async () => {
+      process.env['DECKENT_API_AUTH_DISABLED'] = '1';
       const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/status');
       expect(res.status).toBe(200);
+      // Verify warning was emitted
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('WARNING: API authentication is DISABLED'),
+      );
+      stderrSpy.mockRestore();
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
+    });
+
+    // ─── Integration: CORS reject for non-localhost origin ────
+    it('rejects CORS preflight from non-localhost origin', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+      api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status', 'OPTIONS', undefined, {
+        'Origin': 'https://evil.example.com',
+      });
+      expect(res.status).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe('CORS origin not allowed');
+      stderrSpy.mockRestore();
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
+    });
+
+    // ─── Integration: Security headers present ────
+    it('includes security headers in API responses', async () => {
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      api = createHttpServer(PROJECT_ROOT, { port: 0, apiToken: TEST_TOKEN, rateLimit: 0 });
+      await new Promise<void>((r) => api.server.once('listening', r));
+
+      const res = await request(api, '/api/status', 'GET', undefined, {
+        'Authorization': `Bearer ${TEST_TOKEN}`,
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['x-frame-options']).toBe('DENY');
+      expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+      expect(res.headers['strict-transport-security']).toContain('max-age=');
       stderrSpy.mockRestore();
     });
   });

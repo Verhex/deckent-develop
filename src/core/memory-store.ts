@@ -1,0 +1,673 @@
+/**
+ * MemoryStore — SQLite DB layer for Memory V2.
+ *
+ * Wraps better-sqlite3 with FTS5 full-text search, tags, relations,
+ * field-level history tracking, and soft-delete/decay lifecycle.
+ *
+ * Schema version: 1
+ */
+
+import Database from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
+import { turkishNormalize } from './memory-normalize.js';
+import type {
+  MemoryEntryV2,
+  CreateEntryInput,
+  EntryRelation,
+  EntryHistoryRecord,
+  RelationType,
+} from './memory-types.js';
+
+const SCHEMA_VERSION = 1;
+
+// ─── Row type from SQLite (decay_exempt is INTEGER 0/1) ──────────
+
+interface EntryRow {
+  id: string;
+  type: string;
+  source: string;
+  title: string;
+  content: string;
+  summary: string | null;
+  tag_text: string;
+  title_norm: string;
+  content_norm: string;
+  summary_norm: string;
+  tag_norm: string;
+  status: string;
+  priority: string;
+  sprint_id: string | null;
+  sprint_num: number;
+  lang: string;
+  decay_exempt: number;
+  metadata: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+function rowToEntry(row: EntryRow): MemoryEntryV2 {
+  return {
+    id: row.id,
+    type: row.type,
+    source: row.source as MemoryEntryV2['source'],
+    title: row.title,
+    content: row.content,
+    summary: row.summary,
+    tag_text: row.tag_text,
+    title_norm: row.title_norm,
+    content_norm: row.content_norm,
+    summary_norm: row.summary_norm,
+    tag_norm: row.tag_norm,
+    status: row.status,
+    priority: row.priority,
+    sprint_id: row.sprint_id,
+    sprint_num: row.sprint_num,
+    lang: row.lang,
+    decay_exempt: row.decay_exempt === 1,
+    metadata: row.metadata,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    deleted_at: row.deleted_at,
+  };
+}
+
+// ─── MemoryStore class ───────────────────────────────────────────
+
+export class MemoryStore {
+  private db: DatabaseType;
+
+  constructor(dbPath: string) {
+    this.db = new Database(dbPath);
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('foreign_keys = ON');
+    this.initSchema();
+  }
+
+  // ── Schema initialization ────────────────────────────────────
+
+  private initSchema(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS entries (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'system',
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        summary TEXT,
+        tag_text TEXT NOT NULL DEFAULT '',
+        title_norm TEXT NOT NULL DEFAULT '',
+        content_norm TEXT NOT NULL DEFAULT '',
+        summary_norm TEXT NOT NULL DEFAULT '',
+        tag_norm TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        priority TEXT NOT NULL DEFAULT 'normal',
+        sprint_id TEXT,
+        sprint_num INTEGER NOT NULL DEFAULT 0,
+        lang TEXT NOT NULL DEFAULT 'en',
+        decay_exempt INTEGER NOT NULL DEFAULT 0,
+        metadata TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS tags (
+        entry_id TEXT NOT NULL,
+        tag TEXT NOT NULL COLLATE NOCASE,
+        PRIMARY KEY (entry_id, tag),
+        FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS relations (
+        from_id TEXT NOT NULL,
+        to_id TEXT NOT NULL,
+        rel_type TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (from_id, to_id, rel_type)
+      );
+
+      CREATE TABLE IF NOT EXISTS entry_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entry_id TEXT NOT NULL,
+        field TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        changed_by TEXT NOT NULL,
+        change_type TEXT NOT NULL,
+        changed_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Indexes
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_entries_type ON entries(type);
+      CREATE INDEX IF NOT EXISTS idx_entries_source ON entries(source);
+      CREATE INDEX IF NOT EXISTS idx_entries_sprint_num ON entries(sprint_num);
+      CREATE INDEX IF NOT EXISTS idx_entries_status ON entries(status);
+      CREATE INDEX IF NOT EXISTS idx_entries_decay ON entries(decay_exempt, sprint_num);
+      CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+      CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_id);
+      CREATE INDEX IF NOT EXISTS idx_history_entry ON entry_history(entry_id);
+    `);
+
+    // Partial index on deleted_at where NULL (active entries)
+    this.createIndexIfNotExists(
+      'idx_entries_active',
+      'CREATE INDEX idx_entries_active ON entries(deleted_at) WHERE deleted_at IS NULL',
+    );
+
+    // FTS5 virtual table
+    this.createFts5Table();
+
+    // FTS5 sync triggers
+    this.createFtsTriggers();
+
+    // Record schema version
+    this.recordSchemaVersion();
+  }
+
+  private createIndexIfNotExists(name: string, ddl: string): void {
+    const exists = this.db.prepare(
+      `SELECT 1 FROM sqlite_master WHERE type='index' AND name=?`,
+    ).get(name) as { 1: number } | undefined;
+    if (!exists) {
+      this.db.exec(ddl);
+    }
+  }
+
+  private createFts5Table(): void {
+    const exists = this.db.prepare(
+      `SELECT 1 FROM sqlite_master WHERE type='table' AND name='entries_fts'`,
+    ).get() as { 1: number } | undefined;
+    if (!exists) {
+      this.db.exec(`
+        CREATE VIRTUAL TABLE entries_fts USING fts5(
+          title, content, summary, tag_text,
+          title_norm, content_norm, summary_norm, tag_norm,
+          content='entries',
+          content_rowid='rowid',
+          tokenize='unicode61 remove_diacritics 2'
+        );
+      `);
+    }
+  }
+
+  private createFtsTriggers(): void {
+    const triggerNames = [
+      'entries_ai',  // after insert
+      'entries_ad',  // after delete
+      'entries_au',  // after update
+    ];
+
+    for (const name of triggerNames) {
+      const exists = this.db.prepare(
+        `SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?`,
+      ).get(name) as { 1: number } | undefined;
+      if (exists) continue;
+
+      if (name === 'entries_ai') {
+        this.db.exec(`
+          CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN
+            INSERT INTO entries_fts(rowid, title, content, summary, tag_text,
+              title_norm, content_norm, summary_norm, tag_norm)
+            VALUES (new.rowid, new.title, new.content, new.summary, new.tag_text,
+              new.title_norm, new.content_norm, new.summary_norm, new.tag_norm);
+          END;
+        `);
+      } else if (name === 'entries_ad') {
+        this.db.exec(`
+          CREATE TRIGGER entries_ad AFTER DELETE ON entries BEGIN
+            INSERT INTO entries_fts(entries_fts, rowid, title, content, summary, tag_text,
+              title_norm, content_norm, summary_norm, tag_norm)
+            VALUES ('delete', old.rowid, old.title, old.content, old.summary, old.tag_text,
+              old.title_norm, old.content_norm, old.summary_norm, old.tag_norm);
+          END;
+        `);
+      } else if (name === 'entries_au') {
+        this.db.exec(`
+          CREATE TRIGGER entries_au AFTER UPDATE ON entries BEGIN
+            INSERT INTO entries_fts(entries_fts, rowid, title, content, summary, tag_text,
+              title_norm, content_norm, summary_norm, tag_norm)
+            VALUES ('delete', old.rowid, old.title, old.content, old.summary, old.tag_text,
+              old.title_norm, old.content_norm, old.summary_norm, old.tag_norm);
+            INSERT INTO entries_fts(rowid, title, content, summary, tag_text,
+              title_norm, content_norm, summary_norm, tag_norm)
+            VALUES (new.rowid, new.title, new.content, new.summary, new.tag_text,
+              new.title_norm, new.content_norm, new.summary_norm, new.tag_norm);
+          END;
+        `);
+      }
+    }
+  }
+
+  private recordSchemaVersion(): void {
+    const existing = this.db.prepare(
+      `SELECT version FROM schema_version WHERE version = ?`,
+    ).get(SCHEMA_VERSION) as { version: number } | undefined;
+    if (!existing) {
+      this.db.prepare(
+        `INSERT INTO schema_version (version, applied_at) VALUES (?, datetime('now'))`,
+      ).run(SCHEMA_VERSION);
+    }
+  }
+
+  // ── CRUD ─────────────────────────────────────────────────────
+
+  insert(input: CreateEntryInput): void {
+    const source = input.source ?? 'system';
+    const summary = input.summary ?? null;
+    const tags = input.tags ?? [];
+    const status = input.status ?? 'active';
+    const priority = input.priority ?? 'normal';
+    const sprintId = input.sprint_id ?? null;
+    const sprintNum = input.sprint_num ?? 0;
+    const lang = input.lang ?? 'en';
+    const decayExempt = input.decay_exempt ? 1 : 0;
+    const metadata = JSON.stringify(input.metadata ?? {});
+    const relations = input.relations ?? [];
+
+    const tagText = tags.join(' ');
+    const titleNorm = turkishNormalize(input.title);
+    const contentNorm = turkishNormalize(input.content);
+    const summaryNorm = turkishNormalize(summary ?? '');
+    const tagNorm = turkishNormalize(tagText);
+
+    const insertEntry = this.db.prepare(`
+      INSERT INTO entries (
+        id, type, source, title, content, summary,
+        tag_text, title_norm, content_norm, summary_norm, tag_norm,
+        status, priority, sprint_id, sprint_num, lang,
+        decay_exempt, metadata
+      ) VALUES (
+        @id, @type, @source, @title, @content, @summary,
+        @tag_text, @title_norm, @content_norm, @summary_norm, @tag_norm,
+        @status, @priority, @sprint_id, @sprint_num, @lang,
+        @decay_exempt, @metadata
+      )
+    `);
+
+    const insertTag = this.db.prepare(
+      `INSERT INTO tags (entry_id, tag) VALUES (?, ?)`,
+    );
+
+    const insertRelation = this.db.prepare(
+      `INSERT OR IGNORE INTO relations (from_id, to_id, rel_type) VALUES (?, ?, ?)`,
+    );
+
+    const insertHistory = this.db.prepare(`
+      INSERT INTO entry_history (entry_id, field, old_value, new_value, changed_by, change_type)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    const txn = this.db.transaction(() => {
+      insertEntry.run({
+        id: input.id,
+        type: input.type,
+        source,
+        title: input.title,
+        content: input.content,
+        summary,
+        tag_text: tagText,
+        title_norm: titleNorm,
+        content_norm: contentNorm,
+        summary_norm: summaryNorm,
+        tag_norm: tagNorm,
+        status,
+        priority,
+        sprint_id: sprintId,
+        sprint_num: sprintNum,
+        lang,
+        decay_exempt: decayExempt,
+        metadata,
+      });
+
+      for (const tag of tags) {
+        insertTag.run(input.id, tag);
+      }
+
+      for (const rel of relations) {
+        insertRelation.run(input.id, rel.to_id, rel.rel_type);
+      }
+
+      // Auto-extract ADR references from content + title
+      const adrRefs = MemoryStore.extractAdrReferences(input.content + ' ' + input.title);
+      for (const adrId of adrRefs) {
+        // Don't self-reference
+        if (adrId !== input.id) {
+          insertRelation.run(input.id, adrId, 'references');
+        }
+      }
+
+      // Record create history
+      insertHistory.run(input.id, '*', null, null, 'system', 'create');
+    });
+
+    txn();
+  }
+
+  upsert(input: CreateEntryInput, changedBy: string): void {
+    const existing = this.db.prepare(
+      `SELECT * FROM entries WHERE id = ?`,
+    ).get(input.id) as EntryRow | undefined;
+
+    if (!existing) {
+      this.insert(input);
+      return;
+    }
+
+    // Compute new values
+    const source = input.source ?? 'system';
+    const summary = input.summary ?? null;
+    const tags = input.tags ?? [];
+    const status = input.status ?? 'active';
+    const priority = input.priority ?? 'normal';
+    const sprintId = input.sprint_id ?? null;
+    const sprintNum = input.sprint_num ?? 0;
+    const lang = input.lang ?? 'en';
+    const decayExempt = input.decay_exempt ? 1 : 0;
+    const metadata = JSON.stringify(input.metadata ?? {});
+
+    const tagText = tags.join(' ');
+    const titleNorm = turkishNormalize(input.title);
+    const contentNorm = turkishNormalize(input.content);
+    const summaryNorm = turkishNormalize(summary ?? '');
+    const tagNorm = turkishNormalize(tagText);
+
+    // Build diff of changed fields
+    const diffs: Array<{ field: string; oldVal: string | null; newVal: string | null }> = [];
+
+    const fieldMap: Array<[string, string | number | null, string | number | null]> = [
+      ['type', existing.type, input.type],
+      ['source', existing.source, source],
+      ['title', existing.title, input.title],
+      ['content', existing.content, input.content],
+      ['summary', existing.summary, summary],
+      ['tag_text', existing.tag_text, tagText],
+      ['status', existing.status, status],
+      ['priority', existing.priority, priority],
+      ['sprint_id', existing.sprint_id, sprintId],
+      ['sprint_num', existing.sprint_num, sprintNum],
+      ['lang', existing.lang, lang],
+      ['decay_exempt', existing.decay_exempt, decayExempt],
+      ['metadata', existing.metadata, metadata],
+    ];
+
+    for (const [field, oldVal, newVal] of fieldMap) {
+      const oldStr = oldVal === null ? null : String(oldVal);
+      const newStr = newVal === null ? null : String(newVal);
+      if (oldStr !== newStr) {
+        diffs.push({ field, oldVal: oldStr, newVal: newStr });
+      }
+    }
+
+    const updateEntry = this.db.prepare(`
+      UPDATE entries SET
+        type = @type,
+        source = @source,
+        title = @title,
+        content = @content,
+        summary = @summary,
+        tag_text = @tag_text,
+        title_norm = @title_norm,
+        content_norm = @content_norm,
+        summary_norm = @summary_norm,
+        tag_norm = @tag_norm,
+        status = @status,
+        priority = @priority,
+        sprint_id = @sprint_id,
+        sprint_num = @sprint_num,
+        lang = @lang,
+        decay_exempt = @decay_exempt,
+        metadata = @metadata,
+        updated_at = datetime('now')
+      WHERE id = @id
+    `);
+
+    const deleteTags = this.db.prepare(`DELETE FROM tags WHERE entry_id = ?`);
+    const insertTag = this.db.prepare(`INSERT INTO tags (entry_id, tag) VALUES (?, ?)`);
+    const insertHistory = this.db.prepare(`
+      INSERT INTO entry_history (entry_id, field, old_value, new_value, changed_by, change_type)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    const txn = this.db.transaction(() => {
+      updateEntry.run({
+        id: input.id,
+        type: input.type,
+        source,
+        title: input.title,
+        content: input.content,
+        summary,
+        tag_text: tagText,
+        title_norm: titleNorm,
+        content_norm: contentNorm,
+        summary_norm: summaryNorm,
+        tag_norm: tagNorm,
+        status,
+        priority,
+        sprint_id: sprintId,
+        sprint_num: sprintNum,
+        lang,
+        decay_exempt: decayExempt,
+        metadata,
+      });
+
+      // Replace tags
+      deleteTags.run(input.id);
+      for (const tag of tags) {
+        insertTag.run(input.id, tag);
+      }
+
+      // Record field-level history for each changed field
+      for (const diff of diffs) {
+        insertHistory.run(input.id, diff.field, diff.oldVal, diff.newVal, changedBy, 'update');
+      }
+    });
+
+    txn();
+  }
+
+  getById(id: string, opts?: { includeDeleted?: boolean }): MemoryEntryV2 | null {
+    const includeDeleted = opts?.includeDeleted ?? false;
+    const sql = includeDeleted
+      ? `SELECT * FROM entries WHERE id = ?`
+      : `SELECT * FROM entries WHERE id = ? AND deleted_at IS NULL`;
+    const row = this.db.prepare(sql).get(id) as EntryRow | undefined;
+    return row ? rowToEntry(row) : null;
+  }
+
+  getByType(type: string): MemoryEntryV2[] {
+    const rows = this.db.prepare(
+      `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL ORDER BY sprint_num DESC`,
+    ).all(type) as EntryRow[];
+    return rows.map(rowToEntry);
+  }
+
+  // ── Tags ─────────────────────────────────────────────────────
+
+  getTagsForEntry(entryId: string): string[] {
+    const rows = this.db.prepare(
+      `SELECT tag FROM tags WHERE entry_id = ?`,
+    ).all(entryId) as Array<{ tag: string }>;
+    return rows.map(r => r.tag);
+  }
+
+  getByTags(tags: string[]): MemoryEntryV2[] {
+    if (tags.length === 0) return [];
+    const placeholders = tags.map(() => '?').join(', ');
+    const rows = this.db.prepare(`
+      SELECT DISTINCT e.* FROM entries e
+      INNER JOIN tags t ON e.id = t.entry_id
+      WHERE t.tag IN (${placeholders})
+        AND e.deleted_at IS NULL
+    `).all(...tags) as EntryRow[];
+    return rows.map(rowToEntry);
+  }
+
+  // ── Relations ────────────────────────────────────────────────
+
+  getRelationsFrom(entryId: string): EntryRelation[] {
+    return this.db.prepare(
+      `SELECT * FROM relations WHERE from_id = ?`,
+    ).all(entryId) as EntryRelation[];
+  }
+
+  getRelationsTo(entryId: string): EntryRelation[] {
+    return this.db.prepare(
+      `SELECT * FROM relations WHERE to_id = ?`,
+    ).all(entryId) as EntryRelation[];
+  }
+
+  /**
+   * Insert a single relation between two entries.
+   * Uses INSERT OR IGNORE to avoid duplicates.
+   */
+  insertRelation(fromId: string, toId: string, relType: RelationType): void {
+    this.db.prepare(
+      `INSERT OR IGNORE INTO relations (from_id, to_id, rel_type) VALUES (?, ?, ?)`,
+    ).run(fromId, toId, relType);
+  }
+
+  /**
+   * Get all relations for an entry (both from and to directions).
+   * Returns a combined array of EntryRelation.
+   */
+  getRelations(entryId: string): EntryRelation[] {
+    return this.db.prepare(
+      `SELECT * FROM relations WHERE from_id = ? OR to_id = ?`,
+    ).all(entryId, entryId) as EntryRelation[];
+  }
+
+  /**
+   * Get total count of relations in the database.
+   */
+  countRelations(): number {
+    const row = this.db.prepare(
+      `SELECT COUNT(*) as cnt FROM relations`,
+    ).get() as { cnt: number };
+    return row.cnt;
+  }
+
+  /**
+   * Extract ADR references from text content.
+   * Matches patterns like ADR-001, ADR-039, etc.
+   * Returns normalized IDs like 'adr-001'.
+   */
+  static extractAdrReferences(text: string): string[] {
+    const matches = text.match(/\bADR-(\d{3})\b/g);
+    if (!matches) return [];
+    const unique = new Set(matches.map(m => m.toLowerCase()));
+    return [...unique];
+  }
+
+  // ── History ──────────────────────────────────────────────────
+
+  getHistory(entryId: string): EntryHistoryRecord[] {
+    return this.db.prepare(
+      `SELECT * FROM entry_history WHERE entry_id = ? ORDER BY id ASC`,
+    ).all(entryId) as EntryHistoryRecord[];
+  }
+
+  // ── Lifecycle ────────────────────────────────────────────────
+
+  softDelete(id: string, changedBy: string): void {
+    const txn = this.db.transaction(() => {
+      this.db.prepare(
+        `UPDATE entries SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      ).run(id);
+      this.db.prepare(`
+        INSERT INTO entry_history (entry_id, field, old_value, new_value, changed_by, change_type)
+        VALUES (?, 'deleted_at', NULL, datetime('now'), ?, 'soft_delete')
+      `).run(id, changedBy);
+    });
+    txn();
+  }
+
+  restore(id: string, changedBy: string): void {
+    const txn = this.db.transaction(() => {
+      this.db.prepare(
+        `UPDATE entries SET deleted_at = NULL, updated_at = datetime('now') WHERE id = ?`,
+      ).run(id);
+      this.db.prepare(`
+        INSERT INTO entry_history (entry_id, field, old_value, new_value, changed_by, change_type)
+        VALUES (?, 'deleted_at', datetime('now'), NULL, ?, 'restore')
+      `).run(id, changedBy);
+    });
+    txn();
+  }
+
+  decay(currentSprintNum: number, decayAfterSprints: number): { deletedCount: number } {
+    const threshold = currentSprintNum - decayAfterSprints;
+
+    // Find entries to decay
+    const toDecay = this.db.prepare(`
+      SELECT id FROM entries
+      WHERE sprint_num < ?
+        AND decay_exempt = 0
+        AND deleted_at IS NULL
+    `).all(threshold) as Array<{ id: string }>;
+
+    if (toDecay.length === 0) return { deletedCount: 0 };
+
+    const updateStmt = this.db.prepare(
+      `UPDATE entries SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    );
+    const historyStmt = this.db.prepare(`
+      INSERT INTO entry_history (entry_id, field, old_value, new_value, changed_by, change_type)
+      VALUES (?, 'deleted_at', NULL, datetime('now'), 'decay', 'decay')
+    `);
+
+    const txn = this.db.transaction(() => {
+      for (const row of toDecay) {
+        updateStmt.run(row.id);
+        historyStmt.run(row.id);
+      }
+    });
+
+    txn();
+    return { deletedCount: toDecay.length };
+  }
+
+  // ── Counts ───────────────────────────────────────────────────
+
+  countByType(): Map<string, number> {
+    const rows = this.db.prepare(`
+      SELECT type, COUNT(*) as cnt FROM entries WHERE deleted_at IS NULL GROUP BY type
+    `).all() as Array<{ type: string; cnt: number }>;
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      map.set(row.type, row.cnt);
+    }
+    return map;
+  }
+
+  totalCount(): number {
+    const row = this.db.prepare(
+      `SELECT COUNT(*) as cnt FROM entries WHERE deleted_at IS NULL`,
+    ).get() as { cnt: number };
+    return row.cnt;
+  }
+
+  // ── Schema & Raw Access ──────────────────────────────────────
+
+  getSchemaVersion(): number {
+    const row = this.db.prepare(
+      `SELECT MAX(version) as v FROM schema_version`,
+    ).get() as { v: number | null };
+    return row.v ?? 0;
+  }
+
+  close(): void {
+    this.db.close();
+  }
+
+  getRawDb(): DatabaseType {
+    return this.db;
+  }
+}

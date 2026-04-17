@@ -9,10 +9,13 @@ import type { Command } from 'commander';
 
 import { loadConfig } from '../../core/config.js';
 import { runSprint } from '../../orchestra/brain.js';
-import { readCheckpoint, hasCheckpoint } from '../../orchestra/sprint-checkpoint.js';
+import {
+  readCheckpoint, hasCheckpoint,
+  detectStaleWorkers,
+} from '../../orchestra/sprint-checkpoint.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { DECKENT_DIR } from '../../core/constants.js';
+import { DECKENT_DIR, TASKS_DIR } from '../../core/constants.js';
 
 // ─── Register ───────────────────────────────────────────────────────
 
@@ -44,14 +47,45 @@ export function registerResume(program: Command): void {
       print(`  Phase:   ${checkpoint.brainPhase}`);
       print(`  Completed tasks: ${checkpoint.completedTasks.length}`);
       print(`  Pending tasks:   ${checkpoint.pendingTasks.length}`);
-      print(`  Active workers:  ${checkpoint.activeWorkers.length} (will be killed before respawn)`);
+      print(`  Active workers:  ${checkpoint.activeWorkers.length}`);
+
+      // Detect stale heartbeats (>5min) among active workers
+      const staleWorkers = detectStaleWorkers(projectRoot, checkpoint);
+      if (staleWorkers.length > 0) {
+        print(`\n  ⚠ Stale workers detected: ${staleWorkers.length}`);
+        for (const sw of staleWorkers) {
+          const ageMin = Math.round(sw.ageMs / 60_000);
+          print(`    - ${sw.workerId} (task ${sw.taskId}): ${sw.reason}, age ${ageMin}min`);
+        }
+        print('  Stale workers will be killed and their tasks respawned.');
+      }
+
+      // Check which "active" workers actually completed (wrote .result before crash)
+      const completedDuringCrash: string[] = [];
+      for (const worker of checkpoint.activeWorkers) {
+        const resultPath = join(projectRoot, TASKS_DIR, `task-${worker.taskId}.result`);
+        if (existsSync(resultPath)) {
+          completedDuringCrash.push(worker.taskId);
+        }
+      }
+      if (completedDuringCrash.length > 0) {
+        print(`\n  ✓ Tasks completed before crash: ${completedDuringCrash.join(', ')}`);
+      }
+
+      // Calculate actual resumable count
+      const allCompletedIds = new Set([
+        ...checkpoint.completedTasks,
+        ...completedDuringCrash,
+      ]);
+      const resumableCount = checkpoint.pendingTasks.length +
+        staleWorkers.filter(w => !allCompletedIds.has(w.taskId)).length;
 
       if (opts.dryRun) {
-        print('\n[dry-run] Would resume with the above state. No workers spawned.');
+        print(`\n[dry-run] Would resume ${resumableCount} tasks. No workers spawned.`);
         return;
       }
 
-      if (checkpoint.pendingTasks.length === 0) {
+      if (resumableCount === 0 && checkpoint.pendingTasks.length === 0) {
         print('\nAll tasks already completed — nothing to resume.');
         print(`Run "deckent retro" to see the sprint retrospective.`);
         return;
@@ -66,7 +100,21 @@ export function registerResume(program: Command): void {
         process.exit(1);
       }
 
-      print('\nSpawning pending tasks...\n');
+      // Kill stale workers before respawn
+      if (staleWorkers.length > 0) {
+        print('\nKilling stale workers...');
+        for (const sw of staleWorkers) {
+          try {
+            // Try tmux kill first, then spawn backend kill
+            const { killWorker } = await import('../../orchestra/tmux.js');
+            killWorker(sw.taskId);
+          } catch {
+            // Worker may already be dead (SIGKILL scenario) — expected
+          }
+        }
+      }
+
+      print(`\nSpawning ${resumableCount} pending tasks...\n`);
 
       try {
         await runSprint(projectRoot, config, {

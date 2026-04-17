@@ -1,0 +1,115 @@
+{
+  "id": "143-011",
+  "title": "Rule Generator (Karar 4-B, 3 Provider)",
+  "description": "Rule Generator (Karar 4-B, 3 Provider)\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Agent: architect\n- Files: src/core/rule-generator.ts, rule-templates/*.template.md (3 yeni), provider-adapters/claude.ts, codex.ts, gemini.ts, tests/, .codex/rules/*, .gemini/rules/*\n- Scope: src/core/, src/orchestra/, tests/core/, .claude/, .codex/, .gemini/\n\n### Description\nTemplate engine: ADR entry'lerden `.claude/rules/brain.md` + `auditor.md` + `worker-default.md` üretir. 3 provider adapter (claude/codex/gemini). `<!-- AUTO-START -->` / `<!-- CUSTOM-START -->` ayrımı (user edits preserved). Sprint-finalizer regenerateRules() çağrısı.\n\n**Kanıt:** `ls .claude/rules/ .codex/rules/ .gemini/rules/` → 9 dosya (3 role × 3 provider).\n**Test:** 15+ test (template render, custom preservation, provider adapters, idempotency)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/",
+      "src/core/",
+      "src/orchestra/",
+      "tests/core/",
+      ".claude/",
+      ".codex/",
+      ".gemini/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/rule-generator.ts",
+      "rule-templates/*.template.md (3 yeni)",
+      "provider-adapters/claude.ts",
+      "codex.ts",
+      "gemini.ts",
+      ".codex/rules/*",
+      ".gemini/rules/*",
+      "template.md",
+      ".template",
+      "brain.md",
+      "auditor.md",
+      "worker-default.md",
+      "tests/core/rule-generator.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `ls .claude/rules/ .codex/rules/ .gemini/rules/` → 9 dosya (3 role × 3 provider).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "architect",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.39
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.2
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.05
+        },
+        {
+          "name": "rule-templates",
+          "weight": 0.05
+        },
+        {
+          "name": "provider-adapters",
+          "weight": 0.05
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "create",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 13,
+        "moduleCount": 5,
+        "crossCutting": true,
+        "estimatedSize": "epic"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.08,
+          "rule-templates/": 0.08,
+          "provider-adapters/": 0.08,
+          ".codex/": 0.08,
+          ".gemini/": 0.08,
+          "tests/": 0.08
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.08
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:20:43.812Z"
+}

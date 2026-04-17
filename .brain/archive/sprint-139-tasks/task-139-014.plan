@@ -1,0 +1,40 @@
+# Task 139-014: Auditor Cache Invalidation + lastHeartbeat Read Path
+
+## Problem
+Sprint 138 false positive stale alerts: worker DONE but auditor says "stale" because
+HB timestamp is old. Need mtime-based cache, multi-signal detection, and backend-agnostic checks.
+
+## Implementation Plan
+
+### A. mtime-based HB cache (auditor.ts)
+1. Add HeartbeatCache interface { hb: Heartbeat, mtimeMs: number }
+2. Add module-level Map<string, HeartbeatCache> for caching
+3. Create readHeartbeatCached(taskId, tasksDir) that checks statSync mtime before re-reading
+4. Use cached version in scanHeartbeats()
+
+### B. Multi-signal stale detection (auditor.ts)
+1. Create isWorkerAlive(hb, projectRoot, tasksDir) function
+2. Check 3 signals: HB freshness, .result exists, process/container running
+3. If 2+ signals active → alive (not stale)
+4. Add monotonic sequence check (if sequence increases, worker is alive)
+
+### C. Backend-agnostic process check (auditor.ts)
+1. Detect backend from HB.backend field (docker | tmux | subprocess)
+2. Docker: spawnSync('docker', ['ps', '--filter', 'name=deckent-w-NNN', ...])
+3. tmux: spawnSync('tmux', ['has-session', '-t', 'w-NNN'])
+4. subprocess: check PID from HB or kill(pid, 0)
+5. Fallback: if no backend info, skip process check
+
+### D. Integration into scanHeartbeats()
+1. Replace direct readJsonSafe with readHeartbeatCached
+2. Replace simple elapsed-time stale check with isWorkerAlive multi-signal
+3. Keep existing shouldReportStale as final reconciliation
+
+### E. Tests (auditor.test.ts)
+1. Cache invalidation test (mtime change → reread)
+2. Cache hit test (same mtime → no reread)
+3. Multi-signal: HB stale but result exists → not stale
+4. Multi-signal: HB stale but container running → not stale
+5. Each backend detection test (docker, tmux, subprocess)
+6. False positive regression test (Sprint 138 pattern)
+7. Sequence monotonic check

@@ -17,6 +17,7 @@ import {
   WORKER_TIMEOUT_SECONDS,
   TmuxError,
 } from '../../src/orchestra/tmux.js';
+import { ValidationError } from '../../src/core/validators.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
 
@@ -647,6 +648,61 @@ describe.skipIf(isWindows)('spawnWorker with adapter', () => {
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
     expect(cmdArg).toContain('claude -p - --model sonnet');
+  });
+});
+
+// ─── Task ID Validation Tests ─────────────────────────────────────
+describe.skipIf(isWindows)('taskId validation in public functions', () => {
+  const maliciousIds = [
+    '; rm -rf /',
+    '$(whoami)',
+    '`id`',
+    '| cat /etc/passwd',
+    '../etc/passwd',
+    'task\0evil',
+  ];
+
+  beforeEach(() => {
+    mockedSpawnSync.mockReturnValue({
+      status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
+    } as never);
+  });
+
+  for (const malId of maliciousIds) {
+    it(`spawnWorker rejects malicious taskId: ${JSON.stringify(malId)}`, () => {
+      expect(() => spawnWorker(malId, 'sonnet', 'prompt', '/project')).toThrow(ValidationError);
+      // spawnSync should NOT have been called — validation fires first
+      expect(mockedSpawnSync).not.toHaveBeenCalled();
+    });
+  }
+
+  for (const malId of maliciousIds) {
+    it(`killWorker rejects malicious taskId: ${JSON.stringify(malId)}`, () => {
+      expect(() => killWorker(malId)).toThrow(ValidationError);
+      expect(mockedSpawnSync).not.toHaveBeenCalled();
+    });
+  }
+
+  for (const malId of maliciousIds) {
+    it(`attachToWorkerPane rejects malicious taskId: ${JSON.stringify(malId)}`, () => {
+      expect(() => attachToWorkerPane(malId)).toThrow(ValidationError);
+      expect(mockedSpawnSync).not.toHaveBeenCalled();
+    });
+  }
+
+  it('buildWorkerCommand rejects malicious taskId', () => {
+    expect(() => buildWorkerCommand('opus', '/tmp/p.txt', undefined, undefined, '; rm -rf /')).toThrow(ValidationError);
+  });
+
+  it('buildWorkerCommand accepts valid taskId', () => {
+    const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
+    expect(cmd).toContain('claude');
+    expect(cmd).toContain('001-001');
+  });
+
+  it('spawnWorker accepts valid taskId and proceeds normally', () => {
+    spawnWorker('task-001', 'sonnet', 'build the feature', '/project');
+    expect(mockedSpawnSync).toHaveBeenCalled();
   });
 });
 

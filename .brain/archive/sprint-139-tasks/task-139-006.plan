@@ -1,0 +1,19 @@
+# Task 139-006: Dashboard vs MCP State Divergence Retest
+
+## Plan
+
+### 1. status.ts:211 catch bloğu — error expose
+- `catch` → `catch (err)` — parametreyi yakala
+- `err instanceof Error ? err.message : String(err)` ile mesajı çıkar
+- Stack trace dahil: `err instanceof Error ? err.stack : undefined`
+- Response'a `errorDetail` alanı ekle (Task 10 ile uyumlu)
+- `debugLog` benzeri console.error ile gerçek trace logla
+
+### 2. sprint-state.ts audit
+- Mevcut implementation kontrol: read path doğru mu?
+- Relative path kullanımı (`join('.deckent', ...)`) — projectRoot'a göre doğru çalışıyor mu?
+
+### 3. Test yazımı (tests/mcp/tools/ ve tests/monitor/)
+- MCP state test: parse error expose, error detail field
+- CLI state convergence: CLI ve MCP aynı sprint ID okur
+- Error stack trace test: bozuk dashboard → errorDetail alanı

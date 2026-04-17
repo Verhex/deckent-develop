@@ -184,115 +184,13 @@ describe('registerStartTool', () => {
     });
   });
 
-  // ── Job State Tracking ───────────────────────────────────────────────────
-
-  describe('job state tracking', () => {
-    it('writes COMPLETE state with sprintId when runSprint resolves', async () => {
-      let resolveRun!: (sprint: Sprint) => void;
-      vi.mocked(runSprint).mockReturnValue(
-        new Promise<Sprint>((resolve) => { resolveRun = resolve; }),
-      );
-
-      const tool = await getStartTool();
-      await tool.handler({ autoApprove: false });
-
-      resolveRun(MOCK_SPRINT);
-      await new Promise((r) => setTimeout(r, 20));
-
-      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ status: 'COMPLETE', sprintId: 'sprint-007' }),
-      );
-    });
-
-    it('writes COMPLETE state with completedAt timestamp', async () => {
-      let resolveRun!: (sprint: Sprint) => void;
-      vi.mocked(runSprint).mockReturnValue(
-        new Promise<Sprint>((resolve) => { resolveRun = resolve; }),
-      );
-
-      const tool = await getStartTool();
-      await tool.handler({ autoApprove: false });
-
-      resolveRun(MOCK_SPRINT);
-      await new Promise((r) => setTimeout(r, 20));
-
-      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          status: 'COMPLETE',
-          completedAt: expect.any(String),
-        }),
-      );
-    });
-
-    it('writes FAILED state with error message when runSprint rejects', async () => {
-      let rejectRun!: (err: Error) => void;
-      vi.mocked(runSprint).mockReturnValue(
-        new Promise<Sprint>((_, reject) => { rejectRun = reject; }),
-      );
-
-      const tool = await getStartTool();
-      await tool.handler({ autoApprove: false });
-
-      rejectRun(new Error('plan phase failed'));
-      await new Promise((r) => setTimeout(r, 20));
-
-      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ status: 'FAILED', error: 'plan phase failed' }),
-      );
-    });
-
-    it('captures BrainError phase info in FAILED state', async () => {
-      const { BrainError } = await import('../../../src/orchestra/brain.js');
-      let rejectRun!: (err: Error) => void;
-      vi.mocked(runSprint).mockReturnValue(
-        new Promise<Sprint>((_, reject) => { rejectRun = reject; }),
-      );
-
-      const tool = await getStartTool();
-      await tool.handler({ autoApprove: false });
-
-      rejectRun(new BrainError('quota exceeded', 'SPAWN'));
-      await new Promise((r) => setTimeout(r, 20));
-
-      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          status: 'FAILED',
-          error: expect.stringContaining('SPAWN'),
-        }),
-      );
-    });
-  });
-
-  // ── autoApprove Parameter ────────────────────────────────────────────────
-
-  describe('autoApprove parameter', () => {
-    it('passes autoApprove: true to runSprint when set', async () => {
-      const tool = await getStartTool();
-      await tool.handler({ autoApprove: true });
-
-      expect(vi.mocked(runSprint)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.anything(),
-        expect.objectContaining({ autoApprove: true }),
-      );
-    });
-
-    it('always passes autoApprove: true to runSprint (IMMUTABLE)', async () => {
-      const tool = await getStartTool();
-      await tool.handler({ autoApprove: false });
-
-      // autoApprove is hardcoded true — schema param ignored at runtime
-      expect(vi.mocked(runSprint)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.anything(),
-        expect.objectContaining({ autoApprove: true }),
-      );
-    });
-  });
+  // NOTE: "Job State Tracking" and "autoApprove Parameter" describe blocks
+  // removed (2026-04-17, T-143-012 MCP Disconnect Fix). runSprint() is no
+  // longer called in the handler's process — the handler now fork()s a
+  // detached sprint-runner-entry.js child, so in-process runSprint mocks
+  // are invisible. COMPLETE/FAILED state tracking and autoApprove payload
+  // propagation must be covered by an integration test that inspects the
+  // forked IPC config file. Tracked as Sprint 144 debt.
 
   // ── Error Handling ───────────────────────────────────────────────────────
 
@@ -324,14 +222,9 @@ describe('registerStartTool', () => {
       expect(result.isError).toBe(true);
     });
 
-    it('does not call runSprint when loadConfig fails', async () => {
-      vi.mocked(loadConfig).mockRejectedValue(new Error('no config'));
-
-      const tool = await getStartTool();
-      await tool.handler({ autoApprove: false });
-
-      expect(vi.mocked(runSprint)).not.toHaveBeenCalled();
-    });
+    // "does not call runSprint when loadConfig fails" removed — runSprint is
+    // now invoked inside a forked child, so the ana-process mock is never
+    // called regardless of loadConfig outcome; the assertion is vacuous.
   });
 
   // ── Enriched Response ────────────────────────────────────────────────────

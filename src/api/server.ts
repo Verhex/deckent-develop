@@ -1,7 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
-import { randomBytes, createHash, timingSafeEqual, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
@@ -75,27 +75,15 @@ export function generateApiToken(): string {
   return randomBytes(32).toString('hex');
 }
 
-/**
- * Hash a token with SHA-256 so timingSafeEqual always compares equal-length buffers.
- * This prevents length-based timing side-channels.
- */
-function hashToken(token: string): Buffer {
-  return createHash('sha256').update(token).digest();
-}
+// ─── Security Headers ───────────────────────────────────────────
 
-/** Check bearer token from Authorization header using timing-safe comparison */
-function checkAuth(req: IncomingMessage, token: string | null): boolean {
-  // If no token configured, auth is disabled (backward-compatible)
-  if (!token) return true;
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return false;
-  const [scheme, value] = authHeader.split(' ', 2);
-  if (scheme !== 'Bearer' || value === undefined) return false;
-  // Use SHA-256 hashes so buffers are always 32 bytes — required by timingSafeEqual
-  const expected = hashToken(token);
-  const actual = hashToken(value);
-  return timingSafeEqual(actual, expected);
-}
+const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'X-XSS-Protection': '0',
+};
 
 // ─── Zod Schemas for POST validation ────────────────────────────
 const StartSchema = z.object({ autoApprove: z.boolean().optional() });
@@ -136,6 +124,7 @@ function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': `http://localhost:${DEFAULT_PORT}`,
+    ...SECURITY_HEADERS,
   });
   res.end(body);
 }
@@ -258,7 +247,7 @@ async function handleRequest(
   sseClients: Set<ServerResponse>,
   staticDir?: string,
   initWatcher?: () => void,
-  apiToken?: string | null,
+  _apiToken?: string | null,
   rateLimiter?: RateLimiter,
   authMiddleware?: (req: IncomingMessage, res: ServerResponse) => boolean,
 ): Promise<void> {
@@ -276,17 +265,24 @@ async function handleRequest(
     }
   }
 
-  const origin = req.headers['origin'] ?? `http://localhost:${DEFAULT_PORT}`;
-  const allowedOrigin = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')
-    ? origin
-    : `http://localhost:${DEFAULT_PORT}`;
+  const origin = req.headers['origin'] ?? '';
+  // Strict CORS: only localhost/127.0.0.1 with explicit port — wildcard never allowed
+  const isAllowedOrigin = /^http:\/\/(?:localhost|127\.0\.0\.1):\d+$/.test(origin);
+  const allowedOrigin = isAllowedOrigin ? origin : `http://localhost:${DEFAULT_PORT}`;
 
   // CORS preflight
   if (method === 'OPTIONS') {
+    if (!isAllowedOrigin && origin !== '') {
+      // Reject CORS preflight from disallowed origins
+      res.writeHead(403, { 'Content-Type': 'application/json', ...SECURITY_HEADERS });
+      res.end(JSON.stringify({ error: 'CORS origin not allowed' }));
+      return;
+    }
     res.writeHead(200, {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      ...SECURITY_HEADERS,
     });
     res.end();
     return;
@@ -295,12 +291,6 @@ async function handleRequest(
   // Auth check for all API routes (health endpoint exempt, handled by bearerAuthMiddleware)
   if (url.startsWith('/api/') && authMiddleware) {
     if (!authMiddleware(req, res)) return;
-  } else if (url.startsWith('/api/') && method === 'POST') {
-    // Legacy fallback: if no authMiddleware provided, check POST-only (backward-compat)
-    if (!checkAuth(req, apiToken ?? null)) {
-      sendError(res, 401, 'Unauthorized — provide Authorization: Bearer <token>');
-      return;
-    }
   }
 
   // ─── Health endpoint (always accessible, no auth) ──────────
@@ -738,10 +728,10 @@ export function createHttpServer(
   // Resolve final token: explicit param > env var fallback
   const finalToken = resolveAuthToken(resolvedToken);
 
-  // Warn once at startup if no auth token is configured
-  if (!finalToken) {
+  // Inform at startup about auth status
+  if (!finalToken && process.env['DECKENT_API_AUTH_DISABLED'] !== '1') {
     process.stderr.write(
-      '[deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_auth_token to enable auth.\n',
+      '[deckent:info] No API token configured. All API requests will require auth (401). Set DECKENT_API_TOKEN or config.api_auth_token to provide a token.\n',
     );
   }
 

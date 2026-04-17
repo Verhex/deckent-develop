@@ -1492,7 +1492,10 @@ describe('init command', () => {
     expect(content).toContain('my-project');
     expect(content).toContain('@.deckent/workspace/IDENTITY.md');
     expect(content).toContain('@DIRECTIVES.md');
-    expect(content).toContain('@.brain/MEMORY.md');
+    // Memory V2 (Sprint 141+): MEMORY.md is an auto-generated export.
+    // DECKENT.md now references the summary export directly instead of the
+    // legacy .brain/MEMORY.md file.
+    expect(content).toContain('@.brain/exports/summary.md');
     expect(content).toContain('@.claude/rules/brain.md');
     expect(content).toContain('@.deckent/workspace/BOOT.md');
   });

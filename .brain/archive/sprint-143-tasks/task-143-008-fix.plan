@@ -1,0 +1,37 @@
+# Task 143-008-fix: Memory V2 Tam Migrasyon (ci-reporter + managed-docs)
+
+## Baseline Analysis
+All 3 target files already have DB-first patterns with file-based fallbacks.
+The task requires removing legacy file-based fallback code so that:
+`grep -rn "readFileSync.*\.brain/\(RETRO\|MEMORY\|DEBT\|PATTERNS\|sprints/\)" src/` → 0 results
+
+## Changes Required
+
+### 1. ci-reporter.ts
+- Lines 183-196: Remove legacy file-based RETRO.md write in `appendCiHealthToRetro()`
+- Lines 261-288: Remove legacy file-based MEMORY.md write in `appendCiLearningsToMemory()`
+- Remove unused imports: MEMORY_FILE, RETRO_FILE, MEMORY_MAX_LINES, RETRO_MAX_LINES, writeFileSync
+- Remove unused import: trimMemoryWithHeader from sprint-retro-writer.js
+
+### 2. content-generators.ts
+- Lines 190-203: Remove legacy file-based DEBT.md read fallback in active-debt generator
+- Lines 239-259: Remove legacy file-based sprints/ read fallback in sprint-history generator
+- Remove unused imports: DEBT_FILE, SPRINTS_DIR, readdirSync
+
+### 3. template-renderer.ts
+- Lines 76-85: Remove legacy file-based sprints/ read fallback in buildTemplateScope()
+- Remove unused imports: SPRINTS_DIR, readdirSync, existsSync, readFileSync (if fully unused)
+
+### 4. Tests
+- Update existing tests or write new ones to verify DB-only path works
+- Ensure no regressions in test suite
+
+## Approach
+- Keep DB-first path intact
+- When store is not available, return empty/default data instead of reading files
+- This is the correct V2 behavior: if no DB, there's no data (cold start)
+
+## Verify
+- tsc --noEmit
+- npx vitest run
+- grep verification: 0 results for legacy patterns in src/

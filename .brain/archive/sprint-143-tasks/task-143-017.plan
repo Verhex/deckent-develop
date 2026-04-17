@@ -1,0 +1,36 @@
+# Task 143-017: E2E Harness (Chain Safety Foundation)
+
+## Approach
+1. Create `tests/e2e/chain-safety.e2e.test.ts` — new file with 10+ E2E scenarios for chain safety gate
+2. Extend `tests/e2e/sprint-lifecycle.e2e.test.ts` — add chain-related lifecycle test
+3. Create `scripts/run-e2e-harness.mjs` — standalone runner for `npm run e2e:chain`
+
+## Chain Safety Gate Logic (simulated)
+The chain safety gate runs 5 checks after sprint finalization:
+1. doctor PASS
+2. tsc --noEmit 0 errors
+3. vitest ≥99% pass
+4. Sprint cost <$100 (subs mode threshold)
+5. NO_GO count <3
+
+PASS → auto-trigger next sprint
+FAIL → abort + notify
+
+## Test Scenarios (chain-safety.e2e.test.ts)
+1. All 5 checks pass → PASS gate → auto-trigger signal
+2. 3+ NO_GO tasks → FAIL gate → abort
+3. Cost >$100 → FAIL gate → abort
+4. Doctor failure → FAIL gate
+5. tsc errors → FAIL gate
+6. vitest <99% pass → FAIL gate
+7. Exactly 2 NO_GO → still PASS (boundary)
+8. Cost exactly $100 → still PASS (boundary)
+9. Mixed failures (cost + NO_GO) → FAIL
+10. Empty sprint (0 tasks) → PASS (edge case)
+11. All NO_GO sprint → FAIL + abort-notify
+12. PASS gate returns next sprint trigger info
+
+## Files Modified
+- tests/e2e/chain-safety.e2e.test.ts (NEW)
+- tests/e2e/sprint-lifecycle.e2e.test.ts (EXTEND)
+- scripts/run-e2e-harness.mjs (NEW)

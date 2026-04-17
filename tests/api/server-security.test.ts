@@ -66,6 +66,17 @@ const mockDeepMerge = vi.mocked(deepMerge);
 
 const PROJECT_ROOT = '/tmp/test-project';
 
+// Global auth bypass for non-auth-focused tests
+let _stderrSpy: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+  process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+  _stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+});
+afterEach(() => {
+  delete process.env['DECKENT_API_AUTH_DISABLED'];
+  _stderrSpy?.mockRestore();
+});
+
 function request(
   api: HttpApi,
   path: string,
@@ -255,6 +266,7 @@ describe('Server Security Hardening', () => {
     });
 
     it('POST requires auth when autoGenerateToken is set', async () => {
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
       const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
       api = createHttpServer(PROJECT_ROOT, { port: 0, autoGenerateToken: true, rateLimit: 0 });
       await new Promise<void>((r) => api.server.once('listening', r));
@@ -301,16 +313,16 @@ describe('Server Security Hardening', () => {
       expect(res.headers['access-control-allow-origin']).toBe('http://localhost:5173');
     });
 
-    it('rejects non-localhost origin', async () => {
+    it('rejects non-localhost origin with 403', async () => {
       api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
       await new Promise<void>((r) => api.server.once('listening', r));
 
       const res = await request(api, '/api/status', 'OPTIONS', undefined, {
         'Origin': 'http://evil.com',
       });
-      expect(res.status).toBe(200);
-      // Should fall back to default localhost origin
-      expect(res.headers['access-control-allow-origin']).toMatch(/localhost/);
+      expect(res.status).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe('CORS origin not allowed');
     });
   });
 

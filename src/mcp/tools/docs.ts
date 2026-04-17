@@ -7,6 +7,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { addDoc, removeDoc, loadDocsConfig, saveDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { runManagedDocUpdates, buildStandaloneDocContext } from '../../orchestra/managed-docs/managed-doc-runner.js';
+import { validatePath } from '../../core/validators.js';
 
 export function registerDocsTool(server: McpServer): void {
   server.registerTool(
@@ -65,6 +66,7 @@ export function registerDocsTool(server: McpServer): void {
               isError: true,
             };
           }
+          validatePath(root, file);
           const config = loadDocsConfig(root);
           if (!config) {
             return {
@@ -105,6 +107,7 @@ export function registerDocsTool(server: McpServer): void {
               isError: true,
             };
           }
+          validatePath(root, file);
           if (!existsSync(join(root, file))) {
             return {
               content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: `File not found: ${file}` }) }],
@@ -124,6 +127,7 @@ export function registerDocsTool(server: McpServer): void {
             isError: true,
           };
         }
+        validatePath(root, file);
         const removed = removeDoc(root, file);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: removed, message: removed ? `Removed: ${file}` : `Not found: ${file}` }) }],

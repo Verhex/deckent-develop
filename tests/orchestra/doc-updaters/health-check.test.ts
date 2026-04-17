@@ -6,12 +6,14 @@ import type { Sprint, SprintMetrics } from '../../../src/core/types.js';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
 }));
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 const mockedExistsSync = vi.mocked(existsSync);
+const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
 
@@ -67,14 +69,38 @@ describe('healthCheckUpdater', () => {
     expect(healthCheckUpdater.shouldRun(ctx)).toBe(false);
   });
 
-  it('shouldRun returns false when file does not exist', () => {
+  it('shouldRun returns true for internal project (file existence not required)', () => {
     mockedExistsSync.mockReturnValue(false);
-    expect(healthCheckUpdater.shouldRun(makeCtx())).toBe(false);
+    expect(healthCheckUpdater.shouldRun(makeCtx())).toBe(true);
   });
 
   it('shouldRun returns true for internal project with file present', () => {
     mockedExistsSync.mockReturnValue(true);
     expect(healthCheckUpdater.shouldRun(makeCtx())).toBe(true);
+  });
+
+  it('creates file when it does not exist', () => {
+    mockedExistsSync.mockReturnValue(false);
+    const result = healthCheckUpdater.run(makeCtx());
+
+    expect(result.updated).toBe(true);
+    expect(result.reason).toBe('created');
+    expect(mockedWriteFileSync).toHaveBeenCalledOnce();
+    const written = String(mockedWriteFileSync.mock.calls[0][1]);
+    expect(written).toContain('Post-Sprint 20');
+    expect(written).toContain('| Tests | 5 |');
+    expect(written).toContain('| Sprints | 20 |');
+  });
+
+  it('uses consistent HEALTH_DOC_PATH in shouldRun and run', () => {
+    // Both shouldRun and run should reference docs/reference/health-check.md
+    expect(healthCheckUpdater.targetFile).toBe('docs/reference/health-check.md');
+    // run() with existing file should read from the same path
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('# No metrics\n');
+    healthCheckUpdater.run(makeCtx());
+    const readPath = String(mockedReadFileSync.mock.calls[0][0]);
+    expect(readPath).toContain('docs/reference/health-check.md');
   });
 
   it('updates metric table rows', () => {
@@ -103,11 +129,12 @@ describe('healthCheckUpdater', () => {
     expect(written).toContain(`Last audit: ${yearMonth}`);
   });
 
-  it('returns skipped_not_found when file missing at run time', () => {
+  it('creates file with correct content when missing at run time', () => {
     mockedExistsSync.mockReturnValue(false);
     const result = healthCheckUpdater.run(makeCtx());
-    expect(result.updated).toBe(false);
-    expect(result.reason).toBe('skipped_not_found');
+    expect(result.updated).toBe(true);
+    expect(result.reason).toBe('created');
+    expect(mockedWriteFileSync).toHaveBeenCalledOnce();
   });
 
   it('returns skipped_no_changes when nothing matches', () => {

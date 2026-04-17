@@ -1,0 +1,36 @@
+# Task 143-013: Auto-Archive Guard (Task 3 Regression Protection)
+
+## Problem
+`archiveOrphanTasks()` in sprint-docs-updater.ts archives ALL task files matching the sprint prefix,
+including PENDING and EXECUTING tasks. This is destructive — if a sprint crashes mid-execution
+and cleanup runs, in-progress tasks are lost.
+
+## Solution
+
+### 1. Create `src/orchestra/task-restoration.ts`
+- `createPreArchiveSnapshot(projectRoot, sprintId)` — tar.gz + SHA-256 hash before archive
+- `verifySnapshot(snapshotPath, expectedHash)` — verify integrity
+- `restoreFromSnapshot(projectRoot, sprintId)` — restore tasks from snapshot
+- `getActiveTaskStatuses(tasksDir, sprintPrefix)` — read task JSON to check status
+- `filterArchivableTasks(files, tasksDir, sprintPrefix)` — only DONE/NO_GO files are archivable
+
+### 2. Modify `sprint-finalizer.ts` Step 12b
+- Before calling `archiveOrphanTasks()`, call `createPreArchiveSnapshot()`
+- Replace direct `archiveOrphanTasks()` call with guarded version that preserves PENDING/EXECUTING
+
+### 3. Tests (10+)
+- Snapshot creation with correct hash
+- Snapshot hash verification (valid + tampered)
+- PENDING task preservation during archive
+- EXECUTING task preservation during archive
+- DONE task archived correctly
+- NO_GO task archived correctly
+- Restore roundtrip from snapshot
+- Empty tasks dir handling
+- Missing snapshot file error handling
+- Multiple status mix (DONE + PENDING + EXECUTING)
+
+## Files Changed
+- src/orchestra/task-restoration.ts (NEW)
+- src/orchestra/sprint-finalizer.ts (MODIFIED)
+- tests/orchestra/auto-archive.test.ts (NEW)

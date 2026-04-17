@@ -54,6 +54,17 @@ const mockWriteFileSync = vi.mocked(writeFileSync);
 
 const PROJECT_ROOT = '/tmp/edge-test-project';
 
+// Global auth bypass for non-auth-focused tests
+let _stderrSpy: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+  process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+  _stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+});
+afterEach(() => {
+  delete process.env['DECKENT_API_AUTH_DISABLED'];
+  _stderrSpy?.mockRestore();
+});
+
 // ─── Helpers ────────────────────────────────────────────────────
 
 function makeRequest(
@@ -136,16 +147,18 @@ describe('checkAuth edge cases', () => {
     vi.clearAllMocks();
     _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
+    // Auth tests need real auth behavior
+    delete process.env['DECKENT_API_AUTH_DISABLED'];
   });
 
   afterEach(async () => {
     if (api) await api.close();
   });
 
-  it('allows POST with no token configured (auth disabled)', async () => {
+  it('returns 401 when no token configured (secure by default)', async () => {
     api = await startServer();
     const res = await makeRequest(api, '/api/start', { method: 'POST', body: {} });
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(401);
   });
 
   it('returns 401 when Authorization header is absent and token is configured', async () => {
@@ -314,11 +327,11 @@ describe('CORS edge cases', () => {
     expect(res['access-control-allow-origin']).toMatch(/^http:\/\/(localhost|127\.0\.0\.1)/);
   });
 
-  it('OPTIONS preflight with non-localhost origin uses default CORS', async () => {
+  it('OPTIONS preflight with non-localhost origin returns 403 CORS reject', async () => {
     api = await startServer();
     const addr = api.server.address() as { port: number };
 
-    const res = await new Promise<{ status: number; headers: http.IncomingHttpHeaders }>((resolve, reject) => {
+    const res = await new Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }>((resolve, reject) => {
       const req = http.request(
         {
           hostname: '127.0.0.1',
@@ -328,16 +341,17 @@ describe('CORS edge cases', () => {
           headers: { Origin: 'https://attacker.com' },
         },
         (r) => {
-          resolve({ status: r.statusCode!, headers: r.headers });
-          r.destroy();
+          let data = '';
+          r.on('data', (chunk) => { data += chunk; });
+          r.on('end', () => resolve({ status: r.statusCode!, body: data, headers: r.headers }));
         },
       );
       req.on('error', reject);
       req.end();
     });
 
-    expect(res.status).toBe(200);
-    expect(res.headers['access-control-allow-origin']).not.toBe('https://attacker.com');
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body).error).toBe('CORS origin not allowed');
   });
 });
 
@@ -534,6 +548,7 @@ describe('Error response edge cases', () => {
   });
 
   it('returns 401 with correct error message format', async () => {
+    delete process.env['DECKENT_API_AUTH_DISABLED'];
     api = await startServer({ apiToken: 'token' });
     const res = await makeRequest(api, '/api/start', { method: 'POST', body: {} });
     expect(res.status).toBe(401);

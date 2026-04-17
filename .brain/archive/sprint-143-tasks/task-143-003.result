@@ -1,0 +1,28 @@
+{
+  "taskId": "143-003",
+  "filesChanged": [
+    ".gitignore",
+    "scripts/verify-gitignore.mjs",
+    "src/cli/commands/doctor.ts",
+    "tests/cli/commands/doctor.test.ts"
+  ],
+  "linesAdded": 105,
+  "linesRemoved": 2,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "1. git rm --cached .brain/memory.db — removed from git index (0 results from git ls-files). 2. .gitignore already had correct entries (memory.db, -shm, -wal). 3. Created scripts/verify-gitignore.mjs — checks gitignore entries + git tracking status, exits 0/1. 4. Added checkGitignore() to doctor.ts runDoctorChecks — validates gitignore entries exist AND files not tracked. 5. Added 5 tests to doctor.test.ts (pass, tracked, missing gitignore, missing entry, not-required). 6. Updated existing test for total check count 14→15. All 215 doctor-related tests pass. tsc --noEmit passes (only pre-existing checkpoint.ts unused import error).",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 5000,
+    "cacheReadTokens": 30000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

@@ -496,6 +496,18 @@ registry.set('DECKENT_E066', {
   howToFix: ['Check experiment status', 'Create a new experiment if needed'],
 });
 
+registry.set('DECKENT_E067', {
+  message: 'rule template not found',
+  suggestion: 'Verify the template file exists in the rule-templates directory',
+  whatHappened: 'rule-generator could not locate a role template file on disk.',
+  why: 'Rule generation requires template files for each role (brain, auditor, worker-default).',
+  howToFix: [
+    'Check that src/core/rule-templates/<role>.template.md exists',
+    'Reinstall Deckent if templates are missing from the package',
+    'Pass a custom templateDir to loadTemplate() if templates live elsewhere',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {

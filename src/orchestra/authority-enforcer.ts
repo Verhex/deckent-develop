@@ -6,7 +6,8 @@
 // and emitted to the event stream but do NOT block the action.
 // Sprint 140+: Hard enforcement (planned).
 
-import { normalize } from 'node:path';
+import { normalize, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { writeEvent } from './event-stream.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -428,6 +429,230 @@ export function emitAuthorityViolation(
   }
 }
 
+// ─── Layer 4: ADR Compliance Enforcement ────────────────────────────
+// Runtime checks for ADR-006 (spawnSync shell:true), ADR-008 (core→orchestra
+// import), ADR-010 (package.json deps whitelist). Violations produce NO_GO +
+// amendment proposals. Fail-safe: enforcer errors → task continues.
+
+/** A single ADR compliance violation found in worker output. */
+export interface AdrViolation {
+  taskId: string;
+  adrId: string;
+  file: string;
+  line: number;
+  description: string;
+  amendmentProposal: string;
+}
+
+/** Result of ADR compliance enforcement. */
+export interface AdrComplianceResult {
+  pass: boolean;
+  violations: AdrViolation[];
+  /** If the enforcer itself failed, this captures the error message */
+  enforcerError?: string;
+}
+
+/** Allowed runtime dependencies per ADR-010 (amended Sprint 143). */
+const ADR010_DEPS_WHITELIST = new Set([
+  'commander',
+  'better-sqlite3',
+  '@modelcontextprotocol/sdk',
+  'zod',
+]);
+
+/**
+ * ADR-006: Check for `shell: true` in spawnSync/execSync calls.
+ * Scans .ts file contents for shell: true patterns.
+ */
+function checkAdr006(taskId: string, filePath: string, content: string): AdrViolation[] {
+  const violations: AdrViolation[] = [];
+  const lines = content.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    // Match shell: true in spawnSync/execSync/spawn options
+    if (/shell\s*:\s*true/.test(line)) {
+      violations.push({
+        taskId,
+        adrId: 'adr-006',
+        file: filePath,
+        line: i + 1,
+        description: `ADR-006 violation: \`shell: true\` found at line ${i + 1}. All commands must use \`spawnSync(binary, [...args])\` without shell interpretation.`,
+        amendmentProposal: 'Remove `shell: true` and pass command + args array to spawnSync/execSync.',
+      });
+    }
+  }
+
+  return violations;
+}
+
+/**
+ * ADR-008: Check for core/ modules importing from orchestra/.
+ * Only applies to files under src/core/.
+ */
+function checkAdr008(taskId: string, filePath: string, content: string): AdrViolation[] {
+  const violations: AdrViolation[] = [];
+  // Only check files in src/core/
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  if (!normalizedPath.includes('src/core/')) return violations;
+
+  const lines = content.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    // Match import/require from orchestra path
+    if (/(?:import|require)\s*\(?\s*['"].*\/orchestra\//.test(line) ||
+        /from\s+['"].*\/orchestra\//.test(line)) {
+      violations.push({
+        taskId,
+        adrId: 'adr-008',
+        file: filePath,
+        line: i + 1,
+        description: `ADR-008 violation: core/ module imports from orchestra/ at line ${i + 1}. Brain is the ONLY module that imports orchestra/. core/ must not depend on orchestra/.`,
+        amendmentProposal: 'Move the shared logic to core/ or use dependency inversion (interface in core/, implementation in orchestra/).',
+      });
+    }
+  }
+
+  return violations;
+}
+
+/**
+ * ADR-010: Check package.json dependencies against whitelist.
+ * Only applies when package.json is in the changed files list.
+ */
+function checkAdr010(taskId: string, filePath: string, content: string): AdrViolation[] {
+  const violations: AdrViolation[] = [];
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  if (!normalizedPath.endsWith('package.json')) return violations;
+
+  try {
+    const pkg = JSON.parse(content) as { dependencies?: Record<string, string> };
+    if (!pkg.dependencies) return violations;
+
+    for (const dep of Object.keys(pkg.dependencies)) {
+      if (!ADR010_DEPS_WHITELIST.has(dep)) {
+        violations.push({
+          taskId,
+          adrId: 'adr-010',
+          file: filePath,
+          line: 0,
+          description: `ADR-010 violation: runtime dependency "${dep}" is not in the allowed whitelist [${[...ADR010_DEPS_WHITELIST].join(', ')}].`,
+          amendmentProposal: `Remove "${dep}" from dependencies, or amend ADR-010 with justification for adding it.`,
+        });
+      }
+    }
+  } catch {
+    // Malformed package.json — not an ADR violation, skip
+  }
+
+  return violations;
+}
+
+/**
+ * Enforce ADR compliance on worker-changed files.
+ *
+ * Scans the listed files for violations of ADR-006, ADR-008, and ADR-010.
+ * Returns a result with pass/fail status and any violations found.
+ *
+ * **Fail-safe**: If the enforcer itself throws (e.g., file read error),
+ * the task is NOT blocked — the error is captured in `enforcerError`.
+ *
+ * @param projectRoot - Absolute path to project root
+ * @param sprintId - Current sprint identifier
+ * @param taskId - The task being evaluated
+ * @param changedFiles - List of files changed by the worker (relative paths)
+ * @returns AdrComplianceResult with violations (if any)
+ */
+export function enforceAdrCompliance(
+  projectRoot: string,
+  sprintId: string,
+  taskId: string,
+  changedFiles: string[],
+): AdrComplianceResult {
+  try {
+    const violations: AdrViolation[] = [];
+
+    for (const file of changedFiles) {
+      let content: string;
+      try {
+        content = readFileSync(join(projectRoot, file), 'utf-8');
+      } catch {
+        // File doesn't exist or can't be read — skip (may have been deleted)
+        continue;
+      }
+
+      // ADR-006: spawnSync shell:true check (all .ts files)
+      if (file.endsWith('.ts')) {
+        violations.push(...checkAdr006(taskId, file, content));
+      }
+
+      // ADR-008: core→orchestra import check (core/ .ts files)
+      if (file.endsWith('.ts')) {
+        violations.push(...checkAdr008(taskId, file, content));
+      }
+
+      // ADR-010: package.json deps whitelist check
+      if (file.endsWith('package.json')) {
+        violations.push(...checkAdr010(taskId, file, content));
+      }
+    }
+
+    // Emit breadcrumb events for each violation
+    for (const v of violations) {
+      try {
+        writeEvent(
+          projectRoot,
+          sprintId,
+          'auditor',
+          'brain',
+          'AUDITOR→BRAIN:ADR_VIOLATION',
+          {
+            taskId: v.taskId,
+            adrId: v.adrId,
+            file: v.file,
+            line: v.line,
+            description: v.description,
+            amendmentProposal: v.amendmentProposal,
+          },
+        );
+      } catch {
+        // Fail-safe: event write failure must not block enforcement
+      }
+    }
+
+    return {
+      pass: violations.length === 0,
+      violations,
+    };
+  } catch (err) {
+    // Fail-safe: enforcer crash → task continues, error is logged
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    try {
+      writeEvent(
+        projectRoot,
+        sprintId,
+        'auditor',
+        'brain',
+        'AUDITOR→BRAIN:ADR_VIOLATION',
+        {
+          taskId,
+          enforcerError: errorMsg,
+          description: 'ADR compliance enforcer failed — task proceeds (fail-safe)',
+        },
+      );
+    } catch {
+      // Double fail-safe
+    }
+
+    return {
+      pass: true, // Fail-safe: do not block the task
+      violations: [],
+      enforcerError: errorMsg,
+    };
+  }
+}
+
 // ─── Exports for Testing ─────────────────────────────────────────────
 
 /** Exposed for unit testing — do not use directly in production code. */
@@ -435,4 +660,8 @@ export const _testing = {
   pathMatches,
   normalizePath,
   AUTHORITY_MATRIX,
+  checkAdr006,
+  checkAdr008,
+  checkAdr010,
+  ADR010_DEPS_WHITELIST,
 };

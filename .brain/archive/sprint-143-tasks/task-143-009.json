@@ -1,0 +1,106 @@
+{
+  "id": "143-009",
+  "title": "DECISIONS.md Archive + init.ts DB Preload",
+  "description": "DECISIONS.md Archive + init.ts DB Preload\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Agent: refactorer\n- Files: scripts/archive-decisions-md.mjs (yeni), src/cli/commands/init.ts, src/core/adr-seed.ts (yeni), .gitignore, tests/cli/init.test.ts\n- Scope: src/cli/commands/, src/core/, scripts/, tests/cli/\n\n### Description\n`.brain/DECISIONS.md` (1505 satır) → `.brain/archive/decisions-root-pre-sprint143/`. Hash verify. init.ts DB preload: 40 ADR seed (src/core/adr-seed.ts) + identity entry. Template referansları `@.brain/MEMORY.md` → `@.brain/exports/summary.md`.\n\n**Kanıt:** `ls .brain/DECISIONS.md` → no such file. Yeni proje init sonrası `sqlite3 .brain/memory.db \"SELECT COUNT(*)\"` → ≥41.\n**Test:** 6+ test\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "src/core/",
+      "tests/cli/",
+      "scripts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "scripts/archive-decisions-md.mjs (yeni)",
+      "src/cli/commands/init.ts",
+      "src/core/adr-seed.ts (yeni)",
+      ".gitignore",
+      "tests/cli/init.test.ts",
+      "src/core/adr-seed.ts",
+      "DECISIONS.md",
+      "MEMORY.md",
+      "summary.md",
+      "init.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `ls .brain/DECISIONS.md` → no such file. Yeni proje init sonrası `sqlite3 .brain/memory.db \"SELECT COUNT(*)\"` → ≥41.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceAgent": "refactorer",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "refactorer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.75
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.29
+        },
+        {
+          "name": "core",
+          "weight": 0.21
+        },
+        {
+          "name": "scripts",
+          "weight": 0.14
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 10,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "scripts/": 0.1,
+          "src/": 0.3,
+          "tests/": 0.1
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.1
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:20:30.337Z"
+}

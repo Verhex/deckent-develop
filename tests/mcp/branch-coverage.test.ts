@@ -312,47 +312,12 @@ describe('MCP Branch Coverage', () => {
 
   // ─── start.ts: background job error handling ───────────────────────
   describe('deckent_start — background job error handling', () => {
-    it('writes FAILED job state with BrainError phase info', async () => {
-      const { registerStartTool } = await import('../../src/mcp/tools/start.js');
-      const mock = createMockServer();
-      registerStartTool(mock as unknown as import('@modelcontextprotocol/sdk/server/mcp.js').McpServer);
-
-      vi.mocked(loadConfig).mockResolvedValue({
-        mode: 'max_plan',
-        activeModeConfig: {
-          max_workers: 8, brain_model: 'opus', default_model: 'sonnet',
-          haiku_allowed: true,
-        },
-        modes: {} as import('../../src/core/types.js').ResolvedConfig['modes'],
-        language: 'en', projectName: 'test', projectRoot: '/tmp/test', version: '0.1.0',
-      });
-
-      const brainError = new (BrainError as unknown as new (msg: string, phase?: string) => Error & { phase?: string })('spawn failed', 'SPAWN');
-      let rejectRun!: (err: Error) => void;
-      const runPromise = new Promise<never>((_, reject) => { rejectRun = reject; });
-      vi.mocked(runSprint).mockReturnValue(runPromise);
-
-      const result = await mock.tools.get('deckent_start')!.handler({ autoApprove: false });
-      const parsed = JSON.parse(result.content[0]!.text);
-      const data = parsed.data ?? parsed;
-
-      // Returns immediately with RUNNING
-      expect(data.success).toBe(true);
-      expect(data.status).toBe('RUNNING');
-
-      // Reject in background
-      rejectRun(brainError);
-      await new Promise(r => setTimeout(r, 10));
-
-      // writeJobState should have been called with FAILED and phase info
-      expect(vi.mocked(writeJobState)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          status: 'FAILED',
-          error: expect.stringContaining('Sprint failed at phase SPAWN'),
-        }),
-      );
-    });
+    // NOTE: "writes FAILED job state with BrainError phase info" removed
+    // (2026-04-17, T-143-012 MCP Disconnect Fix). runSprint now runs in a
+    // detached forked child, so in-process rejection of a runSprint mock
+    // cannot drive the ana-process writeJobState. Same removal reasoning as
+    // tests/mcp/tools.test.ts and tests/mcp/tools/start.test.ts. Sprint 144
+    // debt: integration-level FAILED-state test via IPC file inspection.
 
     it('handles non-Error thrown values in loadConfig', async () => {
       const { registerStartTool } = await import('../../src/mcp/tools/start.js');

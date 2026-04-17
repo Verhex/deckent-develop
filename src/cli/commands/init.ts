@@ -35,7 +35,6 @@ import {
   CLAUDE_FILE,
   DECKENT_FILE,
   MEMORY_FILE,
-  DECISIONS_FILE,
   DEBT_FILE,
   PATTERNS_FILE,
   RETRO_FILE,
@@ -62,6 +61,8 @@ import type { ProviderName } from '../../core/task-types.js';
 import { getModePreset } from '../../core/mode-presets.js';
 import { runDoctorChecks } from './doctor.js';
 import { isDockerAvailable } from '../../orchestra/spawn-backend-docker.js';
+import { ADR_SEED_DATA, createIdentitySeed } from '../../core/adr-seed.js';
+import { MemoryStore } from '../../core/memory-store.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -683,12 +684,26 @@ globs: ["**/*"]
           : generateDirectivesTemplateEN(stackResult, projectName);
         writeIfNotExists(join(root, DIRECTIVES_FILE), directivesContent);
 
-        // 10. Brain files
+        // 10. Brain files (Memory V2: DB-first, .md files are legacy exports)
         writeIfNotExists(join(root, BRAIN_DIR, MEMORY_FILE), '# Learned Patterns\n');
-        writeIfNotExists(join(root, BRAIN_DIR, DECISIONS_FILE), '# Architecture Decisions\n');
+        // DECISIONS.md no longer created — ADRs are seeded into memory.db (see 10-db below)
         writeIfNotExists(join(root, BRAIN_DIR, DEBT_FILE), '# Tech Debt\n');
         writeIfNotExists(join(root, BRAIN_DIR, PATTERNS_FILE), '# Detected Patterns\n');
         writeIfNotExists(join(root, BRAIN_DIR, RETRO_FILE), '# Sprint Retrospective\n');
+        ensureDir(join(root, BRAIN_DIR, 'exports'));
+
+        // 10-db. Memory V2 DB preload — seed ADRs + identity entry on fresh init
+        const dbPath = join(root, BRAIN_DIR, 'memory.db');
+        if (!existsSync(dbPath)) {
+          try {
+            const store = new MemoryStore(dbPath);
+            for (const adr of ADR_SEED_DATA) {
+              store.insert(adr);
+            }
+            store.insert(createIdentitySeed(projectName));
+            store.close();
+          } catch { /* non-fatal — DB preload failure doesn't block init */ }
+        }
 
         // 10a. PROJECT-IDENTITY.md (permanent memory — never decayed)
         const identityLanguage = detectedAnalysis?.language ?? stackResult.language ?? 'unknown';
@@ -1137,7 +1152,7 @@ Detaylı rehber: .deckent/docs/directives-guide.md
 
 ## Context
 @DIRECTIVES.md
-@.brain/MEMORY.md
+@.brain/exports/summary.md
 @.contracts/api-surface.md
 
 ## Agent Roles
@@ -1198,7 +1213,7 @@ Detailed guide: .deckent/docs/directives-guide.md
 
 ## Context
 @DIRECTIVES.md
-@.brain/MEMORY.md
+@.brain/exports/summary.md
 @.contracts/api-surface.md
 
 ## Agent Roles

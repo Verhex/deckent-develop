@@ -3,10 +3,10 @@
 // Reads .deckent/docs.json, generates content for auto sections,
 // and updates target files while preserving protected sections.
 
-import { existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { debugLog } from '../../core/utils.js';
-import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import type { DocUpdateContext, DocUpdateResult } from '../doc-updaters/types.js';
 import type { Sprint, SprintMetrics, SprintResult, ResolvedConfig } from '../../core/types.js';
 import { loadDocsConfig } from './docs-config.js';
@@ -15,6 +15,7 @@ import { updateDocSections, trimToMaxLines } from './section-updater.js';
 import { renderTemplate } from './template-renderer.js';
 import { loadUserGeneratorsSync } from './plugin-loader.js';
 import { contentHash, readDocCache, writeDocCache } from './doc-cache.js';
+import { MemoryStore } from '../../core/memory-store.js';
 
 /**
  * Run managed doc updates for all configured documents.
@@ -139,23 +140,37 @@ function emptyMetrics(): SprintMetrics {
 
 /**
  * Build a DocUpdateContext for standalone (non-sprint) doc updates.
- * Reads the latest sprint ID from .brain/sprints/ if available.
+ * DB-first: reads latest sprint ID from MemoryStore when available.
+ * Falls back to .brain/sprints/ directory scan.
  * Returns null if no docs config is found.
  */
 export function buildStandaloneDocContext(projectRoot: string): DocUpdateContext | null {
   const config = loadDocsConfig(projectRoot);
   if (!config || config.docs.length === 0) return null;
 
-  // Try to find the latest sprint ID
-  let sprintId = 'standalone';
+  // Try to open MemoryStore (non-fatal)
+  let store: MemoryStore | undefined;
   try {
-    const sprintsDir = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
-    if (existsSync(sprintsDir)) {
-      const files = readdirSync(sprintsDir).filter(f => f.endsWith('.md')).sort();
-      const latestFile = files.at(-1);
-      if (latestFile) sprintId = latestFile.replace('.md', '');
+    const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+    if (existsSync(dbPath)) {
+      store = new MemoryStore(dbPath);
     }
-  } catch { /* non-fatal */ }
+  } catch { /* non-fatal — DB might be locked or corrupted */ }
+
+  // Try to find the latest sprint ID — DB-first
+  let sprintId = 'standalone';
+  if (store) {
+    try {
+      const sprintEntries = store.getByType('sprint');
+      if (sprintEntries.length > 0) {
+        const sorted = [...sprintEntries].sort((a, b) => a.sprint_num - b.sprint_num);
+        const latest = sorted.at(-1);
+        if (latest?.sprint_id) sprintId = latest.sprint_id;
+        else if (latest?.id) sprintId = latest.id;
+      }
+    } catch { /* fall through to file-based */ }
+  }
+  // V2: no file-based fallback — DB is single source of truth
 
   const sprintResult: SprintResult = {
     sprint: { id: sprintId, number: parseInt(sprintId.replace(/\D/g, '') || '0', 10), tasks: [] } as unknown as Sprint,
@@ -178,5 +193,6 @@ export function buildStandaloneDocContext(projectRoot: string): DocUpdateContext
     sprintResult,
     config: { language, auto_docs: { tier1: true, tier2: true, tier3: true } } as ResolvedConfig,
     isInternalProject: existsSync(join(projectRoot, 'DECKENT-MASTER-BLUEPRINT.md')),
+    store,
   };
 }

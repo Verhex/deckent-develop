@@ -1,0 +1,45 @@
+# Task 143-006: FTS5 Query Builder Fix — Execution Plan
+
+## Root Cause
+`escapeFts5Query()` joins tokens with space (implicit AND in FTS5). Users expect OR by default for broader recall.
+Silent `catch {}` swallows FTS5 errors — impossible to debug.
+No `mode` parameter in `MemoryQueryParams`.
+
+## Changes
+
+### 1. NEW: src/core/debug-log.ts
+- Structured stderr logger with 4 levels (debug, info, warn, error)
+- Controlled by DECKENT_DEBUG env var
+- Timestamps + level prefix
+
+### 2. MODIFY: src/core/memory-types.ts → Add `mode` to MemoryQueryParams
+- `mode?: 'and' | 'or'` (default 'or')
+
+### 3. MODIFY: src/core/memory-query.ts
+- `escapeFts5Query(input, mode)` — join with OR or space (AND)
+- `ftsSearch()` pass mode through
+- Replace silent catch with `MemoryQueryError` throw + debugLog.error
+- `buildAutoQuery()` → force `mode: 'or'`
+
+### 4. MODIFY: src/cli/commands/recall.ts
+- Add `--mode=and|or` CLI flag
+
+### 5. MODIFY: src/mcp/tools/memory-query.ts
+- Add `mode` parameter to Zod schema
+
+### 6. Tests (15+)
+- tests/core/debug-log.test.ts (4 tests)
+- tests/core/memory-query.test.ts (extend: 8+ new tests for dual-mode, error, etc.)
+- tests/cli/commands/recall.test.ts (2 tests)
+- tests/mcp/tools/memory-query.test.ts (2 tests)
+
+## Files
+- src/core/debug-log.ts (NEW)
+- src/core/memory-types.ts (mode field — NOTE: in scope via src/core/)
+- src/core/memory-query.ts (MODIFY)
+- src/cli/commands/recall.ts (MODIFY)
+- src/mcp/tools/memory-query.ts (MODIFY)
+- tests/core/debug-log.test.ts (NEW)
+- tests/core/memory-query.test.ts (EXTEND)
+- tests/cli/commands/recall.test.ts (NEW)
+- tests/mcp/tools/memory-query.test.ts (NEW)

@@ -1,0 +1,109 @@
+{
+  "id": "143-007",
+  "title": "Relations Hibrit — Backfill + Write-time (Karar 3-C)",
+  "description": "Relations Hibrit — Backfill + Write-time (Karar 3-C)\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Agent: architect\n- Files: scripts/backfill-relations.mjs (yeni), src/core/memory-store.ts, src/core/memory-types.ts, src/orchestra/task-builder.ts, src/orchestra/sprint-finalizer.ts, src/cli/commands/memory.ts, tests/\n- Scope: scripts/, src/core/, src/orchestra/, src/cli/commands/, tests/\n\n### Description\n`Relation` + `RelationType` types. `MemoryStore.insertRelation()` + `getRelations()` + `insert()` auto-extract ADR references (regex `\\bADR-\\d{3}\\b`). Backfill script 65 entry tarar → `.brain/exports/relations-backfill-preview.md`. `deckent memory relations review` komutu manuel gate (y/n per relation). Sprint finalize triple-link (sprint-log → memory → retro `depends_on`).\n\n**Kanıt:** `sqlite3 .brain/memory.db \"SELECT COUNT(*) FROM relations\"` → ≥80. source dağılımı: backfill ≥80, auto-extract ≥20, finalizer ≥2.\n**Test:** 20+ test (pattern extraction, auto-extract, finalizer triple-link, gate workflow)\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/",
+      "src/core/",
+      "src/orchestra/",
+      "src/cli/commands/",
+      "scripts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "scripts/backfill-relations.mjs (yeni)",
+      "src/core/memory-store.ts",
+      "src/core/memory-types.ts",
+      "src/orchestra/task-builder.ts",
+      "src/orchestra/sprint-finalizer.ts",
+      "src/cli/commands/memory.ts",
+      "relations-backfill-preview.md",
+      "tests/core/memory-store.test.ts",
+      "tests/core/memory-types.test.ts",
+      "tests/orchestra/task-builder.test.ts",
+      "tests/orchestra/sprint-finalizer.test.ts",
+      "tests/cli/commands/memory.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `sqlite3 .brain/memory.db \"SELECT COUNT(*) FROM relations\"` → ≥80. source dağılımı: backfill ≥80, auto-extract ≥20, finalizer ≥2.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-143",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "architect",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-17T07:46:56.615Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.79
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.29
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.29
+        },
+        {
+          "name": "cli",
+          "weight": 0.18
+        },
+        {
+          "name": "scripts",
+          "weight": 0.12
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.67
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 12,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "epic"
+      },
+      "scope": {
+        "writeRatio": {
+          "scripts/": 0.08,
+          "src/": 0.42,
+          "tests/": 0.42
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.42
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-17T09:20:00.798Z"
+}

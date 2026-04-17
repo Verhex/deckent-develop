@@ -1,0 +1,20 @@
+{
+  "taskId": "139-051",
+  "filesChanged": [
+    ".brain/DECISIONS.md",
+    "src/orchestra/self-modifying-detector.ts",
+    "tests/orchestra/self-modifying-detector.test.ts"
+  ],
+  "linesAdded": 509,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ADR-039 Self-Modifying Task Detection written (MADR v3 hibrit format, ~100 lines). Note: Task description referenced ADR-038 but that number was already used by Dead Code Disposition (Sprint 139 audit). Used next available number ADR-039 instead. Runtime module src/orchestra/self-modifying-detector.ts created (163 LoC) with 3 public functions: detectDeckentRepo(), isSelfModifying(), isSelfModifyingSprint(). 23 tests all passing. tsc --noEmit clean. npm run lint:adr passes (40 ADRs validated). Runtime smoke test confirms isSelfModifyingSprint === true for this repo with src/orchestra/ scope. Integration points (sprint-spawner wave sequencing, sprint-finalizer MCP restart hook) documented in ADR but deferred to Sprint 140+ per ADR scope.",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 95
+  }
+}

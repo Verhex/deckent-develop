@@ -3,9 +3,8 @@
 // a DocUpdateContext. Provides a lightweight alternative to built-in generators
 // for users who want custom content without writing TypeScript.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 import { AgentPoolManager } from '../../core/agent-pool.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
 import { modelRegistry } from '../../core/model-registry.js';
@@ -62,15 +61,17 @@ export function buildTemplateScope(ctx: DocUpdateContext): Record<string, unknow
   }
   scope.taskCounts = { done, techDebt, noGo, total: evals.size };
 
-  // Latest sprint ID from .brain/sprints/
-  try {
-    const sprintsDir = join(ctx.projectRoot, BRAIN_DIR, SPRINTS_DIR);
-    if (existsSync(sprintsDir)) {
-      const files = readdirSync(sprintsDir).filter(f => f.endsWith('.md')).sort();
-      scope.latestSprintId = files.at(-1)?.replace('.md', '') ?? null;
-      scope.totalSprints = files.length;
-    }
-  } catch { /* non-fatal */ }
+  // Latest sprint ID from MemoryStore (V2: DB is single source of truth)
+  if (ctx.store) {
+    try {
+      const sprintEntries = ctx.store.getByType('sprint');
+      if (sprintEntries.length > 0) {
+        const sorted = [...sprintEntries].sort((a, b) => a.sprint_num - b.sprint_num);
+        scope.latestSprintId = sorted.at(-1)?.sprint_id ?? sorted.at(-1)?.id ?? null;
+        scope.totalSprints = sprintEntries.length;
+      }
+    } catch { /* non-fatal */ }
+  }
 
   // package.json version
   try {

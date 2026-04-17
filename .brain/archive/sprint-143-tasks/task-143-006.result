@@ -1,0 +1,34 @@
+{
+  "taskId": "143-006",
+  "filesChanged": [
+    "src/core/debug-log.ts",
+    "src/core/memory-query.ts",
+    "src/core/memory-types.ts",
+    "src/cli/commands/recall.ts",
+    "src/mcp/tools/memory-query.ts",
+    "tests/core/debug-log.test.ts",
+    "tests/core/memory-query.test.ts",
+    "tests/cli/commands/recall.test.ts",
+    "tests/mcp/tools/memory-query.test.ts"
+  ],
+  "linesAdded": 320,
+  "linesRemoved": 25,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "FTS5 Query Builder Fix completed. Changes: (1) NEW src/core/debug-log.ts — structured stderr logger with 4 levels, controlled by DECKENT_DEBUG env var. (2) escapeFts5Query() now accepts mode param: 'or' (default, broader recall with OR join) or 'and' (implicit AND, all tokens must match). Smart operator deduplication prevents 'OR OR' when user writes explicit operators. (3) Silent catch in ftsSearch() replaced with MemoryQueryError class + debugLog.error. (4) buildAutoQuery() forces mode:'or' for Brain lifecycle. (5) CLI --mode=and|or flag on recall command. (6) MCP tool mode parameter added. 44 tests pass (4 debug-log + 34 memory-query + 4 MCP schema + 2 CLI recall). Pre-existing tsc errors in memory-store.ts and memory.ts (from other tasks) not affected.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 120000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

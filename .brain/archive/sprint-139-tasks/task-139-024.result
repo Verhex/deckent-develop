@@ -1,0 +1,20 @@
+{
+  "taskId": "139-024",
+  "filesChanged": [
+    "src/orchestra/result-evaluator.ts",
+    "src/orchestra/sprint-spawner.ts",
+    "tests/orchestra/result-evaluator.test.ts"
+  ],
+  "linesAdded": 225,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 90,
+  "selfAssessment": "DONE",
+  "notes": "Implemented Runtime vs Code Issue Discriminator as specified.\n\n**Alt-iş A: classifyFailure() — result-evaluator.ts**\n- `FailureCategory` = 'RUNTIME' | 'CODE' | 'AMBIGUOUS'\n- `FailureContext` interface: exitCode, notes, errorOutput, selfAssessment, resultFilePresent\n- `FailureClassification` interface: category, signals, reason\n- RUNTIME_PATTERNS (16 regex): exitCode 137/SIGKILL, Docker HB shutdown, container lifecycle, OOM, network errors\n- CODE_PATTERNS (14 regex): tsc errors, TypeScript type errors, test failures, scope violations, syntax errors\n- `classifyFailure(ctx)`: hard rule exitCode 137→RUNTIME, no result file→RUNTIME signal; scans text for patterns; mixed→AMBIGUOUS\n- `CascadeDecision` interface: shouldRetry, shouldCascade, spawnFixWorker, category, reason\n- `decideCascadeAction(taskId, ctx)`: RUNTIME→retry=true cascade=false, CODE→retry=false cascade=true spawnFixWorker=true, AMBIGUOUS→retry=true cascade=false (Alperen Q1 risk-taking)\n\n**Alt-iş B: evaluateFailureCascade() — sprint-spawner.ts**\n- Imported classifyFailure types from result-evaluator.ts\n- `evaluateFailureCascade(projectRoot, taskId, ctx)` wrapper\n- Calls decideCascadeAction, emits FIX_REQUEST event to event stream with failureCategory, shouldRetry, shouldCascade, spawnFixWorker fields\n- Re-exports FailureContext, CascadeDecision, FailureClassification, FailureCategory types\n\n**Tests: 12 new tests in result-evaluator.test.ts**\n- classifyFailure: exitCode 137→RUNTIME, Docker HB note→RUNTIME, tsc error→CODE, test failure→CODE, mixed→AMBIGUOUS, no signals→AMBIGUOUS, 'no such container'→RUNTIME, scope violation→CODE (8 tests)\n- decideCascadeAction: RUNTIME cascade logic, CODE cascade logic, AMBIGUOUS cascade logic, taskId in reason string (4 tests)\n\n**Verify:**\n- tsc --noEmit: 0 errors in changed files (pre-existing sprint-finalizer.ts TS6133 unrelated)\n- vitest run result-evaluator.test.ts: 130/130 pass\n- vitest run sprint-spawner.test.ts: 43/43 pass\n- Total: 401 tests pass across 3 test files",
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 90
+  }
+}

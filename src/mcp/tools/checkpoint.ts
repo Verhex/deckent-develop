@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { enrichResponse } from '../helpers/enrich.js';
+import { validateSprintId, validatePhase, validatePath } from '../../core/validators.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -48,8 +49,11 @@ function listCheckpoints(root: string): Array<{ sprintId: string; phase: string;
 }
 
 function updateCheckpointStatus(root: string, sprintId: string, phase: string, status: 'approved' | 'rejected'): { success: boolean; message: string } {
+  validateSprintId(sprintId);
+  validatePhase(phase);
   const dir = getCheckpointsDir(root);
   const filePath = join(dir, `checkpoint-${sprintId}-${phase}.json`);
+  validatePath(dir, `checkpoint-${sprintId}-${phase}.json`);
 
   if (!existsSync(filePath)) {
     return { success: false, message: `Checkpoint not found: ${sprintId}/${phase}` };
@@ -107,6 +111,9 @@ export function registerCheckpointTool(server: McpServer): void {
             isError: true,
           };
         }
+
+        validateSprintId(sprintId);
+        validatePhase(phase);
 
         const status = action === 'approve' ? 'approved' as const : 'rejected' as const;
         const result = updateCheckpointStatus(root, sprintId, phase, status);
