@@ -3,7 +3,7 @@ import type { ModelType, ProviderName } from './types.js';
 import type { ResolvedConfig } from './config-types.js';
 import { PROVIDER_MODEL_MAP } from './task-types.js';
 import { getEquivalentModel } from './model-equivalence.js';
-import { Connector } from '../orchestra/connector.js';
+import { Connector } from './session-interface.js';
 import { loadDeckSecrets } from './deck-file.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────

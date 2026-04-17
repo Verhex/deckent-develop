@@ -71,8 +71,9 @@ describe('ADR Seed Data (adr-seed.ts)', () => {
 
 describe('init.ts template references', () => {
   it('DECKENT.md templates reference exports/summary.md, not MEMORY.md', async () => {
+    // Templates moved to init-templates.ts (Sprint 144 Task 1 split)
     const initContent = readFileSync(
-      join(process.cwd(), 'src', 'cli', 'commands', 'init.ts'),
+      join(process.cwd(), 'src', 'cli', 'commands', 'init-templates.ts'),
       'utf-8',
     );
 
@@ -91,8 +92,9 @@ describe('init.ts template references', () => {
   });
 
   it('init.ts does not create DECISIONS.md for new projects', () => {
+    // Brain files logic moved to init-steps.ts (Sprint 144 Task 1 split)
     const initContent = readFileSync(
-      join(process.cwd(), 'src', 'cli', 'commands', 'init.ts'),
+      join(process.cwd(), 'src', 'cli', 'commands', 'init-steps.ts'),
       'utf-8',
     );
 

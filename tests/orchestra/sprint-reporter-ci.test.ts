@@ -7,9 +7,11 @@ import {
   readCiReportTrend,
   formatCiHealthSection,
   appendCiHealthToRetro,
+  appendCiLearningsToMemory,
   type CiTrend,
   type CiTrendEntry,
 } from '../../src/orchestra/sprint-reporter.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,7 +41,9 @@ function makeCiReportData(overrides: {
       testFailed: overrides.testFailed ?? 0,
       coverage: overrides.coverage ?? 95.0,
     },
+    delta: { newTests: 0, regressions: overrides.testFailed ?? 0, coverageDelta: 0 },
     tscPassed: overrides.tscPassed ?? true,
+    buildPassed: true,
     timestamp: '2026-03-26T10:00:00.000Z',
   };
 }
@@ -221,12 +225,152 @@ describe('appendCiHealthToRetro', () => {
 
   // NOTE: 3 tests removed (2026-04-17, Sprint 143 cleanup). In Memory V2 the
   // function no longer writes to RETRO.md — it upserts a retro entry into the
-  // MemoryStore when a store is provided, otherwise it is a no-op. The old
-  // RETRO.md-based assertions are semantically invalid under the new
-  // architecture. Removed tests: "does nothing when RETRO.md does not exist"
-  // (unrelated TypeError from missing delta defaults in formatCiHealthSection),
-  // "appends CI Health section to RETRO.md", "is idempotent — does not append
-  // twice". Sprint 144 debt: add DB-write coverage (pass a MemoryStore and
-  // assert via store.getById) and defensive-default fix for the
-  // formatCiHealthSection coverageDelta access path.
+  // MemoryStore when a store is provided, otherwise it is a no-op.
+
+  it('does nothing when CI report does not exist (no store)', () => {
+    expect(() => appendCiHealthToRetro(tmpDir, 'sprint-missing')).not.toThrow();
+  });
+});
+
+// ─── appendCiHealthToRetro — DB-write coverage ───────────────────────────────
+
+describe('appendCiHealthToRetro — DB-write coverage', () => {
+  let tmpDir: string;
+  let brainDir: string;
+  let store: MemoryStore;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+    brainDir = join(tmpDir, '.brain');
+    mkdirSync(brainDir, { recursive: true });
+    store = new MemoryStore(':memory:');
+  });
+
+  afterEach(() => {
+    store.close();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('upserts retro entry into DB when CI report exists and store is provided', () => {
+    writeCiReportFile(brainDir, 'sprint-001', makeCiReportData({ sprintId: 'sprint-001' }));
+
+    appendCiHealthToRetro(tmpDir, 'sprint-001', store);
+
+    const entry = store.getById('retro-ci-health-sprint-001');
+    expect(entry).not.toBeNull();
+    expect(entry!.type).toBe('retro');
+    expect(entry!.title).toContain('sprint-001');
+  });
+
+  it('validates DB entry content contains CI Health section', () => {
+    writeCiReportFile(brainDir, 'sprint-042', makeCiReportData({
+      sprintId: 'sprint-042',
+      testCount: 200,
+      testFailed: 0,
+      coverage: 93.5,
+      tscPassed: true,
+    }));
+
+    appendCiHealthToRetro(tmpDir, 'sprint-042', store);
+
+    const entry = store.getById('retro-ci-health-sprint-042');
+    expect(entry).not.toBeNull();
+    expect(entry!.content).toContain('## CI Health');
+    expect(entry!.content).toContain('PASS');
+    expect(entry!.content).toContain('93.5%');
+    expect(entry!.sprint_id).toBe('sprint-042');
+  });
+
+  it('is idempotent — calling twice results in only 1 DB entry (no duplicate)', () => {
+    writeCiReportFile(brainDir, 'sprint-010', makeCiReportData({ sprintId: 'sprint-010' }));
+
+    appendCiHealthToRetro(tmpDir, 'sprint-010', store);
+    appendCiHealthToRetro(tmpDir, 'sprint-010', store); // second call — should skip
+
+    const entry = store.getById('retro-ci-health-sprint-010');
+    expect(entry).not.toBeNull();
+    expect(entry!.id).toBe('retro-ci-health-sprint-010');
+  });
+
+  it('is a no-op when store is undefined — does not throw', () => {
+    writeCiReportFile(brainDir, 'sprint-001', makeCiReportData({ sprintId: 'sprint-001' }));
+    expect(() => appendCiHealthToRetro(tmpDir, 'sprint-001', undefined)).not.toThrow();
+  });
+
+  it('is a no-op when CI report does not exist — does not write to DB', () => {
+    appendCiHealthToRetro(tmpDir, 'sprint-999', store);
+    const entry = store.getById('retro-ci-health-sprint-999');
+    expect(entry).toBeNull();
+  });
+
+  it('DB entry tags include ci-health and retro', () => {
+    writeCiReportFile(brainDir, 'sprint-005', makeCiReportData({ sprintId: 'sprint-005' }));
+
+    appendCiHealthToRetro(tmpDir, 'sprint-005', store);
+
+    const entry = store.getById('retro-ci-health-sprint-005');
+    expect(entry).not.toBeNull();
+    // tags are stored in a separate table — use getTagsForEntry
+    const tags = store.getTagsForEntry('retro-ci-health-sprint-005');
+    expect(tags).toContain('ci-health');
+    expect(tags).toContain('retro');
+  });
+});
+
+// ─── appendCiLearningsToMemory — DB-write coverage ───────────────────────────
+
+describe('appendCiLearningsToMemory — DB-write coverage', () => {
+  let store: MemoryStore;
+
+  function makeFakeLearningResult() {
+    return {
+      reports: [
+        {
+          sprintId: 'sprint-001',
+          baseline: { testCount: 98, coverage: 91.0 },
+          result: { testCount: 100, testPassed: 98, testFailed: 2, coverage: 92.0 },
+          delta: { newTests: 2, regressions: 2, coverageDelta: 1.0 },
+          tscPassed: true,
+          buildPassed: true,
+          timestamp: '2026-01-01T00:00:00Z',
+        },
+      ],
+      patterns: [],
+      suggestions: [],
+      configSuggestions: [],
+      summary: 'Sprint 001 CI summary',
+    };
+  }
+
+  beforeEach(() => {
+    store = new MemoryStore(':memory:');
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  it('upserts ci-learnings-latest memory entry when reports exist', () => {
+    appendCiLearningsToMemory('', makeFakeLearningResult(), store);
+
+    const entry = store.getById('ci-learnings-latest');
+    expect(entry).not.toBeNull();
+    expect(entry!.type).toBe('memory');
+    expect(entry!.title).toBe('CI Learnings');
+  });
+
+  it('is a no-op when store is undefined — does not throw', () => {
+    expect(() => appendCiLearningsToMemory('', makeFakeLearningResult(), undefined)).not.toThrow();
+  });
+
+  it('is idempotent — calling twice upserts, not duplicates', () => {
+    const fakeResult = makeFakeLearningResult();
+
+    appendCiLearningsToMemory('', fakeResult, store);
+    appendCiLearningsToMemory('', fakeResult, store); // second call — upsert
+
+    const entry = store.getById('ci-learnings-latest');
+    expect(entry).not.toBeNull();
+    expect(entry!.id).toBe('ci-learnings-latest');
+  });
 });

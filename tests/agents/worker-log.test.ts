@@ -8,8 +8,8 @@ import {
   formatVerifyLog,
   formatDoneLog,
   appendWorkerLog,
-} from '../../src/agents/worker.js';
-import type { WorkerLogAction } from '../../src/agents/worker.js';
+} from '../../src/agents/worker-log.js';
+import type { WorkerLogAction } from '../../src/agents/worker-log.js';
 
 describe('formatWorkerLog', () => {
   it('formats a basic log line with emoji indicator', () => {
