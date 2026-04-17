@@ -7,7 +7,7 @@ Ship-blocker foundation sprint. 6 P0 güvenlik (shell injection, path traversal,
 **Spec:** `docs/superpowers/specs/2026-04-17-sprint-143-144-145-zincir-reform-design.md` § 2
 **Plan:** `docs/superpowers/plans/2026-04-17-sprint-143-implementation-plan.md`
 
-**Süre hard cap:** 4h | **Cost budget:** $12 | **Opus-only P0/P1 zorunlu.**
+**Süre hard cap:** 4h | **Cost budget:** $100 (subs mode, gate threshold) | **Opus-only P0/P1 zorunlu.**
 
 ---
 
@@ -16,7 +16,7 @@ Ship-blocker foundation sprint. 6 P0 güvenlik (shell injection, path traversal,
 1. **Opus-only:** Sprint 143 tümü P0/P1 kritik, her task `forceModel: opus` zorunlu. İhlal = NO_GO.
 2. **MVP yasak:** Her task kök neden analizi + kesin çözüm + test. "Acaba-denesem" pattern yasak.
 3. **Core bozulamaz:** Brain sprint-finalize + cleanup + heartbeat regresyon = chain ABORT.
-4. **Chain safety gate:** Sprint sonu 5-check (doctor + tsc + vitest ≥99% + cost <$15 + no_go <3).
+4. **Chain safety gate:** Sprint sonu 5-check (doctor + tsc + vitest ≥99% + cost <$100 subs-mode + no_go <3).
 
 ---
 
@@ -289,7 +289,7 @@ Runtime panic → worker kill Alperen onayı gerekiyor (feedback tartışmasız 
 - Scope: tests/e2e/, scripts/
 
 ### Description
-Chain safety gate E2E: 3-task mini-sprint → finalize → 5-check gate. PASS → auto-trigger-next. FAIL (cost>$15, 3+ NO_GO) → abort-notify. `npm run e2e:chain`.
+Chain safety gate E2E: 3-task mini-sprint → finalize → 5-check gate. PASS → auto-trigger-next. FAIL (cost>$100 subs-mode threshold, 3+ NO_GO) → abort-notify. `npm run e2e:chain`.
 
 **Kanıt:** `npm run e2e:chain` PASS + FAIL scenarios PASS.
 **Test:** 10+ E2E scenario
@@ -350,7 +350,7 @@ Sprint finalize otomatik 5-check:
 1. `deckent doctor` PASS
 2. `tsc --noEmit` 0 error
 3. `vitest run` ≥99% pass
-4. Sprint cost <$15
+4. Sprint cost <$100 (subs mode threshold)
 5. NO_GO count <3
 
 **PASS → Sprint 144 auto-trigger.**

@@ -10,7 +10,7 @@
 
 **Tech Stack:** TypeScript (ESM), Zod, better-sqlite3, vitest, React (dashboard), i18n (dashboard pattern).
 
-**Süre:** ~4.5 saat hard cap | **Cost budget:** $15 | **Opus task:** 12/18 | **Sonnet task:** 6/18 (P2: MCP i18n, dashboard i18n, skill test, .npmignore, cleanup policy, DECISIONS archive finalize)
+**Süre:** ~4.5 saat hard cap | **Cost budget:** $100 (subs mode, gate threshold) | **Opus task:** 12/18 | **Sonnet task:** 6/18 (P2: MCP i18n, dashboard i18n, skill test, .npmignore, cleanup policy, DECISIONS archive finalize)
 
 ---
 

@@ -7,7 +7,7 @@ Kalite + meta sprint (zincir final). Feature-level brain co-evolve (features-man
 **Spec:** `docs/superpowers/specs/2026-04-17-sprint-143-144-145-zincir-reform-design.md` § 4
 **Plan:** `docs/superpowers/plans/2026-04-17-sprint-145-implementation-plan.md`
 
-**Süre hard cap:** 4.5h | **Cost budget:** $15 | **Opus task:** 12/18, **Sonnet task:** 6/18 (P2).
+**Süre hard cap:** 4.5h | **Cost budget:** $100 (subs mode, gate threshold) | **Opus task:** 12/18, **Sonnet task:** 6/18 (P2).
 
 ---
 

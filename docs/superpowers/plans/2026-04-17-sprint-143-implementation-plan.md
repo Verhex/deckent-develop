@@ -10,7 +10,7 @@
 
 **Tech Stack:** TypeScript (ESM), better-sqlite3, FTS5, MCP stdio, tmux, vitest, Zod.
 
-**Süre:** ~4 saat hard cap | **Cost budget:** $12 | **Opus task:** 20/20 (tümü P0/P1 kritik)
+**Süre:** ~4 saat hard cap | **Cost budget:** $100 (subs mode, gate threshold) | **Opus task:** 20/20 (tümü P0/P1 kritik)
 
 ---
 
@@ -1447,11 +1447,11 @@ describe('Chain Safety Gate', () => {
     expect(gate.nextAction).toBe('auto-trigger-next');
   });
 
-  it('gate FAIL (cost > $15) → ABORT + notification', async () => {
-    const result = await runMockSprint('sprint-test-002', { cost: 20 });
+  it('gate FAIL (cost > $100) → ABORT + notification', async () => {
+    const result = await runMockSprint('sprint-test-002', { cost: 120 });
     const gate = await runGate({ root, sprintId: result.sprintId });
 
-    expect(gate.cost).toBeGreaterThan(15);
+    expect(gate.cost).toBeGreaterThan(100);
     expect(gate.overall).toBe('FAIL');
     expect(gate.nextAction).toBe('abort-notify');
   });
@@ -1647,7 +1647,7 @@ Sprint finalize sonunda **otomatik** 5-check gate:
 1. **deckent doctor** — tüm health check'ler PASS
 2. **tsc --noEmit** — 0 TypeScript error
 3. **npx vitest run** — ≥99% pass (12485+ baseline'dan geri düşmesin)
-4. **Cost spike** — sprint toplam cost < $15 (Token tracker'dan)
+4. **Cost spike** — sprint toplam cost < $100 (Token tracker'dan, subs mode threshold)
 5. **NO_GO count** — sprint içinde <3 NO_GO
 
 ### PASS → Sprint 144 otomatik tetiklenir

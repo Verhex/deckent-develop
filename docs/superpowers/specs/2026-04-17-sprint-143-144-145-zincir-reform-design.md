@@ -62,7 +62,7 @@ Bu spec, God Analysis Sprint 142'nin 233 bulgusunu (6 P0 + 45 P1 + 78 P2 + 104 P
    - `deckent doctor` PASS zorunlu
    - `tsc --noEmit` 0 error zorunlu
    - `vitest run` %99+ pass zorunlu (12485 baseline'dan geri düşmesin)
-   - Cost spike: sprint toplam cost > $15 → ABORT + notification
+   - Cost spike: sprint toplam cost > $100 → ABORT + notification (Alperen subs mode, threshold yüksek)
    - No_go rate: sprint içinde 3+ NO_GO → ABORT + notification
 5. **Brain co-evolve (Direktif 31-32):** Her sprint sonu otomatik tetiklenir (Sprint 143'te wire olur):
    - `deckent memory export` → exports/ regenerate
@@ -284,7 +284,7 @@ FAIL → Chain ABORT, notification dispatcher Claude Code chat bar'a push, Alper
 | Opus task | 20 (Alperen direktifi: P0+P1 kesin opus, Sprint 143 tümü P0/P1 kritik) |
 | Sonnet task | 0 |
 | Süre hard cap | 4 saat |
-| Cost budget | $12 |
+| Cost budget | $100 (subs mode, gate threshold) |
 | Başarı kriteri | Brain health 72 → 85 (ara hedef; 95+ Sprint 145 sonu), Memory V2 82 → 100, 6 P0 güvenlik closed, core stabilite runtime enforced, operasyonel P0 6-task closed |
 
 **Brain health 72→85 gerekçesi (ara hedef):** Memory V2 tam migrasyon (+10 puan: relations backfill + FTS5 fix + export stale fix + PATTERNS.md sync + sprint-141 log DB + IDENTITY.md auto-regen), DECISIONS.md archive (+2 puan: bellek bütçesi 1505 satır altına), ADR relations (+1 puan: 1→80+ relation). Kalan +10 puan Sprint 144 (god split architectural +4 + ADR-008 cycle fix +3 + performance +3) ve Sprint 145 (doc cross-validation + feature co-evolve +10)'te gelir. 72→85→92→95+ zincir progression.
@@ -476,7 +476,7 @@ FAIL → Chain ABORT.
 | Opus task | 16 (P0/P1 kritik: god split, ADR-008, perf, ölü kod, operasyonel HIGH) |
 | Sonnet task | 4 (P2: i18n temel, Türkçe locale, redact taşı, rich output) |
 | Süre hard cap | 5 saat |
-| Cost budget | $18 |
+| Cost budget | $100 (subs mode, gate threshold) |
 | Başarı kriteri | God objeler bölünmüş, ADR-008 Cycle 2 0, 29 ölü dosya silinmiş, operasyonel HIGH 6 closed |
 
 ---
@@ -667,7 +667,7 @@ Chain safety gate + Alperen + Claude Code joint toplu review. Başarı kriterler
 | Opus task | 12 (kritik: co-evolve, CLI i18n, CI fix, vitest stabilize, doc updates, config strict, observability, review raporu) |
 | Sonnet task | 6 (P2: MCP i18n, dashboard i18n, skill tests, .npmignore, cleanup policy, DECISIONS archive) |
 | Süre hard cap | 4.5 saat |
-| Cost budget | $15 |
+| Cost budget | $100 (subs mode, gate threshold) |
 | Başarı kriteri | 1.1 tablosu tüm hedefler karşılanır |
 
 ---

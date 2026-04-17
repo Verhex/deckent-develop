@@ -10,7 +10,7 @@
 
 **Tech Stack:** TypeScript (ESM), vitest, madge (circular dep detect), better-sqlite3, MCP.
 
-**Süre:** ~5 saat hard cap | **Cost budget:** $18 | **Opus task:** 16/21 (P0/P1). **Sonnet task:** 5/21 (P2: i18n temel, Türkçe locale, redact taşı, rich output, docker hardening).
+**Süre:** ~5 saat hard cap | **Cost budget:** $100 (subs mode, gate threshold) | **Opus task:** 16/21 (P0/P1). **Sonnet task:** 5/21 (P2: i18n temel, Türkçe locale, redact taşı, rich output, docker hardening).
 
 ---
 

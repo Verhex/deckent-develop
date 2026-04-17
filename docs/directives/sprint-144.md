@@ -7,7 +7,7 @@ Mimari temizlik sprint. 4 god object (init.ts 1552→<400, doctor.ts 1069→<500
 **Spec:** `docs/superpowers/specs/2026-04-17-sprint-143-144-145-zincir-reform-design.md` § 3
 **Plan:** `docs/superpowers/plans/2026-04-17-sprint-144-implementation-plan.md`
 
-**Süre hard cap:** 5h | **Cost budget:** $18 | **Opus task:** 16/21, **Sonnet task:** 5/21 (P2).
+**Süre hard cap:** 5h | **Cost budget:** $100 (subs mode, gate threshold) | **Opus task:** 16/21, **Sonnet task:** 5/21 (P2).
 
 ---
 
