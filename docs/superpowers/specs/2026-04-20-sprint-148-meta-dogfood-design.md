@@ -227,9 +227,9 @@ Sprint 145-146-147 hepsi `structured` başarılıydı. Sprint 148 **AI mode dene
 
 #### T-148-014: macOS E2E Test — tmux Backend Full Sprint
 - **Model:** opus · **Effort:** high · **Skill:** typescript-expert, devops-engineer
-- **Files:** `tests/e2e/cross-platform/macos-tmux.test.ts` (NEW), `docs/audits/sprint-148/macos-validation.md`
-- **Scope:** `tests/e2e/cross-platform/`, `docs/audits/`
-- **Description:** macOS (darwin) ortamında tmux backend ile 3-task mini-sprint simülasyonu. GitHub Actions macos-latest runner veya Docker darwin emulation. Platform differences: fs.watch behavior (kqueue), tmux version (3.3+), path separators. Validation: worker spawn, heartbeat, result write, cleanup.
+- **Files:** `tests/e2e/cross-platform/macos-tmux.test.ts` (NEW), `.github/workflows/cross-platform-e2e.yml` (NEW), `docs/audits/sprint-148/macos-validation.md`
+- **Scope:** `tests/e2e/cross-platform/`, `.github/workflows/`, `docs/audits/`
+- **Description:** macOS (darwin) ortamında tmux backend ile 3-task mini-sprint simülasyonu. **CI approach: GitHub Actions `macos-latest` runner** (darwin emulation değil, gerçek macOS VM). Workflow dosyası içine 3-platform matrix job (macos/ubuntu/windows-wsl2). Platform differences handle: fs.watch behavior (kqueue vs inotify), tmux version detection (3.3+ required), path separators. Validation: worker spawn, heartbeat, result write, cleanup.
 - **Test (6):** (1) Platform detection correct, (2) tmux session spawn, (3) worker exec, (4) HB format valid, (5) result write atomic, (6) cleanup graceful.
 - **Kanıt:** `docs/audits/sprint-148/macos-validation.md` sonuç rapor (GO/NO_GO).
 
