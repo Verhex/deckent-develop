@@ -2,7 +2,25 @@
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
-## Latest: v0.3.0-beta.1-sprint84 (2026-04-02)
+## Latest: v0.4.0-beta.2 (2026-04-20)
+
+### Sprint 146 — Prompt God Template Reform + Critical Bug Fix + Rubric Consolidation
+- Unified prompt builder `buildTaskPrompt()` — tek entry, char count %40 azalma (~45K → ≤27K)
+- ADR Relevance Scoring Engine — topN=3, scope/keyword/age skorlama
+- Scope Sanitizer — dist/ filter, path traversal reject, dedupe
+- Agent Routing V2 Retrain — intent keyword refresh, test-writer routing %52 → ≤%22
+- **Bug fix:** DIRECTIVES.md mid-sprint silme — phase guard (yalnızca CLEANUP fazı)
+- **Bug fix:** SDL Decision Log dead write — v2 + meaningful events + dolu input/output
+- **Bug fix:** Agent exclusion hard-code kaldırıldı — dinamik context-aware exclusion
+- Rubric consolidation: worker self-report kaldırıldı, Quality Assessor kanonik
+- Sprint 147 nervous system preflight: `nervous-types.ts` + ADR-040 draft
+- `scripts/prompt-linter.mjs` + `scripts/chain-gate-check.mjs` kalite gate'leri
+
+Full changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+
+---
+
+## v0.3.0-beta.1-sprint84 (2026-04-02)
 
 ### Sprint 084 — Dashboard Fix + i18n Tam Kapsam + Canlı Veri Test + Build Otomasyon
 - AgentDetail penceresi genişletildi (400→600px), font boyutları artırıldı, log 220→350px

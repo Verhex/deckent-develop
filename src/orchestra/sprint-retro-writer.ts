@@ -12,6 +12,7 @@ import {
 } from '../core/constants.js';
 import { MemoryStore } from '../core/memory-store.js';
 import { debugLog } from '../core/utils.js';
+import { assessQuality } from './quality-assessor.js';
 import {
   formatDuration,
   formatAgentPerformanceTable,
@@ -197,51 +198,48 @@ export function formatHumanRetro(data: HumanRetroData): string {
   return lines.join('\n');
 }
 
-// ═══ Rubric Scores Section ═══════════════════════════════════════
+// ═══ Quality Dimensions Section (formerly Rubric Scores) ════════
 
-/** Format a rubric scores table for RETRO.md from task results. */
+/**
+ * Format a quality dimensions table for RETRO.md using Quality Assessor scores.
+ * Sprint 146: Uses assessQuality() dimensions as the canonical scoring system.
+ * Falls back to deprecated rubricScores for backward compatibility with old results.
+ */
 export function formatRubricScoresSection(
   sprint: Sprint,
   results?: TaskResult[],
 ): string[] {
   if (!results || results.length === 0) return [];
 
-  // Only include tasks that have rubric scores
-  const scoredResults = results.filter(r => r.rubricScores && Object.keys(r.rubricScores).length > 0);
-  if (scoredResults.length === 0) return [];
-
   const lines: string[] = [];
   const sprintLabel = sprint.id;
-  lines.push(`### Rubric Scores (${sprintLabel})`);
-  lines.push('| Task | Correctness | Coverage | Scope | Docs | Avg |');
-  lines.push('|------|-------------|----------|-------|------|-----|');
+  lines.push(`### Quality Dimensions (${sprintLabel})`);
+  lines.push('| Task | Correctness | Coverage | Scope Adherence | Completeness | Overall |');
+  lines.push('|------|-------------|----------|-----------------|--------------|---------|');
 
-  const avgScores: number[] = [];
+  const overallScores: number[] = [];
 
-  for (const result of scoredResults) {
+  for (const result of results) {
     const task = sprint.tasks.find(t => t.id === result.taskId);
-    const label = task ? `${result.taskId} — ${task.title.slice(0, 30)}` : result.taskId;
-    const rs = result.rubricScores!;
+    if (!task) continue;
 
-    const fmt = (v: number | undefined): string => v !== undefined ? `${v}` : 'N/A';
-    const correctness = rs.correctness;
-    const coverage = rs.test_coverage;
-    const scope = rs.scope_compliance;
-    const docs = rs.documentation;
+    const label = `${result.taskId} — ${task.title.slice(0, 30)}`;
 
-    // Compute row average from defined values only
-    const defined = [correctness, coverage, scope, docs].filter((v): v is number => v !== undefined);
-    const avg = defined.length > 0 ? Math.round(defined.reduce((a, b) => a + b, 0) / defined.length) : undefined;
-    if (avg !== undefined) avgScores.push(avg);
+    // Compute Quality Assessor dimensions inline
+    const evaluation = result.evaluationDecision ?? result.selfAssessment ?? 'DONE';
+    const score = assessQuality(task, result, evaluation);
 
-    lines.push(`| ${label} | ${fmt(correctness)} | ${fmt(coverage)} | ${fmt(scope)} | ${fmt(docs)} | ${avg !== undefined ? avg : 'N/A'} |`);
+    const d = score.dimensions;
+    overallScores.push(score.overall);
+
+    lines.push(`| ${label} | ${d.correctness} | ${d.coverage} | ${d.scopeAdherence} | ${d.completeness} | ${score.overall} |`);
   }
+
+  if (overallScores.length === 0) return [];
 
   // Overall sprint average
-  if (avgScores.length > 0) {
-    const overallAvg = Math.round(avgScores.reduce((a, b) => a + b, 0) / avgScores.length);
-    lines.push(`| **Sprint Avg** | — | — | — | — | **${overallAvg}** |`);
-  }
+  const overallAvg = Math.round(overallScores.reduce((a, b) => a + b, 0) / overallScores.length);
+  lines.push(`| **Sprint Avg** | — | — | — | — | **${overallAvg}** |`);
 
   return lines;
 }

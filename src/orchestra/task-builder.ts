@@ -14,8 +14,12 @@ import { debugLog } from '../core/utils.js';
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 import { TokenCounter } from '../core/token-counter.js';
 import { MemoryStore } from '../core/memory-store.js';
+import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { searchMemory } from '../core/memory-query.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../core/constants.js';
+import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
+import { buildTaskPrompt } from './prompt-god-template.js';
+import type { SprintContext } from './prompt-god-template.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 // ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
@@ -704,7 +708,7 @@ export function truncateAtParagraph(content: string, maxLen: number): string {
  * Returns only accepted ADRs matching the task's scope and keywords.
  * Returns empty string if no DB available.
  */
-export function queryRelevantADRs(taskDescription: string, taskScope: string[], projectRoot?: string): string {
+export function queryRelevantADRs(taskDescription: string, taskScope: string[], projectRoot?: string, task?: Pick<Task, 'scope' | 'title' | 'description'>): string {
   const root = projectRoot ?? process.cwd();
   const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
 
@@ -715,22 +719,44 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
 
     const store = new MemoryStore(dbPath);
     try {
-      const keywords = taskDescription.split(/\s+/).filter(w => w.length > 3).slice(0, 10);
-      const scopeKeywords = taskScope.map(s => s.replace(/\//g, ' ')).join(' ');
-      const queryText = [...keywords, ...scopeKeywords.split(/\s+/)].filter(w => w.length > 2).join(' ');
+      // Load all accepted ADRs
+      const allAdrs = store.getByType('adr').filter(a => a.status === 'accepted');
 
-      const results = searchMemory(store, {
-        text: queryText || undefined,
-        type: ['adr'],
-        status: ['accepted'],
-        limit: 5,
-      });
-
-      if (results.length === 0) {
+      if (allAdrs.length === 0) {
         return '';
       }
 
-      return results.map(r => `## ${r.entry.id}: ${r.entry.title}\n\n${r.entry.content}`).join('\n\n---\n\n');
+      // If a full Task-like object is provided, use the new scoring engine
+      if (task) {
+        const ranked = selectRelevantAdrs(task, allAdrs, 3);
+        if (ranked.length === 0) return '';
+        return buildAdrPromptSection(ranked, 'full', allAdrs);
+      }
+
+      // Fallback: construct a minimal task-like object from description + scope
+      const pseudoTask = {
+        title: taskDescription,
+        description: taskDescription,
+        scope: { directories: taskScope, filesRead: [] as string[], filesWrite: [] as string[] },
+      };
+      const ranked = selectRelevantAdrs(pseudoTask, allAdrs, 3);
+      if (ranked.length === 0) {
+        // Final fallback: FTS5 search (original behavior)
+        const keywords = taskDescription.split(/\s+/).filter(w => w.length > 3).slice(0, 10);
+        const scopeKeywords = taskScope.map(s => s.replace(/\//g, ' ')).join(' ');
+        const queryText = [...keywords, ...scopeKeywords.split(/\s+/)].filter(w => w.length > 2).join(' ');
+
+        const results = searchMemory(store, {
+          text: queryText || undefined,
+          type: ['adr'],
+          status: ['accepted'],
+          limit: 3,
+        });
+
+        if (results.length === 0) return '';
+        return results.map(r => `## ${r.entry.id}: ${r.entry.title}\n\n${r.entry.content}`).join('\n\n---\n\n');
+      }
+      return buildAdrPromptSection(ranked, 'full', allAdrs);
     } finally {
       store.close();
     }
@@ -741,9 +767,8 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
 
 /**
  * Build the full prompt string that will be sent to a worker agent.
- * Includes agent context block (if assigned), skill context block (if skills assigned),
- * ADR context (mandatory architecture rules), task details, scope instructions,
- * heartbeat format, and result file format.
+ * Delegates to prompt-god-template.ts buildTaskPrompt() for unified prompt generation.
+ * Maintains backward-compatible signature.
  * @param task - The task the worker will execute
  * @param agentPrompt - Optional specialized agent prompt to prepend
  * @param skillPrompts - Optional skill context blocks to include
@@ -756,17 +781,6 @@ export function buildWorkerPrompt(
 ): string {
   const effort = resolveWorkerEffort(task);
 
-  // Agent context block: prepended when a specialized agent is assigned
-  const agentBlock = agentPrompt
-    ? `=== Agent: ${task.assignedAgent ?? 'generic'} ===\n${agentPrompt.slice(0, 2000)}\n\n=== Task ===\n`
-    : '';
-
-  // Skill context block: appended after agent block when skills are assigned
-  // effort → maxTokens budget per skill: low=1000, normal=1500, high=2500
-  const effortMaxTokensMap: Record<string, number> = { high: 2500, max: 2500, medium: 1500, normal: 1500, low: 1000 };
-  const SKILL_PER_ITEM_MAX = effortMaxTokensMap[effort] ?? 1500;
-  const SKILL_SECTION_MAX = Math.round(SKILL_PER_ITEM_MAX * 2.67);
-
   // V2 routing: filter skill prompts to only those relevant to task intent
   const isV2 = task.routingMeta?.routingVersion === 'v2';
   const rawDNA = task.routingMeta?.taskDNA;
@@ -775,104 +789,36 @@ export function buildWorkerPrompt(
     effectiveSkillPrompts = filterSkillPromptsByDNA(skillPrompts, rawDNA as TaskDNA);
   }
 
-  let skillBlock = '';
-  if (effectiveSkillPrompts && effectiveSkillPrompts.length > 0) {
-    const header = '=== Skills ===';
-    const parts: string[] = [header];
-    let totalLen = header.length;
-    for (const sp of effectiveSkillPrompts) {
-      const truncated = truncateAtParagraph(sp.content, SKILL_PER_ITEM_MAX);
-      const entry = `--- ${sp.name} ---\n${truncated}`;
-      if (totalLen + entry.length + 1 > SKILL_SECTION_MAX) break;
-      parts.push(entry);
-      totalLen += entry.length + 1;
+  // Load ADRs from Memory V2 if available (for prompt-god-template ADR scoring)
+  let allAdrs: MemoryEntryV2[] | undefined;
+  try {
+    const root = process.cwd();
+    const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
+    if (existsSync(dbPath)) {
+      const store = new MemoryStore(dbPath);
+      try {
+        allAdrs = store.getByType('adr').filter(a => a.status === 'accepted');
+      } finally {
+        store.close();
+      }
     }
-    if (parts.length > 1) {
-      skillBlock = parts.join('\n') + '\n\n';
-    }
+  } catch {
+    // ADR loading is best-effort
   }
 
-  // ─── Scope Rules ───────────────────────────────────────────────────
-  const scopeDirs = task.scope.directories.length > 0
-    ? task.scope.directories.map(d => `  - ${d}`).join('\n')
-    : '  - (no directory restriction)';
-  const scopeFiles = task.scope.filesWrite.length > 0
-    ? task.scope.filesWrite.map(f => `  - ${f}`).join('\n')
-    : '  - (determined by your task scope)';
+  // Delegate to prompt-god-template
+  const ctx: SprintContext = {
+    agentPrompt,
+    agentId: task.assignedAgent ?? 'generic',
+    skillPrompts: effectiveSkillPrompts,
+    allAdrs,
+    effort,
+    dependencies: task.dependencies,
+  };
 
-  // ADR context injection: query relevant ADRs from Memory V2 (falls back to V1)
-  const taskKeywords = task.description ?? task.title ?? '';
-  const taskDirs = task.scope?.directories ?? [];
-  const adrContent = queryRelevantADRs(taskKeywords, taskDirs);
-  const adrBlock = adrContent
-    ? `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${adrContent}\n\n`
-    : '';
+  const artifact = buildTaskPrompt(task, ctx);
 
-  const prompt = `${agentBlock}${skillBlock}${adrBlock}You are a Deckent worker agent.
-See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.
-
-## Your Task
-${task.id}: ${task.title} — ${task.description}
-- Model: ${task.model}
-- Effort: ${effort}
-
-## What To Do
-1. Read the task scope carefully — understand what files you may touch
-2. Write your execution plan to .tasks/task-${task.id}.plan BEFORE coding — outline your approach, files to modify, and expected changes
-3. Write the code changes described above
-4. Document: update relevant docs if your changes affect them
-5. Report: write your result file to .tasks/task-${task.id}.result
-
-## CRITICAL VERIFY STEPS (DO NOT SKIP)
-You MUST run these commands before marking your task as done:
-
-1. \`tsc --noEmit\` — fix ALL type errors (max 3 attempts)
-2. \`npx vitest run\` — fix ALL test failures (max 3 attempts)
-
-If BOTH pass → selfAssessment = "DONE"
-If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
-If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_DEBT"
-If tests fail after 3 attempts → selfAssessment = "NO_GO" with error details
-
-## Scope Rules
-You may ONLY modify files in these directories:
-${scopeDirs}
-
-You may ONLY write to these files:
-${scopeFiles}
-
-DO NOT touch files outside your scope — the auditor will flag violations.
-
-## Heartbeat
-Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id}", status "EXECUTING".
-Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).
-
-## Result File
-Write to: .tasks/task-${task.id}.result with taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes.
-MUST include tokenUsage with ALL four fields: { "inputTokens": <number>, "outputTokens": <number>, "cacheReadTokens": <number>, "provider": "${task.provider ?? 'claude'}", "model": "${task.model}" }.
-  - inputTokens: your best estimate of prompt/input tokens consumed (REQUIRED — use 0 only if truly unknown)
-  - outputTokens: your best estimate of completion/output tokens produced (REQUIRED — use 0 only if truly unknown)
-  - cacheReadTokens: cache read tokens if applicable (optional, default 0)
-  - provider: MUST be "${task.provider ?? 'claude'}" (hardcoded for this task)
-  - model: MUST be "${task.model}" (hardcoded for this task)
-Sprint 140 will reject results with missing tokenUsage as NO_GO. Partial tokenUsage (missing provider/model) generates warnings in Sprint 139.
-REQUIRED: Include rubricScores field with 4 integer keys (0-100): correctness, test_coverage, scope_compliance, documentation. Example: "rubricScores": { "correctness": 95, "test_coverage": 90, "scope_compliance": 100, "documentation": 85 }
-The result file is REQUIRED — without it your work cannot be evaluated.
-
-CRITICAL: You MUST write a .result file before exiting. Even if tests fail, write selfAssessment: "NO_GO" with error details. Never exit without writing .tasks/task-${task.id}.result — a missing result file causes the entire sprint to stall.
-
-## Honest Self-Assessment Required
-Before writing .result with selfAssessment: DONE, you MUST verify:
-1. Baseline state: what was the test/code state before your work?
-2. End state: what is it now?
-3. Delta: how much of the task did you ACTUALLY complete?
-
-If <80%, write GO_WITH_TECH_DEBT with specific gap.
-If <50%, write NO_GO with explanation.
-"DONE" means functional outcome matches task spec fully.
-"Code written" ≠ "DONE".`;
-
-  // Estimate prompt token size and write to task
+  // Estimate prompt token size and write to task (legacy behavior)
   try {
     const tokenCounter = new TokenCounter();
     const estimate = tokenCounter.estimatePromptSize(
@@ -886,5 +832,5 @@ If <50%, write NO_GO with explanation.
     debugLog('buildWorkerPrompt:token-estimate', err instanceof Error ? err : new Error(String(err)));
   }
 
-  return prompt;
+  return artifact.prompt;
 }

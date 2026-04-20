@@ -1508,3 +1508,99 @@ Veya Claude Code'da açıp söyleyin: "Bunu uygula."
 - Memory V2 SQLite DB-first — FTS5 dual-layer arama
 - Event Stream ADR-035 Protocol V1.0 — 15 kanal kodu
 - RBAC ADR-037 Protocol V1.0 — formal yetki matrisi
+
+---
+
+# 31. SPRİNT 146 KAPANIŞ BÖLÜMÜ
+
+## Sprint 146 Özeti
+
+**Tema:** "Prompt kalitesi 64/100 → 85/100 + 3 canlı kanıt bug fix + rubric 3-sistem konsolidasyon"
+**Sprint tipi:** P0 ağırlıklı, Beta GA yolu (Sprint 150 GA — Per 23 Nis TRT)
+**Toplam task:** 17 | **Wave sayısı:** 6 | **Hard cap:** 5h | **Cost cap:** $95
+
+### Sprint 146 Ana Hedefleri
+
+Sprint 145'in ürettiği 24 tech debt ve 3 canlı bug'ı köklü şekilde kapatmak:
+
+1. **Prompt God Template Reform** (10 task) — agent V2 + limit + ADR relevance scoring + scope sanitize + generative template pattern → prompt kalite 64/100 → 85/100
+2. **3 canlı bug fix** — DIRECTIVES mid-sprint silme + SDL decision log dead write + agent exclusion hard-code
+3. **Rubric system consolidation** — 3 paralel skor sistemi → 1 canonical (Quality Assessor)
+4. **Sprint 145 test regression fix** — vitest 3 fail
+5. **Sprint 147 nervous system preflight** — ADR-040 draft + types yer ayır
+
+### Sprint 146 Deliverables (17 Task)
+
+| Task | Başlık | Durum |
+|------|--------|-------|
+| T1 | Agent Truncation Bug Fix | agent-pool.ts satır 29 kırpma kaldırıldı |
+| T2 | Agent Routing V2 Retrain + Intent Classifier Refresh | test-writer %52 → ≤%22, intent mapping yenilendi |
+| T3 | ADR Relevance Scoring Engine | adr-selector.ts — topN=3, skor: scope +0.4, keyword +0.3 |
+| T4 | Scope Sanitizer | scope-sanitizer.ts — dist/ kaldır, global dosya koru, duplicate dedupe |
+| T5 | Generative Useful God Template | prompt-god-template.ts ~400 LoC — buildTaskPrompt() tek giriş noktası |
+| T6 | Task-Type ADR Preset Matrix + Filler Cleanup | TASK_TYPE_ADR_PRESETS 7 task tipi, boş header atla |
+| T7 | Prompt Quality Linter | scripts/prompt-linter.mjs — avg ≥ 75/100 gate |
+| T8 | DIRECTIVES.md Mid-Sprint Silme Bug Fix | phase guard: archiveDirectives yalnızca CLEANUP fazında |
+| T9 | SDL Decision Log Rehabilitation | v2 routing → anlamlı log, input/output dolu |
+| T10 | Rubric System Consolidation | worker self-report kaldır, Quality Assessor kanonik |
+| T11 | Sprint 145 vitest Regression Fix | 3 fail test düzeltildi |
+| T12 | Nervous System Preflight — ADR-040 + Types | nervous-types.ts placeholder, ADR-040 status: proposed |
+| T13 | Sprint 146 Retro Template + Docs Update | Sprint-146.md + CHANGELOG 0.4.0-beta.2 |
+| T14 | Agent Exclusion Dynamic | getDynamicExclusions() — intent+scope dinamik |
+| T15 | Chain Safety Gate Script | scripts/chain-gate-check.mjs — 6 check |
+| T16 | Sprint 146 Living Record Update | FINAL-EXECUTIVE-REPORT.md güncelleme |
+| T17 | ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 Append | Bu bölüm |
+
+### Sprint 146 Bug Fix Özeti
+
+**Bug 1 — DIRECTIVES.md Mid-Sprint Silme:**
+Sprint 144 ve 145'te aynı pattern: EXECUTE fazında DIRECTIVES.md template'e dönüşüyor (463 byte). Kök neden: archiveDirectives() phase guard olmadan çağrılıyor. Çözüm: `if (phase !== 'CLEANUP') return;` guard + emergency reconstruct.
+
+**Bug 2 — SDL Decision Log Dead Write:**
+.deckent/decisions/ altında 27 dosya yazılıyor ama hiçbiri okunmuyor. input/output boş. Çözüm: hibrit rehab — v2 routing + meaningful step filter + deckent explain entegrasyonu.
+
+**Bug 3 — Agent Exclusion Hard-Code:**
+architecture-planner, frontend-designer, migration-specialist her task'ta sabit exclude ediliyordu. Çözüm: getDynamicExclusions() — intent + scope kombinasyonuna göre dinamik.
+
+### Sprint 146 Teknik Mimari Çıktıları
+
+```
+src/orchestra/
+├── adr-selector.ts         (YENİ — ADR relevance scoring, topN=3)
+├── scope-sanitizer.ts      (YENİ — dist/ filter, global dosya koruma)
+├── prompt-god-template.ts  (YENİ ~400 LoC — buildTaskPrompt() tek giriş)
+└── task-builder.ts         (GÜNCELLENDİ — god template kullanır)
+
+src/core/
+└── nervous-types.ts        (YENİ ~100 LoC — Sprint 147 placeholder)
+
+scripts/
+├── prompt-linter.mjs       (YENİ — avg ≥ 75/100 kalite gate)
+└── chain-gate-check.mjs    (YENİ — 6-check sprint gate)
+```
+
+### Sprint 146 → Sprint 147 Köprüsü
+
+Sprint 146 başarılı kapanış kriterleri:
+- Prompt kalite ortalama ≥ 75/100 (linter pass)
+- DIRECTIVES mid-sprint korumalı
+- SDL log meaningful
+- Agent exclusion dinamik
+- Worker prompt rubric spec yok
+- vitest ≥ %99.3
+- ADR-040 draft kayıtlı
+- nervous-types.ts placeholder Sprint 147 için hazır
+
+### Sprint 147 Preview — Nervous System
+
+Sprint 147 teması: **"Deckent Nervous System"** — yetki matrisi + bildirim motoru + güvenlik katmanı.
+
+Tasarım spec: `docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md`
+
+Temel bileşenler:
+- **AuthorityMode** + **ApprovalPolicy** — RBAC'ı runtime'da enforce et (ADR-037 ötesi)
+- **NervousNotification** — kullanıcıya anlamlı bildirim akışı
+- **SafetyFloorAction** — tehlikeli task'larda hard-stop guard
+- **ADR-040** — nervous system governance (Sprint 147 sonunda accepted)
+
+**Beta GA yolu:** Sprint 146 (bugün) → Sprint 147 (Sal) → Sprint 148 (Çar) → Sprint 149 (Çar-Per) → Sprint 150 (Per 🚀 GA)

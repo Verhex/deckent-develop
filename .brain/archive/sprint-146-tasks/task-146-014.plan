@@ -1,0 +1,28 @@
+# Task 146-014: Agent Exclusion Dynamic — Execution Plan
+
+## Current State Analysis
+- getDynamicExclusions() already exists in src/core/activation-engine.ts:278-322
+- It's already imported and used in src/core/routing-engine.ts:28,101
+- No hard-coded global exclusions of architecture-planner/frontend-designer/migration-specialist remain
+- Task 2 appears to have completed the implementation already
+
+## Plan
+1. Verify getDynamicExclusions() implementation matches task spec exactly
+2. Check if any additional intent/scope cases need adding
+3. Create comprehensive test file: tests/orchestra/agent-exclusion-dynamic.test.ts (8 tests)
+4. Run tsc and vitest to verify
+
+## Files to Modify
+- tests/orchestra/agent-exclusion-dynamic.test.ts (NEW — test file)
+- src/core/activation-engine.ts (review, potentially no changes needed)
+- src/orchestra/task-router.ts (review, potentially no changes needed)
+
+## Test Cases
+1. documentation intent → exclude: migration-specialist, devops-engineer, security-auditor
+2. src/orchestra/ scope → exclude: frontend-designer, accessibility-auditor
+3. src/cli/ scope → exclude: frontend-designer, accessibility-auditor, migration-specialist
+4. src/dashboard/ scope → exclude: data-engineer, migration-specialist
+5. security intent → empty exclusion
+6. Combined intent+scope → merged exclusions
+7. Old 3 agents NOT globally excluded (architecture-planner usable)
+8. Integration: Sprint 146 scenario simulation

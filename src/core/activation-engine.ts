@@ -267,3 +267,56 @@ function extractDomainFromScope(scopePath: string): string | null {
   if (['index', 'utils'].includes(domain)) return null;
   return domain;
 }
+
+// ─── Dynamic Exclusions ───────────────────────────────────────────────────
+
+/**
+ * Compute dynamic agent exclusions based on intent + scope.
+ * Replaces hard-coded global exclusion of architecture-planner, frontend-designer,
+ * migration-specialist with context-aware per-task exclusions.
+ */
+export function getDynamicExclusions(
+  intent: string,
+  scopeDirs: string[],
+): string[] {
+  const exclusions = new Set<string>();
+
+  // Intent-based exclusions
+  switch (intent) {
+    case 'documentation':
+      exclusions.add('migration-specialist');
+      exclusions.add('devops-engineer');
+      exclusions.add('security-auditor');
+      break;
+    case 'testing':
+      exclusions.add('migration-specialist');
+      exclusions.add('doc-writer');
+      break;
+    case 'security':
+      // No exclusions — security tasks may touch any domain
+      break;
+    case 'design':
+      exclusions.add('data-engineer');
+      exclusions.add('migration-specialist');
+      break;
+  }
+
+  // Scope-based exclusions
+  for (const dir of scopeDirs) {
+    if (dir.startsWith('src/orchestra/') || dir === 'src/orchestra') {
+      exclusions.add('frontend-designer');
+      exclusions.add('accessibility-auditor');
+    }
+    if (dir.startsWith('src/cli/') || dir === 'src/cli') {
+      exclusions.add('frontend-designer');
+      exclusions.add('accessibility-auditor');
+      exclusions.add('migration-specialist');
+    }
+    if (dir.startsWith('src/dashboard/') || dir === 'src/dashboard') {
+      exclusions.add('data-engineer');
+      exclusions.add('migration-specialist');
+    }
+  }
+
+  return [...exclusions];
+}

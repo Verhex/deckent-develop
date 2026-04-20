@@ -1,0 +1,15 @@
+# Task 146-011 Execution Plan
+
+## Objective
+Fix Sprint 145 vitest regression — 3 failing tests
+
+## Steps
+1. Run vitest to identify failing tests
+2. Read failing test files and their source modules  
+3. Fix each test (import paths, missing exports, test logic)
+4. Re-run vitest to verify fix
+5. Write result file
+
+## Scope
+- tests/ directory only
+

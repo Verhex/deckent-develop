@@ -1,0 +1,95 @@
+{
+  "id": "146-008",
+  "title": "DIRECTIVES.md Mid-Sprint Silme Bug Fix",
+  "description": "DIRECTIVES.md Mid-Sprint Silme Bug Fix\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-docs-updater.ts, tests/orchestra/archive-directives-phase.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nSprint 145 canlı kanıt (08:14 TRT, t+18dk): DIRECTIVES.md template-hale dönüştü EXECUTE phase'de. archiveDirectives yanlış tetiklenmiş. Sprint 144 archive 463 byte (template) — pattern 2 sprint üst üste.\n\narchiveDirectives() fonksiyonuna phase guard ekle:\n\n```typescript\nexport function archiveDirectives(projectRoot: string, sprintId: string, phase: SprintPhase): void {\n  if (phase !== 'CLEANUP') {\n    debugLog('archiveDirectives', `REJECTED: called in phase ${phase}, only CLEANUP allowed`);\n    return;\n  }\n  // existing logic\n}\n```\n\nEmergency restore: eğer mid-sprint çağrı durumunda task JSON'dan reconstruct et.\n\n### Test (7 test)\n1-5. PLAN/EXECUTE/FIX/RETRO/CLEANUP phase'lerde beklenen davranış\n6. Emergency restore: mid-sprint çağrıda task JSON'dan reconstruct\n7. Sprint 145 08:14 TRT senaryo simulate: reject edilir\n\n**Kanıt:** `npx vitest run tests/orchestra/archive-directives-phase.test.ts` 7/7 PASS.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/sprint-finalizer.ts",
+      "src/orchestra/sprint-docs-updater.ts",
+      "tests/orchestra/archive-directives-phase.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/archive-directives-phase.test.ts` 7/7 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-146",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T06:53:24.097Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T07:44:49.425Z"
+}

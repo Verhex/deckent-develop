@@ -1,0 +1,29 @@
+{
+  "taskId": "146-002",
+  "filesChanged": [
+    "src/core/intent-classifier.ts",
+    "src/core/activation-engine.ts",
+    "src/core/routing-engine.ts",
+    "tests/orchestra/agent-routing-health.test.ts"
+  ],
+  "linesAdded": 312,
+  "linesRemoved": 18,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 146 Task 2: Agent Routing V2 Retrain + Intent Classifier Refresh. 3 code changes + 1 new test file. All 12 tests pass, no regressions in existing routing tests (83/83 pass). Pre-existing 118 test failures are unrelated to this task.\n\nChanges:\n1. intent-classifier.ts: Enhanced INTENT_KEYWORDS — added 'documentation', 'doc update', 'güncelleme', 'dokümantasyon' to documentation; added 'wire', 'runtime' to bugfix; added 'adaptive', 'timeout', 'estimator', 'engine', 'validator' to implementation; removed 'migration' from config (conflict). Added .md scope signal. Fixed root-level file prefix to './' instead of skipping. Added mdRatio detection for .md-heavy writes to boost documentation intent.\n2. activation-engine.ts: Added getDynamicExclusions() function — context-aware per-task exclusions based on intent + scope (replaces hard-coded global exclusion).\n3. routing-engine.ts: Wired getDynamicExclusions() into selectBestAgent via routeTaskV2 — dynamic exclusions merged with override exclusions.\n4. agent-routing-health.test.ts: 12 tests covering all task spec requirements.",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 60000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

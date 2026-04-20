@@ -1,0 +1,86 @@
+{
+  "id": "146-016",
+  "title": "Sprint 146 Living Record Update (FINAL-EXECUTIVE-REPORT.md)",
+  "description": "Sprint 146 Living Record Update (FINAL-EXECUTIVE-REPORT.md)\n- Model: sonnet\n- Effort: low\n- Skills: documentation-writer\n- Files: docs/audits/sprint-132/FINAL-EXECUTIVE-REPORT.md\n- Scope: docs/audits/\n\n### Description\nSprint 145 inline güncelleme pattern'i Sprint 146 için. Section 1 (tema) + Section 5 (roadmap Sprint 147-150) + Section 6 (risk register prompt bug'ları closed, nervous system risk'leri open) + Section 8 (acceptance criteria 17 task deliverables) + Section N append.\n\n### Test\n- `grep -c \"Sprint 146\" docs/audits/sprint-132/FINAL-EXECUTIVE-REPORT.md` ≥ 20\n\n**Kanıt:** git diff Section 1/5/6/8 + Section N append.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-132/",
+      "docs/audits/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "docs/audits/sprint-132/FINAL-EXECUTIVE-REPORT.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `grep -c \"Sprint 146\" docs/audits/sprint-132/FINAL-EXECUTIVE-REPORT.md` ≥ 20; *Kanıt:** git diff Section 1/5/6/8 + Section N append.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-146",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-20T06:53:24.098Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.4
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "docs/": 1
+        },
+        "primaryWriteTarget": "docs/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T07:45:21.554Z"
+}

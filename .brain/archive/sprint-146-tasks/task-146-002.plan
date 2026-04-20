@@ -1,0 +1,52 @@
+# Task 146-002 Execution Plan
+
+## Problem Analysis
+Sprint 145: test-writer got 14/27 tasks (52%) because:
+1. Intent classifier doesn't distinguish "documentation" vs "testing" well enough
+2. Keywords like "doc update", ".md", "güncelleme" not in documentation keywords
+3. Keywords like "adaptive", "timeout", "estimator" not mapped to core-dev intent
+4. No "evaluation" intent type exists — "rubric", "eval", "assess" fall through
+5. Agent activation rules are too narrow — only primary intent match gets score 10
+
+## Root Cause
+The intent classifier's INTENT_KEYWORDS for `documentation` lacks key Turkish/domain terms.
+The `implementation` intent catches too many things while `documentation` loses to `testing`
+because "test" keyword appears in many task descriptions (e.g., "**Test:** 3+ tests").
+
+The SCOPE_INTENT_SIGNALS don't boost `.md` filesWrite or root-level doc files.
+Agent activation via V2 rules only checks `intent.primary` — no scope-based scoring.
+
+## Plan
+
+### 1. Enhance intent-classifier.ts
+- Add missing keywords to INTENT_KEYWORDS:
+  - documentation: "documentation", "doc update", ".md", "güncelleme", "changelog", "readme"
+  - implementation: "adaptive", "timeout", "estimator" → actually these should be general impl
+  - Add scope signals for root .md files → documentation
+  - Add SCOPE_INTENT_SIGNALS for .md filesWrite at root level
+
+### 2. Add write-scope analysis for .md files
+- If filesWrite contains root-level .md files (e.g., DECKENT-ANA-PLAN-TR.md) → boost documentation intent
+- This is the key fix for T-145-020 misrouting
+
+### 3. Enhance activation-engine.ts
+- Agent V2 activation configs need scope-based rules, not just intent.primary
+- Add new activation rules for agents:
+  - doc-writer: boost for .md filesWrite, docs/ scope
+  - architect: boost for src/orchestra/, src/core/ scope + large/epic complexity
+  - bug-fixer: boost for bugfix intent + src/ scope
+
+### 4. Add getDynamicExclusions() to routing-engine.ts
+- Instead of hard-coded global exclusions, compute per-task exclusions:
+  - documentation intent → exclude migration-specialist, devops-engineer
+  - src/orchestra/ scope → exclude frontend-designer, accessibility-auditor
+  - etc.
+
+### 5. Write tests in tests/orchestra/agent-routing-health.test.ts
+- 12 tests as specified in task description
+
+## Files to Modify
+1. src/core/intent-classifier.ts — keyword refresh + scope signals
+2. src/core/activation-engine.ts — (minimal, mostly agent configs handle this)
+3. src/orchestra/task-router.ts — (minimal, routing engine handles core logic)
+4. tests/orchestra/agent-routing-health.test.ts — new test file

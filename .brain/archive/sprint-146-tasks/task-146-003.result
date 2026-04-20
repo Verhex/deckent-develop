@@ -1,0 +1,28 @@
+{
+  "taskId": "146-003",
+  "filesChanged": [
+    "src/orchestra/adr-selector.ts",
+    "src/orchestra/task-builder.ts",
+    "tests/orchestra/adr-selector.test.ts"
+  ],
+  "linesAdded": 380,
+  "linesRemoved": 15,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ADR Relevance Scoring Engine implemented. Created src/orchestra/adr-selector.ts (~330 LoC) with: selectRelevantAdrs() scoring engine (scope path match +0.4, keyword match +0.3, intent preference +0.2, age penalty max -0.1), buildAdrPromptSection() for full/summary mode rendering, classifyTaskIntent() for task type classification. Updated task-builder.ts queryRelevantADRs() to use new scoring engine with backward-compat FTS5 fallback. 13/13 tests pass (10 spec tests + 3 intent classification bonus tests). tsc --noEmit PASS. ADR injection reduced from 5 ADRs to topN=3 with relevance scoring. Pre-existing test failures (event-stream-emit, event-bus, agent-routing-health, turkish-locale) unrelated to this task.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 35000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

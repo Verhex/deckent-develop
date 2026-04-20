@@ -1,0 +1,32 @@
+{
+  "taskId": "146-010",
+  "workerId": "w-146-010",
+  "filesChanged": [
+    "src/orchestra/prompt-god-template.ts",
+    "src/core/task-types.ts",
+    "src/orchestra/sprint-retro-writer.ts",
+    "tests/orchestra/rubric-consolidation.test.ts"
+  ],
+  "linesAdded": 195,
+  "linesRemoved": 40,
+  "testsPassed": true,
+  "coverage": 85,
+  "selfAssessment": "DONE",
+  "notes": "Rubric system consolidated: (1) Removed rubricScores spec from worker prompt in prompt-god-template.ts — workers no longer self-report rubric scores. (2) Added @deprecated JSDoc to TaskResult.rubricScores in task-types.ts — field retained for backward compat only. (3) Updated formatRubricScoresSection in sprint-retro-writer.ts to use Quality Assessor assessQuality() dimensions (correctness, coverage, scopeAdherence, completeness) instead of worker self-report. Table headers changed to 'Quality Dimensions' with canonical column names. (4) 10/10 tests pass covering: prompt no rubricScores, deprecated field compat, assessQuality canonical scoring, RETRO table headers, field naming, backward compat, skillRelevance for outcome-tracker, no rubricScores fallback, column headers, multi-task integration. tsc PASS, vitest 10/10 PASS.",
+  "agentId": "architect",
+  "skillIds": ["typescript-expert"],
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

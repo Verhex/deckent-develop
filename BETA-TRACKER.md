@@ -30,8 +30,8 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 
 | Sprint | Day | Theme | Key Deliverables | Readiness |
 |--------|-----|-------|------------------|-----------|
-| Sprint 145 | Mon Apr 20 | Adaptive Timeout + Observability + Doc Reform | 27 tasks: i18n 95%, event bus, timeout watcher, config Zod, Memory V2 stress test, BETA-TRACKER calibration | 4.10/5 |
-| Sprint 146 | Mon Apr 20 – Tue Apr 21 | Dead Code + Config + CLI/MCP Parity | Dead Code Wave C (Sprint 144 T-007/T-008 retry), config audit, CLI --root flag parity, MCP outputSchema | 4.25/5 |
+| Sprint 145 | Mon Apr 20 | Adaptive Timeout + Observability + Doc Reform | 27 tasks: i18n 95%, event bus, timeout watcher, config Zod, Memory V2 stress test, BETA-TRACKER calibration | 4.10/5 ✅ |
+| Sprint 146 | Mon Apr 20 – Tue Apr 21 | Prompt God Template Reform + Bug Fix + Rubric Consolidation | Agent truncation fix, routing V2 retrain, ADR relevance scoring, scope sanitizer, prompt god template, DIRECTIVES protection, SDL rehab, rubric consolidation — 17 tasks | 4.25/5 ✅ |
 | Sprint 147 | Tue Apr 21 | Multi-Provider Beta-Hardening | Claude + Codex + Gemini live sprint test, provider fallback chain validation, dashboard polish | 4.45/5 |
 | Sprint 148 | Wed Apr 22 | Cross-Platform + Plugin Sandbox | macOS + Linux + WSL2 dogfood validation, plugin e2e test, Docker image optimization | 4.65/5 |
 | Sprint 149 | Wed Apr 22 – Thu Apr 23 | Final Doc + npm Dry-Run | README/API ref/config ref final sync, .npmignore validation, `npm pack --dry-run` clean, CHANGELOG Sprint 145-149 | 4.85/5 |
@@ -60,7 +60,7 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-145 |
+| Sprint | sprint-146 |
 | MCP Tools | 23 |
 | MCP Resources | 8 |
 | CLI Commands | 49+ |
@@ -917,13 +917,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-145 |
-| Total Tasks | 28 |
-| Completed | 27 |
-| Tech Debt | 24 |
+| Sprint | sprint-146 |
+| Total Tasks | 17 |
+| Completed | 16 |
+| Tech Debt | 6 |
 | No-Go | 1 |
-| Duration | 92dk 30sn |
-| Coverage | 7.8% |
+| Duration | 62dk 3sn |
+| Coverage | 16.2% |
 
 ## Sprint History (Sprint 136-145)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |
@@ -1426,3 +1426,51 @@ Cache only reduces cost — tokens still occupy the context window:
 
 ## Sprint History
 _No sprint history._
+
+## Sprint 146 — Detailed Summary
+
+**Theme:** Prompt God Template Reform + Critical Bug Fix + Rubric Consolidation
+**Date:** Mon Apr 20 – Tue Apr 21, 2026
+**Tasks:** 17 | **Waves:** 6 | **Status:** Active
+
+### Sprint 146 Deliverables
+
+**Wave 1 — Foundation (parallel):**
+- T1: Agent Truncation Bug Fix — agent-pool.ts satır 29 kırpma kaldırıldı (full PROMPT.md yükleme)
+- T2: Agent Routing V2 Retrain — intent classifier refresh, test-writer %52 → ≤%22
+- T3: ADR Relevance Scoring Engine — adr-selector.ts, topN=3, age penalty
+- T4: Scope Sanitizer — dist/ remove, global file protection, path deduplication
+
+**Wave 2 — Build (parallel):**
+- T5: Generative God Template — prompt-god-template.ts ~400 LoC, buildTaskPrompt() single entry
+- T6: ADR Preset Matrix + Filler Cleanup — 7 task types, empty header suppression
+- T7: Prompt Quality Linter — scripts/prompt-linter.mjs, exit code 0 avg ≥75/100
+
+**Wave 3 — Bug Fix (parallel):**
+- T8: DIRECTIVES Mid-Sprint Protection — phase guard, CLEANUP-only archiving
+- T9: SDL Decision Log Rehab — v2-only logging, meaningful steps, deckent explain integration
+- T10: Rubric System Consolidation — Quality Assessor canonical, worker self-report removed
+
+**Wave 4 — Preflight (parallel):**
+- T11: Sprint 145 vitest Regression Fix — 3 fail resolved, ≥99.3% pass
+- T12: Nervous System Preflight — `src/core/nervous-types.ts`, ADR-040 status: proposed
+- T13: Sprint 146 Retro + Docs — Sprint-146.md, CHANGELOG 0.4.0-beta.2
+
+**Wave 5 — Integrate (parallel):**
+- T14: Agent Exclusion Dynamic — getDynamicExclusions(), no more global hard-code
+- T15: Chain Safety Gate — scripts/chain-gate-check.mjs, 6 gates
+
+**Wave 6 — Docs (parallel):**
+- T16: Living Record Update — FINAL-EXECUTIVE-REPORT.md sections 1/5/6/8 + append
+- T17: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 append (this entry)
+
+### Sprint 147 Preview — Nervous System
+
+Sprint 147 theme: **Deckent Nervous System** — runtime authority enforcement + notification engine + safety floor.
+
+- **nervous-types.ts** placeholder ready (Sprint 146 T12)
+- **ADR-040** draft registered, status: `proposed` → `accepted` at Sprint 147 end
+- Components: AuthorityMode, ApprovalPolicy, NervousNotification, SafetyFloorAction
+- Design spec: `docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md`
+
+**Beta GA path:** Sprint 146 ✅ → Sprint 147 (Tue) → Sprint 148 (Wed) → Sprint 149 (Wed-Thu) → Sprint 150 (Thu 🚀 GA Apr 23)

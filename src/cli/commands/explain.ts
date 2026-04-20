@@ -182,6 +182,79 @@ export function extractGoalFromSprintLog(content: string): string | null {
   return line;
 }
 
+// ─── Decision Log Display ──────────────────────────────────────────────────
+
+/**
+ * Build human-readable output for a task's routing decision log.
+ * Reads from `.deckent/decisions/decision-<taskId>.json`.
+ */
+export function buildTaskDecisionOutput(taskId: string, root: string, lang = 'en'): string | null {
+  const decisionPath = join(root, '.deckent', 'decisions', `decision-${taskId}.json`);
+  if (!existsSync(decisionPath)) return null;
+
+  try {
+    const raw = readFileSync(decisionPath, 'utf-8');
+    const parsed = JSON.parse(raw) as {
+      taskId: string;
+      sprintId: string;
+      steps: Array<{
+        step: number;
+        name: string;
+        input: Record<string, unknown>;
+        output: Record<string, unknown>;
+        reasoning: string;
+      }>;
+      decidedAt: string;
+    };
+
+    const lines: string[] = [];
+    const header = lang === 'tr'
+      ? `Task ${parsed.taskId} Routing Kararları (${parsed.sprintId})`
+      : `Task ${parsed.taskId} Routing Decisions (${parsed.sprintId})`;
+    lines.push(header);
+    lines.push('\u2501'.repeat(header.length));
+    lines.push('');
+
+    // Show input from first step (task context)
+    const firstStep = parsed.steps[0];
+    if (firstStep?.input && Object.keys(firstStep.input).length > 0) {
+      const inputLabel = lang === 'tr' ? 'Giriş:' : 'Input:';
+      lines.push(inputLabel);
+      if (firstStep.input.title) lines.push(`  Title: ${firstStep.input.title}`);
+      if (firstStep.input.intent) lines.push(`  Intent: ${firstStep.input.intent}`);
+      if (Array.isArray(firstStep.input.scope)) lines.push(`  Scope: ${(firstStep.input.scope as string[]).join(', ')}`);
+      lines.push('');
+    }
+
+    // Show output from first step (routing result)
+    if (firstStep?.output && Object.keys(firstStep.output).length > 0) {
+      const outputLabel = lang === 'tr' ? 'Sonuç:' : 'Result:';
+      lines.push(outputLabel);
+      if (firstStep.output.agent) lines.push(`  Agent: ${firstStep.output.agent}`);
+      if (Array.isArray(firstStep.output.skills)) lines.push(`  Skills: ${(firstStep.output.skills as string[]).join(', ')}`);
+      if (firstStep.output.confidence) lines.push(`  Confidence: ${firstStep.output.confidence}`);
+      lines.push('');
+    }
+
+    // Show reasoning steps
+    const stepsLabel = lang === 'tr' ? 'Routing Adımları:' : 'Routing Steps:';
+    lines.push(stepsLabel);
+    for (const step of parsed.steps) {
+      const excluded = step.reasoning.toLowerCase().includes('excluded');
+      const marker = excluded ? '\u2718' : '\u2714';
+      lines.push(`  ${marker} ${step.reasoning}`);
+    }
+
+    lines.push('');
+    const decidedLabel = lang === 'tr' ? 'Karar zamanı' : 'Decided at';
+    lines.push(`${decidedLabel}: ${parsed.decidedAt}`);
+
+    return lines.join('\n');
+  } catch {
+    return null;
+  }
+}
+
 /** i18n labels for explain output */
 const EXPLAIN_LABELS: Record<string, Record<string, string>> = {
   summary: { en: 'Summary', tr: 'Özet' },
@@ -263,11 +336,23 @@ export function registerExplain(program: Command): void {
     .command('explain')
     .description('Explain what the last sprint did in human-friendly language')
     .option('--sprint <id>', 'Show a specific sprint by ID (e.g. 042)')
+    .option('--task <taskId>', 'Show routing decision log for a specific task (e.g. 146-001)')
     .option('--json', 'Output results as JSON')
     .option('--verbose', 'Show all learnings and full task details (default shows max 3 learnings)')
-    .action((opts: { sprint?: string; json?: boolean; verbose?: boolean }) => {
+    .action((opts: { sprint?: string; task?: string; json?: boolean; verbose?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
+
+      // --task mode: show routing decision log for a specific task
+      if (opts.task) {
+        const output = buildTaskDecisionOutput(opts.task, root, lang);
+        if (!output) {
+          print(`No decision log found for task ${opts.task}`);
+          return;
+        }
+        print(output);
+        return;
+      }
 
       let sprintFile: string | null;
       if (opts.sprint) {

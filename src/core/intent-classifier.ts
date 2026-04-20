@@ -9,16 +9,16 @@ import type { TaskDNA, IntentType, OperationType, TaskSize } from './routing-typ
 
 const INTENT_KEYWORDS: Record<IntentType, string[]> = {
   security: ['security', 'auth', 'authentication', 'jwt', 'csrf', 'xss', 'injection', 'vulnerability', 'encryption', 'owasp', 'permission', 'acl', 'rbac'],
-  bugfix: ['fix', 'bug', 'error', 'crash', 'regression', 'broken', 'issue', 'defect', 'patch', 'hotfix'],
+  bugfix: ['fix', 'bug', 'error', 'crash', 'regression', 'broken', 'issue', 'defect', 'patch', 'hotfix', 'wire', 'runtime'],
   testing: ['test', 'spec', 'coverage', 'vitest', 'jest', 'mock', 'stub', 'assertion', 'e2e', 'integration test', 'unit test'],
   refactor: ['refactor', 'cleanup', 'restructure', 'simplify', 'extract', 'split', 'merge', 'consolidate', 'rename', 'reorganize'],
-  documentation: ['doc', 'readme', 'changelog', 'comment', 'jsdoc', 'guide', 'tutorial', 'api doc'],
+  documentation: ['doc', 'documentation', 'doc update', 'readme', 'changelog', 'comment', 'jsdoc', 'guide', 'tutorial', 'api doc', 'güncelleme', 'dokümantasyon'],
   performance: ['performance', 'optimize', 'speed', 'latency', 'cache', 'profil', 'benchmark', 'bottleneck', 'memory leak'],
   design: ['ui', 'ux', 'layout', 'component', 'style', 'css', 'theme', 'responsive', 'animation'],
   devops: ['ci', 'cd', 'pipeline', 'deploy', 'docker', 'kubernetes', 'workflow', 'github actions', 'infrastructure'],
-  config: ['config', 'setting', 'env', 'environment', 'migration', 'option', 'flag', 'parameter'],
+  config: ['config', 'setting', 'env', 'environment', 'option', 'flag', 'parameter'],
   migration: ['migrate', 'migration', 'upgrade', 'version', 'schema', 'transform', 'convert'],
-  implementation: ['implement', 'add', 'create', 'build', 'feature', 'endpoint', 'command', 'module', 'function'],
+  implementation: ['implement', 'add', 'create', 'build', 'feature', 'endpoint', 'command', 'module', 'function', 'adaptive', 'timeout', 'estimator', 'engine', 'validator'],
   unknown: [],
 };
 
@@ -40,6 +40,7 @@ const SCOPE_INTENT_SIGNALS: Array<{ pattern: RegExp; intent: IntentType; weight:
   { pattern: /^\.github\/|^ci\/|^\.circleci/i, intent: 'devops', weight: 3 },
   { pattern: /security|auth/i, intent: 'security', weight: 2 },
   { pattern: /docs?\//i, intent: 'documentation', weight: 2 },
+  { pattern: /\.md$/i, intent: 'documentation', weight: 2 }, // .md file writes signal documentation
   { pattern: /test/i, intent: 'testing', weight: 1 }, // lower weight — testing often secondary
 ];
 
@@ -141,17 +142,23 @@ export function detectPrimaryIntent(
     }
   }
 
-  // If most writes are docs
+  // If most writes are docs (docs/ directory or root-level .md files)
   const docRatio = Object.entries(analysis.writeRatio)
     .filter(([k]) => k.startsWith('docs/') || k === 'docs/')
     .reduce((sum, [, v]) => sum + v, 0);
-  if (docRatio >= 0.5) {
+  // Also check for .md-heavy writes at any level (root .md files don't have a dir prefix)
+  const mdFileCount = scope.filesWrite.filter(f => f.endsWith('.md')).length;
+  const mdRatio = scope.filesWrite.length > 0 ? mdFileCount / scope.filesWrite.length : 0;
+  if (docRatio >= 0.5 || mdRatio >= 0.5) {
     const docScore = scores.find(s => s.intent === 'documentation');
     if (docScore) {
       docScore.score += 3;
     } else {
       scores.push({ intent: 'documentation', score: 3 });
     }
+    // Debunk testing when most writes are doc files
+    const testScore = scores.find(s => s.intent === 'testing');
+    if (testScore && mdRatio >= 0.5) testScore.score = Math.max(0, testScore.score - 2);
   }
 
   // Sort by score descending
@@ -343,12 +350,10 @@ export function analyzeWriteScope(scope: TaskScope): TaskDNA['scope'] {
   let testWrites = 0;
 
   for (const file of writes) {
-    // Extract top-level dir (e.g., "src/", "tests/", "docs/")
+    // Extract top-level dir (e.g., "src/", "tests/", "docs/", "./" for root)
     const slash = file.indexOf('/');
-    const prefix = slash >= 0 ? file.slice(0, slash + 1) : '';
-    if (prefix) {
-      dirCounts.set(prefix, (dirCounts.get(prefix) ?? 0) + 1);
-    }
+    const prefix = slash >= 0 ? file.slice(0, slash + 1) : './';
+    dirCounts.set(prefix, (dirCounts.get(prefix) ?? 0) + 1);
 
     // Count test files
     if (file.startsWith('tests/') || file.startsWith('test/') || file.includes('.test.') || file.includes('.spec.')) {

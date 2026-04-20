@@ -998,7 +998,7 @@ export async function finalizeSprint(
     const rawCfg = opts?.config as Record<string, unknown> | undefined;
     const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;
     if (autoArchive) {
-      archiveDirectives(projectRoot, sprint.id);
+      archiveDirectives(projectRoot, sprint.id, 'CLEANUP');
     } else {
       debugLog('finalizeSprint:archiveDirectives', 'Skipped — auto_archive_directives=false');
     }

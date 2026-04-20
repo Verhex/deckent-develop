@@ -501,19 +501,32 @@ export async function planSprint(
             routingVersion: 'v2',
           };
 
-          // Persist decision trail via DecisionLogger so routing decisions are traceable
+          // Persist decision trail via DecisionLogger — only for v2 routing with meaningful steps
           try {
-            const { DecisionLogger } = await import('./decision-logger.js');
+            const { DecisionLogger, filterMeaningfulSteps } = await import('./decision-logger.js');
             const decisionLogger = new DecisionLogger(projectRoot);
-            const entries = decision.reasoning.map((r, i) => ({
+            const allEntries = decision.reasoning.map((r, i) => ({
               step: i + 1,
               name: `routing-step-${i + 1}`,
-              input: {} as Record<string, unknown>,
-              output: {} as Record<string, unknown>,
+              input: {
+                taskId: task.id,
+                title: task.title,
+                scope: task.scope.directories,
+                intent: decision.taskDNA.intent.primary,
+              } as Record<string, unknown>,
+              output: {
+                agent: decision.agentId ?? 'generic',
+                skills: decision.skillIds,
+                confidence: decision.agentConfidence,
+              } as Record<string, unknown>,
               durationMs: 0,
               reasoning: r,
             }));
-            decisionLogger.log(sprintId, task.id, entries);
+            const meaningful = filterMeaningfulSteps(allEntries);
+            // Only write log if there are meaningful steps
+            if (meaningful.length > 0) {
+              decisionLogger.log(sprintId, task.id, meaningful);
+            }
           } catch (logErr) {
             debugLog('planSprint:decision-trail', logErr);
           }

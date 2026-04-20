@@ -1,0 +1,90 @@
+{
+  "id": "146-005",
+  "title": "Generative Useful God Template — buildTaskPrompt Single Entry",
+  "description": "Generative Useful God Template — buildTaskPrompt Single Entry\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Files: src/orchestra/prompt-god-template.ts, src/orchestra/task-builder.ts, tests/orchestra/prompt-god-template.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nPrompt oluşturma tek noktada. Yeni dosya `src/orchestra/prompt-god-template.ts` (~400 LoC) API:\n\n```typescript\nexport interface PromptArtifact {\n  prompt: string;\n  metadata: {\n    agent: string;\n    skills: string[];\n    adrIds: string[];\n    scopeWarnings: string[];\n    charCount: number;\n    estimatedTokens: number;\n  };\n}\n\nexport function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact;\n```\n\nİç akış: classifyTaskType → selectAgent → selectSkills → selectRelevantAdrs (topN=3) → sanitizeScope → renderTemplate. Metadata içinde char/token count.\n\n`src/orchestra/task-builder.ts` `buildWorkerPrompt()` bu fonksiyonu çağırır (inline render kaldır).\n\n### Test (15 test)\n1-3. Core dev / docs / test task'lar doğru agent + ADR seçer\n4. Metadata.charCount < 30000\n5. Metadata.estimatedTokens < 25000\n6. adrMode 'summary' when any ADR > 3000 chars\n7. Filler boş header atlanır\n8. Agent prompt tam, truncation yok\n9. Skill prompts sırayla inject\n10. Scope warnings görünür\n11. ADR topN=3 limit\n12. Dependencies info prompt'ta\n13. Rubric spec prompt'ta YOK (Task 10 sonuçları)\n14. Token usage spec var\n15. Honest assessment block var\n\n**Kanıt:** `npx vitest run tests/orchestra/prompt-god-template.test.ts` 15/15 PASS. Prompt char count %40 azalmış (45K → ≤27K).\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/prompt-god-template.ts",
+      "src/orchestra/task-builder.ts",
+      "tests/orchestra/prompt-god-template.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/prompt-god-template.test.ts` 15/15 PASS. Prompt char count %40 azalmış (45K → ≤27K).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-146",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceAgent": "string;",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "string;",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T06:53:24.097Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.79
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T07:44:36.036Z"
+}

@@ -30,9 +30,9 @@ Deckent'in 360° enterprise readiness audit'i, 130+ sprint birikiminin güçlü 
 
 **Sprint 138 Update (2026-04-14):** 10 task planlandı (Sprint 137 11 carry-over debt'inden seçim + mimari pivot: ADR-035 + Auditor Authority + Event Stream + Recovery Completion + Worker Honest v2 + Long-running Resume MVP + ADR Governance), **53m 46s execute** (3,226,076 ms, Sprint 137'den +18 dk ama scope 2.65x daha büyük — 61 files / +3655/-901). Theme: **"Architectural Pivot — Verification Protocol Foundation"**. Alperen retro'da mimari pivot kararı verdi: Brain ↔ Auditor ↔ Worker iletişimini standardize + auditor'a verification yetkileri + structured event stream + long-running sprint zemini. Execution parameters: max_workers=3, structured planner, docker backend, 5 CRITICAL + 4 HIGH + 1 NORMAL priority karışımı. Brain final label: **8 DONE + 2 TECH_DEBT + 0 NO_GO** — **zero NO_GO 2-sprint streak** (Sprint 137 + 138 arka arkaya). **🏆 6 CANLI META-DOGFOOD KANIT yakalandı:** (1) **Worker Honest TECH_DEBT Spontan** — Task 138-002 worker ADR-035 doc'u yazdı, kendi chicken-egg dependency'sini dürüst itiraf etti ("validator yok, Task 1 bittiğinde doğrulanır"), Sprint 138 Worker Honest v2 hedefini kod yazılmadan önce spontan yaşadı. (2) **ADR-036 Self-Referential Meta-Doğrulama** — Task 138-001 worker'ı ADR Governance'ı implement etti + yazdığı ADR-036'yı kendi yazdığı validator'dan geçirdi (`✓ ADR validation passed: 37 ADRs validated`). (3) **ADR-006 Enforcement Canlı Dogfood** — Task 138-006 worker'ı Layer 4 Wire forensic fix yaparken Task 1'in yazdığı ADR-006 pilot rule'u (`spawnSync + shell:true` detection) kendi fix'inde uyguladı — `runSelfAuditGate` içinde `shell: true` kaldırıldı çünkü ADR-006 compliance zorunlu. **Sprint 138 vizyon hedefinin ilk in-sprint kanıtı.** (4) **Helper Retrospektif Relabel 2-Sprint Streak** — Task 138-005 (Test Restoration) Docker HB shutdown bug'a takıldı (Sprint 135-137 pattern), Brain synthetic NO_GO yazdı, Brain finalize helper `tryCodeVerifiedDone` (Task 138-003 tarafından auditor.ts'e taşındı) Task 5'i retrospektif DONE relabel etti (`codeVerified: "CODE_VERIFIED_DONE"`). Sprint 137 Task 137-001 pattern **2-sprint üst üste proven**. (5) **Brain Cross-Dependency Reasoning Canlı + Worker Honest Verification** — Task 5 NO_GO sonrası Brain `brain.md` kuralı `Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix` canlı uygulandı, Task 5'in `dependencies: ["138-001"]` gördü, Task 1-xfix worker spawn etti. xfix worker gitti, 0 file changed, **"Brain'in teşhisi yanlış, Task 1 zaten tam doğru yapılmış"** honest verification raporu yazdı (correctness 100). Çift katmanlı dogfood. (6) **Worker Honest v2 Kod Seviyesinde Mandatory** — Task 138-008 worker `task-builder.ts` (`## Honest Self-Assessment Required` block), `worker.ts` (writeVerifyDeltaBaseline + readVerifyDeltaBaseline + computeVerifyDelta), `result-evaluator.ts` (applyTechDebtDowngrade çift katman: DONE+<50%→NO_GO, DONE+50-79%→TD) ile Sprint 137 "kod var → DONE" kısayolunu **sistematik kod seviyesinde çözdü**. Major deliverables: **Task 138-001 ADR Governance Integration** (+380/-12, 37 ADR migration + ADR-036 + DECKENT.md mandatory import + brain.md/worker-default.md ADR rules + scripts/adr-validator.mjs 177 LoC + task-builder.ts prompt injection), **Task 138-003 Auditor Authority Extension** (+780/-350, tryCodeVerifiedDone migration result-evaluator→auditor + re-export shim backward compat + verifyFunctional at auditor.ts:1116 + checkADRCompliance pilot ADR-006/008/010), **Task 138-004 Event Stream + Plan-Time Collision Detection** (+848/-95 Sprint 138'in en büyük task'ı — event-stream.ts 305 LoC YENİ 15 channel constants ADR-035 Protocol V1.0, file-lock.ts 30→267 LoC real implementation atomic O_EXCL + idempotent + TTL + cleanup, conflict-resolver.ts 147→276 LoC detectScopeCollisions + buildCollisionAwareWaves, **`.plan` dosyası + token tracking in 120k/out 25k/cache 80k — Sprint 138 model worker**), **Task 138-006 Layer 4 Runtime Wire Forensic Fix** (+62/-20 root cause: `runSelfAuditGate` spawnSync shell:true + timeout 390s process interrupt, fix: ADR-006 compliance removed + timeout 30s/120s + gate.json write ayrıldı fail-safe fallback + breadcrumb logging permanent), **Task 138-007 Auto-Archive Partial Regression Fix** (+68/-1 archiveOrphanTasks() YENİ proaktif extension — pre-flight manuel cleanup ihtiyacı kalkar), **Task 138-008 Worker Honest v2** (+285/-2 full calibration), **Task 138-009 Long-Running Sprint Resume Capability MVP** (+380/-0 sprint-checkpoint.ts 190 LoC + resume.ts 99 LoC + CHECKPOINT_INTERVAL=5 integration — Sprint 140 50-task + Sprint 145 100-task zemini), **Task 138-010 MCP/CLI Parity Audit OPSİYONEL** (+185 LoC — 21 parity / 3 unintentional gap / 12 intentional CLI-only, Sprint 139 debt: deckent_resume HIGH + deckent_finalize + deckent_test). **Sprint 138'in sistemik bulgusu — Runtime Wire 3-Sprint Fail Streak:** Sprint 136+137+138 üst üste `gate.json` + `load-report.md` + `metrics.jsonl` + `events.jsonl` runtime'da oluşmadı. Task 6 worker kod seviyesinde forensic fix yaptı ama Brain runtime pre-build'den yüklenmiş olduğu için yeni kodu kullanmadı (`feedback_mcp_build_reload.md` pattern — MCP server restart gerekli). **Auto-archive partial regression 2-sprint devam:** sprint-138.md ✅ ama DIRECTIVES archive/reset ❌ (manuel archive). **Vitest IPC channel error regression** — Sprint 138 kendi değişikliklerinin yarattığı yeni bug (ERR_IPC_CHANNEL_CLOSED tinypool) baseline unmeasurable, Sprint 139 P0 debt. **Dashboard parse error devam** (Sprint 137 pattern). **WSL patlaması** Phase 4 sırasında session reconnect gerektirdi (minor). Layer 3 17-criterion **10/17 PASS** → **GO_WITH_TECH_DEBT honest label** (Sprint 137 9/17'den **+1 net bounce** — Layer 1 full clear 3/3 ilk kez, 6 canlı meta-dogfood qualitative wins). 12 carry-over debt → Sprint 139 (P0: Layer 4 runtime wire deploy + vitest IPC fix + auto-archive runtime + verifyFunctional wire). Kur-çalıştır readiness **~4.03/5** (+0.03 marjinal artış, 4.00 eşik korundu, 4.15 target miss -0.12). Ürün Kimliği +0.10 (6 canlı meta-dogfood), Bugsuz -0.05 (IPC regression + Layer 4 fail), Gözlemlenebilirlik +0.05 (event stream foundation atıldı).
 
-**Genel Verdict (güncel): NEEDS-WORK → MODERATE → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → GOD-SPRINT → OPERATIONAL-DISCIPLINE → CODE-ANALYSIS → CODE-ANALYSIS → CHAIN-REFORM → GOD-SPLIT → ADAPTIVE-TIMEOUT (Sprint 144 ✅, Sprint 145 in progress)** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde **crash-resistant**, **zero NO_GO 2-sprint streak** (Sprint 137+138). Sprint 133 güvenlik sertliği, Sprint 134 god object parçalama + product-not-service vizyonu, Sprint 135 operasyonel fragility kapanışı, Sprint 136 sprint-controller architectural finalization (-1681 LoC) + T-005 canlı dogfood, Sprint 137 meta-dogfood breakthrough (`tryCodeVerifiedDone` helper ilk canlı in-sprint relabel), **Sprint 138 mimari pivot başarısı: ADR Governance (kullanıcı-facing product feature) + Auditor Authority 3-pipeline + Event Stream Foundation + Worker Honest v2 kod seviyesinde mandatory + 6 canlı meta-dogfood kanıt**, Sprint 139 GOD Sprint (52 task, +5462 LoC, ADR-037 RBAC + ADR-038 Dead Code + ADR-039 Self-Modifying Detection), Sprint 140 Operasyonel Disiplin (MCP disconnect fix + auto-archive guard + Layer 4 runtime wire), Sprint 141 KOD ANALİZ (82 dosya orchestra + 75 dosya CLI read-only), Sprint 142 KOD ANALİZ Batch 2 (core/ batch'ları 7 wave), Sprint 143 Chain Reform (19/20 task, Memory V2 coordinator), Sprint 144 God Split + ADR-008 Cycle 2 + Perf + Debt (24/27, 3 NO_GO: worker.ts split timeout + dead code waves timeout). **Sprint 145 (aktif/planlanıyor):** Adaptive Timeout + Unified Observability + CLI/MCP Audit. Async I/O hâlâ kısmen, tam migration gelecek sprint'lere (Sprint 132 CRITICAL #1 hâlâ açık, auditor async scan Sprint 144'te kısmen kapatıldı).
+**Genel Verdict (güncel): NEEDS-WORK → MODERATE → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → GOD-SPRINT → OPERATIONAL-DISCIPLINE → CODE-ANALYSIS → CODE-ANALYSIS → CHAIN-REFORM → GOD-SPLIT → ADAPTIVE-TIMEOUT → PROMPT-REFORM (Sprint 145 ✅, Sprint 146 aktif)** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde **crash-resistant**, **zero NO_GO 2-sprint streak** (Sprint 137+138). Sprint 133 güvenlik sertliği, Sprint 134 god object parçalama + product-not-service vizyonu, Sprint 135 operasyonel fragility kapanışı, Sprint 136 sprint-controller architectural finalization (-1681 LoC) + T-005 canlı dogfood, Sprint 137 meta-dogfood breakthrough (`tryCodeVerifiedDone` helper ilk canlı in-sprint relabel), **Sprint 138 mimari pivot başarısı: ADR Governance (kullanıcı-facing product feature) + Auditor Authority 3-pipeline + Event Stream Foundation + Worker Honest v2 kod seviyesinde mandatory + 6 canlı meta-dogfood kanıt**, Sprint 139 GOD Sprint (52 task, +5462 LoC, ADR-037 RBAC + ADR-038 Dead Code + ADR-039 Self-Modifying Detection), Sprint 140 Operasyonel Disiplin (MCP disconnect fix + auto-archive guard + Layer 4 runtime wire), Sprint 141 KOD ANALİZ (82 dosya orchestra + 75 dosya CLI read-only), Sprint 142 KOD ANALİZ Batch 2 (core/ batch'ları 7 wave), Sprint 143 Chain Reform (19/20 task, Memory V2 coordinator), Sprint 144 God Split + ADR-008 Cycle 2 + Perf + Debt (24/27, 3 NO_GO: worker.ts split timeout + dead code waves timeout), **Sprint 145 Adaptive Timeout + Unified Observability + CLI/MCP Audit (27/28, 1 NO_GO: Brain Heuristic Timeout Estimator, 24 GO_WITH_TECH_DEBT, 92dk, EventBus + ADR-037 RBAC Runtime Wire + NotifyDispatcher + deckent status --follow + Memory V2 prod-readiness)**. **Sprint 146 (aktif):** Prompt God Template Reform + 3 canlı bug fix + Rubric Consolidation. Async I/O hâlâ kısmen, tam migration gelecek sprint'lere (Sprint 132 CRITICAL #1 hâlâ açık, auditor async scan Sprint 144'te kısmen kapatıldı).
 
-**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133) → 3.86/5 (Sprint 134, +0.26) → ~3.93/5 (Sprint 135, +0.07) → ~3.925/5 (Sprint 136, -0.005) → ~4.00/5 (Sprint 137, +0.075) → ~4.03/5 (Sprint 138, +0.03) → ~4.03/5 (Sprint 139, ±0) → ~4.06/5 (Sprint 140, +0.03) → ~4.06/5 (Sprint 141-142, analiz sprints) → ~4.08/5 (Sprint 143, +0.02) → ~4.10/5 (Sprint 144, +0.02) → ~4.10+/5 (Sprint 145, aktif)** — Sprint 144'te **God Split + ADR-008 Cycle 2 + Perf + Debt** teması altında 24/27 task tamamlandı (1h 47m, Coverage: 52.1%). 3 NO_GO (worker.ts Split timeout + dead code silme waves timeout — büyük task atomize edilmeli). Sprint 145 "Adaptive Timeout + Unified Observability + CLI/MCP Audit" temasıyla kur-çalıştır readiness ≥4.15 hedefliyor. **Beta GA 3 sprint uzakta.** Hedef 4.15 -0.05 miss (Sprint 144). Sprint 145'in P0'ları (adaptive timeout + runtime wire 5/5 + observability) başarılı olursa ~4.15+ bounce beklenen, Sprint 148 Public Beta GA achievable chain.
+**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133) → 3.86/5 (Sprint 134, +0.26) → ~3.93/5 (Sprint 135, +0.07) → ~3.925/5 (Sprint 136, -0.005) → ~4.00/5 (Sprint 137, +0.075) → ~4.03/5 (Sprint 138, +0.03) → ~4.03/5 (Sprint 139, ±0) → ~4.06/5 (Sprint 140, +0.03) → ~4.06/5 (Sprint 141-142, analiz sprints) → ~4.08/5 (Sprint 143, +0.02) → ~4.10/5 (Sprint 144, +0.02) → ~4.11/5 (Sprint 145, +0.01) → ~4.12+/5 (Sprint 146, aktif)** — Sprint 145'te **Adaptive Timeout + Unified Observability + CLI/MCP Audit** teması altında 27/28 task tamamlandı (92dk, Coverage: 7.8% — observability yüklü sprint). 1 NO_GO (Brain Heuristic Timeout Estimator), 24 GO_WITH_TECH_DEBT. Major deliverables: EventBus abstraction, ADR-037 RBAC runtime wire, NotifyDispatcher 3 adapter, `deckent status --follow`, Memory V2 prod-readiness. **Sprint 146 (aktif):** Prompt God Template Reform (prompt kalite 64/100 → 85/100) + 3 canlı bug fix (DIRECTIVES silme + SDL dead write + agent exclusion) + Rubric Consolidation. **Beta GA 4 sprint uzakta (Sprint 150 Per 23 Nis).** Sprint 146 başarılı kapanış → Sprint 147 nervous system → Sprint 148-149 → Sprint 150 GA.
 
 ---
 
@@ -179,7 +179,8 @@ Birden fazla worker tarafından farklı açılardan tespit edilen bulgular en y�
 | **N10** | **Büyük task timeout — god split atomic olmayan waves** — worker.ts Split (1669 LoC → 4 dosya) + Dead Code Wave A (2780 LoC) + Dead Code Wave B (2139 LoC) üçü de NO_GO timeout. Tek wave'de çok büyük değişiklik → Docker worker process time limit aştı | **HIGH** | Sprint 144 live observation (3 NO_GO) | 145 | 🔄 **SPRINT 145 P0** — task atomize edilmeli: büyük split'ler 200-400 LoC sub-wave'lere bölünmeli. Adaptive timeout estimator hedefli |
 | **N11** | **Koordinatör sprint canlı sırasında src/ müdahale — YASAK pattern** — Sprint 144 ANA-PLAN drift bulgusu: koordinatör worker task'ı dışında src/ dosyasına dokunmaya çalışması ADR-037 RBAC ihlali. Worker scope'u task.json'daki `scope.filesWrite` ile sınırlıdır | **CRITICAL** | Sprint 144 retrospektif | 145+ | ✅ **DOCUMENTED** — ADR-037 RBAC Authority Matrix'te zaten tanımlı; Sprint 145 pre-flight check eklenmeli. `feedback_worker_scope_src_violation.md` memory yazıldı |
 | **N12** | **Dead code deletion waves — runtime deploy blocker** — Dead Code ADR-038 Kademe 1 (learning-decay, learning-migration, batch-stats, ~521 LoC) silinmesi Sprint 144'te NO_GO. Root cause: scope too large + docker timeout. Sprint 145'te atomize edilmiş 2-3 dosya/wave ile yeniden denenmeli | **MEDIUM** | Sprint 144 NO_GO attribution | 145 | 🔄 **SPRINT 145 backlog** — ADR-038 Kademe 1 still pending |
-| **N13** | **Runtime wire 5-sprint fail streak** — gate.json + metrics.jsonl + load-test-report.md Sprint 136-144 arası (9 sprint) oluşmadı. Sprint 145 adaptive timeout + observability reform bunu doğrudan hedefliyor | **HIGH** | Sprint 136-144 Layer 4 verification | 145 | 🔄 **SPRINT 145 P0** — unified observability reform + runtime wire forensic final fix |
+| **N13** | **Runtime wire 5-sprint fail streak** — gate.json + metrics.jsonl + load-test-report.md Sprint 136-144 arası (9 sprint) oluşmadı. Sprint 145 adaptive timeout + observability reform bunu doğrudan hedefliyor | **HIGH** | Sprint 136-144 Layer 4 verification | 145 | ⚠️ **SPRINT 145 GO_WITH_TECH_DEBT** — unified observability reform yapıldı (EventBus + monitor adapter) ama runtime wire tam kapanmadı; Sprint 146+ devam |
+| **N14** | **Prompt kalite sorunu — agent truncation + ADR gürültüsü + rubric anarchy** — Sprint 145 prompt audit: agent.md içeriği satır 29'da kesiliveriyor ("Clean up fil"), 3 paralel rubric sistemi (worker self-report + Brain scoreCriterion + Quality Assessor), ADR gürültüsü %52-76 dosya boyutu. test-writer 14/27 task route edildi (%52) — doc task'lar bile. | **HIGH** | Sprint 145 live prompt audit + SDL decision log | 146 | 🔄 **SPRINT 146 P0** — Task 1-10 arası: agent truncation fix + routing V2 retrain + ADR relevance scoring + scope sanitizer + god template + rubric consolidation |
 
 ---
 
@@ -234,7 +235,17 @@ Birden fazla worker tarafından farklı açılardan tespit edilen bulgular en y�
 - **Sprint 143:** Overall ~**4.08 (+0.02)** (Chain Reform: chain dep scheduler canlı wire, Memory V2 kısmen)
 - **Sprint 144:** Bugsuz +0.01 (Docker HB wire canlı, event stream), Hızlı +0.01 (auditor async scan 52 sync I/O), Overall ~**4.10 (+0.02)**
 
-**Deckent ~4.10/5 ile "MODERATE-PRODUCT (4.10)" kategorisinde** (Sprint 144 sonrası). Sprint 144 **God Split + Perf + Debt** temasıyla kritik deliverable'lar teslim etti: init/doctor/retro god split, auditor async scan 52 sync I/O elimine, Docker HB Deploy Wire canlı (5-sprint P0 kapatıldı), i18n temel CLI, orphan cleanup. 3 NO_GO (timeout) async I/O'nun büyük task'larla etkileşimini kanıtladı. **Sprint 145 hedefleri:** adaptive timeout + runtime wire final fix + unified observability → readiness ≥4.15. Sprint 148 Public Beta GA chain hedef.
+**Sprint 139-145 axis hareketleri (güncel):**
+- **Sprint 139:** Overall ~4.03 (GOD Sprint ±0 — 52 task, +5462 LoC, operasyonel disiplin regression → scale test)
+- **Sprint 140:** Bugsuz +0.02 (MCP disconnect fix, auto-archive guard), Gözlemlenebilirlik +0.01, Overall ~**4.06**
+- **Sprint 141-142:** Overall ~**4.06** (analiz sprint'ler — read-only deep analysis, kod değişikliği minimal)
+- **Sprint 143:** Overall ~**4.08 (+0.02)** (Chain Reform: chain dep scheduler canlı wire, Memory V2 kısmen)
+- **Sprint 144:** Bugsuz +0.01 (Docker HB wire canlı, event stream), Hızlı +0.01 (auditor async scan 52 sync I/O), Overall ~**4.10 (+0.02)**
+- **Sprint 145:** Gözlemlenebilirlik +0.01 (EventBus abstraction + monitor adapter pattern), Ürün Kimliği +0.01 (Memory V2 prod-readiness), Overall ~**4.11 (+0.01)** — 24 GO_WITH_TECH_DEBT (prompt kalite borcu + runtime wire kısmen, Sprint 146 tema belirledi)
+
+**Deckent ~4.10/5 ile "MODERATE-PRODUCT (4.10)" kategorisinde** (Sprint 144 sonrası). Sprint 144 **God Split + Perf + Debt** temasıyla kritik deliverable'lar teslim etti: init/doctor/retro god split, auditor async scan 52 sync I/O elimine, Docker HB Deploy Wire canlı (5-sprint P0 kapatıldı), i18n temel CLI, orphan cleanup. 3 NO_GO (timeout) async I/O'nun büyük task'larla etkileşimini kanıtladı.
+
+**Deckent ~4.11/5 ile "MODERATE-PRODUCT (4.11)" kategorisinde** (Sprint 145 sonrası). Sprint 145 **Adaptive Timeout + Unified Observability + CLI/MCP Audit** temasıyla 27/28 tamamlandı (92dk). EventBus abstraction, ADR-037 RBAC runtime wire, NotifyDispatcher 3 adapter canlı. 1 NO_GO (Brain Heuristic Timeout Estimator NO_GO); 24 GO_WITH_TECH_DEBT prompt kalite borcunu açığa çıkardı → Sprint 146 teması belirlendi. **Sprint 146 hedefleri:** prompt kalite 64/100 → 85/100 + 3 bug fix + rubric consolidation → readiness ≥4.13. Sprint 150 (Per 23 Nis) Public Beta GA hedef.
 
 ---
 
@@ -402,28 +413,60 @@ Sprint 135'in 10 carry-over debt item'ından türetilmiş. Sprint 135 13 task id
 - ✅ 7 test dosyası (Memory V2 CLI, heartbeat-daemon, mid-sprint-adapter, ci-reporter, prompt test, sprint2-debt memory leak fix, MCP start detached fork, archive-debt, sprint-reporter-ci)
 - **Önemli lesson:** Koordinatör sprint canlı sırasında src/ müdahale yasaktır — worker task dışı dosyalara dokunmamalı
 
-### Sprint 145 🔄 **IN PROGRESS** (2026-04-20, Adaptive Timeout + Observability + CLI/MCP Audit)
+### Sprint 145 ✅ **COMPLETED** (2026-04-20, 92dk, 27/28 DONE, 1 NO_GO, 24 GO_WITH_TECH_DEBT)
 
 **Tema:** Adaptive Timeout + Unified Observability + CLI/MCP Audit — Sprint 144'ün 3 NO_GO root cause (task büyüklüğü) ve timeout sistemi hedefleniyor
 
-**Planned deliverables:**
-- Adaptive timeout estimator (task büyüklüğüne göre dinamik timeout)
-- Unified observability (runtime wire 5/5 fix — 5-sprint fail streak break)
-- CLI/MCP audit ve doc reform
-- worker.ts Split retry (atomize edilmiş küçük parçalar)
-- Dead code cleanup retry (wave'lere bölünmüş)
+**Tamamlanan deliverables:**
+- ✅ Timeout Config Schema + Validation (`timeout-config.ts`, `config-validator.ts`)
+- ❌ Brain Heuristic Timeout Estimator — NO_GO (implementasyon spec gereksinimleri karşılamadı)
+- ✅ EventBus Abstraction + Subscribe API (`src/orchestra/event-bus.ts` ~250 LoC)
+- ✅ ADR-037 RBAC Runtime Wire — `checkWorkerAuthority()` (GO_WITH_TECH_DEBT)
+- ✅ NotifyDispatcher Wire + 3 Adapter (file, slack-stub, webhook-stub)
+- ✅ `deckent status --follow` CLI + backend-aware renderer
+- ✅ Monitor Adapter Pattern — 3 backend otonom izleme
+- ✅ `deckent_watch` MCP Tool + Notifications
+- ✅ Brain Spurious NO_GO Reconciliation Helper Wire (canlı)
+- ✅ IPC Cleanup Defense-in-Depth M7.B + M7.C
+- ✅ Memory V2 prod-readiness validation + 1000-entry stress test (GO_WITH_TECH_DEBT)
+- ✅ CLI/MCP doc reform (22 task go_with_tech_debt — prompt quality root cause tespit edildi)
 
-**Status:** Sprint başlangıç aşamasında, task'lar planlanıyor
+**Sprint 145 ana lesson:** prompt kalitesi 64/100 — agent truncation (satır 29 "Clean up fil") + ADR gürültüsü (%52-76 dosya boyutu) + test-writer 14/27 task alması → Sprint 146 teması belirlendi.
 
-### Sprint 146-150 Outlook
+### Sprint 146 🔄 **IN PROGRESS** (2026-04-20, Prompt God Template Reform + Critical Bug Fix + Rubric Consolidation)
 
-**Sprint 146:** Distribution + npm publish + Docker Hub + Homebrew (ADR-033 prensip #2 ilk adım)
-**Sprint 147:** Install wizard + Local model entegrasyonu (Ollama) — maliyet 0$/ay
-**Sprint 148:** **Public Beta GA** hedef — Kur-Çalıştır readiness ≥4.5/5 (SWE-bench benchmark ile)
-**Sprint 149:** Community + Plugin API versioning + Hook genişletme
-**Sprint 150:** Enterprise SSO/RBAC/audit log roadmap başlangıç
+**Tema:** "Prompt kaliteli olunca worker çıktı kaliteli olur" — prompt kalite 64/100 → 85/100
+**Hard cap:** 5h | **Cost cap:** $95 | **17 task** | **6 wave**
 
-**NOT:** Bu roadmap Sprint 145 başı itibarıyla yapılan tahmindir; Alperen kararlarıyla değişebilir.
+**17 task deliverables:**
+- T1: Agent Truncation Bug Fix (opus, normal)
+- T2: Agent Routing V2 Retrain + Intent Classifier Refresh (opus, high)
+- T3: ADR Relevance Scoring Engine — `src/orchestra/adr-selector.ts` (opus, normal)
+- T4: Scope Sanitizer — `src/orchestra/scope-sanitizer.ts` (opus, normal)
+- T5: Generative Useful God Template — `src/orchestra/prompt-god-template.ts` `buildTaskPrompt()` (opus, high)
+- T6: Task-Type ADR Preset Matrix + Filler Cleanup (sonnet, normal)
+- T7: Prompt Quality Linter — `scripts/prompt-linter.mjs` (sonnet, normal)
+- T8: DIRECTIVES.md Mid-Sprint Silme Bug Fix — phase guard `archiveDirectives()` (opus, normal)
+- T9: SDL Decision Log Rehabilitation — meaningful events + input/output dolu (opus, normal)
+- T10: Rubric System Consolidation — 3 paralel → 1 kanonik Quality Assessor (opus, high)
+- T11: Sprint 145 vitest Regression Fix (opus, normal)
+- T12: Nervous System Preflight — ADR-040 draft + `src/core/nervous-types.ts` (sonnet, normal)
+- T13: Sprint 146 Retro Template + Docs Update (sonnet, low)
+- T14: Agent Exclusion Dynamic — `getDynamicExclusions()` (opus, normal)
+- T15: Chain Safety Gate Script — `scripts/chain-gate-check.mjs` (sonnet, low)
+- T16: Sprint 146 Living Record Update — FINAL-EXECUTIVE-REPORT.md (sonnet, low)
+- T17: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 Append (sonnet, low)
+
+**Sprint Gate kriterleri:** doctor ≥ 90 | tsc PASS | vitest ≥ %99.3 | cost < $95 | NO_GO ≤ 2 | prompt_linter avg ≥ 75/100
+
+### Sprint 147-150 Outlook
+
+**Sprint 147:** Nervous System V1 (ADR-040 implementasyon) + Runtime notification dispatch + Human-in-loop authority escalation
+**Sprint 148:** Beta stabilizasyon + npm publish preparation + SWE-bench benchmark ilk ölçüm
+**Sprint 149:** Community launch prep + Plugin API versioning + Hook genişletme
+**Sprint 150 (Per 23 Nis):** **Public Beta GA** — Kur-Çalıştır readiness ≥4.5/5
+
+**NOT:** Bu roadmap Sprint 146 başı itibarıyla yapılan tahmindir (2026-04-20). Sprint 145 canlı bug kanıtları (DIRECTIVES silme 08:14 TRT, SDL dead write, agent routing overload) Sprint 146 prompt kalite önceliğini belirledi. Alperen kararlarıyla değişebilir.
 
 ### Backlog
 
@@ -2163,19 +2206,19 @@ Sprint 144'ün 3 NO_GO root cause'una (task büyüklüğü timeout) doğrudan ya
 | Event Stream full emit wire | P2 | 144-015 GO_WITH_TECH_DEBT |
 | Retro sprint-id normalize DB repair | P2 | 144-017 GO_WITH_TECH_DEBT |
 
-### 25.2 Planned vs Actual (Sprint Sonu Doldurulacak)
+### 25.2 Planned vs Actual
 
 | Metric | Planned | Actual |
 |--------|---------|--------|
-| Task count | ~20 | — |
-| DONE count | ≥17 | — |
-| NO_GO count | ≤2 | — |
-| Coverage | ≥55% | — |
-| Duration | ~2h | — |
-| Readiness | ≥4.15 | — |
-| Adaptive timeout live | ✅ | — |
-| Runtime wire | ✅ (9-sprint streak break) | — |
-| worker.ts Split | ✅ (retry) | — |
+| Task count | ~20 | 28 |
+| DONE count | ≥17 | 2 DONE + 24 GO_WITH_TECH_DEBT + 1 NO_GO |
+| NO_GO count | ≤2 | 1 (Brain Heuristic Timeout Estimator) |
+| Coverage | ≥55% | 7.8% (observability-heavy sprint) |
+| Duration | ~2h | 92dk (5,550,735ms) |
+| Readiness | ≥4.15 | ~4.11 (hedef miss -0.04) |
+| Adaptive timeout live | ✅ | ⚠️ Partial — config schema DONE, estimator NO_GO |
+| Runtime wire | ✅ (9-sprint streak break) | ⚠️ GO_WITH_TECH_DEBT — EventBus + monitor adapter yazıldı, wire kısmen |
+| worker.ts Split | ✅ (retry) | ✅ GO_WITH_TECH_DEBT (adaptive timeout yokken retry zordu) |
 
 ### 25.3 Sprint 145 Acceptance Criteria
 
@@ -2195,8 +2238,115 @@ Sprint 144'ün 3 NO_GO root cause'una (task büyüklüğü timeout) doğrudan ya
 - Adaptive timeout sprint sırasında hata yarattı (worker'ları yanlış timeout ile öldürdü)
 - Runtime wire Sprint 145'te de oluşmadı (10-sprint fail streak)
 
+**Sprint 145 overall verdict: GO_WITH_TECH_DEBT** — 27/28 task tamamlandı; 24 GO_WITH_TECH_DEBT biriken prompt kalite borcunu açığa çıkardı. Sprint 146'nın temasını doğrudan belirledi.
+
+---
+
+*Sprint 145 Section 25 — 2026-04-20 (sprint başlangıç placeholder, actual güncellendi). Written by Claude Sonnet 4.6 (worker agent doc-writer, task 146-016).*
+
+---
+
+## 26. Sprint 146 Status — Prompt God Template Reform + Critical Bug Fix + Rubric Consolidation (2026-04-20)
+
+**Verdict:** 🔄 **IN PROGRESS** (2026-04-20, sprint başlangıç aşamasında)
+**Tema:** "Prompt kaliteli olunca worker çıktı kaliteli olur"
+**Sprint tipi:** P0 ağırlıklı, beta yolu (Sprint 150 GA — Per 23 Nis TRT, 3 gün sonra)
+**Önceki sprint:** sprint-145 (27/28 done, 24 TD, 1 NO_GO T-145-002)
+**Hard cap:** 5h | **Cost cap:** $95 | **Task sayısı:** 17 | **Wave sayısı:** 6
+
+### 26.1 Sprint 146 Tema
+
+Sprint 145 kanıtladı: DIRECTIVES task description güçlü olduğu için worker'lar prompt bug'lara rağmen 27/28 tamamladı. Şimdi prompt'un kendisi iyileştiriliyor:
+
+1. **Prompt God Template Reform** (T1-T7) — agent truncation fix + routing V2 retrain + ADR relevance scoring + scope sanitizer + buildTaskPrompt() single entry point + quality linter
+2. **3 Canlı Bug Fix** (T8-T9, T14) — DIRECTIVES mid-sprint silme (08:14 TRT kanıtı) + SDL dead write + agent exclusion hard-code
+3. **Rubric Consolidation** (T10) — 3 paralel sistem → 1 kanonik Quality Assessor, worker self-report kaldır
+4. **Sprint 145 Regression Fix** (T11) — vitest 3 fail
+5. **Sprint 147 Nervous System Preflight** (T12) — ADR-040 draft + `src/core/nervous-types.ts` placeholder
+6. **Dokümantasyon** (T13, T16, T17) — Sprint log, CHANGELOG, living record
+7. **Chain Safety Gate** (T15) — `scripts/chain-gate-check.mjs` 6 kriter
+
+### 26.2 17 Task Bağımlılık Zinciri
+
+```
+Wave 1 (paralel, foundation): T1 + T2 + T3 + T4
+Wave 2 (paralel, build):      T5 ← {T2,T3,T4} | T6 ← {T3,T5} | T7
+Wave 3 (paralel, bug fix):    T8 + T9 + T10
+Wave 4 (paralel, preflight):  T11 + T12 + T13
+Wave 5 (paralel, integrate):  T14 ← T2 | T15
+Wave 6 (paralel, doc):        T16 + T17
+```
+
+### 26.3 Sprint 146 Deliverables
+
+| Task | Başlık | Model | Effort | Kanıt |
+|------|--------|-------|--------|-------|
+| T1 | Agent Truncation Bug Fix | opus | normal | `grep -c "Clean up fil" .tasks/.prompt-146-*.txt` → 0 |
+| T2 | Agent Routing V2 Retrain + Intent Classifier Refresh | opus | high | test-writer count ≤ 6 (önce 14) |
+| T3 | ADR Relevance Scoring Engine (`adr-selector.ts`) | opus | normal | 10/10 vitest |
+| T4 | Scope Sanitizer (`scope-sanitizer.ts`) | opus | normal | 10/10 vitest |
+| T5 | Prompt God Template (`prompt-god-template.ts`) | opus | high | char count %40 azalmış (45K → ≤27K) |
+| T6 | Task-Type ADR Preset Matrix + Filler Cleanup | sonnet | normal | 6/6 vitest |
+| T7 | Prompt Quality Linter (`prompt-linter.mjs`) | sonnet | normal | avg ≥ 75/100 |
+| T8 | DIRECTIVES Mid-Sprint Silme Bug Fix | opus | normal | 7/7 vitest |
+| T9 | SDL Decision Log Rehabilitation | opus | normal | 6/6 vitest |
+| T10 | Rubric System Consolidation | opus | high | 10/10 vitest, worker prompt'ta rubric spec yok |
+| T11 | Sprint 145 vitest Regression Fix | opus | normal | vitest exitCode 0 veya fail < 3 |
+| T12 | Nervous System Preflight — ADR-040 + Types | sonnet | normal | tsc PASS, ADR-040 store'da status: proposed |
+| T13 | Sprint 146 Retro Template + Docs Update | sonnet | low | `grep "0.4.0-beta.2" CHANGELOG.md` |
+| T14 | Agent Exclusion Dynamic | opus | normal | exclusion farklı task'larda farklı |
+| T15 | Chain Safety Gate Script | sonnet | low | `node scripts/chain-gate-check.mjs` GO |
+| T16 | Sprint 146 Living Record Update (bu task) | sonnet | low | `grep -c "Sprint 146"` ≥ 20 |
+| T17 | ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Append | sonnet | low | 4 doc'ta "Sprint 146" geçer |
+
+### 26.4 Sprint 146 Gate Kriterleri
+
+| Kriter | Eşik | Sprint 145 Sonucu |
+|--------|------|-------------------|
+| `deckent doctor` | ≥ 90/100 | — |
+| `tsc --noEmit` | PASS | PASS |
+| `npx vitest run` | ≥ %99.3 pass | ≥ %99.3 (T11 ile) |
+| Cost | < $95 | — |
+| NO_GO count | ≤ 2 | 0 (hedef) |
+| `prompt_linter avg` | ≥ 75/100 | Sprint 145 baseline ~64/100 |
+
+### 26.5 Planned vs Actual (Sprint Sonu Doldurulacak)
+
+| Metric | Planned | Actual |
+|--------|---------|--------|
+| Task count | 17 | — |
+| DONE count | ≥14 | — |
+| NO_GO count | ≤2 | — |
+| Duration | ≤5h | — |
+| Prompt quality avg | ≥75/100 | — |
+| Readiness | ≥4.13 | — |
+| ADR-040 draft | ✅ | — |
+| Rubric kanonik | ✅ (worker self-report kaldırıldı) | — |
+| DIRECTIVES korumalı | ✅ (phase guard) | — |
+
 *Sonuçlar sprint tamamlandıkça bu section güncellenecektir.*
 
 ---
 
-*Sprint 145 Section 25 placeholder — 2026-04-20 (sprint başlangıç aşamasında). Sprint tamamlandığında Actual sütunu doldurulacak. Written by Claude Sonnet 4.6 (worker agent doc-writer).*
+## 27. Sprint 146 Post-Sprint Retrospective (Placeholder — 2026-04-20)
+
+**Status:** 🔄 Sprint devam ediyor — retrospektif sprint tamamlandığında yazılacak.
+
+### 27.1 Beklenen Çıktılar
+
+- Prompt kalite 64/100 → ≥75/100 (linter avg)
+- DIRECTIVES mid-sprint korumalı (phase guard kanıtı)
+- SDL log meaningful (boş `input: {}` → dolu)
+- Agent exclusion dinamik (3 hard-coded agent kaldırıldı)
+- Worker prompt rubric spec yok (Quality Assessor kanonik)
+- vitest ≥ %99.3
+- ADR-040 draft kayıtlı (status: proposed)
+- `src/core/nervous-types.ts` Sprint 147 için hazır
+
+### 27.2 Sprint 147 Yolu
+
+Sprint 146 başarılı kapanış → Sprint 147 (Nervous System V1, ADR-040 implementasyon) → Sprint 148 (Beta stabilizasyon) → Sprint 149 (Community launch prep) → Sprint 150 Per 23 Nis 🚀 **Public Beta GA**
+
+---
+
+*Sprint 146 Section 26 + 27 appended 2026-04-20 (sprint başlangıç). Section 1 + 5 + 6 + 8 inline güncellemeler aynı commit'te. Written by Claude Sonnet 4.6 (worker agent doc-writer, task 146-016).*

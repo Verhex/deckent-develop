@@ -1,0 +1,27 @@
+{
+  "taskId": "146-004",
+  "filesChanged": [
+    "src/orchestra/scope-sanitizer.ts",
+    "src/orchestra/task-builder.ts",
+    "tests/orchestra/scope-sanitizer.test.ts"
+  ],
+  "linesAdded": 185,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Created scope-sanitizer.ts with 8 filter rules (absolute path reject, path traversal reject, dist/ remove, extension-only remove, unqualified filename remove+warning, global protected remove, (yeni) suffix strip, case-insensitive dedupe). Integrated into task-builder.ts buildWorkerPrompt() so worker prompts receive sanitized scope. 10/10 tests pass including integration test. tsc errors are pre-existing in adr-selector.ts (different task scope).",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 35000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

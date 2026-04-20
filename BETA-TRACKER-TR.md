@@ -9,7 +9,7 @@
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-145 |
+| Sprint | sprint-146 |
 | MCP Tools | 23 |
 | MCP Resources | 8 |
 | CLI Commands | 49+ |
@@ -904,7 +904,7 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 25. ✅ **Dead Code Audit** — Sprint 142-144'te tamamlandı (Wave A/B/C)
 
 #### P4 — BETA GA HAZIRLIK (Sprint 146-150)
-26. Sprint 146: Ölü Kod Wave C tamamlama + Config Audit
+26. Sprint 146: Prompt God Template Reform + 3 bug fix + rubric konsolidasyon (17 task)
 27. Sprint 147: Multi-Provider Beta-Sertleştirme + Dashboard cilalama
 28. Sprint 148: Cross-platform doğrulama + Plugin sandbox güçlendirme
 29. Sprint 149: Final doküman konsolidasyonu + npm publish dry-run
@@ -982,7 +982,8 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 | Sprint 142 | 12 | 10 | 2 | 0 | ~30dk | Core audit batch 1 |
 | Sprint 143 | 20 | 19 | 0 | 1 | ~55dk | Chain reform |
 | Sprint 144 | 27 | 24 | 0 | 3 | ~65dk | God split + ADR-008 |
-| Sprint 145 | 27+ | aktif | - | - | aktif | Timeout + observability |
+| Sprint 145 | 28 | 27 | 24 | 1 | 92dk 30sn | Timeout + observability ✅ |
+| Sprint 146 | 17 | aktif | - | - | aktif | Prompt god template reform |
 
 ### Sprint 098 Metrikleri
 - **Kapsam:** Dokümantasyon + Sprint Output + History Fix
@@ -1418,7 +1419,7 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - **Rakiplerden farkı:** DB-first bellek + RBAC + chain scheduling + 39 ADR governance
 
 ### Beta GA (Sprint 146-150): "Ürün Lansmanı"
-- Sprint 146: Ölü Kod Wave C + Config Audit + CLI --root parity + MCP outputSchema
+- Sprint 146: ✅ Prompt God Template Reform + 3 bug fix (DIRECTIVES koruması, SDL rehab, agent exclusion dinamik) + rubric konsolidasyon — 17 task
 - Sprint 147: Multi-Provider Beta-Sertleştirme + Web Dashboard cilalama
 - Sprint 148: Cross-platform doğrulama + Plugin sandbox
 - Sprint 149: Final doküman konsolidasyonu + npm publish dry-run
@@ -1572,10 +1573,80 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-145 |
-| Total Tasks | 28 |
-| Completed | 27 |
-| Tech Debt | 24 |
+| Sprint | sprint-146 |
+| Total Tasks | 17 |
+| Completed | 16 |
+| Tech Debt | 6 |
 | No-Go | 1 |
-| Duration | 92dk 30sn |
-| Coverage | 7.8% |
+| Duration | 62dk 3sn |
+| Coverage | 16.2% |
+
+## Sprint 146 — Detaylı Özet
+
+**Tema:** Prompt God Template Reform + Kritik Bug Fix + Rubric Konsolidasyon
+**Tarih:** Pzt 20 Nis – Sal 21 Nis 2026
+**Task sayısı:** 17 | **Wave sayısı:** 6 | **Durum:** Aktif
+
+### Sprint 146 Deliverables
+
+**Wave 1 — Temel (paralel):**
+- T1: Agent Truncation Bug Fix — agent-pool.ts satır 29 kırpma kaldırıldı (tam PROMPT.md yükleme)
+- T2: Agent Routing V2 Retrain — intent classifier yenilendi, test-writer %52 → ≤%22
+- T3: ADR Relevance Scoring Engine — adr-selector.ts, topN=3, yaş penaltisi
+- T4: Scope Sanitizer — dist/ kaldır, global dosya koru, yol tekrarı kaldır
+
+**Wave 2 — İnşa (paralel):**
+- T5: Generative God Template — prompt-god-template.ts ~400 LoC, buildTaskPrompt() tek giriş
+- T6: ADR Preset Matrix + Boş Başlık Temizleme — 7 task tipi preset, boş başlık atla
+- T7: Prompt Kalite Linter — scripts/prompt-linter.mjs, avg ≥75/100 gate
+
+**Wave 3 — Bug Fix (paralel):**
+- T8: DIRECTIVES Orta-Sprint Koruma — phase guard, yalnızca CLEANUP'ta arşivle
+- T9: SDL Decision Log Rehabilitasyon — v2-only log, anlamlı adımlar, deckent explain entegre
+- T10: Rubric Konsolidasyon — Quality Assessor kanonik, worker self-report kaldırıldı
+
+**Wave 4 — Ön Hazırlık (paralel):**
+- T11: Sprint 145 vitest Regresyon Fix — 3 fail düzeltildi, ≥%99.3 geçme oranı
+- T12: Nervous System Ön Hazırlık — `src/core/nervous-types.ts`, ADR-040 status: proposed
+- T13: Sprint 146 Retro + Docs — Sprint-146.md, CHANGELOG 0.4.0-beta.2
+
+**Wave 5 — Entegre (paralel):**
+- T14: Agent Exclusion Dinamik — getDynamicExclusions(), global hard-code kaldırıldı
+- T15: Zincir Güvenlik Gate — scripts/chain-gate-check.mjs, 6 kontrol
+
+**Wave 6 — Doküman (paralel):**
+- T16: Canlı Kayıt Güncelleme — FINAL-EXECUTIVE-REPORT.md bölüm 1/5/6/8 + ek
+- T17: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 ekleme (bu bölüm)
+
+### Sprint 147 Preview — Nervous System
+
+Sprint 147 teması: **Deckent Sinir Sistemi** — runtime yetki zorlaması + bildirim motoru + güvenlik katmanı.
+
+- **nervous-types.ts** placeholder hazır (Sprint 146 T12)
+- **ADR-040** taslak kayıtlı, status: `proposed` → Sprint 147 sonunda `accepted`
+- Bileşenler: AuthorityMode, ApprovalPolicy, NervousNotification, SafetyFloorAction
+- Tasarım spec: `docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md`
+
+## Sprint Metrikleri (Sprint 146 Güncel)
+| Metrik | Değer |
+|--------|-------|
+| Sprint | sprint-146 |
+| Toplam Task | 17 |
+| Tamamlanan | aktif |
+| Tech Debt | - |
+| No-Go | - |
+| Süre | aktif |
+| Coverage | - |
+
+## Sprint Metrics (Sprint 146 Current)
+| Metric | Value |
+|--------|-------|
+| Sprint | sprint-146 |
+| Total Tasks | 17 |
+| Completed | active |
+| Tech Debt | - |
+| No-Go | - |
+| Duration | active |
+| Coverage | - |
+
+**Beta GA yolu:** Sprint 146 ✅ → Sprint 147 (Sal) → Sprint 148 (Çar) → Sprint 149 (Çar-Per) → Sprint 150 (Per 🚀 GA 23 Nis)

@@ -45,6 +45,8 @@
 | adr-039 | Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-146 Learnings** (sprint-146): ## Sprint sprint-146 Learnings
+- Agent Truncation Bug Fix: GO_WITH_TECH_DEBT — Root cause: task-builder.ts:761 had `a...
 - **Sprint sprint-145 Learnings** (sprint-145): ## Sprint sprint-145 Learnings
 - Brain Heuristic Timeout Estimator: NO_GO — Brain Heuristic Timeout Estimator impleme...
 - **Sprint sprint-144 Learnings** (sprint-144): ## Sprint sprint-144 Learnings
@@ -59,7 +61,6 @@
 - **Sprint 138 Learnings** (sprint-138): - ADR-035 Verification Protocol Standard: GO_WITH_TECH_DEBT — ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol ...
 - **Sprint 137 Learnings** (sprint-137): - Brain Budget Decay No-Op Bug Fix: GO_WITH_TECH_DEBT — Fixed brain budget decay no-op bug in runDecay() (debt-manage...
 - **Sprint 136 Learnings** (sprint-136): - 5 Test Regression Fix (Sprint 136 Opener): GO_WITH_TECH_DEBT — 5 target test files (start-sandbox, start, i18n-inte...
-- **Sprint 135 Learnings** (sprint-135): - Docker Backend Graceful Shutdown (Docker Bug Offensive Root Cause Fix): GO_WITH_TECH_DEBT — Docker graceful shutdow...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -67,4 +68,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 142 | Generated: 2026-04-20_
+_Total entries: 150 | Generated: 2026-04-20_

@@ -1,0 +1,72 @@
+{
+  "id": "146-011",
+  "title": "Sprint 145 vitest Regression Fix",
+  "description": "Sprint 145 vitest Regression Fix\n- Model: opus\n- Effort: normal\n- Skills: testing-expert, typescript-expert\n- Files: tests/\n- Scope: tests/\n\n### Description\nSprint 145 gate: vitestFail 3. `npx vitest run 2>&1 | grep -E \"FAIL|failed\"` ile 3 fail test'i bul, fix et.\n\nMuhtemel adaylar: T-003 event-bus.ts yeni dosya import path, T-002 timeout-estimator.ts (NO_GO'dan kalma partial test).\n\n### Test\n- `npx vitest run` exitCode 0 veya fail < 3\n- Fail rate < %1\n\n**Kanıt:** Sprint 146 pre-start vitest ≥ %99.28 PASS.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": []
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `npx vitest run` exitCode 0 veya fail < 3; *Kanıt:** Sprint 146 pre-start vitest ≥ %99.28 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-146",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "testing-expert",
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T06:53:24.098Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.55
+      },
+      "domains": [],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 0,
+        "moduleCount": 0,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 1
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T07:45:02.416Z"
+}

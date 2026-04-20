@@ -1,0 +1,39 @@
+# Task 146-003: ADR Relevance Scoring Engine — Execution Plan
+
+## Approach
+Create `src/orchestra/adr-selector.ts` with relevance scoring based on:
+- Scope path match (+0.4)
+- Keyword match (+0.3)
+- Intent preference (+0.2)
+- Age penalty (negative)
+
+Then update `task-builder.ts` to use the new selector, and write comprehensive tests.
+
+## Files to Create/Modify
+1. **CREATE** `src/orchestra/adr-selector.ts` — New ADR relevance scoring module
+2. **MODIFY** `src/orchestra/task-builder.ts` — Wire `selectRelevantAdrs` into `queryRelevantADRs`
+3. **CREATE** `tests/orchestra/adr-selector.test.ts` — 10 tests per spec
+
+## Implementation Details
+
+### adr-selector.ts API
+- `AdrRelevance` interface: adrId, title, score, matchReasons
+- `selectRelevantAdrs(task, allAdrs, topN=3)` — scores and ranks ADRs
+- `buildAdrPromptSection(adrs, mode)` — renders markdown for prompt
+
+### Scoring Algorithm
+1. **Scope path match (+0.4):** ADR content mentions paths in task.scope.directories
+2. **Keyword match (+0.3):** ADR title/content keywords match task title/description
+3. **Intent preference (+0.2):** Task type (core-dev, docs, cli, etc.) maps to ADR presets
+4. **Age penalty:** Older ADRs (high sprint_num distance) get slight penalty
+
+### task-builder.ts Integration
+- `queryRelevantADRs()` will use `selectRelevantAdrs()` internally
+- Keep backward compat — same return type (string)
+
+## Test Plan (10 tests)
+1-3. Task type routing (core-dev, docs, CLI)
+4-6. Individual score components (scope, keyword, age)
+7. TopN cap
+8. Empty input
+9-10. buildAdrPromptSection modes

@@ -6,6 +6,70 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint146] - 2026-04-20
+
+### Added
+
+- Agent Routing V2 Retrain + Intent Classifier Refresh
+- Task-Type ADR Preset Matrix + Filler Cleanup
+- Prompt Quality Linter
+- SDL Decision Log Rehabilitation
+- Nervous System Preflight — ADR-040 + Types
+- Sprint 146 Retro Template + Docs Update
+- Agent Exclusion Dynamic (Task 2 tamamlayıcı)
+- Chain Safety Gate Script
+- Sprint 146 Living Record Update (FINAL-EXECUTIVE-REPORT.md)
+- ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 Append
+
+### Changed
+
+- Agent Truncation Bug Fix (completed with tech debt)
+- ADR Relevance Scoring Engine (completed with tech debt)
+- Scope Sanitizer (completed with tech debt)
+- Generative Useful God Template — buildTaskPrompt Single Entry (completed with tech debt)
+- DIRECTIVES.md Mid-Sprint Silme Bug Fix (completed with tech debt)
+- Rubric System Consolidation (completed with tech debt)
+
+
+_Tasks: 17 total, 16 done, 6 tech debt, 1 no-go_
+
+## [0.4.0-beta.2] - 2026-04-20
+
+### Added
+
+- `src/orchestra/adr-selector.ts` — ADR Relevance Scoring Engine: `selectRelevantAdrs()`, `buildAdrPromptSection()`, `AdrRelevance` interface; scope path match +0.4, keyword match +0.3, intent preference +0.2, age penalty; topN=3 default
+- `src/orchestra/scope-sanitizer.ts` — Scope Sanitizer: dist/ filter, extension-only remove, global protected file reject, path traversal reject, duplicate dedupe, "(yeni)" strip
+- `src/orchestra/prompt-god-template.ts` — Unified Prompt Builder `buildTaskPrompt()` single entry point; `PromptArtifact` interface with char/token count metadata; char count %40 azalma (~45K → ≤27K)
+- `src/core/nervous-types.ts` — Sprint 147 Nervous System type placeholders: `AuthorityMode`, `RiskLevel`, `ApprovalPolicy`, `NervousNotification`, `AuthorityMatrix`
+- `scripts/prompt-linter.mjs` — Prompt Quality Linter: 6 kalite kontrolü, avg ≥ 75/100 exit 0
+- `scripts/chain-gate-check.mjs` — Sprint Chain Safety Gate: tsc + vitest + doctor + cost + NO_GO + prompt_linter
+- ADR-040 draft (`status: proposed`) — Sprint 147 Nervous System foundation
+- `TASK_TYPE_ADR_PRESETS` matrix — 7 task type × ADR preset mapping
+- `docs/sprint-log/Sprint-146.md` — Sprint 146 sprint log
+
+### Changed
+
+- `src/core/intent-classifier.ts` — Agent Routing V2 Retrain: intent keyword mapping yenilendi (documentation/core-dev/evaluation/testing/bug-fix); test-writer routing %52 → ≤%22
+- `src/core/activation-engine.ts` — Dynamic exclusion kuralları: context-aware, hard-coded global exclude kaldırıldı
+- `src/orchestra/task-builder.ts` — `buildWorkerPrompt()` artık `buildTaskPrompt()` çağırır; inline render kaldırıldı
+- `src/orchestra/quality-assessor.ts` — `assessQuality()` her evaluate sonrası zorunlu; kanonik dimensions: coverage, scopeAdherence, completeness
+- `src/orchestra/result-evaluator.ts` — rubric konsolidasyon: Quality Assessor kanonik kaynak
+- `src/orchestra/sprint-retro-writer.ts` — `formatRubricScoresSection()` Quality Assessor dimensions kullanır
+- `src/core/task-types.ts` — `TaskResult.rubricScores` `@deprecated`
+
+### Fixed
+
+- **DIRECTIVES.md Mid-Sprint Silme Bug** — `archiveDirectives()` phase guard eklendi: yalnızca CLEANUP fazında tetiklenir; emergency restore task JSON'dan reconstruct
+- **SDL Decision Log Dead Write** — `writeDecisionLog()` yalnızca v2 routing + meaningful events; `input`/`output` dolu; `deckent explain` komutunda okunur
+- **Agent Exclusion Hard-Code** — `getDynamicExclusions()` implementasyonu: intent + scope'a göre dinamik exclusion; global hard-code kaldırıldı
+- **Agent Truncation Bug** — `agent-pool.ts` agent PROMPT.md substring truncation kaldırıldı (limit: 50000+)
+- **Sprint 145 vitest 3 Regression** — event-bus.ts + timeout-estimator.ts test fail'leri fix
+
+
+_Tasks: 17 total — Prompt God Template Reform + 3 canlı bug fix + rubric consolidation_
+
+---
+
 ## [0.4.0-beta.1-sprint145] - 2026-04-20
 
 ### Added

@@ -1,0 +1,37 @@
+# Task 146-007 Execution Plan: Prompt Quality Linter
+
+## Goal
+Create `scripts/prompt-linter.mjs` (ESM, node executable) and `tests/scripts/prompt-linter.test.ts` (vitest).
+
+## Approach
+
+### scripts/prompt-linter.mjs
+- Exported `scorePrompt(content: string): { score: number, issues: string[] }` function
+- `lintPromptFile(filePath: string): PromptLintResult`
+- CLI entry: `--sprint <id>` → scan `.tasks/.prompt-<sprint>-*.txt` files, report avg score
+- Exit code 0 if avg ≥ 75, exit code 1 otherwise
+
+### Scoring Rules (starting 100, deduct):
+1. ADR ratio = adrChars / totalChars
+   - ratio > 0.5 → -15
+   - ratio > 0.7 → additional -15 (cumulative -30)
+2. Agent truncation: contains "Clean up fil" pattern → -20
+3. Empty filler headers: `=== SomeSection ===\n\n===` pattern → -5 per occurrence
+4. Rubric spec present: "rubricScores" or "RUBRIC" keyword in prompt → -10
+5. Char count > 40000 → -10
+6. Duplicate scope paths: same path appears 2+ times → -5
+
+### tests/scripts/prompt-linter.test.ts
+5 tests as specified:
+1. Clean prompt → score 100
+2. ADR ratio 60% → score 85 (one -15 deduction)
+3. Truncation → score 80 (-20)
+4. Empty filler → score 95 (-5)
+5. Integration: mock sprint file scan → avg ≥ 75
+
+## File Order
+1. Write scripts/prompt-linter.mjs
+2. Write tests/scripts/prompt-linter.test.ts
+3. Run tsc --noEmit
+4. Run npx vitest run tests/scripts/prompt-linter.test.ts
+5. Write .result

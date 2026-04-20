@@ -16,6 +16,40 @@ export interface PersistedDecisionLog {
   decidedAt: string;
 }
 
+// ─── Meaningful Step Patterns ──────────────────────────────────────────────
+
+/**
+ * Patterns that identify meaningful routing decisions worth logging.
+ * Steps matching NONE of these patterns are filtered out to reduce noise.
+ */
+const MEANINGFUL_PATTERNS: RegExp[] = [
+  /Agent selected:/i,
+  /Agent '.+' excluded/i,
+  /Dynamic exclusions:/i,
+  /Skill budget:/i,
+  /Skill selected:/i,
+  /Skill '.+' excluded/i,
+  /Context fit:/i,
+  /Agent forced by override/i,
+  /Skills forced by override/i,
+  /Skills cleared by override/i,
+  /learning bonus:/i,
+  /intent-priority bonus:/i,
+];
+
+/**
+ * Filter decision log entries to keep only meaningful routing steps.
+ * Removes trivial steps (e.g. basic intent classification) that don't
+ * provide actionable debug information.
+ *
+ * A step is meaningful if its reasoning matches any of the MEANINGFUL_PATTERNS.
+ */
+export function filterMeaningfulSteps(entries: DecisionLogEntry[]): DecisionLogEntry[] {
+  return entries.filter(entry =>
+    MEANINGFUL_PATTERNS.some(pattern => pattern.test(entry.reasoning)),
+  );
+}
+
 // ─── DecisionLogger ────────────────────────────────────────────────────────
 
 export class DecisionLogger {

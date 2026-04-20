@@ -1,0 +1,102 @@
+{
+  "id": "146-004",
+  "title": "Scope Sanitizer",
+  "description": "Scope Sanitizer\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/scope-sanitizer.ts, src/orchestra/task-builder.ts, tests/orchestra/scope-sanitizer.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nSprint 145 canlı: T-145-001 `filesWrite: [..., \"config.json\", \"dist/cli/entry.js\"]` — config.json global, dist/ derleme output yazılmamalı. T-145-002+003 duplicate paths.\n\nYeni dosya `src/orchestra/scope-sanitizer.ts` filtreler:\n1. `dist/` prefix → remove\n2. Extension-only (`.ts`, `.md`) → remove\n3. Unqualified filename (`init.ts` without src/ prefix) → remove + warning\n4. Global protected (`config.json`, `package.json`, `tsconfig.json`) → remove\n5. Duplicate paths (case-insensitive) → dedupe\n6. \"(yeni)\" suffix strip + dedupe\n7. Absolute paths → reject\n8. `..` path traversal → reject\n\n### Test (10 test)\n1. `filesWrite: [\"dist/cli/entry.js\"]` → removed\n2. `filesWrite: [\".ts\"]` → removed\n3. `filesWrite: [\"init.ts\"]` → warning\n4. `filesWrite: [\"config.json\"]` → removed\n5. `filesWrite: [\"src/a.ts\", \"src/a.ts\"]` → deduped\n6. `filesWrite: [\"src/a.ts (yeni)\", \"src/a.ts\"]` → deduped\n7. `filesWrite: [\"../etc/passwd\"]` → rejected\n8. `filesWrite: [\"/etc/passwd\"]` → rejected\n9. Normal scope unchanged\n10. Integration: `task-builder.ts` scope output sanitized\n\n**Kanıt:** `npx vitest run tests/orchestra/scope-sanitizer.test.ts` 10/10 PASS.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/scope-sanitizer.ts",
+      "src/orchestra/task-builder.ts",
+      "tests/orchestra/scope-sanitizer.test.ts",
+      "init.ts",
+      "src/a.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/scope-sanitizer.test.ts` 10/10 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-146",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T06:53:24.097Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing",
+          "config"
+        ],
+        "confidence": 0.55
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.71
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.22
+        },
+        {
+          "type": "modify",
+          "weight": 0.22
+        },
+        {
+          "type": "configure",
+          "weight": 0.22
+        },
+        {
+          "type": "delete",
+          "weight": 0.11
+        },
+        {
+          "type": "rename",
+          "weight": 0.11
+        },
+        {
+          "type": "test",
+          "weight": 0.11
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.6,
+          "tests/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T07:44:31.267Z"
+}

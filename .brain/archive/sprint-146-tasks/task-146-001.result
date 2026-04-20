@@ -1,0 +1,27 @@
+{
+  "taskId": "146-001",
+  "filesChanged": [
+    "src/orchestra/task-builder.ts",
+    "tests/core/agent-pool.test.ts"
+  ],
+  "linesAdded": 128,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Root cause: task-builder.ts:761 had `agentPrompt.slice(0, 2000)` which truncated agent prompts to 2000 chars. This caused the 'Clean up fil' mid-sentence truncation seen in Sprint 145 prompt files. Fix: removed the .slice(0, 2000) limit so full agent prompt content is passed through. Note: agent-pool.ts itself had NO truncation — it correctly loads agent.json without any content limits. The truncation was in the prompt builder (task-builder.ts). Added 5 tests verifying: (1-3) loadAgent returns full content for architect/test-writer/doc-writer, (4) cache invalidation returns fresh full content, (5) buildWorkerPrompt output contains full agent prompt without 'Clean up fil' truncation. tsc PASS, vitest 86/86 PASS.",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 60000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 85,
+    "documentation": 80
+  },
+  "evaluationDecision": "DONE"
+}

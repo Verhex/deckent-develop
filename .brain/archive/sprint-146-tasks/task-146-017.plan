@@ -1,0 +1,21 @@
+# Task 146-017: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 Append
+
+## Execution Plan
+
+### Files to Modify:
+1. DECKENT-ANA-PLAN-TR.md — Sprint 146 kapanış bölümü append (bölüm 31)
+2. DECKENT-MASTER-BLUEPRINT.md — Sprint 146 milestone append (implementation history section)
+3. BETA-TRACKER.md — Sprint 146 satırını aktif güncelle + roadmap güncelle
+4. BETA-TRACKER-TR.md — BETA-TRACKER.md ile parite, Türkçe
+
+### Content Plan:
+Each file gets:
+- Sprint 146 tema: "Prompt God Template Reform"
+- 17 task özet (T1-T17)
+- Key deliverables: Agent truncation fix, routing V2, ADR relevance, scope sanitizer, prompt god template, rubric consolidation, DIRECTIVES protection, SDL rehab
+- Bug fix highlights: DIRECTIVES mid-sprint silme, SDL dead write, agent exclusion hard-code
+- Sprint 147 preview: nervous system design, ADR-040
+
+### Test Criteria:
+- grep "Sprint 146" tüm 4 dosyada geçmeli
+- grep "nervous system" tüm 4 dosyada geçmeli

@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **570** potentially unused exports across src/.
+Found **584** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
@@ -90,7 +90,6 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/task-builder.ts | parseDependenciesDirective | 0 |
 | src/orchestra/task-builder.ts | parsePriorityDirective | 0 |
 | src/orchestra/task-builder.ts | parseBulletOrNumberedTasks | 0 |
-| src/orchestra/task-builder.ts | truncateAtParagraph | 0 |
 | src/orchestra/task-builder.ts | queryRelevantADRs | 0 |
 | src/orchestra/timeout-estimator.ts | TimeoutBreakdown | 0 |
 | src/orchestra/timeout-estimator.ts | estimateTaskLoC | 0 |
@@ -100,6 +99,7 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/sprint-utils.ts | resolveMaxWorkersNumeric | 0 |
 | src/orchestra/promotion-pipeline.ts | PromotionCriteria | 0 |
 | src/orchestra/promotion-pipeline.ts | DemotionCriteria | 0 |
+| src/orchestra/promotion-pipeline.ts | PromotionResult | 0 |
 
 ## Recommendations
 

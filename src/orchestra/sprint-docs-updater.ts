@@ -537,11 +537,18 @@ export function collectSprintFiles(root: string): Array<{ file: string; dir: str
  * - Writes a placeholder DIRECTIVES.md with next-sprint header
  * - Creates .brain/archive/ if it doesn't exist
  * - No-ops gracefully if DIRECTIVES.md doesn't exist
+ * - Phase guard: only executes during CLEANUP or COMPLETE phase (Sprint 146 bug fix)
  *
  * @param projectRoot - Project root directory
  * @param sprintId - The completed sprint ID (e.g. 'sprint-133')
+ * @param phase - Current sprint phase. If provided, only CLEANUP/COMPLETE phases are allowed.
  */
-export function archiveDirectives(projectRoot: string, sprintId: string): void {
+export function archiveDirectives(projectRoot: string, sprintId: string, phase?: string): void {
+  // Phase guard: reject calls outside CLEANUP/COMPLETE (Sprint 146 T-008 bug fix)
+  if (phase !== undefined && phase !== 'CLEANUP' && phase !== 'COMPLETE') {
+    debugLog('archiveDirectives', `REJECTED: called in phase ${phase}, only CLEANUP allowed`);
+    return;
+  }
   const directivesPath = join(projectRoot, DIRECTIVES_FILE);
   const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR);
 
@@ -561,6 +568,97 @@ export function archiveDirectives(projectRoot: string, sprintId: string): void {
 
   writeFileSync(directivesPath, buildDirectivesPlaceholder(sprintId, archiveFileName, nextNum));
   debugLog('archiveDirectives', `Archived ${DIRECTIVES_FILE} → ${archivePath}`);
+}
+
+/**
+ * Emergency restore: reconstruct DIRECTIVES.md from task JSON files when
+ * it was accidentally overwritten mid-sprint with a placeholder template.
+ *
+ * Reads all task-NNN-*.json files from .tasks/, extracts title + description,
+ * and rebuilds a minimal DIRECTIVES.md so the sprint can continue.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint ID (e.g. 'sprint-146')
+ * @returns true if DIRECTIVES.md was restored, false otherwise
+ */
+export function emergencyRestoreDirectives(projectRoot: string, sprintId: string): boolean {
+  const directivesPath = join(projectRoot, DIRECTIVES_FILE);
+
+  // Only restore if current DIRECTIVES.md looks like a placeholder (small file, has "Sprint NNN" template header)
+  if (existsSync(directivesPath)) {
+    const content = readFileSync(directivesPath, 'utf-8');
+    // A real DIRECTIVES has task descriptions — placeholders are short templates
+    if (content.length > 500 && !content.includes('## Task 1: [Task title]')) {
+      debugLog('emergencyRestoreDirectives', 'DIRECTIVES.md appears intact — skipping restore');
+      return false;
+    }
+  }
+
+  const tasksDir = join(projectRoot, '.tasks');
+  if (!existsSync(tasksDir)) {
+    debugLog('emergencyRestoreDirectives', '.tasks/ not found — cannot restore');
+    return false;
+  }
+
+  const sprintNum = extractSprintNumber(sprintId);
+  if (sprintNum === null) return false;
+
+  const prefix = `task-${sprintNum}-`;
+  const allFiles = readdirSync(tasksDir);
+  const taskFiles = allFiles.filter(f => f.startsWith(prefix) && f.endsWith('.json'));
+
+  if (taskFiles.length === 0) {
+    debugLog('emergencyRestoreDirectives', `No task JSON files found for ${sprintId}`);
+    return false;
+  }
+
+  interface TaskJson {
+    id?: string;
+    title?: string;
+    description?: string;
+    model?: string;
+    effort?: string;
+    scope?: { directories?: string[]; filesWrite?: string[] };
+  }
+
+  const tasks: TaskJson[] = [];
+  for (const file of taskFiles) {
+    try {
+      const raw = readFileSync(join(tasksDir, file), 'utf-8');
+      const task = JSON.parse(raw) as TaskJson;
+      if (task.title) tasks.push(task);
+    } catch { /* skip unparseable files */ }
+  }
+
+  if (tasks.length === 0) return false;
+
+  // Reconstruct minimal DIRECTIVES.md
+  const lines: string[] = [
+    `# DIRECTIVES — ${sprintId} (Emergency Restore)`,
+    '',
+    `> Restored from ${tasks.length} task JSON files after mid-sprint template overwrite.`,
+    '',
+    '---',
+    '',
+  ];
+
+  for (const task of tasks) {
+    lines.push(`## Task ${task.id ?? '?'}: ${task.title}`);
+    if (task.model) lines.push(`- Model: ${task.model}`);
+    if (task.effort) lines.push(`- Effort: ${task.effort}`);
+    if (task.scope?.directories) lines.push(`- Scope: ${task.scope.directories.join(', ')}`);
+    if (task.scope?.filesWrite) lines.push(`- Files: ${task.scope.filesWrite.join(', ')}`);
+    lines.push('');
+    lines.push('### Description');
+    lines.push(task.description ?? '(no description)');
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+
+  writeFileSync(directivesPath, lines.join('\n'), 'utf-8');
+  debugLog('emergencyRestoreDirectives', `Restored DIRECTIVES.md from ${tasks.length} task files`);
+  return true;
 }
 
 // ═══ Orphan Task Archive ═══════════════════════════════════════════

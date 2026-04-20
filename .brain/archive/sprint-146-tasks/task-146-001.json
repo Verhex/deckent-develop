@@ -1,0 +1,99 @@
+{
+  "id": "146-001",
+  "title": "Agent Truncation Bug Fix",
+  "description": "Agent Truncation Bug Fix\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/core/agent-pool.ts, tests/core/agent-pool.test.ts\n- Scope: src/core/, tests/core/\n\n### Description\nSprint 145 canlı kanıt: 3/3 prompt dosyasında agent.md içeriği satır 29'da \"Clean up fil\" olarak kesiliyor. Prompt builder agent content'i truncate ediyor. `grep -n \"substring\\|slice(0\\|readFile\" src/core/agent-pool.ts` ile truncation noktasını bul. Eğer `readFileSync().substring(0, N)` varsa `N` limitini kaldır veya 50000'e çıkar. Agent PROMPT.md dosyasını tam yüklediğini doğrula.\n\n### Test (5 test)\n1. `loadAgent('architect')` tam PROMPT.md içeriği döner (>1000 satır mock)\n2. `loadAgent('test-writer')` tam içerik\n3. `loadAgent('doc-writer')` tam içerik\n4. Cache invalidate sonrası tam içerik\n5. `buildWorkerPrompt({agent: 'architect', ...})` çıktısında \"Clean up fil\" kırpımı yok\n\n**Kanıt:** `grep -c \"Clean up fil\" .tasks/.prompt-146-*.txt` → 0. tsc PASS, vitest 5/5 PASS.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/agent-pool.ts",
+      "tests/core/agent-pool.test.ts",
+      "agent.md",
+      "PROMPT.md",
+      ".substring"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep -c \"Clean up fil\" .tasks/.prompt-146-*.txt` → 0. tsc PASS, vitest 5/5 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-146",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T06:53:24.097Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.56
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.57
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.29
+        },
+        {
+          "type": "test",
+          "weight": 0.29
+        },
+        {
+          "type": "modify",
+          "weight": 0.14
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "document",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.2,
+          "tests/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1668,
+  "updatedAt": "2026-04-20T07:44:13.564Z"
+}

@@ -1,0 +1,27 @@
+# Task 146-008 Execution Plan
+
+## Objective
+Fix DIRECTIVES.md mid-sprint deletion bug by adding phase guard to archiveDirectives().
+
+## Root Cause
+archiveDirectives() has no phase check — if called during EXECUTE or other non-CLEANUP phases,
+it overwrites DIRECTIVES.md with a placeholder template. Sprint 144+145 confirmed this pattern.
+
+## Changes
+
+### 1. src/orchestra/sprint-docs-updater.ts
+- Add optional `phase` parameter to `archiveDirectives()`
+- Add phase guard: only allow execution when phase is 'CLEANUP' or 'COMPLETE' (or undefined for backward compat)
+- Add `emergencyRestoreDirectives()` function for mid-sprint recovery from task JSONs
+
+### 2. src/orchestra/sprint-finalizer.ts
+- Pass phase info ('CLEANUP') to archiveDirectives() call at line 1001
+
+### 3. tests/orchestra/archive-directives-phase.test.ts (NEW)
+- 7 tests covering PLAN/EXECUTE/FIX/RETRO/CLEANUP phase behavior
+- Emergency restore test
+- Sprint 145 scenario simulation
+
+## Verify
+- tsc --noEmit
+- npx vitest run tests/orchestra/archive-directives-phase.test.ts

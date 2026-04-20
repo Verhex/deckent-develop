@@ -7,13 +7,13 @@
 ## Live Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-145 |
-| Total Tasks | 28 |
-| Completed | 27 |
-| Tech Debt | 24 |
+| Sprint | sprint-146 |
+| Total Tasks | 17 |
+| Completed | 16 |
+| Tech Debt | 6 |
 | No-Go | 1 |
-| Duration | 92dk 30sn |
-| Coverage | 7.8% |
+| Duration | 62dk 3sn |
+| Coverage | 16.2% |
 
 # TABLE OF CONTENTS
 
@@ -2557,3 +2557,79 @@ This document is the single source of truth for Deckent's implementation.
 Version 3.0 — Updated Sprint 145 (April 2026).
 Use the MCP tools: "Set up Deckent" or "Plan a sprint for [goals]".
 Or open it in Claude Code and say: "Implement this."
+
+---
+
+## Sprint 146 — Prompt God Template Reform + Critical Bug Fix + Rubric Consolidation
+
+**Theme:** "Prompt quality 64/100 → 85/100 + 3 live-proven bug fixes + rubric 3-system consolidation"
+**Sprint type:** P0-heavy, Beta GA path (Sprint 150 GA — Thu Apr 23 TRT)
+**Total tasks:** 17 | **Waves:** 6 | **Hard cap:** 5h | **Cost cap:** $95
+
+### Key Deliverables
+
+**Prompt God Template Reform (10 tasks):**
+- **Task 1 — Agent Truncation Bug Fix:** agent-pool.ts line 29 truncation removed — full PROMPT.md content now loaded
+- **Task 2 — Agent Routing V2 Retrain:** Intent classifier refreshed — test-writer share 52% → ≤22%; doc tasks properly routed to doc-writer
+- **Task 3 — ADR Relevance Scoring Engine:** `adr-selector.ts` — selectRelevantAdrs(topN=3), scoring: scope match +0.4, keyword +0.3, age penalty
+- **Task 4 — Scope Sanitizer:** `scope-sanitizer.ts` — removes dist/, extension-only, unqualified filenames, global protected files, dedupes paths
+- **Task 5 — Generative God Template:** `prompt-god-template.ts` ~400 LoC — `buildTaskPrompt()` single entry point, PromptArtifact with metadata
+- **Task 6 — ADR Preset Matrix + Filler Cleanup:** TASK_TYPE_ADR_PRESETS for 7 task types, empty header suppression
+- **Task 7 — Prompt Quality Linter:** `scripts/prompt-linter.mjs` — ADR ratio, truncation, filler, char count checks; avg ≥ 75/100 exit gate
+
+**3 Critical Bug Fixes (3 tasks):**
+- **Task 8 — DIRECTIVES Mid-Sprint Protection:** `archiveDirectives()` phase guard — only runs in CLEANUP phase, emergency reconstruct from task JSON
+- **Task 9 — SDL Decision Log Rehab:** v2 routing filter + meaningful step logging + `deckent explain <taskId>` integration
+- **Task 10 — Rubric System Consolidation:** Worker self-report removed, Quality Assessor dimensions canonical, `assessQuality()` mandatory post-evaluate
+
+**Foundation + Preflight (4 tasks):**
+- **Task 11 — Sprint 145 vitest Regression Fix:** 3 failing tests resolved, ≥99.3% pass rate
+- **Task 12 — Nervous System Preflight:** `nervous-types.ts` ~100 LoC placeholder types, ADR-040 status: proposed in memory store
+- **Task 13 — Sprint 146 Retro + Docs:** `docs/sprint-log/Sprint-146.md` + CHANGELOG 0.4.0-beta.2 entry
+- **Task 14 — Agent Exclusion Dynamic:** `getDynamicExclusions()` — intent+scope combination drives exclusion, no more hard-coded global exclusions
+
+**Gate Scripts (2 tasks):**
+- **Task 15 — Chain Safety Gate:** `scripts/chain-gate-check.mjs` — tsc, vitest, doctor ≥90, cost <$95, NO_GO ≤2, prompt_linter ≥75
+- **Task 16 — Living Record Update:** FINAL-EXECUTIVE-REPORT.md sections 1/5/6/8 updated, Section N appended
+
+**Documentation (2 tasks):**
+- **Task 17 — Ana Plan + Beta Tracker Append:** ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER EN+TR Sprint 146 sections
+
+### Architectural Outputs
+
+```
+NEW src/orchestra/adr-selector.ts        — ADR relevance scoring (selectRelevantAdrs, buildAdrPromptSection)
+NEW src/orchestra/scope-sanitizer.ts     — Scope path sanitization (8 filter rules)
+NEW src/orchestra/prompt-god-template.ts — Unified prompt builder (~400 LoC, buildTaskPrompt)
+UPD src/orchestra/task-builder.ts        — Uses god template, scope sanitizer
+NEW src/core/nervous-types.ts            — Sprint 147 placeholder types (~100 LoC)
+NEW scripts/prompt-linter.mjs           — Prompt quality linter (6 checks, exit code 0 avg ≥75)
+NEW scripts/chain-gate-check.mjs        — Sprint gate script (6 gates)
+```
+
+### Sprint Gate Results (Sprint 146 Exit)
+
+| Gate | Target | Result |
+|------|--------|--------|
+| doctor | ≥ 90/100 | TBD |
+| tsc | PASS | TBD |
+| vitest | ≥ 99.3% | TBD |
+| cost | < $95 | TBD |
+| NO_GO | ≤ 2 | TBD |
+| prompt_linter | avg ≥ 75/100 | TBD |
+
+### Sprint 147 Preview — Nervous System
+
+Sprint 147 theme: **Deckent Nervous System** — runtime authority enforcement + notification engine + safety floor.
+
+Design spec: `docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md`
+
+Core components:
+- **AuthorityMode** + **ApprovalPolicy** — runtime RBAC enforcement beyond ADR-037
+- **NervousNotification** — meaningful user notification stream
+- **SafetyFloorAction** — hard-stop guard for dangerous tasks
+- **ADR-040** — nervous system governance (accepted at Sprint 147 end)
+
+Types placeholder ready: `src/core/nervous-types.ts` (Sprint 146 T12 delivery)
+
+**Beta GA path:** Sprint 146 (today) → Sprint 147 (Tue) → Sprint 148 (Wed) → Sprint 149 (Wed-Thu) → Sprint 150 (Thu 🚀 GA)

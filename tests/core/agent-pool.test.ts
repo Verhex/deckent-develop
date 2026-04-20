@@ -9,10 +9,24 @@ vi.mock('node:fs', () => ({
   rmSync: vi.fn(),
 }));
 
+vi.mock('../../src/core/memory-store.js', () => ({
+  MemoryStore: vi.fn(),
+}));
+vi.mock('../../src/core/memory-query.js', () => ({
+  searchMemory: vi.fn().mockReturnValue([]),
+}));
+vi.mock('../../src/core/token-counter.js', () => ({
+  TokenCounter: vi.fn().mockImplementation(() => ({
+    estimatePromptSize: vi.fn().mockReturnValue({ totalTokens: 1000 }),
+  })),
+}));
+
 import * as fs from 'node:fs';
 import { AgentPoolManager, isTempAgentStale, DEFAULT_MAX_TEMP_AGENTS, DEFAULT_MAX_AGENT_AGE } from '../../src/core/agent-pool.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import type { AgentDefinition } from '../../src/core/agent-types.js';
+import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
+import type { Task } from '../../src/core/types.js';
 
 const ROOT = '/test/project';
 
@@ -1010,5 +1024,162 @@ describe('AgentPoolManager batch read (loadAgents — O(N+1) syscalls)', () => {
     const pool = manager.loadAgents();
     expect(pool.size).toBe(0);
     expect(fs.readdirSync).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Agent Truncation Bug Fix (Task 146-001) ─────────────────────────────────
+// Sprint 145 canlı kanıt: agent prompt "Clean up fil" olarak kırpılıyordu.
+// buildWorkerPrompt() içindeki agentPrompt.slice(0, 2000) kaldırıldı.
+
+function makeMinimalTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: '146-001',
+    title: 'Test Task',
+    description: 'Test description',
+    model: 'sonnet' as const,
+    effort: 'normal' as const,
+    priority: 'NORMAL' as const,
+    reason: 'test',
+    scope: {
+      directories: ['src/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/test.ts'],
+    },
+    dependencies: [],
+    goNogo: {
+      goCriteria: 'tests pass',
+      noGoCriteria: 'tests fail',
+      techDebtAcceptable: 'minor issues ok',
+    },
+    status: 'EXECUTING' as const,
+    sprintId: 'sprint-146',
+    createdAt: new Date().toISOString(),
+    assignedAgent: 'architect',
+    assignedSkills: [],
+    provider: 'claude' as const,
+    ...overrides,
+  } as Task;
+}
+
+describe('Agent Truncation Bug Fix (Task 146-001)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('loadAgent(architect) returns full PROMPT.md content (>1000 lines mock)', () => {
+    // Generate a large PROMPT.md content (>1000 lines)
+    const longContent = Array.from({ length: 1200 }, (_, i) =>
+      `Line ${i + 1}: This is a detailed instruction for the architect agent about system design patterns and module organization.`
+    ).join('\n');
+
+    const agent = makeAgent({ id: 'architect', name: 'Architect' });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('architect')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ ...agent, systemPrompt: longContent }));
+
+    const manager = new AgentPoolManager(ROOT);
+    const result = manager.getAgent('architect');
+    expect(result).toBeDefined();
+    expect(result!.systemPrompt).toBe(longContent);
+    expect(result!.systemPrompt!.split('\n').length).toBe(1200);
+  });
+
+  it('loadAgent(test-writer) returns full content without truncation', () => {
+    const longContent = 'A'.repeat(5000); // 5000 chars, well over old 2000 limit
+    const agent = makeAgent({ id: 'test-writer', name: 'Test Writer' });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('test-writer')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ ...agent, systemPrompt: longContent }));
+
+    const manager = new AgentPoolManager(ROOT);
+    const result = manager.getAgent('test-writer');
+    expect(result).toBeDefined();
+    expect(result!.systemPrompt).toBe(longContent);
+    expect(result!.systemPrompt!.length).toBe(5000);
+  });
+
+  it('loadAgent(doc-writer) returns full content without truncation', () => {
+    const longContent = 'Documentation guidelines:\n'.repeat(200); // ~5200 chars
+    const agent = makeAgent({ id: 'doc-writer', name: 'Doc Writer' });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('doc-writer')] as any);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ ...agent, systemPrompt: longContent }));
+
+    const manager = new AgentPoolManager(ROOT);
+    const result = manager.getAgent('doc-writer');
+    expect(result).toBeDefined();
+    expect(result!.systemPrompt!.length).toBe(longContent.length);
+  });
+
+  it('cache invalidate returns fresh full content', () => {
+    const shortContent = 'Short prompt v1';
+    const longContent = 'X'.repeat(4000); // Longer prompt v2
+
+    const agent = makeAgent({ id: 'cache-test', name: 'Cache Test' });
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue([mockDirEntry('cache-test')] as any);
+
+    // First load: short content
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ ...agent, systemPrompt: shortContent }));
+    const manager = new AgentPoolManager(ROOT);
+    const result1 = manager.getAgent('cache-test');
+    expect(result1!.systemPrompt).toBe(shortContent);
+
+    // Second load: updated content (agent pool re-reads from disk each time)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ ...agent, systemPrompt: longContent }));
+    const result2 = manager.getAgent('cache-test');
+    expect(result2!.systemPrompt).toBe(longContent);
+    expect(result2!.systemPrompt!.length).toBe(4000);
+  });
+
+  it('buildWorkerPrompt() output does not contain "Clean up fil" truncation pattern', () => {
+    // Simulate the real scenario: agent prompt that previously got truncated at "Clean up fil"
+    const agentPrompt = [
+      '# Test Writer Agent',
+      '',
+      'You are a testing expert agent.',
+      '',
+      '## Core Responsibilities',
+      '1. Write Tests -- Unit, integration, and e2e tests',
+      '2. Achieve Coverage -- Target 80%+ line coverage',
+      '3. Ensure Isolation -- Tests must not depend on each other',
+      '',
+      '## Testing Principles',
+      '',
+      '### Arrange-Act-Assert (AAA)',
+      'Every test should follow the AAA pattern clearly.',
+      '',
+      '### Test Isolation',
+      '- Each test must be independently runnable',
+      '- No shared mutable state between tests',
+      '- Use beforeEach/afterEach for setup and teardown',
+      '- Clean up files and temporary directories after each test',
+      '- Never leave test artifacts behind',
+      '',
+      '### Advanced Patterns',
+      '- Use parameterized tests for similar scenarios',
+      '- Group related tests in describe blocks',
+      '- Use snapshot testing sparingly and intentionally',
+      '- Write integration tests for cross-module boundaries',
+      '',
+      '### Error Testing',
+      '- Test error paths as thoroughly as success paths',
+      '- Verify error messages are descriptive and actionable',
+      '- Test boundary conditions and edge cases',
+      '- Ensure proper cleanup on error paths',
+    ].join('\n');
+
+    // This content is > 2000 chars when combined with real-world prompt content
+    const fullAgentPrompt = agentPrompt + '\n\n' + 'Additional detailed instructions. '.repeat(100);
+    expect(fullAgentPrompt.length).toBeGreaterThan(2000); // Verify it exceeds old limit
+
+    const task = makeMinimalTask({ assignedAgent: 'test-writer' });
+    const result = buildWorkerPrompt(task, fullAgentPrompt);
+
+    // Verify no truncation: the full agent prompt should be in the output
+    expect(result).toContain('Clean up files and temporary directories after each test');
+    expect(result).not.toContain('Clean up fil\n'); // Old truncation pattern
+    expect(result).toContain('Additional detailed instructions.'); // Content past old 2000 limit
+    expect(result).toContain('=== Agent: test-writer ===');
   });
 });

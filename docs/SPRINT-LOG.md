@@ -3800,3 +3800,41 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 145-027: Memory V2 Prod-Readiness Validation + 1000-Entry Stress (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 146 — sprint-146
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-20
+**Duration:** 3723s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 16 |
+| Tech Debt | 6 |
+| No-Go | 1 |
+| Coverage | 16.2% |
+| Duration | 3723070ms |
+
+### Tasks
+
+- 146-001: Agent Truncation Bug Fix (GO_WITH_TECH_DEBT)
+- 146-002: Agent Routing V2 Retrain + Intent Classifier Refresh (DONE)
+- 146-003: ADR Relevance Scoring Engine (GO_WITH_TECH_DEBT)
+- 146-004: Scope Sanitizer (GO_WITH_TECH_DEBT)
+- 146-005: Generative Useful God Template — buildTaskPrompt Single Entry (GO_WITH_TECH_DEBT)
+- 146-006: Task-Type ADR Preset Matrix + Filler Cleanup (DONE)
+- 146-007: Prompt Quality Linter (DONE)
+- 146-008: DIRECTIVES.md Mid-Sprint Silme Bug Fix (GO_WITH_TECH_DEBT)
+- 146-009: SDL Decision Log Rehabilitation (DONE)
+- 146-010: Rubric System Consolidation (GO_WITH_TECH_DEBT)
+- 146-011: Sprint 145 vitest Regression Fix (NO_GO)
+- 146-012: Nervous System Preflight — ADR-040 + Types (DONE)
+- 146-013: Sprint 146 Retro Template + Docs Update (DONE)
+- 146-014: Agent Exclusion Dynamic (Task 2 tamamlayıcı) (DONE)
+- 146-015: Chain Safety Gate Script (DONE)
+- 146-016: Sprint 146 Living Record Update (FINAL-EXECUTIVE-REPORT.md) (DONE)
+- 146-017: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 Append (DONE)
+
+---

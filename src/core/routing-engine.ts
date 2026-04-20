@@ -25,7 +25,7 @@ import {
   SKILL_TOKEN_BUDGET_BY_EFFORT,
 } from './routing-types.js';
 import { classifyIntent } from './intent-classifier.js';
-import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivation } from './activation-engine.js';
+import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivation, getDynamicExclusions } from './activation-engine.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
 import { debugLog } from './utils.js';
@@ -97,7 +97,16 @@ export function routeTaskV2(
     agentConfidence = 'high';
     reasoning.push(`Agent forced by override: ${agentId}`);
   } else {
-    const agentResult = selectBestAgent(taskDNA, agentPool, cfg, learningData, resolved.excludeAgents ?? []);
+    // Compute dynamic exclusions based on intent + scope (replaces hard-coded global exclusions)
+    const dynamicExclusions = getDynamicExclusions(
+      taskDNA.intent.primary,
+      task.scope.directories,
+    );
+    const allExcludeAgents = [...new Set([...(resolved.excludeAgents ?? []), ...dynamicExclusions])];
+    if (dynamicExclusions.length > 0) {
+      reasoning.push(`Dynamic exclusions: [${dynamicExclusions.join(', ')}]`);
+    }
+    const agentResult = selectBestAgent(taskDNA, agentPool, cfg, learningData, allExcludeAgents);
     agentId = agentResult.agentId;
     agentScore = agentResult.score;
     agentConfidence = agentResult.confidence;

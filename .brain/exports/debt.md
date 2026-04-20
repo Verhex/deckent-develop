@@ -96,3 +96,9 @@ M | normal | - | resolved |
 | debt-145-025 | Tech debt from 145-025: BETA-TRACKER.md comprehensively updated from Sprint 136  | normal | - | resolved |
 | debt-145-026 | Tech debt from 145-026: BETA-TRACKER-TR.md tamamen güncellendi: 1289→1581 satır  | normal | - | resolved |
 | debt-145-027 | Tech debt from 145-027: Memory V2 Prod-Readiness + 1000-Entry Stress test suite  | normal | - | resolved |
+| debt-146-001 | Tech debt from 146-001: Root cause: task-builder.ts:761 had `agentPrompt.slice(0 | normal | - | resolved |
+| debt-146-003 | Tech debt from 146-003: ADR Relevance Scoring Engine implemented. Created src/or | normal | - | resolved |
+| debt-146-004 | Tech debt from 146-004: Created scope-sanitizer.ts with 8 filter rules (absolute | normal | - | resolved |
+| debt-146-005 | Tech debt from 146-005: buildTaskPrompt() implemented as single entry point in p | normal | - | resolved |
+| debt-146-008 | Tech debt from 146-008: Phase guard added to archiveDirectives() — rejects calls | normal | - | resolved |
+| debt-146-010 | Tech debt from 146-010: Rubric system consolidated: (1) Removed rubricScores spe | normal | - | resolved |

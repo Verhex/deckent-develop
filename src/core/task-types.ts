@@ -306,7 +306,12 @@ export interface TaskResult {
   feedbackLoop?: FeedbackLoop;
   /** Token usage data from the worker's LLM interaction */
   tokenUsage?: TokenUsage;
-  /** Rubric scores from evaluateWithRubric() — per-dimension quality scores */
+  /**
+   * Worker self-reported rubric scores.
+   * @deprecated Sprint 146: Worker self-report removed — use Quality Assessor dimensions
+   * (assessQuality() from quality-assessor.ts) as the canonical quality scoring system.
+   * This field is retained for backward compatibility with existing result files only.
+   */
   rubricScores?: {
     correctness?: number;
     test_coverage?: number;

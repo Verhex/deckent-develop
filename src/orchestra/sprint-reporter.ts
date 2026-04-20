@@ -74,6 +74,7 @@ export {
   addRecurringPatternsToFile,
   collectSprintFiles,
   archiveDirectives,
+  emergencyRestoreDirectives,
   archiveOrphanTasks,
 } from './sprint-docs-updater.js';
 
