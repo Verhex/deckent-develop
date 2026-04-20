@@ -1,0 +1,191 @@
+// src/core/nervous-types.ts
+//
+// Nervous System placeholder types — Sprint 147 implementation zemin.
+// Bu dosya Sprint 146 preflight'ta oluşturuldu; gerçek implementasyon Sprint 147'de.
+//
+// Design spec: docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md
+// ADR-040: proposed (Sprint 147 sonunda accept edilecek)
+
+// ─── Authority Modes ─────────────────────────────────────────────────────────
+
+/**
+ * Yetki öncesi belirler hangi eylemlerin kullanıcı onayı gerektirdiğini.
+ *
+ * - strict:    Düşük risk → suggest-30m, Orta/Yüksek → approve  (Enterprise, yeni user)
+ * - balanced:  Düşük → autonomous, Orta → suggest-30m, Yüksek → approve  (default)
+ * - autopilot: Düşük/Orta → autonomous, Yüksek → suggest-5m  (güvenilir user)
+ * - full-auto: Tümü → autonomous (safety floor hariç)  (CI/CD, hands-off)
+ */
+export type AuthorityMode = 'strict' | 'balanced' | 'autopilot' | 'full-auto';
+
+// ─── Risk Levels ──────────────────────────────────────────────────────────────
+
+/**
+ * Bir eylemin veya olayın risk seviyesi.
+ * Decision Engine bu değeri kullanarak ApprovalPolicy'yi belirler.
+ */
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+// ─── Approval Policies ────────────────────────────────────────────────────────
+
+/**
+ * Bir eylemin onay politikası.
+ *
+ * - autonomous:  Kullanıcı onayı olmadan otomatik yürütülür, history'ye loglanır
+ * - suggest-30m: 30 dakika timeout ile öneri — kabul edilmezse auto-apply
+ * - suggest-5m:  5 dakika timeout ile öneri — kabul edilmezse auto-apply
+ * - approve:     Kullanıcı /accept veya /reject verinceye kadar bekler
+ */
+export type ApprovalPolicy = 'autonomous' | 'suggest-30m' | 'suggest-5m' | 'approve';
+
+// ─── Severity ─────────────────────────────────────────────────────────────────
+
+/**
+ * Bir NervousNotification'ın görünürlük önceliği.
+ *
+ * - info:      Bilgilendirme amaçlı, kullanıcı müdahalesi gerekmez
+ * - warning:   Dikkat edilmesi gereken durum, yakında eylem gerekebilir
+ * - critical:  Hemen müdahale gerekebilir
+ * - emergency: Sprint'i veya sistemi etkileyecek kritik durum
+ */
+export type Severity = 'info' | 'warning' | 'critical' | 'emergency';
+
+// ─── Safety Floor Actions ─────────────────────────────────────────────────────
+
+/**
+ * Full-auto mod dahil hiçbir AuthorityMode'un otomatik yürütemeyeceği eylemler.
+ * Bu 5 eylem kod seviyesinde kilitlidir — config override edilemez.
+ *
+ * Design spec Section 3: "Safety floor: full-auto bile bu 5 eylemi bypass edemez"
+ */
+export type SafetyFloorAction =
+  | 'KILL_LIVE_SPRINT'         // Canlı sprint durdurma
+  | 'MANUAL_FILE_DELETE'       // .tasks/* gibi manuel dosya silme
+  | 'COST_OVER_THRESHOLD'      // Yapılandırılan eşiği aşan sprint başlatma
+  | 'DESTRUCTIVE_GIT'          // git reset --hard, force push main
+  | 'ADR_DEPRECATE_ACCEPTED';  // Accepted ADR'ı deprecate etme
+
+// ─── Notification Action ──────────────────────────────────────────────────────
+
+/**
+ * Kullanıcıya sunulan öneri eylemi.
+ * Sprint 147'de Proposer bileşeni bu yapıyı üretecek.
+ */
+export interface NotificationAction {
+  /** Eylem tanımlayıcısı — unique per notification */
+  readonly id: string;
+  /** İnsan-okunabilir eylem etiketi (CLI/MCP'de gösterilir) */
+  readonly label: string;
+  /** Eylemin onay politikası */
+  readonly policy: ApprovalPolicy;
+  /** Eylemin risk seviyesi */
+  readonly risk: RiskLevel;
+  /** Safety floor kontrolü — true ise hiçbir mod otomatik yürütemez */
+  readonly isSafetyFloor: boolean;
+  /** Eylem parametreleri (tip-safe payload Sprint 147'de genişletilecek) */
+  readonly payload?: Record<string, unknown>;
+}
+
+// ─── Nervous Notification ─────────────────────────────────────────────────────
+
+/**
+ * Nervous System'in ürettiği notification yapısı.
+ * Proposer bileşeni bu yapıyı üretir, Dispatcher kanalları üzerinden iletir.
+ *
+ * Sprint 147 implementasyon notu:
+ * - MCP push adapter: deckent_notification_push tool üzerinden
+ * - CLI stderr adapter: ANSI formatlamalı tty output
+ * - File log adapter: .deckent/nervous-history.jsonl append
+ */
+export interface NervousNotification {
+  /** UUID v4 — cross-channel dedup için */
+  readonly id: string;
+  /** Notification tipi — Detector tarafından belirlenir */
+  readonly type: string;
+  /** İnsan-okunabilir başlık */
+  readonly title: string;
+  /** Detaylı açıklama */
+  readonly message: string;
+  /** Görünürlük önceliği */
+  readonly severity: Severity;
+  /** ISO 8601 UTC timestamp */
+  readonly createdAt: string;
+  /** Tetikleyen Detector id'si */
+  readonly detectorId: string;
+  /** Kullanıcıya sunulan eylemler (boş → sadece bilgilendirme) */
+  readonly actions: ReadonlyArray<NotificationAction>;
+  /** Öneri zaman aşımı (ms) — null ise approve bekler */
+  readonly timeoutMs: number | null;
+  /** Sprint ID — sprint context varsa */
+  readonly sprintId?: string;
+  /** Task ID — task context varsa */
+  readonly taskId?: string;
+  /** Grouping key — aynı key'li notification'lar throttle edilir */
+  readonly groupKey?: string;
+}
+
+// ─── Authority Matrix ─────────────────────────────────────────────────────────
+
+/**
+ * Bir AuthorityMode için eylem → onay politikası mapping'i.
+ * Decision Engine bu yapıyı kullanarak her eylem için policy üretir.
+ *
+ * Sprint 147'de built-in preset'ler bu interface'i uygulayacak:
+ * const BALANCED_MATRIX: AuthorityMatrix = { ... }
+ */
+export interface AuthorityMatrix {
+  /** Bu matrix'in ait olduğu preset modu */
+  readonly mode: AuthorityMode;
+  /** Risk seviyesine göre default politika */
+  readonly riskPolicyMap: Readonly<Record<RiskLevel, ApprovalPolicy>>;
+  /**
+   * Eylem bazlı override — preset'ten farklı politika gerektiren eylemler.
+   * Kullanıcı .deckent/config.json'da action_overrides ile özelleştirebilir.
+   */
+  readonly actionOverrides: Readonly<Record<string, ApprovalPolicy>>;
+  /**
+   * Safety floor listesi — bu eylemler hiçbir zaman autonomous çalışmaz.
+   * Preset tarafından değiştirilemez, sadece extend edilebilir.
+   */
+  readonly safetyFloor: ReadonlyArray<SafetyFloorAction>;
+}
+
+// ─── Nervous System Config ────────────────────────────────────────────────────
+
+/**
+ * .deckent/config.json altında nervous_system alanının şeması.
+ * Sprint 147'de config-validator.ts bu interface'i doğrulayacak.
+ */
+export interface NervousSystemConfig {
+  /** Aktif yetki modu (default: 'balanced') */
+  readonly mode: AuthorityMode;
+  /** Eylem bazlı override'lar — mode preset'inin üstüne eklenir */
+  readonly actionOverrides?: Readonly<Record<string, ApprovalPolicy>>;
+  /** Quiet hours: {start: "23:00", end: "07:00"} formatında */
+  readonly quietHours?: Readonly<{ start: string; end: string }>;
+  /** Throttle window (ms) — aynı groupKey notification'lar bu sürede tekrar üretilmez */
+  readonly throttleWindowMs?: number;
+  /** Nervous system etkin mi (default: false, Sprint 147 sonunda true) */
+  readonly enabled: boolean;
+}
+
+// ─── Detector Result ──────────────────────────────────────────────────────────
+
+/**
+ * Observer Layer'dan gelen event'i işleyen Detector'ın ürettiği sonuç.
+ * Sprint 147'de DetectorRegistry bu interface'i kullanan Detector'ları yönetecek.
+ */
+export interface DetectorResult {
+  /** Bu detector tarafından belirlenen risk seviyesi */
+  readonly risk: RiskLevel;
+  /** Öneri eylemler (boş → sadece log) */
+  readonly suggestedActions: ReadonlyArray<Pick<NotificationAction, 'id' | 'label' | 'risk' | 'payload'>>;
+  /** Notification üretilmeli mi */
+  readonly shouldNotify: boolean;
+  /** Notification severity — shouldNotify true ise kullanılır */
+  readonly severity?: Severity;
+  /** Gruplama anahtarı — throttle için */
+  readonly groupKey?: string;
+  /** Detector'a özgü ham veri */
+  readonly metadata?: Record<string, unknown>;
+}
