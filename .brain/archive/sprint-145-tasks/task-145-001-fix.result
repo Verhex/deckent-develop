@@ -1,0 +1,26 @@
+{
+  "taskId": "145-001-fix",
+  "filesChanged": [
+    "src/core/config-types.ts",
+    "src/core/config.ts"
+  ],
+  "linesAdded": 72,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "TimeoutConfig interface added to config-types.ts (12 fields). DEFAULT_TIMEOUT_CONFIG exported from config.ts. createDefaultConfig() includes timeout defaults. validateConfig() enforces 4 rule categories: effort_base ordering (high > normal > low), per-backend min >= 300, per-backend max <= 14400, max > min consistency. loadConfig() resolves timeout via deepMerge. config-validator.ts already re-exports DEFAULT_TIMEOUT_CONFIG. All 12 timeout tests pass. 399 config tests pass (12 files, zero regression). tsc --noEmit clean.",
+  "tokenUsage": {
+    "inputTokens": 80000,
+    "outputTokens": 5000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 98,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

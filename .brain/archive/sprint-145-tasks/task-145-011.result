@@ -1,0 +1,30 @@
+{
+  "taskId": "145-011",
+  "workerId": "w-145-011",
+  "filesChanged": [
+    "src/orchestra/spawn-backend-docker.ts",
+    "src/orchestra/result-collector.ts",
+    "src/orchestra/result-evaluator.ts",
+    "src/agents/worker-lifecycle.ts",
+    "tests/docker/timeout-with-work.test.ts"
+  ],
+  "linesAdded": 185,
+  "linesRemoved": 12,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "TIMEOUT_WITH_WORK partial result mechanism implemented across 4 source files + 1 test file (14 tests). Changes: (1) Docker worker.sh EXIT trap now detects partial work via git diff --name-only and writes TIMEOUT_WITH_WORK result with filesChanged array instead of blind NO_GO. (2) result-collector checks for late .result file before overwriting with synthetic NO_GO on timeout. (3) evaluateResult treats TIMEOUT_WITH_WORK as GO_WITH_TECH_DEBT. (4) scoreCorrectness gives partial credit (10 points). (5) worker-lifecycle finalizeHeartbeatOnShutdown handles TIMEOUT_WITH_WORK status. (6) monitorContainer reconciliation recognizes TIMEOUT_WITH_WORK for heartbeat status. tsc --noEmit: 4 pre-existing errors in config-validator.ts and timeout-estimator.ts (scope dışı, benim değişikliklerimden değil). vitest: 14/14 new tests pass, 130/130 result-evaluator tests pass, 43/43 worker-lifecycle tests pass.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 120000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

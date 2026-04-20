@@ -1,0 +1,27 @@
+## Plan: BETA-TRACKER-TR.md — TR Parity + 10 Sprint Kayıp Kalibrasyonu
+
+### Analiz
+- TR dosyası 1289 satır, EN dosyası 1192 satır
+- TR "Son güncelleme: 2026-04-10, Sprint 130+" — 10 sprint kayıp (131-145 eksik)
+- EN "Last updated: 2026-04-14, Sprint 136+" — EN de kayıp ama daha güncel
+- Task: TR'yi EN ile parity sağlayacak ve Sprint 145'e kadar güncelleyecek şekilde yaz
+
+### Güncellenecek Bölümler
+1. **Başlık meta**: Son güncelleme tarihi, sprint sayısı, test sayısı güncellenecek
+2. **Mevcut Durum tablosu**: sprint-145, MCP Tools 22, CLI 41+ vs.
+3. **Genel Bakış**: Sprint 131-145 özet ekleme
+4. **Sprint geçmişi**: Sprint 131-145 entry'leri ekleme (EN'den çeviri)
+5. **Sprint Metrics tablosu**: Güncel değerlerle güncelle
+6. **Sprint History tablosu**: sprint-139 → sprint-145
+7. **Sonuç bölümü**: Sprint 145 sonrası güncel durum
+8. **Beta GA vizyonu**: Alperen direktifi + 5-sprint roadmap tablosu + Sprint 150 GA exit criteria
+9. **Tamamlanan stratejik hedefler**: 26 → güncel sayı (Sprint 131-145 eklentiler)
+
+### Yaklaşım
+- Mevcut TR içeriği korunacak (temiz, iyi yapılandırılmış)
+- EN'deki Sprint 131-136 entry'leri TR'ye çevirilecek
+- Sprint 137-145 bilgileri IDENTITY.md ve brain summary'den derlenecek
+- Alperen direktifi + roadmap tablosu + GA exit criteria eklenecek
+
+### Dosyalar
+- Yazılacak: BETA-TRACKER-TR.md

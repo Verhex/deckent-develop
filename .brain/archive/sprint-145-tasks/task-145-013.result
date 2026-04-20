@@ -1,0 +1,26 @@
+{
+  "taskId": "145-013",
+  "filesChanged": [
+    "src/orchestra/monitor-adapter.ts",
+    "tests/orchestra/monitor-adapter.test.ts"
+  ],
+  "linesAdded": 390,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Monitor Adapter Pattern implemented with 3 backends (Docker, tmux, subprocess) + factory function. 23/23 tests pass. All adapter methods (listActiveWorkers, captureWorkerOutput, getResourceUsage, killWorker) implemented. Subprocess captureWorkerOutput returns placeholder as spec requires. Tmux getResourceUsage returns null as spec requires. Factory handles docker/tmux/subprocess/auto/unknown correctly. No tsc errors in new files (existing errors are from prior sprint work).",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

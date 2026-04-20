@@ -1,0 +1,111 @@
+{
+  "id": "145-012",
+  "title": "deckent status --follow CLI + Backend-Aware Renderer",
+  "description": "deckent status --follow CLI + Backend-Aware Renderer\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/cli/commands/status.ts, src/cli/helpers/status-renderer.ts (yeni), src/cli/helpers/ansi.ts (yeni), tests/cli/status-follow.test.ts\n- Scope: src/cli/, tests/cli/\n- Dependencies: Task 3 (event-bus), Task 13 (monitor-adapter)\n\n### Description\n`src/cli/commands/status.ts` `--follow` (kısa `-f`) flag ekle. Mevcut `--watch` (5s poll) korunur.\n\n`src/cli/helpers/ansi.ts` (no external dep, native ANSI):\n```typescript\nexport const cursorTo = (col: number, row: number) => `\\x1b[${row + 1};${col + 1}H`;\nexport const clearLine = () => '\\x1b[2K';\nexport const clearScreen = () => '\\x1b[2J\\x1b[H';\nexport const hideCursor = () => '\\x1b[?25l';\nexport const showCursor = () => '\\x1b[?25h';\nexport const color = {\n  red: (s: string) => `\\x1b[31m${s}\\x1b[0m`,\n  green: (s: string) => `\\x1b[32m${s}\\x1b[0m`,\n  yellow: (s: string) => `\\x1b[33m${s}\\x1b[0m`,\n  blue: (s: string) => `\\x1b[34m${s}\\x1b[0m`,\n  bold: (s: string) => `\\x1b[1m${s}\\x1b[0m`,\n};\n```\n\n`src/cli/helpers/status-renderer.ts` (~200 LoC) Spec'teki box-drawing UI:\n```\n╭────────────────────────────────────────────────────────────────────╮\n│ 🚀 Sprint 145 — EXECUTE phase · 🐳 Docker backend · 3 workers       │\n├────────────────────────────────────────────────────────────────────┤\n│ 📊 Progress: ██████████░░░░░░░░░░  10/27 (37%)                      │\n│ ⏱  Elapsed: 35m · ETA ~2h · Hard cap 6h · Cost ~$45/$110           │\n├────────────────────────────────────────────────────────────────────┤\n│ 👷 Active Workers (3): ...                                           │\n│ 📝 Recent Events (last 5): ...                                       │\n│ ⚠  Alerts: 0 · 🎯 NO_GO: 0 (gate cap 2)                             │\n╰────────────────────────────────────────────────────────────────────╯\n```\n\n`src/cli/commands/status.ts`:\n```typescript\nimport { eventBus } from '../../orchestra/event-bus.js';\nimport { createMonitorAdapter } from '../../orchestra/monitor-adapter.js';\nimport { StatusRenderer } from '../helpers/status-renderer.js';\nimport { hideCursor, showCursor, clearScreen } from '../helpers/ansi.js';\n\nexport function registerStatus(program: Command): void {\n  program.command('status')\n    .option('--watch', 'Poll-based refresh every 5s (legacy)')\n    .option('-f, --follow', 'Follow mode: snapshot + live event tail')\n    .action(async (opts) => {\n      if (opts.follow) {\n        const adapter = createMonitorAdapter(loadConfig());\n        const renderer = new StatusRenderer(adapter);\n        process.stdout.write(hideCursor() + clearScreen());\n        const initial = await renderer.snapshot();\n        process.stdout.write(initial);\n        const unsubscribe = eventBus.subscribe(currentSprintId, undefined, async () => {\n          const next = await renderer.snapshot();\n          renderer.redraw(next);\n        });\n        process.on('SIGINT', () => {\n          unsubscribe();\n          process.stdout.write(showCursor() + '\\n');\n          process.exit(0);\n        });\n      } else {\n        // existing snapshot/watch behavior\n      }\n    });\n}\n```\n\n### Test (6+ test)\n1. `--follow` flag commander tarafından tanınır\n2. StatusRenderer snapshot 5 section render eder (header/progress/workers/events/footer)\n3. Backend-aware header (Docker/Tmux/Subprocess icon değişir)\n4. Subscribe callback redraw çağırır (mock event)\n5. SIGINT handler showCursor + unsubscribe çağırır\n6. Integration: dummy sprint çalıştır + status --follow → ilk snapshot stdout'a yazıldı\n\n**Kanıt:** `npx vitest run tests/cli/status-follow.test.ts` 6+/6+ PASS, manual: sprint live + `node dist/cli/entry.js status --follow` → terminal'de canlı box UI, Ctrl+C clean exit.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "src/cli/helpers/",
+      "tests/cli/",
+      "src/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/status.ts",
+      "src/cli/helpers/status-renderer.ts (yeni)",
+      "src/cli/helpers/ansi.ts (yeni)",
+      "tests/cli/status-follow.test.ts",
+      "src/cli/helpers/status-renderer.ts",
+      "src/cli/helpers/ansi.ts",
+      "dist/cli/entry.js"
+    ]
+  },
+  "dependencies": [
+    "Task 3 (event-bus)",
+    "Task 13 (monitor-adapter)"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/cli/status-follow.test.ts` 6+/6+ PASS, manual: sprint live + `node dist/cli/entry.js status --follow` → terminal'de canlı box UI, Ctrl+C clean exit.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing",
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.63
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.91
+        },
+        {
+          "name": "dist",
+          "weight": 0.09
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.22
+        },
+        {
+          "type": "configure",
+          "weight": 0.22
+        },
+        {
+          "type": "delete",
+          "weight": 0.11
+        },
+        {
+          "type": "document",
+          "weight": 0.11
+        }
+      ],
+      "complexity": {
+        "fileCount": 7,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.71,
+          "tests/": 0.14,
+          "dist/": 0.14
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.14
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:17:50.350Z"
+}

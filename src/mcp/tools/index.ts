@@ -21,6 +21,7 @@ import { registerCheckpointTool } from './checkpoint.js';
 import { registerDocsTool } from './docs.js';
 import { registerExplainTool } from './explain.js';
 import { registerMemoryQueryTool } from './memory-query.js';
+import { registerWatch } from './watch.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -45,4 +46,5 @@ export function registerTools(server: McpServer): void {
   registerDocsTool(server);
   registerExplainTool(server);
   registerMemoryQueryTool(server);
+  registerWatch(server);
 }

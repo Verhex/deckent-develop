@@ -61,6 +61,13 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
   logPath?: string;
   /** Whether this is a fix/retry spawn — adds -fix suffix to prompt filename */
   isPriorityFix?: boolean;
+  /**
+   * Per-task adaptive timeout in seconds, computed by brainEstimateTimeout().
+   * When set, overrides the backend's default timeout constant.
+   * Passed as TASK_TIMEOUT env var to Docker containers and as timeoutSeconds
+   * parameter to tmux/subprocess backends.
+   */
+  taskTimeoutSeconds?: number;
 }
 
 // ─── SpawnBackendError ────────────────────────────────────────────────────────
@@ -98,6 +105,7 @@ export class TmuxBackend implements SpawnBackend {
     tmuxSpawnWorker(taskId, model, prompt, dir, {
       allowedTools: opts?.allowedTools,
       autoApprove: opts?.autoApprove,
+      taskTimeoutSeconds: opts?.taskTimeoutSeconds,
     });
   }
 
@@ -138,7 +146,14 @@ export class SubprocessBackend implements SpawnBackend {
     this.timeoutMs = opts?.timeoutMs ?? 0;
   }
 
-  private getBackend(): SubprocessSpawnBackend {
+  private getBackend(timeoutOverrideMs?: number): SubprocessSpawnBackend {
+    // When a per-task timeout is provided, create a fresh backend with that timeout
+    // (SubprocessSpawnBackend.defaultTimeoutMs is protected, so we can't mutate it)
+    if (timeoutOverrideMs != null) {
+      return new SubprocessSpawnBackend(this.projectDir, {
+        defaultTimeoutMs: timeoutOverrideMs,
+      });
+    }
     if (!this._backend) {
       this._backend = new SubprocessSpawnBackend(this.projectDir, {
         defaultTimeoutMs: this.timeoutMs,
@@ -148,7 +163,10 @@ export class SubprocessBackend implements SpawnBackend {
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
-    this.getBackend().spawn(taskId, model, prompt, opts);
+    const timeoutOverrideMs = opts?.taskTimeoutSeconds != null
+      ? opts.taskTimeoutSeconds * 1000
+      : undefined;
+    this.getBackend(timeoutOverrideMs).spawn(taskId, model, prompt, opts);
   }
 
   kill(taskId: string): void {

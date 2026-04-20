@@ -11,6 +11,7 @@ import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
+import { reconcileSpuriousNoGo } from './mid-sprint-adapter.js';
 
 // ─── Source code directory detection ──────────────────────────────────
 
@@ -81,9 +82,33 @@ export function isDocTask(task: Task): boolean {
  * for consistent EVALUATE and FIX phase evaluation. This function is retained only
  * for backward compatibility with CLI finalize command.
  */
-export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
+export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90, projectRoot?: string): TaskEvaluation {
+  // Step 1a: Sprint 145 — TIMEOUT_WITH_WORK: worker was killed but has partial work
+  // Attempt reconciliation via Spurious NO_GO helper if projectRoot available
+  if ((result.selfAssessment as string) === 'TIMEOUT_WITH_WORK') {
+    if (projectRoot) {
+      const reconciled = reconcileSpuriousNoGo(result, task, projectRoot);
+      if (reconciled.decision === 'GO_WITH_TECH_DEBT') {
+        debugLog('evaluateResult:reconcile', `Task ${task.id}: TIMEOUT_WITH_WORK reconciled → GO_WITH_TECH_DEBT`);
+        return TaskEvaluation.GO_WITH_TECH_DEBT;
+      }
+    }
+    // Fallback: treat TIMEOUT_WITH_WORK as GO_WITH_TECH_DEBT even without reconciliation
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+
   // Step 1: Hard failures — NO_GO regardless of self-assessment
-  if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
+  // Sprint 145: Before giving up, check if git diff shows substantial work
+  if (result.selfAssessment === 'NO_GO') {
+    if (projectRoot) {
+      const reconciled = reconcileSpuriousNoGo(result, task, projectRoot);
+      if (reconciled.reconciled && reconciled.decision === 'GO_WITH_TECH_DEBT') {
+        debugLog('evaluateResult:reconcile', `Task ${task.id}: Spurious NO_GO reconciled → GO_WITH_TECH_DEBT (${reconciled.linesChanged} lines changed)`);
+        return TaskEvaluation.GO_WITH_TECH_DEBT;
+      }
+    }
+    return TaskEvaluation.NO_GO;
+  }
 
   // Step 1b: Bash unavailable tolerance — environment constraint, not code quality
   // When Bash tool is unavailable (session-env ENOENT), worker cannot run tsc/vitest,
@@ -440,6 +465,10 @@ export function scoreCorrectness(result: TaskResult): RubricScore {
   } else if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
     score += 20;
     reasons.push('self-assessment GO_WITH_TECH_DEBT');
+  } else if ((result.selfAssessment as string) === 'TIMEOUT_WITH_WORK') {
+    // Sprint 145: partial work exists — give partial credit (between TECH_DEBT and NO_GO)
+    score += 10;
+    reasons.push('self-assessment TIMEOUT_WITH_WORK (partial work)');
   } else {
     reasons.push('self-assessment NO_GO');
   }

@@ -1,0 +1,107 @@
+{
+  "id": "145-011",
+  "title": "Result Atomicity Guarantee — TIMEOUT_WITH_WORK Partial Result",
+  "description": "Result Atomicity Guarantee — TIMEOUT_WITH_WORK Partial Result\n- Model: opus\n- Effort: normal\n- Skills: docker-expert, typescript-expert\n- Files: src/orchestra/spawn-backend-docker.ts (worker.sh template), src/orchestra/spawn-backend.ts, src/agents/worker-lifecycle.ts, tests/docker/timeout-with-work.test.ts\n- Scope: src/orchestra/, src/agents/, tests/docker/\n- Dependencies: Task 10\n\n### Description\nSprint 144 NO_GO root cause: worker SIGKILL → EXIT trap `{\"selfAssessment\":\"NO_GO\"}` yazıyor, `git diff` ignore ediliyor.\n\nYeni worker.sh EXIT trap:\n```sh\non_exit() {\n  local exit_code=$?\n  cd \"$WORKSPACE\"\n  local changed_files=$(git diff --name-only 2>/dev/null | tr '\\n' '|' | sed 's/|$//')\n  local changed_count=$(echo -n \"$changed_files\" | grep -c '|')\n  if [[ -n \"$changed_files\" && $exit_code -ne 0 ]]; then\n    # Partial work detected, write TIMEOUT_WITH_WORK\n    cat > \".tasks/${TASK_ID}.result\" <<EOF\n{\n  \"taskId\": \"${TASK_ID}\",\n  \"selfAssessment\": \"TIMEOUT_WITH_WORK\",\n  \"filesChanged\": [$(echo \"$changed_files\" | tr '|' '\\n' | jq -Rsc 'split(\"\\n\") | map(select(length > 0))')],\n  \"exitCode\": $exit_code,\n  \"notes\": \"Worker timeout/killed but git diff shows ${changed_count} files modified. Brain should reconcile via Spurious NO_GO helper.\"\n}\nEOF\n  elif [[ -z \"$(cat .tasks/${TASK_ID}.result 2>/dev/null)\" ]]; then\n    # No partial work AND no result written, fall back to NO_GO\n    echo '{\"selfAssessment\":\"NO_GO\",\"notes\":\"Worker exited without writing result\"}' > \".tasks/${TASK_ID}.result\"\n  fi\n}\ntrap on_exit EXIT\n```\n\n`src/agents/worker-lifecycle.ts` veya result okuma logic'i `TIMEOUT_WITH_WORK` self-assessment'i tanımalı.\n\n### Test (5+ test)\n1. Worker SIGTERM ile öldürülür + git diff'te 3 dosya → `.result` `selfAssessment: TIMEOUT_WITH_WORK`, filesChanged length 3\n2. Worker normal exit + .result yazıldı → trap üzerine yazmaz (existing result preserved)\n3. Worker SIGKILL + git diff boş + .result yok → fallback NO_GO\n4. jq escape doğru (boşluk içeren dosya isimleri)\n5. Integration: docker container'a SIGTERM → result file TIMEOUT_WITH_WORK içerir\n\n**Kanıt:** `npx vitest run tests/docker/timeout-with-work.test.ts` 5+/5+ PASS, manual repro: docker container'da `kill -TERM 1` → `.tasks/task-XXX.result` `TIMEOUT_WITH_WORK` + `filesChanged` array dolu.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "src/agents/",
+      "tests/docker/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts (worker.sh template)",
+      "src/orchestra/spawn-backend.ts",
+      "src/agents/worker-lifecycle.ts",
+      "tests/docker/timeout-with-work.test.ts",
+      "src/orchestra/spawn-backend-docker.ts"
+    ]
+  },
+  "dependencies": [
+    "Task 10"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/docker/timeout-with-work.test.ts` 5+/5+ PASS, manual repro: docker container'da `kill -TERM 1` → `.tasks/task-XXX.result` `TIMEOUT_WITH_WORK` + `filesChanged` array dolu.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "docker-expert",
+    "typescript-expert"
+  ],
+  "assignedAgent": "devops-engineer",
+  "assignedSkills": [
+    "docker-expert",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "devops",
+        "secondary": [
+          "testing",
+          "documentation"
+        ],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.5
+        },
+        {
+          "name": "agents",
+          "weight": 0.25
+        },
+        {
+          "name": "docker",
+          "weight": 0.25
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.8,
+          "tests/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:17:45.724Z"
+}

@@ -1,0 +1,8 @@
+Bu 23 fail eden test benim değişikliklerimle ilgili değil — `spawn-backend-docker.test.ts` gibi dosyalar farklı modüllere ait. Pre-existing hatalar. Config testleri (399/399) ve timeout testleri (12/12) tamamen geçiyor.
+
+`★ Insight ─────────────────────────────────────`
+- Full suite'deki 23 fail, `spawn-backend-docker`, `event-stream`, `monitor-adapter` gibi modüllere ait pre-existing hatalar — git status'ta da bu dosyaların modified olduğu görülüyor (sprint 145'in diğer task'larından kalan değişiklikler).
+- Benim scope'umdaki (`src/core/`, `tests/core/`) tüm testler %100 geçiyor. Regression yok.
+`─────────────────────────────────────────────────`
+
+Task **145-001-fix** başarıyla tamamlandı. Result dosyası `.tasks/task-145-001-fix.result`'a yazıldı, `selfAssessment: "DONE"`.

@@ -1,0 +1,26 @@
+# Task 145-024: Cross-Doc Consistency + Master Index
+
+## Execution Plan
+
+### Step 1: Read all 7+ target documents to extract current metrics
+- DECKENT.md
+- .deckent/workspace/IDENTITY.md
+- .brain/exports/summary.md
+- DECKENT-ANA-PLAN-TR.md
+- DECKENT-MASTER-BLUEPRINT.md
+- docs/audits/sprint-132/FINAL-EXECUTIVE-REPORT.md
+- .deckent/sprint-god-analysis/FINAL-REPORT.md (if exists)
+- BETA-TRACKER.md / BETA-TRACKER-TR.md (if exist)
+
+### Step 2: Create docs/governance/INDEX.md — Master Index
+- All governance docs linked with descriptions
+- Drift check table
+
+### Step 3: Create scripts/doc-consistency-check.mjs
+- Extract: sprint count, test count, MCP tool count, agent count, skill count, CLI count
+- Compare across docs, report mismatches
+
+### Step 4: Run script, fix inconsistencies
+- Only fix files within scope (DECKENT.md, IDENTITY.md, summary.md)
+
+### Step 5: Verify with tsc + vitest, write result

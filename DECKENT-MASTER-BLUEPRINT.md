@@ -1,19 +1,19 @@
 # DECKENT MASTER BLUEPRINT
 ## AI Agent Orchestration System — Complete Implementation Reference
-### Version 2.1 — March 2026 — Verhex
+### Version 3.0 — April 2026 — Verhex
 
 ---
 
 ## Live Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-139 |
-| Toplam Task | 0 |
-| Tamamlanan | 0 |
-| Tech Debt | 0 |
-| No-Go | 0 |
-| Süre | 180dk 22sn |
-| Coverage | NaN% |
+| Sprint | sprint-145 |
+| Total Tasks | 28 |
+| Completed | 27 |
+| Tech Debt | 24 |
+| No-Go | 1 |
+| Duration | 92dk 30sn |
+| Coverage | 7.8% |
 
 # TABLE OF CONTENTS
 
@@ -22,7 +22,7 @@
 3. Native CLI & Installation
 4. Workspace Structure
 5. Agent System (Brain, Auditor, Worker)
-6. Memory Architecture (3-Tier)
+6. Memory Architecture (DB-First — Memory V2)
 7. Sprint Lifecycle & Orchestration
 8. GO / NO-GO / Tech Debt Protocol
 9. Usage-Aware Planning
@@ -31,7 +31,7 @@
 12. UI Roadmap (Terminal → Web → VSCode)
 13. Multi-Plan Compatibility
 14. i18n & Multi-Language
-15. Security & Permissions
+15. Security & Permissions (RBAC Authority Matrix)
 16. Self-Test & Reporting
 17. Repository Strategy
 18. File-by-File Reference
@@ -41,6 +41,7 @@
 22. User Flows
 23. Strategic Roadmap
 24. Sprint History
+25. Beta GA Gate Criteria (Sprint 150)
 
 ---
 
@@ -102,7 +103,7 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
            │                          │
 ┌──────────▼──────────────────────────▼──────────────┐
 │              DECKENT MCP SERVER (stdio)              │
-│  21 Tools + 8 Resources                             │
+│  22 Tools + 8 Resources                             │
 │  init | set_directives | plan | start | analyze ... │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -127,10 +128,11 @@ Sprint + learning loop. Deckent doesn't just execute tasks — it plans sprints,
 └─────────────────────────────────────────────────────┘
            │
 ┌──────────▼──────────────────────────────────────────┐
-│              MEMORY SYSTEM (.brain/)                  │
-│  Tier 1: MEMORY.md (always loaded, ~200 lines)      │
-│  Tier 2: sprint logs (per-sprint, auto-archived)    │
-│  Tier 3: deep knowledge (searchable archive)        │
+│          MEMORY V2 — DB-FIRST (.brain/)              │
+│  SQLite (memory.db) — single source of truth        │
+│  FTS5 full-text search (dual-layer TR/EN normalize) │
+│  7 entry types: ADR, memory, sprint, debt, pattern  │
+│  Auto-export: .brain/exports/ (summary, decisions)  │
 └─────────────────────────────────────────────────────┘
            │
 ┌──────────▼──────────────────────────────────────────┐
@@ -221,6 +223,17 @@ deckent upgrade           Self-update
 deckent mcp               Start MCP server (stdio transport for Claude Code)
 deckent sync             Sync adapter files (CLAUDE.md, AGENTS.md) with DECKENT.md reference
 deckent watch            Live tmux split view: dashboard + worker panes
+deckent recall <query>   Search project memory (Memory V2 FTS5 search)
+deckent remember <note>  Save a note to project memory
+deckent memory rebuild   Rebuild memory.db from .md exports
+deckent memory export    Export memory.db to .md snapshots
+deckent memory stats     Show memory database statistics
+deckent explain          Explain sprint results and history
+deckent docs add <path>  Add a document to managed-docs lifecycle
+deckent docs list        List managed documents
+deckent agent list       List registered agents (built-in + temp)
+deckent skill list       List registered skills with manifests
+deckent checkpoint       Approve/reject human checkpoint
 ```
 
 **Plan command flags:**
@@ -299,17 +312,23 @@ my-project/
 │       ├── en.json
 │       └── tr.json
 │
-├── .brain/                            # Memory system (Brain + Auditor only)
-│   ├── MEMORY.md                      # Tier 1: always loaded (~200 lines)
-│   ├── DECISIONS.md                   # Architecture Decision Records
+├── .brain/                            # Memory V2 DB-First (Brain + Auditor only)
+│   ├── memory.db                      # SQLite DB — SINGLE SOURCE OF TRUTH (gitignored)
+│   ├── exports/                       # Auto-generated git-tracked snapshots
+│   │   ├── summary.md                # ~4K context summary (loaded via @ reference)
+│   │   ├── decisions.md              # ADR list for git diff/review
+│   │   ├── memory.md                 # Sprint learnings export
+│   │   └── debt.md                   # Debt table export
+│   ├── MEMORY.md                      # Sprint learnings (max 300 lines)
+│   ├── DECISIONS.md                   # Architecture Decision Records (39 ADRs)
 │   ├── DEBT.md                        # Technical debt log
 │   ├── PATTERNS.md                    # Auditor findings
 │   ├── RETRO.md                       # Latest sprint retrospective
-│   ├── sprints/                       # Tier 2: per-sprint logs
-│   │   ├── sprint-001.md
-│   │   └── sprint-002.md
-│   └── archive/                       # Tier 3: deep knowledge
-│       └── memory-old.md
+│   ├── ERRORS.md                      # Error log (file-based)
+│   ├── sprints/                       # Per-sprint logs
+│   │   └── sprint-NNN.md
+│   └── archive/                       # Deep archive
+│       └── pre-v2/                   # Pre-V2 backup (DECISIONS.md, MEMORY.md)
 │
 ├── .contracts/                        # Inter-agent contracts
 │   └── api-surface.md
@@ -332,25 +351,60 @@ my-project/
 │       └── testing.md                 # Rules for test files
 │
 ├── src/                               # Deckent source code
-│   ├── core/                         # Types, config, constants, utils
-│   │   ├── types.ts                 # All shared interfaces and enums
+│   ├── core/                         # Types, config, utilities (89 modules)
+│   │   ├── types.ts + *-types.ts    # All type definitions (task, config, sprint, monitoring, routing)
 │   │   ├── constants.ts             # App-wide constants
 │   │   ├── config.ts                # 3-layer config loader
+│   │   ├── config-validator.ts      # Runtime config validation
 │   │   ├── utils.ts                 # Shared utilities
-│   │   └── analyzer.ts             # Project stack/size analysis
-│   ├── orchestra/                    # Brain + Planner + tmux orchestration
-│   │   ├── brain.ts                 # Sprint lifecycle orchestrator
+│   │   ├── analyzer.ts             # Project stack/size analysis
+│   │   ├── memory-store.ts          # MemoryStore — SQLite DB-first memory (CRUD, FTS5, decay)
+│   │   ├── memory-query.ts          # searchMemory() — dual-layer FTS5 search
+│   │   ├── memory-normalize.ts      # turkishNormalize() — i18n text normalization
+│   │   ├── memory-types.ts          # MemoryEntryV2, CreateEntryInput interfaces
+│   │   ├── memory-export.ts         # DB → .md snapshot generation
+│   │   ├── memory-import.ts         # .md → DB migration parser
+│   │   ├── agent-pool.ts            # AgentPoolManager, 16 built-in agents, LRU eviction
+│   │   ├── skill-pool.ts            # 21 built-in skills
+│   │   ├── skill-registry.ts        # AST sandbox validation
+│   │   ├── routing-engine.ts        # Layer 3 — unified routing (routeTaskV2)
+│   │   ├── intent-classifier.ts     # Layer 1 — task intent classification
+│   │   ├── activation-engine.ts     # Layer 2 — structured activation rules
+│   │   ├── model-registry.ts        # ModelRegistry (13 models, 3 providers)
+│   │   ├── mode-presets.ts          # ModelStrategy, MODE_PRESETS
+│   │   ├── provider.ts             # ProviderAdapter interface
+│   │   └── notify-adapters/         # Notification adapters (file, webhook, etc.)
+│   ├── orchestra/                    # Sprint lifecycle, orchestration (88 modules)
+│   │   ├── brain.ts                 # Orchestrator (re-export layer)
+│   │   ├── sprint-controller.ts     # Full sprint lifecycle (PLAN→SPAWN→...→CLEANUP)
 │   │   ├── planner.ts              # AI task planning (Zod-validated)
-│   │   └── tmux.ts                  # tmux session management
-│   ├── agents/                       # Worker lifecycle
-│   ├── monitor/                      # Auditor monitoring
-│   ├── api/                          # HTTP API + SSE
+│   │   ├── task-router.ts           # Provider + agent + skill routing per task
+│   │   ├── result-evaluator.ts      # GO/NO-GO/TECH_DEBT evaluation
+│   │   ├── result-collector.ts      # waitForResults, processQueue, aggregation + IPC
+│   │   ├── event-stream.ts          # Structured event stream (ADR-035)
+│   │   ├── event-bus.ts             # Centralized event routing
+│   │   ├── tmux.ts                  # tmux session management
+│   │   ├── spawn-backend.ts         # subprocess worker backend
+│   │   ├── spawn-backend-docker.ts  # Docker worker backend
+│   │   ├── mid-sprint-adapter.ts    # Real-time rerouting on task failure
+│   │   ├── timeout-watcher.ts       # Real-time timeout detection
+│   │   ├── timeout-estimator.ts     # Historical data → dynamic timeout
+│   │   ├── monitor-adapter.ts       # Pluggable monitoring backend
+│   │   └── managed-docs/            # Sprint lifecycle document management
+│   ├── agents/                       # Worker execution (20 modules)
+│   │   ├── worker.ts                # Task claim, file locking, heartbeat, result
+│   │   └── adaptive-agent.ts        # Runtime agent adaptation
+│   ├── providers/                    # Provider adapters (5 modules)
+│   │   ├── claude-adapter.ts        # Claude CLI adapter
+│   │   ├── codex-adapter.ts         # OpenAI Codex CLI adapter
+│   │   └── gemini-adapter.ts        # Google Gemini CLI adapter
+│   ├── api/                          # HTTP API server (3 modules)
 │   │   ├── server.ts               # 16 endpoints + SSE stream
 │   │   └── watcher.ts              # Dashboard file watcher
-│   ├── cli/                          # CLI commands (commander.js, 35 files)
-│   ├── mcp/                          # MCP server integration
+│   ├── cli/                          # CLI commands (87 files, 41+ commands)
+│   ├── mcp/                          # MCP server (22 tools + 8 resources)
 │   │   ├── server.ts                # Entry point (McpServer + stdio)
-│   │   ├── tools/                   # 21 tool handlers
+│   │   ├── tools/                   # 22 tool handlers
 │   │   │   ├── init.ts             # deckent_init
 │   │   │   ├── directives.ts       # deckent_set_directives
 │   │   │   ├── plan.ts             # deckent_plan
@@ -362,12 +416,17 @@ my-project/
 │   │   │   ├── analyze.ts          # deckent_analyze_project
 │   │   │   ├── sync.ts             # deckent_sync
 │   │   │   ├── config.ts           # deckent_config
-│   │   │   ├── usage.ts            # deckent_usage
 │   │   │   ├── review.ts           # deckent_review
 │   │   │   ├── run.ts              # deckent_run
 │   │   │   ├── kill.ts             # deckent_kill
 │   │   │   ├── cleanup.ts          # deckent_cleanup
-│   │   │   └── help.ts             # deckent_help
+│   │   │   ├── help.ts             # deckent_help
+│   │   │   ├── checkpoint.ts       # deckent_checkpoint
+│   │   │   ├── docs.ts             # deckent_docs
+│   │   │   ├── explain.ts          # deckent_explain
+│   │   │   ├── watch.ts            # deckent_watch
+│   │   │   ├── agent-list.ts       # deckent_agent_list
+│   │   │   └── skill-list.ts       # deckent_skill_list
 │   │   └── resources/               # 8 resource handlers
 │   └── dashboard/                    # Web Dashboard (React+Vite+Tailwind)
 │       └── src/
@@ -460,11 +519,13 @@ Lint: tsc --noEmit
 **Reads:** DIRECTIVES, MEMORY, RETRO, DEBT, PATTERNS, project state
 **Writes:** .tasks/, .contracts/, .brain/RETRO, .brain/MEMORY, .brain/DECISIONS
 
-**Brain+Planner Separation (ADR-008):**
-- `brain.ts` — orchestrator, imports from all modules
+**Brain+Planner Separation (ADR-008, refined Sprint 136/Sprint 144):**
+- `brain.ts` — orchestrator re-export layer (Sprint 136: 1312→58 LoC)
+- `sprint-controller.ts` — full sprint lifecycle (Sprint 136: 1890→209 LoC)
 - `planner.ts` — AI task planning, imports ONLY from `core/` (types, constants)
 - Planner uses Zod schema validation for AI responses
 - Brain delegates planning to Planner when `brain_planning` is `'ai'` or `'auto'`
+- ADR-008 Cycle 2 fix (Sprint 144): core/session-interface.ts extracted
 
 **Planning Modes (`brain_planning` config):**
 - `'structured'` — parse DIRECTIVES.md via `parseStructuredDirectives()`
@@ -523,6 +584,17 @@ Workers are instructed to create `.tasks/task-{id}.hb` with JSON heartbeat (work
 
 **Auditor teaches:** Patterns found by Auditor feed into Brain's next plan.
 
+**Auditor 3-Pipeline Verification (Sprint 138, ADR-035):**
+Since Sprint 138, Auditor runs independent 3-pipeline verification on worker results:
+1. `verifyWorkerResult()` — checks .result file integrity and scope compliance
+2. `verifyFunctional()` — validates test pass/fail and coverage claims
+3. `validateTechDebt()` — confirms tech debt items are properly documented
+
+Auditor verdict (PASS / DOWNGRADE / FAIL) feeds into Brain's GO/NO_GO decision. Worker self-assessment alone is never trusted (Sprint 137 lesson: worker claimed DONE with 53 test failures).
+
+**Auditor Async Scan Loop (Sprint 144):**
+52 synchronous I/O operations replaced with async equivalents. Scan loop no longer blocks Brain's event loop during heartbeat reads.
+
 ## 5.3 Worker
 
 **Role:** Builder — plans, codes, tests, documents
@@ -566,53 +638,144 @@ Brain assigns model per task in the task JSON:
 ```
 Worker spawns with that model. No runtime switching — model is fixed for task lifetime.
 
+**Worker Honest Assessment (Sprint 138, ADR-035 V1.0):**
+Workers include an Honest Self-Assessment block requiring:
+1. Baseline state verification (what was the state before work?)
+2. End state verification (what is it now?)
+3. Delta analysis (how much of the task was actually completed?)
+`verify-delta.json` provides objective evidence. `applyTechDebtDowngrade()` automatically downgrades DONE→GO_WITH_TECH_DEBT when delta is insufficient.
+
+**Worker Event Hooks (Sprint 139):**
+Workers emit structured events via the ADR-035 event stream: HEARTBEAT, RESULT, QUESTION, CODE_VERIFY_REQUEST. Notification dispatcher forwards critical events to user-configured adapters (file, webhook).
+
+**Worker Scope Enforcement (Sprint 139, ADR-037):**
+Workers can only write to `scope.filesWrite` and `scope.directories` from their task JSON. Writing to `.brain/`, `.dashboard`, or other workers' task files is explicitly denied. Violations detected by Auditor `git diff --stat` scan.
+
 ---
 
-# 6. MEMORY ARCHITECTURE (3-Tier)
+# 6. MEMORY ARCHITECTURE (DB-First — Memory V2)
 
-Inspired by OpenClaw's tiered memory.
+## Overview
 
-## Tier 1: Always Loaded (MEMORY.md)
-- Max 300 lines
-- Brain writes after every sprint
-- Loaded into every agent's context via @import in AGENTS.md
-- Contains: learned patterns, key conventions, critical rules
-- Decay: oldest entries archived after 5 sprints of non-use
+Memory V2 (Sprint 140+) replaced the original 3-tier file-based memory with a **SQLite DB-first architecture**. All memory operations go through `.brain/memory.db` as the single source of truth. Markdown files (`.brain/exports/`) are generated exports for git tracking and human readability.
 
-## Tier 2: Sprint Logs (.brain/sprints/)
-- One file per sprint: sprint-001.md, sprint-002.md
-- Contains: full results, metrics, decisions made
-- Brain reads last 2 sprints at planning time
-- Older sprints archived automatically
+**Key Features:**
+- **SQLite + better-sqlite3**: Zero-config embedded database, no external dependency
+- **FTS5 Full-Text Search**: Dual-layer Turkish normalize (TR/EN/DE %100 recall)
+- **96% context reduction**: From ~96K DECISIONS.md to ~4K summary.md auto-generated export
+- **7 entry types**: ADR, memory, sprint, debt, pattern, retro, identity
+- **Cross-source query**: Single API searches across all knowledge types
 
-## Tier 3: Deep Archive (.brain/archive/)
-- Compressed old memories, patterns, sprint logs
-- NOT loaded into context automatically
-- Brain can search when needed (grep/find)
-- Useful for long-term trend analysis
+## DB Schema (5 tables + FTS5)
+
+```sql
+-- entries: main knowledge table
+CREATE TABLE entries (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,        -- adr | memory | sprint | debt | pattern | retro | identity
+  title TEXT NOT NULL,
+  content TEXT,
+  status TEXT,               -- accepted | deprecated | superseded | resolved | open
+  sprint_id TEXT,
+  importance INTEGER DEFAULT 5,
+  decay_exempt BOOLEAN DEFAULT 0,
+  created_at TEXT,
+  updated_at TEXT
+);
+
+-- tags: normalized many-to-many tag association
+-- relations: cross-reference (references, supersedes, caused_by, resolves, blocks, depends_on)
+-- entry_history: field-level change tracking
+-- entries_fts: FTS5 virtual table (8 columns: 4 original + 4 turkishNormalize)
+-- schema_version: migration safety
+```
+
+## Query API
+
+```typescript
+import { searchMemory } from './core/memory-query.js';
+
+const results = searchMemory(store, {
+  text: 'docker heartbeat',          // FTS5 dual-layer search
+  type: ['adr', 'memory'],           // filter by entry type
+  status: ['accepted'],              // filter by status
+  sprint_range: { min: 135 },        // filter by sprint number
+  tags_contain: ['security'],        // entries must have ALL tags
+  limit: 5,                          // max results
+});
+```
+
+## File Layout
+
+```
+.brain/
+├── memory.db                        # SQLite DB — SINGLE SOURCE OF TRUTH (gitignored)
+├── exports/                         # Auto-generated git-tracked snapshots
+│   ├── summary.md                   # ~4K context summary (loaded via @ reference)
+│   ├── decisions.md                 # ADR list for git diff/review
+│   ├── memory.md                    # Sprint learnings
+│   └── debt.md                      # Debt table
+├── MEMORY.md                        # Legacy: sprint learnings (max 300 lines)
+├── RETRO.md                         # Latest retrospective (overwritten)
+├── PATTERNS.md                      # Auditor findings (append-only)
+├── ERRORS.md                        # Error log (still file-based)
+├── sprints/                         # Per-sprint logs
+│   └── sprint-NNN.md
+└── archive/                         # Deep archive
+    └── pre-v2/                      # Pre-V2 backup (DECISIONS.md, MEMORY.md)
+```
+
+## CLI & MCP Access
+
+```bash
+# CLI commands
+deckent recall "docker heartbeat"     # Search memory
+deckent remember "important note"     # Save to memory
+deckent memory rebuild                # Rebuild DB from exports
+deckent memory export                 # Export DB to .md snapshots
+deckent memory stats                  # Show DB statistics
+
+# MCP tool
+deckent_memory_query                  # Cross-source search via MCP
+```
+
+## turkishNormalize — i18n Text Normalization
+
+FTS5 search uses dual-layer normalization for %100 recall across TR/EN/DE:
+- Layer 1: Original text indexed as-is
+- Layer 2: `turkishNormalize()` applied — handles İ/ı, Ö/ö, Ü/ü, Ç/ç, Ş/ş, Ğ/ğ
+- Queries search both layers simultaneously
+- Source: `src/core/memory-normalize.ts`
 
 ## Decay Mechanism
+
 ```
 Every sprint end:
-1. Count total lines in .brain/ (excluding archive/)
-2. If > 900 lines → compress:
-   a. MEMORY.md: archive entries unused for 5+ sprints
-   b. PATTERNS.md: remove resolved patterns
-   c. DEBT.md: remove resolved debts
-   d. Move old sprint logs to archive/
-3. Verify total < 900 lines
+1. Brain calls store.decay(currentSprintNum, decayAfterSprints)
+2. Entries older than N sprints (default 5) with decay_exempt=false are archived
+3. DECAY_EXEMPT entries: DECISIONS.md (ADRs), PROJECT-IDENTITY.md — never decay
+4. .brain/ file budget: 900 lines max (MEMORY 300, RETRO 120, PATTERNS 150, sprint log 100)
+5. Export .md snapshots after decay: `deckent memory export`
 ```
 
-## Memory Files
+## Legacy 3-Tier (Pre-V2, Sprint 1-139)
 
-| File | Writer | Reader | Max Lines | Decay |
-|------|--------|--------|-----------|-------|
-| MEMORY.md | Brain | All | 300 | 5 sprints |
-| DECISIONS.md | Brain | Brain, Auditor | No limit | Never |
-| DEBT.md | Brain | Brain | No limit | On resolve |
-| PATTERNS.md | Auditor | Brain | 150 | 5 sprints |
-| RETRO.md | Brain | Brain | 120 | Overwritten |
-| sprints/*.md | Brain | Brain | 100 each | Auto-archive |
+The original memory system used three file tiers:
+- **Tier 1**: MEMORY.md (always loaded, ~200 lines) — now in DB as type='memory'
+- **Tier 2**: Sprint logs (.brain/sprints/) — now in DB as type='sprint'
+- **Tier 3**: Deep archive (.brain/archive/) — migrated to DB, originals in archive/pre-v2/
+
+## Memory Files Reference
+
+| File/Source | Writer | Reader | Decay |
+|-------------|--------|--------|-------|
+| memory.db (entries) | Brain | All (via query API) | Per-type configurable |
+| exports/summary.md | Brain (auto-gen) | All (via @ reference) | Regenerated each sprint |
+| exports/decisions.md | Brain (auto-gen) | Git reviewers | Regenerated each sprint |
+| MEMORY.md | Brain | All | 5 sprints |
+| RETRO.md | Brain | Brain | Overwritten each sprint |
+| PATTERNS.md | Auditor | Brain | 5 sprints |
+| sprints/*.md | Brain | Brain | Auto-archive |
 
 ---
 
@@ -667,11 +830,14 @@ Phase 6: RETRO (Brain)
 Phase 7: DECAY
   Compress if .brain/ > 900 lines
   Archive old sprint logs
-  Clean .tasks/, .locks/
+  Memory V2: store.decay(currentSprintNum, decayAfterSprints)
+  Export .md snapshots: deckent memory export
 
-Phase 8: TRANSITION
-  If DIRECTIVES.md has more goals → start Phase 1 again
-  If done → report final status
+Phase 8: CLEANUP
+  Archive .tasks/ files
+  Release .locks/
+  Kill remaining tmux sessions
+  Export final sprint metrics
   SPRINT NEVER LEFT INCOMPLETE
 ```
 
@@ -1017,7 +1183,17 @@ Agent prompts remain in English (LLM performance). UI/CLI output follows user's 
 
 ---
 
-# 15. SECURITY & PERMISSIONS
+# 15. SECURITY & PERMISSIONS (RBAC Authority Matrix)
+
+## RBAC Protocol V1.0 (ADR-037 — Sprint 139)
+
+Formal Role-Based Access Control matrix defining file system access, event stream channel rights, and sprint lifecycle action permissions for each component. Built on NIST SP 800-162 principles (least privilege, separation of duties, fail-closed).
+
+**Core Principles:**
+1. **Least Privilege** — Each component has only the minimum permissions needed
+2. **Separation of Duties** — No component is both implementer and verifier
+3. **Auditability** — All permission use logged to event stream (ADR-035)
+4. **Fail-Closed** — Default is "no access" — only explicitly granted permissions are allowed
 
 ## Permission Model
 
@@ -1028,27 +1204,39 @@ Level 1: Operator (YOU)
   - Approves/rejects sprint plans
   - Can kill any agent
 
-Level 2: Brain
-  - Read: all files
-  - Write: .tasks/, .contracts/, .brain/, .dashboard
-  - Execute: claude -p (spawn workers)
-  - tmux: create/kill windows
-  - git: commit, push (with operator approval)
-  - CANNOT: write AGENTS.md, DIRECTIVES.md, .deckent/config.json
+Level 2: Brain (Orchestrator — ADR-037 §Brain Authority Matrix)
+  - WRITE: .tasks/*, .deckent/config.json, .deckent/sprint-state.json,
+           .deckent/sprint-*-events.jsonl (APPEND only), .deckent/sprint-*-checkpoint.json,
+           .brain/MEMORY.md, .brain/RETRO.md, .brain/DEBT.md, .brain/PATTERNS.md,
+           .brain/sprints/*, .brain/archive/*
+  - DENY:  src/**, tests/**, .brain/DECISIONS.md, .dashboard, .locks/*
+  - Execute: claude -p (spawn workers), tmux create/kill
+  - Event channels: EMIT BRAIN→WORKER:*, CONSUME WORKER→BRAIN:*, AUDITOR→BRAIN:*
 
-Level 3: Auditor
-  - Read: all files
-  - Write: .dashboard, .brain/PATTERNS.md, .tasks/ALERT
-  - Execute: git diff, git log (read-only git)
-  - CANNOT: write source code, create tasks, spawn workers
+Level 3: Auditor (Independent Verifier — ADR-037 §Auditor Authority Matrix)
+  - READ:  .tasks/*.hb/result/json, .locks/*, src/**, tests/**, .brain/DECISIONS.md
+  - WRITE: .dashboard, .deckent/sprint-*-gate.json, docs/audits/*,
+           .brain/PATTERNS.md (APPEND only), .deckent/sprint-*-events.jsonl (APPEND only)
+  - DENY:  src/** (WRITE), tests/** (WRITE), .tasks/*.json (WRITE), .brain/MEMORY.md
+  - NEVER writes source code — audit independence is inviolable
+  - Event channels: EMIT AUDITOR→BRAIN:*, CONSUME WORKER→AUDITOR:*
 
-Level 4: Worker
-  - Read: AGENTS.md, .contracts/, assigned task
-  - Write: source code WITHIN SCOPE ONLY
-  - Write: .tasks/{own-id}.hb, .tasks/{own-id}.result, .tasks/{own-id}.plan
-  - Execute: build, test, lint (project commands)
-  - CANNOT: write .brain/, .contracts/, other workers' files
+Level 4: Worker (Task Implementer — ADR-037 §Worker Authority Matrix)
+  - WRITE: scope.filesWrite (from task JSON), scope.directories (new files only),
+           .tasks/task-{ownId}.hb/result/plan/verify-delta.json, .locks/{ownScope}
+  - READ:  .tasks/task-{ownId}.json, scope.filesRead, .brain/DECISIONS.md, .locks/*
+  - DENY:  .tasks/task-{otherId}.*, .brain/*, .dashboard, docs/audits/*,
+           any src/** outside assigned scope
+  - Event channels: EMIT WORKER→BRAIN:*, WORKER→AUDITOR:*, CONSUME BRAIN→WORKER:*
 ```
+
+## Cross-Role Interaction Rules (ADR-037 §5)
+
+1. **Separation of Assessment & Verification**: Worker writes self-assessment → Auditor verifies (PASS/DOWNGRADE/FAIL) → Brain makes final GO/NO_GO decision
+2. **No Worker-to-Worker Communication**: All coordination through Brain
+3. **Auditor Independence**: Auditor NEVER writes src/** or tests/** — inviolable
+4. **Brain Orchestration Boundary**: Brain plans and decides but never writes source code directly
+5. **Event Stream Integrity**: Append-only, per-component channel rights, file-based fallback (ADR-035)
 
 ## Claude Code --allowedTools Per Agent
 
@@ -1210,7 +1398,7 @@ Every file in the project, its purpose, who writes it, who reads it:
 | src/api/watcher.ts | Dashboard file watcher | Developer | API server | Permanent |
 | src/dashboard/ | Web Dashboard (React+Vite+Tailwind) | Developer | Browser | Permanent |
 | src/mcp/server.ts | MCP server entry point | Developer | Claude Code | Permanent |
-| src/mcp/tools/*.ts | MCP tool handlers (20) | Developer | MCP server | Permanent |
+| src/mcp/tools/*.ts | MCP tool handlers (22) | Developer | MCP server | Permanent |
 | src/mcp/resources/*.ts | MCP resource handlers (8) | Developer | MCP server | Permanent |
 | .deckent/workspace/TOOLS.md | Environment tools/commands | deckent init | Workers | Permanent |
 | .deckent/workspace/BOOT.md | Agent boot sequence | deckent init | All agents | Permanent |
@@ -1419,7 +1607,7 @@ Deckent ran itself for the first time:
 - FAQ document
 - +292 tests (3150→3442), 136 test files, 0 regressions
 
-## Sprint 27-29: Global Launch Preparation (Planned)
+## Sprint 27-29: Global Launch Preparation
 
 Full directives available at:
 - `docs/directives/sprint-027.md` — Technical gap closure (30 tasks)
@@ -1550,7 +1738,7 @@ Both methods register in `.claude/settings.json`:
 }
 ```
 
-## Tools (17)
+## Tools (22)
 
 ### Lifecycle Tools
 
@@ -1564,6 +1752,7 @@ Both methods register in `.claude/settings.json`:
 | `deckent_review` | none | evaluateResults() | Evaluate sprint: GO / NO_GO / GO_WITH_TECH_DEBT |
 | `deckent_cleanup` | none | archiveTasks + releaseLocks | Archive task files, release locks |
 | `deckent_kill` | target: 'all' \| workerId | killWorkers() | Kill running sprint or specific worker |
+| `deckent_checkpoint` | action: 'approve'\|'reject' | checkpoint handler | Approve or reject human checkpoint |
 
 ### Information Tools
 
@@ -1573,8 +1762,9 @@ Both methods register in `.claude/settings.json`:
 | `deckent_doctor` | none | runDoctorChecks() | System health check |
 | `deckent_retro` | none | reads RETRO.md | Latest sprint retrospective |
 | `deckent_history` | last?: number | reads .brain/sprints/ | Sprint history logs |
-| `deckent_usage` | none | reads usage stats | Token and cost usage across sprints |
 | `deckent_help` | none | runtime capabilities | Runtime state, capabilities, and usage guide |
+| `deckent_explain` | query | sprint history analysis | Explain sprint results and history |
+| `deckent_watch` | none | live monitoring | Watch sprint progress in real-time |
 
 ### Configuration & Sync Tools
 
@@ -1583,6 +1773,15 @@ Both methods register in `.claude/settings.json`:
 | `deckent_config` | action: 'read'\|'set', key?, value? | loadConfig/setConfig | Read or set configuration values |
 | `deckent_sync` | none | ensureDeckentImport() | Sync CLAUDE.md + AGENTS.md with @DECKENT.md reference |
 | `deckent_analyze_project` | none | analyzeProject() | Analyze project stack, size, methodology |
+| `deckent_docs` | action: 'add'\|'remove'\|'list' | managed-docs config | Sprint lifecycle document management |
+
+### Agent, Skill & Memory Tools
+
+| Tool | Input | Maps To | Purpose |
+|------|-------|---------|---------|
+| `deckent_agent_list` | none | reads agent pool | List registered agents (built-in + temp) |
+| `deckent_skill_list` | none | reads skill registry | List registered skills (manifest + AST sandbox) |
+| `deckent_memory_query` | text, type?, tags? | searchMemory() | Cross-source memory search (ADR, sprint, debt, pattern) |
 
 ## Resources (8)
 
@@ -1590,11 +1789,10 @@ Both methods register in `.claude/settings.json`:
 |-----|---------|-----------|
 | `deckent://dashboard` | Live sprint status (JSON) | application/json |
 | `deckent://directives` | Current DIRECTIVES.md | text/markdown |
-| `deckent://memory` | Learned patterns (.brain/MEMORY.md) | text/markdown |
+| `deckent://memory` | Brain memory summary (.brain/exports/summary.md) | text/markdown |
 | `deckent://debt` | Tech debt items (parsed table → JSON) | application/json |
 | `deckent://config` | Project config (.deckent/config.json) | application/json |
 | `deckent://retro` | Last sprint retrospective (RETRO.md) | text/markdown |
-| `deckent://usage` | Token and cost usage summary | application/json |
 | `deckent://tasks` | Active task list with status | application/json |
 | `deckent://agents` | Registered agent pool with stats | application/json |
 
@@ -1817,7 +2015,7 @@ Full directive: `docs/directives/sprint-029.md`
 
 **Exit criteria:** `npm install -g deckent@beta` works. `deckent init && deckent start "hello"` completes in <60s. 3+ project types tested. Performance benchmarks baselined. Launch docs ready.
 
-## Phase 4: Agent/Skill Intelligence (Sprint 29-33) — COMPLETE
+## Phase 4: Agent/Skill Intelligence (Sprint 29-33) — COMPLETE (Sprint 133 Readiness 3.6/5)
 
 **Goal:** Dynamic agent pool, composable skills, intelligent Brain decisions, polished UX.
 
@@ -1897,7 +2095,7 @@ Full directive: `docs/directives/sprint-033.md`
 Full directive: `docs/directives/sprint-034.md`
 (Moved from original Sprint 29 plan)
 
-## Phase 5: Multi-Provider & Ecosystem (Sprint 35-38) — IN PROGRESS
+## Phase 5: Multi-Provider & Ecosystem (Sprint 35-38) — COMPLETE
 
 **Goal:** Run workers on different providers simultaneously. VSCode extension. Community ecosystem.
 
@@ -1910,31 +2108,58 @@ Full directive: `docs/directives/sprint-034.md`
 - Platform decoupling (planner/tmux/subprocess) — DONE (Sprint 038)
 - Beta cleanup: readJsonSafe, error handling, type safety, brain.ts split — DONE (Sprint 035-036)
 
-**Remaining:**
+## Phase 6: Governance & Hardening (Sprint 133-145) — IN PROGRESS
+
+**Goal:** Enterprise-grade governance, security hardening, architectural finalization.
+
+**Completed (Sprint 133-144):**
+- Security hardening: plugin SHA-256 signing, SkillSandbox AST, shell injection fix, path traversal fix — DONE (Sprint 133, 143)
+- ADR Governance Integration: MADR v3 hybrid, 37 ADR migration, ADR-036 self-referential — DONE (Sprint 138)
+- ADR-035 Verification Protocol Standard: 15 channel codes V1.0 — DONE (Sprint 138)
+- ADR-037 RBAC Authority Matrix V1.0: formal role-based access control — DONE (Sprint 139)
+- ADR-038 Dead Code Disposition + ADR-039 Self-Modifying Task Detection: architectural protection — DONE (Sprint 139)
+- Auditor 3-Pipeline verification: independent result validation — DONE (Sprint 138)
+- Structured Event Stream + scope collision detection — DONE (Sprint 138)
+- Worker Honest Assessment Calibration v2 — DONE (Sprint 138)
+- Long-Running Sprint Resume MVP — DONE (Sprint 138)
+- Docker HB 5-sprint P0 fix — DONE (Sprint 139)
+- Chain Dependency Scheduler (Kahn's topological sort) — DONE (Sprint 139)
+- Backend Parity 3/3 (Docker + tmux + subprocess E2E) — DONE (Sprint 139)
+- Memory V2 DB-First (SQLite FTS5, dual-layer normalize) — DONE (Sprint 140-143)
+- Comprehensive codebase analysis (316+ files) — DONE (Sprint 141-142)
+- God object split: init.ts, doctor.ts, retro.ts, sprint-controller.ts — DONE (Sprint 136, 144)
+- Auditor async scan loop (52 sync I/O eliminated) — DONE (Sprint 144)
+- i18n basic CLI (5 commands TR/EN) — DONE (Sprint 144)
+
+**In Progress (Sprint 145):**
+- Adaptive Timeout estimation
+- Unified Observability (event bus + monitor adapter)
+- Dead code cleanup from Sprint 141/142 audit
+- CLI/MCP parity hardening
+
+**Remaining (Sprint 146+):**
 - Provider-specific tool mapping (allowedTools → function_calling)
 - Local models (Ollama) adapter
 - VSCode extension (sidebar, status bar, sprint management)
 - GitHub App (issue → sprint → PR automation)
 - Team mode: shared sprints, role-based access
 - Skill marketplace (community skills + agents)
-- Cloud dashboard (deckent.agency remote monitoring)
 - Claude Code Agent Teams integration (native spawn backend)
-- Rubric-based grading (CMA model — structured evaluation with separate grader context, iterative improvement)
-- Versioned memory stores (CMA model — SHA-based concurrency, rollback, compliance redaction)
+- Rubric-based grading (CMA model)
 - Agent versioning (CMA model — immutable version history, rollback, A/B testing)
-- REST API / OpenAPI spec for multi-SDK access (CMA model — Python/Go/Java/C# clients)
+- REST API / OpenAPI spec for multi-SDK access
 
-## Phase 6: Platform & Enterprise (Sprint 45+) — VISION
+## Phase 7: Platform & Enterprise (Sprint 150+) — VISION
 
 **Goal:** Deckent as a platform for AI-driven development.
 
-- Enterprise features: SSO, audit log, compliance, RBAC
 - Deckent Hub: community templates, plugins, DIRECTIVES examples
 - CI/CD integration: auto `deckent plan --dry-run` on PR
 - Cloud orchestration: remote tmux-free workers
 - Multi-project orchestration: cross-repo sprints
-- Native Windows support (no WSL2 required)
 - Managed environment templates (CMA model — structured container configs per project type)
+
+**Note:** Enterprise features like SSO, RBAC, and audit logging are partially addressed by ADR-037 (RBAC) and the event stream audit trail (ADR-035). ADR-039 Self-Modifying Task Detection provides architectural protection for dogfooding scenarios. Full enterprise platform features are deferred to Phase 7, consistent with ADR-033's Product-Not-Service vision.
 
 ---
 
@@ -2015,12 +2240,23 @@ Full directive: `docs/directives/sprint-034.md`
 | 075 | 12196 | 96%+ | Docs TR tutarlılık, VISION.md, link audit, detect-secrets, god object faz 2. 5/5 done |
 | 076 | 12196 | 96%+ | Stale heartbeat fix, dashboard API test, graceful shutdown, god object faz 3. 4/4 done |
 | 077 | 12196 | 96%+ | CHANGELOG, SPRINT-LOG, PROJECT-IDENTITY, CLAUDE.md güncelleme. 3/3 done |
-| 078-130 | 12194 | 89.33% | Blueprint sync, i18n, dashboard UX, MCP parity (21 tools), multi-provider, ModelRegistry (13 models), self-dogfooding, god-object split, codebase accuracy reform. 12,194 tests, real coverage 89.33%. |
-| 131-132 | 12372 | 89.33% | HTTP API auth, loadConfig cache, 4 ADRs (029-032). Sprint 132 360° enterprise audit: 118 findings (5 CRITICAL/22 HIGH), readiness baseline 3.2/5. |
+| 078-085 | 12194 | 89.33% | Blueprint sync, i18n Pattern System (ADR-032), dashboard UX polish, MCP parity expansion (17→21 tools), CLI/MCP feature parity (ADR-022-V2). |
+| 086-100 | 12194 | 89.33% | Multi-provider ModelRegistry (13 models, 3 providers, 4 tiers). ModelType extension to 8 base models. Provider fallback chain. Tier-based equivalence (premium/standard/economy). Self-dogfooding continuous validation. |
+| 101-120 | 12194 | 89.33% | God-object split continuation. Codebase accuracy reform. Docker Backend introduction (ADR-027 revisited). Sprint Timeout Reform initial implementation. Heartbeat Daemon. Human Checkpoints + Checkpoint CLI/MCP. |
+| 121-130 | 12194 | 89.33% | Agent/Skill Evolution Pipeline (promotion, demotion, temp→permanent). Adaptive Thresholds. Context-Aware Routing (TaskDNA). Token Usage Tracker. Managed-Docs Universalization (ADR-029/030/031). Content Hash Cache (ADR-031). |
+| 131-132 | 12372 | 89.33% | HTTP API auth (Bearer Token). loadConfig cache. 4 ADRs (029-032): Managed-Docs, Template Engine, Hash Cache, i18n Pattern. Sprint 132 360° enterprise audit: 118 findings (5 CRITICAL/22 HIGH), readiness baseline 3.2/5. |
 | 133 | 12485 | 89.33% | Security hardening: plugin SHA-256 signing + SkillSandbox AST scan. 12/12 tasks DONE, 27m 21s, +147 net tests. Readiness: 3.2 → 3.6/5. |
 | 134 | 12485 | 89.33% | Triple dogfooding + product vision. sprint-reporter.ts 4-way split (2297→96 LoC barrel). Task Dependency Pipeline live. Brain Self-Audit Gate. ADR-033/034 Product-Not-Service. 11 DONE + 4 TECH_DEBT. Readiness: 3.6 → 3.86/5 (+0.26). |
 | 135 | 12478 | 89.33% | Operational hardening. Coordinator resilience (sprint-pid-manager.ts). Docker graceful shutdown. askBrain IPC registry. Planner priority+dependencies parsing. Brain budget DECAY_EXEMPT. Zero coordinator crash, 1h 0m 54s natural completion. Readiness: 3.86 → 3.93/5 (+0.07). |
 | sprint-136 | 12684 | 89.33% | Architectural deepening. sprint-controller.ts 1890→209 LoC (-1681). T-005 priority wire dogfood fix. tryCodeVerifiedDone() helper (+408 LoC). gate.json+load-report wire code-ready. 7 DONE + 3 NO_GO. Test restoration Sprint 137 P0. Readiness: 3.93 → 3.925/5. |
+| sprint-137 | 12700+ | 89.33% | Brain test suite post-refactor restoration. tryCodeVerifiedDone wire + in-sprint dogfood. gate.json + load-report runtime wire restore. ErrorRegistry lint script wire. Brain budget decay no-op bug fix. 6/6 done, 0 NO_GO, 35.9 min. |
+| sprint-138 | 12800+ | 89.33% | ADR Governance Integration (MADR v3 hybrid + 37 ADR migration + ADR-036). ADR-035 Verification Protocol Standard (15 channel codes V1.0). Auditor Authority Extension 3-Pipeline (verifyWorkerResult + verifyFunctional + validateTechDebt + checkADRCompliance). Structured Event Stream + Scope Collision Detection (event-stream.ts 305 LoC + file-lock.ts 30→267 real). Layer 4 Runtime Wire Forensic Fix (ADR-006 live enforcement). Worker Honest Assessment Calibration v2. Long-Running Sprint Resume MVP (sprint-checkpoint.ts + resume.ts). 11/11 done, 0 NO_GO, 53.8 min. |
+| sprint-139 | 12900+ | 89.33% | Docker HB Core Fix 5-sprint P0 (atomicWriteFileSync + SIGTERM fsync handler + 15s grace, +382 LoC). Chain Dependency Scheduler Wave 1 (Kahn's topological sort + detectScopeCollisions, +620 LoC). Backend Parity 3/3 (Docker + tmux + subprocess E2E). ADR-037 RBAC Authority Matrix V1.0 (+1370 LoC, runtime scope enforcement). ADR-038 + ADR-039 Self-Modifying Task Detection (+789 LoC). Worker Event Hook + Notification Dispatcher. Event Stream Runtime E2E. 52 tasks planned, manual finalize GO_WITH_TECH_DEBT. |
+| sprint-141 | 13000+ | 89.33% | Comprehensive codebase analysis: src/core/ (78 files), src/orchestra/ (82 files), src/cli/ (75 files), src/mcp/ (37 files), src/dashboard/ (44 files), tests/ (28 categories), docs/ (260 files). Architecture graph + circular dep analysis. Dead code + type safety + security analysis. ADR compliance + CLI/MCP parity + i18n review. Memory V2 integrity verification. 15/18 done, 8 TECH_DEBT, 3 NO_GO, 74.3 min. |
+| sprint-142 | 13200+ | 89.33% | God Analysis — largest sprint by task count (49 tasks). Massive batched code review: src/core/ (7 batches), src/orchestra/ (9 batches), src/cli/ (7 batches), src/mcp/ (3 batches), src/dashboard/ (2 batches), tests/ (6 batches), docs/ (2 batches). Architecture graph + dead code + security review. Memory V2 integrity deep verification. 44/49 done, 42 TECH_DEBT, 5 NO_GO, 174.7 min. |
+| sprint-143 | 13500+ | 89.33% | Chain Reform complete — 19/20 DONE. Security fixes: shell injection (tmux.ts), path traversal (checkpoint/docs/decision-logger), API auth default secure, heartbeat-daemon execSync whitelist. FTS5 query builder fix. Relations hybrid backfill. DECISIONS.md archive + init.ts DB preload. Layer 4 runtime wire deploy (ADR-006 live enforcement). Sprint-finalizer hook. MCP disconnect fix. Task restoration on crash. 19/20 done, 1 TECH_DEBT, 1 NO_GO, 104.9 min. |
+| sprint-144 | 14000+ | 89.33% | God split + ADR-008 Cycle 2: init.ts split (1566→4 files), doctor.ts split (1102→3 files), retro.ts split (453→3 files). Auditor async scan loop (52 sync I/O ops eliminated). ADR-008 Cycle 2 fix (core/session-interface.ts). Dockerfile hardening. i18n basic CLI (5 commands TR/EN). Turkish locale fix (.toLocaleLowerCase('tr-TR')). Docker HB deploy wire. Event stream emit wire. Sprint-state lifecycle. Rich sprint output (7-section). Memory V2 CLI testing (+40 tests). 24/27 done, 2 TECH_DEBT, 3 NO_GO, 107.4 min. |
+| sprint-145 | 14400+ | 89.33% | Adaptive Timeout + Unified Observability + CLI/MCP audit. In progress. |
 
 **First dogfooding result (Sprint 6):** Deckent ran `deckent start` on itself, generated README.md in 86 seconds with 1 worker. The orchestration loop (plan → spawn → execute → evaluate → retro → cleanup) completed end-to-end.
 
@@ -2092,7 +2328,148 @@ Full directive: `docs/directives/sprint-034.md`
 
 **Operational hardening milestone (Sprint 135):** Zero coordinator crash achieved — sprint-pid-manager.ts (258 LoC) provides crash-resistant coordination. Docker graceful shutdown (stop --time=10) resolves spurious NO_GO pattern. askBrain IPC registry: ipc-registry.ts 37→270 LoC. Planner now parses priority and dependencies from DIRECTIVES. Brain memory budget DECAY_EXEMPT for permanent records (DECISIONS.md, PROJECT-IDENTITY.md). Sprint completed in 1h 0m 54s natural (vs Sprint 134's 2h 33m manual recovery). Readiness: 3.86→3.93/5.
 
-**Architectural finalization milestone (sprint-136):** sprint-controller.ts reduced from 1890→209 LoC (-1681 lines) — the most significant single-sprint structural reduction in project history. New modules: sprint-spawner.ts + sprint-phases.ts. T-005 chicken-egg resolved via in-sprint dogfood: hardcoded 'priority: NORMAL' bug found and fixed in sprint-controller.ts:528. tryCodeVerifiedDone() helper added (+408 LoC result-evaluator.ts) for spurious NO_GO recovery (active Sprint 137). gate.json + load-report.md write hooks code-ready; runtime restore Sprint 137. Test suite: 124 test failures (all in tests/orchestra/) from Task 8 refactor side effect — Sprint 137 P0. Readiness: 3.93→3.925/5.
+**Architectural finalization milestone (Sprint 136):** sprint-controller.ts reduced from 1890→209 LoC (-1681 lines) — the most significant single-sprint structural reduction in project history. New modules: sprint-spawner.ts + sprint-phases.ts. T-005 chicken-egg resolved via in-sprint dogfood: hardcoded 'priority: NORMAL' bug found and fixed in sprint-controller.ts:528. tryCodeVerifiedDone() helper added (+408 LoC result-evaluator.ts) for spurious NO_GO recovery (active Sprint 137). gate.json + load-report.md write hooks code-ready; runtime restore Sprint 137. Test suite: 124 test failures (all in tests/orchestra/) from Task 8 refactor side effect — Sprint 137 P0. Readiness: 3.93→3.925/5.
+
+## Sprint 137: Test Restoration + Wire Deployment
+
+- Brain test suite post-refactor restoration — all 124 test failures from Sprint 136 resolved
+- tryCodeVerifiedDone wire + in-sprint dogfood: spurious NO_GO recovery validated in live sprint
+- gate.json + load-report.md runtime wire restore: auditor sprint gate computation operational
+- ErrorRegistry lint script wire: `npm run lint:adr` validates all error codes
+- Brain budget decay no-op bug fix: runDecay() was silently returning without processing
+- 6/6 done, 0 NO_GO, 35.9 min — fastest sprint since Sprint 76
+- Agents: architect, test-writer, doc-writer, bug-fixer
+
+## Sprint 138: ADR Governance + Verification Protocol + Event Stream
+
+- **ADR Governance Integration** (Task 1): MADR v3 hybrid format adopted across 37 existing ADRs. ADR-036 self-referential governance ADR. scripts/adr-validator.mjs automated compliance check. DECKENT.md mandatory read directive. Worker prompt injection for ADR awareness
+- **ADR-035 Verification Protocol Standard** (Task 2): 15 channel codes V1.0 defining Brain↔Worker↔Auditor event stream communication protocol. Source/target validation. Typed event payloads
+- **Auditor Authority Extension 3-Pipeline** (Task 3): verifyWorkerResult() + verifyFunctional() + validateTechDebt() + pilot checkADRCompliance() for ADR-006/008/010. Independent verification — auditor never trusts worker self-assessment alone
+- **Structured Event Stream** (Task 4): event-stream.ts (305 LoC) + file-lock.ts real implementation (30→267 LoC). detectScopeCollisions() + buildCollisionAwareWaves() for plan-time conflict prevention
+- **Layer 4 Runtime Wire Forensic Fix** (Task 6): ADR-006 live enforcement with fail-safe fallback and breadcrumb logging
+- **Worker Honest Assessment Calibration v2** (Task 8): Honest Self-Assessment block in worker prompt + verify-delta baseline + applyTechDebtDowngrade dual layer — prevents "DONE" claims without actual code verification
+- **Long-Running Sprint Resume MVP** (Task 9): sprint-checkpoint.ts + resume.ts + CHECKPOINT_INTERVAL=5 — sprints can survive process crash and resume from checkpoint
+- 11/11 done, 2 TECH_DEBT, 0 NO_GO, 53.8 min
+- Agents: architect, bug-fixer, test-writer, doc-writer
+
+## Sprint 139: Docker HB Fix + Chain Scheduler + RBAC + Self-Modifying Detection
+
+Largest sprint in project history — 52 tasks planned.
+
+- **Docker HB Core Fix** (Task 13, 5-sprint P0): atomicWriteFileSync replaces fs.writeFileSync for heartbeat writes. SIGTERM handler with fsync guarantee. 15s grace period before force kill. +382 LoC. Eliminated false NO_GO from Docker worker heartbeat loss
+- **Chain Dependency Scheduler Wave 1** (Task 28): Kahn's algorithm topological sort for task dependency chains. detectScopeCollisions() integration. +620 LoC. Sprint 135 T-005 fifth live dogfood validation
+- **Backend Parity 3/3** (Tasks 17-19): Docker + tmux + subprocess all have comprehensive E2E test suites. First subprocess E2E test since Sprint 120 — 19 sprint gap closed
+- **ADR-037 RBAC Authority Matrix V1.0** (Tasks 34-35): Formal role-based access control defining Brain/Auditor/Worker file permissions, event stream channel rights, and sprint lifecycle actions. +1370 LoC. Runtime scope enforcement. NIST SP 800-162 principles (least privilege, separation of duties, fail-closed)
+- **ADR-038 + ADR-039 Self-Modifying Task Detection** (Tasks 51-52): Self-modifying-detector.ts (+789 LoC) discriminates deckent dogfood vs user project tasks. Architectural protection born from Sprint 139's catastrophic self-modification incident where a worker modified its own orchestrator code
+- **Worker Event Hook + Notification Dispatcher** (Task 41): src/core/notification-dispatcher.ts + notify-adapters/. DECKENT→USER:NOTIFY channel deployed for user-facing notifications
+- **Event Stream Runtime E2E Test** (Task 44): Full pipeline simulation test validating event stream from emit to consume
+- 52 tasks planned, manual finalize GO_WITH_TECH_DEBT (Seçenek C)
+- Agents: architect, test-writer, bug-fixer, security-auditor, ci-guardian, doc-writer
+
+## Sprint 141: Comprehensive Codebase Analysis (316+ Files)
+
+- Full static analysis across entire codebase:
+  - src/core/ (78 files) — DONE: Memory V2, types, routing, agent/skill pools analyzed
+  - src/orchestra/ (82 files) — NO_GO (timeout): brain, sprint lifecycle, task routing, event streams
+  - src/cli/ (75 files) — GO_WITH_TECH_DEBT: all CLI commands reviewed
+  - src/mcp/ (37 files) — DONE: tools, resources, server analyzed
+  - src/dashboard/ (44 files) — DONE: React/TypeScript components analyzed
+  - tests/ (28 categories) — DONE: 462+ test files categorized
+  - docs/ (260 files) — DONE: documentation structure mapped
+- Architecture dependency graph + circular dependency analysis
+- Dead code identification + type safety review + security audit
+- ADR compliance verification across all modules
+- CLI/MCP feature parity assessment
+- Memory V2 integrity verification
+- 15/18 done, 8 TECH_DEBT, 3 NO_GO, 74.3 min
+- Agents: code-reviewer, frontend-designer, test-writer, doc-writer, architecture-planner, architect, security-auditor
+
+## Sprint 142: God Analysis — Largest Sprint by Task Count (49 Tasks)
+
+- Systematic batched code review across entire codebase:
+  - src/core/ — 7 batches: Memory V2 modules, types system, routing engine, agent/skill pools, provider adapters, config system, utility modules
+  - src/orchestra/ — 9 batches: brain barrel, sprint-controller, sprint-phases, task-router, result-evaluator, result-collector, event-stream, spawn backends, managed-docs
+  - src/cli/ — 7 batches: lifecycle commands, info commands, config commands, agent/skill commands, dashboard/web, helper modules, registration
+  - src/mcp/ — 3 batches: tool handlers, resource handlers, server core
+  - src/dashboard/ — 2 batches: React components, hooks/lib/types
+  - tests/ — 6 batches covering all 462+ test files
+  - docs/ — 2 batches: architecture docs, sprint history
+- Architecture graph + circular dependency analysis
+- Dead code audit + type safety review + security scan
+- Memory V2 deep integrity verification
+- Error handling inventory + TODO/FIXME catalog
+- 44/49 done, 42 TECH_DEBT (review findings), 5 NO_GO, 174.7 min
+- Agents: code-reviewer, architect, frontend-designer, test-writer, doc-writer, devops-engineer, refactorer, security-auditor, architecture-planner
+
+## Sprint 143: Chain Reform Complete + Security Hardening
+
+- **Security Fixes**:
+  - Shell injection fix in tmux.ts (argument escaping)
+  - Path traversal fix in checkpoint/docs/decision-logger (normalized path validation)
+  - API auth default secure (authentication required by default)
+  - heartbeat-daemon execSync whitelist (only whitelisted commands)
+- **Memory V2 Database**:
+  - FTS5 query builder fix (proper term escaping)
+  - Relations hybrid — backfill + write-time for cross-references
+  - DECISIONS.md archive + init.ts DB preload (96K → 4K context reduction operational)
+  - .brain/memory.db git tracking fix
+- **Infrastructure**:
+  - Sprint-finalizer hook for clean shutdown
+  - Rule generator for 3 providers
+  - MCP disconnect fix (background sprint runner)
+  - Auto-archive guard (prevents premature archiving)
+  - Layer 4 ADR-006 runtime wire deploy (live enforcement)
+  - Task restoration on crash
+  - Panic kill guard (prevents accidental sprint termination)
+- **Testing**: E2E harness for chain safety foundation
+- **Documentation**: ADR-010 amendment, MCP help.ts + server instructions
+- 19/20 done, 1 TECH_DEBT, 1 NO_GO, 104.9 min
+- Agents: security-auditor, devops-engineer, bug-fixer, architect, refactorer, test-writer, doc-writer
+
+## Sprint 144: God Split + Performance + i18n
+
+- **God Object Split (File Decomposition)**:
+  - init.ts split (1566 → 4 files): init-core.ts, init-adapters.ts, init-wizard.ts, init.ts barrel
+  - doctor.ts split (1102 → 3 files): doctor-checks.ts, doctor-display.ts, doctor.ts barrel
+  - retro.ts split (453 → 3 files): retro-display.ts, retro-commands.ts, retro.ts barrel
+  - worker.ts split attempted (1669 → 4 files) — NO_GO (timeout)
+- **Performance**: Auditor async scan loop — 52 synchronous I/O operations eliminated
+- **Architecture**: ADR-008 Cycle 2 fix (core/session-interface.ts extraction)
+- **Security**: Dockerfile hardening, file-lock + deck-file + credentials improvements
+- **i18n**: Basic CLI internationalization (5 commands TR/EN), Turkish locale fix (.toLocaleLowerCase('tr-TR'))
+- **Infrastructure**: Docker HB deploy wire (Sprint 139 fix live), event stream emit wire, sprint-state lifecycle (pid manager), retro sprint-id normalize, orphan cleanup (.tasks + locks) + pre-flight
+- **Output**: Rich sprint output (7-section summary)
+- **Testing**: Memory V2 CLI testing (+40 tests), heartbeat-daemon + mid-sprint-adapter + ci-reporter testing (+24 tests), prompt test slot-based assertion refactor, sprint2-debt.test.ts memory leak fix
+- **Dead Code Audit**: Wave A (agent + V1 routing, 17 files, 2780 LoC) — NO_GO, Wave B (orchestra orphaned + feature flag, 12 files, 2139 LoC) — NO_GO (both deferred to Sprint 145)
+- 24/27 done, 2 TECH_DEBT, 3 NO_GO, 107.4 min
+- Agents: refactorer, architect, performance-analyzer, security-auditor, devops-engineer, bug-fixer, doc-writer, test-writer
+
+## Sprint 145: Adaptive Timeout + Unified Observability + CLI/MCP Audit (In Progress)
+
+- Adaptive timeout estimation (timeout-estimator.ts) — historical sprint data → dynamic timeout calculation
+- Unified event bus (event-bus.ts) — centralized event routing for all components
+- Monitor adapter (monitor-adapter.ts) — pluggable monitoring backend
+- Timeout watcher (timeout-watcher.ts) — real-time timeout detection and alerting
+- Dead code cleanup from Sprint 141/142 audit findings
+- CLI/MCP parity hardening
+- DECKENT-MASTER-BLUEPRINT.md EN full update (this document)
+- See `.brain/sprints/sprint-145.md` and `docs/audits/sprint-145/` for details
+
+**Test restoration milestone (Sprint 137):** Brain test suite fully restored after Sprint 136 refactor side effects. tryCodeVerifiedDone() wired into live result evaluation — spurious NO_GO recovery operational. gate.json + load-report.md runtime hooks restored. ErrorRegistry lint script validated across all error codes. Budget decay no-op bug fixed in runDecay(). 6/6 tasks done in 35.9 min — fastest sprint completion since Sprint 76.
+
+**ADR Governance milestone (Sprint 138):** Architecture Decision Record governance formalized. MADR v3 hybrid format adopted across 37 existing ADRs. ADR-036 self-referential (governance of governance). ADR-035 Verification Protocol Standard defines 15 event stream channel codes for Brain↔Worker↔Auditor communication. Auditor Authority Extension 3-Pipeline: verifyWorkerResult() + verifyFunctional() + validateTechDebt() + pilot checkADRCompliance() for ADR-006/008/010. Structured Event Stream (event-stream.ts 305 LoC) with plan-time scope collision detection. Worker Honest Assessment Calibration v2 (verify-delta baseline + applyTechDebtDowngrade dual layer). Long-Running Sprint Resume MVP (sprint-checkpoint.ts + resume.ts, CHECKPOINT_INTERVAL=5). 11/11 done, 0 NO_GO.
+
+**RBAC + Chain Scheduler milestone (Sprint 139):** Largest sprint in project history — 52 tasks planned. Docker HB 5-sprint P0 bug fixed (atomicWriteFileSync + SIGTERM fsync handler, +382 LoC). Chain Dependency Scheduler Wave 1: Kahn's algorithm topological sort + scope collision awareness (+620 LoC) — Sprint 135 T-005 fifth live dogfood. Backend Parity achieved: Docker + tmux + subprocess all have E2E test suites — first subprocess E2E since Sprint 120 (19-sprint gap). ADR-037 RBAC Authority Matrix V1.0 (+1370 LoC) formalizes Brain/Auditor/Worker file permissions, event channels, and lifecycle actions. ADR-038 + ADR-039 Self-Modifying Task Detection (+789 LoC) — architectural protection born from Sprint 139's catastrophic self-modification incident. Worker Event Hook + Notification Dispatcher deployed. Manual finalize with GO_WITH_TECH_DEBT.
+
+**Comprehensive analysis milestone (Sprint 141):** Full codebase analysis across 316+ files: src/core/ (78), src/orchestra/ (82), src/cli/ (75), src/mcp/ (37), src/dashboard/ (44), tests/ (28 categories), docs/ (260 markdown). Architecture dependency graph + circular dependency analysis. Dead code, type safety, and security audit. ADR compliance verification. CLI/MCP feature parity review. Memory V2 integrity verification. 15/18 done in 74.3 min.
+
+**God Analysis milestone (Sprint 142):** Largest sprint by task count — 49 tasks. Systematic batched code review across entire codebase: 7 core batches, 9 orchestra batches, 7 CLI batches, 3 MCP batches, 2 dashboard batches, 6 test batches, 2 doc batches. Architecture graph generation. Memory V2 deep integrity verification. Error handling inventory. TODO/FIXME catalog. 44/49 done, 42 TECH_DEBT items representing comprehensive review findings.
+
+**Chain Reform milestone (Sprint 143):** 19/20 tasks done — chain dependency system live. Critical security fixes: shell injection in tmux.ts, path traversal in checkpoint/docs/decision-logger, API auth default secure, heartbeat-daemon execSync whitelist. FTS5 query builder fix for Memory V2. DECISIONS.md archived + init.ts DB preload (96K → 4K context reduction operational). Layer 4 ADR-006 runtime enforcement live. Sprint-finalizer hook. MCP disconnect fix (background sprint runner). Task restoration on crash. E2E harness foundation for chain safety.
+
+**God split milestone (Sprint 144):** Major file decomposition: init.ts (1566→4 files), doctor.ts (1102→3 files), retro.ts (453→3 files). Auditor converted to async scan loop (52 synchronous I/O operations eliminated). ADR-008 Cycle 2 fix (core/session-interface.ts extraction). Dockerfile hardening. i18n basic CLI (5 commands TR/EN). Turkish locale fix (.toLocaleLowerCase('tr-TR')). Docker HB deploy wire from Sprint 139. Event stream emit wire. Sprint-state lifecycle via pid manager. Rich sprint output (7-section summary). Memory V2 CLI testing (+40 tests). 24/27 done.
+
+**Adaptive Timeout + Unified Observability milestone (Sprint 145):** Sprint in progress. Timeout estimation, event bus, monitor adapter, timeout watcher, dead code cleanup, CLI/MCP parity hardening. See `.brain/sprints/sprint-145.md` and `docs/audits/sprint-145/` for details.
 
 **Provider Architecture (Sprint 38):**
 ```
@@ -2113,8 +2490,70 @@ Full directive: `docs/directives/sprint-034.md`
 
 ---
 
+# 25. BETA GA GATE CRITERIA (Sprint 150 — Target: 23 April 2026)
+
+## Overview
+
+Sprint 150 is the target gate for transitioning from beta (0.4.0-beta.1) to GA (1.0.0). All criteria must be met before the version bump.
+
+## Gate Criteria
+
+### Functional Completeness
+- [ ] All 22 MCP tools operational and tested
+- [ ] All 8 MCP resources returning valid data
+- [ ] All 41+ CLI commands functional
+- [ ] All 16 built-in agents with validated PROMPT.md
+- [ ] All 21 built-in skills with manifest.json + SKILL.md
+- [ ] Memory V2 DB-First fully operational (CRUD, FTS5, export, import, decay)
+- [ ] 3 provider backends operational (Claude, Codex, Gemini)
+- [ ] 3 spawn backends operational (tmux, subprocess, Docker)
+
+### Quality
+- [ ] Test count: 15,000+ (currently 14,400+)
+- [ ] Coverage: ≥85% (currently 89.33%)
+- [ ] Zero CRITICAL tech debt items
+- [ ] tsc --noEmit: 0 errors
+- [ ] No known data-loss bugs
+
+### Governance
+- [ ] All 39 ADRs in accepted/deprecated status (no draft/proposed)
+- [ ] ADR-037 RBAC runtime enforcement operational
+- [ ] ADR-035 event stream audit trail complete
+- [ ] ADR-036 governance integration validated
+- [ ] npm run lint:adr passes
+
+### Documentation
+- [ ] DECKENT-MASTER-BLUEPRINT.md EN fully updated (this document)
+- [ ] DECKENT-ANA-PLAN-TR.md TR fully updated
+- [ ] README.md with badges, quick start, comparison table
+- [ ] API reference (docs/reference/api.md)
+- [ ] CHANGELOG.md up to date
+- [ ] SECURITY.md with responsible disclosure
+
+### Distribution
+- [ ] `npx deckent init && deckent start "hello"` completes in <60s
+- [ ] npm pack produces clean tarball
+- [ ] .npmignore excludes sensitive files
+- [ ] Cross-platform verified: macOS, Linux, WSL2
+
+### Performance
+- [ ] 10-task sprint completes in <5 min
+- [ ] Memory V2 query <100ms for 1000 entries
+- [ ] CLI startup <500ms
+
+## Cross-References
+- Sprint metrics: `.brain/exports/summary.md`
+- ADR decisions: `.brain/exports/decisions.md`
+- Technical debt: `.brain/exports/debt.md`
+- Sprint history: `.brain/sprints/sprint-*.md`
+- Audit reports: `docs/audits/sprint-*/`
+- Architecture specs: `.contracts/api-surface.md`
+
+---
+
 # END OF BLUEPRINT
 
 This document is the single source of truth for Deckent's implementation.
+Version 3.0 — Updated Sprint 145 (April 2026).
 Use the MCP tools: "Set up Deckent" or "Plan a sprint for [goals]".
 Or open it in Claude Code and say: "Implement this."

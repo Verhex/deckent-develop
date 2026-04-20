@@ -1,0 +1,73 @@
+# Task 145-021 Execution Plan: DECKENT-MASTER-BLUEPRINT.md EN Full Update
+
+## Objective
+Update English blueprint from Sprint 136 to Sprint 145 parity with TR ANA-PLAN.
+Target: ~2400+ lines, ≥60 Sprint 13x-14x references.
+
+## Changes
+
+### 1. Live Metrics (lines 7-17)
+- Update sprint to sprint-145
+- Update test/coverage/task stats
+
+### 2. Architecture Overview (Section 2, lines 90-176)
+- Update MCP Server line: 22 Tools + 8 Resources
+- Add Memory V2 DB-First architecture diagram
+- Add Event Bus / Event Stream architecture
+- Add RBAC Authority Matrix reference
+
+### 3. Memory Architecture (Section 6, lines 571-616)
+- Replace "3-Tier" with "DB-First (Memory V2)" architecture
+- Add SQLite FTS5, dual-layer Turkish normalize
+- Add DB schema overview
+- Add query API reference
+- Keep legacy 3-tier as historical note
+
+### 4. MCP Server Architecture (Section 21, lines 1525-1621)
+- Update tool count: 17 → 22
+- Add missing tools: agent_list, skill_list, checkpoint, docs, explain, memory_query, watch
+- Update resource count
+
+### 5. Implementation History (Section 19, lines 1222-2113)
+- Add Sprint 137: Brain test restoration, tryCodeVerifiedDone wire, gate.json restore
+- Add Sprint 138: ADR Governance, ADR-035 Protocol, Auditor 3-Pipeline, Event Stream, Resume MVP
+- Add Sprint 139: Docker HB fix, Chain Scheduler, RBAC ADR-037, Self-Modifying Detection ADR-038/039
+- Add Sprint 141: Comprehensive codebase analysis (316 files)
+- Add Sprint 142: God Analysis (49 tasks, largest sprint)
+- Add Sprint 143: Chain Reform, security fixes, Memory V2 migration
+- Add Sprint 144: God split, ADR-008 Cycle 2, perf, dead code audit
+- Add Sprint 145: Current sprint (in progress)
+
+### 6. Sprint History Table (Section 24, lines 1941-2024)
+- Add rows for Sprint 137-145
+- Add milestone paragraphs for key achievements
+
+### 7. Strategic Roadmap (Section 23)
+- Update Phase 5 status
+- Add Beta GA gate criteria section (Sprint 150 target)
+
+### 8. Global Stats Updates
+- Version: 0.4.0-beta.1
+- Tests: 14,400+ (target based on 621 test files)
+- Coverage: 89.33%
+- CLI Commands: 41+
+- MCP: 22 tools, 8 resources
+- Agents: 16 built-in
+- Skills: 21 built-in
+- Providers: 3
+- Sprints: 145+
+- Orchestra modules: 88
+- Core modules: 89
+
+### 9. Cross-References
+- Link to .brain/exports/summary.md
+- Link to .brain/exports/decisions.md
+- Reference ADR-035..039
+
+## Files Modified
+- DECKENT-MASTER-BLUEPRINT.md (only file)
+
+## Verification
+- wc -l ≥ 2400
+- grep -c "Sprint 1[3-4][0-9]" ≥ 60
+- grep for: "Memory V2", "Adaptive Timeout", "Unified Observability", "ADR-035", "ADR-036", "ADR-037", "ADR-038", "ADR-039"

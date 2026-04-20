@@ -18,12 +18,27 @@ import type {
   PlanModeConfig,
   ResolvedConfig,
   SystemProfile,
+  TimeoutConfig,
 } from './types.js';
 import { ALL_MODELS, PROVIDER_MODEL_MAP } from './types.js';
 import type { ProviderName } from './types.js';
 import { MODE_PRESETS } from './mode-presets.js';
 import type { ModelStrategy } from './mode-presets.js';
 import { metric } from './observability.js';
+
+// ─── Default Timeout Config ─────────────────────────────────────────
+export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
+  docker_min_timeout: 1200,
+  docker_max_timeout: 7200,
+  tmux_min_timeout: 900,
+  tmux_max_timeout: 5400,
+  subprocess_min_timeout: 600,
+  subprocess_max_timeout: 3600,
+  effort_base: { low: 600, normal: 1200, high: 2400 },
+  loc_scaling_enabled: true,
+  history_scaling_enabled: true,
+  runtime_extension_enabled: false,
+};
 
 // ─── Default Auto Docs Config ───────────────────────────────────────
 export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
@@ -337,6 +352,45 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Timeout config validation ─────────────────────────────────────
+  if (config.timeout !== undefined) {
+    const t = deepMerge(DEFAULT_TIMEOUT_CONFIG, config.timeout as Partial<TimeoutConfig>);
+
+    // effort_base ordering: high > normal > low
+    if (t.effort_base.high <= t.effort_base.normal) {
+      errors.push('timeout.effort_base.high must be greater than effort_base.normal');
+    }
+    if (t.effort_base.normal <= t.effort_base.low) {
+      errors.push('timeout.effort_base.normal must be greater than effort_base.low');
+    }
+
+    // per-backend min >= 300
+    const minFields = ['docker_min_timeout', 'tmux_min_timeout', 'subprocess_min_timeout'] as const;
+    for (const field of minFields) {
+      if (t[field] < 300) {
+        errors.push(`timeout.${field} must be >= 300`);
+      }
+    }
+
+    // per-backend max <= 14400
+    const maxFields = ['docker_max_timeout', 'tmux_max_timeout', 'subprocess_max_timeout'] as const;
+    for (const field of maxFields) {
+      if (t[field] > 14400) {
+        errors.push(`timeout.${field} must be <= 14400`);
+      }
+    }
+
+    // max > min consistency per backend
+    const backends = ['docker', 'tmux', 'subprocess'] as const;
+    for (const backend of backends) {
+      const minKey = `${backend}_min_timeout` as keyof TimeoutConfig;
+      const maxKey = `${backend}_max_timeout` as keyof TimeoutConfig;
+      if ((t[maxKey] as number) <= (t[minKey] as number)) {
+        errors.push(`timeout.${maxKey} must be greater than timeout.${minKey}`);
+      }
+    }
+  }
+
   // ─── Routing Engine validation ──────────────────────────────────────
   if (config.routing_engine !== undefined) {
     const validRoutingEngines = ['v1', 'v2'] as const;
@@ -476,6 +530,8 @@ export function createDefaultConfig(): DeckentConfig {
     cleanup_delay_ms: 180_000,
     // Sprint checkpoint interval: how many terminal tasks before writing a checkpoint
     sprint_checkpoint_interval: 5,
+    // Timeout
+    timeout: structuredClone(DEFAULT_TIMEOUT_CONFIG),
   };
 }
 
@@ -671,6 +727,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     ai_planner_timeout: config.ai_planner_timeout,
     // Sprint checkpoint interval
     sprint_checkpoint_interval: config.sprint_checkpoint_interval,
+    // Timeout
+    timeout: config.timeout
+      ? deepMerge(DEFAULT_TIMEOUT_CONFIG, config.timeout as Partial<TimeoutConfig>)
+      : structuredClone(DEFAULT_TIMEOUT_CONFIG),
   };
 
   // ─── Update cache ───────────────────────────────────────────────────

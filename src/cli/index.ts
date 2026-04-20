@@ -39,6 +39,8 @@ import { registerCostCommand } from './commands/cost.js';
 import { registerRecall } from './commands/recall.js';
 import { registerRemember } from './commands/remember.js';
 import { registerMemory } from './commands/memory.js';
+import { registerResume } from './commands/resume.js';
+import { registerHelp } from './commands/help.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -99,6 +101,8 @@ export function buildProgram(): Command {
   registerRecall(program);
   registerRemember(program);
   registerMemory(program);
+  registerResume(program);
+  registerHelp(program);
 
   return program;
 }

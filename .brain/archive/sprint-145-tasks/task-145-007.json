@@ -1,0 +1,99 @@
+{
+  "id": "145-007",
+  "title": "ADR-038 Self-Modifying Detector Runtime Wire",
+  "description": "ADR-038 Self-Modifying Detector Runtime Wire\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/self-modifying-detector.ts, src/orchestra/sprint-controller.ts, tests/orchestra/self-modifying.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nAudit bulgu #2: `isSelfModifying*()` fonksiyonları her zaman `false` döndürüyor (Sprint 139 T-051/052 ADR-038 dead).\n\n`src/orchestra/self-modifying-detector.ts` mevcut. `isSelfModifyingTask(task, projectRoot)` ve `isSelfModifyingScope(scope, projectRoot)` actual implementation'a sahip olmalı:\n\n```typescript\nimport * as path from 'node:path';\nimport { existsSync, readFileSync } from 'node:fs';\n\nexport function isDeckentRepository(projectRoot: string): boolean {\n  // Detection: package.json name === 'deckent' veya .deckent/IDENTITY.md \"deckent\" içerir\n  try {\n    const pkg = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'));\n    if (pkg.name === 'deckent') return true;\n  } catch {}\n  const identity = path.join(projectRoot, '.deckent/workspace/IDENTITY.md');\n  if (existsSync(identity)) {\n    const content = readFileSync(identity, 'utf-8');\n    if (/Name:\\s*deckent\\b/i.test(content)) return true;\n  }\n  return false;\n}\n\nexport function isSelfModifyingScope(\n  scope: { directories?: string[]; filesWrite?: string[] },\n  projectRoot: string\n): boolean {\n  if (!isDeckentRepository(projectRoot)) return false;\n  const targets = [...(scope.directories ?? []), ...(scope.filesWrite ?? [])];\n  return targets.some(t => /^src\\/(orchestra|agents|core|mcp|cli)/.test(t));\n}\n\nexport function isSelfModifyingTask(task: { scope: { directories?: string[]; filesWrite?: string[] } }, projectRoot: string): boolean {\n  return isSelfModifyingScope(task.scope, projectRoot);\n}\n```\n\n`src/orchestra/sprint-controller.ts` PLAN sonrası:\n```typescript\nconst selfModifyingTasks = tasks.filter(t => isSelfModifyingTask(t, projectRoot));\nif (selfModifyingTasks.length > 0) {\n  emitNotify(sprintId, 'warn', 'Self-modifying sprint detected',\n    `${selfModifyingTasks.length} tasks modify Deckent's own src/. Live coordinator src/ edits FORBIDDEN.`,\n    { taskIds: selfModifyingTasks.map(t => t.id) });\n}\n```\n\n### Test (6+ test)\n1. `isDeckentRepository` deckent-dev için true\n2. `isDeckentRepository` user proje (package.json name='myapp') için false\n3. `isSelfModifyingScope` `src/orchestra/` true (deckent repo'da)\n4. `isSelfModifyingScope` `docs/` false (deckent repo'da)\n5. `isSelfModifyingScope` `src/orchestra/` user proje'de false (deckent değil)\n6. `isSelfModifyingTask` task scope ile entegre\n\n**Kanıt:** `npx vitest run tests/orchestra/self-modifying.test.ts` 6+/6+ PASS, Sprint 145 PLAN sonrası NOTIFY event \"Self-modifying sprint detected\" çıktı (sprint-145 self-modifying olduğu için).\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/",
+      "{ directories?: string[]; filesWrite?: string[] }/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/self-modifying-detector.ts",
+      "src/orchestra/sprint-controller.ts",
+      "tests/orchestra/self-modifying.test.ts",
+      "IDENTITY.md",
+      "package.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/self-modifying.test.ts` 6+/6+ PASS, Sprint 145 PLAN sonrası NOTIFY event \"Self-modifying sprint detected\" çıktı (sprint-145 self-modifying olduğu için).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing",
+          "documentation"
+        ],
+        "confidence": 0.72
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.63
+        },
+        {
+          "name": "{ directories?: string[]; filesWrite?: string[] }",
+          "weight": 0.13
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.4,
+          "tests/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:17:21.137Z"
+}

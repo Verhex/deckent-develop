@@ -1,0 +1,96 @@
+{
+  "id": "145-008",
+  "title": "registerResume CLI Wire + CLI Registration Test Harness",
+  "description": "registerResume CLI Wire + CLI Registration Test Harness\n- Model: sonnet\n- Effort: normal\n- Skills: typescript-expert, testing-expert\n- Files: src/cli/index.ts, tests/cli/registration-harness.test.ts\n- Scope: src/cli/, tests/cli/\n\n### Description\nAudit bulgu #5: `src/cli/commands/resume.ts` `registerResume(program)` export var ama `src/cli/index.ts`'e import + call yok.\n\n`src/cli/index.ts` 2 satır fix:\n```typescript\nimport { registerResume } from './commands/resume.js';\n// ... diğer import'lar arasına\n\nregisterResume(program);\n// ... diğer register* çağrıları arasına\n```\n\nAyrıca regresyon yakalamak için yeni test harness `tests/cli/registration-harness.test.ts`:\n\n```typescript\nimport { describe, it, expect } from 'vitest';\nimport { readdirSync, readFileSync } from 'node:fs';\nimport { join } from 'node:path';\n\ndescribe('CLI registration harness', () => {\n  const COMMANDS_DIR = 'src/cli/commands';\n  const INDEX_FILE = 'src/cli/index.ts';\n  const indexContent = readFileSync(INDEX_FILE, 'utf-8');\n\n  const commandFiles = readdirSync(COMMANDS_DIR)\n    .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'));\n\n  const INTERNAL_COMMANDS = ['heartbeat.ts', 'output.ts'];  // worker-internal\n\n  for (const file of commandFiles) {\n    if (INTERNAL_COMMANDS.includes(file)) continue;\n    const content = readFileSync(join(COMMANDS_DIR, file), 'utf-8');\n    const match = content.match(/export function (register\\w+)\\s*\\(/);\n    if (!match) continue;\n    const fnName = match[1];\n\n    it(`${file}: ${fnName} is imported and called in index.ts`, () => {\n      expect(indexContent).toMatch(new RegExp(`import\\\\s*{[^}]*${fnName}[^}]*}\\\\s*from`));\n      expect(indexContent).toMatch(new RegExp(`${fnName}\\\\s*\\\\(\\\\s*program\\\\s*\\\\)`));\n    });\n  }\n});\n```\n\n### Test\n- Yukarıdaki harness 38+ test üretir (her CLI command dosyası için bir test).\n- registerResume dahil hepsi PASS olmalı.\n\n**Kanıt:** `npx vitest run tests/cli/registration-harness.test.ts` tümü PASS, `node dist/cli/entry.js resume --help` exitCode 0 ve \"resume\" komut help'i basar (top-level help değil).\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/",
+      "tests/cli/",
+      "src/cli/commands/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/index.ts",
+      "tests/cli/registration-harness.test.ts",
+      "src/cli/commands/resume.ts",
+      "dist/cli/entry.js"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/cli/registration-harness.test.ts` tümü PASS, `node dist/cli/entry.js resume --help` exitCode 0 ve \"resume\" komut help'i basar (top-level help değil).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.85
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.86
+        },
+        {
+          "name": "dist",
+          "weight": 0.14
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.6
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.25,
+          "dist/": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:17:26.345Z"
+}

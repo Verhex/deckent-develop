@@ -1,0 +1,79 @@
+{
+  "id": "145-023",
+  "title": "God Analysis FINAL-REPORT.md Sprint 145 Closure Section",
+  "description": "God Analysis FINAL-REPORT.md Sprint 145 Closure Section\n- Model: sonnet\n- Effort: normal\n- Skills: documentation-writer\n- Files: .deckent/sprint-god-analysis/FINAL-REPORT.md\n- Scope: .deckent/sprint-god-analysis/\n\n### Description\nSprint 140 self-analysis çıktısı. Sprint 141-145'te kaç bulgu kapatıldı kalibrasyonu.\n\nYeni bölüm \"Sprint 141-145 Closure Status\":\n1. God Analysis 233 bulgu listesi tarandı, her birine status:\n   - ✅ CLOSED (Sprint 141-145'te çözüldü, hangi task)\n   - 🔄 IN PROGRESS (Sprint 146-150 planlı)\n   - ⚠ DEFERRED (post-beta)\n   - ❌ OBSOLETE (artık geçerli değil)\n2. Ölü kod listesi (mevcut Wave A+B silinenler) güncel durum\n3. Sprint 140 koordinatör müdahale lesson'u retrospektif: Sprint 144 src/ müdahale lesson ile bağlantı\n\n### Test\n- `grep -c \"✅\\|🔄\\|⚠\\|❌\" .deckent/sprint-god-analysis/FINAL-REPORT.md` ≥ 100 (closure status markers)\n- Yeni \"Sprint 141-145 Closure Status\" başlığı var\n\n**Kanıt:** Yeni section eklendi, 100+ status marker, dosya satır sayısı 2615 → 3000+.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      ".deckent/sprint-god-analysis/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".deckent/sprint-god-analysis/FINAL-REPORT.md",
+      "FINAL-REPORT.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `grep -c \"✅\\|🔄\\|⚠\\|❌\" .deckent/sprint-god-analysis/FINAL-REPORT.md` ≥ 100 (closure status markers); *Kanıt:** Yeni section eklendi, 100+ status marker, dosya satır sayısı 2615 → 3000+.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-20T04:56:28.402Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.36
+      },
+      "domains": [],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          ".deckent/": 0.5
+        },
+        "primaryWriteTarget": ".deckent/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:18:37.042Z"
+}

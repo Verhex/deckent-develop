@@ -4,7 +4,11 @@
 
 import type { Task } from '../core/types.js';
 import type { ProviderName, ModelType } from '../core/task-types.js';
+import type { ResolvedConfig } from '../core/config-types.js';
 import { PROVIDER_MODEL_MAP } from '../core/task-types.js';
+import { brainEstimateTimeout } from './timeout-estimator.js';
+import type { SprintHistory } from './timeout-estimator.js';
+import { writeEvent, CHANNELS } from './event-stream.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -33,6 +37,8 @@ export interface TaskRouting {
   skills: string[];
   /** Human-readable explanation of why this routing was chosen */
   reason: string;
+  /** Estimated timeout in seconds from Brain heuristic estimator (optional) */
+  timeoutSeconds?: number;
 }
 
 /** Task type categories detected from scope and file patterns */
@@ -264,4 +270,49 @@ function ensureAvailable(preferred: ProviderName, available: ProviderName[]): Pr
     return preferred;
   }
   return available[0] ?? 'claude' as ProviderName;
+}
+
+// ─── Timeout Event Emission ────────────────────────────────────────
+
+/**
+ * Emit timeout-related events after task routing.
+ *
+ * Writes TIMEOUT_ASSIGN for every routed task with its timeout breakdown.
+ * If the estimated timeout exceeds the backend max (clampReason = 'max_ceiling'),
+ * also writes TIMEOUT_CAP_EXCEEDED.
+ *
+ * @param task - The routed task
+ * @param config - Resolved project config (used by brainEstimateTimeout)
+ * @param history - Sprint history for adaptive timeout
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint identifier
+ */
+export function emitTimeoutEvents(
+  task: Task,
+  config: ResolvedConfig,
+  history: SprintHistory,
+  projectRoot: string,
+  sprintId: string,
+): void {
+  const { timeoutSeconds, breakdown } = brainEstimateTimeout(task, config, history);
+
+  writeEvent(
+    projectRoot,
+    sprintId,
+    'brain',
+    'worker',
+    CHANNELS.TIMEOUT_ASSIGN,
+    { taskId: task.id, timeoutSeconds, breakdown },
+  );
+
+  if (breakdown.clampReason === 'max_ceiling') {
+    writeEvent(
+      projectRoot,
+      sprintId,
+      'auditor',
+      'brain',
+      CHANNELS.TIMEOUT_CAP_EXCEEDED,
+      { taskId: task.id, requested: breakdown.estimated, capped: timeoutSeconds },
+    );
+  }
 }

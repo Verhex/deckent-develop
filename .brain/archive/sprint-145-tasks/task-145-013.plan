@@ -1,0 +1,24 @@
+# Task 145-013: Monitor Adapter Pattern — 3 Backend Otonom
+
+## Plan
+
+1. Create `src/orchestra/monitor-adapter.ts` (~300 LoC)
+   - Define interfaces: WorkerInfo, ResourceUsage, MonitorAdapter
+   - Implement DockerMonitorAdapter (docker ps, docker logs, docker stats, docker kill)
+   - Implement TmuxMonitorAdapter (tmux ls, tmux capture-pane, tmux kill-session)
+   - Implement SubprocessMonitorAdapter (.deckent/workers/*.pid, ps, kill)
+   - Factory function: createMonitorAdapter(config) → MonitorAdapter
+
+2. Create `tests/orchestra/monitor-adapter.test.ts` (10+ tests)
+   - Factory tests: docker/tmux/subprocess/unknown
+   - Contract tests per adapter: listActiveWorkers, captureWorkerOutput, killWorker, getResourceUsage
+   - Subprocess captureWorkerOutput returns placeholder
+   - Tmux getResourceUsage returns null
+
+3. Verify: tsc --noEmit + vitest run
+
+## Key Decisions
+- Use execSync/spawnSync for shell commands (ADR-006 compliance)
+- Wrap in try/catch to handle missing docker/tmux gracefully
+- SubprocessAdapter reads PID files from .deckent/workers/
+- All methods are async (interface contract) but internally may use sync exec

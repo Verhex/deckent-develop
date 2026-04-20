@@ -1,0 +1,38 @@
+# Task 145-017 Execution Plan — Timeout Event Stream Emit
+
+## Objective
+Add 3 new timeout-related event channels to event-stream.ts CHANNELS constant,
+and integrate timeout event emission into task-router.ts after routing.
+
+## Changes
+
+### 1. src/orchestra/event-stream.ts
+- Add 3 new channel constants to CHANNELS:
+  - TIMEOUT_ASSIGN: 'BRAIN→WORKER:TIMEOUT_ASSIGN'
+  - TIMEOUT_WARNING: 'WORKER→BRAIN:TIMEOUT_WARNING'
+  - TIMEOUT_CAP_EXCEEDED: 'AUDITOR→BRAIN:TIMEOUT_CAP_EXCEEDED'
+
+### 2. src/orchestra/task-router.ts
+- Import writeEvent, CHANNELS from event-stream.ts
+- Import brainEstimateTimeout, SprintHistory from timeout-estimator.ts
+- Add emitTimeoutEvents() helper that:
+  - Calls brainEstimateTimeout() with task, config, history
+  - Writes TIMEOUT_ASSIGN event
+  - If clampReason === 'max_ceiling', also writes TIMEOUT_CAP_EXCEEDED
+- Export for external use or integrate into routeTask flow
+
+NOTE: The task description shows timeout emission after route, but routeTask
+doesn't have access to projectRoot/sprintId/history. I'll create a separate
+exported function `emitTimeoutEvents()` that callers invoke after routeTask.
+This keeps routeTask pure (no I/O side effects) and follows separation of concerns.
+
+### 3. tests/orchestra/event-stream-timeout.test.ts
+- 4+ tests:
+  1. routeTask + emitTimeoutEvents → TIMEOUT_ASSIGN event written
+  2. payload.breakdown fields present (base, multipliers)
+  3. estimate > max → TIMEOUT_CAP_EXCEEDED also written
+  4. estimate within bounds → CAP_EXCEEDED not written
+
+## Verify
+- tsc --noEmit
+- npx vitest run tests/orchestra/event-stream-timeout.test.ts

@@ -1,0 +1,27 @@
+{
+  "taskId": "145-014",
+  "filesChanged": [
+    "src/mcp/tools/watch.ts",
+    "src/mcp/tools/index.ts",
+    "tests/mcp/tools/watch.test.ts"
+  ],
+  "linesAdded": 290,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "deckent_watch MCP tool implemented with full spec compliance. Tool registers on McpServer, backfills recent events via eventBus.tail(), subscribes to live events via eventBus.subscribe(), filters by channel keywords, auto-unsubscribes on sendLoggingMessage failure. 9/9 tests pass. No type errors in scope files (4 pre-existing errors in config-validator.ts and timeout-estimator.ts are out of scope).",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

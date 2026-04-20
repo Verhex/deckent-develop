@@ -1,0 +1,81 @@
+{
+  "id": "145-020",
+  "title": "DECKENT-ANA-PLAN-TR.md Tam Güncelleme — Sprint 23 → 145",
+  "description": "DECKENT-ANA-PLAN-TR.md Tam Güncelleme — Sprint 23 → 145\n- Model: opus\n- Effort: high\n- Skills: documentation-writer\n- Files: DECKENT-ANA-PLAN-TR.md\n- Scope: ./\n\n### Description\nMevcut dosya **Sprint 23'te donmuş** (Mart 2026 v2.1, 818 satır). 122 sprint geride.\n\nGüncellemeler:\n1. Versiyon: v2.1 → **v3.0 — Nisan 2026 — Beta GA**\n2. Bölüm 3.2 CLI komut listesi: 32 komut → 41+ komut güncel liste (memory, cost, finalize, recall, remember, archive-debt vs ekle)\n3. Bölüm 21 MCP araçları: 17 araç → **22 araç** (deckent_memory_query, deckent_explain, deckent_docs vs ekle)\n4. Bölüm 21 MCP kaynakları: 9 → **8 kaynak** (usage kaldırıldı veya doğrula)\n5. Bölüm 23 Stratejik Yol Haritası: Aşama 4 (Sprint 39-65) → Aşama 5 (Sprint 66-150) yeni bölüm\n6. Bölüm 24 Sprint Geçmişi: Sprint 23 sonrası 122 sprint compact tablo (CHANGELOG.md kalitesi):\n   - Sprint 24-77 mevcut (818 satırın 750+'si bu)\n   - **Sprint 78-145 YENİ** ekle: her sprint için 1 satır (Sprint, test, kapsam, öne çıkanlar)\n7. Yeni bölüm: **\"Memory V2 DB-First Mimarisi\"** — SQLite FTS5, dual-layer turkishNormalize, decay, MCP entegrasyonu\n8. Yeni bölüm: **\"ADR Governance\"** — ADR-035 verification protocol, ADR-036 mandatory enforcement, ADR-037 RBAC, ADR-038 self-modifying, ADR-039 dead code disposition\n9. Yeni bölüm: **\"Adaptive Timeout System\"** — Sprint 145 spec özetlenmiş\n10. Yeni bölüm: **\"Unified Native Observability\"** — Sprint 145 spec özetlenmiş\n11. Yeni bölüm: **\"Cost Management System\"** — Sprint 141 parametric multi-provider\n12. Bölüm 19 Uygulama Geçmişi: Sprint 24-145 timeline blok blok (her 10 sprint için bir paragraf)\n\n### Test\n- N/A (doc task), ama tutarlılık check'i:\n  - `grep -c \"Sprint 1[3-4][0-9]\" DECKENT-ANA-PLAN-TR.md` ≥ 80\n  - Toplam satır ≥ 1500 (mevcut 818'den artış)\n  - \"Memory V2\", \"ADR-035\", \"Adaptive Timeout\", \"Unified Observability\", \"Cost Management\" terimleri içerir\n\n**Kanıt:** `wc -l DECKENT-ANA-PLAN-TR.md` ≥ 1500, `grep -c \"Sprint 1[3-4][0-9]\" DECKENT-ANA-PLAN-TR.md` ≥ 80, manuel okuma ile Sprint 145 closure section eklendi.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "DECKENT-ANA-PLAN-TR.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `grep -c \"Sprint 1[3-4][0-9]\" DECKENT-ANA-PLAN-TR.md` ≥ 80; *Kanıt:** `wc -l DECKENT-ANA-PLAN-TR.md` ≥ 1500, `grep -c \"Sprint 1[3-4][0-9]\" DECKENT-ANA-PLAN-TR.md` ≥ 80, manuel okuma ile Sprint 145 closure section eklendi.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-145",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-20T04:56:28.402Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "security"
+        ],
+        "confidence": 0.42
+      },
+      "domains": [],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.44
+        },
+        {
+          "type": "modify",
+          "weight": 0.22
+        },
+        {
+          "type": "test",
+          "weight": 0.22
+        },
+        {
+          "type": "create",
+          "weight": 0.11
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {},
+        "primaryWriteTarget": "",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:18:25.414Z"
+}

@@ -1,0 +1,31 @@
+# Task 145-015 — Spurious NO_GO Reconciliation Helper Wire
+
+## Problem
+Sprint 136'da helper yazıldı, Sprint 137'de "wire canlı" denildi ama Sprint 144'te dogfood ölü kanıtlandı.
+`reconcileSpuriousNoGo` fonksiyonu hiçbir yerde yok — mid-sprint-adapter.ts sadece MidSprintAdapter class'ı içeriyor.
+
+## Plan
+
+### 1. mid-sprint-adapter.ts — `reconcileSpuriousNoGo` standalone fonksiyonu ekle
+- Task: git diff --stat ile değişen dosya/satır sayısı (execSync simülasyonu)
+- Scope-compliance: filesChanged ⊂ task.scope.filesWrite/directories
+- tsc --noEmit check
+- vitest scope check
+- Eğer 1+2+3 PASS ve 4 partial PASS (>%50) → GO_WITH_TECH_DEBT
+
+NOT: Fonksiyon async olacak, execSync yerine child_process.exec ile çalışacak.
+projectRoot parametresi alacak.
+
+### 2. result-evaluator.ts — `evaluateResult()` ve `evaluateWithRubric()` içine wire et
+- TIMEOUT_WITH_WORK → reconcileSpuriousNoGo çağır
+- NO_GO + git diff > 50 lines → reconcileSpuriousNoGo çağır
+- evaluateResult sync olduğu için burada sadece basit wire yapılacak
+- evaluateWithRubric'te de reconciliation hook eklenecek
+
+### 3. tests/orchestra/spurious-nogo.test.ts — 8+ test
+- 8 test senaryosu task description'dan
+
+## Dosyalar
+- WRITE: src/orchestra/mid-sprint-adapter.ts
+- WRITE: src/orchestra/result-evaluator.ts
+- CREATE: tests/orchestra/spurious-nogo.test.ts

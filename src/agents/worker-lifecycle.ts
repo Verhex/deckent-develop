@@ -58,6 +58,13 @@ export function atomicWriteFileSync(filePath: string, data: string): void {
 const DONE_SET = new Set(['DONE', 'GO_WITH_TECH_DEBT']);
 
 /**
+ * Sprint 145: Self-assessment values that indicate partial work exists.
+ * TIMEOUT_WITH_WORK means the worker was killed but git diff shows modified files.
+ * These results should NOT be overwritten with a synthetic NO_GO — Brain reconciles.
+ */
+const PARTIAL_WORK_SET = new Set(['TIMEOUT_WITH_WORK']);
+
+/**
  * Ensure a .result file is fsync'd to disk.
  *
  * If the .result file exists but was written via plain writeFileSync (pre-Sprint 139
@@ -107,7 +114,28 @@ export function finalizeHeartbeatOnShutdown(projectRoot: string, taskId: string)
     const raw = readFileSync(resPath, 'utf-8');
     const result = JSON.parse(raw) as { selfAssessment?: string };
 
-    if (!result.selfAssessment || !DONE_SET.has(result.selfAssessment)) {
+    if (!result.selfAssessment) {
+      return false;
+    }
+
+    // Sprint 145: Handle TIMEOUT_WITH_WORK — partial work exists, preserve result
+    if (PARTIAL_WORK_SET.has(result.selfAssessment)) {
+      const hbPath = heartbeatFilePath(projectRoot, taskId);
+      const hbData = JSON.stringify({
+        workerId: `docker-${taskId}`,
+        taskId,
+        status: 'TIMEOUT_WITH_WORK',
+        exitCode: 1,
+        sequence: 99,
+        timestamp: new Date().toISOString(),
+        backend: 'docker',
+        note: 'Finalized on SIGTERM — partial work detected, result fsynced to disk',
+      }, null, 2);
+      atomicWriteFileSync(hbPath, hbData);
+      return true;
+    }
+
+    if (!DONE_SET.has(result.selfAssessment)) {
       return false;
     }
 

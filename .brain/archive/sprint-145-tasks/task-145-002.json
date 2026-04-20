@@ -1,0 +1,99 @@
+{
+  "id": "145-002",
+  "title": "Brain Heuristic Timeout Estimator",
+  "description": "Brain Heuristic Timeout Estimator\n- Model: opus\n- Effort: high\n- Skills: system-architect, performance-optimizer\n- Files: src/orchestra/timeout-estimator.ts (yeni), src/orchestra/task-router.ts, tests/orchestra/timeout-estimator.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n- Dependencies: Task 1\n\n### Description\nYeni dosya `src/orchestra/timeout-estimator.ts` (~250 LoC). Imza:\n\n```typescript\nimport type { Task } from '../core/task-types.js';\nimport type { ResolvedConfig } from '../core/config-types.js';\nimport type { SprintHistory } from '../core/sprint-types.js';\n\nexport interface TimeoutBreakdown {\n  base: number;\n  locMultiplier: number;\n  scopeMultiplier: number;\n  historyFactor: number;\n  backendFactor: number;\n  estimated: number;\n  clampedTo: number;\n  clampReason: 'min_floor' | 'max_ceiling' | 'within_bounds';\n}\n\nexport function brainEstimateTimeout(\n  task: Task,\n  config: ResolvedConfig,\n  history: SprintHistory\n): { timeoutSeconds: number; breakdown: TimeoutBreakdown };\n\nexport function estimateTaskLoC(task: Task): number;\n```\n\nAlgoritma (spec'teki formül):\n- `baseByEffort` = config'ten `effort_base[task.effort]`\n- `locDelta` = DIRECTIVES'ten parse edilen LoC delta veya `scope.filesWrite.length * 200`\n- `locMultiplier` = `Math.max(1.0, Math.log10(locDelta / 500 + 1) * 0.6)` — sadece `loc_scaling_enabled` ise\n- `scopeMultiplier` = `1 + (filesWrite > 5 ? (filesWrite - 5) * 0.05 : 0)`\n- `historyFactor` = `histAvg > 0 ? Math.max(1.0, (histAvg / 1000) / baseByEffort * 1.2) : 1.0` — sadece `history_scaling_enabled`\n- `backendFactor` = `{docker: 1.0, tmux: 0.9, subprocess: 0.8}[backend]`\n- `estimated = round(base * locMultiplier * scopeMultiplier * historyFactor * backendFactor)`\n- Clamp: `Math.max(min_timeout, Math.min(max_timeout, estimated))`\n\n`src/orchestra/task-router.ts` `routeTaskV2()` veya `routeTask()` çıktısına `timeoutSeconds` field ekle, `brainEstimateTimeout` çağırarak.\n\n### Test (15+ test minimum, branch coverage)\n1. `low` effort + 0 LoC → ~600s (base, no multiplier)\n2. `high` effort + 2000 LoC delta → ~3800s (test örnek)\n3. `high` + 2000 LoC + 8 files write → scope multiplier 1.15 uygulanmış\n4. Docker backend (1.0x) vs tmux (0.9x) vs subprocess (0.8x)\n5. `loc_scaling_enabled: false` → locMultiplier 1.0 zorla\n6. `history_scaling_enabled: false` → historyFactor 1.0 zorla\n7. Estimated < min_timeout → min'e clamp + `clampReason: 'min_floor'`\n8. Estimated > max_timeout → max'a clamp + `clampReason: 'max_ceiling'`\n9. Empty history → historyFactor 1.0 (no division by zero)\n10. `estimateTaskLoC` DIRECTIVES \"1566 → <400\" pattern → 1166 delta\n11. `estimateTaskLoC` filesWrite fallback → 5 files = 1000 estimated\n12. T-144-001 senaryo (init split, high, 2000 LoC, 8 files) → ≥3500s\n13. T-144-003 senaryo (retro split, normal, 450 LoC, 6 files) → ~1260s\n14. Breakdown.estimated * clampReason === clampedTo invariant\n15. `task-router.ts` integration: routeTask() return içinde timeoutSeconds field var\n\n**Kanıt:** `npx vitest run tests/orchestra/timeout-estimator.test.ts` 15+/15+ PASS, `tsc --noEmit` PASS, T-144-001 simulate edildi, ≥3500s döndürdü.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/timeout-estimator.ts (yeni)",
+      "src/orchestra/task-router.ts",
+      "tests/orchestra/timeout-estimator.test.ts",
+      "src/orchestra/timeout-estimator.ts"
+    ]
+  },
+  "dependencies": [
+    "Task 1"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/timeout-estimator.test.ts` 15+/15+ PASS, `tsc --noEmit` PASS, T-144-001 simulate edildi, ≥3500s döndürdü.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-145",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "system-architect",
+    "performance-optimizer"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "system-architect",
+    "performance-optimizer"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.67
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.43
+        },
+        {
+          "type": "configure",
+          "weight": 0.29
+        },
+        {
+          "type": "document",
+          "weight": 0.14
+        },
+        {
+          "type": "create",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.75,
+          "tests/": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2638,
+  "updatedAt": "2026-04-20T06:16:49.448Z"
+}

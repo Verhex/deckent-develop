@@ -1,0 +1,26 @@
+# Task 145-005 Execution Plan
+
+## Approach
+
+1. Add `emitNotify()` helper to `src/orchestra/event-stream.ts`
+   - Uses existing `writeEvent(projectRoot, sprintId, source, target, channel, payload)` signature
+   - Source: 'deckent', target: 'user'
+   - Channel: CHANNELS.NOTIFY
+   - Payload: { level, title, body, meta }
+
+2. Add 4-5 strategic `emitNotify()` calls to `src/orchestra/sprint-controller.ts`
+   - Need to import `emitNotify` from event-stream.js
+   - SPAWN phase (after runSpawnPhase)
+   - EVALUATE phase (after runEvaluatePhase)
+   - RETRO phase (after runRetroPhase)
+   - CLEANUP phase (after runCleanupPhase)
+   - COMPLETE (sprint done)
+
+3. Write test file `tests/orchestra/event-stream-notify.test.ts`
+   - Test 1: emitNotify writes event with channel === 'DECKENT→USER:NOTIFY'
+   - Test 2: payload structure (level, title, body) correct
+   - Test 3: Sprint controller integration (SPAWN emitNotify called)
+
+## Notes
+- projectRoot needed for emitNotify — use a tmpdir in tests
+- Existing writeEvent() signature: (projectRoot, sprintId, source, target, channel, payload)

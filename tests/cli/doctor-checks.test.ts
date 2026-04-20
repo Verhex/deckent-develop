@@ -40,6 +40,7 @@ vi.mock('../../src/core/errors.js', () => ({
 
 const mockMemoryStore = {
   totalCount: vi.fn().mockReturnValue(50),
+  getByType: vi.fn().mockReturnValue([]),
   close: vi.fn(),
 };
 vi.mock('../../src/core/memory-store.js', () => ({
@@ -342,17 +343,20 @@ describe('getLastSprintId (checks module)', () => {
 
 // ─── countDebtItems ──────────────────────────────────────────────────
 
-describe('countDebtItems (checks module)', () => {
-  it('returns zero when no debt file', () => {
+describe('countDebtItems (checks module, DB-first)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('returns zero when no DB file', () => {
     vi.mocked(existsSync).mockReturnValue(false);
     expect(countDebtItems('/mock')).toEqual({ total: 0, critical: 0 });
   });
 
-  it('counts debt lines', () => {
+  it('counts debt entries from MemoryStore', () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(
-      '| ID | Desc | P |\n|---|---|---|\n| D1 | foo | HIGH |\n| D2 | bar | CRITICAL |' as unknown as ReturnType<typeof readFileSync>
-    );
+    mockMemoryStore.getByType.mockReturnValue([
+      { type: 'debt', status: 'open', priority: 'HIGH' },
+      { type: 'debt', status: 'open', priority: 'CRITICAL' },
+    ]);
     const r = countDebtItems('/mock');
     expect(r.total).toBe(2);
     expect(r.critical).toBe(1);
@@ -361,10 +365,21 @@ describe('countDebtItems (checks module)', () => {
 
 // ─── countOpenDebtItems ──────────────────────────────────────────────
 
-describe('countOpenDebtItems (checks module)', () => {
-  it('returns 0 when no debt file', () => {
+describe('countOpenDebtItems (checks module, DB-first)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('returns 0 when no DB file', () => {
     vi.mocked(existsSync).mockReturnValue(false);
     expect(countOpenDebtItems('/mock')).toBe(0);
+  });
+
+  it('filters resolved entries', () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    mockMemoryStore.getByType.mockReturnValue([
+      { type: 'debt', status: 'open', priority: 'HIGH' },
+      { type: 'debt', status: 'resolved', priority: 'LOW' },
+    ]);
+    expect(countOpenDebtItems('/mock')).toBe(1);
   });
 });
 

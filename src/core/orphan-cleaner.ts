@@ -12,6 +12,7 @@ import {
   existsSync, readdirSync, readFileSync,
   mkdirSync, copyFileSync, unlinkSync,
 } from 'node:fs';
+import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
 
 import { TASKS_DIR } from './constants.js';
@@ -288,4 +289,32 @@ export function preflightOrphanCleanup(
     `Cleaned ${report.archivedFiles.length} orphan files from ${report.cleanedSprintIds.length} sprints`);
 
   return report;
+}
+
+// ─── IPC Directory Cleanup ───────────────────────────────────────────
+
+/**
+ * M7.B: Pre-flight orphan IPC directory scan.
+ * Removes stale sprint IPC directories from previous sprint runs.
+ * Protects the current sprint's IPC directory.
+ *
+ * @param root - Project root directory
+ * @param currentJobId - Current sprint/job ID (e.g. "sprint-145") — protected from deletion
+ * @returns Number of orphan IPC directories removed
+ */
+export async function cleanOrphanIpcDirs(root: string, currentJobId: string): Promise<number> {
+  const deckentDir = join(root, '.deckent');
+  const entries = await fsPromises.readdir(deckentDir).catch(() => [] as string[]);
+  const ipcPattern = /^sprint-\d+-ipc$/;
+  let cleaned = 0;
+  for (const entry of entries) {
+    if (!ipcPattern.test(entry)) continue;
+    const jobIdMatch = entry.match(/^(sprint-\d+)-ipc$/);
+    if (!jobIdMatch) continue;
+    const jobId = jobIdMatch[1];
+    if (jobId === currentJobId) continue; // protect current
+    await fsPromises.rm(join(deckentDir, entry), { recursive: true, force: true });
+    cleaned++;
+  }
+  return cleaned;
 }

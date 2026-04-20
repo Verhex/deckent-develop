@@ -297,47 +297,9 @@ export function getLastSprintId(root: string): string | null {
   }
 }
 
-/**
- * Count open debt items from DEBT.md.
- * Returns total count and critical count.
- */
-export function countDebtItems(root: string): { total: number; critical: number } {
-  const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
-  if (!existsSync(debtPath)) return { total: 0, critical: 0 };
-  try {
-    const content = readFileSync(debtPath, 'utf-8');
-    const lines = content.split('\n').filter(l => l.startsWith('|') && !l.startsWith(DEBT_TABLE_HEADER.slice(0, 5)) && !l.startsWith('|-'));
-    const critical = lines.filter(l => l.includes('CRITICAL')).length;
-    return { total: lines.length, critical };
-  } catch {
-    return { total: 0, critical: 0 };
-  }
-}
-
-/**
- * Count open (unresolved) debt items from DEBT.md.
- * Looks for table rows where the "Resolved" column is not "true".
- */
-export function countOpenDebtItems(root: string): number {
-  const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
-  if (!existsSync(debtPath)) return 0;
-  try {
-    const content = readFileSync(debtPath, 'utf-8');
-    const dataLines = content.split('\n').filter(
-      l => l.startsWith('|') && !l.startsWith(DEBT_TABLE_HEADER.slice(0, 5)) && !l.startsWith('|-')
-    );
-    // Each row: | ID | Desc | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |
-    // Column index 6 (0-based after split) is "Resolved"
-    return dataLines.filter(l => {
-      const cols = l.split('|').map(c => c.trim());
-      // cols[0] is empty (before first |), cols[7] is Resolved
-      const resolved = cols[7] ?? '';
-      return resolved !== 'true';
-    }).length;
-  } catch {
-    return 0;
-  }
-}
+// DB-first debt counting — imported from helpers/debt-counter.ts (Sprint 145 T-009)
+import { countDebtItems, countOpenDebtItems } from '../helpers/debt-counter.js';
+export { countDebtItems, countOpenDebtItems };
 
 /**
  * Read CI baseline from .deckent/ci-baseline.json.

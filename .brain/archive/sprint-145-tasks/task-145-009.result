@@ -1,0 +1,30 @@
+{
+  "taskId": "145-009",
+  "filesChanged": [
+    "src/cli/helpers/debt-counter.ts",
+    "src/cli/commands/doctor.ts",
+    "src/cli/commands/doctor-checks.ts",
+    "tests/cli/debt-counter.test.ts",
+    "tests/cli/doctor-checks.test.ts",
+    "tests/cli/commands/doctor.test.ts"
+  ],
+  "linesAdded": 55,
+  "linesRemoved": 68,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "DB-first debt counting migration complete. Created src/cli/helpers/debt-counter.ts with MemoryStore.getByType('debt') implementation. Removed duplicate markdown-parsing countDebtItems/countOpenDebtItems from doctor.ts and doctor-checks.ts, replaced with import + re-export from new helper. Updated 3 test files (debt-counter 9 tests, doctor-checks 41 tests, doctor 183 tests, e2e 18 tests — all 251 PASS). tsc --noEmit PASS for our files (4 errors from other Sprint 145 tasks: timeout-estimator, config-validator). Backward compat maintained via same function signatures (root: string param).",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 120000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  }
+}

@@ -1,0 +1,18 @@
+`★ Insight ─────────────────────────────────────`
+1. **Master Index pattern**: Dağınık dokümanları tek bir INDEX.md ile bağlamak, büyük projelerde "nereye bakmalıyım?" sorusunu ortadan kaldırır. Bu yaklaşım özellikle governance dokümanlarında kritiktir — çünkü doğru referansa ulaşamayan geliştirici eski bilgiyle çalışır.
+2. **Automated consistency checks**: Numerik drift, projelerde en sessiz bilgi bozulma türüdür. Bu script her sprint sonunda çalıştırılarak stale sayıların tespit edilmesi otomatikleştirildi. `exit code 1` CI/CD entegrasyonuna da hazır.
+3. **i18n regex gotcha**: `\s*` quantifier'ı newline'ı da kapsar — `16 built-in\nSkills` gibi cross-line eşleşmeler beklenmedik false positive'lere yol açar. Regex tasarlarken explicit `[^\n]*` kullanmak bu tür hataları önler.
+`─────────────────────────────────────────────────`
+
+## Özet
+
+Task 145-024 tamamlandı. Yapılan işler:
+
+| Çıktı | Durum |
+|-------|-------|
+| `docs/governance/INDEX.md` | Oluşturuldu — 9 doküman link'i, drift check tablosu |
+| `scripts/doc-consistency-check.mjs` | Oluşturuldu — 7 metrik, i18n-aware (TR+EN), exit code 0/1 |
+| `IDENTITY.md` güncelleme | sprint-141→145, Sprints 139+→145+ |
+| Cross-doc tutarlılık | 6/7 metrik tutarlı, 1 beklenen fark (summary.md auto-gen) |
+| `tsc --noEmit` | PASS |
+| `vitest` | 27 fail (pre-existing, task ile ilgisiz) |

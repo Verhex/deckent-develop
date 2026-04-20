@@ -1,0 +1,23 @@
+# Task 145-014: deckent_watch MCP Tool + Notifications
+
+## Approach
+1. Create `src/mcp/tools/watch.ts` — registerWatch function
+2. Update `src/mcp/tools/index.ts` — import + call registerWatch
+3. Create `tests/mcp/tools/watch.test.ts` — 5+ tests
+
+## Key Design Decisions
+- `eventBus.tail()` takes 3 args: (projectRoot, sprintId, n) — adapt from spec's 2-arg version
+- `server.sendLoggingMessage()` is on McpServer directly (not server.server)
+- `getCurrentSprintId` from `../../monitor/sprint-state.js` (ADR-008 compliant)
+- Use `z` from `zod/v4` (project convention)
+- Channel filter: task spec uses string enum but ChannelCode values are full strings like 'BRAIN→WORKER:TASK_ASSIGN'
+  - We'll accept short channel names and match with .includes() as spec suggests
+
+## Files
+- CREATE: src/mcp/tools/watch.ts (~120 LoC)
+- MODIFY: src/mcp/tools/index.ts (add import + register call)
+- CREATE: tests/mcp/tools/watch.test.ts (5+ tests)
+
+## Verify
+- tsc --noEmit
+- npx vitest run tests/mcp/tools/watch.test.ts

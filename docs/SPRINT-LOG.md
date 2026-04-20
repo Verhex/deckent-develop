@@ -3752,3 +3752,51 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 144-027: sprint-reporter-ci DB-Write Coverage (Sprint 143 Debt #4) (DONE)
 
 ---
+## Sprint 145 — sprint-145
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-20
+**Duration:** 5551s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 28 |
+| Completed | 27 |
+| Tech Debt | 24 |
+| No-Go | 1 |
+| Coverage | 7.8% |
+| Duration | 5550735ms |
+
+### Tasks
+
+- 145-001: Timeout Config Schema + Validation (DONE)
+- 145-002: Brain Heuristic Timeout Estimator (NO_GO)
+- 145-003: EventBus Abstraction + Subscribe API (GO_WITH_TECH_DEBT)
+- 145-004: ADR-037 RBAC Runtime Wire — checkWorkerAuthority (GO_WITH_TECH_DEBT)
+- 145-005: CHANNELS.NOTIFY writeEvent Emit Wire (GO_WITH_TECH_DEBT)
+- 145-006: NotifyDispatcher Wire + 3 Adapter (GO_WITH_TECH_DEBT)
+- 145-007: ADR-038 Self-Modifying Detector Runtime Wire (GO_WITH_TECH_DEBT)
+- 145-008: registerResume CLI Wire + CLI Registration Test Harness (GO_WITH_TECH_DEBT)
+- 145-009: T-144-002 Helper Migration — countDebtItems → store.getByType (GO_WITH_TECH_DEBT)
+- 145-010: worker.sh Template Update — TASK_TIMEOUT Env Var (GO_WITH_TECH_DEBT)
+- 145-011: Result Atomicity Guarantee — TIMEOUT_WITH_WORK Partial Result (GO_WITH_TECH_DEBT)
+- 145-012: deckent status --follow CLI + Backend-Aware Renderer (GO_WITH_TECH_DEBT)
+- 145-013: Monitor Adapter Pattern — 3 Backend Otonom (GO_WITH_TECH_DEBT)
+- 145-014: deckent_watch MCP Tool + Notifications (GO_WITH_TECH_DEBT)
+- 145-015: Brain Spurious NO_GO Reconciliation Helper Wire (GO_WITH_TECH_DEBT)
+- 145-016: IPC Cleanup Defense-in-Depth M7.B + M7.C (GO_WITH_TECH_DEBT)
+- 145-017: Timeout Event Stream Emit (GO_WITH_TECH_DEBT)
+- 145-018: UI Polish — Renk, Emoji, Partial Redraw (GO_WITH_TECH_DEBT)
+- 145-019: Runtime Extension Prototype (Opsiyon B Watcher Daemon) (GO_WITH_TECH_DEBT)
+- 145-020: DECKENT-ANA-PLAN-TR.md Tam Güncelleme — Sprint 23 → 145 (DONE)
+- 145-021: DECKENT-MASTER-BLUEPRINT.md EN Tam Güncelleme (GO_WITH_TECH_DEBT)
+- 145-022: FINAL-EXECUTIVE-REPORT.md Sprint 144 + 145 Inline + Append (GO_WITH_TECH_DEBT)
+- 145-023: God Analysis FINAL-REPORT.md Sprint 145 Closure Section (GO_WITH_TECH_DEBT)
+- 145-024: Cross-Doc Consistency + Master Index (GO_WITH_TECH_DEBT)
+- 145-025: BETA-TRACKER.md (EN) — Sprint 145-150 Milestone Kalibrasyonu (GO_WITH_TECH_DEBT)
+- 145-026: BETA-TRACKER-TR.md — TR Parity + 10 Sprint Kayıp Kalibrasyonu (GO_WITH_TECH_DEBT)
+- 145-027: Memory V2 Prod-Readiness Validation + 1000-Entry Stress (GO_WITH_TECH_DEBT)
+
+---

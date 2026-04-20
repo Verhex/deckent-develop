@@ -6,6 +6,29 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint145] - 2026-04-20
+
+### Added
+
+- Timeout Config Schema + Validation
+- DECKENT-ANA-PLAN-TR.md Tam Güncelleme — Sprint 23 → 145
+
+### Changed
+
+- EventBus Abstraction + Subscribe API (completed with tech debt)
+- ADR-037 RBAC Runtime Wire — checkWorkerAuthority (completed with tech debt)
+- CHANNELS.NOTIFY writeEvent Emit Wire (completed with tech debt)
+- NotifyDispatcher Wire + 3 Adapter (completed with tech debt)
+- ADR-038 Self-Modifying Detector Runtime Wire (completed with tech debt)
+- registerResume CLI Wire + CLI Registration Test Harness (completed with tech debt)
+- T-144-002 Helper Migration — countDebtItems → store.getByType (completed with tech debt)
+- worker.sh Template Update — TASK_TIMEOUT Env Var (completed with tech debt)
+- Result Atomicity Guarantee — TIMEOUT_WITH_WORK Partial Result (completed with tech debt)
+- deckent status --follow CLI + Backend-Aware Renderer (completed with tech debt)
+
+
+_Tasks: 28 total, 27 done, 24 tech debt, 1 no-go_
+
 ## [0.4.0-beta.1-sprint144] - 2026-04-17
 
 ### Added

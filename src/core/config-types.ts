@@ -7,6 +7,30 @@ import type { ModelType, ProviderName, EvaluationRubric } from './task-types.js'
 import type { ModelStrategy } from './mode-presets.js';
 import type { ModelTier } from './model-equivalence.js';
 
+// ─── Timeout Configuration ──────────────────────────────────────────
+export interface TimeoutConfig {
+  /** Docker backend minimum timeout in seconds (default: 1200) */
+  docker_min_timeout: number;
+  /** Docker backend maximum timeout in seconds (default: 7200) */
+  docker_max_timeout: number;
+  /** Tmux backend minimum timeout in seconds (default: 900) */
+  tmux_min_timeout: number;
+  /** Tmux backend maximum timeout in seconds (default: 5400) */
+  tmux_max_timeout: number;
+  /** Subprocess backend minimum timeout in seconds (default: 600) */
+  subprocess_min_timeout: number;
+  /** Subprocess backend maximum timeout in seconds (default: 3600) */
+  subprocess_max_timeout: number;
+  /** Base timeout per effort level in seconds */
+  effort_base: { low: number; normal: number; high: number };
+  /** Scale timeout based on lines-of-code estimate (default: true) */
+  loc_scaling_enabled: boolean;
+  /** Scale timeout based on historical sprint data (default: true) */
+  history_scaling_enabled: boolean;
+  /** Allow runtime extension of timeout (default: false) */
+  runtime_extension_enabled: boolean;
+}
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
@@ -255,6 +279,10 @@ export interface DeckentConfig {
   /** Require valid SHA-256 signature for plugin hook modules (default: false).
    *  When true, unsigned plugins are rejected. When false, they emit a warning. */
   plugin_require_signature?: boolean;
+
+  // ─── Timeout ───────────────────────────────────────────────────────
+  /** Unified timeout configuration for all backends */
+  timeout?: Partial<TimeoutConfig>;
 }
 
 export interface ResolvedConfig {
@@ -333,6 +361,8 @@ export interface ResolvedConfig {
    * Lower values → more frequent checkpoints → safer for long sprints.
    * Default: 5. Sprint 139 override: 3. */
   sprint_checkpoint_interval?: number;
+  /** Resolved timeout configuration (always populated from defaults + overrides) */
+  timeout?: TimeoutConfig;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

@@ -1,0 +1,86 @@
+{
+  "id": "145-003",
+  "title": "EventBus Abstraction + Subscribe API",
+  "description": "EventBus Abstraction + Subscribe API\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, system-architect\n- Files: src/orchestra/event-bus.ts (yeni), src/orchestra/event-stream.ts, tests/orchestra/event-bus.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n\n### Description\nYeni singleton `src/orchestra/event-bus.ts` (~200 LoC):\n\n```typescript\nimport { EventEmitter } from 'node:events';\nimport * as fs from 'node:fs/promises';\nimport { watch, type FSWatcher } from 'node:fs';\nimport type { EventMessage, Channel } from './event-stream.js';\n\nexport type SubscriberFn = (event: EventMessage) => void | Promise<void>;\n\nexport class EventBus extends EventEmitter {\n  publish(event: EventMessage): void;\n  subscribe(\n    sprintId: string,\n    channels: Channel[] | undefined,\n    fn: SubscriberFn\n  ): () => void;  // returns unsubscribe\n  async tail(sprintId: string, n: number): Promise<EventMessage[]>;\n  watchFile(sprintId: string): FSWatcher;\n  unwatchAll(): void;\n}\n\nexport const eventBus = new EventBus();\n```\n\n`src/orchestra/event-stream.ts` `writeEvent()` çağrısının sonuna `eventBus.publish(event)` ekle. JSONL dosya yazma + in-process publish paralel olmalı (try/catch ile publish hatası dosya yazmayı bloklamasın).\n\nSubscribe filter logic:\n- `sprintId` mismatch → skip\n- `channels` array verilmiş ve event.channel hiçbiri değilse → skip\n- Diğer durumda fn(event)\n\n`tail()`: dosyayı oku, son N satırı parse et, return.\n\n`watchFile()`: `node:fs.watch` ile yeni satır ekleme tespit et, parse et, eventBus.publish (cross-process event'leri yakalar).\n\n### Test (8+ test)\n1. publish → subscribe direct call\n2. subscribe channels filter (NOTIFY only ise PHASE event'i pas geçilir)\n3. subscribe sprintId filter (sprint-144 subscribe ise sprint-145 event'i ignore)\n4. unsubscribe çağrılınca yeni event'ler iletilmez\n5. publish error → subscribe handler exception swallow (event-stream akışı bozulmaz)\n6. tail() son 5 satırı doğru parse eder\n7. tail() boş dosya → []\n8. watchFile yeni satır eklenince publish tetikler (integration)\n\n**Kanıt:** `npx vitest run tests/orchestra/event-bus.test.ts` 8+/8+ PASS, integration test live JSONL append → subscribe handler tetiklenir.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/event-bus.ts (yeni)",
+      "src/orchestra/event-stream.ts",
+      "tests/orchestra/event-bus.test.ts",
+      "src/orchestra/event-bus.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/event-bus.test.ts` 8+/8+ PASS, integration test live JSONL append → subscribe handler tetiklenir.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.73
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.67
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.75,
+          "tests/": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1864,
+  "updatedAt": "2026-04-20T06:16:58.828Z"
+}

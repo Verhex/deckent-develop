@@ -1,0 +1,90 @@
+{
+  "id": "145-017",
+  "title": "Timeout Event Stream Emit",
+  "description": "Timeout Event Stream Emit\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/orchestra/event-stream.ts, src/orchestra/task-router.ts, tests/orchestra/event-stream-timeout.test.ts\n- Scope: src/orchestra/, tests/orchestra/\n- Dependencies: Task 2, Task 10\n\n### Description\nYeni event tipleri:\n- `BRAIN→WORKER:TIMEOUT_ASSIGN` — task spawn'da timeout breakdown\n- `WORKER→BRAIN:TIMEOUT_WARNING` — worker %80 yaklaşımı (gelecek için, şu an emit edilmeyebilir)\n- `AUDITOR→BRAIN:TIMEOUT_CAP_EXCEEDED` — estimate > max_timeout\n\n`src/orchestra/event-stream.ts` `CHANNELS` enum'a ekle:\n```typescript\nexport const CHANNELS = {\n  // ... existing\n  TIMEOUT_ASSIGN: 'BRAIN→WORKER:TIMEOUT_ASSIGN',\n  TIMEOUT_WARNING: 'WORKER→BRAIN:TIMEOUT_WARNING',\n  TIMEOUT_CAP_EXCEEDED: 'AUDITOR→BRAIN:TIMEOUT_CAP_EXCEEDED',\n} as const;\n```\n\n`src/orchestra/task-router.ts` route sonrası:\n```typescript\nimport { writeEvent, CHANNELS } from './event-stream.js';\n\nconst { timeoutSeconds, breakdown } = brainEstimateTimeout(task, config, history);\nwriteEvent({\n  sprintId,\n  channel: CHANNELS.TIMEOUT_ASSIGN,\n  timestamp: new Date().toISOString(),\n  payload: { taskId: task.id, timeoutSeconds, breakdown },\n});\nif (breakdown.clampReason === 'max_ceiling') {\n  writeEvent({\n    sprintId,\n    channel: CHANNELS.TIMEOUT_CAP_EXCEEDED,\n    timestamp: new Date().toISOString(),\n    payload: { taskId: task.id, requested: breakdown.estimated, capped: timeoutSeconds },\n  });\n}\n```\n\n### Test (4+ test)\n1. routeTask sonrası TIMEOUT_ASSIGN event yazıldı\n2. payload.breakdown alanları dolu (base, multipliers)\n3. estimate > max → TIMEOUT_CAP_EXCEEDED de yazılır\n4. estimate within bounds → CAP_EXCEEDED yazılmaz\n\n**Kanıt:** `npx vitest run tests/orchestra/event-stream-timeout.test.ts` 4+/4+ PASS, sprint-145-events.jsonl'da `\"channel\":\"BRAIN→WORKER:TIMEOUT_ASSIGN\"` satırları.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/event-stream.ts",
+      "src/orchestra/task-router.ts",
+      "tests/orchestra/event-stream-timeout.test.ts"
+    ]
+  },
+  "dependencies": [
+    "Task 2",
+    "Task 10"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/event-stream-timeout.test.ts` 4+/4+ PASS, sprint-145-events.jsonl'da `\"channel\":\"BRAIN→WORKER:TIMEOUT_ASSIGN\"` satırları.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T04:56:28.402Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.81
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:18:16.899Z"
+}

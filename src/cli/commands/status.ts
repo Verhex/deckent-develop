@@ -9,9 +9,13 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { formatStatus, resolveOutputMode } from '../../core/output-formatter.js';
+import { eventBus } from '../../orchestra/event-bus.js';
+import { StatusRenderer } from '../helpers/status-renderer.js';
+import { hideCursor, showCursor, clearScreen } from '../helpers/ansi.js';
 
 interface StatusOpts {
   watch?: boolean;
+  follow?: boolean;
   json?: boolean;
   verbose?: boolean;
   raw?: boolean;
@@ -228,6 +232,7 @@ export function registerStatus(program: Command): void {
     .command('status')
     .description('Show the current sprint dashboard')
     .option('--watch', 'Auto-refresh every 2 seconds')
+    .option('-f, --follow', 'Follow mode: snapshot + live event tail')
     .option('--json', 'Output raw JSON instead of formatted dashboard')
     .option('--raw', 'Show legacy raw dashboard (box format)')
     .option('--verbose', 'Show detailed agent and skill assignment info')
@@ -238,6 +243,51 @@ export function registerStatus(program: Command): void {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const lang = getLangFromRoot(root);
+
+      // --follow: live event-driven refresh using EventBus
+      if (opts.follow) {
+        const renderer = new StatusRenderer({
+          projectRoot: root,
+          noColor: opts.noColor ?? isNoColor(),
+        });
+
+        const sprintId = getCurrentSprintId(root);
+
+        // Initial render
+        process.stdout.write(hideCursor() + clearScreen());
+        const initial = renderer.snapshot();
+        process.stdout.write(initial);
+
+        // Subscribe to event bus for live updates
+        let unsubscribe: (() => void) | undefined;
+        if (sprintId) {
+          // Start watching the JSONL event file for cross-process events
+          eventBus.watchFile(root, sprintId);
+
+          unsubscribe = eventBus.subscribe(sprintId, undefined, () => {
+            const next = renderer.snapshot();
+            renderer.redraw(next);
+          });
+        }
+
+        // Also poll as fallback (in case events are missed)
+        const fallbackTimer = setInterval(() => {
+          const next = renderer.snapshot();
+          renderer.redraw(next);
+        }, 5000);
+
+        const cleanup = (): void => {
+          unsubscribe?.();
+          eventBus.unwatchAll();
+          clearInterval(fallbackTimer);
+          process.stdout.write(showCursor() + '\n');
+          process.exit(0);
+        };
+
+        process.on('SIGINT', cleanup);
+        process.on('SIGTERM', cleanup);
+        return;
+      }
 
       // --graph: display Mermaid dependency graph (reads .deckent/sprint-NNN-depgraph.mmd)
       // Checked before dashboard existence so it works even when no dashboard is active.

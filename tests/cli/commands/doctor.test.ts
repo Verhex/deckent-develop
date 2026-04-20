@@ -1061,37 +1061,37 @@ describe('getLastSprintId', () => {
 
 // ─── countDebtItems ─────────────────────────────────────────────────
 
-describe('countDebtItems', () => {
+describe('countDebtItems (DB-first)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(existsSync).mockReturnValue(true);
   });
 
-  it('returns zero when no debt file', () => {
+  it('returns zero when no DB file', () => {
     vi.mocked(existsSync).mockReturnValue(false);
     const result = countDebtItems('/mock/root');
     expect(result).toEqual({ total: 0, critical: 0 });
   });
 
-  it('counts debt lines (excluding header)', () => {
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(
-      '| ID | Description | Priority |\n|---|---|---|\n| D001 | foo | HIGH |\n| D002 | bar | CRITICAL |\n| D003 | baz | LOW |'
-    );
+  it('counts debt entries from MemoryStore', () => {
+    mockMemoryStore.getByType.mockReturnValue([
+      { type: 'debt', status: 'open', priority: 'HIGH' },
+      { type: 'debt', status: 'open', priority: 'CRITICAL' },
+      { type: 'debt', status: 'resolved', priority: 'LOW' },
+    ]);
     const result = countDebtItems('/mock/root');
     expect(result.total).toBe(3);
     expect(result.critical).toBe(1);
   });
 
-  it('returns zero for empty debt file', () => {
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('');
+  it('returns zero for empty DB', () => {
+    mockMemoryStore.getByType.mockReturnValue([]);
     const result = countDebtItems('/mock/root');
     expect(result).toEqual({ total: 0, critical: 0 });
   });
 
-  it('handles read error gracefully', () => {
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error('read error'); });
+  it('handles MemoryStore error gracefully', () => {
+    mockMemoryStore.getByType.mockImplementation(() => { throw new Error('db error'); });
     const result = countDebtItems('/mock/root');
     expect(result).toEqual({ total: 0, critical: 0 });
   });

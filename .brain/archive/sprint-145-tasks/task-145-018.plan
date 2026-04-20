@@ -1,0 +1,72 @@
+# Task 145-018 Execution Plan
+## UI Polish — Renk, Emoji, Partial Redraw
+
+### Objective
+StatusRenderer'a 7 yeni özellik ekle + 6+ snapshot test yaz.
+
+### Files to Modify
+1. `src/cli/helpers/ansi.ts` — gray renk + magenta renk ekle
+2. `src/cli/helpers/status-renderer.ts` — tüm polish özellikleri
+3. `tests/cli/status-renderer-polish.test.ts` — yeni dosya
+
+### Implementation Plan
+
+#### A. ansi.ts changes
+- `color.gray` ekle: `\x1b[90m` (bright black / dim white)
+- `color.magenta` ekle: `\x1b[35m`
+- `color.white` ekle: `\x1b[37m`
+
+#### B. status-renderer.ts changes
+
+1. **Phase rengi** (phaseColor helper):
+   - PLAN → dim/gray
+   - EXECUTE → blue
+   - EVALUATE → yellow
+   - RETRO → green
+   - FIX → yellow
+   - SPAWN → cyan
+   - diğerleri → dim
+
+2. **Worker status icon** (workerHealthIcon):
+   - lastHeartbeat < 2dk → 🟢 healthy
+   - 2dk-5dk arası → 🟡 warn
+   - >5dk veya yok → 🔴 stale
+
+3. **Recent events icon map** (eventIcon helper):
+   - RESULT-DONE → ✅
+   - SPAWN → 🔁
+   - NO_GO → ❌
+   - ALERT → ⚠️
+   - NOTIFY → 🔵
+   - default → •
+
+4. **Progress bar gradient** (progressBar):
+   - Dolu kısım (██) → yeşil renk (düşük %'lerde)
+   - >%80 → sarı uyarı rengi
+
+5. **Partial redraw** (PartialRedrawRenderer):
+   - `lastRender: string[]` state tut
+   - `nextRender: string[]` ile karşılaştır
+   - Sadece değişen satırları cursor positioning ile yaz
+
+6. **Terminal width responsive** (getBoxWidth):
+   - `process.stdout.columns >= 60` → Unicode box drawing
+   - `< 60` → ASCII fallback (`+`, `-`, `|`)
+
+7. **Cost rengi** (costColor):
+   - < 50% → green
+   - 50-80% → yellow
+   - > 80% → red
+
+#### C. Test plan (6 testler)
+1. PLAN phase renk snapshot → phase string gri/dim içeriyor
+2. Worker icon stale (HB > 2dk eski) → 🔴 icon var
+3. Recent events icon map (5 event tipi) → doğru iconlar
+4. 60-col terminal width fallback ASCII → `+` ve `-` kullanıyor
+5. Cost %85 → kırmızı renk kodu içeriyor
+6. Partial redraw 2 state arası → sadece değişen satır yazılır
+
+### Estimated Changes
+- ansi.ts: +3 satır
+- status-renderer.ts: +100 satır
+- test dosyası: +200 satır

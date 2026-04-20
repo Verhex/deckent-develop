@@ -17,6 +17,7 @@ import { SpawnBackendError } from './spawn-backend.js';
 // ─── Constants ────────────────────────────────────────────────────────────
 
 const DEFAULT_IMAGE = 'deckent-worker:latest';
+/** @deprecated Use adaptive timeout via brainEstimateTimeout() + SpawnBackendOptions.taskTimeoutSeconds instead. Kept for backward compat fallback. */
 const DEFAULT_TIMEOUT_SECONDS = 1200; // 20 minutes
 const CONTAINER_WORKSPACE = '/workspace';
 const CONTAINER_PREFIX = 'deckent-w-';
@@ -49,6 +50,9 @@ export class DockerSpawnBackend implements SpawnBackend {
    */
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
     const dir = opts?.projectDir ?? this.projectDir;
+    // Adaptive timeout: prefer per-task override from brainEstimateTimeout(),
+    // fall back to constructor value, then DEFAULT_TIMEOUT_SECONDS
+    const effectiveTimeout = opts?.taskTimeoutSeconds ?? this.timeoutSeconds;
     const tasksDir = join(dir, TASKS_DIR);
     mkdirSync(tasksDir, { recursive: true });
 
@@ -121,6 +125,57 @@ export class DockerSpawnBackend implements SpawnBackend {
     const hbContainerPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.hb`;
     // Sprint 139: fsync_file helper ensures data hits disk before SIGKILL arrives.
     // Uses dd + sync as POSIX-portable fsync (no Python/perl dependency in Alpine).
+    // Sprint 145: TIMEOUT_WITH_WORK EXIT trap function — detects partial work via git diff
+    // When worker is killed (non-zero exit) but has modified files, writes TIMEOUT_WITH_WORK
+    // result instead of blind NO_GO. Brain can then reconcile via Spurious NO_GO helper.
+    const onExitFn = [
+      'on_exit() {',
+      '  local exit_code=$?',
+      // If .result already exists (worker wrote it normally), just fsync and exit
+      '  if [ -f "$RFILE" ]; then',
+      '    fsync_file "$RFILE"',
+      '    fsync_file "$HBFILE"',
+      '    kill $HB_PID 2>/dev/null',
+      '    return',
+      '  fi',
+      // Non-zero exit: check git diff for partial work
+      `  cd "${CONTAINER_WORKSPACE}" 2>/dev/null || true`,
+      '  local changed_files=""',
+      '  changed_files=$(git diff --name-only 2>/dev/null || true)',
+      '  if [ -n "$changed_files" ] && [ "$exit_code" -ne 0 ]; then',
+      // Build JSON array from changed files using pure POSIX sh (no jq dependency)
+      '    local json_array="["',
+      '    local first=1',
+      '    local count=0',
+      // Process each line — handles filenames with spaces via IFS
+      '    while IFS= read -r f; do',
+      '      [ -z "$f" ] && continue',
+      '      count=$((count + 1))',
+      '      if [ "$first" -eq 1 ]; then',
+      '        first=0',
+      '      else',
+      '        json_array="$json_array,"',
+      '      fi',
+      // Escape double quotes and backslashes in filenames for valid JSON
+      '      local escaped=$(printf "%s" "$f" | sed \'s/\\\\/\\\\\\\\/g; s/"/\\\\"/g\')',
+      '      json_array="$json_array\\"$escaped\\""',
+      '    done <<GITEOF',
+      '$changed_files',
+      'GITEOF',
+      '    json_array="$json_array]"',
+      `    cat > "$RFILE" <<RESULTEOF`,
+      `{"taskId":"${taskId}","selfAssessment":"TIMEOUT_WITH_WORK","filesChanged":$json_array,"exitCode":$exit_code,"notes":"Worker timeout/killed but git diff shows $count files modified. Brain should reconcile via Spurious NO_GO helper."}`,
+      'RESULTEOF',
+      '  else',
+      // No partial work AND no result written — fall back to NO_GO
+      `    echo '${fallbackJson}' > "$RFILE"`,
+      '  fi',
+      '  fsync_file "$RFILE"',
+      '  fsync_file "$HBFILE"',
+      '  kill $HB_PID 2>/dev/null',
+      '}',
+    ].join('\n');
+
     const scriptContent = [
       '#!/bin/sh',
       `RFILE="${resultPath}"`,
@@ -128,18 +183,20 @@ export class DockerSpawnBackend implements SpawnBackend {
       // POSIX-portable fsync: copy file to itself via dd conv=fsync
       // This forces OS buffer cache → disk. Survives SIGKILL after return.
       'fsync_file() { [ -f "$1" ] && dd if="$1" of="$1.fsync" bs=4096 conv=fsync 2>/dev/null && mv "$1.fsync" "$1" 2>/dev/null; }',
+      // Sprint 145: git-diff-aware EXIT trap function
+      onExitFn,
       // Ensure session-env exists (Claude CLI requires it)
       `mkdir -p "${containerHome}/.claude" 2>/dev/null || true`,
       `touch "${containerHome}/.claude/session-env" 2>/dev/null || true`,
-      // EXIT trap: guarantees .result file is ALWAYS written + fsync'd, even if Claude crashes
-      // Sprint 139: added fsync_file call to force disk write before container dies
-      `trap '[ -f "$RFILE" ] || echo '"'"'${fallbackJson}'"'"' > "$RFILE"; fsync_file "$RFILE"; fsync_file "$HBFILE"; kill $HB_PID 2>/dev/null' EXIT`,
+      // EXIT trap: Sprint 145 — calls on_exit() which detects partial work via git diff
+      'trap on_exit EXIT',
       // SIGTERM trap: on graceful stop, fsync .result immediately (before grace period expires)
       `trap 'fsync_file "$RFILE"; fsync_file "$HBFILE"; exit 0' TERM`,
       // Heartbeat update loop (every 15s) — prevents false stale alerts
       `( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$SEQ,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$HBFILE"; done ) &`,
       'HB_PID=$!',
-      `timeout ${this.timeoutSeconds} ${claudeCmd} < "${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}" || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
+      `TIMEOUT=\${TASK_TIMEOUT:-${effectiveTimeout}}`,
+      `timeout $TIMEOUT ${claudeCmd} < "${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}" || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
     ].join('\n');
     writeFileSync(scriptHostPath, scriptContent, { mode: 0o755 });
 
@@ -177,6 +234,8 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Pass Deckent worker context env vars (for SIGTERM handler in worker.ts)
     dockerArgs.push('-e', `DECKENT_TASK_ID=${taskId}`);
     dockerArgs.push('-e', `DECKENT_PROJECT_ROOT=${CONTAINER_WORKSPACE}`);
+    // Adaptive timeout: pass computed timeout to container as env var
+    dockerArgs.push('-e', `TASK_TIMEOUT=${effectiveTimeout}`);
 
     // Pass API keys if available (for Codex/Gemini providers)
     const envKeys = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_DEBUG'];
@@ -343,6 +402,10 @@ export class DockerSpawnBackend implements SpawnBackend {
               hbStatus = 'DONE';
               hbExitCode = 0;
               debugLog('docker-backend:reconcile', `taskId=${taskId} exitCode=${exitCode} but .result=${result.selfAssessment} → HB DONE`);
+            } else if (result.selfAssessment === 'TIMEOUT_WITH_WORK') {
+              // Sprint 145: partial work detected — not DONE but not a clean failure either
+              hbStatus = 'TIMEOUT_WITH_WORK';
+              debugLog('docker-backend:reconcile', `taskId=${taskId} exitCode=${exitCode} .result=TIMEOUT_WITH_WORK → partial work, Brain reconciles`);
             }
           }
         } catch {

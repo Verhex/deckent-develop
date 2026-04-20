@@ -1,0 +1,90 @@
+{
+  "id": "145-004",
+  "title": "ADR-037 RBAC Runtime Wire — checkWorkerAuthority",
+  "description": "ADR-037 RBAC Runtime Wire — checkWorkerAuthority\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, security-specialist\n- Files: src/agents/worker.ts, src/orchestra/authority-enforcer.ts, tests/agents/worker-rbac.test.ts\n- Scope: src/agents/, src/orchestra/, tests/agents/\n\n### Description\nAudit bulgu #1: `src/agents/worker.ts:379` `checkWorkerAuthority()` hiç çağrılmıyor (Sprint 139 T-035 ADR-037 dead).\n\nWorker'ın task execution başlangıcında ve her file write öncesinde `checkWorkerAuthority(taskId, action, target)` çağır. Authority violation:\n1. Worker stdout'a \"AUTHORITY_VIOLATION: <action> on <target> not in scope\" yaz\n2. `.tasks/task-XXX.result` `{selfAssessment: 'NO_GO', notes: 'RBAC violation: ...'}` yaz\n3. `event-stream.ts` üzerinden `CHANNELS.AUTHORITY_VIOLATION` emit\n4. exit code 2 ile çık\n\n`src/orchestra/authority-enforcer.ts` `checkWorkerAuthority` import edilebilir olmalı (eğer şu an internal/private ise export et).\n\n### Test (5+ test)\n1. Worker scope.filesWrite içindeki dosyaya write → PASS\n2. Worker scope.filesWrite dışındaki dosyaya write → THROW + NO_GO result\n3. Worker scope.directories dışındaki path → THROW + NO_GO\n4. event stream'e AUTHORITY_VIOLATION event yazıldı\n5. exit code 2 (RBAC reserved)\n\n**Kanıt:** `npx vitest run tests/agents/worker-rbac.test.ts` 5+/5+ PASS, integration: dummy task scope dışı yaz dene → result NO_GO + event stream'de AUTHORITY_VIOLATION görünür.\n\n---\n\n## Wave 2 — P0 Build (5 task, paralel)",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/agents/",
+      "src/orchestra/",
+      "tests/agents/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/agents/worker.ts",
+      "src/orchestra/authority-enforcer.ts",
+      "tests/agents/worker-rbac.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/agents/worker-rbac.test.ts` 5+/5+ PASS, integration: dummy task scope dışı yaz dene → result NO_GO + event stream'de AUTHORITY_VIOLATION görünür.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "security-specialist"
+  ],
+  "assignedAgent": "security-auditor",
+  "assignedSkills": [
+    "typescript-expert",
+    "security-specialist"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "security",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.54
+      },
+      "domains": [
+        {
+          "name": "agents",
+          "weight": 0.67
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:17:04.602Z"
+}

@@ -1,0 +1,83 @@
+{
+  "id": "145-018",
+  "title": "UI Polish — Renk, Emoji, Partial Redraw",
+  "description": "UI Polish — Renk, Emoji, Partial Redraw\n- Model: sonnet\n- Effort: low\n- Skills: frontend-design\n- Files: src/cli/helpers/status-renderer.ts, src/cli/helpers/ansi.ts\n- Scope: src/cli/helpers/\n- Dependencies: Task 12\n\n### Description\nSprint 145 polish — Task 12'nin StatusRenderer'ına:\n1. Phase rengi (PLAN gri, EXECUTE mavi, EVALUATE sarı, RETRO yeşil)\n2. Worker status icon: 🟢 healthy / 🟡 warn / 🔴 stale\n3. Recent events icon map: ✅ RESULT-DONE, 🔁 SPAWN, ❌ NO_GO, ⚠ ALERT, 🔵 NOTIFY\n4. Progress bar gradient (██████░░░░░░ → renk verdi)\n5. Partial redraw — sadece değişen satırı yeniden çiz (lastRender vs nextRender diff)\n6. Terminal width responsive — `process.stdout.columns` küçükse box drawing'i basitleştir (60 cols altında ASCII fallback)\n7. Cost rengi: <%50 yeşil, %50-%80 sarı, >%80 kırmızı\n\n### Test (6+ test, snapshot tabanlı)\n1. PLAN phase renk snapshot\n2. Worker icon stale (HB > 2dk eski) snapshot\n3. Recent events icon map test (5 event tipi)\n4. 60-col terminal width fallback ASCII\n5. Cost %85 → kırmızı renk\n6. Partial redraw 2 farklı state arası 1 satır değişti → sadece o satır yeniden yazılır\n\n**Kanıt:** `npx vitest run tests/cli/status-renderer-polish.test.ts` 6+/6+ PASS (snapshot dosyaları kayıtlı), manual: terminal'de live UI renkler doğru görünür.\n\n---\n\n## Wave 6 — P2 Prototype (1 task, opsiyonel ama planlandı)",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/helpers/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/helpers/status-renderer.ts",
+      "src/cli/helpers/ansi.ts",
+      "tests/cli/status-renderer-polish.test.ts"
+    ]
+  },
+  "dependencies": [
+    "Task 12"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/cli/status-renderer-polish.test.ts` 6+/6+ PASS (snapshot dosyaları kayıtlı), manual: terminal'de live UI renkler doğru görünür.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "frontend-design"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "frontend-design"
+  ],
+  "createdAt": "2026-04-20T04:56:28.402Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.5
+        },
+        {
+          "type": "create",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:18:20.571Z"
+}

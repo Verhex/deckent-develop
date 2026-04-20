@@ -1,0 +1,107 @@
+{
+  "id": "145-010",
+  "title": "worker.sh Template Update — TASK_TIMEOUT Env Var",
+  "description": "worker.sh Template Update — TASK_TIMEOUT Env Var\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, devops-engineer\n- Files: src/orchestra/spawn-backend-docker.ts, src/orchestra/tmux.ts, src/orchestra/spawn-backend.ts, tests/orchestra/spawn-timeout.test.ts\n- Scope: src/orchestra/, tests/orchestra/, tests/docker/\n- Dependencies: Task 1, Task 2\n\n### Description\n3 backend'deki `DEFAULT_TIMEOUT_SECONDS = 1200` sabit. worker.sh template'de:\n\nÖnce:\n```sh\ntimeout 1200 claude -p - --model opus ...\n```\n\nSonra:\n```sh\nTIMEOUT=${TASK_TIMEOUT:-1200}\ntimeout $TIMEOUT claude -p - --model opus ...\n```\n\n`spawn-backend-docker.ts` `spawnDockerWorker(task, env)`:\n```typescript\nimport { brainEstimateTimeout } from './timeout-estimator.js';\n\nconst { timeoutSeconds, breakdown } = brainEstimateTimeout(task, config, history);\nenv.TASK_TIMEOUT = String(timeoutSeconds);\n// docker run -e TASK_TIMEOUT=$TASK_TIMEOUT ...\n```\n\nAynı değişiklik `tmux.ts` `WORKER_TIMEOUT_SECONDS` için ve `spawn-backend.ts` subprocess için.\n\n`DEFAULT_TIMEOUT_SECONDS` constant **deprecated** comment ile bırak (geri uyumluluk), runtime'da config'ten gelen değer kullanılır.\n\n### Test (8+ test)\n1. spawnDockerWorker low effort → env.TASK_TIMEOUT === '600'\n2. spawnDockerWorker high effort → env.TASK_TIMEOUT >= '2400'\n3. spawnTmuxWorker effort fallback (tmux backend factor 0.9x)\n4. spawnSubprocessWorker (subprocess factor 0.8x)\n5. config'te override → effective value\n6. min_timeout floor uygulandı (estimate < min)\n7. max_timeout ceiling uygulandı (estimate > max)\n8. Integration: dummy task spawn et → docker container env içinde TASK_TIMEOUT görünür\n\n**Kanıt:** `npx vitest run tests/orchestra/spawn-timeout.test.ts` 8+/8+ PASS, `docker inspect <worker_container>` env'de `TASK_TIMEOUT` görünür, worker.sh stdout'unda \"TIMEOUT=2400\" görünür.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/",
+      "tests/docker/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/orchestra/tmux.ts",
+      "src/orchestra/spawn-backend.ts",
+      "tests/orchestra/spawn-timeout.test.ts"
+    ]
+  },
+  "dependencies": [
+    "Task 1",
+    "Task 2"
+  ],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/orchestra/spawn-timeout.test.ts` 8+/8+ PASS, `docker inspect <worker_container>` env'de `TASK_TIMEOUT` görünür, worker.sh stdout'unda \"TIMEOUT=2400\" görünür.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "devops-engineer"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "devops-engineer"
+  ],
+  "createdAt": "2026-04-20T04:56:28.401Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.72
+      },
+      "domains": [
+        {
+          "name": "orchestra",
+          "weight": 0.86
+        },
+        {
+          "name": "docker",
+          "weight": 0.14
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "modify",
+          "weight": 0.13
+        },
+        {
+          "type": "create",
+          "weight": 0.13
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.75,
+          "tests/": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:17:40.775Z"
+}

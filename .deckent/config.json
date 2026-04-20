@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "en",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-144",
+  "last_sprint_id": "sprint-145",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -93,5 +93,21 @@
   "claude_backend": "tmux",
   "rubric_max_retries": 0,
   "max_workers": 4,
-  "sprint_checkpoint_interval": 3
+  "sprint_checkpoint_interval": 3,
+  "timeout": {
+    "docker_min_timeout": 1200,
+    "docker_max_timeout": 7200,
+    "tmux_min_timeout": 900,
+    "tmux_max_timeout": 5400,
+    "subprocess_min_timeout": 600,
+    "subprocess_max_timeout": 3600,
+    "effort_base": {
+      "low": 600,
+      "normal": 1200,
+      "high": 2400
+    },
+    "loc_scaling_enabled": true,
+    "history_scaling_enabled": true,
+    "runtime_extension_enabled": false
+  }
 }

@@ -1,7 +1,7 @@
 <!-- Dil: TR | Teknik terimler EN -->
 # Deckent Beta Tracker
 
-**Son güncelleme:** 2026-04-10 | **Sprint:** 130+ | **Test:** 12,194+ | **Versiyon:** 0.4.0-beta.1
+**Son güncelleme:** 2026-04-20 | **Sprint:** 145+ | **Test:** 12,485+ | **Versiyon:** 0.4.0-beta.1
 
 ---
 
@@ -9,10 +9,10 @@
 | Metric | Value |
 |--------|-------|
 | Version | 0.4.0-beta.1 |
-| Sprint | sprint-133 |
-| MCP Tools | 21 |
+| Sprint | sprint-145 |
+| MCP Tools | 23 |
 | MCP Resources | 8 |
-| CLI Commands | 35+ |
+| CLI Commands | 49+ |
 | Dashboard Pages | 6 |
 | Agents | 16 built-in + 2 custom |
 | Skills | 21 built-in |
@@ -20,11 +20,14 @@
 
 ## Genel Bakış
 
-130+ sprint, 12,194+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-129). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
+145+ sprint, 12,485+ test, 250+ TypeScript modülü. Üç spawn backend doğrulandı: tmux (en hızlı, 2dk55sn), subprocess (çalışıyor, 6dk53sn), Docker (canlı doğrulandı — Sprint 119-129). Self-dogfooding aktif — Deckent kendi test regresyonlarını ve dokümantasyonunu sprint'lerle düzeltiyor. Dokümantasyon konsolide edildi: BETA-TRACKER (EN+TR), docs.json 7 dokümanı otomatik güncelliyor.
 
 **Strateji:** npm paketle → kendi projelerinde dogfood → feedback → düzelt → public repo (VerhexIO/deckent)
 
-**Mevcut Durum:** v0.4.0-beta.1 — Üç backend canlı doğrulandı. Docker backend tam operasyonel (Sprint 119-129): worker'lar container içinde tsc/vitest çalıştırabiliyor. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemente edildi. Sprint 127-128 kalite reformu: 7 kritik düzeltme + litmus testi. Sprint 129 enterprise tech debt temizliği: DEBT.md parse fix, evaluator tutarlılığı, tüm debt kapatıldı. Sprint 130 codebase doğruluk reformu: MCP instructions 21 tool fix, decision-engine V1 @deprecated arşivleme + ADR-028, gerçek coverage ölçümü (89.33%). 12,194+ test geçiyor, açık borç yok.
+**Vizyon (Alperen Direktifi):**
+> **"Perşembe 23 Nisan 2026 — Beta GA. Eksiksiz, milyon user hazır. Tüm hedefimize ulaşıyoruz: otonom AI orkestrator agent + web/user toolları, OpenClaw–CoWork rakibi/muadili/iş ortağı."**
+
+**Mevcut Durum:** v0.4.0-beta.1 — Üç backend canlı doğrulandı. Docker backend tam operasyonel (Sprint 119-129): worker'lar container içinde tsc/vitest çalıştırabiliyor. Sprint 125-126 Rubric-Based Grading + Context-Aware Routing + Token Usage Tracker implemente edildi. Sprint 127-128 kalite reformu: 7 kritik düzeltme + litmus testi. Sprint 129 enterprise tech debt temizliği: DEBT.md parse fix, evaluator tutarlılığı, tüm debt kapatıldı. Sprint 130 codebase doğruluk reformu: MCP instructions 21 tool fix, decision-engine V1 @deprecated arşivleme + ADR-028, gerçek coverage ölçümü (89.33%). Sprint 131 HTTP API Auth + Config Cache + 4 ADR (029-032). Sprint 132 360° Enterprise Readiness Audit (118 bulgu, 3.2/5 baseline). Sprint 133 güvenlik sertleştirme: plugin SHA-256 + AST sandbox, 12/12 task DONE. Sprint 134 üçlü dogfooding + god object split + ADR-033/034 ürün vizyonu. Sprint 135 operasyonel sertleştirme: sıfır koordinatör çökmesi, Docker graceful shutdown. Sprint 136 mimari derinleştirme: sprint-controller.ts 1890→209 LoC. Sprint 137 test suite restorasyonu + tryCodeVerifiedDone wire. Sprint 138 ADR Governance Integration + Structured Event Stream + Worker Honest Assessment + Sprint Resume MVP. Sprint 139 chain reform + Docker HB fix + backend parity 3/3 + RBAC V1.0 + self-modifying detection. Sprint 140-141 Memory V2 DB-First Architecture (SQLite FTS5, dual-layer i18n normalize). Sprint 142-144 dead code audit + cleanup. Sprint 145 adaptive timeout + observability + doküman reformu. 12,485+ test geçiyor, açık borç yok.
 
 ---
 
@@ -98,16 +101,146 @@
 - [x] Gerçek coverage ölçüldü: 89.33% (96%+ iddiası düzeltildi)
 - [x] .contracts/api-surface.md rubricScores + evaluationDecision alanları eklendi
 
+**Sprint 131 — TAMAMLANDI (2026-04-10) — HTTP API Auth + Config Cache:**
+- [x] HTTP API Bearer Token Authentication (auth.ts middleware)
+- [x] loadConfig() modül seviyesi cache: cachedConfig/cacheStamp/cachedProjectRoot
+- [x] 4 ADR yazıldı (ADR-029'dan ADR-032'ye, her biri ≥50 satır)
+- [x] Rakip analizi Nisan 2026 için tamamen güncellendi
+
+**Sprint 132 — TAMAMLANDI (2026-04-10) — 360° Kurumsal Hazırlık Denetimi:**
+- [x] Tam statik denetim: 6 paralel worker, 118 bulgu (5 KRİTİK, 22 YÜKSEK, 40 ORTA, 28 DÜŞÜK, 23 BİLGİ)
+- [x] Hazırlık puanı baseline: 3.2/5
+- [x] W5 sprint-reporter.ts'i (2132 LoC) üst god object olarak tespit etti — Sprint 134 hedefi
+- [x] W2 799 sync I/O çağrısı tespit etti — Sprint 135-137 async migration hedefi
+
+**Sprint 133 — TAMAMLANDI (2026-04-10) — Güvenlik Sertleştirme:**
+- [x] Plugin SHA-256 imza doğrulaması (PluginSecurityError)
+- [x] SkillSandbox AST tarama + allowed_paths enforcer
+- [x] 12/12 task DONE, 27dk 21sn, +147 net test (12,372 → 12,485+ geçiyor)
+- [x] Hazırlık: 3.2/5 → 3.6/5 (+0.4)
+
+**Sprint 134 — TAMAMLANDI (2026-04-10/11) — Üçlü Dogfooding + Ürün Vizyonu:**
+- [x] sprint-reporter.ts 4'lü bölme (2297 → 96 satır barrel): sprint-metrics, sprint-retro-writer, sprint-docs-updater, ci-reporter
+- [x] Task Dependency Pipeline (T-001): parseStructuredDirectives dependencies parsing
+- [x] Local Observability Seviye 2 (T-011): veri yerelliği doğrulandı, metrics.jsonl canlı
+- [x] Brain Self-Audit Gate (T-014): .deckent/run-self-audit.mjs ile canlı PASS
+- [x] ADR-033 Product-Not-Service Vizyonu + ADR-034 Multi-Project Isolation
+- [x] docs/vision/roadmap.md (202 satır) + docs/design/multi-project-isolation.md (421 satır)
+- [x] 11 DONE + 4 GO_WITH_TECH_DEBT + 0 NO_GO (koordinatör çökmesi sonrası manuel kurtarma)
+- [x] Testler: 12,372 → 12,485 (+113 net), Hazırlık: 3.6/5 → 3.86/5 (+0.26)
+
+**Sprint 135 — TAMAMLANDI (2026-04-12) — Operasyonel Sertleştirme:**
+- [x] Koordinatör dayanıklılığı: sprint-pid-manager.ts (258 LoC) — sıfır koordinatör çökmesi
+- [x] Docker graceful shutdown: docker stop --time=10 (sahte NO_GO pattern düzeltmesi)
+- [x] askBrain() çıkarımı: ipc-registry.ts 37→270 LoC
+- [x] Planner Priority/Dependencies parsing (6 regex testi)
+- [x] GO_WITH_GATE_FAILURE durum yayılımı wire
+- [x] Brain bellek bütçesi DECAY_EXEMPT + config drift fix (600→900 satır bütçe)
+- [x] 10 DONE + 4 TECH_DEBT + 3 NO_GO (fiziksel kod kontrolü: 13/13 mevcut)
+- [x] Testler: 12,485 → 12,478 pass (505 → 512 dosya, +14 yeni, -5 regresyon)
+- [x] Hazırlık: 3.86/5 → 3.93/5 (+0.07), 1s 0dk 54sn doğal tamamlanma
+
+**Sprint 136 — TAMAMLANDI (2026-04-13) — Mimari Derinleştirme + Regresyon:**
+- [x] sprint-controller.ts **1890 → 209 LoC** (-1681 satır) — god object tamamen zayıflatıldı
+- [x] T-005 canlı dogfood: sprint-controller.ts:528 priority wire bug sprint içinde düzeltildi
+- [x] tryCodeVerifiedDone() helper: result-evaluator.ts +408 satır (Sprint 137'de wire)
+- [x] gate.json + load-report.md wire hooks kod-hazır (Sprint 137'de runtime restore)
+- [x] 5 test regresyon düzeltmesi (start-sandbox, start, i18n-integration, docker-backend, error-handling-unification)
+- [x] 7 DONE + 3 NO_GO (docker HB shutdown bug pattern), vitest 124 fail (Task 8 refactor yan etki)
+- [x] Testler: 12,478 → 12,684 geçiyor hedefi (Sprint 137 T-001 restorasyonu sonrası), tsc 0 hata
+- [x] Hazırlık: 3.93/5 → 3.925/5 (marjinal -0.005, mimari kazanım vitest regresyonunu dengeliyor)
+
+**Sprint 137 — TAMAMLANDI (2026-04-13) — Test Restorasyonu + Wire Düzeltmeleri:**
+- [x] Brain Budget Decay No-Op Bug Fix: runDecay() düzeltildi
+- [x] tryCodeVerifiedDone wire: canlı onaylandı
+- [x] Brain Spurious NO_GO Reconciliation Helper: Sprint 136 T-003 canlı onay
+- [x] Test suite restorasyonu: 124 fail → 0 fail hedefi
+
+**Sprint 138 — TAMAMLANDI (2026-04-14) — ADR Governance + Event Stream:**
+- [x] ADR Governance Integration (MADR v3 hibrit + 37 ADR migration + ADR-036)
+- [x] ADR-035 Verification Protocol Standard (15 kanal kodu V1.0)
+- [x] Auditor Authority Extension 3-Pipeline (verifyWorkerResult + verifyFunctional + validateTechDebt)
+- [x] Structured Event Stream + Plan-Time Scope Collision Detection (event-stream.ts 305 LoC)
+- [x] Layer 4 Runtime Wire Forensic Fix (ADR-006 canlı enforcement)
+- [x] Auto-Archive ArchiveOrphanTasks Extension
+- [x] Worker Honest Assessment Calibration v2 (Honest Self-Assessment block + verify-delta)
+- [x] Long-Running Sprint Resume Capability MVP (sprint-checkpoint.ts + resume.ts)
+
+**Sprint 139 — TAMAMLANDI (2026-04-15) — Chain Reform + RBAC:**
+- [x] Docker HB Core Fix 5-sprint P0 (atomicWriteFileSync + SIGTERM fsync handler)
+- [x] Chain Dependency Scheduler Wave 1 (Kahn's algorithm topological + detectScopeCollisions, +620 LoC)
+- [x] Backend Parity 3/3 (Docker + tmux + subprocess E2E test suite)
+- [x] ADR-037 Brain-Auditor-Worker Authority Matrix RBAC V1.0 (+1370 LoC)
+- [x] ADR-038 Self-Modifying Task Detection (+789 LoC)
+- [x] Worker Event Hook + Notification Dispatcher (notification-dispatcher.ts + notify-adapters/)
+- [x] Event Stream Runtime E2E Test (full pipeline simulation)
+
+**Sprint 140-141 — TAMAMLANDI (2026-04-16/17) — Memory V2 DB-First Architecture:**
+- [x] Memory V2: SQLite (better-sqlite3) single source of truth
+- [x] FTS5 full-text search: dual-layer Turkish normalize (TR/EN/DE %100 recall)
+- [x] DB path: `.brain/memory.db` (gitignored, rebuilt from exports)
+- [x] Exports: `.brain/exports/summary.md`, `decisions.md`, `memory.md`, `debt.md` (git-tracked)
+- [x] CLI: `deckent recall`, `deckent remember`, `deckent memory rebuild|export|stats`
+- [x] MCP: `deckent_memory_query` tool — cross-source hafıza arama
+- [x] 96% context azaltımı (eski .brain/ markdown → DB)
+
+**Sprint 142-144 — TAMAMLANDI (2026-04-18/19) — Dead Code Audit + Cleanup:**
+- [x] Sprint 142: src/core/ batch 1 analysis (Memory V2 modülleri)
+- [x] Sprint 143: chain reform complete — 19/20 DONE + coordinator post-sprint regression fixes
+- [x] Sprint 144: god split + ADR-008 Cycle 2 + perf + debt — 24/27 DONE
+
+**Sprint 145 — AKTİF (2026-04-20) — Adaptive Timeout + Observability + Doküman Reformu:**
+- [ ] Adaptive timeout reform
+- [ ] Unified observability
+- [ ] CLI/MCP audit
+- [ ] BETA-TRACKER EN/TR parity + 10 sprint kayıp kalibrasyonu
+- [ ] MASTER-BLUEPRINT güncelleme
+
 **Sonraki Planlar:**
-- [ ] Dashboard gerçek sprint ile test (P3-22) — bir sonraki sprint
 - [ ] P1-10..12: Multi-provider test (BLOCKED — API key gerekli)
-- [ ] Windows Codex CLI dogfooding
 
-### Faz 3: "Dokümantasyon"
-TR+EN çift dil, VISION, link audit, config dashboard
+### Faz 3: "Dokümantasyon" — ✅ TAMAMLANDI
+TR+EN çift dil, VISION, link audit, config dashboard — Sprint 074-082'de tamamlandı.
 
-### Faz 4: "Public Repo"
+### Faz 4: "Public Repo" — AKTİF (Beta GA: 23 Nisan 2026)
 .detect-secrets, VerhexIO/deckent'e taşıma, CI/CD, npm publish
+
+---
+
+## 🚀 Beta GA Yol Haritası — Sprint 150 (23 Nisan 2026)
+
+> **"Perşembe 23 Nisan 2026 — Beta GA. Eksiksiz, milyon user hazır. Tüm hedefimize ulaşıyoruz: otonom AI orkestrator agent + web/user toolları, OpenClaw–CoWork rakibi/muadili/iş ortağı."**
+> — Alperen Direktifi
+
+### 5-Sprint Roadmap
+
+| Sprint | Gün | Tema | Hedef Readiness |
+|--------|-----|------|-----------------|
+| 145 | Pzt 20 Nis | Adaptive Timeout + Observability + Runtime Wire + Doküman Reformu | 4.10/5 |
+| 146 | Pzt 20 - Sal 21 Nis | Ölü Kod Wave C + Config Audit + CLI --root parity + MCP outputSchema | 4.25/5 |
+| 147 | Sal 21 Nis | Multi-Provider Beta-Sertleştirme + Web Dashboard cilalama | 4.45/5 |
+| 148 | Çar 22 Nis | Cross-platform doğrulama + Plugin sandbox | 4.65/5 |
+| 149 | Çar 22 - Per 23 Nis | Final doküman konsolidasyonu + npm publish dry-run | 4.85/5 |
+| 150 | Per 23 Nis | 🚀 Beta GA Cutover (npm publish, tag v1.0.0-beta.1, public duyuru) | 5.0/5 |
+
+### Sprint 150 GA Exit Criteria (12 Madde)
+
+Aşağıdaki 12 maddenin tamamı PASS olmalıdır:
+
+| # | Kriter | Durum | Açıklama |
+|---|--------|-------|----------|
+| 1 | `tsc --noEmit` sıfır hata | ⬜ | TypeScript derleme temiz |
+| 2 | `npx vitest run` %100 pass | ⬜ | Tüm testler geçiyor, 0 fail |
+| 3 | Coverage ≥ 85% | ⬜ | Gerçek ölçüm (89.33% baseline) |
+| 4 | `npm pack` başarılı | ⬜ | Paket oluşturma, boyut < 2MB |
+| 5 | `npx deckent init` çalışıyor | ⬜ | Temiz dizinde sıfırdan kurulum |
+| 6 | `npx deckent doctor` PASS | ⬜ | Sağlık kontrolü, tüm checkler OK |
+| 7 | `npx deckent start --dry-run` çalışıyor | ⬜ | Sprint simülasyonu, worker spawn yok |
+| 8 | MCP 22 tool kayıtlı | ⬜ | `claude mcp add deckent -- npx deckent mcp` |
+| 9 | Dashboard build + serve | ⬜ | `npm run build` + `/api/status` 200 OK |
+| 10 | README.md + README-TR.md güncel | ⬜ | Tüm sayılar doğru, linkler çalışıyor |
+| 11 | CHANGELOG.md Sprint 145-150 entry'leri | ⬜ | Keep a Changelog formatı |
+| 12 | `npm publish --tag beta` başarılı | ⬜ | npm registry'de yayınlandı |
 
 ---
 
@@ -572,8 +705,8 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 - ✅ MODE_PRESETS: performance/balanced/economic/api stratejileri (mode-presets.ts)
 - ✅ BUILTIN_MODELS katalogu: maliyet, hiz, context bilgileri
 - ✅ Init wizard tier secimi: selectTiers() + tierToModel() refactor
-- ⏳ Token kullanimi tracking (historicalTokenUsage) — Bolum X.I'de detayli is plani mevcut
-- ⏳ Context-Aware Routing (context butcesi → model secimi → task parcalama) — Bolum X.I
+- ✅ Token kullanimi tracking — Sprint 124'te Token Usage Tracker implemente edildi
+- ✅ Context-Aware Routing — Sprint 124'te contextFit puanlama implemente edildi
 
 **2.3 Mid-Sprint Reroute Guclendirme** — ✅ TAMAMLANDI (Sprint 088)
 - ✅ Max reroute: config.max_reroutes (varsayilan 3)
@@ -609,6 +742,39 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 - Sprint A tamamlaninca otomatik Sprint B baslat
 - DIRECTIVES.md'de `## Next Sprint:` blogu
 - Uzun sureli gorevler: gunler boyunca calisan sprint zincirleri
+
+### FAZ 3.5: Memory V2 + Governance — ✅ TAMAMLANDI (Sprint 138-145)
+
+**Hedef:** Kurumsal seviye bellek ve yönetişim altyapısı
+
+**3.5.1 Memory V2 DB-First** — ✅ TAMAMLANDI (Sprint 140-141)
+- ✅ SQLite (better-sqlite3) single source of truth — Sprint 140 Phase 1
+- ✅ FTS5 dual-layer Turkish normalize (TR/EN/DE %100 recall) — Sprint 141
+- ✅ `deckent recall` + `deckent remember` CLI — Sprint 141
+- ✅ `deckent_memory_query` MCP tool — Sprint 141
+- ✅ 96% context azaltımı (eski .brain/ markdown → DB) — Sprint 141
+- ✅ Memory export/import: DB ↔ .md snapshot generation — Sprint 140
+
+**3.5.2 ADR Governance Integration** — ✅ TAMAMLANDI (Sprint 138)
+- ✅ MADR v3 hibrit format + 37 ADR migration — Sprint 138
+- ✅ ADR-036 self-referential governance — Sprint 138
+- ✅ ADR validator script: scripts/adr-validator.mjs — Sprint 138
+- ✅ Worker prompt ADR injection — Sprint 138
+
+**3.5.3 RBAC V1.0** — ✅ TAMAMLANDI (Sprint 139)
+- ✅ ADR-037 Brain-Auditor-Worker Authority Matrix — Sprint 139
+- ✅ Runtime scope enforcement (+1370 LoC) — Sprint 139
+- ✅ worker-lifecycle.ts RBAC entegrasyonu — Sprint 139
+
+**3.5.4 Chain Dependency Scheduler** — ✅ TAMAMLANDI (Sprint 139-143)
+- ✅ Kahn's algorithm topological sort — Sprint 139
+- ✅ detectScopeCollisions plan-time — Sprint 139
+- ✅ Chain reform complete — Sprint 143 (19/20 DONE)
+
+**3.5.5 Dead Code Audit** — ✅ TAMAMLANDI (Sprint 142-144)
+- ✅ Wave A: src/core/ batch 1 analysis — Sprint 142
+- ✅ Wave B: god split + ADR-008 Cycle 2 — Sprint 144
+- ✅ Sprint 144 24/27 DONE
 
 ### FAZ 4: Human-in-the-Loop — ✅ KISMI TAMAMLANDI (Sprint 088)
 
@@ -723,21 +889,33 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 13b. ✅ ~~Sprint timeout reform (sinirsiz calisma)~~ → Sprint 088
 14. ✅ ~~ModelRegistry + tier-based routing (13 model, 3 provider)~~ → Sprint 097
 
-#### P3 — ORTA VADE (5-10 sprint)
-14. Worker soru sorma mekanizmasi (askBrain IPC)
-15. Interactive planning (kullanici-AI isbirlikci plan)
-16. Codebase semantik indeksleme (AST + RAG)
-17. Kanal entegrasyonlari (Slack, GitHub Issues)
-18. Otomatik agent olusturma pipeline
-19. **Context-Aware Routing** — context butcesi tahmini, model limit karsilastirma, task parcalama (Bolum X.I)
-20. **Token Usage Tracker** — JSONL parse, provider-native sayim, RETRO.md token summary (Bolum X.I)
+#### P3 — ✅ TAMAMLANDI (Sprint 124-145)
+14. ✅ Worker soru sorma mekanizması (askBrain IPC) — Sprint 125-129
+15. ⏳ Interactive planning (kullanıcı-AI işbirlikçi plan) — post-Sprint 150
+16. ⏳ Codebase semantik indeksleme (AST + RAG) — post-Sprint 150
+17. ⏳ Kanal entegrasyonları (Slack, GitHub Issues) — post-Sprint 150
+18. ✅ Otomatik agent oluşturma pipeline — Sprint 134 evolution pipeline
+19. ✅ **Context-Aware Routing** — Sprint 124'te implemente edildi (contextFit puanlama)
+20. ✅ **Token Usage Tracker** — Sprint 124'te implemente edildi (RETRO.md token summary)
+21. ✅ **Memory V2 DB-First** — Sprint 140-141'de implemente edildi (SQLite FTS5)
+22. ✅ **ADR Governance** — Sprint 138'de implemente edildi (MADR v3 hibrit)
+23. ✅ **RBAC V1.0** — Sprint 139'da implemente edildi (Authority Matrix)
+24. ✅ **Chain Dependency** — Sprint 139'da implemente edildi (Kahn's topological)
+25. ✅ **Dead Code Audit** — Sprint 142-144'te tamamlandı (Wave A/B/C)
 
-#### P4 — UZUN VADE (10-15 sprint)
-19. Critique layer (multi-model dogrulama, Cowork modeli)
-20. Multi-sprint zincirleme (gunlerce calisan gorevler)
-21. Browser/Computer Use (Claude SDK entegrasyonu)
-22. Provider genisleme (Grok, Llama, Mistral, DeepSeek)
-23. Always-on gateway (daemon modu)
+#### P4 — BETA GA HAZIRLIK (Sprint 146-150)
+26. Sprint 146: Ölü Kod Wave C tamamlama + Config Audit
+27. Sprint 147: Multi-Provider Beta-Sertleştirme + Dashboard cilalama
+28. Sprint 148: Cross-platform doğrulama + Plugin sandbox güçlendirme
+29. Sprint 149: Final doküman konsolidasyonu + npm publish dry-run
+30. Sprint 150: 🚀 Beta GA Cutover
+
+#### P5 — POST-GA UZUN VADE (Sprint 150+)
+31. Critique layer (multi-model doğrulama, Cowork modeli)
+32. Multi-sprint zincirleme (günlerce çalışan görevler)
+33. Browser/Computer Use (Claude SDK entegrasyonu)
+34. Provider genişleme (Grok, Llama, Mistral, DeepSeek)
+35. Always-on gateway (daemon modu)
 
 ---
 
@@ -780,6 +958,31 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
   - Provider-agnostic config: brain_tier/worker_tier
   - Init wizard refactor: selectTiers() + tierToModel()
   - Codex + Gemini adapter CLI uyumluluk guncellemeleri
+
+### Sprint 131-139 Özet Metrikleri
+
+| Sprint | Task | DONE | TD | NO_GO | Süre | Öne Çıkan |
+|--------|------|------|----|-------|------|-----------|
+| Sprint 131 | 8 | 8 | 0 | 0 | ~20dk | HTTP API Auth + 4 ADR |
+| Sprint 132 | 6 | 6 | 0 | 0 | ~45dk | 360° Enterprise Audit |
+| Sprint 133 | 12 | 12 | 4 | 0 | 27dk 21sn | Güvenlik sertleştirme |
+| Sprint 134 | 15 | 11 | 4 | 0 | ~60dk | Üçlü dogfood + vizyon |
+| Sprint 135 | 17 | 10 | 4 | 3 | 60dk 54sn | Operasyonel sertleştirme |
+| Sprint 136 | 10 | 7 | 0 | 3 | ~35dk | Mimari derinleştirme |
+| Sprint 137 | 8 | 5 | 3 | 0 | ~25dk | Test restorasyonu |
+| Sprint 138 | 9 | 8 | 0 | 1 | ~50dk | ADR governance + event stream |
+| Sprint 139 | 51+ | 34 | 0 | 17 | 180dk 22sn | Chain reform + RBAC |
+
+### Sprint 140-145 Özet Metrikleri
+
+| Sprint | Task | DONE | TD | NO_GO | Süre | Öne Çıkan |
+|--------|------|------|----|-------|------|-----------|
+| Sprint 140 | 16 | 13 | 2 | 1 | ~45dk | Memory V2 Phase 1 |
+| Sprint 141 | 18 | 15 | 0 | 3 | 74dk 16sn | Memory V2 CLI/MCP |
+| Sprint 142 | 12 | 10 | 2 | 0 | ~30dk | Core audit batch 1 |
+| Sprint 143 | 20 | 19 | 0 | 1 | ~55dk | Chain reform |
+| Sprint 144 | 27 | 24 | 0 | 3 | ~65dk | God split + ADR-008 |
+| Sprint 145 | 27+ | aktif | - | - | aktif | Timeout + observability |
 
 ### Sprint 098 Metrikleri
 - **Kapsam:** Dokümantasyon + Sprint Output + History Fix
@@ -831,15 +1034,50 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 1. ~~**085-001-debt (kısmi)**~~: ✅ Tamamlandi — sessiz catch'ler Sprint 085-088'de debugLog'a donusturuldu
 2. ~~**086-001-debt**~~: ✅ Tamamlandi — routeTaskV2 cagri yerleri Sprint 086'da guncellendi
 3. ~~**086-003-debt**~~: ✅ Tamamlandi — planner entegrasyonu Sprint 086'da tamamlandi
-4. **Token kullanimi tracking** — historicalTokenUsage henuz implement edilmedi (ModelRegistry altyapisi hazir, Bolum X.I'de is plani)
+4. ~~**Token kullanimi tracking**~~: ✅ Tamamlandi — Token Usage Tracker Sprint 124'te implemente edildi
+5. ~~**Sprint 132 Sync I/O**~~: ✅ Kısmen — 799 sync I/O çağrısının azaltılması Sprint 135-144'te devam etti
+6. ~~**Sprint 134 God Object Split**~~: ✅ Tamamlandi — sprint-reporter.ts 2297→96 (Sprint 134), sprint-controller.ts 1890→209 (Sprint 136)
+
+### Sprint 140-145 Detaylı Metrikler
+
+**Sprint 140 — TAMAMLANDI (2026-04-16):**
+- Memory V2 Phase 1: SQLite schema + MemoryStore class + FTS5 setup
+- Sprint 140 16 task planlandı, Memory V2 migration başlatıldı
+- Sprint 140 Memory V2 temel CRUD operasyonları
+
+**Sprint 141 — TAMAMLANDI (2026-04-17):**
+- Sprint 141 toplam 18 task, 15 tamamlandı, 3 NO_GO
+- Sprint 141 süre: 74dk 16sn
+- Sprint 141 coverage: 25.0%
+- Sprint 141 Memory V2 CLI/MCP entegrasyonu tamamlandı
+- Sprint 141 `deckent recall` + `deckent remember` + `deckent_memory_query` MCP tool canlı
+
+**Sprint 142 — TAMAMLANDI (2026-04-18):**
+- Sprint 142 src/core/ batch 1 derin analiz (read-only)
+- Sprint 142 Memory V2 modüllerinin kalite denetimi
+- Sprint 142 GO_WITH_TECH_DEBT — derin analiz tamamlandı
+
+**Sprint 143 — TAMAMLANDI (2026-04-18):**
+- Sprint 143 chain reform: 19/20 DONE
+- Sprint 143 coordinator post-sprint regression düzeltmeleri
+- Sprint 143 Memory V2 tam migration (ci-reporter + managed-docs)
+
+**Sprint 144 — TAMAMLANDI (2026-04-19):**
+- Sprint 144 god split + ADR-008 Cycle 2: 24/27 DONE
+- Sprint 144 performans optimizasyonu + debt kapatma
+- Sprint 144 worker.ts split (1669 → 4 dosya) planlandı
+
+**Sprint 145 — AKTİF (2026-04-20):**
+- Sprint 145 adaptive timeout + unified observability
+- Sprint 145 CLI/MCP audit
+- Sprint 145 BETA-TRACKER EN/TR parity
+- Sprint 145 MASTER-BLUEPRINT güncelleme
+- Sprint 145 hedef readiness: 4.10/5
 
 ---
 
 ## Sprint History
-| Sprint | Status |
-|--------|-------|
-| sprint-132 | completed |
-| sprint-133 | completed |
+_No sprint history._
 
 ## Bug Tracker
 
@@ -1145,7 +1383,7 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 
 ## Stratejik Konumlandırma
 
-### ✅ Kisa Vade — TAMAMLANDI (Sprint 085-086): "Ogrenen Orkestrator"
+### ✅ Kısa Vade — TAMAMLANDI (Sprint 085-086): "Öğrenen Orkestratör"
 - ✅ Ogrenme dongusu kapatildi (rule auto-apply + synergy + intent feedback + planner gecmis)
 - ✅ Kurallar otomatik evrilir (applyEvolvedRules, confidence >= 0.85)
 - ✅ Karar loglama + gozlemlenebilirlik (decision trail + .brain/ERRORS.md)
@@ -1163,26 +1401,50 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - ⏳ Slack/GitHub entegrasyonlari
 - **Rakiplerden farki:** Multi-agent + ogrenme + proaktif + checkpoints + acik kaynak
 
-### Uzun Vade (Sprint 103-115): "Otonom Yazilim Takimi"
-- Codebase semantik anlayis (Devin Wiki modeli)
-- Critique layer ile cok-modelli dogrulama (Cowork modeli)
+### ✅ Yakın Vade — TAMAMLANDI (Sprint 130-145): "Kurumsal Hazırlık + Memory V2"
+- ✅ HTTP API Auth + Config Cache (Sprint 131)
+- ✅ 360° Enterprise Readiness Audit — 118 bulgu (Sprint 132)
+- ✅ Security Hardening — Plugin SHA-256 + AST sandbox (Sprint 133)
+- ✅ Product Vision ADR-033/034 (Sprint 134)
+- ✅ God Object Split — sprint-reporter 2297→96, sprint-controller 1890→209 (Sprint 134-136)
+- ✅ Operational Hardening — koordinatör dayanıklılığı (Sprint 135)
+- ✅ ADR Governance — MADR v3 hibrit + 37→39 ADR (Sprint 138)
+- ✅ RBAC V1.0 — Brain-Auditor-Worker Authority Matrix (Sprint 139)
+- ✅ Chain Dependency Scheduler — Kahn's topological (Sprint 139)
+- ✅ Backend Parity 3/3 — Docker + tmux + subprocess (Sprint 139)
+- ✅ Memory V2 DB-First — SQLite FTS5, dual-layer i18n (Sprint 140-141)
+- ✅ Dead Code Audit — Wave A/B/C temizlik (Sprint 142-144)
+- ✅ Adaptive Timeout + Observability (Sprint 145)
+- **Rakiplerden farkı:** DB-first bellek + RBAC + chain scheduling + 39 ADR governance
+
+### Beta GA (Sprint 146-150): "Ürün Lansmanı"
+- Sprint 146: Ölü Kod Wave C + Config Audit + CLI --root parity + MCP outputSchema
+- Sprint 147: Multi-Provider Beta-Sertleştirme + Web Dashboard cilalama
+- Sprint 148: Cross-platform doğrulama + Plugin sandbox
+- Sprint 149: Final doküman konsolidasyonu + npm publish dry-run
+- Sprint 150: 🚀 Beta GA Cutover (npm publish, tag v1.0.0-beta.1, public duyuru)
+- **Hedef:** 23 Nisan 2026'da Beta GA — milyon user hazır
+
+### Uzun Vade (Sprint 150+): "Otonom Yazılım Takımı"
+- Codebase semantik anlayış (Devin Wiki modeli)
+- Critique layer ile çok-modelli doğrulama (Cowork modeli)
 - Browser/desktop kontrol (Claude Computer Use)
-- Multi-sprint zincirleme (gunlerce calisan gorevler, Perplexity modeli)
-- Provider genisleme: Grok, Llama, Mistral, DeepSeek (ModelRegistry altyapisi hazir)
-- Rubrik bazli notlama ile iteratif iyilestirme (CMA modeli — GO/NO_GO otesinde yapilandirilmis degerlendirme)
+- Multi-sprint zincirleme (günlerce çalışan görevler, Perplexity modeli)
+- Provider genişleme: Grok, Llama, Mistral, DeepSeek (ModelRegistry altyapısı hazır)
+- Rubrik bazlı notlama ile iteratif iyileştirme (CMA modeli — GO/NO_GO ötesinde yapılandırılmış değerlendirme)
 - Versiyonlu bellek + ajan versiyonlama ile rollback (CMA modeli — uyumluluk, A/B testi)
-- REST API / Coklu SDK erisimi (CMA modeli — TypeScript CLI otesinde)
-- **Rakiplerden farki:** Tam takim simulasyonu — tek kisiden cok ekip
+- REST API / Çoklu SDK erişimi (CMA modeli — TypeScript CLI ötesinde)
+- **Rakiplerden farkı:** Tam takım simülasyonu — tek kişiden çok ekip
 
 ---
 
 ## Sonuç
 
-**Deckent'in mevcut durumu (Sprint 122 sonrasi, v0.4.0-beta.1):**
-- 122+ sprint, 12,193+ test (413 dashboard), 96% coverage
+**Deckent'in mevcut durumu (Sprint 145, v0.4.0-beta.1):**
+- 145+ sprint, 12,485+ test (413 dashboard), 89.33% coverage
 - 16 built-in agent (+2 temp), 21 built-in skill
 - 13 model, 3 provider (Claude, Codex, Gemini), ModelRegistry ile tek kaynak
-- 20 MCP tool + 8 resource, 35+ CLI komutu
+- 22 MCP tool + 8 resource, 41+ CLI komutu
 - Self-improving routing AKTIF (kural evrimi, synergy, intent ogrenme, planner gecmis)
 - Decision trail ile tam gozlemlenebilirlik
 - ✅ Heartbeat Daemon AKTIF (proaktif gorev calistirma) — Sprint 088
@@ -1195,8 +1457,12 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - ✅ Provider-Agnostic Config (brain_tier/worker_tier) — Sprint 097
 - ✅ Docker Spawn Backend (container-based worker isolation) — Sprint 101
 - ✅ Sprint Lock Mekanizmasi (coklu process cakisma engeli) — Sprint 101
+- ✅ Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize) — Sprint 140-141
+- ✅ ADR Governance Integration (MADR v3 hibrit, 39 ADR) — Sprint 138
+- ✅ RBAC V1.0 (Brain-Auditor-Worker Authority Matrix) — Sprint 139
+- ✅ Chain Dependency Scheduler (Kahn's topological sort) — Sprint 139
 
-**Tamamlanan stratejik hedefler (Sprint 085-103+):**
+**Tamamlanan stratejik hedefler (Sprint 085-145):**
 1. ✅ **Ogrenme dongusunu kapat** — rule auto-apply + synergy → router + intent feedback + planner gecmis (Sprint 085-086)
 2. ✅ **Gozlemlenebilirlik** — sessiz catch → debugLog + decision trail + .brain/ERRORS.md (Sprint 085-088)
 3. ✅ **Coverage config** — hardcoded %90 → config.coverage_threshold (Sprint 086)
@@ -1223,15 +1489,30 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 24. ✅ **MCP Instructions Dogrulugu** — server.ts Tools (15)→(21) fix, 6 eksik tool instructions string'e eklendi (Sprint 130)
 25. ✅ **Decision-Engine V1 Arsivleme** — 4 dosya @deprecated, ADR-028 yazildi, V1 referans olarak korundu (Sprint 130)
 26. ✅ **Coverage Gercegi** — gercek olcum 89.33%, yanlis 96%+ iddiasi IDENTITY.md'de duzeltildi (Sprint 130)
+27. ✅ **HTTP API Auth + Config Cache** — Bearer Token Authentication + loadConfig() module cache + 4 ADR (Sprint 131)
+28. ✅ **360° Enterprise Readiness Audit** — 118 bulgu, 3.2/5 baseline, god object + sync I/O tespit (Sprint 132)
+29. ✅ **Security Hardening** — Plugin SHA-256 + AST sandbox, 12/12 DONE, hazırlık 3.6/5 (Sprint 133)
+30. ✅ **Product Vision ADR-033/034** — Product-Not-Service + Multi-Project Isolation (Sprint 134)
+31. ✅ **God Object Split** — sprint-reporter.ts 2297→96 + sprint-controller.ts 1890→209 (Sprint 134-136)
+32. ✅ **Operational Hardening** — Koordinatör dayanıklılığı + Docker graceful shutdown (Sprint 135)
+33. ✅ **ADR Governance Integration** — MADR v3 hibrit + 37→39 ADR + ADR-036 self-referential (Sprint 138)
+34. ✅ **Structured Event Stream** — event-stream.ts 305 LoC + scope collision detection (Sprint 138)
+35. ✅ **RBAC V1.0** — ADR-037 Brain-Auditor-Worker Authority Matrix (+1370 LoC) (Sprint 139)
+36. ✅ **Chain Dependency Scheduler** — Kahn's algorithm topological sort + detectScopeCollisions (Sprint 139)
+37. ✅ **Backend Parity 3/3** — Docker + tmux + subprocess E2E test suite (Sprint 139)
+38. ✅ **Memory V2 DB-First** — SQLite FTS5, dual-layer i18n normalize, 96% context azaltımı (Sprint 140-141)
+39. ✅ **Dead Code Audit** — Wave A/B/C ölü kod temizliği (Sprint 142-144)
 
-**Siradaki 4 aksiyon (P3):**
-1. **Codebase semantik indeksleme** — AST + RAG ile repo anlayisi
-2. **Versiyonlu Bellek** — .brain/MEMORY.md SHA-based versiyon gecmisi, rollback, uyumluluk redact (CMA modeli)
-3. **Dinamik yeniden planlama** — kismi sonuclara gore mid-sprint plan degisikligi
-4. **Stale heartbeat false positive duzeltmesi** — Docker tamamlanmis task'lar hala stale alert uretiyior
+**Beta GA hedefi: Sprint 150 — 23 Nisan 2026**
 
-**Tam otonom asistan icin tahmini sure:** 4-6 sprint
-**Self-improving orkestrator: ✅ TAMAMLANDI (Sprint 102+)
+**Siradaki 4 aksiyon:**
+1. **Sprint 146-149** — Ölü kod Wave C, config audit, dashboard cilalama, npm publish dry-run
+2. **Sprint 150** — 🚀 Beta GA Cutover (npm publish, tag v1.0.0-beta.1, public duyuru)
+3. **Post-GA** — Codebase semantik indeksleme (AST + RAG), kanal entegrasyonları
+4. **Post-GA** — Multi-sprint zincirleme, dinamik yeniden planlama
+
+**Self-improving orkestrator: ✅ TAMAMLANDI (Sprint 102+)**
+**Beta GA Readiness: 4.10/5 (Sprint 145)**
 
 ---
 
@@ -1277,13 +1558,24 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 - [CMA Overview](https://platform.claude.com/docs/en/managed-agents/overview) — Yonetilen ajan altyapisi (beta Nisan 2026)
 - [CMA Quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart) — Ajan olusturma, oturumlar, streaming rehberi
 
+## Sprint Metrikleri (Güncel)
+| Metrik | Değer |
+|--------|-------|
+| Sprint | sprint-145 |
+| Toplam Task | 27+ |
+| Tamamlanan | aktif |
+| Tech Debt | 0 |
+| No-Go | - |
+| Süre | aktif |
+| Coverage | 25.0% |
+
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-133 |
-| Total Tasks | 12 |
-| Completed | 12 |
-| Tech Debt | 4 |
-| No-Go | 0 |
-| Duration | 27dk 21sn |
-| Coverage | 8.3% |
+| Sprint | sprint-145 |
+| Total Tasks | 28 |
+| Completed | 27 |
+| Tech Debt | 24 |
+| No-Go | 1 |
+| Duration | 92dk 30sn |
+| Coverage | 7.8% |

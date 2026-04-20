@@ -1,0 +1,37 @@
+{
+  "id": "145-001-fix",
+  "title": "Fix: Timeout Config Schema + Validation",
+  "description": "Priority fix for NO_GO task 145-001. Notes: TimeoutConfig interface added to config-types.ts with all 12 fields per spec. Default values set in config.ts (DEFAULT_TIMEOUT_CONFIG). 3-layer merge via deepMerge supports partial user overrides. Validation rules added to validateConfig(): effort_base ordering (high > normal > low), per-backend min >= 300, per-backend max <= 14400, max > min consistency. config-validator.ts created as re-export module. 12 tests pass covering defaults, all validation rules, merge behavior, and loadConfig integration. tsc --noEmit PASS (only pre-existing error in event-bus.ts). 161 existing config tests pass without regression.",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 145-001 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/config-types.ts",
+      "src/core/config.ts",
+      "src/core/config-validator.ts",
+      "tests/core/config-timeout.test.ts",
+      "config.json",
+      "dist/cli/entry.js"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/core/config-timeout.test.ts` 4/4 PASS, `tsc --noEmit` PASS, `node dist/cli/entry.js config set timeout.docker_min_timeout 1500` exitCode 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "isPriorityFix": true,
+  "fixForTaskId": "145-001",
+  "createdAt": "2026-04-20T06:16:44.139Z",
+  "estimatedTokens": 119,
+  "updatedAt": "2026-04-20T06:28:59.208Z"
+}

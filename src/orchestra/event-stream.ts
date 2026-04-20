@@ -77,6 +77,14 @@ export const CHANNELS = {
 
   // Authority enforcement (Sprint 139 — Task 035, ADR-037)
   AUTHORITY_VIOLATION: 'AUDITOR→BRAIN:AUTHORITY_VIOLATION',
+
+  // Timeout events (Sprint 145 — Task 017)
+  TIMEOUT_ASSIGN: 'BRAIN→WORKER:TIMEOUT_ASSIGN',
+  TIMEOUT_WARNING: 'WORKER→BRAIN:TIMEOUT_WARNING',
+  TIMEOUT_CAP_EXCEEDED: 'AUDITOR→BRAIN:TIMEOUT_CAP_EXCEEDED',
+
+  // Timeout extension (Sprint 145 — Task 019)
+  TIMEOUT_EXTEND: 'BRAIN→WORKER:TIMEOUT_EXTEND',
 } as const;
 
 export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];

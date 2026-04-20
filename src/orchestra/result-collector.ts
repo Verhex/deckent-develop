@@ -219,6 +219,20 @@ export async function waitForResults(
       const timeoutPath = join(projectRoot, TASKS_DIR, `task-${taskId}.timeout`);
       const timeoutExists = await stat(timeoutPath).then(() => true, () => false);
       if (timeoutExists) {
+        // Sprint 145: Check if EXIT trap already wrote a .result (e.g. TIMEOUT_WITH_WORK)
+        // before overwriting with synthetic NO_GO. The EXIT trap runs between timeout kill
+        // and result collection, so .result may appear after the first resultExists check.
+        const lateResultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+        const lateResult = readJsonSafe<TaskResult>(lateResultPath);
+        if (lateResult) {
+          enrichResultTokenUsage(lateResult, taskMap.get(taskId));
+          results.push(lateResult);
+          collected.add(taskId);
+          newlyCollected.push(taskId);
+          debugLog('collectResults:lateResult', `taskId=${taskId} EXIT trap wrote .result (${lateResult.selfAssessment}), skipping synthetic NO_GO`);
+          continue;
+        }
+
         const syntheticResult: TaskResult = {
           taskId,
           workerId: `w-${taskId}`,

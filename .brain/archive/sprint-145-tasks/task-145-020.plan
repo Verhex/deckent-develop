@@ -1,0 +1,21 @@
+# Task 145-020 Execution Plan
+
+## Objective
+Update DECKENT-ANA-PLAN-TR.md from Sprint 23 freeze (v2.1, 818 lines) to v3.0 covering Sprint 145.
+
+## Steps
+1. Read current file (done - 818 lines, Sprint 23 frozen)
+2. Gather sprint history data from git log, CHANGELOG, sprint logs
+3. Gather new feature info: Memory V2, ADR governance, timeout system, observability, cost management
+4. Update version header: v2.1 → v3.0
+5. Update CLI commands: 32 → 41+
+6. Update MCP tools: 17 → 22
+7. Update MCP resources: 9 → 8
+8. Add new sections: Memory V2, ADR Governance, Adaptive Timeout, Unified Observability, Cost Management
+9. Update Aşama 4 and add Aşama 5 roadmap
+10. Add Sprint 78-145 history rows
+11. Update Uygulama Geçmişi with block summaries
+12. Verify line count ≥ 1500
+
+## Files Modified
+- DECKENT-ANA-PLAN-TR.md (only file)

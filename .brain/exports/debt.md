@@ -64,3 +64,35 @@
 | debt-143-012 | Tech debt from 143-012: MCP Disconnect Fix implemented. sprint-runner-entry.ts p | normal | - | resolved |
 | debt-144-015 | Tech debt from 144-015: Sprint 138 event-stream.ts foundation wired into Brain,  | normal | - | resolved |
 | debt-144-017 | Tech debt from 144-017: Retro sprint-id normalize completed: (1) sprint-retro-wr | normal | - | resolved |
+| debt-145-003 | Tech debt from 145-003: EventBus Abstraction + Subscribe API implemented as spec | normal | - | resolved |
+| debt-145-004 | Tech debt from 145-004: ADR-037 RBAC Runtime Wire completed. Changes:
+
+1. Fixed  | normal | - | resolved |
+| debt-145-005 | Tech debt from 145-005: Added emitNotify() helper to event-stream.ts (source='de | normal | - | resolved |
+| debt-145-006 | Tech debt from 145-006: NotifyDispatcher successfully wired in both MCP server a | normal | - | resolved |
+| debt-145-007 | Tech debt from 145-007: ADR-038 Self-Modifying Detector Runtime Wire completed.  | normal | - | resolved |
+| debt-145-008 | Tech debt from 145-008: Fixed registerResume (audit finding #5) + registerHelp ( | normal | - | resolved |
+| debt-145-009 | Tech debt from 145-009: DB-first debt counting migration complete. Created src/c | normal | - | resolved |
+| debt-145-010 | Tech debt from 145-010: All 3 backends updated with adaptive timeout wiring:
+
+1. | normal | - | resolved |
+| debt-145-011 | Tech debt from 145-011: TIMEOUT_WITH_WORK partial result mechanism implemented a | normal | - | resolved |
+| debt-145-012 | Tech debt from 145-012: Task 145-012 completed: (1) ansi.ts — native ANSI escape | normal | - | resolved |
+| debt-145-013 | Tech debt from 145-013: Monitor Adapter Pattern implemented with 3 backends (Doc | normal | - | resolved |
+| debt-145-014 | Tech debt from 145-014: deckent_watch MCP tool implemented with full spec compli | normal | - | resolved |
+| debt-145-015 | Tech debt from 145-015: Sprint 145 Task 015: Spurious NO_GO Reconciliation Helpe | normal | - | resolved |
+| debt-145-016 | Tech debt from 145-016: M7.B + M7.C IPC Cleanup Defense-in-Depth implemented.
+
+M | normal | - | resolved |
+| debt-145-017 | Tech debt from 145-017: 3 new timeout channel constants added to CHANNELS enum ( | normal | - | resolved |
+| debt-145-018 | Tech debt from 145-018: All 7 polish features implemented and 39 tests passing ( | normal | - | resolved |
+| debt-145-019 | Tech debt from 145-019: TimeoutWatcher class implemented with 250+ LoC. 22/22 te | normal | - | resolved |
+| debt-145-021 | Tech debt from 145-021: DECKENT-MASTER-BLUEPRINT.md EN fully updated from Sprint | normal | - | resolved |
+| debt-145-022 | Tech debt from 145-022: FINAL-EXECUTIVE-REPORT.md Sprint 144 + Sprint 145 inline | normal | - | resolved |
+| debt-145-023 | Tech debt from 145-023: Section 23 'Sprint 141-145 Closure Status' eklendi. 233  | normal | - | resolved |
+| debt-145-024 | Tech debt from 145-024: Task 145-024 tamamlandı:
+
+1. docs/governance/INDEX.md ol | normal | - | resolved |
+| debt-145-025 | Tech debt from 145-025: BETA-TRACKER.md comprehensively updated from Sprint 136  | normal | - | resolved |
+| debt-145-026 | Tech debt from 145-026: BETA-TRACKER-TR.md tamamen güncellendi: 1289→1581 satır  | normal | - | resolved |
+| debt-145-027 | Tech debt from 145-027: Memory V2 Prod-Readiness + 1000-Entry Stress test suite  | normal | - | resolved |

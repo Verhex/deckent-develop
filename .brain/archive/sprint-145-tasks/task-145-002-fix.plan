@@ -1,0 +1,24 @@
+# Execution Plan — Task 145-002-fix
+
+## Problem
+timeout-estimator.ts imports TimeoutConfig and DEFAULT_TIMEOUT_CONFIG which don't exist.
+ResolvedConfig has no `timeout` field.
+config-validator.ts re-exports DEFAULT_TIMEOUT_CONFIG which doesn't exist in config.ts.
+
+## Steps
+1. Add TimeoutConfig interface to src/core/config-types.ts
+2. Add `timeout?: TimeoutConfig` field to ResolvedConfig
+3. Add DEFAULT_TIMEOUT_CONFIG constant to src/core/config.ts
+4. Fix TaskRouting interface to include optional timeoutSeconds field (test expects it)
+5. Run tsc --noEmit — verify clean
+6. Run vitest — verify tests pass
+7. Write result file
+
+## Files to modify
+- src/core/config-types.ts (add TimeoutConfig, update ResolvedConfig)
+- src/core/config.ts (add DEFAULT_TIMEOUT_CONFIG)
+- src/orchestra/task-router.ts (add timeoutSeconds to TaskRouting if needed)
+
+## Risk
+- Must match the exact shape expected by timeout-estimator.ts and tests
+- Must not break existing config merge logic

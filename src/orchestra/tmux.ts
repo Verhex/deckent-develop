@@ -67,7 +67,7 @@ export function cleanupPromptFile(promptPath: string): void {
   try { unlinkSync(promptPath); } catch (e) { debugLog('cleanupPromptFile:unlinkSync', e); }
 }
 
-/** Default worker timeout in seconds (20 minutes) */
+/** @deprecated Use adaptive timeout via brainEstimateTimeout() + SpawnBackendOptions.taskTimeoutSeconds instead. Kept for backward compat fallback. */
 export const WORKER_TIMEOUT_SECONDS = 1200;
 
 /**
@@ -153,7 +153,7 @@ export function spawnWorker(
   model: ModelType,
   prompt: string,
   projectDir: string,
-  opts?: SpawnOptions,
+  opts?: SpawnOptions & { taskTimeoutSeconds?: number },
   adapter?: ProviderAdapter,
 ): void {
   validateTaskId(taskId);
@@ -165,7 +165,7 @@ export function spawnWorker(
     '-c', projectDir,
   ]);
   const promptPath = writePromptFile(projectDir, prompt);
-  const cmd = buildWorkerCommand(model, promptPath, opts, adapter, taskId);
+  const cmd = buildWorkerCommand(model, promptPath, opts, adapter, taskId, opts?.taskTimeoutSeconds);
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${windowName}`,

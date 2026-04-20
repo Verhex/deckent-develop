@@ -7,7 +7,7 @@
 // Usage: node sprint-runner-entry.js <ipc-dir>
 // The IPC directory must contain config.json with sprint parameters.
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── IPC File Names ──────────────────────────────────────────────
@@ -230,6 +230,21 @@ async function main(): Promise<void> {
     });
 
     process.exit(1);
+  }
+}
+
+// M7.C: Self-cleanup — remove IPC directory on successful exit.
+// Must be registered before main() so it fires on all exit paths.
+// 'exit' event only supports synchronous operations (async I/O is ignored).
+// Preserves IPC dir on non-zero exit codes for post-mortem debugging.
+{
+  const _ipcDirForCleanup = process.argv[2];
+  if (_ipcDirForCleanup) {
+    process.on('exit', (code) => {
+      if (code === 0 || code === undefined) {
+        try { rmSync(_ipcDirForCleanup, { recursive: true, force: true }); } catch { /* best-effort */ }
+      }
+    });
   }
 }
 

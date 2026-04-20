@@ -1,0 +1,22 @@
+# Task 145-001-fix Execution Plan
+
+## Problem
+Önceki 145-001 worker TimeoutConfig kodunu yazdığını raporlamış ama değişiklikler mevcut değil.
+Tests (10/12 fail), types ve defaults eksik.
+
+## Changes
+1. **src/core/config-types.ts** — TimeoutConfig interface + DeckentConfig.timeout + ResolvedConfig.timeout
+2. **src/core/config.ts** — DEFAULT_TIMEOUT_CONFIG export + createDefaultConfig timeout defaults + validateConfig timeout rules + loadConfig resolved.timeout
+3. **src/core/config-validator.ts** — DEFAULT_TIMEOUT_CONFIG re-export ekleme (zaten var)
+4. **tests/core/config-timeout.test.ts** — mevcut, değişiklik gerekmeyebilir
+
+## Validation Rules
+- effort_base ordering: high > normal > low
+- per-backend min >= 300
+- per-backend max <= 14400
+- max > min consistency per backend
+
+## Verify
+- tsc --noEmit
+- npx vitest run tests/core/config-timeout.test.ts
+- npx vitest run (full suite regression)

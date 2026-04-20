@@ -1,0 +1,90 @@
+{
+  "id": "145-016",
+  "title": "IPC Cleanup Defense-in-Depth M7.B + M7.C",
+  "description": "IPC Cleanup Defense-in-Depth M7.B + M7.C\n- Model: sonnet\n- Effort: low\n- Skills: typescript-expert\n- Files: src/core/orphan-cleaner.ts, src/orchestra/sprint-runner-entry.ts, tests/core/orphan-cleaner-ipc.test.ts\n- Scope: src/core/, src/orchestra/, tests/core/\n\n### Description\nM7.A Sprint 144 sırasında manuel shipped (commit 0030451). M7.B ve M7.C Sprint 145 defense-in-depth.\n\n**M7.B — Pre-flight orphan IPC scan:**\n```typescript\n// src/core/orphan-cleaner.ts içine ekle\nexport async function cleanOrphanIpcDirs(root: string, currentJobId: string): Promise<number> {\n  const deckentDir = path.join(root, '.deckent');\n  const entries = await fs.readdir(deckentDir).catch(() => []);\n  const ipcPattern = /^sprint-\\d+-ipc$/;\n  let cleaned = 0;\n  for (const entry of entries) {\n    if (!ipcPattern.test(entry)) continue;\n    const jobIdMatch = entry.match(/sprint-(\\d+)-ipc/);\n    if (!jobIdMatch) continue;\n    const jobId = jobIdMatch[1];\n    if (jobId === currentJobId) continue;  // protect current\n    await fs.rm(path.join(deckentDir, entry), { recursive: true, force: true });\n    cleaned++;\n  }\n  return cleaned;\n}\n```\n\n`preflightOrphanCleanup()` çağrı zincirine ekle.\n\n**M7.C — sprint-runner-entry self-cleanup:**\n```typescript\n// src/orchestra/sprint-runner-entry.ts başlangıcına yakın\nconst ipcDir = process.argv[2];\nprocess.on('exit', () => {\n  if (process.exitCode === 0 || process.exitCode === undefined) {\n    try { fs.rmSync(ipcDir, { recursive: true, force: true }); } catch {}\n  }\n});\n```\n\n### Test (4+ test)\n1. cleanOrphanIpcDirs 5 orphan dizin temizler, current'i korur\n2. cleanOrphanIpcDirs ipc pattern'e uymayan dizinleri ignore eder\n3. sprint-runner-entry self-cleanup exit code 0 ise IPC siler\n4. sprint-runner-entry exit code != 0 ise IPC korur (debug için)\n\n**Kanıt:** `npx vitest run tests/core/orphan-cleaner-ipc.test.ts` 4+/4+ PASS, Sprint 145 sonu `ls -d .deckent/sprint-*-ipc | wc -l` ≤ 1.\n\n---\n\n## Wave 5 — P1 Polish (2 task, paralel)",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/orchestra/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/orphan-cleaner.ts",
+      "src/orchestra/sprint-runner-entry.ts",
+      "tests/core/orphan-cleaner-ipc.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/core/orphan-cleaner-ipc.test.ts` 4+/4+ PASS, Sprint 145 sonu `ls -d .deckent/sprint-*-ipc | wc -l` ≤ 1.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-145",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T04:56:28.402Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.67
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "delete",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T06:18:12.054Z"
+}

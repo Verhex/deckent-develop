@@ -1,0 +1,41 @@
+# Task 145-011: Result Atomicity Guarantee — TIMEOUT_WITH_WORK Partial Result
+
+## Execution Plan
+
+### Problem
+Sprint 144 NO_GO root cause: Worker SIGKILL → EXIT trap writes `{"selfAssessment":"NO_GO"}` ignoring `git diff` changes. Partial work is lost.
+
+### Changes
+
+#### 1. Type System (src/core/task-types.ts — READ-ONLY reference, outside scope)
+- `SelfAssessment` type already includes string literals — we use string union approach
+- `TIMEOUT_WITH_WORK` handled as string in result files, recognized in evaluator/collector
+
+#### 2. Docker worker.sh EXIT trap (src/orchestra/spawn-backend-docker.ts)
+- Replace simple fallback NO_GO with git-diff-aware EXIT trap
+- On non-zero exit + git diff has changes → write TIMEOUT_WITH_WORK result with filesChanged array
+- On non-zero exit + no git diff + no result → fallback NO_GO
+- Preserve existing result if already written (normal exit path)
+
+#### 3. Result Collector (src/orchestra/result-collector.ts — outside direct scope)
+- Result collector reads .result files as-is — TIMEOUT_WITH_WORK flows through naturally
+- Timeout marker (.timeout) path: update synthetic result to check for existing .result with TIMEOUT_WITH_WORK before overwriting
+
+#### 4. Result Evaluator (src/orchestra/result-evaluator.ts — outside direct scope)
+- evaluateResult(): TIMEOUT_WITH_WORK → GO_WITH_TECH_DEBT (partial work exists, Brain reconciles)
+
+#### 5. Worker Lifecycle (src/agents/worker-lifecycle.ts)
+- Add TIMEOUT_WITH_WORK to recognition in finalizeHeartbeatOnShutdown
+- Update DONE_SET or add separate PARTIAL_WORK_SET for heartbeat status logic
+
+#### 6. Tests (tests/docker/timeout-with-work.test.ts)
+- Test 1: SIGTERM + git diff 3 files → TIMEOUT_WITH_WORK + filesChanged.length === 3
+- Test 2: Normal exit + .result exists → trap doesn't overwrite
+- Test 3: SIGKILL + no git diff + no result → fallback NO_GO
+- Test 4: File names with spaces escape correctly in jq
+- Test 5: Integration: docker EXIT trap script generates correct JSON
+
+### Scope Compliance
+- Only touching: src/orchestra/spawn-backend-docker.ts, src/agents/worker-lifecycle.ts, tests/docker/
+- spawn-backend.ts: only if SpawnBackendOptions needs update (unlikely)
+- task-types.ts is outside scope — TIMEOUT_WITH_WORK handled as string, not enum extension
