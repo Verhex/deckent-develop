@@ -1,7 +1,9 @@
 <!-- Language: EN | Technical terms remain as-is -->
 # Deckent Beta Tracker
 
-**Last updated:** 2026-04-20 | **Sprint:** 145 | **Tests:** 12,485+ | **Version:** 0.4.0-beta.1
+**Last updated:** 2026-04-20 (Sprint 148 post) | **Sprint:** 148 DONE | **Tests:** 15,256 | **Version:** 0.4.0-beta.3 → v1.0.0-beta.1 target
+
+**Related:** [ROADMAP-GOD-LEVEL.md](docs/ROADMAP-GOD-LEVEL.md) — Sprint 149-200 master plan
 
 ---
 
@@ -22,7 +24,10 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 | 9 | i18n: CLI 100% + MCP 100% + Dashboard 95%+ | 95%+ | 🔄 Sprint 145 |
 | 10 | Memory V2 stress test pass | FTS5 + decay + rebuild | 🔄 Sprint 145 |
 | 11 | Documentation: README, API ref, config ref current | All synced | 🔄 Sprint 149 |
-| 12 | Zero open CRITICAL/HIGH debt | 0 items | ✅ PASS |
+| 12 | Zero open CRITICAL/HIGH debt | 0 items | 🔄 Sprint 149 (Dockerfile USER + vitest 135→<50) |
+| **13** | **Messaging trio smoke** — Discord + Telegram bots live | 2/2 + WhatsApp scaffold | ⏳ Sprint 149 |
+| **14** | **`deckent_style` toggle** — sprint/task switch config driven | Live | ⏳ Sprint 149 |
+| **15** | **DeckentHub 20 seed skills** — Ed25519 signed, AST sandboxed | 20/20 published | ⏳ Sprint 149 |
 
 ---
 
@@ -34,8 +39,9 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 | Sprint 146 | Mon Apr 20 – Tue Apr 21 | Prompt God Template Reform + Bug Fix + Rubric Consolidation | Agent truncation fix, routing V2 retrain, ADR relevance scoring, scope sanitizer, prompt god template, DIRECTIVES protection, SDL rehab, rubric consolidation — 17 tasks | 4.25/5 ✅ |
 | Sprint 147 | Tue Apr 21 | Nervous System Core Implementation | 13 modules + 25 test files, ADR-040 accepted, NervousObserver + Dispatcher + SafetyFloor + 5 Detectors + CLI TUI + 5 MCP tools | 4.45/5 ✅ |
 | Sprint 148 | Mon Apr 20 | Meta-Dogfood + Agent Taxonomy Reform + Nervous Activation | test-writer removed, testing-expert auto-activate, nervous enabled=true balanced, 5 detectors live, cross-platform 3/3, routing V3 | 4.65/5 ✅ |
-| Sprint 149 | Wed Apr 22 – Thu Apr 23 | Final Doc + npm Dry-Run | README/API ref/config ref final sync, .npmignore validation, `npm pack --dry-run` clean, CHANGELOG Sprint 145-149 | 4.85/5 |
-| Sprint 150 | Thu Apr 23 2026 | 🚀 Beta GA Cutover | npm publish, git tag v1.0.0-beta.1, GitHub release, public announce, 12/12 exit criteria PASS | 5.0/5 |
+| Sprint 149 | Wed Apr 22 | **Hybrid Foundation + Debt + Security + God-Level Start** | 27 tasks — 6 blocks: A-Mode toggle (`deckent_style`), B-P0 Security (Dockerfile+`.deck` interpolation), C-Messaging Trio (Discord+Telegram+WhatsApp scaffold), D-DeckentHub+Ed25519+20 seed skill, E-Doc consolidation (388 .md), F-ADR-041 accept + npm dry-run | 4.85/5 |
+| Sprint 150 | Thu Apr 23 2026 | 🚀 **Beta GA Cutover + Dashboard ChatPage + Public Repo Flip** | npm publish v1.0.0-beta.1, git tag, GitHub release, ChatPage.tsx (dashboard 7. page), deckent-hub public, Discord+Telegram bots live, Show HN + Reddit + Twitter announce, 15/15 exit criteria PASS | 5.0/5 |
+| Sprint 151+ | Apr 24 – Oct 2026 | **Post-Launch Phases 2-5** — see ROADMAP-GOD-LEVEL.md | Community bug triage, messaging polish, Hub growth, adaptive agent, daemon, local LLM, Voice (10K), Mobile (50K) | God-level |
 
 ---
 
