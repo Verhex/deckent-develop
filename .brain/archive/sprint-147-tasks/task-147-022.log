@@ -1,0 +1,12 @@
+`★ Insight ─────────────────────────────────────`
+ADR-040 DB'de **yoktu** — Sprint 146 T-146-012 sadece `nervous-types.ts` placeholder yazmış, DB'ye `insert()` çağırmamıştı. Bu nedenle `upsert()` yerine `insert()` kullandık. `upsert()` mevcut kayıt yoksa `insert()`'e delegate eder; DB'de zaten varsa field-level diff ile history kaydı bırakırdı. İki yöntem de güvenli — fark şu ki `upsert` ekstra bir `getById` sorgusu çalıştırır.
+`─────────────────────────────────────────────────`
+
+**T-147-022 DONE**
+
+Özet:
+- `ADR-040` `memory.db`'ye eklendi: `status=accepted`, `sprint_id=sprint-147`, `decay_exempt=true`
+- MADR v3 hibrit format: Context (Sprint 145-146 canlı kanıtlar), Decision (tam Nervous System pipeline), Consequences (+/-), References (T-147-001..T-147-021)
+- `.brain/exports/decisions.md` yenilendi (99,173 char, 40+1 ADR)
+- `.brain/exports/summary.md` yenilendi (4,898 char, ADR-040 tablo satırı dahil)
+- 3/3 test PASS, `tsc --noEmit` temiz

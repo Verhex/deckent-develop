@@ -1,0 +1,88 @@
+{
+  "id": "147-018",
+  "title": "Dispatcher — Context Detection + 3 Adapter Routing",
+  "description": "Dispatcher — Context Detection + 3 Adapter Routing\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Files: src/nervous/dispatcher.ts, tests/nervous/dispatcher.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\nSprint 145 T-006 NotifyDispatcher foundation üzerine nervous-specific dispatcher. Context detection otomatik kanal seç, cross-channel dedup garantisi.\n\n`src/nervous/dispatcher.ts` (~300 LoC):\n\n```typescript\nimport type { NervousNotification } from '../core/nervous-types.js';\nimport { getNotifyDispatcher } from '../notify/dispatcher.js';  // Sprint 145 T-006\n\nexport type Channel = 'mcp' | 'cli' | 'file';\n\nexport class NervousDispatcher {\n  private readonly emittedIds = new Set<string>();  // cross-channel dedup\n\n  constructor(private readonly config: NervousSystemConfig) {}\n\n  async dispatch(notification: NervousNotification): Promise<{ channels: Channel[]; success: boolean }> {\n    if (this.emittedIds.has(notification.id)) return { channels: [], success: true };\n    this.emittedIds.add(notification.id);\n\n    const channels = this.selectChannels(notification);\n    const results = await Promise.all(channels.map(c => this.pushToChannel(c, notification)));\n\n    return { channels, success: results.every(r => r) };\n  }\n\n  private selectChannels(n: NervousNotification): Channel[] {\n    const channels: Channel[] = ['file'];  // her zaman log\n    const cfg = this.config.notifications?.channels;\n    if (!cfg) return channels;\n\n    // Critical/emergency broadcast\n    if (n.severity === 'critical' || n.severity === 'emergency') {\n      if (cfg.mcp) channels.push('mcp');\n      if (cfg.cli) channels.push('cli');\n      return channels;\n    }\n\n    // Context detection\n    if (process.env.DECKENT_MCP_ACTIVE === '1' && cfg.mcp) {\n      channels.push('mcp');\n    } else if (process.stdout.isTTY && cfg.cli) {\n      channels.push('cli');\n    }\n    return channels;\n  }\n\n  private async pushToChannel(channel: Channel, n: NervousNotification): Promise<boolean>;\n}\n```\n\n### Test (8 test)\n1. Dispatch to file always\n2. MCP env var set → channels include 'mcp'\n3. TTY present + MCP off → channels include 'cli'\n4. Critical severity → broadcasts to all enabled\n5. Duplicate notification ID → no re-dispatch\n6. All channels disabled → only 'file'\n7. MCP dispatch failure → 'cli' fallback triggered\n8. Integration: NotifyDispatcher.push called (Sprint 145 T-006 wire)\n\n**Kanıt:** `npx vitest run tests/nervous/dispatcher.test.ts` 8/8 PASS.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/dispatcher.ts",
+      "tests/nervous/dispatcher.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/nervous/dispatcher.test.ts` 8/8 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.43
+        },
+        {
+          "type": "test",
+          "weight": 0.29
+        },
+        {
+          "type": "configure",
+          "weight": 0.29
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T10:23:09.255Z"
+}

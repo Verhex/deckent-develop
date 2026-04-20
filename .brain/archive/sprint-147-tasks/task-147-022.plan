@@ -1,0 +1,47 @@
+# Task 147-022 Execution Plan
+
+## Objective
+ADR-040'ı "proposed" → "accepted" statüsüne güncellemek ve `.brain/exports/decisions.md` dosyasını yenilemek.
+
+## Steps
+
+### 1. Mevcut ADR-040 Durumunu Kontrol Et
+- `MemoryStore.getById('adr-040')` ile mevcut kaydı oku
+- Eğer kayıt yoksa `insert()` ile yeni oluştur
+- Eğer varsa `upsert()` ile güncelle
+
+### 2. ADR-040 İçeriği
+MADR v3 hibrit format (Context/Decision/Consequences/References):
+
+**ID:** adr-040
+**Title:** Nervous System Architecture — Proactive Meta-Orchestrator
+**Status:** accepted
+**Sprint:** sprint-147
+
+**Content:**
+- Context: Sprint 145 canlı olayları (DIRECTIVES mid-sprint template bug, test-writer %53 anomaly, `string;` agent corruption)
+- Decision: `src/nervous/` modüler sistemi — Observer → DetectorRegistry → DecisionEngine → Proposer → Dispatcher → Executor pipeline
+- 4 authority preset (strict/balanced/autopilot/full-auto) + 5 locked safety floor
+- Consequences (+): Proaktif meta-layer, production-grade autonomy control
+- Consequences (-): Complexity artar, Sprint 148 activation gerekir
+- References: T-147-001..T-147-021 tüm Sprint 147 taskları
+
+### 3. decisions.md Yenile
+- `exportDecisionsMd(store)` çağır
+- `.brain/exports/decisions.md` üzerine yaz
+- ADR-040 satırının eklendiğini doğrula
+
+### 4. summary.md Güncelle
+- `exportSummaryMd(store)` çağır
+- `.brain/exports/summary.md` üzerine yaz
+- ADR-040'ın tablo satırında göründüğünü doğrula
+
+## Files Modified
+- `.brain/memory.db` — ADR-040 upsert (accepted)
+- `.brain/exports/decisions.md` — regenerated
+- `.brain/exports/summary.md` — regenerated (optional, summary table güncellemesi)
+
+## Verification
+1. `store.getById('adr-040').status === 'accepted'`
+2. decisions.md içinde `## adr-040:` satırı mevcut
+3. ADR body "References" section'ı T-147-001..T-147-021 içeriyor

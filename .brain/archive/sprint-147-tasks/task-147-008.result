@@ -1,0 +1,24 @@
+{
+  "taskId": "147-008",
+  "filesChanged": ["src/nervous/history.ts", "tests/nervous/history.test.ts"],
+  "linesAdded": 235,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "NervousHistory class implemented with JSONL append-only semantics, undo via compensation records, and retention pruning. All 8 tests pass. tsc --noEmit clean.",
+  "tokenUsage": {
+    "inputTokens": 25000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

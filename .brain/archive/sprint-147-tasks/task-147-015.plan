@@ -1,0 +1,35 @@
+# Task 147-015 Execution Plan
+# CLI Config — `deckent config nervous` TUI
+
+## Goal
+Implement `registerConfigNervous(program)` in `src/cli/commands/config-nervous.ts`.
+The command provides TUI + script-friendly subcommands for managing nervous system config.
+
+## Approach
+1. Create `src/cli/commands/config-nervous.ts` with `registerConfigNervous(configCmd)` function.
+   - Accepts the `config` Command object and attaches a `nervous` subcommand to it.
+   - Subcommands:
+     - (default) `deckent config nervous` → Interactive preset selection + override review
+     - `set mode <preset>` → change authority mode
+     - `override <ACTION_ID> <policy>` → add per-action override
+     - `list` → show 4-row matrix table
+     - `reset` → clear action_overrides
+
+2. Config file: `.deckent/config.json` → `nervous_system.mode` + `nervous_system.actionOverrides`
+
+3. Safety floor validation: use `isSafetyFloorAction()` from action-registry.ts to block overrides.
+
+4. Tests in `tests/cli/config-nervous.test.ts` covering all 7 test cases.
+
+## Files to Write
+- `src/cli/commands/config-nervous.ts` (~300 LoC)
+- `tests/cli/config-nervous.test.ts` (~200 LoC)
+
+## Test Cases
+1. set mode strict → config.nervous_system.mode = 'strict'
+2. override COMMIT_PUSH approve → action_overrides updated
+3. list → 4 line matrix table (strict/balanced/autopilot/full-auto)
+4. reset → action_overrides = {}
+5. Invalid preset → error + exit 1
+6. Invalid action ID → error
+7. Safety floor override attempt → rejected + warning

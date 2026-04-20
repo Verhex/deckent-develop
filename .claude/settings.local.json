@@ -235,7 +235,8 @@
       "Bash(echo \"--- EXIT $? ---\")",
       "Bash(awk '{print $1}')",
       "Bash(echo \"exit: $?\")",
-      "Bash(xargs -0 -r git rm --cached)"
+      "Bash(xargs -0 -r git rm --cached)",
+      "Bash(xargs -I{} basename {} .result)"
     ]
   },
   "outputStyle": "Explanatory"

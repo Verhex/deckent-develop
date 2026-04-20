@@ -1,0 +1,95 @@
+{
+  "id": "147-017",
+  "title": "Config Schema Extension — nervous_system",
+  "description": "Config Schema Extension — nervous_system\n\n- Model: sonnet\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/core/config.ts, src/core/config-defaults.ts, tests/core/config-nervous-schema.test.ts\n- Scope: src/core/, tests/core/\n\n### Description\n3-layer config merge'e nervous_system section ekle. Default: `enabled: false` (Sprint 147 sonunda Sprint 148 için true).\n\n```typescript\n// src/core/config-defaults.ts extend\nnervous_system: {\n  enabled: false,\n  mode: 'balanced',\n  actionOverrides: {},\n  safety_floor: {\n    locked_actions: ['KILL_LIVE_SPRINT', 'MANUAL_FILE_DELETE', 'COST_OVER_THRESHOLD', 'DESTRUCTIVE_GIT', 'ADR_DEPRECATE_ACCEPTED'],\n    cost_threshold_usd: 110,\n    bypass_allowed: false,\n  },\n  notifications: {\n    channels: { mcp: true, cli: true, file: true, desktop: false },\n    throttle_ms: 300000,\n    group_info_window_ms: 600000,\n    severity_min: 'info',\n    quiet_hours: { start: '22:00', end: '08:00', timezone: 'TRT' },\n    cross_channel_dedup: true,\n  },\n  detectors: {\n    stale_worker: { enabled: true, threshold_ms: 180000 },\n    scope_collision: { enabled: true },\n    debt_trend: { enabled: true, threshold_rate: 0.15 },\n    agent_routing: { enabled: true, anomaly_threshold: 0.40 },\n    directives_protection: { enabled: true, auto_restore: true },\n    // 5 reserve (Sprint 148 activate)\n    dead_event_stream: { enabled: false, reserve_for: 'sprint-148' },\n    cost_threshold: { enabled: false, reserve_for: 'sprint-148' },\n    prompt_quality: { enabled: false, reserve_for: 'sprint-148' },\n    worker_output_variance: { enabled: false, reserve_for: 'sprint-148' },\n    self_modifying_warner: { enabled: false, reserve_for: 'sprint-148' },\n  },\n  history_retention_days: 30,\n}\n```\n\n### Test (6 test)\n1. Default config has nervous_system.enabled=false\n2. Project config mode override applied (3-layer merge)\n3. Global config overrides defaults, project overrides global\n4. Invalid mode → validation error\n5. Invalid threshold_ms (negative) → validation error\n6. nervous_system.detectors has exactly 10 entries (5 active + 5 reserve)\n\n**Kanıt:** `npx vitest run tests/core/config-nervous-schema.test.ts` 6/6 PASS.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/config.ts",
+      "src/core/config-defaults.ts",
+      "tests/core/config-nervous-schema.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/core/config-nervous-schema.test.ts` 6/6 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.81
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T10:23:04.778Z"
+}

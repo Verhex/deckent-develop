@@ -1,0 +1,88 @@
+{
+  "id": "147-004",
+  "title": "Observer — Event Bus + Filesystem Watcher + Cron",
+  "description": "Observer — Event Bus + Filesystem Watcher + Cron\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Files: src/nervous/observer.ts, tests/nervous/observer.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\nNervous System'in girişi: 4 event source (event-bus, filesystem, cron, sprint-lifecycle). Sprint 145 T-003 EventBus + T-145-005 CHANNELS foundation üzerine kurulur.\n\n`src/nervous/observer.ts` (~400 LoC):\n\n```typescript\nimport { EventEmitter } from 'node:events';\nimport { watch, FSWatcher } from 'node:fs';\nimport { eventBus } from '../orchestra/event-bus.js';\nimport type { ObserverEvent, ObserverEventSource } from '../core/nervous-types.js';\nimport { randomUUID } from 'node:crypto';\n\nexport class NervousObserver extends EventEmitter {\n  private readonly fsWatchers: Map<string, FSWatcher> = new Map();\n  private cronTimer: NodeJS.Timeout | null = null;\n  private isStarted = false;\n\n  constructor(\n    private readonly projectRoot: string,\n    private readonly cronIntervalMs = 15000,  // 15s tick\n  ) { super(); }\n\n  start(): void {\n    if (this.isStarted) return;\n    this.subscribeEventBus();\n    this.startFilesystemWatchers();\n    this.startCronTick();\n    this.isStarted = true;\n  }\n\n  stop(): void {\n    if (!this.isStarted) return;\n    eventBus.off('deckent-event', this.onEventBusMessage);\n    for (const w of this.fsWatchers.values()) w.close();\n    this.fsWatchers.clear();\n    if (this.cronTimer) { clearInterval(this.cronTimer); this.cronTimer = null; }\n    this.isStarted = false;\n  }\n\n  private subscribeEventBus = (): void => {\n    eventBus.on('deckent-event', this.onEventBusMessage);\n  };\n\n  private onEventBusMessage = (payload: Record<string, unknown>): void => {\n    const event = this.buildEvent('event-bus', String(payload.type ?? 'UNKNOWN'), payload);\n    this.emit('observe', event);\n  };\n\n  private startFilesystemWatchers(): void {\n    // Sprint 145+146 dizinleri: .tasks/, .brain/, DIRECTIVES.md\n    const targets = ['.tasks', '.brain', 'DIRECTIVES.md', '.deckent'];\n    for (const t of targets) {\n      try {\n        const w = watch(`${this.projectRoot}/${t}`, { recursive: true }, (eventType, filename) => {\n          const event = this.buildEvent('filesystem', 'FILE_CHANGE',\n            { eventType, filename, path: `${t}/${filename ?? ''}` });\n          this.emit('observe', event);\n        });\n        this.fsWatchers.set(t, w);\n      } catch (e) { /* path may not exist */ }\n    }\n  }\n\n  private startCronTick(): void {\n    this.cronTimer = setInterval(() => {\n      const event = this.buildEvent('cron', 'TICK', { intervalMs: this.cronIntervalMs });\n      this.emit('observe', event);\n    }, this.cronIntervalMs);\n  }\n\n  private buildEvent(source: ObserverEventSource, type: string, payload: Record<string, unknown>): ObserverEvent {\n    return {\n      id: randomUUID(),\n      source,\n      type,\n      timestamp: new Date().toISOString(),\n      payload,\n      sprintId: typeof payload.sprintId === 'string' ? payload.sprintId : undefined,\n      taskId: typeof payload.taskId === 'string' ? payload.taskId : undefined,\n    };\n  }\n}\n```\n\n### Test (10 test)\n1. `start()` → `isStarted=true`, 2nd call no-op\n2. `stop()` → watchers cleared, timer null\n3. EventBus emit → observer emits 'observe' with source='event-bus'\n4. Filesystem change (write to `.tasks/test.json`) → emits 'observe' source='filesystem'\n5. Cron tick (50ms interval) → emits 'observe' source='cron' within 100ms\n6. 3 sources all emit valid ObserverEvent (UUID, ISO timestamp)\n7. sprintId/taskId payload'tan extract edilir\n8. Multiple start() calls idempotent\n9. FS watcher hata (missing dir) → continue (other watchers active)\n10. `stop()` sonrası event bus subscription off (emit → no callback)\n\n**Kanıt:** `npx vitest run tests/nervous/observer.test.ts` 10/10 PASS. tsc PASS.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/observer.ts",
+      "tests/nervous/observer.test.ts",
+      "DIRECTIVES.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/nervous/observer.test.ts` 10/10 PASS. tsc PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.65
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 0.8
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.6
+        },
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.33,
+          "tests/": 0.33,
+          "./": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T10:22:02.492Z"
+}

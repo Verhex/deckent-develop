@@ -1,0 +1,27 @@
+# Task 147-018: NervousDispatcher — Context Detection + 3 Adapter Routing
+
+## Execution Plan
+
+### 1. Implement src/nervous/dispatcher.ts (~300 LoC)
+- NervousDispatcher class with cross-channel dedup (Set<string>)
+- 3 channel adapters: MCP, CLI, File
+- Context detection: DECKENT_MCP_ACTIVE env → MCP, stdout.isTTY → CLI, always → file
+- Critical/emergency → broadcast to all enabled channels
+- MCP failure → CLI fallback
+- File adapter: append to .deckent/nervous-log.jsonl
+- CLI adapter: ANSI-formatted stderr output
+- MCP adapter: bridge to NotifyDispatcher from Sprint 145
+
+### 2. Implement tests/nervous/dispatcher.test.ts (8+ tests)
+1. Dispatch to file always
+2. MCP env var set → channels include 'mcp'
+3. TTY present + MCP off → channels include 'cli'
+4. Critical severity → broadcasts to all enabled
+5. Duplicate notification ID → no re-dispatch
+6. All channels disabled → only 'file'
+7. MCP dispatch failure → 'cli' fallback triggered
+8. Integration: NotifyDispatcher wire test
+
+### 3. Verify
+- tsc --noEmit PASS
+- npx vitest run tests/nervous/dispatcher.test.ts PASS

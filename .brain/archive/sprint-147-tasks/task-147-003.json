@@ -1,0 +1,90 @@
+{
+  "id": "147-003",
+  "title": "Authority Matrix — 4 Preset + Safety Floor + Override",
+  "description": "Authority Matrix — 4 Preset + Safety Floor + Override\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, system-architect\n- Files: src/nervous/authority-matrix.ts, tests/nervous/authority-matrix.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\nDesign spec Section 3. 4 preset: strict/balanced/autopilot/full-auto. Her preset risk → policy mapping'i içerir, safety floor override edilemez.\n\n`src/nervous/authority-matrix.ts` (~300 LoC):\n\n```typescript\nimport type { AuthorityMatrix, AuthorityMode, RiskLevel, ApprovalPolicy, SafetyFloorAction } from '../core/nervous-types.js';\nimport { ACTION_BY_ID } from './action-registry.js';\n\nexport const SAFETY_FLOOR: ReadonlyArray<SafetyFloorAction> = [\n  'KILL_LIVE_SPRINT',\n  'MANUAL_FILE_DELETE',\n  'COST_OVER_THRESHOLD',\n  'DESTRUCTIVE_GIT',\n  'ADR_DEPRECATE_ACCEPTED',\n];\n\nexport const STRICT_MATRIX: AuthorityMatrix = {\n  mode: 'strict',\n  riskPolicyMap: { low: 'suggest-30m', medium: 'approve', high: 'approve' },\n  actionOverrides: {},\n  safetyFloor: SAFETY_FLOOR,\n};\n\nexport const BALANCED_MATRIX: AuthorityMatrix = {\n  mode: 'balanced',\n  riskPolicyMap: { low: 'autonomous', medium: 'suggest-30m', high: 'approve' },\n  actionOverrides: {},\n  safetyFloor: SAFETY_FLOOR,\n};\n\nexport const AUTOPILOT_MATRIX: AuthorityMatrix = {\n  mode: 'autopilot',\n  riskPolicyMap: { low: 'autonomous', medium: 'autonomous', high: 'suggest-5m' },\n  actionOverrides: {},\n  safetyFloor: SAFETY_FLOOR,\n};\n\nexport const FULL_AUTO_MATRIX: AuthorityMatrix = {\n  mode: 'full-auto',\n  riskPolicyMap: { low: 'autonomous', medium: 'autonomous', high: 'autonomous' },\n  actionOverrides: {},\n  safetyFloor: SAFETY_FLOOR,\n};\n\nexport const MATRIX_BY_MODE: ReadonlyMap<AuthorityMode, AuthorityMatrix> =\n  new Map([['strict', STRICT_MATRIX], ['balanced', BALANCED_MATRIX],\n           ['autopilot', AUTOPILOT_MATRIX], ['full-auto', FULL_AUTO_MATRIX]]);\n\n/** Resolve final policy from matrix + overrides + safety floor check */\nexport function resolvePolicy(\n  matrix: AuthorityMatrix,\n  actionId: string,\n  userOverrides?: Readonly<Record<string, ApprovalPolicy>>\n): { policy: ApprovalPolicy; isSafetyFloor: boolean; reason: string } {\n  const action = ACTION_BY_ID.get(actionId);\n  if (!action) throw new Error(`Unknown action: ${actionId}`);\n\n  // 1. Safety floor check — locked even in full-auto\n  const isSafetyFloor = action.requiredSafetyFloor.length > 0 ||\n                        (SAFETY_FLOOR as readonly string[]).includes(actionId);\n  if (isSafetyFloor) {\n    return { policy: 'approve', isSafetyFloor: true,\n             reason: `Safety floor: ${actionId} requires explicit user approval` };\n  }\n\n  // 2. User override (if any)\n  const userOverride = userOverrides?.[actionId];\n  if (userOverride) {\n    return { policy: userOverride, isSafetyFloor: false,\n             reason: `User override for ${actionId}: ${userOverride}` };\n  }\n\n  // 3. Matrix action override\n  const matrixOverride = matrix.actionOverrides[actionId];\n  if (matrixOverride) {\n    return { policy: matrixOverride, isSafetyFloor: false,\n             reason: `Matrix override: ${matrixOverride}` };\n  }\n\n  // 4. Default risk→policy mapping\n  return { policy: matrix.riskPolicyMap[action.defaultRisk], isSafetyFloor: false,\n           reason: `Risk-based default (${action.defaultRisk}): ${matrix.riskPolicyMap[action.defaultRisk]}` };\n}\n```\n\n### Test (12 test)\n1. STRICT: low-risk action → 'suggest-30m'\n2. BALANCED: low → 'autonomous', medium → 'suggest-30m', high → 'approve'\n3. AUTOPILOT: high-risk → 'suggest-5m' (not approve)\n4. FULL_AUTO: normal high-risk → 'autonomous'\n5. FULL_AUTO: KILL_LIVE_SPRINT → 'approve' (safety floor VETO)\n6. User override `{ COMMIT_PUSH: 'approve' }` + AUTOPILOT → 'approve'\n7. Safety floor override edilemez (user override KILL_LIVE_SPRINT='autonomous' → yine 'approve')\n8. `resolvePolicy(balanced, 'UNKNOWN')` throws\n9. Reason string her 4 yoldan (safety/user/matrix/default) farklı format\n10. All 4 matrices have identical SAFETY_FLOOR reference\n11. `MATRIX_BY_MODE.size === 4`\n12. Frozen immutability: `STRICT_MATRIX.riskPolicyMap.low = 'autonomous'` throws (readonly)\n\n**Kanıt:** `npx vitest run tests/nervous/authority-matrix.test.ts` 12/12 PASS. tsc PASS. Safety floor test 5+7 **kritik**.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/authority-matrix.ts",
+      "tests/nervous/authority-matrix.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/nervous/authority-matrix.test.ts` 12/12 PASS. tsc PASS. Safety floor test 5+7 **kritik**.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.86
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2106,
+  "updatedAt": "2026-04-20T10:21:58.096Z"
+}

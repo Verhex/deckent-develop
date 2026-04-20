@@ -1,0 +1,17 @@
+# Task 147-001 Execution Plan
+
+## Goal
+Extend src/core/nervous-types.ts with 6 new runtime types for Sprint 147 Nervous System.
+
+## Approach
+1. Append new types AFTER existing ones (preserve all existing exports)
+2. Add: ObserverEventSource, ObserverEvent, DetectorContext, SprintStateSnapshot, ActionDefinition, ExecutionRecord, DecisionOutput
+3. Write runtime validation tests in tests/core/nervous-types-runtime.test.ts
+
+## Files to Modify
+- src/core/nervous-types.ts (append ~80 LoC)
+- tests/core/nervous-types-runtime.test.ts (new, ~120 LoC)
+
+## Verify
+- tsc --noEmit PASS
+- npx vitest run tests/core/nervous-types-runtime.test.ts 6/6 PASS

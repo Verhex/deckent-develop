@@ -1,0 +1,27 @@
+# Task 147-007 Execution Plan
+
+## Goal
+Implement the Executor class for the Nervous System — handles 3 execution modes:
+1. Autonomous (immediate execution)
+2. Suggest-timeout (timer + auto-apply on expiry)
+3. Approve (wait indefinitely for user decision)
+
+## Approach
+1. Create `src/nervous/executor.ts` with full Executor class (~400 LoC)
+2. Create `tests/nervous/executor.test.ts` with 12 tests using fake timers
+3. Since `history.ts` doesn't exist yet, define a minimal NervousHistory interface in executor.ts
+
+## Key Design Decisions
+- Use vi.useFakeTimers() for timer-based tests
+- ActionHandler is a function type (DI for testability)
+- Use ACTION_BY_ID from action-registry for reversibility lookup
+- Promise-based approve/suggest patterns for clean async flow
+
+## Files to Modify
+- CREATE: src/nervous/executor.ts
+- CREATE: tests/nervous/executor.test.ts
+
+## Dependencies
+- src/core/nervous-types.ts (types - already exists)
+- src/nervous/action-registry.ts (ACTION_BY_ID - already exists)
+- history.ts (not yet created - define interface locally)

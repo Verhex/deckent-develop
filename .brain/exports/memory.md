@@ -1,5 +1,8 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-147 Learnings
+- Sprint sprint-147 Learnings: ## Sprint sprint-147 Learnings
+
 ## Sprint sprint-146 Learnings
 - Sprint sprint-146 Learnings: ## Sprint sprint-146 Learnings
 - Agent Truncation Bug Fix: GO_WITH_TECH_DEBT — Root cause: task-builder.ts:761 had `agentPrompt.slice(0, 2000)` which truncated agent prompts to 2000 chars. This cause

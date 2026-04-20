@@ -1,0 +1,28 @@
+{
+  "taskId": "147-016",
+  "filesChanged": [
+    "src/mcp/tools/nervous.ts",
+    "src/mcp/tools/index.ts",
+    "src/mcp/server.ts",
+    "tests/mcp/nervous-tools.test.ts"
+  ],
+  "linesAdded": 380,
+  "linesRemoved": 3,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "5 MCP tools implemented: deckent_nervous_subscribe, deckent_nervous_accept, deckent_nervous_reject, deckent_nervous_status, deckent_nervous_config. Registered in tools/index.ts. Server instructions updated 22→27 tools. 10/10 tests pass. tsc --noEmit clean.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 80
+  }
+}

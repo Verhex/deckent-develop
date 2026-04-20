@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "en",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-146",
+  "last_sprint_id": "sprint-147",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -109,5 +109,80 @@
     "loc_scaling_enabled": true,
     "history_scaling_enabled": true,
     "runtime_extension_enabled": false
+  },
+  "nervous_system": {
+    "enabled": false,
+    "mode": "balanced",
+    "actionOverrides": {},
+    "safety_floor": {
+      "locked_actions": [
+        "KILL_LIVE_SPRINT",
+        "MANUAL_FILE_DELETE",
+        "COST_OVER_THRESHOLD",
+        "DESTRUCTIVE_GIT",
+        "ADR_DEPRECATE_ACCEPTED"
+      ],
+      "cost_threshold_usd": 110,
+      "bypass_allowed": false
+    },
+    "notifications": {
+      "channels": {
+        "mcp": true,
+        "cli": true,
+        "file": true,
+        "desktop": false
+      },
+      "throttle_ms": 300000,
+      "group_info_window_ms": 600000,
+      "severity_min": "info",
+      "quiet_hours": {
+        "start": "22:00",
+        "end": "08:00",
+        "timezone": "TRT"
+      },
+      "cross_channel_dedup": true
+    },
+    "detectors": {
+      "stale_worker": {
+        "enabled": true,
+        "threshold_ms": 180000
+      },
+      "scope_collision": {
+        "enabled": true
+      },
+      "debt_trend": {
+        "enabled": true,
+        "threshold_rate": 0.15
+      },
+      "agent_routing": {
+        "enabled": true,
+        "anomaly_threshold": 0.4
+      },
+      "directives_protection": {
+        "enabled": true,
+        "auto_restore": true
+      },
+      "dead_event_stream": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "cost_threshold": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "prompt_quality": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "worker_output_variance": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      },
+      "self_modifying_warner": {
+        "enabled": false,
+        "reserve_for": "sprint-148"
+      }
+    },
+    "history_retention_days": 30
   }
 }

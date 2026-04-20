@@ -1,0 +1,87 @@
+{
+  "id": "147-019",
+  "title": "Integration Tests — 40+ Tests Suite",
+  "description": "Integration Tests — 40+ Tests Suite\n\n- Model: opus\n- Effort: high\n- Skills: testing-expert, typescript-expert\n- Files: tests/nervous/integration/*.test.ts (5 file)\n- Scope: tests/nervous/\n\n### Description\n40+ integration test: Observer+Detector+DecisionEngine+Proposer+Executor+Dispatcher tam pipeline. Sprint 146 T-146-011 vitest regression fix de bu waveda toplanır (mocks bozulan 2 fail tamir).\n\n5 test dosyası:\n1. `observer-to-detector.test.ts` (10 test) — Observer event → Detector dispatch\n2. `detector-to-decision.test.ts` (10 test) — DetectorResult → DecisionOutput(s)\n3. `proposer-to-executor.test.ts` (10 test) — Notification → ExecutionRecord\n4. `dispatcher-end-to-end.test.ts` (6 test) — Full pipeline simulation\n5. `regression-sprint-146.test.ts` (5 test) — Sprint 146 T-011 vitest regression fix\n\nMin toplam: 41 test.\n\n### Test\nŞart: `npx vitest run tests/nervous/integration/` 41/41 PASS.\nEk: `npx vitest run` total fail < 3 (Sprint 146'dan gelen 118 baseline'ı da iyileştirme).\n\n**Kanıt:** Vitest full run: Sprint 146 baseline fail 118 → Sprint 147 fail < 30.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/nervous/integration/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/nervous/integration/*.test.ts (5 file)",
+      ".test",
+      "test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Vitest full run: Sprint 146 baseline fail 118 → Sprint 147 fail < 30.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "testing-expert",
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "testing-expert",
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 0.6
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.33,
+          "./": 0.67
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T10:23:12.955Z"
+}

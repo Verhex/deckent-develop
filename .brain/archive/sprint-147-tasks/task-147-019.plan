@@ -1,0 +1,33 @@
+# Task 147-019 Execution Plan
+
+## Objective
+Write 41+ integration tests across 5 files in tests/nervous/integration/
+
+## Files to Create
+1. tests/nervous/integration/observer-to-detector.test.ts (10 tests)
+2. tests/nervous/integration/detector-to-decision.test.ts (10 tests)
+3. tests/nervous/integration/proposer-to-executor.test.ts (10 tests)
+4. tests/nervous/integration/dispatcher-end-to-end.test.ts (6 tests)
+5. tests/nervous/integration/regression-sprint-146.test.ts (5 tests)
+
+## Approach
+- Mock filesystem and external I/O at boundaries
+- Use real module instances (no mocking code under test)
+- Test full pipeline flows: Observer event → Detector → DecisionEngine → Proposer → Executor → Dispatcher
+- Use vi.useFakeTimers for timeout-dependent tests
+- Replay Sprint 146 real-world scenarios (string; corruption, test-writer anomaly)
+
+## Dependencies
+All source modules exist and were read:
+- src/nervous/observer.ts
+- src/nervous/decision-engine.ts
+- src/nervous/proposer.ts
+- src/nervous/executor.ts
+- src/nervous/dispatcher.ts
+- src/nervous/history.ts
+- src/nervous/action-registry.ts
+- src/nervous/authority-matrix.ts
+- src/nervous/detectors/stale-worker.ts
+- src/nervous/detectors/scope-collision.ts
+- src/nervous/detectors/directives-protection.ts
+- src/nervous/detectors/agent-routing.ts

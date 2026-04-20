@@ -1,0 +1,28 @@
+{
+  "taskId": "147-021",
+  "workerId": "w-147-021",
+  "filesChanged": [
+    "src/orchestra/sprint-controller.ts",
+    "tests/orchestra/sprint-controller-nervous-hook.test.ts"
+  ],
+  "linesAdded": 180,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": 95,
+  "selfAssessment": "DONE",
+  "notes": "Sprint controller lifecycle event emission implemented. Added emitSprintEvent() and emitPhaseChange() helpers to sprint-controller.ts. 7 SPRINT_PHASE_CHANGE events emitted at each phase transition (PLAN→SPAWN, SPAWN→EXECUTE, EXECUTE→EVALUATE, EVALUATE→FIX, FIX→RETRO, RETRO→DECAY, DECAY→COMPLETE). Additional events: SPRINT_STARTED (after PLAN), SPRINT_RETRO_COMPLETE (after retro), SPRINT_COMPLETED (after final phase). All emissions wrapped in try-catch — never breaks sprint flow. 5/5 tests pass, tsc clean.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

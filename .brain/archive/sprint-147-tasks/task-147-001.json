@@ -1,0 +1,97 @@
+{
+  "id": "147-001",
+  "title": "Nervous Types Genişletme — Runtime Types",
+  "description": "Nervous Types Genişletme — Runtime Types\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/core/nervous-types.ts, tests/core/nervous-types-runtime.test.ts\n- Scope: src/core/, tests/core/\n\n### Description\nSprint 146 T-12'de placeholder types yazıldı (~190 LoC). Sprint 147 runtime logic için genişletme.\n\nMevcut types (KORU): `AuthorityMode`, `RiskLevel`, `ApprovalPolicy`, `Severity`, `SafetyFloorAction`, `NotificationAction`, `NervousNotification`, `AuthorityMatrix`, `NervousSystemConfig`, `DetectorResult`.\n\nEklenecek (YENİ):\n\n```typescript\n// ─── Observer Event ──────────────────────────────────────────────\nexport type ObserverEventSource = 'event-bus' | 'filesystem' | 'cron' | 'sprint-lifecycle';\n\nexport interface ObserverEvent {\n  readonly id: string;                 // UUID v4\n  readonly source: ObserverEventSource;\n  readonly type: string;               // e.g. \"WORKER_HEARTBEAT\", \"FILE_WRITE\", \"SPRINT_PHASE_CHANGE\"\n  readonly timestamp: string;          // ISO 8601 UTC\n  readonly payload: Record<string, unknown>;\n  readonly sprintId?: string;\n  readonly taskId?: string;\n}\n\n// ─── Detector Context ─────────────────────────────────────────────\nexport interface DetectorContext {\n  readonly event: ObserverEvent;\n  readonly sprintState: SprintStateSnapshot;  // currentPhase, activeWorkers, debtCount\n  readonly projectRoot: string;\n  readonly now: Date;                         // for testability\n}\n\nexport interface SprintStateSnapshot {\n  readonly sprintId: string | null;\n  readonly currentPhase: 'IDLE' | 'PLAN' | 'SPAWN' | 'EXECUTE' | 'EVALUATE' | 'FIX' | 'RETRO' | 'DECAY' | 'CLEANUP';\n  readonly activeWorkers: ReadonlyArray<{ id: string; taskId: string; lastHeartbeat: string }>;\n  readonly openDebtCount: number;\n  readonly totalTasks: number;\n  readonly completedTasks: number;\n}\n\n// ─── Action Definition ────────────────────────────────────────────\nexport interface ActionDefinition {\n  readonly id: string;                // e.g. \"ORPHAN_TASK_ARCHIVE\"\n  readonly displayName: string;\n  readonly description: string;\n  readonly category: 'low-risk' | 'medium-risk' | 'high-risk' | 'safety-floor';\n  readonly defaultRisk: RiskLevel;\n  readonly requiredSafetyFloor: SafetyFloorAction[];  // max 1, empty if not locked\n  readonly reversible: boolean;       // Undo command destekler mi\n}\n\n// ─── Execution Record ─────────────────────────────────────────────\nexport interface ExecutionRecord {\n  readonly id: string;                // UUID\n  readonly notificationId: string;\n  readonly actionId: string;\n  readonly decision: 'accepted' | 'rejected' | 'timeout-auto-applied' | 'autonomous';\n  readonly decidedBy: 'user' | 'system' | 'timeout';\n  readonly executedAt: string;        // ISO 8601 UTC\n  readonly outcome: 'success' | 'failure' | 'pending';\n  readonly error?: string;\n  readonly durationMs?: number;\n  readonly reversible: boolean;\n  readonly payload: Record<string, unknown>;\n}\n\n// ─── Decision Output ──────────────────────────────────────────────\nexport interface DecisionOutput {\n  readonly action: ActionDefinition;\n  readonly policy: ApprovalPolicy;    // resolved from authority matrix\n  readonly risk: RiskLevel;\n  readonly isSafetyFloor: boolean;\n  readonly reason: string;            // insan-okunabilir (for transparency)\n}\n```\n\n### Test (6 test)\n1. `ObserverEvent` UUID v4 validation, ISO 8601 timestamp\n2. `DetectorContext` sprintState snapshot yapısı doğru\n3. `ActionDefinition` category + defaultRisk consistency (low-risk → 'low')\n4. `ExecutionRecord` decision union types correct\n5. `DecisionOutput` safety floor task'da autonomous VETO edilir (type-level test)\n6. tsc strict mode PASS (no implicit any, readonly violations)\n\n**Kanıt:** `npx vitest run tests/core/nervous-types-runtime.test.ts` 6/6 PASS. `tsc --noEmit` PASS.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/nervous-types.ts",
+      "tests/core/nervous-types-runtime.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/core/nervous-types-runtime.test.ts` 6/6 PASS. `tsc --noEmit` PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "security",
+          "config"
+        ],
+        "confidence": 0.74
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.29
+        },
+        {
+          "type": "configure",
+          "weight": 0.29
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        },
+        {
+          "type": "create",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 2042,
+  "updatedAt": "2026-04-20T10:21:49.552Z"
+}

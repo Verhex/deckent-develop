@@ -1,0 +1,27 @@
+{
+  "taskId": "147-022",
+  "filesChanged": [
+    ".brain/memory.db",
+    ".brain/exports/decisions.md",
+    ".brain/exports/summary.md"
+  ],
+  "linesAdded": 120,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ADR-040 'Nervous System Architecture — Proactive Meta-Orchestrator' başarıyla memory.db'ye eklendi (status=accepted, sprint-147, decay_exempt=true). decisions.md 99173 char → ADR-040 entry dahil. summary.md 4898 char → ADR-040 tablo satırı dahil. 3/3 test PASS: (1) store.getById('adr-040').status==='accepted', (2) decisions.md '## adr-040:' içeriyor, (3) body T-147-001..T-147-021 tüm task referansları + ## References section. MADR v3 hibrit format: Context (Sprint 145-146 canlı kanıtlar) / Decision (Observer→Detector→Engine→Proposer→Dispatcher→Executor pipeline, 4 preset, 5 safety floor, 30 action, 5 detector) / Consequences (+/-) / References (tüm 22 Sprint 147 task). tsc --noEmit PASS (kaynak kod değişikliği yok).",
+  "tokenUsage": {
+    "inputTokens": 8500,
+    "outputTokens": 2800,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 95
+  }
+}

@@ -92,3 +92,4 @@
 - DIRECTIVES.md Mid-Sprint Silme Bug Fix: GO_WITH_TECH_DEBT — Phase guard added to archiveDirectives() — rejects calls outside CLEANUP/COMPLETE phase. Emergency restore function adde
 - Rubric System Consolidation: GO_WITH_TECH_DEBT — Rubric system consolidated: (1) Removed rubricScores spec from worker prompt in prompt-god-template.ts — workers no long
 - Sprint 145 vitest Regression Fix: NO_GO — Docker worker exited without writing result file
+## Sprint sprint-147 Learnings

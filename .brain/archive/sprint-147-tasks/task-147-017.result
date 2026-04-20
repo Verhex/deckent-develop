@@ -1,0 +1,27 @@
+{
+  "taskId": "147-017",
+  "filesChanged": [
+    "src/core/config-types.ts",
+    "src/core/config.ts",
+    "tests/core/config-nervous-schema.test.ts"
+  ],
+  "linesAdded": 163,
+  "linesRemoved": 5,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "3-layer config merge extended with nervous_system section. Added NervousSystemConfig interface + type aliases (NervousAuthorityMode, NervousSeverityMin, NervousApprovalPolicy, NervousSafetyFloorAction, NervousDetectorConfig) to config-types.ts. Added full default values in createDefaultConfig() — enabled: false, mode: 'balanced', 5 active + 5 reserved detectors. Added validation in validateConfig() covering mode enum, threshold_ms negativity, threshold_rate range, anomaly_threshold range. 6/6 tests pass. Pre-existing 4 failures in tests/core/error-registry-lint.test.ts and tests/core/error-handling-unification.test.ts are unrelated (they test for raw throw new Error in src/orchestra/ and are caused by other Sprint 147 tasks adding nervous system code). tsc --noEmit shows only pre-existing error in src/cli/commands/config-nervous.ts (unused RED variable) — outside scope.",
+  "tokenUsage": {
+    "inputTokens": 28000,
+    "outputTokens": 3200,
+    "cacheReadTokens": 15000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 98,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 88
+  }
+}

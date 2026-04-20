@@ -1,0 +1,24 @@
+# Task 147-014 Execution Plan
+
+## Approach
+1. Create `src/cli/commands/nervous.ts` — register commander.js subcommands (ADR-012 pattern)
+2. Register in `src/cli/index.ts` via `registerNervous(program)`
+3. Create `tests/cli/nervous-command.test.ts` — 10 test cases
+
+## Files to Modify
+- src/cli/commands/nervous.ts (NEW ~500 LoC)
+- src/cli/index.ts (add import + register call)
+- tests/cli/nervous-command.test.ts (NEW ~300 LoC)
+
+## Dependencies Used
+- src/nervous/executor.ts (Executor class, resolveApproval)
+- src/nervous/history.ts (NervousHistory class, readAll, findRecentReversible)
+- src/core/nervous-types.ts (NervousNotification, ExecutionRecord, NervousSystemConfig)
+
+## Design
+- Commander.js `program.command('nervous')` with subcommands
+- Dashboard: read pending from executor, recent from history, config from config.json
+- accept/reject: call executor.resolveApproval
+- history: read from NervousHistory with limit/since filters
+- log --follow: tail -f style with fs.watch on history JSONL
+- Colors: ANSI escape codes (no chalk per ADR-010)

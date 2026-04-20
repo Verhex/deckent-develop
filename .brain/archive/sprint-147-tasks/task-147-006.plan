@@ -1,0 +1,30 @@
+# Task 147-006 Execution Plan
+
+## Goal
+Implement Proposer class for the Nervous System — builds NervousNotification from DetectorResult + DecisionOutput, with throttle + severity filter + grouping.
+
+## Approach
+1. Create `src/nervous/proposer.ts` (~250 LoC)
+   - Proposer class with recentGroups Map for throttling
+   - propose() method: filters by shouldNotify, severity, throttle → builds NervousNotification
+   - computeTimeoutMs(): extracts smallest suggest-*m timeout from decisions
+   - passesSeverityFilter(): severity rank comparison
+   - isThrottled(): groupKey time-window check
+
+2. Create `tests/nervous/proposer.test.ts` (8 tests)
+   - shouldNotify=false → null
+   - severityMin filter
+   - groupKey throttle (within 5min → null, after → notification)
+   - critical bypasses severity filter
+   - multiple decisions → multiple actions
+   - timeoutMs computation
+   - approve-only → null timeout
+   - payload propagation
+
+## Files
+- Write: src/nervous/proposer.ts
+- Write: tests/nervous/proposer.test.ts
+
+## Verification
+- tsc --noEmit PASS
+- npx vitest run tests/nervous/proposer.test.ts 8/8 PASS

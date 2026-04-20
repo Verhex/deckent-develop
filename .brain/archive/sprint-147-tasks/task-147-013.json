@@ -1,0 +1,92 @@
+{
+  "id": "147-013",
+  "title": "DirectivesMidSprintProtection",
+  "description": "DirectivesMidSprintProtection\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, system-architect\n- Files: src/nervous/detectors/directives-protection.ts, tests/nervous/detectors/directives-protection.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\nSprint 145 08:14 TRT canlı bug: DIRECTIVES.md EXECUTE phase'de template'e dönüştü. Sprint 146 T-146-008 phase guard ekledi (archiveDirectives reject). Sprint 147 bu detector **pro-active izlem + otomatik restore** ekler.\n\n`src/nervous/detectors/directives-protection.ts` (~300 LoC):\n\n```typescript\nimport type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';\nimport { readFileSync, existsSync, statSync } from 'node:fs';\nimport { join } from 'node:path';\n\nexport class DirectivesMidSprintProtection {\n  readonly detectorId = 'directives-protection';\n\n  detect(ctx: DetectorContext): DetectorResult | null {\n    if (ctx.event.source !== 'filesystem') return null;\n    if (!ctx.event.payload.path?.toString().endsWith('DIRECTIVES.md')) return null;\n\n    // Protection only active during EXECUTE/FIX phases\n    const protectedPhases = ['EXECUTE', 'FIX'];\n    if (!protectedPhases.includes(ctx.sprintState.currentPhase)) return null;\n\n    const directivesPath = join(ctx.projectRoot, 'DIRECTIVES.md');\n    if (!existsSync(directivesPath)) {\n      return this.buildCriticalAlert(ctx, 'DIRECTIVES.md DELETED mid-sprint');\n    }\n\n    const content = readFileSync(directivesPath, 'utf-8');\n    const size = statSync(directivesPath).size;\n\n    // Sprint 144/145 pattern: 463 byte = template\n    const TEMPLATE_SIZE_THRESHOLD = 2000;\n    const suspiciousPatterns = [\n      /^# DIRECTIVES — \\(Sprint \\d+ için hazırlanıyor\\)/,  // Template pattern\n      /\\(Task başlığı\\)/,                                   // Placeholder pattern\n    ];\n\n    const isTemplate = size < TEMPLATE_SIZE_THRESHOLD ||\n                       suspiciousPatterns.some(p => p.test(content));\n\n    if (!isTemplate) return null;\n\n    return this.buildCriticalAlert(ctx, `DIRECTIVES.md reverted to template mid-sprint (size=${size})`);\n  }\n\n  private buildCriticalAlert(ctx: DetectorContext, reason: string): DetectorResult {\n    return {\n      risk: 'high',\n      shouldNotify: true,\n      severity: 'emergency',\n      groupKey: `directives-protection:${ctx.sprintState.sprintId}`,\n      suggestedActions: [{\n        id: 'DIRECTIVES_WRITE',\n        label: `🚨 EMERGENCY: Restore DIRECTIVES.md from task JSON files`,\n        risk: 'high' as const,\n        payload: { reason, sprintId: ctx.sprintState.sprintId, phase: ctx.sprintState.currentPhase, autoRestore: true },\n      }],\n      metadata: { type: 'directives-protection', reason },\n    };\n  }\n}\n```\n\n### Test (8 test)\n1. PLAN phase + DIRECTIVES change → null (not protected phase)\n2. EXECUTE phase + normal DIRECTIVES (full content) → null\n3. EXECUTE phase + DIRECTIVES 463 byte → emergency alert\n4. EXECUTE phase + template pattern match → emergency alert\n5. EXECUTE phase + DIRECTIVES deleted → emergency alert\n6. FIX phase + template → emergency alert (FIX also protected)\n7. RETRO phase + template → null (not protected, expected transition)\n8. suggestedActions[0].payload.autoRestore === true (nervous system balanced mode → autonomous)\n\n**Kanıt:** `npx vitest run tests/nervous/detectors/directives-protection.test.ts` 8/8 PASS. Test #3 **Sprint 145 08:14 TRT senaryo replay**.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/detectors/",
+      "tests/nervous/detectors/",
+      "src/nervous/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/detectors/directives-protection.ts",
+      "tests/nervous/detectors/directives-protection.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/nervous/detectors/directives-protection.test.ts` 8/8 PASS. Test #3 **Sprint 145 08:14 TRT senaryo replay**.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.9
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T10:22:40.539Z"
+}

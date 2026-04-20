@@ -1,0 +1,26 @@
+{
+  "taskId": "147-010",
+  "filesChanged": [
+    "src/nervous/detectors/scope-collision.ts",
+    "tests/nervous/detectors/scope-collision.test.ts"
+  ],
+  "linesAdded": 215,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ScopeCollisionMonitor implementasyonu ve 5 unit test tamamlandı. tsc --noEmit PASS, vitest 5/5 PASS. Detector yalnızca PLAN ve EXECUTE fazlarında aktif; .tasks/*.json dosyalarından filesWrite'ları okur, normalize eder (lowercase + çoklu slash temizleme), ve birden fazla task aynı dosyaya yazacaksa SCOPE_COLLISION_REORDER eylemini önerir. Tüm görev spec'indeki 5 test senaryosu doğrulandı.",
+  "tokenUsage": {
+    "inputTokens": 14500,
+    "outputTokens": 1800,
+    "cacheReadTokens": 52000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 90
+  }
+}

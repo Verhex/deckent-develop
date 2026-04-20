@@ -1,0 +1,92 @@
+{
+  "id": "147-007",
+  "title": "Executor — 3 Mod Handler (Autonomous / Suggest / Approve)",
+  "description": "Executor — 3 Mod Handler (Autonomous / Suggest / Approve)\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, system-architect\n- Files: src/nervous/executor.ts, tests/nervous/executor.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\nNotification onaylandıktan sonra eylemi fiilen yürütür. 3 mod: autonomous (hemen), suggest-timeout (timer + auto-apply), approve (user decision bekler). History append.\n\n`src/nervous/executor.ts` (~400 LoC):\n\n```typescript\nimport type { NervousNotification, ExecutionRecord, ApprovalPolicy } from '../core/nervous-types.js';\nimport type { NervousHistory } from './history.js';\nimport { randomUUID } from 'node:crypto';\n\nexport interface ActionHandler {\n  (actionId: string, payload: Record<string, unknown>): Promise<{ outcome: 'success' | 'failure'; error?: string }>;\n}\n\nexport class Executor {\n  private readonly pendingTimers: Map<string, NodeJS.Timeout> = new Map();\n  private readonly pendingApprovals: Map<string, {\n    notification: NervousNotification;\n    resolve: (decision: 'accepted' | 'rejected') => void;\n  }> = new Map();\n\n  constructor(\n    private readonly history: NervousHistory,\n    private readonly actionHandler: ActionHandler,\n  ) {}\n\n  async handle(notification: NervousNotification): Promise<ExecutionRecord[]> {\n    const records: ExecutionRecord[] = [];\n    for (const action of notification.actions) {\n      const record = await this.handleAction(notification, action);\n      records.push(record);\n      await this.history.append(record);\n    }\n    return records;\n  }\n\n  private async handleAction(notification: NervousNotification, action: NotificationAction): Promise<ExecutionRecord> {\n    const base = {\n      id: randomUUID(),\n      notificationId: notification.id,\n      actionId: action.id,\n      executedAt: new Date().toISOString(),\n      reversible: /* lookup action-registry */,\n      payload: action.payload ?? {},\n    };\n\n    if (action.policy === 'autonomous') {\n      const r = await this.actionHandler(action.id, action.payload ?? {});\n      return { ...base, decision: 'autonomous', decidedBy: 'system', outcome: r.outcome, error: r.error };\n    }\n\n    if (action.policy === 'suggest-5m' || action.policy === 'suggest-30m') {\n      return this.handleSuggestTimeout(notification, action, base);\n    }\n\n    if (action.policy === 'approve') {\n      return this.handleApprove(notification, action, base);\n    }\n\n    throw new Error(`Unknown policy: ${action.policy}`);\n  }\n\n  /** User-driven: deckent nervous accept <id> / reject <id> calls this */\n  resolveApproval(notificationId: string, decision: 'accepted' | 'rejected'): void {\n    const pending = this.pendingApprovals.get(notificationId);\n    if (pending) { pending.resolve(decision); this.pendingApprovals.delete(notificationId); }\n  }\n\n  shutdown(): void {\n    for (const t of this.pendingTimers.values()) clearTimeout(t);\n    this.pendingTimers.clear();\n    for (const p of this.pendingApprovals.values()) p.resolve('rejected');\n    this.pendingApprovals.clear();\n  }\n}\n```\n\n### Test (12 test)\n1. Autonomous policy → immediate handler call + outcome='success' record\n2. Autonomous handler throw → outcome='failure', error captured\n3. suggest-5m → timer 300s, user accept mid-way → 'accepted' decision\n4. suggest-30m + no action → timeout → 'timeout-auto-applied'\n5. suggest-5m + reject mid-way → 'rejected' decision\n6. approve → awaits indefinitely until resolveApproval\n7. approve + rejected → record decidedBy='user', outcome no handler call\n8. Multiple actions in single notification → multiple records\n9. shutdown() clears all timers, pending approvals resolve 'rejected'\n10. History.append called for every record\n11. Reversibility flag propagated from ActionDefinition\n12. Payload propagation handler → payload doğru\n\n**Kanıt:** `npx vitest run tests/nervous/executor.test.ts` 12/12 PASS. Fake timers kullan (vitest vi.useFakeTimers).\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/executor.ts",
+      "tests/nervous/executor.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/nervous/executor.test.ts` 12/12 PASS. Fake timers kullan (vitest vi.useFakeTimers).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T10:22:18.486Z"
+}

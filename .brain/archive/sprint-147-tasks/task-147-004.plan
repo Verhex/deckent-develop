@@ -1,0 +1,35 @@
+# Task 147-004 Execution Plan — Observer
+
+## Objective
+Create NervousObserver class that listens to 4 event sources (event-bus, filesystem, cron, sprint-lifecycle) and emits unified ObserverEvent objects.
+
+## Analysis
+
+### EventBus Integration
+- The existing EventBus (`src/orchestra/event-bus.ts`) extends EventEmitter
+- It emits 'event' in publish() — we'll listen to this for event-bus source events
+- It also has subscribe() with filtering — we'll use the simpler EventEmitter API
+
+### Key Design Decisions
+1. Observer extends EventEmitter, emits 'observe' for all sources
+2. FS watchers target `.tasks/`, `.brain/`, `DIRECTIVES.md`, `.deckent/`
+3. Cron tick configurable interval (default 15s)
+4. Sprint-lifecycle events come through the event-bus channel
+5. Idempotent start/stop
+
+## Files to Create
+1. `src/nervous/observer.ts` (~250 LoC)
+2. `tests/nervous/observer.test.ts` (~350 LoC, 10 tests)
+
+## Implementation Steps
+1. Write observer.ts with NervousObserver class
+2. Write comprehensive test suite
+3. Run tsc --noEmit
+4. Run vitest on the test file
+5. Fix any issues
+6. Write result file
+
+## Risk Assessment
+- FS watcher tests need temp directories — use vi.mock or real temp dirs
+- EventBus singleton — mock the module import
+- Timer tests — use vi.useFakeTimers

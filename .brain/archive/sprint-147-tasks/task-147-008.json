@@ -1,0 +1,88 @@
+{
+  "id": "147-008",
+  "title": "History — JSONL Append + Undo + Retention",
+  "description": "History — JSONL Append + Undo + Retention\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/nervous/history.ts, tests/nervous/history.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\n`.deckent/nervous-history.jsonl` audit trail. Append-only, N+1 line per record, undo support (reversible actions için son N record geri alınabilir).\n\n`src/nervous/history.ts` (~250 LoC):\n\n```typescript\nimport type { ExecutionRecord, ActionDefinition } from '../core/nervous-types.js';\nimport { appendFile, readFile, writeFile } from 'node:fs/promises';\nimport { existsSync } from 'node:fs';\nimport { join } from 'node:path';\n\nexport class NervousHistory {\n  private readonly filePath: string;\n\n  constructor(projectRoot: string) {\n    this.filePath = join(projectRoot, '.deckent', 'nervous-history.jsonl');\n  }\n\n  /** Atomic append — each record is one JSONL line */\n  async append(record: ExecutionRecord): Promise<void> {\n    const line = JSON.stringify(record) + '\\n';\n    await appendFile(this.filePath, line, 'utf-8');\n  }\n\n  async readAll(): Promise<ExecutionRecord[]> {\n    if (!existsSync(this.filePath)) return [];\n    const content = await readFile(this.filePath, 'utf-8');\n    return content.split('\\n').filter(Boolean).map(line => JSON.parse(line) as ExecutionRecord);\n  }\n\n  async findById(id: string): Promise<ExecutionRecord | null> {\n    const all = await this.readAll();\n    return all.find(r => r.id === id) ?? null;\n  }\n\n  async findRecentReversible(limit = 10): Promise<ExecutionRecord[]> {\n    const all = await this.readAll();\n    return all.filter(r => r.reversible && r.outcome === 'success').slice(-limit).reverse();\n  }\n\n  /** Mark as undone — append compensation record (does NOT delete) */\n  async markUndone(originalId: string, compensationDetail: Record<string, unknown>): Promise<void>;\n\n  /** Retention: drop records older than N days */\n  async prune(retentionDays: number = 30): Promise<number>;  // returns pruned count\n}\n```\n\n### Test (8 test)\n1. Append single record → file contains 1 JSONL line\n2. Append 3 records → readAll returns all 3 in order\n3. findById existing → returns record\n4. findById nonexistent → null\n5. findRecentReversible → only reversible+success, limit 10, newest first\n6. markUndone → appends new record with `originalId` ref (no delete)\n7. prune(retentionDays=7) → drops records older than 7 days, returns count\n8. Concurrent append (2 parallel) → both present (atomic append)\n\n**Kanıt:** `npx vitest run tests/nervous/history.test.ts` 8/8 PASS. Temp dir for isolation.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/history.ts",
+      "tests/nervous/history.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/nervous/history.test.ts` 8/8 PASS. Temp dir for isolation.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-147",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T09:35:04.411Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "delete",
+          "weight": 0.43
+        },
+        {
+          "type": "create",
+          "weight": 0.29
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        },
+        {
+          "type": "configure",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T10:22:22.896Z"
+}
