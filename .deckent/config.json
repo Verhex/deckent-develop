@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "en",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-147",
+  "last_sprint_id": "sprint-148",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -111,7 +111,7 @@
     "runtime_extension_enabled": false
   },
   "nervous_system": {
-    "enabled": false,
+    "enabled": true,
     "mode": "balanced",
     "actionOverrides": {},
     "safety_floor": {

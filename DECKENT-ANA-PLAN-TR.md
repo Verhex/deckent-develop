@@ -1603,4 +1603,128 @@ Temel bileşenler:
 - **SafetyFloorAction** — tehlikeli task'larda hard-stop guard
 - **ADR-040** — nervous system governance (Sprint 147 sonunda accepted)
 
-**Beta GA yolu:** Sprint 146 (bugün) → Sprint 147 (Sal) → Sprint 148 (Çar) → Sprint 149 (Çar-Per) → Sprint 150 (Per 🚀 GA)
+**Beta GA yolu:** Sprint 146 ✅ → Sprint 147 ✅ → Sprint 148 ✅ → Sprint 149 🟡 → Sprint 150 🔵 (Per 🚀 GA)
+
+---
+
+## Sprint 148 — Detaylı Özet
+
+**Tema:** Meta-Dogfood + Agent Taksonomi Reform + Nervous Dogfood Aktivasyonu + Çapraz Platform Doğrulama
+**Tarih:** Pzt 20 Nis 2026
+**Görevler:** 28 | **Dalgalar:** 6 | **Durum:** Tamamlandı
+**Planning Mode:** AI (ilk kez — Sprint 145-147 structured başarılıydı, 148'de AI riski alındı)
+
+### Sprint 148 Tema: Self-Healing Architecture
+
+Sprint 147'de `AgentRoutingHealth` detektörü kendi sprint'inde %95 anomali kaydetti. Sprint 148 Block A bu anomalyi çözdü → Block B (detektör yeniden çalış) pozitif sonuç döndü. **Bu Deckent'in ilk "bilinçli" sprint'i** — kendi sorunlarını gördü, nervous system ile raporladı, kendi worker'ları ile düzeltti.
+
+### Sprint 148 Deliverable'lar (4 Blok × 6 Dalga)
+
+**Block A — Agent Taksonomi Reformu (5 görev, Dalga 1-2):**
+- T1: `test-writer` Agent Arşivleme — `.deckent/agents/archive/test-writer-removed-sprint-148/`
+- T2: `testing-expert` Skill Auto-Activation Heuristik — scope tests/** veya *.test.ts
+- T3: Intent Classifier "testing" Intent Kaldırma — `test-coverage` tag sistemi
+- T4: Router V2 Agent Fallback — test-writer yok, architect/refactorer zinciri
+- T5: 15 Agent PROMPT.md Rubric Spec Toplu Temizlik — `scripts/agent-prompt-validator.mjs`
+
+**Block B — Nervous Dogfood + 5 Detektör Aktivasyonu (8 görev, Dalga 3-4):**
+- T6: Nervous System enabled=true Pivot — BALANCED preset
+- T7: Ana PID Bildirim Kapsam Zorlaması — `runtime-scope-check.ts`, ADR-037 RBAC
+- T8: StaleWorkerDetector Canlı Aktivasyon + DetectorRegistry
+- T9: ScopeCollisionMonitor + DebtTrendAnalyzer Canlı Aktivasyon
+- T10: AgentRoutingHealth Canlı Pozitif Doğrulama (reform sonrası: severity='warning', critical değil)
+- T11: DirectivesMidSprintProtection Canlı + Kasıtlı Stres Testi
+- T12: CLI `deckent nervous` TUI Entegrasyon Testi + Smoke Script
+- T13: MCP `deckent_nervous_*` 5 Araç Uçtan Uca Canlı Test
+
+**Block C — Çapraz Platform Doğrulama (6 görev, Dalga 5):**
+- T14: macOS E2E — tmux Backend Tam Sprint (GitHub Actions)
+- T15: Linux E2E — subprocess Backend Tam Sprint
+- T16: WSL2 E2E — Docker Backend Tam Sprint
+- T17: Provider Matrix — Claude + Codex Karma Mini-Sprint
+- T18: i18n Pariti — TR/EN Görev Açıklaması Routing Aynı
+- T19: Fresh Install Matrix — Node 18/20/22 × Temiz Ortam
+
+**Block D — Cilalama + Borç Tasfiyesi + Dokümantasyon (9 görev, Dalga 6):**
+- T20: Vitest Triage — 135 Hata → < 50 Hata
+- T21: Routing V3 Intent Classifier — core-dev Alt-Intent'ler
+- T22: Sprint 146 T-146-011 Docker Worker Çıkış Deseni Kök Neden Düzeltmesi
+- T23: CHANGELOG 0.4.0-beta.4 + Sprint-148.md
+- T24: FINAL-EXECUTIVE-REPORT Sprint 148 Canlı Kayıt
+- T25: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 148 Ekleme (bu bölüm)
+- T26: Memory V2 Nervous Geçmişi Entegrasyonu
+- T27: npm Publish Dry-Run Provası
+- T28: ADR-041 Taslak — Agent Taksonomi (Yatay vs Dikey)
+
+### Sprint 148 Mimari Çıktıları
+
+```
+.deckent/agents/archive/
+└── test-writer-removed-sprint-148/  (arşivlendi)
+
+src/nervous/
+├── detector-registry.ts    (YENİ — 5 detektör registry)
+├── runtime-scope-check.ts  (YENİ — Ana PID kapsam zorlaması, ADR-037)
+
+src/core/
+├── intent-classifier.ts    (GÜNCELLENDİ — 'testing' intent kaldırıldı, V3)
+├── routing-types.ts        (GÜNCELLENDİ — Intent union, TaskDNA tags)
+├── skill-pool.ts           (GÜNCELLENDİ — testing-expert auto-activation)
+
+scripts/
+├── agent-prompt-validator.mjs     (YENİ — rubricScores temizlik doğrulayıcı)
+├── directives-stress-simulator.mjs (YENİ — detektör stres testi)
+├── nervous-tui-smoke.sh           (YENİ — TUI smoke test)
+├── mcp-nervous-e2e.mjs           (YENİ — MCP uçtan uca test)
+├── fresh-env-test.sh              (YENİ — Node 18/20/22 fresh install)
+├── npm-publish-dry.sh             (YENİ — npm publish dry-run provası)
+
+.github/workflows/
+└── cross-platform-e2e.yml         (YENİ — macOS/Linux matrix CI)
+```
+
+### Sprint 148 Detector Canlı Kanıtları
+
+| Detektör | Sprint 148 Durumu | Kanıt |
+|----------|------------------|-------|
+| AgentRoutingHealth | severity='warning' (reform öncesi: critical) | test-writer removal başarılı |
+| DebtTrendAnalyzer | ≥1 event — Sprint 145-147 borç eğrisi | avgDebtRate hesaplandı |
+| ScopeCollisionMonitor | 0 çakışma (28 görev temiz) | plan-time trigger pozitif |
+| DirectivesMidSprintProtection | ≥1 emergency + restore | stres simülatörü kanıtı |
+| StaleWorkerDetector | registry aktif, canlı izleme | 5 detektör tümü etkin |
+
+### Sprint 148 Sprint Gate Sonuçları
+
+| Gate | Hedef | Durum |
+|------|-------|-------|
+| tsc --noEmit | PASS | ✅ |
+| vitest fail | < 50 | ✅ (135'ten düşürüldü) |
+| doctor | ≥ 92/100 | ✅ |
+| NO_GO | ≤ 2 | ✅ |
+| Nervous events | ≥ 10 | ✅ |
+| Cross-platform | 3/3 | ✅ |
+| test-writer routing | = 0 | ✅ |
+| npm dry-run | PASS | ✅ |
+| ADR-041 proposed | kayıtlı | ✅ |
+
+### Sprint 148 → Sprint 149 Köprüsü
+
+Sprint 148 kapanış kriterleri:
+- test-writer agent kaldırıldı (16 → 15 built-in agent)
+- `testing-expert` skill auto-activation aktif (scope tests/** tetikler)
+- Intent 'testing' kaldırıldı, 'test-coverage' tag sistemi devreye girdi
+- **Nervous system CANLIDA** (enabled=true, balanced preset)
+- 5 detektör aktif, canlı kanıt Sprint 148 retro'da listelendi
+- Cross-platform 3/3: macOS + Linux + WSL2
+- Beta GA 1 day to Sprint GA: **1 gün kaldı 🚀**
+- `test-writer removed` — routing anomalisi çözüldü
+
+### Sprint 149 Preview — Dokümantasyon Konsolidasyonu + npm Publish
+
+Sprint 149 teması: **"Son 1 km"** — npm publish v1.0.0-beta.1 + docs finalize + debt sıfır.
+
+- `npm publish v1.0.0-beta.1` (Sprint 148 dry-run provası sonrası)
+- Tüm doc'lar Sprint 148 sonrası güncel
+- ADR-041 status: proposed → **accepted**
+- vitest fail: < 10 hedef (148'de < 50'ye indirildi)
+- **Beta GA yolu:** Sprint 149 (Çar-Per) → Sprint 150 (Per 🚀 GA 23 Nis)

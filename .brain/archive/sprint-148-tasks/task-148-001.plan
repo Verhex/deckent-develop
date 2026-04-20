@@ -1,0 +1,21 @@
+# Task 148-001 Execution Plan
+
+## Objective
+Move test-writer agent to archive and write removal justification document.
+
+## Steps
+1. Create archive directory: `.deckent/agents/archive/test-writer-removed-sprint-148/`
+2. Move agent.json and PROMPT.md to archive
+3. Remove original `.deckent/agents/test-writer/` directory
+4. Write justification document at `docs/audits/sprint-148/test-writer-removal-justification.md`
+5. Verify: test-writer no longer in agents/, archive exists
+
+## Files Modified
+- .deckent/agents/test-writer/ → archived
+- .deckent/agents/archive/test-writer-removed-sprint-148/agent.json (new)
+- .deckent/agents/archive/test-writer-removed-sprint-148/PROMPT.md (new)
+- docs/audits/sprint-148/test-writer-removal-justification.md (new)
+
+## Verification
+- `ls .deckent/agents/ | grep test-writer` → empty
+- `ls .deckent/agents/archive/test-writer-removed-sprint-148/` → agent.json, PROMPT.md

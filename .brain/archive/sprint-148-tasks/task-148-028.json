@@ -1,0 +1,96 @@
+{
+  "id": "148-028",
+  "title": "ADR-041 Draft — Agent Taxonomy (Horizontal vs Vertical)",
+  "description": "ADR-041 Draft — Agent Taxonomy (Horizontal vs Vertical)\n\n- Model: sonnet\n- Effort: low\n- Skills: documentation-writer, system-architect\n- Files: .brain/memory.db (insert), .brain/exports/decisions.md (regenerated)\n- Scope: .brain/\n\n### Description\nADR-041 taslak `status: proposed`. Sprint 149'da accept edilecek (dogfood kanıtı sonrası).\n\nMADR v3 hibrit format:\n```markdown\n# ADR-041: Agent Taxonomy — Horizontal Skills vs Vertical Agents\n\n## Status\nproposed (Sprint 148)\n\n## Context\nSprint 146-147 live evidence: `test-writer` agent 22/22 Sprint 147 tasks (100% anomaly). Intent classifier misroutes \"test\" keyword as primary 'testing' intent...\n\n## Decision\nReorganize agent taxonomy: **agent = vertical expertise** (architect, security-auditor, frontend-designer, doc-writer). **Skill = horizontal capability** (testing-expert, typescript-expert, documentation-writer). Test is a horizontal skill usable by any agent, not a standalone vertical agent.\n\n## Consequences\n(+) Routing distribution balanced (no agent > 40%)\n(+) Nervous AgentRoutingHealth detector meaningful\n(+) Beta GA UX clean (\"why does every task go to test-writer?\" embarrassment avoided)\n(-) Sprint 147 existing test-writer stats archived\n(-) Breaking change: custom user agents may require migration adapter\n\n## References\nSprint 146 T-146-005 string; corruption, Sprint 147 95% anomaly, Sprint 148 T-148-001..005 reform.\n```\n\nMemoryStore.insert:\n```typescript\nstore.insert({\n  id: 'adr-041',\n  type: 'adr',\n  title: 'Agent Taxonomy — Horizontal Skills vs Vertical Agents',\n  body: /* above content */,\n  status: 'proposed',\n  sprint_id: 'sprint-148',\n  tags: ['governance', 'agent-pool', 'taxonomy', 'beta-ga'],\n  decay_exempt: true,\n});\n```\n\n### Test (3 test)\n1. `store.insert` success\n2. `store.getById('adr-041')` returns entry, status='proposed'\n3. `.brain/exports/decisions.md` regenerated, includes ADR-041\n\n**Kanıt:** `store.getByType('adr').find(a => a.id === 'adr-041')?.status === 'proposed'`.\n\n---\n\n# BAĞIMLILIK ZİNCİRİ\n\n```\nWave 1 (paralel, reform hazırlık): T1 + T2 + T3\nWave 2 (paralel, reform kesim):    T4 ← {T1,T2,T3} | T5\nWave 3 (paralel, nervous enable):  T6 + T7 + T8 + T9 ← T8\nWave 4 (paralel, detector + UI):   T10 + T11 + T12 + T13\nWave 5 (paralel, cross-platform):  T14 + T15 + T16 + T17 + T18 + T19\nWave 6 (paralel, polish + doc):    T20 + T21 + T22 + T23 + T24 + T25 + T26 + T27 + T28\n```\n\n# SPRINT GATE (CHAIN SAFETY)\n\n1. **tsc --noEmit PASS** (0 errors)\n2. **vitest fail < 50** (Sprint 147 baseline 135, hedef < 50)\n3. **doctor ≥ 92/100** (READY + agent count 15)\n4. **NO_GO ≤ 2** (Sprint 147 baseline 0)\n5. **Nervous events ≥ 10** (detector canlı kanıt)\n6. **Cross-platform 3/3** (macOS + Linux + WSL2)\n7. **Agent routing test-writer = 0** (reform kanıt)\n8. **cost < $150** (geniş soft cap)\n9. **ADR-041 proposed** kayıtlı\n10. **npm publish dry-run PASS**\n\n# SPRINT 148 SELF-MODIFYING UYARISI\n\nDeckent kendi agent pool'unu, intent classifier'ını, router'ını ve nervous system'ini değiştiriyor. ADR-038 Self-Modifying Detection **canlı çalışmalı**. Koordinatör disiplin:\n- Sprint canlı iken src/ müdahale **YASAK** (Sprint 144-147 lesson)\n- Monitor 15-30s interval\n- T-148-007 Ana PID constraint **zorunlu** — worker process'ten nervous init YASAK\n\n# FALLBACK — Sprint 149 Numaratör +1\n\nKatastrofik fail senaryosu (< 50% completion veya > 3 NO_GO veya 8h hard cap aşımı):\n1. `deckent_cleanup` (Alperen onaylı)\n2. `.tasks/archive/sprint-148-failed/` taşı\n3. Aynı DIRECTIVES.md Sprint 149 olarak yeniden başlat\n4. Sprint 150 Beta GA **1 gün** ertelenir (Cuma 24 Nis) — **kabul edilebilir**\n\n# BETA GA COUNTDOWN\n\nSprint 150 Perşembe 23 Nis TRT = **2 gün 18 saat**.\n\n**Sprint 148 başarısı Sprint 149'a temiz giriş → Sprint 150 cutover:**\n- npm publish v1.0.0-beta.1\n- git tag v1.0.0-beta.1\n- GitHub release notes\n- `deckent nervous` user-facing v1.0 announcement\n\n---\n\n**Oluşturan:** Koordinatör (writing-plans skill + spec 2026-04-20 + Alperen onayları 7/7)\n**Baseline:** Sprint 147 23/23 DONE 49m 34s 0 TD (hedef Sprint 148 ≤ 8h, rubric ≥ 85)\n**İlk komut:** `deckent_plan mode: 'ai'` — Alperen onayı bekliyor",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      ".brain/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".brain/memory.db (insert)",
+      ".brain/exports/decisions.md (regenerated)",
+      "decisions.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `store.getByType('adr').find(a => a.id === 'adr-041')?.status === 'proposed'`.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "documentation-writer",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T13:54:40.608Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "security"
+        ],
+        "confidence": 0.48
+      },
+      "domains": [],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.22
+        },
+        {
+          "type": "test",
+          "weight": 0.22
+        },
+        {
+          "type": "document",
+          "weight": 0.22
+        },
+        {
+          "type": "delete",
+          "weight": 0.11
+        },
+        {
+          "type": "configure",
+          "weight": 0.11
+        },
+        {
+          "type": "create",
+          "weight": 0.11
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          ".brain/": 0.67,
+          "./": 0.33
+        },
+        "primaryWriteTarget": ".brain/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:45:26.290Z"
+}

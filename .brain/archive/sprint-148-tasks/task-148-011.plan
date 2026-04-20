@@ -1,0 +1,16 @@
+# Task 148-011 Execution Plan
+
+## Goal
+Create stress test for DirectivesMidSprintProtection detector + simulator script.
+
+## Files to Create
+1. `scripts/directives-stress-simulator.mjs` — deliberate DIRECTIVES.md overwrite with auto-restore
+2. `tests/nervous/detectors/directives-protection-stress.test.ts` — 8 tests (7 regression + 1 stress)
+
+## Approach
+1. Write `scripts/directives-stress-simulator.mjs` exactly as specified in DIRECTIVES
+2. Write stress test file that:
+   - Re-implements the 7 unit tests from Sprint 147 T-147-013 (regression coverage)
+   - Adds 1 stress test that simulates the script's behavior (mock fs operations)
+3. Run tsc --noEmit + vitest on the new test file
+4. Write result

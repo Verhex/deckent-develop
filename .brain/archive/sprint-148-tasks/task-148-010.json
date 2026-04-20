@@ -1,0 +1,89 @@
+{
+  "id": "148-010",
+  "title": "AgentRoutingHealth Canlı Pozitif Doğrulama",
+  "description": "AgentRoutingHealth Canlı Pozitif Doğrulama\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: tests/nervous/detectors/agent-routing-positive.test.ts\n- Scope: tests/nervous/\n\n### Description\nBu detector'ın **kendi sprint'inde ikinci kez** çalışacağı kritik an. Sprint 147'de %95 anomaly yakaladı. Sprint 148'de Wave 1-2 sonrası (Block A reform tamamlandıktan sonra) EVALUATE phase'de **tekrar** çalışır.\n\n**Beklenen canlı sonuç:**\n- 28 task analizi:\n  - architect: ~12 task (%43) — core-dev + mcp-dev + cli-dev\n  - refactorer: ~5 task (%18)\n  - doc-writer: ~6 task (%21) — Block D docs\n  - devops-engineer: ~3 task (%11) — cross-platform\n  - bug-fixer: ~1 task (%4)\n  - security-auditor: ~1 task (%4)\n- Anomaly threshold %40 → architect %43 **sınırda**, muhtemelen alert üretir (borderline case)\n- Critical severity (corrupt agent) → **0** (test-writer removal sonrası string; pattern yok)\n\n### Test (5 test)\n1. 28 task analizi → architect %43 → borderline medium-severity alert\n2. `string;` corrupt agent pattern → 0 detection (reform sonrası)\n3. Anomaly threshold 0.40 → architect borderline, sonraki sprint Block D docs balanced eder\n4. False positive test — architect %43 legitimate (multi-block presence), detector warning ama blocker değil\n5. Sprint 147 replay — aynı detector %95 → critical alert (regression test, Sprint 147 data hâlâ detect edilir)\n\n**Kanıt:** Sprint 148 EVALUATE phase event stream: `agent-routing` detector event, severity='warning' (critical değil — reform başarılı).\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/nervous/detectors/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/nervous/detectors/agent-routing-positive.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 148 EVALUATE phase event stream: `agent-routing` detector event, severity='warning' (critical değil — reform başarılı).",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation",
+          "security"
+        ],
+        "confidence": 0.67
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 1
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 1
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:44:16.115Z"
+}

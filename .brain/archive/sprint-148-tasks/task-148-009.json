@@ -1,0 +1,87 @@
+{
+  "id": "148-009",
+  "title": "ScopeCollisionMonitor + DebtTrendAnalyzer Live Activation",
+  "description": "ScopeCollisionMonitor + DebtTrendAnalyzer Live Activation\n\n- Model: sonnet\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/nervous/detector-registry.ts (already active from T-008), tests/nervous/detectors/scope-collision-live.test.ts, tests/nervous/detectors/debt-trend-live.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\nT-008 registry 5 detector enabled. Bu task her iki detector için **canlı integration test** + Sprint 148 sırasında event kanıt.\n\n**ScopeCollisionMonitor** — Sprint 148 PLAN phase'inde auto-trigger:\n- 28 task arasında `filesWrite` overlap analizi\n- Beklenti: Block A 5 task + Block B 8 task + ... birbirine yakın scope yok (DIRECTIVES temiz yazıldı)\n- Canlı sonuç: 0 collision (pozitif kanıt detector çalışıyor ama false positive yok)\n\n**DebtTrendAnalyzer** — Sprint 148 RETRO phase'inde auto-trigger:\n- Son 3 sprint (145, 146, 147) debt rate: 24/28=%86, 6/17=%35, 0/23=%0 — avg %40\n- **ALERT** — threshold %15 aşıldı (Sprint 145 debt spike outlier)\n- Action: DEBT_REPRIORITIZE suggest-30m\n\n### Test (6 test)\n1. Scope collision plan-time trigger — 28 task temiz → 0 collision detection (pozitif)\n2. Deliberate collision fixture (2 task aynı dosya) → 1 collision event\n3. Collision payload includes task IDs + file path\n4. Debt trend Sprint 145-147 data → avgDebtRate calculation correct\n5. Debt trend alert severity='warning', suggestedAction=DEBT_REPRIORITIZE\n6. Sprint 148 retro'da debt-trend event listed\n\n**Kanıt:** Sprint 148 RETRO \"Detector Events\" section — debt-trend ≥1 event.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/",
+      "tests/nervous/detectors/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/detector-registry.ts (already active from T-008)",
+      "tests/nervous/detectors/scope-collision-live.test.ts",
+      "tests/nervous/detectors/debt-trend-live.test.ts",
+      "src/nervous/detector-registry.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 148 RETRO \"Detector Events\" section — debt-trend ≥1 event.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:44:12.282Z"
+}

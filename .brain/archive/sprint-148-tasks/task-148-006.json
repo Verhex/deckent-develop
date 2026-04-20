@@ -1,0 +1,92 @@
+{
+  "id": "148-006",
+  "title": "Nervous System enabled=true Pivot — BALANCED Preset",
+  "description": "Nervous System enabled=true Pivot — BALANCED Preset\n\n- Model: sonnet\n- Effort: low\n- Skills: typescript-expert\n- Files: .deckent/config.json, src/core/config-defaults.ts, tests/core/nervous-enabled-integration.test.ts\n- Scope: .deckent/, src/core/, tests/core/\n\n### Description\n`.deckent/config.json`'a top-level alan ekle (yoksa):\n```json\n{\n  \"nervous_system\": {\n    \"enabled\": true,\n    \"mode\": \"balanced\",\n    \"actionOverrides\": {},\n    \"quietHours\": { \"start\": \"22:00\", \"end\": \"08:00\" },\n    \"throttleWindowMs\": 300000\n  }\n}\n```\n\n`src/core/config-defaults.ts` defaults.nervous_system: `enabled: false` (yeni projeler default güvenli).\n\nBrain boot sırasında (sprint-controller.ts başlangıcı) config.nervous_system.enabled true ise NervousObserver + DetectorRegistry + Dispatcher init edilir. **Ana PID'de** (T-148-007 constraint).\n\n### Test (3 test)\n1. `.deckent/config.json` load → `nervous_system.enabled === true`\n2. `configDefaults.nervous_system.enabled === false` (global default)\n3. Brain boot integration: config enabled → observer.start() called, event-stream'de `NERVOUS:STARTED` event\n\n**Kanıt:** Sprint 148 ilk 30s event stream'de `NERVOUS:STARTED source=brain` event.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "tests/core/",
+      ".deckent/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".deckent/config.json",
+      "src/core/config-defaults.ts",
+      "tests/core/nervous-enabled-integration.test.ts",
+      "config.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 148 ilk 30s event stream'de `NERVOUS:STARTED source=brain` event.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "testing",
+          "config"
+        ],
+        "confidence": 0.56
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.57
+        }
+      ],
+      "operations": [
+        {
+          "type": "configure",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          ".deckent/": 0.25,
+          "src/": 0.25,
+          "tests/": 0.25,
+          "./": 0.25
+        },
+        "primaryWriteTarget": ".deckent/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:43:59.055Z"
+}

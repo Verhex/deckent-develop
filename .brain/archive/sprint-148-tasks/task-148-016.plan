@@ -1,0 +1,27 @@
+# Task 148-016: WSL2 E2E — Docker Backend Full Sprint
+
+## Execution Plan
+
+### Approach
+Create a comprehensive E2E test file for WSL2 + Docker backend validation, following the same pattern as macOS tmux test (task-148-014). Tests use `describe.skipIf()` for graceful degradation on non-WSL2 platforms.
+
+### Files to Create
+1. `tests/e2e/cross-platform/wsl2-docker.test.ts` — 6 test cases
+2. `docs/audits/sprint-148/wsl2-validation.md` — Audit validation document
+
+### Test Strategy
+- Test 1: WSL2 detection via `uname -r` containing "microsoft" (or graceful skip)
+- Test 2: Docker daemon accessibility via `docker info`
+- Test 3: Mini sprint 3-task lifecycle via Docker containers
+- Test 4: inotify watcher behavior across WSL boundary (fs.watch)
+- Test 5: Drive mount path resolution (/mnt/c/... → C:\...)
+- Test 6: CRLF → LF normalization on config read
+
+### Skip Strategy
+- Non-WSL2 environments: Tests skip gracefully with `describe.skipIf(!isWSL2)`
+- Docker unavailable: Docker-dependent tests skip with `describe.skipIf(!dockerAvailable)`
+- This ensures CI green on all platforms while providing real validation on WSL2
+
+### Dependencies
+- spawn-backend-docker.ts (read-only reference)
+- Docker daemon + deckent-worker image for live tests

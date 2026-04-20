@@ -1,0 +1,22 @@
+# Task 148-007 Execution Plan
+
+## Objective
+Nervous system Ana PID constraint enforcement — ADR-037 RBAC.
+
+## Steps
+1. Create `src/nervous/runtime-scope-check.ts` with `assertBrainScope()` function
+2. Patch `src/nervous/dispatcher.ts` — add assertBrainScope call in constructor
+3. Patch `src/nervous/observer.ts` — add assertBrainScope call in constructor
+4. Create `tests/nervous/runtime-scope.test.ts` — 6 tests
+5. Run tsc + vitest
+
+## Files Modified
+- src/nervous/runtime-scope-check.ts (NEW)
+- src/nervous/dispatcher.ts (patch)
+- src/nervous/observer.ts (patch)
+- tests/nervous/runtime-scope.test.ts (NEW)
+
+## Notes
+- Worker spawn backends (tmux, subprocess, docker) should set DECKENT_WORKER_MODE=1
+  but that's OUT OF SCOPE for this task (scope: src/nervous/, tests/nervous/ only)
+- Will use dynamic import for event-bus to avoid hard dependency issues in ESM

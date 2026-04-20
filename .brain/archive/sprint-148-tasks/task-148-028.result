@@ -1,0 +1,21 @@
+{
+  "taskId": "148-028",
+  "filesChanged": [
+    ".brain/memory.db",
+    ".brain/exports/decisions.md"
+  ],
+  "linesAdded": 90,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "ADR-041 'Agent Taxonomy — Horizontal Skills vs Vertical Agents' başarıyla .brain/memory.db'ye insert edildi (status='proposed', sprint_id='sprint-148', tags=[governance, agent-pool, taxonomy, beta-ga], decay_exempt=true). Tüm 3 test geçti: (1) store.insert() success, (2) store.getById('adr-041') → status='proposed', (3) .brain/exports/decisions.md regenerated — ADR-041 içeriyor. decisions.md toplam 42 ADR içeriyor (adr-001..adr-041). tsc --noEmit çalıştırılmadı çünkü scope .brain/ ile sınırlı ve kaynak kod değişikliği yapılmadı. Sprint 148 Gate #9 karşılandı: ADR-041 proposed olarak kayıtlı.",
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 2800,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "evaluationDecision": "DONE"
+}

@@ -1,0 +1,25 @@
+# Task 148-004: Router V2 Agent Fallback — test-writer Yok, architect/refactorer Chain
+
+## Plan
+
+### 1. agent-pool.ts — `getActiveAgentIds()` metodu ekle
+- `AgentPoolManager` sınıfına `getActiveAgentIds(): Set<string>` metodu ekle
+- `.deckent/agents/` dizinini tarayarak aktif agent ID'lerini döndürür
+- `archive/` ve geçersiz dizinleri skip eder
+
+### 2. routing-engine.ts — `AGENT_FALLBACK_CHAIN` + `selectAgentByFallback()` ekle
+- IntentType → string[] fallback map
+- `selectBestAgent()` null dönerse (no candidate met threshold), fallback chain devreye girer
+- `ACTIVE_AGENT_IDS` param olarak alır
+
+### 3. task-router.ts — export `AGENT_FALLBACK_CHAIN` (re-export)
+- routing-engine'den re-export
+
+### 4. tests/orchestra/router-agent-fallback.test.ts — 8 test
+- Mock agent pool, verify fallback chain logic
+
+## Files
+- src/core/agent-pool.ts (add getActiveAgentIds)
+- src/core/routing-engine.ts (add AGENT_FALLBACK_CHAIN + fallback logic)
+- src/orchestra/task-router.ts (minimal, re-export if needed)
+- tests/orchestra/router-agent-fallback.test.ts (new, 8 tests)

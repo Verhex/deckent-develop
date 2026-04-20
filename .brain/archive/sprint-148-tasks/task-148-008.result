@@ -1,0 +1,21 @@
+{
+  "taskId": "148-008",
+  "filesChanged": [
+    "src/nervous/detector-registry.ts",
+    "src/nervous/observer.ts",
+    "tests/nervous/detectors/stale-worker-live.test.ts"
+  ],
+  "linesAdded": 195,
+  "linesRemoved": 6,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "DetectorRegistry created with IDetector interface and DetectorConfig type. 5 detectors registered conditionally based on config flags. observer.ts patched: SprintStateProvider callback injection, DetectorRegistry instantiation in constructor, emitObserve() private method replaces direct this.emit('observe'). Detection results emitted as 'detection' event. 6 tests written (5 spec + 1 bonus stale-worker integration). tsc --noEmit PASS, all 184 nervous tests PASS.",
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 2800,
+    "cacheReadTokens": 42000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

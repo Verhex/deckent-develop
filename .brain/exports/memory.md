@@ -1,5 +1,10 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-148 Learnings
+- Sprint sprint-148 Learnings: ## Sprint sprint-148 Learnings
+- Vitest Triage — 135 Fail → < 50 Fail: NO_GO — Docker worker exited without writing result file
+- Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix: GO_WITH_TECH_DEBT — Docker Worker Exit Pattern root cause fixed. Problem: Container SIGKILL (exit 137, OOM kill) bypasses all shell traps — 
+
 ## Sprint sprint-147 Learnings
 - Sprint sprint-147 Learnings: ## Sprint sprint-147 Learnings
 

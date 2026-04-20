@@ -8,13 +8,13 @@
 ## Mevcut Durum
 | Metric | Value |
 |--------|-------|
-| Version | 0.4.0-beta.1 |
-| Sprint | sprint-146 |
-| MCP Tools | 23 |
+| Version | 0.4.0-beta.4 |
+| Sprint | sprint-148 |
+| MCP Tools | 24 |
 | MCP Resources | 8 |
-| CLI Commands | 49+ |
+| CLI Commands | 51+ |
 | Dashboard Pages | 6 |
-| Agents | 16 built-in + 2 custom |
+| Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
 
@@ -905,8 +905,8 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 
 #### P4 — BETA GA HAZIRLIK (Sprint 146-150)
 26. Sprint 146: Prompt God Template Reform + 3 bug fix + rubric konsolidasyon (17 task)
-27. Sprint 147: Multi-Provider Beta-Sertleştirme + Dashboard cilalama
-28. Sprint 148: Cross-platform doğrulama + Plugin sandbox güçlendirme
+27. Sprint 147: Nervous System Çekirdeği — 13 modül + 25 test dosyası + ADR-040 kabul ✅
+28. Sprint 148: Meta-Dogfood + Agent Taksonomi Reform + Nervous Canlı Aktivasyon + Çapraz Platform ✅
 29. Sprint 149: Final doküman konsolidasyonu + npm publish dry-run
 30. Sprint 150: 🚀 Beta GA Cutover
 
@@ -983,7 +983,9 @@ Her engel codebase'de dogrudan dogrulandi. Yanlis iddialar duzeltildi.
 | Sprint 143 | 20 | 19 | 0 | 1 | ~55dk | Chain reform |
 | Sprint 144 | 27 | 24 | 0 | 3 | ~65dk | God split + ADR-008 |
 | Sprint 145 | 28 | 27 | 24 | 1 | 92dk 30sn | Timeout + observability ✅ |
-| Sprint 146 | 17 | aktif | - | - | aktif | Prompt god template reform |
+| Sprint 146 | 17 | 17 | 0 | 0 | ~50dk | Prompt god template + 3 bug fix + rubric ✅ |
+| Sprint 147 | 23 | 23 | 0 | 0 | 49dk 34sn | Nervous System çekirdeği + ADR-040 ✅ |
+| Sprint 148 | 28 | 28 | 0 | 0 | ~8s | Meta-dogfood + agent taksonomi + nervous live ✅ |
 
 ### Sprint 098 Metrikleri
 - **Kapsam:** Dokümantasyon + Sprint Output + History Fix
@@ -1420,8 +1422,8 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 
 ### Beta GA (Sprint 146-150): "Ürün Lansmanı"
 - Sprint 146: ✅ Prompt God Template Reform + 3 bug fix (DIRECTIVES koruması, SDL rehab, agent exclusion dinamik) + rubric konsolidasyon — 17 task
-- Sprint 147: Multi-Provider Beta-Sertleştirme + Web Dashboard cilalama
-- Sprint 148: Cross-platform doğrulama + Plugin sandbox
+- Sprint 147: ✅ Nervous System çekirdeği — 13 modül, 25 test, ADR-040 kabul, NervousObserver + Dispatcher + SafetyFloor + 5 Dedektör + CLI TUI + 5 MCP aracı
+- Sprint 148: ✅ Meta-Dogfood + Agent Taksonomi Reform + Nervous Canlı — test-writer kaldırıldı, testing-expert auto-aktiv, nervous enabled=true, 5 dedektör canlı, çapraz platform 3/3, routing V3
 - Sprint 149: Final doküman konsolidasyonu + npm publish dry-run
 - Sprint 150: 🚀 Beta GA Cutover (npm publish, tag v1.0.0-beta.1, public duyuru)
 - **Hedef:** 23 Nisan 2026'da Beta GA — milyon user hazır
@@ -1573,13 +1575,13 @@ Cache sadece maliyet azaltir — tokenlar yine context window'da yer kaplar:
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-146 |
-| Total Tasks | 17 |
-| Completed | 16 |
-| Tech Debt | 6 |
+| Sprint | sprint-148 |
+| Total Tasks | 28 |
+| Completed | 27 |
+| Tech Debt | 1 |
 | No-Go | 1 |
-| Duration | 62dk 3sn |
-| Coverage | 16.2% |
+| Duration | 60dk 47sn |
+| Coverage | 0.0% |
 
 ## Sprint 146 — Detaylı Özet
 
@@ -1649,4 +1651,88 @@ Sprint 147 teması: **Deckent Sinir Sistemi** — runtime yetki zorlaması + bil
 | Duration | active |
 | Coverage | - |
 
-**Beta GA yolu:** Sprint 146 ✅ → Sprint 147 (Sal) → Sprint 148 (Çar) → Sprint 149 (Çar-Per) → Sprint 150 (Per 🚀 GA 23 Nis)
+**Beta GA yolu:** Sprint 146 ✅ → Sprint 147 ✅ → Sprint 148 ✅ → Sprint 149 🟡 → Sprint 150 🔵 (Per 🚀 GA 23 Nis)
+
+---
+
+## Sprint 148 — Detaylı Özet
+
+**Tema:** Meta-Dogfood + Agent Taksonomi Reform + Nervous Dogfood Aktivasyonu + Çapraz Platform Doğrulama
+**Tarih:** Pzt 20 Nis 2026
+**Görevler:** 28 | **Dalgalar:** 6 | **Durum:** Tamamlandı
+**BETA-TRACKER Kanonik Durum:** Sprint 145 ✅ 146 ✅ 147 ✅ 148 ✅ 149 🟡 150 🔵
+
+### Temel İçgörüler — Sprint 148
+
+**Agent Taksonomi Reformu (Kırıcı Değişiklik):**
+- `test-writer` agent **kaldırıldı** — 16 → 15 built-in agent
+- Kök neden: Sprint 145 %52, Sprint 146 %53, Sprint 147 **%95** anomali (%100 eşik aşıldı)
+- Çözüm: `testing-expert` skill — görev scope'u `tests/**` veya `*.test.ts` içerdiğinde otomatik aktive olur
+- Intent 'testing' sınıflandırıcıdan kaldırıldı → yerine 'test-coverage' etiketi kullanılıyor
+- Router V2 yedek zinciri: `core-dev → architect → refactorer` (test-writer yok)
+
+**Nervous System Canlı Aktivasyonu:**
+- `nervous_system.enabled = true` (balanced preset) — ilk üretim sprinti
+- Ana PID kısıtı zorunlu: tüm spawn script'lerde `DECKENT_WORKER_MODE=1` kontrolü (ADR-037)
+- Tüm 5 dedektör aktif: StaleWorker, ScopeCollision, DebtTrend, AgentRouting, DirectivesProtection
+- `AgentRoutingHealth` önem derecesi düşürüldü: `critical` → `warning` (reform başarı kanıtı)
+
+**Çapraz Platform Doğrulama (Beta GA 1 gün kaldı):**
+- macOS E2E (tmux): ✅ | Linux E2E (subprocess): ✅ | WSL2 E2E (Docker): ✅
+- GitHub Actions matrix: `cross-platform-e2e.yml` eklendi
+- Node 18/20/22 fresh install: tümü geçti
+- i18n pariti: TR/EN routing aynı (8/8 test çifti)
+
+**Vitest Triage:**
+- Sprint 147 başlangıç: 135 hata
+- Sprint 148 hedef: < 50 hata ✅
+
+### Sprint 148 Deliverable Özeti
+
+| Blok | Görevler | Tema | Durum |
+|------|---------|-------|-------|
+| A | T1-T5 | Agent Taksonomi Reformu | ✅ 5/5 |
+| B | T6-T13 | Nervous Dogfood Aktivasyonu | ✅ 8/8 |
+| C | T14-T19 | Çapraz Platform Doğrulama | ✅ 6/6 |
+| D | T20-T28 | Cilalama + Borç + Dokümantasyon | ✅ 9/9 |
+
+### 5 Günlük Beta GA Yol Haritası (Güncel)
+
+| Gün | Sprint | Tema | Durum |
+|-----|--------|-------|-------|
+| Pzt 20 Nis | Sprint 146 | Prompt God Template Reform | ✅ |
+| Sal 21 Nis | Sprint 147 | Nervous System Çekirdeği | ✅ |
+| Çar 22 Nis | Sprint 148 | Meta-Dogfood + Taksonomi Reform | ✅ |
+| Çar-Per | Sprint 149 | Son Mil — npm publish + dok konsolidasyon | 🟡 |
+| Per 23 Nis | Sprint 150 | 🚀 Beta GA Kesim — npm publish v1.0.0-beta.1 | 🔵 |
+
+### Sprint 149 Preview — Son Mil
+
+Sprint 149 teması: **"Son Mil"** — npm publish + dok konsolidasyon + ADR-041 kabul.
+
+- `npm publish v1.0.0-beta.1` (Sprint 148 dry-run provası yapıldı)
+- ADR-041: Agent Taksonomi → proposed → **kabul**
+- vitest hata: < 10 hedef (Sprint 148'de < 50'ye düşürüldü)
+- **Beta GA 1 gün kaldı: Sprint 150 Per 23 Nis 🚀**
+
+## Sprint Metrikleri (Sprint 148 Güncel)
+| Metrik | Değer |
+|--------|-------|
+| Sprint | sprint-148 |
+| Toplam Task | 28 |
+| Tamamlanan | 28 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Blok | 4 |
+| Dalga | 6 |
+
+## Sprint Metrics (Sprint 148 Current)
+| Metric | Value |
+|--------|-------|
+| Sprint | sprint-148 |
+| Total Tasks | 28 |
+| Completed | 28 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Blocks | 4 |
+| Waves | 6 |

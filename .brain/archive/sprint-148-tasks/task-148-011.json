@@ -1,0 +1,93 @@
+{
+  "id": "148-011",
+  "title": "DirectivesMidSprintProtection Canlı + Deliberate Stress Test",
+  "description": "DirectivesMidSprintProtection Canlı + Deliberate Stress Test\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, system-architect\n- Files: tests/nervous/detectors/directives-protection-stress.test.ts, scripts/directives-stress-simulator.mjs (NEW)\n- Scope: tests/nervous/, scripts/\n\n### Description\nSprint 145 08:14 TRT canlı bug (DIRECTIVES.md template'e dönüştü) Sprint 146 T-146-008 phase guard ile çözüldü. Sprint 147 T-147-013 detector yazıldı. Sprint 148'de **canlı stress test**: Block D Wave 6'da deliberate simulation:\n\nScript `scripts/directives-stress-simulator.mjs`:\n```javascript\n// EXECUTE phase içinde deliberate olarak DIRECTIVES.md'yi template'e dönüştür\n// (sadece test amacıyla, 5 saniye sonra otomatik restore edilir)\nimport { readFileSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\n\nconst root = process.argv[2];\nconst backupPath = join(root, '.directives-backup.md');\nconst directivesPath = join(root, 'DIRECTIVES.md');\n\n// Backup original\nconst original = readFileSync(directivesPath, 'utf-8');\nwriteFileSync(backupPath, original);\n\n// Overwrite with template (triggers detector)\nconst template = `# DIRECTIVES — (Sprint 149 için hazırlanıyor)\\n\\n## Task 1: (Task başlığı)\\n- Model: sonnet\\n`;\nwriteFileSync(directivesPath, template);\n\nconsole.log('[stress-sim] DIRECTIVES overwritten, detector should alert within 5s');\n\n// Auto-restore after 5s (safety)\nsetTimeout(() => {\n  writeFileSync(directivesPath, original);\n  console.log('[stress-sim] DIRECTIVES auto-restored');\n  process.exit(0);\n}, 5000);\n```\n\nTest verifies:\n1. Stress simulator çalışır\n2. Detector 3s içinde emergency alert üretir\n3. Nervous executor autonomous policy (emergency severity bypass authority) restore tetikler\n4. Original DIRECTIVES.md geri yüklenir\n5. Sprint devam eder (interruption yok)\n\n### Test (8 test)\n1-7. Sprint 147 T-147-013'teki 7 unit test regression\n8. Sprint 148 Wave 6 canlı simulator → detector alert → auto-restore → sprint continues\n\n**Kanıt:** Sprint 148 event stream `directives-protection` detector ≥1 emergency event + restore success. `.directives-backup.md` cleanup edilir.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/nervous/detectors/",
+      "tests/nervous/",
+      "scripts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/nervous/detectors/directives-protection-stress.test.ts",
+      "scripts/directives-stress-simulator.mjs (NEW)"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 148 event stream `directives-protection` detector ≥1 emergency event + restore success. `.directives-backup.md` cleanup edilir.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.9
+      },
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 0.6
+        },
+        {
+          "name": "scripts",
+          "weight": 0.4
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "delete",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.5,
+          "scripts/": 0.5
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:44:19.939Z"
+}

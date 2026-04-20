@@ -1,0 +1,26 @@
+{
+  "taskId": "148-026",
+  "filesChanged": [
+    "src/nervous/history.ts",
+    "tests/integration/memory-nervous.test.ts"
+  ],
+  "linesAdded": 145,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Memory V2 Nervous History Integration completed. Added indexToMemory() method to NervousHistory class that inserts ExecutionRecord as type='nervous-action' into MemoryStore with FTS5 searchable body. 5/5 integration tests pass: insert, FTS5 search, sprint context tagging, decay_exempt=false retention, multi-record search. tsc --noEmit clean.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 89000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 80
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "id": "148-020-fix",
+  "title": "Fix: Vitest Triage — 135 Fail → < 50 Fail",
+  "description": "Priority fix for NO_GO task 148-020. Notes: Docker worker exited without writing result file",
+  "model": "opus",
+  "effort": "high",
+  "priority": "CRITICAL",
+  "reason": "Task 148-020 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-148/",
+      "tests/",
+      "docs/audits/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/ (multiple patches — Sprint 145-147 regression)",
+      "docs/audits/sprint-148/vitest-triage.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `npx vitest run` fail count < 50; *Kanıt:** Sprint 148 pre-retro: `npx vitest run 2>&1 | grep -E \"^Tests\"` → fail count printed, < 50.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "EXECUTING",
+  "sprintId": "sprint-148",
+  "isPriorityFix": true,
+  "fixForTaskId": "148-020",
+  "createdAt": "2026-04-20T14:44:52.032Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.88
+      },
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.6
+        },
+        {
+          "name": " (multiple patches — Sprint 145-147 regression)",
+          "weight": 0.2
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.5,
+          "docs/": 0.5
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "estimatedTokens": 1580
+}

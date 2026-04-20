@@ -1,0 +1,45 @@
+# Task 148-008: StaleWorkerDetector Canlı Activation + DetectorRegistry
+
+## Approach
+
+### Problem
+- `NervousSystemConfig` interface'inde `detectors` alanı yok → eklemek gerekiyor
+- Veya DetectorRegistry ayrı bir `DetectorConfig` tipi kabul edecek
+
+### Design Decision
+`NervousSystemConfig`'e `detectors` alanı ekleyemiyorum (src/core/ scope dışında). Bunun yerine:
+- `DetectorRegistry` kendi `DetectorRegistryConfig` tipini tanımlar
+- Task spec'teki `config.detectors?.stale_worker?.enabled` erişimi için local tip
+- Alternatif: `NervousSystemConfig`'e intersection ile genişletilmiş tip
+
+NervousSystemConfig scope dışı (src/core/nervous-types.ts) — ama görevi tamamlamak için
+`detector-registry.ts`'de local config tipi tanımlayabiliriz.
+
+### Files to create/modify
+1. `src/nervous/detector-registry.ts` (NEW) — DetectorRegistry + IDetector interface + DetectorRegistryConfig
+2. `src/nervous/observer.ts` (PATCH) — observe event'inde DetectorRegistry.runAll çağrısı
+3. `tests/nervous/detectors/stale-worker-live.test.ts` (NEW) — 5 test
+
+### DetectorRegistryConfig Structure
+```typescript
+interface DetectorConfig {
+  stale_worker?: { enabled: boolean; threshold_ms?: number };
+  scope_collision?: { enabled: boolean };
+  debt_trend?: { enabled: boolean; threshold_rate?: number };
+  agent_routing?: { enabled: boolean; anomaly_threshold?: number };
+  directives_protection?: { enabled: boolean };
+}
+```
+
+### Observer Patch
+observer.ts'e DetectorRegistry import + detect callback:
+- `start()` çağrısında DetectorRegistry oluşturulur (config enjekte)
+- `on('observe', event)` callback'inde registry.runAll(ctx) çağrılır
+- Results event olarak emit edilir
+
+### Constraints
+- DetectorRegistry AgentRoutingHealth constructor: `(anomalyThreshold = 0.4)` ✓
+- DebtTrendAnalyzer constructor: `(thresholdRate = 0.15, windowSize = 3)` ✓
+- StaleWorkerDetector constructor: `(staleThresholdMs = 180000)` ✓
+- ScopeCollisionMonitor: no-arg constructor ✓
+- DirectivesMidSprintProtection: no-arg constructor ✓

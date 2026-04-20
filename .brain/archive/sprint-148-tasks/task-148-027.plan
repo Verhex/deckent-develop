@@ -1,0 +1,44 @@
+# Task 148-027: npm Publish Dry-Run Rehearsal — Execution Plan
+
+## Objective
+Create scripts/npm-publish-dry.sh and docs/audits/sprint-148/npm-publish-dry.md
+as a rehearsal for Sprint 149 full npm publish.
+
+## Files To Create
+1. scripts/npm-publish-dry.sh — bash script for dry-run validation
+2. docs/audits/sprint-148/npm-publish-dry.md — audit report documenting results
+
+## Execution Steps
+
+### Step 1: Analyze current state
+- Read package.json → version is 0.4.0-beta.1 (NOT beta.3 as DIRECTIVES says — need to check)
+- Read .npmignore → already comprehensive exclusions
+- Read scripts/pack-test.ts → existing pack validation logic
+
+### Step 2: Write scripts/npm-publish-dry.sh
+- Uses npm version 0.4.0-beta.4 --no-git-tag-version --allow-same-version
+- Runs npm pack --dry-run + npm publish --dry-run
+- Checks tarball size via npm pack --json + jq
+- Scans for secret patterns in pack output
+- Uses existing pack-test.ts logic as reference for what to check
+
+### Step 3: Run script to capture actual results
+- Execute bash scripts/npm-publish-dry.sh
+- Capture output for the audit doc
+
+### Step 4: Write docs/audits/sprint-148/npm-publish-dry.md
+- Status: GO or NO_GO
+- Version verified
+- Tarball contents listing
+- Size check result
+- Secret pattern check
+- Included/excluded files validation
+
+### Step 5: Verify
+- tsc --noEmit (no new source files being written)
+- Script syntax check
+
+## Notes
+- No new TypeScript files — this is a scripts + docs task
+- package.json version will be bumped to 0.4.0-beta.4 (--no-git-tag-version keeps git clean)
+- tsc/vitest should be unaffected by this task

@@ -1,0 +1,21 @@
+{
+  "taskId": "148-009",
+  "filesChanged": [
+    "tests/nervous/detectors/scope-collision-live.test.ts",
+    "tests/nervous/detectors/debt-trend-live.test.ts"
+  ],
+  "linesAdded": 280,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "T-009 tamamlandı. 6/6 test PASS.\n\nscope-collision-live.test.ts (3 test):\n- Test 1: 28 Sprint-148 task temiz plan → 0 collision (pozitif doğrulama, DIRECTIVES temiz)\n- Test 2: Deliberate collision fixture (2 task detector-registry.ts paylaşıyor) → 1 collision event\n- Test 3: Collision payload yapısı — taskIds her iki ID içeriyor, file path doğru\n\ndebt-trend-live.test.ts (3 test):\n- Test 4: Sprint 145 (24/28=%85.7) + Sprint 146 (6/17=%35.3) + Sprint 147 (0/23=%0) → avgDebtRate≈%40.3 > %15 threshold → ALERT\n- Test 5: severity='warning', suggestedAction=DEBT_REPRIORITIZE, label %oranı içeriyor\n- Test 6: payload.sprints sprint-145/146/147 ID'leri listeler, groupKey sprint-148 bağlamı\n\ndetector-registry.ts değiştirilmedi — T-008'de zaten tamamlanmıştı.\n\ntsc --noEmit: 0 hata\nnpx vitest run (scope-collision-live + debt-trend-live): 6/6 PASS\nnpx vitest run (mevcut unit tests): 11/11 PASS (scope-collision + debt-trend birlikte)",
+  "tokenUsage": {
+    "inputTokens": 28500,
+    "outputTokens": 4200,
+    "cacheReadTokens": 15000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "evaluationDecision": "DONE"
+}

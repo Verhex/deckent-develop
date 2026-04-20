@@ -1,0 +1,97 @@
+{
+  "id": "148-020",
+  "title": "Vitest Triage — 135 Fail → < 50 Fail",
+  "description": "Vitest Triage — 135 Fail → < 50 Fail\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, testing-expert\n- Files: tests/ (multiple patches — Sprint 145-147 regression), docs/audits/sprint-148/vitest-triage.md\n- Scope: tests/, docs/audits/\n\n### Description\nSprint 147 sonrası `npx vitest run` → 135 fail. Triage kategori:\n- **A:** Sprint 145 regression (~70 fail, spawn-backend-docker mock drift)\n- **B:** Sprint 146 regression (~30 fail, rubric consolidation side effects)\n- **C:** Sprint 147 yeni (~20 fail, nervous integration expected mocks)\n- **D:** Pre-existing Sprint <145 (~15 fail, deprecated)\n\nHer kategoride ilk 5-10 fail fix → cumulative 85+ fix (135 - 85 = 50 target).\n\nTriage doc `docs/audits/sprint-148/vitest-triage.md`:\n```markdown\n# Sprint 148 Vitest Triage Report\n\n## Summary\n- Baseline (Sprint 147): 135 fail / 15256 total\n- Target (Sprint 148): < 50 fail\n- Fixed: [count]\n- Remaining: [count]\n\n## Category A: Sprint 145 Mock Drift (70 fail)\n[list + fix commits]\n\n## Category B: Rubric Side Effects (30 fail)\n[list + fix commits]\n...\n```\n\n### Test\n- `npx vitest run` fail count < 50\n- Coverage stable (not regressed)\n- No new test removal (only fixes)\n\n**Kanıt:** Sprint 148 pre-retro: `npx vitest run 2>&1 | grep -E \"^Tests\"` → fail count printed, < 50.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-148/",
+      "tests/",
+      "docs/audits/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/ (multiple patches — Sprint 145-147 regression)",
+      "docs/audits/sprint-148/vitest-triage.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `npx vitest run` fail count < 50; *Kanıt:** Sprint 148 pre-retro: `npx vitest run 2>&1 | grep -E \"^Tests\"` → fail count printed, < 50.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-148",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.73
+      },
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.6
+        },
+        {
+          "name": " (multiple patches — Sprint 145-147 regression)",
+          "weight": 0.2
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "test",
+          "weight": 0.33
+        },
+        {
+          "type": "modify",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.5,
+          "docs/": 0.5
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:44:52.032Z"
+}

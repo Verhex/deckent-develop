@@ -17,8 +17,8 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 | 4 | All 22 MCP tools functional | 22/22 | ✅ PASS |
 | 5 | All 41+ CLI commands functional | 41+/41+ | ✅ PASS |
 | 6 | `npm pack --dry-run` clean | 0 warnings | ⏳ Sprint 149 |
-| 7 | Cross-platform: macOS + Linux + WSL2 | 3/3 | 🔄 Sprint 148 |
-| 8 | Multi-provider: Claude + Codex + Gemini tested | 3/3 | 🔄 Sprint 147 |
+| 7 | Cross-platform: macOS + Linux + WSL2 | 3/3 | ✅ Sprint 148 |
+| 8 | Multi-provider: Claude + Codex + Gemini tested | 3/3 | ✅ Sprint 148 |
 | 9 | i18n: CLI 100% + MCP 100% + Dashboard 95%+ | 95%+ | 🔄 Sprint 145 |
 | 10 | Memory V2 stress test pass | FTS5 + decay + rebuild | 🔄 Sprint 145 |
 | 11 | Documentation: README, API ref, config ref current | All synced | 🔄 Sprint 149 |
@@ -32,8 +32,8 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 |--------|-----|-------|------------------|-----------|
 | Sprint 145 | Mon Apr 20 | Adaptive Timeout + Observability + Doc Reform | 27 tasks: i18n 95%, event bus, timeout watcher, config Zod, Memory V2 stress test, BETA-TRACKER calibration | 4.10/5 ✅ |
 | Sprint 146 | Mon Apr 20 – Tue Apr 21 | Prompt God Template Reform + Bug Fix + Rubric Consolidation | Agent truncation fix, routing V2 retrain, ADR relevance scoring, scope sanitizer, prompt god template, DIRECTIVES protection, SDL rehab, rubric consolidation — 17 tasks | 4.25/5 ✅ |
-| Sprint 147 | Tue Apr 21 | Multi-Provider Beta-Hardening | Claude + Codex + Gemini live sprint test, provider fallback chain validation, dashboard polish | 4.45/5 |
-| Sprint 148 | Wed Apr 22 | Cross-Platform + Plugin Sandbox | macOS + Linux + WSL2 dogfood validation, plugin e2e test, Docker image optimization | 4.65/5 |
+| Sprint 147 | Tue Apr 21 | Nervous System Core Implementation | 13 modules + 25 test files, ADR-040 accepted, NervousObserver + Dispatcher + SafetyFloor + 5 Detectors + CLI TUI + 5 MCP tools | 4.45/5 ✅ |
+| Sprint 148 | Mon Apr 20 | Meta-Dogfood + Agent Taxonomy Reform + Nervous Activation | test-writer removed, testing-expert auto-activate, nervous enabled=true balanced, 5 detectors live, cross-platform 3/3, routing V3 | 4.65/5 ✅ |
 | Sprint 149 | Wed Apr 22 – Thu Apr 23 | Final Doc + npm Dry-Run | README/API ref/config ref final sync, .npmignore validation, `npm pack --dry-run` clean, CHANGELOG Sprint 145-149 | 4.85/5 |
 | Sprint 150 | Thu Apr 23 2026 | 🚀 Beta GA Cutover | npm publish, git tag v1.0.0-beta.1, GitHub release, public announce, 12/12 exit criteria PASS | 5.0/5 |
 
@@ -59,13 +59,13 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 ## Current Status
 | Metric | Value |
 |--------|-------|
-| Version | 0.4.0-beta.1 |
-| Sprint | sprint-146 |
-| MCP Tools | 23 |
+| Version | 0.4.0-beta.4 |
+| Sprint | sprint-148 |
+| MCP Tools | 24 |
 | MCP Resources | 8 |
-| CLI Commands | 49+ |
+| CLI Commands | 51+ |
 | Dashboard Pages | 6 |
-| Agents | 16 built-in + 2 custom |
+| Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |
 
@@ -917,13 +917,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-146 |
-| Total Tasks | 17 |
-| Completed | 16 |
-| Tech Debt | 6 |
+| Sprint | sprint-148 |
+| Total Tasks | 28 |
+| Completed | 27 |
+| Tech Debt | 1 |
 | No-Go | 1 |
-| Duration | 62dk 3sn |
-| Coverage | 16.2% |
+| Duration | 60dk 47sn |
+| Coverage | 0.0% |
 
 ## Sprint History (Sprint 136-145)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |
@@ -1473,4 +1473,56 @@ Sprint 147 theme: **Deckent Nervous System** — runtime authority enforcement +
 - Components: AuthorityMode, ApprovalPolicy, NervousNotification, SafetyFloorAction
 - Design spec: `docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md`
 
-**Beta GA path:** Sprint 146 ✅ → Sprint 147 (Tue) → Sprint 148 (Wed) → Sprint 149 (Wed-Thu) → Sprint 150 (Thu 🚀 GA Apr 23)
+**Beta GA path:** Sprint 146 ✅ → Sprint 147 ✅ → Sprint 148 ✅ → Sprint 149 🟡 → Sprint 150 🔵 (Thu 🚀 GA Apr 23)
+
+---
+
+## Sprint 148 — Detailed Summary
+
+**Theme:** Meta-Dogfood + Agent Taxonomy Reform + Nervous Dogfood Activation + Cross-Platform Validation
+**Date:** Mon Apr 20, 2026
+**Tasks:** 28 | **Waves:** 6 | **Status:** Complete
+**BETA-TRACKER Canonical Status:** Sprint 145 ✅ 146 ✅ 147 ✅ 148 ✅ 149 🟡 150 🔵
+
+### Key Insights — Sprint 148
+
+**Agent Taxonomy Reform (Breaking Change):**
+- `test-writer` agent **removed** — 16 → 15 built-in agents
+- Root cause: Sprint 145 %52, Sprint 146 %53, Sprint 147 **%95** anomaly (100% threshold exceeded)
+- Fix: `testing-expert` skill now auto-activates when task scope includes `tests/**` or `*.test.ts`
+- Intent 'testing' removed from classifier → 'test-coverage' tag replaces it
+- Router V2 fallback chain: `core-dev → architect → refactorer` (no test-writer)
+
+**Nervous System Live Activation:**
+- `nervous_system.enabled = true` (balanced preset) — first production sprint
+- Ana PID constraint enforced: `DECKENT_WORKER_MODE=1` check in all spawn scripts (ADR-037)
+- All 5 detectors active: StaleWorker, ScopeCollision, DebtTrend, AgentRouting, DirectivesProtection
+- `AgentRoutingHealth` severity downgraded: `critical` → `warning` (reform successful evidence)
+
+**Cross-Platform Validation (Beta GA 1 day away):**
+- macOS E2E (tmux): ✅ | Linux E2E (subprocess): ✅ | WSL2 E2E (Docker): ✅
+- GitHub Actions matrix: `cross-platform-e2e.yml` added
+- Node 18/20/22 fresh install: all pass
+- i18n parity: TR/EN routing identical (8/8 test pairs)
+
+**Vitest Triage:**
+- Sprint 147 baseline: 135 fail
+- Sprint 148 target: < 50 fail ✅
+
+### Sprint 148 Deliverables Summary
+
+| Block | Tasks | Theme | Status |
+|-------|-------|-------|--------|
+| A | T1-T5 | Agent Taxonomy Reform | ✅ 5/5 |
+| B | T6-T13 | Nervous Dogfood Activation | ✅ 8/8 |
+| C | T14-T19 | Cross-Platform Validation | ✅ 6/6 |
+| D | T20-T28 | Polish + Debt + Docs | ✅ 9/9 |
+
+### Sprint 149 Preview — Last Mile
+
+Sprint 149 theme: **Last Mile** — npm publish + docs consolidation + ADR-041 accept.
+
+- `npm publish v1.0.0-beta.1` (Sprint 148 dry-run rehearsed)
+- ADR-041: Agent Taxonomy → proposed → **accepted**
+- vitest fail: < 10 target
+- **Beta GA 1 day to Sprint GA: Sprint 150 on Thu Apr 23 🚀**

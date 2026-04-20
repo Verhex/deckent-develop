@@ -1,0 +1,30 @@
+# Task 148-028 Execution Plan — ADR-041 Draft
+
+## Approach
+
+This task does NOT write TypeScript source code. It directly:
+1. Inserts ADR-041 into `.brain/memory.db` via a Node.js script using MemoryStore API
+2. Regenerates `.brain/exports/decisions.md` from the updated DB
+
+## Steps
+
+1. Write heartbeat (.tasks/task-148-028.hb) — already exists from Docker worker
+2. Understand MemoryStore.insert() signature (DONE — read memory-store.ts)
+3. Understand exportDecisionsMd() (DONE — reads from store.getByType('adr'))
+4. Write a small Node.js script to:
+   a. Open .brain/memory.db via MemoryStore
+   b. Insert ADR-041 with status='proposed', tags=[governance, agent-pool, taxonomy, beta-ga], decay_exempt=true
+   c. Call exportDecisionsMd(store) and write result to .brain/exports/decisions.md
+5. Execute the script
+6. Verify: query back adr-041, check decisions.md contains it
+7. Write result file
+
+## Files Changed
+- .brain/memory.db (insert via MemoryStore API)
+- .brain/exports/decisions.md (regenerated)
+
+## ADR-041 Content (MADR v3 hybrid)
+- Status: proposed
+- Sprint: 148
+- Tags: governance, agent-pool, taxonomy, beta-ga
+- decay_exempt: true

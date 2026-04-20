@@ -1,0 +1,22 @@
+{
+  "taskId": "148-027",
+  "filesChanged": [
+    "package.json",
+    "scripts/npm-publish-dry.sh",
+    "docs/audits/sprint-148/npm-publish-dry.md"
+  ],
+  "linesAdded": 130,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "scripts/npm-publish-dry.sh created and executed successfully (exit 0). All 8 checks PASS: (1) npm pack success, (2) tarball size 877 kB < 2MB limit, (3) all 6 sensitive dirs excluded (.brain, .tasks, .deckent, .locks, tests, src), (4) no secret patterns found. docs/audits/sprint-148/npm-publish-dry.md written with GO status and Sprint 149 publish readiness checklist. package.json bumped to 0.4.0-beta.4 (--no-git-tag-version). tsc --noEmit: 0 errors. Note: jq not available in environment — used node -e for JSON parsing in script instead.",
+  "tokenUsage": {
+    "inputTokens": 12500,
+    "outputTokens": 2800,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "evaluationDecision": "DONE"
+}

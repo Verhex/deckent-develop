@@ -1,0 +1,23 @@
+{
+  "taskId": "148-007",
+  "workerId": "w-148-007",
+  "filesChanged": [
+    "src/nervous/runtime-scope-check.ts",
+    "src/nervous/dispatcher.ts",
+    "src/nervous/observer.ts",
+    "tests/nervous/runtime-scope.test.ts"
+  ],
+  "linesAdded": 155,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Runtime scope enforcement implemented. assertBrainScope() throws NervousScopeViolationError when DECKENT_WORKER_MODE=1. NervousDispatcher and NervousObserver constructors call assertBrainScope(). 6/6 new tests pass, existing dispatcher (13) and observer (11) tests unaffected. tsc --noEmit passes (only pre-existing error in detector-registry.ts from T-148-008 scope). Note: Worker spawn backends (tmux.ts, spawn-backend.ts, spawn-backend-docker.ts) need DECKENT_WORKER_MODE=1 env var set — those files are outside this task's scope (src/orchestra/), should be handled by a separate task or as a follow-up.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 38000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

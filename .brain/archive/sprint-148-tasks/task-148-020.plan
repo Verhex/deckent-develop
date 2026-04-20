@@ -1,0 +1,36 @@
+# Task 148-020: Vitest Triage Plan
+
+## Baseline: 160 fail / 33 files
+
+## Categories & Fix Strategy:
+
+### Category A: Agent taxonomy / test-writer removal effects (~30 fail)
+Files:
+- tests/agents/builtin-agents.test.ts (14 fail) — expects test-writer, 8 agents
+- tests/agents/manifest-v2-validation.test.ts (6 fail) — expects 9 agents, test-writer
+- tests/orchestra/agent-activation.test.ts (2 fail) — expects 8 agents
+Fix: Update agent counts, remove test-writer specific tests
+
+### Category B: DECISIONS.md / ADR file-based tests (12 fail)
+Files:
+- tests/brain/decisions.test.ts (11 fail) — reads DECISIONS.md directly (Memory V2 migration)
+- tests/audits/dead-code-decisions.test.ts (6 fail) — same
+- tests/scripts/adr-validator.test.ts (2 fail)
+Fix: Skip or update to use Memory V2 DB
+
+### Category C: sprint-summary-rich.test.ts (30 fail)
+- Import or API mismatch
+Fix: Check formatRichSummary export and fix
+
+### Category D: event-stream / notify tests (~15 fail)
+- event-stream-emit.test.ts (8 fail) — CHANNELS constants
+- event-stream-notify.test.ts (9 fail) — emitNotify
+Fix: Update imports/mocks
+
+### Category E: rubric-detail / sprint-reporter (13 fail)
+Fix: Check formatRubricScoresSection export
+
+### Category F: Misc (remaining ~20 fail)
+- docker-hb, spawn-backend, self-modifying, worker-rbac, etc.
+
+## Approach: Fix highest-impact files first (A, C, D, E = ~90 tests)

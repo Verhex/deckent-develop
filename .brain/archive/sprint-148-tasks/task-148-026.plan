@@ -1,0 +1,22 @@
+# Task 148-026: Memory V2 Nervous History Integration
+
+## Approach
+1. Add `indexToMemory()` method to `NervousHistory` class in `src/nervous/history.ts`
+   - After each `append()`, optionally insert to MemoryStore
+   - New method: `indexToMemory(record, store)` that inserts ExecutionRecord as type='nervous-action'
+
+2. No changes to `src/core/memory-store.ts` needed — the existing `insert()` API supports custom types
+
+3. Write integration test `tests/integration/memory-nervous.test.ts`:
+   - Test 1: ExecutionRecord → memory entry insert
+   - Test 2: FTS5 search 'directives-protection' → returns record
+   - Test 3: Sprint context tagged (sprint_id)
+   - Test 4: Retention (decay_exempt=false)
+   - Test 5: Export includes nervous entries
+
+## Files Modified
+- src/nervous/history.ts — add indexToMemory() method
+- tests/integration/memory-nervous.test.ts — new integration test file
+
+## Files NOT modified
+- src/core/memory-store.ts — existing API sufficient (type field is just a string)

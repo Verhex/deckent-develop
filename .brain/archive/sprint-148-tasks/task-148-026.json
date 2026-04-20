@@ -1,0 +1,90 @@
+{
+  "id": "148-026",
+  "title": "Memory V2 Nervous History Integration",
+  "description": "Memory V2 Nervous History Integration\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/core/memory-store.ts, src/nervous/history.ts, tests/integration/memory-nervous.test.ts\n- Scope: src/core/, src/nervous/, tests/integration/\n\n### Description\nMemory V2 (SQLite FTS5) nervous history opsiyonel indeksleme. Her ExecutionRecord sonrası:\n```typescript\nstore.insert({\n  type: 'nervous-action',\n  body: JSON.stringify(record),\n  sprint_id: record.sprintId ?? 'unknown',\n  tags: [record.actionId, record.decision, record.decidedBy],\n  metadata: { notificationId: record.notificationId, outcome: record.outcome },\n  decay_exempt: false,\n});\n```\n\nFTS5 ile aranabilir: `searchMemory(store, { type: ['nervous-action'], text: 'directives-protection' })` → Sprint 148 detector event'leri döner.\n\n### Test (5 test)\n1. ExecutionRecord → memory entry insert\n2. FTS5 search 'directives-protection' → Sprint 148 record döner\n3. Sprint context tagged (sprint_id=148)\n4. Retention (decay_after_sprints=20) respect\n5. `deckent memory export` includes nervous entries\n\n**Kanıt:** `sqlite3 .brain/memory.db \"SELECT count(*) FROM entries WHERE type='nervous-action'\"` > 0.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/nervous/",
+      "tests/integration/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/memory-store.ts",
+      "src/nervous/history.ts",
+      "tests/integration/memory-nervous.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `sqlite3 .brain/memory.db \"SELECT count(*) FROM entries WHERE type='nervous-action'\"` > 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.608Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [],
+        "confidence": 0.81
+      },
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.33
+        },
+        {
+          "name": "nervous",
+          "weight": 0.33
+        },
+        {
+          "name": "integration",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.67
+        },
+        {
+          "type": "create",
+          "weight": 0.33
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:45:18.440Z"
+}

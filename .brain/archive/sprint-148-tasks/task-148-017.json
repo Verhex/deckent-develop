@@ -1,0 +1,97 @@
+{
+  "id": "148-017",
+  "title": "Provider Matrix — Claude + Codex Mixed Mini-Sprint",
+  "description": "Provider Matrix — Claude + Codex Mixed Mini-Sprint\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, anthropic-sdk\n- Files: tests/e2e/provider-matrix/claude-codex-mixed.test.ts, docs/audits/sprint-148/provider-parity.md\n- Scope: tests/e2e/provider-matrix/, docs/audits/\n\n### Description\n3-task mini sprint: 1 opus (Claude) + 1 gpt-4.1 (Codex) + 1 haiku (Claude). OPENAI_API_KEY test fixture'da, gerçek API değil (mock adapter). Provider fallback test — Codex timeout → Claude fallback.\n\n### Test (4 test)\n1. 3 task 3 different provider routed\n2. Fallback on provider failure — Codex timeout → Claude\n3. Per-provider metrics (latency, tokens, cost)\n4. Provider stats aggregation retro'da\n\n**Kanıt:** `docs/audits/sprint-148/provider-parity.md`.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/e2e/provider-matrix/",
+      "docs/audits/sprint-148/",
+      "docs/audits/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/e2e/provider-matrix/claude-codex-mixed.test.ts",
+      "docs/audits/sprint-148/provider-parity.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `docs/audits/sprint-148/provider-parity.md`.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "anthropic-sdk"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "anthropic-sdk"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "testing"
+        ],
+        "confidence": 0.84
+      },
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.6
+        },
+        {
+          "name": "e2e",
+          "weight": 0.4
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.25
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "document",
+          "weight": 0.25
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.5,
+          "docs/": 0.5
+        },
+        "primaryWriteTarget": "tests/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:44:44.273Z"
+}

@@ -1,0 +1,25 @@
+# Task 148-015: Linux E2E — subprocess Backend Full Sprint
+
+## Approach
+Create a comprehensive E2E test file for Linux + subprocess backend that validates:
+1. Platform detection (linux)
+2. 3-task mini sprint lifecycle via subprocess
+3. Stdout line-buffered capture
+4. Exit code 0 → DONE result
+5. Exit code non-zero → NO_GO result
+6. SIGTERM graceful shutdown
+
+## Files to Create
+- `tests/e2e/cross-platform/linux-subprocess.test.ts` — 6 test cases
+- `docs/audits/sprint-148/linux-validation.md` — GO validation document
+
+## Implementation Pattern
+- Mirror macos-tmux.test.ts structure but adapted for subprocess backend
+- Use `describe.skipIf(platform() !== 'linux')` for platform-specific tests
+- Use real child_process.spawn for subprocess simulation
+- Test SIGTERM handling with process.kill()
+
+## Dependencies
+- node:child_process (spawn, spawnSync)
+- node:fs, node:path, node:os
+- vitest (describe, it, expect, beforeEach, afterEach)

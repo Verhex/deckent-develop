@@ -1,0 +1,20 @@
+{
+  "taskId": "148-017",
+  "filesChanged": [
+    "tests/e2e/provider-matrix/claude-codex-mixed.test.ts",
+    "docs/audits/sprint-148/provider-parity.md"
+  ],
+  "linesAdded": 365,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Provider matrix E2E test suite created with 12 tests across 4 describe blocks: (1) 3-task multi-provider routing — validates opus→claude, gpt-4.1→codex, haiku→claude via forceModel + routeTask(), (2) Codex timeout → Claude fallback via resolveProviderWithFallback() with tier-equivalent model remapping (gpt-4.1→sonnet), (3) Per-provider metrics tracking with ModelRegistry.estimateCost() validation, (4) Provider stats aggregation with retro-compatible markdown table generation. All 12 tests PASS. tsc --noEmit 0 errors. Audit doc written to docs/audits/sprint-148/provider-parity.md with full scenario tables and evidence.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 85000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

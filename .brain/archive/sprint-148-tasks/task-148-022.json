@@ -1,0 +1,96 @@
+{
+  "id": "148-022",
+  "title": "Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix",
+  "description": "Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, docker-expert\n- Files: src/backends/docker-spawn-backend.ts, tests/backends/docker-exit-reproducer.test.ts\n- Scope: src/backends/, tests/backends/\n\n### Description\nSprint 146 T-146-011 NO_GO: \"Docker worker exited without writing result file\". Sprint 147 T-147-147-011-fix archive edildi (task-146-011-fix dosyaları Sprint 147 pre-flight'ta taşındı). Root cause hâlâ açık.\n\nHipotez: Container SIGKILL (exit 137) before .result write. Sprint 139 Docker HB core fix `atomicWriteFileSync` + SIGTERM handler eklemiş ama SIGKILL (force kill) için yetersiz.\n\nÇözüm: Worker.sh'ye EXIT trap — script çıkmadan **her zaman** partial result yaz:\n```bash\n# worker.sh (Docker template)\ncleanup_result() {\n  local exit_code=$?\n  if [ ! -f \"$RESULT_PATH\" ]; then\n    echo \"{\\\"taskId\\\":\\\"$TASK_ID\\\",\\\"selfAssessment\\\":\\\"NO_GO\\\",\\\"notes\\\":\\\"Worker exited (code=$exit_code) without writing result\\\",\\\"exitCode\\\":$exit_code}\" > \"$RESULT_PATH\"\n  fi\n}\ntrap cleanup_result EXIT\n```\n\n### Test (4 test)\n1. Reproducer: deliberate SIGKILL mid-task → result with exitCode + NO_GO\n2. Normal completion — cleanup_result no-op (file exists)\n3. SIGTERM handled gracefully — result written normally\n4. OOM kill (exit 137) — result still written\n\n**Kanıt:** Sprint 148 Docker E2E test: 0 \"worker exited without result\" NO_GO.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/backends/",
+      "tests/backends/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/backends/docker-spawn-backend.ts",
+      "tests/backends/docker-exit-reproducer.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 148 Docker E2E test: 0 \"worker exited without result\" NO_GO.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "docker-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert",
+    "docker-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.608Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "documentation"
+        ],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "backends",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "modify",
+          "weight": 0.2
+        },
+        {
+          "type": "delete",
+          "weight": 0.2
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        },
+        {
+          "type": "create",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "small"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:45:02.078Z"
+}

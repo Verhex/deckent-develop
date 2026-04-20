@@ -1,0 +1,87 @@
+{
+  "id": "148-025",
+  "title": "ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 148 Append",
+  "description": "ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 148 Append\n\n- Model: sonnet\n- Effort: low\n- Skills: documentation-writer\n- Files: DECKENT-ANA-PLAN-TR.md, DECKENT-MASTER-BLUEPRINT.md, BETA-TRACKER.md, BETA-TRACKER-TR.md\n- Scope: ./\n\n### Description\n4 doc'a Sprint 148 bölümü append:\n- Teması (Meta-Dogfood + Agent Taksonomi Reform)\n- 28 task özeti 4 block × 6 wave\n- Deliverables + detector canlı kanıtları\n- Sprint 149-150 preview (\"1 day to Beta GA 🚀\")\n- BETA-TRACKER canonical status: Sprint 145 ✅ 146 ✅ 147 ✅ 148 ✅ 149 🟡 150 🔵\n\nANA-PLAN-TR + MASTER-BLUEPRINT (EN) parity. BETA-TRACKER EN+TR 5-gün roadmap.\n\n### Test\n- 4 doc'ta \"Sprint 148\" geçer\n- 4 doc'ta \"Beta GA 1 day\" geçer\n- 4 doc'ta \"test-writer removed\" nervous insights\n\n**Kanıt:** `grep -l \"Sprint 148\" DECKENT-ANA-PLAN-TR.md DECKENT-MASTER-BLUEPRINT.md BETA-TRACKER.md BETA-TRACKER-TR.md` → 4 files.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "DECKENT-ANA-PLAN-TR.md",
+      "DECKENT-MASTER-BLUEPRINT.md",
+      "BETA-TRACKER.md",
+      "BETA-TRACKER-TR.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep -l \"Sprint 148\" DECKENT-ANA-PLAN-TR.md DECKENT-MASTER-BLUEPRINT.md BETA-TRACKER.md BETA-TRACKER-TR.md` → 4 files.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-20T13:54:40.608Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "domains": [],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.33
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "rename",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "create",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "./": 1
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:45:13.814Z"
+}

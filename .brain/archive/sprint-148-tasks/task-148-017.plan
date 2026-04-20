@@ -1,0 +1,23 @@
+# Task 148-017: Provider Matrix — Claude + Codex Mixed Mini-Sprint
+
+## Approach
+Create a comprehensive E2E test suite that validates mixed-provider routing scenarios using mock adapters (no real API calls).
+
+## Files to Create
+1. `tests/e2e/provider-matrix/claude-codex-mixed.test.ts` — 4 test cases
+2. `docs/audits/sprint-148/provider-parity.md` — Audit document
+
+## Test Strategy
+- Use `makeMockAdapter` pattern from `tests/e2e/provider-smoke.test.ts`
+- Mock 3 providers: claude (available), codex (available/timeout), haiku (available)
+- Test scenarios:
+  1. 3-task routing: opus→claude, gpt-4.1→codex, haiku→claude
+  2. Codex timeout → Claude fallback via `resolveProviderWithFallback`
+  3. Per-provider metrics tracking (latency, tokens, cost simulation)
+  4. Provider stats aggregation for retro format
+
+## Key Dependencies
+- `ProviderRegistry`, `resolveProviderWithFallback` from `src/core/provider.ts`
+- `routeTask`, `detectTaskType` from `src/orchestra/task-router.ts`
+- `getEquivalentModel`, `getModelTier` from `src/core/model-equivalence.ts`
+- Mock adapter pattern from existing tests

@@ -1,0 +1,28 @@
+# Task 148-002 Execution Plan
+
+## Goal
+Add auto-activation heuristic for `testing-expert` skill when a task touches test files/directories.
+
+## Changes
+
+### 1. src/core/skill-selector.ts
+- Extend task parameter type to include `scope.filesWrite?: string[]`
+- After existing scoring, add auto-activation logic:
+  - If `scope.directories` includes any path starting with `tests/` → add `testing-expert`
+  - If `scope.filesWrite` includes any file ending with `.test.ts`, `.spec.ts`, `.test.tsx` → add `testing-expert`
+  - Only if `testing-expert` not already in results (deduplicate)
+
+### 2. .deckent/skills/testing-expert/manifest.json
+- Add `autoActivate` field with `scopeMatch` and `filesWriteMatch` patterns
+
+### 3. tests/core/skill-auto-activation.test.ts (NEW)
+- 5 tests per DIRECTIVES spec:
+  1. Scope tests/ → includes testing-expert
+  2. filesWrite with .test.ts → includes testing-expert
+  3. No tests scope → does NOT include testing-expert
+  4. Manifest activation path still works
+  5. Duplicate prevention
+
+## Verify
+- tsc --noEmit
+- npx vitest run tests/core/skill-auto-activation.test.ts

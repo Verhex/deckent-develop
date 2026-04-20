@@ -1,0 +1,25 @@
+# Task 148-021: Routing V3 Intent Classifier — core-dev Sub-Intents
+
+## Approach
+1. Add `subIntent` field to `TaskDNA` in `routing-types.ts`
+2. Add `SubIntentType` union type
+3. Implement `detectSubIntent()` in `intent-classifier.ts`
+4. Wire sub-intent into `classifyIntent()`
+5. Add `routingVersion` field to `RoutingDecision` in `routing-types.ts`
+6. Set `routingVersion: 'v3'` in `routeTaskV2()` output
+7. Add 'devops' and 'architecture' to IntentType union (per DIRECTIVES)
+8. Write 6 tests in `tests/core/intent-v3.test.ts`
+
+## Files to Modify
+- src/core/routing-types.ts — add SubIntentType, subIntent field, routingVersion field
+- src/core/intent-classifier.ts — add detectSubIntent(), wire into classifyIntent()
+- src/core/routing-engine.ts — add routingVersion: 'v3' to output
+
+## Files to Create
+- tests/core/intent-v3.test.ts — 6 test cases
+
+## Expected Changes
+- SubIntentType: 'types' | 'config' | 'routing' | 'observer' | 'registry' | 'dispatcher'
+- TaskDNA.subIntent?: SubIntentType
+- RoutingDecision.routingVersion: 'v2' | 'v3'
+- detectSubIntent() based on scope dirs + description keywords

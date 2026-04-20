@@ -1,0 +1,90 @@
+{
+  "id": "148-012",
+  "title": "CLI `deckent nervous` TUI Integration Test + Smoke Script",
+  "description": "CLI `deckent nervous` TUI Integration Test + Smoke Script\n\n- Model: sonnet\n- Effort: normal\n- Skills: typescript-expert\n- Files: scripts/nervous-tui-smoke.sh (NEW), tests/cli/nervous-tui-live.test.ts\n- Scope: scripts/, tests/cli/\n\n### Description\nSprint 147 T-147-014'te CLI command yazıldı. Sprint 148 canlı TUI kullanımı + smoke test.\n\nSmoke script `scripts/nervous-tui-smoke.sh`:\n```bash\n#!/bin/bash\nset -euo pipefail\n\n# Run in background to avoid hanging\ntimeout 10 npx deckent nervous 2>&1 | tee /tmp/nervous-tui-output.log\nexit_code=${PIPESTATUS[0]}\n\n# Validate output contains expected sections\ngrep -q \"🧠 Deckent Nervous System\" /tmp/nervous-tui-output.log || { echo \"❌ Missing header\"; exit 1; }\ngrep -q \"Pending:\" /tmp/nervous-tui-output.log || { echo \"❌ Missing Pending section\"; exit 1; }\ngrep -q \"Recent\" /tmp/nervous-tui-output.log || { echo \"❌ Missing Recent section\"; exit 1; }\ngrep -q \"Config:\" /tmp/nervous-tui-output.log || { echo \"❌ Missing Config section\"; exit 1; }\ngrep -q \"mode=balanced\" /tmp/nervous-tui-output.log || { echo \"❌ Mode not balanced\"; exit 1; }\n\necho \"✅ Nervous TUI smoke test PASS\"\n```\n\nIntegration test:\n- `deckent nervous` no pending → \"No pending notifications\" mesajı\n- Pending var → table format render\n- `deckent nervous history --limit 5` → 5 line history\n- `deckent nervous accept ns-XXX` → resolveApproval call\n\n### Test (5 test)\n1. TUI renders with all sections\n2. Pending count matches event stream\n3. History `--limit 5` shows 5 records\n4. Color/ANSI escape correct (strip + validate structure)\n5. Invalid subcommand → usage + exit 1\n\n**Kanıt:** `bash scripts/nervous-tui-smoke.sh` exit 0.\n\n---",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "tests/cli/",
+      "scripts/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "scripts/nervous-tui-smoke.sh (NEW)",
+      "tests/cli/nervous-tui-live.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `bash scripts/nervous-tui-smoke.sh` exit 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "test-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "testing",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.85
+      },
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.5
+        },
+        {
+          "name": "scripts",
+          "weight": 0.5
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "scripts/": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "scripts/",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "uncertain",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:44:23.780Z"
+}

@@ -102,3 +102,4 @@ M | normal | - | resolved |
 | debt-146-005 | Tech debt from 146-005: buildTaskPrompt() implemented as single entry point in p | normal | - | resolved |
 | debt-146-008 | Tech debt from 146-008: Phase guard added to archiveDirectives() — rejects calls | normal | - | resolved |
 | debt-146-010 | Tech debt from 146-010: Rubric system consolidated: (1) Removed rubricScores spe | normal | - | resolved |
+| debt-148-022 | Tech debt from 148-022: Docker Worker Exit Pattern root cause fixed. Problem: Co | normal | - | resolved |

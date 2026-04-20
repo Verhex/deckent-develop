@@ -1,0 +1,97 @@
+{
+  "id": "148-001",
+  "title": "test-writer Agent Archive + Removal Justification",
+  "description": "test-writer Agent Archive + Removal Justification\n\n- Model: opus\n- Effort: low\n- Skills: typescript-expert\n- Files: .deckent/agents/test-writer/ (move to archive), docs/audits/sprint-148/test-writer-removal-justification.md\n- Scope: .deckent/agents/, docs/audits/\n\n### Description\nSprint 146-147 canlı kanıtları:\n- Sprint 145: test-writer 14/27 (%52)\n- Sprint 146: test-writer 9/17 (%53)\n- Sprint 147: test-writer 21/22 (%95) — **%100 anomaly** threshold aşıldı\n\nReform ilk adımı: `.deckent/agents/test-writer/` dizinini **TAMAMEN KALDIRMAK** yerine archive'a taşı (geri yükleme kapasitesi için):\n- Source: `.deckent/agents/test-writer/`\n- Destination: `.deckent/agents/archive/test-writer-removed-sprint-148/`\n\nAynı zamanda `docs/audits/sprint-148/test-writer-removal-justification.md` yaz:\n- Sprint 145/146/147 stats tablosu\n- AgentRoutingHealth detector findings\n- Beta GA user experience gerekçesi\n- \"Test yatay skill, agent dikey uzmanlık\" taksonomi kararı\n\n`agent-pool.ts` boot sırasında archive dizinini skip eder — 16 → 15 built-in agent.\n\n### Test (3 test)\n1. `fs.existsSync('.deckent/agents/test-writer')` → false\n2. `fs.existsSync('.deckent/agents/archive/test-writer-removed-sprint-148/agent.json')` → true\n3. `new AgentPoolManager().getBuiltinAgents().length === 15`\n\n**Kanıt:** `ls .deckent/agents/ | grep -v archive | wc -l` → **15**. `cat docs/audits/sprint-148/test-writer-removal-justification.md` → 3 sprint stats içerir.\n\n---",
+  "model": "opus",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "docs/audits/sprint-148/",
+      ".deckent/agents/",
+      "docs/audits/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      ".deckent/agents/test-writer/ (move to archive)",
+      "docs/audits/sprint-148/test-writer-removal-justification.md",
+      "agent.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `ls .deckent/agents/ | grep -v archive | wc -l` → **15**. `cat docs/audits/sprint-148/test-writer-removal-justification.md` → 3 sprint stats içerir.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "low",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [],
+        "confidence": 0.9
+      },
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.5
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.33
+        },
+        {
+          "type": "delete",
+          "weight": 0.17
+        },
+        {
+          "type": "rename",
+          "weight": 0.17
+        },
+        {
+          "type": "test",
+          "weight": 0.17
+        },
+        {
+          "type": "document",
+          "weight": 0.17
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          ".deckent/": 0.33,
+          "docs/": 0.33,
+          "./": 0.33
+        },
+        "primaryWriteTarget": ".deckent/",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 1671,
+  "updatedAt": "2026-04-20T14:43:34.374Z"
+}

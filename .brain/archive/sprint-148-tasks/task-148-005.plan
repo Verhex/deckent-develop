@@ -1,0 +1,25 @@
+# Task 148-005 Execution Plan
+
+## Objective
+Remove rubricScores self-report spec from all 15 agent PROMPT.md files.
+Create agent-prompt-validator.mjs script.
+
+## Pre-Work Analysis
+1. Scan all .deckent/agents/*/PROMPT.md for rubricScores pattern
+2. Check agent.json files for systemPrompt containing rubricScores
+
+## Findings
+- All 15 active agent PROMPT.md files are ALREADY CLEAN (0 rubricScores matches)
+- rubricScores found only in: .deckent/agents/archive/test-writer-removed-sprint-148/agent.json
+  - This is the archived test-writer agent's systemPrompt field
+  - Archive scope — outside active agent pool
+  - Task-148-001 already archived this agent
+
+## Actions
+1. PROMPT.md cleanup: SKIPPED — files already clean (Sprint 147 or prior work may have cleaned these)
+2. Create scripts/agent-prompt-validator.mjs — DONE
+3. Verify validator runs successfully — DONE (exit 0)
+
+## Verification
+- grep -r "rubricScores" .deckent/agents/ --include="PROMPT.md" → 0 matches ✅
+- node scripts/agent-prompt-validator.mjs → exit 0, "All 17 agents clean" ✅

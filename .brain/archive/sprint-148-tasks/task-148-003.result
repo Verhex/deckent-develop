@@ -1,0 +1,37 @@
+{
+  "taskId": "148-003",
+  "filesChanged": [
+    "src/core/routing-types.ts",
+    "src/core/intent-classifier.ts",
+    "src/core/activation-engine.ts",
+    "src/core/routing-engine.ts",
+    "src/orchestra/prompt-token-optimizer.ts",
+    "src/orchestra/ecosystem-intelligence.ts",
+    "tests/core/intent-classifier-refactor.test.ts",
+    "tests/core/intent-classifier.test.ts",
+    "tests/core/routing-types.test.ts",
+    "tests/core/routing-engine.test.ts",
+    "tests/orchestra/agent-routing-health.test.ts",
+    "tests/orchestra/ecosystem-intelligence.test.ts"
+  ],
+  "linesAdded": 145,
+  "linesRemoved": 85,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint 148 T-148-003: Intent Classifier 'testing' Refactor completed.\n\n## Changes:\n1. **routing-types.ts**: Removed 'testing' from IntentType union (12→11 types). Added `tags: string[]` to TaskDNA interface. Updated `createDefaultTaskDNA()` and `ALL_INTENT_TYPES`.\n2. **intent-classifier.ts**: Removed 'testing' from INTENT_KEYWORDS. Updated SCOPE_INTENT_SIGNALS. Removed testing score boost logic. Added `detectTags()` function — adds 'test-coverage' tag when scope has tests/ or filesWrite has .test.ts/.spec.ts/.test.tsx. Removed testing from secondary intents.\n3. **activation-engine.ts**: Removed 'testing' case from getDynamicExclusions().\n4. **routing-engine.ts**: Updated getIntentPriorityBonus() to use tag-based check (`tags.includes('test-coverage')`) instead of `primary === 'testing'`.\n5. **prompt-token-optimizer.ts**: Removed 'testing' key from INTENT_SKILL_AFFINITY, merged keywords into 'implementation'.\n6. **ecosystem-intelligence.ts**: Remapped test/spec/coverage keywords from 'testing' to 'implementation'. Removed 'testing' from EXCLUSION_RULES.\n\n## Tests:\n- New: tests/core/intent-classifier-refactor.test.ts — 16 tests (10 spec + 6 detectTags unit tests)\n- Updated: 6 existing test files to accommodate testing→implementation refactor\n- Total: 250 tests across 12 test files — ALL PASS\n- tsc --noEmit: 0 errors (excluding pre-existing detector-registry.ts)\n\n## Verification:\n- `grep \"intent.*'testing'\" src/core/intent-classifier.ts` → 0 match as primary\n- `isValidIntentType('testing')` → false\n- `ALL_INTENT_TYPES` does not contain 'testing'\n- Tasks with tests/ scope get 'test-coverage' tag\n- Tasks with src/ scope do NOT get 'test-coverage' tag\n\n## Tech Debt:\n- .deckent/skills/testing-expert/manifest.json and .deckent/skills/ci-testing/manifest.json still have activation rules referencing 'intent.primary: testing' — these rules will never match (harmless) but should be updated by T-148-002 (skill auto-activation).\n- .deckent/agents/*/agent.json exclusion rules referencing 'testing' — similarly harmless, handled by T-148-004 (router fallback).",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 90,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

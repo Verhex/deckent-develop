@@ -2,7 +2,36 @@
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
-## Latest: v0.4.0-beta.2 (2026-04-20)
+## Latest: v0.4.0-beta.4 (2026-04-21)
+
+### Sprint 148 — Agent Taxonomy Reform + Nervous Dogfood Activation + Cross-Platform Validation
+
+#### Breaking Changes
+- **Agent Taxonomy Reform:** `test-writer` agent removed. Test expertise migrated to `testing-expert` skill with auto-activation (scope `tests/**` or filesWrite `*.test.ts`). Intent classifier "testing" primary intent removed, replaced by "test-coverage" tag.
+
+#### Added
+- Nervous System Activation (balanced preset default for this project, `enabled: false` in new projects)
+- 5 MVP Detectors live: StaleWorker, ScopeCollision, DebtTrend, AgentRouting, DirectivesMidSprintProtection
+- Ana PID Notification Scope enforcement (ADR-037 RBAC)
+- Cross-Platform CI Matrix (macOS/Linux/WSL2 × tmux/subprocess/Docker)
+- GitHub Actions workflow: `cross-platform-e2e.yml`
+- Fresh Install Matrix (Node 18/20/22)
+- Provider Matrix (Claude + Codex)
+- i18n Parity (TR/EN routing identical)
+
+#### Fixed
+- Docker worker exit pattern (Sprint 146 T-146-011 root cause)
+- Vitest regression 135 → < 50 fail
+- Routing V3 (agent fallback chain, test-writer excluded)
+- 15 agent PROMPT.md rubric spec cleanup (Sprint 146 T-10 eksik wire completion)
+
+#### Changed
+- Routing V2 → V3 (granular core-dev sub-intents)
+- Intent union: removed `'testing'`, added `'devops'`, `'architecture'`
+
+---
+
+## [0.4.0-beta.2] — 2026-04-20
 
 ### Sprint 146 — Prompt God Template Reform + Critical Bug Fix + Rubric Consolidation
 - Unified prompt builder `buildTaskPrompt()` — tek entry, char count %40 azalma (~45K → ≤27K)

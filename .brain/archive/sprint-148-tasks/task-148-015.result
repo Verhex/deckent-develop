@@ -1,0 +1,20 @@
+{
+  "taskId": "148-015",
+  "filesChanged": [
+    "tests/e2e/cross-platform/linux-subprocess.test.ts",
+    "docs/audits/sprint-148/linux-validation.md"
+  ],
+  "linesAdded": 365,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Linux E2E subprocess backend test suite created with 6 tests: platform detection, 3-task mini sprint lifecycle, stdout line-buffered capture, exit code 0 → DONE, exit code non-zero → NO_GO, SIGTERM graceful shutdown. All 6 tests PASS on Linux. Uses `node -e` as subprocess command (no Claude CLI needed in CI). DECKENT_WORKER_MODE=1 env var set for ADR-037 compliance.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 35000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

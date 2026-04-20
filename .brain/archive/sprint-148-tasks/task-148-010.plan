@@ -1,0 +1,19 @@
+# Task 148-010: AgentRoutingHealth Canlı Pozitif Doğrulama
+
+## Plan
+1. `tests/nervous/detectors/agent-routing-positive.test.ts` oluştur
+2. 5 test case:
+   - T1: 28 task Sprint 148 dağılımı → architect %43 → borderline warning alert
+   - T2: string; corrupt agent pattern → 0 detection (reform sonrası temiz data)
+   - T3: Anomaly threshold 0.40 → architect borderline test
+   - T4: False positive test — %43 legitimate → warning, blocker değil
+   - T5: Sprint 147 replay — %95 anomaly → critical alert
+3. vitest ile doğrula
+
+## Files
+- CREATE: tests/nervous/detectors/agent-routing-positive.test.ts
+
+## Approach
+- Mevcut agent-routing.test.ts pattern'ini takip et (vi.mock node:fs)
+- Sprint 148 gerçek task dağılımını simüle et (28 task, test-writer yok)
+- Sprint 147 replay ile regression doğrulaması

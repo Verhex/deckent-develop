@@ -1,0 +1,100 @@
+{
+  "id": "148-023",
+  "title": "CHANGELOG 0.4.0-beta.4 + Sprint-148.md",
+  "description": "CHANGELOG 0.4.0-beta.4 + Sprint-148.md\n\n- Model: sonnet\n- Effort: low\n- Skills: documentation-writer\n- Files: CHANGELOG.md, docs/sprint-log/Sprint-148.md\n- Scope: ./, docs/sprint-log/\n\n### Description\nRelease note 0.4.0-beta.4:\n```markdown\n## [0.4.0-beta.4] - 2026-04-21 (TRT)\n\n### Breaking Changes\n- **Agent Taxonomy Reform:** `test-writer` agent removed. Test expertise migrated to `testing-expert` skill with auto-activation (scope tests/** or filesWrite *.test.ts). Intent classifier \"testing\" primary intent removed, replaced by \"test-coverage\" tag.\n\n### Added\n- Nervous System Activation (balanced preset default for this project, `enabled: false` in new projects)\n- 5 MVP Detectors live: StaleWorker, ScopeCollision, DebtTrend, AgentRouting, DirectivesMidSprintProtection\n- Ana PID Notification Scope enforcement (ADR-037 RBAC)\n- Cross-Platform CI Matrix (macOS/Linux/WSL2 × tmux/subprocess/Docker)\n- GitHub Actions workflow: cross-platform-e2e.yml\n- Fresh Install Matrix (Node 18/20/22)\n- Provider Matrix (Claude + Codex)\n- i18n Parity (TR/EN routing identical)\n\n### Fixed\n- Docker worker exit pattern (Sprint 146 T-146-011 root cause)\n- Vitest regression 135 → < 50 fail\n- Routing V3 (agent fallback chain, test-writer excluded)\n- 15 agent PROMPT.md rubric spec cleanup (Sprint 146 T-10 eksik wire completion)\n\n### Changed\n- Routing V2 → V3 (granular core-dev sub-intents)\n- Intent union: removed 'testing', added 'devops', 'architecture'\n```\n\n`docs/sprint-log/Sprint-148.md` — Sprint 148 executive summary.\n\n### Test\n- `grep \"0.4.0-beta.4\" CHANGELOG.md` → 1+ match\n- `test -f docs/sprint-log/Sprint-148.md`\n\n**Kanıt:** Git diff shows both files.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "docs/sprint-log/",
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "CHANGELOG.md",
+      "docs/sprint-log/Sprint-148.md",
+      ".test",
+      "test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; `grep \"0.4.0-beta.4\" CHANGELOG.md` → 1+ match; *Kanıt:** Git diff shows both files.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-20T13:54:40.608Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.95
+      },
+      "domains": [
+        {
+          "name": "docs",
+          "weight": 0.33
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.21
+        },
+        {
+          "type": "test",
+          "weight": 0.21
+        },
+        {
+          "type": "document",
+          "weight": 0.21
+        },
+        {
+          "type": "modify",
+          "weight": 0.14
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "rename",
+          "weight": 0.07
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "./": 0.75,
+          "docs/": 0.25
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:45:06.022Z"
+}

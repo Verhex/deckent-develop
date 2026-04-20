@@ -1,0 +1,23 @@
+{
+  "taskId": "148-006",
+  "filesChanged": [
+    ".deckent/config.json",
+    "src/core/config-types.ts",
+    "src/core/config.ts",
+    "tests/core/nervous-enabled-integration.test.ts"
+  ],
+  "linesAdded": 55,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Nervous System enabled=true pivot completed:\n1. .deckent/config.json: nervous_system.enabled false→true (BALANCED preset, all 5 detectors active)\n2. src/core/config-defaults already correct (createDefaultConfig has enabled=false — new projects safe)\n3. ResolvedConfig interface extended with nervous_system? optional field (config-types.ts)\n4. loadConfig() now passes nervous_system through to resolved config (config.ts)\n5. 3 tests written and passing: project config load, default disabled, NervousObserver boot readiness\n\ntsc --noEmit: PASS (0 errors)\nvitest run tests/core/nervous-enabled-integration.test.ts: 3/3 PASS\nvitest run tests/core/config-nervous-schema.test.ts + config.test.ts: 167/167 PASS\n\nNote: src/core/config-defaults.ts does not exist as a separate file — defaults live in createDefaultConfig() in config.ts, which already had enabled=false. ResolvedConfig addition enables Brain to access nervous_system config at runtime for boot decision.",
+  "tokenUsage": {
+    "inputTokens": 42000,
+    "outputTokens": 2800,
+    "cacheReadTokens": 85000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "evaluationDecision": "DONE"
+}

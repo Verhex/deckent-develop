@@ -1,0 +1,21 @@
+{
+  "taskId": "148-004",
+  "filesChanged": [
+    "src/core/routing-engine.ts",
+    "src/core/agent-pool.ts",
+    "tests/orchestra/router-agent-fallback.test.ts"
+  ],
+  "linesAdded": 105,
+  "linesRemoved": 5,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Router V2 Agent Fallback Chain implemented. AGENT_FALLBACK_CHAIN (Record<IntentType, string[]>) covers all 11 intent types. selectAgentByFallback() iterates chain against active agent IDs. routeTaskV2 now calls fallback when selectBestAgent returns null. AgentPoolManager.getActiveAgentIds() scans .deckent/agents/ skipping archive/. _loadFromDir also skips archive directory. 'testing' key removed from fallback chain (IntentType removed by T-148-003). getIntentPriorityBonus updated: testing→test-coverage tag. 11/11 tests pass. 0 TypeScript errors in scope files (9 pre-existing errors in scope-external files: intent-classifier.ts, ecosystem-intelligence.ts — all from T-148-003 IntentType union change).",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 6000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

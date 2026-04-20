@@ -1,0 +1,110 @@
+{
+  "id": "148-014",
+  "title": "macOS E2E — tmux Backend Full Sprint (GitHub Actions)",
+  "description": "macOS E2E — tmux Backend Full Sprint (GitHub Actions)\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, devops-engineer\n- Files: tests/e2e/cross-platform/macos-tmux.test.ts (NEW), .github/workflows/cross-platform-e2e.yml (NEW), docs/audits/sprint-148/macos-validation.md\n- Scope: tests/e2e/cross-platform/, .github/workflows/, docs/audits/\n\n### Description\nGitHub Actions workflow `cross-platform-e2e.yml`:\n```yaml\nname: Cross-Platform E2E\non: [push, pull_request]\njobs:\n  e2e:\n    strategy:\n      matrix:\n        os: [macos-latest, ubuntu-latest]\n        backend: [tmux, subprocess]\n        exclude:\n          - os: macos-latest\n            backend: subprocess  # prioritize tmux on macOS\n    runs-on: ${{ matrix.os }}\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with: { node-version: '20' }\n      - run: npm ci\n      - run: npm run build\n      - if: matrix.backend == 'tmux' && matrix.os == 'macos-latest'\n        run: brew install tmux\n      - run: npx vitest run tests/e2e/cross-platform/${{ matrix.os }}-${{ matrix.backend }}.test.ts\n```\n\nTest `tests/e2e/cross-platform/macos-tmux.test.ts`:\n- 3-task mini sprint\n- fs.watch kqueue behavior\n- tmux 3.3+ version check\n- Worker spawn / HB / result / cleanup lifecycle\n\n### Test (6 test)\n1. Platform detection: `os.platform() === 'darwin'`\n2. tmux version >= 3.3\n3. Mini sprint 3 task — all complete\n4. HB format ISO 8601 + UUID valid\n5. Result atomic write (kqueue race condition safe)\n6. Cleanup graceful — no orphan tmux sessions\n\n**Kanıt:** `docs/audits/sprint-148/macos-validation.md` GO status. CI badge green.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "tests/e2e/cross-platform/",
+      "docs/audits/sprint-148/",
+      ".github/workflows/",
+      "docs/audits/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "tests/e2e/cross-platform/macos-tmux.test.ts (NEW)",
+      ".github/workflows/cross-platform-e2e.yml (NEW)",
+      "docs/audits/sprint-148/macos-validation.md",
+      "tests/e2e/cross-platform/macos-tmux.test.ts",
+      "cross-platform-e2e.yml",
+      ".test",
+      "test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `docs/audits/sprint-148/macos-validation.md` GO status. CI badge green.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-148",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "devops-engineer"
+  ],
+  "assignedAgent": "devops-engineer",
+  "assignedSkills": [
+    "typescript-expert",
+    "devops-engineer"
+  ],
+  "createdAt": "2026-04-20T13:54:40.607Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "devops",
+        "secondary": [
+          "testing",
+          "documentation"
+        ],
+        "confidence": 0.7
+      },
+      "domains": [
+        {
+          "name": "e2e",
+          "weight": 0.27
+        },
+        {
+          "name": "docs",
+          "weight": 0.27
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.43
+        },
+        {
+          "type": "delete",
+          "weight": 0.14
+        },
+        {
+          "type": "test",
+          "weight": 0.14
+        },
+        {
+          "type": "document",
+          "weight": 0.14
+        },
+        {
+          "type": "configure",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 7,
+        "moduleCount": 3,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "tests/": 0.29,
+          ".github/": 0.14,
+          "docs/": 0.14,
+          "./": 0.43
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0.29
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-20T14:44:32.523Z"
+}
