@@ -3,14 +3,15 @@
 // Replaces the broken detectTaskType() with weighted, multi-signal analysis.
 
 import type { TaskScope } from './task-types.js';
-import type { TaskDNA, IntentType, OperationType, TaskSize } from './routing-types.js';
+import type { TaskDNA, IntentType, SubIntentType, OperationType, TaskSize } from './routing-types.js';
 
 // ─── Intent Keywords ────────────────────────────────────────────────────────
 
 const INTENT_KEYWORDS: Record<IntentType, string[]> = {
   security: ['security', 'auth', 'authentication', 'jwt', 'csrf', 'xss', 'injection', 'vulnerability', 'encryption', 'owasp', 'permission', 'acl', 'rbac'],
   bugfix: ['fix', 'bug', 'error', 'crash', 'regression', 'broken', 'issue', 'defect', 'patch', 'hotfix', 'wire', 'runtime'],
-  testing: ['test', 'spec', 'coverage', 'vitest', 'jest', 'mock', 'stub', 'assertion', 'e2e', 'integration test', 'unit test'],
+  // 'testing' removed as primary intent — Sprint 148 taxonomy reform
+  // Test work is now tracked via 'test-coverage' tag in TaskDNA.tags
   refactor: ['refactor', 'cleanup', 'restructure', 'simplify', 'extract', 'split', 'merge', 'consolidate', 'rename', 'reorganize'],
   documentation: ['doc', 'documentation', 'doc update', 'readme', 'changelog', 'comment', 'jsdoc', 'guide', 'tutorial', 'api doc', 'güncelleme', 'dokümantasyon'],
   performance: ['performance', 'optimize', 'speed', 'latency', 'cache', 'profil', 'benchmark', 'bottleneck', 'memory leak'],
@@ -18,7 +19,8 @@ const INTENT_KEYWORDS: Record<IntentType, string[]> = {
   devops: ['ci', 'cd', 'pipeline', 'deploy', 'docker', 'kubernetes', 'workflow', 'github actions', 'infrastructure'],
   config: ['config', 'setting', 'env', 'environment', 'option', 'flag', 'parameter'],
   migration: ['migrate', 'migration', 'upgrade', 'version', 'schema', 'transform', 'convert'],
-  implementation: ['implement', 'add', 'create', 'build', 'feature', 'endpoint', 'command', 'module', 'function', 'adaptive', 'timeout', 'estimator', 'engine', 'validator'],
+  architecture: ['architecture', 'adr', 'design pattern', 'roadmap', 'system design', 'module structure', 'dependency graph'],
+  implementation: ['implement', 'add', 'create', 'build', 'feature', 'endpoint', 'command', 'module', 'function', 'adaptive', 'timeout', 'estimator', 'engine', 'validator', 'test', 'spec', 'coverage', 'vitest', 'types'],
   unknown: [],
 };
 
@@ -41,7 +43,7 @@ const SCOPE_INTENT_SIGNALS: Array<{ pattern: RegExp; intent: IntentType; weight:
   { pattern: /security|auth/i, intent: 'security', weight: 2 },
   { pattern: /docs?\//i, intent: 'documentation', weight: 2 },
   { pattern: /\.md$/i, intent: 'documentation', weight: 2 }, // .md file writes signal documentation
-  { pattern: /test/i, intent: 'testing', weight: 1 }, // lower weight — testing often secondary
+  { pattern: /test/i, intent: 'implementation', weight: 1 }, // test scope → implementation (test-coverage tag added separately)
 ];
 
 // ─── Main API ───────────────────────────────────────────────────────────────
@@ -64,6 +66,8 @@ export function classifyIntent(task: {
   const domains = detectDomains(scope);
   const operations = detectOperations(text, scope);
   const complexity = analyzeComplexity(scope);
+  const tags = detectTags(scope);
+  const subIntent = detectSubIntent(text, scope, primaryResult.intent);
 
   return {
     intent: {
@@ -71,6 +75,8 @@ export function classifyIntent(task: {
       secondary,
       confidence: primaryResult.confidence,
     },
+    subIntent,
+    tags,
     domains,
     operations,
     complexity,
@@ -121,24 +127,22 @@ export function detectPrimaryIntent(
   // CRITICAL FIX: Write ratio analysis prevents the detectTaskType ordering bug.
   // If most writes go to src/, it's implementation even if "test" keyword appears.
   if (analysis.testWriteRatio < 0.3 && analysis.writeRatio['src/'] !== undefined) {
-    // Most writes are source code — boost implementation, debunk testing
+    // Most writes are source code — boost implementation
     const implScore = scores.find(s => s.intent === 'implementation');
     if (implScore) {
       implScore.score += 3;
     } else {
       scores.push({ intent: 'implementation', score: 3 });
     }
-    const testScore = scores.find(s => s.intent === 'testing');
-    if (testScore) testScore.score = Math.max(0, testScore.score - 2);
   }
 
-  // If most writes are tests and no strong source signal
+  // If most writes are tests — boost implementation (test-coverage tag handles routing)
   if (analysis.testWriteRatio >= 0.5) {
-    const testScore = scores.find(s => s.intent === 'testing');
-    if (testScore) {
-      testScore.score += 3;
+    const implScore = scores.find(s => s.intent === 'implementation');
+    if (implScore) {
+      implScore.score += 2;
     } else {
-      scores.push({ intent: 'testing', score: 3 });
+      scores.push({ intent: 'implementation', score: 2 });
     }
   }
 
@@ -156,9 +160,6 @@ export function detectPrimaryIntent(
     } else {
       scores.push({ intent: 'documentation', score: 3 });
     }
-    // Debunk testing when most writes are doc files
-    const testScore = scores.find(s => s.intent === 'testing');
-    if (testScore && mdRatio >= 0.5) testScore.score = Math.max(0, testScore.score - 2);
   }
 
   // Sort by score descending
@@ -196,20 +197,12 @@ export function detectSecondaryIntents(
   primary: IntentType,
   scopeAnalysis?: TaskDNA['scope'],
 ): IntentType[] {
-  const analysis = scopeAnalysis ?? analyzeWriteScope(scope);
+  // scopeAnalysis kept in signature for backward compat (callers may pass it)
+  void scopeAnalysis;
   const secondary: IntentType[] = [];
 
-  // If task has actual test work (scope signal or significant writes) but primary isn't testing.
-  // Intentionally excludes keyword-only matches: "Test: 10+ tests" in DIRECTIVES descriptions
-  // should NOT trigger test-writer for implementation tasks.
-  if (primary !== 'testing') {
-    const hasTestScope = scope.directories.some(d => d.includes('test')) ||
-      scope.filesWrite.some(f => f.includes('.test.') || f.includes('.spec.') || f.startsWith('tests/') || f.startsWith('test/'));
-    const hasSignificantTestWork = analysis.testWriteRatio >= 0.2;
-    if (hasSignificantTestWork || hasTestScope) {
-      secondary.push('testing');
-    }
-  }
+  // Testing removed as primary/secondary intent (Sprint 148 taxonomy reform).
+  // Test work is now indicated via 'test-coverage' tag in TaskDNA.tags.
 
   // If task touches docs but primary isn't documentation
   if (primary !== 'documentation') {
@@ -394,4 +387,80 @@ export function analyzeWriteScope(scope: TaskScope): TaskDNA['scope'] {
     primaryWriteTarget,
     testWriteRatio: Math.round((testWrites / total) * 100) / 100,
   };
+}
+
+// ─── Sub-Intent Detection (V3) ─────────────────────────────────────────────
+
+/**
+ * V3 sub-intent detection for fine-grained routing within core-dev tasks.
+ * Detects sub-domain from scope paths and description keywords.
+ * Only applies when primary intent is 'implementation' (core-dev).
+ */
+
+const SUB_INTENT_SIGNALS: Array<{ pattern: RegExp; subIntent: SubIntentType }> = [
+  { pattern: /types?\.ts|type-?defs?|interfaces?/i, subIntent: 'types' },
+  { pattern: /config|settings?|defaults?|options?/i, subIntent: 'config' },
+  { pattern: /rout(ing|er)|route/i, subIntent: 'routing' },
+  { pattern: /observer|watch|monitor|nervous/i, subIntent: 'observer' },
+  { pattern: /registry|registr(ies|ar)/i, subIntent: 'registry' },
+  { pattern: /dispatch(er)?|notify|notification/i, subIntent: 'dispatcher' },
+];
+
+export function detectSubIntent(
+  text: string,
+  scope: TaskScope,
+  primary: IntentType,
+): SubIntentType | undefined {
+  // Sub-intents only apply to implementation (core-dev) tasks
+  if (primary !== 'implementation') return undefined;
+
+  const allPaths = [...scope.directories, ...scope.filesWrite, ...scope.filesRead];
+  const combined = `${text} ${allPaths.join(' ')}`.toLowerCase();
+
+  // Score each sub-intent signal
+  const scores = new Map<SubIntentType, number>();
+  for (const signal of SUB_INTENT_SIGNALS) {
+    const matches = combined.match(signal.pattern);
+    if (matches) {
+      scores.set(signal.subIntent, (scores.get(signal.subIntent) ?? 0) + 1);
+    }
+  }
+
+  if (scores.size === 0) return undefined;
+
+  // Return the highest-scoring sub-intent
+  let best: SubIntentType | undefined;
+  let bestScore = 0;
+  for (const [subIntent, score] of scores) {
+    if (score > bestScore) {
+      bestScore = score;
+      best = subIntent;
+    }
+  }
+
+  return best;
+}
+
+// ─── Tag Detection ─────────────────────────────────────────────────────────
+
+/**
+ * Detect cross-cutting tags from scope analysis.
+ * 'test-coverage' is added when the task touches test directories or test files.
+ * This replaces the former 'testing' primary intent for routing purposes.
+ */
+export function detectTags(scope: TaskScope): string[] {
+  const tags: string[] = [];
+
+  const scopeHasTests = scope.directories.some(d =>
+    d.startsWith('tests/') || d.startsWith('test/') || d === 'tests' || d === 'test',
+  );
+  const writesTest = scope.filesWrite.some(f =>
+    f.endsWith('.test.ts') || f.endsWith('.spec.ts') || f.endsWith('.test.tsx'),
+  );
+
+  if (scopeHasTests || writesTest) {
+    tags.push('test-coverage');
+  }
+
+  return tags;
 }

@@ -17,9 +17,9 @@ import type {
 
 /** Maps skill trigger/category keywords to intent types */
 const KEYWORD_TO_INTENT: Record<string, IntentType> = {
-  // Testing
-  test: 'testing', testing: 'testing', spec: 'testing', coverage: 'testing',
-  assertion: 'testing', mock: 'testing', vitest: 'testing', jest: 'testing',
+  // Testing → implementation (Sprint 148: testing removed as primary intent)
+  test: 'implementation', testing: 'implementation', spec: 'implementation', coverage: 'implementation',
+  assertion: 'implementation', mock: 'implementation', vitest: 'implementation', jest: 'implementation',
   // CI/DevOps
   ci: 'devops', deploy: 'devops', pipeline: 'devops', docker: 'devops',
   github: 'devops', actions: 'devops', workflow: 'devops', devops: 'devops',
@@ -54,11 +54,11 @@ const CATEGORY_TO_INTENT: Record<string, IntentType> = {
 /** Intents that should be excluded for certain primary intents */
 const EXCLUSION_RULES: Record<IntentType, IntentType[]> = {
   documentation: ['implementation'],
-  testing:       ['documentation'],
+  // 'testing' removed as primary intent (Sprint 148)
   security:      ['documentation'],
   devops:        [],
   implementation:[], bugfix: [], refactor: [], config: [],
-  performance:   [], design: [], migration: [], unknown: [],
+  performance:   [], design: [], migration: [], architecture: [], unknown: [],
 };
 
 // ─── Core Function ────────────────────────────────────────────────────────────

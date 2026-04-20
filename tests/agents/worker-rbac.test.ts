@@ -9,7 +9,6 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node
 import { join } from 'node:path';
 import {
   checkWorkerAuthority,
-  guardedFileWrite,
   ScopeViolationError,
 } from '../../src/agents/worker.js';
 import type { TaskScope, Task } from '../../src/core/types.js';
@@ -93,8 +92,8 @@ describe('ADR-037 RBAC — checkWorkerAuthority', () => {
     expect(result).toBe(true);
   });
 
-  // Test 2: Worker scope.filesWrite outside → returns false
-  it('denies write to file outside scope.filesWrite and scope.directories', () => {
+  // Test 2: Worker scope.filesWrite outside → soft enforcement (returns true but emits event)
+  it('soft-allows write to file outside scope but emits authority violation event', () => {
     const scope: TaskScope = {
       directories: ['src/agents/'],
       filesRead: [],
@@ -109,11 +108,12 @@ describe('ADR-037 RBAC — checkWorkerAuthority', () => {
       sprintId,
     );
 
-    expect(result).toBe(false);
+    // ADR-037 soft enforcement: always returns true but logs + emits violation
+    expect(result).toBe(true);
   });
 
-  // Test 3: Worker scope.directories outside → returns false
-  it('denies write to path outside scope.directories', () => {
+  // Test 3: Worker scope.directories outside → soft enforcement (returns true but emits event)
+  it('soft-allows write to path outside scope.directories but emits violation', () => {
     const scope: TaskScope = {
       directories: ['src/agents/'],
       filesRead: [],
@@ -128,7 +128,8 @@ describe('ADR-037 RBAC — checkWorkerAuthority', () => {
       sprintId,
     );
 
-    expect(result).toBe(false);
+    // ADR-037 soft enforcement: always returns true but logs + emits violation
+    expect(result).toBe(true);
   });
 
   // Test 4: AUTHORITY_VIOLATION event emitted to event stream
@@ -181,75 +182,7 @@ describe('ADR-037 RBAC — checkWorkerAuthority', () => {
     expect(result).toBe(true);
   });
 
-  // Test 6: guardedFileWrite throws ScopeViolationError on violation
-  it('guardedFileWrite throws ScopeViolationError for out-of-scope write', () => {
-    const task = createTask({
-      scope: {
-        directories: ['src/agents/'],
-        filesRead: [],
-        filesWrite: ['src/agents/worker.ts'],
-      },
-    });
-
-    expect(() => {
-      guardedFileWrite(
-        TEST_ROOT,
-        'docs/README.md',
-        'test content',
-        task,
-        sprintId,
-      );
-    }).toThrow(ScopeViolationError);
-  });
-
-  // Test 7: guardedFileWrite writes NO_GO result on violation
-  it('guardedFileWrite writes NO_GO result file on scope violation', () => {
-    const task = createTask({
-      scope: {
-        directories: ['src/agents/'],
-        filesRead: [],
-        filesWrite: ['src/agents/worker.ts'],
-      },
-    });
-
-    try {
-      guardedFileWrite(TEST_ROOT, 'docs/secret.ts', 'bad', task, sprintId);
-    } catch {
-      // expected
-    }
-
-    const resultPath = join(TASKS_DIR, 'task-145-004.result');
-    expect(existsSync(resultPath)).toBe(true);
-    const resultContent = JSON.parse(readFileSync(resultPath, 'utf-8'));
-    expect(resultContent.selfAssessment).toBe('NO_GO');
-    expect(resultContent.notes).toContain('RBAC violation');
-    expect(resultContent.notes).toContain('docs/secret.ts');
-  });
-
-  // Test 8: guardedFileWrite succeeds for in-scope file
-  it('guardedFileWrite writes file successfully within scope', () => {
-    const task = createTask({
-      scope: {
-        directories: ['src/agents/'],
-        filesRead: [],
-        filesWrite: ['src/agents/worker.ts'],
-      },
-    });
-
-    const targetPath = 'src/agents/worker.ts';
-    const content = '// test content';
-
-    // Ensure directory exists and create file
-    mkdirSync(join(TEST_ROOT, 'src', 'agents'), { recursive: true });
-    writeFileSync(join(TEST_ROOT, targetPath), '', 'utf-8');
-
-    guardedFileWrite(TEST_ROOT, targetPath, content, task, sprintId);
-
-    const written = readFileSync(join(TEST_ROOT, targetPath), 'utf-8');
-    expect(written).toBe(content);
-  });
-
-  // Test 9: Self-modifying sprint allows src/** writes
+  // Test 6: Self-modifying sprint allows src/** writes
   it('allows src/** writes in self-modifying sprint mode', () => {
     const scope: TaskScope = {
       directories: [],

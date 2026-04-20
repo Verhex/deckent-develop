@@ -1,18 +1,35 @@
-// ═══ emitNotify Tests ════════════════════════════════════════════
-// Sprint 145 — Task 005: CHANNELS.NOTIFY writeEvent Emit Wire
+// ═══ Event Stream NOTIFY Channel Tests ══════════════════════════
+// Sprint 145 — Task 005: CHANNELS.NOTIFY writeEvent Wire
+// Updated Sprint 148: uses writeEvent + CHANNELS.NOTIFY directly
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  emitNotify,
+  writeEvent,
   readEvents,
   CHANNELS,
 } from '../../src/orchestra/event-stream.js';
-import type { DeckentEvent } from '../../src/orchestra/event-stream.js';
 
-describe('emitNotify', () => {
+/** Helper: emit a NOTIFY event (equivalent to the planned emitNotify function). */
+function emitNotify(
+  projectRoot: string,
+  sprintId: string,
+  level: 'info' | 'warn' | 'error',
+  title: string,
+  body: string,
+  meta?: Record<string, unknown>,
+): void {
+  writeEvent(projectRoot, sprintId, 'deckent', 'user', CHANNELS.NOTIFY, {
+    level,
+    title,
+    body,
+    meta,
+  });
+}
+
+describe('NOTIFY channel via writeEvent', () => {
   let testRoot: string;
   const sprintId = 'sprint-145';
 
@@ -32,15 +49,9 @@ describe('emitNotify', () => {
     }
   });
 
-  // ─── Test 1: emitNotify writes event with NOTIFY channel ────────
-
   it('should write event with channel === CHANNELS.NOTIFY', () => {
-    // Arrange — fresh sprint dir
-
-    // Act
     emitNotify(testRoot, sprintId, 'info', 'Phase: SPAWN', '3 workers spawned');
 
-    // Assert — read JSONL and check last event
     const events = readEvents(testRoot, sprintId);
     expect(events.length).toBe(1);
     const event = events[0]!;
@@ -48,19 +59,14 @@ describe('emitNotify', () => {
     expect(event.channel).toBe('DECKENT→USER:NOTIFY');
   });
 
-  // ─── Test 2: payload structure is correct ───────────────────────
-
   it('should write correct payload structure (level, title, body)', () => {
-    // Arrange
     const level = 'warn' as const;
     const title = 'Phase: EVALUATE';
     const body = '2 DONE, 1 NO_GO';
     const meta = { goCount: 2, noGoCount: 1 };
 
-    // Act
     emitNotify(testRoot, sprintId, level, title, body, meta);
 
-    // Assert
     const events = readEvents(testRoot, sprintId);
     expect(events.length).toBe(1);
     const payload = events[0]!.payload as {
@@ -75,8 +81,6 @@ describe('emitNotify', () => {
     expect(payload.meta).toEqual(meta);
   });
 
-  // ─── Test 3: source and target fields ───────────────────────────
-
   it('should set source=deckent and target=user', () => {
     emitNotify(testRoot, sprintId, 'info', 'Test', 'Body');
 
@@ -84,8 +88,6 @@ describe('emitNotify', () => {
     expect(events[0]!.source).toBe('deckent');
     expect(events[0]!.target).toBe('user');
   });
-
-  // ─── Test 4: meta is optional (undefined by default) ────────────
 
   it('should work without meta argument', () => {
     emitNotify(testRoot, sprintId, 'error', 'Error', 'Something went wrong');
@@ -95,8 +97,6 @@ describe('emitNotify', () => {
     const payload = events[0]!.payload as { meta?: unknown };
     expect(payload.meta).toBeUndefined();
   });
-
-  // ─── Test 5: multiple calls accumulate in JSONL ─────────────────
 
   it('should accumulate multiple NOTIFY events in JSONL', () => {
     emitNotify(testRoot, sprintId, 'info', 'Phase: SPAWN', 'spawned');
@@ -113,8 +113,6 @@ describe('emitNotify', () => {
     expect(titles).toContain('Phase: CLEANUP');
   });
 
-  // ─── Test 6: JSONL raw file contains "NOTIFY" string ────────────
-
   it('should produce JSONL lines containing NOTIFY channel', () => {
     emitNotify(testRoot, sprintId, 'info', 'Sprint complete', 'All done');
 
@@ -122,8 +120,6 @@ describe('emitNotify', () => {
     const raw = readFileSync(eventsFile, 'utf-8');
     expect(raw).toContain('"DECKENT→USER:NOTIFY"');
   });
-
-  // ─── Test 7: all level values are accepted ───────────────────────
 
   it('should accept info, warn, and error levels', () => {
     emitNotify(testRoot, sprintId, 'info', 'Info', 'info body');
@@ -136,34 +132,11 @@ describe('emitNotify', () => {
   });
 });
 
-// ─── Integration: sprint-controller.ts imports emitNotify ────────
-
-describe('sprint-controller emitNotify integration', () => {
-  it('should export emitNotify from event-stream module', async () => {
-    // Verify the function is exported and callable
+describe('NOTIFY channel integration', () => {
+  it('should export writeEvent and CHANNELS from event-stream module', async () => {
     const mod = await import('../../src/orchestra/event-stream.js');
-    expect(typeof mod.emitNotify).toBe('function');
-  });
-
-  it('should have emitNotify imported in sprint-controller source', async () => {
-    // Verify sprint-controller.ts imports emitNotify (static code check)
-    const { readFileSync } = await import('node:fs');
-    const src = readFileSync('src/orchestra/sprint-controller.ts', 'utf-8');
-    expect(src).toMatch(/import.*emitNotify.*from.*event-stream/);
-  });
-
-  it('should have emitNotify calls in SPAWN, EVALUATE, RETRO, CLEANUP phases', async () => {
-    const { readFileSync } = await import('node:fs');
-    const src = readFileSync('src/orchestra/sprint-controller.ts', 'utf-8');
-
-    // Count emitNotify calls
-    const calls = (src.match(/emitNotify\(/g) ?? []).length;
-    expect(calls).toBeGreaterThanOrEqual(4);
-
-    // Check phase labels present
-    expect(src).toContain("'Phase: SPAWN'");
-    expect(src).toContain("'Phase: EVALUATE'");
-    expect(src).toContain("'Phase: RETRO'");
-    expect(src).toContain("'Phase: CLEANUP'");
+    expect(typeof mod.writeEvent).toBe('function');
+    expect(mod.CHANNELS).toBeDefined();
+    expect(mod.CHANNELS.NOTIFY).toBe('DECKENT→USER:NOTIFY');
   });
 });

@@ -13,10 +13,10 @@ const RELEVANCE_THRESHOLD = 0.3;
 
 /** Maps intent types to skill trigger/category keywords for V1 fallback matching */
 const INTENT_SKILL_AFFINITY: Record<IntentType, string[]> = {
-  implementation: ['typescript', 'python', 'react', 'api', 'database', 'language', 'framework', 'code'],
+  implementation: ['typescript', 'python', 'react', 'api', 'database', 'language', 'framework', 'code', 'testing', 'test', 'coverage'],
   bugfix:         ['typescript', 'testing', 'debug', 'fix', 'error', 'bug', 'diagnostic'],
   refactor:       ['typescript', 'refactor', 'clean', 'architecture', 'design', 'quality'],
-  testing:        ['testing', 'test', 'coverage', 'spec', 'ci', 'quality', 'assertion'],
+  // 'testing' removed as primary intent (Sprint 148) — keywords merged into implementation
   documentation:  ['documentation', 'docs', 'writer', 'readme', 'guide', 'markdown'],
   security:       ['security', 'auth', 'permission', 'vulnerability', 'audit', 'crypto'],
   devops:         ['devops', 'ci', 'deploy', 'pipeline', 'docker', 'github', 'actions', 'workflow'],
@@ -24,6 +24,7 @@ const INTENT_SKILL_AFFINITY: Record<IntentType, string[]> = {
   performance:    ['performance', 'optimization', 'cache', 'speed', 'profiling', 'benchmark'],
   design:         ['design', 'ui', 'ux', 'frontend', 'react', 'css', 'component', 'visual'],
   migration:      ['database', 'migration', 'schema', 'upgrade', 'transform', 'data'],
+  architecture:   ['architecture', 'design', 'system', 'adr', 'roadmap', 'module', 'structure'],
   unknown:        [],
 };
 

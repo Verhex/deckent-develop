@@ -7,7 +7,6 @@ export type IntentType =
   | 'implementation'
   | 'bugfix'
   | 'refactor'
-  | 'testing'
   | 'documentation'
   | 'security'
   | 'devops'
@@ -15,11 +14,28 @@ export type IntentType =
   | 'performance'
   | 'design'
   | 'migration'
+  | 'architecture'
   | 'unknown';
 
 export const ALL_INTENT_TYPES: readonly IntentType[] = [
-  'implementation', 'bugfix', 'refactor', 'testing', 'documentation',
-  'security', 'devops', 'config', 'performance', 'design', 'migration', 'unknown',
+  'implementation', 'bugfix', 'refactor', 'documentation',
+  'security', 'devops', 'config', 'performance', 'design', 'migration', 'architecture', 'unknown',
+] as const;
+
+/**
+ * Sub-intent types for fine-grained routing within 'core-dev' (implementation) tasks.
+ * V3 refinement: allows routing engine to make domain-specific decisions.
+ */
+export type SubIntentType =
+  | 'types'
+  | 'config'
+  | 'routing'
+  | 'observer'
+  | 'registry'
+  | 'dispatcher';
+
+export const ALL_SUB_INTENT_TYPES: readonly SubIntentType[] = [
+  'types', 'config', 'routing', 'observer', 'registry', 'dispatcher',
 ] as const;
 
 export type OperationType =
@@ -39,6 +55,10 @@ export interface TaskDNA {
     secondary: IntentType[];
     confidence: number; // 0.0-1.0
   };
+  /** V3: Fine-grained sub-intent for core-dev tasks (types, config, routing, etc.) */
+  subIntent?: SubIntentType;
+  /** Lightweight tags for cross-cutting concerns (e.g. 'test-coverage'). */
+  tags: string[];
   domains: Array<{ name: string; weight: number }>;
   operations: Array<{ type: OperationType; weight: number }>;
   complexity: {
@@ -101,6 +121,8 @@ export interface RoutingDecision {
   reasoning: string[];
   /** Context budget fit assessment: how well the task fits the selected model's context window */
   contextFit?: 'ok' | 'tight' | 'overflow';
+  /** Routing engine version used to produce this decision */
+  routingVersion: 'v2' | 'v3';
 }
 
 export type OverrideSource = 'none' | 'task-directive' | 'sprint-directive' | 'project-config';
@@ -150,6 +172,7 @@ export interface RoutingEngineConfig {
 export function createDefaultTaskDNA(): TaskDNA {
   return {
     intent: { primary: 'unknown', secondary: [], confidence: 0 },
+    tags: [],
     domains: [],
     operations: [],
     complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' },

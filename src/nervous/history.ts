@@ -4,6 +4,7 @@
 // Sprint 147 Task 8.
 
 import type { ExecutionRecord } from '../core/nervous-types.js';
+import type { MemoryStore } from '../core/memory-store.js';
 import { appendFile, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -107,5 +108,35 @@ export class NervousHistory {
   /** Get the file path (useful for testing) */
   getFilePath(): string {
     return this.filePath;
+  }
+
+  /**
+   * Index an ExecutionRecord into Memory V2 (SQLite FTS5) for cross-source search.
+   *
+   * Inserts the record as type='nervous-action' with FTS5-searchable body,
+   * tagged by actionId, decision, and decidedBy for faceted retrieval.
+   *
+   * This is optional — if no MemoryStore is available, records are still
+   * persisted in the JSONL history file via append().
+   */
+  indexToMemory(record: ExecutionRecord, store: MemoryStore): void {
+    const id = `nervous-${record.id}`;
+    const sprintId = (record as { sprintId?: string }).sprintId ?? 'unknown';
+    const tags = [record.actionId, record.decision, record.decidedBy].filter(Boolean);
+
+    store.insert({
+      id,
+      type: 'nervous-action',
+      title: `Nervous Action: ${record.actionId} [${record.decision}]`,
+      content: JSON.stringify(record),
+      source: 'system',
+      sprint_id: sprintId,
+      tags,
+      metadata: {
+        notificationId: record.notificationId,
+        outcome: record.outcome,
+      },
+      decay_exempt: false,
+    });
   }
 }

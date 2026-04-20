@@ -3881,3 +3881,52 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 147-022: ADR-040 Accept — Nervous System Architecture (DONE)
 
 ---
+## Sprint 148 — sprint-148
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-20
+**Duration:** 3647s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 28 |
+| Completed | 27 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 3647114ms |
+
+### Tasks
+
+- 148-001: test-writer Agent Archive + Removal Justification (DONE)
+- 148-002: testing-expert Skill Auto-Activation Heuristic (DONE)
+- 148-003: Intent Classifier "testing" Intent Refactor — test-coverage Tag (DONE)
+- 148-004: Router V2 Agent Fallback — test-writer Yok, architect/refactorer Chain (DONE)
+- 148-005: 16 Agent PROMPT.md Rubric Spec Batch Cleanup (DONE)
+- 148-006: Nervous System enabled=true Pivot — BALANCED Preset (DONE)
+- 148-007: 🚨 Notification Delivery Scope Enforcement (Ana PID Constraint) (DONE)
+- 148-008: StaleWorkerDetector Canlı Activation + DetectorRegistry (DONE)
+- 148-009: ScopeCollisionMonitor + DebtTrendAnalyzer Live Activation (DONE)
+- 148-010: AgentRoutingHealth Canlı Pozitif Doğrulama (DONE)
+- 148-011: DirectivesMidSprintProtection Canlı + Deliberate Stress Test (DONE)
+- 148-012: CLI `deckent nervous` TUI Integration Test + Smoke Script (DONE)
+- 148-013: MCP `deckent_nervous_*` 5 Tool End-to-End Live Test (DONE)
+- 148-014: macOS E2E — tmux Backend Full Sprint (GitHub Actions) (DONE)
+- 148-015: Linux E2E — subprocess Backend Full Sprint (DONE)
+- 148-016: WSL2 E2E — Docker Backend Full Sprint (DONE)
+- 148-017: Provider Matrix — Claude + Codex Mixed Mini-Sprint (DONE)
+- 148-018: i18n Parity — TR/EN Task Description Routing Identical (DONE)
+- 148-019: Fresh Install Matrix — Node 18/20/22 × Clean Env (DONE)
+- 148-020: Vitest Triage — 135 Fail → < 50 Fail (NO_GO)
+- 148-021: Routing V3 Intent Classifier — core-dev Sub-Intents (DONE)
+- 148-022: Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix (GO_WITH_TECH_DEBT)
+- 148-023: CHANGELOG 0.4.0-beta.4 + Sprint-148.md (DONE)
+- 148-024: FINAL-EXECUTIVE-REPORT Sprint 148 Living Record (DONE)
+- 148-025: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 148 Append (DONE)
+- 148-026: Memory V2 Nervous History Integration (DONE)
+- 148-027: npm Publish Dry-Run Rehearsal (DONE)
+- 148-028: ADR-041 Draft — Agent Taxonomy (Horizontal vs Vertical) (DONE)
+
+---

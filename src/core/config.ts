@@ -798,6 +798,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     timeout: config.timeout
       ? deepMerge(DEFAULT_TIMEOUT_CONFIG, config.timeout as Partial<TimeoutConfig>)
       : structuredClone(DEFAULT_TIMEOUT_CONFIG),
+    // Nervous System — passed through from project config
+    nervous_system: config.nervous_system,
   };
 
   // ─── Update cache ───────────────────────────────────────────────────

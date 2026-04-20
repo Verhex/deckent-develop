@@ -6,7 +6,6 @@ const AGENTS_DIR = resolve(__dirname, '../../.deckent/agents');
 
 const BUILTIN_AGENTS = [
   'security-auditor',
-  'test-writer',
   'doc-writer',
   'code-reviewer',
   'refactorer',
@@ -55,7 +54,7 @@ function readPromptMd(agentId: string): string {
 
 describe('Built-in Agents', () => {
   describe('all agents directory structure', () => {
-    it('should have all 8 built-in agent directories', () => {
+    it('should have all 7 built-in agent directories', () => {
       for (const agentId of BUILTIN_AGENTS) {
         const dirPath = resolve(AGENTS_DIR, agentId);
         expect(existsSync(dirPath), `Directory missing: ${dirPath}`).toBe(true);
@@ -119,50 +118,6 @@ describe('Built-in Agents', () => {
       expect(content.length).toBeGreaterThan(100);
       expect(content).toContain('OWASP');
       expect(content).toContain('Threat Modeling');
-    });
-  });
-
-  describe('test-writer', () => {
-    const agentId = 'test-writer';
-
-    it('should have valid JSON in agent.json', () => {
-      const config = readAgentJson(agentId);
-      expect(config).toBeDefined();
-      expect(typeof config).toBe('object');
-    });
-
-    it('should have correct id and name', () => {
-      const config = readAgentJson(agentId);
-      expect(config.id).toBe('test-writer');
-      expect(config.name).toBe('Test Writer');
-    });
-
-    it('should have non-empty triggerKeywords', () => {
-      const config = readAgentJson(agentId);
-      expect(Array.isArray(config.triggerKeywords)).toBe(true);
-      expect(config.triggerKeywords.length).toBeGreaterThan(0);
-      expect(config.triggerKeywords).toContain('test');
-      expect(config.triggerKeywords).toContain('coverage');
-      expect(config.triggerKeywords).toContain('vitest');
-    });
-
-    it('should have valid preferredModel', () => {
-      const config = readAgentJson(agentId);
-      expect(VALID_MODELS).toContain(config.preferredModel);
-      expect(config.preferredModel).toBe('sonnet');
-    });
-
-    it('should have effortMultiplier in valid range', () => {
-      const config = readAgentJson(agentId);
-      expect(config.effortMultiplier).toBeGreaterThanOrEqual(0.1);
-      expect(config.effortMultiplier).toBeLessThanOrEqual(3.0);
-    });
-
-    it('should have PROMPT.md with substantial content', () => {
-      const content = readPromptMd(agentId);
-      expect(content.length).toBeGreaterThan(100);
-      expect(content).toContain('Arrange-Act-Assert');
-      expect(content).toContain('vitest');
     });
   });
 

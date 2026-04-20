@@ -175,13 +175,13 @@ describe('API auth with token', () => {
     expect(okRes.status).toBe(200);
   });
 
-  it('POST endpoints work without auth when no token is configured', async () => {
-    // No token — auth disabled (backward-compatible)
+  it('POST endpoints return 401 when no token configured and auth not disabled', async () => {
+    // No token + no DECKENT_API_AUTH_DISABLED=1 → auth enforced (Sprint 145+ behavior)
     api = createHttpServer(PROJECT_ROOT, 0);
     await new Promise<void>((r) => api.server.once('listening', r));
 
     const res = await request(api, '/api/start', 'POST', { autoApprove: true });
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(401);
   });
 });
 
@@ -216,11 +216,12 @@ describe('CORS headers', () => {
     expect(res.headers['access-control-allow-headers']).toContain('Authorization');
   });
 
-  it('response includes CORS origin header on GET', async () => {
+  it('response includes CORS origin header on OPTIONS (preflight)', async () => {
     api = createHttpServer(PROJECT_ROOT, 0);
     await new Promise<void>((r) => api.server.once('listening', r));
 
-    const res = await request(api, '/api/doctor');
+    // OPTIONS preflight bypasses auth and returns CORS headers
+    const res = await request(api, '/api/doctor', 'OPTIONS');
     expect(res.headers['access-control-allow-origin']).toBeDefined();
   });
 });

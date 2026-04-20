@@ -53,11 +53,11 @@ describe('Auditor Async Scan — heartbeat-daemon', () => {
   // ─── Async Path Tests ─────────────────────────────────────────
 
   describe('async I/O paths', () => {
-    it('runHeartbeat returns a Promise', async () => {
+    it('runHeartbeat returns a HeartbeatRunResult synchronously', async () => {
       const root = await setupTestProject('# Heartbeat Tasks\n- [x] done\n');
       const result = runHeartbeat(root);
-      expect(result).toBeInstanceOf(Promise);
-      await result;
+      expect(result).toHaveProperty('total');
+      expect(result).toHaveProperty('executed');
     });
 
     it('runHeartbeat creates default HEARTBEAT.md when missing', async () => {
@@ -178,27 +178,24 @@ describe('Auditor Async Scan — heartbeat-daemon', () => {
   // ─── HeartbeatDaemon Async Tests ──────────────────────────────
 
   describe('HeartbeatDaemon async', () => {
-    it('start() returns a Promise<HeartbeatRunResult>', async () => {
+    it('start() returns a HeartbeatRunResult synchronously', async () => {
       const root = await setupTestProject('# Heartbeat Tasks\n- [x] done\n');
       const daemon = new HeartbeatDaemon(root, 60);
 
       const result = daemon.start();
-      expect(result).toBeInstanceOf(Promise);
+      expect(result).toHaveProperty('total');
+      expect(result.total).toBe(1);
 
-      const resolved = await result;
-      expect(resolved.total).toBe(1);
-
-      await daemon.stop();
+      daemon.stop();
     });
 
-    it('stop() returns a Promise<void>', async () => {
+    it('stop() returns void and sets running to false', async () => {
       const root = await setupTestProject('# Heartbeat Tasks\n');
       const daemon = new HeartbeatDaemon(root, 60);
 
-      await daemon.start();
+      daemon.start();
       const stopResult = daemon.stop();
-      expect(stopResult).toBeInstanceOf(Promise);
-      await stopResult;
+      expect(stopResult).toBeUndefined();
       expect(daemon.running).toBe(false);
     });
 

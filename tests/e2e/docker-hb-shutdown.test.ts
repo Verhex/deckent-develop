@@ -389,7 +389,8 @@ describe('Docker HB Shutdown Bug Fix — worker script SIGTERM trap', () => {
     );
 
     // Assert — EXIT trap for crash safety, TERM trap for graceful shutdown
-    expect(sourceContent).toMatch(/trap\s+'.*'\s+EXIT/);
+    // Sprint 145: EXIT trap calls on_exit function (not inline string)
+    expect(sourceContent).toMatch(/trap\s+on_exit\s+EXIT/);
     expect(sourceContent).toMatch(/trap\s+'.*'\s+TERM/);
   });
 });

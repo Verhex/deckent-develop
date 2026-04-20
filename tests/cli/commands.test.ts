@@ -317,14 +317,15 @@ describe('doctor command', () => {
 
   it('reports critical debt', async () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'v22.0.0', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
-    vi.mocked(readFileSync).mockImplementation((p) => {
-      if (String(p).includes('DEBT')) {
-        return '| ID | Desc |\n|---|---|\n| d-1 | fix | task-1 | s-1 | CRITICAL | 3 | false | - | 2026 |';
-      }
-      return '# Content\nSome data';
-    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    // DB-first: countDebtItems uses MemoryStore.getByType('debt')
+    mockCmdMemStore.getByType.mockReturnValue([
+      { id: 'd-1', type: 'debt', title: 'fix', priority: 'CRITICAL', status: 'open' },
+    ]);
     await runCommand(registerDoctor, ['doctor']);
     expect(stdout()).toContain('critical');
+    // Reset
+    mockCmdMemStore.getByType.mockReturnValue([]);
   });
 
   it('reports stale locks', async () => {

@@ -13,6 +13,7 @@ import type { NervousNotification, NervousSystemConfig } from '../core/nervous-t
 import { appendFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { assertBrainScope } from './runtime-scope-check.js';
 
 // ─── Channel Type ───────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export class NervousDispatcher {
       isTtyAvailable?: () => boolean;
     },
   ) {
+    assertBrainScope('NervousDispatcher');
     this.projectRoot = projectRoot;
     this.channelConfig = extractChannelConfig(config);
 

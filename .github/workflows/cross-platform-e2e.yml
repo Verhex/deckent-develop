@@ -1,0 +1,55 @@
+name: Cross-Platform E2E
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: cross-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E — ${{ matrix.os }} / ${{ matrix.backend }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        backend: [tmux, subprocess]
+        exclude:
+          - os: macos-latest
+            backend: subprocess
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Install tmux (macOS)
+        if: matrix.backend == 'tmux' && matrix.os == 'macos-latest'
+        run: brew install tmux
+
+      - name: Install tmux (Ubuntu)
+        if: matrix.backend == 'tmux' && matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y tmux
+
+      - name: Verify tmux version
+        if: matrix.backend == 'tmux'
+        run: tmux -V
+
+      - name: Run cross-platform E2E tests
+        run: npx vitest run tests/e2e/cross-platform/ --reporter=verbose
+        timeout-minutes: 10
+        env:
+          DECKENT_E2E_BACKEND: ${{ matrix.backend }}
+          DECKENT_E2E_PLATFORM: ${{ matrix.os }}

@@ -7,7 +7,6 @@ const SKILLS_DIR = resolve(__dirname, '../../.deckent/skills');
 
 const ALL_AGENTS = [
   'security-auditor',
-  'test-writer',
   'bug-fixer',
   'doc-writer',
   'code-reviewer',
@@ -61,7 +60,7 @@ function readSkillManifest(skillId: string): ManifestBase & Record<string, unkno
 
 describe('Manifest V2 Validation', () => {
   describe('Agent manifests — manifestVersion: 2', () => {
-    it('all 9 agent.json files exist', () => {
+    it('all 8 agent.json files exist', () => {
       for (const agentId of ALL_AGENTS) {
         const filePath = resolve(AGENTS_DIR, agentId, 'agent.json');
         expect(existsSync(filePath), `agent.json missing: ${agentId}`).toBe(true);
@@ -196,11 +195,6 @@ describe('Manifest V2 Validation', () => {
       expect(Array.isArray(keywords)).toBe(true);
       expect(keywords).toContain('security');
       expect(keywords).toContain('xss');
-    });
-
-    it('test-writer preserves preferredModel: sonnet', () => {
-      const manifest = readAgentJson('test-writer');
-      expect(manifest['preferredModel']).toBe('sonnet');
     });
 
     it('ci-testing preserves priority: 12', () => {

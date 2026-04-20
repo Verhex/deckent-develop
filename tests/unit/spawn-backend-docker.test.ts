@@ -82,7 +82,7 @@ describe('DockerSpawnBackend', () => {
   });
 
   describe('kill', () => {
-    it('should use docker stop --time=10 for graceful shutdown', () => {
+    it('should use docker stop --time=15 for graceful shutdown', () => {
       mockSpawnSync.mockReturnValue({
         stdout: '',
         stderr: '',
@@ -94,11 +94,11 @@ describe('DockerSpawnBackend', () => {
 
       backend.kill('001-001');
 
-      // docker stop --time=10 (graceful) + docker rm -f (cleanup)
+      // docker stop --time=15 (graceful, Sprint 139 increase) + docker rm -f (cleanup)
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['stop', '--time=10', 'deckent-w-001-001'],
-        expect.any(Object),
+        ['stop', '--time=15', 'deckent-w-001-001'],
+        expect.objectContaining({ encoding: 'utf-8', timeout: 20000 }),
       );
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
@@ -124,8 +124,8 @@ describe('DockerSpawnBackend', () => {
       // Should call docker stop first, then fallback to docker kill
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['stop', '--time=10', 'deckent-w-001-001'],
-        expect.any(Object),
+        ['stop', '--time=15', 'deckent-w-001-001'],
+        expect.objectContaining({ encoding: 'utf-8', timeout: 20000 }),
       );
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',

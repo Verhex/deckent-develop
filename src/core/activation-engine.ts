@@ -288,10 +288,8 @@ export function getDynamicExclusions(
       exclusions.add('devops-engineer');
       exclusions.add('security-auditor');
       break;
-    case 'testing':
-      exclusions.add('migration-specialist');
-      exclusions.add('doc-writer');
-      break;
+    // 'testing' removed as primary intent (Sprint 148 taxonomy reform)
+    // Test-related exclusions now handled via 'test-coverage' tag
     case 'security':
       // No exclusions — security tasks may touch any domain
       break;

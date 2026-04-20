@@ -15,6 +15,7 @@ import type {
   ConfidenceLevel,
   ActivationConfig,
   OverrideSource,
+  IntentType,
 } from './routing-types.js';
 import {
   createDefaultRoutingEngineConfig,
@@ -29,6 +30,49 @@ import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivat
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
 import { debugLog } from './utils.js';
+
+// ─── Agent Fallback Chain ──────────────────────────────────────────────────
+
+/**
+ * Intent-based agent fallback chain.
+ * When no agent meets the activation score threshold, this chain provides
+ * deterministic agent selection based on the task's primary intent.
+ * Post-Sprint-148: test-writer removed, testing tasks route to architect/refactorer.
+ */
+export const AGENT_FALLBACK_CHAIN: Record<IntentType, string[]> = {
+  'implementation': ['architect', 'refactorer'],
+  'bugfix': ['bug-fixer', 'refactorer'],
+  'refactor': ['refactorer', 'architect'],
+  'documentation': ['doc-writer'],
+  'security': ['security-auditor'],
+  'devops': ['devops-engineer', 'architect'],
+  'config': ['architect', 'refactorer'],
+  'performance': ['performance-analyzer', 'architect'],
+  'design': ['frontend-designer'],
+  'migration': ['migration-specialist', 'architect'],
+  'architecture': ['architecture-planner', 'architect'],
+  'unknown': ['architect'],
+};
+
+/**
+ * Select an agent using the fallback chain when no agent met activation threshold.
+ * Iterates the chain for the given intent, returning the first agent that exists
+ * in the active agent IDs set.
+ *
+ * @param primary - The task's primary intent type
+ * @param activeAgentIds - Set of currently active (enabled) agent IDs
+ * @returns The selected agent ID (defaults to 'architect' as ultimate fallback)
+ */
+export function selectAgentByFallback(
+  primary: IntentType,
+  activeAgentIds: Set<string>,
+): string {
+  const chain = AGENT_FALLBACK_CHAIN[primary] ?? ['architect'];
+  for (const agentId of chain) {
+    if (activeAgentIds.has(agentId)) return agentId;
+  }
+  return 'architect'; // ultimate fallback
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -49,6 +93,8 @@ export interface RoutingOptions {
   estimatedTokens?: number;
   /** Model ID assigned to the task — used for context budget fit assessment */
   modelId?: string;
+  /** Set of active agent IDs for fallback chain resolution */
+  activeAgentIds?: Set<string>;
 }
 
 interface ScoredCandidate {
@@ -111,6 +157,21 @@ export function routeTaskV2(
     agentScore = agentResult.score;
     agentConfidence = agentResult.confidence;
     reasoning.push(...agentResult.reasoning);
+
+    // Step 3b: Fallback chain if no agent met threshold
+    if (agentId === null && options?.activeAgentIds) {
+      agentId = selectAgentByFallback(taskDNA.intent.primary, options.activeAgentIds);
+      agentScore = 50; // fallback score
+      agentConfidence = 'low';
+      reasoning.push(`Agent fallback chain: '${agentId}' (intent=${taskDNA.intent.primary})`);
+    } else if (agentId === null) {
+      // No activeAgentIds provided — use static fallback
+      const chain = AGENT_FALLBACK_CHAIN[taskDNA.intent.primary] ?? ['architect'];
+      agentId = chain[0] ?? 'architect';
+      agentScore = 50;
+      agentConfidence = 'low';
+      reasoning.push(`Agent static fallback: '${agentId}' (intent=${taskDNA.intent.primary})`);
+    }
   }
 
   // Step 4: Calculate skill budget (effort-aware token allocation)
@@ -158,6 +219,7 @@ export function routeTaskV2(
     taskDNA,
     reasoning,
     contextFit,
+    routingVersion: 'v3' as const,
   };
 }
 
@@ -499,7 +561,8 @@ function getIntentPriorityBonus(
 ): number {
   const primary = taskDNA.intent.primary;
 
-  if (primary === 'testing' && skillId === 'testing-expert') return 2;
+  // Sprint 148: test-coverage tag replaces former 'testing' primary intent
+  if (taskDNA.tags?.includes('test-coverage') && skillId === 'testing-expert') return 2;
   if (primary === 'documentation' && skillId === 'documentation-writer') return 2;
 
   if (primary === 'implementation' && skillId === 'typescript-expert') {

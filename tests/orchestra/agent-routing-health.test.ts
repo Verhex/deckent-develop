@@ -233,10 +233,13 @@ describe('Agent Routing Health — Sprint 146', () => {
     };
 
     const dna = classifyIntent(task);
-    expect(dna.intent.primary).toBe('testing');
+    // Sprint 148: 'testing' removed as primary intent — test tasks classify as implementation
+    expect(dna.intent.primary).not.toBe('testing');
+    expect(dna.tags).toContain('test-coverage');
 
     const decision = routeTaskV2(task, pool, skills);
-    expect(decision.agentId).toBe('test-writer');
+    // Sprint 148: test-writer removed — fallback chain provides alternative agent
+    expect(decision.agentId).not.toBe('test-writer');
   });
 
   // Test 4: T-145-004 src/agents/ bug fix → bug-fixer or security-auditor

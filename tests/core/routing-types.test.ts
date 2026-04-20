@@ -59,7 +59,8 @@ describe('routing-types helpers', () => {
     it('returns true for valid intent types', () => {
       expect(isValidIntentType('implementation')).toBe(true);
       expect(isValidIntentType('security')).toBe(true);
-      expect(isValidIntentType('testing')).toBe(true);
+      // Sprint 148: 'testing' removed from IntentType union
+      expect(isValidIntentType('testing')).toBe(false);
       expect(isValidIntentType('unknown')).toBe(true);
     });
 
@@ -71,14 +72,14 @@ describe('routing-types helpers', () => {
   });
 
   describe('ALL_INTENT_TYPES', () => {
-    it('contains 12 intent types', () => {
+    it('contains 12 intent types (testing removed Sprint 148, architecture added V3)', () => {
       expect(ALL_INTENT_TYPES).toHaveLength(12);
     });
 
-    it('includes core intent types', () => {
+    it('includes core intent types (testing excluded)', () => {
       expect(ALL_INTENT_TYPES).toContain('implementation');
       expect(ALL_INTENT_TYPES).toContain('bugfix');
-      expect(ALL_INTENT_TYPES).toContain('testing');
+      expect(ALL_INTENT_TYPES).not.toContain('testing');
       expect(ALL_INTENT_TYPES).toContain('security');
       expect(ALL_INTENT_TYPES).toContain('unknown');
     });

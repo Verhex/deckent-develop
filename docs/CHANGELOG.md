@@ -6,6 +6,28 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.4-sprint148] - 2026-04-20
+
+### Added
+
+- test-writer Agent Archive + Removal Justification
+- testing-expert Skill Auto-Activation Heuristic
+- Intent Classifier "testing" Intent Refactor — test-coverage Tag
+- Router V2 Agent Fallback — test-writer Yok, architect/refactorer Chain
+- 16 Agent PROMPT.md Rubric Spec Batch Cleanup
+- Nervous System enabled=true Pivot — BALANCED Preset
+- 🚨 Notification Delivery Scope Enforcement (Ana PID Constraint)
+- StaleWorkerDetector Canlı Activation + DetectorRegistry
+- ScopeCollisionMonitor + DebtTrendAnalyzer Live Activation
+- AgentRoutingHealth Canlı Pozitif Doğrulama
+
+### Changed
+
+- Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix (completed with tech debt)
+
+
+_Tasks: 28 total, 27 done, 1 tech debt, 1 no-go_
+
 ## [0.4.0-beta.1-sprint147] - 2026-04-20
 
 ### Added

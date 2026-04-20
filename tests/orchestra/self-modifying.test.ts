@@ -7,9 +7,8 @@ import { mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
-  isDeckentRepository,
-  isSelfModifyingScope,
-  isSelfModifyingTask,
+  detectDeckentRepo as isDeckentRepository,
+  isSelfModifying,
   clearDetectionCache,
 } from '../../src/orchestra/self-modifying-detector.js';
 
@@ -67,60 +66,60 @@ describe('self-modifying-detector alias API', () => {
     expect(isDeckentRepository(testRoot)).toBe(false);
   });
 
-  // ═══ Test 3: isSelfModifyingScope — src/orchestra/ on deckent → true ═══
+  // ═══ Test 3: isSelfModifying — src/orchestra/ on deckent → true ═══
 
-  it('isSelfModifyingScope returns true for src/orchestra/ in deckent repo', () => {
+  it('isSelfModifying returns true for src/orchestra/ in deckent repo', () => {
     setupDeckentRepo();
-    const scope = { directories: ['src/orchestra/'], filesWrite: [] };
-    expect(isSelfModifyingScope(scope, testRoot)).toBe(true);
+    const task = { scope: { directories: ['src/orchestra/'], filesWrite: [] } };
+    expect(isSelfModifying(task, testRoot)).toBe(true);
   });
 
-  // ═══ Test 4: isSelfModifyingScope — docs/ on deckent → false ═══
+  // ═══ Test 4: isSelfModifying — docs/ on deckent → false ═══
 
-  it('isSelfModifyingScope returns false for docs/ in deckent repo', () => {
+  it('isSelfModifying returns false for docs/ in deckent repo', () => {
     setupDeckentRepo();
-    const scope = { directories: ['docs/'], filesWrite: ['DIRECTIVES.md'] };
-    expect(isSelfModifyingScope(scope, testRoot)).toBe(false);
+    const task = { scope: { directories: ['docs/'], filesWrite: ['DIRECTIVES.md'] } };
+    expect(isSelfModifying(task, testRoot)).toBe(false);
   });
 
-  // ═══ Test 5: isSelfModifyingScope — src/orchestra/ on user project → false ═══
+  // ═══ Test 5: isSelfModifying — src/orchestra/ on user project → false ═══
 
-  it('isSelfModifyingScope returns false for src/orchestra/ in user project', () => {
+  it('isSelfModifying returns false for src/orchestra/ in user project', () => {
     setupUserProject();
-    const scope = { directories: ['src/orchestra/', 'src/core/'] };
-    expect(isSelfModifyingScope(scope, testRoot)).toBe(false);
+    const task = { scope: { directories: ['src/orchestra/', 'src/core/'] } };
+    expect(isSelfModifying(task, testRoot)).toBe(false);
   });
 
-  // ═══ Test 6: isSelfModifyingTask — task scope integration ═══
+  // ═══ Test 6: isSelfModifying — task scope integration ═══
 
-  it('isSelfModifyingTask integrates with task scope correctly', () => {
+  it('isSelfModifying integrates with task scope correctly', () => {
     setupDeckentRepo();
 
     const selfModTask = {
       scope: { directories: ['src/agents/'], filesWrite: ['src/agents/worker.ts'] },
     };
-    expect(isSelfModifyingTask(selfModTask, testRoot)).toBe(true);
+    expect(isSelfModifying(selfModTask, testRoot)).toBe(true);
 
     const safeTask = {
       scope: { directories: ['tests/'], filesWrite: ['tests/agents/worker.test.ts'] },
     };
-    expect(isSelfModifyingTask(safeTask, testRoot)).toBe(false);
+    expect(isSelfModifying(safeTask, testRoot)).toBe(false);
   });
 
-  // ═══ Test 7: isSelfModifyingScope with filesWrite only ═══
+  // ═══ Test 7: isSelfModifying with filesWrite only ═══
 
-  it('isSelfModifyingScope detects self-modification via filesWrite only', () => {
+  it('isSelfModifying detects self-modification via filesWrite only', () => {
     setupDeckentRepo();
-    const scope = { filesWrite: ['src/cli/entry.ts', 'src/mcp/server.ts'] };
-    expect(isSelfModifyingScope(scope, testRoot)).toBe(true);
+    const task = { scope: { filesWrite: ['src/cli/entry.ts', 'src/mcp/server.ts'] } };
+    expect(isSelfModifying(task, testRoot)).toBe(true);
   });
 
-  // ═══ Test 8: isSelfModifyingScope with empty scope ═══
+  // ═══ Test 8: isSelfModifying with empty scope ═══
 
-  it('isSelfModifyingScope returns false for empty scope', () => {
+  it('isSelfModifying returns false for empty scope', () => {
     setupDeckentRepo();
-    const scope = { directories: [], filesWrite: [] };
-    expect(isSelfModifyingScope(scope, testRoot)).toBe(false);
+    const task = { scope: { directories: [], filesWrite: [] } };
+    expect(isSelfModifying(task, testRoot)).toBe(false);
   });
 
   // ═══ Test 9: isDeckentRepository with IDENTITY.md fallback ═══

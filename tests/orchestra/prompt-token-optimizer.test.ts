@@ -31,9 +31,9 @@ function makeSkill(id: string, triggers: string[], category = 'tool'): SkillDefi
 // ─── computeSkillRelevance ────────────────────────────────────────────────────
 
 describe('computeSkillRelevance', () => {
-  it('returns high relevance for a testing skill against testing intent', () => {
+  it('returns high relevance for a testing skill against implementation intent with test domains', () => {
     const skill = makeSkill('testing-expert', ['test', 'coverage', 'vitest']);
-    const dna = makeTaskDNA('testing');
+    const dna = makeTaskDNA('implementation', ['test', 'coverage']);
     const score = computeSkillRelevance(skill, dna);
     expect(score).toBeGreaterThan(0.3);
   });
@@ -93,7 +93,7 @@ describe('filterSkillPrompts', () => {
   it('filters out irrelevant skills and keeps relevant ones', () => {
     const testingSkill = makeSkill('testing-expert', ['test', 'vitest', 'coverage']);
     const docSkill     = makeSkill('documentation-writer', ['docs', 'readme', 'documentation']);
-    const dna = makeTaskDNA('testing');
+    const dna = makeTaskDNA('implementation');
 
     const result = filterSkillPrompts([testingSkill, docSkill], dna);
     // testing-expert should be included; documentation-writer may not be for testing intent
@@ -116,7 +116,7 @@ describe('filterSkillPrompts', () => {
 describe('filterSkillPromptsByDNA', () => {
   it('returns input unchanged when only one prompt', () => {
     const prompts = [{ name: 'testing-expert', content: 'Test coverage expert' }];
-    const dna = makeTaskDNA('testing');
+    const dna = makeTaskDNA('implementation');
     const result = filterSkillPromptsByDNA(prompts, dna);
     expect(result).toEqual(prompts);
   });
@@ -126,7 +126,7 @@ describe('filterSkillPromptsByDNA', () => {
       { name: 'testing-expert', content: 'Focused on test coverage, vitest, specs and assertions.' },
       { name: 'documentation-writer', content: 'Writes docs, README and markdown guides.' },
     ];
-    const dna = makeTaskDNA('testing');
+    const dna = makeTaskDNA('implementation');
     const result = filterSkillPromptsByDNA(prompts, dna);
     expect(result.some(p => p.name === 'testing-expert')).toBe(true);
   });

@@ -284,11 +284,11 @@ describe('buildTaskPrompt', () => {
     const ctx = makeCtx();
     const result = buildTaskPrompt(task, ctx);
 
-    // Rubric scoring section should not be present (only rubricScores in result format)
+    // Rubric scoring section should not be present (rubric spec removed from prompt)
     expect(result.prompt).not.toMatch(/## Rubric\b/i);
     expect(result.prompt).not.toContain('rubricSpec');
-    // But rubricScores in result format IS acceptable (result instruction, not scoring spec)
-    expect(result.prompt).toContain('rubricScores');
+    // rubricScores was removed from prompt template (Sprint 148 cleanup)
+    expect(result.prompt).not.toContain('rubricScores');
   });
 
   // Test 14: Token usage spec present

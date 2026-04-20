@@ -21,7 +21,7 @@ const DEFAULT_MAX_SKILLS = 3;
  * 8. Cap at maxSkills (default 3)
  */
 export function selectSkills(
-  task: { title: string; description: string; scope?: { directories: string[] } },
+  task: { title: string; description: string; scope?: { directories?: string[]; filesWrite?: string[] } },
   projectStack: ProjectStack | null,
   pool: Map<string, SkillDefinition>,
   agent?: { id: string; expertise?: string[] },
@@ -127,6 +127,19 @@ export function selectSkills(
 
   const truncated = resolved.length > cap;
   const capped = resolved.slice(0, cap);
+
+  // Auto-activate testing-expert if task touches tests
+  const scopeHasTests = task.scope?.directories?.some(d => d.startsWith('tests/')) ?? false;
+  const writesTest = task.scope?.filesWrite?.some(f =>
+    f.endsWith('.test.ts') || f.endsWith('.spec.ts') || f.endsWith('.test.tsx')
+  ) ?? false;
+
+  if ((scopeHasTests || writesTest) && !capped.some(s => s.id === 'testing-expert')) {
+    const testingExpert = pool.get('testing-expert');
+    if (testingExpert) {
+      capped.push(testingExpert);
+    }
+  }
 
   return {
     skills: capped,

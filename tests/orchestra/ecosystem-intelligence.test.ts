@@ -43,9 +43,9 @@ describe('analyzeNewSkill', () => {
     const config = analyzeNewSkill(dir);
     expect(config.rules.length).toBeGreaterThan(0);
     expect(config.minScore).toBeGreaterThan(0);
-    // Primary intent should be 'testing'
-    const testingRule = config.rules.find(r => r.when['intent.primary'] === 'testing');
-    expect(testingRule).toBeDefined();
+    // Sprint 148: 'testing' removed as primary intent — test/coverage keywords now map to 'implementation'
+    const implRule = config.rules.find(r => r.when['intent.primary'] === 'implementation');
+    expect(implRule).toBeDefined();
   });
 
   it('generates exclusion rules for documentation skill', () => {

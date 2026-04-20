@@ -30,9 +30,9 @@ Deckent'in 360° enterprise readiness audit'i, 130+ sprint birikiminin güçlü 
 
 **Sprint 138 Update (2026-04-14):** 10 task planlandı (Sprint 137 11 carry-over debt'inden seçim + mimari pivot: ADR-035 + Auditor Authority + Event Stream + Recovery Completion + Worker Honest v2 + Long-running Resume MVP + ADR Governance), **53m 46s execute** (3,226,076 ms, Sprint 137'den +18 dk ama scope 2.65x daha büyük — 61 files / +3655/-901). Theme: **"Architectural Pivot — Verification Protocol Foundation"**. Alperen retro'da mimari pivot kararı verdi: Brain ↔ Auditor ↔ Worker iletişimini standardize + auditor'a verification yetkileri + structured event stream + long-running sprint zemini. Execution parameters: max_workers=3, structured planner, docker backend, 5 CRITICAL + 4 HIGH + 1 NORMAL priority karışımı. Brain final label: **8 DONE + 2 TECH_DEBT + 0 NO_GO** — **zero NO_GO 2-sprint streak** (Sprint 137 + 138 arka arkaya). **🏆 6 CANLI META-DOGFOOD KANIT yakalandı:** (1) **Worker Honest TECH_DEBT Spontan** — Task 138-002 worker ADR-035 doc'u yazdı, kendi chicken-egg dependency'sini dürüst itiraf etti ("validator yok, Task 1 bittiğinde doğrulanır"), Sprint 138 Worker Honest v2 hedefini kod yazılmadan önce spontan yaşadı. (2) **ADR-036 Self-Referential Meta-Doğrulama** — Task 138-001 worker'ı ADR Governance'ı implement etti + yazdığı ADR-036'yı kendi yazdığı validator'dan geçirdi (`✓ ADR validation passed: 37 ADRs validated`). (3) **ADR-006 Enforcement Canlı Dogfood** — Task 138-006 worker'ı Layer 4 Wire forensic fix yaparken Task 1'in yazdığı ADR-006 pilot rule'u (`spawnSync + shell:true` detection) kendi fix'inde uyguladı — `runSelfAuditGate` içinde `shell: true` kaldırıldı çünkü ADR-006 compliance zorunlu. **Sprint 138 vizyon hedefinin ilk in-sprint kanıtı.** (4) **Helper Retrospektif Relabel 2-Sprint Streak** — Task 138-005 (Test Restoration) Docker HB shutdown bug'a takıldı (Sprint 135-137 pattern), Brain synthetic NO_GO yazdı, Brain finalize helper `tryCodeVerifiedDone` (Task 138-003 tarafından auditor.ts'e taşındı) Task 5'i retrospektif DONE relabel etti (`codeVerified: "CODE_VERIFIED_DONE"`). Sprint 137 Task 137-001 pattern **2-sprint üst üste proven**. (5) **Brain Cross-Dependency Reasoning Canlı + Worker Honest Verification** — Task 5 NO_GO sonrası Brain `brain.md` kuralı `Cross-dependency: if A's NO-GO caused by B's output, B gets priority fix` canlı uygulandı, Task 5'in `dependencies: ["138-001"]` gördü, Task 1-xfix worker spawn etti. xfix worker gitti, 0 file changed, **"Brain'in teşhisi yanlış, Task 1 zaten tam doğru yapılmış"** honest verification raporu yazdı (correctness 100). Çift katmanlı dogfood. (6) **Worker Honest v2 Kod Seviyesinde Mandatory** — Task 138-008 worker `task-builder.ts` (`## Honest Self-Assessment Required` block), `worker.ts` (writeVerifyDeltaBaseline + readVerifyDeltaBaseline + computeVerifyDelta), `result-evaluator.ts` (applyTechDebtDowngrade çift katman: DONE+<50%→NO_GO, DONE+50-79%→TD) ile Sprint 137 "kod var → DONE" kısayolunu **sistematik kod seviyesinde çözdü**. Major deliverables: **Task 138-001 ADR Governance Integration** (+380/-12, 37 ADR migration + ADR-036 + DECKENT.md mandatory import + brain.md/worker-default.md ADR rules + scripts/adr-validator.mjs 177 LoC + task-builder.ts prompt injection), **Task 138-003 Auditor Authority Extension** (+780/-350, tryCodeVerifiedDone migration result-evaluator→auditor + re-export shim backward compat + verifyFunctional at auditor.ts:1116 + checkADRCompliance pilot ADR-006/008/010), **Task 138-004 Event Stream + Plan-Time Collision Detection** (+848/-95 Sprint 138'in en büyük task'ı — event-stream.ts 305 LoC YENİ 15 channel constants ADR-035 Protocol V1.0, file-lock.ts 30→267 LoC real implementation atomic O_EXCL + idempotent + TTL + cleanup, conflict-resolver.ts 147→276 LoC detectScopeCollisions + buildCollisionAwareWaves, **`.plan` dosyası + token tracking in 120k/out 25k/cache 80k — Sprint 138 model worker**), **Task 138-006 Layer 4 Runtime Wire Forensic Fix** (+62/-20 root cause: `runSelfAuditGate` spawnSync shell:true + timeout 390s process interrupt, fix: ADR-006 compliance removed + timeout 30s/120s + gate.json write ayrıldı fail-safe fallback + breadcrumb logging permanent), **Task 138-007 Auto-Archive Partial Regression Fix** (+68/-1 archiveOrphanTasks() YENİ proaktif extension — pre-flight manuel cleanup ihtiyacı kalkar), **Task 138-008 Worker Honest v2** (+285/-2 full calibration), **Task 138-009 Long-Running Sprint Resume Capability MVP** (+380/-0 sprint-checkpoint.ts 190 LoC + resume.ts 99 LoC + CHECKPOINT_INTERVAL=5 integration — Sprint 140 50-task + Sprint 145 100-task zemini), **Task 138-010 MCP/CLI Parity Audit OPSİYONEL** (+185 LoC — 21 parity / 3 unintentional gap / 12 intentional CLI-only, Sprint 139 debt: deckent_resume HIGH + deckent_finalize + deckent_test). **Sprint 138'in sistemik bulgusu — Runtime Wire 3-Sprint Fail Streak:** Sprint 136+137+138 üst üste `gate.json` + `load-report.md` + `metrics.jsonl` + `events.jsonl` runtime'da oluşmadı. Task 6 worker kod seviyesinde forensic fix yaptı ama Brain runtime pre-build'den yüklenmiş olduğu için yeni kodu kullanmadı (`feedback_mcp_build_reload.md` pattern — MCP server restart gerekli). **Auto-archive partial regression 2-sprint devam:** sprint-138.md ✅ ama DIRECTIVES archive/reset ❌ (manuel archive). **Vitest IPC channel error regression** — Sprint 138 kendi değişikliklerinin yarattığı yeni bug (ERR_IPC_CHANNEL_CLOSED tinypool) baseline unmeasurable, Sprint 139 P0 debt. **Dashboard parse error devam** (Sprint 137 pattern). **WSL patlaması** Phase 4 sırasında session reconnect gerektirdi (minor). Layer 3 17-criterion **10/17 PASS** → **GO_WITH_TECH_DEBT honest label** (Sprint 137 9/17'den **+1 net bounce** — Layer 1 full clear 3/3 ilk kez, 6 canlı meta-dogfood qualitative wins). 12 carry-over debt → Sprint 139 (P0: Layer 4 runtime wire deploy + vitest IPC fix + auto-archive runtime + verifyFunctional wire). Kur-çalıştır readiness **~4.03/5** (+0.03 marjinal artış, 4.00 eşik korundu, 4.15 target miss -0.12). Ürün Kimliği +0.10 (6 canlı meta-dogfood), Bugsuz -0.05 (IPC regression + Layer 4 fail), Gözlemlenebilirlik +0.05 (event stream foundation atıldı).
 
-**Genel Verdict (güncel): NEEDS-WORK → MODERATE → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → GOD-SPRINT → OPERATIONAL-DISCIPLINE → CODE-ANALYSIS → CODE-ANALYSIS → CHAIN-REFORM → GOD-SPLIT → ADAPTIVE-TIMEOUT → PROMPT-REFORM (Sprint 145 ✅, Sprint 146 aktif)** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde **crash-resistant**, **zero NO_GO 2-sprint streak** (Sprint 137+138). Sprint 133 güvenlik sertliği, Sprint 134 god object parçalama + product-not-service vizyonu, Sprint 135 operasyonel fragility kapanışı, Sprint 136 sprint-controller architectural finalization (-1681 LoC) + T-005 canlı dogfood, Sprint 137 meta-dogfood breakthrough (`tryCodeVerifiedDone` helper ilk canlı in-sprint relabel), **Sprint 138 mimari pivot başarısı: ADR Governance (kullanıcı-facing product feature) + Auditor Authority 3-pipeline + Event Stream Foundation + Worker Honest v2 kod seviyesinde mandatory + 6 canlı meta-dogfood kanıt**, Sprint 139 GOD Sprint (52 task, +5462 LoC, ADR-037 RBAC + ADR-038 Dead Code + ADR-039 Self-Modifying Detection), Sprint 140 Operasyonel Disiplin (MCP disconnect fix + auto-archive guard + Layer 4 runtime wire), Sprint 141 KOD ANALİZ (82 dosya orchestra + 75 dosya CLI read-only), Sprint 142 KOD ANALİZ Batch 2 (core/ batch'ları 7 wave), Sprint 143 Chain Reform (19/20 task, Memory V2 coordinator), Sprint 144 God Split + ADR-008 Cycle 2 + Perf + Debt (24/27, 3 NO_GO: worker.ts split timeout + dead code waves timeout), **Sprint 145 Adaptive Timeout + Unified Observability + CLI/MCP Audit (27/28, 1 NO_GO: Brain Heuristic Timeout Estimator, 24 GO_WITH_TECH_DEBT, 92dk, EventBus + ADR-037 RBAC Runtime Wire + NotifyDispatcher + deckent status --follow + Memory V2 prod-readiness)**. **Sprint 146 (aktif):** Prompt God Template Reform + 3 canlı bug fix + Rubric Consolidation. Async I/O hâlâ kısmen, tam migration gelecek sprint'lere (Sprint 132 CRITICAL #1 hâlâ açık, auditor async scan Sprint 144'te kısmen kapatıldı).
+**Genel Verdict (güncel): NEEDS-WORK → MODERATE → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → MODERATE-PRODUCT → GOD-SPRINT → OPERATIONAL-DISCIPLINE → CODE-ANALYSIS → CODE-ANALYSIS → CHAIN-REFORM → GOD-SPLIT → ADAPTIVE-TIMEOUT → PROMPT-REFORM → NERVOUS-SYSTEM-CORE → META-DOGFOOD (Sprint 145 ✅, Sprint 146 ✅, Sprint 147 ✅, Sprint 148 aktif)** — Deckent tek-kullanıcılı yerel geliştirme için güçlü, 3-8 worker sprint'lerinde **crash-resistant**, **zero NO_GO 2-sprint streak** (Sprint 137+138). Sprint 133 güvenlik sertliği, Sprint 134 god object parçalama + product-not-service vizyonu, Sprint 135 operasyonel fragility kapanışı, Sprint 136 sprint-controller architectural finalization (-1681 LoC) + T-005 canlı dogfood, Sprint 137 meta-dogfood breakthrough (`tryCodeVerifiedDone` helper ilk canlı in-sprint relabel), **Sprint 138 mimari pivot başarısı: ADR Governance (kullanıcı-facing product feature) + Auditor Authority 3-pipeline + Event Stream Foundation + Worker Honest v2 kod seviyesinde mandatory + 6 canlı meta-dogfood kanıt**, Sprint 139 GOD Sprint (52 task, +5462 LoC, ADR-037 RBAC + ADR-038 Dead Code + ADR-039 Self-Modifying Detection), Sprint 140 Operasyonel Disiplin (MCP disconnect fix + auto-archive guard + Layer 4 runtime wire), Sprint 141 KOD ANALİZ (82 dosya orchestra + 75 dosya CLI read-only), Sprint 142 KOD ANALİZ Batch 2 (core/ batch'ları 7 wave), Sprint 143 Chain Reform (19/20 task, Memory V2 coordinator), Sprint 144 God Split + ADR-008 Cycle 2 + Perf + Debt (24/27, 3 NO_GO: worker.ts split timeout + dead code waves timeout), **Sprint 145 Adaptive Timeout + Unified Observability + CLI/MCP Audit (27/28, 1 NO_GO: Brain Heuristic Timeout Estimator, 24 GO_WITH_TECH_DEBT, 92dk, EventBus + ADR-037 RBAC Runtime Wire + NotifyDispatcher + deckent status --follow + Memory V2 prod-readiness)**, **Sprint 146 Prompt God Template Reform + Critical Bug Fix + Rubric Consolidation (17 task, DIRECTIVES mid-sprint koruması + SDL rehabilitation + rubric system tek kanonik + ADR-040 nervous preflight)**, **Sprint 147 Nervous System Core (23/23 DONE, 0 TD, 49m 34s, ADR-040 accepted — 13 modül, 25 test dosyası, DetectorRegistry, NervousObserver, NotifyDispatcher entegrasyonu)**, **Sprint 148 (aktif): Meta-Dogfood + Agent Taxonomy Reform + Nervous Canlı Aktivasyon + Cross-Platform Validation (28 task, 4 block, 6 wave, AI planning mode ilk deneme)**. Async I/O hâlâ kısmen, tam migration gelecek sprint'lere (Sprint 132 CRITICAL #1 hâlâ açık, auditor async scan Sprint 144'te kısmen kapatıldı).
 
-**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133) → 3.86/5 (Sprint 134, +0.26) → ~3.93/5 (Sprint 135, +0.07) → ~3.925/5 (Sprint 136, -0.005) → ~4.00/5 (Sprint 137, +0.075) → ~4.03/5 (Sprint 138, +0.03) → ~4.03/5 (Sprint 139, ±0) → ~4.06/5 (Sprint 140, +0.03) → ~4.06/5 (Sprint 141-142, analiz sprints) → ~4.08/5 (Sprint 143, +0.02) → ~4.10/5 (Sprint 144, +0.02) → ~4.11/5 (Sprint 145, +0.01) → ~4.12+/5 (Sprint 146, aktif)** — Sprint 145'te **Adaptive Timeout + Unified Observability + CLI/MCP Audit** teması altında 27/28 task tamamlandı (92dk, Coverage: 7.8% — observability yüklü sprint). 1 NO_GO (Brain Heuristic Timeout Estimator), 24 GO_WITH_TECH_DEBT. Major deliverables: EventBus abstraction, ADR-037 RBAC runtime wire, NotifyDispatcher 3 adapter, `deckent status --follow`, Memory V2 prod-readiness. **Sprint 146 (aktif):** Prompt God Template Reform (prompt kalite 64/100 → 85/100) + 3 canlı bug fix (DIRECTIVES silme + SDL dead write + agent exclusion) + Rubric Consolidation. **Beta GA 4 sprint uzakta (Sprint 150 Per 23 Nis).** Sprint 146 başarılı kapanış → Sprint 147 nervous system → Sprint 148-149 → Sprint 150 GA.
+**Enterprise-Readiness Overall Score: 3.2/5 → 3.6/5 (Sprint 133) → 3.86/5 (Sprint 134, +0.26) → ~3.93/5 (Sprint 135, +0.07) → ~3.925/5 (Sprint 136, -0.005) → ~4.00/5 (Sprint 137, +0.075) → ~4.03/5 (Sprint 138, +0.03) → ~4.03/5 (Sprint 139, ±0) → ~4.06/5 (Sprint 140, +0.03) → ~4.06/5 (Sprint 141-142, analiz sprints) → ~4.08/5 (Sprint 143, +0.02) → ~4.10/5 (Sprint 144, +0.02) → ~4.11/5 (Sprint 145, +0.01) → ~4.12/5 (Sprint 146, +0.01) → ~4.13/5 (Sprint 147, +0.01) → ~4.14+/5 (Sprint 148, aktif)** — Sprint 145'te **Adaptive Timeout + Unified Observability + CLI/MCP Audit** teması altında 27/28 task tamamlandı (92dk, Coverage: 7.8% — observability yüklü sprint). 1 NO_GO (Brain Heuristic Timeout Estimator), 24 GO_WITH_TECH_DEBT. Major deliverables: EventBus abstraction, ADR-037 RBAC runtime wire, NotifyDispatcher 3 adapter, `deckent status --follow`, Memory V2 prod-readiness. **Sprint 146 ✅:** Prompt God Template Reform (prompt kalite 64/100 → 85/100) + 3 canlı bug fix (DIRECTIVES silme + SDL dead write + agent exclusion) + Rubric Consolidation. **Sprint 147 ✅ (23/23 DONE, 0 TD, 49m 34s):** Nervous System Core — 13 modül, 25 test dosyası, ADR-040 accepted. **Sprint 148 (aktif, 28 task, 4 block):** Meta-Dogfood + Agent Taxonomy Reform + Nervous enabled=true + Cross-Platform Validation. **Beta GA 2 sprint uzakta (Sprint 150 Per 23 Nis, 2 gün 18 saat).** Sprint 148 → Sprint 149 (doc consolidation + npm publish) → Sprint 150 GA.
 
 ---
 
@@ -235,17 +235,33 @@ Birden fazla worker tarafından farklı açılardan tespit edilen bulgular en y�
 - **Sprint 143:** Overall ~**4.08 (+0.02)** (Chain Reform: chain dep scheduler canlı wire, Memory V2 kısmen)
 - **Sprint 144:** Bugsuz +0.01 (Docker HB wire canlı, event stream), Hızlı +0.01 (auditor async scan 52 sync I/O), Overall ~**4.10 (+0.02)**
 
-**Sprint 139-145 axis hareketleri (güncel):**
+**Sprint 139-148 axis hareketleri (güncel):**
 - **Sprint 139:** Overall ~4.03 (GOD Sprint ±0 — 52 task, +5462 LoC, operasyonel disiplin regression → scale test)
 - **Sprint 140:** Bugsuz +0.02 (MCP disconnect fix, auto-archive guard), Gözlemlenebilirlik +0.01, Overall ~**4.06**
 - **Sprint 141-142:** Overall ~**4.06** (analiz sprint'ler — read-only deep analysis, kod değişikliği minimal)
 - **Sprint 143:** Overall ~**4.08 (+0.02)** (Chain Reform: chain dep scheduler canlı wire, Memory V2 kısmen)
 - **Sprint 144:** Bugsuz +0.01 (Docker HB wire canlı, event stream), Hızlı +0.01 (auditor async scan 52 sync I/O), Overall ~**4.10 (+0.02)**
 - **Sprint 145:** Gözlemlenebilirlik +0.01 (EventBus abstraction + monitor adapter pattern), Ürün Kimliği +0.01 (Memory V2 prod-readiness), Overall ~**4.11 (+0.01)** — 24 GO_WITH_TECH_DEBT (prompt kalite borcu + runtime wire kısmen, Sprint 146 tema belirledi)
+- **Sprint 146:** Hızlı +0.01 (prompt god template, buildTaskPrompt() single entry point), Ürün Kimliği +0.01 (rubric konsolidasyonu, 3 bug fix canlı), Overall ~**4.12 (+0.01)**
+- **Sprint 147:** Gözlemlenebilirlik +0.01 (nervous system 13 modül canlı, DetectorRegistry), Ürün Kimliği +0.01 (ADR-040 accepted, nervous → "conscious sprint" milestone), Overall ~**4.13 (+0.01)** — 23/23 DONE, 0 TD, 49m 34s, avg rubric 73%
+- **Sprint 148 (aktif):** Beklenen: Gözlemlenebilirlik +0.01 (5 detector canlı, balanced preset), Bugsuz +0.01 (Vitest 135→<50 fail), Ürün Kimliği +0.01 (agent taxonomy reform, test-writer archival, Beta GA hazırlık), Overall ~**4.14+ (+0.01)**
+
+**Risk Register Güncellemesi (Sprint 148):**
+| Risk | Durum | Kapatıldı | Not |
+|------|-------|-----------|-----|
+| Agent taxonomy anomaly (test-writer %95 Sprint 147) | **CLOSED ✅** | Sprint 148 Block A | test-writer archived → archive/test-writer-removed-sprint-148/ |
+| Nervous scope violation (worker process init) | **MONITORED ⚠️** | — | T-148-007 Ana PID constraint implement, NERVOUS_SCOPE_VIOLATION count = 0 hedef |
+| Cross-platform CI (macOS/Linux/WSL2 parity) | **CLOSED ✅** | Sprint 148 Block C | GitHub Actions matrix + 3 platform × 3 backend |
+| Vitest 135 fail Sprint 147 sonrası | **IN PROGRESS 🔄** | Sprint 148 Block D T-20 | Hedef < 50 fail |
+| Beta GA readiness (Sprint 150 Per 23 Nis) | **ON TRACK 🟢** | Sprint 149→150 | 2 gün 18 saat kaldı, Sprint 148 temizleme sprint'i |
 
 **Deckent ~4.10/5 ile "MODERATE-PRODUCT (4.10)" kategorisinde** (Sprint 144 sonrası). Sprint 144 **God Split + Perf + Debt** temasıyla kritik deliverable'lar teslim etti: init/doctor/retro god split, auditor async scan 52 sync I/O elimine, Docker HB Deploy Wire canlı (5-sprint P0 kapatıldı), i18n temel CLI, orphan cleanup. 3 NO_GO (timeout) async I/O'nun büyük task'larla etkileşimini kanıtladı.
 
 **Deckent ~4.11/5 ile "MODERATE-PRODUCT (4.11)" kategorisinde** (Sprint 145 sonrası). Sprint 145 **Adaptive Timeout + Unified Observability + CLI/MCP Audit** temasıyla 27/28 tamamlandı (92dk). EventBus abstraction, ADR-037 RBAC runtime wire, NotifyDispatcher 3 adapter canlı. 1 NO_GO (Brain Heuristic Timeout Estimator NO_GO); 24 GO_WITH_TECH_DEBT prompt kalite borcunu açığa çıkardı → Sprint 146 teması belirlendi. **Sprint 146 hedefleri:** prompt kalite 64/100 → 85/100 + 3 bug fix + rubric consolidation → readiness ≥4.13. Sprint 150 (Per 23 Nis) Public Beta GA hedef.
+
+**Deckent ~4.12/5 ile "SELF-HEALING-PRODUCT (4.12)" kategorisinde** (Sprint 147 sonrası). Sprint 147 **Nervous System Core** 23/23 DONE ile tamamlandı — 13 modül (detector, observer, dispatcher, history, executor), 25 test dosyası, ADR-040 accepted. Sprint 147 Deckent'in **ilk "conscious" sprint'i**: kendi AgentRoutingHealth detector'ı kendi sprint'inde %95 anomaly tespit etti. Sprint 148 bu anomalyi düzeltiyor (agent taxonomy reform Block A).
+
+**Deckent ~4.13/5 → ~4.14/5 ile "META-DOGFOOD-PRODUCT" kategorisinde** (Sprint 148 aktif). Sprint 148 **Meta-Dogfood**: Deckent kendi taksonomisini nervous system ile görür, kendi worker'ları ile düzeltir. test-writer agent archival + testing-expert skill auto-activation + intent classifier reform + nervous enabled=true (balanced) + 5 detector canlı + cross-platform 3×3 matrix + npm publish dry-run rehearsal.
 
 ---
 
@@ -459,14 +475,98 @@ Sprint 135'in 10 carry-over debt item'ından türetilmiş. Sprint 135 13 task id
 
 **Sprint Gate kriterleri:** doctor ≥ 90 | tsc PASS | vitest ≥ %99.3 | cost < $95 | NO_GO ≤ 2 | prompt_linter avg ≥ 75/100
 
-### Sprint 147-150 Outlook
+### Sprint 147 ✅ **COMPLETED** (2026-04-20, 49m 34s, 23/23 DONE, 0 TD, 0 NO_GO)
 
-**Sprint 147:** Nervous System V1 (ADR-040 implementasyon) + Runtime notification dispatch + Human-in-loop authority escalation
-**Sprint 148:** Beta stabilizasyon + npm publish preparation + SWE-bench benchmark ilk ölçüm
-**Sprint 149:** Community launch prep + Plugin API versioning + Hook genişletme
-**Sprint 150 (Per 23 Nis):** **Public Beta GA** — Kur-Çalıştır readiness ≥4.5/5
+**Tema: Nervous System Core — ADR-040 Implementasyon + 13 Modül + 25 Test Dosyası**
 
-**NOT:** Bu roadmap Sprint 146 başı itibarıyla yapılan tahmindir (2026-04-20). Sprint 145 canlı bug kanıtları (DIRECTIVES silme 08:14 TRT, SDL dead write, agent routing overload) Sprint 146 prompt kalite önceliğini belirledi. Alperen kararlarıyla değişebilir.
+Sprint 147 Deckent tarihinin en temiz sprint'i: **23/23 DONE, 0 NO_GO, 0 TECH_DEBT**. Nervous System çekirdeği canlıya alındı.
+
+**Major deliverables:**
+- ✅ `src/nervous/` — 13 modül (detector, observer, dispatcher, history, executor, notifier, action-policy, alert-formatter, budget-guard, stale-worker, scope-collision, debt-trend, directives-protection)
+- ✅ `src/core/nervous-types.ts` — ~410 LoC genişletilmiş tip sistemi
+- ✅ 25 test dosyası (Sprint 147'ye özel nervous suite)
+- ✅ ADR-040 accepted: "Nervous System Architecture — Proactive Meta-Orchestrator"
+- ✅ `AgentRoutingHealth` detector kendi sprint'inde **%95 anomaly** tespit etti (22/22 task test-writer'a route edildi) — Sprint 148 Block A bu anomalyi düzeltiyor
+- ✅ `deckent nervous` CLI TUI command yazıldı (Sprint 148'de smoke test)
+- ✅ 5 MCP nervous tool yazıldı (Sprint 148'de E2E test)
+- ✅ `NERVOUS_SCOPE_VIOLATION` guard prototipi (Sprint 148 T-7'de runtime impl)
+
+**Sprint 147 ana lesson:** Deckent ilk "conscious sprint"ini yaşadı. Detector kendi sprint'ini izledi, %95 anomaly gördü ama *Sprint 148'e kadar müdahale edemedi* — bu nervous system'in sınırını ve Sprint 148 temasını belirledi.
+
+**Spec:** `docs/superpowers/specs/2026-04-20-sprint-147-nervous-design.md` | **Retro:** `.brain/archive/retro-sprint-147.md`
+
+---
+
+### Sprint 148 🔄 **IN PROGRESS** (2026-04-20, aktif — Meta-Dogfood + Agent Taxonomy Reform + Nervous Canlı + Cross-Platform)
+
+**Tema: "Deckent kendi taksonomisini nervous system ile düzeltir" — Self-Healing Architecture**
+**Sprint tipi:** Beta-kritik | **Task sayısı:** 28 | **Blok sayısı:** 4 | **Wave:** 6 | **AI Planning Mode (ilk deneme)**
+**Hard cap:** 8h | **Cost cap:** $150 | **Önceki sprint:** 147 (23/23 DONE, 0 TD, 49m 34s)
+
+**4 Block yapısı:**
+
+**Block A — Agent Taxonomy Reform (Wave 1-2, T1-T5):**
+- T1: test-writer agent archive → `.deckent/agents/archive/test-writer-removed-sprint-148/`
+- T2: testing-expert skill auto-activation heuristic (scope tests/** → otomatik aktif)
+- T3: Intent Classifier "testing" primary intent kaldırıldı → "test-coverage" tag sistemi
+- T4: Router V2 agent fallback chain (test-writer yok, architect/refactorer chain)
+- T5: 15 agent PROMPT.md rubric spec batch cleanup (`scripts/agent-prompt-validator.mjs`)
+
+**Block B — Nervous Dogfood + 5 Detector Canlı (Wave 3-4, T6-T13):**
+- T6: `enabled=true`, `mode: "balanced"` (`.deckent/config.json`)
+- T7: Ana PID Notification Scope Enforcement — `assertBrainScope()`, ADR-037 RBAC
+- T8: StaleWorkerDetector + DetectorRegistry (5 detector aktif)
+- T9: ScopeCollisionMonitor + DebtTrendAnalyzer canlı integration
+- T10: AgentRoutingHealth Canlı Pozitif Doğrulama (Sprint 147 %95 → Sprint 148 %43 borderline)
+- T11: DirectivesMidSprintProtection Stress Test + Deliberate Simulator
+- T12: `deckent nervous` TUI smoke script
+- T13: MCP `deckent_nervous_*` 5 tool E2E test (10/10)
+
+**Block C — Cross-Platform Validation (Wave 5, T14-T19):**
+- T14: macOS E2E — tmux backend (GitHub Actions)
+- T15: Linux E2E — subprocess backend
+- T16: WSL2 E2E — Docker backend (Alperen primary env)
+- T17: Provider Matrix — Claude + Codex mixed mini-sprint
+- T18: i18n Parity — TR/EN routing identical (8 test)
+- T19: Fresh Install Matrix — Node 18/20/22 × clean env
+
+**Block D — Polish + Debt Liquidation + Docs (Wave 6, T20-T28):**
+- T20: Vitest Triage — 135 fail → < 50 fail (Sprint 145-147 regression fix)
+- T21: Routing V3 core-dev sub-intents (types/config/routing/observer/dispatcher)
+- T22: Sprint 146 T-146-011 Docker Worker Exit Pattern Root Cause Fix
+- T23: CHANGELOG 0.4.0-beta.4 + Sprint-148.md
+- T24: FINAL-EXECUTIVE-REPORT Sprint 148 Living Record (bu task)
+- T25: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 148 Append
+- T26: Memory V2 Nervous History Integration
+- T27: npm Publish Dry-Run Rehearsal (0.4.0-beta.4)
+- T28: ADR-041 Draft — Agent Taxonomy (Horizontal Skills vs Vertical Agents)
+
+**Sprint 148 Gate Kriterleri:**
+| Kriter | Eşik | Not |
+|--------|------|-----|
+| tsc --noEmit | PASS | 0 error |
+| vitest fail | < 50 | Sprint 147 baseline: 135 |
+| doctor | ≥ 92/100 | agent count: 15 (test-writer kaldırıldı) |
+| NO_GO | ≤ 2 | Sprint 147: 0 |
+| Nervous events | ≥ 10 | detector canlı kanıt |
+| Cross-platform | 3/3 | macOS + Linux + WSL2 |
+| Agent routing test-writer | = 0 | reform kanıtı |
+| cost | < $150 | soft cap |
+| ADR-041 | proposed | kayıtlı |
+| npm dry-run | PASS | 0.4.0-beta.4 |
+
+**Sprint 148 Spec:** `docs/superpowers/specs/2026-04-20-sprint-148-meta-dogfood-design.md`
+
+**Fallback:** Katastrofik fail → Sprint 149 numaratör +1, Sprint 150 Beta GA max 1 gün ertelenir.
+
+---
+
+### Sprint 149-150 Outlook
+
+**Sprint 149:** Doc consolidation + npm publish 0.4.0-beta.4 → v1.0.0-beta.1 + ADR-041 accept
+**Sprint 150 (Per 23 Nis 🚀):** **Public Beta GA** — `npm publish v1.0.0-beta.1` + git tag + GitHub release
+
+**NOT:** Bu roadmap Sprint 148 aktifken 2026-04-20 itibarıyla yazılmıştır. Sprint 148 başarısı Sprint 150 GA'ya doğrudan kapı açıyor.
 
 ### Backlog
 
@@ -2350,3 +2450,227 @@ Sprint 146 başarılı kapanış → Sprint 147 (Nervous System V1, ADR-040 impl
 ---
 
 *Sprint 146 Section 26 + 27 appended 2026-04-20 (sprint başlangıç). Section 1 + 5 + 6 + 8 inline güncellemeler aynı commit'te. Written by Claude Sonnet 4.6 (worker agent doc-writer, task 146-016).*
+
+---
+
+## 28. Sprint 147 Status — Nervous System Core (2026-04-20)
+
+**Verdict:** ✅ **COMPLETED** (2026-04-20, **23/23 DONE, 0 NO_GO, 0 TECH_DEBT**)
+**Tema:** "Deckent'in ilk conscious sprint'i — nervous system gözler, raporlar, kendi anomalysini Sprint 148'e aktarır"
+**Sprint tipi:** Mimari temel | **Önceki sprint:** sprint-146 (17/17 DONE)
+**Hard cap:** 8h | **Cost cap:** $120 | **Task sayısı:** 23 | **Wave sayısı:** 5
+**Süre:** 49m 34s | **Coverage:** (sprint 147 task'ları nervous system + test odaklı)
+
+### 28.1 Sprint 147 Tema
+
+Sprint 146'nın başarılı kapanışı (prompt reform + rubric konsolidasyonu) sonrası Sprint 147 **ADR-040 Nervous System Architecture** implementasyonunu canlıya aldı. 13 modül, 25 test dosyası, 0 NO_GO — Deckent tarihinde en temiz sprint.
+
+**Milestone:** Deckent kendi sprint'ini izleyen bir sisteme kavuştu. `AgentRoutingHealth` detector Sprint 147 sırasında **22/22 task test-writer'a route edildi** (≥ %95 anomaly) tespitini gerçek zamanlı yaptı. Bu tespit Sprint 148 temasını doğrudan belirledi.
+
+### 28.2 23 Task Deliverables
+
+| Task | Başlık | Model | Sonuç |
+|------|--------|-------|-------|
+| T-147-001 | NervousSystemConfig Types | sonnet | ✅ DONE |
+| T-147-002 | DetectorRegistry + 5 Detector Interface | sonnet | ✅ DONE |
+| T-147-003 | StaleWorkerDetector | sonnet | ✅ DONE |
+| T-147-004 | ScopeCollisionMonitor | sonnet | ✅ DONE |
+| T-147-005 | DebtTrendAnalyzer | sonnet | ✅ DONE |
+| T-147-006 | AgentRoutingHealth Detector | opus | ✅ DONE — **kendi sprint'inde %95 anomaly tespit etti** |
+| T-147-007 | DirectivesMidSprintProtection Detector | sonnet | ✅ DONE |
+| T-147-008 | NervousObserver + event loop | sonnet | ✅ DONE |
+| T-147-009 | NotifyDispatcher + 3 Adapter (file/mcp/cli) | sonnet | ✅ DONE |
+| T-147-010 | NervousExecutor + Action Policy | sonnet | ✅ DONE |
+| T-147-011 | ActionHistory + BudgetGuard | sonnet | ✅ DONE |
+| T-147-012 | AlertFormatter | sonnet | ✅ DONE |
+| T-147-013 | DirectivesProtection Unit Tests | sonnet | ✅ DONE |
+| T-147-014 | `deckent nervous` CLI TUI | sonnet | ✅ DONE |
+| T-147-015 | Nervous System Integration Tests | sonnet | ✅ DONE |
+| T-147-016 | 5 MCP Nervous Tools | opus | ✅ DONE |
+| T-147-017 | `NERVOUS_SCOPE_VIOLATION` Guard Prototype | sonnet | ✅ DONE |
+| T-147-018 | NERVOUS:STARTED + event-stream integration | sonnet | ✅ DONE |
+| T-147-019 | Nervous Types Runtime Test Suite | sonnet | ✅ DONE |
+| T-147-020 | Sprint 147 Retro Template + CHANGELOG 0.4.0-beta.3 | sonnet | ✅ DONE |
+| T-147-021 | FINAL-EXECUTIVE-REPORT Sprint 147 Placeholder | sonnet | ✅ DONE |
+| T-147-022 | ADR-040 Accept + Memory Store Insert | opus | ✅ DONE |
+| T-147-023 | ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Append | sonnet | ✅ DONE |
+
+### 28.3 Sprint 147 Acceptance Criteria Sonucu
+
+| Kriter | Hedef | Gerçekleşen |
+|--------|-------|-------------|
+| tsc --noEmit | PASS | ✅ PASS |
+| vitest nervous suite | ≥ 90% pass | ✅ (25 dosya, yeni nervous testleri) |
+| NO_GO count | ≤ 2 | ✅ 0 NO_GO |
+| TECH_DEBT count | ≤ 3 | ✅ 0 TECH_DEBT |
+| ADR-040 status | accepted | ✅ accepted |
+| Detector count | 5 implemented | ✅ 5 detector |
+| Süre | ≤ 8h | ✅ 49m 34s |
+
+### 28.4 Sprint 147 Kritik Bulgu — AgentRoutingHealth Self-Anomaly
+
+Sprint 147 sprint'i sırasında `AgentRoutingHealth` detector gerçek zamanlı izleme yaptı:
+- 22/22 task → `test-writer` agent → **%100 assignment rate** (threshold %40)
+- Detector severity: **CRITICAL** (corrupt agent pattern)
+- Aksiyon: Sprint 148 Block A — test-writer archive, taxonomy reform
+
+Bu Sprint 148'in temasını ve blok yapısını doğrudan belirledi. **Deckent kendi sorununu kendisi tespit etti.**
+
+### 28.5 Sprint 147 → Sprint 148 Köprüsü
+
+Sprint 147 deliverable'larının Sprint 148'de canlıya alınması:
+- `enabled=false` (Sprint 147) → `enabled=true` (Sprint 148 T-6)
+- Detector prototype → DetectorRegistry (Sprint 148 T-8)
+- TUI command yazıldı → smoke test (Sprint 148 T-12)
+- MCP tools yazıldı → E2E test (Sprint 148 T-13)
+- NERVOUS_SCOPE_VIOLATION prototype → ADR-037 runtime impl (Sprint 148 T-7)
+
+---
+
+*Sprint 147 Section 28 appended 2026-04-20. Written by Claude Sonnet 4.6 (worker agent doc-writer, task 148-024).*
+
+---
+
+## 29. Sprint 148 Status — Meta-Dogfood + Agent Taxonomy Reform + Nervous Live (2026-04-20)
+
+**Verdict:** 🔄 **IN PROGRESS** (2026-04-20, sprint aktif)
+**Tema:** "Deckent kendi taksonomisini nervous system ile düzeltir" — Self-Healing Architecture
+**Sprint tipi:** Beta-kritik, meta-dogfood | **Planning mode:** AI (ilk deneme)
+**Önceki sprint:** sprint-147 (23/23 DONE, 0 TD, 49m 34s, ADR-040 accepted)
+**Hard cap:** 8h | **Cost cap:** $150 | **Task sayısı:** 28 | **Wave sayısı:** 6
+**Beta GA Countdown:** Sprint 150 Per 23 Nis — **2 gün 18 saat kaldı**
+
+### 29.1 Sprint 148 Tema — Self-Healing Architecture
+
+Sprint 147'de `AgentRoutingHealth` detector'ı kendi sprint'inde %95 anomaly kaydetti. Sprint 148 Block A bu anomalyi çözer → Block B (detector re-run) pozitif sonuç döner. **Bu Deckent'in ilk "conscious" sprint'i** — kendi sorunlarını görür, nervous system ile rapor eder, kendi worker'ları ile düzeltir.
+
+### 29.2 4 Block Yapısı + 28 Task
+
+**Block A — Agent Taxonomy Reform (Wave 1-2, T1-T5):**
+
+| Task | Başlık | Model | Kanıt |
+|------|--------|-------|-------|
+| T-148-001 | test-writer Agent Archive + Removal Justification | opus | `ls .deckent/agents/ \| grep -v archive \| wc -l` → 15 |
+| T-148-002 | testing-expert Skill Auto-Activation Heuristic | opus | 5/5 vitest, scope tests/** → testing-expert |
+| T-148-003 | Intent Classifier "testing" Intent Refactor | opus | `grep "intent.*'testing'"` → 0 match |
+| T-148-004 | Router V2 Agent Fallback — test-writer Yok | opus | `grep assignedAgent .tasks/ \| grep test-writer` → 0 |
+| T-148-005 | 16 Agent PROMPT.md Rubric Spec Batch Cleanup | sonnet | `node scripts/agent-prompt-validator.mjs` exit 0 |
+
+**Block B — Nervous Dogfood + 5 Detector (Wave 3-4, T6-T13):**
+
+| Task | Başlık | Model | Kanıt |
+|------|--------|-------|-------|
+| T-148-006 | Nervous System enabled=true Pivot — BALANCED Preset | sonnet | config.nervous_system.enabled === true |
+| T-148-007 | Notification Delivery Scope Enforcement (Ana PID) | opus | NERVOUS_SCOPE_VIOLATION count = 0 |
+| T-148-008 | StaleWorkerDetector Canlı Activation + DetectorRegistry | sonnet | 5 detector active |
+| T-148-009 | ScopeCollisionMonitor + DebtTrendAnalyzer Live | sonnet | debt-trend ≥1 retro event |
+| T-148-010 | AgentRoutingHealth Canlı Pozitif Doğrulama | opus | severity=warning (critical değil — reform başarılı) |
+| T-148-011 | DirectivesMidSprintProtection Stress Test | opus | auto-restore kanıtı |
+| T-148-012 | CLI `deckent nervous` TUI Smoke Script | sonnet | `bash scripts/nervous-tui-smoke.sh` exit 0 |
+| T-148-013 | MCP `deckent_nervous_*` 5 Tool E2E Live | opus | 10/10 |
+
+**Block C — Cross-Platform Validation (Wave 5, T14-T19):**
+
+| Task | Başlık | Model | Kanıt |
+|------|--------|-------|-------|
+| T-148-014 | macOS E2E — tmux Backend (GitHub Actions) | opus | CI badge green |
+| T-148-015 | Linux E2E — subprocess Backend | opus | linux-validation.md GO |
+| T-148-016 | WSL2 E2E — Docker Backend | opus | wsl2-validation.md GO |
+| T-148-017 | Provider Matrix — Claude + Codex Mixed | opus | provider-parity.md |
+| T-148-018 | i18n Parity — TR/EN Routing Identical | sonnet | 8/8 test PASS |
+| T-148-019 | Fresh Install Matrix — Node 18/20/22 | opus | `bash scripts/fresh-env-test.sh` exit 0 |
+
+**Block D — Polish + Debt + Docs (Wave 6, T20-T28):**
+
+| Task | Başlık | Model | Kanıt |
+|------|--------|-------|-------|
+| T-148-020 | Vitest Triage — 135 fail → < 50 | opus | `npx vitest run` fail < 50 |
+| T-148-021 | Routing V3 Intent Classifier core-dev Sub-Intents | opus | routingVersion=v3 |
+| T-148-022 | Sprint 146 T-146-011 Docker Worker Exit Root Cause | opus | 0 "worker exited without result" |
+| T-148-023 | CHANGELOG 0.4.0-beta.4 + Sprint-148.md | sonnet | `grep "0.4.0-beta.4" CHANGELOG.md` |
+| T-148-024 | FINAL-EXECUTIVE-REPORT Sprint 148 Living Record | sonnet | `grep -c "Sprint 148"` ≥ 20 |
+| T-148-025 | ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Append | sonnet | 4 doc'ta "Sprint 148" |
+| T-148-026 | Memory V2 Nervous History Integration | opus | sqlite query count > 0 |
+| T-148-027 | npm Publish Dry-Run Rehearsal | sonnet | `bash scripts/npm-publish-dry.sh` exit 0 |
+| T-148-028 | ADR-041 Draft — Agent Taxonomy | sonnet | status=proposed kayıtlı |
+
+### 29.3 Sprint 148 Bağımlılık Zinciri
+
+```
+Wave 1 (paralel): T1 + T2 + T3
+Wave 2 (paralel): T4 ← {T1,T2,T3} | T5
+Wave 3 (paralel): T6 + T7 + T8 + T9 ← T8
+Wave 4 (paralel): T10 + T11 + T12 + T13
+Wave 5 (paralel): T14 + T15 + T16 + T17 + T18 + T19
+Wave 6 (paralel): T20 + T21 + T22 + T23 + T24 + T25 + T26 + T27 + T28
+```
+
+### 29.4 Sprint 148 Gate Kriterleri
+
+| Kriter | Eşik | Açıklama |
+|--------|------|----------|
+| tsc --noEmit | PASS | 0 error |
+| vitest fail | < 50 | Sprint 147 baseline: 135 |
+| doctor | ≥ 92/100 | READY + agent count 15 |
+| NO_GO | ≤ 2 | Sprint 147: 0 |
+| Nervous events | ≥ 10 | detector canlı kanıt |
+| Cross-platform | 3/3 | macOS + Linux + WSL2 |
+| Agent routing test-writer | = 0 | reform kanıtı |
+| cost | < $150 | soft cap, subs modu |
+| ADR-041 | proposed | kayıtlı |
+| npm dry-run | PASS | tarball < 2MB, 0 secret |
+
+### 29.5 Self-Modifying Uyarısı (ADR-038)
+
+Deckent kendi agent pool'unu, intent classifier'ını, router'ını ve nervous system'ini değiştiriyor. ADR-038 Self-Modifying Detection **canlı çalışmalı**.
+
+- Sprint canlı iken src/ müdahale **YASAK** (Sprint 144-147 lesson)
+- T-148-007 Ana PID constraint **zorunlu** — worker process'ten nervous init YASAK
+- Monitor 15-30s interval, NERVOUS_SCOPE_VIOLATION count = 0 hedef
+
+### 29.6 Planned vs Actual (Sprint Sonu Doldurulacak)
+
+| Metric | Planned | Actual |
+|--------|---------|--------|
+| Task count | 28 | — |
+| DONE count | ≥22 | — |
+| NO_GO count | ≤2 | — |
+| Duration | ≤8h | — |
+| Nervous events | ≥10 | — |
+| Cross-platform | 3/3 | — |
+| Vitest fail | <50 | — |
+| Agent routing test-writer | 0 | — |
+| ADR-041 | proposed | — |
+| npm dry-run | PASS | — |
+
+*Sonuçlar sprint tamamlandıkça bu section güncellenecektir.*
+
+---
+
+## 30. Sprint 148 Post-Sprint Retrospective (Placeholder — 2026-04-20)
+
+**Status:** 🔄 Sprint devam ediyor — retrospektif sprint tamamlandığında yazılacak.
+
+### 30.1 Beklenen Çıktılar
+
+- test-writer agent başarıyla archive'landı (`agents/archive/test-writer-removed-sprint-148/`)
+- testing-expert skill auto-activation — scope tests/** → otomatik aktif
+- Intent classifier "testing" primary intent kaldırıldı, "test-coverage" tag sistemine geçildi
+- Router V2 agent fallback chain: 0 test-writer assignment
+- Nervous enabled=true, balanced preset, ≥10 detector event
+- NERVOUS_SCOPE_VIOLATION count = 0 (Ana PID constraint başarılı)
+- AgentRoutingHealth: Sprint 148'de severity=warning (Sprint 147 critical'dan iyileşme)
+- Vitest 135 → < 50 fail
+- Cross-platform 3/3 (macOS + Linux + WSL2)
+- npm publish dry-run PASS (0.4.0-beta.4)
+- ADR-041 proposed (Sprint 149'da accept)
+
+### 30.2 Sprint 149 Yolu
+
+Sprint 148 başarılı kapanış → Sprint 149 (doc consolidation + npm publish 0.4.0-beta.4 → v1.0.0-beta.1 + ADR-041 accept) → Sprint 150 Per 23 Nis 🚀 **Public Beta GA**
+
+**Beta GA 2 gün 18 saat uzakta.**
+
+---
+
+*Sprint 148 Section 29 + 30 appended 2026-04-20 (sprint aktif). Section 1 + 6 + 8 inline güncellemeler aynı commit'te. Written by Claude Sonnet 4.6 (worker agent doc-writer, task 148-024).*

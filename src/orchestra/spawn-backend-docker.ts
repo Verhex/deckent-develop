@@ -427,10 +427,38 @@ export class DockerSpawnBackend implements SpawnBackend {
         }, null, 2), 'utf-8');
       } catch (e) { debugLog('docker-backend:hb-update', e); }
 
-      // If no .result file and exit != 0, write timeout marker
+      // If no .result file and exit != 0, write fallback result + timeout marker.
+      // Sprint 148 root cause fix: SIGKILL (exit 137, OOM kill) bypasses all shell
+      // traps — the container's EXIT trap never runs. The host-side monitor must
+      // write the fallback .result so Brain's result-collector doesn't wait forever.
       const timeoutPath = join(tasksDir, `task-${taskId}.timeout`);
-      if (!existsSync(resultPath) && exitCode !== 0 && !existsSync(timeoutPath)) {
-        writeFileSync(timeoutPath, `container_exit_${exitCode}`, 'utf-8');
+      if (!existsSync(resultPath) && exitCode !== 0) {
+        // Host-side fallback result — ensures result-collector always finds a .result file
+        const hostFallbackResult = JSON.stringify({
+          taskId,
+          workerId: `docker-${taskId}`,
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          coverage: 0,
+          selfAssessment: 'NO_GO',
+          notes: `Worker exited (code=${exitCode}) without writing result. Host-side fallback.`,
+          exitCode,
+        });
+        try {
+          writeFileSync(resultPath, hostFallbackResult, 'utf-8');
+          // fsync from host side to ensure data hits disk
+          const fd = openSync(resultPath, 'r');
+          try { fsyncSync(fd); } finally { closeSync(fd); }
+          debugLog('docker-backend:host-fallback', `taskId=${taskId} exitCode=${exitCode} → wrote fallback .result`);
+        } catch (e) {
+          debugLog('docker-backend:host-fallback-error', `taskId=${taskId} ${e}`);
+        }
+        // Also write .timeout marker for backward compat
+        if (!existsSync(timeoutPath)) {
+          writeFileSync(timeoutPath, `container_exit_${exitCode}`, 'utf-8');
+        }
       }
 
       // Extract container logs BEFORE removal (docker logs requires container to exist)

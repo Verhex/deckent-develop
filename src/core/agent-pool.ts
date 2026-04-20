@@ -123,6 +123,7 @@ export class AgentPoolManager {
     // No per-entry existsSync — readJsonSafe returns null for missing or invalid files.
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
+      if (entry.name === 'archive') continue; // Skip archive directory
       const agentFile = path.join(dir, entry.name, AGENT_FILENAME);
       const raw = readJsonSafe<Record<string, unknown>>(agentFile);
       if (raw) {
@@ -185,6 +186,22 @@ export class AgentPoolManager {
    */
   listEnabled(): AgentDefinition[] {
     return this.listAgents().filter((a) => a.enabled);
+  }
+
+  /**
+   * Get the set of active (enabled) agent IDs from the persistent agent pool.
+   * Scans .deckent/agents/ directory, skipping 'archive' subdirectory.
+   * This is used by the routing fallback chain to verify agent availability.
+   */
+  getActiveAgentIds(): Set<string> {
+    const pool = this.loadAgents();
+    const ids = new Set<string>();
+    for (const [id, agent] of pool) {
+      if (agent.enabled && !id.startsWith('archive')) {
+        ids.add(id);
+      }
+    }
+    return ids;
   }
 
   // ─── Temp Agents ─────────────────────────────────────────────────────────────

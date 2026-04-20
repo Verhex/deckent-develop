@@ -460,6 +460,8 @@ export interface ResolvedConfig {
   sprint_checkpoint_interval?: number;
   /** Resolved timeout configuration (always populated from defaults + overrides) */
   timeout?: TimeoutConfig;
+  /** Nervous system configuration (passed through from DeckentConfig) */
+  nervous_system?: NervousSystemConfig;
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

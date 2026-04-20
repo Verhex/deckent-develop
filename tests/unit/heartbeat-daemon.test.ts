@@ -51,9 +51,9 @@ describe('heartbeat-daemon', () => {
   describe('runHeartbeat', () => {
     it('should parse and execute pending tasks from HEARTBEAT.md', () => {
       const heartbeatContent = `# Heartbeat Tasks
-- [ ] echo hello
-- [x] echo done
-- [ ] echo world
+- [ ] date
+- [x] node --version
+- [ ] uptime
 `;
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(heartbeatContent);
@@ -66,8 +66,8 @@ describe('heartbeat-daemon', () => {
       expect(result.passed).toBe(2);
       expect(result.failed).toBe(0);
       expect(result.details).toHaveLength(2);
-      expect(result.details[0]!.command).toBe('echo hello');
-      expect(result.details[1]!.command).toBe('echo world');
+      expect(result.details[0]!.command).toBe('date');
+      expect(result.details[1]!.command).toBe('uptime');
     });
 
     it('should handle failing commands and log failures', () => {

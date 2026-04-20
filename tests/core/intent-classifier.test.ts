@@ -44,7 +44,7 @@ describe('intent-classifier', () => {
       expect(dna.scope.testWriteRatio).toBe(0);
     });
 
-    it('classifies pure testing task correctly', () => {
+    it('classifies pure testing task — NOT testing primary (Sprint 148 reform), has test-coverage tag', () => {
       const dna = classifyIntent({
         title: 'Write unit tests for auth module',
         description: 'Add vitest coverage for login and JWT validation',
@@ -55,7 +55,9 @@ describe('intent-classifier', () => {
         },
       });
 
-      expect(dna.intent.primary).toBe('testing');
+      // Sprint 148: 'testing' removed from IntentType union
+      expect(dna.intent.primary).not.toBe('testing');
+      expect(dna.tags).toContain('test-coverage');
       expect(dna.scope.testWriteRatio).toBe(1);
     });
 
@@ -112,8 +114,8 @@ describe('intent-classifier', () => {
         },
       });
 
-      // Primary is implementation (more src/ writes)
-      expect(dna.intent.secondary).toContain('testing');
+      // Sprint 148: 'testing' removed from secondary intents — check tags instead
+      expect(dna.tags).toContain('test-coverage');
     });
   });
 
@@ -130,7 +132,7 @@ describe('intent-classifier', () => {
       expect(result.intent).toBe('implementation');
     });
 
-    it('returns testing for test-heavy writes', () => {
+    it('returns implementation for test-heavy writes (testing removed as primary intent)', () => {
       const result = detectPrimaryIntent(
         'write unit tests',
         {
@@ -139,7 +141,8 @@ describe('intent-classifier', () => {
           filesWrite: ['tests/core/foo.test.ts', 'tests/core/bar.test.ts'],
         },
       );
-      expect(result.intent).toBe('testing');
+      // Sprint 148: 'testing' removed from union — test tasks classify as implementation
+      expect(result.intent).not.toBe('testing');
     });
 
     it('returns unknown for empty input', () => {
@@ -297,21 +300,13 @@ describe('intent-classifier', () => {
   });
 
   describe('detectSecondaryIntents', () => {
-    it('detects testing as secondary when primary is implementation and test scope exists', () => {
+    it('does NOT add testing as secondary (Sprint 148: testing removed from intents)', () => {
       const secondary = detectSecondaryIntents(
         'implement feature with tests',
         { directories: ['src/', 'tests/'], filesRead: [], filesWrite: [] },
         'implementation',
       );
-      expect(secondary).toContain('testing');
-    });
-
-    it('does not include primary intent in secondary', () => {
-      const secondary = detectSecondaryIntents(
-        'write tests for coverage',
-        { directories: ['tests/'], filesRead: [], filesWrite: [] },
-        'testing',
-      );
+      // Sprint 148: testing removed from both primary and secondary intents
       expect(secondary).not.toContain('testing');
     });
 
@@ -324,9 +319,8 @@ describe('intent-classifier', () => {
       expect(secondary).toContain('security');
     });
 
-    it('does NOT add testing as secondary from keyword alone — no scope signal (B fix)', () => {
-      // DIRECTIVES description like "Test: 10+ tests" should not trigger secondary testing
-      // when there are no test files/dirs in scope
+    it('does NOT add testing as secondary from keyword alone (Sprint 148: testing fully removed)', () => {
+      // Sprint 148: testing removed from both primary and secondary intents entirely
       const secondary = detectSecondaryIntents(
         'implement new feature. test: 10+ tests required',
         { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts'] },
@@ -335,39 +329,13 @@ describe('intent-classifier', () => {
       expect(secondary).not.toContain('testing');
     });
 
-    it('adds testing as secondary when filesWrite contains test files (B fix)', () => {
+    it('does NOT add testing as secondary even with test files (Sprint 148: use tags instead)', () => {
       const secondary = detectSecondaryIntents(
         'implement new feature',
         { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts', 'tests/core/config.test.ts'] },
         'implementation',
       );
-      expect(secondary).toContain('testing');
-    });
-
-    it('adds testing as secondary based on significant testWriteRatio (B fix)', () => {
-      // Passed scopeAnalysis with testWriteRatio >= 0.2
-      const scopeAnalysis = {
-        writeRatio: { 'src/': 0.5, 'tests/': 0.5 },
-        primaryWriteTarget: 'src/',
-        testWriteRatio: 0.5,
-      };
-      const secondary = detectSecondaryIntents(
-        'implement feature',
-        { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/a.ts', 'tests/core/a.test.ts'] },
-        'implementation',
-        scopeAnalysis,
-      );
-      expect(secondary).toContain('testing');
-    });
-
-    it('does NOT add testing as secondary from keyword + no test scope for pure src tasks', () => {
-      // Sprint-068 bug: DIRECTIVES description mentions "test" → test-writer assigned
-      // This verifies the fix: tasks with ALL writes in src/ should not get testing secondary
-      const secondary = detectSecondaryIntents(
-        'implement sprint controller. add tests',  // "test" keyword present
-        { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/sprint-controller.ts'] },
-        'implementation',
-      );
+      // Sprint 148: testing no longer appears as secondary — use test-coverage tag
       expect(secondary).not.toContain('testing');
     });
   });

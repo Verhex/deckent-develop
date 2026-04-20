@@ -16,8 +16,10 @@ import { EventEmitter } from 'node:events';
 import { watch, type FSWatcher } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { ObserverEvent, ObserverEventSource } from '../core/nervous-types.js';
+import type { ObserverEvent, ObserverEventSource, DetectorContext, SprintStateSnapshot } from '../core/nervous-types.js';
 import { eventBus } from '../orchestra/event-bus.js';
+import { assertBrainScope } from './runtime-scope-check.js';
+import { DetectorRegistry, type DetectorConfig } from './detector-registry.js';
 
 // ─── Sprint Lifecycle Event Types ──────────────────────────────────
 
@@ -59,16 +61,36 @@ const FS_WATCH_TARGETS: readonly string[] = [
  *   // ... later
  *   observer.stop();
  */
+/** SprintState sağlayıcı callback tipi */
+export type SprintStateProvider = () => SprintStateSnapshot;
+
+/** Varsayılan idle sprint state snapshot */
+const IDLE_SPRINT_STATE: SprintStateSnapshot = {
+  sprintId: null,
+  currentPhase: 'IDLE',
+  activeWorkers: [],
+  openDebtCount: 0,
+  totalTasks: 0,
+  completedTasks: 0,
+};
+
 export class NervousObserver extends EventEmitter {
   private readonly fsWatchers: Map<string, FSWatcher> = new Map();
   private cronTimer: ReturnType<typeof setInterval> | null = null;
   private _isStarted = false;
+  private readonly detectorRegistry: DetectorRegistry | null;
 
   constructor(
     private readonly projectRoot: string,
     private readonly cronIntervalMs: number = 15_000,
+    detectorConfig?: DetectorConfig,
+    private readonly sprintStateProvider: SprintStateProvider = () => IDLE_SPRINT_STATE,
   ) {
     super();
+    assertBrainScope('NervousObserver');
+    this.detectorRegistry = detectorConfig !== undefined
+      ? new DetectorRegistry(detectorConfig)
+      : null;
   }
 
   /** Observer çalışıyor mu */
@@ -118,6 +140,34 @@ export class NervousObserver extends EventEmitter {
     this._isStarted = false;
   }
 
+  // ─── Observe + Detect Pipeline ────────────────────────────────
+
+  /**
+   * Bir ObserverEvent emit eder ve DetectorRegistry varsa runAll çalıştırır.
+   * Detector sonuçları 'detection' event'i olarak emit edilir.
+   */
+  private emitObserve(event: ObserverEvent): void {
+    this.emit('observe', event);
+
+    if (this.detectorRegistry === null) return;
+
+    const ctx: DetectorContext = {
+      event,
+      sprintState: this.sprintStateProvider(),
+      projectRoot: this.projectRoot,
+      now: new Date(),
+    };
+
+    // Async — hataları yut, observer loop'u bozmaz
+    this.detectorRegistry.runAll(ctx).then(results => {
+      for (const result of results) {
+        this.emit('detection', result, event);
+      }
+    }).catch(err => {
+      console.error('[NervousObserver] DetectorRegistry.runAll failed:', err);
+    });
+  }
+
   // ─── EventBus Integration ──────────────────────────────────────
 
   private subscribeEventBus(): void {
@@ -137,7 +187,7 @@ export class NervousObserver extends EventEmitter {
       : 'event-bus';
 
     const event = this.buildEvent(source, eventType, deckentEvent);
-    this.emit('observe', event);
+    this.emitObserve(event);
   };
 
   // ─── Filesystem Watchers ───────────────────────────────────────
@@ -152,7 +202,7 @@ export class NervousObserver extends EventEmitter {
             filename: filename ?? undefined,
             path: `${target}/${filename ?? ''}`,
           });
-          this.emit('observe', event);
+          this.emitObserve(event);
         });
         this.fsWatchers.set(target, watcher);
       } catch {
@@ -168,7 +218,7 @@ export class NervousObserver extends EventEmitter {
       const event = this.buildEvent('cron', 'TICK', {
         intervalMs: this.cronIntervalMs,
       });
-      this.emit('observe', event);
+      this.emitObserve(event);
     }, this.cronIntervalMs);
 
     // Timer should not keep process alive

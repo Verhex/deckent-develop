@@ -712,7 +712,7 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
 
     await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
-    expect(mockArchive).toHaveBeenCalledWith('/tmp/project', 'sprint-138');
+    expect(mockArchive).toHaveBeenCalledWith('/tmp/project', 'sprint-138', expect.anything());
   });
 
   it('archiveDirectives is called even when sprint has no tasks', async () => {

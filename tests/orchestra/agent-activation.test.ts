@@ -79,9 +79,9 @@ describe('Agent Activation', () => {
   // ─── A) systemPrompt in agent.json ─────────────────────────────────────
 
   describe('systemPrompt in agent.json', () => {
-    it('all 8 builtin agents have non-empty systemPrompt', () => {
+    it('all 7 builtin agents have non-empty systemPrompt', () => {
       const agentIds = [
-        'security-auditor', 'test-writer', 'doc-writer', 'bug-fixer',
+        'security-auditor', 'doc-writer', 'bug-fixer',
         'code-reviewer', 'refactorer', 'api-builder', 'performance-analyzer',
       ];
       const projectRoot = path.resolve(__dirname, '../..');
@@ -97,7 +97,7 @@ describe('Agent Activation', () => {
 
     it('systemPrompt passes AgentPoolManager validation', () => {
       const agentIds = [
-        'security-auditor', 'test-writer', 'doc-writer', 'bug-fixer',
+        'security-auditor', 'doc-writer', 'bug-fixer',
         'code-reviewer', 'refactorer', 'api-builder', 'performance-analyzer',
       ];
       const projectRoot = path.resolve(__dirname, '../..');

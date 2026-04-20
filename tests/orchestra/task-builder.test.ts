@@ -692,15 +692,14 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
     expect(prompt).not.toContain('=== Agent:');
   });
 
-  it('truncates agentPrompt to 2000 chars', () => {
+  it('includes full agentPrompt without truncation', () => {
     const longPrompt = 'X'.repeat(3000);
     const task = makeTask({ assignedAgent: 'test-agent' });
     const prompt = buildWorkerPrompt(task, longPrompt);
-    // The agentPrompt portion (between header line and "=== Task ===" line)
-    // should contain at most 2000 X's
+    // agentPrompt is included without truncation (Sprint 147+ behavior)
     const agentSection = prompt.split('=== Task ===')[0]!;
     const xCount = (agentSection.match(/X/g) || []).length;
-    expect(xCount).toBeLessThanOrEqual(2000);
+    expect(xCount).toBe(3000);
   });
 
   it('uses "generic" for assignedAgent when not set', () => {
