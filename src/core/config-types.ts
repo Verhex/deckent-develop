@@ -283,6 +283,103 @@ export interface DeckentConfig {
   // ─── Timeout ───────────────────────────────────────────────────────
   /** Unified timeout configuration for all backends */
   timeout?: Partial<TimeoutConfig>;
+
+  // ─── Nervous System ─────────────────────────────────────────────────
+  /** Proactive meta-orchestrator nervous system configuration (Sprint 147+) */
+  nervous_system?: NervousSystemConfig;
+}
+
+// ─── Nervous System Config Types ────────────────────────────────────
+
+/** Authority mode for Nervous System — controls how autonomously it acts */
+export type NervousAuthorityMode = 'strict' | 'balanced' | 'autopilot' | 'full-auto';
+
+/** Severity levels for Nervous System notifications */
+export type NervousSeverityMin = 'info' | 'warning' | 'critical' | 'emergency';
+
+/** Approval policy types */
+export type NervousApprovalPolicy = 'autonomous' | 'suggest-30m' | 'suggest-5m' | 'approve';
+
+/** Safety floor locked actions — never auto-executed */
+export type NervousSafetyFloorAction =
+  | 'KILL_LIVE_SPRINT'
+  | 'MANUAL_FILE_DELETE'
+  | 'COST_OVER_THRESHOLD'
+  | 'DESTRUCTIVE_GIT'
+  | 'ADR_DEPRECATE_ACCEPTED';
+
+/** Individual detector configuration */
+export interface NervousDetectorConfig {
+  /** Whether this detector is active */
+  enabled: boolean;
+  /** Stale worker threshold in ms (stale_worker only) */
+  threshold_ms?: number;
+  /** Debt trend rate threshold 0-1 (debt_trend only) */
+  threshold_rate?: number;
+  /** Agent routing anomaly threshold 0-1 (agent_routing only) */
+  anomaly_threshold?: number;
+  /** Auto-restore DIRECTIVES.md on corruption (directives_protection only) */
+  auto_restore?: boolean;
+  /** Reserved for future sprint (reserve detectors only) */
+  reserve_for?: string;
+}
+
+/** Full Nervous System configuration schema */
+export interface NervousSystemConfig {
+  /** Enable nervous system (default: false — Sprint 148 will set true) */
+  enabled: boolean;
+  /** Authority mode preset (default: 'balanced') */
+  mode: NervousAuthorityMode;
+  /** Per-action policy overrides — override preset for specific actions */
+  actionOverrides: Record<string, NervousApprovalPolicy>;
+  /** Safety floor configuration */
+  safety_floor: {
+    /** Actions that require explicit user approval even in full-auto mode */
+    locked_actions: NervousSafetyFloorAction[];
+    /** Cost threshold in USD — COST_OVER_THRESHOLD triggers above this */
+    cost_threshold_usd: number;
+    /** Whether safety floor can be bypassed (always false — code-locked) */
+    bypass_allowed: boolean;
+  };
+  /** Notification channel and throttle configuration */
+  notifications: {
+    /** Output channels */
+    channels: {
+      mcp: boolean;
+      cli: boolean;
+      file: boolean;
+      desktop: boolean;
+    };
+    /** Minimum ms between same-group notifications */
+    throttle_ms: number;
+    /** Window for grouping info notifications (ms) */
+    group_info_window_ms: number;
+    /** Minimum severity level to surface notifications */
+    severity_min: NervousSeverityMin;
+    /** Quiet hours — no non-critical notifications in this window */
+    quiet_hours: {
+      start: string;   // "HH:MM" format
+      end: string;     // "HH:MM" format
+      timezone: string;
+    };
+    /** Deduplicate notification across channels by ID */
+    cross_channel_dedup: boolean;
+  };
+  /** Per-detector configuration — 5 active + 5 reserved */
+  detectors: {
+    stale_worker: NervousDetectorConfig;
+    scope_collision: NervousDetectorConfig;
+    debt_trend: NervousDetectorConfig;
+    agent_routing: NervousDetectorConfig;
+    directives_protection: NervousDetectorConfig;
+    dead_event_stream: NervousDetectorConfig;
+    cost_threshold: NervousDetectorConfig;
+    prompt_quality: NervousDetectorConfig;
+    worker_output_variance: NervousDetectorConfig;
+    self_modifying_warner: NervousDetectorConfig;
+  };
+  /** Retention for history JSONL file in days */
+  history_retention_days: number;
 }
 
 export interface ResolvedConfig {

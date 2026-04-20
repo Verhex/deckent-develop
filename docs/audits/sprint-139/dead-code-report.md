@@ -42,7 +42,7 @@ These modules are deprecated but preserved by ADR decisions.
 ### src/orchestra/decision-engine.ts
 - **Lines:** 170
 - **Reason:** V1 DecisionOrchestrator — deprecated by ADR-028, kept as reference
-- **Imported by:** src/orchestra/decision-steps/scope-step.ts, src/orchestra/decision-steps/agent-step.ts, src/orchestra/decision-replay.ts
+- **Imported by:** src/orchestra/decision-steps/scope-step.ts, src/orchestra/decision-steps/agent-step.ts, src/orchestra/decision-replay.ts, src/nervous/decision-engine.ts
 - **Action:** Keep — requires ADR amendment to remove
 
 ### src/orchestra/decision-replay.ts
@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **584** potentially unused exports across src/.
+Found **579** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |

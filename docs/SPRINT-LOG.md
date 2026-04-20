@@ -3838,3 +3838,46 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 146-017: ANA-PLAN-TR + MASTER-BLUEPRINT + BETA-TRACKER Sprint 146 Append (DONE)
 
 ---
+## Sprint 147 — sprint-147
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-20
+**Duration:** 2974s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 23 |
+| Completed | 23 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2973941ms |
+
+### Tasks
+
+- 147-001: Nervous Types Genişletme — Runtime Types (DONE)
+- 147-002: Action Registry — 30 Eylem + Risk Matrix (DONE)
+- 147-003: Authority Matrix — 4 Preset + Safety Floor + Override (DONE)
+- 147-004: Observer — Event Bus + Filesystem Watcher + Cron (DONE)
+- 147-005: Decision Engine — Detector → Policy → Decision (DONE)
+- 147-006: Proposer — Notification Builder + Throttle + Grouping (DONE)
+- 147-007: Executor — 3 Mod Handler (Autonomous / Suggest / Approve) (DONE)
+- 147-008: History — JSONL Append + Undo + Retention (DONE)
+- 147-009: StaleWorkerDetector (DONE)
+- 147-010: ScopeCollisionMonitor (DONE)
+- 147-011: DebtTrendAnalyzer (DONE)
+- 147-012: AgentRoutingHealth — `string;` Corruption + %40 Anomaly (DONE)
+- 147-013: DirectivesMidSprintProtection (DONE)
+- 147-014: CLI Dashboard — `deckent nervous` (DONE)
+- 147-015: CLI Config — `deckent config nervous` TUI (DONE)
+- 147-016: MCP Tools — 5 Nervous System Tools (DONE)
+- 147-017: Config Schema Extension — nervous_system (DONE)
+- 147-018: Dispatcher — Context Detection + 3 Adapter Routing (DONE)
+- 147-019: Integration Tests — 40+ Tests Suite (DONE)
+- 147-020: E2E — Canlı Sprint Simulation (DONE)
+- 147-021: Sprint Controller Hook — Lifecycle Event Emit (DONE)
+- 147-022: ADR-040 Accept — Nervous System Architecture (DONE)
+
+---

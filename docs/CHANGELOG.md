@@ -6,6 +6,24 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [0.4.0-beta.1-sprint147] - 2026-04-20
+
+### Added
+
+- Nervous Types Genişletme — Runtime Types
+- Action Registry — 30 Eylem + Risk Matrix
+- Authority Matrix — 4 Preset + Safety Floor + Override
+- Observer — Event Bus + Filesystem Watcher + Cron
+- Decision Engine — Detector → Policy → Decision
+- Proposer — Notification Builder + Throttle + Grouping
+- Executor — 3 Mod Handler (Autonomous / Suggest / Approve)
+- History — JSONL Append + Undo + Retention
+- StaleWorkerDetector
+- ScopeCollisionMonitor
+
+
+_Tasks: 23 total, 23 done, 0 tech debt, 0 no-go_
+
 ## [0.4.0-beta.1-sprint146] - 2026-04-20
 
 ### Added

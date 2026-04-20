@@ -78,6 +78,9 @@ import type { SprintStateSnapshot } from './sprint-pid-manager.js';
 // ─── Sprint Checkpoint (phase-transition auto-checkpoint) ────────
 import { writePhaseCheckpoint } from './sprint-checkpoint.js';
 
+// ─── Event Bus (nervous system lifecycle hooks) ─────────────────
+import { eventBus } from './event-bus.js';
+
 // ─── Panic Guard ─────────────────────────────────────────────────
 import { PanicGuard } from '../core/panic-guard.js';
 
@@ -145,6 +148,32 @@ export type { FinalizeSprintOptions, SelfAuditResult } from './sprint-finalizer.
 
 // --- parallel-pipeline.ts ---
 export { DependencyCycleError } from './parallel-pipeline.js';
+
+// ═══ Sprint Lifecycle Event Helpers (Nervous System hooks) ════════
+
+/**
+ * Emit a sprint lifecycle event via the EventBus.
+ * Always fires regardless of nervous system config — subscribers are optional.
+ * NervousObserver listens for these as 'sprint-lifecycle' source events.
+ */
+function emitSprintEvent(
+  type: string,
+  payload: Record<string, unknown>,
+): void {
+  try {
+    eventBus.emit('deckent-event', {
+      type,
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    // Never let event emission break sprint flow
+  }
+}
+
+function emitPhaseChange(oldPhase: string, newPhase: string, sprintId: string): void {
+  emitSprintEvent('SPRINT_PHASE_CHANGE', { oldPhase, newPhase, sprintId });
+}
 
 // ═══ RunSprintOptions ═════════════════════════════════════════════
 
@@ -340,6 +369,10 @@ export async function runSprint(
   // Phase-transition checkpoint: PLAN complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:plan', e); }
 
+  // Nervous System: PLAN→SPAWN + SPRINT_STARTED
+  emitPhaseChange(SprintPhase.PLAN, SprintPhase.SPAWN, sprint.id);
+  emitSprintEvent('SPRINT_STARTED', { sprintId: sprint.id, taskCount: sprint.tasks.length });
+
   // Phase 2: SPAWN
   const { taskQueue, scanInterval: initialScanInterval } = await runSpawnPhase(
     projectRoot, sprint, config, opts, spawnBackend,
@@ -348,6 +381,9 @@ export async function runSprint(
 
   // Phase-transition checkpoint: SPAWN complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:spawn', e); }
+
+  // Nervous System: SPAWN→EXECUTE
+  emitPhaseChange(SprintPhase.SPAWN, SprintPhase.EXECUTE, sprint.id);
 
   // Phase 3: EXECUTE
   let results: TaskResult[] = [];
@@ -460,6 +496,9 @@ export async function runSprint(
   // Phase-transition checkpoint: EXECUTE complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:execute', e); }
 
+  // Nervous System: EXECUTE→EVALUATE
+  emitPhaseChange(SprintPhase.EXECUTE, SprintPhase.EVALUATE, sprint.id);
+
   // Phase 4: EVALUATE
   const evaluations = new Map<string, TaskEvaluation>();
   await runEvaluatePhase(projectRoot, sprint, results, evaluations, config.coverage_threshold);
@@ -513,21 +552,37 @@ export async function runSprint(
   // Phase-transition checkpoint: EVALUATE complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:evaluate', e); }
 
+  // Nervous System: EVALUATE→FIX
+  emitPhaseChange(SprintPhase.EVALUATE, SprintPhase.FIX, sprint.id);
+
   // Phase 5: FIX
   await runFixPhase(projectRoot, sprint, evaluations, results, config, opts, routingVersionForFix, spawnBackend);
 
   // Phase-transition checkpoint: FIX complete
   try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:fix', e); }
 
+  // Nervous System: FIX→RETRO
+  emitPhaseChange(SprintPhase.FIX, SprintPhase.RETRO, sprint.id);
+
   // Phase 6+7: RETRO + DECAY
   await runRetroPhase(projectRoot, sprint, evaluations, results, config, opts?.testMode);
+
+  // Nervous System: RETRO complete + RETRO→CLEANUP
+  emitSprintEvent('SPRINT_RETRO_COMPLETE', { sprintId: sprint.id });
+  emitPhaseChange(SprintPhase.RETRO, SprintPhase.DECAY, sprint.id);
 
   // Phase 8: CLEANUP
   scanInterval = runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
 
+  // Nervous System: CLEANUP→COMPLETE
+  emitPhaseChange(SprintPhase.DECAY, SprintPhase.COMPLETE, sprint.id);
+
   sprint.status = SprintStatus.COMPLETE;
   sprint.phase = SprintPhase.COMPLETE;
   sprint.completedAt = now();
+
+  // Nervous System: SPRINT_COMPLETED
+  emitSprintEvent('SPRINT_COMPLETED', { sprintId: sprint.id });
 
   releaseSprintLock(projectRoot);
   clearActiveSprint();

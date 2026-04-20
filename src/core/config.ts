@@ -391,6 +391,35 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Nervous System validation ─────────────────────────────────────
+  if (config.nervous_system !== undefined) {
+    const ns = config.nervous_system;
+    const validNsModes = ['strict', 'balanced', 'autopilot', 'full-auto'] as const;
+    if (!(validNsModes as readonly string[]).includes(ns.mode)) {
+      errors.push(`Invalid value '${ns.mode}' for field 'nervous_system.mode'. Valid: ${validNsModes.join(', ')}`);
+    }
+    if (ns.notifications?.throttle_ms !== undefined && ns.notifications.throttle_ms < 0) {
+      errors.push('nervous_system.notifications.throttle_ms must be >= 0');
+    }
+    if (ns.detectors !== undefined) {
+      const sw = ns.detectors.stale_worker;
+      if (sw?.threshold_ms !== undefined && sw.threshold_ms < 0) {
+        errors.push('nervous_system.detectors.stale_worker.threshold_ms must be >= 0');
+      }
+      const dt = ns.detectors.debt_trend;
+      if (dt?.threshold_rate !== undefined && (dt.threshold_rate < 0 || dt.threshold_rate > 1)) {
+        errors.push('nervous_system.detectors.debt_trend.threshold_rate must be between 0 and 1');
+      }
+      const ar = ns.detectors.agent_routing;
+      if (ar?.anomaly_threshold !== undefined && (ar.anomaly_threshold < 0 || ar.anomaly_threshold > 1)) {
+        errors.push('nervous_system.detectors.agent_routing.anomaly_threshold must be between 0 and 1');
+      }
+    }
+    if (ns.history_retention_days !== undefined && ns.history_retention_days < 1) {
+      errors.push('nervous_system.history_retention_days must be >= 1');
+    }
+  }
+
   // ─── Routing Engine validation ──────────────────────────────────────
   if (config.routing_engine !== undefined) {
     const validRoutingEngines = ['v1', 'v2'] as const;
@@ -532,6 +561,44 @@ export function createDefaultConfig(): DeckentConfig {
     sprint_checkpoint_interval: 5,
     // Timeout
     timeout: structuredClone(DEFAULT_TIMEOUT_CONFIG),
+    // Nervous System (disabled by default — Sprint 148 will activate)
+    nervous_system: {
+      enabled: false,
+      mode: 'balanced',
+      actionOverrides: {},
+      safety_floor: {
+        locked_actions: [
+          'KILL_LIVE_SPRINT',
+          'MANUAL_FILE_DELETE',
+          'COST_OVER_THRESHOLD',
+          'DESTRUCTIVE_GIT',
+          'ADR_DEPRECATE_ACCEPTED',
+        ],
+        cost_threshold_usd: 110,
+        bypass_allowed: false,
+      },
+      notifications: {
+        channels: { mcp: true, cli: true, file: true, desktop: false },
+        throttle_ms: 300000,
+        group_info_window_ms: 600000,
+        severity_min: 'info',
+        quiet_hours: { start: '22:00', end: '08:00', timezone: 'TRT' },
+        cross_channel_dedup: true,
+      },
+      detectors: {
+        stale_worker: { enabled: true, threshold_ms: 180000 },
+        scope_collision: { enabled: true },
+        debt_trend: { enabled: true, threshold_rate: 0.15 },
+        agent_routing: { enabled: true, anomaly_threshold: 0.40 },
+        directives_protection: { enabled: true, auto_restore: true },
+        dead_event_stream: { enabled: false, reserve_for: 'sprint-148' },
+        cost_threshold: { enabled: false, reserve_for: 'sprint-148' },
+        prompt_quality: { enabled: false, reserve_for: 'sprint-148' },
+        worker_output_variance: { enabled: false, reserve_for: 'sprint-148' },
+        self_modifying_warner: { enabled: false, reserve_for: 'sprint-148' },
+      },
+      history_retention_days: 30,
+    },
   };
 }
 

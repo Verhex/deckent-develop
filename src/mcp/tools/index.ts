@@ -22,6 +22,7 @@ import { registerDocsTool } from './docs.js';
 import { registerExplainTool } from './explain.js';
 import { registerMemoryQueryTool } from './memory-query.js';
 import { registerWatch } from './watch.js';
+import { registerNervousTools } from './nervous.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -47,4 +48,5 @@ export function registerTools(server: McpServer): void {
   registerExplainTool(server);
   registerMemoryQueryTool(server);
   registerWatch(server);
+  registerNervousTools(server);
 }

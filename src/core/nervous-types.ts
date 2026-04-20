@@ -189,3 +189,143 @@ export interface DetectorResult {
   /** Detector'a özgü ham veri */
   readonly metadata?: Record<string, unknown>;
 }
+
+// ─── Observer Event ──────────────────────────────────────────────────────────
+
+/**
+ * Observer Layer event source tipi.
+ * Her kaynak farklı frekans ve tetikleyiciye sahiptir.
+ */
+export type ObserverEventSource = 'event-bus' | 'filesystem' | 'cron' | 'sprint-lifecycle';
+
+/**
+ * Observer Layer'ın algıladığı her olay.
+ * Detector'lara iletilmek üzere NervousObserver tarafından üretilir.
+ */
+export interface ObserverEvent {
+  /** UUID v4 — event dedup ve tracing için */
+  readonly id: string;
+  /** Bu event'in kaynağı */
+  readonly source: ObserverEventSource;
+  /** Event tipi — e.g. "WORKER_HEARTBEAT", "FILE_WRITE", "SPRINT_PHASE_CHANGE" */
+  readonly type: string;
+  /** ISO 8601 UTC timestamp */
+  readonly timestamp: string;
+  /** Event payload — kaynak tipine göre değişir */
+  readonly payload: Record<string, unknown>;
+  /** Sprint context varsa */
+  readonly sprintId?: string;
+  /** Task context varsa */
+  readonly taskId?: string;
+}
+
+// ─── Sprint State Snapshot ───────────────────────────────────────────────────
+
+/**
+ * Detector'a aktarılan anlık sprint durumu.
+ * Detector'lar bu snapshot üzerinden karar verir.
+ */
+export interface SprintStateSnapshot {
+  /** Aktif sprint ID (null = idle) */
+  readonly sprintId: string | null;
+  /** Mevcut sprint fazı */
+  readonly currentPhase: 'IDLE' | 'PLAN' | 'SPAWN' | 'EXECUTE' | 'EVALUATE' | 'FIX' | 'RETRO' | 'DECAY' | 'CLEANUP';
+  /** Aktif worker listesi — heartbeat bilgisi ile */
+  readonly activeWorkers: ReadonlyArray<{ id: string; taskId: string; lastHeartbeat: string }>;
+  /** Açık teknik borç sayısı */
+  readonly openDebtCount: number;
+  /** Sprint'teki toplam task sayısı */
+  readonly totalTasks: number;
+  /** Tamamlanan task sayısı */
+  readonly completedTasks: number;
+}
+
+// ─── Detector Context ────────────────────────────────────────────────────────
+
+/**
+ * Detector.detect() fonksiyonuna aktarılan tam bağlam.
+ * Observer event + sprint state + zaman bilgisi içerir.
+ */
+export interface DetectorContext {
+  /** Tetikleyen observer event */
+  readonly event: ObserverEvent;
+  /** Anlık sprint durumu */
+  readonly sprintState: SprintStateSnapshot;
+  /** Proje kök dizini */
+  readonly projectRoot: string;
+  /** Test edilebilirlik için enjekte edilebilir zaman */
+  readonly now: Date;
+}
+
+// ─── Action Definition ───────────────────────────────────────────────────────
+
+/**
+ * Nervous System'in yürütebileceği bir eylem tanımı.
+ * ActionRegistry'de 30 eylem bu interface ile tanımlıdır.
+ */
+export interface ActionDefinition {
+  /** Eylem tanımlayıcısı — e.g. "ORPHAN_TASK_ARCHIVE" */
+  readonly id: string;
+  /** İnsan-okunabilir görünen ad */
+  readonly displayName: string;
+  /** Kısa açıklama */
+  readonly description: string;
+  /** Risk kategorisi */
+  readonly category: 'low-risk' | 'medium-risk' | 'high-risk' | 'safety-floor';
+  /** Varsayılan risk seviyesi */
+  readonly defaultRisk: RiskLevel;
+  /** Safety floor kontrolü — boş değilse approve zorunlu */
+  readonly requiredSafetyFloor: ReadonlyArray<SafetyFloorAction>;
+  /** Undo desteği var mı */
+  readonly reversible: boolean;
+}
+
+// ─── Execution Record ────────────────────────────────────────────────────────
+
+/**
+ * Bir eylemin yürütülme kaydı.
+ * NervousHistory JSONL dosyasına append edilir.
+ */
+export interface ExecutionRecord {
+  /** UUID — kayıt tanımlayıcısı */
+  readonly id: string;
+  /** İlgili notification ID */
+  readonly notificationId: string;
+  /** Yürütülen eylem ID */
+  readonly actionId: string;
+  /** Karar sonucu */
+  readonly decision: 'accepted' | 'rejected' | 'timeout-auto-applied' | 'autonomous';
+  /** Kararı veren */
+  readonly decidedBy: 'user' | 'system' | 'timeout';
+  /** ISO 8601 UTC — yürütülme zamanı */
+  readonly executedAt: string;
+  /** Yürütme sonucu */
+  readonly outcome: 'success' | 'failure' | 'pending';
+  /** Hata mesajı (outcome='failure' ise) */
+  readonly error?: string;
+  /** Yürütme süresi (ms) */
+  readonly durationMs?: number;
+  /** Geri alınabilir mi */
+  readonly reversible: boolean;
+  /** Eylem payload'u */
+  readonly payload: Record<string, unknown>;
+}
+
+// ─── Decision Output ─────────────────────────────────────────────────────────
+
+/**
+ * Decision Engine'in bir detector sonucu için ürettiği karar çıktısı.
+ * Her suggested action için bir DecisionOutput üretilir.
+ */
+export interface DecisionOutput {
+  /** Eylem tanımı */
+  readonly action: ActionDefinition;
+  /** Çözümlenmiş onay politikası (authority matrix + override + safety floor) */
+  readonly policy: ApprovalPolicy;
+  /** Eylemin risk seviyesi */
+  readonly risk: RiskLevel;
+  /** Safety floor kapsamında mı */
+  readonly isSafetyFloor: boolean;
+  /** İnsan-okunabilir karar gerekçesi (transparency) */
+  readonly reason: string;
+}
