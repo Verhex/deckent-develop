@@ -9,11 +9,15 @@
 // Cross-channel dedup: same notification ID dispatched only once
 // MCP failure → CLI fallback
 
-import type { NervousNotification, NervousSystemConfig } from '../core/nervous-types.js';
+import type { NervousNotification, NervousSystemConfig, Severity } from '../core/nervous-types.js';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { assertBrainScope } from './runtime-scope-check.js';
+
+// ─── Notify Bridge (DECKENT→USER:NOTIFY — Hot Fix H6) ───────────
+import { notify } from '../core/notify.js';
+import type { NotificationEventName } from '../core/notification-dispatcher.js';
 
 // ─── Channel Type ───────────────────────────────────────────────────────────
 
@@ -107,6 +111,11 @@ export class NervousDispatcher {
       return { channels: [], success: true };
     }
     this.emittedIds.add(notification.id);
+
+    // ─── DECKENT→USER:NOTIFY BRIDGE (Hot Fix H6) ──────────────────
+    // Parallel fire to the global NotifyDispatcher (CLI parent-TTY + MCP + file).
+    // Fail-safe: bridge errors never block nervous dispatch.
+    bridgeToUserNotify(notification);
 
     const channels = this.selectChannels(notification);
     const deliveredChannels: Channel[] = [];
@@ -288,4 +297,48 @@ function extractChannelConfig(config: NervousSystemConfig): ChannelConfig {
 
   // Default: all channels enabled
   return { mcp: true, cli: true, file: true, desktop: false };
+}
+
+// ═══ DECKENT→USER:NOTIFY Bridge (Hot Fix H6) ═════════════════════════════════
+// Maps NervousNotification → standard NotificationEventName and fires the global
+// NotifyDispatcher. Runs in parallel with nervous channel dispatch (non-blocking).
+// Fail-safe: never throws.
+
+/**
+ * Map nervous severity → NotificationEventName.
+ * critical/emergency + actionable → human-checkpoint-required (critical priority, immediate)
+ * warning → task-no-go (warning priority)
+ * info → task-done (info priority, throttled)
+ *
+ * Note: the event name choice drives priority in the global dispatcher.
+ */
+function mapSeverityToEventName(
+  severity: Severity,
+  hasActions: boolean,
+): NotificationEventName {
+  if (severity === 'critical' || severity === 'emergency') {
+    return hasActions ? 'human-checkpoint-required' : 'task-no-go';
+  }
+  if (severity === 'warning') return 'task-no-go';
+  return 'task-done';
+}
+
+/**
+ * Bridge a NervousNotification to the DECKENT→USER:NOTIFY pipeline.
+ * Fire-and-forget, fail-safe. Errors are swallowed.
+ */
+function bridgeToUserNotify(notification: NervousNotification): void {
+  try {
+    const hasActions = notification.actions.length > 0;
+    const eventName = mapSeverityToEventName(notification.severity, hasActions);
+    void notify(
+      eventName,
+      notification.sprintId ?? 'unknown',
+      `[Nervous] ${notification.title}`,
+      notification.message,
+      notification.detectorId,
+    ).catch(() => { /* Fail-safe */ });
+  } catch {
+    // Fail-safe: never let bridge errors propagate
+  }
 }

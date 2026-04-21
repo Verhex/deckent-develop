@@ -35,11 +35,15 @@ import { readJsonSafe, parseDebtTable, debugLog } from '../core/utils.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import type { SpawnBackend } from './spawn-backend.js';
 
+// ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ──────────────────
+import { notify } from '../core/notify.js';
+
 // ─── Rollback ─────────────────────────────────────────────────────
 import type { SafetyPoint } from './rollback.js';
 import {
   createSafetyPoint, rollback, getRollbackPolicy,
   recordRollbackInDebt, saveSafetyPoint, deleteSafetyPoint,
+  isGitRepo, cleanOrphanSafetyPoint,
 } from './rollback.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
@@ -207,10 +211,29 @@ export async function runPlanPhase(
     // Create git safety point after planning but before workers spawn
     let safetyPoint: SafetyPoint | null = null;
     if (rollbackEnabled) {
+      // Pre-check: clean up orphan safety points from previous sprints
       try {
-        safetyPoint = createSafetyPoint(projectRoot, sprint.id);
-        saveSafetyPoint(projectRoot, safetyPoint);
-      } catch (e) { debugLog('runPlanPhase:createSafetyPoint', e); }
+        cleanOrphanSafetyPoint(projectRoot, sprint.id);
+      } catch (e) { debugLog('runPlanPhase:cleanOrphanSafetyPoint', e); }
+
+      // Pre-check: verify git repo exists
+      if (!isGitRepo(projectRoot)) {
+        const msg = 'Rollback disabled: not a git repository. Run `git init` or set rollback_policy to "never".';
+        debugLog('runPlanPhase:noGitRepo', msg);
+        // Visible warning — do not silently disable
+        console.warn(`[rollback] ${msg}`);
+      } else {
+        try {
+          safetyPoint = createSafetyPoint(projectRoot, sprint.id);
+          saveSafetyPoint(projectRoot, safetyPoint);
+        } catch (e) {
+          // Stash pop failure (DECKENT_E057) is critical — propagate to abort sprint
+          if (e instanceof Error && e.message.includes('Stash pop failed')) {
+            throw e;
+          }
+          debugLog('runPlanPhase:createSafetyPoint', e);
+        }
+      }
     }
 
     return { sprint, safetyPoint };
@@ -348,6 +371,26 @@ export async function runEvaluatePhase(
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
+
+        // DECKENT→USER:NOTIFY (Hot Fix H6) — task-done / task-no-go, fail-safe
+        try {
+          if (evaluation === TaskEvaluation.DONE) {
+            void notify(
+              'task-done',
+              sprint.id,
+              `Task ${task.id} tamamlandı`,
+              (result.notes ?? '').slice(0, 100) || `${task.title ?? task.id} DONE`,
+            );
+          } else if (evaluation === TaskEvaluation.NO_GO) {
+            void notify(
+              'task-no-go',
+              sprint.id,
+              `Task ${task.id} başarısız`,
+              (result.notes ?? '').slice(0, 100) || `${task.title ?? task.id} NO_GO`,
+            );
+          }
+        } catch (e) { debugLog('runEvaluatePhase:notify', e); }
+
         // Run afterTask hooks (non-fatal)
         try {
           await runHooks('afterTask', {
@@ -378,6 +421,15 @@ export async function runEvaluatePhase(
         debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing)`);
         handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
         evaluations.set(task.id, TaskEvaluation.NO_GO);
+        // DECKENT→USER:NOTIFY (Hot Fix H6) — timeout/missing NO_GO
+        try {
+          void notify(
+            'task-no-go',
+            sprint.id,
+            `Task ${task.id} başarısız (timeout)`,
+            'Worker sonucu üretmedi (timeout/missing)',
+          );
+        } catch (e) { debugLog('runEvaluatePhase:notify:timeout', e); }
         // Run afterTask hooks for timeout tasks too (non-fatal)
         try {
           await runHooks('afterTask', {

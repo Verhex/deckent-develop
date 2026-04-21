@@ -81,11 +81,14 @@ import { writePhaseCheckpoint } from './sprint-checkpoint.js';
 // ─── Event Bus (nervous system lifecycle hooks) ─────────────────
 import { eventBus } from './event-bus.js';
 
+// ─── Notify (DECKENT→USER:NOTIFY wire — Hot Fix H6) ─────────────
+import { notify } from '../core/notify.js';
+
 // ─── Panic Guard ─────────────────────────────────────────────────
 import { PanicGuard } from '../core/panic-guard.js';
 
 // ─── Observability ──────────────────────────────────────────────
-import { metric, trace, structuredLog, initObservability } from '../core/observability.js';
+import { metric, trace, structuredLog, initObservability, setObservabilitySprintId } from '../core/observability.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import { loadPluginHooks } from '../core/plugin-hooks.js';
@@ -107,6 +110,10 @@ import { getChannelRegistry } from './ipc-registry.js';
 import {
   routeSprintTasks as routeSprintTasksImpl,
 } from './sprint-spawner.js';
+
+// ─── Task Mode Runner ─────────────────────────────────────────────
+export { runTaskMode } from './task-mode-runner.js';
+export type { TaskModeContext, TaskModeResult } from './task-mode-runner.js';
 
 // ═══ Re-exports — backward compatibility ══════════════════════════
 // All symbols previously exported from this file are re-exported
@@ -259,6 +266,15 @@ export async function runSprint(
   config: ResolvedConfig,
   opts?: RunSprintOptions,
 ): Promise<Sprint> {
+  // Mode guard: task mode cannot use sprint lifecycle
+  if (config.deckent_style === 'task') {
+    throw new BrainError(
+      'Sprint mode required for runSprint. Use runTaskMode for task style. ' +
+      'Set deckent_style=sprint or run `deckent mode sprint`.',
+      SprintPhase.PLAN,
+    );
+  }
+
   const routingVersionForFix = config.routing_engine ?? 'v1';
 
   const spawnBackend: SpawnBackend | undefined = opts?.spawnBackend
@@ -295,6 +311,9 @@ export async function runSprint(
   const { sprint, safetyPoint } = await runPlanPhase(
     projectRoot, config, opts, activeProvider, rollbackEnabled,
   );
+
+  // Set sprint ID for observability tagging (sprintId available after plan phase)
+  setObservabilitySprintId(sprint.id, { perSprintFile: true });
 
   // Human Checkpoint: PLAN
   if (config.human_checkpoints?.includes('plan')) {
@@ -372,6 +391,16 @@ export async function runSprint(
   // Nervous System: PLAN→SPAWN + SPRINT_STARTED
   emitPhaseChange(SprintPhase.PLAN, SprintPhase.SPAWN, sprint.id);
   emitSprintEvent('SPRINT_STARTED', { sprintId: sprint.id, taskCount: sprint.tasks.length });
+
+  // DECKENT→USER:NOTIFY (Hot Fix H6) — fire-and-forget, fail-safe
+  try {
+    void notify(
+      'sprint-started',
+      sprint.id,
+      `Sprint ${sprint.id} başladı`,
+      `${sprint.tasks.length} task planlandı`,
+    );
+  } catch (e) { debugLog('runSprint:notify:sprint-started', e); }
 
   // Phase 2: SPAWN
   const { taskQueue, scanInterval: initialScanInterval } = await runSpawnPhase(

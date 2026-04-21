@@ -2,10 +2,15 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { DECKENT_VERSION } from '../core/constants.js';
+import { join } from 'node:path';
+import { DECKENT_VERSION, DECKENT_DIR } from '../core/constants.js';
 import { registerTools } from './tools/index.js';
 import { registerResources } from './resources/index.js';
 import { McpNotificationAdapter } from '../core/notify-adapters/mcp-adapter.js';
+import { CliNotificationAdapter } from '../core/notify-adapters/cli-adapter.js';
+import { FileNotificationAdapter } from '../core/notify-adapters/file-adapter.js';
+import { NotifyDispatcher } from '../core/notification-dispatcher.js';
+import { setGlobalNotifyDispatcher } from '../core/notify-registry.js';
 
 export const DECKENT_MCP_INSTRUCTIONS = `
 Deckent is an AI agent orchestration CLI that runs multi-agent sprints inside your project.
@@ -87,6 +92,39 @@ Config issue → deckent_config read → deckent_config set key value
 /** MCP notification adapter — bound to the server after creation. */
 export let mcpNotifyAdapter: McpNotificationAdapter | null = null;
 
+/**
+ * Initialize the global NotifyDispatcher with CLI + MCP + file adapters.
+ * Fire-and-forget at MCP startup so lifecycle hooks (sprint-controller,
+ * sprint-finalizer, result-evaluator) can emit DECKENT→USER:NOTIFY.
+ *
+ * Sets DECKENT_PARENT_PID env for CliNotificationAdapter parent-TTY detection.
+ */
+export function initializeNotifyDispatcher(
+  server: McpServer,
+  projectRoot: string,
+): NotifyDispatcher {
+  // Set parent PID env for CLI adapter (Claude Code terminal's stdout fd on Linux)
+  if (!process.env['DECKENT_PARENT_PID']) {
+    process.env['DECKENT_PARENT_PID'] = String(process.ppid);
+  }
+
+  const dispatcher = new NotifyDispatcher(1000); // 1s throttle (non-critical)
+
+  // CLI parent-TTY adapter
+  dispatcher.addAdapter(new CliNotificationAdapter());
+
+  // MCP notifications/message adapter (reuses the singleton bound below)
+  const mcpAdapter = mcpNotifyAdapter ?? new McpNotificationAdapter(server);
+  dispatcher.addAdapter(mcpAdapter);
+
+  // File JSONL adapter (audit trail at .deckent/notify-log.jsonl)
+  const notifyLogPath = join(projectRoot, DECKENT_DIR, 'notify-log.jsonl');
+  dispatcher.addAdapter(new FileNotificationAdapter(notifyLogPath));
+
+  setGlobalNotifyDispatcher(dispatcher);
+  return dispatcher;
+}
+
 export function createServer(): McpServer {
   const server = new McpServer(
     { name: 'deckent', version: DECKENT_VERSION },
@@ -98,6 +136,15 @@ export function createServer(): McpServer {
 
   // Bind MCP notification adapter to this server instance
   mcpNotifyAdapter = new McpNotificationAdapter(server);
+
+  // Initialize global dispatcher (CLI + MCP + file) for lifecycle notifications
+  try {
+    initializeNotifyDispatcher(server, process.cwd());
+  } catch (err) {
+    process.stderr.write(
+      `deckent-mcp: notify dispatcher init failed: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
 
   return server;
 }

@@ -31,6 +31,9 @@ import {
 // ─── Core — utils ─────────────────────────────────────────────────
 import { readJsonSafe, debugLog } from '../core/utils.js';
 
+// ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ────────────────────
+import { notify } from '../core/notify.js';
+
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import {
   now, isStaleTaskFile,
@@ -320,6 +323,16 @@ export async function waitForHumanApproval(
 
   await writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
   debugLog('waitForHumanApproval', `Checkpoint written: ${checkpointPath} — waiting for approval`);
+
+  // DECKENT→USER:NOTIFY (Hot Fix H6) — human-checkpoint-required (critical, immediate)
+  try {
+    void notify(
+      'human-checkpoint-required',
+      sprintId,
+      `Onay bekleniyor: ${phase}`,
+      summary,
+    );
+  } catch (e) { debugLog('waitForHumanApproval:notify', e); }
 
   // Poll every 5 seconds until approved or rejected
   while (true) {
