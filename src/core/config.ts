@@ -1,5 +1,5 @@
 import { writeFile, mkdir } from 'node:fs/promises';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync, renameSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import {
   PROJECT_CONFIG_PATH,
@@ -10,7 +10,7 @@ import {
   SUPPORTED_LANGUAGES,
 } from './constants.js';
 import { readJsonSafeAsync } from './utils.js';
-import { needsMigration, migrateConfig } from './config-migration.js';
+import { needsMigration, migrateConfig, removeDuplicateKeys } from './config-migration.js';
 import type {
   AutoDocsConfig,
   DeckentConfig,
@@ -25,6 +25,7 @@ import type { ProviderName } from './types.js';
 import { MODE_PRESETS } from './mode-presets.js';
 import type { ModelStrategy } from './mode-presets.js';
 import { metric } from './observability.js';
+import { interpolateConfig } from './deck-interpolation.js';
 
 // ─── Default Timeout Config ─────────────────────────────────────────
 export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
@@ -78,30 +79,37 @@ const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 /** All valid provider names */
 export const VALID_PROVIDERS: readonly ProviderName[] = Object.keys(PROVIDER_MODEL_MAP) as ProviderName[];
 
+/**
+ * Default mode definitions derived from MODE_PRESETS (single source of truth).
+ * max_workers comes from MODE_PRESETS; model names are v1 backward-compat layer.
+ *
+ * Sprint 150: Consolidated — mode-presets.ts is the canonical source for max_workers.
+ * Brain/default model names kept for PlanModeConfig backward compat.
+ */
 export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
   performance: {
-    max_workers: 8,
+    max_workers: MODE_PRESETS['performance']!.max_workers,
     brain_model: 'opus',
     default_model: 'opus',
     haiku_allowed: true,
     brain_planning: 'auto',
   },
   balanced: {
-    max_workers: 5,
+    max_workers: MODE_PRESETS['balanced']!.max_workers,
     brain_model: 'sonnet',
     default_model: 'opus',
     haiku_allowed: true,
     brain_planning: 'auto',
   },
   economic: {
-    max_workers: 3,
+    max_workers: MODE_PRESETS['economic']!.max_workers,
     brain_model: 'sonnet',
     default_model: 'sonnet',
     haiku_allowed: false,
     brain_planning: 'auto',
   },
   api: {
-    max_workers: 10,
+    max_workers: MODE_PRESETS['api']!.max_workers,
     brain_model: 'opus',
     default_model: 'sonnet',
     haiku_allowed: true,
@@ -420,6 +428,11 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── deckent_style validation ───────────────────────────────────────
+  if (config.deckent_style !== undefined && !['sprint', 'task'].includes(config.deckent_style)) {
+    errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task`);
+  }
+
   // ─── Routing Engine validation ──────────────────────────────────────
   if (config.routing_engine !== undefined) {
     const validRoutingEngines = ['v1', 'v2'] as const;
@@ -497,13 +510,11 @@ export function createDefaultConfig(): DeckentConfig {
   return {
     mode: DEFAULT_MODE,
     modes: structuredClone(DEFAULT_MODES),
-    // Provider
-    brain_provider: 'claude',
-    worker_provider: 'claude',
-    fallback_provider: undefined,
+    // Provider (Sprint 150 Decision 4 — grouped `providers` is canonical; flat keys deprecated)
+    providers: { brain: 'claude', worker: 'claude' },
     provider_overrides: undefined,
     cost_optimization: false,
-    claude_backend: 'tmux',
+    // claude_backend removed (Sprint 150 Decision 3 — use spawn_backend instead)
     auth_mode: 'subscription',
     // Human Checkpoints (empty = fully autonomous)
     human_checkpoints: [],
@@ -561,6 +572,22 @@ export function createDefaultConfig(): DeckentConfig {
     sprint_checkpoint_interval: 5,
     // Timeout
     timeout: structuredClone(DEFAULT_TIMEOUT_CONFIG),
+    // Observability (Sprint 150 Task 030 — metrics rotation defaults)
+    observability: {
+      rotation: {
+        maxSizeMB: 1,
+        archiveFormat: 'gzip',
+        keepLastN: 10,
+      },
+    },
+    // Sprint File Retention (Sprint 150 Task 035 — Hybrid keep_last_n + size_cap_mb)
+    sprint_file_retention: {
+      keep_last_n: 10,
+      size_cap_mb: 500,
+      archive_path: '.deckent/archive/sprints/',
+    },
+    // Runtime Style
+    deckent_style: 'sprint',
     // Nervous System (disabled by default — Sprint 148 will activate)
     nervous_system: {
       enabled: false,
@@ -655,8 +682,31 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
 
   const projectConfigPath = join(root, PROJECT_CONFIG_PATH);
 
-  const projectConfig = await readJsonFile<Partial<DeckentConfig>>(projectConfigPath);
+  let projectConfig = await readJsonFile<Partial<DeckentConfig>>(projectConfigPath);
+
+  // Self-healing: if readJsonFile returned null but the file exists on disk,
+  // it means the JSON is corrupted. Backup + fresh default.
+  if (projectConfig === null && existsSync(projectConfigPath)) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = `${projectConfigPath}.corrupted.${timestamp}.bak`;
+    try {
+      renameSync(projectConfigPath, backupPath);
+      const freshDefault = createDefaultConfig();
+      writeFileSync(projectConfigPath, JSON.stringify(freshDefault, null, 2) + '\n');
+      console.error(
+        `[deckent] Config dosyanız bozulmuştu, yedeklendi: ${backupPath}\n` +
+        `Defaults ile devam ediliyor. Düzeltme için: deckent config read`,
+      );
+      projectConfig = freshDefault;
+    } catch (backupErr) {
+      console.error(`[deckent] Config recovery failed: ${backupErr instanceof Error ? backupErr.message : String(backupErr)}`);
+    }
+  }
+
   if (projectConfig) {
+    // Sprint 150: Remove duplicate keys before merge (Decision 3+4)
+    removeDuplicateKeys(projectConfig as Record<string, unknown>);
+
     config = deepMerge(config, projectConfig);
 
     // Auto-migrate: if the project config file is missing fields, update it on disk (non-fatal)
@@ -672,7 +722,19 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
+  // ─── Grouped providers → flat provider fields ──────────────────────
+  // Runtime-only projection. Must run BEFORE env var overrides so env vars win.
+  // (Sprint 150 Decision 4 — grouped `providers` is canonical in JSON; flat
+  //  fields stay available at runtime for backward compatibility.)
+  if (config.providers) {
+    if (config.providers.brain) config.brain_provider = config.providers.brain;
+    if (config.providers.worker) config.worker_provider = config.providers.worker;
+    if (config.providers.fallback) config.fallback_provider = config.providers.fallback;
+    if (config.providers.overrides) config.provider_overrides = config.providers.overrides;
+  }
+
   // ─── Env var overrides ─────────────────────────────────────────────
+  // Env vars override grouped→flat projection above.
   const envBrainProvider = process.env['DECKENT_BRAIN_PROVIDER'];
   if (envBrainProvider) {
     config.brain_provider = envBrainProvider as ProviderName;
@@ -689,14 +751,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   if (envLanguage) {
     config.language = envLanguage;
   }
-
-  // ─── Grouped providers → flat provider fields ──────────────────────
-  // If config.providers is set, it takes precedence over flat fields
-  if (config.providers) {
-    if (config.providers.brain) config.brain_provider = config.providers.brain;
-    if (config.providers.worker) config.worker_provider = config.providers.worker;
-    if (config.providers.fallback) config.fallback_provider = config.providers.fallback;
-    if (config.providers.overrides) config.provider_overrides = config.providers.overrides;
+  const envDeckentStyle = process.env['DECKENT_STYLE'];
+  if (envDeckentStyle) {
+    config.deckent_style = envDeckentStyle as 'sprint' | 'task';
   }
 
   // ─── Mode preset → model_strategy merge ────────────────────────────
@@ -800,15 +857,20 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
       : structuredClone(DEFAULT_TIMEOUT_CONFIG),
     // Nervous System — passed through from project config
     nervous_system: config.nervous_system,
+    // Runtime Style
+    deckent_style: config.deckent_style ?? 'sprint',
   };
 
+  // ─── $DECK: interpolation ────────────────────────────────────────────
+  const interpolated = interpolateConfig(resolved, root) as ResolvedConfig;
+
   // ─── Update cache ───────────────────────────────────────────────────
-  cachedConfig = resolved;
+  cachedConfig = interpolated;
   cacheStamp = getConfigMtime(root);
   cachedProjectRoot = root;
 
   metric('config.cache', 1, { result: 'miss' });
-  return resolved;
+  return interpolated;
 }
 
 /**
@@ -1176,6 +1238,13 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     options: ['never', 'on_failure', 'always'],
     category: 'Sprint',
   },
+  deckent_style: {
+    description: 'Active runtime style: "sprint" for developer orchestration, "task" for one-shot life assistant.',
+    type: "'sprint' | 'task'",
+    default: 'sprint',
+    options: ['sprint', 'task'],
+    category: 'Sprint',
+  },
 } as const;
 
 /**
@@ -1291,6 +1360,7 @@ export function mergeConfigs(
     adaptive_thresholds: config.adaptive_thresholds ?? false,
     agent_min_score: config.agent_min_score ?? 5,
     adaptive_config: config.adaptive_config ?? { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
+    deckent_style: config.deckent_style ?? 'sprint',
   };
 }
 

@@ -2,7 +2,7 @@
   "mode": "performance",
   "language": "en",
   "projectName": "deckent",
-  "last_sprint_id": "sprint-148",
+  "last_sprint_id": "sprint-150",
   "spawn_backend": "docker",
   "modes": {
     "performance": {
@@ -48,8 +48,6 @@
     "brain": "claude",
     "worker": "claude"
   },
-  "brain_provider": "claude",
-  "worker_provider": "claude",
   "cost_optimization": false,
   "auth_mode": "subscription",
   "fix_phase_enabled": true,
@@ -90,9 +88,8 @@
     "coverage_lookback": 3
   },
   "lock_stale_threshold": 300,
-  "claude_backend": "tmux",
   "rubric_max_retries": 0,
-  "max_workers": 4,
+  "max_workers": 3,
   "sprint_checkpoint_interval": 3,
   "timeout": {
     "docker_min_timeout": 1200,
@@ -184,5 +181,18 @@
       }
     },
     "history_retention_days": 30
+  },
+  "deckent_style": "sprint",
+  "observability": {
+    "rotation": {
+      "maxSizeMB": 1,
+      "archiveFormat": "gzip",
+      "keepLastN": 10
+    }
+  },
+  "sprint_file_retention": {
+    "keep_last_n": 10,
+    "size_cap_mb": 500,
+    "archive_path": ".deckent/archive/sprints/"
   }
 }

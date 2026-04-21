@@ -284,9 +284,31 @@ export interface DeckentConfig {
   /** Unified timeout configuration for all backends */
   timeout?: Partial<TimeoutConfig>;
 
+  // ─── Observability ──────────────────────────────────────────────────
+  /** Observability configuration: metrics rotation, archiving, sprintId tagging */
+  observability?: {
+    rotation?: {
+      /** Max size in MB before auto-rotate (default: 1) */
+      maxSizeMB?: number;
+      /** Archive format (default: 'gzip') */
+      archiveFormat?: 'gzip';
+      /** Keep last N archived files (default: 10) */
+      keepLastN?: number;
+    };
+  };
+
+  // ─── Sprint File Retention ───────────────────────────────────────────
+  /** Retention policy for sprint-prefixed files in .deckent/ (events, checkpoints, gates, pre-archives).
+   *  Hybrid strategy: keep_last_n + size_cap_mb — whichever triggers first wins. */
+  sprint_file_retention?: Partial<SprintFileRetentionConfig>;
+
   // ─── Nervous System ─────────────────────────────────────────────────
   /** Proactive meta-orchestrator nervous system configuration (Sprint 147+) */
   nervous_system?: NervousSystemConfig;
+
+  // ─── Runtime Style ─────────────────────────────────────────────────
+  /** Active runtime style — sprint (developer orchestration) or task (one-shot life assistant) */
+  deckent_style?: 'sprint' | 'task';
 }
 
 // ─── Nervous System Config Types ────────────────────────────────────
@@ -382,6 +404,18 @@ export interface NervousSystemConfig {
   history_retention_days: number;
 }
 
+/** Configuration for sprint-prefixed file retention in .deckent/ directory.
+ *  Hybrid strategy: keep_last_n sprints + size_cap_mb — whichever triggers first.
+ *  Files beyond retention window are archived to archive_path/<sprint-id>/. */
+export interface SprintFileRetentionConfig {
+  /** Number of most-recent sprints to keep in .deckent/ root (default: 10) */
+  keep_last_n: number;
+  /** Maximum total size in MB for sprint files before oldest are archived (default: 500) */
+  size_cap_mb: number;
+  /** Archive destination path relative to project root (default: '.deckent/archive/sprints/') */
+  archive_path: string;
+}
+
 export interface ResolvedConfig {
   mode: PlanMode;
   activeModeConfig: PlanModeConfig;
@@ -462,6 +496,10 @@ export interface ResolvedConfig {
   timeout?: TimeoutConfig;
   /** Nervous system configuration (passed through from DeckentConfig) */
   nervous_system?: NervousSystemConfig;
+  /** Observability configuration (passed through from DeckentConfig) */
+  observability?: DeckentConfig['observability'];
+  /** Resolved runtime style — always 'sprint' or 'task' */
+  deckent_style: 'sprint' | 'task';
 }
 
 // ─── Config Metadata ──────────────────────────────────────────────

@@ -148,6 +148,23 @@ export function needsMigration(existing: Record<string, unknown>): boolean {
   if (typeof existing['mode'] === 'string' && legacyModes.includes(existing['mode'])) return true;
   const modes = existing['modes'] as Record<string, unknown> | undefined;
   if (modes && legacyModes.some(m => m in modes)) return true;
+  // Sprint 150 Decision 3+4: duplicate keys present
+  if (hasDuplicateKeys(existing)) return true;
+  return false;
+}
+
+/**
+ * Check whether a config has any duplicate keys that would be removed
+ * by `removeDuplicateKeys` (Sprint 150 Decision 3+4). Non-destructive.
+ */
+export function hasDuplicateKeys(existing: Record<string, unknown>): boolean {
+  if (existing['spawn_backend'] !== undefined && existing['claude_backend'] !== undefined) return true;
+  const providers = existing['providers'] as Record<string, unknown> | undefined;
+  if (providers) {
+    if (providers['brain'] !== undefined && existing['brain_provider'] !== undefined) return true;
+    if (providers['worker'] !== undefined && existing['worker_provider'] !== undefined) return true;
+    if (providers['fallback'] !== undefined && existing['fallback_provider'] !== undefined) return true;
+  }
   return false;
 }
 
@@ -226,9 +243,13 @@ export function migrateConfig(
     }
   }
 
+  // Sprint 150 Decision 3+4: Remove duplicate keys (claude_backend, flat provider fields)
+  // This is destructive — it DELETES keys from `existing`, so must run before getMissingFields.
+  const removedDuplicates = removeDuplicateKeys(existing);
+
   const missingFields = getMissingFields(existing);
 
-  if (missingFields.length === 0 && !legacyRenamed) {
+  if (missingFields.length === 0 && !legacyRenamed && removedDuplicates.length === 0) {
     return {
       migrated: false,
       addedFields: [],
@@ -563,6 +584,52 @@ export function needsV2Migration(existing: Record<string, unknown>): boolean {
   const clone = { ...existing };
   const result = migrateConfigV1ToV2(clone);
   return result.migrated;
+}
+
+// ─── V2 Duplicate Key Removal ─────────────────────────────────────────────
+
+/**
+ * Remove duplicate config keys per Alperen's 8-decision matrix (Sprint 150):
+ *
+ * Decision 3: If `spawn_backend` exists → delete `claude_backend` (duplicate + conflict)
+ * Decision 4: If `providers.brain` exists → delete flat `brain_provider`
+ *             If `providers.worker` exists → delete flat `worker_provider`
+ *
+ * Preserves: top-level `max_workers` (Decision 2), mode preset `max_workers` (Decision 1).
+ *
+ * @returns List of removed keys for audit trail
+ */
+export function removeDuplicateKeys(config: Record<string, unknown>): string[] {
+  const removed: string[] = [];
+
+  // Decision 3: claude_backend is duplicate when spawn_backend exists
+  if (config['spawn_backend'] !== undefined && config['claude_backend'] !== undefined) {
+    delete config['claude_backend'];
+    removed.push('claude_backend');
+  }
+
+  // Decision 4: flat provider fields are duplicate when grouped providers exist
+  const providers = config['providers'] as Record<string, unknown> | undefined;
+  if (providers) {
+    if (providers['brain'] !== undefined && config['brain_provider'] !== undefined) {
+      delete config['brain_provider'];
+      removed.push('brain_provider');
+    }
+    if (providers['worker'] !== undefined && config['worker_provider'] !== undefined) {
+      delete config['worker_provider'];
+      removed.push('worker_provider');
+    }
+    if (providers['fallback'] !== undefined && config['fallback_provider'] !== undefined) {
+      delete config['fallback_provider'];
+      removed.push('fallback_provider');
+    }
+  }
+
+  if (removed.length > 0) {
+    structuredLog('info', 'config_duplicate_keys_removed', { removed });
+  }
+
+  return removed;
 }
 
 // Collect leaf keys is exported for testing purposes
