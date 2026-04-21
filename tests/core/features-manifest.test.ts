@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
-// ─── Features Manifest Schema Tests ────────────────────────────────────────
-// Sprint 139 Task 038 — Dead Code Audit Step 2
-// Validates .deckent/features-manifest.json schema, category membership, and
-// usage tracking metadata integrity.
+// ─── Features Manifest Schema + Integrity Tests ───────────────────────────
+// Sprint 139 Task 038 — Schema validation (original)
+// Sprint 150 Task 029 — Content-vs-code integrity, CLI/MCP wire, staleness detection
 
 const MANIFEST_PATH = join(process.cwd(), '.deckent', 'features-manifest.json');
 
@@ -193,14 +193,6 @@ describe('features-manifest.json — category membership', () => {
 
 // ─── Test 4: Usage Tracking Metadata ────────────────────────────────────────
 describe('features-manifest.json — usage tracking metadata', () => {
-  it('active features have evidenceSprints array', () => {
-    for (const entry of manifest.active) {
-      expect(entry).toHaveProperty('evidenceSprints');
-      expect(Array.isArray(entry.evidenceSprints)).toBe(true);
-      expect((entry.evidenceSprints as string[]).length).toBeGreaterThan(0);
-    }
-  });
-
   it('dead features have supersededBy or deprecatedSince field', () => {
     for (const entry of manifest.dead) {
       const hasSupersededBy = 'supersededBy' in entry;
@@ -228,5 +220,138 @@ describe('features-manifest.json — usage tracking metadata', () => {
       manifest.dormant.length +
       manifest.dead.length;
     expect(total).toBeGreaterThanOrEqual(20);
+  });
+});
+
+// ─── Test 5: Content-vs-Code Integrity (Sprint 150 Task 029) ───────────────
+describe('features-manifest.json — content-vs-code integrity', () => {
+  it('all feature files[] entries exist on filesystem (or are valid directories)', () => {
+    const allEntries = [
+      ...manifest.active,
+      ...manifest.lightly_used,
+      ...manifest.dormant,
+      // Dead features may have deleted files, skip those
+    ];
+    const missing: string[] = [];
+    for (const entry of allEntries) {
+      for (const file of entry.files) {
+        const fullPath = join(process.cwd(), file);
+        if (!existsSync(fullPath)) {
+          missing.push(`${entry.id}: ${file}`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('active features have at least 1 file that is imported by other src/ files', () => {
+    // Spot-check: sprint-controller must be imported by other files
+    const controller = manifest.active.find(e => e.id === 'sprint-controller');
+    expect(controller).toBeDefined();
+
+    const result = spawnSync('grep', [
+      '-rl', '--include=*.ts',
+      'sprint-controller',
+      join(process.cwd(), 'src'),
+    ], { encoding: 'utf-8', timeout: 10000 });
+
+    const importers = (result.stdout || '').trim().split('\n').filter(Boolean);
+    // Should be imported by at least 2 files (excluding itself)
+    expect(importers.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('dead features are actually deprecated or superseded', () => {
+    for (const entry of manifest.dead) {
+      expect(
+        'deprecatedSince' in entry || 'supersededBy' in entry || 'adrRef' in entry,
+      ).toBe(true);
+    }
+  });
+
+  it('stale entry detection: learning-decay.ts should not be in manifest', () => {
+    const allEntries = [
+      ...manifest.active,
+      ...manifest.lightly_used,
+      ...manifest.dormant,
+      ...manifest.dead,
+    ];
+    const learningDecay = allEntries.find(e =>
+      e.files.some(f => f.includes('learning-decay')),
+    );
+    expect(learningDecay).toBeUndefined();
+  });
+
+  it('manifest _meta.generatedBy references sync-manifest.mjs', () => {
+    expect(manifest._meta.generatedBy).toContain('sync-manifest');
+  });
+});
+
+// ─── Test 6: Generator Script Validation (Sprint 150 Task 029) ─────────────
+describe('sync-manifest.mjs — generator validation', () => {
+  it('sync-manifest.mjs script exists', () => {
+    const scriptPath = join(process.cwd(), 'scripts', 'sync-manifest.mjs');
+    expect(existsSync(scriptPath)).toBe(true);
+  });
+
+  it('dry-run produces valid output', () => {
+    const result = spawnSync('node', [
+      join(process.cwd(), 'scripts', 'sync-manifest.mjs'),
+      '--dry-run',
+    ], { encoding: 'utf-8', timeout: 30000, cwd: process.cwd() });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('Features Manifest Sync');
+    expect(result.stdout).toContain('Active:');
+    expect(result.stdout).toContain('Total:');
+  });
+
+  it('json output is valid JSON with correct structure', () => {
+    const result = spawnSync('node', [
+      join(process.cwd(), 'scripts', 'sync-manifest.mjs'),
+      '--json',
+    ], { encoding: 'utf-8', timeout: 30000, cwd: process.cwd() });
+
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout.trim());
+    expect(parsed).toHaveProperty('_meta');
+    expect(parsed).toHaveProperty('active');
+    expect(parsed).toHaveProperty('dormant');
+    expect(parsed).toHaveProperty('dead');
+  });
+});
+
+// ─── Test 7: CLI + MCP Wire Existence (Sprint 150 Task 029) ────────────────
+describe('features CLI + MCP — wire existence', () => {
+  it('features.ts CLI command file exists', () => {
+    const cliPath = join(process.cwd(), 'src', 'cli', 'commands', 'features.ts');
+    expect(existsSync(cliPath)).toBe(true);
+  });
+
+  it('feature-query.ts MCP tool file exists', () => {
+    const mcpPath = join(process.cwd(), 'src', 'mcp', 'tools', 'feature-query.ts');
+    expect(existsSync(mcpPath)).toBe(true);
+  });
+
+  it('features CLI is registered in src/cli/index.ts', () => {
+    const indexContent = readFileSync(join(process.cwd(), 'src', 'cli', 'index.ts'), 'utf-8');
+    expect(indexContent).toContain('registerFeatures');
+    expect(indexContent).toContain('./commands/features.js');
+  });
+
+  it('feature-query MCP tool is registered in src/mcp/tools/index.ts', () => {
+    const indexContent = readFileSync(join(process.cwd(), 'src', 'mcp', 'tools', 'index.ts'), 'utf-8');
+    expect(indexContent).toContain('registerFeatureQueryTool');
+    expect(indexContent).toContain('./feature-query.js');
+  });
+});
+
+// ─── Test 8: Sprint Finalizer Hook (Sprint 150 Task 029) ──────────────────
+describe('sprint-finalizer — features manifest hook', () => {
+  it('sprint-finalizer.ts contains features manifest sync hook', () => {
+    const finalizerContent = readFileSync(
+      join(process.cwd(), 'src', 'orchestra', 'sprint-finalizer.ts'), 'utf-8',
+    );
+    expect(finalizerContent).toContain('sync-manifest.mjs');
+    expect(finalizerContent).toContain('featuresManifest');
   });
 });

@@ -1,7 +1,9 @@
-// ═══ IPC Orphan Cleaner Tests (M7.B + M7.C) ════════════════════════
-// Sprint 145 Task 016: Defense-in-depth IPC directory cleanup
+// ═══ IPC Orphan Cleaner Tests (M7.B + M7.B-v2 + M7.C) ═══════════════
+// Sprint 145 Task 016: Defense-in-depth IPC directory cleanup (M7.B legacy)
+// Sprint 150 Task 028: Live-PID-check wire-up (M7.B v2)
 //
-// M7.B: cleanOrphanIpcDirs — pre-flight scan removes stale sprint IPC dirs
+// M7.B (legacy): cleanOrphanIpcDirsLegacy — pre-flight scan by jobId
+// M7.B v2: cleanOrphanIpcDirs — pre-flight scan with live-PID check
 // M7.C: sprint-runner-entry self-cleanup — cleans IPC dir on successful exit
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -9,7 +11,10 @@ import { mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { cleanOrphanIpcDirs } from '../../src/core/orphan-cleaner.js';
+import {
+  cleanOrphanIpcDirs,
+  cleanOrphanIpcDirsLegacy,
+} from '../../src/core/orphan-cleaner.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -19,17 +24,27 @@ function createTestRoot(): string {
   return root;
 }
 
-function createIpcDir(root: string, sprintId: string): string {
+/** Create an IPC dir WITH config.json containing optional pid field */
+function createIpcDir(root: string, sprintId: string, pid?: number): string {
   const dir = join(root, '.deckent', `${sprintId}-ipc`);
   mkdirSync(dir, { recursive: true });
-  // Write a marker file so we can verify full removal
-  writeFileSync(join(dir, 'config.json'), JSON.stringify({ sprintId }));
+  const config: Record<string, unknown> = { sprintId };
+  if (pid !== undefined) config.pid = pid;
+  writeFileSync(join(dir, 'config.json'), JSON.stringify(config));
   return dir;
 }
 
-// ─── M7.B Tests ───────────────────────────────────────────────────────
+/** Create an IPC dir WITHOUT config.json (config-only leak scenario) */
+function createIpcDirNoConfig(root: string, sprintId: string): string {
+  const dir = join(root, '.deckent', `${sprintId}-ipc`);
+  mkdirSync(dir, { recursive: true });
+  // intentionally no config.json
+  return dir;
+}
 
-describe('cleanOrphanIpcDirs (M7.B)', () => {
+// ─── M7.B Legacy Tests ────────────────────────────────────────────────
+
+describe('cleanOrphanIpcDirsLegacy (M7.B legacy)', () => {
   let testRoot: string;
 
   beforeEach(() => { testRoot = createTestRoot(); });
@@ -44,7 +59,7 @@ describe('cleanOrphanIpcDirs (M7.B)', () => {
     const currentDir = createIpcDir(testRoot, currentId);
 
     // Act
-    const cleaned = await cleanOrphanIpcDirs(testRoot, currentId);
+    const cleaned = await cleanOrphanIpcDirsLegacy(testRoot, currentId);
 
     // Assert
     expect(cleaned).toBe(5);
@@ -66,7 +81,7 @@ describe('cleanOrphanIpcDirs (M7.B)', () => {
     const currentId = 'sprint-145';
 
     // Act
-    const cleaned = await cleanOrphanIpcDirs(testRoot, currentId);
+    const cleaned = await cleanOrphanIpcDirsLegacy(testRoot, currentId);
 
     // Assert: only the IPC pattern dir was cleaned
     expect(cleaned).toBe(1);
@@ -80,7 +95,7 @@ describe('cleanOrphanIpcDirs (M7.B)', () => {
     // Arrange: only current sprint IPC dir
     createIpcDir(testRoot, 'sprint-145');
 
-    const cleaned = await cleanOrphanIpcDirs(testRoot, 'sprint-145');
+    const cleaned = await cleanOrphanIpcDirsLegacy(testRoot, 'sprint-145');
 
     expect(cleaned).toBe(0);
   });
@@ -89,9 +104,146 @@ describe('cleanOrphanIpcDirs (M7.B)', () => {
     // Arrange: remove the .deckent dir entirely
     rmSync(join(testRoot, '.deckent'), { recursive: true, force: true });
 
-    const cleaned = await cleanOrphanIpcDirs(testRoot, 'sprint-145');
+    const cleaned = await cleanOrphanIpcDirsLegacy(testRoot, 'sprint-145');
 
     expect(cleaned).toBe(0);
+  });
+});
+
+// ─── M7.B v2 Tests — Live-PID check ──────────────────────────────────
+
+describe('cleanOrphanIpcDirs (M7.B v2 — live-PID check)', () => {
+  let testRoot: string;
+
+  beforeEach(() => { testRoot = createTestRoot(); });
+  afterEach(() => { rmSync(testRoot, { recursive: true, force: true }); });
+
+  it('removes IPC dir with a dead PID', () => {
+    // Arrange: use PID 99999999 which is virtually guaranteed dead
+    const deadPid = 99999999;
+    const dir = createIpcDir(testRoot, 'sprint-142', deadPid);
+
+    // Act: minAgeMs=0 to bypass age guard (newly created dirs would be skipped otherwise)
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true, minAgeMs: 0 });
+
+    // Assert: removed
+    expect(cleaned).toHaveLength(1);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('preserves IPC dir whose PID is alive (current process)', () => {
+    // Arrange: use the current process PID — guaranteed alive
+    const livePid = process.pid;
+    const dir = createIpcDir(testRoot, 'sprint-143', livePid);
+
+    // Act
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true, minAgeMs: 0 });
+
+    // Assert: NOT removed
+    expect(cleaned).toHaveLength(0);
+    expect(existsSync(dir)).toBe(true);
+  });
+
+  it('removes IPC dir with no config.json (config-only leak)', () => {
+    // Arrange: IPC dir without config.json
+    const dir = createIpcDirNoConfig(testRoot, 'sprint-141');
+
+    // Act: minAgeMs=0 to bypass age guard for this test
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true, minAgeMs: 0 });
+
+    // Assert: removed (no config.json → always safe to delete)
+    expect(cleaned).toHaveLength(1);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('removes IPC dir with config.json but no pid field', () => {
+    // Arrange: config.json exists but has no pid — treat as dead
+    const dir = createIpcDir(testRoot, 'sprint-140');
+    // dir already has config.json without pid
+
+    // Act: minAgeMs=0 to bypass age guard for this test
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true, minAgeMs: 0 });
+
+    // Assert: removed (no pid to check → dead)
+    expect(cleaned).toHaveLength(1);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('removes dead PID dirs while preserving live PID dirs', () => {
+    // Arrange: mix of dead + live PIDs
+    const deadPid = 99999999;
+    const livePid = process.pid;
+
+    const deadDir = createIpcDir(testRoot, 'sprint-141', deadPid);
+    const liveDir = createIpcDir(testRoot, 'sprint-142', livePid);
+    const noConfigDir = createIpcDirNoConfig(testRoot, 'sprint-140');
+
+    // Act: minAgeMs=0 to bypass age guard
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true, minAgeMs: 0 });
+
+    // Assert
+    expect(cleaned).toHaveLength(2); // dead + no-config removed
+    expect(existsSync(deadDir)).toBe(false);
+    expect(existsSync(noConfigDir)).toBe(false);
+    expect(existsSync(liveDir)).toBe(true); // live preserved
+  });
+
+  it('returns empty array when .deckent dir does not exist', () => {
+    rmSync(join(testRoot, '.deckent'), { recursive: true, force: true });
+
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true });
+
+    expect(cleaned).toHaveLength(0);
+  });
+
+  it('ignores non-IPC directories', () => {
+    const nonIpcDirs = ['pids', 'agents', 'sprint-144-events'];
+    for (const d of nonIpcDirs) {
+      mkdirSync(join(testRoot, '.deckent', d), { recursive: true });
+    }
+
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true });
+
+    expect(cleaned).toHaveLength(0);
+    for (const d of nonIpcDirs) {
+      expect(existsSync(join(testRoot, '.deckent', d))).toBe(true);
+    }
+  });
+
+  it('concurrent isolation: two live-PID IPC dirs are both preserved', () => {
+    // Simulate 2 concurrent deckent_start calls:
+    // Both use the current process PID (both "alive")
+    const livePid = process.pid;
+    const dir1 = createIpcDir(testRoot, 'sprint-200', livePid);
+    const dir2 = createIpcDir(testRoot, 'sprint-201', livePid);
+
+    const cleaned = cleanOrphanIpcDirs(testRoot, { checkLivePid: true });
+
+    // Neither should be removed
+    expect(cleaned).toHaveLength(0);
+    expect(existsSync(dir1)).toBe(true);
+    expect(existsSync(dir2)).toBe(true);
+  });
+
+  it('uses default opts (checkLivePid=true) when no opts provided', () => {
+    // Default: checkLivePid=true, minAgeMs=30000.
+    // Live PID dirs are always preserved regardless of age.
+    // Dead PID dirs (with explicit pid) are removed even if young.
+    // Pid-less dirs younger than 30s are preserved (race guard).
+    const livePid = process.pid;
+    const liveDir = createIpcDir(testRoot, 'sprint-202', livePid);
+    const youngNoPidDir = createIpcDir(testRoot, 'sprint-204'); // no pid, young → preserved
+    const deadPidDir = createIpcDir(testRoot, 'sprint-203', 99999999); // dead pid → removed
+
+    const cleaned = cleanOrphanIpcDirs(testRoot); // no opts (default minAgeMs=30000)
+
+    // liveDir preserved (live PID)
+    expect(existsSync(liveDir)).toBe(true);
+    // youngNoPidDir preserved (young, no pid → age guard fires)
+    expect(existsSync(youngNoPidDir)).toBe(true);
+    // deadPidDir removed (dead PID is always cleaned regardless of age)
+    expect(existsSync(deadPidDir)).toBe(false);
+    expect(cleaned).toHaveLength(1);
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import type { SpawnSyncReturns } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, rmSync } from 'node:fs';
 
 import {
   isCleanWorkingTree,
@@ -11,11 +11,14 @@ import {
   createSafetyPoint,
   rollback,
   deleteSafetyPoint,
+  deleteSafetyPointFile,
   safetyBranchExists,
   getRollbackPolicy,
   recordRollbackInDebt,
   saveSafetyPoint,
   loadSafetyPoint,
+  isGitRepo,
+  cleanOrphanSafetyPoint,
   type SafetyPoint,
   type RollbackResult,
 } from '../../src/orchestra/rollback.js';
@@ -33,6 +36,7 @@ vi.mock('node:fs', async () => {
     writeFileSync: vi.fn(),
     appendFileSync: vi.fn(),
     mkdirSync: vi.fn(),
+    rmSync: vi.fn(),
   };
 });
 
@@ -146,8 +150,7 @@ describe('createSafetyPoint', () => {
     expect(point.commitSha).toBe('cafebabe');
   });
 
-  it('warns but succeeds when stash pop fails after dirty tree', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('throws when stash pop fails after dirty tree (user-loss guard)', () => {
     // isCleanWorkingTree → dirty
     mockSpawnSync.mockReturnValueOnce(makeResult(' M src/foo.ts'));
     // git stash push
@@ -159,13 +162,9 @@ describe('createSafetyPoint', () => {
     // git stash pop fails
     mockSpawnSync.mockReturnValueOnce(makeResult('', 'conflict', 1));
 
-    const point = createSafetyPoint('/repo', 'sprint-002b');
-    expect(point.wasClean).toBe(false);
-    expect(point.commitSha).toBe('cafebabe');
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('could not pop stash'),
+    expect(() => createSafetyPoint('/repo', 'sprint-002b')).toThrow(
+      'Stash pop failed',
     );
-    warnSpy.mockRestore();
   });
 
   it('throws when stash fails on dirty tree', () => {
@@ -339,6 +338,7 @@ const mockReadFileSync = vi.mocked(readFileSync);
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockAppendFileSync = vi.mocked(appendFileSync);
 const mockMkdirSync = vi.mocked(mkdirSync);
+const mockRmSync = vi.mocked(rmSync);
 
 describe('recordRollbackInDebt', () => {
   beforeEach(() => {
@@ -475,5 +475,162 @@ describe('loadSafetyPoint', () => {
     mockReadFileSync.mockImplementationOnce(() => { throw new Error('ENOENT'); });
 
     expect(loadSafetyPoint('/repo')).toBeNull();
+  });
+});
+
+describe('deleteSafetyPoint — JSON cleanup (BULGU 1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const safetyPoint: SafetyPoint = {
+    id: 'sprint-080',
+    branchName: 'deckent-backup-sprint-080',
+    commitSha: 'abc123',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    wasClean: true,
+  };
+
+  it('deletes both git branch AND JSON file on success', () => {
+    mockSpawnSync.mockReturnValueOnce(makeResult('Deleted branch'));
+
+    const result = deleteSafetyPoint('/repo', safetyPoint);
+    expect(result).toBe(true);
+    expect(mockRmSync).toHaveBeenCalledWith(
+      expect.stringContaining('safety-point.json'),
+      { force: true },
+    );
+  });
+
+  it('deletes JSON file even when branch deletion fails', () => {
+    mockSpawnSync.mockReturnValueOnce(makeResult('', 'not found', 1));
+
+    const result = deleteSafetyPoint('/repo', safetyPoint);
+    expect(result).toBe(false);
+    // JSON file should still be cleaned up
+    expect(mockRmSync).toHaveBeenCalledWith(
+      expect.stringContaining('safety-point.json'),
+      { force: true },
+    );
+  });
+});
+
+describe('deleteSafetyPointFile', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls rmSync with force: true', () => {
+    deleteSafetyPointFile('/repo');
+    expect(mockRmSync).toHaveBeenCalledWith(
+      expect.stringContaining('safety-point.json'),
+      { force: true },
+    );
+  });
+
+  it('does not throw when rmSync fails', () => {
+    mockRmSync.mockImplementationOnce(() => { throw new Error('EPERM'); });
+    expect(() => deleteSafetyPointFile('/repo')).not.toThrow();
+  });
+});
+
+describe('isGitRepo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns true when git rev-parse --git-dir succeeds', () => {
+    mockSpawnSync.mockReturnValueOnce(makeResult('.git'));
+    expect(isGitRepo('/repo')).toBe(true);
+  });
+
+  it('returns false when not a git repository', () => {
+    mockSpawnSync.mockReturnValueOnce(makeResult('', 'not a git repo', 128));
+    expect(isGitRepo('/repo')).toBe(false);
+  });
+});
+
+describe('cleanOrphanSafetyPoint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns false when no safety point file exists', () => {
+    mockExistsSync.mockReturnValueOnce(false); // loadSafetyPoint → file not found
+
+    expect(cleanOrphanSafetyPoint('/repo', 'sprint-100')).toBe(false);
+  });
+
+  it('returns false when safety point belongs to current sprint (live preservation)', () => {
+    const data: SafetyPoint = {
+      id: 'sprint-100',
+      branchName: 'deckent-backup-sprint-100',
+      commitSha: 'abc',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      wasClean: true,
+    };
+    mockExistsSync.mockReturnValueOnce(true); // loadSafetyPoint → file exists
+    mockReadFileSync.mockReturnValueOnce(JSON.stringify(data));
+
+    expect(cleanOrphanSafetyPoint('/repo', 'sprint-100')).toBe(false);
+    expect(mockRmSync).not.toHaveBeenCalled();
+  });
+
+  it('cleans orphan when safety point belongs to a different sprint (stale detection)', () => {
+    const data: SafetyPoint = {
+      id: 'sprint-099',
+      branchName: 'deckent-backup-sprint-099',
+      commitSha: 'abc',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      wasClean: true,
+    };
+    mockExistsSync.mockReturnValueOnce(true); // loadSafetyPoint → file exists
+    mockReadFileSync.mockReturnValueOnce(JSON.stringify(data));
+    // safetyBranchExists → branch does not exist
+    mockSpawnSync.mockReturnValueOnce(makeResult('', 'not found', 128));
+
+    expect(cleanOrphanSafetyPoint('/repo', 'sprint-100')).toBe(true);
+    expect(mockRmSync).toHaveBeenCalledWith(
+      expect.stringContaining('safety-point.json'),
+      { force: true },
+    );
+  });
+
+  it('cleans orphan branch when it still exists', () => {
+    const data: SafetyPoint = {
+      id: 'sprint-098',
+      branchName: 'deckent-backup-sprint-098',
+      commitSha: 'abc',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      wasClean: true,
+    };
+    mockExistsSync.mockReturnValueOnce(true); // loadSafetyPoint → file exists
+    mockReadFileSync.mockReturnValueOnce(JSON.stringify(data));
+    // safetyBranchExists → branch exists (orphan)
+    mockSpawnSync.mockReturnValueOnce(makeResult('abc'));
+    // git branch -D (cleanup)
+    mockSpawnSync.mockReturnValueOnce(makeResult('Deleted'));
+
+    expect(cleanOrphanSafetyPoint('/repo', 'sprint-100')).toBe(true);
+    expect(mockRmSync).toHaveBeenCalled();
+  });
+});
+
+describe('createSafetyPoint — stash pop fail throws with recovery instructions', () => {
+  it('error message includes git stash recovery instructions', () => {
+    // isCleanWorkingTree → dirty
+    mockSpawnSync.mockReturnValueOnce(makeResult(' M src/foo.ts'));
+    // git stash push
+    mockSpawnSync.mockReturnValueOnce(makeResult('Saved'));
+    // getCurrentCommitSha
+    mockSpawnSync.mockReturnValueOnce(makeResult('cafebabe'));
+    // git branch
+    mockSpawnSync.mockReturnValueOnce(makeResult(''));
+    // git stash pop fails
+    mockSpawnSync.mockReturnValueOnce(makeResult('', 'CONFLICT', 1));
+
+    expect(() => createSafetyPoint('/repo', 'sprint-recovery')).toThrow(
+      /git stash list/,
+    );
   });
 });

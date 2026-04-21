@@ -127,9 +127,11 @@ describe('DockerSpawnBackend', () => {
         ['stop', '--time=15', 'deckent-w-001-001'],
         expect.objectContaining({ encoding: 'utf-8', timeout: 20000 }),
       );
+      // Sprint 149: fallback changed from bare `docker kill` (SIGKILL) to
+      // `docker kill --signal=SIGTERM` so the worker trap still runs fsync.
       expect(mockSpawnSync).toHaveBeenCalledWith(
         'docker',
-        ['kill', 'deckent-w-001-001'],
+        ['kill', '--signal=SIGTERM', 'deckent-w-001-001'],
         expect.any(Object),
       );
     });

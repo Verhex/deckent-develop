@@ -10,6 +10,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  rmSync: vi.fn(),
 }));
 
 const mockMemStore = {
@@ -26,8 +27,14 @@ vi.mock('../../src/core/memory-store.js', () => ({
   MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
 }));
 
+// fork() must be stubbed to prevent registerStartTool from spawning real
+// detached children + leaking .deckent/sprint-<timestamp>-ipc/ orphan dirs.
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  fork: vi.fn(() => ({
+    on: vi.fn(),
+    unref: vi.fn(),
+  })),
 }));
 
 vi.mock('../../src/core/config.js', () => ({

@@ -135,6 +135,12 @@ vi.mock('../../src/core/observability.js', () => ({
   structuredLog: vi.fn(),
   initObservability: vi.fn(),
   resetObservability: vi.fn(),
+  setObservabilitySprintId: vi.fn(),
+  getObservabilitySprintId: vi.fn().mockReturnValue(null),
+  getMetricsPath: vi.fn().mockReturnValue('/tmp/metrics.jsonl'),
+  getPerSprintMetricsPath: vi.fn().mockReturnValue(null),
+  generateLoadReport: vi.fn().mockResolvedValue('# Load Report\n'),
+  TELEMETRY_ENABLED: false,
 }));
 
 vi.mock('../../src/orchestra/ipc-registry.js', () => ({

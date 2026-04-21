@@ -42,9 +42,10 @@ describe('CHANGELOG.md format validation', () => {
     const content = readChangelog();
     const versions = extractVersionHeaders(content);
     expect(versions.length).toBeGreaterThan(0);
-    // All versions should start with 0.1.0-
+    // Sprint 150 T-150-026: version bumped to 1.0.0-beta.1 (Beta GA prep).
+    // Accept both 0.x.y (historical) and 1.x.y (Beta GA onward) patterns.
     versions.forEach((v) => {
-      expect(v).toMatch(/^0\.\d+\.\d+/);
+      expect(v).toMatch(/^[01]\.\d+\.\d+/);
     });
   });
 

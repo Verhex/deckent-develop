@@ -511,14 +511,18 @@ describe('VALID_PROVIDERS', () => {
 });
 
 describe('multi-provider config defaults', () => {
-  it('default config has brain_provider=claude', () => {
+  // Sprint 150 Decision 4: flat brain_provider/worker_provider deprecated.
+  // Grouped providers (config.providers.brain/worker) is canonical.
+  it('default config has providers.brain=claude (grouped canonical)', () => {
     const config = getDefaultConfig();
-    expect(config.brain_provider).toBe('claude');
+    expect(config.providers?.brain).toBe('claude');
+    expect(config.brain_provider).toBeUndefined();
   });
 
-  it('default config has worker_provider=claude', () => {
+  it('default config has providers.worker=claude (grouped canonical)', () => {
     const config = getDefaultConfig();
-    expect(config.worker_provider).toBe('claude');
+    expect(config.providers?.worker).toBe('claude');
+    expect(config.worker_provider).toBeUndefined();
   });
 
   it('default config has cost_optimization=false', () => {

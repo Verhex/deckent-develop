@@ -163,6 +163,11 @@ vi.mock('../../src/core/observability.js', () => ({
   metric: vi.fn(),
   trace: vi.fn(),
   TELEMETRY_ENABLED: false,
+  setObservabilitySprintId: vi.fn(),
+  getObservabilitySprintId: vi.fn().mockReturnValue(null),
+  getMetricsPath: vi.fn().mockReturnValue('/tmp/metrics.jsonl'),
+  getPerSprintMetricsPath: vi.fn().mockReturnValue(null),
+  resetObservability: vi.fn(),
 }));
 
 // ─── Post-Finalize Hooks Mock (Sprint 143 Task 10) ──

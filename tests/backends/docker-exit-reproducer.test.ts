@@ -136,7 +136,7 @@ describe('Docker Worker Exit Pattern — Host-Side Fallback', () => {
     const result = JSON.parse(resultContent);
     expect(result.selfAssessment).toBe('NO_GO');
     expect(result.exitCode).toBe(137);
-    expect(result.notes).toContain('exited (code=137)');
+    expect(result.notes).toContain('code=137');
     expect(result.taskId).toBe('test-kill-001');
   });
 

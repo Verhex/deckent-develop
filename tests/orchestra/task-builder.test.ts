@@ -451,10 +451,10 @@ describe('buildWorkerPrompt', () => {
   });
 
   it('includes filesWrite in scope section', () => {
-    const task = makeTask({ scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/foo.ts', 'src/core/bar.ts'] } });
+    const task = makeTask({ scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config.ts', 'src/core/types.ts'] } });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('  - src/core/foo.ts');
-    expect(prompt).toContain('  - src/core/bar.ts');
+    expect(prompt).toContain('  - src/core/config.ts');
+    expect(prompt).toContain('  - src/core/types.ts');
   });
 
   it('shows no-restriction message when directories are empty', () => {

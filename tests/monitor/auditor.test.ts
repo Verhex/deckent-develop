@@ -174,7 +174,16 @@ describe('scanHeartbeats', () => {
       currentAction: 'writing', timestamp: staleTimestamp, filesChangedCount: 0, sequence: 0,
     };
 
-    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+    // Sprint 150 T-150-009: auditor now skips stale check unless task.json has
+    // status === 'EXECUTING' (or another active-execution state). Mock both .hb
+    // and task.json reads so the stale path is exercised.
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.endsWith('.json')) {
+        return JSON.stringify({ id: 'task-001', status: 'EXECUTING' }) as never;
+      }
+      return JSON.stringify(hb) as never;
+    });
 
     const result = scanHeartbeats('/project');
     expect(result.staleAgents).toHaveLength(1);
@@ -264,7 +273,14 @@ describe('scanHeartbeats', () => {
       currentAction: 'writing', timestamp: staleTimestamp, filesChangedCount: 0, sequence: 0,
     };
 
-    mockedReadFileSync.mockReturnValue(JSON.stringify(hb) as never);
+    // Sprint 150 T-150-009: stale alert requires task.status === 'EXECUTING'.
+    mockedReadFileSync.mockImplementation((path: unknown) => {
+      const p = String(path);
+      if (p.endsWith('.json')) {
+        return JSON.stringify({ id: 'task-001', status: 'EXECUTING' }) as never;
+      }
+      return JSON.stringify(hb) as never;
+    });
 
     const result = scanHeartbeats('/project');
     expect(result.staleAgents).toHaveLength(1);

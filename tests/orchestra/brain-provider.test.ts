@@ -198,6 +198,13 @@ vi.mock('../../src/core/observability.js', () => ({
   trace: vi.fn((_name: string, fn: () => unknown) => fn()),
   structuredLog: vi.fn(),
   initObservability: vi.fn(),
+  setObservabilitySprintId: vi.fn(),
+  getObservabilitySprintId: vi.fn().mockReturnValue(null),
+  getMetricsPath: vi.fn().mockReturnValue('/tmp/metrics.jsonl'),
+  getPerSprintMetricsPath: vi.fn().mockReturnValue(null),
+  resetObservability: vi.fn(),
+  generateLoadReport: vi.fn().mockResolvedValue('# Load Report\n'),
+  TELEMETRY_ENABLED: false,
 }));
 
 // Result collector mock (resolveAgentPrompt + resolveSkillPrompts now live here)

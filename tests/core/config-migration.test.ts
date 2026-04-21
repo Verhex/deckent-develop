@@ -11,6 +11,7 @@ import {
   modelToTier,
   migrateConfigV1ToV2,
   needsV2Migration,
+  removeDuplicateKeys,
 } from '../../src/core/config-migration.js';
 import { createDefaultConfig } from '../../src/core/config.js';
 
@@ -68,9 +69,9 @@ describe('getMissingFields', () => {
     const minimal = { mode: 'max_plan', modes: {} };
     const missing = getMissingFields(minimal);
     expect(missing.length).toBeGreaterThan(0);
-    // Known fields that would be missing from a minimal config
-    expect(missing).toContain('brain_provider');
-    expect(missing).toContain('worker_provider');
+    // Sprint 150 Decision 4: grouped `providers` is canonical in defaults,
+    // flat brain_provider/worker_provider are legacy runtime-only projections.
+    expect(missing).toContain('providers');
     expect(missing).toContain('memory_budget');
     expect(missing).toContain('scan_interval');
   });

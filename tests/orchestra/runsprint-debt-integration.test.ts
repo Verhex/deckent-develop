@@ -164,8 +164,12 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
   recordRollbackInDebt: vi.fn(),
   saveSafetyPoint: vi.fn(),
   deleteSafetyPoint: vi.fn(),
+  deleteSafetyPointFile: vi.fn(),
   isCleanWorkingTree: vi.fn().mockReturnValue(true),
   safetyBranchExists: vi.fn().mockReturnValue(false),
+  isGitRepo: vi.fn().mockReturnValue(true),
+  cleanOrphanSafetyPoint: vi.fn().mockReturnValue(false),
+  loadSafetyPoint: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../src/orchestra/coverage-validator.js', () => ({

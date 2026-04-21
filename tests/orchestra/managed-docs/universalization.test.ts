@@ -182,15 +182,22 @@ describe('Doc cache — content hash + skip logic', () => {
   });
 
   it('writeDocCache + readDocCache round-trip', () => {
-    const cache = { 'doc-1': { entryHash: 'abc', fileHash: 'def', updatedAt: '2026-04-10T00:00:00Z' } };
-    writeDocCache(TEST_ROOT, cache);
-    expect(readDocCache(TEST_ROOT)).toEqual(cache);
+    const entry = { entryHash: 'abc', fileHash: 'def', updatedAt: '2026-04-10T00:00:00Z' };
+    writeDocCache(TEST_ROOT, { 'doc-1': entry });
+    const result = readDocCache(TEST_ROOT);
+    expect(result['doc-1']).toEqual(entry);
+    // _meta is auto-inserted
+    expect(result._meta).toBeDefined();
+    expect((result._meta as any).adr).toBe('ADR-031');
   });
 
-  it('clearDocCache empties the cache file', () => {
+  it('clearDocCache empties the cache file doc entries', () => {
     writeDocCache(TEST_ROOT, { 'doc-1': { entryHash: 'a', fileHash: 'b', updatedAt: 'now' } });
     clearDocCache(TEST_ROOT);
-    expect(readDocCache(TEST_ROOT)).toEqual({});
+    const result = readDocCache(TEST_ROOT);
+    // Doc entries are cleared
+    const docKeys = Object.keys(result).filter(k => k !== '_meta');
+    expect(docKeys).toHaveLength(0);
   });
 
   it('second run with unchanged content skips via cache', () => {

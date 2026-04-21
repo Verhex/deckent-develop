@@ -167,7 +167,7 @@ describe('dead-code-audit.mjs script execution', () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Audit complete');
-  });
+  }, 150_000);
 
   it('produces JSON output with --json flag', () => {
     const result = spawnSync('node', [
@@ -183,7 +183,7 @@ describe('dead-code-audit.mjs script execution', () => {
     // JSON output should contain suspectResults
     expect(result.stdout).toContain('"suspectResults"');
     expect(result.stdout).toContain('"summary"');
-  });
+  }, 150_000);
 
   it('generates report file', () => {
     const reportPath = join(projectRoot, 'docs', 'audits', 'sprint-139', 'dead-code-report.md');

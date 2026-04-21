@@ -95,8 +95,11 @@ describe('Docker EXIT Trap — TIMEOUT_WITH_WORK', () => {
   it('on_exit falls back to NO_GO when no git diff and no result', () => {
     const source = readDockerSource();
 
-    // When no changed files AND non-zero exit, should write fallback NO_GO
-    expect(source).toContain('fallbackJson');
+    // Sprint 150 T-150-007: Docker fallback rewrite uses cat heredoc with inline
+    // NO_GO JSON including signal_info (exitCode > 128). Variable name removed;
+    // assertion now checks on the NO_GO self-assessment sentinel + fallback comment.
+    expect(source).toContain('"selfAssessment":"NO_GO"');
+    expect(source).toContain('fallback NO_GO');
     // The else branch handles no-partial-work case
     expect(source).toContain('else');
   });

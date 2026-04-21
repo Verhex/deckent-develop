@@ -287,3 +287,166 @@ describe('deckent_status — dependencyGraph field (Task 139-031)', () => {
     });
   });
 });
+
+// ─── Metric Snapshot Tests (T-150-038) ───────────────────────────────────────
+
+describe('deckent_status — metricSnapshot (T-150-038)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(readLatestJobState).mockReturnValue(null);
+    vi.mocked(getCurrentSprintId).mockReturnValue('sprint-150');
+    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readDashboardSafe).mockReturnValue({
+      valid: true,
+      state: { ...sampleDashboard, sprint: { id: 'sprint-150', startedAt: new Date(Date.now() - 300_000).toISOString() } },
+      repaired: false,
+    });
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(sampleDashboard));
+  });
+
+  // ── Per-sprint file takes priority ───────────────────────────────────────
+
+  it('reads metricSnapshot from per-sprint file when it exists', async () => {
+    const perSprintMetrics = [
+      JSON.stringify({ type: 'metric', name: 'task.done', value: 5, tags: { sprintId: 'sprint-150' }, timestamp: '2026-04-21T10:00:00.000Z' }),
+      JSON.stringify({ type: 'metric', name: 'worker.active', value: 3, tags: { sprintId: 'sprint-150' }, timestamp: '2026-04-21T10:00:01.000Z' }),
+    ].join('\n');
+
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('sprint-150-metrics.jsonl')) return true;
+      if (path.includes('.dashboard')) return true;
+      return true;
+    });
+
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('sprint-150-metrics.jsonl')) return perSprintMetrics;
+      return JSON.stringify(sampleDashboard);
+    });
+
+    const tool = await getStatusTool();
+    const result = await tool.handler({ json: true });
+    const parsed = JSON.parse(result.content[0]!.text) as { metricSnapshot?: Record<string, unknown> };
+
+    expect(parsed.metricSnapshot).toBeDefined();
+    expect(parsed.metricSnapshot?.['task.done']).toBe(5);
+    expect(parsed.metricSnapshot?.['worker.active']).toBe(3);
+  });
+
+  // ── Flat file fallback with sprintId tag filter ───────────────────────────
+
+  it('falls back to flat metrics.jsonl when per-sprint file does not exist, filtering by sprintId', async () => {
+    const flatMetrics = [
+      // sprint-149 entry — should be excluded
+      JSON.stringify({ type: 'metric', name: 'old.metric', value: 99, tags: { sprintId: 'sprint-149' }, timestamp: '2026-04-20T00:00:00.000Z' }),
+      // sprint-150 entry — should be included
+      JSON.stringify({ type: 'metric', name: 'task.done', value: 8, tags: { sprintId: 'sprint-150' }, timestamp: '2026-04-21T10:00:00.000Z' }),
+      // untagged entry — retro-compat: included
+      JSON.stringify({ type: 'metric', name: 'untagged.metric', value: 1, tags: {}, timestamp: '2026-04-21T10:00:02.000Z' }),
+    ].join('\n');
+
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('sprint-150-metrics.jsonl')) return false;
+      if (path.includes('metrics.jsonl')) return true;
+      return true;
+    });
+
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('metrics.jsonl') && !path.includes('sprint-150-metrics')) return flatMetrics;
+      return JSON.stringify(sampleDashboard);
+    });
+
+    const tool = await getStatusTool();
+    const result = await tool.handler({ json: true });
+    const parsed = JSON.parse(result.content[0]!.text) as { metricSnapshot?: Record<string, unknown> };
+
+    expect(parsed.metricSnapshot).toBeDefined();
+    // sprint-150 entry included
+    expect(parsed.metricSnapshot?.['task.done']).toBe(8);
+    // sprint-149 entry excluded
+    expect(parsed.metricSnapshot?.['old.metric']).toBeUndefined();
+    // untagged entry included (retro-compat)
+    expect(parsed.metricSnapshot?.['untagged.metric']).toBe(1);
+  });
+
+  // ── No metrics file → empty snapshot ─────────────────────────────────────
+
+  it('returns empty metricSnapshot when neither per-sprint nor flat metrics file exists', async () => {
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('metrics.jsonl')) return false;
+      return true;
+    });
+
+    const tool = await getStatusTool();
+    const result = await tool.handler({ json: true });
+    const parsed = JSON.parse(result.content[0]!.text) as { metricSnapshot?: Record<string, unknown> };
+
+    expect(parsed.metricSnapshot).toBeDefined();
+    expect(Object.keys(parsed.metricSnapshot ?? {})).toHaveLength(0);
+  });
+
+  // ── Per-sprint file is present in rawData output ──────────────────────────
+
+  it('includes metricSnapshot in standard (non-json) response', async () => {
+    const perSprintMetrics = JSON.stringify({
+      type: 'metric',
+      name: 'hb.stale',
+      value: 0,
+      tags: { sprintId: 'sprint-150' },
+      timestamp: '2026-04-21T10:00:00.000Z',
+    });
+
+    vi.mocked(existsSync).mockReturnValue(true);
+
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('sprint-150-metrics.jsonl')) return perSprintMetrics;
+      return JSON.stringify(sampleDashboard);
+    });
+
+    const tool = await getStatusTool();
+    // Standard (non-json) response
+    const result = await tool.handler({ json: false });
+    const parsed = JSON.parse(result.content[0]!.text) as { metricSnapshot?: Record<string, unknown> };
+
+    expect(parsed.metricSnapshot).toBeDefined();
+    expect(parsed.metricSnapshot?.['hb.stale']).toBe(0);
+  });
+
+  // ── Integration: sprint-scoped chain (T-150-030 + T-150-038) ─────────────
+
+  it('chain: per-sprint metrics file written by observability, read by status tool', async () => {
+    // Simulates the T-150-030 + T-150-038 chain:
+    // observability.ts (perSprintFile=true) writes sprint-150-metrics.jsonl
+    // status.ts readMetricSnapshot() reads it
+    const chainedMetrics = [
+      JSON.stringify({ type: 'metric', name: 'collect.batch', value: 12, tags: { sprintId: 'sprint-150' }, timestamp: '2026-04-21T10:00:00.000Z' }),
+      JSON.stringify({ type: 'metric', name: 'result.collected', value: 7, tags: { sprintId: 'sprint-150' }, timestamp: '2026-04-21T10:00:01.000Z' }),
+      JSON.stringify({ type: 'trace', operation: 'sprint.plan', durationMs: 250, success: true, timestamp: '2026-04-21T10:00:02.000Z' }),
+    ].join('\n');
+
+    vi.mocked(existsSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('sprint-150-metrics.jsonl')) return true;
+      return true;
+    });
+
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('sprint-150-metrics.jsonl')) return chainedMetrics;
+      return JSON.stringify(sampleDashboard);
+    });
+
+    const tool = await getStatusTool();
+    const result = await tool.handler({ json: true });
+    const parsed = JSON.parse(result.content[0]!.text) as { metricSnapshot?: Record<string, unknown> };
+
+    // Metric entries present (trace entry has no 'name' so won't appear in snapshot)
+    expect(parsed.metricSnapshot?.['collect.batch']).toBe(12);
+    expect(parsed.metricSnapshot?.['result.collected']).toBe(7);
+  });
+});

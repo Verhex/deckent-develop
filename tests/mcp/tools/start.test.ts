@@ -4,6 +4,30 @@ import type { Sprint, ResolvedConfig } from '../../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
+// Stub fork + filesystem writes so registerStartTool does not create real
+// .deckent/sprint-<timestamp>-ipc/ directories in the project root during tests.
+// Pre-fix this test leaked ~10 orphan IPC dirs per run (cumulatively 435+).
+vi.mock('node:child_process', async () => {
+  const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+  return {
+    ...actual,
+    fork: vi.fn(() => ({
+      on: vi.fn(),
+      unref: vi.fn(),
+    })),
+  };
+});
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    ...actual,
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    rmSync: vi.fn(),
+  };
+});
+
 vi.mock('../../../src/core/config.js', () => ({
   loadConfig: vi.fn(),
 }));

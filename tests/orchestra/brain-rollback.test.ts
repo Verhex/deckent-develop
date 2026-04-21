@@ -158,11 +158,14 @@ vi.mock('../../src/orchestra/rollback.js', () => ({
   saveSafetyPoint: (...args: unknown[]) => mockSaveSafetyPoint(...args),
   loadSafetyPoint: vi.fn().mockReturnValue(null),
   deleteSafetyPoint: (...args: unknown[]) => mockDeleteSafetyPoint(...args),
+  deleteSafetyPointFile: vi.fn(),
   isCleanWorkingTree: vi.fn().mockReturnValue(true),
   safetyBranchExists: vi.fn().mockReturnValue(true),
   getDirtyFiles: vi.fn().mockReturnValue([]),
   getCurrentCommitSha: vi.fn().mockReturnValue('abc123'),
   getCurrentBranch: vi.fn().mockReturnValue('main'),
+  isGitRepo: vi.fn().mockReturnValue(true),
+  cleanOrphanSafetyPoint: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('../../src/agents/worker-ipc.js', () => ({
@@ -262,6 +265,13 @@ vi.mock('../../src/core/observability.js', () => ({
   trace: vi.fn((_name: string, fn: () => unknown) => fn()),
   structuredLog: vi.fn(),
   initObservability: vi.fn(),
+  setObservabilitySprintId: vi.fn(),
+  getObservabilitySprintId: vi.fn().mockReturnValue(null),
+  getMetricsPath: vi.fn().mockReturnValue('/tmp/metrics.jsonl'),
+  getPerSprintMetricsPath: vi.fn().mockReturnValue(null),
+  resetObservability: vi.fn(),
+  generateLoadReport: vi.fn().mockResolvedValue('# Load Report\n'),
+  TELEMETRY_ENABLED: false,
 }));
 
 vi.mock('../../src/core/plugin-hooks.js', () => ({
