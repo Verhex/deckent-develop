@@ -58,14 +58,26 @@ export const TELEMETRY_ENABLED = false;
 // ─── Internal State ──────────────────────────────────────────────
 
 let _projectRoot: string | null = null;
+let _sprintId: string | null = null;
+let _perSprintFile = false;
 
 /**
- * Initialize observability with a project root.
+ * Initialize observability with a project root and optional sprint ID.
  * Must be called before metric/trace/structuredLog if you want file output.
  * If not called, entries are silently discarded (safe no-op for tests/CLI).
+ *
+ * @param projectRoot - The project root directory
+ * @param sprintId - Optional sprint ID for auto-tagging entries
+ * @param opts - Optional settings: perSprintFile writes to sprint-specific file
  */
-export function initObservability(projectRoot: string): void {
+export function initObservability(
+  projectRoot: string,
+  sprintId?: string,
+  opts?: { perSprintFile?: boolean },
+): void {
   _projectRoot = projectRoot;
+  _sprintId = sprintId ?? null;
+  _perSprintFile = opts?.perSprintFile ?? false;
 }
 
 /**
@@ -73,6 +85,37 @@ export function initObservability(projectRoot: string): void {
  */
 export function resetObservability(): void {
   _projectRoot = null;
+  _sprintId = null;
+  _perSprintFile = false;
+}
+
+/**
+ * Get the current sprint ID (for external use, e.g. rotation).
+ */
+export function getObservabilitySprintId(): string | null {
+  return _sprintId;
+}
+
+/**
+ * Set the sprint ID after initialization (e.g. when sprint ID is determined after plan phase).
+ * Also enables per-sprint file writing if requested.
+ */
+export function setObservabilitySprintId(sprintId: string, opts?: { perSprintFile?: boolean }): void {
+  _sprintId = sprintId;
+  if (opts?.perSprintFile !== undefined) {
+    _perSprintFile = opts.perSprintFile;
+  }
+}
+
+/**
+ * Get the per-sprint metrics file path.
+ * Returns null if no sprintId is set or perSprintFile is disabled.
+ */
+export function getPerSprintMetricsPath(projectRoot?: string, sprintId?: string): string | null {
+  const root = projectRoot ?? _projectRoot;
+  const sid = sprintId ?? _sprintId;
+  if (!root || !sid) return null;
+  return join(root, METRICS_DIR, `${sid}-metrics.jsonl`);
 }
 
 /**
@@ -385,19 +428,51 @@ function buildMarkdownReport(
 // ─── Internal Helpers ────────────────────────────────────────────
 
 /**
+ * Inject sprintId tag into an entry if a sprint is active.
+ * Does not overwrite existing sprintId tag.
+ */
+function injectSprintId<T extends ObservabilityEntry>(entry: T): T {
+  if (!_sprintId) return entry;
+
+  if (entry.type === 'metric') {
+    const tags = { ...((entry as MetricEntry).tags ?? {}), sprintId: _sprintId };
+    return { ...entry, tags } as T;
+  }
+  // For trace and log entries, we don't have a tags field by default,
+  // but we can add sprintId context
+  if (entry.type === 'log') {
+    const context = { ...((entry as LogEntry).context ?? {}), sprintId: _sprintId };
+    return { ...entry, context } as T;
+  }
+  return entry;
+}
+
+/**
  * Append a single JSON entry to the metrics file.
  * Silently discards if observability is not initialized.
+ * Auto-injects sprintId tag when sprint is active.
  */
 function appendEntry(entry: ObservabilityEntry): void {
   if (!_projectRoot) return;
 
+  const taggedEntry = injectSprintId(entry);
+
   try {
+    // Always write to main metrics file
     const metricsPath = getMetricsPath(_projectRoot);
     const dir = dirname(metricsPath);
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
-    appendFileSync(metricsPath, JSON.stringify(entry) + '\n', 'utf-8');
+    appendFileSync(metricsPath, JSON.stringify(taggedEntry) + '\n', 'utf-8');
+
+    // Also write to per-sprint file if enabled
+    if (_perSprintFile && _sprintId) {
+      const perSprintPath = getPerSprintMetricsPath(_projectRoot, _sprintId);
+      if (perSprintPath) {
+        appendFileSync(perSprintPath, JSON.stringify(taggedEntry) + '\n', 'utf-8');
+      }
+    }
   } catch {
     // Silent failure — observability should never break the sprint
   }

@@ -29,6 +29,8 @@ import {
   DEBT_FILE, JOBS_DIR,
 } from '../core/constants.js';
 
+import { runRetention } from '../core/sprint-file-retention.js';
+
 // ─── Core — utils ─────────────────────────────────────────────────
 import { parseDebtTable, updateLastSprintId, debugLog } from '../core/utils.js';
 
@@ -68,6 +70,8 @@ import { runDecay, auditBrainBudget } from './debt-manager.js';
 
 // ─── Observability ────────────────────────────────────────────────
 import { generateLoadReport, initObservability } from '../core/observability.js';
+import { rotateMetricsFile } from '../core/observability-rotation.js';
+import type { ObservabilityRotationConfig } from '../core/observability-rotation.js';
 
 // ─── Agent/Skill Pool ─────────────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -89,6 +93,9 @@ import type { PostFinalizeHookResult } from '../core/identity-generator.js';
 
 // ─── Task Restoration / Auto-Archive Guard (Sprint 143 Task 13) ───
 import { createPreArchiveSnapshot, classifyTaskFiles } from './task-restoration.js';
+
+// ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ────────────────────
+import { notify } from '../core/notify.js';
 
 
 // ═══ Types ════════════════════════════════════════════════════════
@@ -983,6 +990,35 @@ export async function finalizeSprint(
 
   debugLog('finalizeSprint:breadcrumb', 'Step 10c (loadReport) — done');
 
+  // 10c2. Rotate metrics file (Sprint 150 T-030)
+  debugLog('finalizeSprint:breadcrumb', 'Step 10c2 (metricsRotation) — entering');
+  try {
+    const rotationConfig: Partial<ObservabilityRotationConfig> = {
+      ...(opts?.config?.observability?.rotation ?? {}),
+    };
+    const rotationResult = rotateMetricsFile(projectRoot, sprint.id, rotationConfig);
+    if (rotationResult.rotated) {
+      debugLog('finalizeSprint:metricsRotation',
+        `Rotated ${rotationResult.originalSizeBytes} bytes → ${rotationResult.archivePath} ` +
+        `(${rotationResult.archivedSizeBytes} bytes gzipped), pruned ${rotationResult.pruned.length} old archives`);
+    }
+  } catch (e) { debugLog('finalizeSprint:metricsRotation', `WARNING: metrics rotation failed: ${e}`); }
+  debugLog('finalizeSprint:breadcrumb', 'Step 10c2 (metricsRotation) — done');
+
+  // 10d. Regenerate features manifest (Sprint 150 Task 029 — Feature Manifest Canlılaştırma)
+  debugLog('finalizeSprint:breadcrumb', 'Step 10d (featuresManifest) — entering');
+  try {
+    const syncScript = join(projectRoot, 'scripts', 'sync-manifest.mjs');
+    if (existsSync(syncScript)) {
+      const syncResult = spawnSync('node', [syncScript, '--root', projectRoot], {
+        encoding: 'utf-8',
+        timeout: 30000,
+        cwd: projectRoot,
+      });
+      debugLog('finalizeSprint:featuresManifest', `Sync exit=${syncResult.status}: ${(syncResult.stdout || '').trim()}`);
+    }
+  } catch (e) { debugLog('finalizeSprint:featuresManifest', `WARNING: features manifest sync failed: ${e}`); }
+
   // 11. Adaptive thresholds: auto-adjust agent_min_score + coverage_threshold based on recent sprints
   if (opts?.config?.adaptive_thresholds) {
     try {
@@ -1040,6 +1076,24 @@ export async function finalizeSprint(
     const removed = cleanTasksArchive(projectRoot);
     debugLog('finalizeSprint:cleanTasksArchive', `Removed ${removed} old .tasks/archive/ dirs`);
   } catch (e) { debugLog('finalizeSprint:cleanTasksArchive', e); }
+
+  // 12d. Sprint file retention — clean counters, migrate forensic files, enforce keep_last_n + size_cap
+  debugLog('finalizeSprint:breadcrumb', 'Step 12d (sprintFileRetention) — entering');
+  try {
+    // Read retention config from project config if available
+    let retentionConfig: Record<string, unknown> = {};
+    try {
+      const cfgPath = join(projectRoot, '.deckent', 'config.json');
+      if (existsSync(cfgPath)) {
+        const raw = JSON.parse(readFileSync(cfgPath, 'utf-8'));
+        if (raw?.sprint_file_retention) retentionConfig = raw.sprint_file_retention;
+      }
+    } catch { /* use defaults */ }
+
+    const retentionResult = runRetention(projectRoot, sprint.id, retentionConfig);
+    debugLog('finalizeSprint:sprintFileRetention',
+      `Retention complete: archived=${retentionResult.archived.length}, countersDeleted=${retentionResult.countersDeleted.length}, forensicMoved=${retentionResult.forensicMoved.length}, bytesFreed=${retentionResult.bytesFreed}`);
+  } catch (e) { debugLog('finalizeSprint:sprintFileRetention', e); }
 
   // 13. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
   debugLog('finalizeSprint:breadcrumb', 'Step 13 (jobSummary) — entering');
@@ -1160,6 +1214,20 @@ export async function finalizeSprint(
     CHANNELS.SPRINT_PHASE_CHANGE,
     { fromPhase: 'RETRO', toPhase: 'CLEANUP', sprintId: sprint.id, timestamp: new Date().toISOString() },
   );
+
+  // DECKENT→USER:NOTIFY (Hot Fix H6) — sprint-finalized, fail-safe
+  try {
+    const done = metrics.completedTasks ?? 0;
+    const total = metrics.totalTasks ?? sprint.tasks.length;
+    const noGo = metrics.noGoTasks ?? 0;
+    const debt = metrics.techDebtTasks ?? 0;
+    void notify(
+      'sprint-finalized',
+      sprint.id,
+      `Sprint ${sprint.id} kapandı`,
+      `${done}/${total} DONE, ${debt} TECH_DEBT, ${noGo} NO_GO`,
+    );
+  } catch (e) { debugLog('finalizeSprint:notify:sprint-finalized', e); }
 
   return metrics;
 }

@@ -69,23 +69,47 @@ function readLastOutputs(
 }
 
 /**
- * Read metric snapshot from .deckent/sprint-NNN-metrics.jsonl.
- * Returns last metric entry per name.
+ * Read metric snapshot for a sprint.
+ * Tries per-sprint file first (sprint-NNN-metrics.jsonl), then falls back
+ * to the flat metrics.jsonl filtered by sprintId tag.
  * File-system based to avoid ADR-008 import cycle.
  */
 function readMetricSnapshot(
   projectRoot: string,
   sprintId: string,
 ): Record<string, unknown> {
-  const filePath = join(projectRoot, DECKENT_DIR, `${sprintId}-metrics.jsonl`);
-  if (!existsSync(filePath)) return {};
+  // Try per-sprint file first (written when perSprintFile is enabled)
+  const perSprintPath = join(projectRoot, DECKENT_DIR, `${sprintId}-metrics.jsonl`);
+  if (existsSync(perSprintPath)) {
+    try {
+      const raw = readFileSync(perSprintPath, 'utf-8');
+      const lines = raw.split('\n').filter(l => l.trim().length > 0);
+      const snapshot: Record<string, unknown> = {};
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as { name?: string; value?: unknown };
+          if (entry.name) snapshot[entry.name] = entry.value;
+        } catch { /* skip */ }
+      }
+      return snapshot;
+    } catch (e) {
+      debugLog('status.ts:per-sprint-metrics-read-error', e);
+    }
+  }
+
+  // Fallback: flat metrics file filtered by sprintId tag
+  const flatPath = join(projectRoot, DECKENT_DIR, 'metrics.jsonl');
+  if (!existsSync(flatPath)) return {};
   try {
-    const raw = readFileSync(filePath, 'utf-8');
+    const raw = readFileSync(flatPath, 'utf-8');
     const lines = raw.split('\n').filter(l => l.trim().length > 0);
     const snapshot: Record<string, unknown> = {};
     for (const line of lines) {
       try {
-        const entry = JSON.parse(line) as { name?: string; value?: unknown };
+        const entry = JSON.parse(line) as { name?: string; value?: unknown; tags?: Record<string, string> };
+        // Only include entries tagged with the requested sprintId (or untagged for retro-compat)
+        const entrySprintId = entry.tags?.sprintId;
+        if (entrySprintId && entrySprintId !== sprintId) continue;
         if (entry.name) snapshot[entry.name] = entry.value;
       } catch { /* skip */ }
     }
