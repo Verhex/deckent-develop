@@ -1,600 +1,600 @@
-| 2026-04-20T14:13:01.503Z | docker-backend:post-stop-verify | taskId=148-003 .result verified + fsynced |
-| 2026-04-20T14:13:01.604Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:13:01.606Z | docker-backend:exit | taskId=148-003 exitCode=137 |
-| 2026-04-20T14:13:01.609Z | docker-backend:reconcile | taskId=148-003 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-20T14:13:01.754Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:13:01.755Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/agent.json' |
-| 2026-04-20T14:13:01.757Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/agent.json' |
-| 2026-04-20T14:13:01.878Z | docker-backend:spawn | taskId=148-011 container=deckent-w-148-011 model=opus |
-| 2026-04-20T14:13:02.207Z | docker-backend:spawn-ok | taskId=148-011 containerId=3efc7843cd6b |
-| 2026-04-20T14:13:37.834Z | waitForResults:progress | Sprint devam ediyor — 8/28 task tamamlandı (15dk) |
-| 2026-04-20T14:13:48.499Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-20T14:13:53.506Z | docker-backend:kill | taskId=148-010 (graceful stop --time=15) |
-| 2026-04-20T14:13:59.575Z | docker-backend:post-stop-verify | taskId=148-010 .result verified + fsynced |
-| 2026-04-20T14:13:59.662Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:13:59.664Z | docker-backend:exit | taskId=148-010 exitCode=0 |
-| 2026-04-20T14:13:59.803Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:13:59.805Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/agent.json' |
-| 2026-04-20T14:13:59.806Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/agent.json' |
-| 2026-04-20T14:13:59.884Z | docker-backend:spawn | taskId=148-012 container=deckent-w-148-012 model=sonnet |
-| 2026-04-20T14:14:00.229Z | docker-backend:spawn-ok | taskId=148-012 containerId=9227f2c5761d |
-| 2026-04-20T14:14:19.788Z | docker-backend:kill | taskId=148-009 (graceful stop --time=15) |
-| 2026-04-20T14:14:26.388Z | docker-backend:post-stop-verify | taskId=148-009 .result verified + fsynced |
-| 2026-04-20T14:14:26.472Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:14:26.474Z | docker-backend:exit | taskId=148-009 exitCode=0 |
-| 2026-04-20T14:14:26.627Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:14:26.629Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/agent.json' |
-| 2026-04-20T14:14:26.630Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/agent.json' |
-| 2026-04-20T14:14:26.713Z | docker-backend:spawn | taskId=148-013 container=deckent-w-148-013 model=opus |
-| 2026-04-20T14:14:27.614Z | docker-backend:spawn-ok | taskId=148-013 containerId=acbc2317043c |
-| 2026-04-20T14:14:44.726Z | docker-backend:kill | taskId=148-011 (graceful stop --time=15) |
-| 2026-04-20T14:14:57.520Z | docker-backend:post-stop-verify | taskId=148-011 .result verified + fsynced |
-| 2026-04-20T14:14:57.600Z | docker-backend:exit | taskId=148-011 exitCode=0 |
-| 2026-04-20T14:14:57.749Z | scope-sanitizer | warnings=2, rejected=0 |
-| 2026-04-20T14:14:57.819Z | docker-backend:spawn | taskId=148-014 container=deckent-w-148-014 model=opus |
-| 2026-04-20T14:14:58.156Z | docker-backend:spawn-ok | taskId=148-014 containerId=7b369daad59f |
-| 2026-04-20T14:16:57.394Z | docker-backend:kill | taskId=148-014 (graceful stop --time=15) |
-| 2026-04-20T14:17:13.380Z | docker-backend:post-stop-verify | taskId=148-014 .result verified + fsynced |
-| 2026-04-20T14:17:13.482Z | docker-backend:exit | taskId=148-014 exitCode=137 |
-| 2026-04-20T14:17:13.485Z | docker-backend:reconcile | taskId=148-014 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-20T14:17:13.708Z | docker-backend:spawn | taskId=148-015 container=deckent-w-148-015 model=opus |
-| 2026-04-20T14:17:14.092Z | docker-backend:spawn-ok | taskId=148-015 containerId=4749983b2159 |
-| 2026-04-20T14:17:27.569Z | docker-backend:kill | taskId=148-013 (graceful stop --time=15) |
-| 2026-04-20T14:17:42.891Z | docker-backend:post-stop-verify | taskId=148-013 .result verified + fsynced |
-| 2026-04-20T14:17:42.978Z | docker-backend:exit | taskId=148-013 exitCode=137 |
-| 2026-04-20T14:17:42.982Z | docker-backend:reconcile | taskId=148-013 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-20T14:17:43.195Z | docker-backend:spawn | taskId=148-016 container=deckent-w-148-016 model=opus |
-| 2026-04-20T14:17:43.523Z | docker-backend:spawn-ok | taskId=148-016 containerId=d19392dc2a1a |
-| 2026-04-20T14:18:23.288Z | docker-backend:kill | taskId=148-012 (graceful stop --time=15) |
-| 2026-04-20T14:18:33.385Z | docker-backend:post-stop-verify | taskId=148-012 .result verified + fsynced |
-| 2026-04-20T14:18:33.471Z | docker-backend:exit | taskId=148-012 exitCode=0 |
-| 2026-04-20T14:18:33.689Z | docker-backend:spawn | taskId=148-017 container=deckent-w-148-017 model=opus |
-| 2026-04-20T14:18:34.008Z | docker-backend:spawn-ok | taskId=148-017 containerId=8e8bd4bb6e61 |
-| 2026-04-20T14:18:39.018Z | waitForResults:progress | Sprint devam ediyor — 14/28 task tamamlandı (20dk) |
-| 2026-04-20T14:20:37.870Z | docker-backend:kill | taskId=148-015 (graceful stop --time=15) |
-| 2026-04-20T14:20:51.444Z | docker-backend:post-stop-verify | taskId=148-015 .result verified + fsynced |
-| 2026-04-20T14:20:51.543Z | docker-backend:exit | taskId=148-015 exitCode=0 |
-| 2026-04-20T14:20:51.690Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-04-20T14:20:51.760Z | docker-backend:spawn | taskId=148-018 container=deckent-w-148-018 model=sonnet |
-| 2026-04-20T14:20:52.098Z | docker-backend:spawn-ok | taskId=148-018 containerId=d43193636bea |
-| 2026-04-20T14:21:33.203Z | docker-backend:kill | taskId=148-016 (graceful stop --time=15) |
-| 2026-04-20T14:21:49.315Z | docker-backend:post-stop-verify | taskId=148-016 .result verified + fsynced |
-| 2026-04-20T14:21:49.394Z | docker-backend:exit | taskId=148-016 exitCode=137 |
-| 2026-04-20T14:21:49.397Z | docker-backend:reconcile | taskId=148-016 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-20T14:21:49.603Z | docker-backend:spawn | taskId=148-019 container=deckent-w-148-019 model=opus |
-| 2026-04-20T14:21:49.929Z | docker-backend:spawn-ok | taskId=148-019 containerId=aa6de2a15128 |
-| 2026-04-20T14:22:48.836Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-20T14:22:53.842Z | docker-backend:kill | taskId=148-018 (graceful stop --time=15) |
-| 2026-04-20T14:22:57.803Z | docker-backend:post-stop-verify | taskId=148-018 .result verified + fsynced |
-| 2026-04-20T14:22:57.903Z | docker-backend:exit | taskId=148-018 exitCode=0 |
-| 2026-04-20T14:22:58.110Z | docker-backend:spawn | taskId=148-020 container=deckent-w-148-020 model=opus |
-| 2026-04-20T14:22:58.437Z | docker-backend:spawn-ok | taskId=148-020 containerId=5ed231cf577e |
-| 2026-04-20T14:23:39.293Z | waitForResults:progress | Sprint devam ediyor — 17/28 task tamamlandı (25dk) |
-| 2026-04-20T14:23:42.206Z | docker-backend:kill | taskId=148-017 (graceful stop --time=15) |
-| 2026-04-20T14:23:58.472Z | docker-backend:post-stop-verify | taskId=148-017 .result verified + fsynced |
-| 2026-04-20T14:23:58.585Z | docker-backend:exit | taskId=148-017 exitCode=137 |
-| 2026-04-20T14:23:58.590Z | docker-backend:reconcile | taskId=148-017 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-20T14:23:58.819Z | docker-backend:spawn | taskId=148-021 container=deckent-w-148-021 model=opus |
-| 2026-04-20T14:23:59.227Z | docker-backend:spawn-ok | taskId=148-021 containerId=b50ac69ce57b |
-| 2026-04-20T14:24:23.585Z | docker-backend:kill | taskId=148-019 (graceful stop --time=15) |
-| 2026-04-20T14:24:35.577Z | docker-backend:post-stop-verify | taskId=148-019 .result verified + fsynced |
-| 2026-04-20T14:24:35.712Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:24:35.715Z | docker-backend:exit | taskId=148-019 exitCode=0 |
-| 2026-04-20T14:24:35.876Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:24:35.878Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/agent.json' |
-| 2026-04-20T14:24:35.885Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/agent.json' |
-| 2026-04-20T14:24:36.006Z | docker-backend:spawn | taskId=148-022 container=deckent-w-148-022 model=opus |
-| 2026-04-20T14:24:36.418Z | docker-backend:spawn-ok | taskId=148-022 containerId=401f44904b1e |
-| 2026-04-20T14:27:58.503Z | docker-backend:kill | taskId=148-021 (graceful stop --time=15) |
-| 2026-04-20T14:28:14.720Z | docker-backend:post-stop-verify | taskId=148-021 .result verified + fsynced |
-| 2026-04-20T14:28:14.824Z | docker-backend:exit | taskId=148-021 exitCode=137 |
-| 2026-04-20T14:28:14.827Z | docker-backend:reconcile | taskId=148-021 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-20T14:28:14.984Z | scope-sanitizer | warnings=2, rejected=0 |
-| 2026-04-20T14:28:15.060Z | docker-backend:spawn | taskId=148-023 container=deckent-w-148-023 model=sonnet |
-| 2026-04-20T14:28:15.379Z | docker-backend:spawn-ok | taskId=148-023 containerId=c1f567324940 |
-| 2026-04-20T14:28:40.405Z | waitForResults:progress | Sprint devam ediyor — 20/28 task tamamlandı (30dk) |
-| 2026-04-20T14:29:56.939Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-20T14:30:01.942Z | docker-backend:kill | taskId=148-022 (graceful stop --time=15) |
-| 2026-04-20T14:30:12.757Z | docker-backend:post-stop-verify | taskId=148-022 .result verified + fsynced |
-| 2026-04-20T14:30:12.839Z | docker-backend:exit | taskId=148-022 exitCode=0 |
-| 2026-04-20T14:30:13.064Z | docker-backend:spawn | taskId=148-024 container=deckent-w-148-024 model=sonnet |
-| 2026-04-20T14:30:13.412Z | docker-backend:spawn-ok | taskId=148-024 containerId=e6fe65dba1f3 |
-| 2026-04-20T14:31:10.863Z | docker-backend:kill | taskId=148-023 (graceful stop --time=15) |
-| 2026-04-20T14:31:18.235Z | docker-backend:post-stop-verify | taskId=148-023 .result verified + fsynced |
-| 2026-04-20T14:31:18.318Z | docker-backend:exit | taskId=148-023 exitCode=0 |
-| 2026-04-20T14:31:18.465Z | scope-sanitizer | warnings=4, rejected=0 |
-| 2026-04-20T14:31:18.538Z | docker-backend:spawn | taskId=148-025 container=deckent-w-148-025 model=sonnet |
-| 2026-04-20T14:31:18.877Z | docker-backend:spawn-ok | taskId=148-025 containerId=4e308d716a2d |
-| 2026-04-20T14:33:41.972Z | waitForResults:progress | Sprint devam ediyor — 22/28 task tamamlandı (35dk) |
-| 2026-04-20T14:36:17.145Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-20T14:36:22.148Z | docker-backend:kill | taskId=148-024 (graceful stop --time=15) |
-| 2026-04-20T14:36:37.485Z | docker-backend:post-stop-verify | taskId=148-024 .result verified + fsynced |
-| 2026-04-20T14:36:37.595Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:36:37.596Z | docker-backend:exit | taskId=148-024 exitCode=137 |
-| 2026-04-20T14:36:37.598Z | docker-backend:reconcile | taskId=148-024 exitCode=137 but .result=DONE → HB DONE |
-| 2026-04-20T14:36:37.737Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:36:37.738Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/agent.json' |
-| 2026-04-20T14:36:37.740Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/agent.json' |
-| 2026-04-20T14:36:37.819Z | docker-backend:spawn | taskId=148-026 container=deckent-w-148-026 model=opus |
-| 2026-04-20T14:36:38.170Z | docker-backend:spawn-ok | taskId=148-026 containerId=f172ec8868e2 |
-| 2026-04-20T14:36:43.175Z | docker-backend:kill | taskId=148-025 (graceful stop --time=15) |
-| 2026-04-20T14:36:56.264Z | docker-backend:post-stop-verify | taskId=148-025 .result verified + fsynced |
-| 2026-04-20T14:36:56.345Z | docker-backend:exit | taskId=148-025 exitCode=0 |
-| 2026-04-20T14:36:56.564Z | docker-backend:spawn | taskId=148-027 container=deckent-w-148-027 model=sonnet |
-| 2026-04-20T14:36:56.912Z | docker-backend:spawn-ok | taskId=148-027 containerId=f0834cb228d3 |
-| 2026-04-20T14:38:35.568Z | docker-backend:kill | taskId=148-026 (graceful stop --time=15) |
-| 2026-04-20T14:38:47.492Z | docker-backend:post-stop-verify | taskId=148-026 .result verified + fsynced |
-| 2026-04-20T14:38:47.619Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:38:47.620Z | docker-backend:exit | taskId=148-026 exitCode=0 |
-| 2026-04-20T14:38:47.762Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/PROMPT.md' |
-| 2026-04-20T14:38:47.764Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/test-writer/agent.json' |
-| 2026-04-20T14:38:47.765Z | resolveAgentPrompt:readFile | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/agents/test-writer/agent.json' |
-| 2026-04-20T14:38:47.782Z | scope-sanitizer | warnings=1, rejected=0 |
-| 2026-04-20T14:38:47.854Z | docker-backend:spawn | taskId=148-028 container=deckent-w-148-028 model=sonnet |
-| 2026-04-20T14:38:48.184Z | docker-backend:spawn-ok | taskId=148-028 containerId=b25d253bfc52 |
-| 2026-04-20T14:38:48.187Z | waitForResults:progress | Sprint devam ediyor — 25/28 task tamamlandı (40dk) |
-| 2026-04-20T14:39:17.184Z | readJsonSafe | Unexpected end of JSON input |
-| 2026-04-20T14:39:28.617Z | docker-backend:exit | taskId=148-027 exitCode=0 |
-| 2026-04-20T14:41:11.234Z | docker-backend:exit | taskId=148-028 exitCode=0 |
-| 2026-04-20T14:43:30.515Z | sprint-checkpoint:phaseTransition | Phase EXECUTE → writing checkpoint |
-| 2026-04-20T14:43:30.516Z | sprint-checkpoint:write | Checkpoint #3 written for sprint-148 |
-| 2026-04-20T14:43:30.522Z | runEvaluatePhase:start | totalTasks=28 collectedResults=28 collectedIds=[148-001,148-002,148-005,148-004,148-006,148-007,148-008,148-003,148-010,148-009,148-011,148-014,148-013,148-012,148-015,148-016,148-018,148-017,148-019, |
-| 2026-04-20T14:43:30.529Z | countLanguageFiles:statSync | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/.tasks/task-148-020.result.fsync' |
-| 2026-04-20T14:43:34.372Z | runEvaluatePhase:task | task=148-001 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:43:34.375Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:43:34.376Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:43:34.377Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:43:34.378Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:43:34.379Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:43:34.380Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:43:34.381Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:43:34.382Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:43:34.383Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:43:34.384Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:43:34.385Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:43:38.906Z | runEvaluatePhase:task | task=148-002 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:43:38.908Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:43:38.909Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:43:38.910Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:43:38.911Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:43:38.912Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:43:38.913Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:43:38.914Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:43:38.915Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:43:38.916Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:43:38.917Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:43:38.918Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:43:43.893Z | runEvaluatePhase:task | task=148-003 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:43:43.896Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:43:43.897Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:43:43.898Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:43:43.899Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:43:43.900Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:43:43.901Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:43:43.902Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:43:43.903Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:43:43.904Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:43:43.905Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:43:43.906Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:43:48.681Z | runEvaluatePhase:task | task=148-004 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:43:48.684Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:43:48.685Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:43:48.686Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:43:48.687Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:43:48.688Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:43:48.689Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:43:48.690Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:43:48.691Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:43:48.692Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:43:48.692Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:43:48.693Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:43:52.507Z | runEvaluatePhase:task | task=148-005 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:43:52.510Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:43:52.511Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:43:52.512Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:43:52.513Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:43:52.514Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:43:52.515Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:43:52.516Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:43:52.517Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:43:52.518Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:43:52.519Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:43:52.520Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:43:59.054Z | runEvaluatePhase:task | task=148-006 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:43:59.057Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:43:59.058Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:43:59.059Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:43:59.060Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:43:59.061Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:43:59.061Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:43:59.063Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:43:59.063Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:43:59.064Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:43:59.065Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:43:59.066Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:03.720Z | runEvaluatePhase:task | task=148-007 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:03.723Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:03.723Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:03.725Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:03.726Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:03.727Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:03.728Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:03.729Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:03.730Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:03.731Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:03.731Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:03.732Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:08.407Z | runEvaluatePhase:task | task=148-008 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:08.409Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:08.410Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:08.412Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:08.413Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:08.414Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:08.414Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:08.415Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:08.416Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:08.417Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:08.418Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:08.419Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:12.281Z | runEvaluatePhase:task | task=148-009 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:12.284Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:12.284Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:12.285Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:12.286Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:12.287Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:12.288Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:12.289Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:12.290Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:12.291Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:12.292Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:12.293Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:16.114Z | runEvaluatePhase:task | task=148-010 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:16.116Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:16.117Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:16.118Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:16.121Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:16.122Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:16.122Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:16.123Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:16.124Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:16.125Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:16.126Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:16.127Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:19.937Z | runEvaluatePhase:task | task=148-011 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:19.940Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:19.941Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:19.942Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:19.944Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:19.945Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:19.946Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:19.947Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:19.948Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:19.949Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:19.950Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:19.951Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:23.779Z | runEvaluatePhase:task | task=148-012 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:23.782Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:23.783Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:23.784Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:23.785Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:23.786Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:23.787Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:23.788Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:23.788Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:23.789Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:23.790Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:23.791Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:27.687Z | runEvaluatePhase:task | task=148-013 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:27.690Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:27.690Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:27.691Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:27.692Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:27.693Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:27.694Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:27.695Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:27.696Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:28.638Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:28.639Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:28.640Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:32.522Z | runEvaluatePhase:task | task=148-014 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:32.524Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:32.525Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:32.526Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:32.527Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:32.528Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:32.529Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:32.530Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:32.531Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:32.532Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:32.533Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:32.534Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:36.419Z | runEvaluatePhase:task | task=148-015 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:36.422Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:36.423Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:36.424Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:36.425Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:36.426Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:36.426Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:36.428Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:36.428Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:36.429Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:36.430Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:36.431Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:40.319Z | runEvaluatePhase:task | task=148-016 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:40.322Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:40.322Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:40.323Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:40.325Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:40.326Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:40.327Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:40.328Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:40.328Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:40.329Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:40.330Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:40.331Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:44.271Z | runEvaluatePhase:task | task=148-017 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:44.274Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:44.275Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:44.276Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:44.277Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:44.278Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:44.279Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:44.280Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:44.280Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:44.281Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:44.282Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:44.283Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:48.163Z | runEvaluatePhase:task | task=148-018 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:48.167Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:48.168Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:48.169Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:48.169Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:48.170Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:48.171Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:48.172Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:48.173Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:48.174Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:48.175Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:48.176Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:52.028Z | runEvaluatePhase:task | task=148-019 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:52.031Z | runEvaluatePhase:task | task=148-020 selfAssessment=NO_GO evaluation=NO_GO testsPassed=false |
-| 2026-04-20T14:44:52.032Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:52.033Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:52.034Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:52.035Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:52.036Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:52.037Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:52.038Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:52.039Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:52.040Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:52.041Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:52.042Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:44:57.153Z | runEvaluatePhase:task | task=148-021 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:44:57.155Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:44:57.156Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:44:57.157Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:44:57.158Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:44:57.159Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:44:57.160Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:44:57.161Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:44:57.162Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:44:57.163Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:44:57.164Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:44:57.165Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:02.077Z | runEvaluatePhase:task | task=148-022 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
-| 2026-04-20T14:45:02.113Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:45:02.114Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:45:02.115Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:45:02.116Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:45:02.117Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:45:02.118Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:45:02.119Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:45:02.120Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:45:02.120Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:45:02.121Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:45:02.122Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:06.020Z | runEvaluatePhase:task | task=148-023 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:45:06.023Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:45:06.024Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:45:06.025Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:45:06.026Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:45:06.027Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:45:06.028Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:45:06.029Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:45:06.031Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:45:06.031Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:45:06.032Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:45:06.033Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:09.969Z | runEvaluatePhase:task | task=148-024 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:45:09.971Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:45:09.972Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:45:09.973Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:45:09.974Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:45:09.975Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:45:09.976Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:45:09.977Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:45:09.978Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:45:09.978Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:45:09.979Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:45:09.980Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:13.813Z | runEvaluatePhase:task | task=148-025 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:45:13.815Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:45:13.817Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:45:13.817Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:45:13.818Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:45:13.819Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:45:13.820Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:45:13.821Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:45:13.822Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:45:13.822Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:45:13.823Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:45:13.824Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:18.439Z | runEvaluatePhase:task | task=148-026 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:45:18.442Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:45:18.443Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:45:18.444Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:45:18.445Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:45:18.446Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:45:18.447Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:45:18.447Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:45:18.448Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:45:18.449Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:45:18.450Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:45:18.451Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:22.359Z | runEvaluatePhase:task | task=148-027 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:45:22.361Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:45:22.362Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:45:22.363Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:45:22.364Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:45:22.365Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:45:22.366Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:45:22.367Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:45:22.368Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:45:22.368Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:45:22.369Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:45:22.370Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:26.289Z | runEvaluatePhase:task | task=148-028 selfAssessment=DONE evaluation=DONE testsPassed=true |
-| 2026-04-20T14:45:26.291Z | runEvaluatePhase:done | evaluations.size=28 keys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,148-018,148-019,148-020,148-021,148-02 |
-| 2026-04-20T14:45:26.298Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
-| 2026-04-20T14:45:26.299Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-148 |
-| 2026-04-20T14:45:26.302Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:45:26.304Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
-| 2026-04-20T14:45:26.305Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
-| 2026-04-20T14:45:26.306Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
-| 2026-04-20T14:45:26.307Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
-| 2026-04-20T14:45:26.308Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
-| 2026-04-20T14:45:26.309Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
-| 2026-04-20T14:45:26.310Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
-| 2026-04-20T14:45:26.311Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
-| 2026-04-20T14:45:26.312Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
-| 2026-04-20T14:45:26.313Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
-| 2026-04-20T14:45:26.313Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
-| 2026-04-20T14:45:26.315Z | mid-sprint-adapter:shouldReroute | Rerouting: agent undefined→doc-writer, skills []→[documentation-writer] (attempt 1/3) |
-| 2026-04-20T14:45:26.316Z | mid-sprint-adapter:apply | Task 148-020-fix rerouted → agent=doc-writer, skills=[documentation-writer] |
-| 2026-04-20T14:45:26.348Z | docker-backend:exit | taskId=148-020 exitCode=0 |
-| 2026-04-20T14:45:26.588Z | docker-backend:spawn | taskId=148-020-fix container=deckent-w-148-020-fix model=opus |
-| 2026-04-20T14:45:26.919Z | docker-backend:spawn-ok | taskId=148-020-fix containerId=62b47be09751 |
-| 2026-04-20T14:50:27.375Z | waitForResults:progress | Sprint devam ediyor — 0/1 task tamamlandı (5dk) |
-| 2026-04-20T14:55:27.829Z | waitForResults:progress | Sprint devam ediyor — 0/1 task tamamlandı (10dk) |
-| 2026-04-20T14:55:27.832Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
-| 2026-04-20T14:55:27.833Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-148 |
-| 2026-04-20T14:55:27.836Z | tryCodeVerifiedDone | Reconciliation triggered for task 148-020 |
-| 2026-04-20T14:55:27.848Z | finalizeSprint:preRetro | evaluations.size=28 keys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,148-018,148-019,148-020,148-021,148-02 |
-| 2026-04-20T14:55:27.850Z | buildAgentPerformance | task=148-001 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:55:27.851Z | buildAgentPerformance | task=148-002 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.852Z | buildAgentPerformance | task=148-003 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.852Z | buildAgentPerformance | task=148-004 agent=temp-react-ts-specialist ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148 |
-| 2026-04-20T14:55:27.853Z | buildAgentPerformance | task=148-005 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:55:27.854Z | buildAgentPerformance | task=148-006 agent=temp-react-ts-specialist ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148 |
-| 2026-04-20T14:55:27.855Z | buildAgentPerformance | task=148-007 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:55:27.856Z | buildAgentPerformance | task=148-008 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:55:27.857Z | buildAgentPerformance | task=148-009 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.858Z | buildAgentPerformance | task=148-010 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.858Z | buildAgentPerformance | task=148-011 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.859Z | buildAgentPerformance | task=148-012 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.860Z | buildAgentPerformance | task=148-013 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.861Z | buildAgentPerformance | task=148-014 agent=devops-engineer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148- |
-| 2026-04-20T14:55:27.862Z | buildAgentPerformance | task=148-015 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:55:27.863Z | buildAgentPerformance | task=148-016 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:55:27.864Z | buildAgentPerformance | task=148-017 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:55:27.864Z | buildAgentPerformance | task=148-018 agent=architect ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:55:27.865Z | buildAgentPerformance | task=148-019 agent=architect ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:55:27.866Z | buildAgentPerformance | task=148-020 agent=doc-writer ev=NO_GO evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.867Z | buildAgentPerformance | task=148-021 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:55:27.868Z | buildAgentPerformance | task=148-022 agent=test-writer ev=GO_WITH_TECH_DEBT evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148 |
-| 2026-04-20T14:55:27.869Z | buildAgentPerformance | task=148-023 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:55:27.870Z | buildAgentPerformance | task=148-024 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:55:27.871Z | buildAgentPerformance | task=148-025 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:55:27.871Z | buildAgentPerformance | task=148-026 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:55:27.872Z | buildAgentPerformance | task=148-027 agent=architect ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:55:27.873Z | buildAgentPerformance | task=148-028 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.438Z | finalizeSprint:tripleLink | Triple-link created for sprint-148 |
-| 2026-04-20T14:57:01.510Z | finalizeSprint:routing-outcomes | Recorded 28 routing outcomes to learnings.json |
-| 2026-04-20T14:57:01.513Z | finalizeSprint:rule-evolution | 6 new rules evolved |
-| 2026-04-20T14:57:01.517Z | rule-evolver:saveRules | 6 rules saved to .deckent/routing/evolved-rules.json |
-| 2026-04-20T14:57:01.519Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.520Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.524Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.526Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.528Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.529Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.531Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.533Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.535Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.537Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.539Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.540Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.542Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.543Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.545Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.548Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.572Z | finalizeSprint:syncStatsToManifests | Synced 16 agents, 16 skills to manifest files |
-| 2026-04-20T14:57:01.576Z | finalizeSprint:promotion | agent 'test-writer': 123 tasks, 91% success — meets promotion criteria |
-| 2026-04-20T14:57:01.577Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
-| 2026-04-20T14:57:01.578Z | finalizeSprint:promotion | agent 'temp-react-ts-specialist': 9 tasks, 100% success — meets promotion criteria |
-| 2026-04-20T14:57:01.579Z | promotion-pipeline:promote | Temp agent 'temp-react-ts-specialist' not found |
-| 2026-04-20T14:57:01.580Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
-| 2026-04-20T14:57:01.581Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
-| 2026-04-20T14:57:01.599Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.633Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.deckent/agents/archive/agent.json' |
-| 2026-04-20T14:57:01.654Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
-| 2026-04-20T14:57:01.780Z | buildAgentPerformance | task=148-001 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:57:01.786Z | buildAgentPerformance | task=148-002 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.795Z | buildAgentPerformance | task=148-003 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.799Z | buildAgentPerformance | task=148-004 agent=temp-react-ts-specialist ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148 |
-| 2026-04-20T14:57:01.803Z | buildAgentPerformance | task=148-005 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:57:01.804Z | buildAgentPerformance | task=148-006 agent=temp-react-ts-specialist ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148 |
-| 2026-04-20T14:57:01.807Z | buildAgentPerformance | task=148-007 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:57:01.809Z | buildAgentPerformance | task=148-008 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:57:01.813Z | buildAgentPerformance | task=148-009 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.816Z | buildAgentPerformance | task=148-010 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.817Z | buildAgentPerformance | task=148-011 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.818Z | buildAgentPerformance | task=148-012 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.826Z | buildAgentPerformance | task=148-013 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.827Z | buildAgentPerformance | task=148-014 agent=devops-engineer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148- |
-| 2026-04-20T14:57:01.828Z | buildAgentPerformance | task=148-015 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:57:01.829Z | buildAgentPerformance | task=148-016 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:57:01.837Z | buildAgentPerformance | task=148-017 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:57:01.838Z | buildAgentPerformance | task=148-018 agent=architect ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:57:01.841Z | buildAgentPerformance | task=148-019 agent=architect ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:57:01.842Z | buildAgentPerformance | task=148-020 agent=doc-writer ev=NO_GO evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.846Z | buildAgentPerformance | task=148-021 agent=bug-fixer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:57:01.850Z | buildAgentPerformance | task=148-022 agent=test-writer ev=GO_WITH_TECH_DEBT evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148 |
-| 2026-04-20T14:57:01.851Z | buildAgentPerformance | task=148-023 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:57:01.859Z | buildAgentPerformance | task=148-024 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:57:01.863Z | buildAgentPerformance | task=148-025 agent=doc-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,1 |
-| 2026-04-20T14:57:01.867Z | buildAgentPerformance | task=148-026 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.869Z | buildAgentPerformance | task=148-027 agent=architect ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017,14 |
-| 2026-04-20T14:57:01.872Z | buildAgentPerformance | task=148-028 agent=test-writer ev=DONE evalMapSize=28 evalKeys=[148-001,148-002,148-003,148-004,148-005,148-006,148-007,148-008,148-009,148-010,148-011,148-012,148-013,148-014,148-015,148-016,148-017, |
-| 2026-04-20T14:57:01.880Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
-| 2026-04-20T14:57:13.578Z | runSelfAuditGate:tsc | status=PASS errors=0 |
-| 2026-04-20T14:59:18.796Z | runSelfAuditGate:vitest | status=FAIL delta.fail=1 |
-| 2026-04-20T14:59:19.564Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-270841-trap.json' |
-| 2026-04-20T14:59:19.655Z | runSelfAuditGate:honesty | violations=0 |
-| 2026-04-20T14:59:19.669Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-148 |
-| 2026-04-20T14:59:19.677Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
-| 2026-04-20T14:59:19.678Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
-| 2026-04-20T14:59:19.697Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-148-gate.json overallGate=GATE_FAILURE |
-| 2026-04-20T14:59:19.704Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
-| 2026-04-20T14:59:19.882Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-148/load-test-report.md |
-| 2026-04-20T14:59:19.885Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
-| 2026-04-20T14:59:19.909Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
-| 2026-04-20T14:59:19.919Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-148.md |
-| 2026-04-20T14:59:19.920Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
-| 2026-04-20T14:59:20.064Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-148-pre-archive.tar.gz (142 files, hash=18c7310eb69e...) |
-| 2026-04-20T14:59:20.069Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 142 files, hash=18c7310eb69e... |
-| 2026-04-20T14:59:20.197Z | archiveOrphanTasks | Archived 143 task files to /home/alperen/deckent-dev/.brain/archive/sprint-148-tasks |
-| 2026-04-20T14:59:20.200Z | finalizeSprint:archiveOrphanTasks | Archived 143 orphan task files |
-| 2026-04-20T14:59:20.202Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
-| 2026-04-20T14:59:20.207Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
-| 2026-04-20T14:59:20.215Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
-| 2026-04-20T14:59:20.238Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-148.json |
-| 2026-04-20T14:59:20.248Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
-| 2026-04-20T14:59:20.442Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
-| 2026-04-20T14:59:20.446Z | postFinalizeHooks:identityRegen | updated adrCount=42 |
-| 2026-04-20T14:59:20.495Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
-| 2026-04-20T14:59:20.496Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=updated ruleRegen=true errors=0 |
-| 2026-04-20T14:59:20.501Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
-| 2026-04-20T15:02:27.891Z | docker-backend:kill | taskId=148-020-fix (graceful stop --time=15) |
-| 2026-04-20T15:02:44.380Z | docker-backend:post-stop-verify | taskId=148-020-fix .result MISSING after stop — EXIT trap should write fallback |
-| 2026-04-20T15:02:44.907Z | docker-backend:exit | taskId=148-020-fix exitCode=137 |
+| 2026-04-21T11:20:37.741Z | scope-sanitizer | warnings=2, rejected=0 |
+| 2026-04-21T11:20:37.810Z | docker-backend:spawn | taskId=150-032 container=deckent-w-150-032 model=opus |
+| 2026-04-21T11:20:38.147Z | docker-backend:spawn-ok | taskId=150-032 containerId=a3812a0e6194 |
+| 2026-04-21T11:21:10.157Z | docker-backend:kill | taskId=150-029 (graceful stop --time=15) |
+| 2026-04-21T11:21:28.342Z | docker-backend:post-stop-verify | taskId=150-029 .result verified + fsynced |
+| 2026-04-21T11:21:28.453Z | docker-backend:exit | taskId=150-029 exitCode=0 |
+| 2026-04-21T11:21:28.605Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-04-21T11:21:28.670Z | docker-backend:spawn | taskId=150-033 container=deckent-w-150-033 model=opus |
+| 2026-04-21T11:21:28.978Z | docker-backend:spawn-ok | taskId=150-033 containerId=8668981d3786 |
+| 2026-04-21T11:23:14.077Z | waitForResults:progress | Sprint devam ediyor — 30/38 task tamamlandı (45dk) |
+| 2026-04-21T11:25:29.255Z | docker-backend:kill | taskId=150-031 (graceful stop --time=15) |
+| 2026-04-21T11:25:44.563Z | docker-backend:post-stop-verify | taskId=150-031 .result verified + fsynced |
+| 2026-04-21T11:25:44.638Z | docker-backend:exit | taskId=150-031 exitCode=137 |
+| 2026-04-21T11:25:44.641Z | docker-backend:reconcile | taskId=150-031 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-21T11:25:44.798Z | scope-sanitizer | warnings=3, rejected=0 |
+| 2026-04-21T11:25:44.864Z | docker-backend:spawn | taskId=150-034 container=deckent-w-150-034 model=opus |
+| 2026-04-21T11:25:45.178Z | docker-backend:spawn-ok | taskId=150-034 containerId=8e8621aa023d |
+| 2026-04-21T11:27:27.815Z | docker-backend:kill | taskId=150-033 (graceful stop --time=15) |
+| 2026-04-21T11:27:37.450Z | docker-backend:post-stop-verify | taskId=150-033 .result verified + fsynced |
+| 2026-04-21T11:27:37.558Z | docker-backend:exit | taskId=150-033 exitCode=0 |
+| 2026-04-21T11:27:37.707Z | scope-sanitizer | warnings=5, rejected=0 |
+| 2026-04-21T11:27:37.774Z | docker-backend:spawn | taskId=150-035 container=deckent-w-150-035 model=opus |
+| 2026-04-21T11:27:38.079Z | docker-backend:spawn-ok | taskId=150-035 containerId=dc94afc3cbd9 |
+| 2026-04-21T11:28:16.581Z | waitForResults:progress | Sprint devam ediyor — 32/38 task tamamlandı (51dk) |
+| 2026-04-21T11:30:15.133Z | docker-backend:kill | taskId=150-032 (graceful stop --time=15) |
+| 2026-04-21T11:30:30.465Z | docker-backend:post-stop-verify | taskId=150-032 .result verified + fsynced |
+| 2026-04-21T11:30:30.581Z | docker-backend:exit | taskId=150-032 exitCode=137 |
+| 2026-04-21T11:30:30.584Z | docker-backend:reconcile | taskId=150-032 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-21T11:30:30.732Z | scope-sanitizer | warnings=3, rejected=0 |
+| 2026-04-21T11:30:30.796Z | docker-backend:spawn | taskId=150-036 container=deckent-w-150-036 model=sonnet |
+| 2026-04-21T11:30:31.107Z | docker-backend:spawn-ok | taskId=150-036 containerId=ead331feb0df |
+| 2026-04-21T11:33:18.824Z | waitForResults:progress | Sprint devam ediyor — 33/38 task tamamlandı (56dk) |
+| 2026-04-21T11:34:45.281Z | readJsonSafe | Unexpected end of JSON input |
+| 2026-04-21T11:34:50.283Z | docker-backend:kill | taskId=150-036 (graceful stop --time=15) |
+| 2026-04-21T11:34:57.124Z | docker-backend:post-stop-verify | taskId=150-036 .result verified + fsynced |
+| 2026-04-21T11:35:00.565Z | docker-backend:exit | taskId=150-036 exitCode=0 |
+| 2026-04-21T11:35:00.795Z | scope-sanitizer | warnings=5, rejected=0 |
+| 2026-04-21T11:35:00.881Z | docker-backend:spawn | taskId=150-037 container=deckent-w-150-037 model=opus |
+| 2026-04-21T11:35:01.243Z | docker-backend:spawn-ok | taskId=150-037 containerId=ed729dfaa53f |
+| 2026-04-21T11:36:36.982Z | docker-backend:kill | taskId=150-035 (graceful stop --time=15) |
+| 2026-04-21T11:36:55.933Z | docker-backend:post-stop-verify | taskId=150-035 .result verified + fsynced |
+| 2026-04-21T11:36:56.098Z | docker-backend:exit | taskId=150-035 exitCode=137 |
+| 2026-04-21T11:36:56.102Z | docker-backend:reconcile | taskId=150-035 exitCode=137 but .result=DONE → HB DONE |
+| 2026-04-21T11:36:56.314Z | scope-sanitizer | warnings=2, rejected=0 |
+| 2026-04-21T11:36:56.404Z | docker-backend:spawn | taskId=150-038 container=deckent-w-150-038 model=sonnet |
+| 2026-04-21T11:36:56.830Z | docker-backend:spawn-ok | taskId=150-038 containerId=839b941eef69 |
+| 2026-04-21T11:38:23.587Z | waitForResults:progress | Sprint devam ediyor — 35/38 task tamamlandı (61dk) |
+| 2026-04-21T11:39:20.731Z | docker-backend:exit | taskId=150-037 exitCode=0 |
+| 2026-04-21T11:40:00.580Z | docker-backend:exit | taskId=150-038 exitCode=0 |
+| 2026-04-21T11:40:53.494Z | sprint-checkpoint:phaseTransition | Phase EXECUTE → writing checkpoint |
+| 2026-04-21T11:40:53.498Z | sprint-checkpoint:write | Checkpoint #3 written for sprint-150 |
+| 2026-04-21T11:40:53.499Z | runEvaluatePhase:start | totalTasks=38 collectedResults=38 collectedIds=[150-002,150-001,150-005,150-004,150-003,150-006,150-008,150-010,150-009,150-007,150-012,150-011,150-013,150-016,150-014,150-015,150-018,150-019,150-017, |
+| 2026-04-21T11:41:00.909Z | runEvaluatePhase:task | task=150-001 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:00.911Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:00.912Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:00.913Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:00.914Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:00.915Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:00.916Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:00.917Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:00.918Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:00.919Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:00.920Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:00.921Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:05.073Z | runEvaluatePhase:task | task=150-002 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:05.076Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:05.077Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:05.078Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:05.078Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:05.079Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:05.080Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:05.081Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:05.082Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:05.083Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:05.084Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:05.085Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:09.172Z | runEvaluatePhase:task | task=150-003 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:09.174Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:09.175Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:09.176Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:09.177Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:09.178Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:09.179Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:09.179Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:09.180Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:09.181Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:09.182Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:09.183Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:14.095Z | runEvaluatePhase:task | task=150-004 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:14.098Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:14.099Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:14.100Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:14.101Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:14.102Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:14.102Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:14.103Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:14.104Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:14.105Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:14.106Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:14.107Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:18.215Z | runEvaluatePhase:task | task=150-005 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:18.217Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:18.218Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:18.219Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:18.220Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:18.221Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:18.222Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:18.223Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:18.224Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:18.225Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:18.226Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:18.227Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:22.392Z | runEvaluatePhase:task | task=150-006 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:22.394Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:22.395Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:22.396Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:22.397Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:22.398Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:22.399Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:22.400Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:22.400Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:22.401Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:22.402Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:22.403Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:26.491Z | runEvaluatePhase:task | task=150-007 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
+| 2026-04-21T11:41:26.535Z | runEvaluatePhase:task | task=150-008 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-21T11:41:26.536Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:26.537Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:26.538Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:26.539Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:26.540Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:26.541Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:26.542Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:26.542Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:26.543Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:26.544Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:26.545Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:35.241Z | runEvaluatePhase:task | task=150-009 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
+| 2026-04-21T11:41:35.273Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:35.274Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:35.275Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:35.276Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:35.277Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:35.278Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:35.279Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:35.279Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:35.280Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:35.281Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:35.282Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:40.159Z | runEvaluatePhase:task | task=150-010 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:40.161Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:40.162Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:40.163Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:40.164Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:40.165Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:40.166Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:40.166Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:40.167Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:40.168Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:40.169Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:40.170Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:45.120Z | runEvaluatePhase:task | task=150-011 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:45.123Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:45.124Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:45.125Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:45.126Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:45.126Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:45.127Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:45.128Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:45.129Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:45.130Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:45.131Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:45.132Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:50.029Z | runEvaluatePhase:task | task=150-012 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:50.031Z | runEvaluatePhase:task | task=150-013 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-21T11:41:50.032Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:50.033Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:50.034Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:50.035Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:50.036Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:50.037Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:50.038Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:50.039Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:50.039Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:50.040Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:50.041Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:41:54.213Z | runEvaluatePhase:task | task=150-014 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:41:54.216Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:41:54.217Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:41:54.218Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:41:54.220Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:41:54.221Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:41:54.222Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:41:54.223Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:41:54.224Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:41:54.224Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:41:54.225Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:41:54.226Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:00.112Z | runEvaluatePhase:task | task=150-015 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:00.115Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:00.116Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:00.117Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:00.118Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:00.119Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:00.119Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:00.120Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:00.121Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:00.122Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:00.123Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:00.124Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:04.271Z | runEvaluatePhase:task | task=150-016 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:04.274Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:04.274Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:04.275Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:04.276Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:04.277Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:04.278Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:04.279Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:04.280Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:04.281Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:04.281Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:04.283Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:11.574Z | runEvaluatePhase:task | task=150-017 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
+| 2026-04-21T11:42:11.605Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:11.606Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:11.607Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:11.608Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:11.609Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:11.610Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:11.611Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:11.611Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:11.612Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:11.613Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:11.614Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:15.803Z | runEvaluatePhase:task | task=150-018 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:15.805Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:15.806Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:15.807Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:15.808Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:15.809Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:15.810Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:15.811Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:15.812Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:15.813Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:15.814Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:15.815Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:19.983Z | runEvaluatePhase:task | task=150-019 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:19.985Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:19.991Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:19.992Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:19.992Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:19.993Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:19.994Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:19.995Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:19.996Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:19.997Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:19.998Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:19.999Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:24.215Z | runEvaluatePhase:task | task=150-020 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:24.218Z | runEvaluatePhase:task | task=150-021 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-21T11:42:24.219Z | runEvaluatePhase:task | task=150-022 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-21T11:42:24.220Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:24.221Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:24.222Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:24.223Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:24.224Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:24.225Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:24.226Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:24.227Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:24.228Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:24.229Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:24.230Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:28.501Z | runEvaluatePhase:task | task=150-023 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:28.504Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:28.505Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:28.506Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:28.507Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:28.508Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:28.508Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:28.509Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:28.510Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:28.511Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:28.512Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:28.513Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:32.675Z | runEvaluatePhase:task | task=150-024 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:32.678Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:32.679Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:32.680Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:32.680Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:32.682Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:32.683Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:32.684Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:32.685Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:32.686Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:32.686Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:32.687Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:36.895Z | runEvaluatePhase:task | task=150-025 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:36.898Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:36.899Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:36.903Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:36.904Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:36.910Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:36.911Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:36.912Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:36.912Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:36.913Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:36.914Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:36.915Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:44.334Z | runEvaluatePhase:task | task=150-026 selfAssessment=GO_WITH_TECH_DEBT evaluation=GO_WITH_TECH_DEBT testsPassed=true |
+| 2026-04-21T11:42:44.367Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:44.368Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:44.369Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:44.370Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:44.371Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:44.372Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:44.374Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:44.378Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:44.379Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:44.380Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:44.381Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:48.555Z | runEvaluatePhase:task | task=150-027 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:42:48.558Z | runEvaluatePhase:task | task=150-028 selfAssessment=DONE evaluation=NO_GO testsPassed=true |
+| 2026-04-21T11:42:48.559Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:48.560Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:48.561Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:48.569Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:48.570Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:48.571Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:48.572Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:48.572Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:48.573Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:48.574Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:48.575Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:42:54.465Z | runEvaluatePhase:task | task=150-029 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
+| 2026-04-21T11:42:54.497Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:42:54.498Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:42:54.499Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:42:54.499Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:42:54.501Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:42:54.501Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:42:54.502Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:42:54.503Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:42:54.504Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:42:54.505Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:42:54.505Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:00.940Z | runEvaluatePhase:task | task=150-030 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:00.943Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:00.944Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:00.945Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:00.946Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:00.947Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:00.948Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:00.949Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:00.950Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:00.951Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:00.951Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:00.952Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:05.228Z | runEvaluatePhase:task | task=150-031 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:05.230Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:05.231Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:05.232Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:05.233Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:05.234Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:05.235Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:05.235Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:05.236Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:05.237Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:05.238Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:05.239Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:11.291Z | runEvaluatePhase:task | task=150-032 selfAssessment=DONE evaluation=GO_WITH_TECH_DEBT testsPassed=true |
+| 2026-04-21T11:43:11.323Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:11.324Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:11.325Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:11.326Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:11.326Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:11.327Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:11.328Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:11.329Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:11.330Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:11.331Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:11.332Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:19.847Z | runEvaluatePhase:task | task=150-033 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:19.849Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:19.850Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:19.851Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:19.852Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:19.853Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:19.854Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:19.855Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:19.856Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:19.856Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:19.857Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:19.858Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:26.246Z | runEvaluatePhase:task | task=150-034 selfAssessment=GO_WITH_TECH_DEBT evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:26.248Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:26.249Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:26.250Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:26.251Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:26.252Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:26.253Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:26.254Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:26.255Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:26.255Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:26.256Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:26.257Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:31.874Z | runEvaluatePhase:task | task=150-035 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:31.877Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:31.877Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:31.879Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:31.879Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:31.880Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:31.881Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:31.882Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:31.883Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:31.884Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:31.885Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:31.886Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:37.123Z | runEvaluatePhase:task | task=150-036 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:37.126Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:37.127Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:37.128Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:37.128Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:37.129Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:37.130Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:37.131Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:37.132Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:37.133Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:37.134Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:37.134Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:42.650Z | runEvaluatePhase:task | task=150-037 selfAssessment=GO_WITH_TECH_DEBT evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:42.653Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:42.654Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:42.654Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:42.656Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:42.656Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:42.657Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:42.658Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:42.659Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:42.660Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:42.661Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:42.662Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:46.920Z | runEvaluatePhase:task | task=150-038 selfAssessment=DONE evaluation=DONE testsPassed=true |
+| 2026-04-21T11:43:46.922Z | runEvaluatePhase:done | evaluations.size=38 keys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,150-018,150-019,150-020,150-021,150-02 |
+| 2026-04-21T11:43:46.930Z | sprint-checkpoint:phaseTransition | Phase EVALUATE → writing checkpoint |
+| 2026-04-21T11:43:46.931Z | sprint-checkpoint:write | Checkpoint #4 written for sprint-150 |
+| 2026-04-21T11:43:46.936Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Cargo.toml' |
+| 2026-04-21T11:43:46.937Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/go.mod' |
+| 2026-04-21T11:43:46.938Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/setup.py' |
+| 2026-04-21T11:43:46.939Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pyproject.toml' |
+| 2026-04-21T11:43:46.940Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/requirements.txt' |
+| 2026-04-21T11:43:46.941Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Pipfile' |
+| 2026-04-21T11:43:46.942Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/pom.xml' |
+| 2026-04-21T11:43:46.943Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/build.gradle' |
+| 2026-04-21T11:43:46.943Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/CMakeLists.txt' |
+| 2026-04-21T11:43:46.944Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/Makefile' |
+| 2026-04-21T11:43:46.945Z | isStackStale:statSyncFile | ENOENT: no such file or directory, stat '/home/alperen/deckent-dev/meson.build' |
+| 2026-04-21T11:43:46.952Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-04-21T11:43:47.026Z | docker-backend:spawn | taskId=150-008-fix container=deckent-w-150-008-fix model=opus |
+| 2026-04-21T11:43:47.366Z | docker-backend:spawn-ok | taskId=150-008-fix containerId=271b45516388 |
+| 2026-04-21T11:43:47.375Z | scope-sanitizer | warnings=1, rejected=0 |
+| 2026-04-21T11:43:47.457Z | docker-backend:spawn | taskId=150-013-fix container=deckent-w-150-013-fix model=sonnet |
+| 2026-04-21T11:43:47.779Z | docker-backend:spawn-ok | taskId=150-013-fix containerId=7d6b8b786615 |
+| 2026-04-21T11:43:47.791Z | scope-sanitizer | warnings=2, rejected=0 |
+| 2026-04-21T11:43:47.949Z | docker-backend:spawn | taskId=150-021-fix container=deckent-w-150-021-fix model=sonnet |
+| 2026-04-21T11:43:48.355Z | docker-backend:spawn-ok | taskId=150-021-fix containerId=55e70c6c689d |
+| 2026-04-21T11:43:48.416Z | docker-backend:exit | taskId=150-034 exitCode=0 |
+| 2026-04-21T11:44:49.720Z | readJsonSafe | Unexpected end of JSON input |
+| 2026-04-21T11:44:52.093Z | docker-backend:exit | taskId=150-013-fix exitCode=0 |
+| 2026-04-21T11:45:04.756Z | docker-backend:exit | taskId=150-008-fix exitCode=0 |
+| 2026-04-21T11:45:13.025Z | docker-backend:exit | taskId=150-021-fix exitCode=0 |
+| 2026-04-21T11:48:52.685Z | waitForResults:progress | Sprint devam ediyor — 3/5 task tamamlandı (5dk) |
+| 2026-04-21T11:53:50.790Z | sprint-checkpoint:phaseTransition | Phase FIX → writing checkpoint |
+| 2026-04-21T11:53:50.791Z | sprint-checkpoint:write | Checkpoint #5 written for sprint-150 |
+| 2026-04-21T11:53:50.796Z | finalizeSprint:preRetro | evaluations.size=41 keys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,150-018,150-019,150-020,150-021,150-02 |
+| 2026-04-21T11:53:50.797Z | buildAgentPerformance | task=150-001 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.798Z | buildAgentPerformance | task=150-002 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.799Z | buildAgentPerformance | task=150-003 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.801Z | buildAgentPerformance | task=150-004 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.801Z | buildAgentPerformance | task=150-005 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.802Z | buildAgentPerformance | task=150-006 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.803Z | buildAgentPerformance | task=150-007 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-01 |
+| 2026-04-21T11:53:50.804Z | buildAgentPerformance | task=150-008 agent=architect ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.805Z | buildAgentPerformance | task=150-009 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-01 |
+| 2026-04-21T11:53:50.806Z | buildAgentPerformance | task=150-010 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.807Z | buildAgentPerformance | task=150-011 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.808Z | buildAgentPerformance | task=150-012 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.808Z | buildAgentPerformance | task=150-013 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.809Z | buildAgentPerformance | task=150-014 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.810Z | buildAgentPerformance | task=150-015 agent=api-builder ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017, |
+| 2026-04-21T11:53:50.811Z | buildAgentPerformance | task=150-016 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.812Z | buildAgentPerformance | task=150-017 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:53:50.813Z | buildAgentPerformance | task=150-018 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.814Z | buildAgentPerformance | task=150-019 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.815Z | buildAgentPerformance | task=150-020 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:53:50.815Z | buildAgentPerformance | task=150-021 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.816Z | buildAgentPerformance | task=150-022 agent=doc-writer ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017, |
+| 2026-04-21T11:53:50.817Z | buildAgentPerformance | task=150-023 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.818Z | buildAgentPerformance | task=150-024 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.819Z | buildAgentPerformance | task=150-025 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.819Z | buildAgentPerformance | task=150-026 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:53:50.821Z | buildAgentPerformance | task=150-027 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.821Z | buildAgentPerformance | task=150-028 agent=architect ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:53:50.822Z | buildAgentPerformance | task=150-029 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:53:50.823Z | buildAgentPerformance | task=150-030 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.824Z | buildAgentPerformance | task=150-031 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.825Z | buildAgentPerformance | task=150-032 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:53:50.826Z | buildAgentPerformance | task=150-033 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.827Z | buildAgentPerformance | task=150-034 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.828Z | buildAgentPerformance | task=150-035 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.829Z | buildAgentPerformance | task=150-036 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.830Z | buildAgentPerformance | task=150-037 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:53:50.831Z | buildAgentPerformance | task=150-038 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.614Z | finalizeSprint:tripleLink | Triple-link created for sprint-150 |
+| 2026-04-21T11:55:31.752Z | finalizeSprint:routing-outcomes | Recorded 38 routing outcomes to learnings.json |
+| 2026-04-21T11:55:31.759Z | finalizeSprint:rule-evolution | 9 new rules evolved |
+| 2026-04-21T11:55:31.770Z | rule-evolver:saveRules | 9 rules saved to .deckent/routing/evolved-rules.json |
+| 2026-04-21T11:55:31.798Z | finalizeSprint:syncStatsToManifests | Synced 16 agents, 16 skills to manifest files |
+| 2026-04-21T11:55:31.801Z | finalizeSprint:promotion | agent 'test-writer': 123 tasks, 91% success — meets promotion criteria |
+| 2026-04-21T11:55:31.802Z | promotion-pipeline:promote | Temp agent 'test-writer' not found |
+| 2026-04-21T11:55:31.803Z | finalizeSprint:promotion | agent 'temp-react-ts-specialist': 28 tasks, 100% success — meets promotion criteria |
+| 2026-04-21T11:55:31.805Z | promotion-pipeline:promote | Temp agent 'temp-react-ts-specialist' not found |
+| 2026-04-21T11:55:31.806Z | finalizeSprint:promotion | skill 'code-reviewer': 32 tasks, 91% success — meets promotion criteria |
+| 2026-04-21T11:55:31.807Z | promotion-pipeline:promote | Temp skill 'code-reviewer' not found |
+| 2026-04-21T11:55:31.829Z | finalizeSprint:breadcrumb | Step 10 (richOutput) — entering |
+| 2026-04-21T11:55:31.908Z | buildAgentPerformance | task=150-001 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.909Z | buildAgentPerformance | task=150-002 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.910Z | buildAgentPerformance | task=150-003 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.912Z | buildAgentPerformance | task=150-004 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.913Z | buildAgentPerformance | task=150-005 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.914Z | buildAgentPerformance | task=150-006 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.915Z | buildAgentPerformance | task=150-007 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-01 |
+| 2026-04-21T11:55:31.919Z | buildAgentPerformance | task=150-008 agent=architect ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.920Z | buildAgentPerformance | task=150-009 agent=temp-react-ts-specialist ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-01 |
+| 2026-04-21T11:55:31.921Z | buildAgentPerformance | task=150-010 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.922Z | buildAgentPerformance | task=150-011 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.924Z | buildAgentPerformance | task=150-012 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.924Z | buildAgentPerformance | task=150-013 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.925Z | buildAgentPerformance | task=150-014 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.926Z | buildAgentPerformance | task=150-015 agent=api-builder ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017, |
+| 2026-04-21T11:55:31.928Z | buildAgentPerformance | task=150-016 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.929Z | buildAgentPerformance | task=150-017 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:55:31.930Z | buildAgentPerformance | task=150-018 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.930Z | buildAgentPerformance | task=150-019 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.932Z | buildAgentPerformance | task=150-020 agent=temp-react-ts-specialist ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150 |
+| 2026-04-21T11:55:31.933Z | buildAgentPerformance | task=150-021 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.933Z | buildAgentPerformance | task=150-022 agent=doc-writer ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017, |
+| 2026-04-21T11:55:31.934Z | buildAgentPerformance | task=150-023 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.936Z | buildAgentPerformance | task=150-024 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.936Z | buildAgentPerformance | task=150-025 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.938Z | buildAgentPerformance | task=150-026 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:55:31.939Z | buildAgentPerformance | task=150-027 agent=doc-writer ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.941Z | buildAgentPerformance | task=150-028 agent=architect ev=NO_GO evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,1 |
+| 2026-04-21T11:55:31.942Z | buildAgentPerformance | task=150-029 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:55:31.943Z | buildAgentPerformance | task=150-030 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.943Z | buildAgentPerformance | task=150-031 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.945Z | buildAgentPerformance | task=150-032 agent=architect ev=GO_WITH_TECH_DEBT evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-0 |
+| 2026-04-21T11:55:31.946Z | buildAgentPerformance | task=150-033 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.947Z | buildAgentPerformance | task=150-034 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.948Z | buildAgentPerformance | task=150-035 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.950Z | buildAgentPerformance | task=150-036 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.950Z | buildAgentPerformance | task=150-037 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.951Z | buildAgentPerformance | task=150-038 agent=architect ev=DONE evalMapSize=41 evalKeys=[150-001,150-002,150-003,150-004,150-005,150-006,150-007,150-008,150-009,150-010,150-011,150-012,150-013,150-014,150-015,150-016,150-017,15 |
+| 2026-04-21T11:55:31.955Z | finalizeSprint:breadcrumb | Step 10b (selfAuditGate) — entering |
+| 2026-04-21T11:55:43.036Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-04-21T11:58:03.296Z | runSelfAuditGate:vitest | status=FAIL delta.fail=5 |
+| 2026-04-21T11:58:11.496Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-547690-b.json' |
+| 2026-04-21T11:58:11.508Z | readJsonSafe | ENOENT: no such file or directory, open '/home/alperen/deckent-dev/.tasks/task-test-docker-547690.json' |
+| 2026-04-21T11:58:12.847Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-04-21T11:58:12.894Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-150 |
+| 2026-04-21T11:58:12.950Z | finalizeSprint:selfAuditGate | Gate completed: overallGate=GATE_FAILURE |
+| 2026-04-21T11:58:12.992Z | finalizeSprint:selfAuditGate | Status updated: RETROSPECTIVE → GO_WITH_GATE_FAILURE |
+| 2026-04-21T11:58:13.091Z | finalizeSprint:selfAuditGate | Gate result written to /home/alperen/deckent-dev/.deckent/sprint-150-gate.json overallGate=GATE_FAILURE |
+| 2026-04-21T11:58:13.168Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — entering |
+| 2026-04-21T11:58:13.620Z | finalizeSprint:loadReport | Load test report written to /home/alperen/deckent-dev/docs/audits/sprint-150/load-test-report.md |
+| 2026-04-21T11:58:13.639Z | finalizeSprint:breadcrumb | Step 10c (loadReport) — done |
+| 2026-04-21T11:58:13.685Z | finalizeSprint:breadcrumb | Step 12 (archiveDirectives) — entering |
+| 2026-04-21T11:58:13.767Z | archiveDirectives | Archived DIRECTIVES.md → /home/alperen/deckent-dev/.brain/archive/DIRECTIVES-sprint-150.md |
+| 2026-04-21T11:58:13.768Z | finalizeSprint:breadcrumb | Step 12b (archiveOrphanTasks) — entering |
+| 2026-04-21T11:58:14.415Z | createPreArchiveSnapshot | Snapshot created: /home/alperen/deckent-dev/.deckent/sprint-150-pre-archive.tar.gz (206 files, hash=b3ea1d859188...) |
+| 2026-04-21T11:58:14.416Z | finalizeSprint:preArchiveSnapshot | Snapshot created: 206 files, hash=b3ea1d859188... |
+| 2026-04-21T11:58:14.813Z | archiveOrphanTasks | Archived 208 task files to /home/alperen/deckent-dev/.brain/archive/sprint-150-tasks |
+| 2026-04-21T11:58:14.815Z | finalizeSprint:archiveOrphanTasks | Archived 208 orphan task files |
+| 2026-04-21T11:58:14.829Z | finalizeSprint:breadcrumb | Step 12c (cleanTasksArchive) — entering |
+| 2026-04-21T11:58:14.876Z | finalizeSprint:cleanTasksArchive | Removed 0 old .tasks/archive/ dirs |
+| 2026-04-21T11:58:14.877Z | finalizeSprint:breadcrumb | Step 13 (jobSummary) — entering |
+| 2026-04-21T11:58:15.027Z | finalizeSprint:jobSummary | Job summary written to /home/alperen/deckent-dev/.deckent/jobs/sprint-150.json |
+| 2026-04-21T11:58:15.028Z | finalizeSprint:breadcrumb | Step 14 (postFinalizeHooks) — entering |
+| 2026-04-21T11:58:15.909Z | postFinalizeHooks:memoryExport | 4 files written, 0 errors |
+| 2026-04-21T11:58:15.931Z | postFinalizeHooks:identityRegen | updated adrCount=43 |
+| 2026-04-21T11:58:16.565Z | postFinalizeHooks:ruleRegen | Rule regeneration hook called |
+| 2026-04-21T11:58:16.567Z | finalizeSprint:postFinalizeHooks | memExport=4 identity=updated ruleRegen=true errors=0 |
+| 2026-04-21T11:58:16.609Z | [Brain] | Cleanup delayed 180000ms — .tasks/ files remain readable |
+| 2026-04-21T13:36:30.549Z | observability-rotation | Rotated 268467 bytes → /home/alperen/deckent-dev/.deckent/archive/metrics/metrics-sprint-150-live-wire.jsonl.gz (17601 bytes gzipped), pruned 0 old archives |
+| 2026-04-21T15:08:16.979Z | file-adapter | Write failed: EISDIR: illegal operation on a directory, open '/home/alperen/deckent-dev' |
+| 2026-04-21T15:08:16.981Z | file-adapter | Write failed: EISDIR: illegal operation on a directory, open '/home/alperen/deckent-dev' |
+| 2026-04-21T15:08:17.980Z | file-adapter | Write failed: EISDIR: illegal operation on a directory, open '/home/alperen/deckent-dev' |
+| 2026-04-21T15:09:49.453Z | runSelfAuditGate:tsc | status=PASS errors=0 |
+| 2026-04-21T15:12:01.220Z | runSelfAuditGate:vitest | status=FAIL delta.fail=2 |
+| 2026-04-21T15:12:01.229Z | runSelfAuditGate:honesty | violations=0 |
+| 2026-04-21T15:12:01.241Z | runSelfAuditGate | overallGate=GATE_FAILURE sprint=sprint-150 |

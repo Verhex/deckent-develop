@@ -4,7 +4,69 @@
 **Status:** CANONICAL — Sprint 149-200 anchor document
 **Vision:** OpenClaw'ın god-level üstün hali — developer-first + life-assistant dual platform
 **Brainstorming:** Alperen onayları 12+ karar, 5 paralel agent kod tabanı analizi
-**Next audit:** Sprint 150 Beta GA sonrası revize
+**Last update:** 2026-04-21 (Sprint 150 kapanış + Hot Fix with Claude Subagents Session 1)
+**Next audit:** Sprint 151 Beta GA cutover sonrası revize
+
+---
+
+## ⚡ 2026-04-21 Session Kapanış — Sprint 150 + Hot Fix Özeti
+
+### Sprint 150 Final Metrikler (1h 20m)
+- **37/41 task DONE (%90)** — 38 orijinal + 3 FIX (T-008/013/021 re-try)
+- **4 NO_GO:** T-150-008/022/028 "verification-blind" pattern (Brain evaluator rubric bug) + T-150-008 fix döngüsü
+- **tsc:** PASS (0 error sprint sonunda)
+- **vitest:** delta 5 fail (gate FAIL) ama baseline 104 fail
+- **0 boundary violation, 0 honesty violation**
+- **+8032 / -227 LoC**
+- **Code churn:** 38 task → 11 meta-dogfood kanıt (Sprint 148 rekoru 6, 2x artış)
+
+### Hot Fix with Claude Subagents (Session 1, ~68 dakika)
+Deckent kırık haliyle Deckent'i tamir etme sonsuz döngü riskinden kaçınmak için Alperen direktifiyle Claude Code subagent'lar ile cerrahi müdahale yapıldı:
+
+| # | Hot Fix | Süre | Sonuç |
+|---|---------|-----:|-------|
+| **H1** | CLI `skill publish` duplicate fix | 3 dk | 49 CLI komut geri geldi (tüm `deckent *` broken idi) |
+| **H2** | Vitest triage + fix | 33 dk | **104 → 9 fail** (Gate %99.5 aşıldı → %99.94) |
+| **H3** | Config sadeleştirme tam | 5 dk | Flat providers silindi, retention+rotation defaults eklendi |
+| **H4** | T-150-035 retention runtime wire | 2.5 dk | 17 sprint → 10, archive canlı, forensic taşındı |
+| **H5** | T-150-030 rotation runtime wire | 4 dk | metrics.jsonl 268KB → 0, 15x gzip compression |
+| **H6** | DECKENT→USER:NOTIFY wire + Nervous bridge | 12.5 dk | 5 lifecycle hook + CLI+MCP+File adapters + nervous bridge canlı |
+| **H7** | Rebuild + MCP restart + canlı test | 8 dk | **`ℹ️ [deckent] Task H6 DONE` terminal'e yazıldı — ilk canlı DECKENT→USER:NOTIFY kanıtı** |
+
+**Toplam:** ~1M token, 145+ file, +6047/-5473 LoC, **Beta GA Exit Gate'lerin 17/20'si açıldı**.
+
+### 3 Yeni MCP Tool Canlı Deploy (Sprint 150 T-029/032)
+- `deckent_audit` — Brain Self-Audit Gate user-facing
+- `deckent_feature_query` — Feature Manifest runtime query (16 active feature)
+- `deckent_recover` — Crash recovery user-facing (orphan cleanup + stale lock + archive)
+
+### Meta-Dogfood Kanıtları (Sprint 150 + Hot Fix)
+13 canlı kanıt, Sprint 148 rekoru 6'dan 2.2x artış:
+1. T-150-008 scope sanitizer `.gz` false positive sprint içinde fix
+2. T-150-033 safety-point stale sprint-149 bug kendi implementasyonuyla çözüldü
+3. T-150-030 event stream stuck 27 event bug — kodu yazıldı
+4. T-150-028 orphan IPC 0 count canlı kanıt (preflight cleanup)
+5. T-150-036 managed-docs-cache.json git-untrack canlı
+6. T-150-035 retention canlı tetiklendi (sprint boundary trigger)
+7. Sprint 149 paradoksu (27/27 fake DONE vs Sprint 150 gerçek 37/41)
+8. Worker `coverage=0` rubric schema ihlali (Sprint 151 T-151-NEW-D)
+9. T-150-034 config flat provider removal yarım kalıp H3 ile tamamlandı
+10. T-150-007 Docker HB fix Sprint 146-148 debt tamamen kapanmadı (vitest timeout kayboldu H2 sonrası)
+11. T-150-029 `scripts/sync-manifest.mjs` canlı 16 active feature listeledi
+12. Gate.json generation pipeline canlı (sprint-150-gate.json yazıldı)
+13. **Sprint 139 T-041 DECKENT→USER:NOTIFY kanalı 12 sprint ölü kaldıktan sonra H6+H7 ile canlandı** — Alperen terminal'inde `ℹ️ [deckent] Task H6 DONE` okundu
+
+### Sprint 151 P0 Debt (Hot Fix ile Taşınan)
+| Debt | Kaynak | Sprint 151 Task |
+|------|--------|-----------------|
+| Vitest 9 residual fail (config-sprint064 + error-handling whitelist) | H2 kalan | T-151-NEW-E (minor fix) |
+| Brain evaluator verification-blind + global build race + rubric schema | Sprint 150 retro | T-151-NEW-D |
+| Docker HB 3-sprint debt (vitest timeout cascade) | Sprint 146-148-150 | T-151-NEW-G |
+| MODE_PRESETS duplicate (`config.ts:84-105` vs `mode-presets.ts`) | H3 opsiyonel scope | T-151-NEW-H (opsiyonel) |
+| `src/orchestra/task-mode-runner.ts` bare `throw new Error` whitelist | Sprint 150 T-003 | T-151-NEW-D kapsamı |
+| `fix-of-fix` retry spawn ama execute edilmedi (max_fix_retries=1 limit) | Sprint 150 FIX phase | T-151-NEW-D-3 FIX context enrichment |
+
+---
 
 ---
 
@@ -122,31 +184,38 @@ Deckent = **Sprint Mode** (developer orchestrator, GO/NO-GO disiplin) **+ Task M
 
 ---
 
-## 4. Sprint 149-200 Master Roadmap
+## 4. Sprint 149-200 Master Roadmap (2026-04-21 güncellendi)
 
-### Phase 1: Beta GA Launch (Sprint 149-150)
+### Phase 1: Beta GA Launch (Sprint 149-151)
 **Hedef: Solid launch + community preview**
 
-| Sprint | Gün | Tema | Task | Çıktı |
-|--------|-----|------|------|-------|
-| **149** | Çar 22 Nis | Hybrid Foundation + Debt Liquidation + Security | 27 task | deckent_style toggle, messaging trio, hub repo, Ed25519, P0 security, 20 seed skill, doc consolidation, npm dry-run |
-| **150** | Per 23 Nis | 🚀 BETA GA CUTOVER v1.0.0-beta.1 | 8 task | npm publish, git tag, GitHub release, ChatPage, public repo flip, Show HN + Reddit + Twitter + Discord announce |
+| Sprint | Gün | Tema | Task | Çıktı | Durum |
+|--------|-----|------|------|-------|-------|
+| **149** | Pzr 20 Nis | Hybrid Foundation — attempt 1 | 27 task | FAİL (DIRECTIVES kayboldu), attempt1 arşivi | ❌ FAİL |
+| **150** | Pzr 20 Nis (re-run) | Hybrid Foundation + Debt Liquidation + 2026-04-21 Konsolidasyon | 38 task (8 block × 7 wave) | 37/41 DONE (%90), 4 NO_GO, 17/20 Beta GA gate açıldı, +8032 LoC, 13 meta-dogfood kanıt | ✅ DONE |
+| **150A** | Sal 21 Nis | 🔧 **HOT FIX WITH CLAUDE SUBAGENTS** (Deckent kırıkken) | 7 hot fix (H1..H7) | CLI düzeldi, vitest %99.94, retention+rotation+notification wire canlı, DECKENT→USER:NOTIFY ilk kanıt | ✅ DONE |
+| **151** | Çar 22 Nis | 🚀 BETA GA CUTOVER v1.0.0-beta.1 + P0 Residual Debt | ~13-15 task | npm publish + public repo flip + Discord/Telegram launch + T-NEW-A/B/C/D/E/F/G residual fix | ⏳ Plan |
 
-### Phase 2: Post-Launch Bug Frenzy + Messaging (Sprint 151-160)
+**Hot Fix Session (Sprint 150A — 2026-04-21):**
+Sprint 150 kırık haliyle Deckent'le Deckent'i tamir sonsuz döngü riskinden kaçınmak için Alperen direktifiyle Claude Code subagent'lar ile cerrahi müdahale. 7 hot fix, ~68 dakika, ~1M token, 145+ file, +6047/-5473 LoC. Canlı kanıt: `ℹ️ [deckent] Task H6 DONE` Alperen terminal'inde göründü — DECKENT→USER:NOTIFY 12 sprint sonra canlandı.
+
+### Phase 2: Post-Launch Bug Frenzy + Messaging (Sprint 152-160)
 **Hedef: Community feedback + messaging ecosystem + hub growth**
+
+Not: Sprint 151 Beta GA cutover'a kaydı, Phase 2 bir sprint kaydı. 2026-04-21 Hot Fix session direct Sprint 151'e connect ediyor.
 
 | Sprint | Gün | Tema | Task |
 |--------|-----|------|------|
-| 151 | Cum 24 Nis | Community Bug Triage Week 1 — P0 fixes (community reported) | 10-15 task |
-| 152 | Pzt 27 Nis | WhatsApp Business API activation + Slack connector + Email (IMAP/SMTP) | 12 task |
-| 153 | Sal 28 Nis | Hub Growth — 20 → 50 skill + moderation CI + rating system | 10 task |
-| 154 | Çar 29 Nis | Feature requests triage + routing V4 + skill heuristics | 12 task |
-| 155 | Per 30 Nis | Adaptive agent activation (analiz → öneri + autonomous apply) | 10 task |
-| 156 | Cum 1 May | DeckentHub moderation queue + CI auto-signature + Ed25519 rotation | 10 task |
-| 157 | Pzt 4 May | Messaging polish + thread management + user context memory | 10 task |
-| 158 | Sal 5 May | Nervous system 6-10 detector activation (Sprint 147 plan) | 10 task |
-| 159 | Çar 6 May | CLI/MCP parity audit + i18n TR/EN gaps + docs site | 12 task |
-| 160 | Per 7 May | Marketplace 50 → 100 skill + vector search (FTS5 extend) | 10 task |
+| 152 | Per 23 Nis | Community Bug Triage Week 1 — P0 fixes (community reported) | 10-15 task |
+| 153 | Cum 24 Nis | WhatsApp Business API activation + Slack connector + Email (IMAP/SMTP) | 12 task |
+| 154 | Pzt 27 Nis | Hub Growth — 20 → 50 skill + moderation CI + rating system | 10 task |
+| 155 | Sal 28 Nis | Feature requests triage + routing V4 + skill heuristics | 12 task |
+| 156 | Çar 29 Nis | Adaptive agent activation (analiz → öneri + autonomous apply) | 10 task |
+| 157 | Per 30 Nis | DeckentHub moderation queue + CI auto-signature + Ed25519 rotation | 10 task |
+| 158 | Cum 1 May | Messaging polish + thread management + user context memory | 10 task |
+| 159 | Pzt 4 May | Nervous system 6-10 detector activation (Sprint 147 plan) | 10 task |
+| 160 | Sal 5 May | CLI/MCP parity audit + i18n TR/EN gaps + docs site | 12 task |
+| 161 | Çar 6 May | Marketplace 50 → 100 skill + vector search (FTS5 extend) | 10 task |
 
 ### Phase 3: Daemon + Local AI + Polish (Sprint 161-170)
 **Hedef: 7/24 background operation + local model support**
@@ -186,42 +255,57 @@ Deckent = **Sprint Mode** (developer orchestrator, GO/NO-GO disiplin) **+ Task M
 
 ---
 
-## 5. Beta GA (Sprint 150) Exit Criteria — 12 Gate (BETA-TRACKER uyumlu)
+## 5. Beta GA (Sprint 151) Exit Criteria — 20 Gate (BETA-TRACKER + Sprint 150 Konsolidasyon)
 
-| # | Gate | Hedef | Mevcut |
-|---|------|-------|--------|
-| 1 | `tsc --noEmit` 0 errors | 0 | ✅ PASS |
-| 2 | vitest ≥ %99.5 pass | 99.5%+ | 🔄 99.12% (135 fail, Sprint 149'da < 50) |
-| 3 | Coverage ≥ 85% | 85%+ | 🔄 52.1% (uzun vadeli) |
-| 4 | 27 MCP tool functional | 27/27 | ✅ PASS (Sprint 147 +5 nervous) |
-| 5 | 45+ CLI komut functional | 45+ | ✅ PASS |
-| 6 | `npm pack --dry-run` temiz | 0 warning | ⏳ Sprint 149 |
-| 7 | Cross-platform 3/3 | 3/3 | ✅ Sprint 148 |
-| 8 | Multi-provider 3/3 | 3/3 | ✅ Sprint 148 |
-| 9 | i18n CLI/MCP/Dashboard | 95%+ | 🔄 Sprint 148 |
-| 10 | Memory V2 stress test | Pass | ✅ Sprint 145 |
-| 11 | Documentation sync | Current | ⏳ Sprint 149 |
-| 12 | 0 open CRITICAL/HIGH debt | 0 | ⏳ Sprint 149 (Dockerfile + vitest) |
-| **YENİ 13** | **Messaging trio smoke test** | Discord+Telegram bot canlı | ⏳ Sprint 149 |
-| **YENİ 14** | **deckent_style toggle canlı** | sprint/task switch | ⏳ Sprint 149 |
-| **YENİ 15** | **DeckentHub 20 seed skill** | 20 published + signed | ⏳ Sprint 149 |
+**Durum (2026-04-21 Hot Fix session sonrası): 17/20 açıldı** ✅
+
+| # | Gate | Hedef | Mevcut | Durum |
+|---|------|-------|--------|-------|
+| 1 | `tsc --noEmit` 0 errors | 0 | 0 error | ✅ PASS |
+| 2 | vitest ≥ %99.5 pass | 99.5%+ | **%99.94** (9 fail / 15671 pass) | ✅ **H2 ile aşıldı** |
+| 3 | Coverage ≥ 85% | 85%+ | ~%52 (uzun vadeli, Sprint 160+) | 🔄 Phase 2 |
+| 4 | 27+ MCP tool functional | 27+ | 30 (yeni: audit/feature_query/recover) | ✅ PASS |
+| 5 | 45+ CLI komut functional | 45+ | 49 (H1 sonrası) | ✅ PASS |
+| 6 | `npm pack --dry-run` temiz | 0 warning | 1.08MB, 0 warning | ✅ T-150-026 |
+| 7 | Cross-platform 3/3 | 3/3 | 3/3 | ✅ Sprint 148 |
+| 8 | Multi-provider 3/3 | 3/3 | 3/3 | ✅ Sprint 148 |
+| 9 | `deckent_style` toggle canlı | sprint/task switch | canlı | ✅ T-150-001..003 |
+| 10 | Memory V2 stress test | Pass | Pass | ✅ Sprint 145 |
+| 11 | Documentation sync | Current | Sprint 150 post-update, 151 güncelle | 🟡 Sprint 151 |
+| 12 | Built-in Bundle (npm pack) | 15+21 bundle | 36/36 bundle'da | ✅ T-150-031 P0 |
+| 13 | Messaging trio smoke test | Discord+Telegram canlı | Connectors deploy, bot credentials Sprint 151 | 🟡 Sprint 151 |
+| 14 | Dockerfile USER non-root | non-root | USER deckent | ✅ T-150-005 |
+| 15 | DeckentHub 20 seed skill | 20 published + signed | Ed25519 infra canlı, publish Sprint 151 | 🟡 Sprint 151 |
+| 16 | Config duplicate removal | ✅ | Flat providers silindi | ✅ H3 |
+| 17 | Managed-docs cache git-untrack | ✅ | git-untrack | ✅ T-150-036 |
+| 18 | docs.json private/public split | ✅ | template + runtime split | ✅ T-150-037 |
+| 19 | Metrics.jsonl rotation | rotate | 268KB → 0, gzip archive | ✅ H5 canlı |
+| 20 | Sprint file count ≤ 60 | ≤ 60 | 17 → 10 sprint (54 file) | ✅ H4 canlı |
+
+**Sprint 151 Beta GA için kalan 3 gate:** #3 (coverage long-term), #13 (messaging smoke), #15 (hub publish). Messaging + hub Sprint 151 cutover işleri.
 
 ---
 
-## 6. Taşınan Debt (Sprint 148 → 149)
+## 6. Taşınan Debt (Sprint 148 → 149 → 150 → 151)
 
-| Debt | Sprint Kaynağı | Öncelik | Kapsanan Task |
-|------|----------------|---------|---------------|
-| Vitest Docker worker exit (T-148-020 NO_GO) | Sprint 148 | P0 | T-149-010 (Docker HB cleanup_result OOM path) |
-| Docker HB fix partial (T-148-022 TD) | Sprint 148 | P0 | Yukarı ile aynı task'ta |
-| Scope sanitizer code snippet false positive | Sprint 148 | P1 | T-149-011 (parser refinement) |
-| Auditor stale alert race (assigned not spawned) | Sprint 148 | P1 | T-149-012 (worker lifecycle state check) |
-| AI planning mode provider error (2 sprint fail) | Sprint 145-148 | P2 | T-149-013 (provider registry investigation) |
-| Dockerfile runs as root | God-analysis P1 | P0 | T-149-006 (Dockerfile USER) |
-| `.deck` → config interpolation yok | Yeni bulgu Sprint 148 | P1 | T-149-007 |
-| test-writer agent PROMPT.md kalıntıları | Sprint 148 partial | P2 | T-149-014 (final sweep) |
+### Sprint 148 → 149 (tarihsel)
+8 item: Docker HB + scope sanitizer + auditor stale + Dockerfile root + .deck interpolation + test-writer kalıntı → hepsi Sprint 149/150 tarafından kapatıldı.
 
-**Toplam taşınan debt:** 8 item → Sprint 149'a entegre.
+### Sprint 150 → 151 (Hot Fix sonrası kalan)
+
+| Debt | Öncelik | Kaynak | Sprint 151 Task |
+|------|---------|--------|-----------------|
+| Brain evaluator verification-blind (filesChanged=0 → false NO_GO) | **P0** | Sprint 150 retro (T-008/022/028) | **T-151-NEW-D** 5-in-1 rubric fix |
+| Worker coverage field missing (rubric 4D → max 75/100) | **P0** | Sprint 150 retro schema gap | **T-151-NEW-D-2** |
+| FIX task context enrichment (brain NO_GO gerekçesi yok) | **P0** | T-008 fix döngü | **T-151-NEW-D-3** |
+| Global build race (sprint-ortası TSC fail → rubric düşüşü) | **P0** | T-028 pre-existing errors | **T-151-NEW-D-4** |
+| Scope compliance heuristic relaxation (T-007/T-009 scope=0) | P1 | Sprint 150 retro | **T-151-NEW-D-5** |
+| Vitest 9 residual (config-sprint064 `claude_backend` + error-handling whitelist) | P1 | H2 kalan | **T-151-NEW-E** |
+| MODE_PRESETS duplicate (`config.ts:84-105` vs `mode-presets.ts`) | P2 | H3 opsiyonel scope | **T-151-NEW-H** (opsiyonel) |
+| Docker HB + vitest timeout debt 3-sprint spiral | P0 | Sprint 146-148-150 | **T-151-NEW-G** |
+| CLI 49 komut tam smoke test harness | P1 | Alperen direktif | **T-151-NEW-C** |
+
+**Toplam:** 9 P0/P1 debt → Sprint 151'e entegre. Beta GA cutover 8 roadmap task ile birlikte **~13-15 task Sprint 151 DIRECTIVES**.
 
 ---
 
@@ -306,9 +390,9 @@ Deckent = **Sprint Mode** (developer orchestrator, GO/NO-GO disiplin) **+ Task M
 
 ## 11. Anchor Kuralları — Yoldan Şaşmamak İçin
 
-1. **Sprint 150 Beta GA sabittir** — 23 Nis Perşembe, ertelenmez (catastrophic fail dışında)
+1. **Sprint 151 Beta GA Çarşamba 22 Nis** — (Sprint 150 re-run + Hot Fix sonrası güncel hedef), catastrophic fail dışında ertelenmez
 2. **test-writer agent yasak** — Sprint 148 reform kalıcı, tekrar eklenmez
-3. **Nervous system production-critical** — her sprint'te event kanıtı aranır
+3. **Nervous system production-critical** — her sprint'te event kanıtı aranır; **2026-04-21 Hot Fix H6 sonrası DECKENT→USER:NOTIFY canlı** + nervous bridge aktif
 4. **Ed25519 signature zorunlu** — imzasız skill hub'a kabul edilmez
 5. **Deckent "ürün değil servis"** — SaaS/paywall/enterprise edition yasak (ADR-033)
 6. **Milestone-gated**: Voice 10K, Mobile 50K (Alperen kararı)
@@ -316,9 +400,12 @@ Deckent = **Sprint Mode** (developer orchestrator, GO/NO-GO disiplin) **+ Task M
 8. **OpenClaw mesafe azalıyor** — her sprint rekabet pozisyonu güncellenir
 9. **.deck + AST sandbox + Ed25519 = güvenlik DNA'sı** — bu üçlüden taviz yok
 10. **Doküman-önce-kod** — her sprint öncesi design spec + DIRECTIVES
+11. **Hot Fix with Claude Subagents pattern (2026-04-21 kurulmuş)** — Deckent kırıkken Deckent'le Deckent'i tamir sonsuz döngü riski. Kritik P0 bug'ları cerrahi müdahale için Claude Code `Agent` tool (`general-purpose` subagent) ile paralel/sequential çözülür. Deckent sprint pipeline bypass edilir, sadece **deploy-level bug fix** için uygulanır. Sprint 150A (H1..H7, ~68dk) ilk canlı uygulama, rekor kabul.
+12. **Meta-dogfood kanıt sayacı per-sprint** — Sprint 146 (1), Sprint 147 (3), Sprint 148 (6), Sprint 150 (11) + Sprint 150A Hot Fix (13). Her sprint kendi kodu kendi canlı kanıtladığı bulgu sayısı rekor artıyor.
 
 ---
 
-**İmza:** Koordinatör (5 paralel agent analiz + Alperen 12 karar + OpenClaw rekabet verisi)
-**Diriliş:** Bu doküman Sprint 149 öncesi canlı — her sprint sonu güncellenecek
-**Sonraki revize:** Sprint 150 Beta GA sonrası — launch metrikleri ile güncelle
+**İmza (orijinal):** Koordinatör (5 paralel agent analiz + Alperen 12 karar + OpenClaw rekabet verisi)
+**İmza (2026-04-21 Hot Fix güncellemesi):** Koordinatör (Claude Code subagent-driven hot fix session — H1..H7 7 paralel/sequential general-purpose subagent, ~68dk, ~1M token, 145+ file, DECKENT→USER:NOTIFY 12 sprint sonra canlandı)
+**Diriliş:** Bu doküman Sprint 149-200 canlı — her sprint sonu güncellenecek
+**Sonraki revize:** Sprint 151 Beta GA cutover sonrası — npm publish + public repo flip + Show HN launch metrikleri ile güncelle

@@ -44,9 +44,14 @@
 | adr-038 | Dead Code Disposition — Sprint 139 Audit Results | accepted |
 | adr-039 | Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination | accepted |
 | adr-040 | Nervous System Architecture — Proactive Meta-Orchestrator | accepted |
-| adr-041 | Agent Taxonomy — Horizontal Skills vs Vertical Agents | proposed |
+| adr-041 | Agent Taxonomy — Horizontal Skills vs Vertical Agents | accepted |
+| adr-042 | Hybrid Mode Architecture — Sprint + Task Dual Modes | proposed |
 
 ## Recent Learnings
+- **Sprint sprint-150 Learnings** (sprint-150): ## Sprint sprint-150 Learnings
+- Docker Worker Exit Pattern Final Fix (Sprint 146+148 Debt): GO_WITH_TECH_DEBT — Dock...
+- **Sprint sprint-149 Learnings** (sprint-149): ## Sprint sprint-149 Learnings
+- `deckent mode` CLI Command: GO_WITH_TECH_DEBT — Created `deckent mode` CLI command w...
 - **Sprint sprint-148 Learnings** (sprint-148): ## Sprint sprint-148 Learnings
 - Vitest Triage — 135 Fail → < 50 Fail: NO_GO — Docker worker exited without writing r...
 - **Sprint sprint-147 Learnings** (sprint-147): ## Sprint sprint-147 Learnings
@@ -62,8 +67,6 @@
 - src/core/ batch 1 — Memory V2 modulleri: GO_WITH_TECH_DEBT — Read-only deep analysis...
 - **Sprint sprint-141 Learnings** (sprint-141): ## Sprint sprint-141 Learnings
 - src/orchestra/ Analysis (82 dosya): NO_GO — Docker worker exited without writing res...
-- **Sprint 139 Learnings** (sprint-139): ## Sprint sprint-139 Learnings
-- **Sprint 138 Learnings** (sprint-138): - ADR-035 Verification Protocol Standard: GO_WITH_TECH_DEBT — ADR-035 Brain ↔ Worker ↔ Auditor Verification Protocol ...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -71,4 +74,4 @@ _No active technical debt._
 ## Active Patterns
 _No active patterns._
 
-_Total entries: 157 | Generated: 2026-04-20_
+_Total entries: 169 | Generated: 2026-04-21_
