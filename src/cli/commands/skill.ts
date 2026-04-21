@@ -11,6 +11,8 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { registerSkillMarketplace } from './skill-marketplace.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
+// Note: `skill publish` is registered by registerSkillMarketplace() below —
+// the unified pipeline (sandbox + Ed25519 sign + registry upload) lives there.
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -646,5 +648,9 @@ export function registerSkill(program: Command): void {
     });
 
   // ─── marketplace subcommands (search, publish) ────────────────────
+  // The unified `skill publish <skillPath>` command (sandbox + Ed25519 sign +
+  // registry upload) is registered here. Sprint 150 Hot Fix: previously this
+  // file and skill-marketplace.ts both added a `publish` sub-command to the
+  // same parent, which caused commander to throw on CLI boot.
   registerSkillMarketplace(skillCmd);
 }

@@ -1,11 +1,13 @@
 // ─── Skill Marketplace CLI ───────────────────────────────────────────────────
-// Commands: deckent skill search <query>, deckent skill publish
+// Commands: deckent skill search <query>, deckent skill publish <skillPath>
 
 import type { Command } from 'commander';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { RegistryClient } from '../../core/marketplace/registry-client.js';
 import { MarketplaceAuth } from '../../core/marketplace/marketplace-auth.js';
+import { SkillSandbox } from '../../core/marketplace/skill-sandbox.js';
+import { loadOrGenerateKeypair, signMessage, bytesToHex } from '../../core/signature.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
@@ -145,21 +147,42 @@ export function registerSkillMarketplace(parentCmd: Command): void {
       }
     });
 
-  // ─── skill publish ───────────────────────────────────────────────────────
+  // ─── skill publish <skillPath> — unified: sandbox + Ed25519 sign + registry
+  // Sprint 150 Hot Fix: merges Sprint 149 T-149-019 (sandbox + sign) with
+  // marketplace registry upload into a single command. Pipeline:
+  //   1. Validate skill path + manifest + SKILL.md
+  //   2. AST sandbox scan (scope-safety)
+  //   3. Ed25519 sign (unless --no-sign)
+  //   4. Registry upload (unless --dry-run)
   parentCmd
-    .command('publish')
-    .description('Publish a skill to the marketplace registry')
-    .option('--dry-run', 'Validate without publishing')
-    .action(async (opts: { dryRun?: boolean }) => {
+    .command('publish <skillPath>')
+    .description('Validate, sign (Ed25519) and publish a skill to the marketplace')
+    .option('--dry-run', 'Validate + sign without uploading to registry')
+    .option('--key-dir <dir>', 'Custom keypair directory (default: ~/.deckent/keys)')
+    .option('--no-sign', 'Skip Ed25519 signing (registry upload only)')
+    .action(async (skillPath: string, opts: { dryRun?: boolean; keyDir?: string; sign?: boolean }) => {
       try {
-        const root = resolveProjectRoot();
-
-        // Find manifest.json in current skill directory
-        const manifestPath = join(root, 'manifest.json');
-        if (!existsSync(manifestPath)) {
-          throw ErrorRegistry.createError('DECKENT_E034');
+        // ─── Step 1: Validate skill path + files ─────────────────────────
+        const resolvedPath = resolve(skillPath);
+        if (!existsSync(resolvedPath)) {
+          printError(`Skill directory not found: ${resolvedPath}`);
+          process.exitCode = 1;
+          return;
         }
 
+        const manifestPath = join(resolvedPath, 'manifest.json');
+        if (!existsSync(manifestPath)) {
+          throw ErrorRegistry.createError('DECKENT_E034', { message: 'manifest.json not found in skill directory' });
+        }
+
+        const skillMdPath = join(resolvedPath, 'SKILL.md');
+        if (!existsSync(skillMdPath)) {
+          printError('SKILL.md not found in skill directory');
+          process.exitCode = 1;
+          return;
+        }
+
+        // Parse manifest
         const manifestRaw = readFileSync(manifestPath, 'utf-8');
         let manifest: Record<string, unknown>;
         try {
@@ -168,20 +191,8 @@ export function registerSkillMarketplace(parentCmd: Command): void {
           throw ErrorRegistry.createError('DECKENT_E035');
         }
 
-        // Pre-publish validation
+        // Pre-publish manifest validation
         const errors = validateManifestForPublish(manifest);
-
-        // Check SKILL.md exists
-        const skillMdPath = join(root, 'SKILL.md');
-        if (!existsSync(skillMdPath)) {
-          errors.push('SKILL.md file is required for publishing');
-        }
-
-        // Check author
-        if (!manifest.author || typeof manifest.author !== 'string') {
-          errors.push('Missing "author" field in manifest');
-        }
-
         if (errors.length > 0) {
           print('Validation failed:');
           for (const err of errors) {
@@ -191,11 +202,53 @@ export function registerSkillMarketplace(parentCmd: Command): void {
           return;
         }
 
+        // ─── Step 2: AST sandbox scan ───────────────────────────────────
+        const sandbox = new SkillSandbox(resolvedPath);
+        const safetyReport = sandbox.validateSkillSafety(resolvedPath);
+        if (!safetyReport.safe) {
+          print('Sandbox violations found:');
+          for (const issue of safetyReport.issues) {
+            print(`  - ${issue}`);
+          }
+          process.exitCode = 1;
+          return;
+        }
+        print(`Sandbox OK (${safetyReport.scannedFiles} files scanned)`);
+
+        // ─── Step 3: Ed25519 sign (unless --no-sign) ────────────────────
+        // commander: `--no-sign` sets opts.sign = false; default is undefined (→ sign)
+        const shouldSign = opts.sign !== false;
+        if (shouldSign) {
+          const keypair = loadOrGenerateKeypair(opts.keyDir);
+          const skillContent = readFileSync(skillMdPath, 'utf-8');
+          const signPayload = skillContent + JSON.stringify(manifest);
+          const signature = await signMessage(signPayload, keypair.privateKey);
+
+          const sigPath = join(resolvedPath, 'signature.ed25519');
+          writeFileSync(sigPath, signature);
+
+          print(`Signed with public key ${bytesToHex(keypair.publicKey).slice(0, 16)}...`);
+          print(`Signature written to ${sigPath}`);
+        } else {
+          print('Skipping Ed25519 sign (--no-sign flag set)');
+        }
+
+        // ─── Step 4: Registry upload (unless --dry-run) ─────────────────
         if (opts.dryRun) {
-          print('Dry run: validation passed. Skill is ready to publish.');
+          print('Dry run: validation + sign passed. Skill is ready to publish.');
           print(`  Name: ${manifest.name}`);
           print(`  Version: ${manifest.version}`);
-          print(`  Author: ${manifest.author}`);
+          if (manifest.author) {
+            print(`  Author: ${manifest.author}`);
+          }
+          print('  (registry upload skipped)');
+          return;
+        }
+
+        // Registry upload requires author field
+        if (!manifest.author || typeof manifest.author !== 'string') {
+          printError('Missing "author" field in manifest (required for registry upload). Use --dry-run to skip upload.');
+          process.exitCode = 1;
           return;
         }
 
