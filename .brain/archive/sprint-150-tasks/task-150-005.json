@@ -1,0 +1,96 @@
+{
+  "id": "150-005",
+  "title": "Dockerfile USER Non-Root",
+  "description": "Dockerfile USER Non-Root\n\n- Model: sonnet\n- Effort: low\n- Skills: docker-expert, devops-engineer\n- Files: Dockerfile, tests/backends/docker-non-root.test.ts\n- Scope: ./, tests/backends/\n\n### Description\nGod-analysis P1 finding #7: Dockerfile runs as root. Düzelt.\n\n`Dockerfile` değişiklik (baştan okuma yap, USER directive ekle):\n```dockerfile\n# ... existing FROM, WORKDIR, COPY, RUN steps ...\n\n# After dependency install, before CMD\nRUN groupadd -r deckent && useradd -r -g deckent -m -d /home/deckent deckent \\\n    && mkdir -p /app /home/deckent/.deckent \\\n    && chown -R deckent:deckent /app /home/deckent\n\nUSER deckent\nWORKDIR /home/deckent/app\n\n# ... CMD/ENTRYPOINT ...\n```\n\n**NOT:** Worker.sh scripts `mkdir` operations Docker user context'inde çalışmalı. Permission errors'ı test et.\n\n### Test (4 test)\n1. Dockerfile USER directive present (`grep USER Dockerfile`)\n2. Docker build success\n3. `docker run deckent whoami` → `deckent` (non-root)\n4. Worker.sh mkdir/write operations succeed under deckent user\n\n**Kanıt:** Dockerfile build + container whoami check + integration test.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "tests/backends/",
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "Dockerfile",
+      "tests/backends/docker-non-root.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Dockerfile build + container whoami check + integration test.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "docker-expert",
+    "devops-engineer"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "docker-expert",
+    "devops-engineer"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "security"
+        ],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "backends",
+          "weight": 0.5
+        },
+        {
+          "name": "Dockerfile",
+          "weight": 0.25
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.6
+        },
+        {
+          "type": "test",
+          "weight": 0.2
+        },
+        {
+          "type": "document",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 2,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "./": 0.5,
+          "tests/": 0.5
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0.5
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:41:18.216Z"
+}

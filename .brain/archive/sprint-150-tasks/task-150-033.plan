@@ -1,0 +1,46 @@
+# Task 150-033: Safety-Point Lifecycle Onarımı + User-Loss Guard
+
+## Execution Plan
+
+### Findings to Fix
+1. **BULGU 1:** `deleteSafetyPoint` git branch siler ama JSON dosyası kalır → asimetrik cleanup
+2. **BULGU 2:** No-git-repo fallback silent → user bilgilendirilmez
+3. **BULGU 3:** Stash pop fail → console.warn ile gömülüp kaybolabilir (P0 user-loss)
+
+### Steps
+
+1. **rollback.ts — deleteSafetyPoint** genişletme:
+   - Git branch delete sonrası `rmSync` ile JSON dosyasını da sil
+   - `deleteSafetyPointFile` helper export
+
+2. **rollback.ts — cleanOrphanSafetyPoint** yeni fonksiyon:
+   - Disk'te JSON var ama sprint ID uyuşmuyorsa → orphan, sil
+   - Live sprint branch'ini kontrol et
+
+3. **rollback.ts — isGitRepo** pre-check:
+   - `git rev-parse --git-dir` ile kontrol
+   - Git repo yoksa → DECKENT_E053'ü güncelle (mevcut "rating" için kullanılıyor, yeni kod ekle)
+
+4. **rollback.ts — stash pop fail-hard** (BULGU 3):
+   - `console.warn` → explicit throw with recovery instructions
+   - Sprint start abort edilir
+
+5. **errors.ts — DECKENT_E056** yeni error kodu:
+   - "no git repository" — rollback disabled reason
+
+6. **sprint-phases.ts — runPlanPhase** güncelle:
+   - Safety point creation fail'de `config.rollback.disabledReason` ayarla (veya log)
+
+7. **Tests:**
+   - rollback.test.ts: deleteSafetyPoint JSON cleanup, cleanOrphanSafetyPoint, stash pop throw
+   - sprint-phases-rollback.test.ts: lifecycle integration
+
+8. **docs/reference/config.md:** rollback config referansı
+
+### Files to Modify
+- src/orchestra/rollback.ts (main changes)
+- src/core/errors.ts (new error code)
+- src/orchestra/sprint-phases.ts (minor patch)
+- tests/orchestra/rollback.test.ts (extend)
+- tests/orchestra/sprint-phases-rollback.test.ts (NEW)
+- docs/reference/config.md (doc update)

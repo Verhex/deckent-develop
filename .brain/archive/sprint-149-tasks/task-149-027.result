@@ -1,0 +1,19 @@
+{
+  "taskId": "149-027",
+  "filesChanged": [
+    "docs/release/public-repo-manifest.md",
+    "scripts/public-repo-sync.sh"
+  ],
+  "linesAdded": 195,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "selfAssessment": "DONE",
+  "notes": "VerhexIO/deckent public repo hazırlığı tamamlandı.\n\ndocs/release/public-repo-manifest.md: 20 include + 18 exclude = 38 item (≥10 gereksinim aşıldı). Tablo formatında, Sprint 150 flip talimatları dahil.\n\nscripts/public-repo-sync.sh: rsync tabanlı sync script, --dry-run flag desteği (exit 0, gerçek kopyalama yapmaz). 10 exclude path doğrulandı (.brain/, .deckent/, .deck, DECKENT-MASTER-BLUEPRINT.md, DECKENT-ANA-PLAN-TR.md, node_modules/, dist/, .tasks/, .locks/, docs/audits/). chmod +x yapıldı.\n\n3/3 test PASS:\n1. manifest ≥10 item: PASS (38 item)\n2. --dry-run exit 0: PASS\n3. Exclude paths: PASS (10/10)\n\ntsc/vitest çalıştırılmadı — bu task sadece .md ve .sh dosyaları oluşturdu (TypeScript kaynak kodu yok).",
+  "tokenUsage": {
+    "inputTokens": 18500,
+    "outputTokens": 2800,
+    "cacheReadTokens": 42000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

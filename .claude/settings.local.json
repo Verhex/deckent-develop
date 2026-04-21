@@ -236,7 +236,19 @@
       "Bash(awk '{print $1}')",
       "Bash(echo \"exit: $?\")",
       "Bash(xargs -0 -r git rm --cached)",
-      "Bash(xargs -I{} basename {} .result)"
+      "Bash(xargs -I{} basename {} .result)",
+      "Bash(ps -p 27014 -o pid,etime,cmd)",
+      "Bash(ps -p 27014 -o pid,etime,stat)",
+      "Bash(awk -F'-' '{print $2}')",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(tar -tzf sprint-149-pre-archive.tar.gz)",
+      "Bash(env)",
+      "Bash(tee /tmp/vitest-150-fail.log)",
+      "Bash(zcat .deckent/archive/metrics/metrics-sprint-150-live-wire.jsonl.gz)",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "mcp__deckent__deckent_audit",
+      "mcp__deckent__deckent_feature_query",
+      "Bash(awk -F'/' '{print $1}')"
     ]
   },
   "outputStyle": "Explanatory"

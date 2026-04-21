@@ -1,0 +1,38 @@
+{
+  "id": "150-028-fix",
+  "title": "Fix: `cleanOrphanIpcDirs` Wire-Up with Live-PID Check",
+  "description": "Priority fix for NO_GO task 150-028. Notes: cleanOrphanIpcDirs function updated: new sync API with live-PID check support (opts: { checkLivePid, minAgeMs }). Old async API preserved as cleanOrphanIpcDirsLegacy for backward compat. start.ts pre-flight wired with try/catch. Test file updated: legacy tests call cleanOrphanIpcDirsLegacy, 8 new tests added for live-PID check scenarios. All 42 scope tests pass (orphan-cleaner.test.ts + orphan-cleaner-ipc.test.ts + start-detached-fork.integration.test.ts). TSC clean for modified files. Pre-existing TSC errors in other files (observability-rotation.ts, feature-query.ts, sprint-finalizer.ts) are not from this task. Key design: minAgeMs=30s default prevents concurrent start race condition by protecting young IPC dirs without config.pid; dead PIDs (explicit 99999999) are always cleaned regardless of age.",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 150-028 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/mcp/tools/",
+      "tests/core/",
+      "tests/mcp/tools/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/orphan-cleaner.ts",
+      "src/mcp/tools/start.ts",
+      "tests/core/orphan-cleaner-ipc.test.ts (NEW)",
+      "tests/core/orphan-cleaner-ipc.test.ts",
+      "start-detached-fork.integration.test.ts",
+      "start.ts",
+      "tests/mcp/tools/start-detached-fork.integration.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep -rn \"cleanOrphanIpcDirs\" src/` → start.ts'de aktif çağrı; `npx vitest run tests/core/orphan-cleaner-ipc.test.ts tests/mcp/tools/start-detached-fork.integration.test.ts` → all pass.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-150",
+  "isPriorityFix": true,
+  "fixForTaskId": "150-028",
+  "createdAt": "2026-04-21T11:42:48.559Z"
+}

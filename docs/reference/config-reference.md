@@ -506,6 +506,47 @@ See [MULTI-PROVIDER-GUIDE.md](MULTI-PROVIDER-GUIDE.md) for the full multi-provid
 
 ---
 
+## Rollback & Safety Point
+
+Deckent creates a git backup branch before each sprint starts. If all tasks fail (NO_GO), it can automatically roll back to the pre-sprint state.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `rollback_policy` | `'auto' \| 'ask' \| 'never'` | `'never'` | When to trigger rollback. `auto` = roll back if all tasks NO_GO. `ask` = prompt user. `never` = disable. |
+
+### How It Works
+
+1. **PLAN phase**: `createSafetyPoint()` creates a `deckent-backup-<sprintId>` git branch at current HEAD
+2. If the working tree is dirty, changes are stashed first, then restored after branch creation
+3. The safety point metadata is persisted to `.deckent/safety-point.json`
+4. **After sprint**: `deleteSafetyPoint()` removes both the backup branch AND the JSON file
+
+### Safety Guards
+
+- **No git repo**: If the project is not a git repository, rollback is visibly disabled with a console warning. It does NOT silently fail.
+- **Stash pop failure**: If stashing uncommitted changes succeeds but restoring them fails, the sprint is **aborted** with recovery instructions (`git stash list` + `git stash pop`). This prevents user data loss.
+- **Orphan cleanup**: At the start of each sprint, stale safety-point files from previous incomplete sprints are automatically cleaned up.
+
+### Error Codes
+
+| Code | Description |
+|------|-------------|
+| `DECKENT_E050` | Failed to stash changes before creating safety point |
+| `DECKENT_E051` | Failed to get current commit SHA (not a git repo or no commits) |
+| `DECKENT_E052` | Failed to create safety backup branch |
+| `DECKENT_E056` | Not a git repository — rollback disabled |
+| `DECKENT_E057` | Stash pop failed — uncommitted changes trapped in stash |
+
+### Disabling Rollback
+
+```bash
+deckent config set rollback_policy never
+```
+
+Source: `src/orchestra/rollback.ts`, `src/orchestra/sprint-phases.ts`
+
+---
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) -- System architecture overview

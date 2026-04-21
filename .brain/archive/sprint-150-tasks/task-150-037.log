@@ -1,0 +1,22 @@
+`★ Insight ─────────────────────────────────────`
+**1. Private/Public Split Pattern:** `docs.json.template` (kaynak kodda, public) vs `.deckent/docs.json` (runtime, gitignored) ayrımı `.env.example` / `.env` pattern'inin managed-docs versiyonu. Bu pattern Beta GA'da private leak riskini sıfıra indirir.
+
+**2. Path Safety Defense-in-Depth:** `validateDocPath()` üç katmanlı savunma uygular: absolute path reddi, `..` traversal reddi, ve `resolve()` ile root escape kontrolü. Bu, OWASP Path Traversal (CWE-22) koruması sağlar — adversarial input `.deckent/docs.json`'a yazılmadan önce yakalanır.
+
+**3. seedDocsConfig Idempotency:** Fonksiyon "zaten varsa dokunma" prensibiyle çalışır. Bu, `deckent init`'in güvenle birden fazla kez çalıştırılabilmesini garanti eder — user'ın custom override'ları asla kaybetmez.
+`─────────────────────────────────────────────────`
+
+## Yapılan Degisiklikler Ozeti
+
+| Dosya | Degisiklik |
+|-------|------------|
+| `src/cli/commands/init-templates/docs.json.template` | **YENi** - Bootstrap template (public) |
+| `.gitignore` | `.deckent/docs.json` eklendi (private runtime config) |
+| `src/orchestra/managed-docs/docs-config.ts` | `validateDocPath()` + `seedDocsConfig()` eklendi, `addDoc()` path safety ile guclendi |
+| `src/cli/commands/init-steps.ts` | Inline config -> `seedDocsConfig()` |
+| `src/mcp/tools/init.ts` | Inline config -> `seedDocsConfig()` |
+| `tests/orchestra/managed-docs/docs-path-safety.test.ts` | **YENi** - 8 path safety testi |
+| `tests/cli/commands/docs-add-interactive.test.ts` | **YENi** - 8 seed + interactive testi |
+| `docs/reference/managed-docs.md` | **YENi** - 200+ satir referans dokuman |
+
+**Sonuc:** `tsc --noEmit` 0 hata, 36/36 test PASS. `GO_WITH_TECH_DEBT` - Interactive readline prompt ve `--no-prompt` CLI flag'i henuz eklenmedi (mevcut `docs` command yapisinin incelenmesi gerekiyor). `git rm --cached .deckent/docs.json` adimi koordinator/Alperen onayi ile yapilmali (destructive git op).

@@ -106,6 +106,7 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     agent_min_score: 5,
     adaptive_config: { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     sprint_timeout_minutes: 0,
+    deckent_style: 'sprint' as const,
   };
   const ctx = { projectRoot, sprintResult, config: resolvedConfig, isInternalProject };
   const builtinResults = runAllUpdaters(ctx);

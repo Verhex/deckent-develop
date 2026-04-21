@@ -1,0 +1,10 @@
+`★ Insight ─────────────────────────────────────`
+1. **Sprint 149'da zaten tamamlanmış:** `isPlaceholderPath()`, `isJsAccessPattern()` ve `maskCodeBlocks()` fonksiyonları scope-sanitizer.ts ve task-builder.ts'te aktif. Bu fix task'ı sadece doğrulama gerektiriyordu.
+2. **22 test tam kapsam:** scope-sanitizer-v2.test.ts (12 test) Sprint 148 debt senaryolarını (`.directories`, `.some`, `src/foo.ts` gibi false positive'ler) ve edge case'leri (composite isimler `foo-bar.ts` korunur) kapsıyor.
+3. **Defensive parsing:** `maskCodeBlocks()` DIRECTIVES markdown'daki code block'ları parse etmeden önce boşaltarak, örnek kod snippet'lerindeki dosya yollarının filesWrite listesine sızmasını önlüyor.
+`─────────────────────────────────────────────────`
+
+**Task 150-008-fix: DONE**
+- tsc --noEmit: 0 hata
+- vitest: 22/22 test geçti
+- Kod değişikliği gerekmedi — Sprint 149 implementasyonu tam ve doğru

@@ -1,30 +1,59 @@
 # deckent
 
-**Your AI development team, orchestrated.**
+**The AI orchestrator for developers who want discipline.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12194%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-129%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12485%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-150%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
-Deckent is an AI agent orchestration CLI that turns natural language into working code. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results -- all in a single sprint.
+Deckent is an AI agent orchestration CLI with two modes: **Sprint Mode** for structured multi-agent development sprints, and **Task Mode** for one-shot life assistant tasks. Write your goals, and Deckent plans tasks, assigns parallel AI workers, monitors quality, and delivers results — all with discipline.
+
+> **AST-sandboxed skills • Nervous System • Memory V2 (SQLite FTS5) • 3 backends • 3 providers • cross-platform**
 
 <!-- ![demo](docs/assets/demo.gif) -->
+
+---
 
 ## Quick Start
 
 ```bash
-npx deckent init
-npx deckent plan "Add user authentication"
-npx deckent start
+npm install -g deckent
+
+# Developer workflow (Sprint Mode)
+deckent init
+deckent mode sprint
+# Edit DIRECTIVES.md with your goals, then:
+deckent start
+
+# Life assistant (Task Mode)
+deckent mode task
+deckent run "Remind me to review the PR before end of day"
 ```
+
+---
+
+## Dual Mode: Sprint + Task
+
+Deckent operates in two distinct modes, switchable with a single command:
+
+| Mode | Command | Use Case |
+|------|---------|----------|
+| **Sprint** | `deckent mode sprint` | Structured multi-agent development: PLAN→SPAWN→EXECUTE→EVALUATE→RETRO |
+| **Task** | `deckent mode task` | One-shot life assistant: single task, immediate execution, no sprint overhead |
+
+```bash
+deckent mode show      # Show current mode
+deckent mode sprint    # Switch to sprint mode (developer workflow)
+deckent mode task      # Switch to task mode (life assistant)
+deckent mode auto      # Auto-detect from context (git + DIRECTIVES.md → sprint)
+deckent mode global task  # Set global default
+```
+
+The `deckent_style` config key persists your choice across sessions. Task Mode brings a full life-assistant experience — one-shot tasks, idle detection, and connector notifications.
 
 ---
 
 ## How It Works
 
-Deckent follows a three-step cycle:
-
-1. **Describe** -- Write what you want built in `DIRECTIVES.md`
-2. **Plan** -- Brain reads your goals and creates scoped, prioritized tasks
-3. **Execute** -- Parallel AI workers build, test, and report results
+### Sprint Mode
 
 ```
                     DIRECTIVES.md
@@ -38,6 +67,19 @@ Deckent follows a three-step cycle:
                   GO / NO-GO / TECH_DEBT
 ```
 
+1. **Describe** — Write goals in `DIRECTIVES.md`
+2. **Plan** — Brain reads goals, creates scoped prioritized tasks
+3. **Execute** — Parallel AI workers build, test, and report results
+4. **Evaluate** — Every task gets GO / NO-GO / TECH_DEBT verdict
+
+### Task Mode
+
+```
+  User Input → [ Task Runner ] → Worker → Result
+```
+
+Single-task execution. No PLAN/SPAWN phases. Ideal for quick commands, reminders, and life-assistant use cases.
+
 ---
 
 ## Architecture
@@ -50,50 +92,66 @@ Deckent follows a three-step cycle:
 |   +----------+     +----------+     +----------+                 |
 |   |  Brain   |---->| Worker 1 |     | Auditor  |                 |
 |   | (plans,  |---->| Worker 2 |     | (scans,  |                 |
-|   | evaluates|---->| Worker N |     |  alerts)  |                 |
+|   | evaluates|---->| Worker N |     |  alerts) |                 |
 |   +----------+     +----------+     +----------+                 |
 |        |                                   |                     |
 |   .brain/            .tasks/          .dashboard                 |
-|   (memory,           (task JSON,      (live status)              |
-|    debt,              results,                                   |
+|   (memory DB,        (task JSON,      (live status)              |
+|    decisions,         results,                                   |
 |    patterns)          heartbeats)                                |
++------------------------------------------------------------------+
+|         Nervous System — Proactive Meta-Orchestrator             |
 +------------------------------------------------------------------+
 ```
 
-- **Brain** -- Plans tasks, assigns models, evaluates results, learns from patterns
-- **Workers** -- Execute tasks in parallel (via tmux or subprocess), each running a full plan-code-test-report cycle
-- **Auditor** -- Monitors heartbeats, detects boundary violations, enforces quality
+- **Brain** — Plans tasks, assigns models, evaluates results, learns across sprints
+- **Workers** — Execute tasks in parallel (tmux, subprocess, or Docker), each with plan-code-test-report cycle
+- **Auditor** — Monitors heartbeats, detects boundary violations, enforces quality
+- **Nervous System** — Proactive meta-orchestrator: detects anomalies, idle states, routing patterns, and emits contextual notifications
 
 ---
 
 ## Key Features
 
-- **Sprint Lifecycle** -- Structured PLAN, SPAWN, EXECUTE, EVALUATE, RETRO, DECAY phases ensure every sprint runs to completion
-- **Multi-Worker Parallel Execution** -- Up to 10 AI workers running simultaneously, each in an isolated scope
-- **Memory and Learning** -- Brain stores learnings in `.brain/MEMORY.md` and patterns in `PATTERNS.md`, improving with every sprint
-- **Auditor Quality Gate** -- Continuous monitoring: stale heartbeat detection, boundary violation scanning, deadlock detection via Kahn's algorithm
-- **GO / NO-GO Evaluation** -- Every task result is evaluated against defined criteria. NO-GO tasks get logged and optionally retried
-- **Multi-Provider Support** -- Works with Claude (default), OpenAI Codex, and Google Gemini. Configure per-role (brain, worker) or per-task
-- **Provider Fallback Chain** -- Primary provider fails? Automatic fallback to alternative provider with model equivalence mapping
-- **Stack-Aware Init** -- Detects your project stack (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin, TypeScript) and configures build/test commands automatically
-- **TempAgent and TempSkill** -- Auto-generates project-specific agents and skills based on your codebase conventions
-- **Built-in Docs** -- `.deckent/docs/` ships with quick-start, directives-guide, and config-reference guides
-- **Native Windows Support** -- Full subprocess backend with `shell:true`, periodic heartbeat updates, and UTF-8 handling
-- **Plugin System** -- Extend Deckent with custom hooks, commands, and patterns
-- **MCP Integration** -- 21 MCP tools + 8 resources for seamless Claude Code IDE integration
-- **Web Dashboard** -- React + Vite + Tailwind dashboard with real-time SSE updates
-- **Internationalization** -- English and Turkish language support built in
-- **Review Archive Fallback** -- Sprint review works even after cleanup by reading from archive
-- **Heartbeat Daemon** -- Proactive task system that runs periodic checks (lint, tests) in the background via `deckent heartbeat --daemon`
-- **Human Checkpoints** -- Configurable approval gates at `plan`, `evaluate`, and `fix` phases for supervised autonomous runs
-- **Configurable Sprint Timeout** -- Set `sprint_timeout_minutes: 0` for unlimited-duration sprints, or any positive value for a hard timeout
-- **Model Registry** -- 13 models, 3 providers, 4 tiers (premium_plus, premium, standard, economy) with tier-based routing
-- **Provider-Agnostic Config** -- Configure `brain_tier`/`worker_tier` instead of model names; ModelRegistry resolves the best model per provider automatically
-- **Beta Upgrade Workflow** -- `deckent upgrade --local <path.tgz>` for local beta installations
-- **Rubric-Based Grading** -- 4-criteria structured evaluation (correctness, coverage, scope, docs) with configurable weights
-- **Worker Question Mechanism** -- IPC + file-based fallback for worker-to-brain communication during task execution
-- **Context-Aware Routing** -- Token budget estimation and contextFit scoring for intelligent model selection
-- **Token Usage Tracker** -- Per-task token counting with provider-native metrics and RETRO.md summary table
+### Core Orchestration
+- **Sprint Lifecycle** — 8-phase structured cycle: PLAN, SPAWN, EXECUTE, EVALUATE, FIX, RETRO, DECAY, CLEANUP
+- **Dual Mode** — `deckent_style: 'sprint' | 'task'` — developer orchestration or one-shot life assistant
+- **Multi-Worker Parallel Execution** — Up to 10 AI workers simultaneously, each in isolated scope
+- **GO / NO-GO Evaluation** — Every task result evaluated against defined criteria; NO-GO tasks logged and optionally retried
+- **Auditor Quality Gate** — Stale heartbeat detection, boundary violation scanning, deadlock detection via Kahn's algorithm
+
+### Security & Safety
+- **AST Sandbox** — All skills run through AST validation before execution. No arbitrary code injection. Compared to OpenClaw's 13K+ skill hub with ~20% flagged as malicious, Deckent's sandbox validates every skill before it runs
+- **Scope Enforcement** — Workers may only touch files in their assigned `scope.filesWrite` — Auditor enforces this via `git diff --stat`
+- **RBAC Protocol** — ADR-037 Brain-Auditor-Worker authority matrix; strict role boundaries
+- **`.deck` Secret Interpolation** — Reference secrets in config as `$DECK:MY_TOKEN` — secrets loaded from encrypted `.deck` file at runtime, never committed
+
+### Intelligence & Memory
+- **Nervous System** — Proactive meta-orchestrator (ADR-040): idle detection, routing anomaly alerts, agent health monitoring, contextual notifications
+- **Memory V2 DB-First** — SQLite + FTS5 full-text search, dual-layer Turkish/English normalize, 96% context reduction vs raw markdown. `deckent recall "docker heartbeat"` finds relevant ADRs and sprint learnings instantly
+- **Brain Auto-Query** — Task DNA → relevant ADRs/patterns/learnings auto-queried at PLAN, SPAWN, EVALUATE phases
+- **Self-Learning** — Brain generates config suggestions from sprint results (NO_GO rate, coverage, duration)
+
+### Agents & Skills
+- **15 Built-in Agents** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- **21 Built-in Skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, and 16 more
+- **Temp Agent & Skill Generation** — Auto-generates project-specific agents and skills from your codebase conventions
+- **Agent Evolution Pipeline** — Promotion from temp to permanent based on performance; demotion on failure
+
+### Infrastructure
+- **3 Backends** — tmux (Linux/macOS), subprocess (all platforms including native Windows), Docker (isolated containers)
+- **3 Providers** — Claude (default), OpenAI Codex, Google Gemini — 13 models, 4 tiers
+- **Tier-Based Routing** — `brain_tier: 'premium'` instead of model names; ModelRegistry resolves best model per provider
+- **Configurable Timeouts** — Per-task and per-sprint timeout, `sprint_timeout_minutes: 0` for unlimited
+- **Human Checkpoints** — Configurable approval gates at plan, evaluate, fix phases
+- **MCP Integration** — 22 tools + 8 resources for Claude Code IDE integration
+- **Web Dashboard** — React + Vite + Tailwind, 6 pages, SSE real-time updates, TR/EN language switcher
+
+### Cross-Platform
+- **Linux** — Full (Ubuntu 20+, Debian 11+, Fedora 38+, Arch)
+- **macOS** — Full (12+)
+- **Windows WSL2** — Full (recommended for tmux workflows)
+- **Native Windows** — Full (subprocess backend, `shell:true`, UTF-8 support)
 
 ---
 
@@ -101,36 +159,26 @@ Deckent follows a three-step cycle:
 
 > April 2026 — see [full competitive analysis](docs/analysis/competitive-analysis.md) for detailed head-to-head breakdowns.
 
-| Feature | deckent | Cursor Agents | Devin | OpenHands | Copilot Cowork | OpenClaw |
-|---------|---------|--------------|-------|-----------|----------------|---------|
-| Multi-agent parallel execution | Yes (up to 10 workers) | Limited | Yes | Yes | No | Yes (100+ AgentSkill) |
-| Sprint lifecycle management | Yes (8-phase) | No | Partial | No | No | No |
-| Automatic task planning from goals | Yes (AI + structured) | No | Yes | Partial | No | No |
-| Quality auditor with boundary enforcement | Yes | No | No | No | No | No |
-| Memory and learning across sprints | Yes (native) | No | No | No | No | 3rd party (Mem0/Cognee) |
-| GO/NO-GO evaluation per task | Yes | No | No | No | No | No |
-| Open source | Yes (MIT) | No | No | Yes (OSS) | No | Yes (OSS) |
-| MCP integration | Yes (21 tools, 8 resources) | Partial | No | No | No | Limited |
-| Web dashboard | Yes (6 pages) | Built-in | Built-in | No | No | No |
-| Multi-provider support | Yes (Claude, Codex, Gemini) | No | No | Yes | No | Limited |
-| Built-in agents | 16 | — | — | Registry | — | 100+ |
-| Built-in skills | 21 | — | — | — | — | 13K+ (hub) |
-| Test coverage | 89.33% | — | — | — | — | — |
-| Heartbeat / proactive tasks | Yes | No | No | No | No | No |
-| Price | Free (MIT) | $20-40/mo | $20-500/mo | Free | $19-39/mo | Free |
-
----
-
-## Platform Support
-
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch) | **FULL** | Primary development platform |
-| macOS (12+) | **FULL** | All features supported |
-| Windows via WSL2 | **FULL** | Recommended Windows setup -- use Ubuntu/Debian WSL2 |
-| Native Windows (cmd / PowerShell) | **FULL** | Subprocess backend with `shell:true`, periodic heartbeat, UTF-8 support |
-
-> **Windows users:** Native Windows is fully supported via the subprocess backend. WSL2 remains an option for tmux-based workflows. Running `deckent doctor` verifies platform compatibility.
+| Feature | **deckent** | Cursor Agents | Devin | OpenClaw | Claude Code |
+|---------|-------------|--------------|-------|----------|-------------|
+| Sprint lifecycle (8-phase) | **Yes** | No | Partial | No | No |
+| Multi-agent parallel execution | **Yes** (10 workers) | Limited | Yes | Yes (100+ AgentSkill) | No |
+| Automatic task planning from goals | **Yes** (AI + structured) | No | Yes | No | No |
+| AST sandbox for skills | **Yes** | No | No | No | No |
+| Quality auditor with boundary enforcement | **Yes** | No | No | No | No |
+| Nervous System (proactive meta-orchestrator) | **Yes** | No | No | No | No |
+| Memory V2 (SQLite FTS5, cross-sprint learning) | **Yes** | No | No | 3rd party | No |
+| Dual mode (sprint + task) | **Yes** | No | No | No | No |
+| `.deck` secret interpolation | **Yes** | No | No | No | No |
+| GO/NO-GO evaluation per task | **Yes** | No | No | No | No |
+| Open source | **Yes** (MIT) | No | No | Yes (OSS) | No |
+| MCP integration | **Yes** (22 tools, 8 resources) | Partial | No | Limited | Native |
+| Web dashboard | **Yes** (6 pages) | Built-in | Built-in | No | No |
+| Multi-provider (Claude, Codex, Gemini) | **Yes** | No | No | Limited | No |
+| Built-in agents | **15** | — | — | 100+ | — |
+| Built-in skills | **21** | — | — | 13K+ (hub, ~20% flagged) | — |
+| Test coverage | **89.33%** | — | — | — | — |
+| Price | **Free (MIT)** | $20-40/mo | $20-500/mo | Free | Free |
 
 ---
 
@@ -141,13 +189,11 @@ Deckent follows a three-step cycle:
 | Node.js | >= 18 | `node --version` |
 | git | any | `git --version` |
 | Claude Code CLI | any | `claude --version` |
-| tmux | any (optional) | `tmux -V` |
+| tmux | any (optional, Linux/macOS) | `tmux -V` |
 | OpenAI Codex CLI | any (optional) | `codex --version` |
 | Google Gemini API | any (optional) | `GOOGLE_API_KEY` env var |
 
-**Claude Subscription:** Pro, Max 5x, Max 20x, or API key (pay-as-you-go). Other providers (Codex, Gemini) work with their respective API keys.
-
-**Supported OS:** macOS, Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch), Windows via WSL2
+**Claude Subscription:** Pro, Max 5x, Max 20x, or API key (pay-as-you-go). Other providers (Codex, Gemini) require their respective API keys.
 
 ---
 
@@ -160,7 +206,7 @@ npm install -g deckent
 Verify:
 
 ```bash
-deckent --version
+deckent --version    # 1.0.0-beta.1
 deckent doctor
 ```
 
@@ -174,8 +220,6 @@ deckent doctor
 cd my-project
 deckent init
 ```
-
-Output:
 
 ```
   Welcome to Deckent!
@@ -192,7 +236,15 @@ Output:
   Next: Edit DIRECTIVES.md with your first goals, then run `deckent start`
 ```
 
-### Start a Sprint
+### Set Your Mode
+
+```bash
+deckent mode sprint   # Developer orchestration (default)
+deckent mode task     # Life assistant (one-shot tasks)
+deckent mode auto     # Auto-detect from context
+```
+
+### Start a Sprint (Sprint Mode)
 
 ```bash
 # Edit DIRECTIVES.md with your goals, then:
@@ -205,34 +257,40 @@ deckent start --dry-run
 deckent start --auto-approve
 ```
 
+### Run a One-Shot Task (Task Mode)
+
+```bash
+deckent mode task
+deckent run "Organize my downloads folder by file type"
+deckent run "Draft a reply to the GitHub issue about memory leaks"
+```
+
 ### Check Status
 
 ```bash
 deckent status
-
-# Auto-refresh every 2 seconds:
-deckent status --watch
-
-# Machine-readable output:
-deckent status --json
+deckent status --watch   # Auto-refresh every 2s
+deckent status --json    # Machine-readable output
 ```
 
-Example output:
-
 ```
-Sprint sprint-001 -- EXECUTE phase
+Sprint sprint-149 -- EXECUTE phase
 
   TASK        STATUS      MODEL    LAST HEARTBEAT
-  001-001     EXECUTING   sonnet   5s ago
-  001-002     DONE        haiku    42s ago
+  149-001     EXECUTING   sonnet   5s ago
+  149-002     DONE        haiku    42s ago
 
 Progress: 1/2 done  |  0 failed  |  1 running
 ```
 
-### Plan Without Executing
+### Query Memory
 
 ```bash
-deckent plan
+deckent recall "docker heartbeat"         # Cross-source FTS5 search
+deckent recall "ADR-037 RBAC"             # Find architecture decisions
+deckent remember "Deploy freeze until Friday"  # Save a note
+deckent memory stats                       # Memory DB stats
+deckent memory export                      # Export DB → .md snapshots
 ```
 
 ### Health Check
@@ -240,8 +298,6 @@ deckent plan
 ```bash
 deckent doctor
 ```
-
-Output:
 
 ```
   node_version   v20.11.0 (>=18 required)     [pass]
@@ -256,47 +312,45 @@ Output:
 | Command | Description |
 |---------|-------------|
 | `deckent init` | Interactive setup wizard |
-| `deckent onboard` | Full onboarding (global + project config) |
+| `deckent mode [show\|sprint\|task\|auto\|global]` | Get/set runtime mode |
 | `deckent start` | Run the full sprint lifecycle |
 | `deckent plan` | Plan the next sprint (plan mode only) |
 | `deckent status` | Show live dashboard |
+| `deckent run <cmd>` | Run a task (one-shot in task mode, queued in sprint mode) |
 | `deckent attach` | Attach to the tmux session |
 | `deckent spawn <id>` | Manually spawn a worker |
 | `deckent kill <id>` | Kill a specific worker |
-| `deckent retro` | Run sprint retrospective |
+| `deckent retro` | Read sprint retrospective |
 | `deckent cleanup` | Archive sprint files and kill workers |
 | `deckent doctor` | Check system health |
+| `deckent audit <sprint-id>` | Run Brain Self-Audit Gate for a sprint |
+| `deckent recover <sprint-id>` | Recover a crashed or incomplete sprint |
 | `deckent config` | Show/edit configuration |
 | `deckent config set <key> <value>` | Set a config value |
 | `deckent history` | Show sprint history and metrics |
-| `deckent plugin install <name>` | Install a plugin |
-| `deckent plugin list` | List installed plugins |
 | `deckent analyze` | Analyze project stack and size |
-| `deckent archive-debt` | Archive resolved technical debt |
 | `deckent dashboard` | Terminal TUI dashboard |
 | `deckent serve` | Start HTTP API server |
 | `deckent web` | Web dashboard + API server (localhost:3100) |
-| `deckent upgrade` | Self-update Deckent (`--local <path.tgz>` for beta installs) |
-| `deckent sync` | Sync adapter files with DECKENT.md |
-| `deckent watch` | Live tmux split view |
-| `deckent test` | Run project tests |
-| `deckent set-directives` | Set sprint directives |
-| `deckent finalize` | Finalize current sprint |
-| `deckent run <cmd>` | Run arbitrary command |
-| `deckent explain <topic>` | Explain a concept or command |
-| `deckent quick-start` | Quick-start wizard for new projects |
+| `deckent recall <query>` | Search project memory (ADRs, learnings, debt) |
+| `deckent remember <note>` | Save a note to memory |
+| `deckent memory [rebuild\|export\|stats]` | Memory DB management |
 | `deckent skill` | List or manage installed skills |
-| `deckent skill-marketplace` | [EXPERIMENTAL] Browse and install skills from marketplace |
+| `deckent skill publish <path>` | Publish a skill to DeckentHub (Ed25519 signed) |
+| `deckent features [--category]` | List feature manifest (active\|dormant\|dead\|all) |
 | `deckent agent` | Manage agent pool (list, inspect, reset) |
 | `deckent review` | Review last sprint results |
-| `deckent config migrate` | Migrate config to latest schema version |
-| `deckent heartbeat` | Run a one-shot heartbeat check (`--daemon` for background, `--interval <min>` to configure) |
+| `deckent upgrade` | Self-update (`--local <path.tgz>` for beta installs) |
+| `deckent sync` | Sync adapter files with DECKENT.md |
+| `deckent explain <topic>` | Explain a concept or command |
+| `deckent heartbeat` | One-shot heartbeat check (`--daemon` for background) |
+| `deckent checkpoint` | Approve/reject human checkpoints |
 
 ---
 
 ## MCP Integration
 
-Deckent integrates with Claude Code via the Model Context Protocol. Register with:
+Deckent integrates with Claude Code via the Model Context Protocol:
 
 ```bash
 claude mcp add deckent -- npx deckent mcp
@@ -304,7 +358,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Or let `deckent init` auto-register it.
 
-### MCP Tools (21)
+### MCP Tools (22)
 
 | Tool | Description |
 |------|-------------|
@@ -329,6 +383,7 @@ Or let `deckent init` auto-register it.
 | `deckent_checkpoint` | Approve/reject human checkpoints |
 | `deckent_docs` | Manage and serve built-in documentation |
 | `deckent_explain` | Explain sprint history and results |
+| `deckent_memory_query` | Cross-source memory search (ADR, sprint, debt, pattern) |
 
 ### MCP Resources (8)
 
@@ -353,17 +408,15 @@ Configuration lives in `.deckent/config.json` (project) and `~/.deckent/config.j
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `deckent_style` | string | `"sprint"` | Runtime mode: `sprint` (developer) or `task` (life assistant) |
 | `mode` | string | `"performance"` | Plan tier: `performance`, `balanced`, `economic`, `api` |
 | `language` | string | `"en"` | Output language: `en`, `tr` |
-| `projectName` | string | `"deckent-project"` | Project name for dashboard and logs |
 | `brain_planning` | string | `"auto"` | Planning mode: `ai`, `structured`, `auto` |
 | `brain_provider` | string | `"claude"` | Provider for Brain: `claude`, `codex`, `gemini` |
 | `worker_provider` | string | `"claude"` | Provider for workers: `claude`, `codex`, `gemini` |
-| `fallback_provider` | string | -- | Fallback provider on failure |
-| `modes.<mode>.max_workers` | number | varies | Maximum parallel workers |
-| `modes.<mode>.brain_model` | string | varies | Model used by Brain for planning |
-| `modes.<mode>.default_model` | string | varies | Default model for workers |
-| `modes.<mode>.haiku_allowed` | boolean | varies | Whether Brain can assign haiku |
+| `fallback_provider` | string | — | Fallback provider on failure |
+| `spawn_backend` | string | `"tmux"` | Worker backend: `tmux`, `subprocess`, `docker` |
+| `sprint_timeout_minutes` | number | `60` | Hard sprint timeout; `0` for unlimited |
 
 ### Plan Tiers
 
@@ -374,11 +427,7 @@ Configuration lives in `.deckent/config.json` (project) and `~/.deckent/config.j
 | `economic` | 3 | sonnet | sonnet |
 | `api` | 10 | opus | sonnet |
 
-**Legacy aliases:** `max_plan`, `max5x_plan`, `pro_plan` are still accepted and auto-migrated to the new tier names.
-
 ### Multi-Provider Support
-
-Deckent works with three AI providers. Configure per-role or per-task:
 
 | Provider | Models | Env Var |
 |----------|--------|---------|
@@ -386,9 +435,24 @@ Deckent works with three AI providers. Configure per-role or per-task:
 | Codex (OpenAI) | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
 | Gemini (Google) | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
 
-**13 models across 3 providers.** Tier equivalence: premium_plus (o3, gemini-3.1-pro-preview), premium (opus, gpt-5, gemini-2.5-pro), standard (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), economy (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
+**13 models across 3 providers.** Tier equivalence: `premium_plus` (o3, gemini-3.1-pro-preview), `premium` (opus, gpt-5, gemini-2.5-pro), `standard` (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), `economy` (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
 
 See [docs/reference/multi-provider.md](docs/reference/multi-provider.md) for the full guide.
+
+### `.deck` Secret Interpolation
+
+Reference secrets in your config without committing them:
+
+```json
+{
+  "connectors": {
+    "discord": { "enabled": true, "token": "$DECK:DISCORD_TOKEN" },
+    "telegram": { "enabled": true, "token": "$DECK:TELEGRAM_TOKEN" }
+  }
+}
+```
+
+Secrets are loaded from the `.deck` file at runtime. The `.deck` file is gitignored by default.
 
 See [docs/reference/config-reference.md](docs/reference/config-reference.md) for the full reference.
 
@@ -396,48 +460,46 @@ See [docs/reference/config-reference.md](docs/reference/config-reference.md) for
 
 ## Docker Backend (Isolated Workers)
 
-Workers run in isolated Docker containers — no cross-worker file conflicts. **Live-verified** across Sprint 119-129 (CLI + MCP). Workers can run tsc/vitest inside containers.
-
-### Setup
+Workers run in isolated Docker containers — no cross-worker file conflicts.
 
 ```bash
-docker build -f Dockerfile.worker -t deckent-worker:latest .
+docker build -f Dockerfile -t deckent-worker:latest .
 npx deckent config set spawn_backend docker
 ```
 
-### How It Works
-
 - Project mounted read-only (`/workspace`)
 - `.tasks/` mounted read-write (results, heartbeats)
-- Auth via `~/.claude/` mount (session-based)
-- Non-root execution (host UID/GID)
+- Non-root execution (`deckent` user)
 - Configurable timeout: `npx deckent config set docker_timeout 1800` (default: 1200s)
-- Config-aware backend routing: `spawn_backend` respected by all spawn paths (CLI, MCP, sprint-controller)
-- Dashboard shows backend badge per worker (Docker/tmux/subprocess)
-
-**Testing:** 10 e2e integration tests covering spawn, heartbeat, cleanup, concurrency, log extraction.
 
 See [docs/guide/docker-backend.md](docs/guide/docker-backend.md) for the full guide.
+
+---
+
+## Nervous System
+
+The Nervous System is a proactive meta-orchestrator that runs alongside sprints:
+
+<!-- ![deckent nervous TUI](docs/assets/nervous-tui.png) -->
+> Screenshot coming in Sprint 151 — `deckent nervous` for live TUI
+
+- **Detectors** — Pluggable detectors for stale tasks, idle state (task mode), routing anomalies, agent health
+- **Notifications** — Contextual alerts via event bus; Discord/Telegram connectors in Sprint 149+
+- **Task Mode Idle** — In task mode, notifies after 5 minutes of inactivity
+- **Proactive** — No polling required; detectors run on cron events and sprint lifecycle events
 
 ---
 
 ## Web Dashboard
 
 ```bash
-deckent web     # Opens at localhost:3100
+deckent web   # Opens at localhost:3100
 ```
 
-React + Vite + Tailwind -- 6 pages (Dashboard, Settings, History, Memory, Config, Status), SSE real-time updates, dark/light theme, TR/EN language switcher.
+React + Vite + Tailwind — 6 pages (Dashboard, Settings, History, Memory, Config, Status), SSE real-time updates, dark/light theme, TR/EN language switcher.
 
----
-
-## HTTP API
-
-```bash
-deckent serve   # API only at localhost:3100
-```
-
-17 endpoints + SSE stream. See [docs/reference/api.md](docs/reference/api.md) for the full reference.
+<!-- ![dashboard screenshot](docs/assets/dashboard.png) -->
+> Full screenshot gallery coming in Sprint 151
 
 ---
 
@@ -447,28 +509,68 @@ After `deckent init`:
 
 ```
 my-project/
-  DECKENT.md             # Single source of truth (agent config)
-  DIRECTIVES.md          # Your goals -- edit before each sprint
-  CLAUDE.md              # Claude Code adapter
-  AGENTS.md              # Generic agent adapter
+  DECKENT.md              # Single source of truth (agent config)
+  DIRECTIVES.md           # Your goals — edit before each sprint
+  CLAUDE.md               # Claude Code adapter
+  AGENTS.md               # Generic agent adapter
   .deckent/
-    config.json          # Runtime config
-    workspace/           # Identity, tools, boot sequence
-    docs/                # Built-in guides (quick-start, directives, config)
-    agents/              # Agent pool (built-in + temp agents)
-    skills/              # Skill registry (built-in + temp skills)
-    plugins/             # Installed plugins
-    i18n/                # Language files
+    config.json           # Runtime config (deckent_style, mode, providers)
+    workspace/            # Identity, tools, boot sequence
+    docs/                 # Built-in guides (quick-start, directives, config)
+    agents/               # Agent pool (built-in + temp agents, LRU eviction)
+    skills/               # Skill registry (built-in + temp skills, AST validated)
+    plugins/              # Installed plugins
+    i18n/                 # Language files (en, tr)
   .brain/
-    MEMORY.md            # Learned patterns (auto-updated)
-    DEBT.md              # Technical debt log
-    PATTERNS.md          # Detected patterns
-    RETRO.md             # Last sprint retrospective
-    DECISIONS.md         # Architecture decisions
-    sprints/             # Per-sprint logs
-  .tasks/                # Task JSON files (managed by Brain)
-  .locks/                # File locks (managed by workers)
+    memory.db             # SQLite DB — single source of truth (gitignored)
+    exports/
+      summary.md          # Auto-generated context summary (git-tracked)
+      decisions.md        # ADR list (git-tracked)
+      memory.md           # Sprint learnings (git-tracked)
+      debt.md             # Technical debt (git-tracked)
+    archive/              # Per-sprint logs
+  .tasks/                 # Task JSON files (managed by Brain)
+  .locks/                 # File locks (managed by workers)
+  .deck                   # Secret file (gitignored — $DECK:KEY references)
 ```
+
+---
+
+## Crash Recovery
+
+Deckent knows how to recover itself — and gives you the tools to recover too.
+
+```bash
+# Run Brain Self-Audit Gate for any past sprint
+deckent audit sprint-150
+
+# Recover a crashed or incomplete sprint (interactive, confirms before destructive ops)
+deckent recover sprint-150 --dry-run   # preview what would be cleaned
+deckent recover sprint-150             # execute recovery
+```
+
+```
+Gate: PASS
+tsc: pass, vitest: pass
+Written: .deckent/sprint-150-gate.json
+```
+
+If a sprint crashes mid-execution (network cut, OOM, coordinator panic), `deckent recover` runs audit + orphan cleanup + stale lock clear + task archive in one command.
+
+---
+
+## DeckentHub — Skill Registry
+
+DeckentHub is a curated skill registry where every skill is:
+- **AST-sandboxed** — Validated before execution, no arbitrary code injection
+- **Ed25519-signed** — Cryptographically signed by the author
+- **CI-validated** — GitHub Actions validates sandbox + signature on every PR
+
+```bash
+deckent skill publish ./my-skill   # Sign + submit to DeckentHub
+```
+
+The hub launches with 20 seed skills in Sprint 150: spotify-control, telegram-bot, discord-moderator, calendar-google, and 16 more.
 
 ---
 
@@ -487,7 +589,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing guide, cod
 - [Architecture](docs/architecture/architecture.md)
 - [Sprint Lifecycle](docs/architecture/sprint-lifecycle.md)
 - [MCP Guide](docs/reference/mcp-guide.md)
-- [Plugin Guide](docs/development/plugin-guide.md)
+- [Docker Backend Guide](docs/guide/docker-backend.md)
 - [Troubleshooting](docs/development/troubleshooting.md)
 - [FAQ](docs/guide/faq.md)
 
@@ -495,7 +597,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing guide, cod
 
 ## License
 
-MIT -- [Alperen @ Verhex](https://deckent.agency)
+MIT — [Alperen @ Verhex](https://deckent.agency)
 
 **GitHub:** [github.com/VerhexIO/deckent](https://github.com/VerhexIO/deckent)
 **Website:** [deckent.agency](https://deckent.agency)

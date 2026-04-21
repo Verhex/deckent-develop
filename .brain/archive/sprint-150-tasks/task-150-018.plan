@@ -1,0 +1,42 @@
+## Task 150-018: 20 Seed Skill Creation — Execution Plan
+
+### Status: ALREADY COMPLETE (Previous Sprint Worker)
+
+All 20 seed skills were already created by a previous worker in the deckent-hub/skills/ directory.
+
+### Verification Steps
+1. ✅ 20 skill directories exist under deckent-hub/skills/
+2. ✅ Each has SKILL.md (62-143 lines, trigger patterns + code examples + best practices)
+3. ✅ Each has manifest.json (V2 schema, valid JSON, activation rules, triggers)
+4. ✅ Each has signature.ed25519 (placeholder awaiting T-150-016 keygen)
+
+### Skills Created
+1. spotify-control — Spotify Web API (80 lines)
+2. telegram-bot — Telegraf framework (106 lines)
+3. discord-moderator — Discord.js moderation (120 lines)
+4. calendar-google — Google Calendar API (109 lines)
+5. email-imap — IMAP/SMTP (143 lines)
+6. weather-forecast — OpenWeatherMap (62 lines)
+7. rss-reader — RSS/Atom parser (86 lines)
+8. web-scraper — Playwright wrapper (96 lines)
+9. github-issues — GitHub API (93 lines)
+10. slack-notifier — Slack webhooks (106 lines)
+11. notion-sync — Notion API (82 lines)
+12. todoist — Todoist API (100 lines)
+13. spotify-playlist — Spotify playlist manage (95 lines)
+14. youtube-downloader — yt-dlp wrapper (110 lines)
+15. reddit-fetcher — Reddit API (129 lines)
+16. twitter-post — Twitter API v2 (67 lines)
+17. screenshot-vision — Playwright + Claude Vision (78 lines)
+18. file-organizer — Local fs helpers (101 lines)
+19. currency-converter — Exchange rates (97 lines)
+20. translator — DeepL API (93 lines)
+
+### Quality Checks
+- All 20 manifest.json files: valid JSON + V2 schema compliant
+- All 20 SKILL.md files: trigger patterns + runnable code examples + error handling + best practices
+- All 20 signature.ed25519 files: placeholder format (ed25519:placeholder:awaiting-t149016-keygen:...)
+
+### Tech Debt Note
+- Signatures are placeholder — T-150-016 (Ed25519 keygen) dependency not yet live
+- Signature verification will fail until real keys are generated

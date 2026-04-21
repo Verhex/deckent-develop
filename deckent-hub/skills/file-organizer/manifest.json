@@ -1,0 +1,25 @@
+{
+  "id": "file-organizer",
+  "source": "hub",
+  "name": "File Organizer",
+  "version": "1.0.0",
+  "description": "Local filesystem organization helpers — rename, sort, deduplicate, cleanup",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "filesystem" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "organization" } }, "score": 7 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "utility",
+  "triggers": ["organize", "rename", "sort", "deduplicate", "cleanup", "filesystem"],
+  "stackDetection": { "files": [], "dependencies": [], "commands": [] },
+  "composableWith": ["typescript-expert"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

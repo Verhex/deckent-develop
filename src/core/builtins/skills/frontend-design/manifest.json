@@ -1,0 +1,74 @@
+{
+  "id": "frontend-design",
+  "source": "builtin",
+  "name": "Frontend Design",
+  "version": "0.1.0",
+  "description": "UI/UX design patterns, Tailwind CSS, responsive layouts, animations, design systems",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "frontend"
+          },
+          "intent.primary": "design"
+        },
+        "score": 10
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "css"
+          }
+        },
+        "score": 7
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "tailwind",
+    "css",
+    "responsive",
+    "animation",
+    "design-system",
+    "layout",
+    "grid",
+    "flexbox",
+    "theme",
+    "dark-mode"
+  ],
+  "stackDetection": {
+    "files": [
+      "tailwind.config.js",
+      "tailwind.config.ts",
+      "postcss.config.js"
+    ],
+    "dependencies": [
+      "tailwindcss"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "react-specialist",
+    "accessibility-expert",
+    "typescript-expert"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

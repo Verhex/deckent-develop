@@ -1,0 +1,61 @@
+{
+  "id": "react-specialist",
+  "source": "builtin",
+  "name": "React Specialist",
+  "version": "0.2.0",
+  "description": "React 18+ patterns, functional components, hooks, performance, testing",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "react"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "framework",
+  "triggers": [
+    "react",
+    "component",
+    "hook",
+    "jsx",
+    "tsx",
+    "state",
+    "props",
+    "context",
+    "reducer",
+    "effect"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [
+      "react",
+      "react-dom"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "priority": 10,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

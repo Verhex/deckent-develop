@@ -1,0 +1,25 @@
+# Task 150-027 Execution Plan
+
+## Objective
+Public repo hazırlığı için 2 dosya oluşturmak:
+1. docs/release/public-repo-manifest.md — include/exclude listesi
+2. scripts/public-repo-sync.sh — rsync helper script
+
+## Steps
+1. docs/release/public-repo-manifest.md yaz
+   - ≥10 include/exclude item
+   - Her item için açıklama
+   - T-150-037 bağımlılığını belirt
+
+2. scripts/public-repo-sync.sh yaz
+   - Mevcut task description'daki script template'ini kullan
+   - --dry-run flag ekle
+   - Executable yap (chmod +x)
+
+3. Verify:
+   - tsc --noEmit (bu task sadece .md ve .sh dosyaları, TS değişikliği yok)
+   - vitest run (ilgili test yok ama genel suite kontrol)
+
+## Expected Files Changed
+- docs/release/public-repo-manifest.md (NEW)
+- scripts/public-repo-sync.sh (NEW)

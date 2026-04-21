@@ -1,0 +1,62 @@
+{
+  "id": "accessibility-expert",
+  "source": "builtin",
+  "name": "Accessibility Expert",
+  "version": "0.1.0",
+  "description": "WCAG 2.1 compliance, ARIA patterns, keyboard navigation, screen reader, color contrast",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "accessibility"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "aria",
+    "screen-reader",
+    "keyboard",
+    "focus",
+    "contrast",
+    "semantic-html",
+    "alt-text"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [
+      "@axe-core/react",
+      "eslint-plugin-jsx-a11y"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "react-specialist",
+    "frontend-design",
+    "testing-expert"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

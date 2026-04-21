@@ -1,0 +1,28 @@
+{
+  "taskId": "149-016",
+  "filesChanged": [
+    "src/core/signature.ts",
+    "tests/core/signature.test.ts",
+    "package.json"
+  ],
+  "linesAdded": 200,
+  "linesRemoved": 1,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Ed25519 sign/verify module created with @noble/ed25519 v2. 9/9 tests pass (8 spec + 1 bonus load-existing-keys test). tsc --noEmit clean. Dependencies: @noble/ed25519 ^2.3.0, @noble/hashes ^1.8.0. Features: generateKeypair (async), loadOrGenerateKeypair (sync, persists to ~/.deckent/keys/), signMessage, verifySignature, bytesToHex/hexToBytes re-exports. File permissions: private.hex 0600, public.hex 0644, keys dir 0700.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 80
+  },
+  "evaluationDecision": "DONE"
+}

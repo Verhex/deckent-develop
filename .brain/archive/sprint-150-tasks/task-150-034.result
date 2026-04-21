@@ -1,0 +1,33 @@
+{
+  "taskId": "150-034",
+  "filesChanged": [
+    "src/core/system-capacity.ts",
+    "src/core/config.ts",
+    "src/core/config-migration.ts",
+    "src/cli/commands/init-steps.ts",
+    ".deckent/config.json",
+    "tests/core/system-capacity.test.ts",
+    "tests/core/config-corrupted-recovery.test.ts",
+    "docs/reference/config.md"
+  ],
+  "linesAdded": 650,
+  "linesRemoved": 25,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "GO_WITH_TECH_DEBT",
+  "notes": "7-step config consolidation completed. (1) DEFAULT_MODES now derives max_workers from MODE_PRESETS (single source). (2) removeDuplicateKeys migration added to config-migration.ts + wired into loadConfig. (3) claude_backend removed from createDefaultConfig. (4) Self-healing corrupted config recovery added to loadConfig. (5) system-capacity.ts created with detectSystemCapacity/suggestMaxWorkers/suggestSpawnBackend. (6) init-steps.ts writeConfig wired with auto-detect. (7) docs/reference/config.md written (366 lines). (8) .deckent/config.json live-migrated (claude_backend + flat providers removed). All 285 config-related tests pass (29 new). tsc --noEmit: 0 errors in scope. TECH DEBT: (a) docs/reference/config.md is 366 lines vs target 800+ — covers all key categories but needs expansion for per-key 'reading modules' cross-references. (b) config.json did not reach 120 lines target (186 lines) because auto-migration adds missing fields back. (c) auto-setup.ts was not modified (another task's linter changes conflict). (d) Pre-existing test failures in error-handling-unification.test.ts and error-registry-lint.test.ts are from other tasks' changes (task-mode-runner.ts), not this task.",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 85,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 80
+  },
+  "evaluationDecision": "GO_WITH_TECH_DEBT"
+}

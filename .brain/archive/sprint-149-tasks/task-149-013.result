@@ -1,0 +1,21 @@
+{
+  "taskId": "149-013",
+  "filesChanged": [
+    "src/connectors/whatsapp.ts",
+    "src/connectors/whatsapp-README.md",
+    "tests/connectors/whatsapp-scaffold.test.ts"
+  ],
+  "linesAdded": 185,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "WhatsApp connector scaffold tamamlandı. 3 dosya oluşturuldu:\n1. src/connectors/whatsapp.ts — BaseConnector extend eden WhatsAppConnector. disabled→no-op, enabled→throw (Business API approval gerekli), sendMessage→throw, isHealthy→false. whatsapp-web.js (unofficial/TOS riski) kullanılmadı.\n2. src/connectors/whatsapp-README.md — Meta Developer Portal, Business verification, webhook setup, .deck config, Sprint 152+ activation adımları belgesi.\n3. tests/connectors/whatsapp-scaffold.test.ts — 6 test: disabled no-op, enabled throw, isHealthy false, sendMessage throw, stop no-op, id/name identity.\ntsc --noEmit: 0 hata. vitest run: 6/6 PASS.",
+  "tokenUsage": {
+    "inputTokens": 12000,
+    "outputTokens": 2800,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

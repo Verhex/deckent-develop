@@ -1,0 +1,23 @@
+# Task 149-003: Sprint Controller Mode-Aware Routing
+
+## Approach
+1. Create `src/orchestra/task-mode-runner.ts` — centralized task-mode execution
+2. Patch `src/orchestra/sprint-controller.ts` — add mode guard at runSprint entry
+3. Create `tests/orchestra/mode-aware-routing.test.ts` — 8 tests
+
+## Key Decisions
+- `deckent_style` may not exist yet on config type (Task 149-001 dependency)
+  - Use optional access `config.deckent_style` with type assertion if needed
+  - The guard checks for 'task' explicitly, defaults to sprint behavior
+- `buildRunTask` already exists in `src/cli/commands/run.ts` — reuse it
+- `spawnWorkerMultiProvider` exists in `src/cli/commands/spawn.ts` — import from there
+- `eventBus` from `./event-bus.js` — already in sprint-controller imports
+
+## Files
+- NEW: src/orchestra/task-mode-runner.ts (~150 LoC)
+- PATCH: src/orchestra/sprint-controller.ts (add mode guard + re-export)
+- NEW: tests/orchestra/mode-aware-routing.test.ts (8 tests)
+
+## Verify
+- tsc --noEmit
+- npx vitest run tests/orchestra/mode-aware-routing.test.ts

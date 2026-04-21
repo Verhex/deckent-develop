@@ -1,0 +1,21 @@
+{
+  "taskId": "150-026",
+  "filesChanged": [
+    "scripts/npm-publish-dry-final.sh",
+    "docs/audits/sprint-150/npm-publish-dry-final.md",
+    ".tasks/task-150-026.plan"
+  ],
+  "linesAdded": 85,
+  "linesRemoved": 3,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "GO_WITH_TECH_DEBT",
+  "notes": "npm pack --dry-run PASSES: tarball 1.08MB (<2MB limit), no secrets, no sensitive dirs, all 6 package.json metadata fields present, version=1.0.0-beta.1. package.json was already at 1.0.0-beta.1. scripts/npm-publish-dry-final.sh updated from Sprint 149 version — added Step 8 (T-150-031 built-in bundle check: dist/core/builtins/agents/*.json ≥15, skills/*.json ≥21) and renumbered Step 9. TECH_DEBT: dist/core/builtins/ does not exist — T-150-031 (Built-in Bundle Pipeline) not yet complete, so built-in count check would exit 1 on full script run. Script is correctly wired: will pass once T-150-031 completes and npm run build is re-run. Audit doc at docs/audits/sprint-150/npm-publish-dry-final.md.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 3500,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

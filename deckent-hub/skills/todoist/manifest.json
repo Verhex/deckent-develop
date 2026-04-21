@@ -1,0 +1,22 @@
+{
+  "id": "todoist",
+  "source": "hub",
+  "name": "Todoist",
+  "version": "1.0.0",
+  "description": "Todoist API integration for tasks, projects, labels, and priority management",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "todoist" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "productivity",
+  "triggers": ["todoist", "task", "todo", "project", "label", "priority"],
+  "stackDetection": { "files": [], "dependencies": ["@doist/todoist-api-typescript"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

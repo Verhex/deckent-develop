@@ -1,0 +1,24 @@
+{
+  "taskId": "150-005",
+  "filesChanged": ["Dockerfile", "tests/backends/docker-non-root.test.ts"],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Dockerfile USER non-root fix Sprint 149'da zaten uygulanmıştı. Mevcut durum doğrulandı:\n\n1. `USER deckent` direktifi Dockerfile satır 30'da mevcut ✅\n2. `groupadd -r deckent && useradd -r -g deckent` satır 25'te mevcut ✅\n3. `chown -R deckent:deckent /app /workspace /home/deckent` satır 27'de, USER'dan önce ✅\n4. `/workspace` dizini oluşturulmuş ve chown ile deckent kullanıcısına verilmiş ✅\n\ntests/backends/docker-non-root.test.ts dosyası da zaten mevcut ve 4 test içeriyor:\n- USER directive non-root kontrolü\n- groupadd/useradd/deckent user varlığı\n- chown sırası (USER'dan önce)\n- /workspace dizini sahipliği\n\nTüm 4 test başarıyla geçti. tsc --noEmit sıfır hata.\n\nBaseline: Sprint 149'da god-analysis P1 finding #7 düzeltilmiş. Sprint 150 T-150-005 görevi bu fixin doğrulanması ve test dosyasının varlığının teyididir.",
+  "tokenUsage": {
+    "inputTokens": 8500,
+    "outputTokens": 650,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

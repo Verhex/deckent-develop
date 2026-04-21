@@ -1,0 +1,28 @@
+{
+  "taskId": "149-002",
+  "filesChanged": [
+    "src/cli/commands/mode.ts",
+    "src/cli/index.ts",
+    "tests/cli/mode-command.test.ts"
+  ],
+  "linesAdded": 280,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Created `deckent mode` CLI command with 5 subcommands: show, sprint, task, auto, global. Follows ADR-012 register<Name>(program) pattern. Uses existing config.ts read/write patterns (no setConfigValue needed — project config uses direct JSON read/write, global uses saveGlobalConfig). All 8 tests pass (5 required + 3 extra edge cases). tsc --noEmit clean for mode.ts (other errors from task-mode-runner.ts are T-149-003 scope). index.ts updated with import + registerMode call.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 5000,
+    "cacheReadTokens": 80000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 80
+  },
+  "evaluationDecision": "DONE"
+}

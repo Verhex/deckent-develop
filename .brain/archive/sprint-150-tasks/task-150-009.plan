@@ -1,0 +1,21 @@
+# Task 150-009 Execution Plan: Auditor Stale Alert Race Condition Fix
+
+## Analysis
+Sprint 149 already implemented the core fix in `src/monitor/auditor.ts` (lines 293-316):
+- Task JSON is read to check lifecycle state before generating stale alerts
+- PENDING/CLAIMED/DRAFT/PAUSED tasks skip stale alerts entirely
+- DONE/NO_GO tasks get WARNING (downgraded from CRITICAL)
+- Only EXECUTING/TESTING/DOCUMENTING tasks trigger genuine CRITICAL stale alerts
+
+`src/core/heartbeat-types.ts` exports `ACTIVE_EXECUTION_STATUSES`, `COMPLETED_STATUSES`, `PRE_EXECUTION_STATUSES` sets — but auditor.ts was using inline `new Set()` instead.
+
+Tests in `tests/orchestra/auditor-stale-race.test.ts` cover all 5 required scenarios.
+
+## Changes Made (Sprint 150 DRY Improvement)
+1. Import `ACTIVE_EXECUTION_STATUSES` and `COMPLETED_STATUSES` from `heartbeat-types.ts`
+2. Replace inline `EXECUTING_STATES` set with shared `ACTIVE_EXECUTION_STATUSES`
+3. Replace inline `task.status === TaskStatus.DONE || task.status === TaskStatus.NO_GO` with `COMPLETED_STATUSES.has(task.status)`
+
+## Verification
+- tsc --noEmit: 0 errors
+- vitest: 5/5 tests passing

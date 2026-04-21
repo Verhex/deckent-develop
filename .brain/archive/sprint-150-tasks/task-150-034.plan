@@ -1,0 +1,13 @@
+# Task 150-034 Execution Plan
+
+## Steps
+1. Read all target files (config.ts, config-types.ts, mode-presets.ts, config-migration.ts, init-steps.ts, auto-setup.ts, .deckent/config.json)
+2. Create src/core/system-capacity.ts (NEW) — OS detection + suggest functions
+3. Add "v2-duplicate-remover" migration to config-migration.ts
+4. Remove DEFAULT_MODES from config.ts, import from mode-presets.ts
+5. Add self-healing corrupted config recovery to loadConfig in config.ts
+6. Wire system-capacity into init-steps.ts writeConfig
+7. Write tests: config-migration, corrupted-recovery, system-capacity
+8. Write docs/reference/config.md
+9. Live-migrate .deckent/config.json (remove duplicates)
+10. Run tsc --noEmit + vitest run

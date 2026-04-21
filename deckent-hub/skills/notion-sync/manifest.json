@@ -1,0 +1,22 @@
+{
+  "id": "notion-sync",
+  "source": "hub",
+  "name": "Notion Sync",
+  "version": "1.0.0",
+  "description": "Notion API integration for databases, pages, blocks, and workspace sync",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "notion" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["notion", "database", "page", "block", "sync", "workspace"],
+  "stackDetection": { "files": [], "dependencies": ["@notionhq/client"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

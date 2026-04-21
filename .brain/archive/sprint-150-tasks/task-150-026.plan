@@ -1,0 +1,23 @@
+# Task 150-026 Execution Plan: npm pack --dry-run + Version Bump 1.0.0-beta.1
+
+## Analysis
+- package.json already at version 1.0.0-beta.1 (pre-bumped by T-150-031 or init)
+- All required metadata fields present: description, homepage, bugs, repository, keywords, license
+- Current `files[]` includes: dist, bin, README.md, LICENSE
+- Need to verify: dist/core/builtins/ exists in tarball (T-150-031 dependency)
+
+## Steps
+1. Create scripts/npm-publish-dry-final.sh with checks:
+   - version check
+   - size check (<2MB)
+   - secret scan (no ANTHROPIC_API_KEY, .deck, credentials.json)
+   - built-in bundle check (dist/core/builtins/agents/*.json ≥15, skills/*.json ≥21)
+   - metadata field check
+2. Run npm pack --dry-run to verify
+3. Document findings in docs/audits/sprint-150/npm-publish-dry-final.md
+4. Write result file
+
+## Expected Outcome
+- scripts/npm-publish-dry-final.sh: executable bash script for publish validation
+- docs/audits/sprint-150/npm-publish-dry-final.md: audit trail
+- selfAssessment: DONE if dry-run passes, GO_WITH_TECH_DEBT if built-in bundle missing (T-150-031 dependency)

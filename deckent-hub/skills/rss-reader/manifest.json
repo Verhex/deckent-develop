@@ -1,0 +1,22 @@
+{
+  "id": "rss-reader",
+  "source": "hub",
+  "name": "RSS Reader",
+  "version": "1.0.0",
+  "description": "RSS/Atom feed parsing and polling with change detection",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "rss" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "data",
+  "triggers": ["rss", "feed", "atom", "syndication", "subscribe", "news"],
+  "stackDetection": { "files": [], "dependencies": ["rss-parser"], "commands": [] },
+  "composableWith": ["typescript-expert"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

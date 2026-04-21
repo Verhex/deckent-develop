@@ -1,0 +1,21 @@
+{
+  "taskId": "149-010",
+  "filesChanged": [
+    "src/connectors/types.ts",
+    "src/connectors/base-connector.ts",
+    "tests/connectors/base-connector.test.ts"
+  ],
+  "linesAdded": 220,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Created src/connectors/types.ts (ConnectorId, IncomingMessage, OutgoingMessage, IMessageConnector, ConnectorConfig, MessageHandler) and src/connectors/base-connector.ts (abstract BaseConnector with handler array pattern, lifecycle state, error isolation). 7 tests pass (task spec asked 5, added 2 extra for handler error isolation and schema validation). tsc --noEmit 0 errors. Provider adapter pattern from src/core/provider.ts adapted for messaging: readonly identity fields, async lifecycle, config-driven start. No external dependencies added.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 4500,
+    "cacheReadTokens": 38000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

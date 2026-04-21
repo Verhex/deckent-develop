@@ -1,0 +1,19 @@
+{
+  "taskId": "149-023",
+  "filesChanged": [
+    "scripts/doc-review.mjs",
+    "docs/audits/sprint-149/doc-review-report.md"
+  ],
+  "linesAdded": 447,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "selfAssessment": "DONE",
+  "notes": "Implemented scripts/doc-review.mjs (~220 LoC logic + 227 LoC report generation). Script:\n- Scans 1172 .md files using `find` command\n- Hash-based duplicate detection (sha256, 16-char prefix)\n- Sprint reference extraction via regex (\\bsprint[-_ ]?\\d{3,}\\b)\n- Stale heuristic: sprint < 139 (current-10) → REVISE\n- Internal link checker (relative markdown links only, excludes http/mailto)\n- 4-category output: KEEP(474) / REVISE(116) / DELETE(576) / MOVE(6)\n- 87 broken internal links detected\n- Report: docs/audits/sprint-149/doc-review-report.md (1316 lines)\n\nAll 3 test criteria verified:\n1. node scripts/doc-review.mjs → exit 0\n2. Report contains ## KEEP / ## REVISE / ## DELETE / ## MOVE sections\n3. Broken link detection working (87 broken links found across repo)\n\ntsc: N/A (pure .mjs file, no TypeScript)\nvitest: No .ts changes made, baseline unchanged",
+  "tokenUsage": {
+    "inputTokens": 12000,
+    "outputTokens": 3200,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

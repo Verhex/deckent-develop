@@ -1,0 +1,16 @@
+{
+  "taskId": "150-022",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "selfAssessment": "DONE",
+  "notes": "AGENTS.md dosyası incelendi. Sprint 149'da zaten güncel durumda: 15 built-in agent (ADR-041 reform sonrası), 'test-writer' kelimesi yok. Tablo: 15 satır, detay bölümleri: 15 adet agent başlığı. Test kriterleri: (1) 15 agent listed ✅, (2) test-writer absent ✅. Herhangi bir değişiklik gerekmedi — dosya görev gereksinimlerini tam karşılıyor.",
+  "tokenUsage": {
+    "inputTokens": 12500,
+    "outputTokens": 350,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "id": "150-019",
+  "title": "`deckent skill publish` CLI Complete (Sign + Upload)",
+  "description": "`deckent skill publish` CLI Complete (Sign + Upload)\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/cli/commands/skill.ts (patch), tests/cli/skill-publish.test.ts\n- Scope: src/cli/, tests/cli/\n\n### Description\nMevcut `deckent skill publish` stub'ı complete. Pipeline:\n1. AST sandbox scan (already exists — skill-sandbox.ts)\n2. Ed25519 sign (T-150-016)\n3. Generate `signature.ed25519` file\n4. Create git branch + commit in deckent-hub\n5. Manual push (Alperen review) veya auto PR\n\n`src/cli/commands/skill.ts` publish action extend:\n```typescript\nprogram.command('skill publish <skillPath>').action(async (skillPath) => {\n  const skillContent = readFileSync(join(skillPath, 'SKILL.md'), 'utf-8');\n  const manifest = JSON.parse(readFileSync(join(skillPath, 'manifest.json'), 'utf-8'));\n\n  // Step 1: Sandbox scan\n  const sandboxResult = await validateSkillSafety(skillPath);\n  if (!sandboxResult.safe) {\n    console.error(`❌ Sandbox violations:`, sandboxResult.violations);\n    process.exit(1);\n  }\n\n  // Step 2: Sign\n  const keypair = loadOrGenerateKeypair();\n  const signature = await signMessage(skillContent + JSON.stringify(manifest), keypair.privateKey);\n  writeFileSync(join(skillPath, 'signature.ed25519'), signature);\n\n  console.log(`✓ Sandbox OK, signed with public key ${bytesToHex(keypair.publicKey).slice(0, 16)}...`);\n  console.log(`  Next: push to VerhexIO/deckent-hub`);\n});\n```\n\n### Test (5 test)\n1. Sandbox-unsafe skill → publish rejected\n2. Valid skill → signature generated\n3. Signature verifiable\n4. Missing manifest → clear error\n5. Already-signed skill → signature overwritten\n\n**Kanıt:** `npx vitest run tests/cli/skill-publish.test.ts` 5/5 PASS.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "tests/cli/",
+      "src/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/skill.ts (patch)",
+      "tests/cli/skill-publish.test.ts",
+      "src/cli/commands/skill.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/cli/skill-publish.test.ts` 5/5 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [],
+        "confidence": 0.95
+      },
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.5
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:42:19.984Z"
+}

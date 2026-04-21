@@ -1,0 +1,17 @@
+{
+  "taskId": "150-021-fix",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Investigation confirmed both README.md and README-TR.md are already fully updated with all Sprint 150 changes. The previous task 150-021 had already applied all required changes successfully:\n\n1. Sprint badge: sprints-150+ ✓ (both files, line 5)\n2. Version badge: v1.0.0-beta.1 ✓ (both files, line 5)\n3. Screenshot references: 'Sprint 151' ✓ (not 'Sprint 150')\n4. Task Mode: listed as live feature, no 'coming in Sprint 150' text\n5. DeckentHub 20 seed skills: 'Sprint 150' reference ✓\n6. New CLI commands: deckent audit, deckent recover, deckent features ✓ (both files)\n7. Crash Recovery section (EN) / Kilitlenme Kurtarma (TR) ✓ (both files)\n8. OpenClaw + AST sandbox references ✓ (README.md lines 124, 162, 167)\n9. README-TR.md 20/20 section parity ✓ (both files have exactly 20 H2 sections)\n\nKanıt verification:\n- Test 1: README.md has v1.0.0-beta.1 badge ✓\n- Test 2: README.md mentions OpenClaw + AST sandbox ✓\n- Test 3: README-TR.md has 20 sections matching README.md 20 sections ✓\n\nnote: tsc/vitest not run — task only involves .md documentation files, no TypeScript code changes made or needed.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 800,
+    "cacheReadTokens": 120000,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

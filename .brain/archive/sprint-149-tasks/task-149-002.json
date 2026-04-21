@@ -1,0 +1,94 @@
+{
+  "id": "149-002",
+  "title": "`deckent mode` CLI Command",
+  "description": "`deckent mode` CLI Command\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/cli/commands/mode.ts, src/cli/entry.ts, tests/cli/mode-command.test.ts\n- Scope: src/cli/, tests/cli/\n\n### Description\nYeni CLI komut `deckent mode` — mevcut mode göster + switch + auto-detect.\n\n`src/cli/commands/mode.ts` (~150 LoC):\n```typescript\nimport { Command } from 'commander';\nimport { loadConfig, setConfigValue } from '../../core/config.js';\nimport { existsSync } from 'node:fs';\nimport { join } from 'node:path';\n\nexport function registerMode(program: Command): void {\n  const mode = program.command('mode').description('Get/set deckent_style (sprint|task|auto)');\n\n  mode.command('show').description('Show current mode').action(async () => {\n    const config = await loadConfig();\n    console.log(`Current: ${config.deckent_style ?? 'sprint'} (from ${config._source ?? 'default'})`);\n  });\n\n  mode.command('sprint').description('Switch to sprint mode').action(async () => {\n    await setConfigValue('deckent_style', 'sprint', 'project');\n    console.log('✓ Switched to sprint mode (project override)');\n  });\n\n  mode.command('task').description('Switch to task mode').action(async () => {\n    await setConfigValue('deckent_style', 'task', 'project');\n    console.log('✓ Switched to task mode (project override)');\n  });\n\n  mode.command('auto').description('Auto-detect mode from context').action(async () => {\n    const hasGitRepo = existsSync(join(process.cwd(), '.git'));\n    const hasDirectives = existsSync(join(process.cwd(), 'DIRECTIVES.md'));\n    const inferredStyle = (hasGitRepo && hasDirectives) ? 'sprint' : 'task';\n    await setConfigValue('deckent_style', inferredStyle, 'project');\n    console.log(`✓ Auto-detected: ${inferredStyle} (git=${hasGitRepo}, directives=${hasDirectives})`);\n  });\n\n  mode.command('global <style>').description('Set global default (sprint|task)').action(async (style) => {\n    if (!['sprint', 'task'].includes(style)) throw new Error(`Invalid: ${style}`);\n    await setConfigValue('deckent_style', style as 'sprint' | 'task', 'global');\n    console.log(`✓ Global default set: ${style}`);\n  });\n}\n```\n\n`src/cli/entry.ts` register:\n```typescript\nimport { registerMode } from './commands/mode.js';\n// ...\nregisterMode(program);\n```\n\n### Test (5 test)\n1. `deckent mode show` → current mode printed\n2. `deckent mode sprint` → config written to project\n3. `deckent mode task` → config written to project\n4. `deckent mode auto` + git+DIRECTIVES → 'sprint'\n5. `deckent mode auto` + no git → 'task'\n\n**Kanıt:** Manuel test `node dist/cli/entry.js mode show` + `mode sprint` + validation.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "src/cli/",
+      "tests/cli/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/mode.ts",
+      "src/cli/entry.ts",
+      "tests/cli/mode-command.test.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Manuel test `node dist/cli/entry.js mode show` + `mode sprint` + validation.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-149",
+  "provider": "claude",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-20T20:59:39.155Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "config",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 3,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.67,
+          "tests/": 0.33
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.33
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "estimatedTokens": 960,
+  "updatedAt": "2026-04-20T21:32:26.978Z"
+}

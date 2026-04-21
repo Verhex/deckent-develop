@@ -9,8 +9,8 @@
 //   to archive. Skips if another live sprint pid exists.
 
 import {
-  existsSync, readdirSync, readFileSync,
-  mkdirSync, copyFileSync, unlinkSync,
+  existsSync, readdirSync, readFileSync, statSync,
+  mkdirSync, copyFileSync, unlinkSync, rmSync,
 } from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
@@ -294,15 +294,16 @@ export function preflightOrphanCleanup(
 // ─── IPC Directory Cleanup ───────────────────────────────────────────
 
 /**
- * M7.B: Pre-flight orphan IPC directory scan.
+ * M7.B (legacy async API): Pre-flight orphan IPC directory scan.
  * Removes stale sprint IPC directories from previous sprint runs.
  * Protects the current sprint's IPC directory.
  *
  * @param root - Project root directory
  * @param currentJobId - Current sprint/job ID (e.g. "sprint-145") — protected from deletion
  * @returns Number of orphan IPC directories removed
+ * @deprecated Use cleanOrphanIpcDirs(root, opts) for live-PID-check support
  */
-export async function cleanOrphanIpcDirs(root: string, currentJobId: string): Promise<number> {
+export async function cleanOrphanIpcDirsLegacy(root: string, currentJobId: string): Promise<number> {
   const deckentDir = join(root, '.deckent');
   const entries = await fsPromises.readdir(deckentDir).catch(() => [] as string[]);
   const ipcPattern = /^sprint-\d+-ipc$/;
@@ -317,4 +318,134 @@ export async function cleanOrphanIpcDirs(root: string, currentJobId: string): Pr
     cleaned++;
   }
   return cleaned;
+}
+
+// ─── IPC Directory Cleanup (Live-PID-Check) ──────────────────────────
+
+export interface CleanOrphanIpcDirsOpts {
+  /** If true, read config.json from each IPC dir and check if the PID is alive before deleting. */
+  checkLivePid: boolean;
+  /**
+   * Minimum age in milliseconds before a PID-less IPC dir is eligible for deletion.
+   * Prevents removing freshly-created dirs (e.g. from a concurrent deckent_start)
+   * that haven't had time to write a pid to config.json yet.
+   * Default: 30000 (30 seconds).
+   */
+  minAgeMs?: number;
+}
+
+/**
+ * M7.B v2: Pre-flight orphan IPC directory scan with live-PID check.
+ *
+ * Scans `.deckent/` for `sprint-*-ipc` directories. For each:
+ * - If no config.json → safe to remove (config-only leak or partial write).
+ * - If config.json present and checkLivePid=true → read pid, skip if alive.
+ * - If config.json present and pid is dead (or no pid) → remove.
+ *
+ * This makes it safe to call at `deckent_start` pre-flight even when concurrent
+ * integration tests create their own IPC dirs, because live PIDs are preserved.
+ *
+ * @param root - Project root directory
+ * @param opts - Options (default: { checkLivePid: true })
+ * @returns Array of removed directory paths (relative to .deckent/)
+ */
+export function cleanOrphanIpcDirs(
+  root: string,
+  opts: CleanOrphanIpcDirsOpts = { checkLivePid: true },
+): string[] {
+  const cleaned: string[] = [];
+  const deckentDir = join(root, '.deckent');
+  const minAgeMs = opts.minAgeMs ?? 30_000; // 30 seconds default
+
+  if (!existsSync(deckentDir)) return cleaned;
+
+  let entries: string[];
+  try {
+    entries = readdirSync(deckentDir);
+  } catch {
+    return cleaned;
+  }
+
+  const ipcPattern = /^sprint-\d+-ipc$/;
+  const now = Date.now();
+
+  for (const entry of entries) {
+    if (!ipcPattern.test(entry)) continue;
+
+    const entryPath = join(deckentDir, entry);
+    const configPath = join(entryPath, 'config.json');
+
+    if (!existsSync(configPath)) {
+      // No config.json — this is a config-only orphan or partial-write leak.
+      // Guard: only remove if the dir is old enough (prevents races with
+      // concurrent deckent_start that hasn't written config.json yet).
+      try {
+        const stat = statSync(entryPath);
+        const ageMs = now - stat.mtimeMs;
+        if (ageMs < minAgeMs) {
+          debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Skipping young config-less dir: ${entry} (age=${Math.round(ageMs)}ms < minAge=${minAgeMs}ms)`);
+          continue;
+        }
+        rmSync(entryPath, { recursive: true, force: true });
+        cleaned.push(entry);
+      } catch {
+        debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Failed to remove config-less dir: ${entry}`);
+      }
+      continue;
+    }
+
+    if (opts.checkLivePid) {
+      try {
+        const raw = readFileSync(configPath, 'utf-8');
+        const config = JSON.parse(raw) as { pid?: number };
+        const pid = config.pid;
+        if (pid !== undefined && isPidAlive(pid)) {
+          // PID is alive — this is an active sprint IPC dir; preserve it
+          debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Preserving live IPC dir: ${entry} (PID ${pid})`);
+          continue;
+        }
+        // No pid in config.json — apply age guard using config.json mtime
+        if (pid === undefined) {
+          try {
+            const stat = statSync(configPath);
+            const ageMs = now - stat.mtimeMs;
+            if (ageMs < minAgeMs) {
+              debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Skipping young pid-less IPC dir: ${entry} (config age=${Math.round(ageMs)}ms)`);
+              continue;
+            }
+          } catch {
+            // stat failed — fall through to remove
+          }
+        }
+      } catch {
+        // Unparseable config.json — best-effort, fall through to remove
+        debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Failed to parse config.json in ${entry}, removing`);
+      }
+      // PID is dead or not present (and old enough) → remove
+      try {
+        rmSync(entryPath, { recursive: true, force: true });
+        cleaned.push(entry);
+      } catch {
+        debugLog('orphan-cleaner:cleanOrphanIpcDirs', `Failed to remove dead IPC dir: ${entry}`);
+      }
+    }
+  }
+
+  return cleaned;
+}
+
+/**
+ * Check if a process is alive by sending signal 0.
+ * Returns true if the process exists, false if ESRCH (no such process).
+ * EPERM means the process exists but we don't own it — still "alive".
+ */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true; // SIGKILL(0) succeeded — process alive
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EPERM') return true; // Process alive, we don't own it
+    return false; // ESRCH — process dead
+  }
 }

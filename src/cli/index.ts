@@ -43,6 +43,10 @@ import { registerResume } from './commands/resume.js';
 import { registerHelp } from './commands/help.js';
 import { registerNervous } from './commands/nervous.js';
 import { registerConfigNervous } from './commands/config-nervous.js';
+import { registerMode } from './commands/mode.js';
+import { registerFeatures } from './commands/features.js';
+import { registerAudit } from './commands/audit.js';
+import { registerRecover } from './commands/recover.js';
 import { showSplash } from './helpers/splash.js';
 
 /**
@@ -106,6 +110,10 @@ export function buildProgram(): Command {
   registerResume(program);
   registerNervous(program);
   registerConfigNervous(program);
+  registerMode(program);
+  registerFeatures(program);
+  registerAudit(program);
+  registerRecover(program);
   registerHelp(program);
 
   return program;

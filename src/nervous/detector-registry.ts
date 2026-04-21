@@ -12,6 +12,7 @@ import { ScopeCollisionMonitor } from './detectors/scope-collision.js';
 import { DebtTrendAnalyzer } from './detectors/debt-trend.js';
 import { AgentRoutingHealth } from './detectors/agent-routing.js';
 import { DirectivesMidSprintProtection } from './detectors/directives-protection.js';
+import { TaskModeIdleDetector } from './detectors/task-mode-idle.js';
 
 // ─── Config Types ─────────────────────────────────────────────────────────────
 
@@ -34,6 +35,11 @@ export interface DetectorConfig {
   };
   readonly directives_protection?: {
     readonly enabled: boolean;
+  };
+  readonly task_mode_idle?: {
+    readonly enabled: boolean;
+    readonly idle_threshold_ms?: number;
+    readonly deckent_style?: 'sprint' | 'task';
   };
 }
 
@@ -83,6 +89,14 @@ export class DetectorRegistry {
     }
     if (config.directives_protection?.enabled) {
       this.active.push(new DirectivesMidSprintProtection());
+    }
+    if (config.task_mode_idle?.enabled) {
+      this.active.push(
+        new TaskModeIdleDetector(
+          config.task_mode_idle.deckent_style ?? 'sprint',
+          config.task_mode_idle.idle_threshold_ms,
+        ),
+      );
     }
   }
 

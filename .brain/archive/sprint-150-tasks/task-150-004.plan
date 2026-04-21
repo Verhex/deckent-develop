@@ -1,0 +1,20 @@
+# Task 150-004 Execution Plan: Nervous System Mode-Aware Detectors
+
+## Status: COMPLETED (pre-existing implementation found)
+
+## Exploration Findings
+1. `src/nervous/detectors/task-mode-idle.ts` already exists (Sprint 149 Task 4)
+2. `src/nervous/detector-registry.ts` already has TaskModeIdleDetector registered
+3. `tests/nervous/detectors/task-mode-idle.test.ts` already exists with 6 tests (4 required + 2 edge cases)
+
+## Implementation Summary
+The task was already implemented as part of Sprint 149. The code correctly:
+- Only activates in 'task' mode (via constructor deckentStyle param)
+- Only processes 'cron' events
+- Returns null if no lastUserActivity in payload
+- Returns DetectorResult with severity 'info', shouldNotify: true, groupKey, suggestedActions when idle >= threshold
+- Is registered in DetectorRegistry when config.task_mode_idle.enabled = true
+
+## Verification
+- `npx vitest run tests/nervous/detectors/task-mode-idle.test.ts` → 6/6 PASS
+- `npx tsc --noEmit` → 0 errors

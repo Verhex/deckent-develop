@@ -1,0 +1,29 @@
+{
+  "id": "150-022-fix",
+  "title": "Fix: AGENTS.md Refresh (39 Sprint Behind)",
+  "description": "Priority fix for NO_GO task 150-022. Notes: AGENTS.md dosyası incelendi. Sprint 149'da zaten güncel durumda: 15 built-in agent (ADR-041 reform sonrası), 'test-writer' kelimesi yok. Tablo: 15 satır, detay bölümleri: 15 adet agent başlığı. Test kriterleri: (1) 15 agent listed ✅, (2) test-writer absent ✅. Herhangi bir değişiklik gerekmedi — dosya görev gereksinimlerini tam karşılıyor.",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "CRITICAL",
+  "reason": "Task 150-022 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "AGENTS.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep -c \"test-writer\" AGENTS.md` → 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-150",
+  "isPriorityFix": true,
+  "fixForTaskId": "150-022",
+  "createdAt": "2026-04-21T11:42:24.220Z"
+}

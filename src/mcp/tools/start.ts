@@ -1,11 +1,13 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { fork } from 'node:child_process';
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../core/config.js';
 import { readContext, planSprint, BrainError } from '../../orchestra/brain.js';
+import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
+import { debugLog } from '../../core/utils.js';
 import type { SprintSizeRecommendation } from '../../core/types.js';
 import { writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
@@ -48,6 +50,18 @@ export function registerStartTool(server: McpServer): void {
 
       try {
         const config = await loadConfig(root);
+
+        // ─── Pre-flight: Orphan IPC Directory Cleanup ─────────────
+        // Remove dead sprint IPC directories from previous runs.
+        // Uses live-PID check to preserve any in-flight sprint dirs.
+        try {
+          const cleaned = cleanOrphanIpcDirs(root, { checkLivePid: true });
+          if (cleaned.length > 0) {
+            debugLog('start:orphanCleanup', `Cleaned ${cleaned.length} dead orphan IPC dir(s)`);
+          }
+        } catch (e) {
+          debugLog('start:orphanCleanup:error', e);
+        }
 
         // ─── Sprint Lock Check ─────────────────────────────────────
         if (!force) {
@@ -117,26 +131,50 @@ export function registerStartTool(server: McpServer): void {
           sandboxMode: sandbox,
           timeoutMs: timeout,
         };
-        writeFileSync(join(ipcDir, IPC_CONFIG_FILE), JSON.stringify(runnerConfig, null, 2), 'utf-8');
+
+        // Pre-fork I/O: if writeFileSync fails, tear down the orphan ipcDir
+        // immediately so we do not leak a config-only directory.
+        try {
+          writeFileSync(join(ipcDir, IPC_CONFIG_FILE), JSON.stringify(runnerConfig, null, 2), 'utf-8');
+        } catch (err) {
+          try { rmSync(ipcDir, { recursive: true, force: true }); } catch { /* best-effort */ }
+          throw err;
+        }
 
         // Resolve the compiled runner entry point
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = dirname(__filename);
         const runnerPath = join(__dirname, '..', '..', 'orchestra', 'sprint-runner-entry.js');
 
-        // Fork as detached child — unref() so MCP server can exit independently
-        const child = fork(runnerPath, [ipcDir], {
-          detached: true,
-          stdio: 'ignore', // Don't inherit stdio — critical for MCP transport freedom
-          cwd: root,
-        });
+        // Fork as detached child — unref() so MCP server can exit independently.
+        // If fork itself throws (e.g. runnerPath missing), clean up the dir.
+        let child;
+        try {
+          child = fork(runnerPath, [ipcDir], {
+            detached: true,
+            stdio: 'ignore', // Don't inherit stdio — critical for MCP transport freedom
+            cwd: root,
+          });
+        } catch (err) {
+          try { rmSync(ipcDir, { recursive: true, force: true }); } catch { /* best-effort */ }
+          throw err;
+        }
 
-        // IPC cleanup: success case — remove orphan dir so .deckent/ stays tidy.
-        // Failure case keeps ipcDir for debugging; pre-flight cleaner sweeps later.
+        // IPC cleanup on child exit:
+        //   code === 0 (success)  → always remove (results already consumed
+        //                            via writeJobState + .deckent/jobs/).
+        //   code !== 0 (failure)  → remove ONLY if the child never produced
+        //                            status/result/error files (config-only
+        //                            dirs have zero post-mortem value — they
+        //                            mean the child could not even start).
+        //                            Preserve dirs that contain real debug
+        //                            data for post-mortem inspection.
         child.on('exit', (code) => {
-          if (code === 0) {
-            try { rmSync(ipcDir, { recursive: true, force: true }); } catch { /* best-effort */ }
-          }
+          try {
+            if (code === 0 || isConfigOnlyIpcDir(ipcDir)) {
+              rmSync(ipcDir, { recursive: true, force: true });
+            }
+          } catch { /* best-effort */ }
         });
 
         child.unref();
@@ -174,4 +212,16 @@ export function registerStartTool(server: McpServer): void {
       }
     },
   );
+}
+
+/**
+ * Returns true if the IPC directory contains ONLY the config file (i.e. the
+ * child process never wrote status/result/error). Such directories have no
+ * post-mortem value — the child could not even start.
+ */
+function isConfigOnlyIpcDir(ipcDir: string): boolean {
+  const statusPath = join(ipcDir, 'status.json');
+  const resultPath = join(ipcDir, 'result.json');
+  const errorPath = join(ipcDir, 'error.json');
+  return !existsSync(statusPath) && !existsSync(resultPath) && !existsSync(errorPath);
 }

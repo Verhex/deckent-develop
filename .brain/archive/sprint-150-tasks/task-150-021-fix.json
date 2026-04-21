@@ -1,0 +1,32 @@
+{
+  "id": "150-021-fix",
+  "title": "Fix: README.md Overhaul + Landing Page",
+  "description": "Priority fix for NO_GO task 150-021. Notes: README.md ve README-TR.md Sprint 150 uyumlu güncellendi.\n\nYapılan değişiklikler:\n- Sprint badge: 149+ → 150+\n- Sprint referansları: 'Screenshot coming in Sprint 150' → 'Sprint 151'\n- 'Sprint 150 will bring...' belirsizliği kaldırıldı — Task Mode özellikleri şimdi canlı olarak belirtildi\n- DeckentHub seed skill: Sprint 149 → Sprint 150\n- '<!-- Coming Sprint 150 -->' yorum kaldırıldı\n- Yeni CLI komutları eklendi: deckent audit, deckent recover, deckent features\n- Yeni bölüm eklendi: 'Crash Recovery' (EN) + 'Kilitlenme Kurtarma' (TR)\n- README-TR.md tam parity: 20/20 bölüm eşleşiyor\n\nKanıt (3 test):\n1. README.md v1.0.0-beta.1 badge mevcut ✓\n2. README.md 'OpenClaw' + 'AST sandbox' mevcut ✓\n3. README-TR.md 20 bölüm README.md ile birebir eşleşiyor ✓\n\nNot: tsc/vitest çalıştırılmadı — bu görev sadece .md dosyalarını değiştiriyor, TypeScript kodu yok.",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 150-021 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "README.md",
+      "README-TR.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** grep checks + manual review.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "isPriorityFix": true,
+  "fixForTaskId": "150-021",
+  "createdAt": "2026-04-21T11:42:24.219Z",
+  "estimatedTokens": 178,
+  "updatedAt": "2026-04-21T11:53:50.788Z"
+}

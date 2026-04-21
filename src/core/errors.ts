@@ -422,6 +422,29 @@ registry.set('DECKENT_E053', {
   howToFix: ['Use an integer between 1 and 5'],
 });
 
+registry.set('DECKENT_E056', {
+  message: 'not a git repository',
+  suggestion: 'Initialize a git repo with `git init`, or set rollback_policy to "never" in config',
+  whatHappened: 'Deckent tried to create a safety point but the project directory is not a git repository.',
+  why: 'The rollback/safety-point feature requires git to create backup branches.',
+  howToFix: [
+    'Initialize a git repository: git init && git commit --allow-empty -m "init"',
+    'Or disable rollback: deckent config set rollback_policy never',
+  ],
+});
+
+registry.set('DECKENT_E057', {
+  message: 'stash pop failed — uncommitted changes trapped in stash',
+  suggestion: 'Run `git stash list` to see your changes, then `git stash pop` to restore manually',
+  whatHappened: 'Deckent stashed your uncommitted changes to create a safety point, but could not restore them.',
+  why: 'There may be merge conflicts between the stashed changes and current state.',
+  howToFix: [
+    'Run `git stash list` to see your stashed changes',
+    'Run `git stash pop` to restore them manually',
+    'If there are conflicts, resolve them, then run the sprint again',
+  ],
+});
+
 registry.set('DECKENT_E054', {
   message: 'observability not initialized',
   suggestion: 'Call initObservability(projectRoot) before using metric/trace/structuredLog',

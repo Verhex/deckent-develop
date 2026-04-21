@@ -1,0 +1,36 @@
+{
+  "taskId": "150-032",
+  "filesChanged": [
+    "src/cli/commands/audit.ts",
+    "src/cli/commands/recover.ts",
+    "src/mcp/tools/audit.ts",
+    "src/mcp/tools/recover.ts",
+    "src/cli/index.ts",
+    "src/mcp/tools/index.ts",
+    "docs/reference/cli.md",
+    "tests/cli/commands/audit.test.ts",
+    "tests/cli/commands/recover.test.ts",
+    "tests/mcp/tools/audit.test.ts",
+    "tests/mcp/tools/recover.test.ts"
+  ],
+  "linesAdded": 680,
+  "linesRemoved": 2,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Implemented `deckent audit` + `deckent recover` CLI commands and `deckent_audit` + `deckent_recover` MCP tools. Full ADR-022-V2 CLI/MCP parity achieved.\n\nCLI:\n- `deckent audit <sprint-id>` — runs runSelfAuditGate(), writes gate.json, exits 0 (PASS) or 1 (GATE_FAILURE)\n- `deckent recover <sprint-id>` — 4-step pipeline (audit → IPC cleanup → lock clear → task archive) with --dry-run, --force, --skip-audit\n\nMCP:\n- `deckent_audit` — readOnly: true, destructive: false, idempotent: true\n- `deckent_recover` — readOnly: false, destructive: true, idempotent: false\n\n26 tests passing (8 audit CLI + 7 recover CLI + 5 audit MCP + 6 recover MCP).\ntsc --noEmit: 0 errors in new files (2 pre-existing errors in src/core/config.ts unrelated to this task).\ndocs/reference/cli.md updated with Audit & Recovery section + detailed command reference + crash recovery workflow.",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 95
+  },
+  "evaluationDecision": "DONE"
+}

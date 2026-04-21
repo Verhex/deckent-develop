@@ -1,0 +1,101 @@
+{
+  "id": "150-010",
+  "title": "`src/connectors/` Base + IMessageConnector Interface",
+  "description": "`src/connectors/` Base + IMessageConnector Interface\n\n- Model: opus\n- Effort: normal\n- Skills: typescript-expert, system-architect\n- Files: src/connectors/types.ts (NEW), src/connectors/base-connector.ts (NEW), tests/connectors/base-connector.test.ts\n- Scope: src/connectors/, tests/connectors/\n\n### Description\nMessaging connector altyapı. Provider adapter pattern'ı (`src/core/provider.ts:32-82`) messaging için uyarla.\n\n`src/connectors/types.ts` (~100 LoC):\n```typescript\nexport type ConnectorId = 'discord' | 'telegram' | 'whatsapp' | 'slack' | 'email';\n\nexport interface IncomingMessage {\n  readonly id: string;              // provider-specific msg ID\n  readonly connector: ConnectorId;\n  readonly fromUser: string;         // user ID or handle\n  readonly channelId: string;        // DM or group\n  readonly text: string;\n  readonly timestamp: string;        // ISO 8601\n  readonly raw?: unknown;            // provider-specific payload\n}\n\nexport interface OutgoingMessage {\n  readonly connector: ConnectorId;\n  readonly channelId: string;\n  readonly text: string;\n  readonly replyTo?: string;         // original msg ID for reply\n}\n\nexport interface IMessageConnector {\n  readonly id: ConnectorId;\n  readonly name: string;\n  start(config: ConnectorConfig): Promise<void>;\n  stop(): Promise<void>;\n  sendMessage(msg: OutgoingMessage): Promise<void>;\n  onMessage(handler: (msg: IncomingMessage) => void): void;\n  isHealthy(): boolean;\n}\n\nexport interface ConnectorConfig {\n  readonly enabled: boolean;\n  readonly token: string;            // From .deck interpolation\n  readonly webhookUrl?: string;      // Optional\n  readonly options?: Record<string, unknown>;\n}\n```\n\n`src/connectors/base-connector.ts` (~150 LoC) abstract class (event emitter pattern).\n\n### Test (5 test)\n1. BaseConnector start/stop lifecycle\n2. Handler registration\n3. Unhealthy state detection\n4. Message type validation (IncomingMessage schema)\n5. Error propagation (start fail)\n\n**Kanıt:** `npx vitest run tests/connectors/base-connector.test.ts` 5/5 PASS.\n\n---",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/connectors/",
+      "tests/connectors/",
+      "src/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/connectors/types.ts (NEW)",
+      "src/connectors/base-connector.ts (NEW)",
+      "tests/connectors/base-connector.test.ts",
+      "src/connectors/types.ts",
+      "src/connectors/base-connector.ts",
+      "src/core/provider.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/connectors/base-connector.test.ts` 5/5 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "opus",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "system-architect"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "types",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "connectors",
+          "weight": 0.78
+        },
+        {
+          "name": "core",
+          "weight": 0.22
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.4
+        },
+        {
+          "type": "test",
+          "weight": 0.4
+        },
+        {
+          "type": "configure",
+          "weight": 0.2
+        }
+      ],
+      "complexity": {
+        "fileCount": 6,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "large"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.83,
+          "tests/": 0.17
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.17
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:41:40.160Z"
+}

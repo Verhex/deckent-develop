@@ -1,0 +1,63 @@
+{
+  "id": "python-expert",
+  "source": "builtin",
+  "name": "Python Expert",
+  "version": "0.2.0",
+  "description": "Python best practices, type hints, async patterns, testing, modern tooling",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "python"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "language",
+  "triggers": [
+    "python",
+    "pip",
+    "django",
+    "flask",
+    "fastapi",
+    "pytest",
+    "async"
+  ],
+  "stackDetection": {
+    "files": [
+      "setup.py",
+      "pyproject.toml",
+      "requirements.txt"
+    ],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "testing-expert",
+    "api-builder",
+    "database-migration",
+    "security-specialist",
+    "documentation-writer",
+    "devops-engineer"
+  ],
+  "priority": 10,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

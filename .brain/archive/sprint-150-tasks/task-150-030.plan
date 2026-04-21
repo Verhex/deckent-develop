@@ -1,0 +1,35 @@
+# Task 150-030: Observability Rotation + SprintId Tagging + Dead Read Path Cleanup
+
+## Execution Plan
+
+### Step 1: Create observability-rotation.ts (NEW)
+- `rotateMetricsFile(root, sprintId)`: gzip + archive + truncate
+- `enforceKeepLastN(root, keepLastN)`: old archives cleanup
+- `readArchivedMetrics(archivePath)`: gunzip + parse (for retro-compat)
+
+### Step 2: Add ObservabilityRotationConfig to config-types.ts
+- Add `observability?: { rotation?: { maxSizeMB, archiveFormat, keepLastN } }` to DeckentConfig
+
+### Step 3: Modify observability.ts
+- Add `_sprintId` internal state
+- Modify `initObservability(root, sprintId?)` — optional sprintId param (backward compat)
+- Inject sprintId tag into metric/trace/structuredLog entries automatically
+- Add per-sprint file write option
+
+### Step 4: Wire rotation into sprint-finalizer.ts
+- Import rotateMetricsFile
+- Call at RETRO phase end (after generateLoadReport)
+
+### Step 5: Fix status.ts dead read path
+- `readMetricSnapshot` now reads per-sprint file OR falls back to flat file filtered by sprintId tag
+
+### Step 6: Write tests (observability-rotation.test.ts)
+- Rotation trigger, gzip roundtrip, keepLastN, sprintId tagging, retro-compat, config merge
+
+### Files Modified
+- src/core/observability-rotation.ts (NEW)
+- src/core/observability.ts (modify)
+- src/core/config-types.ts (modify)
+- src/mcp/tools/status.ts (modify)
+- src/orchestra/sprint-finalizer.ts (modify)
+- tests/core/observability-rotation.test.ts (NEW)

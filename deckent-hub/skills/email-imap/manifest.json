@@ -1,0 +1,26 @@
+{
+  "id": "email-imap",
+  "source": "hub",
+  "name": "Email IMAP/SMTP",
+  "version": "1.0.0",
+  "description": "IMAP/SMTP email operations — inbox reading, search, attachments, sending, real-time IDLE",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "email" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "imap" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "smtp" } }, "score": 7 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["email", "imap", "smtp", "inbox", "send", "attachment"],
+  "stackDetection": { "files": [], "dependencies": ["imapflow", "nodemailer"], "commands": [] },
+  "composableWith": ["typescript-expert"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

@@ -65,11 +65,11 @@ Before tagging `v1.0.0-beta.1` and running `npm publish`, **all 12 gates must PA
 ## Current Status
 | Metric | Value |
 |--------|-------|
-| Version | 0.4.0-beta.4 |
-| Sprint | sprint-148 |
+| Version | 1.0.0-beta.1 |
+| Sprint | sprint-149 |
 | MCP Tools | 24 |
 | MCP Resources | 8 |
-| CLI Commands | 51+ |
+| CLI Commands | 52+ |
 | Dashboard Pages | 6 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
@@ -923,13 +923,13 @@ Every blocker was directly verified in the codebase. False claims have been corr
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-148 |
-| Total Tasks | 28 |
-| Completed | 27 |
+| Sprint | sprint-149 |
+| Total Tasks | 4 |
+| Completed | 4 |
 | Tech Debt | 1 |
-| No-Go | 1 |
-| Duration | 60dk 47sn |
-| Coverage | 0.0% |
+| No-Go | 0 |
+| Duration | 33dk 23sn |
+| Coverage | NaN% |
 
 ## Sprint History (Sprint 136-145)
 | Sprint | Tasks | Done | NO_GO | Duration | Avg Rubric | Theme |

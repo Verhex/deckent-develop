@@ -1,0 +1,28 @@
+# Task 149-011: Discord Connector — Execution Plan
+
+## Objective
+Implement Discord bot connector using discord.js, extending BaseConnector.
+
+## Files to Create/Modify
+1. **src/connectors/discord.ts** (NEW) — DiscordConnector class (~200 LoC)
+2. **tests/connectors/discord.test.ts** (NEW) — 6 tests with mocked discord.js
+3. **package.json** — Add discord.js ^14.14.0 as optional dependency
+
+## Approach
+1. Create DiscordConnector extending BaseConnector
+2. Implement start() with discord.js Client + intents
+3. Implement stop() with client.destroy()
+4. Implement sendMessage() with channel.fetch + send
+5. Implement isHealthy() checking WebSocket status
+6. Wire up Events.MessageCreate → emitMessage() with bot filter
+7. Write comprehensive tests with mocked discord.js Client
+
+## Key Decisions
+- discord.js as optionalDependency (ADR-010: commander.js only mandatory runtime dep)
+- Bot message filtering (msg.author.bot → skip)
+- WebSocket status 0 = READY for health check
+- GatewayIntentBits: Guilds, GuildMessages, MessageContent, DirectMessages
+
+## Verify Steps
+1. tsc --noEmit
+2. npx vitest run tests/connectors/discord.test.ts

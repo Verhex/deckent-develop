@@ -1,0 +1,22 @@
+{
+  "id": "youtube-downloader",
+  "source": "hub",
+  "name": "YouTube Downloader",
+  "version": "1.0.0",
+  "description": "yt-dlp wrapper for video and audio download with progress tracking and format selection",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "youtube" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "media",
+  "triggers": ["youtube", "download", "video", "audio", "yt-dlp", "convert"],
+  "stackDetection": { "files": [], "dependencies": [], "commands": ["yt-dlp"] },
+  "composableWith": ["typescript-expert"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

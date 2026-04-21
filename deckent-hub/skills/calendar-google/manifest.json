@@ -1,0 +1,26 @@
+{
+  "id": "calendar-google",
+  "source": "hub",
+  "name": "Google Calendar",
+  "version": "1.0.0",
+  "description": "Google Calendar API integration — event CRUD, recurring events, free/busy, watch notifications",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "calendar" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "schedule" } }, "score": 6 },
+      { "when": { "domains": { "$contains": "meeting" } }, "score": 6 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["calendar", "event", "schedule", "google", "meeting", "reminder"],
+  "stackDetection": { "files": [], "dependencies": ["googleapis"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

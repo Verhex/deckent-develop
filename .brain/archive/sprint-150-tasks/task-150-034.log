@@ -1,0 +1,23 @@
+`★ Insight ─────────────────────────────────────`
+1. **Single Source of Truth Pattern**: `DEFAULT_MODES.performance.max_workers` artik `MODE_PRESETS['performance']!.max_workers` ile eslesiyor — degisiklik tek yerde yapiliyor, iki yere yansıyor. Bu DRY prensibinin "derived constants" varyanti.
+2. **Self-Healing Config**: Corrupted JSON'u rename+fresh-default pattern'i "fail-open with audit trail" yaklasimidir. Kullanici verisini silmez (`.corrupted.bak`), ama uygulamayi crash olmaktan kurtarir. Production sistemlerde yaygin.
+3. **System Capacity MVP**: `os.totalmem()` + `os.cpus().length` + `docker --version` ile 3 sorudan worker sayisi ve backend onerisi uretiliyor. Sprint 151'de GPU/network/disk eklenecek.
+`─────────────────────────────────────────────────`
+
+## Ozet
+
+Task 150-034 tamamlandi (**GO_WITH_TECH_DEBT**). Yapilan degisiklikler:
+
+| Adim | Dosya | Degisiklik |
+|------|-------|------------|
+| 1 | `src/core/config-migration.ts` | `removeDuplicateKeys()` fonksiyonu eklendi (Decision 3+4) |
+| 2 | `src/core/config.ts` | `DEFAULT_MODES` artik `MODE_PRESETS`'ten turetiliyor, `claude_backend` default'tan kaldirildi, self-healing + duplicate removal wired |
+| 3 | `src/core/system-capacity.ts` | **Yeni** — `detectSystemCapacity`, `suggestMaxWorkers`, `suggestSpawnBackend` |
+| 4 | `src/cli/commands/init-steps.ts` | System capacity auto-detect wired into `writeConfig` |
+| 5 | `.deckent/config.json` | Live-migrated: `claude_backend`, flat `brain_provider`, `worker_provider` kaldirildi |
+| 6 | `tests/core/system-capacity.test.ts` | **13 test** — suggest heuristicleri + detect |
+| 7 | `tests/core/config-corrupted-recovery.test.ts` | **16 test** — corrupted recovery + duplicate removal + MODE_PRESETS single source |
+| 8 | `docs/reference/config.md` | **366 satir** — tum config key'leri, migration changelog, setup senaryolari |
+
+**Test sonuclari:** 285/285 config test pass (29 yeni).
+**tsc:** 0 hata (scope icindeki dosyalarda).

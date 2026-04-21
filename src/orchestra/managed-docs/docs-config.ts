@@ -2,7 +2,7 @@
 // Load, save, and manage .deckent/docs.json for user-defined documents.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { DOCS_CONFIG_FILE } from '../../core/constants.js';
 import { debugLog } from '../../core/utils.js';
 import type { DocsConfig, ManagedDocEntry } from './types.js';
@@ -52,13 +52,82 @@ export function saveDocsConfig(projectRoot: string, config: DocsConfig): void {
   writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
 
+// ─── Path Safety ─────────────────────────────────────────────────────────
+
+/**
+ * Validate a doc path for security. Rejects absolute paths, path traversal,
+ * and paths that escape the project root.
+ * @throws Error if path is unsafe
+ */
+export function validateDocPath(projectRoot: string, docPath: string): void {
+  // Reject absolute paths (Unix and Windows)
+  if (docPath.startsWith('/') || /^[A-Za-z]:/.test(docPath)) {
+    throw new Error(`Absolute paths not allowed: ${docPath}`);
+  }
+  // Reject path traversal
+  if (docPath.includes('..')) {
+    throw new Error(`Path traversal not allowed: ${docPath}`);
+  }
+  // Reject paths that escape project root after resolution
+  const resolved = resolve(projectRoot, docPath);
+  if (!resolved.startsWith(resolve(projectRoot))) {
+    throw new Error(`Path escapes project root: ${docPath}`);
+  }
+}
+
+// ─── Seed (Template Bootstrap) ───────────────────────────────────────────
+
+/**
+ * Seed docs.json from the built-in template if it doesn't already exist.
+ * Called during `deckent init` to bootstrap managed-docs config.
+ */
+export function seedDocsConfig(projectRoot: string): void {
+  if (loadDocsConfig(projectRoot)) return; // already exists — don't overwrite
+
+  // Read template from package (dist or src depending on runtime)
+  const templatePaths = [
+    join(__dirname, '../../../cli/commands/init-templates/docs.json.template'),
+    join(__dirname, '../../cli/commands/init-templates/docs.json.template'),
+  ];
+
+  let template: DocsConfig | null = null;
+  for (const tp of templatePaths) {
+    if (existsSync(tp)) {
+      try {
+        template = JSON.parse(readFileSync(tp, 'utf-8')) as DocsConfig;
+        break;
+      } catch { /* try next */ }
+    }
+  }
+
+  // Fallback: inline default if template file not found
+  if (!template) {
+    template = {
+      version: 1,
+      docs: [{
+        id: 'claude-md',
+        path: 'CLAUDE.md',
+        autoSections: ['Sprint Metrics'],
+        protectedSections: [],
+      }],
+    };
+  }
+
+  saveDocsConfig(projectRoot, template);
+}
+
 // ─── Add / Remove / Update ────────────────────────────────────────────────
 
 /**
  * Add a new managed doc entry. Creates config file if missing.
+ * Validates path safety before adding.
  * Returns the generated ID.
+ * @throws Error if path is unsafe (absolute, traversal, or escapes root)
  */
 export function addDoc(projectRoot: string, entry: Omit<ManagedDocEntry, 'id'> & { id?: string }): string {
+  // Security: validate path before any mutation
+  validateDocPath(projectRoot, entry.path);
+
   const config = loadDocsConfig(projectRoot) ?? { version: 1, docs: [] };
   const id = entry.id ?? generateDocId(entry.path);
 

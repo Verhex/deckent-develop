@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { archivePromptFiles } from '../../orchestra/spawn-backend-docker.js';
 import { cleanTasksArchive } from '../../orchestra/sprint-docs-updater.js';
+import { runRetention } from '../../core/sprint-file-retention.js';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
@@ -202,6 +203,29 @@ export function registerCleanup(program: Command): void {
         if (tasksArchiveCleaned > 0) {
           print(`Removed ${tasksArchiveCleaned} old .tasks/archive/ dir(s) (retention: ${promptArchiveRetention} sprints)`);
         }
+
+        // G) Sprint file retention — clean counters, migrate forensic, enforce keep_last_n + size_cap
+        try {
+          let retentionConfig: Record<string, unknown> = {};
+          try {
+            const cfgPath = join(root, PROJECT_CONFIG_PATH);
+            if (existsSync(cfgPath)) {
+              const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as { sprint_file_retention?: Record<string, unknown> };
+              if (raw?.sprint_file_retention) retentionConfig = raw.sprint_file_retention;
+            }
+          } catch { /* use defaults */ }
+
+          const retResult = runRetention(root, sprintId ?? null, retentionConfig);
+          if (retResult.countersDeleted.length > 0) {
+            print(`Deleted ${retResult.countersDeleted.length} counter file(s) (-seq, -checkpoint-seq)`);
+          }
+          if (retResult.forensicMoved.length > 0) {
+            print(`Moved ${retResult.forensicMoved.length} forensic file(s) → docs/audits/`);
+          }
+          if (retResult.archived.length > 0) {
+            print(`Archived ${retResult.archived.length} sprint file(s) (retention: keep_last_n=${retentionConfig.keep_last_n ?? 10})`);
+          }
+        } catch { /* best-effort, non-blocking */ }
 
         // C) Kill only this project's tmux session — not a hardcoded global name
         const sessionName = getProjectSessionName(root);

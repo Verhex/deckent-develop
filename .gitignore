@@ -38,6 +38,9 @@ coverage/
 .deckent/sprint-*-baseline.json
 .deckent/metrics.jsonl
 
+# Managed docs runtime config (private — template in src/cli/commands/init-templates/)
+.deckent/docs.json
+
 # Sprint ephemeral artifacts (IPC, events, checkpoints — regenerated each run)
 .deckent/sprint-*-ipc/
 .deckent/sprint-*-events.jsonl

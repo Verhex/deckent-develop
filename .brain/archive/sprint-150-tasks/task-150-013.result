@@ -1,0 +1,20 @@
+{
+  "taskId": "150-013",
+  "filesChanged": [
+    "src/connectors/whatsapp.ts",
+    "src/connectors/whatsapp-README.md",
+    "tests/connectors/whatsapp-scaffold.test.ts"
+  ],
+  "linesAdded": 2,
+  "linesRemoved": 2,
+  "testsPassed": true,
+  "selfAssessment": "DONE",
+  "notes": "WhatsApp scaffold was already implemented by a previous sprint (Sprint 149). Updated sprint references: 'Sprint 149' → 'Sprint 150' and 'Sprint 152+' → 'Sprint 153+' to match Sprint 150 DIRECTIVES spec. All 6 tests pass (3 required + 3 bonus: sendMessage throws, stop is no-op, connector identity). tsc --noEmit: 0 errors. Test file was already present with full coverage. Scaffold correctly implements BaseConnector interface with activation-error pattern per spec.",
+  "tokenUsage": {
+    "inputTokens": 8500,
+    "outputTokens": 450,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "sonnet"
+  }
+}

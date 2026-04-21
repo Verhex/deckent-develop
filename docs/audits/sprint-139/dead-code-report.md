@@ -1,6 +1,6 @@
 # Dead Code Audit Report — Sprint 139
 
-**Date:** 2026-04-20
+**Date:** 2026-04-21
 **Tool:** scripts/dead-code-audit.mjs
 **Scope:** src/ directory (read-only analysis)
 
@@ -75,7 +75,7 @@ These suspects turned out to be actively used.
 
 ## Unused Export Sampling
 
-Found **583** potentially unused exports across src/.
+Found **606** potentially unused exports across src/.
 Top 20 shown below (full list requires deeper analysis):
 
 | File | Export | Import Count |
@@ -89,6 +89,7 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/task-builder.ts | parseSkillsDirective | 0 |
 | src/orchestra/task-builder.ts | parseDependenciesDirective | 0 |
 | src/orchestra/task-builder.ts | parsePriorityDirective | 0 |
+| src/orchestra/task-builder.ts | maskCodeBlocks | 0 |
 | src/orchestra/task-builder.ts | parseBulletOrNumberedTasks | 0 |
 | src/orchestra/task-builder.ts | queryRelevantADRs | 0 |
 | src/orchestra/timeout-estimator.ts | TimeoutBreakdown | 0 |
@@ -99,7 +100,6 @@ Top 20 shown below (full list requires deeper analysis):
 | src/orchestra/sprint-utils.ts | resolveMaxWorkersNumeric | 0 |
 | src/orchestra/promotion-pipeline.ts | PromotionCriteria | 0 |
 | src/orchestra/promotion-pipeline.ts | DemotionCriteria | 0 |
-| src/orchestra/promotion-pipeline.ts | PromotionResult | 0 |
 
 ## Recommendations
 

@@ -1,0 +1,28 @@
+{
+  "taskId": "149-015",
+  "filesChanged": [
+    "src/connectors/incoming-router.ts",
+    "src/api/server.ts",
+    "tests/connectors/incoming-router.test.ts"
+  ],
+  "linesAdded": 340,
+  "linesRemoved": 3,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Incoming Webhook Router + Nervous Bridge implemented. Key deliverables:\n\n1. NEW src/connectors/incoming-router.ts (~165 LoC):\n   - IncomingMessageRouter class: routes messages → EventBus.publish() as DeckentEvent\n   - validateWebhookKey(): timing-safe key comparison (crypto.timingSafeEqual)\n   - parseDiscordWebhook(): Discord webhook format → normalized payload\n   - parseTelegramWebhook(): Telegram update format → normalized payload\n   - parseWebhookPayload(): connector-aware dispatcher\n   - isValidConnectorId(): ConnectorId type guard\n   - _resetSequence(): test helper\n\n2. PATCHED src/api/server.ts:\n   - POST /api/webhooks/:connector/:key endpoint\n   - .deck secret-based webhook key validation (DECKENT_WEBHOOK_KEY or DECKENT_WEBHOOK_KEY_<CONNECTOR>)\n   - Rate-limited via existing RateLimiter\n   - Auth-protected via existing bearerAuthMiddleware\n   - Connector-specific payload parsing\n   - 200 on success, 401 on bad key, 400 on bad payload\n\n3. NEW tests/connectors/incoming-router.test.ts (20 tests):\n   - IncomingMessageRouter: event emission, payload content, multiple messages\n   - validateWebhookKey: matching, mismatch, empty, length diff\n   - parseDiscordWebhook: valid payload, missing content, null\n   - parseTelegramWebhook: valid payload, missing message, missing text\n   - parseWebhookPayload: discord dispatch, telegram dispatch, generic fallback, invalid\n   - isValidConnectorId: valid 5 ids, reject invalid\n\nVerify: tsc --noEmit 0 errors, vitest 55/55 connector tests PASS.\n\nDesign note: DIRECTIVES example used eventBus.emit('deckent-event', ...) but real EventBus API is publish(event, sprintId?). Used correct API with proper DeckentEvent wire format (protocol_version 1.0, sequence counter, CHANNELS.NOTIFY channel).",
+  "tokenUsage": {
+    "inputTokens": 95000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 72000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 85
+  },
+  "evaluationDecision": "DONE"
+}

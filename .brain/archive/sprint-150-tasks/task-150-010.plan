@@ -1,0 +1,32 @@
+# Task 150-010: IMessageConnector Interface + BaseConnector
+
+## Status: COMPLETE (files already existed)
+
+## Analysis
+All three deliverables already exist and are well-implemented:
+
+1. `src/connectors/types.ts` (~83 LoC) — Full interface set:
+   - ConnectorId union type (5 platforms)
+   - IncomingMessage / OutgoingMessage interfaces (readonly fields)
+   - IMessageConnector interface (lifecycle + messaging + health)
+   - ConnectorConfig interface (.deck interpolation ready)
+   - MessageHandler type alias
+
+2. `src/connectors/base-connector.ts` (~80 LoC) — Abstract base class:
+   - Handler registration (multi-handler support)
+   - Message emission with error isolation
+   - Lifecycle state tracking (started flag)
+   - Disabled config no-op
+
+3. `tests/connectors/base-connector.test.ts` (7 tests) — All passing:
+   - Start/stop lifecycle
+   - Disabled config no-op
+   - Handler registration + multi-handler
+   - Unhealthy state detection
+   - Error propagation on start
+   - Handler error isolation
+   - IncomingMessage schema validation
+
+## Verification
+- `tsc --noEmit` → 0 errors
+- `npx vitest run tests/connectors/base-connector.test.ts` → 7/7 PASS

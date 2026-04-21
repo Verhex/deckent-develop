@@ -1,0 +1,29 @@
+# Task 150-013 Execution Plan
+
+## Task: WhatsApp Scaffold (Post-Launch Activation Ready)
+
+## Current State
+All required files already exist from a previous sprint (Sprint 149):
+- `src/connectors/whatsapp.ts` — scaffold implementation present
+- `src/connectors/whatsapp-README.md` — activation guide present
+- `tests/connectors/whatsapp-scaffold.test.ts` — 6 tests present
+
+## Changes Needed
+
+### 1. Review existing files
+- `whatsapp.ts` uses "Sprint 149" in error message; task spec says "Sprint 150"
+- Otherwise the scaffold matches the spec exactly
+
+### 2. Update sprint reference
+- Change error message from "Sprint 149" to "Sprint 150"
+- Change activation target from "Sprint 152+" to "Sprint 153+"
+- Update whatsapp-README.md Status line accordingly
+
+### 3. Run verification
+- `tsc --noEmit` — type check
+- `npx vitest run tests/connectors/whatsapp-scaffold.test.ts` — test suite
+
+## Expected Outcome
+- 6 tests pass (3 required by spec + 3 bonus)
+- tsc clean
+- selfAssessment: DONE

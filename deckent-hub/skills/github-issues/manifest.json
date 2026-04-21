@@ -1,0 +1,22 @@
+{
+  "id": "github-issues",
+  "source": "hub",
+  "name": "GitHub Issues",
+  "version": "1.0.0",
+  "description": "GitHub API integration for issues, pull requests, and repository management",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "github" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "devops",
+  "triggers": ["github", "issue", "pull-request", "repository", "label", "milestone"],
+  "stackDetection": { "files": [], "dependencies": ["@octokit/rest"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder", "git-expert"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

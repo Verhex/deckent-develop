@@ -1,0 +1,60 @@
+# Performance Optimizer
+
+## Profiling Methodology
+- Always measure before optimizing. Premature optimization is the root of all evil.
+- Use the right profiling tool: Chrome DevTools (frontend), Node.js --inspect (backend), py-spy/cProfile (Python).
+- Profile in conditions close to production: realistic data sizes, concurrent users, network latency.
+- Focus on the critical path. Optimizing code that runs once during startup is rarely worth it.
+- Benchmark with statistical rigor: multiple runs, percentiles (p50, p95, p99), not just averages.
+
+## Big-O Analysis
+- Know the complexity of every algorithm and data structure you use.
+- Common pitfalls: nested loops (O(n^2)), repeated string concatenation (O(n^2)), unindexed database queries (O(n)).
+- Prefer O(n) or O(n log n) algorithms. If O(n^2) is unavoidable, ensure n is bounded and small.
+- Space complexity matters too. An O(n) algorithm that allocates O(n^2) memory can still be slow.
+- Use appropriate data structures: Set/Map for lookups (O(1)), sorted arrays for binary search (O(log n)).
+
+## Caching Strategies
+- LRU (Least Recently Used): good general-purpose cache. Bounded memory. Use for frequently accessed data.
+- TTL (Time-To-Live): good for data that becomes stale. Set TTL based on acceptable staleness.
+- Write-through: update cache on every write. Consistent but higher write latency.
+- Write-behind: batch cache updates. Lower write latency but risk of data loss.
+- Cache invalidation is hard. Prefer TTL expiry over manual invalidation when possible.
+- Use multi-level caching: in-memory (fastest, smallest), Redis (shared, larger), CDN (edge, largest).
+
+## Lazy Loading
+- Load resources only when needed. Apply to: images, routes, modules, database relations.
+- Use dynamic imports (`import()`) for code splitting in JavaScript. Split by route or feature.
+- Implement virtual scrolling for long lists (only render visible items).
+- Use intersection observer for lazy loading images and below-the-fold content.
+- Prefetch resources likely to be needed next (link prefetch, hover intent).
+
+## Memory Optimization
+- Identify memory leaks: growing heap over time, objects retained beyond their lifecycle.
+- Common leak sources: event listeners not removed, closures holding large scopes, global caches without eviction.
+- Use WeakMap/WeakSet for metadata attached to objects that should be garbage collected.
+- Stream large files instead of loading entirely into memory. Use Node.js Streams or async iterators.
+- Pool expensive objects (database connections, worker threads) instead of creating/destroying repeatedly.
+
+## Database Query Optimization
+- Use EXPLAIN ANALYZE to understand query execution plans. Look for sequential scans on large tables.
+- Add indexes for columns in WHERE, JOIN, ORDER BY, and GROUP BY clauses.
+- Use SELECT only the columns you need. Avoid SELECT *.
+- Batch operations: use bulk inserts, batch updates, and batch deletes instead of row-by-row.
+- Use connection pooling with appropriate pool size (typically 10-20 connections per application instance).
+- Use read replicas for read-heavy workloads. Route writes to primary, reads to replicas.
+
+## Bundle Optimization (Frontend)
+- Analyze bundle size with webpack-bundle-analyzer or source-map-explorer.
+- Tree-shake unused code. Ensure libraries support ESM for effective tree-shaking.
+- Code-split by route. Each route should load only the JavaScript it needs.
+- Use compression (gzip, brotli) for all text-based assets.
+- Set long cache TTLs with content hashing in filenames for immutable assets.
+- Optimize images: use modern formats (WebP, AVIF), responsive sizes, lazy loading.
+
+## Network Performance
+- Minimize round trips: batch API calls, use GraphQL for complex data requirements, HTTP/2 multiplexing.
+- Use CDN for static assets and cacheable API responses.
+- Implement request deduplication: if the same request is in-flight, return the same promise.
+- Set appropriate cache headers: Cache-Control, ETag, Last-Modified.
+- Compress API responses. Use streaming for large payloads.

@@ -1,0 +1,46 @@
+# Task 150-031: Built-in Agent + Skill Bundle Pipeline
+
+## Execution Plan
+
+### Step 1: Create src/core/builtins/ seed directory
+- Copy 15 built-in agents from .deckent/agents/ (skip temp-*, archive)
+- Copy 21 built-in skills from .deckent/skills/
+- Each agent: agent.json + PROMPT.md
+- Each skill: manifest.json + SKILL.md
+
+### Step 2: Create scripts/bundle-builtins.mjs
+- Sync script: .deckent/ (dev) → src/core/builtins/
+- Skip temp-* agents
+- Pre-publish hook candidate
+
+### Step 3: Update package.json
+- Build script: add builtins copy step after tsc
+- files[]: already has "dist" which will include dist/core/builtins/
+
+### Step 4: Update copy-assets.mjs
+- Already copies .json and .md from src/ to dist/
+- builtins/ is under src/ so it should work automatically
+- Verify no dashboard-like exclusion blocks it
+
+### Step 5: Add seedBuiltins() to init-steps.ts
+- After writeBrainFiles temp skill/agent generation (line ~537)
+- Use writeIfNotExists pattern for idempotent seeding
+- Resolve builtins path from __dirname (ESM: import.meta)
+
+### Step 6: Write tests
+- tests/e2e/init-builtin-seed.test.ts: verify seed pipeline
+- tests/core/builtin-bundle.test.ts: verify structure integrity
+
+### Step 7: Verify
+- tsc --noEmit
+- npx vitest run (relevant tests)
+
+## Files to Create
+- src/core/builtins/agents/<15 agents>/{agent.json, PROMPT.md}
+- src/core/builtins/skills/<21 skills>/{manifest.json, SKILL.md}
+- scripts/bundle-builtins.mjs
+- tests/e2e/init-builtin-seed.test.ts
+
+## Files to Modify
+- src/cli/commands/init-steps.ts (add seedBuiltins)
+- package.json (build script update)

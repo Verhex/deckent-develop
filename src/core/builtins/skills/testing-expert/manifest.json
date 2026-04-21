@@ -1,0 +1,73 @@
+{
+  "id": "testing-expert",
+  "source": "builtin",
+  "name": "Testing Expert",
+  "version": "0.2.0",
+  "description": "Test pyramid, mocking strategies, coverage, CI integration, vitest/jest patterns",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "testing"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "autoActivate": {
+    "scopeMatch": [
+      "tests/**"
+    ],
+    "filesWriteMatch": [
+      "**/*.test.ts",
+      "**/*.spec.ts",
+      "**/*.test.tsx"
+    ]
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "test",
+    "coverage",
+    "spec",
+    "mock",
+    "stub",
+    "fixture",
+    "assertion",
+    "e2e",
+    "integration"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [
+      "vitest",
+      "jest",
+      "mocha",
+      "cypress"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "react-specialist",
+    "python-expert",
+    "api-builder",
+    "database-migration"
+  ],
+  "priority": 10,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "taskId": "150-008",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "selfAssessment": "DONE",
+  "notes": "All requirements from Sprint 148 debt already implemented in Sprint 149. Verified: (1) isPlaceholderPath() rejects foo/bar/baz/qux/example/test base names — composite names like foo-bar.ts preserved. (2) isJsAccessPattern() rejects .directories/.some/.filter etc — known dotfiles (.gitignore, .env) excluded. (3) maskCodeBlocks() strips code block content in DIRECTIVES parser (parseStructuredDirectives + parseBulletOrNumberedTasks). (4) Rules 9+10 in sanitizeScope() chain active. (5) 22 tests passing (12 in scope-sanitizer-v2.test.ts, 10 in scope-sanitizer.test.ts). (6) tsc --noEmit clean. No code changes needed — Sprint 149 implementation is complete and correct.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 3000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

@@ -1,0 +1,13 @@
+# Task 150-037: docs.json Private/Public Split + Path Safety + Interactive UX
+
+## Steps:
+1. Create `src/cli/commands/init-templates/docs.json.template` — bootstrap template (public)
+2. Add `.deckent/docs.json` to `.gitignore` — dev-private runtime config
+3. Add path safety validation to `addDoc()` in `docs-config.ts`
+4. Update `init-steps.ts` to use `seedDocsConfig()` helper reading template
+5. Create `docs/reference/managed-docs.md` — user-facing documentation
+6. Write path safety tests: `tests/orchestra/managed-docs/docs-path-safety.test.ts`
+7. Write interactive UX tests: `tests/cli/commands/docs-add-interactive.test.ts`
+8. Update existing `docs-config.test.ts` with path safety assertions
+9. Run tsc --noEmit + vitest to verify
+10. Write result file

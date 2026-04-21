@@ -1,0 +1,15 @@
+`★ Insight ─────────────────────────────────────`
+Bu tür "fix" task'larında önce mevcut durumu araştırmak kritiktir. Önceki worker zaten işi tamamlamışsa, fix task'ı gereksiz değişiklik yapmak yerine "already DONE" olarak raporlayabilir — bu hem token ekonomisi hem de kod stabilitesi açısından önemlidir.
+`─────────────────────────────────────────────────`
+
+**Görev tamamlandı — selfAssessment: DONE**
+
+Araştırma sonuçları:
+- `README.md` ve `README-TR.md` dosyaları **zaten tam güncel** durumda
+- Önceki task 150-021 tüm değişiklikleri başarıyla uygulamış
+- Tüm 3 kanıt kriteri doğrulandı:
+  1. `v1.0.0-beta.1` badge ✓ (satır 5)
+  2. `OpenClaw` + `AST sandbox` referansları ✓
+  3. README-TR.md 20/20 bölüm parity ✓
+
+Herhangi bir dosya değişikliği yapılmadı — tsc/vitest çalıştırılması gerekmedi (yalnızca `.md` dosyaları söz konusu).

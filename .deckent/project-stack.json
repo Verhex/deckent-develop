@@ -3,8 +3,11 @@
   "framework": "react",
   "dependencies": [
     "@modelcontextprotocol/sdk",
+    "@noble/ed25519",
+    "@noble/hashes",
     "better-sqlite3",
     "commander",
+    "telegraf",
     "zod",
     "@testing-library/jest-dom",
     "@testing-library/react",
@@ -34,7 +37,7 @@
   ],
   "buildTool": "vite",
   "testFramework": "vitest",
-  "detectedAt": "2026-04-20T14:43:30.546Z",
+  "detectedAt": "2026-04-21T11:40:53.528Z",
   "detectedLanguages": [
     "typescript"
   ],

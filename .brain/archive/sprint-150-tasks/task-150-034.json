@@ -1,0 +1,148 @@
+{
+  "id": "150-034",
+  "title": "Config Sadeleştirme + MODE_PRESETS Konsolidasyon + System Capacity Auto-Detect MVP + Self-Healing (ONAYLI Alperen 8-karar matris)",
+  "description": "Config Sadeleştirme + MODE_PRESETS Konsolidasyon + System Capacity Auto-Detect MVP + Self-Healing (ONAYLI Alperen 8-karar matris)\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, testing-expert, documentation-writer, devops-engineer\n- Files: src/core/config-migration.ts, src/core/config.ts, src/core/config-types.ts, src/core/mode-presets.ts, src/cli/commands/init-steps.ts, src/cli/auto-setup.ts (genişletme), src/core/system-capacity.ts (NEW), tests/core/config-migration.test.ts, tests/core/config-corrupted-recovery.test.ts (NEW), tests/core/system-capacity.test.ts (NEW), docs/reference/config.md (YENİDEN YAZ), .deckent/config.json (bugünkü dev dosyası clean-up migration ile)\n- Scope: src/core/, src/cli/, tests/core/, docs/reference/, .deckent/\n\n### Description\n**Alperen 2026-04-21 8-karar matrisi (T-150-009 FINAL SCOPE KİLİT):**\n\n| # | Konu | Karar |\n|---|------|-------|\n| 1 | Mode preset `max_workers` (8/5/3/10) | **KALIR** — Deckent standart modelleri |\n| 2 | Top-level `max_workers` | **KALIR** — user custom override (50 worker bile) |\n| 3 | `claude_backend` duplicate | **KALDIR** — çift kabuk çelişki + dead read |\n| 4 | Flat `brain_provider/worker_provider` | **KALDIR** — grouped kanon |\n| 5 | `api` mode rename | **HAYIR** — `api` kalacak |\n| 6 | `rollback_policy` default | **`never` kalacak** |\n| 7 | Naming alias | **YOK** — `config.md` tek referans (AI + human dual-audience) |\n| 8 | System capacity auto-detect | **Sprint 150'ye al MVP**, Sprint 151+'da genişlet |\n\n**Uygulama planı (7 adım):**\n\n1. **Duplicate key removal migration (Alperen karar 3+4):**\n   - `config-migration.ts`'e yeni migration step ekle: \"v2-duplicate-remover\".\n   - Eğer `spawn_backend` varsa → `claude_backend`'i sil (schema violation + çelişki).\n   - Eğer `providers.brain` varsa → top-level `brain_provider`'ı sil.\n   - Eğer `providers.worker` varsa → top-level `worker_provider`'ı sil.\n   - Tüm silme işlemleri **atomik** (writeFileSync tek seferde), `debugLog` ile iz bırak.\n   - **Top-level `max_workers` ve preset `max_workers` KORUNUR** (Alperen karar 1+2).\n\n2. **MODE_PRESETS konsolidasyonu (BULGU 2):**\n   - `config.ts:84-105`'teki DEFAULT_MODES duplicate silinsin.\n   - `config.ts` `mode-presets.ts`'den import etsin.\n   - Preset değerleri değişmiyor (performance 8, balanced 5, economic 3, api 10).\n   - Hardcode `max_workers` fallback `4` 6 yerde kalmaya devam — Alperen karar \"hardcoded fallback doğru tasarım.\"\n\n3. **Self-healing corrupted config recovery (BULGU 4):**\n   - `readJsonFile` yerine `loadConfig`'e catch bloğu ekle.\n   - Parse fail olursa: `config.json` → `config.json.corrupted.<ISO-timestamp>.bak` rename, fresh `createDefaultConfig()` yaz, stderr'e warning: \"Config dosyanız bozulmuştu, yedeklendi: <path>. Defaults ile devam ediliyor. Düzeltme için `deckent config read`.\"\n   - Test: corrupt JSON inject → CLI crash olmasın, fresh config ile devam etsin.\n\n4. **System Capacity Auto-Detection MVP (Alperen karar 8):**\n   - `src/core/system-capacity.ts` yeni modül:\n```typescript\nexport interface SystemCapacity {\n  totalRamGB: number;        // os.totalmem() / 1e9\n  freeRamGB: number;         // os.freemem() / 1e9\n  cpuCores: number;          // os.cpus().length\n  dockerAvailable: boolean;  // spawnSync('docker', ['--version'])\n  platform: NodeJS.Platform; // os.platform()\n}\nexport function detectSystemCapacity(): SystemCapacity;\nexport function suggestMaxWorkers(cap: SystemCapacity): number;\nexport function suggestSpawnBackend(cap: SystemCapacity): 'docker' | 'subprocess' | 'tmux';\n```\n   - `suggestMaxWorkers` heuristic MVP:\n     - `totalRamGB < 4` → 1 worker\n     - `totalRamGB 4-8` → 2 worker\n     - `totalRamGB 8-16` → 3-4 worker (cpuCores'a bağlı)\n     - `totalRamGB > 16` → min(cpuCores-2, 8) worker\n   - `suggestSpawnBackend` heuristic:\n     - `platform === 'win32'` → 'subprocess' (zaten mevcut kural)\n     - `dockerAvailable` → 'docker'\n     - aksi → 'subprocess' (veya 'tmux' varsa)\n   - `init-steps.ts` `writeConfig`'e entegre: eğer user config'te `max_workers` yoksa **suggest**et değer yaz, auto-detected olduğunu comment'le belirt (JSON comment değil ama `\"_auto_detected\": { \"max_workers\": true }` meta key ile).\n   - Alperen direktifi: \"**şimdilik MVP, sonra detaylandıracağız**\" → Sprint 151 aday: GPU (nvidia-smi), network latency, disk quota, Claude subscription tier.\n\n5. **`docs/reference/config.md` tam yeniden yaz (BULGU 3):**\n   - AI + human dual-audience başlık paragrafı:\n   ```markdown\n   Bu doküman Deckent config sisteminin tek kanon referansıdır. AI orchestrator'ları\n   (Claude Code, Codex, Gemini) ve insan geliştiricilerin birlikte okuyup anlaması\n   için yazılmıştır. Alias yoktur — her key tek kanonik isimle geçer.\n   ```\n   - 60 key tam matrisi, kategori bazlı 15+ başlık:\n     - Identity (projectName, language, last_sprint_id, detected_env, deckent_style)\n     - Modes & Models (mode, modes.*, model_strategy, providers, brain_provider flat=deprecated, ...)\n     - Backend & Runtime (spawn_backend, docker_image, docker_timeout, multi_ide_mode)\n     - Memory (memory.*, memory_budget, decay_after_sprints, patterns_enabled, project_identity_enabled)\n     - Sprint Lifecycle (fix_phase_enabled, max_fix_retries, coverage_threshold, max_reroutes, reroute_on_tech_debt, sprint_timeout_minutes, sprint_checkpoint_interval, cleanup_delay_ms)\n     - Auditor (scan_interval, heartbeat_timeout, boundary_enforcement, lock_stale_threshold, auto_clean_locks)\n     - Rollback & Safety (rollback_policy, human_checkpoints, auth_mode, api_auth_token, plugin_require_signature)\n     - Evaluation (evaluation_rubric, rubric_max_retries, adaptive_thresholds, agent_min_score, adaptive_config)\n     - Routing (routing_engine, routing_config.*)\n     - Search & Docs (search_enabled, search_provider, search_cache_ttl, auto_docs)\n     - Notifications (notify_on_complete, notify_channel, notify_url) vs Nervous System notifications (ayrı)\n     - Telemetry (telemetry_enabled, telemetry_anonymous)\n     - Output (output_splash, output_mode, output_theme, output_render_mode)\n     - Timeout (timeout.docker_min/max, tmux_min/max, subprocess_min/max, effort_base, loc_scaling_enabled, history_scaling_enabled, runtime_extension_enabled)\n     - Nervous System (enabled, mode, actionOverrides, safety_floor, notifications, detectors, history_retention_days)\n     - Collaboration (collaboration.*) — varsa\n   - Her key için: **Type** / **Default** / **Env var override (varsa)** / **Okuyan modüller** / **User guide**. Terminoloji AI orchestrator'ların tutarlı anlaması için net.\n   - Başlangıç/kurulum senaryoları: \"Temel init\", \"Docker'lı gelişmiş\", \"Claude Max + api mode\", \"Monorepo subproject config\", \"Multi-IDE ortam.\"\n   - Migration changelog: v1 → v2 duplicate key removal.\n\n6. **Live migration Alperen'in `.deckent/config.json`'ı:** Task ilk adımında dev-deckent dosyası live migrate → 188 satırdan ~120 satıra (duplicate keys silinmiş, MODE_PRESETS tek kaynaktan). Validation sonrası auto-saved.\n\n7. **Test matrix (25+ yeni test):**\n   - Migration: `claude_backend` removal (spawn_backend ile birlikte), flat provider removal (grouped ile birlikte), top-level max_workers korunur, mode preset max_workers korunur.\n   - MODE_PRESETS single-source: `getModePreset('performance').max_workers === 8` (import'tan), `config.ts`'de DEFAULT_MODES yok.\n   - Corrupted recovery: JSON syntax error, empty file, null root, binary garbage → 4 senaryo, her biri fresh default + rename.\n   - System capacity: mock `os.totalmem()` (4/8/16/32 GB), mock `os.cpus()` (2/4/8/16 core), mock docker available/unavailable → suggest fns doğru değerler döner.\n   - Auto-detect wire: `writeConfig` capacity MVP sonrası `max_workers` suggest eder, user override'da kalır.\n   - `docs/reference/config.md` lint: markdown linter + her key config-types.ts'de tanımlı mı cross-check.\n\n**Kanıt:**\n- `jq 'has(\"claude_backend\")' .deckent/config.json` → false (migration sonrası)\n- `jq 'has(\"brain_provider\")' .deckent/config.json` → false (migration sonrası, grouped varken)\n- `jq '.max_workers' .deckent/config.json` → number (top-level korundu, user custom)\n- `grep -c \"max_workers:\" src/core/config.ts` → 0 (MODE_PRESETS oradan silindi)\n- `deckent config read --repair` → corrupted scenario'da fresh default döner\n- `docs/reference/config.md | wc -l` → ≥ 800 satır (60 key × ~13 satır ortalama)\n- `npx vitest run tests/core/config-migration.test.ts tests/core/config-corrupted-recovery.test.ts tests/core/system-capacity.test.ts` → all pass\n\n**Kazanımlar:**\n- **Dev:** 188 satırlık config.json temizlenir, tek-kaynak prensibi uygulanır, self-healing eklendi.\n- **User:** `deckent init` auto-capacity detection ile sistemine uygun `max_workers` gelir. Customize hakkı elinde (50 worker isterse yapar). Config.md dosyası AI-first net referans.\n- **Beta GA:** \"Config doğru mu dolacak?\" sorusuna net cevap — auto-detect + user override + doc + self-heal katmanları hazır.\n- **AI orchestrator parity:** Claude Code / Codex / Gemini CLI hepsi aynı config.md'yi okur, tutarlı davranır. Launch messaging'in temeli.\n\n**Bağımlılık kritik:** T-150-034 `src/core/config-types.ts` + `config.ts` dokunur → **T-150-001** (deckent_style) aynı dosyalar. Wave 7'de T-150-034 başlamadan Wave 1 T-150-001'in bittiğini bekle (file lock).\n\n**İlişkili memory:** `feedback_max_workers.md` V2 güncellendi (2026-04-21) — \"WSL2 dev-deckent lokal limit 3-4, product hard limit değil. User customize edebilir.\"\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/cli/commands/",
+      "src/cli/",
+      "tests/core/",
+      "docs/reference/",
+      ".deckent/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/config-migration.ts",
+      "src/core/config.ts",
+      "src/core/config-types.ts",
+      "src/core/mode-presets.ts",
+      "src/cli/commands/init-steps.ts",
+      "src/cli/auto-setup.ts (genişletme)",
+      "src/core/system-capacity.ts (NEW)",
+      "tests/core/config-migration.test.ts",
+      "tests/core/config-corrupted-recovery.test.ts (NEW)",
+      "tests/core/system-capacity.test.ts (NEW)",
+      "docs/reference/config.md (YENİDEN YAZ)",
+      ".deckent/config.json (bugünkü dev dosyası clean-up migration ile)",
+      "docs/reference/config.md",
+      "src/cli/auto-setup.ts",
+      "src/core/system-capacity.ts",
+      "tests/core/config-corrupted-recovery.test.ts",
+      "tests/core/system-capacity.test.ts",
+      "config.json",
+      "config-types.ts",
+      ".max_workers",
+      "config.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "corrupt JSON inject → CLI crash olmasın, fresh config ile devam etsin.; Tests pass; *Kanıt:**; `grep -c \"max_workers:\" src/core/config.ts` → 0 (MODE_PRESETS oradan silindi); `npx vitest run tests/core/config-migration.test.ts tests/core/config-corrupted-recovery.test.ts tests/core/system-capacity.test.ts` → all pass",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert",
+    "documentation-writer",
+    "devops-engineer"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert",
+    "documentation-writer",
+    "devops-engineer"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "security",
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "types",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.48
+        },
+        {
+          "name": "cli",
+          "weight": 0.19
+        },
+        {
+          "name": "docs",
+          "weight": 0.11
+        }
+      ],
+      "operations": [
+        {
+          "type": "document",
+          "weight": 0.21
+        },
+        {
+          "type": "configure",
+          "weight": 0.21
+        },
+        {
+          "type": "create",
+          "weight": 0.16
+        },
+        {
+          "type": "modify",
+          "weight": 0.11
+        },
+        {
+          "type": "delete",
+          "weight": 0.11
+        },
+        {
+          "type": "rename",
+          "weight": 0.11
+        },
+        {
+          "type": "test",
+          "weight": 0.11
+        }
+      ],
+      "complexity": {
+        "fileCount": 21,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "epic"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.43,
+          "tests/": 0.24,
+          "docs/": 0.1,
+          ".deckent/": 0.05,
+          "./": 0.19
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.24
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:43:26.247Z"
+}

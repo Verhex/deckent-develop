@@ -7,9 +7,10 @@
  * Split from init.ts (Sprint 144 Task 1).
  */
 
-import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { writeFileSync, mkdirSync, readFileSync, existsSync, readdirSync, cpSync, statSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { platform } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import type { PlanMode } from '../../core/types.js';
 import type { FullStackResult } from '../../core/stack-detector.js';
 import type { DetectedEnv } from '../../core/environment.js';
@@ -37,10 +38,10 @@ import {
 import { ensureDeckentImport } from '../../core/utils.js';
 import { deepMerge } from '../../core/config.js';
 import { getModePreset } from '../../core/mode-presets.js';
-import { isDockerAvailable } from '../../orchestra/spawn-backend-docker.js';
+import { detectSystemCapacity, suggestMaxWorkers, suggestSpawnBackend } from '../../core/system-capacity.js';
 import { generateProjectIdentity } from '../../orchestra/sprint-reporter.js';
 import { generateProjectConventionsSkill, getGeneratedContent, generateTempAgents } from '../../orchestra/temp-skill-generator.js';
-import { loadDocsConfig, saveDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
+import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { ADR_SEED_DATA, createIdentitySeed } from '../../core/adr-seed.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
@@ -202,13 +203,16 @@ export async function writeConfig(
   if (modePreset) {
     newConfig.model_strategy = modePreset.model_strategy;
   }
-  // Auto-detect best spawn backend
+  // ─── System Capacity Auto-Detection (Sprint 150 MVP) ───────────────
+  const capacity = detectSystemCapacity();
+
+  // Auto-detect spawn_backend
   if (platform() === 'win32') {
     newConfig.spawn_backend = 'subprocess';
   } else if (!newConfig.spawn_backend) {
-    // Detect Docker — if available, recommend it for isolated workers
-    if (isDockerAvailable()) {
-      newConfig.spawn_backend = 'docker';
+    const suggestedBackend = suggestSpawnBackend(capacity);
+    newConfig.spawn_backend = suggestedBackend;
+    if (suggestedBackend === 'docker') {
       print('  ✓ Docker detected → spawn_backend: docker (isolated worker containers)');
       // Check if worker image exists
       const { spawnSync: sp } = await import('node:child_process');
@@ -220,6 +224,25 @@ export async function writeConfig(
         print('    docker build -f Dockerfile.worker -t deckent-worker:latest .');
       }
     }
+  }
+
+  // Auto-suggest max_workers if user hasn't configured it
+  if (existsSync(configPath)) {
+    try {
+      const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+      if (existing['max_workers'] === undefined) {
+        const suggested = suggestMaxWorkers(capacity);
+        newConfig.max_workers = suggested;
+        newConfig._auto_detected = { max_workers: true, totalRamGB: capacity.totalRamGB, cpuCores: capacity.cpuCores };
+        print(`  ✓ System capacity → max_workers: ${suggested} (${capacity.totalRamGB}GB RAM, ${capacity.cpuCores} cores)`);
+      }
+    } catch { /* existing config parse fail — handled by merge below */ }
+  } else {
+    // Fresh init — always suggest
+    const suggested = suggestMaxWorkers(capacity);
+    newConfig.max_workers = suggested;
+    newConfig._auto_detected = { max_workers: true, totalRamGB: capacity.totalRamGB, cpuCores: capacity.cpuCores };
+    print(`  ✓ System capacity → max_workers: ${suggested} (${capacity.totalRamGB}GB RAM, ${capacity.cpuCores} cores)`);
   }
   if (existsSync(configPath)) {
     try {
@@ -488,6 +511,9 @@ Platform: ${platform() === 'win32' ? 'Windows' : platform() === 'darwin' ? 'macO
 `;
   writeIfNotExists(join(root, WORKSPACE_DIR, 'IDENTITY.md'), identityContent);
 
+  // 10a2b. Seed built-in agents + skills from bundled builtins (Sprint 150 T-031)
+  seedBuiltins(root);
+
   // 10a3. TempSkill + TempAgent
   if (identityLanguage !== 'unknown') {
     try {
@@ -547,19 +573,9 @@ Platform: ${platform() === 'win32' ? 'Windows' : platform() === 'darwin' ? 'macO
   writeIfNotExists(join(docsDir, 'directives-guide.md'), generateDirectivesGuideDoc(language));
   writeIfNotExists(join(docsDir, 'config-reference.md'), generateConfigReferenceDoc(language));
 
-  // 10c. Bootstrap docs.json
+  // 10c. Bootstrap docs.json (template-based)
   try {
-    if (!loadDocsConfig(root)) {
-      saveDocsConfig(root, {
-        version: 1,
-        docs: [{
-          id: 'claude-md',
-          path: 'CLAUDE.md',
-          autoSections: ['Sprint Metrics'],
-          protectedSections: [],
-        }],
-      });
-    }
+    seedDocsConfig(root);
   } catch { /* non-fatal */ }
 }
 
@@ -616,4 +632,71 @@ export function writeProviderConfig(
     const freshConfig: Record<string, unknown> = { mode, language, projectName, ...providerMerge };
     writeFileSync(providerConfigPath, JSON.stringify(freshConfig, null, 2) + '\n');
   }
+}
+
+// ─── Built-in Seed ──────────────────────────────────────────────────
+
+/**
+ * Seed built-in agents and skills from the bundled builtins directory.
+ * Uses writeIfNotExists pattern — existing user overrides are preserved.
+ *
+ * The builtins are stored in dist/core/builtins/ (npm package) or
+ * src/core/builtins/ (dev workspace). This function resolves the correct
+ * path at runtime and copies agent/skill definitions to the user's
+ * .deckent/agents/ and .deckent/skills/ directories.
+ *
+ * Sprint 150 Task 031 — P0 Beta GA Blocker.
+ */
+export function seedBuiltins(root: string): void {
+  try {
+    const builtinsDir = resolveBuiltinsDir();
+    if (!builtinsDir) return;
+
+    for (const category of ['agents', 'skills'] as const) {
+      const srcDir = join(builtinsDir, category);
+      if (!existsSync(srcDir)) continue;
+
+      const dstDir = join(root, DECKENT_DIR, category);
+      ensureDir(dstDir);
+
+      let entries: string[];
+      try {
+        entries = readdirSync(srcDir);
+      } catch { continue; }
+
+      for (const entry of entries) {
+        const srcEntry = join(srcDir, entry);
+        try {
+          // Only process directories
+          const stat = statSync(srcEntry);
+          if (!stat.isDirectory()) continue;
+        } catch { continue; }
+
+        const dstEntry = join(dstDir, entry);
+        // Idempotent: only seed if directory doesn't exist (preserve user overrides)
+        if (!existsSync(dstEntry)) {
+          try {
+            cpSync(srcEntry, dstEntry, { recursive: true });
+          } catch { /* best-effort — non-fatal */ }
+        }
+      }
+    }
+  } catch { /* non-fatal — built-in seeding failure doesn't block init */ }
+}
+
+/**
+ * Resolve the builtins directory at runtime.
+ * Checks dist/core/builtins/ first (npm install), then src/core/builtins/ (dev).
+ */
+function resolveBuiltinsDir(): string | null {
+  // This file lives at {root}/dist/cli/commands/init-steps.js (npm) or
+  // {root}/src/cli/commands/init-steps.ts (dev). Either way, builtins
+  // are at ../../core/builtins/ relative to this file's directory.
+  try {
+    const thisFile = fileURLToPath(import.meta.url);
+    const thisDir = dirname(thisFile);
+    const builtinsDir = join(thisDir, '..', '..', 'core', 'builtins');
+    if (existsSync(builtinsDir)) return builtinsDir;
+  } catch { /* no builtins available */ }
+  return null;
 }

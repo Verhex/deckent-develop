@@ -1,0 +1,112 @@
+name: Validate Skill
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+
+jobs:
+  validate:
+    name: AST Sandbox + Manifest + Ed25519 Signature
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install validator dependencies
+        # Install @noble/ed25519 for signature verification in hub-validate.mjs
+        run: |
+          npm install --no-save @noble/ed25519@^2.3.0 @noble/hashes@^1.8.0
+
+      - name: Detect changed skill directories
+        id: changed
+        run: |
+          # Get unique skill directories from changed files
+          CHANGED_SKILLS=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+            | grep '^skills/' \
+            | awk -F'/' '{print $1"/"$2}' \
+            | sort -u)
+
+          if [ -z "$CHANGED_SKILLS" ]; then
+            echo "No skill directories changed"
+            echo "skills=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Changed skill directories:"
+            echo "$CHANGED_SKILLS"
+            echo "skills<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$CHANGED_SKILLS" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate changed skills
+        if: steps.changed.outputs.skills != ''
+        env:
+          # In CI, placeholder sigs from dev builds should still be flagged
+          # Production PRs must have real signatures
+          SKIP_SIGNATURE: '0'
+        run: |
+          EXIT_CODE=0
+
+          while IFS= read -r skill_dir; do
+            [ -z "$skill_dir" ] && continue
+
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  Validating: $skill_dir"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            if ! node scripts/hub-validate.mjs "$skill_dir"; then
+              echo "❌ FAIL: $skill_dir did not pass validation"
+              EXIT_CODE=1
+            fi
+
+          done <<< "${{ steps.changed.outputs.skills }}"
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ One or more skills failed validation — see errors above"
+            echo "   Hint: run locally: node scripts/hub-validate.mjs <skill-dir>"
+          else
+            echo "✅ All changed skills passed validation"
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          exit $EXIT_CODE
+
+      - name: No skills changed
+        if: steps.changed.outputs.skills == ''
+        run: echo "No skill directories changed in this PR — nothing to validate"
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## Skill Validation Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Pipeline:** AST Sandbox → Manifest Schema → Ed25519 Signature" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Changed skills:**" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "${{ steps.changed.outputs.skills }}" ]; then
+            echo "_None_" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "${{ steps.changed.outputs.skills }}" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Validator:** \`scripts/hub-validate.mjs\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "To validate locally:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo 'node scripts/hub-validate.mjs skills/<skill-name>/' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

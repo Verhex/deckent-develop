@@ -1,0 +1,51 @@
+# Task 150-038 Execution Plan
+# Sprint-Scoped MetricsJsonl Writer Wire-Up + status.ts Live Reader
+
+## Analiz Sonucu
+
+T-150-030 tarafından hazırlanan altyapı büyük ölçüde zaten uygulanmış durumda:
+
+### Mevcut Durum (Kod Analizi)
+
+1. **`src/core/observability.ts`** — T-150-030 implementasyonu MEVCUT:
+   - `_perSprintFile` state variable (line 62)
+   - `initObservability(root, sprintId?, opts?)` imzası (line 73-81) — `perSprintFile` opsiyonu destekliyor
+   - `setObservabilitySprintId(sprintId, opts?)` — per-sprint enable/disable (line 103-108)
+   - `getPerSprintMetricsPath()` helper (line 114-119)
+   - `appendEntry()` — hem flat hem per-sprint dosyasına yazar (line 455-479)
+   - `_sprintId` auto-inject tags (line 434-448)
+
+2. **`src/mcp/tools/status.ts`** — `readMetricSnapshot()` MEVCUT (line 77-121):
+   - Per-sprint file first lookup (`${sprintId}-metrics.jsonl`)
+   - Flat file fallback with sprintId tag filtering
+   - `metricSnapshot` MCP response'a ekleniyor (line 403-405, 433)
+
+3. **`src/orchestra/sprint-controller.ts`** — wire MEVCUT (line 313):
+   - `setObservabilitySprintId(sprint.id, { perSprintFile: true })` çağrısı
+
+### Eksik: Test Kapsamı
+`tests/mcp/tools/status.test.ts` sadece `dependencyGraph` testlerini kapsıyor.
+Task'ın istediği 5 test senaryosu eksik:
+1. Per-sprint write mode test
+2. status.ts sprint-scoped reader (per-sprint file exists → read from there)
+3. Backward compat flat mode (flat file only → filter by sprintId tag)
+4. Integration: T-150-030 + T-150-038 chain
+5. Dashboard live metric fetch (MCP `deckent_status` with metricSnapshot)
+
+## Uygulama Adımları
+
+1. Heartbeat oluştur
+2. observability.ts'i doğrula — imza ve davranış doğru mu?
+3. status.test.ts'e 5+ metrik snapshot testi ekle
+4. tsc --noEmit çalıştır
+5. npx vitest run çalıştır
+6. Result dosyası yaz
+
+## Değiştirilecek Dosyalar
+- `.tasks/task-150-038.hb` (yeni)
+- `tests/mcp/tools/status.test.ts` (genişletme — metrik testler)
+- `.tasks/task-150-038.result` (yeni)
+
+## Değiştirilmeyecek Dosyalar (Zaten Hazır)
+- `src/core/observability.ts` — T-150-030 tam uygulandı
+- `src/mcp/tools/status.ts` — readMetricSnapshot() zaten canlı

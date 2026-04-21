@@ -31,6 +31,7 @@ import { clearOrphanLocks } from '../core/file-lock.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { MemoryStore } from '../core/memory-store.js';
 import { MEMORY_DB_FILE } from '../core/constants.js';
+import { ACTIVE_EXECUTION_STATUSES, COMPLETED_STATUSES } from '../core/heartbeat-types.js';
 
 // ─── Constants ─────────────────────────────────────────────────────
 
@@ -289,37 +290,48 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000
     // Defensive fix for Sprint 134 Docker bug (SIGKILL → HB "FAILED exitCode 137" + 47 false alerts).
     if (!shouldReportStale(projectRoot, hb.taskId, hb)) continue;
 
-    // Check if the worker's task is already completed (DONE or NO_GO).
-    // Completed workers stop updating heartbeats — this is expected, not a real stale agent.
+    // Check the worker's task lifecycle state before generating stale alerts.
+    // Sprint 149 fix: Only generate stale alerts for tasks in EXECUTING state.
+    // PENDING/CLAIMED/DRAFT/PAUSED tasks haven't started yet — no heartbeat expected.
     const taskFilePath = join(tasksDir, `task-${hb.taskId}.json`);
     const task = readJsonSafe<Task>(taskFilePath);
-    const isCompleted = task?.status === TaskStatus.DONE || task?.status === TaskStatus.NO_GO;
 
-    if (isCompleted) {
-      // Downgrade to WARNING — worker finished its task, stale heartbeat is expected
-      alerts.push(
-        createAlert(
-          AlertLevel.WARNING,
-          `Stale heartbeat from completed worker: ${hb.workerId} (task: ${hb.taskId}, status: ${task?.status})`,
-          hb.workerId,
-        ),
-      );
-    } else {
-      staleAgents.push({
-        type: 'stale_heartbeat',
-        agentId: hb.workerId,
-        detail: `Heartbeat stale for ${Math.round(elapsed / 1000)}s (task: ${hb.taskId})`,
-        timestamp: now(),
-      });
-      metric('hb.stale', 1, { taskId: hb.taskId });
-      alerts.push(
-        createAlert(
-          AlertLevel.CRITICAL,
-          `Stale agent detected: ${hb.workerId} (task: ${hb.taskId})`,
-          hb.workerId,
-        ),
-      );
+    // Sprint 149: Skip stale check for non-EXECUTING tasks (race condition fix)
+    // Tasks in PENDING, CLAIMED, DRAFT, or PAUSED state should never trigger stale alerts
+    // because the worker hasn't started executing yet (or is paused).
+    // Sprint 150: Use shared ACTIVE_EXECUTION_STATUSES from heartbeat-types.ts (DRY).
+    if (task && !ACTIVE_EXECUTION_STATUSES.has(task.status)) {
+      const isCompleted = COMPLETED_STATUSES.has(task.status);
+      if (isCompleted) {
+        // Downgrade to WARNING — worker finished its task, stale heartbeat is expected
+        alerts.push(
+          createAlert(
+            AlertLevel.WARNING,
+            `Stale heartbeat from completed worker: ${hb.workerId} (task: ${hb.taskId}, status: ${task.status})`,
+            hb.workerId,
+          ),
+        );
+      }
+      // Non-executing, non-completed tasks (PENDING/CLAIMED/DRAFT/PAUSED) — skip entirely
+      continue;
     }
+
+    // Task is in EXECUTING/TESTING/DOCUMENTING state (or task.json missing) — genuine stale
+    staleAgents.push({
+      type: 'stale_heartbeat',
+      agentId: hb.workerId,
+      detail: `Heartbeat stale for ${Math.round(elapsed / 1000)}s (task: ${hb.taskId})`,
+      timestamp: now(),
+    });
+    metric('hb.stale', 1, { taskId: hb.taskId });
+
+    alerts.push(
+      createAlert(
+        AlertLevel.CRITICAL,
+        `Stale agent detected: ${hb.workerId} (task: ${hb.taskId})`,
+        hb.workerId,
+      ),
+    );
   }
 
   return { heartbeats, staleAgents, alerts };

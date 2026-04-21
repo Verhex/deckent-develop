@@ -1,0 +1,56 @@
+{
+  "id": "migration-expert",
+  "source": "builtin",
+  "name": "Migration Expert",
+  "version": "0.1.0",
+  "description": "Framework migration, version upgrades, breaking change resolution, codemods, incremental migration",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "migration"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "migrate",
+    "migration",
+    "upgrade",
+    "breaking-change",
+    "codemod",
+    "deprecation",
+    "version",
+    "legacy",
+    "compat"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "testing-expert",
+    "git-expert"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

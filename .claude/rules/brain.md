@@ -42,6 +42,7 @@ paths: [".tasks/*",".brain/*",".contracts/*"]
 
 ## Active ADR Constraints
 
+- **ADR-041**: Agent Taxonomy — Horizontal Skills vs Vertical Agents — accepted (Sprint 150 — reconfirmed with Sprint 150 dogfood evidence)
 - **ADR-040**: Nervous System Architecture — Proactive Meta-Orchestrator — Deckent'in Sprint 144–146 boyunca yaşanan canlı olaylar, proaktif bir meta-katmana olan ihtiyacı kanıtladı:
 - **ADR-001**: TypeScript + ESM — **Status:** accepted
 - **ADR-002**: Node16 Module Resolution — **Status:** accepted

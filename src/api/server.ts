@@ -21,6 +21,13 @@ import { readWorkerLog } from '../agents/worker.js';
 import {
   runSprint, readContext, planSprint, cleanup,
 } from '../orchestra/brain.js';
+import {
+  IncomingMessageRouter,
+  isValidConnectorId,
+  parseWebhookPayload,
+  validateWebhookKey,
+} from '../connectors/incoming-router.js';
+import { loadDeckSecrets } from '../core/deck-file.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -658,6 +665,53 @@ async function handleRequest(
       } catch (err: unknown) {
         sendError(res, 500, err instanceof Error ? err.message : 'Config update failed');
       }
+      return;
+    }
+
+    // POST /api/webhooks/:connector/:key — inbound webhook from messaging platforms
+    if (url.startsWith('/api/webhooks/')) {
+      const parts = url.slice('/api/webhooks/'.length).split('/');
+      const connector = parts[0] ?? '';
+      const key = parts[1] ?? '';
+
+      if (!connector || !key) {
+        sendError(res, 400, 'Missing connector or key parameter');
+        return;
+      }
+
+      if (!isValidConnectorId(connector)) {
+        sendError(res, 400, `Invalid connector: ${connector}`);
+        return;
+      }
+
+      // Validate webhook key against .deck secrets
+      const secrets = loadDeckSecrets(projectRoot);
+      const expectedKey = secrets['DECKENT_WEBHOOK_KEY'] ?? secrets[`DECKENT_WEBHOOK_KEY_${connector.toUpperCase()}`] ?? '';
+      if (!expectedKey || !validateWebhookKey(key, expectedKey)) {
+        sendError(res, 401, 'Invalid webhook key');
+        return;
+      }
+
+      // Parse payload per connector format
+      const parsed = parseWebhookPayload(connector, body);
+      if (!parsed) {
+        sendError(res, 400, 'Invalid webhook payload');
+        return;
+      }
+
+      // Route to nervous system via IncomingMessageRouter
+      const router = new IncomingMessageRouter();
+      router.route({
+        id: parsed.id,
+        connector,
+        fromUser: parsed.fromUser,
+        channelId: parsed.channelId,
+        text: parsed.text,
+        timestamp: parsed.timestamp,
+        raw: parsed.raw,
+      });
+
+      sendJson(res, { ok: true });
       return;
     }
 

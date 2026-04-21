@@ -1,0 +1,16 @@
+# Task 150-016 Execution Plan
+
+## Assessment
+Both `src/core/signature.ts` and `tests/core/signature.test.ts` already exist and appear complete.
+Dependencies `@noble/ed25519` and `@noble/hashes` already in package.json.
+
+## Steps
+1. Verify existing implementation matches task spec
+2. Run tsc --noEmit to check type safety
+3. Run vitest on signature.test.ts to verify all 8+ tests pass
+4. Write result file
+
+## Files
+- src/core/signature.ts (EXISTS — verify, no changes needed)
+- tests/core/signature.test.ts (EXISTS — verify, no changes needed)
+- package.json (ALREADY has deps)

@@ -14,7 +14,7 @@ import { generateAllSections } from './content-generators.js';
 import { updateDocSections, trimToMaxLines } from './section-updater.js';
 import { renderTemplate } from './template-renderer.js';
 import { loadUserGeneratorsSync } from './plugin-loader.js';
-import { contentHash, readDocCache, writeDocCache } from './doc-cache.js';
+import { contentHash, readDocCache, writeDocCache, getCacheEntry } from './doc-cache.js';
 import { MemoryStore } from '../../core/memory-store.js';
 
 /**
@@ -65,7 +65,7 @@ export function runManagedDocUpdates(ctx: DocUpdateContext): DocUpdateResult[] {
         maxLines: entry.maxLines ?? 0,
       }));
       const fileHash = contentHash(content);
-      const cached = cache[entry.id];
+      const cached = getCacheEntry(cache, entry.id);
       if (cached && cached.entryHash === entryHash && cached.fileHash === fileHash) {
         results.push({ file: entry.path, updated: false, reason: 'cached_no_change' });
         continue;

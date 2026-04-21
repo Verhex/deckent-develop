@@ -1,0 +1,26 @@
+{
+  "id": "telegram-bot",
+  "source": "hub",
+  "name": "Telegram Bot",
+  "version": "1.0.0",
+  "description": "Telegram bot development with telegraf — commands, keyboards, webhooks, middleware",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "telegram" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "bot" } }, "score": 5 },
+      { "when": { "domains": { "$contains": "chat" } }, "score": 5 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["telegram", "bot", "chat", "message", "webhook"],
+  "stackDetection": { "files": [], "dependencies": ["telegraf"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

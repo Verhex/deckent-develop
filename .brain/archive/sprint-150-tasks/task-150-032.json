@@ -1,0 +1,145 @@
+{
+  "id": "150-032",
+  "title": "`deckent audit` + `deckent recover` User-Facing CLI + MCP Yüzeyi",
+  "description": "`deckent audit` + `deckent recover` User-Facing CLI + MCP Yüzeyi\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, testing-expert, api-builder, documentation-writer\n- Files: src/cli/commands/audit.ts (NEW), src/cli/commands/recover.ts (NEW), src/mcp/tools/audit.ts (NEW), src/mcp/tools/recover.ts (NEW), src/orchestra/sprint-finalizer.ts (export genişletme), src/core/orphan-cleaner.ts, tests/cli/commands/audit.test.ts (NEW), tests/cli/commands/recover.test.ts (NEW), tests/mcp/tools/audit.test.ts (NEW), tests/mcp/tools/recover.test.ts (NEW), docs/reference/cli.md, README.md\n- Scope: src/cli/commands/, src/mcp/tools/, src/orchestra/, src/core/, tests/, docs/reference/\n\n### Description\n**User tarafı kritik gap (2026-04-21 `.deckent/run-self-audit.mjs` analizi BULGU'sundan):** `runSelfAuditGate()` production feature aşırı canlı (finalizeSprint:898 her sprint otomatik çağırır) ama CLI ve MCP yüzeyinde **YOK**. Dev-deckent Sprint 134'te crash olduğunda throwaway `.deckent/run-self-audit.mjs` ile recovery yaptı. User aynı durumu yaşarsa (Sprint 139 coordinator panic kill, Sprint 140 $42 disaster, Sprint 144 IPC leak — hepsi user'ın başına da gelecek) elinde recovery aracı yok. \"Biz yaptık deckent'e ekledik peki user tarafı?\" sorusunun tam cevabı.\n\n**Uygulama planı (7 adım):**\n\n1. **`deckent audit <sprint-id>`** CLI komutu — `runSelfAuditGate(sprintId, projectRoot)` çağırır, `SelfAuditResult` JSON'u stdout + `.deckent/<sprint-id>-gate.json`'a yazar. Exit code: PASS → 0, GATE_FAILURE → 1.\n\n2. **`deckent_audit` MCP tool** — `{ sprintId: string }` parametresi, readOnly: true, destructive: false. CLI ile birebir parity (ADR-022-V2).\n\n3. **`deckent recover <sprint-id>`** CLI komutu — audit + orphan cleanup + stale lock clear + task archive pipeline. Sprint yarım kalmışsa yeniden execute edilebilir hale getirir. Interactive prompt (confirm before destructive ops).\n\n4. **`deckent_recover` MCP tool** — destructive: true, autoApprove false default.\n\n5. `sprint-finalizer.ts` → `runSelfAuditGate` zaten export ediliyor (line 228), CLI/MCP katmanları thin wrapper.\n\n6. Docs: `docs/reference/cli.md`'ye komut referansı + recovery workflow (user'ın \"sprint crash oldu ne yapmalıyım?\" senaryosuna adım adım cevap).\n\n7. README'ye \"Crash recovery\" bölümü.\n\n```typescript\n// src/cli/commands/audit.ts\nimport { Command } from 'commander';\nimport { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';\n\nexport function registerAudit(program: Command): void {\n  program.command('audit <sprint-id>')\n    .description('Run Brain Self-Audit Gate for a sprint')\n    .option('--json', 'Output JSON only')\n    .action(async (sprintId, opts) => {\n      const result = await runSelfAuditGate(sprintId, process.cwd());\n      const gatePath = join(process.cwd(), '.deckent', `${sprintId}-gate.json`);\n      writeFileSync(gatePath, JSON.stringify(result, null, 2));\n      if (opts.json) {\n        console.log(JSON.stringify(result, null, 2));\n      } else {\n        console.log(`Gate: ${result.overallGate}`);\n        console.log(`tsc: ${result.tsc.status}, vitest: ${result.vitest.status}`);\n        console.log(`Written: ${gatePath}`);\n      }\n      process.exit(result.overallGate === 'PASS' ? 0 : 1);\n    });\n}\n```\n\n### Test (15+ test)\n- CLI `deckent audit` PASS/FAIL/WARNING yolları\n- CLI `deckent recover` --dry-run vs live\n- MCP tool schema validation\n- MCP tool destructive flag enforcement\n- Crash recovery e2e (tmp project, simulated crash)\n- Exit code matrix\n- Multi-sprint audit (geçmiş sprint'in gate.json'ı var mı kontrol)\n\n**Kanıt:**\n- `deckent audit sprint-150 --json | jq '.overallGate'` → \"PASS\" veya \"GATE_FAILURE\" döner\n- `deckent recover sprint-150 --dry-run` → temizlenecekler listesi stdout\n- `deckent_audit` MCP tool registered: `deckent_help | grep audit` → tool listesinde\n- Crash scenario e2e: tmp project'te sprint yarıda kes → `deckent recover` → sprint yeniden başlatılabilir\n\n**Kazanımlar:**\n- **User:** Sprint crash/hang durumunda **sahipsiz kalmaz**. Deckent'in kendi başına getirdiği T-014 Brain Self-Audit Gate her user projesinde de çalışabilir hale gelir.\n- **Beta GA:** \"Crash recovery story\" user doc'unda somut komutla cevap bulur. Launch messaging: \"Deckent knows how to recover itself — and you.\"\n- **Dev-prod parity:** deckent-dev Sprint 134'te elle yaptığı adım user'da tek komuta iner. Dogfood paritesi.\n- **MCP/CLI parity (ADR-022-V2):** Her CLI komut MCP'de de var — yeni ADR amendment gerektirmez, zaten kural bu.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/cli/commands/",
+      "src/mcp/tools/",
+      "src/orchestra/",
+      "src/core/",
+      "tests/cli/commands/",
+      "tests/mcp/tools/",
+      "docs/reference/",
+      "tests/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/cli/commands/audit.ts (NEW)",
+      "src/cli/commands/recover.ts (NEW)",
+      "src/mcp/tools/audit.ts (NEW)",
+      "src/mcp/tools/recover.ts (NEW)",
+      "src/orchestra/sprint-finalizer.ts (export genişletme)",
+      "src/core/orphan-cleaner.ts",
+      "tests/cli/commands/audit.test.ts (NEW)",
+      "tests/cli/commands/recover.test.ts (NEW)",
+      "tests/mcp/tools/audit.test.ts (NEW)",
+      "tests/mcp/tools/recover.test.ts (NEW)",
+      "docs/reference/cli.md",
+      "README.md",
+      "src/cli/commands/audit.ts",
+      "src/cli/commands/recover.ts",
+      "src/mcp/tools/audit.ts",
+      "src/mcp/tools/recover.ts",
+      "src/orchestra/sprint-finalizer.ts",
+      "tests/cli/commands/audit.test.ts",
+      "tests/cli/commands/recover.test.ts",
+      "tests/mcp/tools/audit.test.ts",
+      "tests/mcp/tools/recover.test.ts",
+      "gate.json"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert",
+    "api-builder",
+    "documentation-writer"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert",
+    "api-builder",
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "documentation",
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "config",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "cli",
+          "weight": 0.33
+        },
+        {
+          "name": "mcp",
+          "weight": 0.33
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.1
+        },
+        {
+          "name": "core",
+          "weight": 0.07
+        },
+        {
+          "name": "docs",
+          "weight": 0.07
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.38
+        },
+        {
+          "type": "document",
+          "weight": 0.38
+        },
+        {
+          "type": "delete",
+          "weight": 0.13
+        },
+        {
+          "type": "test",
+          "weight": 0.13
+        }
+      ],
+      "complexity": {
+        "fileCount": 22,
+        "moduleCount": 5,
+        "crossCutting": true,
+        "estimatedSize": "epic"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.36,
+          "docs/": 0.05,
+          "./": 0.09
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.36
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:43:11.292Z"
+}

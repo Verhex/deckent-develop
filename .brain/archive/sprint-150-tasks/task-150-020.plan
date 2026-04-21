@@ -1,0 +1,17 @@
+# Task 150-020: Hub CI Workflow — validate-skill.yml
+
+## Durum Değerlendirmesi
+Her iki hedef dosya önceki worker tarafından oluşturulmuş:
+- `deckent-hub/.github/workflows/validate-skill.yml` — tam workflow (multi-step, job summary)
+- `scripts/hub-validate.mjs` — 462 satır (sandbox + manifest + signature + self-tests)
+
+## Yapılacaklar
+1. Mevcut dosyaların task spesifikasyonuna uygunluğunu doğrula
+2. `node scripts/hub-validate.mjs --self-test` çalıştır (4 test)
+3. Kanıt testi: `node scripts/hub-validate.mjs deckent-hub/skills/spotify-control/`
+4. tsc --noEmit ve vitest run kontrolleri
+5. Result yaz
+
+## Kapsam
+- Dosyalar zaten mevcut — modifikasyon gerekmiyor
+- Sadece verification ve test adımları gerekli

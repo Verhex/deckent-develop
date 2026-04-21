@@ -2,31 +2,60 @@
 
 # deckent
 
-**Yapay zeka geliştirme ekibiniz, orkestre edilmiş.**
+**Disiplin isteyen geliştiriciler için AI orkestratör.**
 
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12194%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-129%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.4.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-12485%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.33%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-150%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent)
 
-Deckent, doğal dili çalışan koda dönüştüren bir AI agent orkestrasyon CLI'dir. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları teslim eder -- hepsi tek bir sprint içinde.
+Deckent, iki modlu bir AI agent orkestrasyon CLI'dir: geliştiriciler için yapılandırılmış çok-agent sprint'leri sunan **Sprint Mode** ve tek seferlik yaşam asistanı görevleri için **Task Mode**. Hedeflerinizi yazın; Deckent görevleri planlar, paralel AI worker'lar atar, kaliteyi izler ve sonuçları disiplinle teslim eder.
+
+> **AST-sandbox'lanmış skill'ler • Nervous System • Memory V2 (SQLite FTS5) • 3 backend • 3 provider • cross-platform**
 
 <!-- ![demo](docs/assets/demo.gif) -->
+
+---
 
 ## Hızlı Başlangıç
 
 ```bash
-npx deckent init
-npx deckent plan "Add user authentication"
-npx deckent start
+npm install -g deckent
+
+# Geliştirici iş akışı (Sprint Mode)
+deckent init
+deckent mode sprint
+# DIRECTIVES.md'ye hedeflerini yaz, sonra:
+deckent start
+
+# Yaşam asistanı (Task Mode)
+deckent mode task
+deckent run "Günün sonuna kadar PR'ı gözden geçirmeyi hatırlat"
 ```
+
+---
+
+## İki Mod: Sprint + Task
+
+Deckent tek bir komutla iki farklı modda çalışır:
+
+| Mod | Komut | Kullanım Alanı |
+|-----|-------|----------------|
+| **Sprint** | `deckent mode sprint` | Yapılandırılmış çok-agent geliştirme: PLAN→SPAWN→EXECUTE→EVALUATE→RETRO |
+| **Task** | `deckent mode task` | Tek seferlik yaşam asistanı: tek görev, anlık çalıştırma, sprint yükü yok |
+
+```bash
+deckent mode show           # Mevcut modu göster
+deckent mode sprint         # Sprint moduna geç (geliştirici iş akışı)
+deckent mode task           # Task moduna geç (yaşam asistanı)
+deckent mode auto           # Bağlama göre otomatik tespit (git + DIRECTIVES.md → sprint)
+deckent mode global task    # Global varsayılanı ayarla
+```
+
+`deckent_style` config anahtarı tercihinizi oturumlar arasında saklar. Task Mode, tam yaşam asistanı deneyimi sunar — tek seferlik görevler, boşta kalma tespiti ve bağlayıcı bildirimler.
 
 ---
 
 ## Nasıl Çalışır
 
-Deckent üç adımlı bir döngü izler:
-
-1. **Tanımla** -- Ne istediğini `DIRECTIVES.md` dosyasına yaz
-2. **Planla** -- Brain hedeflerini okur ve kapsamlı, öncelikli görevler oluşturur
-3. **Çalıştır** -- Paralel AI worker'lar kodu yazar, test eder ve sonuçları raporlar
+### Sprint Mode
 
 ```
                     DIRECTIVES.md
@@ -39,6 +68,19 @@ Deckent üç adımlı bir döngü izler:
                          |
                   GO / NO-GO / TECH_DEBT
 ```
+
+1. **Tanımla** — `DIRECTIVES.md` dosyasına hedeflerini yaz
+2. **Planla** — Brain hedefleri okur, kapsamlı öncelikli görevler oluşturur
+3. **Çalıştır** — Paralel AI worker'lar kodu yazar, test eder ve sonuçları raporlar
+4. **Değerlendir** — Her görev GO / NO-GO / TECH_DEBT kararı alır
+
+### Task Mode
+
+```
+  Kullanıcı Girdisi → [ Task Runner ] → Worker → Sonuç
+```
+
+Tek görev yürütme. PLAN/SPAWN fazları yok. Hızlı komutlar, hatırlatmalar ve yaşam asistanı kullanım senaryoları için idealdir.
 
 ---
 
@@ -56,46 +98,62 @@ Deckent üç adımlı bir döngü izler:
 |   +----------+     +----------+     +----------+                 |
 |        |                                   |                     |
 |   .brain/            .tasks/          .dashboard                 |
-|   (bellek,           (task JSON,      (canlı durum)              |
-|    borç,              sonuçlar,                                  |
+|   (bellek DB,        (task JSON,      (canlı durum)              |
+|    kararlar,          sonuçlar,                                  |
 |    desenler)          heartbeat'ler)                             |
++------------------------------------------------------------------+
+|         Nervous System — Proaktif Meta-Orkestratör              |
 +------------------------------------------------------------------+
 ```
 
-- **Brain** -- Görevleri planlar, model atar, sonuçları değerlendirir, desenlerden öğrenir
-- **Workers** -- Görevleri paralel yürütür (tmux veya subprocess ile), her biri plan-kod-test-rapor döngüsünü tamamlar
-- **Auditor** -- Heartbeat'leri izler, sınır ihlallerini tespit eder, kaliteyi denetler
+- **Brain** — Görevleri planlar, modelleri atar, sonuçları değerlendirir, sprint'ler arası öğrenir
+- **Workers** — Görevleri paralel yürütür (tmux, subprocess veya Docker); plan-kod-test-rapor döngüsü
+- **Auditor** — Heartbeat'leri izler, sınır ihlallerini tespit eder, kaliteyi denetler
+- **Nervous System** — Proaktif meta-orkestratör: anomali tespiti, boşta kalma durumu, routing desenleri, bağlamsal bildirimler
 
 ---
 
 ## Temel Özellikler
 
-- **Sprint Yaşam Döngüsü** -- Yapılandırılmış PLAN, SPAWN, EXECUTE, EVALUATE, RETRO, DECAY fazları her sprint'in tamamlanmasını sağlar
-- **Çoklu Worker Paralel Çalıştırma** -- Aynı anda 10'a kadar AI worker, her biri izole bir kapsamda çalışır
-- **Bellek ve Öğrenme** -- Brain öğrenimleri `.brain/MEMORY.md`'de, desenleri `PATTERNS.md`'de saklar ve her sprint ile geliştirir
-- **Auditor Kalite Kapısı** -- Sürekli izleme: stale heartbeat tespiti, sınır ihlali taraması, Kahn algoritması ile kilitlenme tespiti
-- **GO / NO-GO Değerlendirme** -- Her görev sonucu belirlenmiş kriterlere göre değerlendirilir. NO-GO görevler kaydedilir ve isteğe bağlı olarak yeniden denenir
-- **Çoklu Provider Desteği** -- Claude (varsayılan), OpenAI Codex ve Google Gemini ile çalışır. Rol bazlı (brain, worker) veya görev bazlı yapılandırma
-- **Provider Yedekleme Zinciri** -- Birincil provider başarısız mı? Model eşdeğerliği eşleşmesiyle otomatik yedek provider'a geçiş
-- **Stack Algılayan Başlangıç** -- Proje stack'inizi (Python, Go, Rust, Java, C#, Swift, Ruby, PHP, Dart, Kotlin, TypeScript) algılar ve build/test komutlarını otomatik yapılandırır
-- **TempAgent ve TempSkill** -- Kod tabanınızın konvansiyonlarına göre projeye özel agent ve skill'ler otomatik üretir
-- **Yerleşik Dokümantasyon** -- `.deckent/docs/` ile hızlı başlangıç, directive rehberi ve yapılandırma referansı gelir
-- **Yerel Windows Desteği** -- `shell:true` ile tam subprocess backend, periyodik heartbeat güncellemeleri ve UTF-8 desteği
-- **Plugin Sistemi** -- Özel hook'lar, komutlar ve desenlerle Deckent'i genişletin
-- **MCP Entegrasyonu** -- Sorunsuz Claude Code IDE entegrasyonu için 21 MCP tool + 8 resource
-- **Web Dashboard** -- Gerçek zamanlı SSE güncellemeleriyle React + Vite + Tailwind dashboard
-- **Uluslararasılaştırma** -- İngilizce ve Türkçe dil desteği yerleşik
-- **Review Arşiv Yedeği** -- Sprint review, cleanup sonrasında bile arşivden okuyarak çalışır
-- **Heartbeat Daemon** -- `deckent heartbeat --daemon` komutuyla arka planda lint/test gibi periyodik kontroller çalıştıran proaktif görev sistemi
-- **Human Checkpoints** -- Denetimli otonom çalıştırmalar için `plan`, `evaluate` ve `fix` fazlarında yapılandırılabilir onay noktaları
-- **Yapılandırılabilir Sprint Timeout** -- Sınırsız süreli sprint için `sprint_timeout_minutes: 0`, ya da dakika cinsinden sabit timeout ayarı
-- **Model Registry** -- 13 model, 3 provider, 4 katman (premium_plus, premium, standard, economy) ile katman tabanlı yönlendirme
-- **Provider-Agnostik Yapılandırma** -- Model adları yerine `brain_tier`/`worker_tier` yapılandırın; ModelRegistry provider'a göre en uygun modeli otomatik seçer
-- **Beta Güncelleme İş Akışı** -- Yerel beta kurulumu için `deckent upgrade --local <path.tgz>`
-- **Rubrik Tabanlı Notlama** -- 4 kriterli yapılandırılmış değerlendirme (doğruluk, kapsam, scope uyumu, dokümantasyon)
-- **Worker Soru Mekanizması** -- Görev yürütme sırasında worker-brain IPC + dosya tabanlı fallback iletişimi
-- **Bağlam Farkında Yönlendirme** -- Token bütçesi tahmini ve contextFit puanlama ile akıllı model seçimi
-- **Token Kullanım İzleyici** -- Provider-native metriklerle görev bazlı token sayımı ve RETRO.md özet tablosu
+### Çekirdek Orkestrasyon
+- **Sprint Yaşam Döngüsü** — 8 fazlı yapılandırılmış döngü: PLAN, SPAWN, EXECUTE, EVALUATE, FIX, RETRO, DECAY, CLEANUP
+- **İki Mod** — `deckent_style: 'sprint' | 'task'` — geliştirici orkestrasyonu veya tek seferlik yaşam asistanı
+- **Çoklu Worker Paralel Çalıştırma** — Aynı anda 10'a kadar AI worker, her biri izole kapsamda
+- **GO / NO-GO Değerlendirme** — Her görev sonucu belirlenen kriterlere göre değerlendirilir; NO-GO görevler kaydedilir ve isteğe bağlı yeniden denenir
+- **Auditor Kalite Kapısı** — Stale heartbeat tespiti, sınır ihlali taraması, Kahn algoritması ile kilitlenme tespiti
+
+### Güvenlik ve Emniyet
+- **AST Sandbox** — Tüm skill'ler çalıştırılmadan önce AST doğrulamasından geçer. Keyfi kod enjeksiyonu yok. OpenClaw'ın 13K+ skill hub'ında yaklaşık %20'si zararlı olarak işaretlenirken, Deckent'in sandbox'ı her skill'i çalıştırmadan önce doğrular
+- **Kapsam Zorunluluğu** — Worker'lar yalnızca atanan `scope.filesWrite` kapsamındaki dosyalara dokunabilir — Auditor bunu `git diff --stat` ile denetler
+- **RBAC Protokolü** — ADR-037 Brain-Auditor-Worker yetki matrisi; kesin rol sınırları
+- **`.deck` Gizli Bilgi Interpolasyonu** — Config'de `$DECK:BENIM_TOKEN` olarak gizli bilgilere başvurun — sırlar runtime'da şifreli `.deck` dosyasından yüklenir, asla commit edilmez
+
+### Zeka ve Bellek
+- **Nervous System** — Proaktif meta-orkestratör (ADR-040): boşta kalma tespiti, routing anomali uyarıları, agent sağlık izleme, bağlamsal bildirimler
+- **Memory V2 DB-First** — SQLite + FTS5 tam metin arama, çift katmanlı Türkçe/İngilizce normalize, ham markdown'a göre %96 bağlam azaltımı. `deckent recall "docker heartbeat"` ile ilgili ADR'ler ve sprint öğrenimleri anında bulunur
+- **Brain Otomatik Sorgu** — Görev DNA'sı → ilgili ADR'ler/desenler/öğrenimler PLAN, SPAWN, EVALUATE fazlarında otomatik sorgulanır
+- **Öz-Öğrenme** — Brain, sprint sonuçlarından (NO_GO oranı, coverage, süre) config önerileri üretir
+
+### Agent'lar ve Skill'ler
+- **15 Yerleşik Agent** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
+- **21 Yerleşik Skill** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert ve 16'sı daha
+- **Temp Agent ve Skill Üretimi** — Kod tabanı konvansiyonlarından projeye özel agent ve skill'ler otomatik üretir
+- **Agent Evrim Pipeline'ı** — Performansa dayalı temp'ten kalıcıya terfi; başarısızlıkta geri alım
+
+### Altyapı
+- **3 Backend** — tmux (Linux/macOS), subprocess (native Windows dahil tüm platformlar), Docker (izole container'lar)
+- **3 Provider** — Claude (varsayılan), OpenAI Codex, Google Gemini — 13 model, 4 katman
+- **Katman Tabanlı Routing** — Model adları yerine `brain_tier: 'premium'`; ModelRegistry, provider'a göre en uygun modeli seçer
+- **Yapılandırılabilir Timeout'lar** — Görev ve sprint bazlı timeout, `sprint_timeout_minutes: 0` sınırsız için
+- **Human Checkpoint'ler** — Plan, evaluate, fix fazlarında yapılandırılabilir onay noktaları
+- **MCP Entegrasyonu** — Claude Code IDE entegrasyonu için 22 tool + 8 resource
+- **Web Dashboard** — React + Vite + Tailwind, 6 sayfa, SSE gerçek zamanlı güncellemeler, TR/EN dil değiştirici
+
+### Cross-Platform
+- **Linux** — Tam (Ubuntu 20+, Debian 11+, Fedora 38+, Arch)
+- **macOS** — Tam (12+)
+- **Windows WSL2** — Tam (tmux iş akışları için önerilir)
+- **Native Windows** — Tam (subprocess backend, `shell:true`, UTF-8 desteği)
 
 ---
 
@@ -103,36 +161,26 @@ Deckent üç adımlı bir döngü izler:
 
 > Nisan 2026 — ayrıntılı karşılaştırma için [tam rekabet analizi](docs/analysis/competitive-analysis.md) sayfasına bakın.
 
-| Özellik | deckent | Cursor Agents | Devin | OpenHands | Copilot Cowork | OpenClaw |
-|---------|---------|--------------|-------|-----------|----------------|---------|
-| Çoklu agent paralel çalıştırma | Evet (10 worker'a kadar) | Sınırlı | Evet | Evet | Hayır | Evet (100+ AgentSkill) |
-| Sprint yaşam döngüsü yönetimi | Evet (8 faz) | Hayır | Kısmi | Hayır | Hayır | Hayır |
-| Hedeflerden otomatik görev planlama | Evet (AI + structured) | Hayır | Evet | Kısmi | Hayır | Hayır |
-| Sınır denetimli kalite auditor | Evet | Hayır | Hayır | Hayır | Hayır | Hayır |
-| Sprint'ler arası bellek ve öğrenme | Evet (native) | Hayır | Hayır | Hayır | Hayır | 3rd party (Mem0/Cognee) |
-| Görev bazlı GO/NO-GO değerlendirme | Evet | Hayır | Hayır | Hayır | Hayır | Hayır |
-| Açık kaynak | Evet (MIT) | Hayır | Hayır | Evet (OSS) | Hayır | Evet (OSS) |
-| MCP entegrasyonu | Evet (21 tool, 8 resource) | Kısmi | Hayır | Hayır | Hayır | Sınırlı |
-| Web dashboard | Evet (6 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır | Hayır |
-| Çoklu provider desteği | Evet (Claude, Codex, Gemini) | Hayır | Hayır | Evet | Hayır | Sınırlı |
-| Yerleşik agent sayısı | 16 | — | — | Registry | — | 100+ |
-| Yerleşik skill sayısı | 21 | — | — | — | — | 13K+ (hub) |
-| Test coverage | %89.33 | — | — | — | — | — |
-| Heartbeat / proaktif görevler | Evet | Hayır | Hayır | Hayır | Hayır | Hayır |
-| Fiyat | Ücretsiz (MIT) | $20-40/ay | $20-500/ay | Ücretsiz | $19-39/ay | Ücretsiz |
-
----
-
-## Platform Desteği
-
-| Platform | Durum | Notlar |
-|----------|-------|--------|
-| Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch) | **TAM** | Birincil geliştirme platformu |
-| macOS (12+) | **TAM** | Tüm özellikler desteklenir |
-| Windows (WSL2 ile) | **TAM** | Önerilen Windows kurulumu -- Ubuntu/Debian WSL2 kullanın |
-| Yerel Windows (cmd / PowerShell) | **TAM** | `shell:true` ile subprocess backend, periyodik heartbeat, UTF-8 desteği |
-
-> **Windows kullanıcıları:** Yerel Windows, subprocess backend ile tam olarak desteklenir. WSL2, tmux tabanlı iş akışları için bir seçenek olmaya devam eder. `deckent doctor` platform uyumluluğunu doğrular.
+| Özellik | **deckent** | Cursor Agents | Devin | OpenClaw | Claude Code |
+|---------|-------------|--------------|-------|----------|-------------|
+| Sprint yaşam döngüsü (8 faz) | **Evet** | Hayır | Kısmi | Hayır | Hayır |
+| Çoklu agent paralel çalıştırma | **Evet** (10 worker) | Sınırlı | Evet | Evet (100+ AgentSkill) | Hayır |
+| Hedeflerden otomatik görev planlama | **Evet** (AI + structured) | Hayır | Evet | Hayır | Hayır |
+| Skill'ler için AST sandbox | **Evet** | Hayır | Hayır | Hayır | Hayır |
+| Sınır denetimli kalite auditor | **Evet** | Hayır | Hayır | Hayır | Hayır |
+| Nervous System (proaktif meta-orkestratör) | **Evet** | Hayır | Hayır | Hayır | Hayır |
+| Memory V2 (SQLite FTS5, sprint'ler arası öğrenme) | **Evet** | Hayır | Hayır | 3rd party | Hayır |
+| İki mod (sprint + task) | **Evet** | Hayır | Hayır | Hayır | Hayır |
+| `.deck` gizli bilgi interpolasyonu | **Evet** | Hayır | Hayır | Hayır | Hayır |
+| Görev bazlı GO/NO-GO değerlendirme | **Evet** | Hayır | Hayır | Hayır | Hayır |
+| Açık kaynak | **Evet** (MIT) | Hayır | Hayır | Evet (OSS) | Hayır |
+| MCP entegrasyonu | **Evet** (22 tool, 8 resource) | Kısmi | Hayır | Sınırlı | Native |
+| Web dashboard | **Evet** (6 sayfa) | Yerleşik | Yerleşik | Hayır | Hayır |
+| Çoklu provider (Claude, Codex, Gemini) | **Evet** | Hayır | Hayır | Sınırlı | Hayır |
+| Yerleşik agent sayısı | **15** | — | — | 100+ | — |
+| Yerleşik skill sayısı | **21** | — | — | 13K+ (hub, ~%20 zararlı) | — |
+| Test coverage | **%89.33** | — | — | — | — |
+| Fiyat | **Ücretsiz (MIT)** | $20-40/ay | $20-500/ay | Ücretsiz | Ücretsiz |
 
 ---
 
@@ -143,13 +191,11 @@ Deckent üç adımlı bir döngü izler:
 | Node.js | >= 18 | `node --version` |
 | git | herhangi | `git --version` |
 | Claude Code CLI | herhangi | `claude --version` |
-| tmux | herhangi (isteğe bağlı) | `tmux -V` |
+| tmux | herhangi (isteğe bağlı, Linux/macOS) | `tmux -V` |
 | OpenAI Codex CLI | herhangi (isteğe bağlı) | `codex --version` |
 | Google Gemini API | herhangi (isteğe bağlı) | `GOOGLE_API_KEY` env var |
 
 **Claude Aboneliği:** Pro, Max 5x, Max 20x veya API key (kullandıkça öde). Diğer provider'lar (Codex, Gemini) kendi API key'leriyle çalışır.
-
-**Desteklenen İşletim Sistemleri:** macOS, Linux (Ubuntu 20+, Debian 11+, Fedora 38+, Arch), Windows (WSL2 ile)
 
 ---
 
@@ -162,7 +208,7 @@ npm install -g deckent
 Doğrulama:
 
 ```bash
-deckent --version
+deckent --version    # 1.0.0-beta.1
 deckent doctor
 ```
 
@@ -176,8 +222,6 @@ deckent doctor
 cd my-project
 deckent init
 ```
-
-Çıktı:
 
 ```
   Welcome to Deckent!
@@ -194,7 +238,15 @@ deckent init
   Next: Edit DIRECTIVES.md with your first goals, then run `deckent start`
 ```
 
-### Sprint Başlat
+### Modunu Ayarla
+
+```bash
+deckent mode sprint   # Geliştirici orkestrasyonu (varsayılan)
+deckent mode task     # Yaşam asistanı (tek seferlik görevler)
+deckent mode auto     # Bağlama göre otomatik tespit
+```
+
+### Sprint Başlat (Sprint Mode)
 
 ```bash
 # DIRECTIVES.md'ye hedeflerini yaz, sonra:
@@ -207,34 +259,40 @@ deckent start --dry-run
 deckent start --auto-approve
 ```
 
+### Tek Seferlik Görev Çalıştır (Task Mode)
+
+```bash
+deckent mode task
+deckent run "İndirme klasörünü dosya türüne göre düzenle"
+deckent run "GitHub issue'sundaki bellek sızıntısı sorusuna yanıt taslağı oluştur"
+```
+
 ### Durumu Kontrol Et
 
 ```bash
 deckent status
-
-# Her 2 saniyede otomatik yenile:
-deckent status --watch
-
-# Makine tarafından okunabilir çıktı:
-deckent status --json
+deckent status --watch   # Her 2 saniyede otomatik yenile
+deckent status --json    # Makine tarafından okunabilir çıktı
 ```
 
-Örnek çıktı:
-
 ```
-Sprint sprint-001 -- EXECUTE phase
+Sprint sprint-149 -- EXECUTE phase
 
   TASK        STATUS      MODEL    LAST HEARTBEAT
-  001-001     EXECUTING   sonnet   5s ago
-  001-002     DONE        haiku    42s ago
+  149-001     EXECUTING   sonnet   5s ago
+  149-002     DONE        haiku    42s ago
 
 Progress: 1/2 done  |  0 failed  |  1 running
 ```
 
-### Çalıştırmadan Planla
+### Belleği Sorgula
 
 ```bash
-deckent plan
+deckent recall "docker heartbeat"              # Cross-source FTS5 arama
+deckent recall "ADR-037 RBAC"                 # Mimari kararları bul
+deckent remember "Cuma'ya kadar deploy dondurulmuş"  # Not kaydet
+deckent memory stats                           # Bellek DB istatistikleri
+deckent memory export                          # DB → .md anlık görüntü dışa aktar
 ```
 
 ### Sağlık Kontrolü
@@ -242,8 +300,6 @@ deckent plan
 ```bash
 deckent doctor
 ```
-
-Çıktı:
 
 ```
   node_version   v20.11.0 (>=18 required)     [pass]
@@ -258,47 +314,45 @@ deckent doctor
 | Komut | Açıklama |
 |-------|----------|
 | `deckent init` | Etkileşimli kurulum sihirbazı |
-| `deckent onboard` | Tam uyarlama (global + proje yapılandırması) |
+| `deckent mode [show\|sprint\|task\|auto\|global]` | Çalışma modunu al/ayarla |
 | `deckent start` | Tam sprint yaşam döngüsünü çalıştır |
 | `deckent plan` | Sonraki sprint'i planla (sadece planlama modu) |
 | `deckent status` | Canlı dashboard göster |
+| `deckent run <cmd>` | Görev çalıştır (task modunda tek seferlik, sprint modunda kuyruğa ekler) |
 | `deckent attach` | tmux oturumuna bağlan |
 | `deckent spawn <id>` | Elle bir worker başlat |
-| `deckent kill <id>` | Belirli bir worker'i durdur |
-| `deckent retro` | Sprint retrospektifini çalıştır |
+| `deckent kill <id>` | Belirli bir worker'ı durdur |
+| `deckent retro` | Sprint retrospektifini oku |
 | `deckent cleanup` | Sprint dosyalarını arşivle ve worker'ları durdur |
 | `deckent doctor` | Sistem sağlığını kontrol et |
+| `deckent audit <sprint-id>` | Bir sprint için Brain Self-Audit Gate çalıştır |
+| `deckent recover <sprint-id>` | Çökmüş veya yarım kalmış sprint'i kurtar |
 | `deckent config` | Yapılandırmayı göster/düzenle |
 | `deckent config set <key> <value>` | Bir yapılandırma değerini ayarla |
 | `deckent history` | Sprint geçmişini ve metrikleri göster |
-| `deckent plugin install <name>` | Bir plugin kur |
-| `deckent plugin list` | Kurulu plugin'leri listele |
 | `deckent analyze` | Proje stack'ini ve boyutunu analiz et |
-| `deckent archive-debt` | Çözülmüş teknik borcu arşivle |
 | `deckent dashboard` | Terminal TUI dashboard |
 | `deckent serve` | HTTP API sunucusunu başlat |
 | `deckent web` | Web dashboard + API sunucusu (localhost:3100) |
-| `deckent upgrade` | Deckent'i güncelle (beta için `--local <path.tgz>`) |
-| `deckent sync` | Adapter dosyalarını DECKENT.md ile senkronize et |
-| `deckent watch` | Canlı tmux bölünmüş görünüm |
-| `deckent test` | Proje testlerini çalıştır |
-| `deckent set-directives` | Sprint directive'lerini ayarla |
-| `deckent finalize` | Mevcut sprint'i sonlandır |
-| `deckent run <cmd>` | Rastgele komut çalıştır |
-| `deckent explain <topic>` | Bir kavram veya komutu açıkla |
-| `deckent quick-start` | Yeni projeler için hızlı başlangıç sihirbazı |
+| `deckent recall <sorgu>` | Proje belleğini ara (ADR'ler, öğrenimler, borç) |
+| `deckent remember <not>` | Belleğe not kaydet |
+| `deckent memory [rebuild\|export\|stats]` | Bellek DB yönetimi |
 | `deckent skill` | Kurulu skill'leri listele veya yönet |
-| `deckent skill-marketplace` | [EXPERIMENTAL] Skill marketplace'i gezin ve kur |
+| `deckent skill publish <yol>` | DeckentHub'a skill yayınla (Ed25519 imzalı) |
+| `deckent features [--category]` | Özellik manifestini listele (active\|dormant\|dead\|all) |
 | `deckent agent` | Agent havuzunu yönet (listele, incele, sıfırla) |
 | `deckent review` | Son sprint sonuçlarını incele |
-| `deckent config migrate` | Yapılandırmayı en son şema sürümüne taşı |
-| `deckent heartbeat` | Tek seferlik heartbeat kontrolü çalıştır (`--daemon` arka planda, `--interval <dk>` ile aralık ayarla) |
+| `deckent upgrade` | Deckent'i güncelle (beta için `--local <path.tgz>`) |
+| `deckent sync` | Adapter dosyalarını DECKENT.md ile senkronize et |
+| `deckent explain <konu>` | Bir kavram veya komutu açıkla |
+| `deckent heartbeat` | Tek seferlik heartbeat kontrolü (`--daemon` arka planda) |
+| `deckent checkpoint` | Human checkpoint'leri onayla/reddet |
 
 ---
 
 ## MCP Entegrasyonu
 
-Deckent, Model Context Protocol üzerinden Claude Code ile entegre olur. Kayıt için:
+Deckent, Model Context Protocol üzerinden Claude Code ile entegre olur:
 
 ```bash
 claude mcp add deckent -- npx deckent mcp
@@ -306,7 +360,7 @@ claude mcp add deckent -- npx deckent mcp
 
 Veya `deckent init` otomatik olarak kayıt yapsın.
 
-### MCP Tool'lar (21)
+### MCP Tool'lar (22)
 
 | Tool | Açıklama |
 |------|----------|
@@ -323,7 +377,7 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent_config` | Yapılandırmayı göster veya güncelle |
 | `deckent_review` | Son sprint sonuçlarını incele |
 | `deckent_run` | Proje bağlamında rastgele komut çalıştır |
-| `deckent_kill` | Belirli bir worker'i durdur |
+| `deckent_kill` | Belirli bir worker'ı durdur |
 | `deckent_cleanup` | Sprint dosyalarını arşivle ve worker'ları temizle |
 | `deckent_help` | Çalışma zamanı yetenekleri, durum bilgisi ve iş akışı rehberi |
 | `deckent_agent_list` | Kayıtlı agent'ları listele (yerleşik ve geçici) |
@@ -331,6 +385,7 @@ Veya `deckent init` otomatik olarak kayıt yapsın.
 | `deckent_checkpoint` | Human checkpoint'leri onayla/reddet |
 | `deckent_docs` | Yerleşik dokümantasyonu yönet ve sun |
 | `deckent_explain` | Sprint geçmişini ve sonuçlarını açıkla |
+| `deckent_memory_query` | Cross-source bellek araması (ADR, sprint, borç, desen) |
 
 ### MCP Resource'lar (8)
 
@@ -355,17 +410,15 @@ Yapılandırma `.deckent/config.json` (proje) ve `~/.deckent/config.json` (globa
 
 | Seçenek | Tip | Varsayılan | Açıklama |
 |---------|-----|-----------|----------|
+| `deckent_style` | string | `"sprint"` | Çalışma modu: `sprint` (geliştirici) veya `task` (yaşam asistanı) |
 | `mode` | string | `"performance"` | Plan katmanı: `performance`, `balanced`, `economic`, `api` |
 | `language` | string | `"en"` | Çıktı dili: `en`, `tr` |
-| `projectName` | string | `"deckent-project"` | Dashboard ve loglar için proje adı |
 | `brain_planning` | string | `"auto"` | Planlama modu: `ai`, `structured`, `auto` |
 | `brain_provider` | string | `"claude"` | Brain için provider: `claude`, `codex`, `gemini` |
 | `worker_provider` | string | `"claude"` | Worker'lar için provider: `claude`, `codex`, `gemini` |
-| `fallback_provider` | string | -- | Başarısızlıkta yedek provider |
-| `modes.<mode>.max_workers` | number | değişken | Maksimum paralel worker sayısı |
-| `modes.<mode>.brain_model` | string | değişken | Brain'in planlama için kullandığı model |
-| `modes.<mode>.default_model` | string | değişken | Worker'lar için varsayılan model |
-| `modes.<mode>.haiku_allowed` | boolean | değişken | Brain'in haiku atayıp atayamayacağı |
+| `fallback_provider` | string | — | Başarısızlıkta yedek provider |
+| `spawn_backend` | string | `"tmux"` | Worker backend: `tmux`, `subprocess`, `docker` |
+| `sprint_timeout_minutes` | number | `60` | Sabit sprint timeout; `0` sınırsız için |
 
 ### Plan Katmanları
 
@@ -376,11 +429,7 @@ Yapılandırma `.deckent/config.json` (proje) ve `~/.deckent/config.json` (globa
 | `economic` | 3 | sonnet | sonnet |
 | `api` | 10 | opus | sonnet |
 
-**Eski takma adlar:** `max_plan`, `max5x_plan`, `pro_plan` hala kabul edilir ve yeni katman adlarına otomatik taşınır.
-
 ### Çoklu Provider Desteği
-
-Deckent üç AI provider ile çalışır. Rol bazlı veya görev bazlı yapılandırılabilir:
 
 | Provider | Modeller | Ortam Değişkeni |
 |----------|----------|-----------------|
@@ -388,9 +437,24 @@ Deckent üç AI provider ile çalışır. Rol bazlı veya görev bazlı yapılan
 | Codex (OpenAI) | o3, gpt-5, gpt-4.1, o4-mini, gpt-5-mini, gpt-4.1-mini | `OPENAI_API_KEY` |
 | Gemini (Google) | gemini-3.1-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash | `GOOGLE_API_KEY` |
 
-**3 provider'da 13 model.** Katman eşdeğerliği: premium_plus (o3, gemini-3.1-pro-preview), premium (opus, gpt-5, gemini-2.5-pro), standard (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), economy (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
+**3 provider'da 13 model.** Katman eşdeğerliği: `premium_plus` (o3, gemini-3.1-pro-preview), `premium` (opus, gpt-5, gemini-2.5-pro), `standard` (sonnet, gpt-4.1, o4-mini, gemini-2.5-flash), `economy` (haiku, gpt-5-mini, gpt-4.1-mini, gemini-2.0-flash).
 
 Tam rehber için [docs/reference/multi-provider.md](docs/reference/multi-provider.md) dosyasına bakın.
+
+### `.deck` Gizli Bilgi Interpolasyonu
+
+Gizli bilgileri commit etmeden config'de kullanın:
+
+```json
+{
+  "connectors": {
+    "discord": { "enabled": true, "token": "$DECK:DISCORD_TOKEN" },
+    "telegram": { "enabled": true, "token": "$DECK:TELEGRAM_TOKEN" }
+  }
+}
+```
+
+Sırlar runtime'da `.deck` dosyasından yüklenir. `.deck` dosyası varsayılan olarak gitignore'dur.
 
 Tam yapılandırma referansı için [docs/reference/config-reference.md](docs/reference/config-reference.md) dosyasına bakın.
 
@@ -398,48 +462,46 @@ Tam yapılandırma referansı için [docs/reference/config-reference.md](docs/re
 
 ## Docker Backend (İzole Worker'lar)
 
-Worker'lar izole Docker container'larında çalışır — worker'lar arası dosya çakışması olmaz. Sprint 119-129 ile **canlı doğrulandı** (CLI + MCP). Worker'lar container içinde tsc/vitest çalıştırabiliyor.
-
-### Kurulum
+Worker'lar izole Docker container'larında çalışır — worker'lar arası dosya çakışması olmaz.
 
 ```bash
-docker build -f Dockerfile.worker -t deckent-worker:latest .
+docker build -f Dockerfile -t deckent-worker:latest .
 npx deckent config set spawn_backend docker
 ```
 
-### Nasıl Çalışır
-
 - Proje read-only olarak mount edilir (`/workspace`)
 - `.tasks/` read-write olarak mount edilir (sonuçlar, heartbeat'ler)
-- `~/.claude/` mount üzerinden kimlik doğrulama (oturum tabanlı)
-- Root olmayan kullanıcı ile çalıştırma (host UID/GID)
+- Root olmayan kullanıcı ile çalıştırma (`deckent` kullanıcısı)
 - Ayarlanabilir timeout: `npx deckent config set docker_timeout 1800` (varsayılan: 1200s)
-- Config-aware backend routing: `spawn_backend` tüm spawn yollarında (CLI, MCP, sprint-controller) okunur
-- Dashboard'da worker başına backend badge gösterimi (Docker/tmux/subprocess)
-
-**Test:** 10 e2e integration test — spawn, heartbeat, cleanup, concurrency, log extraction.
 
 Tam rehber için [docs/guide/docker-backend.md](docs/guide/docker-backend.md) dosyasına bakın.
+
+---
+
+## Nervous System
+
+Nervous System, sprint'lerle birlikte çalışan proaktif bir meta-orkestratorüdür:
+
+<!-- ![deckent nervous TUI](docs/assets/nervous-tui.png) -->
+> Ekran görüntüsü Sprint 151'de gelecek — canlı TUI için `deckent nervous`
+
+- **Detector'lar** — Stale task'lar, boşta kalma durumu (task mode), routing anomalileri, agent sağlığı için tak-çalıştır detector'lar
+- **Bildirimler** — Event bus üzerinden bağlamsal uyarılar; Sprint 149+ ile Discord/Telegram connector'lar
+- **Task Mode Boşta Kalma** — Task modunda, 5 dakikadan uzun inaktvitede bildirim gönderir
+- **Proaktif** — Polling gerekmez; detector'lar cron event'leri ve sprint yaşam döngüsü event'lerinde çalışır
 
 ---
 
 ## Web Dashboard
 
 ```bash
-deckent web     # localhost:3100 adresinde açılır
+deckent web   # localhost:3100 adresinde açılır
 ```
 
-React + Vite + Tailwind -- 6 sayfa (Dashboard, Ayarlar, Geçmiş, Bellek, Config, Durum), SSE gerçek zamanlı güncellemeler, koyu/açık tema, TR/EN dil değiştirici.
+React + Vite + Tailwind — 6 sayfa (Dashboard, Ayarlar, Geçmiş, Bellek, Config, Durum), SSE gerçek zamanlı güncellemeler, koyu/açık tema, TR/EN dil değiştirici.
 
----
-
-## HTTP API
-
-```bash
-deckent serve   # Sadece API, localhost:3100
-```
-
-17 endpoint + SSE akışı. Tam referans için [docs/reference/api.md](docs/reference/api.md) dosyasına bakın.
+<!-- ![dashboard ekran görüntüsü](docs/assets/dashboard.png) -->
+> Tam ekran görüntüsü galerisi Sprint 151'de gelecek
 
 ---
 
@@ -449,28 +511,68 @@ deckent serve   # Sadece API, localhost:3100
 
 ```
 my-project/
-  DECKENT.md             # Tek doğru kaynak (agent yapılandırması)
-  DIRECTIVES.md          # Hedefleriniz -- her sprint öncesi düzenleyin
-  CLAUDE.md              # Claude Code adaptörü
-  AGENTS.md              # Genel agent adaptörü
+  DECKENT.md              # Tek doğru kaynak (agent yapılandırması)
+  DIRECTIVES.md           # Hedefleriniz — her sprint öncesi düzenleyin
+  CLAUDE.md               # Claude Code adaptörü
+  AGENTS.md               # Genel agent adaptörü
   .deckent/
-    config.json          # Çalışma zamanı yapılandırması
-    workspace/           # Kimlik, araçlar, başlangıç sırası
-    docs/                # Yerleşik rehberler (hızlı başlangıç, directive, yapılandırma)
-    agents/              # Agent havuzu (yerleşik + geçici agent'lar)
-    skills/              # Skill kayıt defteri (yerleşik + geçici skill'ler)
-    plugins/             # Kurulu plugin'ler
-    i18n/                # Dil dosyaları
+    config.json           # Çalışma zamanı yapılandırması (deckent_style, mode, provider'lar)
+    workspace/            # Kimlik, araçlar, başlangıç sırası
+    docs/                 # Yerleşik rehberler (hızlı başlangıç, directive, yapılandırma)
+    agents/               # Agent havuzu (yerleşik + geçici agent'lar, LRU eviction)
+    skills/               # Skill kayıt defteri (yerleşik + geçici skill'ler, AST doğrulandı)
+    plugins/              # Kurulu plugin'ler
+    i18n/                 # Dil dosyaları (en, tr)
   .brain/
-    MEMORY.md            # Öğrenilenler (otomatik güncellenir)
-    DEBT.md              # Teknik borç kaydı
-    PATTERNS.md          # Tespit edilen desenler
-    RETRO.md             # Son sprint retrospektifi
-    DECISIONS.md         # Mimari kararlar
-    sprints/             # Sprint bazlı loglar
-  .tasks/                # Task JSON dosyaları (Brain tarafından yönetilir)
-  .locks/                # Dosya kilitleri (worker'lar tarafından yönetilir)
+    memory.db             # SQLite DB — tek doğru kaynak (gitignored)
+    exports/
+      summary.md          # Otomatik oluşturulmuş bağlam özeti (git-tracked)
+      decisions.md        # ADR listesi (git-tracked)
+      memory.md           # Sprint öğrenimleri (git-tracked)
+      debt.md             # Teknik borç (git-tracked)
+    archive/              # Sprint bazlı loglar
+  .tasks/                 # Task JSON dosyaları (Brain tarafından yönetilir)
+  .locks/                 # Dosya kilitleri (worker'lar tarafından yönetilir)
+  .deck                   # Gizli bilgi dosyası (gitignored — $DECK:ANAHTAR referansları)
 ```
+
+---
+
+## Kilitlenme Kurtarma
+
+Deckent kendini nasıl kurtaracağını bilir — ve size de araçları verir.
+
+```bash
+# Herhangi bir geçmiş sprint için Brain Self-Audit Gate çalıştır
+deckent audit sprint-150
+
+# Çökmüş veya yarım kalmış sprint'i kurtar (etkileşimli, yıkıcı işlemler öncesi onay ister)
+deckent recover sprint-150 --dry-run   # neyin temizleneceğini önizle
+deckent recover sprint-150             # kurtarmayı çalıştır
+```
+
+```
+Gate: PASS
+tsc: pass, vitest: pass
+Written: .deckent/sprint-150-gate.json
+```
+
+Bir sprint çalışma ortasında çökerse (ağ kesintisi, OOM, koordinatör paniği), `deckent recover` tek bir komutla audit + orphan temizleme + stale lock temizleme + task arşivleme işlemlerini yapar.
+
+---
+
+## DeckentHub — Skill Kayıt Defteri
+
+DeckentHub, her skill'in şu özelliklere sahip olduğu seçici bir skill kayıt defteridir:
+- **AST-sandbox'lanmış** — Çalıştırılmadan önce doğrulandı, keyfi kod enjeksiyonu yok
+- **Ed25519 imzalı** — Yazar tarafından kriptografik olarak imzalandı
+- **CI doğrulandı** — GitHub Actions her PR'da sandbox + imzayı doğrular
+
+```bash
+deckent skill publish ./my-skill   # İmzala + DeckentHub'a gönder
+```
+
+Hub, Sprint 150'de 20 seed skill ile başlatılıyor: spotify-control, telegram-bot, discord-moderator, calendar-google ve 16'sı daha.
 
 ---
 
@@ -489,7 +591,7 @@ Geliştirme ortamı kurulumu, test rehberi, kod standartları ve PR süreci içi
 - [Mimari](docs/architecture/architecture.md)
 - [Sprint Yaşam Döngüsü](docs/architecture/sprint-lifecycle.md)
 - [MCP Rehberi](docs/reference/mcp-guide.md)
-- [Plugin Rehberi](docs/development/plugin-guide.md)
+- [Docker Backend Rehberi](docs/guide/docker-backend.md)
 - [Sorun Giderme](docs/development/troubleshooting.md)
 - [SSS](docs/guide/faq.md)
 
@@ -497,7 +599,7 @@ Geliştirme ortamı kurulumu, test rehberi, kod standartları ve PR süreci içi
 
 ## Lisans
 
-MIT -- [Alperen @ Verhex](https://deckent.agency)
+MIT — [Alperen @ Verhex](https://deckent.agency)
 
 **GitHub:** [github.com/VerhexIO/deckent](https://github.com/VerhexIO/deckent)
 **Web Sitesi:** [deckent.agency](https://deckent.agency)

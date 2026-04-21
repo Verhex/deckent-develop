@@ -1,0 +1,94 @@
+{
+  "id": "150-012",
+  "title": "Telegram Connector",
+  "description": "Telegram Connector\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert\n- Files: src/connectors/telegram.ts (NEW), tests/connectors/telegram.test.ts, package.json\n- Scope: src/connectors/, tests/connectors/, ./\n\n### Description\nTelegram bot connector (telegraf). Özellikle Türkiye'de popüler.\n\n`package.json` dep ekle: `\"telegraf\": \"^4.15.0\"`.\n\n`src/connectors/telegram.ts` (~200 LoC) — `Telegraf` class, `bot.on('text', ...)` handler, `bot.launch()`.\n\n```typescript\nimport { Telegraf } from 'telegraf';\nimport { BaseConnector } from './base-connector.js';\n\nexport class TelegramConnector extends BaseConnector {\n  readonly id = 'telegram' as const;\n  readonly name = 'Telegram';\n\n  private bot?: Telegraf;\n\n  async start(config: ConnectorConfig): Promise<void> {\n    if (!config.enabled) return;\n    this.bot = new Telegraf(config.token);\n\n    this.bot.on('text', (ctx) => {\n      this.emitMessage({\n        id: String(ctx.message.message_id),\n        connector: 'telegram',\n        fromUser: String(ctx.from.id),\n        channelId: String(ctx.chat.id),\n        text: ctx.message.text,\n        timestamp: new Date(ctx.message.date * 1000).toISOString(),\n        raw: ctx.message,\n      });\n    });\n\n    await this.bot.launch();\n  }\n\n  async stop(): Promise<void> {\n    this.bot?.stop();\n  }\n\n  async sendMessage(msg: OutgoingMessage): Promise<void> {\n    await this.bot?.telegram.sendMessage(msg.channelId, msg.text);\n  }\n\n  isHealthy(): boolean {\n    return this.bot !== undefined;\n  }\n}\n```\n\n### Test (5 test)\n1. Start with token\n2. Start disabled → no-op\n3. Incoming text handler\n4. Send message\n5. Stop\n\n**Kanıt:** `npx vitest run tests/connectors/telegram.test.ts` 5/5 PASS.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/connectors/",
+      "tests/connectors/",
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/connectors/telegram.ts (NEW)",
+      "tests/connectors/telegram.test.ts",
+      "package.json",
+      "src/connectors/telegram.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/connectors/telegram.test.ts` 5/5 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "config",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "connectors",
+          "weight": 0.71
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 4,
+        "moduleCount": 2,
+        "crossCutting": true,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.25,
+          "./": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.25
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:41:50.030Z"
+}

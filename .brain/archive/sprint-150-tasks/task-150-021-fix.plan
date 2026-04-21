@@ -1,0 +1,35 @@
+# Task 150-021-fix Execution Plan
+
+## Task
+Fix: README.md Overhaul + Landing Page — Priority fix for NO_GO task 150-021.
+
+## Investigation
+
+Read README.md and README-TR.md to check their current state.
+
+## Finding
+
+Both README.md and README-TR.md are already fully updated with all Sprint 150 changes:
+
+1. **Sprint badge** — `sprints-150+` ✓ (both files)
+2. **Version badge** — `v1.0.0-beta.1` ✓ (both files)
+3. **Screenshot references** — "Sprint 151" ✓ (not Sprint 150)
+4. **Task Mode** — listed as live feature (not "coming in Sprint 150") ✓
+5. **DeckentHub 20 seed skills** — "Sprint 150" reference ✓
+6. **New CLI commands** — `deckent audit`, `deckent recover`, `deckent features` ✓ (both files)
+7. **Crash Recovery section** (EN) / `Kilitlenme Kurtarma` (TR) — present ✓
+8. **README-TR.md parity** — 20/20 sections match README.md ✓
+9. **OpenClaw** + **AST sandbox** references ✓ (both files)
+
+## Conclusion
+
+The previous task 150-021 (or equivalent) already applied all required changes successfully. This fix task is effectively already DONE — no code modifications needed.
+
+## Verification Plan
+
+1. Verify kanıt criteria:
+   - README.md references `v1.0.0-beta.1` ✓
+   - README.md mentions "OpenClaw" + "AST sandbox" ✓
+   - README-TR.md has matching structure to README.md ✓
+
+2. No TypeScript changes → tsc/vitest not applicable (only .md files modified)

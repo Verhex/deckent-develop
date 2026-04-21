@@ -1,0 +1,21 @@
+{
+  "taskId": "149-007",
+  "filesChanged": [
+    "src/orchestra/spawn-backend-docker.ts",
+    "tests/backends/docker-exit-final.test.ts",
+    "tests/backends/docker-exit-reproducer.test.ts"
+  ],
+  "linesAdded": 310,
+  "linesRemoved": 12,
+  "testsPassed": true,
+  "coverage": 0,
+  "selfAssessment": "DONE",
+  "notes": "Docker Worker Exit Pattern Final Fix completed. 4 improvements: (1) kill() fallback changed from SIGKILL to --signal=SIGTERM so EXIT trap can run. (2) Host-side monitorContainer adds signal_info to notes for exit > 128. (3) tokenUsage added to all fallback .result JSONs (host-side + container-side). (4) Partial write detection: corrupt .result JSON detected and overwritten with clean NO_GO. (5) Result polling after kill() with 5s max wait. All 14 backend tests pass (6 new + 8 existing). Also updated docker-exit-reproducer.test.ts assertion to match new notes format.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8000,
+    "cacheReadTokens": 120000,
+    "provider": "claude",
+    "model": "opus"
+  }
+}

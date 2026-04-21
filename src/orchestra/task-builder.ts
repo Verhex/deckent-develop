@@ -392,6 +392,19 @@ export function enrichScopeWithTestFiles(scope: TaskScope, filesWriteSource: str
 }
 
 /**
+ * Mask fenced code blocks (```...```) in markdown content to prevent
+ * code examples from being parsed as real file paths.
+ * Replaces code block content with empty lines to preserve line structure.
+ */
+export function maskCodeBlocks(content: string): string {
+  return content.replace(/```[\s\S]*?```/g, (match) => {
+    // Replace content with same number of newlines to preserve line count
+    const newlineCount = (match.match(/\n/g) ?? []).length;
+    return '\n'.repeat(newlineCount);
+  });
+}
+
+/**
  * Parse a DIRECTIVES.md document into structured task definitions.
  * Splits on "## Task N:" or "## Gorev N:" headings and extracts title, scope,
  * test targets, and optional Model/Effort overrides from each section.
@@ -400,9 +413,14 @@ export function enrichScopeWithTestFiles(scope: TaskScope, filesWriteSource: str
  * @returns Array of parsed directive tasks; empty if no structured sections found
  */
 export function parseStructuredDirectives(content: string): ParsedDirectiveTask[] {
+  // Mask code blocks to prevent code examples from polluting scope extraction
+  const maskedContent = maskCodeBlocks(content);
+
   // Split on "## Görev N:" / "## Gorev N:" / "## Task N:" pattern
   const blockSplit = content.split(/^##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:/m);
+  const maskedBlockSplit = maskedContent.split(/^##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:/m);
   const blocks = blockSplit.slice(1); // skip content before first heading
+  const maskedBlocks = maskedBlockSplit.slice(1);
 
   if (blocks.length === 0) {
     // Fallback: try bullet list or numbered list format
@@ -410,26 +428,30 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
   }
 
   const tasks: ParsedDirectiveTask[] = [];
-  for (const block of blocks) {
+  for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+    const block = blocks[blockIdx]!;
+    const maskedBlock = maskedBlocks[blockIdx] ?? block;
     const lines = block.trim().split('\n');
+    const maskedLines = maskedBlock.trim().split('\n');
     // First non-empty line after heading becomes the title (strip leading "- " prefix)
     const titleLine = lines.find(l => l.trim()) ?? '';
     const title = titleLine.trim().replace(/^-\s+/, '');
     if (!title) continue;
 
     // Collect all scope-related lines (Dosya:, Kapsam:, Files:, Scope:, file paths)
-    // Exclude the title line to prevent code snippets in titles (e.g. "results.find()")
-    // from creating false positive scope matches
-    const scopeLines = lines.filter(l => {
+    // Use maskedLines for filtering to avoid code block false positives
+    // but use original lines for actual scope extraction (labels are outside code blocks)
+    const scopeLines: string[] = [];
+    for (let li = 0; li < lines.length; li++) {
+      const l = lines[li]!;
+      const ml = maskedLines[li] ?? l;
       // Skip the title line — it may contain code snippets that look like paths
-      if (l === titleLine) return false;
-      // Explicit label lines (highest priority)
-      if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(l)) return true;
-      // Directory-like paths that extractScopeFromDirective can parse
-      if (/\bsrc\/|tests\/|docs\/|scripts\//.test(l)) return true;
-      if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(l)) return true;
-      return false;
-    });
+      if (l === titleLine) continue;
+      // Use masked line for path detection to skip code block content
+      if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(ml)) { scopeLines.push(l); continue; }
+      if (/\bsrc\/|tests\/|docs\/|scripts\//.test(ml)) { scopeLines.push(l); continue; }
+      if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(ml)) { scopeLines.push(l); continue; }
+    }
     const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
       const extracted = extractScopeFromDirective(scopeLine);
       return {
@@ -511,7 +533,9 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
  */
 export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask[] {
   const tasks: ParsedDirectiveTask[] = [];
+  const maskedContent = maskCodeBlocks(content);
   const lines = content.split('\n');
+  const maskedLines = maskedContent.split('\n');
 
   // Match "- Task: <title>", "* Task: <title>", "1. <title>", or "1) <title>"
   const taskLineRegex = /^(?:[-*]\s+Task:\s*|[-*]\s+\d+[.)]\s*|\d+[.)]\s+)(.+)/;
@@ -538,14 +562,19 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         }
 
         const allLines = [line, ...subLines];
+        // Collect masked versions of sub-lines for code block filtering
+        const allMaskedLines = [maskedLines[i]!, ...subLines.map((_sl, si) => maskedLines[i + 1 + si] ?? _sl)];
 
         // Extract scope from all lines (match all patterns extractScopeFromDirective supports)
-        const scopeLines = allLines.filter(l => {
-          if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(l)) return true;
-          if (/\bsrc\/|tests\/|docs\/|scripts\//.test(l)) return true;
-          if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(l)) return true;
-          return false;
-        });
+        // Use masked lines for detection to skip code block content
+        const scopeLines: string[] = [];
+        for (let ali = 0; ali < allLines.length; ali++) {
+          const al = allLines[ali]!;
+          const aml = allMaskedLines[ali] ?? al;
+          if (/(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(aml)) { scopeLines.push(al); continue; }
+          if (/\bsrc\/|tests\/|docs\/|scripts\//.test(aml)) { scopeLines.push(al); continue; }
+          if (/\.brain\/|\.deckent\/|\.contracts\/|\.claude\//.test(aml)) { scopeLines.push(al); continue; }
+        }
         const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
           const extracted = extractScopeFromDirective(scopeLine);
           return {

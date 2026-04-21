@@ -1,0 +1,32 @@
+# Task 150-017: VerhexIO/deckent-hub Repo Create + Templates
+
+## Execution Plan
+
+### Hedef
+Local `deckent-hub/` dizini oluştur — Alperen Sprint 151'de GitHub'a push eder.
+
+### Adımlar
+1. `deckent-hub/` dizin yapısını oluştur
+   - deckent-hub/README.md
+   - deckent-hub/SKILL_TEMPLATE.md
+   - deckent-hub/CONTRIBUTING.md
+   - deckent-hub/.github/workflows/validate-skill.yml
+   - deckent-hub/skills/ (boş dizin, placeholder .gitkeep)
+
+2. Her dosyayı yaz:
+   - README.md: "Deckent Skill Registry — OpenClaw ClawHub alternative with Ed25519 + AST sandbox"
+   - SKILL_TEMPLATE.md: Yeni skill için tam şablon (manifest.json + SKILL.md yapısı)
+   - CONTRIBUTING.md: PR süreci (sandbox validate + sign + submit)
+   - validate-skill.yml: CI workflow (AST sandbox scan + Ed25519 signature verify)
+
+3. Verify:
+   - `test -d deckent-hub` exists
+   - README.md contains "Ed25519" + "AST sandbox"
+   - validate-skill.yml is valid YAML (python -c veya node ile parse)
+
+### Bağımlılıklar
+- T-150-016 (Ed25519 signature.ts) tamamlanmış olmalı — bu task referans eder
+- npm scripts/hub-validate.mjs (T-150-020'de yazılacak) — burada sadece skeleton
+
+### Dosya sayısı: 5 yeni dosya
+### Scope: deckent-hub/ (yeni local dizin)

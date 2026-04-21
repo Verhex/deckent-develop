@@ -1,90 +1,159 @@
-<!-- Dil: TR | Teknik terimler EN -->
-@DECKENT.md
+# Deckent Built-in Agents
 
-# Project: deckent
+> **Sprint 148 Reform:** ADR-041 agent taxonomy reformu ile toplam **15 built-in agent** kaldı. Eski testleme rolü agent-based değil, task bazlı yönetiliyor.
 
-## Rules
-@DIRECTIVES.md
-@.brain/exports/summary.md
+## Agent Listesi
 
-## Architecture
-- **orchestra/** — Sprint lifecycle, planning, evaluation, routing (63 modules)
-  - brain.ts: orchestrator (re-export layer, imports from sprint-controller)
-  - sprint-controller.ts: full sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP)
-  - planner.ts: AI task planning (imports only from core/)
-  - task-builder.ts: task creation, directive parsing, worker prompt building, Agent:/Skills: override parsing
-  - result-evaluator.ts: GO/NO-GO/TECH_DEBT evaluation
-  - task-router.ts: provider + agent + skill routing per task
-  - debt-manager.ts: DEBT.md I/O, decay, pattern management
-  - sprint-reporter.ts: retro, learnings, agent/skill performance
-  - tmux.ts: tmux session management, worker spawn/kill
-  - spawn-backend.ts: subprocess worker backend (non-tmux)
-  - outcome-tracker.ts: routing outcome recording, learning bonuses, synergy matrix
-  - quality-assessor.ts: multi-dimensional quality scoring (correctness, coverage, scope, completeness)
-  - mid-sprint-adapter.ts: real-time rerouting on task failure (FIX phase)
-  - rule-evolver.ts: auto-generate activation rules from outcome data
-  - temp-skill-generator.ts: template-based project-conventions skill generation
-  - promotion-pipeline.ts: temp→permanent agent/skill promotion, demotion
-  - sprint-utils.ts: shared utilities for sprint phases, task analysis, timing helpers
-  - result-collector.ts: waitForResults, processQueue, collectResults, result aggregation + IPC
-- **core/** — Types, config, utilities, agent/skill pools (58 modules)
-  - types.ts + *-types.ts: all type definitions (task, config, sprint, monitoring, routing)
-  - config.ts: 3-layer config merge (defaults → global → project)
-  - agent-pool.ts: AgentPoolManager, 16 built-in agents, LRU eviction
-  - skill-pool.ts + skill-registry.ts: 21 built-in skills, sandbox AST validation
-  - provider.ts: ProviderAdapter interface, multi-provider registry
-  - routing-types.ts: TaskDNA, ActivationConfig, RoutingDecision, SkillBudget types
-  - intent-classifier.ts: Layer 1 — task intent classification from scope/description
-  - activation-engine.ts: Layer 2 — structured activation rules with exclude support
-  - routing-engine.ts: Layer 3 — unified routing (routeTaskV2), confidence scoring, override resolution
-  - condition-evaluator.ts: path-based condition engine ($gt, $contains, $and, $or)
-  - manifest-migrator.ts: V1→V2 manifest migration for agents/skills
-  - model-registry.ts: ModelRegistry class, 13 models, 3 providers, tier-based routing
-  - mode-presets.ts: ModelStrategy, MODE_PRESETS (performance/balanced/economic/api)
-- **agents/** — Worker execution, prompt engineering (16 modules)
-  - worker.ts: task claim, file locking, heartbeat, result write
-  - adaptive-agent.ts: runtime agent adaptation
-- **providers/** — Claude, Codex, Gemini adapters (5 modules)
-- **api/** — HTTP API server, SSE, rate limiting (3 modules)
-- **mcp/** — MCP server: 21 tools + 8 resources, stdio transport
-- **cli/** — 35+ commands, helpers, entry point
-- **dashboard/** — React + Vite + Tailwind web dashboard
+| Agent | Tercih Edilen Model | Birincil Intent | Aktivasyon Anahtar Kelimeleri |
+|-------|--------------------|-----------------|-----------------------------|
+| `architect` | opus | design | architecture, design, module, dependency, adr, scalability |
+| `security-auditor` | opus | security | security, auth, jwt, xss, injection, vulnerability, token |
+| `doc-writer` | haiku | documentation | docs, readme, comment, jsdoc, changelog, guide |
+| `bug-fixer` | sonnet | bugfix | fix, bug, error, crash, regression, hotfix |
+| `code-reviewer` | opus | refactor | review, refactor, quality, lint, cleanup, pr-review |
+| `refactorer` | sonnet | refactor | refactor, cleanup, migrate, modernize, extract |
+| `api-builder` | sonnet | feature | api, endpoint, route, schema, rest, openapi |
+| `performance-analyzer` | sonnet | performance | perf, slow, optimize, memory, profiling, benchmark |
+| `ci-guardian` | sonnet | testing | ci, pipeline, test, regress, build, actions |
+| `architecture-planner` | opus | design | plan, roadmap, adr, milestone, proposal |
+| `accessibility-auditor` | sonnet | security | accessibility, a11y, wcag, aria, keyboard |
+| `data-engineer` | sonnet | feature | data, pipeline, etl, migration, schema, query |
+| `devops-engineer` | sonnet | devops | devops, deploy, docker, compose, github-actions |
+| `frontend-designer` | sonnet | feature | frontend, ui, component, css, responsive, design |
+| `migration-specialist` | sonnet | migration | migration, upgrade, deprecation, breaking-change, framework |
 
-## Commands
-Build: tsc
-Test: npx vitest run
-Test Dashboard: npx vitest run --config src/dashboard/vitest.config.ts
-Test Coverage: npx vitest run --coverage
-Lint: tsc --noEmit
-Dev: tsc --watch
+---
 
-## Agent Instructions
-When acting as Brain: @.claude/rules/brain.md
-When acting as Auditor: @.claude/rules/auditor.md
-When acting as Worker: @.claude/rules/worker-default.md
+## Agent Açıklamaları
 
-## Contracts
-@.contracts/api-surface.md
+### `architect`
+Sistem tasarımı, modül sınırı analizi ve bağımlılık değerlendirmesi. ADR (Architecture Decision Record) yazar, trade-off analizi yapar. Kodu doğrudan değiştirmez — tavsiye ve analiz odaklıdır.
 
-## Identity
-@.deckent/workspace/IDENTITY.md
+**Tetikleyici:** Büyük/epic kapsamlı değişiklikler, yeni modül tasarımı, mimari kararlar.
 
-## Sprint Metrics
-| Metrik | Değer |
-|--------|-------|
-| Sprint | sprint-102 |
-| Toplam Task | 6 |
-| Tamamlanan | 0 |
-| Tech Debt | 0 |
-| No-Go | 6 |
-| Süre | 12dk 9sn |
-| Coverage | 0.0% |
+---
 
-## Active Debt
-_Açık teknik borç yok._
+### `security-auditor`
+OWASP Top 10 güvenlik açıklarını tarar, threat modeling (STRIDE) uygular, auth/şifreleme/giriş doğrulama kusurlarını tespit eder. Defense-in-depth stratejileri önerir.
 
-## Agent Performance
-| Agent | Tasks | Done | Başarı |
-|-------|-------|------|--------|
-| bug-fixer | 5 | 0 | 0% |
-| test-writer | 1 | 0 | 0% |
+**Tetikleyici:** `security`, `auth`, `jwt`, `xss`, `injection`, `vulnerability` anahtar kelimeleri; `src/auth/`, `src/api/`, `src/middleware/` kapsamları.
+
+---
+
+### `doc-writer`
+README, JSDoc, API dokümantasyonu, changelog ve kılavuz oluşturur. Diataxis framework ile içeriği kategorize eder (tutorial/how-to/reference/explanation). TR/EN i18n desteği.
+
+**Tetikleyici:** `docs`, `readme`, `comment`, `changelog` anahtar kelimeleri; `docs/`, `*.md` dosyaları.
+
+---
+
+### `bug-fixer`
+Hata ayıklama, regression fix ve hotfix uzmanı. Root cause analizi yapar, minimal değişiklikle problemi çözer. Yanlışlıkla scope genişletmez.
+
+**Tetikleyici:** `fix`, `bug`, `error`, `crash`, `regression`, `hotfix` anahtar kelimeleri.
+
+---
+
+### `code-reviewer`
+Sistematik kod incelemesi: doğruluk hataları, güvenlik açıkları, okunabilirlik sorunları, test kapsamı. Actionable geri bildirim sağlar (must-fix vs nice-to-have). Kod yazmaz, sadece inceler.
+
+**Tetikleyici:** `review`, `quality`, `refactor`, `cleanup`, `pr-review` anahtar kelimeleri; `src/` kapsamı.
+
+---
+
+### `refactorer`
+Mevcut kodu yeniden yapılandırır: karmaşıklığı azaltır, okunabilirliği artırır, tekrar kullanılabilirliği geliştirir. İşlevselliği koruyarak modernize eder.
+
+**Tetikleyici:** `refactor`, `cleanup`, `migrate`, `modernize`, `extract` anahtar kelimeleri.
+
+---
+
+### `api-builder`
+REST API tasarımı ve implementasyonu. OpenAPI spec, endpoint versiyonlama, request/response şema validasyonu. Express/Fastify entegrasyonu.
+
+**Tetikleyici:** `api`, `endpoint`, `route`, `schema`, `rest`, `openapi` anahtar kelimeleri.
+
+---
+
+### `performance-analyzer`
+Profiling, bellek optimizasyonu, N+1 sorgu tespiti, async optimizasyon. Benchmark karşılaştırmaları yapar ve ölçülebilir iyileştirme önerileri sunar.
+
+**Tetikleyici:** `perf`, `slow`, `optimize`, `memory`, `profiling`, `benchmark` anahtar kelimeleri.
+
+---
+
+### `ci-guardian`
+CI/CD sağlığı: test regresyon tespiti, pipeline hata ayıklama, build stabilitesi. GitHub Actions workflow optimizasyonu. Test coverage koruma.
+
+**Tetikleyici:** `ci`, `pipeline`, `test`, `build`, `actions`, `workflow` anahtar kelimeleri.
+
+---
+
+### `architecture-planner`
+Mimari planlama ve yol haritası oluşturma. ADR taslağı, teknik karar belgesi, sprint önceliklendirme. Uzun vadeli sistem evrimi için strateji geliştirir.
+
+**Tetikleyici:** `plan`, `roadmap`, `adr`, `proposal`, `milestone` anahtar kelimeleri.
+
+---
+
+### `accessibility-auditor`
+WCAG 2.1 AA/AAA uyumluluğu, ARIA rolleri, klavye navigasyonu, renk kontrastı, ekran okuyucu uyumluluğu. Erişilebilirlik testleri ve raporlama.
+
+**Tetikleyici:** `accessibility`, `a11y`, `wcag`, `aria`, `keyboard` anahtar kelimeleri.
+
+---
+
+### `data-engineer`
+Veri pipeline tasarımı, ETL süreçleri, veritabanı şema tasarımı, sorgu optimizasyonu. SQLite, PostgreSQL, ORM entegrasyonu. FTS5 ve arama altyapısı.
+
+**Tetikleyici:** `data`, `pipeline`, `etl`, `schema`, `query`, `migration` anahtar kelimeleri.
+
+---
+
+### `devops-engineer`
+CI/CD pipeline tasarımı, Docker/containerization, deployment otomasyonu, altyapı güvenliği. GitHub Actions workflow, multi-stage build, non-root container.
+
+**Tetikleyici:** `devops`, `deploy`, `docker`, `compose`, `github-actions`, `infra` anahtar kelimeleri.
+
+---
+
+### `frontend-designer`
+React component mimarisi, Tailwind CSS, responsive tasarım, Vite optimizasyonu. Erişilebilir ve kullanıcı odaklı UI tasarımı. TypeScript + React hooks.
+
+**Tetikleyici:** `frontend`, `ui`, `component`, `css`, `responsive`, `design` anahtar kelimeleri; `src/dashboard/` kapsamı.
+
+---
+
+### `migration-specialist`
+Framework/kütüphane geçişleri, API kırılma değişikliği yönetimi, versiyon yükseltme stratejisi. Geriye dönük uyumluluk planlaması ve deprecation yönetimi.
+
+**Tetikleyici:** `migration`, `upgrade`, `deprecation`, `breaking-change`, `framework` anahtar kelimeleri.
+
+---
+
+## Routing Mekanizması
+
+Agent seçimi `src/core/routing-engine.ts` tarafından yapılır:
+
+1. **Layer 1 — Intent Classifier** (`intent-classifier.ts`): Task açıklamasından birincil niyet çıkarılır (`design`, `bugfix`, `security`, `refactor`, `feature`, `testing`, `performance`, `documentation`, `migration`, `devops`).
+2. **Layer 2 — Activation Engine** (`activation-engine.ts`): Her agent'ın activation rules'u değerlendirilir, skor hesaplanır.
+3. **Layer 3 — Routing Engine** (`routing-engine.ts`): En yüksek skorlu agent seçilir; `forceAgent` override, `excludeAgent` dışlama desteklenir.
+
+### Override Kullanımı (DIRECTIVES'te)
+
+```markdown
+## Task 1: Title
+- Agent: architect          # forceAgent override
+- Skills: system-architect  # forceSkills override
+```
+
+## Temp Agents
+
+`.deckent/agents/` altında proje başına geçici agent'lar oluşturulabilir:
+- LRU eviction: max 50 temp agent, 5 sprint yaşlandırma
+- `deckent agent list` ile listelenir
+- Başarılı sprint sonrası promotion pipeline'ı ile kalıcılaştırılabilir
+
+---
+
+*Son Güncelleme: Sprint 149 | Reform: ADR-041 Agent Taxonomy*

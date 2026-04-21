@@ -1,0 +1,26 @@
+{
+  "taskId": "150-038",
+  "filesChanged": [
+    "tests/mcp/tools/status.test.ts"
+  ],
+  "linesAdded": 130,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "T-150-038 tamamlandı. Kod analizi sonucunda T-150-030'un bu task için gereken tüm altyapıyı zaten uyguladığı tespit edildi:\n\n1. src/core/observability.ts — perSprintFile desteği MEVCUT (initObservability opts.perSprintFile, setObservabilitySprintId, getPerSprintMetricsPath, appendEntry dual-write)\n2. src/mcp/tools/status.ts — readMetricSnapshot() MEVCUT (satır 77-121): per-sprint file first, flat fallback with sprintId filter, metricSnapshot rawData'ya ekleniyor (satır 403-405)\n3. src/orchestra/sprint-controller.ts — setObservabilitySprintId(sprint.id, { perSprintFile: true }) wire MEVCUT (satır 313)\n\nEksik olan test kapsamı eklendi: 5 yeni test senaryosu + önceki 12 test = toplam 17 test (hepsi PASS):\n- Per-sprint file öncelikli okuma testi\n- Flat file fallback + sprintId tag filtresi testi\n- Dosya yoksa boş snapshot testi\n- Standard (non-json) response'ta metricSnapshot testi\n- T-150-030 + T-150-038 chain integration testi\n\nKanıt: grep 'sprint-NNN-metrics.jsonl' src/mcp/tools/status.ts → satır 73 yorum + satır 82 canlı path build. tsc --noEmit: 0 hata. npx vitest run tests/mcp/tools/status.test.ts: 17/17 PASS.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 3200,
+    "cacheReadTokens": 85000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 100,
+    "test_coverage": 95,
+    "scope_compliance": 100,
+    "documentation": 90
+  },
+  "evaluationDecision": "DONE"
+}

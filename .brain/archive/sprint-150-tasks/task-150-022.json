@@ -1,0 +1,83 @@
+{
+  "id": "150-022",
+  "title": "AGENTS.md Refresh (39 Sprint Behind)",
+  "description": "AGENTS.md Refresh (39 Sprint Behind)\n\n- Model: sonnet\n- Effort: low\n- Skills: documentation-writer\n- Files: AGENTS.md\n- Scope: ./\n\n### Description\nGod-analysis P1 #12: AGENTS.md Sprint 102'den beri güncellenmemiş (39 sprint geride). Sprint 148 agent taksonomi reform sonrası 15 built-in agent listesi yaz:\n- architect, security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist (15 total, test-writer KALDIRILDI)\n\nHer agent için 1-2 satır açıklama + primary intent mapping.\n\n### Test (2 test)\n1. AGENTS.md 15 agent listed (not 16)\n2. \"test-writer\" kelimesi yok\n\n**Kanıt:** `grep -c \"test-writer\" AGENTS.md` → 0.\n\n---",
+  "model": "sonnet",
+  "effort": "low",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "./"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "AGENTS.md"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `grep -c \"test-writer\" AGENTS.md` → 0.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "NO_GO",
+  "sprintId": "sprint-150",
+  "forceModel": "sonnet",
+  "forceEffort": "low",
+  "forceSkills": [
+    "documentation-writer"
+  ],
+  "assignedAgent": "doc-writer",
+  "assignedSkills": [
+    "documentation-writer"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "documentation",
+        "secondary": [
+          "security"
+        ],
+        "confidence": 0.63
+      },
+      "tags": [],
+      "domains": [],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.29
+        },
+        {
+          "type": "test",
+          "weight": 0.29
+        },
+        {
+          "type": "document",
+          "weight": 0.29
+        },
+        {
+          "type": "modify",
+          "weight": 0.14
+        }
+      ],
+      "complexity": {
+        "fileCount": 1,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "trivial"
+      },
+      "scope": {
+        "writeRatio": {
+          "./": 1
+        },
+        "primaryWriteTarget": "./",
+        "testWriteRatio": 0
+      }
+    },
+    "confidence": "high",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:42:24.220Z"
+}

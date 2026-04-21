@@ -1,0 +1,40 @@
+# Task 149-015: Incoming Webhook Router + Nervous Bridge
+
+## Execution Plan
+
+### 1. Create `src/connectors/incoming-router.ts` (~120 LoC)
+- `IncomingMessageRouter` class with `route(msg)` method
+- Uses `eventBus.publish()` (NOT `emit('deckent-event')`) to bridge to nervous system
+- Creates proper `DeckentEvent` with protocol_version '1.0', sequence, channel
+- Uses CHANNELS.NOTIFY for incoming message events
+- Webhook key validation via `loadDeckSecrets()` from deck-file.ts
+- Connector-specific payload parsers for Discord and Telegram webhook formats
+
+### 2. Patch `src/api/server.ts`
+- Add POST `/api/webhooks/:connector/:key` route in the POST section
+- Validate connector ID against ConnectorId type
+- Validate webhook key against .deck secrets (`DECKENT_WEBHOOK_KEY_<CONNECTOR>`)
+- Parse body per connector format (Discord/Telegram)
+- Route through IncomingMessageRouter
+- Rate-limited (existing RateLimiter applies to /api/ prefix)
+- Returns 200 on success, 401 on invalid key, 400 on bad payload
+
+### 3. Create `tests/connectors/incoming-router.test.ts` (7 tests)
+1. IncomingMessage → event emitted on event bus
+2. Event payload includes connectorId, fromUser, text
+3. Multiple messages → multiple events
+4. Webhook endpoint rate-limited (mock server test)
+5. Invalid webhook key → 401
+6. Discord-specific webhook parse
+7. Telegram-specific webhook parse
+
+### Key Design Decisions
+- EventBus.publish() is the correct API (not EventEmitter.emit with custom event name)
+- DeckentEvent format requires: timestamp, sequence, protocol_version, source, target, channel, payload
+- Webhook key stored in .deck as `DECKENT_WEBHOOK_KEY` (generic) — connector-specific not needed for MVP
+- Rate limiting already applies via server.ts RateLimiter for /api/ routes
+
+### Files Modified
+- NEW: src/connectors/incoming-router.ts
+- PATCH: src/api/server.ts (add webhook POST route)
+- NEW: tests/connectors/incoming-router.test.ts

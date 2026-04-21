@@ -1,0 +1,25 @@
+{
+  "id": "twitter-post",
+  "source": "hub",
+  "name": "Twitter/X Post",
+  "version": "1.0.0",
+  "description": "Twitter/X API v2 integration — post tweets, read timelines, manage threads",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "twitter" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "social-media" } }, "score": 6 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["twitter", "tweet", "post", "timeline", "x-api", "hashtag"],
+  "stackDetection": { "files": [], "dependencies": ["twitter-api-v2"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

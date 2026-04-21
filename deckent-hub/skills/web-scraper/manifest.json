@@ -1,0 +1,22 @@
+{
+  "id": "web-scraper",
+  "source": "hub",
+  "name": "Web Scraper",
+  "version": "1.0.0",
+  "description": "Playwright-based web scraping with structured data extraction",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "scraping" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "automation",
+  "triggers": ["scrape", "crawl", "extract", "browser", "playwright", "headless"],
+  "stackDetection": { "files": [], "dependencies": ["playwright"], "commands": [] },
+  "composableWith": ["typescript-expert"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

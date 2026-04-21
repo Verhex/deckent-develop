@@ -10,6 +10,43 @@ export interface SanitizeResult {
   rejected: string[];
 }
 
+// ─── Code Snippet False Positive Filters (Sprint 149) ──────────────
+
+/** Placeholder filenames commonly used in code examples */
+const PLACEHOLDER_NAMES = new Set(['foo', 'bar', 'baz', 'qux', 'example', 'test']);
+
+/** Known real dotfiles that should NOT be filtered as JS access patterns */
+const KNOWN_DOTFILES = new Set([
+  '.gitignore', '.npmignore', '.editorconfig', '.npmrc', '.env',
+  '.eslintrc', '.prettierrc', '.dockerignore', '.nvmrc', '.node-version',
+  '.browserslistrc', '.babelrc', '.stylelintrc', '.huskyrc',
+]);
+
+/**
+ * Check if a path uses a placeholder filename (foo.ts, bar.js, example.test.ts).
+ * Only rejects exact base-name matches — composite names like foo-bar.ts are preserved.
+ */
+export function isPlaceholderPath(path: string): boolean {
+  const basename = path.split('/').pop() ?? '';
+  // Strip all extensions: "foo.test.ts" → "foo"
+  const base = basename.split('.')[0] ?? '';
+  return PLACEHOLDER_NAMES.has(base.toLowerCase());
+}
+
+/**
+ * Check if a string looks like a JS property access (.directories, .some, .length)
+ * rather than a real file path. Only matches dot-prefixed single words with no
+ * file extension, hyphens, or directory separators. Known dotfiles are excluded.
+ */
+export function isJsAccessPattern(path: string): boolean {
+  // Must start with dot, be a single word, no slashes (not a directory path)
+  if (path.includes('/') || path.includes('\\')) return false;
+  // Known dotfiles are real files
+  if (KNOWN_DOTFILES.has(path.toLowerCase())) return false;
+  // Match: .someWord (camelCase or lowercase, letters only, no hyphens/digits)
+  return /^\.[a-z][a-zA-Z]*$/.test(path);
+}
+
 /** Global protected filenames that workers should never write to */
 const GLOBAL_PROTECTED = new Set([
   'config.json',
@@ -61,6 +98,16 @@ export function sanitizeScope(filesWrite: string[]): SanitizeResult {
 
     // Rule 4: Extension-only (e.g. ".ts", ".md") → remove
     if (/^\.[a-zA-Z0-9]+$/.test(path)) {
+      continue;
+    }
+
+    // Rule 9: JS property access pattern (.directories, .some, .length) → remove
+    if (isJsAccessPattern(path)) {
+      continue;
+    }
+
+    // Rule 10: Placeholder filenames (foo.ts, bar.js, example.test.ts) → remove
+    if (isPlaceholderPath(path)) {
       continue;
     }
 

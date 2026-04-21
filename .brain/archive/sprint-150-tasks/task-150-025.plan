@@ -1,0 +1,21 @@
+# Task 150-025 Execution Plan: ADR-041 ACCEPT + ADR-042 Draft
+
+## Durum Tespiti
+- ADR-041: decisions.md'de zaten `accepted` olarak işaretlenmiş ama Sprint 149 reference var
+  - Sprint 150'de confirm + dogfood kanıtları eklenmeli
+  - Mevcut Implementation Status bölümü güncellenmeli
+- ADR-042: `proposed` statüsünde, Sprint 149 ref, Sprint 150 T-001..T-004 implementation eklenmeli
+
+## Yapılacaklar
+1. decisions.md okuma tamamlandı
+2. ADR-041 bölümünü güncelle:
+   - Sprint 150 dogfood kanıtları eklenmeli (Sprint 150'de test-writer=0)
+   - Implementation Status Sprint 150 eklenmeli
+3. ADR-042 bölümünü güncelle:
+   - Sprint 150 T-150-001..T-150-004 implementation ekle
+4. decisions.md'deki summary table'ı güncelle (adr-042 status zaten proposed)
+
+## Kapsam Kısıtı
+- Sadece .brain/ scope'undayım
+- Yalnızca decisions.md ve memory.db yazabiliyorum
+- MemoryStore CLI'ye erişimim yok, doğrudan decisions.md güncelleyeceğim

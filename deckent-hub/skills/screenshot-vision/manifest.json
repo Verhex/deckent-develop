@@ -1,0 +1,26 @@
+{
+  "id": "screenshot-vision",
+  "source": "hub",
+  "name": "Screenshot Vision",
+  "version": "1.0.0",
+  "description": "Playwright screenshot capture + Claude Vision analysis for visual regression and OCR",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "vision" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "screenshot" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "visual-testing" } }, "score": 7 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "tooling",
+  "triggers": ["screenshot", "vision", "capture", "analyze", "visual", "ocr"],
+  "stackDetection": { "files": [], "dependencies": ["playwright"], "commands": [] },
+  "composableWith": ["typescript-expert", "anthropic-sdk"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

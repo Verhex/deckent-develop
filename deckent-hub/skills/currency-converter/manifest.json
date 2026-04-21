@@ -1,0 +1,25 @@
+{
+  "id": "currency-converter",
+  "source": "hub",
+  "name": "Currency Converter",
+  "version": "1.0.0",
+  "description": "Exchange rates API integration — convert currencies, batch conversion, rate caching",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "currency" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "finance" } }, "score": 6 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["currency", "exchange", "convert", "rate", "forex", "money"],
+  "stackDetection": { "files": [], "dependencies": [], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

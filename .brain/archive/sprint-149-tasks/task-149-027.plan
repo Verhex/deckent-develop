@@ -1,0 +1,34 @@
+# Task 149-027 Execution Plan
+
+## Objective
+VerhexIO/deckent public repo hazırlığı için:
+1. docs/release/public-repo-manifest.md — include/exclude listesi (≥10 item)
+2. scripts/public-repo-sync.sh — rsync + --dry-run flag desteği
+
+## Files to Create
+- docs/release/public-repo-manifest.md (NEW)
+- scripts/public-repo-sync.sh (NEW)
+
+## Approach
+
+### public-repo-manifest.md
+- Tablo formatında include (✅) / exclude (❌) listesi
+- Toplam ≥10 item (DIRECTIVES'den: 5 include + 9+ exclude)
+- Her item için neden dahil/hariç tutulduğunu açıkla
+- Sprint 150 flip talimatlarını da ekle
+
+### public-repo-sync.sh
+- DIRECTIVES'deki temel script'e ek olarak --dry-run flag ekle
+- dry-run = rsync --dry-run flag'ini geçir (gerçekte dosya kopyalamaz)
+- set -euo pipefail (güvenli bash)
+- Başında informational comment — Sprint 149'da çalıştırılmaz
+
+## Tests
+1. manifest.md ≥10 include/exclude item içeriyor
+2. sync.sh --dry-run mode çalışıyor (exit 0 + rsync --dry-run)
+3. Excluded paths correctly filtered (rsync --exclude list)
+
+## Completion Criteria
+- Her iki dosya mevcut
+- manifest.md kategori bazlı tablo yapısında
+- sync.sh executable + --dry-run flag desteği

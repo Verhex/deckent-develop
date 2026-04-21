@@ -1,0 +1,66 @@
+{
+  "id": "typescript-expert",
+  "source": "builtin",
+  "name": "TypeScript Expert",
+  "version": "0.2.0",
+  "description": "TypeScript best practices, strict typing, utility types, error handling patterns",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "typescript"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "language",
+  "triggers": [
+    "typescript",
+    "type",
+    "interface",
+    "generic",
+    "enum",
+    "decorator",
+    "module",
+    "tsconfig"
+  ],
+  "stackDetection": {
+    "files": [
+      "tsconfig.json"
+    ],
+    "dependencies": [
+      "typescript"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "react-specialist",
+    "testing-expert",
+    "api-builder",
+    "security-specialist",
+    "performance-optimizer",
+    "devops-engineer",
+    "documentation-writer",
+    "database-migration"
+  ],
+  "priority": 10,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

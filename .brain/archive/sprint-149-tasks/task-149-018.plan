@@ -1,0 +1,40 @@
+# Task 149-018: 20 Seed Skill Creation — Execution Plan
+
+## Approach
+1. Create `deckent-hub/skills/` directory structure for all 20 skills
+2. Each skill gets: SKILL.md + manifest.json + signature.ed25519
+3. manifest.json follows manifestVersion 2 schema (matching built-in skills)
+4. SKILL.md contains trigger patterns + examples + domain expertise
+5. signature.ed25519 will be placeholder (T-149-016 Ed25519 module dependency)
+
+## Files to Create (60 files total = 20 × 3)
+- deckent-hub/skills/{skill-name}/SKILL.md (×20)
+- deckent-hub/skills/{skill-name}/manifest.json (×20)
+- deckent-hub/skills/{skill-name}/signature.ed25519 (×20)
+
+## Skills List
+1. spotify-control
+2. telegram-bot
+3. discord-moderator
+4. calendar-google
+5. email-imap
+6. weather-forecast
+7. rss-reader
+8. web-scraper
+9. github-issues
+10. slack-notifier
+11. notion-sync
+12. todoist
+13. spotify-playlist
+14. youtube-downloader
+15. reddit-fetcher
+16. twitter-post
+17. screenshot-vision
+18. file-organizer
+19. currency-converter
+20. translator
+
+## Verification
+- ls deckent-hub/skills/ | wc -l → 20
+- Each manifest.json passes schema validation
+- signature.ed25519 exists for each skill

@@ -1,0 +1,30 @@
+# Task 149-022 Execution Plan
+
+## Objective
+Refresh AGENTS.md to reflect Sprint 148 agent taxonomy reform:
+- Remove test-writer agent (removed in Sprint 148)
+- List exactly 15 built-in agents
+- Each agent: 1-2 line description + primary intent mapping
+- Remove stale sprint metrics (sprint-102 data)
+
+## Current State
+- AGENTS.md exists but is outdated (sprint-102 metrics, test-writer present)
+- File is actually a CLAUDE.md-style document, not a clean agent reference
+
+## Target State
+- Clean AGENTS.md with 15 agents:
+  architect, security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer,
+  api-builder, performance-analyzer, ci-guardian, architecture-planner,
+  accessibility-auditor, data-engineer, devops-engineer, frontend-designer,
+  migration-specialist
+- Each agent: name, description (1-2 lines), activation keywords, primary intent
+
+## Files to Modify
+- AGENTS.md (only file in scope)
+
+## Verify Steps
+- grep -c "test-writer" AGENTS.md → 0
+- Count agents → 15
+
+## Estimated Duration
+~15 minutes (low effort)

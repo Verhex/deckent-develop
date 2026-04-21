@@ -1,0 +1,22 @@
+{
+  "id": "reddit-fetcher",
+  "source": "hub",
+  "name": "Reddit Fetcher",
+  "version": "1.0.0",
+  "description": "Reddit API integration for fetching subreddits, posts, comments, and monitoring",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "reddit" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "social",
+  "triggers": ["reddit", "subreddit", "post", "comment", "upvote", "flair"],
+  "stackDetection": { "files": [], "dependencies": ["snoowrap"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

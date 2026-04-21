@@ -1,0 +1,96 @@
+{
+  "id": "150-004",
+  "title": "Nervous System Mode-Aware Detectors",
+  "description": "Nervous System Mode-Aware Detectors\n\n- Model: sonnet\n- Effort: normal\n- Skills: typescript-expert\n- Files: src/nervous/detectors/task-mode-idle.ts (NEW), src/nervous/detector-registry.ts (patch), tests/nervous/detectors/task-mode-idle.test.ts\n- Scope: src/nervous/, tests/nervous/\n\n### Description\nTask mode için yeni detector: kullanıcı 5 dakikadan uzun idle kalırsa hatırlatma öner (balanced preset → suggest-30m).\n\n`src/nervous/detectors/task-mode-idle.ts` (~100 LoC):\n```typescript\nimport type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';\n\nexport class TaskModeIdleDetector {\n  readonly detectorId = 'task-mode-idle';\n\n  constructor(private readonly idleThresholdMs = 300000) {}  // 5 minutes\n\n  detect(ctx: DetectorContext): DetectorResult | null {\n    // Only in task mode\n    if ((ctx as any).config?.deckent_style !== 'task') return null;\n\n    // Only cron events\n    if (ctx.event.source !== 'cron') return null;\n\n    const lastActivity = (ctx as any).lastUserActivity;\n    if (!lastActivity) return null;\n\n    const idleMs = ctx.now.getTime() - new Date(lastActivity).getTime();\n    if (idleMs < this.idleThresholdMs) return null;\n\n    return {\n      risk: 'low',\n      shouldNotify: true,\n      severity: 'info',\n      groupKey: `task-mode-idle:${Math.floor(idleMs / 60000)}m`,\n      suggestedActions: [{\n        id: 'METRIC_EMIT',\n        label: `User idle ${Math.floor(idleMs / 60000)} min — suggest check-in`,\n        risk: 'low' as const,\n        payload: { idleMs, mode: 'task' },\n      }],\n      metadata: { type: 'task-mode-idle', idleMs },\n    };\n  }\n}\n```\n\nDetectorRegistry (patch) — registered if config `nervous_system.detectors.task_mode_idle.enabled=true`.\n\n### Test (4 test)\n1. Task mode + idle < 5min → null\n2. Task mode + idle > 5min → info notification\n3. Sprint mode + any idle → null (detector skip)\n4. Non-cron event → null\n\n**Kanıt:** `npx vitest run tests/nervous/detectors/task-mode-idle.test.ts` 4/4 PASS.\n\n---\n\n# BLOCK B — P0 Security + Sprint 148 Debt (5 task, Wave 2)",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "NORMAL",
+  "reason": "Directive (model: sonnet -- user override)",
+  "scope": {
+    "directories": [
+      "src/nervous/detectors/",
+      "src/nervous/",
+      "tests/nervous/detectors/",
+      "tests/nervous/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/nervous/detectors/task-mode-idle.ts (NEW)",
+      "src/nervous/detector-registry.ts (patch)",
+      "tests/nervous/detectors/task-mode-idle.test.ts",
+      "src/nervous/detectors/task-mode-idle.ts",
+      "src/nervous/detector-registry.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** `npx vitest run tests/nervous/detectors/task-mode-idle.test.ts` 4/4 PASS.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "sonnet",
+  "forceEffort": "normal",
+  "forceSkills": [
+    "typescript-expert"
+  ],
+  "assignedAgent": "temp-react-ts-specialist",
+  "assignedSkills": [
+    "typescript-expert"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "security",
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "config",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "nervous",
+          "weight": 1
+        }
+      ],
+      "operations": [
+        {
+          "type": "create",
+          "weight": 0.5
+        },
+        {
+          "type": "test",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        }
+      ],
+      "complexity": {
+        "fileCount": 5,
+        "moduleCount": 1,
+        "crossCutting": false,
+        "estimatedSize": "medium"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.8,
+          "tests/": 0.2
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.2
+      }
+    },
+    "confidence": "low",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:41:14.096Z"
+}

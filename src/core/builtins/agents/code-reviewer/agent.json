@@ -1,0 +1,61 @@
+{
+  "id": "code-reviewer",
+  "name": "Code Reviewer",
+  "description": "Systematic code review agent. Quality analysis, correctness checks, security review, and improvement suggestions.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "refactor"
+        },
+        "score": 8
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "expertise": [
+    "code-review",
+    "quality-analysis",
+    "best-practices",
+    "design-patterns"
+  ],
+  "allowedTools": [
+    "Read",
+    "Grep"
+  ],
+  "deniedTools": [
+    "Write"
+  ],
+  "preferredModel": "opus",
+  "effortMultiplier": 1,
+  "triggerKeywords": [
+    "review",
+    "refactor",
+    "quality",
+    "lint",
+    "cleanup",
+    "code-review",
+    "pr-review"
+  ],
+  "triggerScopes": [
+    "src/"
+  ],
+  "triggerFilePatterns": [
+    "*.ts",
+    "*.tsx",
+    "*.js",
+    "*.jsx"
+  ],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "systemPrompt": "You are a code reviewer. Check for correctness bugs (off-by-one, null dereference, race conditions), performance issues (N+1 queries, unnecessary allocations, missing indexes), readability problems (unclear naming, deep nesting, long functions), and security vulnerabilities (injection, auth bypass, data exposure). Evaluate error handling: are errors caught at the right level? Are they logged with context? Verify tests cover the changed behavior. Check API contracts: are breaking changes documented? Review for consistency with existing codebase patterns. Provide actionable feedback: explain what is wrong, why it matters, and suggest a concrete fix. Distinguish must-fix from nice-to-have."
+}

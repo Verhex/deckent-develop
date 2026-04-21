@@ -1,0 +1,125 @@
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Command } from 'commander';
+import type { DeckentConfig } from '../../core/types.js';
+import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { loadConfig, saveGlobalConfig, loadGlobalConfig } from '../../core/config.js';
+import { print, printError } from '../helpers/output.js';
+import { resolveProjectRoot } from '../helpers/process.js';
+
+const VALID_STYLES = ['sprint', 'task'] as const;
+type DeckentStyle = (typeof VALID_STYLES)[number];
+
+function isValidStyle(value: string): value is DeckentStyle {
+  return (VALID_STYLES as readonly string[]).includes(value);
+}
+
+/**
+ * Read project config JSON (raw, no merge).
+ */
+function readProjectConfig(configPath: string): Record<string, unknown> {
+  if (!existsSync(configPath)) return {};
+  try {
+    return JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Write a key to project config JSON.
+ */
+function setProjectConfigValue(configPath: string, key: string, value: unknown): void {
+  const config = readProjectConfig(configPath);
+  config[key] = value;
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+}
+
+export function registerMode(program: Command): void {
+  const mode = program
+    .command('mode')
+    .description('Get/set deckent_style (sprint|task|auto)');
+
+  mode
+    .command('show')
+    .description('Show current mode')
+    .action(async () => {
+      try {
+        const root = resolveProjectRoot();
+        const config = await loadConfig(root);
+        const style = (config as unknown as Record<string, unknown>).deckent_style ?? 'sprint';
+        print(`Current: ${style}`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  mode
+    .command('sprint')
+    .description('Switch to sprint mode')
+    .action(async () => {
+      try {
+        const root = resolveProjectRoot();
+        const configPath = join(root, PROJECT_CONFIG_PATH);
+        setProjectConfigValue(configPath, 'deckent_style', 'sprint');
+        print('\u2713 Switched to sprint mode (project override)');
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  mode
+    .command('task')
+    .description('Switch to task mode')
+    .action(async () => {
+      try {
+        const root = resolveProjectRoot();
+        const configPath = join(root, PROJECT_CONFIG_PATH);
+        setProjectConfigValue(configPath, 'deckent_style', 'task');
+        print('\u2713 Switched to task mode (project override)');
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  mode
+    .command('auto')
+    .description('Auto-detect mode from context')
+    .action(async () => {
+      try {
+        const root = resolveProjectRoot();
+        const hasGitRepo = existsSync(join(root, '.git'));
+        const hasDirectives = existsSync(join(root, 'DIRECTIVES.md'));
+        const inferredStyle: DeckentStyle = (hasGitRepo && hasDirectives) ? 'sprint' : 'task';
+        const configPath = join(root, PROJECT_CONFIG_PATH);
+        setProjectConfigValue(configPath, 'deckent_style', inferredStyle);
+        print(`\u2713 Auto-detected: ${inferredStyle} (git=${hasGitRepo}, directives=${hasDirectives})`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  mode
+    .command('global <style>')
+    .description('Set global default (sprint|task)')
+    .action(async (style: string) => {
+      try {
+        if (!isValidStyle(style)) {
+          printError(new Error(`Invalid style: "${style}". Must be "sprint" or "task".`));
+          process.exitCode = 1;
+          return;
+        }
+        const existing = (await loadGlobalConfig()) ?? {};
+        (existing as Record<string, unknown>).deckent_style = style;
+        await saveGlobalConfig(existing as Partial<DeckentConfig>);
+        print(`\u2713 Global default set: ${style}`);
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+}

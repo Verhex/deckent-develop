@@ -1,0 +1,24 @@
+{
+  "taskId": "149-021",
+  "filesChanged": ["README.md", "README-TR.md"],
+  "linesAdded": 520,
+  "linesRemoved": 310,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "README.md and README-TR.md fully overhauled for Sprint 149 / v1.0.0-beta.1. Key changes: (1) Version bumped v0.4.0-beta.1 → v1.0.0-beta.1 throughout. (2) New tagline: 'The AI orchestrator for developers who want discipline.' (3) Dual Mode section added — Sprint Mode + Task Mode with deckent mode commands. (4) Feature list updated: Nervous System, Memory V2 DB-First, AST Sandbox, .deck secret interpolation, deckent_style config key. (5) Comparison table: OpenHands removed, OpenClaw + Claude Code added; agents 16→15 (test-writer removed per Sprint 148 reform); MCP tools 21→22 (memory_query added); AST sandbox and Nervous System rows added. (6) DeckentHub section added. (7) deckent recall/remember/memory commands added to CLI table. (8) Docker backend updated: non-root 'deckent' user. (9) Workspace structure updated: .brain/memory.db + exports/, .deck file. (10) Screenshots placeholder added for Sprint 150. All 3 test criteria verified: v1.0.0-beta.1 present (badge + CLI comment), OpenClaw + AST sandbox present, README-TR.md parallel structure maintained.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 8500,
+    "cacheReadTokens": 12000,
+    "provider": "claude",
+    "model": "sonnet"
+  },
+  "rubricScores": {
+    "correctness": 98,
+    "test_coverage": 100,
+    "scope_compliance": 100,
+    "documentation": 100
+  },
+  "evaluationDecision": "DONE"
+}

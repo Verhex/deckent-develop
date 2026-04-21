@@ -1,0 +1,126 @@
+{
+  "id": "150-030",
+  "title": "Observability Rotation + SprintId Tagging + Dead Read Path Cleanup",
+  "description": "Observability Rotation + SprintId Tagging + Dead Read Path Cleanup\n\n- Model: opus\n- Effort: high\n- Skills: typescript-expert, testing-expert, performance-optimizer\n- Files: src/core/observability.ts, src/core/observability-rotation.ts (NEW), src/core/config.ts, src/core/config-types.ts, src/orchestra/sprint-controller.ts, src/orchestra/sprint-finalizer.ts, src/mcp/tools/status.ts, tests/core/observability.test.ts, tests/core/observability-rotation.test.ts (NEW), .deckent/config.json\n- Scope: src/core/, src/orchestra/, src/mcp/tools/, tests/core/, .deckent/\n\n### Description\n`.deckent/metrics.jsonl` şu an append-only, rotation yok, sprintId tag yok, Sprint 135'ten beri tek dosyada 15 sprint telemetrisi birikti (256KB, 2209 satır, %94'ü 3 metric). Orta vade sonsuz çözüm:\n\n1. **Rotation policy:** size-based (>1MB) ve sprint-based (her sprint bitişinde) rotate → `.deckent/archive/metrics/metrics-<sprint-id>.jsonl.gz`. Config key:\n```typescript\nobservability: {\n  rotation: {\n    maxSizeMB: 1,\n    archiveFormat: 'gzip',\n    keepLastN: 10\n  }\n}\n```\n3-layer config merge'e entegre.\n\n2. **SprintId tagging:** `initObservability(root, sprintId)` signature'a sprintId eklenir, `metric/trace/log` otomatik tag'ler. Retro-kompat: eski \"unknown\" tag'li entry'ler hâlâ okunur.\n\n3. **Dead read path cleanup:** `src/mcp/tools/status.ts:80` `sprint-NNN-metrics.jsonl` okuma kodu — ya yazıcı tarafını wire et (per-sprint ayrı dosya, rotation ile tutarlı), ya da sil (dead code). **Karar: rotation yaklaşımı per-sprint'i natural yapar → yazıcı wire edilmeli, status.ts canlı consumer olur.** T-150-038 tamamlayıcı.\n\n4. **Bugün yapılan archive:** Sprint 150 başlangıç adımında `.deckent/metrics.jsonl` (256KB) → `.deckent/archive/metrics/metrics-pre-sprint-150.jsonl.gz` taşınır, yeni rotation policy canlı.\n\n5. **Metric efficiency:** Top-3 metric (hb.stale/collect.batch/result.collected) %94. Sampling/aggregation düşün: `hb.stale` her scan yerine sadece **değişiklik olduğunda** emit (counter delta). Konfigüre edilebilir.\n\n```typescript\n// src/core/observability-rotation.ts\nexport function rotateMetricsFile(root: string, sprintId: string): void {\n  const metricsPath = join(root, '.deckent', 'metrics.jsonl');\n  const archivePath = join(root, '.deckent', 'archive', 'metrics', `metrics-${sprintId}.jsonl.gz`);\n  if (!existsSync(metricsPath)) return;\n  const stat = statSync(metricsPath);\n  if (stat.size === 0) return;\n  mkdirSync(dirname(archivePath), { recursive: true });\n  const content = readFileSync(metricsPath);\n  const gzipped = gzipSync(content);\n  writeFileSync(archivePath, gzipped);\n  writeFileSync(metricsPath, '');  // truncate\n  enforceKeepLastN(root, 10);\n}\n```\n\n### Test (10+ test)\n- Rotation trigger (size threshold, sprint boundary)\n- Archive gzip format integrity (roundtrip read)\n- keepLastN enforcement (11. arşivde 1. silinir)\n- SprintId auto-injection (mock initObservability, assert tag'lenmiş)\n- Retro-kompat (eski \"unknown\" tagli entry'ler `generateLoadReport`'ta görülür)\n- status.ts per-sprint okuma (yazıcı wire edilmişse)\n- Config 3-layer merge (rotation opts default → global → project)\n- Sprint 140 disaster-benzeri anomali: 1500+ satır tek sprint → rotation tetiklenir\n\n**Kanıt:**\n- `ls .deckent/archive/metrics/*.gz` → en az 1 arşiv dosya var\n- `du -sh .deckent/metrics.jsonl` → <1MB (veya sprint bitişinde 0)\n- `jq 'select(.tags.sprintId)' .deckent/metrics.jsonl | wc -l` → tüm canlı entry'ler sprintId'li\n- `grep \"sprint-NNN-metrics.jsonl\" src/mcp/tools/status.ts` → ya canlı çağrı var ya da dead read path silindi\n- `deckent config read | grep rotation` → rotation policy config'te\n\n**Kazanımlar:**\n- **Runtime:** Dosya asla patlamaz (user projelerinde Beta GA'da kritik). Sprint-segmented analysis mümkün (`generateLoadReport(sprintId)` gerçekten sprint-specific).\n- **User:** `.deckent/` dizin boyutu sabit kalır (sprint başına ≤1MB arşiv × keepLastN). Sprint 140 disaster-benzeri anomali kaybolmaz — arşivde korunur.\n- **Dashboard/MCP:** `status.ts`'in `sprint-NNN-metrics.jsonl` okuma kodu canlı olur → per-sprint dashboard fetching çalışır.\n- **Governance:** Observability loop tam — yazım + rotation + segmentation + okuma + rapor + arşiv, altı katman da canlı.\n\n---",
+  "model": "opus",
+  "effort": "high",
+  "priority": "NORMAL",
+  "reason": "Directive (model: opus -- user override)",
+  "scope": {
+    "directories": [
+      "src/core/",
+      "src/orchestra/",
+      "src/mcp/tools/",
+      "tests/core/",
+      ".deckent/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/core/observability.ts",
+      "src/core/observability-rotation.ts (NEW)",
+      "src/core/config.ts",
+      "src/core/config-types.ts",
+      "src/orchestra/sprint-controller.ts",
+      "src/orchestra/sprint-finalizer.ts",
+      "src/mcp/tools/status.ts",
+      "tests/core/observability.test.ts",
+      "tests/core/observability-rotation.test.ts (NEW)",
+      ".deckent/config.json",
+      "src/core/observability-rotation.ts",
+      "tests/core/observability-rotation.test.ts",
+      ".jsonl",
+      "status.ts",
+      ".gz",
+      ".tags"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:**; `ls .deckent/archive/metrics/*.gz` → en az 1 arşiv dosya var; `grep \"sprint-NNN-metrics.jsonl\" src/mcp/tools/status.ts` → ya canlı çağrı var ya da dead read path silindi",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "forceModel": "opus",
+  "forceEffort": "high",
+  "forceSkills": [
+    "typescript-expert",
+    "testing-expert",
+    "performance-optimizer"
+  ],
+  "assignedAgent": "architect",
+  "assignedSkills": [
+    "typescript-expert",
+    "testing-expert",
+    "performance-optimizer"
+  ],
+  "createdAt": "2026-04-21T10:33:22.309Z",
+  "routingMeta": {
+    "taskDNA": {
+      "intent": {
+        "primary": "implementation",
+        "secondary": [
+          "security",
+          "config"
+        ],
+        "confidence": 0.95
+      },
+      "subIntent": "types",
+      "tags": [
+        "test-coverage"
+      ],
+      "domains": [
+        {
+          "name": "core",
+          "weight": 0.48
+        },
+        {
+          "name": "orchestra",
+          "weight": 0.14
+        },
+        {
+          "name": "mcp",
+          "weight": 0.1
+        }
+      ],
+      "operations": [
+        {
+          "type": "test",
+          "weight": 0.38
+        },
+        {
+          "type": "create",
+          "weight": 0.25
+        },
+        {
+          "type": "configure",
+          "weight": 0.25
+        },
+        {
+          "type": "delete",
+          "weight": 0.13
+        }
+      ],
+      "complexity": {
+        "fileCount": 16,
+        "moduleCount": 4,
+        "crossCutting": true,
+        "estimatedSize": "epic"
+      },
+      "scope": {
+        "writeRatio": {
+          "src/": 0.5,
+          "tests/": 0.19,
+          ".deckent/": 0.06,
+          "./": 0.25
+        },
+        "primaryWriteTarget": "src/",
+        "testWriteRatio": 0.19
+      }
+    },
+    "confidence": "medium",
+    "routingVersion": "v2"
+  },
+  "updatedAt": "2026-04-21T11:43:00.942Z"
+}

@@ -1,0 +1,41 @@
+{
+  "id": "150-008-fix-fix",
+  "title": "Fix: Fix: Scope Sanitizer Code Snippet False Positive Fix (Sprint 148 Debt)",
+  "description": "Priority fix for NO_GO task 150-008-fix. Notes: Verification-only task. All Sprint 148 debt scope-sanitizer requirements were already implemented in Sprint 149. Confirmed: (1) isPlaceholderPath() active in scope-sanitizer.ts:29 — rejects foo/bar/baz/qux/example/test base names, preserves composite names like foo-bar.ts. (2) isJsAccessPattern() active in scope-sanitizer.ts:41 — rejects .directories/.some/.filter etc, excludes known dotfiles (.gitignore, .env). (3) maskCodeBlocks() active in task-builder.ts — strips code block content in DIRECTIVES parser. (4) Rules 9+10 in sanitizeScope() chain active. (5) 22/22 tests passing (12 in scope-sanitizer-v2.test.ts, 10 in scope-sanitizer.test.ts). (6) tsc --noEmit clean (0 errors). No code changes needed.",
+  "model": "opus",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 150-008-fix evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "src/orchestra/",
+      "tests/orchestra/",
+      "src/core/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/orchestra/scope-sanitizer.ts",
+      "src/orchestra/task-builder.ts",
+      "tests/orchestra/scope-sanitizer-v2.test.ts",
+      ".directories",
+      ".some",
+      "src/foo.ts",
+      "tests/foo.test.ts",
+      "task-builder.ts",
+      "src/a.ts",
+      "src/core/config.ts",
+      "src/foo-bar.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Sprint 150 canlı task JSON'larda `.directories`, `.some`, `foo.ts` = 0 match.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "PENDING",
+  "sprintId": "sprint-150",
+  "isPriorityFix": true,
+  "fixForTaskId": "150-008-fix",
+  "createdAt": "2026-04-21T11:53:50.786Z"
+}

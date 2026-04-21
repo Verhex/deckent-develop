@@ -4,7 +4,7 @@
 // rollback: restore to backup branch on failure
 // isCleanWorkingTree: detect uncommitted changes
 
-import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BRAIN_DIR, DEBT_FILE } from '../core/constants.js';
@@ -132,8 +132,13 @@ export function createSafetyPoint(projectRoot: string, sprintId: string): Safety
   if (!wasClean) {
     const popResult = git(['stash', 'pop'], projectRoot);
     if (popResult.status !== 0) {
-      // Non-fatal: working tree was stashed but couldn't pop — log warning
-      console.warn(`[rollback] Warning: could not pop stash after safety point creation: ${popResult.stderr}`);
+      // CRITICAL: stash pop failed — user's uncommitted changes are trapped in stash.
+      // We must NOT silently continue; the user needs to recover manually.
+      throw ErrorRegistry.createError('DECKENT_E057', {
+        message: `Stash pop failed after safety point creation: ${popResult.stderr}. ` +
+          'Your uncommitted changes are saved in git stash. ' +
+          'Run `git stash list` to see them, then `git stash pop` to restore manually.',
+      });
     }
   }
 
@@ -196,11 +201,25 @@ export function rollback(projectRoot: string, safetyPoint: SafetyPoint): Rollbac
 // ─── deleteSafetyPoint ────────────────────────────────────────────
 
 /**
- * Removes the backup branch after a successful sprint (cleanup).
+ * Removes the backup branch AND the persisted JSON file after a successful sprint (cleanup).
+ * Symmetric partner of saveSafetyPoint — ensures no stale artifacts remain.
  */
 export function deleteSafetyPoint(projectRoot: string, safetyPoint: SafetyPoint): boolean {
   const result = git(['branch', '-D', safetyPoint.branchName], projectRoot);
+  // Always clean up the JSON file, even if branch delete failed (branch may already be gone)
+  deleteSafetyPointFile(projectRoot);
   return result.status === 0;
+}
+
+/**
+ * Delete the persisted safety-point JSON file from disk.
+ * Symmetric partner of saveSafetyPoint / loadSafetyPoint.
+ */
+export function deleteSafetyPointFile(projectRoot: string): void {
+  const filePath = join(projectRoot, SAFETY_POINT_FILE);
+  try {
+    rmSync(filePath, { force: true });
+  } catch (e) { debugLog('deleteSafetyPointFile:rmSync', e); }
 }
 
 // ─── safetyBranchExists ───────────────────────────────────────────
@@ -257,6 +276,47 @@ export function recordRollbackInDebt(
       appendFileSync(debtPath, entry, 'utf-8');
     }
   } catch (e) { debugLog('recordRollbackDebt:writeDebt', e); }
+}
+
+// ─── isGitRepo ───────────────────────────────────────────────────
+
+/**
+ * Check if the given directory is inside a git repository.
+ */
+export function isGitRepo(projectRoot: string): boolean {
+  const result = git(['rev-parse', '--git-dir'], projectRoot);
+  return result.status === 0;
+}
+
+// ─── cleanOrphanSafetyPoint ──────────────────────────────────────
+
+/**
+ * Remove orphan safety-point JSON from disk if it belongs to a different sprint.
+ * Called at PLAN phase start to clean up stale artifacts from previous sprints
+ * whose cleanup was incomplete.
+ *
+ * @returns true if an orphan was cleaned, false otherwise
+ */
+export function cleanOrphanSafetyPoint(projectRoot: string, currentSprintId: string): boolean {
+  const existing = loadSafetyPoint(projectRoot);
+  if (!existing) return false;
+
+  // If the safety point belongs to the current sprint, leave it alone
+  if (existing.id === currentSprintId) return false;
+
+  // Check if the corresponding git branch is still live (someone might still need it)
+  const branchLive = safetyBranchExists(projectRoot, existing.id);
+  if (branchLive) {
+    // Branch exists but sprint ID doesn't match — try to clean up both
+    try {
+      git(['branch', '-D', existing.branchName], projectRoot);
+    } catch (e) { debugLog('cleanOrphanSafetyPoint:branchDelete', e); }
+  }
+
+  // Remove the stale JSON file
+  deleteSafetyPointFile(projectRoot);
+  debugLog('cleanOrphanSafetyPoint', `Cleaned orphan safety point from ${existing.id} (current: ${currentSprintId})`);
+  return true;
 }
 
 // ─── saveSafetyPoint / loadSafetyPoint ────────────────────────────

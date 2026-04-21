@@ -3930,3 +3930,110 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 148-028: ADR-041 Draft — Agent Taxonomy (Horizontal vs Vertical) (DONE)
 
 ---
+## Sprint 149 — sprint-149
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-20
+**Duration:** 2004s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2003601ms |
+
+### Tasks
+
+- 149-001: `deckent_style` Config Key — 3-Layer Integration (DONE)
+- 149-002: `deckent mode` CLI Command (GO_WITH_TECH_DEBT)
+- 149-003: Sprint Controller Mode-Aware Routing (DONE)
+- 149-004: Nervous System Mode-Aware Detectors (DONE)
+- 149-005: Dockerfile USER Non-Root (PENDING)
+- 149-006: `.deck` Config Interpolation (`$DECK:KEY` Syntax) (PENDING)
+- 149-007: Docker Worker Exit Pattern Final Fix (Sprint 146+148 Debt) (PENDING)
+- 149-008: Scope Sanitizer Code Snippet False Positive Fix (Sprint 148 Debt) (PENDING)
+- 149-009: Auditor Stale Alert Race Condition Fix (Sprint 148 Debt) (PENDING)
+- 149-010: `src/connectors/` Base + IMessageConnector Interface (PENDING)
+- 149-011: Discord Connector (PENDING)
+- 149-012: Telegram Connector (PENDING)
+- 149-013: WhatsApp Scaffold (Post-Launch Activation Ready) (PENDING)
+- 149-014: Connector Pool + Parallel Dispatch (PENDING)
+- 149-015: Incoming Webhook Router + Nervous Bridge (PENDING)
+- 149-016: `src/core/signature.ts` Ed25519 Sign/Verify (PENDING)
+- 149-017: VerhexIO/deckent-hub Repo Create + Templates (PENDING)
+- 149-018: 20 Seed Skill Creation (PENDING)
+- 149-019: `deckent skill publish` CLI Complete (Sign + Upload) (PENDING)
+- 149-020: Hub CI Workflow — validate-skill.yml (PENDING)
+- 149-021: README.md Overhaul + Landing Page (PENDING)
+- 149-022: AGENTS.md Refresh (39 Sprint Behind) (PENDING)
+- 149-023: 388 .md Interaktif Review Script (PENDING)
+- 149-024: TR/EN Parity + Link Checker (PENDING)
+- 149-025: ADR-041 ACCEPT + ADR-042 Draft (PENDING)
+- 149-026: npm pack --dry-run + Version Bump 1.0.0-beta.1 (PENDING)
+- 149-027: VerhexIO/deckent Public Repo Hazırlık (Sprint 150'de Alperen Flip) (PENDING)
+
+---
+## Sprint 150 — sprint-150
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-04-21
+**Duration:** 4828s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 41 |
+| Completed | 37 |
+| Tech Debt | 6 |
+| No-Go | 4 |
+| Coverage | NaN% |
+| Duration | 4828332ms |
+
+### Tasks
+
+- 150-001: `deckent_style` Config Key — 3-Layer Integration (DONE)
+- 150-002: `deckent mode` CLI Command (DONE)
+- 150-003: Sprint Controller Mode-Aware Routing (DONE)
+- 150-004: Nervous System Mode-Aware Detectors (DONE)
+- 150-005: Dockerfile USER Non-Root (DONE)
+- 150-006: `.deck` Config Interpolation (`$DECK:KEY` Syntax) (DONE)
+- 150-007: Docker Worker Exit Pattern Final Fix (Sprint 146+148 Debt) (GO_WITH_TECH_DEBT)
+- 150-008: Scope Sanitizer Code Snippet False Positive Fix (Sprint 148 Debt) (NO_GO)
+- 150-009: Auditor Stale Alert Race Condition Fix (Sprint 148 Debt) (GO_WITH_TECH_DEBT)
+- 150-010: `src/connectors/` Base + IMessageConnector Interface (DONE)
+- 150-011: Discord Connector (DONE)
+- 150-012: Telegram Connector (DONE)
+- 150-013: WhatsApp Scaffold (Post-Launch Activation Ready) (DONE)
+- 150-014: Connector Pool + Parallel Dispatch (DONE)
+- 150-015: Incoming Webhook Router + Nervous Bridge (DONE)
+- 150-016: `src/core/signature.ts` Ed25519 Sign/Verify (DONE)
+- 150-017: VerhexIO/deckent-hub Repo Create + Templates (GO_WITH_TECH_DEBT)
+- 150-018: 20 Seed Skill Creation (DONE)
+- 150-019: `deckent skill publish` CLI Complete (Sign + Upload) (DONE)
+- 150-020: Hub CI Workflow — validate-skill.yml (DONE)
+- 150-021: README.md Overhaul + Landing Page (DONE)
+- 150-022: AGENTS.md Refresh (39 Sprint Behind) (NO_GO)
+- 150-023: 388 .md Interaktif Review Script (DONE)
+- 150-024: TR/EN Parity + Link Checker (DONE)
+- 150-025: ADR-041 ACCEPT + ADR-042 Draft (DONE)
+- 150-026: npm pack --dry-run + Version Bump 1.0.0-beta.1 (GO_WITH_TECH_DEBT)
+- 150-027: VerhexIO/deckent Public Repo Hazırlık (Sprint 151'de Alperen Flip) (DONE)
+- 150-028: `cleanOrphanIpcDirs` Wire-Up with Live-PID Check (NO_GO)
+- 150-029: Feature Manifest Canlılaştırma (Tam Scope) (GO_WITH_TECH_DEBT)
+- 150-030: Observability Rotation + SprintId Tagging + Dead Read Path Cleanup (DONE)
+- 150-031: Built-in Agent + Skill Bundle Pipeline (P0 Beta GA Blocker) (DONE)
+- 150-032: `deckent audit` + `deckent recover` User-Facing CLI + MCP Yüzeyi (GO_WITH_TECH_DEBT)
+- 150-033: Safety-Point Lifecycle Onarımı + User-Loss Guard (DONE)
+- 150-034: Config Sadeleştirme + MODE_PRESETS Konsolidasyon + System Capacity Auto-Detect MVP + Self-Healing (ONAYLI Alperen 8-karar matris) (DONE)
+- 150-035: Sprint-Prefixed Dosya Retention (FINAL — Alperen 5 soru 2026-04-21 onaylı) (DONE)
+- 150-036: Managed-Docs Cache Git Tracking Fix + Metadata Annotation (DONE)
+- 150-037: `.deckent/docs.json` Private/Public Split + Bootstrap Template + Path Safety + Interactive UX (P0 Beta GA — ONAYLI Alperen Seçenek 3) (DONE)
+- 150-038: Sprint-Scoped MetricsJsonl Writer Wire-Up + status.ts Live Reader (T-150-030 Tamamlayıcısı) (DONE)
+
+---

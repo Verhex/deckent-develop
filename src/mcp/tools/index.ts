@@ -23,6 +23,9 @@ import { registerExplainTool } from './explain.js';
 import { registerMemoryQueryTool } from './memory-query.js';
 import { registerWatch } from './watch.js';
 import { registerNervousTools } from './nervous.js';
+import { registerFeatureQueryTool } from './feature-query.js';
+import { registerAuditTool } from './audit.js';
+import { registerRecoverTool } from './recover.js';
 
 export function registerTools(server: McpServer): void {
   registerInitTool(server);
@@ -49,4 +52,7 @@ export function registerTools(server: McpServer): void {
   registerMemoryQueryTool(server);
   registerWatch(server);
   registerNervousTools(server);
+  registerFeatureQueryTool(server);
+  registerAuditTool(server);
+  registerRecoverTool(server);
 }

@@ -1,0 +1,57 @@
+{
+  "id": "performance-optimizer",
+  "source": "builtin",
+  "name": "Performance Optimizer",
+  "version": "0.2.0",
+  "description": "Profiling, caching, Big-O analysis, memory optimization, lazy loading, bundle optimization",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "performance"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "performance",
+    "optimize",
+    "cache",
+    "memory",
+    "latency",
+    "bottleneck",
+    "profiling",
+    "lazy-load",
+    "bundle"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "react-specialist",
+    "database-migration",
+    "devops-engineer"
+  ],
+  "priority": 10,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgScore": 0,
+    "lastUsedInSprint": ""
+  }
+}

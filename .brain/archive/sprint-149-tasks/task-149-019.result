@@ -1,0 +1,27 @@
+{
+  "taskId": "149-019",
+  "filesChanged": [
+    "src/cli/commands/skill.ts",
+    "tests/cli/skill-publish.test.ts"
+  ],
+  "linesAdded": 228,
+  "linesRemoved": 0,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "deckent skill publish <skillPath> CLI command implemented with full pipeline: (1) SkillSandbox.validateSkillSafety AST+regex scan, (2) Ed25519 loadOrGenerateKeypair + signMessage, (3) signature.ed25519 file write. 5/5 tests pass: unsafe rejection, valid signing, signature verification, missing manifest error, overwrite on re-publish. tsc --noEmit clean. Commander sub-command registered before marketplace sub-commands to avoid conflict with argless marketplace publish.",
+  "tokenUsage": {
+    "inputTokens": 45000,
+    "outputTokens": 6000,
+    "cacheReadTokens": 0,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 90,
+    "scope_compliance": 100,
+    "documentation": 70
+  },
+  "evaluationDecision": "DONE"
+}

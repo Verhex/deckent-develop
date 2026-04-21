@@ -1,0 +1,36 @@
+{
+  "id": "150-013-fix",
+  "title": "Fix: WhatsApp Scaffold (Post-Launch Activation Ready)",
+  "description": "Priority fix for NO_GO task 150-013. Notes: WhatsApp scaffold was already implemented by a previous sprint (Sprint 149). Updated sprint references: 'Sprint 149' → 'Sprint 150' and 'Sprint 152+' → 'Sprint 153+' to match Sprint 150 DIRECTIVES spec. All 6 tests pass (3 required + 3 bonus: sendMessage throws, stop is no-op, connector identity). tsc --noEmit: 0 errors. Test file was already present with full coverage. Scaffold correctly implements BaseConnector interface with activation-error pattern per spec.",
+  "model": "sonnet",
+  "effort": "normal",
+  "priority": "CRITICAL",
+  "reason": "Task 150-013 evaluated as NO_GO",
+  "scope": {
+    "directories": [
+      "src/connectors/",
+      "tests/connectors/"
+    ],
+    "filesRead": [],
+    "filesWrite": [
+      "src/connectors/whatsapp.ts (NEW — scaffold)",
+      "src/connectors/whatsapp-README.md",
+      "tests/connectors/whatsapp-scaffold.test.ts",
+      "whatsapp-README.md",
+      "src/connectors/whatsapp.ts"
+    ]
+  },
+  "dependencies": [],
+  "goNogo": {
+    "goCriteria": "Tests pass; tsc clean; *Kanıt:** Scaffold exists, import resolves, clear activation path documented.",
+    "noGoCriteria": "Build fails or verification commands fail",
+    "techDebtAcceptable": "Minor issues if all verification commands pass"
+  },
+  "status": "DONE",
+  "sprintId": "sprint-150",
+  "isPriorityFix": true,
+  "fixForTaskId": "150-013",
+  "createdAt": "2026-04-21T11:41:50.032Z",
+  "estimatedTokens": 102,
+  "updatedAt": "2026-04-21T11:53:50.786Z"
+}

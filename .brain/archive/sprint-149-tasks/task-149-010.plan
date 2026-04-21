@@ -1,0 +1,21 @@
+# Task 149-010: src/connectors/ Base + IMessageConnector Interface
+
+## Plan
+
+### Files to Create
+1. `src/connectors/types.ts` — ConnectorId, IncomingMessage, OutgoingMessage, IMessageConnector, ConnectorConfig interfaces
+2. `src/connectors/base-connector.ts` — Abstract BaseConnector class with event emitter pattern
+3. `tests/connectors/base-connector.test.ts` — 5 tests covering lifecycle, handlers, health, schema, errors
+
+### Design Decisions
+- Follow ProviderAdapter pattern from src/core/provider.ts (readonly fields, async lifecycle)
+- BaseConnector uses handler array pattern (not EventEmitter inheritance to avoid Node coupling)
+- Lightweight, no external deps — pure TypeScript interfaces + abstract class
+- ESM with .js extensions per ADR-001/002
+
+### Approach
+1. Create src/connectors/ directory
+2. Write types.ts with all interfaces
+3. Write base-connector.ts abstract class
+4. Write tests
+5. Verify with tsc + vitest

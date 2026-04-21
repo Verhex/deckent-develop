@@ -1,0 +1,30 @@
+{
+  "taskId": "150-035",
+  "filesChanged": [
+    "src/core/config-types.ts",
+    "src/core/sprint-file-retention.ts",
+    "src/orchestra/sprint-finalizer.ts",
+    "src/cli/commands/cleanup.ts",
+    "tests/orchestra/sprint-file-retention.test.ts"
+  ],
+  "linesAdded": 530,
+  "linesRemoved": 4,
+  "testsPassed": true,
+  "coverage": null,
+  "selfAssessment": "DONE",
+  "notes": "Sprint File Retention implemented with hybrid keep_last_n=10 + size_cap_mb=500 strategy. Created src/core/sprint-file-retention.ts (~310 LoC) with: (1) extractSprintId + groupBySprintId file discovery, (2) cleanupCounters for -seq/-checkpoint-seq deletion on sprint DONE, (3) migrateForensicFiles to move scorecard/verifier-log/etc to docs/audits/sprint-NNN/, (4) enforceRetention with keep_last_n + size_cap hybrid, (5) runRetention combined pipeline. Integrated into sprint-finalizer.ts (Step 12d after archive + before job summary) and cleanup.ts (Step G after tasks archive). Added SprintFileRetentionConfig interface to config-types.ts. 24 tests all passing — covers retention trigger, archive path, size cap, counter cleanup, forensic migration, config override, numeric sort, edge cases. tsc --noEmit 0 errors.",
+  "tokenUsage": {
+    "inputTokens": 85000,
+    "outputTokens": 12000,
+    "cacheReadTokens": 45000,
+    "provider": "claude",
+    "model": "opus"
+  },
+  "rubricScores": {
+    "correctness": 95,
+    "test_coverage": 92,
+    "scope_compliance": 100,
+    "documentation": 80
+  },
+  "evaluationDecision": "DONE"
+}

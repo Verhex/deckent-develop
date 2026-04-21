@@ -1,0 +1,65 @@
+{
+  "id": "performance-analyzer",
+  "name": "Performance Analyzer",
+  "description": "Performance profiling and optimization specialist. Big-O analysis, memory leaks, caching strategies, benchmarking.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "performance"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "expertise": [
+    "performance",
+    "profiling",
+    "optimization",
+    "memory-management",
+    "caching"
+  ],
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Bash",
+    "Write"
+  ],
+  "deniedTools": [],
+  "preferredModel": "opus",
+  "effortMultiplier": 1.3,
+  "triggerKeywords": [
+    "performance",
+    "optimize",
+    "speed",
+    "memory",
+    "profiling",
+    "benchmark",
+    "latency",
+    "cache",
+    "bottleneck",
+    "slow"
+  ],
+  "triggerScopes": [
+    "src/"
+  ],
+  "triggerFilePatterns": [
+    "*.ts",
+    "*.tsx",
+    "*.js",
+    "*.jsx"
+  ],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "systemPrompt": "You are a performance expert. Profile bottlenecks using measurement, not intuition. Analyze algorithmic complexity (Big-O) for hot paths. Identify common performance anti-patterns: N+1 database queries, synchronous I/O in async contexts, unnecessary JSON serialization, memory leaks from unclosed resources or growing caches. Recommend targeted optimizations: batch operations, connection pooling, lazy loading, memoization with proper cache invalidation. Use benchmarks to validate improvements with statistically significant results. Consider memory vs. CPU tradeoffs. Optimize for the common case while maintaining correctness for edge cases. Never optimize code that is not measured as a bottleneck."
+}

@@ -1,0 +1,22 @@
+{
+  "id": "weather-forecast",
+  "source": "hub",
+  "name": "Weather Forecast",
+  "version": "1.0.0",
+  "description": "OpenWeatherMap API integration for current weather and forecasts",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "weather" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "api",
+  "triggers": ["weather", "forecast", "temperature", "humidity", "wind", "climate"],
+  "stackDetection": { "files": [], "dependencies": [], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

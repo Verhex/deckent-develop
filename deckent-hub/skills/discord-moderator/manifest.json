@@ -1,0 +1,26 @@
+{
+  "id": "discord-moderator",
+  "source": "hub",
+  "name": "Discord Moderator",
+  "version": "1.0.0",
+  "description": "Discord bot with moderation — slash commands, auto-mod, role management, audit logging",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "discord" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "moderate" } }, "score": 7 },
+      { "when": { "domains": { "$contains": "guild" } }, "score": 6 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["discord", "bot", "moderate", "guild", "channel", "role"],
+  "stackDetection": { "files": [], "dependencies": ["discord.js"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

@@ -1,0 +1,15 @@
+`★ Insight ─────────────────────────────────────`
+Bu task'ta iki farklı artifact üretildi: (1) **Manifest** — insan-okunabilir karar belgesi, "ne public'e gider?" sorusunu tablo formatında yanıtlar; (2) **Sync script** — operasyonel araç, manifestteki kararları rsync `--exclude` listelerine çevirir. Bu ayrım önemli: manifest değişirse script de güncellenmelidir (tutarlılık için her ikisinde de `docs/audits/` hariç tutma notu var).
+`─────────────────────────────────────────────────`
+
+**T-149-027 tamamlandı — DONE**
+
+Oluşturulan dosyalar:
+
+- **`docs/release/public-repo-manifest.md`** — 38 item (20 include ✅ + 18 exclude ❌), tablo formatı, Sprint 150 flip talimatları
+- **`scripts/public-repo-sync.sh`** — rsync tabanlı sync script, `--dry-run` flag desteği, 10 kritik exclude path, güvenlik taraması dahil
+
+**3/3 test PASS:**
+1. manifest ≥10 item → 38 item
+2. `--dry-run` exit 0 → geçti
+3. Tüm exclude path'ler mevcut → 10/10

@@ -6,6 +6,53 @@ Bu projedeki tüm önemli değişiklikler bu dosyada belgelenmektedir.
 Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardına dayanır
 ve proje [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallarına uyar.
 
+## [1.0.0-beta.1-sprint150] - 2026-04-21
+
+### Added
+
+- `deckent_style` Config Key — 3-Layer Integration
+- `deckent mode` CLI Command
+- Sprint Controller Mode-Aware Routing
+- Nervous System Mode-Aware Detectors
+- Dockerfile USER Non-Root
+- `.deck` Config Interpolation (`$DECK:KEY` Syntax)
+- `src/connectors/` Base + IMessageConnector Interface
+- Discord Connector
+- Telegram Connector
+- WhatsApp Scaffold (Post-Launch Activation Ready)
+
+### Changed
+
+- Docker Worker Exit Pattern Final Fix (Sprint 146+148 Debt) (completed with tech debt)
+- Auditor Stale Alert Race Condition Fix (Sprint 148 Debt) (completed with tech debt)
+- VerhexIO/deckent-hub Repo Create + Templates (completed with tech debt)
+- npm pack --dry-run + Version Bump 1.0.0-beta.1 (completed with tech debt)
+- Feature Manifest Canlılaştırma (Tam Scope) (completed with tech debt)
+- `deckent audit` + `deckent recover` User-Facing CLI + MCP Yüzeyi (completed with tech debt)
+
+### Fixed
+
+- Sprint-Prefixed Dosya Retention (FINAL — Alperen 5 soru 2026-04-21 onaylı)
+- Managed-Docs Cache Git Tracking Fix + Metadata Annotation
+
+
+_Tasks: 41 total, 37 done, 6 tech debt, 4 no-go_
+
+## [1.0.0-beta.1-sprint149] - 2026-04-20
+
+### Added
+
+- `deckent_style` Config Key — 3-Layer Integration
+- Sprint Controller Mode-Aware Routing
+- Nervous System Mode-Aware Detectors
+
+### Changed
+
+- `deckent mode` CLI Command (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [0.4.0-beta.4-sprint148] - 2026-04-20
 
 ### Added

@@ -1,0 +1,18 @@
+# Task 150-015 Execution Plan: Incoming Webhook Router + Nervous Bridge
+
+## Discovery
+The incoming-router.ts and server.ts webhook endpoint already exist from a previous task or parallel implementation.
+
+## Plan
+1. Verify existing code completeness against task spec
+2. Read incoming-router.ts and server.ts webhook section
+3. Read existing tests
+4. Run tsc --noEmit to check type safety
+5. Run vitest on incoming-router.test.ts to check test pass
+6. Fix any issues found
+7. Write result
+
+## Files
+- src/connectors/incoming-router.ts (EXISTING - verify)
+- src/api/server.ts (EXISTING - verify webhook endpoint)
+- tests/connectors/incoming-router.test.ts (EXISTING - verify 7 tests)

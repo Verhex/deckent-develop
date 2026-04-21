@@ -30,7 +30,7 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly projectDir: string;
   private readonly image: string;
   private readonly timeoutSeconds: number;
-  private readonly containers = new Map<string, string>(); // taskId → containerId
+  private readonly containers = new Map<string, { containerId: string; model: string }>(); // taskId → container info
 
   constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number }) {
     this.projectDir = resolve(projectDir);
@@ -103,11 +103,6 @@ export class DockerSpawnBackend implements SpawnBackend {
     const claudeCmd = `claude ${claudeArgs.join(' ')}`;
     const resultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.result`;
     const timeoutPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
-    const fallbackJson = JSON.stringify({
-      taskId, workerId: `docker-${taskId}`, filesChanged: [], linesAdded: 0,
-      linesRemoved: 0, testsPassed: false, coverage: 0,
-      selfAssessment: 'NO_GO', notes: 'Docker worker exited without writing result file',
-    });
     // Build docker run args
     // Run as host user to avoid root — Claude CLI blocks --dangerously-skip-permissions as root
     const uid = process.getuid?.() ?? 1000;
@@ -163,12 +158,20 @@ export class DockerSpawnBackend implements SpawnBackend {
       '$changed_files',
       'GITEOF',
       '    json_array="$json_array]"',
+      // Sprint 149: Add signal_info for signal-killed containers
+      '    local signal_info=""',
+      '    [ "$exit_code" -gt 128 ] && signal_info=" signal=$((exit_code - 128))"',
       `    cat > "$RFILE" <<RESULTEOF`,
-      `{"taskId":"${taskId}","selfAssessment":"TIMEOUT_WITH_WORK","filesChanged":$json_array,"exitCode":$exit_code,"notes":"Worker timeout/killed but git diff shows $count files modified. Brain should reconcile via Spurious NO_GO helper."}`,
+      `{"taskId":"${taskId}","selfAssessment":"TIMEOUT_WITH_WORK","filesChanged":$json_array,"exitCode":$exit_code,"notes":"Worker timeout/killed (exitCode=$exit_code$signal_info) but git diff shows $count files modified. Brain should reconcile via Spurious NO_GO helper.","tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
       'RESULTEOF',
       '  else',
       // No partial work AND no result written — fall back to NO_GO
-      `    echo '${fallbackJson}' > "$RFILE"`,
+      // Sprint 150: use cat heredoc instead of echo to include signal_info + exit_code
+      '    local signal_info_nw=""',
+      '    [ "$exit_code" -gt 128 ] && signal_info_nw=" signal=$((exit_code - 128))"',
+      `    cat > "$RFILE" <<NORESULTEOF`,
+      `{"taskId":"${taskId}","workerId":"docker-${taskId}","filesChanged":[],"linesAdded":0,"linesRemoved":0,"testsPassed":false,"coverage":0,"selfAssessment":"NO_GO","exitCode":$exit_code,"notes":"Worker exited without writing result (exitCode=$exit_code$signal_info_nw)","tokenUsage":{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"provider":"claude","model":"${model}"}}`,
+      'NORESULTEOF',
       '  fi',
       '  fsync_file "$RFILE"',
       '  fsync_file "$HBFILE"',
@@ -264,7 +267,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
 
     const containerId = result.stdout?.trim() ?? '';
-    this.containers.set(taskId, containerId);
+    this.containers.set(taskId, { containerId, model });
     debugLog('docker-backend:spawn-ok', `taskId=${taskId} containerId=${containerId.slice(0, 12)}`);
 
     // Write initial heartbeat
@@ -281,7 +284,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     }, null, 2), 'utf-8');
 
     // Set up container monitoring (async, fire-and-forget)
-    this.monitorContainer(taskId, containerName, tasksDir);
+    this.monitorContainer(taskId, containerName, tasksDir, model);
   }
 
   /**
@@ -307,11 +310,22 @@ export class DockerSpawnBackend implements SpawnBackend {
         encoding: 'utf-8', timeout: 20_000, // 20s > 15s grace to avoid race
       });
       if (stopResult.status !== 0) {
-        // Fallback: force kill if stop failed (container may already be gone)
-        debugLog('docker-backend:stop-failed', `Falling back to docker kill: ${stopResult.stderr?.trim()}`);
-        spawnSync('docker', ['kill', containerName], { encoding: 'utf-8', timeout: 10_000 });
+        // Fallback: send SIGTERM (not SIGKILL) so EXIT trap can still run
+        // Sprint 149: changed from bare `docker kill` (SIGKILL) to --signal=SIGTERM
+        debugLog('docker-backend:stop-failed', `Falling back to docker kill --signal=SIGTERM: ${stopResult.stderr?.trim()}`);
+        spawnSync('docker', ['kill', '--signal=SIGTERM', containerName], { encoding: 'utf-8', timeout: 10_000 });
       }
     } catch (e) { debugLog('docker-backend:kill-error', e); }
+
+    // Sprint 149: Poll for .result file after stop (max 5s, 500ms intervals)
+    // Gives EXIT trap time to write result after SIGTERM
+    const resultPath = join(this.projectDir, TASKS_DIR, `task-${taskId}.result`);
+    if (!existsSync(resultPath)) {
+      for (let i = 0; i < 10; i++) {
+        spawnSync('sleep', ['0.5'], { timeout: 2_000 });
+        if (existsSync(resultPath)) break;
+      }
+    }
 
     // Post-stop verification: ensure .result was persisted to disk
     this.verifyResultAfterStop(taskId);
@@ -366,7 +380,7 @@ export class DockerSpawnBackend implements SpawnBackend {
   /**
    * Monitor container until it exits, then update heartbeat and cleanup.
    */
-  private monitorContainer(taskId: string, containerName: string, tasksDir: string): void {
+  private monitorContainer(taskId: string, containerName: string, tasksDir: string, model: string): void {
     const child = nodeSpawn('docker', ['wait', containerName], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -432,7 +446,22 @@ export class DockerSpawnBackend implements SpawnBackend {
       // traps — the container's EXIT trap never runs. The host-side monitor must
       // write the fallback .result so Brain's result-collector doesn't wait forever.
       const timeoutPath = join(tasksDir, `task-${taskId}.timeout`);
+      // Sprint 149: Partial write detection — .result exists but corrupt JSON
+      // This catches cases where container was SIGKILL'd mid-write
+      if (existsSync(resultPath) && exitCode !== 0) {
+        try {
+          const raw = readFileSync(resultPath, 'utf-8');
+          JSON.parse(raw); // Just validate — if corrupt, overwrite below
+        } catch {
+          debugLog('docker-backend:partial-write', `taskId=${taskId} .result exists but corrupt JSON — overwriting with NO_GO`);
+          try { unlinkSync(resultPath); } catch { /* ok */ }
+          // Fall through to the fallback writer below
+        }
+      }
+
       if (!existsSync(resultPath) && exitCode !== 0) {
+        // Sprint 149: Add signal_info for signal-killed containers (exit > 128)
+        const signalInfo = exitCode > 128 ? ` signal=${exitCode - 128}` : '';
         // Host-side fallback result — ensures result-collector always finds a .result file
         const hostFallbackResult = JSON.stringify({
           taskId,
@@ -443,8 +472,9 @@ export class DockerSpawnBackend implements SpawnBackend {
           testsPassed: false,
           coverage: 0,
           selfAssessment: 'NO_GO',
-          notes: `Worker exited (code=${exitCode}) without writing result. Host-side fallback.`,
+          notes: `Worker exited (code=${exitCode}${signalInfo}) without writing result. Host-side fallback.`,
           exitCode,
+          tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider: 'claude', model },
         });
         try {
           writeFileSync(resultPath, hostFallbackResult, 'utf-8');

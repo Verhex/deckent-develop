@@ -1,0 +1,22 @@
+{
+  "id": "slack-notifier",
+  "source": "hub",
+  "name": "Slack Notifier",
+  "version": "1.0.0",
+  "description": "Slack webhook and Web API notifications with Block Kit support",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [{ "when": { "domains": { "$contains": "slack" } }, "score": 8 }],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "messaging",
+  "triggers": ["slack", "webhook", "notify", "channel", "message", "block-kit"],
+  "stackDetection": { "files": [], "dependencies": ["@slack/web-api"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}

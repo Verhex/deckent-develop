@@ -1,0 +1,26 @@
+{
+  "id": "spotify-control",
+  "source": "hub",
+  "name": "Spotify Control",
+  "version": "1.0.0",
+  "description": "Spotify Web API integration — playback control, search, playlist management, device transfer",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      { "when": { "domains": { "$contains": "spotify" } }, "score": 8 },
+      { "when": { "domains": { "$contains": "music" } }, "score": 6 },
+      { "when": { "domains": { "$contains": "playback" } }, "score": 7 }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "integration",
+  "triggers": ["spotify", "music", "playback", "track", "playlist", "player"],
+  "stackDetection": { "files": [], "dependencies": ["spotify-web-api-node"], "commands": [] },
+  "composableWith": ["typescript-expert", "api-builder"],
+  "priority": 10,
+  "promptInjection": { "position": "prepend", "maxTokens": 1500 },
+  "enabled": true,
+  "stats": { "totalUses": 0, "successCount": 0, "successRate": 0, "avgCoverage": 0, "lastUsedInSprint": null }
+}
