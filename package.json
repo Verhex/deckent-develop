@@ -72,6 +72,9 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "optionalDependencies": {
     "discord.js": "^14.26.3"
   },

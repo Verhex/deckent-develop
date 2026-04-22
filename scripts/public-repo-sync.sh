@@ -3,7 +3,7 @@
 # public-repo-sync.sh — deckent-dev → VerhexIO/deckent sync helper
 # =============================================================================
 # Bu script Alperen'in Sprint 151'deki public repo flip işlemini kolaylaştırır.
-# Sprint 150'de ÇALIŞTIRILMAZ — sadece hazırlık amaçlı.
+# Sprint 151 Beta GA Cutover — v1.0.0-beta.1 public launch
 #
 # Önkoşul: T-150-037 tamamlanmış olmalı (.deckent/docs.json gitignore'a eklenmiş)
 #
@@ -12,6 +12,8 @@
 #   bash scripts/public-repo-sync.sh --dry-run   # Simülasyon (hiçbir şey kopyalamaz)
 #
 # Gereksinim: rsync, git
+# Sprint 151 güncelleme: COMPETITIVE-ANALYSIS.md exclude, .codex/.gemini exclude,
+#   .test-e2e-* exclude, .secrets.baseline exclude eklendi (T-151-002)
 # =============================================================================
 
 set -euo pipefail
@@ -117,9 +119,12 @@ RSYNC_EXCLUDES=(
   "--exclude=CLAUDE.md"
   "--exclude=BETA-TRACKER.md"
   "--exclude=BETA-TRACKER-TR.md"
+  "--exclude=COMPETITIVE-ANALYSIS.md"  # İç strateji belgesi — T-151-002 kararı
 
-  # Claude Code internal
+  # Claude Code & AI provider internals
   "--exclude=.claude/"
+  "--exclude=.codex/"
+  "--exclude=.gemini/"
 
   # Build artifacts
   "--exclude=node_modules/"
@@ -136,6 +141,10 @@ RSYNC_EXCLUDES=(
   "--exclude=*.pem"
   "--exclude=*.key"
   "--exclude=credentials.json"
+  "--exclude=.secrets.baseline"  # detect-secrets baseline — internal tooling
+
+  # Ephemeral test directories
+  "--exclude=.test-e2e-*"
 
   # Git internals
   "--exclude=.git/"
@@ -179,7 +188,7 @@ if [ -d "$TARGET_REPO" ]; then
     else
       echo "📝 Değişiklikler commit ediliyor..."
       git add -A
-      git commit -m "sync: Sprint 150 beta GA prep (public-repo-sync.sh)"
+      git commit -m "feat: Deckent v1.0.0-beta.1 public launch"
       echo "✅ Commit tamamlandı"
     fi
 

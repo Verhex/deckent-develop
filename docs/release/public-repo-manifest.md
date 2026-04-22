@@ -59,6 +59,11 @@ Bu belge, `deckent-dev` (private geliştirme reposu) ile `VerhexIO/deckent` (pub
 | `.locks/` | Dosya kilitleri — worker coordination (iç kullanım). |
 | `docs/audits/` | İç denetim raporları — sprint-bazlı kod kalitesi analizleri (yönetim iç kullanımı). |
 | `.env` | Ortam değişkenleri — asla repoya girmez. |
+| `COMPETITIVE-ANALYSIS.md` | İç strateji belgesi — fiyatlandırma + rakip analiz. T-151-002 kararı: exclude. |
+| `.codex/` | OpenAI Codex provider internal config — iç kullanım. |
+| `.gemini/` | Google Gemini provider internal config — iç kullanım. |
+| `.secrets.baseline` | detect-secrets tool baseline — internal security tooling. |
+| `.test-e2e-*` | E2E test geçici dizinleri — ephemeral sprint artifacts. |
 
 ---
 
@@ -74,7 +79,7 @@ Sprint 149'da oluşturulan skill registry dizini public repoya gider. Bu, toplul
 Public vizyon belgeleri — public repoya dahil edilir.
 
 ### `COMPETITIVE-ANALYSIS.md`
-Rakip analizi — iç strateji belgesi olarak değerlendirilebilir. **Sprint 150'de Alperen karar verecek** (bu manifestte belirsiz).
+Rakip analizi — **iç strateji belgesi olarak hariç tutulur** (T-151-002 kararı). Fiyatlandırma stratejisi ve rakip zayıf noktaları gibi hassas bilgiler içerir; public repoda görünmemeli.
 
 ---
 
@@ -129,4 +134,4 @@ Alperen Sprint 151'de şu adımları izler:
 | Oluşturulma | Sprint 149 (2026-04-20) |
 | Hedef release | v1.0.0-beta.1 |
 | Sprint flip tarihi | Sprint 151 — Per 24-25 Nis 2026 TRT |
-| Son güncelleme | Sprint 150 T-150-027 |
+| Son güncelleme | Sprint 151 T-151-002 (COMPETITIVE-ANALYSIS.md + .codex/.gemini + .test-e2e-* exclude eklendi) |

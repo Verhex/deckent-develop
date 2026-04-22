@@ -2,7 +2,33 @@
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
 
-## Latest: v0.4.0-beta.4 (2026-04-21)
+## Latest: v1.0.0-beta.1 (2026-04-22) — Beta GA Launch
+
+### Sprint 150 + 150A Hot Fix — Beta GA Cutover
+
+#### Added
+- `deckent_style` Config Key — 3-Layer Integration (`task` / `sprint` / `hybrid`)
+- `deckent mode` CLI Command — runtime mode switching
+- Sprint Controller Mode-Aware Routing
+- Nervous System Mode-Aware Detectors
+- DECKENT→USER:NOTIFY dispatcher + 5 lifecycle hooks (H6 canlı)
+- Discord + Telegram Connectors (`src/connectors/`)
+- `publishConfig.access: "public"` — npm publish ready
+
+#### Fixed
+- Docker Worker Exit Pattern Final Fix (Sprint 146+148 3-sprint debt)
+- Auditor Stale Alert Race Condition Fix (Sprint 148 debt)
+- Sprint-Prefixed Dosya Retention — FINAL (Alperen onaylı 2026-04-21)
+- Managed-Docs Cache Git Tracking Fix + Metadata Annotation
+
+#### Changed
+- Dockerfile USER non-root (security hardening)
+- `.deck` Config Interpolation (`$DECK:KEY` syntax)
+- npm pack tarball 1.2 MB (< 2 MB, 0 gizli dosya)
+
+---
+
+## [0.4.0-beta.4] — 2026-04-21 (Sprint 148)
 
 ### Sprint 148 — Agent Taxonomy Reform + Nervous Dogfood Activation + Cross-Platform Validation
 
