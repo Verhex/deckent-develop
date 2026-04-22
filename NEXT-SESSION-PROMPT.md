@@ -1,170 +1,253 @@
-# Sprint 151 Handoff — Yeni Session Başlangıç Prompt'u
+# Sprint 152 Handoff — Yeni Sistem İlk Açılış Prompt'u
 
-**Oluşturuldu:** 2026-04-22 (Sprint 150 kapanış + Hot Fix + git commit session sonrası)
-**Önceki session süresi:** ~5 saat (Sprint 150 retro + Hot Fix H1..H7 + 7 commit + DIRECTIVES yazımı)
-**Önceki session token:** ~1.2M (subagent'lar + koordinatör)
+**Oluşturuldu:** 2026-04-22 10:45 TRT (Sprint 151 kapanış + sistem taşıma kararı sonrası)
+**Önceki session:** Sprint 151 başlatma → tamamlama → migration playbook (~5 saat)
+**Sistem geçişi:** Eski WSL2 → Yeni sistem (2026-04-23 yarın)
+**Ana referans:** `SYSTEM-MIGRATION-2026-04-22.md` (proje kökünde, 9 bölüm, kapsamlı)
+
+---
+
+## ⚠️ ÖNCELİK SIRASI — BU DOSYAYI OKUYAN İLK İŞ
+
+**Eğer yeni sistemdeyim:** Önce `SYSTEM-MIGRATION-2026-04-22.md` Bölüm 4 checklist'in tamamlandığından emin ol.
+
+**Eğer eski sistemdeyim ve "yeni session"ım:** Bu dosyayı oku, sonra durum özetini iste.
 
 ---
 
 ## Kimlik ve Ortam
 
 - **Proje:** Deckent (AI agent orchestration CLI, TypeScript ESM)
-- **Working directory:** `/home/alperen/deckent-dev`
-- **Branch:** `master` — 7 yeni commit var (son: `9c054a6 chore(sprint-150): 37/41 task output + retention artifacts + Hot Fix bundle`)
+- **Working directory:** `/home/alperen/deckent-dev` (eski) — yeni sistemde aynı path önerilir
+- **Branch:** `master`
 - **Remote:** `https://github.com/VerhexIO/deckent-dev.git` (private)
-- **Sürüm:** 1.0.0-beta.1
+- **Sürüm:** 1.0.0-beta.1 (npm publish bekliyor — Alperen elle)
 - **User:** Alperen — Türkçe yanıt zorunlu, UTC+3 TRT sunum
-- **Platform:** WSL2
-
-## Push Durumu (ÖNCE KONTROL ET)
-
-Önceki session'da `git push origin master` **auth fail** verdi (GitHub HTTPS password deprecated). Alperen elle push atacak mi yoksa sende auth kurulu mu kontrol et:
-
-```bash
-git log --oneline origin/master..HEAD 2>/dev/null | wc -l
-# 0 → push atılmış, temiz
-# >0 → push atılmamış, Alperen'e sor: "! git push origin master" veya "gh auth login + git push"
-```
-
-## Durum Özeti — Sprint 150 + Hot Fix Bitti
-
-### Sprint 150 (2026-04-20/21, re-run) — DONE
-
-- **37/41 task DONE** (%90), **4 NO_GO** (verification-blind pattern), **1h 20m**
-- tsc PASS, vitest delta 5 fail (ama Hot Fix sonrası baseline **%99.94**)
-- **13 meta-dogfood kanıt** (Sprint 148 rekoru 6'nın 2.2x'i)
-- Block A/B/C/D/E/F/G hepsi uygulandı, **Beta GA Exit Gate 17/20 açıldı**
-
-### Sprint 150A Hot Fix (2026-04-21, ~68dk)
-
-Deckent kırıkken Deckent'le Deckent'i tamir sonsuz döngü riskinden kaçınmak için **Claude Code subagent'lar** ile cerrahi müdahale:
-
-| Hot Fix | Sonuç |
-|---------|-------|
-| H1 CLI `skill publish` duplicate | 49 CLI komut geri geldi |
-| H2 Vitest triage | **103 → 9 fail** (%99.94 pass, Gate #2 aşıldı) |
-| H3 Config sadeleştirme | Flat providers silindi + retention/rotation config eklendi |
-| H4 Retention runtime wire | 17 sprint → 10 sprint archive, 29KB freed |
-| H5 Rotation runtime wire | metrics.jsonl 268KB → 0, 15x gzip |
-| H6 DECKENT→USER:NOTIFY wire + Nervous bridge | **12 sprint ölü kanal canlandı** — `ℹ️ [deckent] Task H6 DONE` Alperen terminal'inde göründü |
-| H7 Rebuild + MCP restart + canlı test | Build PASS, vitest %99.94, 3 yeni MCP tool canlı (audit/feature_query/recover) |
-
-### 7 Commit Atıldı (local master'da)
-
-```
-9c054a6 chore(sprint-150): 37/41 task output + retention artifacts + Hot Fix bundle
-85e0705 feat(notify): wire DECKENT→USER:NOTIFY dispatcher + 5 lifecycle hooks + nervous bridge (H6)
-668a495 feat(retention+rotation): wire sprint-file-retention + observability to CLEANUP phase (H4+H5)
-ff4f678 refactor(config): remove duplicate keys + add retention/rotation/capacity (T-150-034 + H3)
-d1247e5 test(suite): Sprint 150 + Hot Fix test suite update (104→9 fail, %99.94 pass)
-d11244c fix(cli): resolve skill publish duplicate command registration
-2c146d5 docs(sprint-150): roadmap güncelle + DIRECTIVES 151 template + retro kapanış
-```
-
-## Sprint 151 — Beta GA Cutover HAZIR
-
-**Hedef:** Çarşamba 22 Nis TRT Beta GA cutover + Show HN launch
-**Task sayısı:** 15 (8 roadmap Beta GA + 7 P0 residual debt)
-**Hard cap:** 8h
-**Cost cap:** $100
-
-### Paket 1 — Beta GA Cutover (8 task)
-
-1. T-151-001 npm publish v1.0.0-beta.1
-2. T-151-002 Public repo flip (VerhexIO/deckent)
-3. T-151-003 Dashboard ChatPage.tsx
-4. T-151-004 Discord Bot Deploy + Smoke
-5. T-151-005 Telegram Bot Deploy + Smoke
-6. T-151-006 Show HN + Reddit + Twitter hazırlık
-7. T-151-007 Discord Server Launch
-8. T-151-008 Dev.to + Hashnode Blog Post
-
-### Paket 2 — P0 Residual Debt (7 task)
-
-9. T-151-009 (T-NEW-A) DECKENT→USER:NOTIFY E2E Test + Nervous Bridge Delivery
-10. T-151-010 (T-NEW-B) CLI buildProgram Smoke Test Harness
-11. T-151-011 (T-NEW-C) 49 CLI Komut Tam Envanter + Smoke
-12. T-151-012 (T-NEW-D) Brain Evaluator 5-in-1 Fix (verification-blind + schema + FIX context + global build race + scope heuristic)
-13. T-151-013 (T-NEW-E) Vitest 9 Residual Fail Fix (→ ≤ 2)
-14. T-151-014 (T-NEW-F) Docker HB + Vitest Timeout Nihai Fix (3-sprint debt final)
-15. T-151-015 (T-NEW-G) Nervous System 6-10 Detector Activation (5 yeni)
-
-**DIRECTIVES.md** zaten yazıldı (~440 satır, kompakt format). Session açılır açılmaz oradan okunmalı.
-
-## Okunacak Dosyalar (Session Başında Zorunlu)
-
-1. **`DIRECTIVES.md`** — Sprint 151 kanonik 15 task planı (440 satır)
-2. **`docs/ROADMAP-GOD-LEVEL.md`** — Master roadmap, 2026-04-21 güncellenmiş kapanış bölümü + 20 gate tablosu + taşınan debt
-3. **Memory dosyaları** (`/home/alperen/.claude/projects/-home-alperen-deckent-dev/memory/`):
-   - `project_sprint151_preflight_p0_bugs.md` — Sprint 151 P0 bug detayları (Hot Fix'ten taşınan)
-   - `feedback_two_persona_analysis.md` — TARTIŞMASIZ her analiz iki persona lensi
-   - `feedback_max_workers.md` V2 — WSL2 dev 3-4 / prod 50+ kuralı
-   - `feedback_deckent_kill_approval_required.md` — destructive komut onay zorunlu
-   - `feedback_timezone_trt.md` — UTC+3 TRT sunum
-   - `feedback_openclaw_not_openhands.md` — rakip OpenClaw (346K star)
-   - `feedback_test_agent_removal.md` — test-writer agent YASAK (ADR-041)
-   - `project_release_strategy.md` — çift repo, gizli dosya listesi
-4. **`.brain/exports/summary.md`** — 42 ADR registry (ADR-041 accepted, ADR-042 proposed, Sprint 151'de ADR-042 accept potansiyeli)
-
-## Sprint 151 Başlangıç Checklist
-
-1. **Pre-flight:**
-   - `git log origin/master..HEAD --oneline | wc -l` → 0 (push atılmış ise)
-   - `deckent_doctor` → 90+/100 bekleniyor
-   - `deckent_status` → Sprint 150 COMPLETE, aktif sprint yok
-   - `git status --porcelain` → clean (0 satır)
-
-2. **MCP sağlığı:**
-   - `deckent_feature_query category=active` → 16 active feature (T-150-029 runtime)
-   - `deckent_audit sprintId=sprint-150` → 2026-04-21'de GATE_FAILURE döndü (vitest delta 5 — Hot Fix sonrası düşmüş olmalı)
-
-3. **`deckent_plan mode: 'structured'`** MCP çağır → 15 task JSON üretmeli
-
-4. **Plan review:**
-   - T-151-001..008 roadmap task'ları (düzgün plan'lanmalı)
-   - T-151-009..015 P0 debt (complex scope)
-   - Wave sayısı 5 beklenir (3 task × 5 wave = 15)
-
-5. **`deckent_start`** Alperen açık onayı ile
-
-6. **Sprint canlı boyunca:**
-   - `src/` müdahale YASAK
-   - `test-writer` agent assignment 0 olmalı
-   - `deckent_kill` Alperen onayı zorunlu
-   - **Nervous system notification Alperen terminal'ine düşecek** (`ℹ️/⚠️/🚨 [deckent] ...`) — bu sprint'te canlı kanıt
-
-## Alperen'in Tercihleri (Memory'den)
-
-- **Dil:** Türkçe yanıt, tam ortografi (é/ü/ö/ı/ş/ç diakritik)
-- **Saat:** UTC+3 TRT sunum (`feedback_timezone_trt`)
-- **Rakip:** OpenClaw (346K star, NOT OpenHands) — `feedback_openclaw_not_openhands`
-- **test-writer:** YASAK (ADR-041) — `feedback_test_agent_removal`
-- **Opus ağırlık:** Sprintlerde opus-heavy, cost endişesi yok (Max subscription)
-- **Commit stratejisi:** Mantıksal 6-7 commit (Sprint 150A'da 7 commit atıldı)
-- **deckent_kill:** Açık onay zorunlu
-
-## İlk Komut — Yeni Session Açılışı
-
-Session açılır açılmaz:
-
-1. **Git push durumu kontrol et** (yukarıdaki komut)
-2. **Alperen'e sor:** "Sprint 151 Beta GA Cutover'a başlayalım mı? DIRECTIVES 15 task hazır, `deckent_plan mode: 'structured'` ile başlatabilirim. Yoksa önce git push gerekiyorsa `! git push origin master` ile halletmeni bekleyebilirim."
-
-## Fallback
-
-Eğer Sprint 150 commit'leri push edilmemişse ve auth'ta sorun devam ediyorsa:
-- `gh auth status` kontrol et (GitHub CLI login var mı)
-- `gh auth login` ile PAT setup (Alperen)
-- Veya SSH remote'a geç: `git remote set-url origin git@github.com:VerhexIO/deckent-dev.git`
+- **Platform:** Linux (WSL2 → yeni sistem hâlâ Linux)
 
 ---
 
-**Oluşturan:** Koordinatör (2026-04-22 session 1 sonu)
-**Restore:** Sprint 150 + Hot Fix + 7 commit + Sprint 151 DIRECTIVES 15 task hazır
-**Hazır dosyalar:**
-- `DIRECTIVES.md` 440 satır, 15 task
-- `docs/ROADMAP-GOD-LEVEL.md` 2026-04-21 güncellendi
-- Memory güncel (`project_sprint151_preflight_p0_bugs.md`)
-- Git local master 7 commit önde (push beklemesi varsa)
+## Sistem Taşıma Durumu (KRİTİK — İlk Kontrol)
 
-**İlk komut (yeni session):** Yukarıda "İlk Komut" bölümüne bak.
+```bash
+# Yeni sistemde Sprint 152 başlatmadan önce kontrol et:
+
+# 1. Migration playbook mevcut mu?
+ls -la SYSTEM-MIGRATION-2026-04-22.md
+
+# 2. Memory V2 DB taşındı mı?
+sqlite3 .brain/memory.db "SELECT COUNT(*) FROM entries;"
+# Beklenen: 174+ (Sprint 151 sonrası)
+
+# 3. Auto-memory dosyaları taşındı mı?
+ls ~/.claude/projects/-home-alperen-deckent-dev/memory/ | wc -l
+# Beklenen: 82+ (en kritik dosyalar:
+#   - feedback_npm_publish_alperen_approval.md (2026-04-22 yeni)
+#   - feedback_two_persona_analysis.md
+#   - feedback_deckent_kill_approval_required.md
+#   - feedback_test_agent_removal.md
+#   - feedback_max_workers.md
+#   - feedback_timezone_trt.md
+#   - feedback_openclaw_not_openhands.md
+#   - project_sprint151_preflight_p0_bugs.md
+#   - MEMORY.md (indeks))
+
+# 4. Build sağlam mı?
+npx tsc --noEmit
+# Beklenen: 0 error
+
+# 5. MCP server register mi?
+claude mcp list
+# Beklenen: deckent görünmeli, yoksa: claude mcp add deckent -- npx deckent mcp
+
+# 6. GitHub auth çalışıyor mu?
+gh auth status
+git push origin master --dry-run
+# Beklenen: ✓ Logged in + "Everything up-to-date"
+
+# 7. Sprint 151 push edildi mi?
+git log origin/master..HEAD --oneline | wc -l
+# Beklenen: 0 (eski sistemde push yapılmış olmalı)
+```
+
+**Yukarıdaki 7 kontrolden HERHANGİ BİRİ FAIL ise:** `SYSTEM-MIGRATION-2026-04-22.md` Bölüm 4 ve 6'ya geri dön, eksik adımı tamamla.
+
+---
+
+## Sprint 151 Kapanış Özeti — Yeni Sistemde Bilmen Gerekenler
+
+### Resmi Sonuç
+
+| Metrik | Değer |
+|--------|-------|
+| **Karar** | GO_WITH_GATE_FAILURE (vitest 1 fail) |
+| **Tamamlanan** | 17/17 task (15 original + 2 fix recovery) |
+| **Süre** | 56 dakika 2 saniye |
+| **NO_GO rate** | **%0** (Sprint 138'den beri ilk %100 başarı) |
+| **Code changes** | +4566/-42, 15 yeni test dosyası |
+| **Token total** | 1.2M (494K cache, %43 cost saving) |
+| **Beta GA Exit Gate** | 17/20 → **19/20** (T-151-009 + T-151-014 açıldı) |
+
+### Task Skor Tablosu (Hepsi DONE veya TD)
+
+| Task | Sonuç | Quality | Not |
+|------|------|---------|-----|
+| 151-001 npm publish hazırlık | DONE | 75 | Worker disipline uydu, publish YASAK kuralı |
+| 151-002 Public repo flip hazırlık | TD | 60 | clone yok (Alperen elle), handoff hazır |
+| 151-003 Dashboard ChatPage | DONE | **100** | 471/471 test, full i18n |
+| 151-004 Discord bot deploy | TD | 60 | Token yok (Alperen elle), --check çalıştı |
+| 151-005 Telegram bot deploy | DONE | 75 | BotFather setup |
+| 151-006 Show HN/Reddit/Twitter | DONE | 75 | 3 platform, ayrı ton |
+| 151-007 Discord server setup | DONE | 75 | CONDUCT.md + 7 kanal |
+| 151-008 Dev.to + Hashnode blog | DONE | 75 | 1375+1695 word |
+| 151-009 Notify E2E test | DONE | 75 | 22/22 PASS, 420 LoC |
+| 151-010 CLI buildProgram smoke | DONE | 75 | 5 test, "49→45 actual" düzeltti |
+| 151-011 49 CLI envanter | DONE | 75 | 104 endpoint, MCP %49 parity keşfi |
+| 151-012 Brain Evaluator 5-in-1 | DONE | **99** | 35 yeni test, 4053 PASS |
+| 151-013 Vitest residual (orig) | NO_GO→DONE (fix) | 20→100 | TIMEOUT, fix worker zaten PASS olduğunu gördü |
+| 151-014 Docker HB final (orig) | NO_GO→DONE (fix) | 20→95 | TIMEOUT, fix worker 6-katman fix yerinde gördü, 66/66 test PASS |
+| 151-015 Nervous detector 6-10 | TD | 66 | 6→11 detector, 224/224 PASS |
+
+### 🏆 Sprint 151 En Önemli 3 Kazanım
+
+1. **`feedback_npm_publish_alperen_approval` ilk dogfood'da çalıştı** (T-151-001) — yeni memory kuralı production-ready
+2. **Brain Evaluator 5-in-1 fix DONE** (T-151-012) — Sprint 152'de aktif olduğunda Sprint 150'nin 4 NO_GO verification-blind pattern kapanır
+3. **NO_GO rate %0 + FIX phase canlı kanıt** — Brain `max_fix_retries: 2` config'i 2 NO_GO için 2 FIX worker spawn etti, ikisi de DONE
+
+---
+
+## Sprint 152 Hazırlık — P0 + P1 Carry-Over Listesi
+
+Sprint 151'den taşınan ve **Sprint 152'de mutlaka ele alınacak** debt'ler:
+
+### P0 (Beta GA Blocker)
+
+| ID | Konu | Detay |
+|----|------|-------|
+| **P0-1** | **Notify Dispatcher Background Subprocess Wire Fix** | **CANLI BULGU 2026-04-22:** notify dispatcher MCP server initialize ediyor ama `deckent_start` background subprocess'te singleton state taşınmıyor. `DECKENT_PARENT_PID` env var spawn'a inject edilmiyor → CLI parent-TTY adapter `isAvailable: false` → 0 user notification. Fix: singleton init'i deckent worker entry point'inde de yap + env var inject. T-151-009 test framework'ü hazır (22/22 PASS regression guard). Beta GA UX gap. |
+| **P0-2** | Vitest 1 residual fail | Sprint 151 GATE_FAILURE sebebi. Kaynak: muhtemelen `tests/docs/jsdoc.test.ts` (validateResultSchema JSDoc eksik) veya `tests/e2e/docker-backend.test.ts` (fsyncSync expect). Tek test, hızlı fix. |
+| **P0-3** | Worker timeout root cause | T-151-013 + T-151-014 ikisi de **"Claude CLI session issue"** ile timeout (T-151-014-fix worker'ın notu). Sprint 152 worker spawn'da Claude CLI subprocess hang detection + auto-restart gerekli. |
+| **P0-4** | Beta GA 20/20 — Alperen elle | T-151-001 + T-151-002 handoff hazır. Yeni sistemde: `npm publish --access public --tag beta` + `git clone deckent-public + sync + push + UI flip`. |
+
+### P1
+
+| ID | Konu | Detay |
+|----|------|-------|
+| **P1-1** | MCP/CLI parity reform | T-151-011 keşfi: 45 CLI komut, sadece 22 MCP'de (=%49 parity). ADR-022-V2 spec'i geride. |
+| **P1-2** | Event stream Wave 2+ event'leri kaçırıyor | Sprint 151 event log 22 satırda durdu (15 task için ≥75 event beklenirdi). Observability gap. |
+| **P1-3** | Status reader robustness | `Invalid count value: -70` hatası mid-sprint görüldü. EVALUATE→RETRO geçişinde reader race. |
+
+### P2 (Runtime Doğrulama)
+
+| ID | Konu |
+|----|------|
+| **P2-1** | Brain Evaluator 5-in-1 runtime canlı doğrulama (T-151-012 build sonrası dogfood) |
+| **P2-2** | Nervous detector 6-10 runtime canlı (T-151-015) |
+
+### Tema Önerisi
+
+> **Sprint 152: "Beta GA Final Polish + Notify Dispatcher Runtime Fix + Sprint 151 Carry-Over"**
+>
+> Tahmini 10-12 task, 4-6 saat hard cap, opus-heavy
+
+---
+
+## Beta GA Cutover — Alperen Elle 3 Adım (Sprint 152 Öncesi VEYA Sırasında)
+
+```bash
+# 1. npm publish — handoff: docs/release/npm-publish-handoff.md
+npm whoami   # Login değilse: npm login
+npm publish --access public --tag beta
+npm info deckent@1.0.0-beta.1 version
+
+# 2. Public repo flip — handoff: docs/release/public-repo-flip-handoff.md
+cd ~
+# deckent-public repo henüz yok, GitHub UI'dan create
+git clone https://github.com/VerhexIO/deckent.git deckent-public
+cd ~/deckent-dev
+bash scripts/public-repo-sync.sh
+cd ~/deckent-public
+git push origin master
+# GitHub UI: VerhexIO/deckent → Settings → Danger Zone → Public
+
+# 3. Doğrulama
+curl -s https://api.github.com/repos/VerhexIO/deckent | jq '.private'   # → false
+```
+
+**Tamamlanırsa:** Beta GA 20/20 GATE AÇIK → Show HN/Reddit/Twitter launch hazır (T-151-006/007/008 draftları docs/launch/).
+
+---
+
+## Memory + Brain Önemli Referanslar
+
+### Tartışmasız Kurallar (her sprint geçerli)
+
+1. **`feedback_npm_publish_alperen_approval`** — Worker asla `npm publish` çalıştıramaz
+2. **`feedback_deckent_kill_approval_required`** — `deckent_kill` / cleanup / docker stop Alperen onayı zorunlu
+3. **`feedback_two_persona_analysis`** — Her analiz dev + prod milyon user lensi
+4. **`feedback_test_agent_removal`** — test-writer agent YASAK (ADR-041)
+5. **`feedback_timezone_trt`** — UTC+3 TRT sunum
+6. **`feedback_openclaw_not_openhands`** — Rakip OpenClaw (NOT OpenHands)
+7. **`feedback_max_workers`** V2 — WSL2 dev 3-4 worker / prod 50+ özgür
+
+### Aktif ADR'lar
+
+42 ADR (`.brain/exports/summary.md`):
+- ADR-001..010: Temel (TS, ESM, vitest, config, security)
+- ADR-022-V2: CLI/MCP parity (Sprint 152'de revizyon)
+- ADR-035: Verification protocol
+- ADR-037: RBAC authority matrix
+- ADR-040: Nervous System
+- ADR-041: Agent taxonomy (test-writer YASAK)
+- ADR-042: Hybrid mode (proposed → Sprint 152'de accept potansiyeli)
+
+### Aktif Memory V2
+
+- DB: `.brain/memory.db` (174+ entry)
+- Search: `deckent_memory_query` MCP tool
+- Export: `.brain/exports/{summary,decisions,memory,debt}.md`
+- Dual-layer i18n FTS5 (TR/EN/DE %100)
+
+---
+
+## İlk Komut — Yeni Session Açılışı
+
+Yeni sistemde Claude Code açıldığında:
+
+```
+/cwd ~/deckent-dev
+SYSTEM-MIGRATION-2026-04-22.md ve NEXT-SESSION-PROMPT.md oku.
+Sonra Bölüm 4 checklist sonuçlarını paylaşacağım, tüm yeşil ise Sprint 152'ye geçelim.
+```
+
+Veya direkt:
+
+```
+"Yeni sistemde restore tamamlandı.
+SYSTEM-MIGRATION-2026-04-22.md Bölüm 4: tüm yeşil.
+Sprint 152 'Beta GA Final Polish + Notify Dispatcher Wire Fix'
+DIRECTIVES yazımına geçelim mi?"
+```
+
+---
+
+## Fallback — Yeni Sistemde Sorun Çıkarsa
+
+| Sorun | Çözüm |
+|-------|-------|
+| Memory.db corrupt | `sqlite3 .brain/memory.db "PRAGMA integrity_check;"` → CORRUPT ise eski sistemden tekrar rsync |
+| ~/.claude/memory eksik | Eski sistemden rsync (en kritik 82 dosya) |
+| GitHub auth fail | `gh auth login -h github.com -s repo,workflow -w` |
+| MCP register yok | `claude mcp add deckent -- npx deckent mcp` |
+| TypeScript build error | `rm -rf node_modules && npm install && npx tsc` |
+| Docker image yok | `docker build -t deckent-worker:latest -f Dockerfile .` |
+| Sprint 151 commit yok (push edilmemiş) | Eski sistem hâlâ açıksa: oradan push, yoksa yeni sistemde commit ceremony (`SYSTEM-MIGRATION` Bölüm 5) |
+
+---
+
+**Hazırlayan:** Koordinatör (Sprint 151 + sistem taşıma kararı sonrası)
+**Önceki sprint:** Sprint 151 GO_WITH_GATE_FAILURE 17/17 (%100) 56dk %0 NO_GO
+**Bekleyen:** Sistem taşıma + Sprint 152 başlatma (yarın yeni sistemden)
+**Migration master doc:** `SYSTEM-MIGRATION-2026-04-22.md` (proje kökü, 9 bölüm)
+
+🌃 **Bugünlük iş bitti. Yarın yeni sistemde devam.**
