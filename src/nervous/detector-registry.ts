@@ -1,10 +1,10 @@
 // src/nervous/detector-registry.ts
 //
-// DetectorRegistry — 5 nervous system detector'ını yönetir ve çalıştırır.
+// DetectorRegistry — 11 nervous system detector'ını yönetir ve çalıştırır.
 // Config'e göre hangi detector'ların aktif olduğunu belirler, runAll() ile
 // tümünü çağırır, tek bir detector'ın başarısız olması diğerlerini etkilemez.
 //
-// Sprint 148 Task 8.
+// Sprint 148 Task 8 (6 detector) + Sprint 151 Task 15 (5 yeni detector).
 
 import type { DetectorContext, DetectorResult } from '../core/nervous-types.js';
 import { StaleWorkerDetector } from './detectors/stale-worker.js';
@@ -13,6 +13,11 @@ import { DebtTrendAnalyzer } from './detectors/debt-trend.js';
 import { AgentRoutingHealth } from './detectors/agent-routing.js';
 import { DirectivesMidSprintProtection } from './detectors/directives-protection.js';
 import { TaskModeIdleDetector } from './detectors/task-mode-idle.js';
+import { BuildFailureRecurrenceDetector } from './detectors/build-failure-recurrence.js';
+import { TokenSpikeDetector } from './detectors/token-spike.js';
+import { AgentRoutingAnomalyDetector } from './detectors/agent-routing-anomaly.js';
+import { ScopeCollisionRateDetector } from './detectors/scope-collision-rate.js';
+import { NotificationDeliveryHealthDetector } from './detectors/notification-delivery-health.js';
 
 // ─── Config Types ─────────────────────────────────────────────────────────────
 
@@ -40,6 +45,26 @@ export interface DetectorConfig {
     readonly enabled: boolean;
     readonly idle_threshold_ms?: number;
     readonly deckent_style?: 'sprint' | 'task';
+  };
+  readonly build_failure_recurrence?: {
+    readonly enabled: boolean;
+    readonly recurrence_threshold?: number;
+  };
+  readonly token_spike?: {
+    readonly enabled: boolean;
+    readonly cost_threshold?: number;
+  };
+  readonly agent_routing_anomaly?: {
+    readonly enabled: boolean;
+    readonly anomaly_threshold?: number;
+  };
+  readonly scope_collision_rate?: {
+    readonly enabled: boolean;
+    readonly collision_threshold?: number;
+  };
+  readonly notification_delivery_health?: {
+    readonly enabled: boolean;
+    readonly failure_rate_threshold?: number;
   };
 }
 
@@ -95,6 +120,39 @@ export class DetectorRegistry {
         new TaskModeIdleDetector(
           config.task_mode_idle.deckent_style ?? 'sprint',
           config.task_mode_idle.idle_threshold_ms,
+        ),
+      );
+    }
+    if (config.build_failure_recurrence?.enabled) {
+      this.active.push(
+        new BuildFailureRecurrenceDetector(
+          config.build_failure_recurrence.recurrence_threshold,
+        ),
+      );
+    }
+    if (config.token_spike?.enabled) {
+      this.active.push(
+        new TokenSpikeDetector(config.token_spike.cost_threshold),
+      );
+    }
+    if (config.agent_routing_anomaly?.enabled) {
+      this.active.push(
+        new AgentRoutingAnomalyDetector(
+          config.agent_routing_anomaly.anomaly_threshold,
+        ),
+      );
+    }
+    if (config.scope_collision_rate?.enabled) {
+      this.active.push(
+        new ScopeCollisionRateDetector(
+          config.scope_collision_rate.collision_threshold,
+        ),
+      );
+    }
+    if (config.notification_delivery_health?.enabled) {
+      this.active.push(
+        new NotificationDeliveryHealthDetector(
+          config.notification_delivery_health.failure_rate_threshold,
         ),
       );
     }
